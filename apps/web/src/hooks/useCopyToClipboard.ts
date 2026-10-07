@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import * as React from "react";
 import * as Schema from "effect/Schema";
 import {
@@ -12,7 +13,7 @@ export class ClipboardApiUnavailableError extends Schema.TaggedError<ClipboardAp
   },
 ) {
   override get message(): string {
-    return `Clipboard API is unavailable while copying ${this.target}.`;
+    return t.common.clipboard.copyUnavailableError(this.target);
   }
 }
 
@@ -24,7 +25,7 @@ export class ClipboardWriteError extends Schema.TaggedError<ClipboardWriteError>
   },
 ) {
   override get message(): string {
-    return `Failed to copy ${this.target} to the clipboard.`;
+    return t.common.clipboard.copyError(this.target);
   }
 }
 
@@ -35,7 +36,7 @@ export class ClipboardReadUnavailableError extends Schema.TaggedError<ClipboardR
   },
 ) {
   override get message(): string {
-    return `Clipboard API is unavailable while reading ${this.target}.`;
+    return t.common.clipboard.readUnavailableError(this.target);
   }
 }
 
@@ -47,7 +48,7 @@ export class ClipboardReadError extends Schema.TaggedError<ClipboardReadError>()
   },
 ) {
   override get message(): string {
-    return `Failed to read ${this.target} from the clipboard.`;
+    return t.common.clipboard.readError(this.target);
   }
 }
 
@@ -95,9 +96,16 @@ function writeTextWithExecCommand(
   }
 }
 
+/**
+ * Copies nonempty text and optional MIME flavors, using plain text as the final fallback.
+ * @param value Text to copy; empty text returns false without writing.
+ * @param target Display name used only in errors; callers may pass a translated name.
+ * @param extraFlavors Additional MIME payloads; text/plain always uses value.
+ * @returns Whether a copy occurred; clipboard failures reject with a tagged error.
+ */
 export async function writeTextToClipboard(
   value: string,
-  target = "text",
+  target = t.common.clipboard.text,
   extraFlavors?: Readonly<Record<string, string>>,
 ) {
   if (typeof window === "undefined") {
@@ -176,7 +184,12 @@ export async function writeTextToClipboard(
   }
 }
 
-export async function readTextFromClipboard(target = "text"): Promise<string> {
+/**
+ * Reads clipboard text or rejects with a tagged availability/read error.
+ * @param target Display name used only in errors; defaults to the localized text label.
+ * @returns Clipboard text, including an empty string when the clipboard contains no text.
+ */
+export async function readTextFromClipboard(target = t.common.clipboard.text): Promise<string> {
   if (
     typeof window === "undefined" ||
     typeof navigator === "undefined" ||
@@ -197,9 +210,15 @@ export async function readTextFromClipboard(target = "text"): Promise<string> {
   }
 }
 
+/**
+ * Copies text and temporarily exposes success state; timers are cleared on unmount.
+ * Options set the reset timeout in milliseconds (zero keeps success), the error display target,
+ * callbacks receiving the supplied context, and optional MIME payloads. Defaults are 2000ms
+ * and the localized text label. Failures are logged and sent to onError when provided.
+ */
 export function useCopyToClipboard<TContext = void>({
   timeout = 2000,
-  target = "text",
+  target = t.common.clipboard.text,
   onCopy,
   onError,
   extraFlavors,
