@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { useAtomValue } from "@effect/atom-react";
 import { useId } from "react";
 
@@ -6,7 +7,7 @@ import { resolveServerBackedAppStageLabel } from "../branding.logic";
 import { primaryServerConfigAtom } from "../state/server";
 
 export type SidebarStageBackdropVariant = "nightly" | "dev";
-export type EnvironmentIdentificationPillLabel = "Dev" | "Nightly";
+export type EnvironmentIdentificationPillLabel = string;
 
 // A wide viewBox keeps the 96-unit art height at a fixed scale while sidebar resizing reveals
 // more horizontal canvas instead of zooming the scene.
@@ -27,8 +28,8 @@ export function resolveEnvironmentIdentificationPillLabel(
   stageLabel: string,
 ): EnvironmentIdentificationPillLabel | null {
   const normalized = stageLabel.trim().toLowerCase();
-  if (normalized === "dev") return "Dev";
-  if (normalized === "nightly") return "Nightly";
+  if (normalized === "dev") return t.sidebar.environment.dev;
+  if (normalized === "nightly") return t.sidebar.environment.nightly;
   return null;
 }
 

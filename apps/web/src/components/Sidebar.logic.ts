@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { resolveThreadWorkingStartedAt } from "@t3tools/client-runtime/state/models";
 import { backgroundWorkHoldsCompletion } from "@t3tools/shared/orchestrationV2PendingBackgroundWork";
 import { threadPullRequestSearchTerms } from "@t3tools/shared/threadPullRequests";
@@ -553,13 +554,13 @@ export function buildMultiSelectThreadContextMenuItems(input: {
   hasRunningThread: boolean;
 }): readonly ContextMenuItem<"mark-unread" | "archive" | "delete">[] {
   return [
-    { id: "mark-unread", label: `Mark unread (${input.count})` },
+    { id: "mark-unread", label: t.sidebar.bulk.markUnread(input.count) },
     {
       id: "archive",
-      label: `Archive (${input.count})`,
+      label: t.sidebar.bulk.archive(input.count),
       disabled: input.hasRunningThread,
     },
-    { id: "delete", label: `Delete (${input.count})`, destructive: true },
+    { id: "delete", label: t.sidebar.bulk.delete(input.count), destructive: true },
   ];
 }
 
@@ -601,13 +602,13 @@ export function buildBulkTitleRegenerationContextMenuItem(input: {
   if (input.actionableCount === 0) {
     return {
       id: "regenerate-title",
-      label: `Regenerating… (${input.supportedCount})`,
+      label: t.sidebar.bulk.regeneratingTitles(input.supportedCount),
       disabled: true,
     };
   }
   return {
     id: "regenerate-title",
-    label: `Regenerate titles (${input.actionableCount})`,
+    label: t.sidebar.bulk.regenerateTitles(input.actionableCount),
   };
 }
 
@@ -620,24 +621,18 @@ export function buildBulkUnpinContextMenuItem(input: {
   pinnedCount: number;
 }): ContextMenuItem<"unpin"> | null {
   if (input.pinnedCount === 0) return null;
-  return { id: "unpin", label: `Unpin (${input.pinnedCount})` };
+  return { id: "unpin", label: t.sidebar.bulk.unpin(input.pinnedCount) };
 }
 
 export interface ThreadStatusPill {
-  label:
-    | "Working"
-    | "Connecting"
-    | "Completed"
-    | "Pending Approval"
-    | "Awaiting Input"
-    | "Waiting"
-    | "Plan Ready";
+  label: string;
   colorClass: string;
   dotClass: string;
   pulse: boolean;
 }
 
-const THREAD_STATUS_PRIORITY: Record<ThreadStatusPill["label"], number> = {
+// Status resolution keeps stable English labels for priority comparisons.
+const THREAD_STATUS_PRIORITY: Record<string, number> = {
   "Pending Approval": 5,
   "Awaiting Input": 4,
   Working: 3,
@@ -646,6 +641,21 @@ const THREAD_STATUS_PRIORITY: Record<ThreadStatusPill["label"], number> = {
   "Plan Ready": 2,
   Completed: 1,
 };
+
+const THREAD_STATUS_LABELS: Record<string, string> = {
+  "Pending Approval": t.sidebar.status.pendingApproval,
+  "Awaiting Input": t.sidebar.status.awaitingInput,
+  Working: t.sidebar.status.working,
+  Connecting: t.sidebar.status.connecting,
+  Waiting: t.sidebar.status.waiting,
+  "Plan Ready": t.sidebar.status.planReady,
+  Completed: t.sidebar.status.completed,
+};
+
+/** Returns the display text for a status label; unknown labels pass through unchanged. */
+export function sidebarThreadStatusLabel(label: string): string {
+  return THREAD_STATUS_LABELS[label] ?? label;
+}
 
 type ThreadStatusInput = Pick<
   SidebarThreadSummary,
@@ -1155,10 +1165,10 @@ export function resolveWorkingStartedAt(
 
 export function formatWorkingDurationLabel(elapsedMs: number): string {
   const seconds = Number.isFinite(elapsedMs) ? Math.max(0, Math.floor(elapsedMs / 1000)) : 0;
-  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 60) return t.sidebar.duration.seconds(seconds);
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
-  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+  if (minutes < 60) return t.sidebar.duration.minutes(minutes);
+  return t.sidebar.duration.hoursMinutes(Math.floor(minutes / 60), minutes % 60);
 }
 
 export function resolveThreadStatusPill(input: {
@@ -1248,9 +1258,14 @@ export function resolveProjectStatusIndicator(
 
   for (const status of statuses) {
     if (status === null) continue;
+    const priority = THREAD_STATUS_PRIORITY[status.label];
+    const highestPriority =
+      highestPriorityStatus === null
+        ? undefined
+        : THREAD_STATUS_PRIORITY[highestPriorityStatus.label];
     if (
       highestPriorityStatus === null ||
-      THREAD_STATUS_PRIORITY[status.label] > THREAD_STATUS_PRIORITY[highestPriorityStatus.label]
+      (priority !== undefined && highestPriority !== undefined && priority > highestPriority)
     ) {
       highestPriorityStatus = status;
     }

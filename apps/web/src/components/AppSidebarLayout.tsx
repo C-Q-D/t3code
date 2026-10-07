@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { useAtomValue } from "@effect/atom-react";
 import * as Schema from "effect/Schema";
 import {
@@ -146,12 +147,12 @@ function SidebarControl() {
                 "pointer-events-auto",
                 isSidebarVisible && stageBackdropVariant && "relative top-auto translate-y-0",
               )}
-              aria-label="Toggle main sidebar"
+              aria-label={t.sidebar.layout.toggleSidebarAriaLabel}
             />
           }
         />
         <TooltipPopup side="bottom">
-          Toggle main sidebar{shortcutLabel ? ` (${shortcutLabel})` : ""}
+          {t.sidebar.layout.toggleSidebarTooltip(shortcutLabel)}
         </TooltipPopup>
       </Tooltip>
     </div>
@@ -312,7 +313,7 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
           collapsible="offcanvas"
           data-app-sidebar=""
           role="navigation"
-          aria-label={isOnSettings ? "Settings" : "Threads"}
+          aria-label={isOnSettings ? t.sidebar.chrome.settings : t.sidebar.chrome.threads}
           resizable={{
             maxWidth: sidebarMaximumWidth,
             minWidth: sidebarMinimumWidth,

@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { ArrowLeftIcon, ChartNoAxesColumnIcon, SettingsIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { memo, useCallback } from "react";
@@ -110,7 +111,7 @@ export function SidebarBrandWidthProbe({
 function SidebarBrand({ onBackdrop }: { onBackdrop: boolean }) {
   return (
     <Link
-      aria-label="Go to threads"
+      aria-label={t.sidebar.chrome.goToThreadsAriaLabel}
       className={cn(
         "relative z-10 ml-[var(--workspace-titlebar-content-left)] hidden h-7 w-fit min-w-0 shrink-0 items-center overflow-hidden rounded-md outline-hidden ring-ring focus-visible:ring-2 md:flex",
         onBackdrop ? "text-white" : "text-foreground",
@@ -126,14 +127,17 @@ function SidebarBrandMark({ onBackdrop }: { onBackdrop: boolean }) {
   return (
     // Center the visible capitals, without the font's ascender/descender space.
     <span className="inline-flex min-w-0 items-baseline gap-1 text-sm font-medium tracking-tight">
-      <T3Wordmark aria-label="T3" className="h-[1cap] w-auto shrink-0" />
+      <T3Wordmark
+        aria-label={t.sidebar.chrome.brandAriaLabel}
+        className="h-[1cap] w-auto shrink-0"
+      />
       <span
         className={cn(
           "truncate [text-box:trim-both_cap_alphabetic]",
           onBackdrop ? "text-white/70" : "text-muted-foreground",
         )}
       >
-        Code
+        {t.sidebar.chrome.brandName}
       </span>
     </span>
   );
@@ -207,26 +211,26 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
         <SidebarMenuItem className="min-w-0 flex-1">
           <SidebarMenuButton onClick={handleBackClick}>
             <ArrowLeftIcon />
-            <span>Back</span>
+            <span>{t.sidebar.chrome.back}</span>
           </SidebarMenuButton>
         </SidebarMenuItem>
       ) : (
         <>
           <SidebarUtilityItem
             icon={<SettingsIcon />}
-            label="Settings"
+            label={t.sidebar.chrome.settings}
             onClick={handleSettingsClick}
           />
           {pullRequestsSupported ? (
             <SidebarUtilityItem
               icon={<PullRequestGlyph.pullRequest />}
-              label="Pull Requests"
+              label={t.sidebar.chrome.pullRequests}
               onClick={handlePullRequestsClick}
             />
           ) : null}
           <SidebarUtilityItem
             icon={<ChartNoAxesColumnIcon />}
-            label="Usage"
+            label={t.sidebar.chrome.usage}
             onClick={handleUsageClick}
           />
         </>
