@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import type { StorageCleanupSettings, WorktreeCleanupRules } from "@t3tools/contracts";
 import { resolveWorktreeCleanup } from "@t3tools/shared/projectSettings";
 import { useRef, useState } from "react";
@@ -47,15 +48,13 @@ function WorktreesDirectoryRow() {
   return (
     <SettingsRow
       {...searchableSetting("storage-worktrees-location")}
-      description={
-        "Folder where new worktrees are created, on any drive, such as D:\\worktrees or ~/worktrees. Existing worktrees stay where they are. Leave empty to use the T3 home folder."
-      }
+      description={t.settings.storage.folderWorktreesCreatedAnyDriveHint}
       serverScoped
       settingKeys={["worktreesDirectory"]}
       resetAction={
         mixed || settings.worktreesDirectory !== "" ? (
           <SettingResetButton
-            label="worktree location"
+            label={t.settings.storage.worktreeLocation}
             onClick={() => updateSettings({ worktreesDirectory: "" })}
           />
         ) : null
@@ -63,10 +62,10 @@ function WorktreesDirectoryRow() {
       control={
         <Input
           key={`${scopeKey}:${mixed}:${settings.worktreesDirectory}`}
-          aria-label="Worktree location"
+          aria-label={t.settings.rows.storageWorktreesLocation.title}
           autoCapitalize="none"
           spellCheck={false}
-          placeholder={mixed ? "Mixed" : "Default"}
+          placeholder={mixed ? t.settings.general.mixed : t.settings.connections.endpoints.default}
           defaultValue={mixed ? "" : settings.worktreesDirectory}
           onChange={() => {
             edited.current = true;
@@ -120,20 +119,20 @@ function RetentionControl({
           }}
         >
           <NumberFieldGroup>
-            <NumberFieldDecrement aria-label={`Decrease ${label}`} />
+            <NumberFieldDecrement aria-label={t.settings.storage.decrease(label)} />
             <NumberFieldInput
-              aria-label={`${label} in days`}
+              aria-label={t.settings.storage.inDays(label)}
               size={new Intl.NumberFormat().format(draft ?? value).length}
               className="field-sizing-content w-auto min-w-[1ch] grow-0 text-right"
             />
             <span aria-hidden="true" className="self-center pr-2 text-xs">
-              days
+              {t.settings.storage.days}
             </span>
-            <NumberFieldIncrement aria-label={`Increase ${label}`} />
+            <NumberFieldIncrement aria-label={t.settings.storage.increase(label)} />
           </NumberFieldGroup>
         </NumberField>
       ) : (
-        <span className="text-xs text-muted-foreground">Off</span>
+        <span className="text-xs text-muted-foreground">{t.settings.connections.status.off}</span>
       )}
       <Switch
         aria-label={label}
@@ -167,7 +166,7 @@ export function StorageSettingsPanel() {
           key
         ] !== settings[key],
     )
-      ? "Mixed across selected machines"
+      ? t.settings.storage.mixedAcrossSelectedMachines
       : undefined;
   const update = (patch: Partial<StorageCleanupSettings>) =>
     updateSettings({ storageCleanup: patch });
@@ -185,7 +184,7 @@ export function StorageSettingsPanel() {
   ) {
     return (
       <SettingsScopeNotice target="all">
-        Update the selected machines to configure project worktree cleanup.
+        {t.settings.storage.updateSelectedMachinesConfigureProjectHint}
       </SettingsScopeNotice>
     );
   }
@@ -205,25 +204,24 @@ export function StorageSettingsPanel() {
           )
           .map((environment) => environment.environmentId)}
       >
-        Update the selected environments to use storage cleanup, or choose a machine that supports
-        it.
+        {t.settings.storage.updateSelectedEnvironmentsStorageCleanupHint}
       </SettingsScopeNotice>
     );
   }
 
   return (
     <SettingsPageContainer>
-      <SettingsSection id="storage-worktrees" title="Worktrees">
+      <SettingsSection id="storage-worktrees" title={t.settings.storage.worktrees}>
         {!isProjectScope && <WorktreesDirectoryRow />}
         {isProjectScope && (
           <SettingsRow
-            title="Automatic worktree cleanup"
+            title={t.settings.storage.automaticWorktreeCleanup}
             description={
               mode === "off"
-                ? "Keep this project's worktrees until you delete them manually."
+                ? t.settings.storage.keepProjectSWorktreesUntilHint
                 : mode === "custom"
-                  ? "Use these rules for this project."
-                  : "Use each machine's worktree cleanup settings."
+                  ? t.settings.storage.projectCleanupRulesHint
+                  : t.settings.storage.eachMachineSWorktreeCleanupHint
             }
             serverScoped
             settingKeys={["worktreeCleanup"]}
@@ -238,21 +236,21 @@ export function StorageSettingsPanel() {
                     updateSettings({ worktreeCleanup: { mode: "custom", rules: {} } });
                 }}
               >
-                <SelectTrigger size="sm" aria-label="Automatic worktree cleanup">
+                <SelectTrigger size="sm" aria-label={t.settings.storage.automaticWorktreeCleanup}>
                   <SelectValue>
                     {mixedModes
-                      ? "Mixed"
+                      ? t.settings.general.mixed
                       : mode === "inherit"
-                        ? "Inherit"
+                        ? t.settings.storage.inherit
                         : mode === "off"
-                          ? "Off"
-                          : "Custom"}
+                          ? t.settings.connections.status.off
+                          : t.settings.storage.custom}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectPopup align="end" alignItemWithTrigger={false}>
-                  <SelectItem value="inherit">Inherit</SelectItem>
-                  <SelectItem value="off">Off</SelectItem>
-                  <SelectItem value="custom">Custom</SelectItem>
+                  <SelectItem value="inherit">{t.settings.storage.inherit}</SelectItem>
+                  <SelectItem value="off">{t.settings.connections.status.off}</SelectItem>
+                  <SelectItem value="custom">{t.settings.storage.custom}</SelectItem>
                 </SelectPopup>
               </Select>
             }
@@ -261,52 +259,52 @@ export function StorageSettingsPanel() {
         {(!isProjectScope || (!mixedModes && mode === "custom")) && (
           <>
             <SettingsRow
-              title="Delete worktrees with deleted threads"
+              title={t.settings.storage.deleteWorktreesWithDeletedThreads}
               status={ruleStatus("worktreeOnDelete")}
-              description="Remove unused worktrees when active or archived threads are deleted. Worktrees with local changes are kept."
+              description={t.settings.storage.removeUnusedWorktreesActiveArchivedHint}
               serverScoped={!isProjectScope}
               control={
                 <Switch
-                  aria-label="Delete worktrees with deleted threads"
+                  aria-label={t.settings.storage.deleteWorktreesWithDeletedThreads}
                   checked={settings.worktreeOnDelete}
                   onCheckedChange={(worktreeOnDelete) => updateWorktree({ worktreeOnDelete })}
                 />
               }
             />
             <SettingsRow
-              title="Delete inactive worktrees"
+              title={t.settings.storage.deleteInactiveWorktrees}
               status={ruleStatus("worktreeAfterDays")}
-              description="Remove worktrees after their threads have been inactive for this many days. Branches and thread history are kept."
+              description={t.settings.storage.removeWorktreesAfterTheirThreadsHint}
               serverScoped={!isProjectScope}
               control={
                 <RetentionControl
-                  label="Delete inactive worktrees"
+                  label={t.settings.storage.deleteInactiveWorktrees}
                   value={settings.worktreeAfterDays}
                   onChange={(worktreeAfterDays) => updateWorktree({ worktreeAfterDays })}
                 />
               }
             />
             <SettingsRow
-              title="Delete merged worktrees"
+              title={t.settings.storage.deleteMergedWorktrees}
               status={ruleStatus("worktreeOnMerge")}
-              description="Remove worktrees whose pull request is merged and whose commits are included in the default branch."
+              description={t.settings.storage.removeWorktreesWhosePullRequestHint}
               serverScoped={!isProjectScope}
               control={
                 <Switch
-                  aria-label="Delete merged worktrees"
+                  aria-label={t.settings.storage.deleteMergedWorktrees}
                   checked={settings.worktreeOnMerge}
                   onCheckedChange={(worktreeOnMerge) => updateWorktree({ worktreeOnMerge })}
                 />
               }
             />
             <SettingsRow
-              title="Delete unchanged worktrees"
+              title={t.settings.storage.deleteUnchangedWorktrees}
               status={ruleStatus("worktreeUnchanged")}
-              description="Remove worktrees with no commits beyond the default branch."
+              description={t.settings.storage.removeWorktreesCommitsBeyondDefaultHint}
               serverScoped={!isProjectScope}
               control={
                 <Switch
-                  aria-label="Delete unchanged worktrees"
+                  aria-label={t.settings.storage.deleteUnchangedWorktrees}
                   checked={settings.worktreeUnchanged}
                   onCheckedChange={(worktreeUnchanged) => updateWorktree({ worktreeUnchanged })}
                 />
@@ -317,28 +315,28 @@ export function StorageSettingsPanel() {
       </SettingsSection>
 
       {!isProjectScope && (
-        <SettingsSection id="storage-artifacts" title="Artifacts and logs">
+        <SettingsSection id="storage-artifacts" title={t.settings.rows.storageArtifacts.title}>
           <SettingsRow
-            title="Delete old browser artifacts"
+            title={t.settings.storage.deleteOldBrowserArtifacts}
             status={ruleStatus("browserArtifactsAfterDays")}
-            description="Delete saved browser captures after this many days. Older capture links will no longer open."
+            description={t.settings.storage.deleteSavedBrowserCapturesAfterHint}
             serverScoped
             control={
               <RetentionControl
-                label="Delete old browser artifacts"
+                label={t.settings.storage.deleteOldBrowserArtifacts}
                 value={settings.browserArtifactsAfterDays}
                 onChange={(browserArtifactsAfterDays) => update({ browserArtifactsAfterDays })}
               />
             }
           />
           <SettingsRow
-            title="Delete old rotated logs"
+            title={t.settings.storage.deleteOldRotatedLogs}
             status={ruleStatus("logsAfterDays")}
-            description="Delete inactive rotated log files after this many days. Current logs are kept."
+            description={t.settings.storage.deleteInactiveRotatedLogFilesHint}
             serverScoped
             control={
               <RetentionControl
-                label="Delete old rotated logs"
+                label={t.settings.storage.deleteOldRotatedLogs}
                 value={settings.logsAfterDays}
                 onChange={(logsAfterDays) => update({ logsAfterDays })}
               />

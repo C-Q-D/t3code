@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import {
   AcpRegistrySettings,
   AntigravitySettings,
@@ -64,9 +65,9 @@ const PROVIDER_CLIENT_DEFINITIONS: readonly ProviderClientDefinition[] = [
     environmentFields: [
       {
         name: "CURSOR_API_KEY",
-        label: "Cursor API key",
-        description: "Optional. Overrides browser sign-in for this provider.",
-        placeholder: "Paste API key",
+        label: t.settings.providerDriverMeta.cursorApiKey,
+        description: t.settings.providerDriverMeta.optionalOverridesBrowserSignProviderHint,
+        placeholder: t.settings.providerDriverMeta.pasteApiKey,
         sensitive: true,
       },
     ],

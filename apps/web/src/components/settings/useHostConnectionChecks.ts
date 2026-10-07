@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { AuthSettingsWriteScope } from "@t3tools/contracts";
 import { readEnvironmentScope } from "../../state/session";
 import { useRef, useState } from "react";
@@ -28,7 +29,7 @@ export function useHostConnectionChecks(targets: ReadonlyArray<DeviceHostCheckTa
         host,
         async (environmentId, input) => {
           if (!readEnvironmentScope(environmentId, AuthSettingsWriteScope)) {
-            throw new Error("This connection cannot test device hosts.");
+            throw new Error(t.settings.hostConnectionChecks.connectionTestDeviceHostsError);
           }
           const result = await test({ environmentId, input });
           if (result._tag === "Failure") throw new Error(Cause.pretty(result.cause));

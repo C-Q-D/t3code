@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { AuthSettingsWriteScope } from "@t3tools/contracts";
 import { useEnvironmentsWithScope } from "../../state/session";
 import {
@@ -67,7 +68,7 @@ function useRunScopedPlan() {
       if (plan.unavailableReason) {
         toastManager.add({
           type: "warning",
-          title: "Setting not saved",
+          title: t.settings.scoped.settingNotSaved,
           description: plan.unavailableReason,
         });
         return;
@@ -83,7 +84,7 @@ function useRunScopedPlan() {
               Cause.fail(
                 new EnvironmentAuthorizationError({
                   requiredScope: missing,
-                  message: "This connection cannot change these settings.",
+                  message: t.settings.scoped.connectionChangeSettingsError,
                 }),
               ),
             );
@@ -95,8 +96,13 @@ function useRunScopedPlan() {
         toastManager.add({
           type: "error",
           title:
-            savedEnvironmentCount > 0 ? "Setting saved on some environments" : "Setting not saved",
-          description: `Could not update ${failedEnvironments.map((environment) => environment.label).join(", ")}.${savedEnvironmentCount > 0 ? " The other selected environments saved the change." : ""}`,
+            savedEnvironmentCount > 0
+              ? t.settings.scoped.settingSavedOnSomeEnvironments
+              : t.settings.scoped.settingNotSaved,
+          description: t.settings.scoped.couldNotUpdate(
+            failedEnvironments.map((environment) => environment.label).join(", "),
+            Boolean(savedEnvironmentCount > 0),
+          ),
         });
       });
     },

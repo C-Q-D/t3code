@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import {
   AuthSettingsWriteScope,
   ENVIRONMENT_MACHINE_KINDS,
@@ -29,13 +30,13 @@ export function resolveEnvironmentIconPickerLock(input: {
   readonly operateAccess: "granted" | "denied" | "pending";
 }): string | null {
   if (input.serverConfig === null) {
-    return "Connect to this environment to change its icon.";
+    return t.settings.environmentIconPicker.connectEnvironmentChangeIconHint;
   }
   if (input.serverConfig.environment.capabilities.environmentIcon !== true) {
-    return "This environment's server is too old to keep an icon. Update it to choose one.";
+    return t.settings.environmentIconPicker.environmentSServerTooOldHint;
   }
   if (input.operateAccess !== "granted") {
-    return "Your session on this environment cannot change its settings.";
+    return t.settings.environmentIconPicker.sessionEnvironmentChangeSettingsError;
   }
   return null;
 }
@@ -68,7 +69,7 @@ export function EnvironmentIconMenu({
     <MenuSub>
       <MenuSubTrigger>
         <EnvironmentMachineIcon kind={resolved} />
-        Icon
+        {t.settings.environmentIconPicker.icon}
       </MenuSubTrigger>
       <MenuSubPopup>
         {lock !== null ? (
@@ -95,7 +96,9 @@ export function EnvironmentIconMenu({
                 </span>
                 {kind === detected ? (
                   <span className="shrink-0 text-xs text-muted-foreground">
-                    {serverConfig?.environment.platform.machine ? "detected" : "default"}
+                    {serverConfig?.environment.platform.machine
+                      ? t.settings.environmentIconPicker.detected
+                      : t.settings.environmentIconPicker.default}
                   </span>
                 ) : null}
               </span>

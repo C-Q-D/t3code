@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import {
   DndContext,
   type DragEndEvent,
@@ -68,7 +69,10 @@ export function EnvironmentRoutesList({
       ? connectionRouteId(prepared.value.target)
       : null;
   const reorder = useAtomCommand(environmentCatalog.reorderRoutes, "Reorder routes");
-  const removeRoute = useAtomCommand(environmentCatalog.removeRoute, "Remove route");
+  const removeRoute = useAtomCommand(
+    environmentCatalog.removeRoute,
+    t.settings.environmentRoutesList.removeRoute,
+  );
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -79,7 +83,11 @@ export function EnvironmentRoutesList({
   const confirmRemove = async (route: ConnectionRoute) => {
     const address = connectionRouteAddress(route);
     const confirmed = await requestConfirmDialog(
-      `Remove ${connectionRouteLabel(route)} route?${address === null ? "" : `\n${address}`}`,
+      t.settings.environmentRoutesList.removeRouteConfirmation(
+        connectionRouteLabel(route),
+        Boolean(address === null),
+        !(address === null) ? address : undefined,
+      ),
       { variant: "destructive" },
     );
     if (confirmed !== true) return;
@@ -111,7 +119,9 @@ export function EnvironmentRoutesList({
         onDragEnd={handleDragEnd}
       >
         <SortableContext items={order} strategy={verticalListSortingStrategy}>
-          <ol aria-label={`Routes to ${environment.label}, preferred first`}>
+          <ol
+            aria-label={t.settings.environmentRoutesList.routesToPreferredFirst(environment.label)}
+          >
             {routes.map((route, index) => (
               <SortableRouteRow
                 key={connectionRouteId(route.target)}
@@ -131,7 +141,7 @@ export function EnvironmentRoutesList({
       <div className="border-t border-border/70 px-1 py-1">
         <Button size="xs" variant="ghost-muted" onClick={onAddRoute}>
           <PlusIcon className="size-3" />
-          Add route
+          {t.settings.connections.environment.addRoute}
         </Button>
       </div>
     </div>
@@ -178,7 +188,7 @@ function SortableRouteRow({
         ref={setActivatorNodeRef}
         {...attributes}
         {...listeners}
-        aria-label={`Reorder ${label}, position ${position}`}
+        aria-label={t.settings.environmentRoutesList.reorderPosition(label, position)}
         className="flex size-6 shrink-0 cursor-grab touch-none items-center justify-center rounded text-muted-foreground/70 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing"
       >
         <GripVerticalIcon className="size-3.5" />
@@ -188,14 +198,14 @@ function SortableRouteRow({
           {label}
           {inUse ? (
             <span className="rounded-sm bg-success/12 px-1 text-2xs font-normal text-success-foreground">
-              In use
+              {t.settings.environmentRoutesList.inUse}
             </span>
           ) : null}
         </p>
         {address !== null ? (
           <p className="truncate text-2xs text-muted-foreground">
             {address}
-            {isLearned(route) ? " · found automatically" : ""}
+            {isLearned(route) ? t.settings.environmentRoutesList.foundAutomatically : ""}
           </p>
         ) : null}
       </div>
@@ -207,14 +217,14 @@ function SortableRouteRow({
                 type="button"
                 variant="ghost-muted"
                 size="icon-xs"
-                aria-label={`Remove ${label} route`}
+                aria-label={t.settings.environmentRoutesList.removeRouteAriaLabel(label)}
                 onClick={onRemove}
               />
             }
           >
             <XIcon className="size-3" />
           </TooltipTrigger>
-          <TooltipPopup side="top">Remove route</TooltipPopup>
+          <TooltipPopup side="top">{t.settings.environmentRoutesList.removeRoute}</TooltipPopup>
         </Tooltip>
       ) : null}
     </li>

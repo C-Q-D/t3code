@@ -1,5 +1,7 @@
 /** English settings messages for search, navigation, scope, and panels. */
 import type {
+  BranchNamingMode,
+  SourceControlWritingStyleMode,
   ResponseStreamingMode,
   SidebarProjectSortOrder,
   DiffLayout,
@@ -11,6 +13,8 @@ import type {
   ScheduledTaskWebhookDeliveryOutcome,
   DesktopSnapShotState,
 } from "@t3tools/contracts";
+
+import type { ThemeColorRole } from "@t3tools/shared/themePalettes";
 
 export const settings = {
   sections: {
@@ -605,6 +609,11 @@ export const settings = {
     },
     worktreeBranchNaming: {
       title: "Worktree branch naming",
+      options: {
+        static: "Static prefix",
+        semantic: "Semantic prefix",
+        custom: "Custom instructions",
+      } satisfies Record<BranchNamingMode, string>,
     },
     githubAccounts: {
       title: "GitHub accounts and token",
@@ -1968,5 +1977,1870 @@ export const settings = {
       ready: "Ready. Continue to choose your shortcut.",
       notReady: "Not ready yet. Finish the step above.",
     },
+  },
+  acpRegistrySearchStep: {
+    theAcpCouldNotBePrepared: "The ACP could not be prepared.",
+    chooseAnAgent: "Choose an agent",
+    searchAcpRegistry: "Search ACP Registry",
+    searchAgents: "Search agents…",
+    enterManually: "Enter manually",
+    localAcpCommand: "Local ACP command",
+    searchingTheAcpRegistry: "Searching the ACP Registry.",
+    refreshingAcpRegistryResults: "Refreshing ACP Registry results.",
+    compatibleFound: (
+      resultCount: string | number | boolean | null | undefined,
+      resultCount1: boolean,
+    ) => `${resultCount} compatible ${resultCount1 ? "agent" : "agents"} found.`,
+    searchingTheRegistry: "Searching the registry...",
+    noCompatibleAgentsFound: "No compatible agents found",
+    tryABroaderSearch: "Try a broader search.",
+    downloading: "Downloading",
+    preparing: "Preparing",
+    about: (agentName: string | number | boolean | null | undefined) => `About ${agentName}`,
+    agentActionAriaLabel: (
+      alreadyAdded: boolean,
+      isPreparing: boolean,
+      progressLabel: string | number | boolean | null | undefined,
+      agentName: string | number | boolean | null | undefined,
+    ) => `${alreadyAdded ? "Already added" : isPreparing ? progressLabel : "Add"} ${agentName}`,
+    added: "Added",
+    add: "Add",
+  },
+  acpSessionManagement: {
+    theAcpOperationFailed: "The ACP operation failed.",
+    couldNotListAcpSessions: "Could not list ACP sessions",
+    acpSessionImported: "ACP session imported",
+    acpSessionAlreadyImported: "ACP session already imported",
+    couldNotImportAcpSession: "Could not import ACP session",
+    permanentlyDeleteNativeAcpSessionHint: (
+      sessionTitle: string | number | boolean | null | undefined,
+      sessionSessionId: string | number | boolean | null | undefined,
+    ) => `Permanently delete native ACP session "${sessionTitle ?? sessionSessionId}"?`,
+    acpSessionDeleted: "ACP session deleted",
+    couldNotDeleteAcpSession: "Could not delete ACP session",
+    couldNotListAcpProviders: "Could not list ACP providers",
+    headersMustJsonObjectStringError: "Headers must be a JSON object with string values.",
+    invalidProviderHeaders: "Invalid provider headers",
+    headersMustBeValidJson: "Headers must be valid JSON.",
+    acpProviderConfigured: "ACP provider configured",
+    couldNotConfigureAcpProvider: "Could not configure ACP provider",
+    disableAcpProvider: (providerProviderId: string | number | boolean | null | undefined) =>
+      `Disable ACP provider "${providerProviderId}"?`,
+    acpProviderDisabled: "ACP provider disabled",
+    couldNotDisableAcpProvider: "Could not disable ACP provider",
+    loggedOutOfAcpAgent: "Logged out of ACP agent",
+    couldNotLogOutOfAcpAgent: "Could not log out of ACP agent",
+    nativeSessions: "Native sessions",
+    resumeAgentOwnedConversationsTHint: "Resume agent-owned conversations as T3 threads.",
+    addProjectBeforeImportingSessionsHint: "Add a project before importing sessions.",
+    loggingOut: "Logging out",
+    logOut: "Log out",
+    projectForAcpSessions: "Project for ACP sessions",
+    loading: "Loading",
+    listSessions: "List sessions",
+    imported: "Imported",
+    importing: "Importing",
+    import: "Import",
+    deleting: "Deleting",
+    loadMore: "Load more",
+    agentProviders: "Agent providers",
+    configureNonSecretRoutingHeadersHint: "Configure non-secret routing. Headers are write-only.",
+    listProviders: "List providers",
+    projectForAcpProviders: "Project for ACP providers",
+    configured: "Configured",
+    required: " · Required",
+    saving: "Saving",
+    save: "Save",
+    protocol: (providerProviderId: string | number | boolean | null | undefined) =>
+      `${providerProviderId} protocol`,
+    baseUrl: (providerProviderId: string | number | boolean | null | undefined) =>
+      `${providerProviderId} base URL`,
+    writeOnlyHeadersJson: (providerProviderId: string | number | boolean | null | undefined) =>
+      `${providerProviderId} write-only headers JSON`,
+    writeOnlyHeadersJsonEG: 'Write-only headers JSON, e.g. {"Authorization":"Bearer …"}',
+  },
+  addCodexAccount: {
+    addChatGptAccount: "Add ChatGPT account",
+    eachAccountOwnCodexInstanceHint:
+      "Each account has its own Codex instance and sign-in. Choose the other account on the sign-in page.",
+    codexRuntime: "Codex runtime",
+    preparingManagedSetup: "Preparing managed setup.",
+    accountName: "Account name",
+    shownProviderListModelPickerHint: "Shown in the provider list and model picker.",
+    eGPersonalOrWork: "e.g. Personal or Work",
+    addingAccount: "Adding account…",
+  },
+  addProviderInstance: {
+    identity: "Identity",
+    config: "Config",
+    signIn: "Sign in",
+    instanceIdRequiredError: "Instance ID is required.",
+    instanceIdLengthError: "Instance ID must be 64 characters or fewer.",
+    instanceIdFormatError:
+      "Instance ID must start with a letter and use only letters, digits, '-', or '_'.",
+    anInstanceNamedAlreadyExists: (id: string | number | boolean | null | undefined) =>
+      `An instance named '${id}' already exists.`,
+    executableIsRequired: "Executable is required.",
+    selectAcpConfigureOneManuallyHint: "Select an ACP or configure one manually.",
+    localAcpCommand: "Local ACP command",
+    addInstanceError: "Could not add provider instance",
+    theSettingsUpdateFailed: "The settings update failed.",
+    instanceAddedToast: "Provider instance added",
+    instanceWasAdded: (
+      driverOptionLabel: string | number | boolean | null | undefined,
+      instanceId: string | number | boolean | null | undefined,
+    ) => `${driverOptionLabel} instance '${instanceId}' was added.`,
+    addProvider: "Add provider",
+    addAccountConfigureProviderHint: (
+      environmentLabel: string | number | boolean | null | undefined,
+    ) => `Add an account or configure a provider on ${environmentLabel}.`,
+    orChooseFromAcpRegistry: "Or choose from ACP Registry",
+    enterManually: "Enter manually",
+    runAnInstalledAcpExecutableOn: (
+      environmentLabel: string | number | boolean | null | undefined,
+    ) => `Run an installed ACP executable on ${environmentLabel}.`,
+    enterOfficialRegistryIdAnyHint:
+      "Enter an official registry ID and any local executable or auth override.",
+    searchRegistry: "Search registry",
+    openDocumentationFor: (
+      selectedAcpName: string | number | boolean | null | undefined,
+      selectedAcpId: string | number | boolean | null | undefined,
+    ) => `Open documentation for ${selectedAcpName} (${selectedAcpId})`,
+    docs: "Docs",
+    openSourceFor: (
+      selectedAcpName: string | number | boolean | null | undefined,
+      selectedAcpId: string | number | boolean | null | undefined,
+    ) => `Open source for ${selectedAcpName} (${selectedAcpId})`,
+    source: "Source",
+    label: "Label",
+    shownInTheProviderList: "Shown in the provider list.",
+    eGWork: "e.g. Work",
+    instanceId: "Instance ID",
+    lettersDigitsOr: "Letters, digits, '-', or '_'.",
+    accentColor: "Accent color",
+    optionalMarkerShownInThePicker: "Optional marker shown in the picker.",
+    driverRequiredConfigurationAddInstanceError:
+      "This driver has no required configuration. You can add the instance now.",
+    configureManually: "Configure manually",
+    next: "Next",
+    adding: "Adding...",
+    continueToSignIn: "Continue to sign-in",
+    addInstance: "Add instance",
+  },
+  addUsageLimitSource: {
+    addACliproxyApiHub: "Add a CLIProxyAPI hub",
+
+    hubUrl: "Hub URL",
+    managementKey: "Management key",
+    labelOptional: "Label (optional)",
+    defaultsToTheHubSHostName: "Defaults to the hub's host name",
+    addHub: "Add hub",
+
+    description: (environmentLabel: string) =>
+      `Show the quota of every account the hub pools, next to the providers on ${environmentLabel}. The key stays on that server.`,
+  },
+  bitbucketCredentials: {
+    accessToken: "Access token",
+    scopedOneRepositoryProjectWorkspaceHint:
+      "Scoped to one repository, project, or workspace. Create it in that item's Bitbucket settings.",
+    learnMore: "Learn more",
+    apiToken: "API token",
+    usesAtlassianAccountReachesEveryHint:
+      "Uses your Atlassian account, so it reaches every repository you can. Give it read and write access to repositories and pull requests, and read:user:bitbucket.",
+    createAnApiToken: "Create an API token",
+    storedSecretEnterValueReplace: "Stored secret, enter a new value to replace",
+    notSet: "Not set",
+    saveBitbucketCredentials: "save Bitbucket credentials",
+    bitbucketSignInMethod: "Bitbucket sign-in method",
+    atlassianAccountEmail: "Atlassian account email",
+    withoutSavedTokenServerFallsHint:
+      "Without a saved token, the server falls back to its T3CODE_BITBUCKET_* environment variables.",
+    savingReplacesYour: (
+      methodsCurrentLabelToLowerCase: string | number | boolean | null | undefined,
+    ) => `Saving replaces your ${methodsCurrentLabelToLowerCase}.`,
+    remove: "Remove",
+    save: "Save",
+  },
+  branchNaming: {
+    worktreeBranchesNamedFirstMessageHint:
+      "Choose how new worktree branches are named from your first message.",
+    branchNaming: "branch naming",
+    branchPrefix: "Branch prefix",
+    exampleTTProducesTHint:
+      "For example, t3 or t3/ produces t3/add-search. Leave empty for no prefix.",
+    prefixResetLabel: "branch prefix",
+    noPrefix: "No prefix",
+    modelChoosesPrefixDescribesWorkHint:
+      "The model chooses a prefix that describes the work, such as feat/add-search, fix/login-timeout, or refactor/auth.",
+    branchNamingInstructions: "Branch naming instructions",
+    appendedNamingPromptModelReturnsHint:
+      "Appended to the naming prompt. The model returns the complete branch name; no prefix or suffix is added.",
+    instructionsResetLabel: "branch naming instructions",
+    mixedEnterInstructionsApplyAllHint:
+      "Mixed. Enter instructions to apply to all selected targets.",
+    juliusFollowedIssueIdShortHint: "Use julius/ followed by the issue ID and a short description.",
+  },
+  browserImportWizard: {
+    and: (
+      domainsSlice01Join: string | number | boolean | null | undefined,
+      domainsAt1: string | number | boolean | null | undefined,
+    ) => `${domainsSlice01Join} and ${domainsAt1}`,
+    andMore: (
+      domainsSlice03Join: string | number | boolean | null | undefined,
+      domainsLength3: string | number | boolean | null | undefined,
+    ) => `${domainsSlice03Join} and ${domainsLength3} more`,
+    profileLongerAvailableImportCookiesHint:
+      "That profile is no longer available. Choose where to import these cookies.",
+    quitToImport: (sourceName: string | number | boolean | null | undefined) =>
+      `Quit ${sourceName} to import`,
+    openCookiesRsquoTReadHint: (sourceName: string | number | boolean | null | undefined) =>
+      `${sourceName} is open, so its cookies can’t be read yet. Quit it, then continue.`,
+    iVeQuitIt: "I’ve quit it",
+    noCookies: "no cookies",
+    cookieCount: (count: string | number | boolean | null | undefined, count1: boolean) =>
+      `${count} ${count1 ? "cookie" : "cookies"}`,
+    openSystemSettingsTryAllowError: "Could not open System Settings. Try Allow again.",
+    letT3CodeReadRsquoSCookies: (sourceName: string | number | boolean | null | undefined) =>
+      `Let T3 Code read ${sourceName}’s cookies`,
+    importCookiesTCodeNeedsError: (sourceName: string | number | boolean | null | undefined) =>
+      `To import cookies from ${sourceName}, T3 Code needs Full Disk Access. Turn it on in System Settings, then come back to finish the import — you can revoke it again once the import is done.`,
+    fullDiskAccess: "Full Disk Access",
+    readSCookiesForThisImport: (sourceName: string | number | boolean | null | undefined) =>
+      `Read ${sourceName}'s cookies for this import.`,
+    accessStillRequiredQuitReopenError:
+      "Access is still required. Quit and reopen T3 Code if you just allowed it, then retry the import.",
+    ifAccessDoesnTUpdateHint:
+      "If access doesn't update after you allow it, quit and reopen T3 Code, then retry the import.",
+    veReachedProfileLimitExistingHint:
+      "You've reached the profile limit. Choose an existing profile to import into.",
+    importFrom: (sourceName: string | number | boolean | null | undefined) =>
+      `Import from ${sourceName}`,
+    chooseWhichCookiesToImportFor: (
+      destinationEnvironmentName: string | number | boolean | null | undefined,
+    ) => `Choose which cookies to import for ${destinationEnvironmentName}.`,
+    from: "From",
+    into: "Into",
+    newProfile: "New profile",
+    createdForTheseCookies: "Created for these cookies",
+    existingProfile: "Existing profile",
+    import: "Import",
+    importingCookies: "Importing cookies",
+    thisMayTakeAMoment: "This may take a moment.",
+    importing: "Importing…",
+    checking: (sourceName: string | number | boolean | null | undefined) =>
+      `Checking ${sourceName}`,
+    checkingFullDiskAccess: "Checking Full Disk Access.",
+    checkingWhetherBrowserClosedHint: "Checking whether the browser has closed.",
+    checkingAccess: "Checking access…",
+    imported: (cookieResultCountImported: string | number | boolean | null | undefined) =>
+      `Imported ${cookieResultCountImported}`,
+    skipped: (cookieResultCountSkipped: string | number | boolean | null | undefined) =>
+      `Skipped ${cookieResultCountSkipped}`,
+    noCookiesFound: "No cookies found",
+    addedToForSkipped: (
+      targetName: string | number | boolean | null | undefined,
+      destinationEnvironmentName: string | number | boolean | null | undefined,
+      skipped0: boolean,
+      cookieResultCountSkipped: string | number | boolean | null | undefined,
+    ) =>
+      `Added to ${targetName} for ${destinationEnvironmentName}.${skipped0 ? ` ${cookieResultCountSkipped} skipped.` : ""}`,
+    noCookiesWereImportedFor: (
+      destinationEnvironmentName: string | number | boolean | null | undefined,
+    ) => `No cookies were imported for ${destinationEnvironmentName}.`,
+    thereWereNoCookiesToImportFor: (
+      destinationEnvironmentName: string | number | boolean | null | undefined,
+    ) => `There were no cookies to import for ${destinationEnvironmentName}.`,
+    skippedBadge: "Skipped",
+    couldnRsquoTImportFrom: (sourceName: string | number | boolean | null | undefined) =>
+      `Couldn’t import from ${sourceName}`,
+  },
+  captureShortcutConfig: {
+    couldnTPrepareChangesCheckError: "Couldn't prepare the changes. Check Advanced for help.",
+    shortcutSaved: "Shortcut saved",
+    shortcutUsageHint: (previewShortcut: string | number | boolean | null | undefined) =>
+      `Use ${previewShortcut} from another app.`,
+    couldnTSaveShortcutReviewError:
+      "Couldn't save your shortcut. Review the changes and try again.",
+    pressYourShortcutEscCancels: "Press your shortcut. Esc cancels.",
+    savedButShortcutNeedsAttentionError:
+      "Saved, but the shortcut needs attention. Check Advanced for help.",
+    shortcutRemoved: "Shortcut removed.",
+    anotherAppCaptureWindowHint: (previewShortcut: string | number | boolean | null | undefined) =>
+      `Use ${previewShortcut} from another app to capture a window.`,
+    reviewChangeBelowRemoveShortcutHint: "Review the change below to remove your shortcut.",
+    reviewChangeBelowSaveShortcutHint: "Review the change below, then save your shortcut.",
+    thereSNoCaptureShortcutToRemove: "There's no capture shortcut to remove.",
+    thisShortcutIsAlreadySetUp: "This shortcut is already set up.",
+    shortcutChanges: "Shortcut changes",
+    changesSavedWeLlKeepHint: "Only these changes will be saved. We'll keep a backup.",
+    saveShortcut: "Save shortcut",
+    removeShortcut: "Remove shortcut",
+    allowTCodeReadDesktopHint:
+      "Allow T3 Code to read your desktop settings. You'll review any changes here before saving.",
+    preparingChanges: "Preparing changes…",
+    reviewChanges: "Review changes",
+    updateTCodeFinishSettingHint: "Update T3 Code to finish setting up your shortcut.",
+    connectingToYourDesktop: "Connecting to your desktop…",
+    restartTCodeFinishConnectingHint: "Restart T3 Code to finish connecting your shortcut.",
+    troubleshooting: "Troubleshooting",
+    settingsFile: "Settings file",
+    tCodeAlsoReadsAnyHint: "T3 Code also reads any files included by this file.",
+    linkedToTheLinkWillBeKept: (
+      previewResolvedPath: string | number | boolean | null | undefined,
+    ) => `Linked to ${previewResolvedPath}. The link will be kept.`,
+    chooseADifferentFile: "Choose a different file…",
+    openRemoveShortcut: "Remove shortcut…",
+    desktopSShortcutSettingsFileHint: "Use your desktop's shortcut settings file.",
+    customConfigNiriConfigChangeHint: "A custom --config or NIRI_CONFIG can change its location.",
+    omarchyOwnBindingsFileDefaultsHint: "On Omarchy, use your own bindings file, not its defaults.",
+    backup: (resultBackupPath: string | number | boolean | null | undefined) =>
+      `Backup: ${resultBackupPath}`,
+    manualSetup: "Manual setup",
+    pasteInsideBindsNiriConfigHint: "Paste this inside binds { … } in your Niri config, then save.",
+    addBindingHyprlandConfigSaveHint: "Add this binding to your Hyprland config, then save.",
+    changeTheKeysIfNeeded: "Change the keys if needed.",
+    copyShortcut: "Copy shortcut",
+    turnCaptureOffTCodeHint: (desktop: string | number | boolean | null | undefined) =>
+      `Turn capture off in T3 Code to stop it. Remove the shortcut from ${desktop} to free up the keys.`,
+    iVeAddedTheShortcut: "I've added the shortcut",
+  },
+  chatGptAccountPicker: {
+    reconnectChatGpt: "Reconnect ChatGPT",
+    openAiSignAccountHint: "On OpenAI, sign in with the account you choose here.",
+    chatGptAccountToConnect: "ChatGPT account to connect",
+  },
+  chatGptUsageButton: {
+    manageUsage: "Manage usage",
+  },
+  chatGptWelcomeCoordinator: {
+    yourChatGptPlanIsConnected: "Your ChatGPT plan is connected",
+    eligibleUsageTCodeUsesHint:
+      "Eligible usage in T3 Code uses your ChatGPT plan. Manage your shared usage and any credit settings in ChatGPT.",
+    on: (
+      nextProviderName: string | number | boolean | null | undefined,
+      nextEnvironmentLabel: string | number | boolean | null | undefined,
+    ) => `${nextProviderName} on ${nextEnvironmentLabel}`,
+  },
+  customModelEditor: {
+    option: (index1: string | number | boolean | null | undefined) => `Option ${index1}`,
+    needsAnId: (position: string | number | boolean | null | undefined) =>
+      `${position} needs an id.`,
+    idIsUsedTwice: (
+      position: string | number | boolean | null | undefined,
+      id: string | number | boolean | null | undefined,
+    ) => `${position}: id "${id}" is used twice.`,
+    needsALabel: (position: string | number | boolean | null | undefined) =>
+      `${position} needs a label.`,
+    needsAtLeastOneChoice: (position: string | number | boolean | null | undefined) =>
+      `${position} needs at least one choice.`,
+    hasAChoiceWithoutAValue: (position: string | number | boolean | null | undefined) =>
+      `${position} has a choice without a value.`,
+    choiceIsUsedTwice: (
+      position: string | number | boolean | null | undefined,
+      choiceId: string | number | boolean | null | undefined,
+    ) => `${position}: choice "${choiceId}" is used twice.`,
+    value: "value",
+    choiceValue: "Choice value",
+    label: "Label",
+    choiceLabel: "Choice label",
+    defaultChoice: "Default choice",
+    removeChoice: "Remove choice",
+    optionLabelPrefix: "Option ",
+    optionId: "Option id",
+    custom: "Custom…",
+    optionLabel: "Option label",
+    optionType: "Option type",
+    toggle: "Toggle",
+    choices: "Choices",
+    removeOption: (index1: string | number | boolean | null | undefined) =>
+      `Remove option ${index1}`,
+    addChoice: "Add choice",
+    displayName: "Display name",
+    optionsShownInTheComposer: "Options shown in the composer",
+    copyOptionsFromABuiltInModel: "Copy options from a built-in model",
+    copyFrom: "Copy from…",
+    customOptionsComposerUsesProviderHint:
+      "No custom options. The composer uses the provider's default options.",
+    customOption: "Custom option",
+    save: "Save",
+  },
+  deviceHostEditor: {
+    addDeviceHost: "Add device host",
+    editDeviceHost: "Edit device host",
+    connectFrom: (targets0Label: string | number | boolean | null | undefined) =>
+      `Connect from ${targets0Label}.`,
+    connectFromSelectedEnvironments: (
+      targetsLength: string | number | boolean | null | undefined,
+    ) => `Connect from ${targetsLength} selected environments.`,
+    hostsOnTheSameMachineAreSkipped: "Hosts on the same machine are skipped.",
+    sshTarget: "SSH target",
+    userHostOrSshAlias: "user@host or SSH alias",
+    sshOptions: "SSH options",
+    identityFile: "Identity file",
+    sshConfigDefault: "SSH config default",
+    optionalResolvedSeparatelyEachEnvironmentHint:
+      "Optional. Resolved separately on each environment.",
+    ofFailed: (
+      failed: string | number | boolean | null | undefined,
+      targetsLength: string | number | boolean | null | undefined,
+    ) => `${failed} of ${targetsLength} failed`,
+    connectionChecksPassed: "Connection checks passed",
+    checkAccessBeforeSaving: "Check access before saving",
+    testConnection: " Test connection",
+    checking: " Checking…",
+    alreadyAvailableLocally: " Already available locally",
+    failed: " Failed",
+    connected: " Connected",
+    showError: "Show error",
+    saveHost: " Save host",
+  },
+  deviceHosts: {
+    multipleHostsMatchSshDestinationHint:
+      "Multiple hosts match this SSH destination. Select the environment to edit its hosts.",
+    deviceHostsSavedAllEnvironments: "Device hosts not saved on all environments",
+    couldNotUpdate: (value: string | number | boolean | null | undefined) =>
+      `Could not update ${value}.`,
+    addRemoteMachinesSimulatorEmulatorHint:
+      "Add remote machines with simulator or emulator runtimes installed, and the selected environments will connect over SSH and set up device tools automatically.",
+    addHost: " Add host",
+    connectSelectedEnvironmentManageDeviceHint:
+      "Connect a selected environment to manage device hosts.",
+    ofEnvironmentsFailed: (
+      hostLabel: string | number | boolean | null | undefined,
+      failedLength: string | number | boolean | null | undefined,
+      targetsLength: string | number | boolean | null | undefined,
+    ) => `${hostLabel}: ${failedLength} of ${targetsLength} environments failed`,
+    connectionChecksPassed: (hostLabel: string | number | boolean | null | undefined) =>
+      `${hostLabel}: connection checks passed`,
+    couldNotConnectFrom: (
+      failedMapTargetTargetLabelJoin: string | number | boolean | null | undefined,
+    ) => `Could not connect from ${failedMapTargetTargetLabelJoin}.`,
+    connectedAlreadyAvailableLocallyEachHint:
+      "Connected or already available locally on each selected environment.",
+    noDeviceHosts: "No device hosts.",
+    checkingConnection: "Checking connection…",
+    installingDeviceSupport: "Installing device support…",
+    connecting: "Connecting…",
+    iOsAvailable: "iOS available",
+    androidAvailable: "Android available",
+    alreadyAvailableLocally: "Already available locally",
+    options: " options",
+    remove: "Remove",
+    testConnection: "Test connection",
+  },
+  environmentIconPicker: {
+    connectEnvironmentChangeIconHint: "Connect to this environment to change its icon.",
+    environmentSServerTooOldHint:
+      "This environment's server is too old to keep an icon. Update it to choose one.",
+    sessionEnvironmentChangeSettingsError:
+      "Your session on this environment cannot change its settings.",
+    icon: "Icon",
+    detected: "detected",
+    default: "default",
+  },
+  environmentRoutesList: {
+    removeRoute: "Remove route",
+    removeRouteConfirmation: (
+      connectionRouteLabelRoute: string | number | boolean | null | undefined,
+      addressNull: boolean,
+      address: string | number | boolean | null | undefined,
+    ) =>
+      `Remove ${connectionRouteLabelRoute} route?${
+        addressNull
+          ? ""
+          : `
+${address}`
+      }`,
+    routesToPreferredFirst: (environmentLabel: string | number | boolean | null | undefined) =>
+      `Routes to ${environmentLabel}, preferred first`,
+    reorderPosition: (
+      label: string | number | boolean | null | undefined,
+      position: string | number | boolean | null | undefined,
+    ) => `Reorder ${label}, position ${position}`,
+    inUse: "In use",
+    foundAutomatically: " · found automatically",
+    removeRouteAriaLabel: (label: string | number | boolean | null | undefined) =>
+      `Remove ${label} route`,
+  },
+  environmentRow: {
+    via: (connectionRouteLabelActive: string | number | boolean | null | undefined) =>
+      `via ${connectionRouteLabelActive}`,
+  },
+  expandableText: {
+    showFullError: "Show full error",
+    showLess: "Show less",
+  },
+  fontFamilyPicker: {
+    isnTMonospace: (value: string | number | boolean | null | undefined) =>
+      `"${value}" isn't monospace`,
+    codeTerminalNeedFixedWidthHint:
+      "Code and terminal need a fixed-width font, so the current font was kept.",
+    default: "default",
+    searchFonts: "Search fonts…",
+    noFontsFound: "No fonts found.",
+  },
+  gitHubAccount: {
+    hiddenAccount: "Hidden account",
+    saveGitHubAccountSettings: "save GitHub account settings",
+    signInWith: "Sign in with ",
+    serverHostRescanAccountsHint: " on the server host, then rescan to choose accounts here.",
+    chooseWhich: "Choose which ",
+    loginEachGitHubHostUsesHint: " login each GitHub host uses, or turn a host off.",
+    hideGitHubAccounts: "Hide GitHub accounts",
+    revealGitHubAccounts: "Reveal GitHub accounts",
+    hostEnabledAriaLabel: (groupHost: string | number | boolean | null | undefined) =>
+      `Use GitHub on ${groupHost}`,
+    account: "Account",
+    gitHubAccountFor: (groupHost: string | number | boolean | null | undefined) =>
+      `GitHub account for ${groupHost}`,
+    activeGhAccount: "Active gh account",
+    accountFallbackLabel: (index1: string | number | boolean | null | undefined) =>
+      `Account ${index1}`,
+    chosenLoginLongerSignedActiveHint:
+      "The chosen login is no longer signed in, so the active gh login is used.",
+    activeLoginOption: "Use active login",
+    canTBeUsed: "can't be used: ",
+    ghReportsThisLoginAsInvalid: "gh reports this login as invalid.",
+    serverOverridesAccountChosenUntilHint: (
+      groupEnvironmentVariable: string | number | boolean | null | undefined,
+    ) =>
+      `${groupEnvironmentVariable} is set on the server, so it overrides the account chosen here until it is unset.`,
+  },
+  gitHubRouting: {
+    readPrs: "Read PRs",
+    readAndAct: "Read and act",
+    readAndActAriaLabel: "read and act",
+    readPrsAriaLabel: "read PRs",
+    machinesTrustReadPrDataHint:
+      "Machines you trust here can read PR data through each other's GitHub access. Enable both machines. Read and act may use broader permissions than the machine that owns them. This applies only to this device.",
+    saveGitHubRoutingPermissionError: "Could not save GitHub routing permission",
+    gitHubRouting: (environmentLabel: string | number | boolean | null | undefined) =>
+      `${environmentLabel} GitHub routing`,
+  },
+  gitHubToken: {
+    saveGitHubToken: "save GitHub token",
+    aTokenSavedHereIsUsedBefore: "A token saved here is used before",
+    andThe: " and the",
+    loginGitHubWorksWithoutGitHubHint:
+      " login, so GitHub works without the GitHub CLI. Give it read and write access to pull requests and contents.",
+    createAToken: "Create a token",
+    token: "Token",
+    storedSecretEnterValueReplace: "Stored secret, enter a new value to replace",
+    notSet: "Not set",
+    tokenSavedServerUsesGhHint: "No token saved; the server uses GH_TOKEN or the gh login.",
+    savedFor: (savedHostsJoin: string | number | boolean | null | undefined) =>
+      `Saved for ${savedHostsJoin}.`,
+    remove: "Remove",
+    save: "Save",
+  },
+  keybindings: {
+    clearAllConditions: "Clear all conditions",
+    removeCondition: "Remove condition",
+    removeGroupAndItsConditions: "Remove group and its conditions",
+    conditionSyntaxHint: "Use variables with !, &&, ||, and parentheses.",
+    navigation: "Navigation",
+    threads: "Threads",
+    composer: "Composer",
+    previewDiff: "Preview & diff",
+    projectScripts: "Project scripts",
+    other: "Other",
+    searchKeybindings: "Search keybindings",
+    unknownCondition: (identifiers0: string | number | boolean | null | undefined) =>
+      `Unknown condition: ${identifiers0}`,
+    unknownConditions: (identifiersJoin: string | number | boolean | null | undefined) =>
+      `Unknown conditions: ${identifiersJoin}`,
+    tCodeRecognizeConditionYetHint:
+      "T3 Code does not recognize this condition yet. It can still be saved, but it may not match unless the runtime provides it.",
+    conflictsWith: (labels0: string | number | boolean | null | undefined) =>
+      `Conflicts with ${labels0}.`,
+    multipleConflictsHint: (
+      labelsSlice03Join: string | number | boolean | null | undefined,
+      labelsLength3: boolean,
+    ) => `Conflicts with ${labelsSlice03Join}${labelsLength3 ? ", and more" : ""}.`,
+    mostRecentMatchingBindingWinsHint: (
+      description: string | number | boolean | null | undefined,
+    ) => `${description} The most recent matching binding wins when both conditions can apply.`,
+    condition: "Condition",
+    negate: (conditionIdentifier: string | number | boolean | null | undefined) =>
+      `Negate ${conditionIdentifier}`,
+    not: "Not",
+    negateGroup: "Negate group",
+    group: "Group",
+    when: "When",
+    always: "Always",
+    whenExpression: "When expression",
+    fixExpressionAboveContinueEditingHint: "Fix the expression above to continue editing visually.",
+    saving: "Saving",
+    save: "Save",
+    editShortcutFor: (
+      commandLabelRowCommand: string | number | boolean | null | undefined,
+      value: string | number | boolean | null | undefined,
+    ) => `Edit shortcut for ${commandLabelRowCommand}: ${value}`,
+    keybindingFor: (commandLabelRowCommand: string | number | boolean | null | undefined) =>
+      `Keybinding for ${commandLabelRowCommand}`,
+    pressShortcut: "Press shortcut",
+    unassigned: "Unassigned",
+    editWhenClauseFor: (label: string | number | boolean | null | undefined) =>
+      `Edit when clause for ${label}`,
+    actionsFor: (commandLabelRowCommand: string | number | boolean | null | undefined) =>
+      `Actions for ${commandLabelRowCommand}`,
+    resetToDefault: "Reset to default",
+    remove: "Remove",
+    newKeybinding: "new keybinding",
+    draftShortcutAriaLabel: (draftCommandLabelText: string | number | boolean | null | undefined) =>
+      `Keybinding for ${draftCommandLabelText}`,
+    cancelNewKeybinding: "Cancel new keybinding",
+    newBindingTitle: "New keybinding",
+    browserMayClaimSomeShortcutsHint:
+      "The browser may claim some shortcuts first. The desktop app receives them all.",
+    unableToOpenKeybindingsFile: "Unable to open keybindings file",
+    theKeybindingsFileWasNotOpened: "The keybindings file was not opened.",
+    unableToSaveKeybinding: "Unable to save keybinding",
+    theKeybindingWasNotSaved: "The keybinding was not saved.",
+    unableToRemoveKeybinding: "Unable to remove keybinding",
+    theKeybindingWasNotRemoved: "The keybinding was not removed.",
+    addKeybinding: "Add keybinding",
+    openKeybindingsJson: "Open keybindings.json",
+    connectionViewKeybindingsButChangeError:
+      "This connection can view keybindings but cannot change them.",
+    noKeybindingsMatchYourSearch: "No keybindings match your search.",
+
+    sourceLabels: { Default: "Default", Custom: "Custom", Project: "Project" } satisfies Record<
+      "Default" | "Custom" | "Project",
+      string
+    >,
+    booleanOperators: { and: "and", or: "or" } satisfies Record<"and" | "or", string>,
+  },
+  loadBalancing: {
+    prefer: "Prefer",
+    normal: "Normal",
+    lessOften: "Less often",
+    manualOnly: "Manual only",
+    automaticallyBalanceLoad: "Automatically balance load",
+    threadsSharedProjectsStartMachineHint:
+      "New threads in shared projects start on the machine with the most free CPU and memory, weighted by each machine's preference.",
+    loadPreference: (environmentLabel: string | number | boolean | null | undefined) =>
+      `${environmentLabel} load preference`,
+  },
+  localEnvironmentSetting: {
+    couldnTChangeThisSetting: "Couldn't change this setting.",
+    runAgentsComputerTurnOffHint:
+      "Run agents on this computer. Turn off to use T3 Code only with remote environments.",
+    turnedOffAgentsRunRemoteHint: "Turned off. Agents only run in remote environments.",
+    turnOffLocalEnvironment: "Turn off local environment?",
+    turnOnLocalEnvironment: "Turn on local environment?",
+    tCodeRestartWithoutRunningHint:
+      "T3 Code will restart without running a server on this computer. Any agents and terminals running here will stop, and other devices will no longer be able to connect to this computer. Your projects, history, and remote environments are unaffected.",
+    tCodeRestartStartRunningHint:
+      "T3 Code will restart and start running a server on this computer again.",
+    restartAndTurnOff: "Restart and turn off",
+    restartAndTurnOn: "Restart and turn on",
+  },
+  notification: {
+    description:
+      "System alerts when a thread finishes, fails, or needs input or approval. Applies to this device while T3 Code is open.",
+    supportHint:
+      "Notifications need a supported browser over HTTPS, or the desktop app. Sound only is still available.",
+    permissionHint:
+      "Allow notifications in your browser or system settings, then choose this option again. Sound only is still available.",
+    unavailableHint:
+      "Notifications are unavailable in this browser. Sound only is still available.",
+  },
+  openSourceLicenses: {
+    licenseManifestRequestFailedStatusError: (
+      stringResponseStatus: string | number | boolean | null | undefined,
+    ) => `The license manifest request failed with status ${stringResponseStatus}.`,
+    viewProjectSourceFor: (entryName: string | number | boolean | null | undefined) =>
+      `View project source for ${entryName}`,
+    projectSource: "Project source",
+    notices: (stringTotalCount: string | number | boolean | null | undefined) =>
+      `${stringTotalCount} notices`,
+    of: (
+      stringFilteredCount: string | number | boolean | null | undefined,
+      stringTotalCount: string | number | boolean | null | undefined,
+    ) => `${stringFilteredCount} of ${stringTotalCount}`,
+    searchOpenSourceLicenses: "Search open-source licenses",
+    searchLicenses: "Search licenses",
+    openSourceNoticesAreUnavailable: "Open-source notices are unavailable",
+    theLicenseManifestCouldNotLoad: "The license manifest could not load.",
+    thirdPartyNotices: "Third-party notices",
+    noLicensesMatchThatSearch: "No licenses match that search.",
+    loadingOpenSourceNotices: "Loading open-source notices…",
+  },
+  panelAnimationsPreview: {
+    replayPanelAnimationPreview: "Replay panel animation preview",
+  },
+  processSignalActions: {
+    sendSigint: "Send SIGINT",
+    sendSigkill: "Send SIGKILL",
+  },
+  projectActionsList: {
+    noActionsConfigured: "No actions configured.",
+    setup: "setup",
+    onSettle: "on settle",
+    previewDesktopOnly: "preview · desktop only",
+    edit: (scriptName: string | number | boolean | null | undefined) => `Edit ${scriptName}`,
+  },
+  projectActions: {
+    failedToImportAction: "Failed to import action.",
+    commandsRunProjectSCheckoutHint:
+      "Commands that run in this project's checkout or its worktree, with optional shortcuts.",
+    importScripts: "Import scripts",
+    importFromT3Json: "Import from t3.json",
+    addActionsDeclaredCheckoutWithoutHint:
+      "Add actions declared by this checkout without editing them first.",
+    addAction: "Add action",
+    differentActionsAcrossEnvironments: "Different actions across environments",
+    oneEnvironmentEditListAddingHint:
+      "Choose one environment to edit its list. Adding an action here adds it on every selected environment.",
+    t3JsonIsInvalid: "t3.json is invalid",
+    tJsonExistsCheckoutButHint:
+      "A t3.json exists in this checkout but fails to parse, so every action and icon it declares is ignored. Check the JSON syntax and icon values.",
+  },
+  projectDefaults: {
+    modelUnavailableSelectEnvironmentModelHint: (
+      environmentLabel: string | number | boolean | null | undefined,
+    ) =>
+      `This model is unavailable on ${environmentLabel ?? "a selected environment"}. Select that environment to choose its model separately.`,
+    defaultModelNotSaved: "Default model not saved",
+    modelForNewThreadsInThisProject: "Model for new threads in this project.",
+    defaultModelThreadsProjectsOverrideHint:
+      "Default model for new threads. Projects can override it.",
+    automatic: "Automatic",
+    defaultModel: "default model",
+    noProvidersAvailable: "No providers available",
+    threadsProjectStartHint: "Where new threads in this project start.",
+    threadsStartProjectsTheirTHint:
+      "Where new threads start. Projects and their t3.json can override it.",
+    defaultWorkspace: "default workspace",
+    workspaceAriaLabel: "Default workspace",
+    repositories: "Repositories",
+    permissionsThreadsProjectHint: "Permissions for new threads in this project.",
+    defaultPermissionsThreadsProjectsOverrideHint:
+      "Default permissions for new threads. Projects can override them.",
+    defaultPermissions: "default permissions",
+    permissionsAriaLabel: "Default permissions",
+    worktreesProjectPopulateGitSubmodulesHint:
+      "How new worktrees in this project populate git submodules.",
+    worktreesPopulateGitSubmodulesProjectsHint:
+      "How new worktrees populate git submodules. Projects and their t3.json can override it.",
+    worktreeSubmodules: "worktree submodules",
+    submodulesAriaLabel: "Worktree submodules",
+    keepsProjectSDefaultBranchHint:
+      "Keeps this project's default branch current when the checkout has no local changes or commits.",
+    keepsDefaultBranchCurrentCheckoutHint:
+      "Keeps the default branch current when the checkout has no local changes or commits. Projects can override it.",
+    defaultAutomaticPull: "default automatic pull",
+    resetAutomaticPullToOff: "Reset automatic pull to off",
+    automaticPullAriaLabel: "Default automatic pull",
+    removeRecognizedAgentCreditLinesHint:
+      "Remove recognized agent credit lines from GitHub merge and squash messages, keeping human co-authors. Includes auto-merge. Excludes merge queues, stack merges, and existing commits.",
+    agentCreditRemoval: "agent credit removal",
+    keepAgentCredits: "Keep agent credits",
+    pullRequestsProjectStartMethodHint: "Pull requests in this project start with this method.",
+    pullRequestsStartMethodLastHint:
+      "Pull requests start with this method. Last selected reuses whatever you chose most recently on this device.",
+    defaultMergeMethod: "default merge method",
+    resetToLastSelected: "Reset to last selected",
+    defaultPullRequestMergeMethod: "Default pull request merge method",
+    lastSelected: "Last selected",
+    allowAgentsProjectSharedBrowserHint:
+      "Allow agents in this project to use the shared browser. Applies when the agent session next starts.",
+    allowAgentsSharedBrowserProjectsHint:
+      "Allow agents to use the shared browser. Projects can override it.",
+    defaultBrowserAccess: "default browser access",
+  },
+  projectFaviconPicker: {
+    searchingProjectFiles: "Searching project files…",
+    indexingProjectFiles: "Indexing project files…",
+    noMatchingImageFiles: "No matching image files.",
+    noImageFilesFound: "No image files found.",
+    chooseProjectIcon: "Choose project icon",
+    selectIcon: "Select icon",
+    couldNotOpenImagePicker: "Could not open image picker",
+    openIn: (fileManagerName: string | number | boolean | null | undefined) =>
+      `Open in ${fileManagerName}`,
+    searchImageFiles: "Search image files…",
+  },
+  projectIconPicker: {
+    chooseProjectIcon: "Choose project icon",
+    chooseAnIconEmojiOrMonogram: "Choose an icon, emoji, or monogram.",
+    iconType: "Icon type",
+    icons: "Icons",
+    emoji: "Emoji",
+    monogram: "Monogram",
+    color: "Color",
+    iconColor: "Icon color",
+    searchLucideIcons: "Search Lucide icons",
+    searchAllLucideIcons: "Search all Lucide icons",
+    noIconsFound: "No icons found.",
+    letters: "Letters",
+    oneOrTwoLettersOrNumbers: "One or two letters or numbers.",
+    orPasteAnyEmoji: "Or paste any emoji",
+    customEmoji: "Custom emoji",
+    pasteAnEmoji: "Paste an emoji",
+    saveIcon: "Save icon",
+  },
+  projectSettings: {
+    addProjectSidebarConfigureHint: "Add a project from the sidebar to configure it here.",
+    thisProjectIsNoLongerAvailable: "This project is no longer available.",
+    checkoutLongerAvailableSelectedProjectHint:
+      "This checkout is no longer available in the selected project and environment.",
+    connectionChangeProjectsError: (
+      deniedEnvironmentLabel: string | number | boolean | null | undefined,
+    ) =>
+      `This connection cannot change projects in ${deniedEnvironmentLabel ?? "this environment"}.`,
+    connectAndTryAgain: (
+      unavailableEnvironmentLabel: string | number | boolean | null | undefined,
+    ) => `Connect ${unavailableEnvironmentLabel ?? "the selected environment"} and try again.`,
+    on: (
+      failureTitle: string | number | boolean | null | undefined,
+      memberEnvironmentLabel: string | number | boolean | null | undefined,
+    ) => `${failureTitle} on ${memberEnvironmentLabel ?? "the current environment"}`,
+    projectTitleCannotBeEmpty: "Project title cannot be empty",
+    failedToRenameProject: "Failed to rename project",
+    failedToUpdateProjectIcon: "Failed to update project icon",
+    failedToRemoveProject: "Failed to remove project",
+    removeAndDeleteItsThread: (
+      targetKind: string | number | boolean | null | undefined,
+      targetLabel: string | number | boolean | null | undefined,
+      projectThreadsLength: string | number | boolean | null | undefined,
+      projectThreadsLength1: boolean,
+    ) =>
+      `Remove ${targetKind} "${targetLabel}" and delete its ${projectThreadsLength} thread${projectThreadsLength1 ? "" : "s"}?`,
+    remove: (
+      targetKind: string | number | boolean | null | undefined,
+      targetLabel: string | number | boolean | null | undefined,
+    ) => `Remove ${targetKind} "${targetLabel}"?`,
+    path: (singleMemberWorkspaceRoot: string | number | boolean | null | undefined) =>
+      `Path: ${singleMemberWorkspaceRoot}`,
+    environment: (singleMemberEnvironmentLabel: string | number | boolean | null | undefined) =>
+      `Environment: ${singleMemberEnvironmentLabel}`,
+    thisRemovesGroupedProjectEntries: (
+      membersLength: string | number | boolean | null | undefined,
+    ) => `This removes ${membersLength} grouped project entries.`,
+    permanentlyClearsConversationHistoryThreadsHint:
+      "This permanently clears conversation history for those threads and any archived threads.",
+    permanentlyClearsAnyArchivedConversationHint:
+      "This permanently clears any archived conversation history.",
+    removesProjectEntriesFilesDiskHint:
+      "This removes only the project entries, not the files on disk.",
+    otherEntriesGroupedProjectUnaffectedHint:
+      "Other entries in this grouped project are unaffected.",
+    thisActionCannotBeUndone: "This action cannot be undone.",
+    failedToRemove: (memberTitle: string | number | boolean | null | undefined) =>
+      `Failed to remove "${memberTitle}"`,
+    checkouts: "Checkouts",
+    removeCheckout: (memberWorkspaceRoot: string | number | boolean | null | undefined) =>
+      `Remove checkout ${memberWorkspaceRoot}`,
+    removeAction: "Remove",
+    tFindSettingKeepProjectHint:
+      "Can't find a setting? Keep this project picked above and hop to any other settings page.",
+    sharedSettingsRequirePermissionChangeHint:
+      "Shared settings require permission to change every checkout in this group.",
+    connectionChangeProjectError: "This connection cannot change this project.",
+    sharedNameProjectGroupSidebarHint:
+      "The shared name for this project group in the sidebar and thread lists.",
+    projectName: "Project name",
+    projectIcon: "Project icon",
+    automatic: "Automatic",
+    iconResetLabel: "project icon",
+    chooseAProjectIcon: "Choose a project icon",
+    chooseIcon: "Choose icon",
+    chooseAProjectIconFile: "Choose a project icon file",
+    chooseFile: "Choose file",
+    danger: "Danger",
+    removeCheckoutAction: "Remove checkout",
+    removeThisProjectEverywhere: "Remove this project everywhere",
+    removeProject: "Remove project",
+    deletesSelectedMachineSCheckoutHint:
+      "Deletes the selected machine's checkout entries and their threads. Other machines and files on disk are not touched.",
+    deletesAllCheckoutEntriesTheirHint: (
+      groupMemberProjectsLength: string | number | boolean | null | undefined,
+    ) =>
+      `Deletes all ${groupMemberProjectsLength} checkout entries and their threads on every machine. Files on disk are not touched.`,
+    deletesProjectEntryThreadsFilesHint:
+      "Deletes the project entry and its threads. Files on disk are not touched.",
+    removeAllEntries: "Remove all entries",
+  },
+  projects: {
+    projectManageNameIconCheckoutsHint:
+      "Choose a project to manage its name, icon, checkouts and actions.",
+  },
+  providerAccentColorPicker: {
+    accentColor: "Accent color",
+    accentColorHue: "Accent color hue",
+    customHexAccentColor: "Custom hex accent color",
+    accentColorFor: (
+      normalized: boolean,
+      propsDisplayName: string | number | boolean | null | undefined,
+    ) => `${normalized ? "Change" : "Add"} accent color for ${propsDisplayName}`,
+    changeAccentColor: "Change accent color",
+    clearColor: "Clear color",
+  },
+  providerAuthCallbackCoordinator: {
+    chatGptSignInCouldnTFinish: "ChatGPT sign-in couldn't finish",
+    returnToTheProviderAndTryAgain: "Return to the provider and try again.",
+    reconnectEnvironmentTryAgainHint: "Reconnect to the environment and try again.",
+  },
+  providerAuthentication: {
+    startingSignIn: "Starting sign-in…",
+    checkingYourAccount: "Checking your account…",
+    completeSignInInTheTerminalBelow: "Complete sign-in in the terminal below.",
+    enterYourCredentialsBelow: "Enter your credentials below.",
+    signedIn: "Signed in.",
+    discoveringSignInMethods: "Discovering sign-in methods…",
+    appSignAdvertisedFollowProviderHint:
+      "No in-app sign-in advertised. Follow the provider's docs to finish setup.",
+    signInOn: (environmentLabel: string | number | boolean | null | undefined) =>
+      `Sign in on ${environmentLabel}.`,
+    providerSignInFailedTryAgain: "Provider sign-in failed. Try again.",
+    openSignPageCopyLinkError:
+      "Could not open the sign-in page. Copy the link and open it in your browser.",
+    account: "Account",
+    signInMethod: "Sign-in method",
+    providerDefault: "Provider default",
+    openBrowser: "Open browser",
+    copySignInLink: "Copy sign-in link",
+    providerSignInLink: "Provider sign-in link",
+    couldNotCopyTheSignInLink: "Could not copy the sign-in link.",
+    openDocs: "Open docs",
+    cancelSignIn: "Cancel sign-in",
+    retrySignIn: "Retry sign-in",
+    signIn: "Sign in",
+    signOutStopsRunningThreadsHint: (
+      providerDisplayName: string | number | boolean | null | undefined,
+      providerDriver: string | number | boolean | null | undefined,
+      environmentLabel: string | number | boolean | null | undefined,
+    ) =>
+      `Sign out of ${providerDisplayName ?? providerDriver} on ${environmentLabel}? This stops running threads that share this sign-in. Thread history is kept.`,
+    signOut: "Sign out",
+    enterCode: "Enter code",
+    inYourBrowser: "in your browser.",
+    loadingSignInTerminal: "Loading sign-in terminal…",
+
+    sendInputProviderSignTerminalError: "Could not send input to the provider sign-in terminal.",
+    ifFinalLocalhostPageLoadHint:
+      "If the final localhost page does not load, paste its full URL here.",
+
+    providerSignTerminalLongerAvailableHint:
+      "The provider sign-in terminal is no longer available.",
+  },
+  providerAuthTerminal: {
+    couldNotOpenTheProviderLink: "Could not open the provider link.",
+    loadSignTerminalCancelRetryError:
+      "Could not load the sign-in terminal. Cancel and retry sign-in.",
+    providerSignInTerminal: "Provider sign-in terminal",
+  },
+  providerDriverMeta: {
+    cursorApiKey: "Cursor API key",
+    optionalOverridesBrowserSignProviderHint:
+      "Optional. Overrides browser sign-in for this provider.",
+    pasteApiKey: "Paste API key",
+  },
+  providerInstanceCard: {
+    storedSecretEnterValueReplace: "Stored secret - enter a new value to replace",
+    clear: (propsFieldLabel: string | number | boolean | null | undefined) =>
+      `Clear ${propsFieldLabel}`,
+    variables: "Variables",
+    apiKeysBaseUrlsOtherHint: "API keys, base URLs, and other per-instance CLI settings.",
+    addVariable: "Add variable",
+    environmentVariableName: (index1: string | number | boolean | null | undefined) =>
+      `Environment variable name ${index1}`,
+    storedSecretPlaceholder: "Stored secret, enter a new value to replace",
+    value: "value",
+    environmentVariableValue: (index1: string | number | boolean | null | undefined) =>
+      `Environment variable value ${index1}`,
+    markEnvironmentVariableAsSensitive: (
+      variableNameIndex1: string | number | boolean | null | undefined,
+    ) => `Mark environment variable ${variableNameIndex1} as sensitive`,
+    sensitiveStoredSeparately: "Sensitive, stored separately",
+    plainText: "Plain text",
+    removeEnvironmentVariable: (variableNameIndex1: string | number | boolean | null | undefined) =>
+      `Remove environment variable ${variableNameIndex1}`,
+    sensitiveValuesStoredSeparatelyNeverHint:
+      "Sensitive values are stored separately and never returned to the app.",
+    updateCommandCopied: (providerName: string | number | boolean | null | undefined) =>
+      `${providerName} update command copied`,
+    runTerminalReadyUpdateHint: "Run it in a terminal when you are ready to update.",
+    couldNotCopyUpdateCommand: (providerName: string | number | boolean | null | undefined) =>
+      `Could not copy ${providerName} update command`,
+    incompatible: "Incompatible",
+    unsupported: "Unsupported",
+    limitedSupport: "Limited support",
+    authenticatedAs: "Authenticated as",
+    viewDetails: (versionAdvisoryTitle: string | number | boolean | null | undefined) =>
+      `${versionAdvisoryTitle} — view details`,
+    updating: "Updating",
+    install: (value: string | number | boolean | null | undefined) => `Install ${value}`,
+    updateNow: "Update now",
+    orUpdateManuallyUsing: "or, update manually using",
+    copyUpdateCommand: "Copy update command",
+    copyCommand: "Copy command",
+    select: (displayName: string | number | boolean | null | undefined) => `Select ${displayName}`,
+    enable: (displayName: string | number | boolean | null | undefined) => `Enable ${displayName}`,
+    deleteInstance: (instanceId: string | number | boolean | null | undefined) =>
+      `Delete instance ${instanceId}`,
+    driver: "Driver",
+    thisInstanceUses: "This instance uses ",
+    availableBuildConfigurationPreservedHint:
+      ", which is not available in this build. Its configuration is preserved.",
+    displayName: "Display name",
+    continueAuthentication: "Continue authentication",
+    instanceLabel: "Instance label",
+    runtime: "Runtime",
+    models: "Models",
+    favoritesVisibilityOrderingSavedDeviceHint:
+      "Favorites, visibility, and ordering are saved on this device. Custom models are saved on the selected environment.",
+  },
+  providerModels: {
+    fastMode: "Fast mode",
+    thinking: "Thinking",
+    reasoning: "Reasoning",
+    enterAModelSlug: "Enter a model slug.",
+    thatModelIsAlreadyBuiltIn: "That model is already built in.",
+    modelSlugsMustCharactersLessError: (
+      maxCustomModelLength: string | number | boolean | null | undefined,
+    ) => `Model slugs must be ${maxCustomModelLength} characters or less.`,
+    thatCustomModelIsAlreadySaved: "That custom model is already saved.",
+    favorites: (isFavorite: boolean, modelName: string | number | boolean | null | undefined) =>
+      `${isFavorite ? "Remove" : "Add"} ${modelName} ${isFavorite ? "from" : "to"} favorites`,
+    removeFromFavorites: "Remove from favorites",
+    addToFavorites: "Add to favorites",
+    moveUp: (modelName: string | number | boolean | null | undefined) => `Move ${modelName} up`,
+    moveUpTooltip: "Move up",
+    moveDown: (modelName: string | number | boolean | null | undefined) => `Move ${modelName} down`,
+    moveDownTooltip: "Move down",
+    edit: (modelSlug: string | number | boolean | null | undefined) => `Edit ${modelSlug}`,
+    editNameAndOptions: "Edit name and options",
+    remove: (modelSlug: string | number | boolean | null | undefined) => `Remove ${modelSlug}`,
+    removeCustomModel: "Remove custom model",
+    customModelsAlwaysShownPicker: "Custom models are always shown in the picker",
+    hiddenFromPicker: "Hidden from picker",
+    shownInPicker: "Shown in picker",
+    showInTheModelPicker: (modelName: string | number | boolean | null | undefined) =>
+      `Show ${modelName} in the model picker`,
+    custom: "custom",
+    filterModels: "Filter models",
+    enableAll: "Enable all",
+    disableAll: "Disable all",
+    favorite: (
+      favoriteCount: string | number | boolean | null | undefined,
+      favoriteCount1: boolean,
+    ) => ` · ${favoriteCount} favorite${favoriteCount1 ? "" : "s"}`,
+    hidden: (hiddenCount: string | number | boolean | null | undefined) =>
+      ` · ${hiddenCount} hidden`,
+    addCustomModel: "Add custom model",
+    noModelsMatch: "No models match.",
+    modelsReportedProviderYetHint: "No models reported for this provider yet.",
+    favoritesGroup: "Favorites",
+    all: "All",
+    add: "Add",
+
+    modelCount: (count: number) => `${count} model${count === 1 ? "" : "s"}`,
+  },
+  providerSettingsForm: {
+    executable: "Executable",
+    executableNamePathEnvironmentHint: "Executable name or path on this environment.",
+    eGDsh: "e.g. dsh",
+    arguments: "Arguments",
+    oneLiteralArgumentPerRowHint: "One literal argument per row, in launch order.",
+    addArgument: "Add argument",
+    argument: (index1: string | number | boolean | null | undefined) => `Argument ${index1}`,
+    removeArgument: (index1: string | number | boolean | null | undefined) =>
+      `Remove argument ${index1}`,
+  },
+  providerSettings: {
+    checked: "Checked ",
+    lastCheckedHint: (lastCheckedRelativeValue: string | number | boolean | null | undefined) =>
+      `Checked ${lastCheckedRelativeValue}`,
+    primaryDevice: "Primary device",
+    localDevice: "Local device",
+    remoteDevice: "Remote device",
+    loadingProviderSettings: "Loading provider settings",
+    couldNotConnectToThisDevice: "Could not connect to this device",
+    providerSettingsAreUnavailable: "Provider settings are unavailable",
+    checkingWhatSessionAllowedChangeHint: "Checking what this session is allowed to change.",
+    waitingForSConfiguration: (environmentLabel: string | number | boolean | null | undefined) =>
+      `Waiting for ${environmentLabel}'s configuration.`,
+    deviceUnavailable: "Device unavailable",
+    reconnectDeviceUpProviderSelectHint:
+      "Reconnect this device to set up its provider, or select another device.",
+    noConnectedDevices: "No connected devices",
+    loadingDevices: "Loading devices",
+    connectExecutionEnvironmentBeforeConfiguringHint:
+      "Connect an execution environment before configuring providers.",
+    readingConnectedExecutionEnvironmentsHint: "Reading connected execution environments.",
+    authenticationRequestExpired: "Authentication request expired",
+    refreshProviderStartAuthenticationFlowHint:
+      "Refresh the provider and start the authentication flow again.",
+    couldNotContinueAuthentication: "Could not continue authentication",
+    theAuthenticationRequestExpired: "The authentication request expired.",
+    couldNotUpdate: (
+      providerDisplayNamesCandidateDriver: string | number | boolean | null | undefined,
+      candidateDriver: string | number | boolean | null | undefined,
+    ) => `Could not update ${providerDisplayNamesCandidateDriver ?? candidateDriver}`,
+    providerUpdateCommandStartedError: "The provider update command could not be started.",
+    couldNotUpdateProviderInstance: "Could not update provider instance",
+    theSettingsUpdateFailed: "The settings update failed.",
+    couldNotDeleteProviderInstance: "Could not delete provider instance",
+    providerDeletedButManagedFiles: "Provider deleted, but managed files remain",
+    managedBinaryCleanupFailed: "Managed binary cleanup failed.",
+    couldNotResetProviderInstance: "Could not reset provider instance",
+    cursorAccount: "Cursor account",
+    usingCursorApiKeyRemoveHint:
+      "Using CURSOR_API_KEY. Remove it from this provider's environment to use browser sign-in.",
+    providerSettings: (resetLabel: string | number | boolean | null | undefined) =>
+      `${resetLabel} provider settings`,
+    refreshProviderStatus: "Refresh provider status",
+    refreshingProviders: "Refreshing providers",
+    addProvider: "Add provider",
+    limitedPermissions: "Limited permissions",
+    sessionViewSProvidersButHint: (
+      environmentLabel: string | number | boolean | null | undefined,
+    ) => `This session can view ${environmentLabel}'s providers but can't change their settings.`,
+    providerInstanceLongerAvailableDeviceHint:
+      "This provider instance is no longer available on this device.",
+    noProvidersConfigured: "No providers configured.",
+    intervalConfiguredSharedBackgroundActivityHint:
+      "This interval is configured here, then the shared Background activity policy decides whether provider probes may run when the timer fires. Custom intervals appear as Advanced in General settings.",
+    refreshProviderStatusVersionsModelsHint:
+      "Refresh provider status, versions, and models in the background. Set to 0 to disable.",
+    providerHealthCheckInterval: "provider health check interval",
+    decreaseProviderHealthCheckInterval: "Decrease provider health check interval",
+    providerHealthCheckIntervalSeconds: "Provider health check interval in seconds",
+    increaseProviderHealthCheckInterval: "Increase provider health check interval",
+  },
+  providerSetup: {
+    antigravitySetup: "Antigravity setup",
+    deviceThatRunsThisProvider: "Device that runs this provider.",
+    enableAntigravity: "Enable Antigravity",
+    setupUnavailable: "Setup unavailable",
+    providerSetupIsReadOnly: "Provider setup is read-only.",
+    updateRequired: "Update required",
+    updateEnvironmentManageAntigravityHint: "Update this environment to manage Antigravity.",
+    downloadingMbMb: (
+      installationDownloadedBytes1000000: string | number | boolean | null | undefined,
+      installationTotalBytesNull: boolean,
+      installationTotalBytes1000000: string | number | boolean | null | undefined,
+    ) =>
+      `Downloading ${installationDownloadedBytes1000000} MB${installationTotalBytesNull ? "" : ` of ${installationTotalBytes1000000} MB`}.`,
+    extractingAntigravity: "Extracting Antigravity.",
+    checkingTheDownloadedRuntime: "Checking the downloaded runtime.",
+    installed: "Installed.",
+    configuredAntigravityRuntimeUnavailableHint:
+      "The configured Antigravity runtime is unavailable.",
+    configuredAntigravityRuntimeCheckedHint:
+      "The configured Antigravity runtime has not been checked.",
+    mbDownload: (value: string | number | boolean | null | undefined) => `${value} MB download.`,
+    notInstalled: "Not installed.",
+    providerSetupFailed: "Provider setup failed.",
+    providerSetupFailedTryAgain: "Provider setup failed. Try again.",
+    removeDownloadedAntigravityRuntimeGoogleHint: (
+      environmentLabel: string | number | boolean | null | undefined,
+    ) =>
+      `Remove the downloaded Antigravity runtime from ${environmentLabel}? Google sign-in and thread history are kept.`,
+    removingRuntime: "Removing runtime",
+    runtime: "Runtime",
+    installAndManageAntigravity: "Install and manage Antigravity.",
+    usesCustomBinaryPathBelowHint:
+      "Uses the custom binary path below. Installation keeps that path.",
+    automaticInstallationUnavailableBinaryPathHint:
+      "Automatic installation unavailable. Set a binary path or use another environment.",
+    antigravityDownload: "Antigravity download",
+    cancellingInstallation: "Cancelling installation",
+    cancelInstallation: "Cancel installation",
+    startingInstallation: "Starting installation",
+    updateAntigravity: "Update Antigravity",
+    reinstallAntigravity: "Reinstall Antigravity",
+    retryInstallation: "Retry installation",
+    installManagedRuntime: "Install managed runtime",
+    installAntigravity: "Install Antigravity",
+    removeDownloadedRuntime: "Remove downloaded runtime",
+    retrySetupStatus: "Retry setup status",
+  },
+  providerStatus: {
+    checkingProviderStatus: "Checking provider status",
+    waitingServerReportInstallationAuthenticationHint:
+      "Waiting for the server to report installation and authentication details.",
+    providerInstalledButDisabledSessionsHint:
+      "This provider is installed but disabled for new sessions in T3 Code.",
+    notFound: "Not found",
+    cliNotDetectedOnPath: "CLI not detected on PATH.",
+    notAuthenticated: (authLabel: string | number | boolean | null | undefined) =>
+      `Not authenticated · ${authLabel}`,
+    unauthenticated: "Not authenticated",
+    needsAttention: "Needs attention",
+    providerInstalledButServerFullyError:
+      "The provider is installed, but the server could not fully verify it.",
+    theProviderFailedItsStartupChecks: "The provider failed its startup checks.",
+    authenticated: (authLabel: string | number | boolean | null | undefined) =>
+      `Authenticated · ${authLabel}`,
+    authenticatedStatus: "Authenticated",
+    available: "Available",
+    limitedSupport: "Limited support",
+    unsupportedVersion: "Unsupported version",
+    knownBrokenVersion: "Known broken version",
+    recommendedVersionHint: (recommendation: string | number | boolean | null | undefined) =>
+      `Use ${recommendation} for full support.`,
+    updateForFullSupport: "Update for full support.",
+    updateAvailable: "Update available",
+    install: (
+      label: string | number | boolean | null | undefined,
+      versionLabel: string | number | boolean | null | undefined,
+    ) => `${label}: install ${versionLabel}.`,
+    installTheLatestProviderVersion: (label: string | number | boolean | null | undefined) =>
+      `${label}: install the latest provider version.`,
+  },
+  providerWizardAuthenticationStep: {
+    account: "Account",
+    discoveringSignInMethods: "Discovering sign-in methods…",
+    appSignAdvertisedFollowProviderHint:
+      "No in-app sign-in advertised. Follow the provider's docs to finish setup.",
+    signIn: "Sign in",
+    openDocs: "Open docs",
+    skipForNow: "Skip for now",
+  },
+  scoped: {
+    settingEnvironmentWideOverriddenProjectError:
+      "This setting is environment-wide and cannot be overridden by a project.",
+    connectSelectedCheckoutsUpdateTheirHint:
+      "Connect the selected checkouts, or update their environments, to save a project override.",
+    connectToSaveThisSetting: (
+      scopeKindEnvironment: boolean,
+      scopeLabel: string | number | boolean | null | undefined,
+    ) => `Connect ${scopeKindEnvironment ? scopeLabel : "an environment"} to save this setting.`,
+    resetCheckoutUnavailableHint:
+      "Connect the selected checkouts, or update their environments, to reset this override.",
+    connectEnvironmentsResetOverridesHint: "Connect the environments to reset these overrides.",
+    settingNotSaved: "Setting not saved",
+    connectionChangeSettingsError: "This connection cannot change these settings.",
+    settingSavedOnSomeEnvironments: "Setting saved on some environments",
+    couldNotUpdate: (
+      value: string | number | boolean | null | undefined,
+      savedEnvironmentCount0: boolean,
+    ) =>
+      `Could not update ${value}.${savedEnvironmentCount0 ? " The other selected environments saved the change." : ""}`,
+  },
+  settingInheritance: {
+    repositoryConventions: "Repository conventions",
+    conventionalCommits: "Conventional Commits",
+    customInstructions: "Custom instructions",
+    lastSelected: "Last selected",
+    never: "Never",
+    automatic: "Automatic",
+    inherit: "Inherit",
+    notSet: "Not set",
+    on: "On",
+    dayCount: (value: string | number | boolean | null | undefined, value1: boolean) =>
+      `${value} ${value1 ? "day" : "days"}`,
+    empty: "Empty",
+    itemCount: (valueLength: string | number | boolean | null | undefined, valueLength1: boolean) =>
+      `${valueLength} ${valueLength1 ? "item" : "items"}`,
+    custom: "Custom",
+    project: (
+      summary: string | number | boolean | null | undefined,
+      overridingProjectsLength: string | number | boolean | null | undefined,
+      overridingProjectsLength1: boolean,
+    ) =>
+      `${summary} · ${overridingProjectsLength} project ${overridingProjectsLength1 ? "override" : "overrides"}`,
+    showWhereThisValueComesFrom: (overrideSummary: string | number | boolean | null | undefined) =>
+      `${overrideSummary}. Show where this value comes from`,
+    overriddenBy: "Overridden by",
+    reset: "Reset ",
+    it: "it",
+    all: "all",
+
+    inherits: "Inherits",
+  },
+  settingsFontPreviews: {
+    frontendDesignFixFlakyTest: "Use $frontend-design to fix the flaky test in ",
+    surfaceTestTsAppsWeb:
+      "[surface.test.ts](apps/web/src/terminal/ghostty/surface.test.ts) and align the header with ",
+    settingsPanelsTsxAppsWebSrcHint:
+      "[SettingsPanels.tsx](apps/web/src/components/settings/SettingsPanels.tsx) before shipping.",
+    promptFontPreview: "Prompt font preview",
+    terminalFontPreview: "Terminal font preview",
+  },
+  settingsScope: {
+    selectProjectOneCheckoutsHint: "Select a project to choose one of its checkouts.",
+    environmentLongerAvailableHint: "This environment is no longer available.",
+    thisProjectIsNoLongerAvailable: "This project is no longer available.",
+    checkoutLongerAvailableSelectedProjectHint:
+      "This checkout is no longer available in the selected project and environment.",
+    projectCheckoutEnvironmentHint: "This project has no checkout on this environment.",
+    checkoutSEnvironmentLongerAvailableHint: "This checkout's environment is no longer available.",
+    projectScopeLabel: (
+      groupDisplayName: string | number | boolean | null | undefined,
+      environmentLabel: string | number | boolean | null | undefined,
+    ) => `${groupDisplayName} / ${environmentLabel ?? "All checkouts"}`,
+  },
+  snapShot: {
+    checkingSnapshots: "Checking snapshots…",
+    notSupportedOnThisPlatform: "Not supported on this platform.",
+    turnThisOnToSetUpSnapshots: "Turn this on to set up snapshots.",
+    captureNeedsAttention: "Capture needs attention",
+    checkCaptureAccessInSetup: "Check capture access in setup",
+    installTheCaptureHelperToContinue: "Install the capture helper to continue",
+    setUpActiveWindowSnapshots: "Set up active-window snapshots",
+    manualCaptureLlWindowEach: "Manual capture only — you'll choose a window each time",
+    enableCaptureToContinue: "Enable capture to continue",
+    connectingYourShortcut: "Connecting your shortcut…",
+    waitingForShortcutPermission: "Waiting for shortcut permission",
+    readyToCapture: "Ready to capture",
+    shortcutUsageHint: "Use your shortcut from another app",
+    shortcutSaved: "Shortcut saved",
+    finishShortcutSetup: "Finish shortcut setup",
+    approveShortcutPermissionPromptContinueHint:
+      "Approve the shortcut permission prompt to continue.",
+    shortcutSavedHint: "Shortcut saved.",
+    continueSetup: "Continue setup",
+    manageCapture: "Manage capture",
+    setUpCapture: (desktop: string | number | boolean | null | undefined) =>
+      `Set up ${desktop} capture`,
+    captureEffectsArenTAvailableHint: "Capture effects aren't available on this desktop.",
+    installUpdateCaptureHelperEnableHint: "Install or update the capture helper to enable effects.",
+    niriEffectsUnavailableHint: "Capture effects aren't available on Niri.",
+    updateGnomeExtensionSignOutHint:
+      "Update the GNOME extension, then sign out and back in to enable effects.",
+    finishExtensionSetupEnableEffectsHint: "Finish extension setup to enable effects.",
+    automaticCaptureIsnTAvailableHint:
+      "Automatic capture isn't available here. Choose a window instead.",
+    captureWindowAttachCurrentDraftHint: "Capture a window and attach it to your current draft.",
+    desktopProvidesScreenshotHint: "This desktop only provides a screenshot.",
+    updateDesktopAppSnapshotsHint: "Update the desktop app to use snapshots.",
+    whooshDefault: "Whoosh (Default)",
+    click: "Click",
+    couldnTCheckCaptureSetup: "Couldn't check capture setup",
+    couldnTOpenShortcutPermissions: "Couldn't open shortcut permissions",
+    couldnTCompleteCaptureSetup: "Couldn't complete capture setup",
+    couldnTSaveCaptureSettings: "Couldn't save capture settings",
+    couldnTAllowAppTextCapture: "Couldn't allow app text capture",
+    couldNotCheckThisShortcut: "Could not check this shortcut.",
+    pressYourShortcutEscCancels: "Press your shortcut. Esc cancels.",
+    t3CodeAlreadyUsesThisFor: (
+      commandLabelCandidateConflict: string | number | boolean | null | undefined,
+    ) => `T3 Code already uses this for "${commandLabelCandidateConflict}".`,
+    checkingShortcut: "Checking shortcut…",
+    readyToSave: "Ready to save.",
+    shortcutExampleHint: "Try a shortcut such as Ctrl+Shift+2.",
+    restartTCodeFinishCaptureHint: "Restart T3 Code to finish capture setup.",
+    couldnTVerifyCaptureAccess: "Couldn't verify capture access",
+    couldnTCloseCaptureSetup: "Couldn't close capture setup",
+    updatingCaptureSettings: "Updating capture settings…",
+    enableSnapshots: "Enable snapshots",
+    includeTextControlsAppMakesHint: "Include text and controls when the app makes them available.",
+    includeAppTextInSnapshots: "Include app text in snapshots",
+    windowCaptureAnyAppHint: "Choose a window to capture from any app.",
+    captureWindowReUsingWithoutHint: "Capture the window you're using without switching apps.",
+    changeShortcut: "Change shortcut",
+    save: "Save",
+    soundPlayedCaptureStartsHint: "Choose the sound played when capture starts.",
+    snapshotSound: "Snapshot sound: ",
+    whoosh: "Whoosh ",
+    default: "(Default)",
+    playWhoosh: "Play Whoosh",
+    playClick: "Play Click",
+    showGentleCueCapturedWindowHint: "Show a gentle cue on the captured window.",
+    flashCapturedWindow: "Flash captured window",
+    animateCapturedWindowsDraftHint: "Animate captured windows into your draft.",
+    animateSnapshots: "Animate snapshots",
+  },
+  sourceControl: {
+    authenticated: "Authenticated",
+    notAuthenticated: "Not authenticated",
+    statusUnknown: "Status unknown",
+    toggleSourceControlAccountVisibility: "Toggle source control account visibility",
+    clickToRevealAccount: "Click to reveal account",
+    clickToHideAccount: "Click to hide account",
+    supportForIsComingSoon: (itemLabel: string | number | boolean | null | undefined) =>
+      `Support for ${itemLabel} is coming soon.`,
+    notAvailableOnThisServer: (itemInstallHint: string | number | boolean | null | undefined) =>
+      `Not available on this server: ${itemInstallHint}`,
+    as: "as",
+    available: (itemInstallHint: string | number | boolean | null | undefined) =>
+      `Available. ${itemInstallHint}`,
+    everyHostIsTurnedOff: (itemLabel: string | number | boolean | null | undefined) =>
+      `Every ${itemLabel} host is turned off.`,
+    authenticatedServerSignConfigureCredentials: (
+      itemLabel: string | number | boolean | null | undefined,
+    ) =>
+      `${itemLabel} is not authenticated on this server. Sign in or configure credentials using the`,
+    toolServerHostEnableChangeHint: " tool on the server host to enable change request features.",
+    availableStatus: "Available",
+    comingSoon: "Coming Soon",
+    toggleDetails: (itemLabel: string | number | boolean | null | undefined) =>
+      `Toggle ${itemLabel} details`,
+    availability: (itemLabel: string | number | boolean | null | undefined) =>
+      `${itemLabel} availability`,
+    intervalConfiguredGitSharedBackgroundHint:
+      "This interval is configured for Git only. The shared Background activity policy still decides whether Git refreshes may run when the timer fires. Custom intervals appear as Advanced in General settings.",
+    fetchInterval: "fetch interval",
+    refreshRemoteBranchesBackgroundAvoidHint:
+      "Refresh remote branches in the background. Set to 0 to avoid automatic Git prompts.",
+    decreaseFetchInterval: "Decrease fetch interval",
+    automaticGitFetchIntervalInSeconds: "Automatic Git fetch interval in seconds",
+    increaseFetchInterval: "Increase fetch interval",
+    serverEnvironment: "Server environment",
+    couldNotScanTheServerEnvironment: "Could not scan the server environment",
+    nothingDetectedYet: "Nothing detected yet",
+    installGitServerAddOptionalError:
+      "Install Git on the server, add optional hosting integrations or credentials your workspace needs, then rescan.",
+    scan: "Scan",
+    rescanServerEnvironment: "Rescan server environment",
+    rescanGitAndHostingIntegrations: "Rescan Git and hosting integrations",
+    connectEnvironmentInspectVersionControlHint:
+      "Connect an environment to inspect its version control tools and hosting integrations.",
+    versionControl: (environmentSuffix: string | number | boolean | null | undefined) =>
+      `Version Control${environmentSuffix}`,
+    sourceControlProviders: "Source Control Providers",
+    providersSectionTitle: (environmentSuffix: string | number | boolean | null | undefined) =>
+      `Source Control Providers${environmentSuffix}`,
+
+    verificationError: (label: string) => `Could not verify ${label}.`,
+  },
+  sourceControlWriting: {
+    sourceControlWritingStyle: "source control writing style",
+    customSourceControlInstructionsAll:
+      "Custom source control instructions for all selected environments",
+    writeInstructionsEachSelectedEnvironmentHint:
+      "Write the instructions each selected environment should use.",
+    applyInstructionsToAll: "Apply instructions to all",
+    writeCustomInstructionsForAll: "Write custom instructions for all",
+    keepTitlesConciseShortBulletHint:
+      "Keep titles concise. Use short bullet points in descriptions.",
+    customSourceControlWritingInstructions: "Custom source control writing instructions",
+    repositorySTemplateChangeRequestHint:
+      "Use the repository's template for change request descriptions when available.",
+    changeRequestTemplates: "change request templates",
+    modelSourceControlTextBranchHint:
+      "Model for source control text and branch or bookmark names. Off uses the environment's text generation model.",
+    connectEnvironmentSourceControlWriterHint:
+      "Connect an environment to choose its source control writer model.",
+    sourceControlWriterModelNotSaved: "Source control writer model not saved",
+    separateSourceControlWriterModel: "Use a separate source control writer model",
+
+    modeOptions: {
+      repo_conventions: {
+        label: "Repository conventions",
+        description:
+          "In each project, matches recent change descriptions and change request titles.",
+      },
+      conventional_commits: {
+        label: "Conventional Commits",
+        description: "Use Conventional Commit prefixes and keep change request text concise.",
+      },
+      custom: {
+        label: "Custom instructions",
+        description:
+          "Use your instructions for change descriptions and change requests in every project.",
+      },
+    } satisfies Record<SourceControlWritingStyleMode, { label: string; description: string }>,
+  },
+  storage: {
+    folderWorktreesCreatedAnyDriveHint:
+      "Folder where new worktrees are created, on any drive, such as D:\\worktrees or ~/worktrees. Existing worktrees stay where they are. Leave empty to use the T3 home folder.",
+    worktreeLocation: "worktree location",
+    decrease: (label: string | number | boolean | null | undefined) => `Decrease ${label}`,
+    inDays: (label: string | number | boolean | null | undefined) => `${label} in days`,
+    days: "days",
+    increase: (label: string | number | boolean | null | undefined) => `Increase ${label}`,
+    mixedAcrossSelectedMachines: "Mixed across selected machines",
+    updateSelectedMachinesConfigureProjectHint:
+      "Update the selected machines to configure project worktree cleanup.",
+    updateSelectedEnvironmentsStorageCleanupHint:
+      "Update the selected environments to use storage cleanup, or choose a machine that supports it.",
+    worktrees: "Worktrees",
+    automaticWorktreeCleanup: "Automatic worktree cleanup",
+    keepProjectSWorktreesUntilHint: "Keep this project's worktrees until you delete them manually.",
+    projectCleanupRulesHint: "Use these rules for this project.",
+    eachMachineSWorktreeCleanupHint: "Use each machine's worktree cleanup settings.",
+    inherit: "Inherit",
+    custom: "Custom",
+    deleteWorktreesWithDeletedThreads: "Delete worktrees with deleted threads",
+    removeUnusedWorktreesActiveArchivedHint:
+      "Remove unused worktrees when active or archived threads are deleted. Worktrees with local changes are kept.",
+    deleteInactiveWorktrees: "Delete inactive worktrees",
+    removeWorktreesAfterTheirThreadsHint:
+      "Remove worktrees after their threads have been inactive for this many days. Branches and thread history are kept.",
+    deleteMergedWorktrees: "Delete merged worktrees",
+    removeWorktreesWhosePullRequestHint:
+      "Remove worktrees whose pull request is merged and whose commits are included in the default branch.",
+    deleteUnchangedWorktrees: "Delete unchanged worktrees",
+    removeWorktreesCommitsBeyondDefaultHint:
+      "Remove worktrees with no commits beyond the default branch.",
+    deleteOldBrowserArtifacts: "Delete old browser artifacts",
+    deleteSavedBrowserCapturesAfterHint:
+      "Delete saved browser captures after this many days. Older capture links will no longer open.",
+    deleteOldRotatedLogs: "Delete old rotated logs",
+    deleteInactiveRotatedLogFilesHint:
+      "Delete inactive rotated log files after this many days. Current logs are kept.",
+  },
+  themeColorPicker: {
+    chooseAColor: "Choose a color",
+    hue: (label: string | number | boolean | null | undefined) => `${label} hue`,
+    pickerHexValue: (label: string | number | boolean | null | undefined) =>
+      `${label} picker hex value`,
+    pickerRgbValue: (label: string | number | boolean | null | undefined) =>
+      `${label} picker RGB value`,
+    chooseColor: (label: string | number | boolean | null | undefined) => `Choose ${label} color`,
+    usage: (selected: boolean, label: string | number | boolean | null | undefined) =>
+      `${selected ? "Hide" : "Show"} ${label} usage`,
+    whereIsUsed: (selected: boolean, label: string | number | boolean | null | undefined) =>
+      `${selected ? "Hide" : "Show"} where ${label} is used`,
+    hexValue: (label: string | number | boolean | null | undefined) => `${label} hex value`,
+
+    roleLabels: {
+      canvas: "Background",
+      chrome: "Chrome",
+      toolbar: "Toolbar background",
+      toolbarForeground: "Toolbar text",
+      toolbarBorder: "Toolbar border",
+      toolbarControl: "Toolbar control",
+      toolbarControlForeground: "Toolbar control text",
+      toolbarControlHover: "Toolbar control hover",
+      surface: "Surface",
+      surfaceRaised: "Surface Raised",
+      surfaceOverlay: "Surface Overlay",
+      text: "Text",
+      textMuted: "Text Muted",
+      border: "Border",
+      input: "Input",
+      focus: "Focus",
+      accent: "Accent color",
+      accentForeground: "Accent Foreground",
+      secondary: "Secondary",
+      secondaryForeground: "Secondary Foreground",
+      muted: "Muted",
+      mutedForeground: "Muted Foreground",
+      placeholder: "Placeholder",
+      secondaryLabel: "Secondary Label",
+      iconMuted: "Icon Muted",
+      error: "Error",
+      errorForeground: "Error text",
+      errorSurface: "Error background",
+      warning: "Warning",
+      warningForeground: "Warning text",
+      warningSurface: "Warning background",
+      update: "Update",
+      updateForeground: "Update text",
+      updateSurface: "Update background",
+      accentSurface: "Accent Surface",
+      accentSurfaceForeground: "Accent Surface Foreground",
+      messageSurface: "Message Surface",
+      messageForeground: "Message Foreground",
+      messageAction: "Message Action",
+      messageActionForeground: "Message Action Foreground",
+      messageActionHover: "Message Action Hover",
+      codeBackground: "Code Background",
+      codeForeground: "Code Foreground",
+      sidebar: "Sidebar",
+      sidebarForeground: "Sidebar Foreground",
+      sidebarMutedForeground: "Sidebar Muted Foreground",
+      sidebarControlSurface: "Sidebar Control Surface",
+      sidebarRowHover: "Sidebar Row Hover",
+      sidebarRowActive: "Sidebar Row Active",
+      sidebarRowSelected: "Sidebar Row Selected",
+      sidebarBorder: "Sidebar Border",
+      terminalBackground: "Terminal Background",
+      terminalForeground: "Terminal Foreground",
+      terminalCursor: "Terminal Cursor",
+      terminalSelection: "Terminal Selection",
+      terminalScrollbar: "Terminal Scrollbar",
+      terminalScrollbarHover: "Terminal Scrollbar Hover",
+    } satisfies Record<ThemeColorRole, string>,
+  },
+  themeEditorHost: {
+    couldNotSaveYourTheme: "Could not save your theme",
+    browserStorageUnavailableChangeKeptHint:
+      "Browser storage is unavailable, so the change was not kept.",
+    updated: (savedThemeLabel: string | number | boolean | null | undefined) =>
+      `${savedThemeLabel} updated`,
+    itsPaletteWasAdded: (mergedAppearance: string | number | boolean | null | undefined) =>
+      `Its ${mergedAppearance} palette was added.`,
+    saved: (savedThemeLabel: string | number | boolean | null | undefined) =>
+      `${savedThemeLabel} saved`,
+    yourChangesAreNowActive: "Your changes are now active.",
+    yourChangesAreSaved: "Your changes are saved.",
+    created: (savedThemeLabel: string | number | boolean | null | undefined) =>
+      `${savedThemeLabel} created`,
+    itSNowActive: "It’s now active.",
+  },
+  themeEditor: {
+    foundation: "Foundation",
+    background: "Background",
+    surface: "Surface",
+    raisedSurface: "Raised surface",
+    overlay: "Overlay",
+    text: "Text",
+    mutedText: "Muted text",
+    border: "Border",
+    input: "Input",
+    brandContent: "Brand & content",
+    subtleSurface: "Subtle surface",
+    highlightSurface: "Highlight surface",
+    accent: "Accent",
+    action: "Action",
+    messageSurface: "Message surface",
+    codeSurface: "Code surface",
+    context: "Context",
+    sidebarBackground: "Sidebar background",
+    sidebarControls: "Sidebar controls",
+    sidebarSelection: "Sidebar selection",
+    terminalBackground: "Terminal background",
+    status: "Status",
+    error: "Error",
+    warning: "Warning",
+    paletteCreateThemeSameNameHint: (
+      editingThemeLabel: string | number | boolean | null | undefined,
+      appearance: string | number | boolean | null | undefined,
+    ) =>
+      `“${editingThemeLabel}” has no ${appearance} palette. Create a theme with the same name to add one.`,
+    alreadyHasAPalette: (
+      mergeTargetLabel: string | number | boolean | null | undefined,
+      appearance: string | number | boolean | null | undefined,
+    ) => `“${mergeTargetLabel}” already has a ${appearance} palette.`,
+    nameYourThemeFirst: "Name your theme first.",
+    alreadyPalettePickAnotherNameHint: (
+      mergeTargetLabel: string | number | boolean | null | undefined,
+      collision: string | number | boolean | null | undefined,
+    ) => `“${mergeTargetLabel}” already has a ${collision} palette. Pick another name.`,
+    alreadyLightDarkPalettesPickHint: (
+      mergeTargetLabel: string | number | boolean | null | undefined,
+    ) => `“${mergeTargetLabel}” already has light and dark palettes. Pick another name.`,
+    themeSavedButMadeActiveError: "Theme saved, but it could not be made active. Try again.",
+    couldNotSaveTheTheme: "Could not save the theme.",
+    couldNotCreateTheTheme: "Could not create the theme.",
+    themeName: "Theme name",
+    eGAurora: "e.g. Aurora",
+    themeAppearance: "Theme appearance",
+    colors: "Colors",
+    twoColorsRestDerived: "Two colors, rest derived",
+    filterColors: "Filter colors",
+    advancedColorsAriaLabel: "Use advanced theme colors",
+    noMatches: "No matches.",
+    editTheme: "Edit theme",
+    createTheme: "Create theme",
+    selectAnElementEscToCancel: "Select an element · Esc to cancel",
+    colorUsageHint: (
+      isAdvanced: boolean,
+      value: string | number | boolean | null | undefined,
+      getThemeRoleLabelSelectedRole: string | number | boolean | null | undefined,
+      usageCount: string | number | boolean | null | undefined,
+      usageCount1: boolean,
+    ) =>
+      `${isAdvanced ? (value ?? getThemeRoleLabelSelectedRole) : getThemeRoleLabelSelectedRole} · ${usageCount ?? 0} ${usageCount1 ? "use" : "uses"}`,
+    selectAColorBelow: "Select a color below",
+    cancelInspectingAppColors: "Cancel inspecting app colors",
+    inspectAppColors: "Inspect app colors",
+    inspect: "Inspect",
+    cancelAndClearTheSelection: "Cancel and clear the selection",
+    pickAColorFromTheApp: "Pick a color from the app",
+    expandTheThemeEditor: "Expand the theme editor",
+    minimizeTheThemeEditor: "Minimize the theme editor",
+    closeTheThemeEditor: "Close the theme editor",
+    mergeInto: (mergeTargetLabel: string | number | boolean | null | undefined) =>
+      `Merge into “${mergeTargetLabel}”`,
+    saveChanges: "Save changes",
+    addPalette: (activeAppearance: string | number | boolean | null | undefined) =>
+      `Add ${activeAppearance} palette`,
+  },
+  themeImport: {
+    bytes: (bytes: string | number | boolean | null | undefined) => `${bytes} bytes`,
+    fileThemeFilesFewKbHint: (
+      formatByteSizeBytes: string | number | boolean | null | undefined,
+      formatByteSizeMaxThemeFileBytes: string | number | boolean | null | undefined,
+    ) =>
+      `That file is ${formatByteSizeBytes}. Theme files are only a few KB, so this one was not read (limit ${formatByteSizeMaxThemeFileBytes}).`,
+    themeJson: "Theme JSON",
+    readFilePasteJsonBelowError: "Could not read that file. Paste the JSON below instead.",
+    tooLarge: (fileName: string | number | boolean | null | undefined) => `${fileName}: too large`,
+    fileReadError: (
+      fileName: string | number | boolean | null | undefined,
+      causeInstanceofError: boolean,
+      causeMessage: string | number | boolean | null | undefined,
+    ) => `${fileName}: ${causeInstanceofError ? causeMessage : "not a theme file"}`,
+    installError: (
+      themeLabel: string | number | boolean | null | undefined,
+      causeInstanceofError: boolean,
+      causeMessage: string | number | boolean | null | undefined,
+    ) => `${themeLabel}: ${causeInstanceofError ? causeMessage : "could not install"}`,
+    tooManyCopiesOf: (themeLabel: string | number | boolean | null | undefined) =>
+      `Too many copies of "${themeLabel}".`,
+    conflictError: (
+      themeLabel: string | number | boolean | null | undefined,
+      causeInstanceofError: boolean,
+      causeMessage: string | number | boolean | null | undefined,
+    ) => `${themeLabel}: ${causeInstanceofError ? causeMessage : "failed"}`,
+    themeAddedButSelectedTryError: "Theme added, but it could not be selected. Try again.",
+    thatThemeFileIsInvalid: "That theme file is invalid.",
+    addATheme: "Add a theme",
+    orImportAFile: "or import a file",
+    chooseFiles: "Choose files",
+    reading: "Reading…",
+    alreadyInstalled: "Already installed",
+    updateExisting: "Update existing",
+    keepBoth: "Keep both",
+    themeFile: "Theme file",
+    dropT3CodeOrVsCodeJsonFiles: "Drop T3 Code or VS Code .json files",
+    addTheme: "Add theme",
+  },
+  themePreviewCircles: {
+    applyMode: (
+      label: string | number | boolean | null | undefined,
+      mode: string | number | boolean | null | undefined,
+    ) => `Use ${label} ${mode} mode`,
+    applyLightModeOnly: "Use for light mode only",
+    applyDarkModeOnly: "Use for dark mode only",
+  },
+  themeSearch: {
+    mostDownloaded: "Most downloaded",
+    bestRated: "Best rated",
+    newest: "Newest",
+    mostRelevant: "Most relevant",
+    openVsxSearchFailed: "Open VSX search failed.",
+    installedThemesCouldNotBeRead: "Installed themes could not be read.",
+    thatThemeCouldNotBeAdded: "That theme could not be added.",
+    searchCommunityThemes: "Search community themes",
+    findOpenSourceThemesFromOpenVsx: "Find open-source themes from Open VSX.",
+    searchOpenVsxThemes: "Search Open VSX themes",
+    searchThemes: "Search themes...",
+    popular: "Popular",
+    sort: "Sort",
+    sortThemes: "Sort themes",
+    searchingThemes: "Searching themes...",
+    supportedFound: (
+      resultsLength: string | number | boolean | null | undefined,
+      resultsLength1: boolean,
+    ) => `${resultsLength} supported ${resultsLength1 ? "theme" : "themes"} found.`,
+    searchingSuffix: " Searching themes...",
+    noSupportedOpenSourceThemesFound: "No supported open-source themes found",
+    tryABroaderSearch: "Try a broader search.",
+    updating: "Updating",
+    installing: "Installing",
+    downloads: "downloads",
+    communityColorThemeEditorHint: "A community color theme for your editor.",
+    viewSourceFor: (extensionName: string | number | boolean | null | undefined) =>
+      `View source for ${extensionName}`,
+    update: (pendingUpdateName: string | number | boolean | null | undefined) =>
+      `Update “${pendingUpdateName}”?`,
+    replacesInstalledVariantsIncludingAnyHint:
+      "This replaces its installed variants, including any local edits. Variants no longer in the extension will be removed.",
+    updateTheme: "Update theme",
+  },
+  theme: {
+    lightAndDarkThemeVariants: "Light and dark theme variants",
+    chooseVariantOptionsCurrently: (
+      mode: string | number | boolean | null | undefined,
+      optionsLength: string | number | boolean | null | undefined,
+      selectedOptionLabel: string | number | boolean | null | undefined,
+    ) => `Choose ${mode} variant, ${optionsLength} options, currently ${selectedOptionLabel}`,
+    applyVariantAriaLabel: (
+      mode: string | number | boolean | null | undefined,
+      selectedOptionLabel: string | number | boolean | null | undefined,
+    ) => `Use ${mode} variant, currently ${selectedOptionLabel}`,
+    applyVariantTooltip: (
+      optionLabel: string | number | boolean | null | undefined,
+      mode: string | number | boolean | null | undefined,
+    ) => `Use ${optionLabel} for ${mode} mode`,
+    variantAriaLabel: (
+      optionLabel: string | number | boolean | null | undefined,
+      mode: string | number | boolean | null | undefined,
+      optionIsActive: boolean,
+    ) => `Use ${optionLabel} for ${mode} mode${optionIsActive ? ", currently active" : ""}`,
+    applyThemeAriaLabel: (
+      variantNavigation: boolean,
+      variantNavigationCollectionLabel: string | number | boolean | null | undefined,
+      themeLabel: string | number | boolean | null | undefined,
+      isActive: boolean,
+    ) =>
+      `Use ${variantNavigation ? `${variantNavigationCollectionLabel}, ${themeLabel} variant` : `${themeLabel} theme`}${isActive ? ", currently active" : ""}`,
+    duplicate: (themeLabel: string | number | boolean | null | undefined) =>
+      `Duplicate ${themeLabel}`,
+    duplicateTheme: "Duplicate theme",
+    edit: (themeLabel: string | number | boolean | null | undefined) => `Edit ${themeLabel}`,
+    editTheme: "Edit theme",
+    export: (themeLabel: string | number | boolean | null | undefined) => `Export ${themeLabel}`,
+    exportThemeFile: "Export theme file",
+    removeThemesFrom: (
+      variantNavigationCollectionLabel: string | number | boolean | null | undefined,
+    ) => `Remove themes from ${variantNavigationCollectionLabel}`,
+    remove: (themeLabel: string | number | boolean | null | undefined) => `Remove ${themeLabel}`,
+    removeThemes: "Remove themes",
+    removeTheme: "Remove theme",
+    firstVariantsLightDark: "Use the first variants for light and dark",
+    applyBothModes: "Use for both light and dark",
+    applySingleMode: (cardModes0: string | number | boolean | null | undefined) =>
+      `Use for ${cardModes0} mode only`,
+    couldnTSaveThemeSelection: "Couldn’t save theme selection",
+    couldnTRemoveTheme: "Couldn’t remove theme",
+    appearanceMode: "Appearance mode",
+    followTheSystemAppearance: "Follow the system appearance",
+    applyMode: (mode: string | number | boolean | null | undefined) => `Use ${mode} mode`,
+    createTheme: "Create theme",
+    addTheme: "Add theme",
+    themes: (
+      importedThemesLength: string | number | boolean | null | undefined,
+      verb: string | number | boolean | null | undefined,
+    ) => `${importedThemesLength} themes ${verb}`,
+    added: (importedThemeLabel: string | number | boolean | null | undefined) =>
+      `${importedThemeLabel} added`,
+    itSNowYourTheme: (modes0: string | number | boolean | null | undefined) =>
+      `It’s now your ${modes0} theme.`,
+    itSNowActive: "It’s now active.",
+    removeCollectionConfirmation: (
+      removeDialogCollectionLabel: string | number | boolean | null | undefined,
+    ) => `Remove themes from “${removeDialogCollectionLabel}”?`,
+    removeThemeConfirmation: (
+      removeDialogThemeLabel: string | number | boolean | null | undefined,
+    ) => `Remove “${removeDialogThemeLabel}”?`,
+    selectVariantsWantRemoveRestoreHint:
+      "Select the variants you want to remove. You can restore them by importing the extension again.",
+    bringBackAnytimeImportingJsonHint: "You can bring it back anytime by importing its JSON file.",
+    removeSelected: (
+      themeIdsToRemoveLength0: boolean,
+      themeIdsToRemoveLength: string | number | boolean | null | undefined,
+    ) => `Remove selected${themeIdsToRemoveLength0 ? ` (${themeIdsToRemoveLength})` : ""}`,
+  },
+  usageProvider: {
+    updateCursorAccountUsage: "update Cursor account usage",
+    addHub: "Add hub",
+    readExistingCursorCliLoginHint:
+      "Read your existing Cursor CLI login from macOS Keychain to show account history and monthly limits. macOS may ask you to allow access.",
+    noHubsConfigured: "No hubs configured.",
+    cliProxy: "CLI Proxy",
+    disabled: " · Disabled",
+    remove: "Remove",
+    removeHubConfirmation: (label: string | number | boolean | null | undefined) =>
+      `Remove ${label}?`,
+    hubSManagementKeyDeletedHint:
+      "The hub's management key is deleted from this server. Its accounts leave the Limits view; the hub itself is untouched. Add it again with the URL and key to bring them back.",
+    removeHub: "Remove hub",
+  },
+  hostConnectionChecks: {
+    connectionTestDeviceHostsError: "This connection cannot test device hosts.",
+  },
+  projectScript: {
+    failedToSaveProjectActions: "Failed to save project actions",
+    availableMachineAnotherActionChangeHint:
+      "No available machine, or another action change is saving.",
+    actionsNotSaved: "Actions not saved",
+    connectionChangeEnvironmentSettingsError: "This connection cannot change environment settings.",
+  },
+  scopedModelAvailability: {
+    modelUnavailableSelectEnvironmentModelHint: (
+      environmentLabel: string | number | boolean | null | undefined,
+    ) =>
+      `This model is unavailable on ${environmentLabel ?? "a selected environment"}. Select that environment to choose its model separately.`,
+  },
+  snapShotShortcutRecorder: {
+    couldNotStartShortcutRecording: "Could not start shortcut recording.",
+    addLetterNumberFunctionKeyHint: "Add a letter, number, or function key to your shortcut.",
+    recordSnapshotShortcutCurrently: (value: string | number | boolean | null | undefined) =>
+      `Record snapshot shortcut, currently ${value}`,
+    changeSnapshotShortcut: "Change snapshot shortcut",
+    pressShortcut: "Press shortcut…",
+    changeShortcut: "Change shortcut",
+    chooseShortcut: "Choose shortcut",
   },
 };

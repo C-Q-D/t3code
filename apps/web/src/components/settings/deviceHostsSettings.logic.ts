@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import type { SshDeviceHostConfig } from "@t3tools/contracts";
 
 /** Apply one host change without replacing another environment's host list. */
@@ -14,9 +15,7 @@ export function updateDeviceHosts(
   const findDestination = (destination: SshDeviceHostConfig) => {
     const matches = hosts.filter((candidate) => sameDestination(candidate, destination));
     if (matches.length > 1) {
-      throw new Error(
-        "Multiple hosts match this SSH destination. Select the environment to edit its hosts.",
-      );
+      throw new Error(t.settings.deviceHosts.multipleHostsMatchSshDestinationHint);
     }
     return matches[0];
   };

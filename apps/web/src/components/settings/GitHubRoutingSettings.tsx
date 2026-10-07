@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { useAtomValue } from "@effect/atom-react";
 import { resolveEnvironmentMachineKind } from "@t3tools/contracts";
 import {
@@ -17,12 +18,15 @@ import { FoldedSettingsSection } from "./FoldedSettingsSection";
 import { searchableSetting } from "./settingsSearch";
 
 const options: ReadonlyArray<{ value: GitHubRoutingPermission; label: string }> = [
-  { value: "off", label: "Off" },
-  { value: "read", label: "Read PRs" },
-  { value: "read-write", label: "Read and act" },
+  { value: "off", label: t.settings.connections.status.off },
+  { value: "read", label: t.settings.gitHubRouting.readPrs },
+  { value: "read-write", label: t.settings.gitHubRouting.readAndAct },
 ];
 
-const summaryLabels = { "read-write": "read and act", read: "read PRs" } as const;
+const summaryLabels = {
+  "read-write": t.settings.gitHubRouting.readAndActAriaLabel,
+  read: t.settings.gitHubRouting.readPrsAriaLabel,
+};
 
 /**
  * Closed-header summary: the machines that share, grouped by permission.
@@ -69,13 +73,11 @@ export function GitHubRoutingSettings({
             label: environment.label,
             permission: gitHubRoutingPermissionFor(environment.entry, permissions),
           })),
-        ) ?? "Off"
+        ) ?? t.settings.connections.status.off
       }
     >
       <p className="px-3 py-2.5 text-xs text-muted-foreground sm:px-4">
-        Machines you trust here can read PR data through each other's GitHub access. Enable both
-        machines. Read and act may use broader permissions than the machine that owns them. This
-        applies only to this device.
+        {t.settings.gitHubRouting.machinesTrustReadPrDataHint}
       </p>
       {environments.map((environment) => (
         <EnvironmentRow
@@ -99,7 +101,7 @@ export function GitHubRoutingSettings({
                   if (result._tag === "Failure")
                     toastManager.add({
                       type: "error",
-                      title: "Could not save GitHub routing permission",
+                      title: t.settings.gitHubRouting.saveGitHubRoutingPermissionError,
                     });
                 },
               );
@@ -108,7 +110,7 @@ export function GitHubRoutingSettings({
             <SelectTrigger
               size="xs"
               className="w-32"
-              aria-label={`${environment.label} GitHub routing`}
+              aria-label={t.settings.gitHubRouting.gitHubRouting(environment.label)}
             >
               <SelectValue />
             </SelectTrigger>

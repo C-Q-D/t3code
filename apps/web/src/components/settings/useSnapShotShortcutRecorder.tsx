@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import {
   isModifierPairShortcut,
   type SnapShotModifier,
@@ -71,7 +72,11 @@ export function useSnapShotShortcutRecorder({
     } catch (error) {
       if (!requests.owns(request)) return;
       requests.clear();
-      onError(error instanceof Error ? error.message : "Could not start shortcut recording.");
+      onError(
+        error instanceof Error
+          ? error.message
+          : t.settings.snapShotShortcutRecorder.couldNotStartShortcutRecording,
+      );
     }
   };
   useEffect(
@@ -96,7 +101,7 @@ export function useSnapShotShortcutRecorder({
       const [left, right] = MODIFIER_CODES[modifier];
       if (held.has(left) && held.has(right)) {
         if (!allowModifierPairs) {
-          onError("Add a letter, number, or function key to your shortcut.");
+          onError(t.settings.snapShotShortcutRecorder.addLetterNumberFunctionKeyHint);
           return;
         }
         stopRecording();
@@ -127,8 +132,10 @@ export function useSnapShotShortcutRecorder({
         disabled={disabled}
         aria-label={
           displayShortcut
-            ? `Record snapshot shortcut, currently ${formatSnapShotShortcutLabel(displayShortcut)}`
-            : "Change snapshot shortcut"
+            ? t.settings.snapShotShortcutRecorder.recordSnapshotShortcutCurrently(
+                formatSnapShotShortcutLabel(displayShortcut),
+              )
+            : t.settings.snapShotShortcutRecorder.changeSnapshotShortcut
         }
         aria-pressed={recording}
         data-keybinding-capture=""
@@ -138,11 +145,11 @@ export function useSnapShotShortcutRecorder({
         onBlur={stopRecording}
       >
         {recording ? (
-          "Press shortcut…"
+          t.settings.snapShotShortcutRecorder.pressShortcut
         ) : !displayShortcut ? (
-          "Change shortcut"
+          t.settings.snapShotShortcutRecorder.changeShortcut
         ) : !allowModifierPairs && isModifierPairShortcut(displayShortcut) ? (
-          "Choose shortcut"
+          t.settings.snapShotShortcutRecorder.chooseShortcut
         ) : (
           <SnapShotShortcutKeys shortcut={displayShortcut} />
         )}

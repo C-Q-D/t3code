@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { useState } from "react";
 
 import { isLocalEnvironmentDisabled } from "../../localEnvironment";
@@ -32,7 +33,11 @@ export function LocalEnvironmentSetting() {
     try {
       await setEnabled(!enabled);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Couldn't change this setting.");
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : t.settings.localEnvironmentSetting.couldnTChangeThisSetting,
+      );
       setIsUpdating(false);
     }
   };
@@ -43,15 +48,15 @@ export function LocalEnvironmentSetting() {
         {...searchableSetting("local-environment")}
         description={
           enabled
-            ? "Run agents on this computer. Turn off to use T3 Code only with remote environments."
-            : "Turned off. Agents only run in remote environments."
+            ? t.settings.localEnvironmentSetting.runAgentsComputerTurnOffHint
+            : t.settings.localEnvironmentSetting.turnedOffAgentsRunRemoteHint
         }
         control={
           <Switch
             checked={enabled}
             disabled={isUpdating}
             onCheckedChange={() => setConfirmOpen(true)}
-            aria-label="Local environment"
+            aria-label={t.settings.rows.localEnvironment.title}
           />
         }
       />
@@ -66,18 +71,20 @@ export function LocalEnvironmentSetting() {
         <AlertDialogPopup>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {enabled ? "Turn off local environment?" : "Turn on local environment?"}
+              {enabled
+                ? t.settings.localEnvironmentSetting.turnOffLocalEnvironment
+                : t.settings.localEnvironmentSetting.turnOnLocalEnvironment}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {enabled
-                ? "T3 Code will restart without running a server on this computer. Any agents and terminals running here will stop, and other devices will no longer be able to connect to this computer. Your projects, history, and remote environments are unaffected."
-                : "T3 Code will restart and start running a server on this computer again."}
+                ? t.settings.localEnvironmentSetting.tCodeRestartWithoutRunningHint
+                : t.settings.localEnvironmentSetting.tCodeRestartStartRunningHint}
             </AlertDialogDescription>
           </AlertDialogHeader>
           {error ? <p className="px-6 pb-4 text-sm text-destructive">{error}</p> : null}
           <AlertDialogFooter>
             <AlertDialogClose disabled={isUpdating} render={<Button variant="outline" />}>
-              Cancel
+              {t.settings.actions.cancel}
             </AlertDialogClose>
             <Button
               variant={enabled ? "destructive" : "default"}
@@ -87,12 +94,12 @@ export function LocalEnvironmentSetting() {
               {isUpdating ? (
                 <>
                   <Spinner size="sm" />
-                  Restarting…
+                  {t.settings.connections.endpoints.restarting}
                 </>
               ) : enabled ? (
-                "Restart and turn off"
+                t.settings.localEnvironmentSetting.restartAndTurnOff
               ) : (
-                "Restart and turn on"
+                t.settings.localEnvironmentSetting.restartAndTurnOn
               )}
             </Button>
           </AlertDialogFooter>

@@ -1,5 +1,6 @@
 "use client";
 
+import { t } from "~/i18n";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
@@ -110,15 +111,15 @@ export function deriveProviderSettingsFields(
           control: formAnnotation.control ?? "text",
           label:
             isLocalAcp && key === "commandPath"
-              ? "Executable"
+              ? t.settings.providerSettingsForm.executable
               : (annotatedTitle ?? titleizeFieldKey(key)),
           ...(isLocalAcp && key === "commandPath"
-            ? { description: "Executable name or path on this environment." }
+            ? { description: t.settings.providerSettingsForm.executableNamePathEnvironmentHint }
             : annotatedDescription !== undefined
               ? { description: annotatedDescription }
               : {}),
           ...(isLocalAcp && key === "commandPath"
-            ? { placeholder: "e.g. dsh" }
+            ? { placeholder: t.settings.providerSettingsForm.eGDsh }
             : formAnnotation.placeholder !== undefined
               ? { placeholder: formAnnotation.placeholder }
               : {}),
@@ -189,8 +190,8 @@ function ProviderCommandArguments({
 
   return (
     <SettingsRow
-      title="Arguments"
-      description="One literal argument per row, in launch order."
+      title={t.settings.providerSettingsForm.arguments}
+      description={t.settings.providerSettingsForm.oneLiteralArgumentPerRowHint}
       control={
         <Button
           type="button"
@@ -199,7 +200,7 @@ function ProviderCommandArguments({
           onClick={() => updateArguments([...rowsRef.current, makeCommandArgumentDraftRow("")])}
         >
           <PlusIcon />
-          Add argument
+          {t.settings.providerSettingsForm.addArgument}
         </Button>
       }
     >
@@ -218,7 +219,7 @@ function ProviderCommandArguments({
                     ),
                   )
                 }
-                aria-label={`Argument ${index + 1}`}
+                aria-label={t.settings.providerSettingsForm.argument(index + 1)}
                 spellCheck={false}
               />
               <Button
@@ -228,7 +229,7 @@ function ProviderCommandArguments({
                 onClick={() =>
                   updateArguments(rowsRef.current.filter((current) => current.id !== argument.id))
                 }
-                aria-label={`Remove argument ${index + 1}`}
+                aria-label={t.settings.providerSettingsForm.removeArgument(index + 1)}
               >
                 <XIcon />
               </Button>

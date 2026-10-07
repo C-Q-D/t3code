@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import {
   STATIC_KEYBINDING_COMMANDS,
   type KeybindingCommand,
@@ -108,11 +109,11 @@ export function whenAstToExpression(node: KeybindingWhenNode | undefined): strin
 }
 
 export function whenNodeRemoveLabel(node: KeybindingWhenNode, depth: number): string {
-  if (depth === 0) return "Clear all conditions";
+  if (depth === 0) return t.settings.keybindings.clearAllConditions;
   if (node.type === "identifier" || (node.type === "not" && node.node.type === "identifier")) {
-    return "Remove condition";
+    return t.settings.keybindings.removeCondition;
   }
-  return "Remove group and its conditions";
+  return t.settings.keybindings.removeGroupAndItsConditions;
 }
 
 function wrapWhenExpression(node: KeybindingWhenNode): string {
@@ -130,7 +131,7 @@ export function parseWhenExpressionDraft(
   if (!ast) {
     return {
       ok: false,
-      message: "Use variables with !, &&, ||, and parentheses.",
+      message: t.settings.keybindings.conditionSyntaxHint,
     };
   }
 
@@ -211,17 +212,29 @@ export interface KeybindingGroup {
 const KEYBINDING_GROUPS = [
   {
     id: "navigation",
-    title: "Navigation",
+    title: t.settings.keybindings.navigation,
     prefixes: ["sidebar", "rightPanel", "commandPalette", "filePicker", "projectSearch", "editor"],
   },
-  { id: "threads", title: "Threads", prefixes: ["thread", "chat", "pullRequest"] },
-  { id: "composer", title: "Composer", prefixes: ["composer", "modelPicker"] },
-  { id: "terminal", title: "Terminal", prefixes: ["terminal"] },
-  { id: "preview", title: "Preview & diff", prefixes: ["preview", "diff"] },
-  { id: "appearance", title: "Appearance", prefixes: ["theme", "appearance", "themeEditor"] },
-  { id: "scripts", title: "Project scripts", prefixes: ["script"] },
-] as const;
-const OTHER_KEYBINDING_GROUP = { id: "other", title: "Other" } as const;
+  {
+    id: "threads",
+    title: t.settings.keybindings.threads,
+    prefixes: ["thread", "chat", "pullRequest"],
+  },
+  { id: "composer", title: t.settings.keybindings.composer, prefixes: ["composer", "modelPicker"] },
+  {
+    id: "terminal",
+    title: t.settings.resourceTelemetry.categories.terminal,
+    prefixes: ["terminal"],
+  },
+  { id: "preview", title: t.settings.keybindings.previewDiff, prefixes: ["preview", "diff"] },
+  {
+    id: "appearance",
+    title: t.settings.pages.appearance,
+    prefixes: ["theme", "appearance", "themeEditor"],
+  },
+  { id: "scripts", title: t.settings.keybindings.projectScripts, prefixes: ["script"] },
+];
+const OTHER_KEYBINDING_GROUP = { id: "other", title: t.settings.keybindings.other };
 
 function keybindingGroupFor(command: KeybindingCommand): { id: string; title: string } {
   const prefix = String(command).split(".")[0] ?? "";
@@ -297,7 +310,8 @@ export function buildKeybindingRows(
       commandLabel(row.command).toLowerCase().includes(normalizedQuery) ||
       row.key.toLowerCase().includes(normalizedQuery) ||
       row.when.toLowerCase().includes(normalizedQuery) ||
-      row.source.toLowerCase().includes(normalizedQuery)
+      row.source.toLowerCase().includes(normalizedQuery) ||
+      t.settings.keybindings.sourceLabels[row.source].toLowerCase().includes(normalizedQuery)
     );
   });
 }

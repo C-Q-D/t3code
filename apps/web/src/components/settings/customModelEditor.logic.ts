@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import {
   type ModelCapabilities,
   ProviderDriverKind,
@@ -211,20 +212,21 @@ export function descriptorsFromCapabilities(
 export function validateDraft(draft: CustomModelDraft): string | null {
   const seenIds = new Set<string>();
   for (const [index, descriptor] of draft.descriptors.entries()) {
-    const position = `Option ${index + 1}`;
+    const position = t.settings.customModelEditor.option(index + 1);
     const id = descriptor.id.trim();
-    if (!id) return `${position} needs an id.`;
-    if (seenIds.has(id)) return `${position}: id "${id}" is used twice.`;
+    if (!id) return t.settings.customModelEditor.needsAnId(position);
+    if (seenIds.has(id)) return t.settings.customModelEditor.idIsUsedTwice(position, id);
     seenIds.add(id);
-    if (!descriptor.label.trim()) return `${position} needs a label.`;
+    if (!descriptor.label.trim()) return t.settings.customModelEditor.needsALabel(position);
     if (descriptor.type !== "select") continue;
-    if (descriptor.choices.length === 0) return `${position} needs at least one choice.`;
+    if (descriptor.choices.length === 0)
+      return t.settings.customModelEditor.needsAtLeastOneChoice(position);
     const seenChoices = new Set<string>();
     for (const choice of descriptor.choices) {
       const choiceId = choice.id.trim();
-      if (!choiceId) return `${position} has a choice without a value.`;
+      if (!choiceId) return t.settings.customModelEditor.hasAChoiceWithoutAValue(position);
       if (seenChoices.has(choiceId)) {
-        return `${position}: choice "${choiceId}" is used twice.`;
+        return t.settings.customModelEditor.choiceIsUsedTwice(position, choiceId);
       }
       seenChoices.add(choiceId);
     }

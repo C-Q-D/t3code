@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 export type WizardNavigation =
   | { readonly kind: "navigate"; readonly step: number }
   | { readonly kind: "blocked"; readonly step: number; readonly error: string };
@@ -5,9 +6,17 @@ export type WizardNavigation =
 const IDENTITY_STEP = 1;
 const ACP_REGISTRY_IDENTITY_STEP = 1;
 
-export const ADD_PROVIDER_WIZARD_STEPS = ["Provider", "Identity", "Config"] as const;
-export const ACP_REGISTRY_WIZARD_STEPS = ["Provider", "Identity", "Sign in"] as const;
-export const LOCAL_ACP_WIZARD_STEPS = ["Provider", "Identity"] as const;
+export const ADD_PROVIDER_WIZARD_STEPS = [
+  "Provider",
+  t.settings.addProviderInstance.identity,
+  t.settings.addProviderInstance.config,
+];
+export const ACP_REGISTRY_WIZARD_STEPS = [
+  "Provider",
+  t.settings.addProviderInstance.identity,
+  t.settings.addProviderInstance.signIn,
+];
+export const LOCAL_ACP_WIZARD_STEPS = ["Provider", t.settings.addProviderInstance.identity];
 
 export interface ProviderIdentityDraft {
   readonly label: string;

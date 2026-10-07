@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { AuthSettingsWriteScope, EnvironmentAuthorizationError } from "@t3tools/contracts";
 import { readEnvironmentScope } from "../../state/session";
 import {
@@ -41,8 +42,9 @@ function reportScriptFailure(result: AtomCommandResult<unknown, unknown>) {
     const error = squashAtomCommandFailure(result);
     toastManager.add({
       type: "error",
-      title: "Failed to save project actions",
-      description: error instanceof Error ? error.message : "An error occurred.",
+      title: t.settings.projectScript.failedToSaveProjectActions,
+      description:
+        error instanceof Error ? error.message : t.settings.archive.actionErrorDescription,
     });
   }
   return mapAtomCommandResult(result, () => undefined);
@@ -79,8 +81,12 @@ export function useProjectScriptSettings(
     keybinding?: string | null,
   ): Promise<AtomCommandResult<void, unknown>> {
     if (savingRef.current || targets.length === 0) {
-      const message = "No available machine, or another action change is saving.";
-      toastManager.add({ type: "error", title: "Actions not saved", description: message });
+      const message = t.settings.projectScript.availableMachineAnotherActionChangeHint;
+      toastManager.add({
+        type: "error",
+        title: t.settings.projectScript.actionsNotSaved,
+        description: message,
+      });
       return AsyncResult.failure(Cause.fail(new Error(message)));
     }
     if (
@@ -93,7 +99,7 @@ export function useProjectScriptSettings(
           Cause.fail(
             new EnvironmentAuthorizationError({
               requiredScope: AuthSettingsWriteScope,
-              message: "This connection cannot change environment settings.",
+              message: t.settings.projectScript.connectionChangeEnvironmentSettingsError,
             }),
           ),
         ),
