@@ -84,6 +84,18 @@ The most common defect in this repo is a change that works on the path you teste
 - To reuse web dev auth across worktrees, configure one fixed `T3CODE_DEV_AUTH_TOKEN` in the main checkout's gitignored `.env`. The `t3.json` setup links that file into worktrees. Never commit or publish the token or a startup URL. See [Reusable dev credential](docs/operations/development.md#reusable-dev-credential).
 - Stop what you started, by the PID you tracked. See rule 1.
 
+## Local Windows installer
+
+After changing code, use `build-windows.cmd` at the repository root to build a local
+Windows x64 installer. It synchronizes locked dependencies, rebuilds current sources,
+and packages an unsigned exe without publishing. For an agent or terminal run without
+the final pause, use `powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/build-windows.ps1`.
+Add `-Arch arm64` only when the matching native build tools are installed.
+Each run writes the installer and `build.log` to `release/windows-<arch>-<timestamp>/`.
+Check the exit code and output; a failed build must not be reported as a generated installer.
+Prerequisites, lockfile updates, and the optional WSL runtime are covered in
+[Windows installer prerequisites](docs/operations/development.md#windows-installer-prerequisites).
+
 ## Test data
 
 An empty database is a bad test. Seed your worktree's `.t3` with a copy of real data instead of pointing at live state:

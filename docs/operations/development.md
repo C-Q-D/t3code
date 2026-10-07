@@ -180,6 +180,18 @@ rustup target add aarch64-apple-darwin x86_64-apple-darwin
 
 ### Windows installer prerequisites
 
+For a local unsigned installer, double-click `build-windows.cmd` in the repository root.
+It installs the locked dependencies, rebuilds the current sources, and runs the existing
+Windows packaging and payload checks. It does not commit, push, or publish.
+Each run writes its installer and `build.log` to `release/windows-<arch>-<timestamp>/`.
+The default architecture is x64; use `build-windows.cmd -Arch arm64` for ARM64.
+For a terminal run without a pause, use
+`powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/build-windows.ps1`.
+Install Node (the version required by root `package.json`) and Vite+ first, then the
+native prerequisites below. If dependency declarations change, update `pnpm-lock.yaml`
+with `vp install` before packaging; the wrapper uses `--frozen-lockfile`.
+The wrapper does not embed a Linux WSL runtime; use the release workflow below if needed.
+
 Install Rust, Python 3, and Visual Studio Build Tools with **Desktop development with C++**.
 Include the Windows SDK and the MSVC build tools and Spectre-mitigated libraries for the target
 architecture. Add its Rust target:
