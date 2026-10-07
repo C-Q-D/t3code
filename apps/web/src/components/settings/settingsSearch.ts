@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { isElectron } from "~/env";
 import { isMacPlatform, isWindowsPlatform, normalizeSearchText } from "~/lib/utils";
 import { STATIC_KEYBINDING_COMMANDS, type KeybindingCommand } from "@t3tools/contracts";
@@ -353,9 +354,15 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "time-format",
-    title: "Time format",
+    title: t.settings.rows.timeFormat.title,
     to: "/settings/general",
     searchTerms: ["timestamp clock locale system browser os 12 hour 24 hour"],
+  },
+  {
+    id: "language",
+    title: t.settings.rows.language.title,
+    to: "/settings/appearance",
+    searchTerms: ["language locale display english chinese 中文 简体中文 system"],
   },
   {
     id: "response-streaming",

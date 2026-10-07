@@ -1,5 +1,7 @@
-import { describe, expect, it, vi } from "vite-plus/test";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { EnvironmentId } from "@t3tools/contracts";
+import { en } from "~/i18n/locales/en";
+import { messages } from "~/i18n/locales/zh-CN";
 
 import {
   filterAvailableSettingsSearchItems,
@@ -43,6 +45,29 @@ const ITEMS: ReadonlyArray<SettingsSearchItem> = [
     to: "/settings/general",
   },
 ];
+
+afterEach(async () => {
+  const { installMessages } = await import("~/i18n");
+  installMessages("en", en);
+  vi.resetModules();
+});
+
+describe("translated settings catalog", () => {
+  it("finds Chinese titles and English aliases when installed before module evaluation", async () => {
+    vi.resetModules();
+    const { installMessages: install } = await import("~/i18n");
+    install("zh-CN", messages);
+    const { searchSettings: search } = await import("./settingsSearch");
+    expect(search("语言")[0]).toMatchObject({
+      id: "language",
+      title: "语言",
+      to: "/settings/appearance",
+    });
+    expect(search("english").map((item) => item.id)).toContain("language");
+    expect(search("chinese").map((item) => item.id)).toContain("language");
+    expect(search("时间格式")[0]).toMatchObject({ id: "time-format", title: "时间格式" });
+  });
+});
 
 describe("searchSettings", () => {
   it.each(["send shortcut", "multiline", "new line"])("finds Send shortcut for %s", (query) => {

@@ -9,6 +9,18 @@ Don't style a raw `<button>`, `<input>`, `<select>`, or `<textarea>` to look lik
 primitive provides. Raw elements are right when the element isn't that control: semantic rows, tabs,
 resize handles, swatches, editor surfaces, anything whose behavior or geometry differs by design.
 
+## UI language
+
+Read UI labels from `t` in [`i18n`](../../apps/web/src/i18n/index.ts), for example
+`t.settings.rows.language.title`. Bootstrap installs messages before importing main, so module-level constants
+can read `t` too. Only Chinese sessions load the separate zh-CN dictionary chunk.
+Do not translate strings sent to the server, saved to storage, used as prompts, or compared as data.
+For example, ChatView's `titleSeed` must still match ThreadTitleRegenerationService's `"New thread"`.
+Annotate each Chinese namespace literal with `Messages["namespace"]` to catch extra keys there.
+Keep English string leaves wide: do not use `as const`. Use typed functions for interpolation and plurals;
+components assemble rich text. Modules under `i18n/**` must not import React, TSX files, or web modules
+outside i18n, because bootstrap imports this small module graph before the UI.
+
 ## Styles
 
 Style with Tailwind classes in the component that renders the element.

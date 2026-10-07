@@ -1,4 +1,5 @@
 import { SettingsGroup } from "./SettingsGroup";
+import { t } from "~/i18n";
 import { AuthSettingsWriteScope } from "@t3tools/contracts";
 import { usePrimaryEnvironmentId } from "../../state/environments";
 import { useEnvironmentScope, useEnvironmentsWithScope } from "../../state/session";
@@ -493,9 +494,16 @@ export function SettingsRow({
   );
 }
 
+/**
+ * Renders a reset button that stops click propagation and delegates the reset to onClick.
+ * @param props.label Setting name used in the accessible action name.
+ * @param props.tooltip Tooltip text; defaults to the localized reset text.
+ * @param props.disabled Whether the button is disabled; defaults to false.
+ * @param props.onClick Callback that performs the reset.
+ */
 export function SettingResetButton({
   label,
-  tooltip = "Reset to default",
+  tooltip = t.common.resetToDefault,
   disabled = false,
   onClick,
 }: {
@@ -511,7 +519,7 @@ export function SettingResetButton({
           <Button
             size="icon-micro"
             variant="ghost-muted"
-            aria-label={`Reset ${label} to default`}
+            aria-label={t.common.resetLabelToDefault(label)}
             disabled={disabled}
             onClick={(event) => {
               event.stopPropagation();
