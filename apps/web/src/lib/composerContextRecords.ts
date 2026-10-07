@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import {
   COMPOSER_CONTEXT_REVIEW_DIFF_MAX_CHARS,
   COMPOSER_CONTEXT_REVIEW_TEXT_MAX_CHARS,
@@ -103,10 +104,10 @@ export function pullRequestContextDisplayState(
   return pullRequest.state === "open" && pullRequest.isDraft ? "draft" : pullRequest.state;
 }
 
+/** Returns a localized PR kind for UI only; wire records keep their original labels. */
 export function pullRequestContextKindLabel(comment: ReviewCommentPresentation): string {
   const state = pullRequestContextDisplayState(comment);
-  if (state === null) return "Pull request";
-  return `${state[0]!.toUpperCase()}${state.slice(1)} pull request`;
+  return t.composer.context.pullRequestKind(state);
 }
 
 export function previewAnnotationContextLabel(annotation: PreviewAnnotationPayload): string {

@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { memo } from "react";
 import { type PendingApproval } from "../../session-logic";
 import { cn } from "~/lib/utils";
@@ -16,24 +17,24 @@ export const ComposerPendingApprovalPanel = memo(function ComposerPendingApprova
   const Detail = approval.requestKind === "mcp-elicitation" ? "span" : "code";
   const fallbackLabel =
     approval.requestKind === "mcp-elicitation"
-      ? "App access approval"
+      ? t.composer.approval.appAccessTitle
       : approval.requestKind === "command"
-        ? "Command approval"
+        ? t.composer.approval.commandTitle
         : approval.requestKind === "file-read"
-          ? "File read approval"
+          ? t.composer.approval.fileReadTitle
           : approval.requestKind === "permission"
-            ? "App permission approval"
-            : "File change approval";
+            ? t.composer.approval.permissionTitle
+            : t.composer.approval.fileChangeTitle;
   const detailAriaLabel =
     approval.requestKind === "mcp-elicitation"
-      ? "App access request"
+      ? t.composer.approval.appAccessAriaLabel
       : approval.requestKind === "command"
-        ? "Command"
+        ? t.composer.approval.commandAriaLabel
         : approval.requestKind === "file-read"
-          ? "File to read"
+          ? t.composer.approval.fileReadAriaLabel
           : approval.requestKind === "permission"
-            ? "Permission request"
-            : "File change";
+            ? t.composer.approval.permissionAriaLabel
+            : t.composer.approval.fileChangeAriaLabel;
 
   return (
     <span
@@ -60,7 +61,7 @@ export const ComposerPendingApprovalPanel = memo(function ComposerPendingApprova
         tabIndex={0}
       >
         {approval.responseCapability === "not_resumable"
-          ? "Provider process is gone — interrupt or restart the run to respond."
+          ? t.composer.approval.processGoneHint
           : approval.detail || fallbackLabel}
       </Detail>
     </span>

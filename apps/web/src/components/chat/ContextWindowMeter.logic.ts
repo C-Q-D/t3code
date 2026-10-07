@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import type { ModelSelection, ProviderDriverKind, ProviderInstanceId } from "@t3tools/contracts";
 import {
   CLAUDE_RESUME_COMPACTION_NEVER_ANSWER,
@@ -102,11 +103,11 @@ export function formatContextWindowCompactionMessage(
   autoCompactThreshold?: number | null,
 ): string {
   if (typeof autoCompactThreshold === "number" && autoCompactThreshold > 0) {
-    return `Compacts automatically at ${autoCompactThreshold.toLocaleString("en-US")} tokens.`;
+    return t.composer.contextWindow.compactAtHint(autoCompactThreshold);
   }
   return modelDisplayName
-    ? `Context for ${modelDisplayName} compacts automatically when needed.`
-    : "Context compacts automatically when needed.";
+    ? t.composer.contextWindow.modelAutoCompactHint(modelDisplayName)
+    : t.composer.contextWindow.autoCompactHint;
 }
 
 /**

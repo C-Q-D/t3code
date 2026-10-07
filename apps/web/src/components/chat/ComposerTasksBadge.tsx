@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { CheckIcon, CircleDotIcon, CircleIcon, ListTodoIcon } from "lucide-react";
 import { memo, type ComponentProps } from "react";
 
@@ -20,9 +21,9 @@ export interface ComposerTaskStep {
 const MAX_TASK_SEGMENTS = 10;
 
 const taskStatusLabels = {
-  pending: "Pending",
-  inProgress: "Running",
-  completed: "Completed",
+  pending: t.composer.tasks.pending,
+  inProgress: t.composer.tasks.running,
+  completed: t.composer.tasks.completed,
 } satisfies Record<ComposerTaskStep["status"], string>;
 
 function keyedTaskSteps(steps: readonly ComposerTaskStep[]) {
@@ -77,7 +78,7 @@ function TaskSummary({
         <ListTodoIcon />
       </ComposerBanner.Icon>
       <ComposerBanner.Content>
-        <span className="shrink-0 text-muted-foreground">Tasks</span>
+        <span className="shrink-0 text-muted-foreground">{t.composer.tasks.title}</span>
         <span
           className="min-w-0 flex-1 truncate text-left font-medium text-foreground/80"
           data-composer-task-current="true"
@@ -118,7 +119,12 @@ export const ComposerTasksBadge = memo(function ComposerTasksBadge({
     <ComposerBanner.Row
       render={<button type="button" />}
       aria-expanded={expanded}
-      aria-label={`${expanded ? "Collapse tasks" : "Tasks"}: ${progress.completedSteps} of ${progress.totalSteps} complete. Current task: ${progress.step}`}
+      aria-label={t.composer.tasks.progressAriaLabel(
+        expanded,
+        progress.completedSteps,
+        progress.totalSteps,
+        progress.step,
+      )}
       data-composer-tasks-badge="true"
       onClick={onToggle}
       onPointerDown={(event) => event.preventDefault()}
@@ -162,7 +168,10 @@ export const ComposerTasksContent = memo(function ComposerTasksContent({
         <ComposerBanner.Scroll data-composer-tasks-scroll="true">
           <ComposerBanner.Children
             render={<ul role="list" />}
-            aria-label={`Task list. ${progress.completedSteps} of ${progress.totalSteps} complete.`}
+            aria-label={t.composer.tasks.listAriaLabel(
+              progress.completedSteps,
+              progress.totalSteps,
+            )}
             data-composer-tasks-list="true"
           >
             {keyedTaskSteps(steps).map(({ key, step }) => (
@@ -206,7 +215,7 @@ export const ComposerTasksContent = memo(function ComposerTasksContent({
                     {step.durationMs !== undefined
                       ? formatDuration(step.durationMs)
                       : step.status === "inProgress"
-                        ? "now"
+                        ? t.composer.tasks.now
                         : null}
                   </span>
                 </ComposerBanner.Actions>

@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import {
   formatProviderSkillDisplayName,
   resolveProviderSkillSourceKind,
@@ -139,16 +140,16 @@ export const ComposerCommandMenu = memo(function ComposerCommandMenu(props: {
             <p className="text-secondary-label text-xs">
               {props.isLoading
                 ? props.triggerKind === "skill"
-                  ? "Searching workspace skills..."
+                  ? t.composer.commandMenu.searchingSkills
                   : props.triggerKind === "pull-request"
-                    ? "Finding pull request..."
-                    : "Searching workspace files..."
+                    ? t.composer.commandMenu.findingPullRequest
+                    : t.composer.commandMenu.searchingPaths
                 : (props.emptyStateText ??
                   (props.triggerKind === "skill"
-                    ? "No skills found. Try / to browse provider commands."
+                    ? t.composer.commandMenu.skillsEmpty
                     : props.triggerKind === "path"
-                      ? "No matching files or folders."
-                      : "No matching command."))}
+                      ? t.composer.commandMenu.pathsEmpty
+                      : t.composer.commandMenu.commandsEmpty))}
             </p>
           </div>
         )}
@@ -238,10 +239,10 @@ export function composerSuggestionOptionId(listId: string, itemId: string): stri
 }
 
 const LISTBOX_LABEL_BY_TRIGGER: Record<ComposerTriggerKind, string> = {
-  path: "Files and folders",
-  "pull-request": "Pull requests",
-  "slash-command": "Commands",
-  skill: "Skills",
+  path: t.composer.commandMenu.pathsLabel,
+  "pull-request": t.composer.commandMenu.pullRequestsLabel,
+  "slash-command": t.composer.commandMenu.commandsLabel,
+  skill: t.composer.commandMenu.skillsLabel,
 };
 
 const SKILL_SOURCE_ICON_BY_KIND: Record<ProviderSkillSourceKind, LucideIcon> = {
@@ -254,12 +255,12 @@ const SKILL_SOURCE_ICON_BY_KIND: Record<ProviderSkillSourceKind, LucideIcon> = {
 };
 
 const SKILL_SOURCE_LABEL_BY_KIND: Record<ProviderSkillSourceKind, string> = {
-  app: "App",
-  repo: "Repo",
-  project: "Project",
-  personal: "Personal",
-  system: "System",
-  other: "Provider",
+  app: t.composer.commandMenu.appSource,
+  repo: t.composer.commandMenu.repoSource,
+  project: t.composer.commandMenu.projectSource,
+  personal: t.composer.commandMenu.personalSource,
+  system: t.composer.commandMenu.systemSource,
+  other: t.composer.commandMenu.providerSource,
 };
 
 function SkillSourceBadge(props: { kind: ProviderSkillSourceKind; showSkillSuffix: boolean }) {
@@ -268,7 +269,7 @@ function SkillSourceBadge(props: { kind: ProviderSkillSourceKind; showSkillSuffi
     <Badge className="ms-auto" variant="secondary">
       <Icon aria-hidden="true" className="text-current" />
       {SKILL_SOURCE_LABEL_BY_KIND[props.kind]}
-      {props.showSkillSuffix ? " Skill" : null}
+      {props.showSkillSuffix ? t.composer.commandMenu.skillSuffix : null}
     </Badge>
   );
 }

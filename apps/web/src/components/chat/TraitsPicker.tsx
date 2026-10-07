@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import {
   type ModelSelection,
   type ProviderDriverKind,
@@ -44,10 +45,10 @@ import { useComposerMenuState } from "./useComposerMenuState";
 type ProviderOptions = ReadonlyArray<ProviderOptionSelection>;
 
 const SAVED_OPTION_LABELS: Readonly<Record<string, string>> = {
-  agent: "Agent",
-  effort: "Effort",
-  reasoningEffort: "Reasoning effort",
-  variant: "Reasoning",
+  agent: t.composer.traits.agent,
+  effort: t.composer.traits.effort,
+  reasoningEffort: t.composer.traits.reasoningEffort,
+  variant: t.composer.traits.reasoning,
 };
 
 function savedOptionLabel(id: string): string {
@@ -95,7 +96,7 @@ const ULTRATHINK_PROMPT_PREFIX = "Ultrathink:\n";
 function DefaultBadge() {
   return (
     <Badge variant="outline" size="sm" className="min-w-0">
-      Default
+      {t.composer.traits.default}
     </Badge>
   );
 }
@@ -407,8 +408,7 @@ export const TraitsMenuContent = memo(function TraitsMenuContentImpl({
               </div>
               {ultrathinkInBodyText && descriptor.id === primarySelectDescriptor?.id ? (
                 <div className="px-2 pb-1.5 text-muted-foreground/80 text-xs">
-                  Your prompt contains &quot;ultrathink&quot; in the text. Remove it to change this
-                  option.
+                  {t.composer.traits.ultrathinkBodyHint}
                 </div>
               ) : null}
               <MenuRadioGroup
@@ -471,7 +471,7 @@ export const TraitsMenuContent = memo(function TraitsMenuContentImpl({
                 {(["on", "off"] as const).map((value) => (
                   <MenuRadioItem key={value} value={value} hideIndicator closeOnClick>
                     <span className="flex w-full min-w-0 items-center justify-between gap-3">
-                      <span>{value === "on" ? "On" : "Off"}</span>
+                      <span>{value === "on" ? t.composer.traits.on : t.composer.traits.off}</span>
                     </span>
                   </MenuRadioItem>
                 ))}
@@ -499,8 +499,8 @@ export function buildTraitsTriggerDisplay(input: {
   const labels: Array<string> = [];
   for (const descriptor of input.descriptors) {
     if (descriptor.id === "fastMode" && descriptor.type === "boolean") {
-      speedLabel = descriptor.currentValue === true ? "Fast" : null;
-      fastModeFallbackLabel = speedLabel ?? "Normal";
+      speedLabel = descriptor.currentValue === true ? t.composer.traits.fast : null;
+      fastModeFallbackLabel = speedLabel ?? t.composer.traits.normal;
       continue;
     }
     if (
@@ -518,20 +518,21 @@ export function buildTraitsTriggerDisplay(input: {
       ) {
         speedLabel =
           ultrafastTier && currentValue === ultrafastTier.id
-            ? "Ultrafast"
+            ? t.composer.traits.ultrafast
             : fastTier && currentValue === fastTier.id
-              ? "Fast"
+              ? t.composer.traits.fast
               : null;
         fastModeFallbackLabel =
-          descriptor.options.find(({ id }) => id === currentValue)?.label ?? "Normal";
+          descriptor.options.find(({ id }) => id === currentValue)?.label ??
+          t.composer.traits.normal;
         continue;
       }
     }
     const label =
       input.ultrathinkPromptControlled && descriptor.id === input.primarySelectDescriptorId
-        ? "Ultrathink"
+        ? t.composer.traits.ultrathink
         : descriptor.type === "boolean"
-          ? `${descriptor.label} ${descriptor.currentValue === true ? "On" : "Off"}`
+          ? t.composer.traits.booleanLabel(descriptor.label, descriptor.currentValue === true)
           : getProviderOptionCurrentLabel(
               descriptor,
               input.modelSelection,

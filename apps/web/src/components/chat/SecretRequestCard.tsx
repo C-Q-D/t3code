@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import {
   SECRET_REQUEST_DEFAULT_PLACEHOLDER,
   SECRET_REQUEST_PRIVACY_NOTE,
@@ -148,7 +149,7 @@ function PendingSecretRequestForm(props: {
           />
         </div>
         <Button type="submit" disabled={submitting || secret.trim().length === 0}>
-          Save securely
+          {t.composer.secretRequest.save}
         </Button>
       </div>
       {error !== null ? (
@@ -171,7 +172,7 @@ function PendingSecretRequestForm(props: {
           disabled={submitting}
           onClick={() => void send({ type: "decline" })}
         >
-          Decline
+          {t.composer.secretRequest.decline}
         </Button>
       </div>
     </form>

@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import {
   type ProviderApprovalDecision,
   type ProviderApprovalOption,
@@ -23,10 +24,10 @@ interface ComposerPendingApprovalActionsProps {
 }
 
 const DEFAULT_APPROVAL_OPTIONS = [
-  { decision: "cancel", label: "Cancel" },
-  { decision: "decline", label: "Decline" },
-  { decision: "acceptForSession", label: "Always allow this session" },
-  { decision: "accept", label: "Approve" },
+  { decision: "cancel", label: t.composer.approval.cancel },
+  { decision: "decline", label: t.composer.approval.decline },
+  { decision: "acceptForSession", label: t.composer.approval.allowSession },
+  { decision: "accept", label: t.composer.approval.approve },
 ] satisfies ReadonlyArray<ProviderApprovalOption>;
 
 export const ComposerPendingApprovalActions = memo(function ComposerPendingApprovalActions({
@@ -77,7 +78,13 @@ export const ComposerPendingApprovalActions = memo(function ComposerPendingAppro
         <Menu>
           <MenuTrigger
             disabled={disabled || isResponding}
-            render={<Button size="icon-xs" variant="outline" aria-label="More approval options" />}
+            render={
+              <Button
+                size="icon-xs"
+                variant="outline"
+                aria-label={t.composer.approval.moreOptions}
+              />
+            }
           >
             <EllipsisIcon />
           </MenuTrigger>

@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { Spinner } from "~/components/ui/spinner";
 import type { ServerUpdateState } from "@t3tools/client-runtime/state/server";
 import { CircleAlertIcon, DownloadIcon } from "lucide-react";
@@ -24,14 +25,14 @@ export function ComposerServerUpdateIcon({
 /** One text line, clipped at the end so the error detail never squeezes its title. */
 export function ComposerServerUpdateStatus({
   state,
-  serverLabel = "server",
+  serverLabel = t.composer.serverUpdate.serverLabel,
 }: {
   readonly state: Exclude<ServerUpdateState, { status: "idle" }>;
   readonly serverLabel?: string;
 }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const triggerId = useId();
-  const title = `${state.status === "failed" ? "Could not update" : "Updating"} ${serverLabel}`;
+  const title = t.composer.serverUpdate.title(state.status === "failed", serverLabel);
   const detail = state.status === "failed" ? state.message : serverUpdateStageLabel(state.stage);
   return (
     <span
@@ -46,7 +47,7 @@ export function ComposerServerUpdateStatus({
           render={
             <button
               type="button"
-              aria-label={`${title}: ${detail}`}
+              aria-label={t.composer.serverUpdate.detailsAriaLabel(title, detail)}
               className="block max-w-full cursor-help truncate rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
               onClick={() => setDetailsOpen(true)}
             >
@@ -57,7 +58,7 @@ export function ComposerServerUpdateStatus({
           }
         />
         <TooltipPopup side="top">
-          {title}: {detail}
+          {t.composer.serverUpdate.detailsAriaLabel(title, detail)}
         </TooltipPopup>
       </Tooltip>
     </span>

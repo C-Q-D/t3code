@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { memo, type MouseEventHandler, type PointerEventHandler } from "react";
 import { CheckIcon, ChevronDownIcon, ChevronLeftIcon, PlayIcon } from "lucide-react";
 import { CornerUpRight, ListPlus } from "lucide";
@@ -63,15 +64,17 @@ const formatPendingPrimaryActionLabel = (input: {
   questionIndex: number;
 }) => {
   if (input.isResponding) {
-    return "Submitting...";
+    return t.composer.primaryActions.submitting;
   }
   if (input.compact) {
-    return input.isLastQuestion ? "Submit" : "Next";
+    return input.isLastQuestion ? t.composer.primaryActions.submit : t.composer.primaryActions.next;
   }
   if (!input.isLastQuestion) {
-    return "Next question";
+    return t.composer.primaryActions.nextQuestion;
   }
-  return input.questionIndex > 0 ? "Submit answers" : "Submit answer";
+  return input.questionIndex > 0
+    ? t.composer.primaryActions.submitAnswers
+    : t.composer.primaryActions.submitAnswer;
 };
 
 // The composer's labeled primary actions (Submit, Refine, Implement) share the send button's
@@ -143,7 +146,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
             onClick={() => {
               if (canOperateThread) onInterrupt();
             }}
-            aria-label="Stop generation"
+            aria-label={t.composer.primaryActions.stop}
           />
         }
       >
@@ -151,7 +154,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
           <rect x="2" y="2" width="8" height="8" rx="1.5" />
         </svg>
       </TooltipTrigger>
-      <TooltipPopup>Interrupt</TooltipPopup>
+      <TooltipPopup>{t.composer.primaryActions.interrupt}</TooltipPopup>
     </Tooltip>
   );
 
@@ -167,7 +170,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
               {...pointerFocusProps}
               onClick={onPreviousPendingQuestion}
               disabled={pendingAction.isResponding}
-              aria-label="Previous question"
+              aria-label={t.composer.primaryActions.previousQuestion}
             >
               <ChevronLeftIcon className="size-3.5" />
             </Button>
@@ -179,7 +182,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
               onClick={onPreviousPendingQuestion}
               disabled={pendingAction.isResponding}
             >
-              Previous
+              {t.composer.primaryActions.previous}
             </Button>
           )
         ) : null}
@@ -214,7 +217,9 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
           {...pointerFocusProps}
           disabled={isSendBusy || isSendDisabled || isConnecting || isEnvironmentUnavailable}
         >
-          {isConnecting || isSendBusy ? "Sending..." : "Refine"}
+          {isConnecting || isSendBusy
+            ? t.composer.primaryActions.sending
+            : t.composer.primaryActions.refine}
         </button>
       );
     }
@@ -227,7 +232,9 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
           {...pointerFocusProps}
           disabled={isSendBusy || isSendDisabled || isConnecting || isEnvironmentUnavailable}
         >
-          {isConnecting || isSendBusy ? "Sending..." : "Implement"}
+          {isConnecting || isSendBusy
+            ? t.composer.primaryActions.sending
+            : t.composer.primaryActions.implement}
         </button>
         <Menu>
           <MenuTrigger
@@ -238,7 +245,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
                   messageActionPillClassName,
                   "h-9 rounded-l-none border-l border-message-action-foreground/20 px-2 sm:h-8",
                 )}
-                aria-label="Implementation actions"
+                aria-label={t.composer.primaryActions.implementationActions}
                 {...pointerFocusProps}
                 disabled={isSendBusy || isSendDisabled || isConnecting || isEnvironmentUnavailable}
               />
@@ -253,7 +260,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
                 if (canOperateThread) onImplementPlanInNewThread();
               }}
             >
-              Implement in a new thread
+              {t.composer.primaryActions.implementNewThread}
             </MenuItem>
           </MenuPopup>
         </Menu>
@@ -288,9 +295,11 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
               />
             }
           >
-            {isConnecting || isSendBusy ? "Sending..." : "Compact and send"}
+            {isConnecting || isSendBusy
+              ? t.composer.primaryActions.sending
+              : t.composer.primaryActions.compactSend}
           </TooltipTrigger>
-          <TooltipPopup>Summarize {tokens} tokens of history, then send</TooltipPopup>
+          <TooltipPopup>{t.composer.primaryActions.summarizeHistory(tokens)}</TooltipPopup>
         </Tooltip>
         <Menu>
           <MenuTrigger
@@ -301,7 +310,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
                   messageActionPillClassName,
                   "h-9 rounded-l-none border-l border-message-action-foreground/20 px-2 sm:h-8",
                 )}
-                aria-label="Send options"
+                aria-label={t.composer.primaryActions.sendOptions}
                 {...pointerFocusProps}
                 disabled={sendBlocked || !hasSendableContent}
               />
@@ -311,7 +320,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
           </MenuTrigger>
           <MenuPopup align="end" side="top" {...composerFloatingLayerProps}>
             <MenuItem disabled={sendBlocked} onClick={onSendWithFullHistory}>
-              Send with full history ({tokens} tokens)
+              {t.composer.primaryActions.fullHistory(tokens)}
             </MenuItem>
           </MenuPopup>
         </Menu>
@@ -320,30 +329,34 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
   }
 
   const submitLabel = showResume
-    ? "Resume thread"
+    ? t.composer.primaryActions.resume
     : isEditingQueuedMessage
-      ? "Update queued message"
+      ? t.composer.primaryActions.updateQueued
       : isQueuing
-        ? "Queue message"
+        ? t.composer.primaryActions.queue
         : isRunning
-          ? "Steer message"
-          : "Submit message";
+          ? t.composer.primaryActions.steer
+          : t.composer.primaryActions.submitMessage;
   const submitStatus = isEnvironmentUnavailable
-    ? "Environment disconnected"
+    ? t.composer.primaryActions.disconnected
     : (sendDisabledReason ??
       (isConnecting
-        ? "Connecting"
+        ? t.composer.primaryActions.connecting
         : isPreparingWorktree
-          ? "Preparing worktree"
+          ? t.composer.primaryActions.preparingWorktree
           : isSendBusy
             ? isEditingQueuedMessage
-              ? "Updating queued message"
-              : "Submitting message"
+              ? t.composer.primaryActions.updatingQueued
+              : t.composer.primaryActions.submittingMessage
             : null));
   const submitTooltip =
     submitStatus ??
     (isRunning && !isEditingQueuedMessage
-      ? `Click to ${followUpBehavior}, Ctrl/⌘-click${alternateShortcutLabel ? ` or ${alternateShortcutLabel}` : ""} to ${alternateAction}`
+      ? t.composer.primaryActions.dispatchTooltip(
+          followUpBehavior,
+          alternateShortcutLabel,
+          alternateAction,
+        )
       : submitLabel);
 
   const sendButton = (
