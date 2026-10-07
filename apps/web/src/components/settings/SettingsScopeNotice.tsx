@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { Button } from "../ui/button";
 import { Alert, AlertAction, AlertDescription } from "../ui/alert";
 import { SettingsPageContainer } from "./settingsLayout";
@@ -31,7 +32,11 @@ export function SettingsScopeNotice({
           .filter((group) => !search.project || group.projectKey === search.project)
           .flatMap((group) =>
             group.memberProjects.map((member) => ({
-              label: `${group.displayName} · ${member.environmentLabel ?? "Environment"} · ${member.workspaceRoot}`,
+              label: t.settings.scopeNotice.checkoutLabel(
+                group.displayName,
+                member.environmentLabel ?? t.settings.scopeNotice.environment,
+                member.workspaceRoot,
+              ),
               search: {
                 project: group.projectKey,
                 machine: member.environmentId,
@@ -56,11 +61,14 @@ export function SettingsScopeNotice({
                   (other) =>
                     other.environmentId !== entry.environmentId && other.label === entry.label,
                 )
-                  ? `${entry.label} · ${entry.displayUrl || entry.environmentId}`
+                  ? t.settings.scopeNotice.environmentLabel(
+                      entry.label,
+                      entry.displayUrl || entry.environmentId,
+                    )
                   : entry.label,
                 search: { machine: entry.environmentId },
               }))
-          : [{ label: "Open all environments", search: {} }];
+          : [{ label: t.settings.scopeNotice.openAllEnvironments, search: {} }];
   return (
     <SettingsPageContainer>
       <Alert role="status">

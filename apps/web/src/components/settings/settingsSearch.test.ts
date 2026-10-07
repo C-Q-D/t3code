@@ -53,6 +53,34 @@ afterEach(async () => {
 });
 
 describe("translated settings catalog", () => {
+  it("finds translated titles and English aliases in General settings", async () => {
+    vi.resetModules();
+    const { installMessages: install } = await import("~/i18n");
+    install("zh-CN", messages);
+    const { searchSettings: search } = await import("./settingsSearch");
+
+    expect(search("项目分组")[0]).toMatchObject({
+      id: "project-grouping",
+      title: "项目分组",
+      to: "/settings/general",
+    });
+    expect(search("combine matching repositories").map((item) => item.id)).toContain(
+      "project-grouping",
+    );
+  });
+
+  it.each([
+    ["general", "project-grouping", "/settings/general"],
+    ["storage", "storage-worktrees-location", "/settings/storage"],
+  ])("finds English page name %s with Chinese messages installed", async (query, id, to) => {
+    vi.resetModules();
+    const { installMessages: install } = await import("~/i18n");
+    install("zh-CN", messages);
+    const { searchSettings: search } = await import("./settingsSearch");
+
+    expect(search(query)).toEqual(expect.arrayContaining([expect.objectContaining({ id, to })]));
+  });
+
   it("finds Chinese titles and English aliases when installed before module evaluation", async () => {
     vi.resetModules();
     const { installMessages: install } = await import("~/i18n");
