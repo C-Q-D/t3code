@@ -43,6 +43,10 @@ export const CodexOrchestratorReplayHarnessError = Schema.Union([
 ]);
 export type CodexOrchestratorReplayHarnessError = typeof CodexOrchestratorReplayHarnessError.Type;
 
+/**
+ * Wrap a test client to keep child metadata and config/read out of the strictly ordered replay.
+ * Child reads use readMetadata; config/read returns transcript.metadata.codexConfig or an empty config.
+ */
 export function withCodexReplayChildMetadata(
   client: CodexClient.CodexAppServerClient["Service"],
   transcript: CodexReplay.CodexAppServerReplayTranscript,
@@ -77,7 +81,9 @@ export function withCodexReplayChildMetadata(
         typeof params.threadId === "string" &&
         childThreadIds.has(params.threadId)
           ? readMetadata(params.threadId, method)
-          : client.raw.request(method, params),
+          : method === "config/read"
+            ? Effect.succeed({ config: transcript.metadata?.codexConfig ?? {} })
+            : client.raw.request(method, params),
     },
   };
 }

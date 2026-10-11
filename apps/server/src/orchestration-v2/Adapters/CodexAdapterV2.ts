@@ -1,4 +1,10 @@
 import { revertCodexThread } from "../../provider/CodexThreadRevert.ts";
+import {
+  codexAutoCompactThreshold,
+  makeCodexConfigReadLogRedactor,
+  prefetchCodexCompactionLimits,
+  type CodexCompactionLimits,
+} from "./codexCompactionLimits.ts";
 import { historyResponseItems } from "@t3tools/provider-core/server/handoffBudget";
 import { makeProviderTextDeltaCoalescer } from "./ProviderTextDeltaCoalescer.ts";
 import {
@@ -180,13 +186,19 @@ export function canReuseCodexContextUsage(previous: ModelSelection, next: ModelS
   );
 }
 
+/**
+ * Project Codex token usage and its update timestamp into provider turn tokenUsage.
+ * maxTokens is Codex's reported usable window; omit autoCompactThreshold when it is absent.
+ */
 export function codexProviderTurnTokenUsage(
   tokenUsage: CodexSchema.V2ThreadTokenUsageUpdatedNotification["tokenUsage"],
   updatedAt: string,
+  autoCompactThreshold?: number,
 ) {
   return {
     usedTokens: Math.max(0, tokenUsage.last.totalTokens),
     maxTokens: tokenUsage.modelContextWindow ?? null,
+    ...(autoCompactThreshold === undefined ? {} : { autoCompactThreshold }),
     inputTokens: Math.max(0, tokenUsage.last.inputTokens),
     cachedInputTokens: Math.max(0, tokenUsage.last.cachedInputTokens),
     outputTokens: Math.max(0, tokenUsage.last.outputTokens),
@@ -1421,12 +1433,17 @@ const layerCodexAppServerClientFactoryCommand = (
     }),
   );
 
+/**
+ * Return undefined without a nativeEventLogger; otherwise filter events before persisting them.
+ * Hide config/read response bodies, then apply general redaction before writing session logs.
+ */
 export function makeCodexAppServerProtocolLogger(input: {
   readonly nativeEventLogger: ProviderEventLoggers.EventNdjsonLogger | undefined;
   readonly threadId: ThreadId;
   readonly providerSessionId: OrchestrationV2ProviderSession["id"];
 }): CodexClient.CodexAppServerClientOptions["logger"] | undefined {
   const { nativeEventLogger } = input;
+  const redactConfigRead = makeCodexConfigReadLogRedactor();
   if (nativeEventLogger === undefined) {
     return undefined;
   }
@@ -1440,7 +1457,7 @@ export function makeCodexAppServerProtocolLogger(input: {
           protocol: "codex.app-server",
           kind: "protocol",
           providerSessionId: input.providerSessionId,
-          event: redactCodexProtocolValue(boundProviderEventForLogging(event)),
+          event: redactCodexProtocolValue(boundProviderEventForLogging(redactConfigRead(event))),
         },
         input.threadId,
       )
@@ -1718,6 +1735,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
           settings: resolvedRuntime?.config ?? adapterOptions.settings,
           environment: resolvedRuntime?.environment ?? adapterOptions.environment,
         });
+        const compactionLimitsByCwd = new Map<string | null, CodexCompactionLimits | null>();
         const additionalContextByThread = yield* Ref.make(
           new Map<
             string,
@@ -4360,6 +4378,10 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                 tokenUsage: codexProviderTurnTokenUsage(
                   payload.tokenUsage,
                   DateTime.formatIso(now),
+                  codexAutoCompactThreshold(
+                    compactionLimitsByCwd.get(context.input.runtimePolicy.cwd),
+                    payload.tokenUsage.modelContextWindow,
+                  ),
                 ),
               },
             });
@@ -6182,6 +6204,12 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
         ) =>
           Effect.gen(function* () {
             const threadId = yield* getNativeThreadId(turnInput.providerThread);
+            yield* prefetchCodexCompactionLimits(
+              client,
+              compactionLimitsByCwd,
+              turnInput.runtimePolicy.cwd,
+              scope,
+            );
             const mcpSession = yield* mcpSessions.read(turnInput.threadId);
             const turnStartParams = yield* buildCodexTurnStartParams({
               nativeThreadId: threadId,

@@ -1088,6 +1088,46 @@ describe("CodexAdapterV2 native protocol logging", () => {
     }),
   );
 
+  it.effect("redacts config/read results before writing protocol logs", () =>
+    Effect.gen(function* () {
+      const writes: Array<unknown> = [];
+      const logger = CodexAdapterV2.makeCodexAppServerProtocolLogger({
+        nativeEventLogger: {
+          filePath: "/tmp/events.log",
+          write: (event) =>
+            Effect.sync(() => {
+              writes.push(event);
+            }),
+          close: () => Effect.void,
+        },
+        threadId: ThreadId.make("config-log-thread"),
+        providerSessionId: ProviderSessionId.make("config-log-session"),
+      });
+      assert.exists(logger);
+      if (logger === undefined) return;
+      yield* logger({
+        direction: "outgoing",
+        stage: "decoded",
+        payload: { id: 17, method: "config/read", params: { cwd: "/workspace" } },
+      });
+      yield* logger({
+        direction: "incoming",
+        stage: "decoded",
+        payload: {
+          id: 17,
+          result: {
+            config: { model_auto_compact_token_limit: 240000, unrelated: "private-config" },
+            origins: {},
+          },
+        },
+      });
+      assert.lengthOf(writes, 2);
+      assert.deepNestedPropertyVal(writes[1], "event.payload.result", { redacted: true });
+      assert.notInclude(JSON.stringify(writes[1]), "240000");
+      assert.notInclude(JSON.stringify(writes[1]), "private-config");
+    }),
+  );
+
   it.effect("filters streaming frames before redaction without losing decode failures", () =>
     Effect.gen(function* () {
       const writes: Array<unknown> = [];
@@ -1915,6 +1955,14 @@ describe("CodexAdapterV2 post-settle continuation", () => {
       Effect.void,
     onRequest: (method: string, params: unknown) => Effect.Effect<void> = () => Effect.void,
     readChildMetadata?: Parameters<typeof withCodexReplayChildMetadata>[2],
+    replayOptions?: {
+      readonly beforeEmitInbound?: NonNullable<
+        CodexReplay.CodexAppServerReplayDriver["beforeEmitInbound"]
+      >;
+      readonly wrapRawRequest?: (
+        request: CodexClient.CodexAppServerClient["Service"]["raw"]["request"],
+      ) => CodexClient.CodexAppServerClient["Service"]["raw"]["request"];
+    },
   ) =>
     Effect.gen(function* () {
       const fileSystem = yield* FileSystem.FileSystem;
@@ -1924,7 +1972,8 @@ describe("CodexAdapterV2 post-settle continuation", () => {
         [];
       const clientFactory: CodexAdapterV2.CodexAppServerClientFactoryShape = {
         open: (openInput) =>
-          Layer.build(CodexReplay.layerReplay(transcript)).pipe(
+          CodexReplay.makeReplayDriver(transcript, replayOptions).pipe(
+            Effect.flatMap((driver) => Layer.build(CodexReplay.layerReplayWithDriver(driver))),
             Effect.mapError(
               (cause) =>
                 new ProviderAdapter.ProviderAdapterOpenSessionError({
@@ -1942,6 +1991,11 @@ describe("CodexAdapterV2 post-settle continuation", () => {
                   (client) =>
                     ({
                       ...client,
+                      raw: {
+                        ...client.raw,
+                        request:
+                          replayOptions?.wrapRawRequest?.(client.raw.request) ?? client.raw.request,
+                      },
                       request: (method, params) =>
                         onRequest(method, params).pipe(
                           Effect.andThen(client.request(method, params)),
@@ -2031,6 +2085,250 @@ describe("CodexAdapterV2 post-settle continuation", () => {
         firstTerminal: Deferred.await(firstTerminal),
       };
     });
+
+  /** Builds usage notifications with the usable window reported by Codex, not its configured window. */
+  const compactionUsageEntry = (
+    turnId: string,
+    label: string,
+  ): CodexReplay.CodexAppServerReplayEntry => ({
+    type: "emit_inbound",
+    label,
+    frame: {
+      method: "thread/tokenUsage/updated",
+      params: {
+        threadId: "compaction-thread",
+        turnId,
+        tokenUsage: {
+          total: {
+            totalTokens: 15,
+            inputTokens: 10,
+            cachedInputTokens: 2,
+            outputTokens: 5,
+            reasoningOutputTokens: 1,
+          },
+          last: {
+            totalTokens: 15,
+            inputTokens: 10,
+            cachedInputTokens: 2,
+            outputTokens: 5,
+            reasoningOutputTokens: 1,
+          },
+          modelContextWindow: 258400,
+        },
+      },
+    },
+  });
+
+  it.effect.each(["configured", "missing"] as const)(
+    "reports %s compaction limits across two turns in one cwd",
+    (config) =>
+      Effect.gen(function* () {
+        const secondTerminal = yield* Deferred.make<void>();
+        const secondTurnId = (yield* IdAllocator.IdAllocatorV2).derive.providerTurn({
+          driver: CodexAdapterV2.CODEX_DRIVER_KIND,
+          nativeTurnId: "compaction-second",
+        });
+        let configReads = 0;
+        const transcript: CodexReplay.CodexAppServerReplayTranscript = {
+          ...makeCodexReplayTranscript({
+            scenario: `compaction-${config}`,
+            entries: [
+              ...codexReplayPreamble({
+                nativeThreadId: "compaction-thread",
+                nativeTurnId: "compaction-first",
+                prompt: "work",
+              }),
+              compactionUsageEntry("compaction-first", "first-usage"),
+              {
+                type: "emit_inbound",
+                label: "first-completed",
+                frame: {
+                  method: "turn/completed",
+                  params: {
+                    threadId: "compaction-thread",
+                    turn: makeCodexReplayTurn({ id: "compaction-first", status: "completed" }),
+                  },
+                },
+              },
+              ...codexReplayPreamble({
+                nativeThreadId: "compaction-thread",
+                nativeTurnId: "compaction-second",
+                prompt: "work",
+              })
+                .slice(-3)
+                .map((entry) => withReplayRequestId(entry, 4)),
+              compactionUsageEntry("compaction-second", "second-usage"),
+              {
+                type: "emit_inbound",
+                label: "second-completed",
+                frame: {
+                  method: "turn/completed",
+                  params: {
+                    threadId: "compaction-thread",
+                    turn: makeCodexReplayTurn({ id: "compaction-second", status: "completed" }),
+                  },
+                },
+              },
+            ],
+          }),
+          ...(config === "configured"
+            ? {
+                metadata: {
+                  codexConfig: {
+                    model_auto_compact_token_limit: 240000,
+                    model_context_window: 272000,
+                  },
+                },
+              }
+            : {}),
+        };
+        const harness = yield* makeCodexReplayHarness(
+          transcript,
+          (event) =>
+            event.type === "turn.terminal" && event.providerTurnId === secondTurnId
+              ? Deferred.succeed(secondTerminal, undefined)
+              : Effect.void,
+          undefined,
+          undefined,
+          {
+            wrapRawRequest: (request) => (method, params) =>
+              Effect.sync(() => {
+                if (method === "config/read") configReads++;
+              }).pipe(Effect.andThen(request(method, params))),
+          },
+        );
+        yield* harness.runtime.startTurn(
+          makeCodexTestTurnInput({
+            threadId: harness.threadId,
+            providerThread: harness.providerThread,
+            now: yield* DateTime.now,
+            attemptId: RunAttemptId.make("compaction-first"),
+            text: "work",
+          }),
+        );
+        yield* harness.firstTerminal;
+        yield* harness.runtime.startTurn(
+          makeCodexTestTurnInput({
+            threadId: harness.threadId,
+            providerThread: harness.providerThread,
+            now: yield* DateTime.now,
+            attemptId: RunAttemptId.make("compaction-second"),
+            text: "work",
+          }),
+        );
+        yield* Deferred.await(secondTerminal);
+        const usages = harness.events.flatMap((event) =>
+          event.type === "provider_turn.updated" && event.providerTurn.tokenUsage
+            ? [event.providerTurn.tokenUsage]
+            : [],
+        );
+        assert.lengthOf(usages, 2);
+        if (config === "configured") {
+          assert.equal(usages[0]?.autoCompactThreshold, 240000);
+          assert.equal(usages[1]?.autoCompactThreshold, 240000);
+          assert.equal(configReads, 1);
+        } else {
+          assert.notProperty(usages[0], "autoCompactThreshold");
+          assert.notProperty(usages[1], "autoCompactThreshold");
+        }
+        assert.equal(usages[0]?.maxTokens, 258400);
+      }).pipe(
+        Effect.scoped,
+        Effect.provide(
+          Layer.mergeAll(IdAllocator.layer, McpProviderSessions.layer, NodeServices.layer),
+        ),
+      ),
+  );
+
+  it.effect(
+    "advances the turn while config/read is pending and reports limits after it resolves",
+    () =>
+      Effect.gen(function* () {
+        const configResult = yield* Deferred.make<unknown>();
+        const configReturned = yield* Deferred.make<void>();
+        const firstUsage = yield* Deferred.make<void>();
+        let configReads = 0;
+        const transcript = makeCodexReplayTranscript({
+          scenario: "compaction-pending",
+          entries: [
+            ...codexReplayPreamble({
+              nativeThreadId: "compaction-thread",
+              nativeTurnId: "compaction-pending",
+              prompt: "work",
+            }),
+            compactionUsageEntry("compaction-pending", "pending-usage"),
+            compactionUsageEntry("compaction-pending", "resolved-usage"),
+            {
+              type: "emit_inbound",
+              label: "completed",
+              frame: {
+                method: "turn/completed",
+                params: {
+                  threadId: "compaction-thread",
+                  turn: makeCodexReplayTurn({ id: "compaction-pending", status: "completed" }),
+                },
+              },
+            },
+          ],
+        });
+        const harness = yield* makeCodexReplayHarness(
+          transcript,
+          (event) =>
+            event.type === "provider_turn.updated" && event.providerTurn.tokenUsage !== undefined
+              ? Deferred.succeed(firstUsage, undefined)
+              : Effect.void,
+          undefined,
+          undefined,
+          {
+            beforeEmitInbound: (entry) =>
+              entry.label === "resolved-usage" ? Deferred.await(configReturned) : Effect.void,
+            wrapRawRequest: (request) => (method, params) =>
+              method === "config/read"
+                ? Effect.sync(() => {
+                    configReads++;
+                  }).pipe(
+                    Effect.andThen(Deferred.await(configResult)),
+                    Effect.onExit(() => Deferred.succeed(configReturned, undefined)),
+                  )
+                : request(method, params),
+          },
+        );
+        yield* harness.runtime.startTurn(
+          makeCodexTestTurnInput({
+            threadId: harness.threadId,
+            providerThread: harness.providerThread,
+            now: yield* DateTime.now,
+            attemptId: RunAttemptId.make("compaction-pending"),
+            text: "work",
+          }),
+        );
+        assert.equal(configReads, 1);
+        yield* Deferred.await(firstUsage);
+        const pending = harness.events.flatMap((event) =>
+          event.type === "provider_turn.updated" && event.providerTurn.tokenUsage
+            ? [event.providerTurn.tokenUsage]
+            : [],
+        );
+        assert.lengthOf(pending, 1);
+        assert.notProperty(pending[0], "autoCompactThreshold");
+        yield* Deferred.succeed(configResult, {
+          config: { model_auto_compact_token_limit: 240000, model_context_window: 272000 },
+        });
+        yield* harness.firstTerminal;
+        const usages = harness.events.flatMap((event) =>
+          event.type === "provider_turn.updated" && event.providerTurn.tokenUsage
+            ? [event.providerTurn.tokenUsage]
+            : [],
+        );
+        assert.lengthOf(usages, 2);
+        assert.equal(usages[1]?.autoCompactThreshold, 240000);
+      }).pipe(
+        Effect.scoped,
+        Effect.provide(
+          Layer.mergeAll(IdAllocator.layer, McpProviderSessions.layer, NodeServices.layer),
+        ),
+      ),
+  );
 
   it.effect.each(["supported", "unsupported", "invalid"] as const)(
     "delivers native history with %s app-server protocol",
