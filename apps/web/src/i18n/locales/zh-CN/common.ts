@@ -35,7 +35,7 @@ export const common: Messages["common"] = {
     autoSettle: "自动完结行为",
     enabled: "已启用",
     disabled: "已禁用",
-    threadId: "对话ID",
+    threadId: "对话 ID",
     archive: "归档对话",
     delete: "删除",
   },
@@ -53,9 +53,9 @@ export const common: Messages["common"] = {
     pullRequestLabel: (shortName, stateLabel) => `${shortName}${stateLabel}`,
     /** Appends the unmodified PR title to its status heading. */
     pullRequestTooltip: (lead, title) => `${lead}：${title}`,
-    stack: "堆叠",
+    stack: "PR stack",
     /** Formats the stackSummary message from the supplied count, label. */
-    stackSummary: (count, label) => `${count} 个拉取请求组成的堆叠，${label}`,
+    stackSummary: (count, label) => `${count} 个 PR 组成的 PR stack，${label}`,
     /** Formats the pendingPullRequest message from the supplied number. */
     pendingPullRequest: (number) => `PR #${number}，等待状态`,
     /** Formats the linkedSummary message from the supplied tooltip, otherCount, label. */
@@ -64,7 +64,7 @@ export const common: Messages["common"] = {
     chain: "链",
     terminalRunning: "终端进程正在运行",
     /** Formats the worktreeBranch message from the supplied path, branch. */
-    worktreeBranch: (path, branch) => `对话的worktree：${path}（${branch}）`,
+    worktreeBranch: (path, branch) => `对话的 worktree：${path}（${branch}）`,
     /** Formats the worktree message from the supplied path. */
     worktree: (path) => `worktree：${path}`,
     remote: "远程",
@@ -105,15 +105,15 @@ export const common: Messages["common"] = {
         ? names.join("和")
         : `${names.slice(0, -1).join(", ")} 和 ${names[names.length - 1]}`,
     /** Formats the update result for the number of affected providers. */
-    finished: (count) => (count === 1 ? "Provider已更新" : "Provider更新已完成"),
+    finished: (count) => (count === 1 ? "Provider 已更新" : "Provider 更新已完成"),
     /** Formats the update result for the number of affected providers. */
-    unchanged: (_count) => "Provider仍需更新",
+    unchanged: (_count) => "Provider 仍需更新",
     /** Formats the update result for the number of affected providers. */
-    updateError: (_count) => "Provider更新失败",
+    updateError: (_count) => "Provider 更新失败",
     /** Formats the update result for the number of affected providers. */
-    updating: (_count) => "正在更新provider",
+    updating: (_count) => "正在更新 Provider",
     /** Formats the update result for the number of affected providers. */
-    newSessionsHint: (_count) => "新会话将使用更新后的provider。",
+    newSessionsHint: (_count) => "新会话将使用更新后的 Provider。",
     /** Formats the updatedVersion message from the supplied providerName, version. */
     updatedVersion: (providerName, version) => `${providerName} 已更新：${version}`,
     /** Formats the updatedProvider message from the supplied providerName. */
@@ -122,39 +122,40 @@ export const common: Messages["common"] = {
     failedVersion: (providerName, version) => `${providerName} ${version} 更新失败`,
     /** Formats the failedProvider message from the supplied providerName. */
     failedProvider: (providerName) => `${providerName} 更新失败`,
-    installHint: "立即安装更新，或查看provider设置。",
+    installHint: "立即安装更新，或查看 Provider 设置。",
     /** Formats the settingsHint message from the supplied names. */
-    settingsHint: (names) => `可在provider设置中更新 ${names}。`,
-    runningHint: "正在运行provider更新命令。",
+    settingsHint: (names) => `可在 Provider 设置中更新 ${names}。`,
+    runningHint: "正在运行 Provider 更新命令。",
     /** Formats the unchangedHint message from the supplied names, count. */
-    unchangedHint: (names, _count) => `${names} 似乎仍未更新。请在provider设置中查看详情。`,
-    updateFallbackError: "Provider更新失败。",
-    unfinishedError: "Provider更新未完成。",
+    unchangedHint: (names, _count) => `${names} 似乎仍未更新。请在 Provider 设置中查看详情。`,
+    updateFallbackError: "Provider 更新失败。",
+    unfinishedError: "Provider 更新未完成。",
     /** Formats the updatedCount message from the supplied count. */
-    updatedCount: (count) => `${count} 个Provider已更新`,
+    updatedCount: (count) => `${count} 个 Provider 已更新`,
     /** Formats the partialFailure message from the supplied failedCount, totalCount. */
     partialFailure: (failedCount, totalCount) =>
-      `${totalCount} 个Provider更新中有 ${failedCount} 个失败`,
+      `${totalCount} 个 Provider 更新中有 ${failedCount} 个失败`,
     /** Formats the updatingNamedProvider message from the supplied providerName. */
     updatingNamedProvider: (providerName) => `正在更新 ${providerName}`,
     /** Formats the updatingCount message from the supplied count. */
-    updatingCount: (count) => `正在更新 ${count} 个Provider`,
+    updatingCount: (count) => `正在更新 ${count} 个 Provider`,
     /** Formats the progressHint message from the supplied names, count. */
     progressHint: (names, _count) => `${names} 正在更新。`,
     /** Formats the failedCount message from the supplied count. */
-    failedCount: (count) => `${count} 个Provider更新失败`,
+    failedCount: (count) => `${count} 个 Provider 更新失败`,
     /** Formats the unchangedNamedProvider message from the supplied providerName. */
     unchangedNamedProvider: (providerName) => `${providerName} 仍需更新`,
     /** Formats the unchangedCount message from the supplied count. */
-    unchangedCount: (count) => `${count} 个Provider仍需更新`,
+    unchangedCount: (count) => `${count} 个 Provider 仍需更新`,
     /** Formats the reviewUnchangedHint message from the supplied names, count. */
-    reviewUnchangedHint: (names, _count) => `${names} 仍然显示为版本过旧。详情请查看Provider设置。`,
+    reviewUnchangedHint: (names, _count) =>
+      `${names} 仍然显示为版本过旧。详情请查看 Provider 设置。`,
     /** Formats the availableProvider message from the supplied providerName, version. */
     availableProvider: (providerName, version) => `有可用更新：${providerName} ${version}`,
     /** Formats the availableCount message from the supplied count. */
-    availableCount: (count) => `${count} 个Provider有可用更新`,
+    availableCount: (count) => `${count} 个 Provider 有可用更新`,
     /** Formats the failedHint message from the supplied names. */
-    failedHint: (names) => `${names} 更新失败。详情请查看Provider设置。`,
+    failedHint: (names) => `${names} 更新失败。详情请查看 Provider 设置。`,
     updatedStatus: "已更新",
     updatingStatus: "正在更新…",
   },

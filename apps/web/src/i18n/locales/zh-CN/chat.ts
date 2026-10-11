@@ -35,7 +35,7 @@ export const chat: Messages["chat"] = {
   workflow: {
     stopEntire: "停止整个工作流",
     failed: "失败",
-    noAgents: "暂无代理",
+    noAgents: "暂无 Agent",
     /** Formats openChat with the supplied display values. */
     openChat: (title: string) => `打开 ${title} 对话`,
     /** Formats stop with the supplied display values. */
@@ -48,7 +48,7 @@ export const chat: Messages["chat"] = {
     phaseLabel: (open: boolean, title: string, status: string) =>
       `${open ? "收起" : "展开"} ${title} 阶段，${status}`,
     /** Formats agentProgress with the supplied display values. */
-    agentProgress: (settled: number, total: number) => `${settled}/${total} 个代理`,
+    agentProgress: (settled: number, total: number) => `${settled}/${total} 个 Agent`,
     status: {
       running: "运行中",
       failed: "失败",
@@ -83,7 +83,7 @@ export const chat: Messages["chat"] = {
     appNeedsStartedThread: "应用消息需要已启动的线程。",
     appMessageFailed: "无法发送应用消息。",
     /** Describes how many child agents await user input. */
-    subagentsNeedInput: (count: number) => `${count} 个子代理需要输入`,
+    subagentsNeedInput: (count: number) => `${count} 个子 Agent 需要输入`,
     openQuestion: "打开问题",
     genericError: "发生错误。",
     terminalOpen: "打开终端",
@@ -106,7 +106,7 @@ export const chat: Messages["chat"] = {
     reconnectError: "重新连接失败。",
     disconnectServerError: "无法断开服务器连接",
     disconnectError: "断开连接失败。",
-    noPullRequestProjectError: "此拉取请求没有可用的活动项目。",
+    noPullRequestProjectError: "此 PR 没有可用的活动项目。",
     server: "服务器",
     disconnectServerHint: "隐藏此服务器的对话。可在连接设置中重新启用。",
     disconnectServer: "断开服务器连接",
@@ -114,7 +114,7 @@ export const chat: Messages["chat"] = {
     serverUpdateAvailable: "有可用的服务器更新",
     update: "更新",
     dismissUpdateNotice: "关闭更新提示",
-    usageLimitsUnavailable: "此Provider无法提供用量限制",
+    usageLimitsUnavailable: "此 Provider 无法提供用量限制",
     environmentNotConnected: "环境未连接。",
     attachmentUnavailable: "附件不可用。",
     keepAttachmentsHere: "将附件保留在此机器上",
@@ -138,7 +138,7 @@ export const chat: Messages["chat"] = {
     scriptNotFound: "未找到脚本。",
     deleteActionError: "无法删除操作",
     openBrowserError: "无法打开浏览器",
-    updateThreadPullRequestError: "无法更新对话的拉取请求",
+    updateThreadPullRequestError: "无法更新对话的 PR",
     copyPathError: "复制路径失败",
     clipboardUnavailable: "剪贴板API不可用。",
     pathCopied: "已复制路径",
@@ -163,7 +163,7 @@ export const chat: Messages["chat"] = {
     dismiss: "关闭",
     threadsDenied: "此连接无法更改对话。",
     chooseProjectBeforeCompacting: "请先选择项目再压缩",
-    compactionUnsupported: "此Provider不支持压缩",
+    compactionUnsupported: "此 Provider 不支持压缩",
     compactionUnavailable: "当前无法压缩",
     branchChanged: "分支已更改，原分支为",
     restoring: "正在恢复…",
@@ -172,7 +172,7 @@ export const chat: Messages["chat"] = {
     settleThreadError: "完结对话失败",
     unpinThreadError: "取消置顶对话失败",
     pinThreadError: "置顶对话失败",
-    revertHistoryUnsupported: "此Provider不支持回退对话记录，请新建对话。",
+    revertHistoryUnsupported: "此 Provider 不支持回退对话记录，请新建对话。",
     interruptBeforeReverting: "请先中断当前轮次，再回退检查点。",
     waitForAttachmentsBeforeRewinding: "请等待附件准备完成，再回退对话。",
     makeRoomBeforeRewinding: "请在输入框中为此消息的附件腾出空间，再回退对话。",
@@ -193,14 +193,14 @@ export const chat: Messages["chat"] = {
     reconnectingSendHint: "正在重新连接环境，请在连接恢复后重试。",
     updateForMultipleModels: "请先更新此服务器，再启动多个模型。",
     chooseModelsAndBranch: "请选择模型和基础分支",
-    multipleModelsHint: "使用多个模型需要在Git项目中新建对话。每个模型使用独立的worktree。",
+    multipleModelsHint: "使用多个模型需要在 Git 项目中新建对话。每个模型使用独立的 worktree。",
     failedUploadsBeforeSaving: "请重试或移除上传失败的附件，再保存。",
     saveQueuedEditError: "无法保存编辑后的排队消息。",
     startCodexThread: "请先启动Codex对话",
     feedbackNeedsMessage: "请先发送消息，再提交反馈。",
     chooseProject: "请先选择项目",
     draftProjectUnavailable: "此草稿所指向的项目已不可用。",
-    chooseBaseBranch: "在新建worktree模式下，请先选择基础分支再发送。",
+    chooseBaseBranch: "在新建 worktree 模式下，请先选择基础分支再发送。",
     failedUploadsBeforeSending: "请重试或移除上传失败的附件，再发送。",
     fileAttachmentsUnsupported: "此服务器不支持文件附件。",
     previousRequestMayHaveStarted: "上一次请求可能已启动。请先打开对应对话确认，再发送。",
@@ -227,15 +227,15 @@ export const chat: Messages["chat"] = {
     cleanupImplementationThreadError: "启动失败后，清理实施对话失败。",
     startImplementationThreadError: "无法启动实施对话",
     createThreadError: "创建新对话时发生错误。",
-    pullRequestsUnavailable: "拉取请求不可用",
-    updateToBrowsePullRequests: "请更新此环境的T3 Code服务器，以浏览拉取请求。",
+    pullRequestsUnavailable: "PR 不可用",
+    updateToBrowsePullRequests: "请更新此环境的 T3 Code 服务器，以浏览 PR。",
     dropFiles: "拖放文件以附加",
     scrollToEnd: "滚动到底部",
     preparingMachine: "正在准备机器",
     rewindingConversation: "正在回退对话",
     sendingFeedback: "正在发送反馈",
     messagesLoading: "正在加载消息",
-    preparingWorktree: "正在准备worktree",
+    preparingWorktree: "正在准备 worktree",
     switchTo: "切换到",
     uncommittedChangesWarning:
       "你有未提交的更改。它们会保留到另一分支；如果发生冲突，则会阻止切换。",
@@ -244,13 +244,13 @@ export const chat: Messages["chat"] = {
     rewindDescription: "将对话回退到此消息之前。提示词和附件会返回输入框。",
     revertFilesToo: "同时回退文件",
     revertKeepChanges: "回退并保留更改",
-    closeBrowserConfirm: "Agent正在使用浏览器，仍要关闭吗？",
-    closeBrowserWarning: "Agent正在控制此浏览器。关闭它可能会中断当前浏览器操作。",
-    closeBrowsersWarning: "Agent正在控制这些浏览器。关闭它们可能会中断当前浏览器操作。",
-    installAntigravity: "请先在Provider设置中安装Antigravity，再发送。",
-    signInAntigravity: "请先在Provider设置中登录Antigravity，再发送。",
+    closeBrowserConfirm: "Agent 正在使用浏览器，仍要关闭吗？",
+    closeBrowserWarning: "Agent 正在控制此浏览器。关闭它可能会中断当前浏览器操作。",
+    closeBrowsersWarning: "Agent 正在控制这些浏览器。关闭它们可能会中断当前浏览器操作。",
+    installAntigravity: "请先在 Provider 设置中安装 Antigravity，再发送。",
+    signInAntigravity: "请先在 Provider 设置中登录 Antigravity，再发送。",
     chooseAntigravityModel: "请先选择Antigravity模型，再发送。",
-    refreshAntigravityModels: "请先在Provider设置中刷新Antigravity模型，再发送。",
+    refreshAntigravityModels: "请先在 Provider 设置中刷新 Antigravity 模型，再发送。",
     antigravityModelUnavailable: "此Antigravity模型已不可用，请选择其他模型。",
     invalidAttachmentUrl: "环境返回了无效的附件URL。",
     attachmentCannotRestore: "此消息中有无法恢复的附件。",
@@ -258,10 +258,10 @@ export const chat: Messages["chat"] = {
     expiredTerminalContexts: "过期的终端上下文",
     expiredContextRemoveHint: "请移除它，或重新添加以包含终端输出。",
     expiredContextReaddHint: "若要包含该终端输出，请重新添加。",
-    switchProviderNewChat: "请新建对话以切换Provider",
-    switchProviderUnsupported: "此对话启动后不支持切换Provider。",
+    switchProviderNewChat: "请新建对话以切换 Provider",
+    switchProviderUnsupported: "此对话启动后不支持切换 Provider。",
     changeModelNewChat: "请新建对话以更改模型",
-    changeModelUnsupported: "此Provider不允许在对话启动后切换模型。",
+    changeModelUnsupported: "此 Provider 不允许在对话启动后切换模型。",
     rewindMessageUnavailable: "要回退到的消息已不可用。",
     rewindTimeout: "等待对话回退超时。",
     noActiveThread: "没有活动对话",
@@ -295,7 +295,7 @@ export const chat: Messages["chat"] = {
     /** Reports the maximum number of attachments allowed in a message. */
     attachmentLimit: (limit) => `每条消息最多可附加 ${limit} 个附件。`,
     /** Names the model whose provider is unavailable. */
-    providerUnavailable: (model) => `模型 ${model} 的Provider不可用。`,
+    providerUnavailable: (model) => `模型 ${model} 的 Provider 不可用。`,
     /** Names the attachment whose upload has not finished. */
     attachmentUploadIncomplete: (name) => `附件“${name}”尚未上传完成。`,
     /** Names the model that could not start. */
@@ -305,7 +305,7 @@ export const chat: Messages["chat"] = {
     /** Appends model-change guidance to the supplied localized reason description. */
     newThreadForModel: (description) => `${description} 请新建对话以使用此模型。`,
     /** Asks to close count browsers currently controlled by the agent. */
-    closeBrowsersConfirm: (count) => `Agent正在使用 ${count} 个浏览器，仍要关闭吗？`,
+    closeBrowsersConfirm: (count) => `Agent 正在使用 ${count} 个浏览器，仍要关闭吗？`,
     /** Names the attachment that could not be restored. */
     restoreAttachmentError: (name) => `无法恢复附件：${name}`,
     /** Explains that the supplied localized singular or plural context noun will not be sent. */
@@ -326,29 +326,29 @@ export const chat: Messages["chat"] = {
     browserDisabled: "浏览器预览仅在T3 Code桌面应用中可用。",
     terminalDisabled: "终端面板仅在项目对话中可用。",
     filesDisabled: "打开项目后才能使用文件功能。",
-    diffDisabled: "差异仅适用于Git仓库中的服务端对话。",
-    pullRequestDisabled: "此对话的分支尚无拉取请求。",
-    pullRequestsDisabled: "此对话没有关联的拉取请求。",
+    diffDisabled: "差异仅适用于 Git 仓库中的服务端对话。",
+    pullRequestDisabled: "此对话的分支尚无 PR。",
+    pullRequestsDisabled: "此对话没有关联的 PR。",
     deviceDisabled: "设备仅在对话中可用。",
     browserHint: "仅在桌面应用中可用。",
     projectHint: "打开项目后可用。",
     gitHint: "适用于Git仓库。",
-    pullRequestHint: "此分支尚无拉取请求。",
-    pullRequestsHint: "没有关联的拉取请求。",
+    pullRequestHint: "此分支尚无 PR。",
+    pullRequestsHint: "没有关联的 PR。",
     deviceHint: "在对话中可用。",
     unmuteTab: "取消标签页静音",
     muteTab: "静音标签页",
     browser: "浏览器",
     terminal: "终端",
     files: "文件",
-    diff: "差异",
-    pullRequest: "拉取请求",
-    linkedPullRequests: "关联的拉取请求",
+    diff: "Diff",
+    pullRequest: "PR",
+    linkedPullRequests: "关联的 PR",
     device: "设备",
     deviceDescription: "查看iOS模拟器或Android模拟器。",
     openSurface: "打开面板",
     openBrowserProfile: "在配置中打开浏览器",
-    pullRequests: "拉取请求",
+    pullRequests: "PR",
     rename: "重命名",
     copyPath: "复制路径",
     close: "关闭",
@@ -375,14 +375,14 @@ export const chat: Messages["chat"] = {
       none: "跳过",
     },
     thisDevice: "此设备",
-    newWorktree: "新建worktree",
+    newWorktree: "新建 worktree",
     currentCheckout: "当前检出",
-    currentWorktree: "当前worktree",
+    currentWorktree: "当前 worktree",
     worktree: "Worktree",
     localCheckout: "本地检出",
     /** Formats the previousWorktreeBranch message from the supplied branch. */
-    previousWorktreeBranch: (branch) => `之前的worktree（${branch}）`,
-    previousWorktree: "之前的worktree",
+    previousWorktreeBranch: (branch) => `之前的 worktree（${branch}）`,
+    previousWorktree: "之前的 worktree",
     selectRef: "选择ref",
     /** Formats the fromRef message from the supplied ref. */
     fromRef: (ref) => `基于 ${ref}`,
@@ -404,16 +404,16 @@ export const chat: Messages["chat"] = {
     createRefError: "创建并切换ref失败。",
     /** Formats the checkoutChangeRequest message from the supplied kind. */
     checkoutChangeRequest: (kind) =>
-      `检出 ${kind === "gitlab" ? "合并请求" : kind === "unknown" ? "变更请求" : "拉取请求"}`,
+      `检出 ${kind === "gitlab" ? "合并请求" : kind === "unknown" ? "变更请求" : "PR"}`,
     /** Formats the createRef message from the supplied ref. */
     createRef: (ref) => `新建ref "${ref}"`,
-    openPullRequest: "打开拉取请求",
+    openPullRequest: "打开 PR",
     create: "创建",
     copyFullPath: "复制完整路径",
     workspacePath: "工作区路径",
     pathCopiedToast: "已复制路径",
     copyPathError: "复制路径失败",
-    modelWorktreeHint: "每个模型都在独立的worktree中启动。",
+    modelWorktreeHint: "每个模型都在独立的 worktree 中启动。",
   },
   header: {
     /** Labels navigation to the named parent thread. */
@@ -455,7 +455,7 @@ export const chat: Messages["chat"] = {
     youStoppedThisResponse: "你已停止此回复",
     worked: "已工作",
     supersededAttempt: "已被替代的尝试",
-    subagentOf: "父Agent",
+    subagentOf: "父 Agent",
     openParentThread: "打开父对话",
     loadEarlierTurns: "加载更早的轮次",
     loadingEarlierTurns: "正在加载更早的轮次…",
@@ -464,7 +464,7 @@ export const chat: Messages["chat"] = {
     nextTurn: "下一轮",
     sentByAutomation: "由自动任务发送",
     openSendingThread: "打开发送方对话",
-    sentByAnotherAgent: "由其他Agent发送",
+    sentByAnotherAgent: "由其他 Agent 发送",
     you: "你",
     queued: "排队中",
     steer: "引导",
@@ -472,29 +472,29 @@ export const chat: Messages["chat"] = {
     originallyQueuedThenPromotedToSteerThe: "原先排队，随后改为引导当前轮次",
     steeredTheActiveTurn: "已引导当前轮次",
     editFromHere: "从这里编辑",
-    forkFromThisResponse: "从此回复创建分支",
+    forkFromThisResponse: "从此回复派生对话",
     interruptRequested: "已请求中断",
     runInterrupted: "运行已中断",
     contextHandoff: "上下文交接",
-    conversationFork: "对话分支",
+    conversationFork: "派生对话",
     contextCompacted: "上下文已压缩",
     planUpdated: "计划已更新",
     inherited: "继承",
     synthetic: "合成",
     activity: "活动",
     toolCalls: "工具调用",
-    settingUpWorktree: "正在设置worktree…",
+    settingUpWorktree: "正在设置 worktree…",
     working: "正在工作…",
     setupScript: "设置脚本",
     toolCallFailed: "工具调用失败",
     annotatedPreviewCrop: "带标注的预览截图",
     previewAnnotation: "预览标注",
     thisContextIsNoLongerAvailable: "此上下文已不可用。",
-    skill: "技能",
+    skill: "Skill",
     reviewComment: "审查评论",
     showLess: "收起",
     showFullMessage: "显示完整消息",
-    openSubagentThread: "打开子Agent对话",
+    openSubagentThread: "打开子 Agent 对话",
     contextCompactionFailed: "上下文压缩失败",
     contextCompactionStopped: "上下文压缩已停止",
     compactingContext: "正在压缩上下文",
@@ -503,7 +503,7 @@ export const chat: Messages["chat"] = {
     openFork: "打开分支",
     createdThread: "已创建对话",
     createdThreadLabel: "新建的对话",
-    subagent: "子Agent",
+    subagent: "子 Agent",
     waiting: "等待中",
     idleResumable: "空闲 · 可继续",
     completed: "已完成",
@@ -538,7 +538,7 @@ export const chat: Messages["chat"] = {
     screenshotUnavailable: "截图不可用",
     retry: "重试",
     openChat: "打开聊天",
-    openSubagent: "打开子Agent",
+    openSubagent: "打开子 Agent",
     /** Names the source thread of an inherited or synthetic item. */
     fromThread: (threadId) => `来自 ${threadId}`,
     /** Names the running worktree setup script. */
@@ -591,8 +591,8 @@ export const chat: Messages["chat"] = {
     unableToOpenLinkInBrowser: "无法在浏览器中打开链接",
     environmentIsNotConnected: "环境未连接。",
     toggleTask: "切换任务状态",
-    unableToLinkPullRequest: "无法关联拉取请求",
-    unableToUnlinkPullRequest: "无法取消关联拉取请求",
+    unableToLinkPullRequest: "无法关联 PR",
+    unableToUnlinkPullRequest: "无法取消关联 PR",
     theRequestFailed: "请求失败。",
     mermaidFailedToLoad: "Mermaid加载失败。",
     theDiagramCouldNotBeRendered: "无法渲染图表。",
@@ -690,9 +690,9 @@ export const chat: Messages["chat"] = {
     merging: "正在合并…",
     merge: "合并",
     checkTheBranchOutAndResolveThe: "检出分支并在新对话中解决冲突",
-    markThisPullRequestAsReadyFor: "将此拉取请求标记为可审查",
+    markThisPullRequestAsReadyFor: "将此 PR 标记为可审查",
     fixTheFailingChecksInANew: "在新对话中修复失败的检查",
-    mergePullRequest: "合并拉取请求？",
+    mergePullRequest: "合并 PR？",
     cancel: "取消",
     showLess: "收起",
     couldNotUpdateAutomation: "无法更新自动任务",
@@ -701,11 +701,11 @@ export const chat: Messages["chat"] = {
     manageScheduledTasks: "管理定时任务",
     editAutomation: "编辑自动任务",
     runNow: "立即运行",
-    watchingHint: "正在关注：检查完成、有人评论或分支出现冲突时，Agent会被唤醒。点击以停止。",
+    watchingHint: "正在关注：检查完成、有人评论或分支出现冲突时，Agent 会被唤醒。点击以停止。",
     /** Names the pull request by number. */
-    pullRequest: (number) => `拉取请求 #${number}`,
+    pullRequest: (number) => `PR #${number}`,
     /** Names the selected pull request merge method. */
-    mergeMethod: (method) => `合并此拉取请求（${method}）`,
+    mergeMethod: (method) => `合并此 PR（${method}）`,
     /** Names the pull request watch to stop. */
     stopWatching: (number) => `停止关注 #${number}`,
     /** Names the pull request number and selected merge method. */
@@ -748,19 +748,19 @@ export const chat: Messages["chat"] = {
     unknown: "未知",
     relatedThreads: "相关对话",
     contextTransfer: "上下文转移",
-    subagent: "子Agent",
-    parentAgent: "父Agent",
+    subagent: "子 Agent",
+    parentAgent: "父 Agent",
     fork: "分支",
     parentThread: "父对话",
-    previousAgents: "之前的Agent",
-    couldNotStopSubagent: "无法停止子Agent",
+    previousAgents: "之前的 Agent",
+    couldNotStopSubagent: "无法停止子 Agent",
     lineage: "对话关系",
     moreThreadActions: "更多对话操作",
     thisRelatedThreadIsUnavailable: "此关联对话不可用",
     mergeBackToSourceConversation: "合并回源对话",
     completeARunInThisForkBefore: "请先在此分支中完成一次运行，再合并回去",
     mergeThisConversationBackIntoItsSource: "将此对话合并回源对话",
-    stopSubagent: "停止子Agent",
+    stopSubagent: "停止子 Agent",
     /** Formats the running related agent count. */
     lineageRunning: (count) => `对话关系 · ${count}个运行中`,
     /** Names the related thread role to open. */
@@ -770,8 +770,8 @@ export const chat: Messages["chat"] = {
     /** Names the source conversation receiving the merge. */
     mergeConversation: (title) => `将此对话合并回 ${title}`,
     /** Names the subagent to stop. */
-    stopAgent: (title) => `停止子Agent ${title}`,
-    disconnectAgentSession: "断开Agent会话",
+    stopAgent: (title) => `停止子 Agent ${title}`,
+    disconnectAgentSession: "断开 Agent 会话",
     showMorePrefix: "再显示",
     showMoreSuffix: "项",
   },
@@ -804,7 +804,7 @@ export const chat: Messages["chat"] = {
     autoApproveEditsAskBeforeOtherActions: "自动批准编辑，其他操作前询问。",
     auto: "自动",
     supportedProvidersApproveRoutineActionsOthersStill:
-      "支持此模式的Provider会批准常规操作；其他Provider仍会询问。",
+      "支持此模式的 Provider 会批准常规操作；其他 Provider 仍会询问。",
     fullAccess: "完全访问",
     allowCommandsAndEditsWithoutPrompts: "允许执行命令和编辑，无需询问。",
     moreComposerControls: "更多输入框选项",
@@ -814,43 +814,43 @@ export const chat: Messages["chat"] = {
     access: "访问权限",
   },
   worktreeSetup: {
-    settingUpWorktree: "正在设置worktree…",
-    worktreeReadySetupScriptFailed: "worktree已就绪，设置脚本失败",
-    worktreeReady: "worktree已就绪",
-    worktreeSetupFailed: "worktree设置失败",
-    worktreeSetupCancelled: "worktree设置已取消",
+    settingUpWorktree: "正在设置 worktree…",
+    worktreeReadySetupScriptFailed: "worktree 已就绪，设置脚本失败",
+    worktreeReady: "worktree 已就绪",
+    worktreeSetupFailed: "worktree 设置失败",
+    worktreeSetupCancelled: "worktree 设置已取消",
     branch: "分支",
     base: "基准",
     path: "路径",
     setup: "设置",
-    worktreeSetup: "worktree设置",
+    worktreeSetup: "worktree 设置",
     details: "详情",
     openTerminal: "打开终端",
     workLocally: "本地工作",
     cancel: "取消",
   },
   providerStatus: {
-    openProviderSetupToSignInWith: "打开Provider设置以使用Google登录。",
-    openProviderSetupToSignIn: "打开Provider设置以登录。",
+    openProviderSetupToSignInWith: "打开 Provider 设置以使用 Google 登录。",
+    openProviderSetupToSignIn: "打开 Provider 设置以登录。",
     signInViaTheCLIToAuthenticate: "通过CLI登录以重新认证。",
-    noModelsAreAvailableForThisProvider: "此Provider没有可用模型。",
-    openProviderSetup: "打开Provider设置",
+    noModelsAreAvailableForThisProvider: "此 Provider 没有可用模型。",
+    openProviderSetup: "打开 Provider 设置",
     chatGPTUsageLimitReached: "已达到ChatGPT用量限制",
     reviewYourUsageSettingsInChatGPTTo: "请查看ChatGPT中的用量设置以继续。",
     dismissError: "关闭错误",
     /** Names the provider driver to install. */
-    install: (provider) => `打开Provider设置以在此环境中安装 ${provider}。`,
+    install: (provider) => `打开 Provider 设置以在此环境中安装 ${provider}。`,
     /** Names the unavailable provider. */
-    unavailable: (provider) => `${provider} Provider不可用。`,
+    unavailable: (provider) => `${provider} Provider 不可用。`,
     /** Names the provider with limited availability. */
-    limited: (provider) => `${provider} Provider可用性受限。`,
+    limited: (provider) => `${provider} Provider 可用性受限。`,
     /** Names the unauthenticated provider. */
     unauthenticated: (provider) => `${provider} 未认证`,
     /** Names the provider version and its compatibility state. */
     incompatible: (provider, version, broken) =>
       `${provider} ${version} ${broken ? "存在已知故障" : "不受支持"}`,
     /** Names the provider status banner. */
-    status: (provider) => `${provider} Provider状态`,
+    status: (provider) => `${provider} Provider 状态`,
     /** Names the provider and reported status whose notice is dismissed. */
     dismiss: (provider, status) =>
       `关闭 ${provider} Provider${({ ready: "就绪", warning: "警告", error: "错误", disabled: "已禁用" } as Record<string, string>)[status] ?? status}通知`,
@@ -956,14 +956,14 @@ export const chat: Messages["chat"] = {
     statusUnavailable: "状态不可用",
     completed: "✓ 已完成",
     working: "运行中",
-    subagents: "子Agent",
+    subagents: "子 Agent",
     runsOnItsOwn: "独立运行",
     openParent: "打开父对话",
     and: "和",
     /** Formats the individual subagent count with the English plural. */
-    individualCount: (count) => `${count}个子Agent`,
+    individualCount: (count) => `${count}个子 Agent`,
     /** Formats the batch count and whether individual agents are also listed. */
-    batchCount: (count, hasIndividuals) => `${count}批${hasIndividuals ? "" : "子Agent"}`,
+    batchCount: (count, hasIndividuals) => `${count}批${hasIndividuals ? "" : "子 Agent"}`,
     /** Formats the launch wording from batch presence, liveness and counted subjects. */
     lead: (batches, live, subjects) =>
       `${batches ? "已启动" : live ? "已开始" : "已运行"}${subjects}`,
@@ -976,7 +976,7 @@ export const chat: Messages["chat"] = {
     /** Formats the idle subagent count. */
     idleCount: (count) => `${count}个空闲`,
     /** Combines the model description with the shared provider status text. */
-    announcement: (model, status) => `${model} 子Agent：${status}`,
+    announcement: (model, status) => `${model} 子 Agent：${status}`,
   },
   inspector: {
     fileCount: (count: number) => `${count} 个文件`,
@@ -989,7 +989,7 @@ export const chat: Messages["chat"] = {
     outputError: (error) => `无法加载输出：${error}`,
     rollBack: "回滚",
     openFork: "打开分支",
-    openSubagentThread: "打开子Agent对话",
+    openSubagentThread: "打开子 Agent 对话",
     /** Formats the command exit code. */
     exitCode: (code) => `退出码 ${code}`,
     /** Formats the reported context transfer kind and status. */
@@ -1033,13 +1033,13 @@ export const chat: Messages["chat"] = {
     fastModeOn: "快速模式已开启",
   },
   workLog: {
-    subagentCount: (count: number) => `${count} 个子代理`,
+    subagentCount: (count: number) => `${count} 个子 Agent`,
     shared: {
       remotePairing: {
         RemoteBackendUrlMissingError: "请输入后端 URL。",
         RemotePairingUrlInvalidError: "配对 URL 无效。",
         RemoteBackendUrlInvalidError: "后端 URL 无效。",
-        RemotePairingTokenMissingError: "配对 URL 缺少令牌。",
+        RemotePairingTokenMissingError: "配对 URL 缺少 token。",
         RemotePairingCodeMissingError: "请输入配对码。",
         invalidDetails: "配对信息无效。",
         differentMachine: (label: string) =>
@@ -1051,7 +1051,7 @@ export const chat: Messages["chat"] = {
           "提示：请重试。如果仍然失败，可能存在时钟偏差；请检查两台设备的自动日期和时间设置。",
         retryHint: "提示：请重试。如果问题持续，请复制跟踪 ID。",
         withHint: (message: string, hint: string) => `${message} ${hint}`,
-        rejectedToken: "中继拒绝了云会话令牌。",
+        rejectedToken: "中继拒绝了云会话 token。",
         rejectedProof: "中继拒绝了 DPoP 证明。",
         rejectedRequest: "中继拒绝了已认证请求。",
         expiredLinkProof: "中继拒绝了已过期的环境关联证明。",
@@ -1065,8 +1065,8 @@ export const chat: Messages["chat"] = {
         linkUnavailable: (reason: string) => `中继无法配置托管端点（${reason}）。`,
         linkLimit: (maxTunnels: number) =>
           `中继拒绝关联：此账户已达到 ${maxTunnels} 个托管隧道的上限。请解除一个环境的关联以释放名额。`,
-        expiredActivityProof: "中继拒绝了已过期的代理活动发布证明。",
-        invalidActivityProof: (reason: string) => `中继拒绝了代理活动发布证明（${reason}）。`,
+        expiredActivityProof: "中继拒绝了已过期的 Agent 活动发布证明。",
+        invalidActivityProof: (reason: string) => `中继拒绝了 Agent 活动发布证明（${reason}）。`,
         internalError: (reason: string) => `中继发生内部错误（${reason}）。`,
         tunnelReleased:
           "由于长期离线，此环境的 T3 Connect 隧道已移除。请在那台计算机上启动 T3 Code 并更新至最新版本以重新连接。",
@@ -1137,11 +1137,11 @@ export const chat: Messages["chat"] = {
       t3Tools: {
         labels: {
           t3_workflow_stop: ["停止", "正在停止", "已请求停止", "工作流"],
-          link_pull_request: ["关联", "正在关联", "已关联", "拉取请求"],
-          unlink_pull_request: ["取消关联", "正在取消关联", "已取消关联", "拉取请求"],
-          list_thread_pull_requests: ["检查", "正在检查", "已检查", "关联的拉取请求"],
-          watch_pull_request: ["关注", "正在关注", "正在关注", "拉取请求"],
-          unwatch_pull_request: ["停止关注", "正在停止关注", "已停止关注", "拉取请求"],
+          link_pull_request: ["关联", "正在关联", "已关联", "PR"],
+          unlink_pull_request: ["取消关联", "正在取消关联", "已取消关联", "PR"],
+          list_thread_pull_requests: ["检查", "正在检查", "已检查", "关联的 PR"],
+          watch_pull_request: ["关注", "正在关注", "正在关注", "PR"],
+          unwatch_pull_request: ["停止关注", "正在停止关注", "已停止关注", "PR"],
           orchestrator_capabilities: ["获取", "正在获取", "已获取", "编排能力"],
           delegate_task: ["委派", "正在委派", "已委派", "子任务"],
           task_status: ["获取", "正在获取", "已获取", "委派任务状态"],
@@ -1158,8 +1158,8 @@ export const chat: Messages["chat"] = {
           t3_thread_send: ["发送", "正在发送", "已发送", "至 T3 对话"],
           t3_thread_wait: ["等待", "正在等待", "已等待", "T3 对话"],
           t3_thread_interrupt: ["中断", "正在中断", "已请求中断", "T3 对话"],
-          t3_worktree_handoff: ["转交", "正在转交", "已转交", "对话至 Git 工作树"],
-          t3_worktree_status: ["获取", "正在获取", "已获取", "对话工作树状态"],
+          t3_worktree_handoff: ["转交", "正在转交", "已转交", "对话至 Git worktree"],
+          t3_worktree_status: ["获取", "正在获取", "已获取", "对话 worktree 状态"],
           preview_status: ["获取", "正在获取", "已获取", "预览浏览器状态"],
           preview_open: ["打开", "正在打开", "已打开", "预览浏览器页面"],
           preview_navigate: ["导航", "正在导航", "已导航", "预览浏览器"],
@@ -1227,7 +1227,7 @@ export const chat: Messages["chat"] = {
         failed: (action) => `未能${action}`,
         declined: (action) => `已拒绝${action}`,
         stopped: (running) => `已停止${running.replace(/^正在/, "")}`,
-        pullRequest: (number) => `拉取请求 #${number}`,
+        pullRequest: (number) => `PR #${number}`,
         joinLabel: (verb, target) => `${verb}${target}`,
         summary: {
           /** Describes stop requests for the supplied workflow count and outcome. */
@@ -1289,11 +1289,11 @@ export const chat: Messages["chat"] = {
           "secret-request": (count, succeeded) =>
             `${succeeded ? "已请求" : "尝试请求"} ${count} 个密钥`,
           "worktree-handoff": (count, succeeded) =>
-            `${succeeded ? "已转交至" : "尝试转交至"} ${count} 个工作树`,
+            `${succeeded ? "已转交至" : "尝试转交至"} ${count} 个 worktree`,
           "worktree-list": (count, succeeded) =>
             `${succeeded ? "已列出工作区分支" : "尝试列出工作区分支"} ${count} 次`,
           "worktree-status": (count, succeeded) =>
-            `${succeeded ? "已检查工作树状态" : "尝试检查工作树状态"} ${count} 次`,
+            `${succeeded ? "已检查 worktree 状态" : "尝试检查 worktree 状态"} ${count} 次`,
           "project-list": (count, succeeded) =>
             `${succeeded ? "已列出项目" : "尝试列出项目"} ${count} 次`,
           "project-read": (count, succeeded) =>
@@ -1314,14 +1314,12 @@ export const chat: Messages["chat"] = {
             `${succeeded ? "已准备" : "尝试准备"} ${count} 次附件上传`,
           "attachment-discard": (count, succeeded) =>
             `${succeeded ? "已丢弃" : "尝试丢弃"} ${count} 个待发送附件`,
-          "link-pr": (count, succeeded) =>
-            `${succeeded ? "已关联" : "尝试关联"} ${count} 个拉取请求`,
+          "link-pr": (count, succeeded) => `${succeeded ? "已关联" : "尝试关联"} ${count} 个 PR`,
           "unlink-pr": (count, succeeded) =>
-            `${succeeded ? "已取消关联" : "尝试取消关联"} ${count} 个拉取请求`,
-          "watch-pr": (count, succeeded) =>
-            `${succeeded ? "正在关注" : "尝试关注"} ${count} 个拉取请求`,
+            `${succeeded ? "已取消关联" : "尝试取消关联"} ${count} 个 PR`,
+          "watch-pr": (count, succeeded) => `${succeeded ? "正在关注" : "尝试关注"} ${count} 个 PR`,
           "unwatch-pr": (count, succeeded) =>
-            `${succeeded ? "已停止关注" : "尝试停止关注"} ${count} 个拉取请求`,
+            `${succeeded ? "已停止关注" : "尝试停止关注"} ${count} 个 PR`,
           browser: (count, succeeded) =>
             `${succeeded ? "已使用浏览器" : "尝试使用浏览器"} ${count} 次`,
           device: (count, succeeded) =>
@@ -1333,7 +1331,7 @@ export const chat: Messages["chat"] = {
           capabilities: (count, succeeded) =>
             `${succeeded ? "已检查编排能力" : "尝试检查编排能力"} ${count} 次`,
           "list-prs": (count, succeeded) =>
-            `${succeeded ? "已检查" : "尝试检查"}关联的拉取请求${count === 1 ? "" : ` ${count} 次`}`,
+            `${succeeded ? "已检查" : "尝试检查"}关联的 PR${count === 1 ? "" : ` ${count} 次`}`,
         },
         sentMessages: (count, threads, succeeded) =>
           `${succeeded ? "已发送" : "尝试发送"} ${count} 条消息${threads === undefined ? "" : `至 ${threads} 个对话`}`,
@@ -1357,20 +1355,19 @@ export const chat: Messages["chat"] = {
           `已读取 ${path}${extraCount > 0 ? ` 及另外 ${extraCount} 个文件` : ""}`,
         readFile: (extraCount) =>
           `已读取文件${extraCount > 0 ? ` 及另外 ${extraCount} 个文件` : ""}`,
-        skill: (name) => `技能：${name}`,
+        skill: (name) => `Skill：${name}`,
       },
       compactingContext: "正在压缩上下文",
       contextCompacted: "上下文已压缩",
-      contextCompactedTokens: (before, after) => `上下文已压缩 ${before} → ${after} 词元`,
+      contextCompactedTokens: (before, after) => `上下文已压缩 ${before} → ${after} token`,
       thought: "思考",
       thoughtTimes: (count) => `思考（×${count}）`,
       groupAction: {
-        "link-pr": (count) => `已关联 ${count} 个拉取请求`,
-        "unlink-pr": (count) => `已取消关联 ${count} 个拉取请求`,
-        "watch-pr": (count) => `正在关注 ${count} 个拉取请求`,
-        "unwatch-pr": (count) => `已停止关注 ${count} 个拉取请求`,
-        "list-prs": (count) =>
-          count === 1 ? "已检查关联的拉取请求" : `已检查关联的拉取请求 ${count} 次`,
+        "link-pr": (count) => `已关联 ${count} 个 PR`,
+        "unlink-pr": (count) => `已取消关联 ${count} 个 PR`,
+        "watch-pr": (count) => `正在关注 ${count} 个 PR`,
+        "unwatch-pr": (count) => `已停止关注 ${count} 个 PR`,
+        "list-prs": (count) => (count === 1 ? "已检查关联的 PR" : `已检查关联的 PR ${count} 次`),
         read: (count) => `已读取 ${count} 个文件`,
         edit: (count) => `已更改${count}个文件`,
         command: (count) => `已运行 ${count} 条命令`,
@@ -1398,13 +1395,13 @@ export const chat: Messages["chat"] = {
     command: "命令",
     tool: "工具",
     /** Formats the provider retry attempt progress. */
-    retrying: (progress) => `正在重试Provider（${progress}）`,
+    retrying: (progress) => `正在重试 Provider（${progress}）`,
     /** Formats the provider recovery retry count. */
-    recovered: (progress) => `Provider已恢复（重试${progress}次）`,
+    recovered: (progress) => `Provider 已恢复（重试${progress}次）`,
     /** Combines the failure label with retry progress. */
     failedAfterRetries: (label, progress) => `${label}，已重试${progress}次`,
     /** Formats retry progress when retries stop. */
-    retryStopped: (progress) => `Provider重试已停止（${progress}）`,
+    retryStopped: (progress) => `Provider 重试已停止（${progress}）`,
     /** Formats the retry delay in milliseconds. */
     retryDelayMs: (delay) => ` 将在${delay}毫秒后重试。`,
     /** Formats the already formatted retry delay in seconds. */
@@ -1414,7 +1411,7 @@ export const chat: Messages["chat"] = {
     /** Formats the name of the changed file. */
     changedFile: (fileName) => `已更改 ${fileName}`,
     usageLimitReached: "已达到用量限制",
-    providerError: "Provider错误",
+    providerError: "Provider 错误",
     createdThread: "已创建对话",
     ranCommand: "已运行命令",
     fileChange: "文件更改",
@@ -1431,7 +1428,7 @@ export const chat: Messages["chat"] = {
   changedFiles: {
     collapseAllFolders: "折叠所有文件夹",
     expandAllFolders: "展开所有文件夹",
-    openDiff: "打开差异",
+    openDiff: "打开 Diff",
     openTheFullDiff: "打开完整差异",
     /** Formats the changed file count with the English plural. */
     count: (count) => `已更改${count}个文件`,

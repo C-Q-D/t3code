@@ -39,7 +39,7 @@ export const sidebar: Messages["sidebar"] = {
     back: "返回",
     settings: "设置",
     threads: "对话",
-    pullRequests: "拉取请求",
+    pullRequests: "PR",
     usage: "用量",
   },
   layout: {
@@ -278,8 +278,8 @@ export const sidebar: Messages["sidebar"] = {
     versionChanges: (version: string) => `${version} 的更改`,
   },
   providerUpdates: {
-    dismissAriaLabel: "关闭Provider更新提示",
-    dismissTooltip: "关闭提示，直到Provider状态发生变化",
+    dismissAriaLabel: "关闭 Provider 更新提示",
+    dismissTooltip: "关闭提示，直到 Provider 状态发生变化",
   },
   confirm: {
     irreversibleHint: "此操作无法撤销。",

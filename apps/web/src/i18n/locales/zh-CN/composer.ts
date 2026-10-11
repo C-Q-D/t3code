@@ -85,32 +85,32 @@ export const composer: Messages["composer"] = {
     switchModelDescription: "切换此对话的回复模型",
     planDescription: "将此对话切换到计划模式",
     buildDescription: "将此对话切换回普通执行模式",
-    runCommandDescription: "运行provider命令",
+    runCommandDescription: "运行 Provider 命令",
     /** Describes a skill using its provider-reported scope. */
-    skillScope: (scope: string) => `${scope} 技能`,
-    runSkillDescription: "运行provider技能",
-    skillsEmpty: "未找到技能。输入 / 浏览provider命令。",
-    pullRequestsUnavailableHint: "此项目不支持拉取请求。",
-    pullRequestsReadError: "无法读取此项目的拉取请求。",
+    skillScope: (scope: string) => `${scope} Skill`,
+    runSkillDescription: "运行 providerSkill",
+    skillsEmpty: "未找到 Skills。输入 / 浏览 Provider 命令。",
+    pullRequestsUnavailableHint: "此项目不支持 PR。",
+    pullRequestsReadError: "无法读取此项目的 PR。",
     /** Includes the search query that matched no pull request. */
-    pullRequestEmpty: (query: string) => `没有与 ${query} 匹配的拉取请求。`,
-    repositoryPullRequestsEmpty: "此仓库中没有拉取请求。",
+    pullRequestEmpty: (query: string) => `没有与 ${query} 匹配的 PR。`,
+    repositoryPullRequestsEmpty: "此仓库中没有 PR。",
     pathsEmpty: "没有匹配的文件或文件夹。",
     commandsEmpty: "没有匹配的命令。",
-    findingPullRequest: "正在查找拉取请求…",
+    findingPullRequest: "正在查找 PR…",
     searchingPaths: "正在搜索工作区文件…",
-    searchingSkills: "正在搜索工作区技能…",
+    searchingSkills: "正在搜索工作区 Skills…",
     pathsLabel: "文件和文件夹",
-    pullRequestsLabel: "拉取请求",
+    pullRequestsLabel: "PR",
     commandsLabel: "命令",
-    skillsLabel: "技能",
+    skillsLabel: "Skills",
     appSource: "应用",
     repoSource: "仓库",
     projectSource: "项目",
     personalSource: "个人",
     systemSource: "系统",
     providerSource: "Provider",
-    skillSuffix: " 技能",
+    skillSuffix: " Skill",
   },
   primaryActions: {
     resume: "继续对话",
@@ -146,7 +146,7 @@ export const composer: Messages["composer"] = {
     submitMessage: "提交消息",
     disconnected: "环境已断开",
     connecting: "正在连接",
-    preparingWorktree: "正在准备worktree",
+    preparingWorktree: "正在准备 worktree",
     updatingQueued: "正在更新排队的消息",
     submittingMessage: "正在提交消息",
     /** Describes the default and alternate send actions and an optional shortcut. */
@@ -157,16 +157,16 @@ export const composer: Messages["composer"] = {
     ) =>
       `点击以${behavior === "queue" ? "排队发送" : "引导"}，按住Ctrl/⌘ 点击${shortcut ? `或按 ${shortcut}` : ""}以${alternateAction === "queue" ? "排队发送" : alternateAction === "restart" ? "重新运行" : "引导"}`,
     /** Describes compaction using an already formatted history token count. */
-    summarizeHistory: (tokens: string) => `总结 ${tokens} 个token的历史记录，然后发送`,
+    summarizeHistory: (tokens: string) => `总结 ${tokens} 个 token 的历史记录，然后发送`,
     submitting: "正在提交…",
   },
   stash: {
     differentEnvironmentToast: "暂存的文件属于其他环境",
     differentEnvironmentHint: "请在接收这些文件的环境中恢复此提示词。",
-    restorePersistenceToast: "已恢复的提示词可能再次出现在暂存区",
+    restorePersistenceToast: "已恢复的提示词可能再次出现在草稿暂存区",
     restorePersistenceHint: "浏览器存储拒绝了此次更新，因此重新加载后该条目可能仍然存在。",
     /** Lists filenames discarded because the stash exceeded its storage limit. */
-    droppedImagesHint: (names: string) => `保存此提示词时，${names} 超出了暂存区大小上限。`,
+    droppedImagesHint: (names: string) => `保存此提示词时，${names} 超出了草稿暂存区大小上限。`,
     /** Lists filenames that could not be read while saving the stash. */
     unreadableImagesHint: (names: string) => `保存此提示词时，无法读取 ${names}。`,
     /** Lists unrestored filenames and the composer attachment count limit. */
@@ -187,7 +187,7 @@ export const composer: Messages["composer"] = {
     oldestDiscardedToast: "已丢弃最早的暂存提示词",
     /** Reports the stash entry limit when the oldest prompt is discarded. */
     oldestDiscardedHint: (limit: number) =>
-      `暂存区最多保存 ${limit} 条提示词，已移除最早的一条以腾出空间。`,
+      `草稿暂存区最多保存 ${limit} 条提示词，已移除最早的一条以腾出空间。`,
     imagesNotSavedToast: "暂存的图片未保存",
     imagesNotSavedHint: "提示词已暂存，但浏览器存储拒绝了其中的图片。重新加载后这些图片会丢失。",
     imagesDidNotAttachToast: "暂存的图片未附加",
@@ -195,14 +195,14 @@ export const composer: Messages["composer"] = {
     imagesDidNotAttachHint: (count: number) =>
       `${count} 张图片保存完成前，该提示词已被恢复或删除。如仍需要，请重新附加。`,
     /** Announces the stashed prompt count and the action that opens the stash. */
-    openAriaLabel: (count: number) => `暂存的提示词：${count} 条。打开暂存区。`,
-    title: "暂存区",
+    openAriaLabel: (count: number) => `暂存的提示词：${count} 条。打开草稿暂存区。`,
+    title: "草稿暂存区",
     /** Summarizes an attachment-only stash entry; kind is a stable singular selector. */
     attachmentSnippet: (count: number, kind: "attachment" | "file" | "image") =>
       `（${count} 个${kind === "attachment" ? "附件" : kind === "file" ? "文件" : "图片"}）`,
-    close: "关闭暂存区",
+    close: "关闭草稿暂存区",
     listAriaLabel: "暂存的提示词",
-    empty: "暂存区还是空的。",
+    empty: "草稿暂存区还是空的。",
     /** Explains how to stash a prompt using the supplied shortcut label. */
     shortcutHint: (shortcut: string) => ` 在输入框中输入提示词后按 ${shortcut} 即可暂存。`,
     /** Names the stashed prompt to restore using its display snippet. */
@@ -215,14 +215,14 @@ export const composer: Messages["composer"] = {
     droppedImagesCountHint: (count: number) => `${count} 张图片已丢弃`,
   },
   provider: {
-    openSettings: "打开provider设置",
-    unavailable: "没有可用的provider",
+    openSettings: "打开 Provider 设置",
+    unavailable: "没有可用的 Provider",
   },
   context: {
     addErrorToast: "无法添加到聊天",
     busyHint: "输入框正忙，请在就绪后重试。",
     wrongEnvironmentToast: "请使用此环境中的对话",
-    wrongEnvironmentHint: "Agent只能读取其所在服务器上的对话。",
+    wrongEnvironmentHint: "Agent 只能读取其所在服务器上的对话。",
     /** Combines a context kind display label with its content label. */
     chipAriaLabel: (kind: string, label: string) => `${kind}，${label}`,
     uploadFailed: "上传失败",
@@ -243,29 +243,29 @@ export const composer: Messages["composer"] = {
     /** Describes the PR state for display; null selects the generic pull request label. */
     pullRequestKind: (state: "open" | "draft" | "merged" | "closed" | null) =>
       state === null
-        ? "拉取请求"
+        ? "PR"
         : state === "open"
-          ? "开放的拉取请求"
+          ? "开放的 PR"
           : state === "draft"
-            ? "草稿拉取请求"
+            ? "草稿 PR"
             : state === "merged"
-              ? "已合并的拉取请求"
-              : "已关闭的拉取请求",
+              ? "已合并的 PR"
+              : "已关闭的 PR",
   },
   placeholder: {
     customAnswer: "填写自定义回答",
     expand: "展开输入框",
     chooseOption: "请选择上方的选项",
     ownAnswer: "输入你自己的回答，或留空以使用所选选项",
-    enableProvider: "请在设置中启用provider",
+    enableProvider: "请在设置中启用 Provider",
     ask: "问点什么…",
     draft: "草稿",
     message: "消息",
     resolveApproval: "请处理此审批请求后继续",
     refinePlan: "添加反馈以完善计划，或留空直接实施",
     chooseProject: "请在上方选择项目以开始对话",
-    enableProviderToSend: "请在设置中启用provider后再发送消息",
-    full: "问点什么，用 @ 引用文件/文件夹，用 $ 使用技能，或输入 / 调用命令",
+    enableProviderToSend: "请在设置中启用 Provider 后再发送消息",
+    full: "问点什么，用 @ 引用文件/文件夹，用 $ 使用 Skills，或输入 / 调用命令",
     disconnected: "请求修改、发送后续消息或附加图片",
   },
   bannerStack: {
@@ -298,7 +298,7 @@ export const composer: Messages["composer"] = {
     fileReadAriaLabel: "要读取的文件",
     permissionAriaLabel: "权限请求",
     fileChangeAriaLabel: "文件修改",
-    processGoneHint: "Provider进程已退出 — 请中断或重新开始运行后再响应。",
+    processGoneHint: "Provider 进程已退出 — 请中断或重新开始运行后再响应。",
   },
   userInput: {
     showQuestion: "显示问题及选项",
@@ -342,14 +342,14 @@ export const composer: Messages["composer"] = {
   contextWindow: {
     /** Describes the token threshold at which automatic compaction starts. */
     compactAtHint: (threshold: number) =>
-      `达到 ${threshold.toLocaleString("en-US")} 个token时自动压缩。`,
+      `达到 ${threshold.toLocaleString("en-US")} 个 token 时自动压缩。`,
     /** Names the model whose context compacts automatically. */
     modelAutoCompactHint: (model: string) => `${model} 的上下文会在需要时自动压缩。`,
     autoCompactHint: "上下文会在需要时自动压缩。",
     /** Announces context usage using an already formatted percentage. */
     usedPercentageAriaLabel: (percentage: string) => `上下文窗口已使用 ${percentage}`,
     /** Announces context usage using an already formatted token count. */
-    usedTokensAriaLabel: (tokens: string) => `上下文窗口已使用 ${tokens} 个token`,
+    usedTokensAriaLabel: (tokens: string) => `上下文窗口已使用 ${tokens} 个 token`,
     title: "上下文窗口",
     usageAriaLabel: "上下文窗口用量",
     totalProcessed: "累计处理",
@@ -364,12 +364,12 @@ export const composer: Messages["composer"] = {
     addFavorite: "添加到收藏",
     /** Names a provider that cannot be selected within the current thread. */
     providerLockedHint: (provider: string) =>
-      `${provider} 在此对话中不可用。请新建对话以切换provider。`,
+      `${provider} 在此对话中不可用。请新建对话以切换 Provider。`,
     searchPlaceholder: "搜索模型…",
     legacy: "旧版模型",
     /** Names the provider whose setup can be opened. */
     setupProvider: (provider: string) => `设置 ${provider}`,
-    openSetup: "打开provider设置",
+    openSetup: "打开 Provider 设置",
     empty: "未找到模型",
     /** Names a provider disabled in settings. */
     disabledHint: (provider: string) => `${provider} — 已在设置中禁用。`,
@@ -401,7 +401,7 @@ export const composer: Messages["composer"] = {
   },
   traits: {
     agent: "Agent",
-    effort: "投入程度",
+    effort: "Effort",
     reasoningEffort: "推理强度",
     default: "默认",
     ultrathinkBodyHint: "你的提示词中包含“ultrathink”，请删除后再更改此选项。",
