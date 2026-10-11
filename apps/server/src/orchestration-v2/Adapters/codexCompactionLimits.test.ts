@@ -199,6 +199,30 @@ describe("makeCodexConfigReadLogRedactor", () => {
     assert.strictEqual(redact(response), response);
   });
 
+  it("preserves a matched error response by reference and consumes its request id", () => {
+    const redact = makeCodexConfigReadLogRedactor();
+    const request: CodexAppServerProtocolLogEvent = {
+      direction: "outgoing",
+      stage: "decoded",
+      payload: { id: 7, method: "config/read" },
+    };
+    const errorResponse: CodexAppServerProtocolLogEvent = {
+      direction: "incoming",
+      stage: "decoded",
+      payload: { id: 7, error: { code: -32601, message: "Method not found" } },
+    };
+    const laterResponse: CodexAppServerProtocolLogEvent = {
+      direction: "incoming",
+      stage: "decoded",
+      payload: { id: 7, result: { config: { model_auto_compact_token_limit: 240000 } } },
+    };
+    assert.strictEqual(redact(request), request);
+    const redactedError = redact(errorResponse);
+    assert.strictEqual(redactedError, errorResponse);
+    assert.notProperty(redactedError.payload, "result");
+    assert.strictEqual(redact(laterResponse), laterResponse);
+  });
+
   it("preserves other responses, notifications and unmatched ids by reference", () => {
     const redact = makeCodexConfigReadLogRedactor();
     const request: CodexAppServerProtocolLogEvent = {

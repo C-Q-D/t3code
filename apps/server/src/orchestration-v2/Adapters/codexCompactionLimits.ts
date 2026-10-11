@@ -73,6 +73,8 @@ export function codexAutoCompactThreshold(
 ): number | undefined {
   const limit = limits?.model_auto_compact_token_limit;
   if (typeof limit !== "number" || !Number.isInteger(limit) || limit <= 0) return undefined;
+  // This limit excludes prefix tokens, but reported usedTokens includes them.
+  // Without a separate prefix token count, we cannot derive a comparable threshold.
   if (limits?.model_auto_compact_token_limit_scope === "body_after_prefix") return undefined;
   if (typeof usableWindow !== "number" || !Number.isInteger(usableWindow) || usableWindow <= 0)
     return undefined;
@@ -92,8 +94,9 @@ export function codexAutoCompactThreshold(
 
 /**
  * Creates a session-local redactor that tracks decoded config/read request ids.
- * @returns A synchronous event transform: matching incoming results are replaced with
- * { redacted: true } and their ids consumed; all other events retain their object identity.
+ * @returns A synchronous event transform: matching incoming responses consume their ids.
+ * Results are replaced with { redacted: true } only when a result key exists;
+ * error responses without a result key and all other events retain their object identity.
  * Invoke only after the persistence filter, before payload bounding/general redaction.
  */
 export function makeCodexConfigReadLogRedactor(): (
@@ -106,7 +109,7 @@ export function makeCodexConfigReadLogRedactor(): (
     if (typeof payload.id !== "number" && typeof payload.id !== "string") return event;
     const id = String(payload.id);
     if (event.direction === "outgoing" && payload.method === "config/read") pending.add(id);
-    if (event.direction === "incoming" && pending.delete(id)) {
+    if (event.direction === "incoming" && pending.delete(id) && "result" in payload) {
       return { ...event, payload: { ...payload, result: { redacted: true } } };
     }
     return event;

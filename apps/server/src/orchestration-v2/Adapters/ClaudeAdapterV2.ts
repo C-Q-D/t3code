@@ -8420,6 +8420,8 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             Effect.ensuring(Deferred.succeed(closed, undefined)),
             Effect.forkIn(sessionScope),
           );
+          // With messages forked and queryContext registered, Stop can close the process during this read.
+          // Fork to avoid delaying the first turn; usage uses the model catalog window until the read completes.
           yield* readClaudeContextLimits(querySession).pipe(
             Effect.tap((limits) =>
               Effect.sync(() => {
