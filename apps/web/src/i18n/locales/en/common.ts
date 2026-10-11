@@ -189,4 +189,10 @@ export const common = {
     readError: (target: string) => `Failed to read ${target} from the clipboard.`,
     text: "text",
   },
+  confirm: {
+    title: "Confirm action",
+    description: "This action requires your confirmation.",
+    cancel: "Cancel",
+    confirm: "Confirm",
+  },
 };

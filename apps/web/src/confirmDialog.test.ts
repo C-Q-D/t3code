@@ -1,4 +1,6 @@
+/** Verifies confirmation queue transitions and the heading/body split used by the dialog host. */
 import { beforeEach, describe, expect, it } from "vite-plus/test";
+import { resolveConfirmDialogCopy } from "./components/ConfirmDialogHost.logic";
 
 import {
   completeConfirmDialogClose,
@@ -100,5 +102,42 @@ describe("confirm dialog coordinator", () => {
     expect(readConfirmDialogState()).toEqual({ status: "idle" });
     unregister();
     return expect(confirmation).resolves.toBe(true);
+  });
+});
+
+describe("confirm dialog copy", () => {
+  it.each([
+    {
+      name: "ASCII question on its own line",
+      message: "Files will be kept.\nDelete this thread?\nThis cannot be undone.",
+      title: "Delete this thread?",
+      description: "Files will be kept.\nThis cannot be undone.",
+    },
+    {
+      name: "full-width question on its own line",
+      message: "文件会保留。\n删除此对话？\n此操作无法撤销。",
+      title: "删除此对话？",
+      description: "文件会保留。\n此操作无法撤销。",
+    },
+    {
+      name: "ASCII question followed by inline supporting text",
+      message: "Delete this thread? This cannot be undone.",
+      title: "Delete this thread?",
+      description: "This cannot be undone.",
+    },
+    {
+      name: "full-width question followed by inline supporting text",
+      message: "删除此对话？此操作无法撤销。",
+      title: "删除此对话？",
+      description: "此操作无法撤销。",
+    },
+    {
+      name: "first inline question when punctuation is mixed",
+      message: "删除此对话？Keep the files? This cannot be undone.",
+      title: "删除此对话？",
+      description: "Keep the files? This cannot be undone.",
+    },
+  ])("separates the title and supporting text: $name", ({ message, title, description }) => {
+    expect(resolveConfirmDialogCopy(message)).toEqual({ title, description });
   });
 });

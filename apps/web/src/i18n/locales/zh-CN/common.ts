@@ -171,4 +171,10 @@ export const common: Messages["common"] = {
     readError: (target) => `无法从剪贴板读取 ${target}。`,
     text: "文本",
   },
+  confirm: {
+    title: "确认操作",
+    description: "此操作需要你确认。",
+    cancel: "取消",
+    confirm: "确认",
+  },
 };

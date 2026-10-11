@@ -1,3 +1,5 @@
+/** Composes the web chat workspace and its client actions; provider protocol and prompts keep their original values. */
+import { t } from "~/i18n";
 import { ChatCanvas } from "./chat/ChatCanvas";
 import { usageLimitRecoveryBannerItem } from "./chat/UsageLimitRecoveryBanner";
 import {
@@ -989,9 +991,12 @@ const PersistentThreadTerminalDrawer = memo(function PersistentThreadTerminalDra
     () => readEnvironmentScope(threadRef.environmentId, AuthTerminalOperateScope),
     [threadRef.environmentId],
   );
-  const openTerminal = useAtomCommand(terminalEnvironment.open, "terminal open");
-  const writeTerminal = useAtomCommand(terminalEnvironment.write, "terminal write");
-  const closeTerminalMutation = useAtomCommand(terminalEnvironment.close, "terminal close");
+  const openTerminal = useAtomCommand(terminalEnvironment.open, t.chat.view.terminalOpen);
+  const writeTerminal = useAtomCommand(terminalEnvironment.write, t.chat.view.terminalWrite);
+  const closeTerminalMutation = useAtomCommand(
+    terminalEnvironment.close,
+    t.chat.view.terminalClose,
+  );
   const serverThread = useThreadShell(threadRef);
   const draftThread = useComposerDraftStore((store) => store.getDraftThreadByRef(threadRef));
   const projectRef = serverThread
@@ -1540,7 +1545,7 @@ type LocalThreadErrorEntry = {
 };
 
 function chatActionErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "An error occurred.";
+  return error instanceof Error ? error.message : t.chat.view.genericError;
 }
 
 const ENVIRONMENT_UNAVAILABLE_SEND_TOAST_TRAIL_SIZE = 3;
@@ -1605,9 +1610,12 @@ export default function ChatView(props: ChatViewProps) {
   const removeKeybinding = useAtomCommand(serverEnvironment.removeKeybinding, {
     reportFailure: false,
   });
-  const openTerminal = useAtomCommand(terminalEnvironment.open, "terminal open");
-  const writeTerminal = useAtomCommand(terminalEnvironment.write, "terminal write");
-  const closeTerminalMutation = useAtomCommand(terminalEnvironment.close, "terminal close");
+  const openTerminal = useAtomCommand(terminalEnvironment.open, t.chat.view.terminalOpen);
+  const writeTerminal = useAtomCommand(terminalEnvironment.write, t.chat.view.terminalWrite);
+  const closeTerminalMutation = useAtomCommand(
+    terminalEnvironment.close,
+    t.chat.view.terminalClose,
+  );
   const createThread = useOrchestrationCommand(threadEnvironment.create, { reportFailure: false });
   const deleteThread = useOrchestrationCommand(threadEnvironment.delete, { reportFailure: false });
   const updateThreadMetadata = useOrchestrationCommand(threadEnvironment.updateMetadata, {
@@ -1638,7 +1646,7 @@ export default function ChatView(props: ChatViewProps) {
     reportFailure: false,
   });
   const loadEarlierThreadHistory = useAtomCommand(threadEnvironment.loadEarlierHistory, {
-    label: "load earlier thread history",
+    label: t.chat.view.loadEarlierHistory,
     reportFailure: false,
   });
   const respondToThreadApproval = useOrchestrationCommand(threadEnvironment.respondToApproval, {
@@ -1657,7 +1665,7 @@ export default function ChatView(props: ChatViewProps) {
     reportFailure: false,
   });
   const openPreview = useAtomCommand(previewEnvironment.open, { reportFailure: false });
-  const closePreview = useAtomCommand(previewEnvironment.close, "preview close");
+  const closePreview = useAtomCommand(previewEnvironment.close, t.chat.view.previewClose);
   const { environments } = useEnvironments();
   const primaryEnvironment = usePrimaryEnvironment();
   const retryEnvironment = useAtomCommand(environmentCatalog.retryNow, { reportFailure: false });
@@ -1847,9 +1855,8 @@ export default function ChatView(props: ChatViewProps) {
       if (!inserted) {
         toastManager.add({
           type: "warning",
-          title: "The composer is not ready",
-          description:
-            "Try citing the selection after the connection or pending input is resolved.",
+          title: t.chat.view.composerNotReady,
+          description: t.chat.view.citeSelectionHint,
         });
       }
       return inserted;
@@ -2167,7 +2174,7 @@ export default function ChatView(props: ChatViewProps) {
         ? null
         : {
             threadId: parentSubagentThreadRef.threadId,
-            title: parentSubagentThread?.title ?? "Parent thread",
+            title: parentSubagentThread?.title ?? t.chat.view.parentThread,
           },
     [parentSubagentThread?.title, parentSubagentThreadRef],
   );
@@ -2512,7 +2519,7 @@ export default function ChatView(props: ChatViewProps) {
           stackedThreadToast({
             type: "error",
             title,
-            description: error instanceof Error ? error.message : "An error occurred.",
+            description: error instanceof Error ? error.message : t.chat.view.genericError,
           }),
         );
       }
@@ -2523,10 +2530,10 @@ export default function ChatView(props: ChatViewProps) {
     activeProjectClone === null
       ? null
       : activeProjectClone.phase === "running"
-        ? "Cloning repository"
+        ? t.chat.view.cloningRepository
         : activeProjectClone.phase === "done"
           ? null
-          : "Repository not cloned";
+          : t.chat.view.repositoryNotCloned;
   const projectCloneBannerItem = useMemo<ComposerBannerStackItem | null>(() => {
     if (!activeProjectClone || !activeProjectRef || activeProjectClone.phase === "done") {
       return null;
@@ -2540,19 +2547,19 @@ export default function ChatView(props: ChatViewProps) {
         compact: true,
         priority: "activity",
         icon: <DownloadIcon />,
-        title: `Cloning ${name}`,
+        title: t.chat.view.cloning(name),
         description: projectCloneProgressSummary(activeProjectClone),
         actions: (
           <Button
             size="xs"
             variant="ghost"
             onClick={() =>
-              void runProjectCloneAction("Failed to cancel clone", () =>
+              void runProjectCloneAction(t.chat.view.cancelCloneError, () =>
                 cancelProjectClone({ environmentId, input: { projectId } }),
               )
             }
           >
-            Cancel
+            {t.chat.view.cancel}
           </Button>
         ),
       };
@@ -2563,8 +2570,8 @@ export default function ChatView(props: ChatViewProps) {
       variant: cancelled ? "warning" : "error",
       compact: true,
       icon: <DownloadIcon />,
-      title: cancelled ? `Cancelled cloning ${name}` : `Failed to clone ${name}`,
-      description: cancelled ? "Retry to bring in the repository." : activeProjectClone.error,
+      title: cancelled ? t.chat.view.cancelledCloning(name) : t.chat.view.cloneError(name),
+      description: cancelled ? t.chat.view.retryCloneHint : activeProjectClone.error,
       actions: (
         <>
           <Button
@@ -2572,18 +2579,18 @@ export default function ChatView(props: ChatViewProps) {
             variant="ghost"
             onClick={() => void removeClonedProject({ environmentId, projectId })}
           >
-            Remove project
+            {t.chat.view.removeProject}
           </Button>
           <Button
             size="xs"
             variant="ghost"
             onClick={() =>
-              void runProjectCloneAction("Failed to retry clone", () =>
+              void runProjectCloneAction(t.chat.view.retryCloneError, () =>
                 retryProjectClone({ environmentId, input: { projectId } }),
               )
             }
           >
-            Retry
+            {t.chat.view.retry}
           </Button>
         </>
       ),
@@ -2704,8 +2711,8 @@ export default function ChatView(props: ChatViewProps) {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Could not reconnect environment",
-            description: error instanceof Error ? error.message : "Failed to reconnect.",
+            title: t.chat.view.reconnectEnvironmentError,
+            description: error instanceof Error ? error.message : t.chat.view.reconnectError,
           }),
         );
       }
@@ -2732,8 +2739,8 @@ export default function ChatView(props: ChatViewProps) {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "Could not disconnect server",
-              description: error instanceof Error ? error.message : "Failed to disconnect.",
+              title: t.chat.view.disconnectServerError,
+              description: error instanceof Error ? error.message : t.chat.view.disconnectError,
             }),
           );
         }
@@ -2843,7 +2850,7 @@ export default function ChatView(props: ChatViewProps) {
   const openOrReuseProjectDraftThread = useCallback(
     async (input: { branch: string; worktreePath: string | null; envMode: DraftThreadEnvMode }) => {
       if (!activeProject) {
-        throw new Error("No active project is available for this pull request.");
+        throw new Error(t.chat.view.noPullRequestProjectError);
       }
       const activeProjectRef = scopeProjectRef(activeProject.environmentId, activeProject.id);
       const logicalProjectKey = deriveLogicalProjectKeyFromSettings(
@@ -3067,8 +3074,12 @@ export default function ChatView(props: ChatViewProps) {
   const hasMultipleRegisteredEnvironments = environments.length > 1;
   const versionMismatchServerLabel =
     hasMultipleRegisteredEnvironments && activeThread
-      ? `${environmentById.get(activeThread.environmentId)?.label ?? serverConfig?.environment.label ?? activeThread.environmentId} server`
-      : "server";
+      ? t.chat.view.namedServer(
+          environmentById.get(activeThread.environmentId)?.label ??
+            serverConfig?.environment.label ??
+            activeThread.environmentId,
+        )
+      : t.chat.view.server;
   const handleDismissVersionMismatch = useCallback(() => {
     if (!versionMismatchDismissKey) return;
     dismissVersionMismatch(versionMismatchDismissKey);
@@ -3098,12 +3109,12 @@ export default function ChatView(props: ChatViewProps) {
           size="xs"
           variant="ghost"
           disabled={disconnectingEnvironment}
-          title="Hide this server's threads. Switch it on again in Connections."
+          title={t.chat.view.disconnectServerHint}
           onClick={() =>
             void handleDisconnectActiveEnvironment(activeEnvironmentUnavailableState.environmentId)
           }
         >
-          Disconnect server
+          {t.chat.view.disconnectServer}
         </Button>
       ) : undefined;
     const environmentReconnecting =
@@ -3120,7 +3131,10 @@ export default function ChatView(props: ChatViewProps) {
         id: `environment-unavailable:${activeEnvironmentUnavailableState.environmentId}`,
         variant: unavailableConnection.phase === "error" ? "error" : "warning",
         icon: <WifiOffIcon />,
-        title: `${activeEnvironmentUnavailableState.label} is ${environmentReconnecting ? "reconnecting" : "offline"}`,
+        title: t.chat.view.environmentOffline(
+          activeEnvironmentUnavailableState.label,
+          environmentReconnecting,
+        ),
         actions: (
           <>
             {!environmentReconnecting ? (
@@ -3133,7 +3147,7 @@ export default function ChatView(props: ChatViewProps) {
                   )
                 }
               >
-                Reconnect
+                {t.chat.view.reconnect}
               </Button>
             ) : null}
             {disconnectAction}
@@ -3170,7 +3184,7 @@ export default function ChatView(props: ChatViewProps) {
                     type="button"
                     className="block max-w-full cursor-help truncate rounded-sm text-left"
                   >
-                    Server update available
+                    {t.chat.view.serverUpdateAvailable}
                   </button>
                 }
               />
@@ -3180,7 +3194,7 @@ export default function ChatView(props: ChatViewProps) {
               </TooltipPopup>
             </Tooltip>
           ) : (
-            "Server update available"
+            t.chat.view.serverUpdateAvailable
           ),
         description:
           !updateInProgress &&
@@ -3202,14 +3216,14 @@ export default function ChatView(props: ChatViewProps) {
             desktopAppUpdate={versionMismatchDesktopAppUpdate}
             threadContinuation={versionMismatchThreadContinuation}
             targetVersion={versionMismatch.clientVersion}
-            label={updateFailed ? "Retry" : "Update"}
+            label={updateFailed ? t.chat.view.retry : t.chat.view.update}
             variant="ghost"
           />
         ),
         ...(updateInProgress || (!updateFailed && !versionMismatchDismissKey)
           ? {}
           : {
-              dismissLabel: "Dismiss update notice",
+              dismissLabel: t.chat.view.dismissUpdateNotice,
               onDismiss: () => {
                 if (updateFailed) {
                   dismissServerUpdateFailure(serverUpdateState);
@@ -3547,7 +3561,7 @@ export default function ChatView(props: ChatViewProps) {
       return true;
     }
     setUsageLimitsPanel(null);
-    toastManager.add({ type: "info", title: "Usage limits are unavailable for this provider" });
+    toastManager.add({ type: "info", title: t.chat.view.usageLimitsUnavailable });
     return false;
   }, [
     activeProviderInstanceId,
@@ -3718,7 +3732,7 @@ export default function ChatView(props: ChatViewProps) {
     async (attachment: ChatFileAttachment) => {
       const connection = readPreparedConnection(environmentId);
       if (!connection) {
-        toastManager.add({ type: "error", title: "The environment is not connected." });
+        toastManager.add({ type: "error", title: t.chat.view.environmentNotConnected });
         return;
       }
 
@@ -3736,8 +3750,8 @@ export default function ChatView(props: ChatViewProps) {
       } catch (error) {
         toastManager.add({
           type: "error",
-          title: "Could not download " + attachment.name,
-          description: error instanceof Error ? error.message : "The attachment is unavailable.",
+          title: t.chat.view.downloadAttachmentError(attachment.name),
+          description: error instanceof Error ? error.message : t.chat.view.attachmentUnavailable,
         });
       }
     },
@@ -3829,7 +3843,7 @@ export default function ChatView(props: ChatViewProps) {
               imageInstances.push(image);
               const handleLoad = () => resolve();
               const handleError = () =>
-                reject(new Error(`Failed to load server preview for ${messageId}.`));
+                reject(new Error(t.chat.view.serverPreviewError(messageId)));
               image.addEventListener("load", handleLoad, { once: true });
               image.addEventListener("error", handleError, { once: true });
               image.src = previewUrl;
@@ -4391,9 +4405,8 @@ export default function ChatView(props: ChatViewProps) {
       toastManager.add({
         type: "warning",
         id: "load-balancing-attachments",
-        title: "Keep attachments on this machine",
-        description:
-          "Remove attachments before choosing automatic routing, then attach them on the selected machine.",
+        title: t.chat.view.keepAttachmentsHere,
+        description: t.chat.view.automaticRoutingAttachmentsHint,
       });
       return;
     }
@@ -4416,12 +4429,12 @@ export default function ChatView(props: ChatViewProps) {
   ]);
   const autoEnvironmentLabel = automaticEnvironment
     ? draftThread?.loadBalancedEnvironmentId
-      ? "Auto balance"
+      ? t.chat.view.autoBalance
       : loadBalancing.pending
-        ? "Checking machines…"
+        ? t.chat.view.checkingMachines
         : loadBalancing.failed
-          ? "Auto balance unavailable"
-          : "Auto balance"
+          ? t.chat.view.autoBalanceUnavailable
+          : t.chat.view.autoBalance
     : undefined;
 
   // The machine an in-flight switch is heading to; a newer switch replaces it.
@@ -4491,7 +4504,7 @@ export default function ChatView(props: ChatViewProps) {
       }
       // Keep send disabled until the destination Scratch project is ready.
       setIsEnvironmentChanging(true);
-      void openScratchProject(target.environmentId, "Could not switch machine")
+      void openScratchProject(target.environmentId, t.chat.view.switchMachineError)
         .then((project) => {
           if (project) retarget(project);
         })
@@ -4577,7 +4590,7 @@ export default function ChatView(props: ChatViewProps) {
       const error = squashAtomCommandFailure(result);
       setThreadError(
         activeThread.id,
-        error instanceof Error ? error.message : "Failed to interrupt the current turn.",
+        error instanceof Error ? error.message : t.chat.view.interruptTurnError,
       );
     }
   }, [activeThread, environmentId, interruptThreadTurn, setThreadError]);
@@ -4597,8 +4610,8 @@ export default function ChatView(props: ChatViewProps) {
       if (prompt !== null && !composer.insertTextAtEnd(prompt, { ensureLeadingBoundary: true })) {
         toastManager.add({
           type: "error",
-          title: "Unable to add to chat",
-          description: "The composer is busy; try again once it is ready.",
+          title: t.chat.view.addToChatError,
+          description: t.chat.view.composerBusyHint,
         });
         return;
       }
@@ -4707,16 +4720,16 @@ export default function ChatView(props: ChatViewProps) {
       toastManager.add(
         stackedThreadToast({
           type: "info",
-          title: "Queued message is no longer queued",
-          description: "Your unsaved edit was kept in the composer.",
+          title: t.chat.view.messageNoLongerQueued,
+          description: t.chat.view.unsavedEditKept,
         }),
       );
     } else if (recovery === "discarded") {
       toastManager.add(
         stackedThreadToast({
           type: "warning",
-          title: "Queued message is no longer queued",
-          description: "Your unsaved edit was discarded.",
+          title: t.chat.view.messageNoLongerQueued,
+          description: t.chat.view.unsavedEditDiscarded,
         }),
       );
     }
@@ -4994,7 +5007,7 @@ export default function ChatView(props: ChatViewProps) {
           const error = squashAtomCommandFailure(openResult);
           setThreadError(
             activeThreadId,
-            error instanceof Error ? error.message : `Failed to run script "${script.name}".`,
+            error instanceof Error ? error.message : t.chat.view.runScriptError(script.name),
           );
         }
         return;
@@ -5014,7 +5027,7 @@ export default function ChatView(props: ChatViewProps) {
           const error = squashAtomCommandFailure(writeResult);
           setThreadError(
             activeThreadId,
-            error instanceof Error ? error.message : `Failed to run script "${script.name}".`,
+            error instanceof Error ? error.message : t.chat.view.runScriptError(script.name),
           );
         }
         return;
@@ -5030,8 +5043,8 @@ export default function ChatView(props: ChatViewProps) {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "Could not open preview",
-              description: error instanceof Error ? error.message : "An unexpected error occurred.",
+              title: t.chat.view.openPreviewError,
+              description: error instanceof Error ? error.message : t.chat.view.unexpectedError,
             }),
           );
         }
@@ -5069,7 +5082,7 @@ export default function ChatView(props: ChatViewProps) {
     void runProjectScriptRef.current(
       {
         id: "chat-code-block",
-        name: "Chat code block",
+        name: t.chat.view.chatCodeBlock,
         command,
         icon: "play",
         runOnWorktreeCreate: false,
@@ -5107,7 +5120,7 @@ export default function ChatView(props: ChatViewProps) {
           Cause.fail(
             new EnvironmentAuthorizationError({
               requiredScope: AuthSettingsWriteScope,
-              message: "This connection cannot change keyboard shortcuts.",
+              message: t.chat.view.keyboardShortcutsDenied,
             }),
           ),
         );
@@ -5153,8 +5166,8 @@ export default function ChatView(props: ChatViewProps) {
             new EnvironmentAuthorizationError({
               requiredScope: AuthSettingsWriteScope,
               message: isDeletingScript
-                ? "The script was deleted, but its keyboard shortcut could not be removed because permission changed."
-                : "The script was saved, but this connection can no longer change keyboard shortcuts.",
+                ? t.chat.view.deletedScriptShortcutError
+                : t.chat.view.savedScriptShortcutError,
             }),
           ),
         );
@@ -5259,7 +5272,7 @@ export default function ChatView(props: ChatViewProps) {
       }
       const existingScript = activeProjectScripts.find((script) => script.id === scriptId);
       if (!existingScript) {
-        return AsyncResult.failure(Cause.fail(new Error("Script not found.")));
+        return AsyncResult.failure(Cause.fail(new Error(t.chat.view.scriptNotFound)));
       }
 
       const updatedScript = buildProjectScript(existingScript.id, input);
@@ -5298,15 +5311,15 @@ export default function ChatView(props: ChatViewProps) {
       if (result._tag === "Success") {
         toastManager.add({
           type: "success",
-          title: `Deleted action "${deletedName ?? "Unknown"}"`,
+          title: t.chat.view.deletedAction(deletedName),
         });
       } else if (!isAtomCommandInterrupted(result)) {
         const error = squashAtomCommandFailure(result);
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Could not delete action",
-            description: error instanceof Error ? error.message : "An unexpected error occurred.",
+            title: t.chat.view.deleteActionError,
+            description: error instanceof Error ? error.message : t.chat.view.unexpectedError,
           }),
         );
       }
@@ -5385,7 +5398,7 @@ export default function ChatView(props: ChatViewProps) {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "Unable to open browser",
+              title: t.chat.view.openBrowserError,
               description: error.message,
             }),
           );
@@ -5653,7 +5666,7 @@ export default function ChatView(props: ChatViewProps) {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Unable to update the thread pull request",
+          title: t.chat.view.updateThreadPullRequestError,
           description: chatActionErrorMessage(squashAtomCommandFailure(result)),
         }),
       );
@@ -6194,8 +6207,8 @@ export default function ChatView(props: ChatViewProps) {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Failed to copy path",
-          description: "Clipboard API unavailable.",
+          title: t.chat.view.copyPathError,
+          description: t.chat.view.clipboardUnavailable,
         }),
       );
       return;
@@ -6205,7 +6218,7 @@ export default function ChatView(props: ChatViewProps) {
       () => {
         toastManager.add({
           type: "success",
-          title: "Path copied",
+          title: t.chat.view.pathCopied,
           description: relativePath,
         });
       },
@@ -6213,8 +6226,8 @@ export default function ChatView(props: ChatViewProps) {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Failed to copy path",
-            description: error instanceof Error ? error.message : "An error occurred.",
+            title: t.chat.view.copyPathError,
+            description: error instanceof Error ? error.message : t.chat.view.genericError,
           }),
         );
       },
@@ -6964,7 +6977,7 @@ export default function ChatView(props: ChatViewProps) {
         '[data-chat-composer-main-surface="true"]',
       );
       const button = composerOverlayElement?.parentElement?.querySelector<HTMLElement>(
-        'button[aria-label="Scroll to end"]',
+        "button[data-scroll-to-end]",
       );
       const clearance =
         composerOverlayElement && mainSurface && button
@@ -7063,7 +7076,7 @@ export default function ChatView(props: ChatViewProps) {
           stackedThreadToast({
             type: "error",
             title: target.failureTitle,
-            description: error instanceof Error ? error.message : "An error occurred.",
+            description: error instanceof Error ? error.message : t.chat.view.genericError,
           }),
         );
       },
@@ -7174,8 +7187,8 @@ export default function ChatView(props: ChatViewProps) {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Failed to un-settle thread",
-            description: error instanceof Error ? error.message : "An error occurred.",
+            title: t.chat.view.unsettleThreadError,
+            description: error instanceof Error ? error.message : t.chat.view.genericError,
           }),
         );
       }
@@ -7220,8 +7233,8 @@ export default function ChatView(props: ChatViewProps) {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Failed to wake thread",
-            description: error instanceof Error ? error.message : "An error occurred.",
+            title: t.chat.view.wakeThreadError,
+            description: error instanceof Error ? error.message : t.chat.view.genericError,
           }),
         );
       }
@@ -7286,7 +7299,7 @@ export default function ChatView(props: ChatViewProps) {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Failed to switch checkout",
+            title: t.chat.view.switchCheckoutError,
             description: chatActionErrorMessage(squashAtomCommandFailure(checkoutResult)),
           }),
         );
@@ -7310,7 +7323,7 @@ export default function ChatView(props: ChatViewProps) {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "Checkout switched, but the thread could not be updated",
+              title: t.chat.view.checkoutThreadUpdateError,
               description: chatActionErrorMessage(squashAtomCommandFailure(updateResult)),
             }),
           );
@@ -7362,7 +7375,7 @@ export default function ChatView(props: ChatViewProps) {
         const error = squashAtomCommandFailure(result);
         setThreadError(
           activeThread.id,
-          error instanceof Error ? error.message : "Failed to stop background work.",
+          error instanceof Error ? error.message : t.chat.view.stopBackgroundWorkError,
         );
       }
     }
@@ -7484,17 +7497,19 @@ export default function ChatView(props: ChatViewProps) {
             <Button
               size="xs"
               variant="ghost"
-              onClick={() => void sendStandaloneCommand("/goal resume", "Failed to resume goal.")}
+              onClick={() =>
+                void sendStandaloneCommand("/goal resume", t.chat.view.resumeGoalError)
+              }
             >
-              Resume
+              {t.chat.view.resume}
             </Button>
           ) : null}
           <Button
             size="xs"
             variant="ghost"
-            onClick={() => void sendStandaloneCommand("/goal clear", "Failed to clear goal.")}
+            onClick={() => void sendStandaloneCommand("/goal clear", t.chat.view.clearGoalError)}
           >
-            Clear
+            {t.chat.view.clear}
           </Button>
         </>
       ),
@@ -7536,7 +7551,7 @@ export default function ChatView(props: ChatViewProps) {
                   ) : (
                     <InlineButton
                       tone="muted"
-                      aria-label={`Open subagent ${item.label}`}
+                      aria-label={t.chat.view.openSubagent(item.label)}
                       onClick={() => onOpenRelatedThread(childThreadId)}
                     >
                       {item.label}
@@ -7552,7 +7567,7 @@ export default function ChatView(props: ChatViewProps) {
           disabled={!canOperateThread || isStoppingBackgroundWork}
           onClick={() => void handleStopBackgroundWork()}
         >
-          {isStoppingBackgroundWork ? "Stopping..." : "Stop"}
+          {isStoppingBackgroundWork ? t.chat.view.stopping : t.chat.view.stop}
         </Button>
       ),
     };
@@ -7578,10 +7593,10 @@ export default function ChatView(props: ChatViewProps) {
         icon={<AlarmClockIcon />}
         label={
           activeThreadShell?.snoozedUntil
-            ? `Snoozed, ${formatRelativeTimeUntilLabel(activeThreadShell.snoozedUntil)}`
-            : "Snoozed"
+            ? t.chat.view.snoozedUntil(formatRelativeTimeUntilLabel(activeThreadShell.snoozedUntil))
+            : t.chat.view.snoozed
         }
-        actionLabel={isUnsnoozing ? "Waking..." : "Wake now"}
+        actionLabel={isUnsnoozing ? t.chat.view.waking : t.chat.view.wakeNow}
         actionDisabled={!canOperateThread || isUnsnoozing}
         onAction={() => void handleUnsnoozeActiveThread()}
       />
@@ -7590,18 +7605,18 @@ export default function ChatView(props: ChatViewProps) {
         icon={<CheckCircle2Icon />}
         label={
           activeThreadShell?.settledAt
-            ? `Settled ${formatRelativeTimeLabel(activeThreadShell.settledAt)}`
-            : "Settled"
+            ? t.chat.view.settledAt(formatRelativeTimeLabel(activeThreadShell.settledAt))
+            : t.chat.view.settled
         }
-        actionLabel={isUnsettling ? "Un-settling..." : "Un-settle"}
+        actionLabel={isUnsettling ? t.chat.view.unsettling : t.chat.view.unsettle}
         actionDisabled={!canOperateThread || isUnsettling}
         onAction={() => void handleUnsettleActiveThread()}
       />
     ) : activeThreadWokeVisible ? (
       <ThreadStatusLine
         icon={<AlarmClockIcon />}
-        label="Woke from snooze"
-        actionLabel="Dismiss"
+        label={t.chat.view.wokeFromSnooze}
+        actionLabel={t.chat.view.dismiss}
         onAction={acknowledgeActiveThreadWoke}
       />
     ) : null;
@@ -7643,12 +7658,12 @@ export default function ChatView(props: ChatViewProps) {
   const compactDisabled = compactThreadUnavailable;
   const compactDisabledReason = compactDisabled
     ? !canOperateThread
-      ? "This connection cannot change threads."
+      ? t.chat.view.threadsDenied
       : !activeProject
-        ? "Choose a project before compacting"
+        ? t.chat.view.chooseProjectBeforeCompacting
         : !manualCompactionProviderAvailable
-          ? "Compaction is unavailable for this provider"
-          : "Compacting is unavailable right now"
+          ? t.chat.view.compactionUnsupported
+          : t.chat.view.compactionUnavailable
     : null;
   // Tokens a stale Claude session would re-read on its next turn. While set,
   // Enter compacts first and the composer's send button says so; "Send with
@@ -7757,7 +7772,9 @@ export default function ChatView(props: ChatViewProps) {
         icon: <GitBranchIcon />,
         title: (
           <span className="flex min-w-0 items-baseline gap-1.5">
-            <span className="shrink-0 font-normal text-muted-foreground">Branch changed — was</span>
+            <span className="shrink-0 font-normal text-muted-foreground">
+              {t.chat.view.branchChanged}
+            </span>
             <Tooltip>
               <TooltipTrigger
                 render={
@@ -7767,8 +7784,10 @@ export default function ChatView(props: ChatViewProps) {
                 }
               />
               <TooltipPopup side="top">
-                This thread last ran on {localCheckoutBranchMismatch.threadBranch}. Sending will
-                continue on {localCheckoutBranchMismatch.currentBranch}.
+                {t.chat.view.branchMismatchHint(
+                  localCheckoutBranchMismatch.threadBranch,
+                  localCheckoutBranchMismatch.currentBranch,
+                )}
               </TooltipPopup>
             </Tooltip>
           </span>
@@ -7780,10 +7799,10 @@ export default function ChatView(props: ChatViewProps) {
             disabled={!canWriteSourceControl || isRestoringThreadBranch}
             onClick={handleRestoreThreadBranch}
           >
-            {isRestoringThreadBranch ? "Restoring..." : "Restore branch"}
+            {isRestoringThreadBranch ? t.chat.view.restoring : t.chat.view.restoreBranch}
           </Button>
         ),
-        dismissLabel: "Dismiss branch change notice",
+        dismissLabel: t.chat.view.dismissBranchNotice,
         onDismiss: () => {
           dismissBranchMismatchForSession(activeBranchMismatchKey);
           setBranchMismatchDismissTick((tick) => tick + 1);
@@ -7962,8 +7981,8 @@ export default function ChatView(props: ChatViewProps) {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "Failed to settle thread",
-              description: error instanceof Error ? error.message : "An error occurred.",
+              title: t.chat.view.settleThreadError,
+              description: error instanceof Error ? error.message : t.chat.view.genericError,
             }),
           );
         });
@@ -7983,8 +8002,8 @@ export default function ChatView(props: ChatViewProps) {
             toastManager.add(
               stackedThreadToast({
                 type: "error",
-                title: pinned ? "Failed to unpin thread" : "Failed to pin thread",
-                description: error instanceof Error ? error.message : "An error occurred.",
+                title: pinned ? t.chat.view.unpinThreadError : t.chat.view.pinThreadError,
+                description: error instanceof Error ? error.message : t.chat.view.genericError,
               }),
             );
           },
@@ -8306,21 +8325,18 @@ export default function ChatView(props: ChatViewProps) {
       if (!message || message.role !== "user") return;
 
       if (!supportsConversationRollback) {
-        setThreadError(
-          activeThread.id,
-          "This provider does not support reverting conversation history. Start a new thread instead.",
-        );
+        setThreadError(activeThread.id, t.chat.view.revertHistoryUnsupported);
         return;
       }
       if (activeEnvironmentUnavailable && activeEnvironmentUnavailableLabel) {
         setThreadError(
           activeThread.id,
-          `Reconnect ${activeEnvironmentUnavailableLabel} before reverting checkpoints.`,
+          t.chat.view.reconnectBeforeReverting(activeEnvironmentUnavailableLabel),
         );
         return;
       }
       if (phase === "running" || isSendBusy || isConnecting) {
-        setThreadError(activeThread.id, "Interrupt the current turn before reverting checkpoints.");
+        setThreadError(activeThread.id, t.chat.view.interruptBeforeReverting);
         return;
       }
       if (restoreFiles === undefined) {
@@ -8334,10 +8350,10 @@ export default function ChatView(props: ChatViewProps) {
       setThreadError(activeThread.id, null);
       try {
         if (composerRef.current?.hasPendingAttachments()) {
-          throw new Error("Wait for attachments to finish preparing before rewinding.");
+          throw new Error(t.chat.view.waitForAttachmentsBeforeRewinding);
         }
         const connection = readPreparedConnection(environmentId);
-        if (!connection) throw new Error("The environment is not connected.");
+        if (!connection) throw new Error(t.chat.view.environmentNotConnected);
         const files = await prepareRevertedMessageAttachments({
           message,
           environmentId,
@@ -8350,9 +8366,7 @@ export default function ChatView(props: ChatViewProps) {
           (draft?.images.length ?? 0) + (draft?.files.length ?? 0) + files.length >
           PROVIDER_SEND_TURN_MAX_ATTACHMENTS
         ) {
-          throw new Error(
-            "Make room for this message's attachments in the composer before rewinding.",
-          );
+          throw new Error(t.chat.view.makeRoomBeforeRewinding);
         }
         const commandId = CommandId.make(randomUUID());
         await waitForRevertedMessage(routeThreadRef, messageId, turnCount, commandId, async () => {
@@ -8400,7 +8414,7 @@ export default function ChatView(props: ChatViewProps) {
       } catch (error) {
         setThreadError(
           activeThread.id,
-          error instanceof Error ? error.message : "Failed to revert thread state.",
+          error instanceof Error ? error.message : t.chat.view.revertThreadError,
         );
       } finally {
         useComposerDraftStore.setState((store) => {
@@ -8437,21 +8451,19 @@ export default function ChatView(props: ChatViewProps) {
       if (activeEnvironmentUnavailable && activeEnvironmentUnavailableLabel) {
         setThreadError(
           activeThread.id,
-          `Reconnect ${activeEnvironmentUnavailableLabel} before reverting checkpoints.`,
+          t.chat.view.reconnectBeforeReverting(activeEnvironmentUnavailableLabel),
         );
         return;
       }
       if (phase === "running" || isSendBusy || isConnecting) {
-        setThreadError(activeThread.id, "Interrupt the current turn before reverting checkpoints.");
+        setThreadError(activeThread.id, t.chat.view.interruptBeforeReverting);
         return;
       }
       const localApi = readLocalApi();
       const confirmed =
         localApi == null
-          ? window.confirm("Roll back this thread to the selected checkpoint?")
-          : await localApi.dialogs.confirm(
-              "Roll back this thread to the selected checkpoint?\nThis action cannot be undone.",
-            );
+          ? window.confirm(t.chat.view.rollbackConfirm)
+          : await localApi.dialogs.confirm(t.chat.view.rollbackWarningConfirm);
       if (!confirmed) return;
 
       useComposerDraftStore.setState((store) => ({
@@ -8470,7 +8482,7 @@ export default function ChatView(props: ChatViewProps) {
         const error = squashAtomCommandFailure(result);
         setThreadError(
           activeThread.id,
-          error instanceof Error ? error.message : "Failed to revert thread state.",
+          error instanceof Error ? error.message : t.chat.view.revertThreadError,
         );
       }
       useComposerDraftStore.setState((store) => {
@@ -8512,17 +8524,14 @@ export default function ChatView(props: ChatViewProps) {
           const error = squashAtomCommandFailure(result);
           setThreadError(
             activeThread.id,
-            error instanceof Error ? error.message : "Failed to fork this response.",
+            error instanceof Error ? error.message : t.chat.view.forkResponseError,
           );
         }
         return;
       }
       const targetThreadReady = await waitForThreadShell(targetThreadRef);
       if (!targetThreadReady) {
-        setThreadError(
-          activeThread.id,
-          "The fork was created, but its thread data did not reach this client. Reconnect and try opening it from the sidebar.",
-        );
+        setThreadError(activeThread.id, t.chat.view.forkDataUnavailable);
         return;
       }
       await navigate({
@@ -8541,7 +8550,7 @@ export default function ChatView(props: ChatViewProps) {
   );
   const onCompactContext = () => {
     if (compactDisabled) return;
-    void sendStandaloneCommand("/compact", "Failed to compact context.");
+    void sendStandaloneCommand("/compact", t.chat.view.compactContextError);
   };
 
   const onResume = async () => {
@@ -8604,7 +8613,7 @@ export default function ChatView(props: ChatViewProps) {
           const error = squashAtomCommandFailure(result);
           setThreadError(
             threadId,
-            error instanceof Error ? error.message : "Could not resume thread.",
+            error instanceof Error ? error.message : t.chat.view.resumeThreadError,
           );
         }
       } else {
@@ -8654,8 +8663,8 @@ export default function ChatView(props: ChatViewProps) {
       toastManager.add(
         stackedThreadToast({
           type: "info",
-          title: "Annotation attached to draft",
-          description: "Sending is unavailable right now. Finish the current action, then send.",
+          title: t.chat.view.annotationAttached,
+          description: t.chat.view.sendingUnavailableHint,
         }),
       );
     };
@@ -8678,11 +8687,11 @@ export default function ChatView(props: ChatViewProps) {
       toastManager.add({
         type: "warning",
         title: loadBalancing.pending
-          ? "Checking machine resources"
-          : "Choose a machine to continue",
+          ? t.chat.view.checkingMachineResources
+          : t.chat.view.chooseMachine,
         description: loadBalancing.pending
-          ? "Resource checks are still running. You can choose a machine in the composer."
-          : "No eligible machine has available resources. Choose a machine in the composer to override.",
+          ? t.chat.view.resourceChecksPending
+          : t.chat.view.noEligibleMachine,
       });
       return;
     }
@@ -8693,8 +8702,8 @@ export default function ChatView(props: ChatViewProps) {
       toastManager.add({
         ...stackedThreadToast({
           type: "warning",
-          title: "Not connected: message not sent",
-          description: "Reconnecting to the environment. Try again once it is connected.",
+          title: t.chat.view.messageNotSent,
+          description: t.chat.view.reconnectingSendHint,
         }),
         id: `chat-send-environment-unavailable:${toastSlot}`,
       });
@@ -8718,7 +8727,7 @@ export default function ChatView(props: ChatViewProps) {
       multipleModelSelections !== null &&
       serverConfig?.environment.capabilities.requiredWorktreeBootstrap !== true
     ) {
-      setThreadError(activeThread.id, "Update this server before starting multiple models.");
+      setThreadError(activeThread.id, t.chat.view.updateForMultipleModels);
       return;
     }
     if (
@@ -8731,9 +8740,8 @@ export default function ChatView(props: ChatViewProps) {
       toastManager.add(
         stackedThreadToast({
           type: "warning",
-          title: "Choose models and a base branch",
-          description:
-            "Multiple models need a new thread in a Git project. Each gets its own worktree.",
+          title: t.chat.view.chooseModelsAndBranch,
+          description: t.chat.view.multipleModelsHint,
         }),
       );
       return;
@@ -8806,7 +8814,7 @@ export default function ChatView(props: ChatViewProps) {
       ) {
         setThreadError(
           editingQueuedRun.threadId,
-          `A message can have at most ${PROVIDER_SEND_TURN_MAX_ATTACHMENTS} attachments.`,
+          t.chat.view.attachmentLimit(PROVIDER_SEND_TURN_MAX_ATTACHMENTS),
         );
         return;
       }
@@ -8850,7 +8858,7 @@ export default function ChatView(props: ChatViewProps) {
             await awaitAttachmentUploads(files.map((file) => file.id));
             validateFiles();
             const uploaded = getUploadedAttachments({ environmentId, images: files });
-            if (uploaded === null) throw new Error("Retry or remove failed uploads before saving.");
+            if (uploaded === null) throw new Error(t.chat.view.failedUploadsBeforeSaving);
             return uploaded;
           },
         });
@@ -8897,7 +8905,7 @@ export default function ChatView(props: ChatViewProps) {
           },
         });
         if (result._tag === "Failure") {
-          setThreadError(editingQueuedRun.threadId, "Could not save the edited queued message.");
+          setThreadError(editingQueuedRun.threadId, t.chat.view.saveQueuedEditError);
           return;
         }
         setThreadError(editingQueuedRun.threadId, null);
@@ -8910,7 +8918,7 @@ export default function ChatView(props: ChatViewProps) {
       } catch (error) {
         setThreadError(
           editingQueuedRun.threadId,
-          error instanceof Error ? error.message : "Could not save the edited queued message.",
+          error instanceof Error ? error.message : t.chat.view.saveQueuedEditError,
         );
       } finally {
         queuedEditSaveInFlightRef.current = false;
@@ -8947,8 +8955,8 @@ export default function ChatView(props: ChatViewProps) {
         toastManager.add(
           stackedThreadToast({
             type: "warning",
-            title: "Start a Codex thread first",
-            description: "Send a message before you submit feedback.",
+            title: t.chat.view.startCodexThread,
+            description: t.chat.view.feedbackNeedsMessage,
           }),
         );
         return;
@@ -9099,8 +9107,8 @@ export default function ChatView(props: ChatViewProps) {
       toastManager.add(
         stackedThreadToast({
           type: "warning",
-          title: "Choose a project first",
-          description: "This draft no longer points to an available project.",
+          title: t.chat.view.chooseProject,
+          description: t.chat.view.draftProjectUnavailable,
         }),
       );
       return;
@@ -9117,7 +9125,7 @@ export default function ChatView(props: ChatViewProps) {
     const shouldCreateWorktree =
       isFirstMessage && sendEnvMode === "worktree" && !activeThread.worktreePath;
     if (shouldCreateWorktree && !activeThreadBranch) {
-      setThreadError(threadIdForSend, "Select a base branch before sending in New worktree mode.");
+      setThreadError(threadIdForSend, t.chat.view.chooseBaseBranch);
       return;
     }
 
@@ -9199,7 +9207,7 @@ export default function ChatView(props: ChatViewProps) {
         (entry) => entry.instanceId === selection.instanceId,
       );
       if (!provider?.enabled || !provider.isAvailable || provider.status !== "ready") {
-        setThreadError(threadIdForSend, `Provider for ${selection.model} is unavailable.`);
+        setThreadError(threadIdForSend, t.chat.view.providerUnavailable(selection.model));
         return;
       }
       const providerBlockReason = getAntigravitySendBlockReason(provider.snapshot, selection.model);
@@ -9267,7 +9275,7 @@ export default function ChatView(props: ChatViewProps) {
       }
       if (getUploadedAttachments({ environmentId, images: composerAttachmentsSnapshot }) === null) {
         sendInFlightRef.current = false;
-        setThreadError(threadIdForSend, "Retry or remove failed uploads before sending.");
+        setThreadError(threadIdForSend, t.chat.view.failedUploadsBeforeSending);
         return;
       }
     }
@@ -9306,8 +9314,7 @@ export default function ChatView(props: ChatViewProps) {
       sendInFlightRef.current = false;
       setThreadError(
         threadIdForSend,
-        attachmentCapabilitiesBeforeDispatch.fileBlockReason ??
-          "This connection cannot change threads.",
+        attachmentCapabilitiesBeforeDispatch.fileBlockReason ?? t.chat.view.threadsDenied,
       );
       setDockedDraftHeroThreadKey((currentThreadKey) =>
         currentThreadKey === activeThreadKey ? null : currentThreadKey,
@@ -9335,12 +9342,12 @@ export default function ChatView(props: ChatViewProps) {
         if (turnUsesAttachmentUploads) {
           const uploaded = getUploadedAttachments({ environmentId, images: [attachment] })?.[0];
           if (!uploaded) {
-            throw new Error(`Attachment '${attachment.name}' did not finish uploading.`);
+            throw new Error(t.chat.view.attachmentUploadIncomplete(attachment.name));
           }
           return uploaded;
         }
         if (attachment.type !== "image") {
-          throw new Error("This server does not support file attachments.");
+          throw new Error(t.chat.view.fileAttachmentsUnsupported);
         }
         return {
           type: "image" as const,
@@ -9402,9 +9409,7 @@ export default function ChatView(props: ChatViewProps) {
             let requestMayHaveStarted = false;
             try {
               if (uncertainThreadId) {
-                throw new Error(
-                  "The previous request may have started. Open its thread to check before sending again.",
-                );
+                throw new Error(t.chat.view.previousRequestMayHaveStarted);
               }
               const supportsInlineMessageContext =
                 appAtomRegistry.get(environmentServerConfigsAtom).get(environmentId)?.environment
@@ -9470,19 +9475,18 @@ export default function ChatView(props: ChatViewProps) {
               const failureToastId = toastManager.add(
                 stackedThreadToast({
                   type: "error",
-                  title: `Could not start ${target.selection.model}`,
-                  description: error instanceof Error ? error.message : "Failed to send message.",
+                  title: t.chat.view.startModelError(target.selection.model),
+                  description:
+                    error instanceof Error ? error.message : t.chat.view.sendMessageError,
                   ...(retainedThreadId
                     ? {
                         timeout: 0,
                         data: {
                           secondaryActionProps: {
-                            children: "Allow retry",
+                            children: t.chat.view.allowRetry,
                             onClick: () => {
                               void readLocalApi()
-                                ?.dialogs.confirm(
-                                  "The previous request may already be running. Check its thread first. Allow another send that could create a duplicate thread?",
-                                )
+                                ?.dialogs.confirm(t.chat.view.duplicateThreadConfirm)
                                 .then(
                                   (confirmed) => {
                                     if (
@@ -9500,7 +9504,7 @@ export default function ChatView(props: ChatViewProps) {
                           },
                         },
                         actionProps: {
-                          children: "Open thread",
+                          children: t.chat.view.openThread,
                           onClick: () => {
                             void navigate({
                               to: "/$environmentId/$threadId",
@@ -9527,7 +9531,7 @@ export default function ChatView(props: ChatViewProps) {
           toastManager.add(
             stackedThreadToast({
               type: "success",
-              title: `Started ${startedCount} ${startedCount === 1 ? "thread" : "threads"} in background`,
+              title: t.chat.view.backgroundThreadsStarted(startedCount),
             }),
           );
         }
@@ -9538,7 +9542,7 @@ export default function ChatView(props: ChatViewProps) {
         failedSelections.push(...multipleModelSelections);
         setThreadError(
           threadIdForSend,
-          error instanceof Error ? error.message : "Failed to send messages.",
+          error instanceof Error ? error.message : t.chat.view.sendMessagesError,
         );
       } finally {
         const restoreFailedDraft = () => {
@@ -9577,12 +9581,11 @@ export default function ChatView(props: ChatViewProps) {
             const recoveryToastId = toastManager.add(
               stackedThreadToast({
                 type: "error",
-                title: "A background prompt could not be sent",
-                description:
-                  "Your newer draft is unchanged. Restore the failed prompt when this composer is empty.",
+                title: t.chat.view.backgroundPromptError,
+                description: t.chat.view.restoreFailedPromptHint,
                 timeout: 0,
                 actionProps: {
-                  children: "Restore prompt",
+                  children: t.chat.view.restorePrompt,
                   onClick: () => {
                     if (
                       !draftId ||
@@ -9593,8 +9596,7 @@ export default function ChatView(props: ChatViewProps) {
                       )
                     ) {
                       toastManager.update(recoveryToastId, {
-                        description:
-                          "Return to the original draft and send or clear its current prompt before restoring.",
+                        description: t.chat.view.returnToOriginalDraftHint,
                       });
                       return;
                     }
@@ -9864,7 +9866,7 @@ export default function ChatView(props: ChatViewProps) {
           toastManager.add(
             stackedThreadToast({
               type: "warning",
-              title: "Could not open a fresh composer",
+              title: t.chat.view.openFreshComposerError,
               description: error instanceof Error ? error.message : undefined,
             }),
           );
@@ -9893,10 +9895,10 @@ export default function ChatView(props: ChatViewProps) {
             toastManager.add(
               stackedThreadToast({
                 type: "success",
-                title: "Started in background",
+                title: t.chat.view.startedInBackground,
                 timeout: 5_000,
                 actionProps: {
-                  children: "Open",
+                  children: t.chat.view.open,
                   onClick: () => {
                     void navigate({
                       to: "/$environmentId/$threadId",
@@ -9974,16 +9976,16 @@ export default function ChatView(props: ChatViewProps) {
         const error = squashAtomCommandFailure(failure);
         setThreadError(
           threadIdForSend,
-          error instanceof Error ? error.message : "Failed to send message.",
+          error instanceof Error ? error.message : t.chat.view.sendMessageError,
         );
         if (backgroundDraftOpened && draftId) {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "Background task failed",
-              description: error instanceof Error ? error.message : "Failed to send message.",
+              title: t.chat.view.backgroundTaskError,
+              description: error instanceof Error ? error.message : t.chat.view.sendMessageError,
               actionProps: {
-                children: "Open draft",
+                children: t.chat.view.openDraft,
                 onClick: () => {
                   void navigate({ to: "/draft/$draftId", params: { draftId } });
                 },
@@ -10027,7 +10029,7 @@ export default function ChatView(props: ChatViewProps) {
         const error = squashAtomCommandFailure(result);
         setThreadError(
           activeThreadId,
-          error instanceof Error ? error.message : "Failed to submit approval decision.",
+          error instanceof Error ? error.message : t.chat.view.approvalDecisionError,
         );
       }
       setRespondingRequestIds((existing) => existing.filter((id) => id !== requestId));
@@ -10061,10 +10063,7 @@ export default function ChatView(props: ChatViewProps) {
         if (attachments.length === 0) continue;
         const uploaded = getUploadedAttachments({ environmentId, images: attachments });
         if (!uploaded) {
-          setThreadError(
-            activeThreadId,
-            "Wait for attachments to finish uploading, or remove failed uploads.",
-          );
+          setThreadError(activeThreadId, t.chat.view.waitForAttachmentUploads);
           return;
         }
         attachmentsByQuestionId.set(
@@ -10092,7 +10091,7 @@ export default function ChatView(props: ChatViewProps) {
         const error = squashAtomCommandFailure(result);
         setThreadError(
           activeThreadId,
-          error instanceof Error ? error.message : "Failed to submit user input.",
+          error instanceof Error ? error.message : t.chat.view.submitUserInputError,
         );
       }
       userInputResponsesInFlight.current.delete(responseKey);
@@ -10119,7 +10118,7 @@ export default function ChatView(props: ChatViewProps) {
         const error = squashAtomCommandFailure(result);
         setThreadError(
           activeThreadId,
-          error instanceof Error ? error.message : "Failed to dismiss the question.",
+          error instanceof Error ? error.message : t.chat.view.dismissQuestionError,
         );
       }
       setRespondingUserInputRequestIds((existing) => existing.filter((id) => id !== requestId));
@@ -10401,7 +10400,7 @@ export default function ChatView(props: ChatViewProps) {
       const error = squashAtomCommandFailure(failure);
       setThreadError(
         threadIdForSend,
-        error instanceof Error ? error.message : "Failed to send plan follow-up.",
+        error instanceof Error ? error.message : t.chat.view.sendPlanFollowUpError,
       );
     }
     sendInFlightRef.current = false;
@@ -10528,7 +10527,7 @@ export default function ChatView(props: ChatViewProps) {
       });
       if (cleanupResult._tag === "Failure" && !isAtomCommandInterrupted(cleanupResult)) {
         console.warn(
-          "Failed to clean up implementation thread after start failure.",
+          t.chat.view.cleanupImplementationThreadError,
           squashAtomCommandFailure(cleanupResult),
         );
       }
@@ -10537,11 +10536,8 @@ export default function ChatView(props: ChatViewProps) {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Could not start implementation thread",
-            description:
-              error instanceof Error
-                ? error.message
-                : "An error occurred while creating the new thread.",
+            title: t.chat.view.startImplementationThreadError,
+            description: error instanceof Error ? error.message : t.chat.view.createThreadError,
           }),
         );
       }
@@ -10580,7 +10576,7 @@ export default function ChatView(props: ChatViewProps) {
         currentProviderInstanceId: activeRuntime?.providerInstanceId ?? null,
         nextModelSelection: { instanceId, model },
       });
-      return reason ? `${reason.description} Start a new thread to use this model.` : null;
+      return reason ? t.chat.view.newThreadForModel(reason.description) : null;
     },
     [activeRuntime, activeThread, providerStatuses, supportsProviderSwitchingViaHandoff],
   );
@@ -10896,8 +10892,8 @@ export default function ChatView(props: ChatViewProps) {
       <PullRequestDetailGhost />
     ) : renderedRightPanelSurface?.kind === "pull-request" && !supportsPullRequests ? (
       <PullRequestsUnavailableState
-        title="Pull requests unavailable"
-        error="Update this environment's T3 Code server to browse pull requests."
+        title={t.chat.view.pullRequestsUnavailable}
+        error={t.chat.view.updateToBrowsePullRequests}
       />
     ) : renderedRightPanelSurface?.kind === "pull-request" ? (
       // No onClose: the surface tab's own X owns closing here, and a second X in the header
@@ -11237,7 +11233,7 @@ export default function ChatView(props: ChatViewProps) {
                   className="flex items-center gap-2 rounded-full border border-primary/25 bg-background/95 px-4 py-2.5 text-sm font-medium text-foreground shadow-lg"
                 >
                   <PaperclipIcon className="size-4 text-primary" aria-hidden="true" />
-                  Drop files to attach
+                  {t.chat.view.dropFiles}
                 </div>
               </div>
             ) : null}
@@ -11371,7 +11367,8 @@ export default function ChatView(props: ChatViewProps) {
                   style={{ bottom: scrollToEndClearance + 4 }}
                 >
                   <Button
-                    aria-label="Scroll to end"
+                    data-scroll-to-end
+                    aria-label={t.chat.view.scrollToEnd}
                     onPointerDown={(event) => event.preventDefault()}
                     onClick={() => {
                       composerRef.current?.restoreAfterTimelineReachedEnd();
@@ -11382,7 +11379,7 @@ export default function ChatView(props: ChatViewProps) {
                     variant="glass"
                   >
                     <ChevronDownIcon className="size-3.5" />
-                    Scroll to end
+                    {t.chat.view.scrollToEnd}
                   </Button>
                 </div>
               )}
@@ -11503,17 +11500,17 @@ export default function ChatView(props: ChatViewProps) {
                               isRevertingCheckpoint={isRevertingCheckpoint}
                               sendDisabledReason={
                                 !canOperateThread
-                                  ? "This connection cannot change threads."
+                                  ? t.chat.view.threadsDenied
                                   : isEnvironmentChanging
-                                    ? "Preparing machine"
+                                    ? t.chat.view.preparingMachine
                                     : isRevertingCheckpoint
-                                      ? "Rewinding conversation"
+                                      ? t.chat.view.rewindingConversation
                                       : feedbackUploading
-                                        ? "Sending feedback"
+                                        ? t.chat.view.sendingFeedback
                                         : threadDetailLoading
-                                          ? "Messages loading"
+                                          ? t.chat.view.messagesLoading
                                           : worktreeSetupBlocksSend
-                                            ? "Preparing worktree"
+                                            ? t.chat.view.preparingWorktree
                                             : projectCloneSendBlockReason
                               }
                               isPreparingWorktree={isPreparingWorktree}
@@ -11738,19 +11735,20 @@ export default function ChatView(props: ChatViewProps) {
               <AlertDialogPopup>
                 <AlertDialogHeader>
                   <AlertDialogTitle>
-                    Switch to{" "}
+                    {t.chat.view.switchTo}{" "}
                     <code className="font-medium">
                       {localCheckoutBranchMismatch?.threadBranch ?? ""}
                     </code>
                     ?
                   </AlertDialogTitle>
                   <AlertDialogDescription>
-                    You have uncommitted changes. They'll carry over to the other branch, or block
-                    the switch if they conflict.
+                    {t.chat.view.uncommittedChangesWarning}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
+                  <AlertDialogClose render={<Button variant="outline" />}>
+                    {t.chat.view.cancel}
+                  </AlertDialogClose>
                   <Button
                     variant="default"
                     disabled={!canWriteSourceControl}
@@ -11759,7 +11757,7 @@ export default function ChatView(props: ChatViewProps) {
                       void handleSwitchCheckoutToThread();
                     }}
                   >
-                    Switch branch
+                    {t.chat.view.switchBranch}
                   </Button>
                 </AlertDialogFooter>
               </AlertDialogPopup>
@@ -11921,14 +11919,13 @@ export default function ChatView(props: ChatViewProps) {
       >
         <AlertDialogPopup>
           <AlertDialogHeader>
-            <AlertDialogTitle>Edit from here?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Rewind chat to before this message. Your prompt and attachments return to the
-              composer.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t.chat.view.editFromHere}</AlertDialogTitle>
+            <AlertDialogDescription>{t.chat.view.rewindDescription}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
+            <AlertDialogClose render={<Button variant="outline" />}>
+              {t.chat.view.cancel}
+            </AlertDialogClose>
             <Button
               variant="destructive"
               onClick={() => {
@@ -11937,7 +11934,7 @@ export default function ChatView(props: ChatViewProps) {
                 void onRevertToTurnCount(pendingRevert.turnCount, pendingRevert.messageId, true);
               }}
             >
-              Revert files too
+              {t.chat.view.revertFilesToo}
             </Button>
             <Button
               onClick={() => {
@@ -11946,7 +11943,7 @@ export default function ChatView(props: ChatViewProps) {
                 void onRevertToTurnCount(pendingRevert.turnCount, pendingRevert.messageId, false);
               }}
             >
-              Revert and keep changes
+              {t.chat.view.revertKeepChanges}
             </Button>
           </AlertDialogFooter>
         </AlertDialogPopup>

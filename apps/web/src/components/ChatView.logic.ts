@@ -1,3 +1,5 @@
+/** Provides chat workspace decisions and recovery helpers; UI copy comes from i18n while stored and outgoing content stays unchanged. */
+import { t } from "~/i18n";
 import * as Option from "effect/Option";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
 import {
@@ -72,6 +74,7 @@ export const MAX_HIDDEN_MOUNTED_TERMINAL_THREADS = 10;
 
 export const ENVIRONMENT_RECONNECT_WARNING_GRACE_MS = 2_000;
 
+/** Returns localized confirmation text for agent-controlled surfaces; desktopByTabId identifies their controllers, or null when none are active. */
 export function agentControlledBrowserCloseConfirmation(
   surfaces: readonly RightPanelSurface[],
   desktopByTabId: Readonly<Record<string, Pick<DesktopPreviewOverlay, "controller"> | undefined>>,
@@ -84,14 +87,11 @@ export function agentControlledBrowserCloseConfirmation(
   ).length;
   if (activeBrowserCount === 0) return null;
   if (activeBrowserCount === 1) {
-    return [
-      "Close browser while the agent is using it?",
-      "The agent is actively controlling this browser. Closing it may interrupt the current browser action.",
-    ].join("\n");
+    return [t.chat.view.closeBrowserConfirm, t.chat.view.closeBrowserWarning].join("\n");
   }
   return [
-    `Close ${activeBrowserCount} browsers while the agent is using them?`,
-    "The agent is actively controlling these browsers. Closing them may interrupt the current browser actions.",
+    t.chat.view.closeBrowsersConfirm(activeBrowserCount),
+    t.chat.view.closeBrowsersWarning,
   ].join("\n");
 }
 
@@ -638,6 +638,13 @@ export function resolveComposerInteractionMode(input: {
   };
 }
 
+/**
+ * Checks whether local Antigravity installation, authentication, or model selection blocks sending.
+ * Unknown authentication defers validation to startup; catalog membership is checked only for a ready provider.
+ * @param provider Current provider status and model catalog; null, undefined, or a non-Antigravity driver bypasses this check.
+ * @param model Selected model slug or alias; surrounding whitespace is ignored and an empty selection blocks sending.
+ * @returns A localized blocking message, or null when sending may proceed to server validation.
+ */
 export function getAntigravitySendBlockReason(
   provider:
     | Pick<ServerProvider, "driver" | "installed" | "auth" | "models" | "status">
@@ -647,18 +654,18 @@ export function getAntigravitySendBlockReason(
 ): string | null {
   if (provider?.driver !== "antigravity") return null;
   if (!provider.installed) {
-    return "Install Antigravity in provider settings before sending.";
+    return t.chat.view.installAntigravity;
   }
   if (provider.auth.status === "unauthenticated") {
-    return "Sign in to Antigravity in provider settings before sending.";
+    return t.chat.view.signInAntigravity;
   }
   const slug = model.trim();
-  if (slug.length === 0) return "Choose an Antigravity model before sending.";
+  if (slug.length === 0) return t.chat.view.chooseAntigravityModel;
   // A restart clears the account status and catalog. Session startup checks
   // saved credentials and validates the model before sending the prompt.
   if (provider.auth.status === "unknown") return null;
   if (provider.models.length === 0) {
-    return "Refresh Antigravity models in provider settings before sending.";
+    return t.chat.view.refreshAntigravityModels;
   }
   // A saved model that left the catalog is kept in the picker as unavailable
   // so the user sees what the thread used. The server rejects it at turn
@@ -669,7 +676,7 @@ export function getAntigravitySendBlockReason(
     slug !== ANTIGRAVITY_DEFAULT_MODEL &&
     !provider.models.some((entry) => entry.slug === slug || entry.aliases?.includes(slug))
   ) {
-    return "That Antigravity model is no longer available. Choose another model.";
+    return t.chat.view.antigravityModelUnavailable;
   }
   return null;
 }
@@ -736,10 +743,21 @@ export async function resolveFileAttachmentUrl(input: {
   });
   if (result._tag === "Failure") throw squashAtomCommandFailure(result);
   const url = resolveAssetUrl(input.httpBaseUrl, result.value.relativeUrl);
-  if (url === null) throw new Error("The environment returned an invalid attachment URL.");
+  if (url === null) throw new Error(t.chat.view.invalidAttachmentUrl);
   return url;
 }
 
+/**
+ * Restores message attachments as files for the composer by signing URLs and downloading in parallel.
+ * Downloads use a 30-second timeout. This helper does not retry signing or downloads.
+ * @param input Attachment source and URL-signing dependencies for the owning environment.
+ * @param input.message Message whose image and file attachments are restored; absent attachments produce an empty array.
+ * @param input.environmentId Environment that owns the attachments and signs their URLs.
+ * @param input.httpBaseUrl Environment HTTP base URL used to resolve signed attachment URLs.
+ * @param input.createAssetUrl URL-signing command runner; its failures propagate and the caller owns its timeout policy.
+ * @returns Files in the original attachment order, with their original names and MIME types; never null.
+ * @throws Propagates signing, fetch, or body-read failures; rejects unsupported attachments, invalid URLs, and unsuccessful responses.
+ */
 export async function prepareRevertedMessageAttachments(input: {
   message: ChatMessage;
   environmentId: EnvironmentId;
@@ -749,7 +767,7 @@ export async function prepareRevertedMessageAttachments(input: {
   return Promise.all(
     (input.message.attachments ?? []).map(async (attachment) => {
       if (attachment.type !== "image" && attachment.type !== "file") {
-        throw new Error("This message has an attachment that cannot be restored.");
+        throw new Error(t.chat.view.attachmentCannotRestore);
       }
       const result = await input.createAssetUrl({
         environmentId: input.environmentId,
@@ -764,9 +782,9 @@ export async function prepareRevertedMessageAttachments(input: {
       });
       if (result._tag === "Failure") throw squashAtomCommandFailure(result);
       const url = resolveAssetUrl(input.httpBaseUrl, result.value.relativeUrl);
-      if (url === null) throw new Error("The environment returned an invalid attachment URL.");
+      if (url === null) throw new Error(t.chat.view.invalidAttachmentUrl);
       const response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
-      if (!response.ok) throw new Error(`Could not restore attachment: ${attachment.name}`);
+      if (!response.ok) throw new Error(t.chat.view.restoreAttachmentError(attachment.name));
       return new File([await response.blob()], attachment.name, { type: attachment.mimeType });
     }),
   );
@@ -889,21 +907,23 @@ export function deriveComposerSendState(options: {
   };
 }
 
+/** Describes expired terminal contexts; expiredTerminalContextCount is normalized to a positive integer and variant selects an omitted or empty-message notice. */
 export function buildExpiredTerminalContextToastCopy(
   expiredTerminalContextCount: number,
   variant: "omitted" | "empty",
 ): { title: string; description: string } {
   const count = Math.max(1, Math.floor(expiredTerminalContextCount));
-  const noun = count === 1 ? "Expired terminal context" : "Expired terminal contexts";
+  const noun =
+    count === 1 ? t.chat.view.expiredTerminalContext : t.chat.view.expiredTerminalContexts;
   if (variant === "empty") {
     return {
-      title: `${noun} won't be sent`,
-      description: "Remove it or re-add it to include terminal output.",
+      title: t.chat.view.expiredContextNotSent(noun),
+      description: t.chat.view.expiredContextRemoveHint,
     };
   }
   return {
-    title: `${noun} omitted from message`,
-    description: "Re-add it if you want that terminal output included.",
+    title: t.chat.view.expiredContextOmitted(noun),
+    description: t.chat.view.expiredContextReaddHint,
   };
 }
 
@@ -1043,6 +1063,17 @@ export function deriveLockedProvider(input: {
   return narrowedThreadProvider ?? narrowedSelectedProvider ?? null;
 }
 
+/**
+ * Checks whether a started conversation must use a new thread for a requested provider or model change.
+ * @param input Session state, provider capabilities, and the requested model selection.
+ * @param input.providers Provider instances and their flags requiring a new thread for model changes.
+ * @param input.hasStartedSession Whether the thread already has a started provider session; false bypasses restrictions.
+ * @param input.supportsProviderSwitchingViaHandoff Whether cross-instance handoff is allowed; omitted means false.
+ * @param input.currentModelSelection Thread's current provider instance and model selection.
+ * @param input.currentProviderInstanceId Active session's provider instance override; null or undefined uses the current selection.
+ * @param input.nextModelSelection Requested provider instance and model selection.
+ * @returns Localized title and description when blocked, or null for an unchanged selection or an allowed change.
+ */
 export function getStartedThreadModelChangeBlockReason(input: {
   providers: ReadonlyArray<Pick<ServerProvider, "instanceId" | "requiresNewThreadForModelChange">>;
   hasStartedSession: boolean;
@@ -1069,8 +1100,8 @@ export function getStartedThreadModelChangeBlockReason(input: {
       return null;
     }
     return {
-      title: "Start a new chat to switch providers",
-      description: "This thread does not support switching providers after it has started.",
+      title: t.chat.view.switchProviderNewChat,
+      description: t.chat.view.switchProviderUnsupported,
     };
   }
   const currentProvider = input.providers.find(
@@ -1086,8 +1117,8 @@ export function getStartedThreadModelChangeBlockReason(input: {
     return null;
   }
   return {
-    title: "Start a new chat to change models",
-    description: "This provider does not allow switching models after a conversation has started.",
+    title: t.chat.view.changeModelNewChat,
+    description: t.chat.view.changeModelUnsupported,
   };
 }
 
@@ -1121,7 +1152,7 @@ export async function waitForRevertedMessage(
   const readProjection = () => Option.getOrNull(appAtomRegistry.get(threadAtom).data);
   const initial = readProjection();
   if (!initial?.messages.some((message) => message.id === messageId)) {
-    throw new Error("The message to rewind is no longer available.");
+    throw new Error(t.chat.view.rewindMessageUnavailable);
   }
   const messageRunId = initial.messages.find((message) => message.id === messageId)?.runId;
   return new Promise<void>((resolve, reject) => {
@@ -1156,7 +1187,7 @@ export async function waitForRevertedMessage(
     };
     unsubscribe = appAtomRegistry.subscribe(threadAtom, inspect);
     timeout = globalThis.setTimeout(() => {
-      finish(new Error("Timed out waiting for the thread to rewind."));
+      finish(new Error(t.chat.view.rewindTimeout));
     }, timeoutMs);
     Promise.resolve()
       .then(revert)

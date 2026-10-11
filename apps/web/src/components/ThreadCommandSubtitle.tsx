@@ -1,3 +1,5 @@
+/** Displays command-palette thread metadata; supplied project, branch, and provider names remain unchanged. */
+import { t } from "~/i18n";
 import type { ProviderDriverKind } from "@t3tools/contracts";
 import { FolderGit2Icon, FolderIcon, GitBranchIcon } from "lucide-react";
 import { ProjectFavicon, type ProjectFaviconProject } from "./ProjectFavicon";
@@ -35,6 +37,7 @@ function WorkspaceIcon(props: { variant: ThreadCommandSubtitleVariant; isWorktre
   return <FolderIcon className={COMMAND_PALETTE_META_ICON_CLASS} aria-hidden />;
 }
 
+/** Renders supplied thread metadata; props control workspace icons and the current-thread marker. */
 export function ThreadCommandSubtitle(props: {
   project: ProjectFaviconProject | null;
   projectTitle: string | null;
@@ -109,7 +112,7 @@ export function ThreadCommandSubtitle(props: {
       {props.isCurrent ? (
         <>
           {projectLabel || branchLabel || showHarness ? <CommandPaletteMetaDot /> : null}
-          <span className="shrink-0">Current thread</span>
+          <span className="shrink-0">{t.chat.view.currentThread}</span>
         </>
       ) : null}
     </span>

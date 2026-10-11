@@ -1,3 +1,5 @@
+/** Displays and copies shell commands unchanged, with a localized accessible copy action. */
+import { t } from "~/i18n";
 import { Check, Copy } from "lucide";
 
 import { MorphIcon } from "~/components/MorphIcon";
@@ -35,7 +37,7 @@ export function CommandBlock({
       <Button
         size="icon-xs"
         variant="ghost"
-        aria-label="Copy command"
+        aria-label={t.chat.view.copyCommand}
         onClick={() => copyToClipboard(command, undefined)}
       >
         <MorphIcon className="size-3.5" icon={isCopied ? Check : Copy} />

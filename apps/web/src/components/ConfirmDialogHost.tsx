@@ -1,3 +1,5 @@
+/** Displays queued client confirmations and localized controls; message content belongs to the caller. */
+import { t } from "~/i18n";
 import { useEffect, useSyncExternalStore } from "react";
 
 import {
@@ -17,40 +19,9 @@ import {
   AlertDialogTitle,
 } from "./ui/alert-dialog";
 import { Button } from "./ui/button";
+import { resolveConfirmDialogCopy } from "./ConfirmDialogHost.logic";
 
-type ConfirmationCopy = {
-  readonly title: string;
-  readonly description: string | null;
-};
-
-function resolveConfirmDialogCopy(message: string): ConfirmationCopy {
-  const normalizedMessage = message.trim();
-  const lines = normalizedMessage.split("\n");
-  const questionLineIndex = lines.findIndex((line) => line.trim().endsWith("?"));
-
-  if (questionLineIndex >= 0) {
-    const title = lines[questionLineIndex]!.trim();
-    const description = lines
-      .filter((_, index) => index !== questionLineIndex)
-      .join("\n")
-      .trim();
-    return { title, description: description || null };
-  }
-
-  const questionMarkIndex = normalizedMessage.indexOf("?");
-  if (questionMarkIndex >= 0) {
-    return {
-      title: normalizedMessage.slice(0, questionMarkIndex + 1).trim(),
-      description: normalizedMessage.slice(questionMarkIndex + 1).trim() || null,
-    };
-  }
-
-  return {
-    title: "Confirm action",
-    description: normalizedMessage || "This action requires your confirmation.",
-  };
-}
-
+/** Hosts the confirmation queue and resolves user responses after the dialog closes. */
 export function ConfirmDialogHost() {
   const state = useSyncExternalStore(
     subscribeConfirmDialog,
@@ -85,9 +56,11 @@ export function ConfirmDialogHost() {
           ) : null}
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
+          <AlertDialogClose render={<Button variant="outline" />}>
+            {t.common.confirm.cancel}
+          </AlertDialogClose>
           <Button variant={confirmVariant} onClick={onConfirm}>
-            Confirm
+            {t.common.confirm.confirm}
           </Button>
         </AlertDialogFooter>
       </AlertDialogPopup>
