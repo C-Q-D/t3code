@@ -1,3 +1,5 @@
+/** Displays conversation errors and their dismissal action. */
+import { t } from "~/i18n";
 import type { OrchestrationV2ProviderFailureClass } from "@t3tools/contracts";
 import { memo } from "react";
 import { Alert, AlertAction, AlertDescription } from "../ui/alert";
@@ -60,8 +62,8 @@ export const ThreadErrorBanner = memo(function ThreadErrorBanner({
         <AlertDescription>
           {chatGptUsageLimit ? (
             <div className="space-y-1">
-              <p className="font-medium">ChatGPT usage limit reached</p>
-              <p>Review your usage settings in ChatGPT to continue.</p>
+              <p className="font-medium">{t.chat.providerStatus.chatGPTUsageLimitReached}</p>
+              <p>{t.chat.providerStatus.reviewYourUsageSettingsInChatGPTTo}</p>
             </div>
           ) : (
             <Tooltip>
@@ -76,7 +78,12 @@ export const ThreadErrorBanner = memo(function ThreadErrorBanner({
           <AlertAction>
             {chatGptUsageLimit ? <ChatGptUsageButton variant="default" size="sm" /> : null}
             {onDismiss ? (
-              <Button variant="ghost" size="icon-xs" aria-label="Dismiss error" onClick={onDismiss}>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                aria-label={t.chat.providerStatus.dismissError}
+                onClick={onDismiss}
+              >
                 <XIcon />
               </Button>
             ) : null}

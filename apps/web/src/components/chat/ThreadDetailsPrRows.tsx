@@ -1,3 +1,5 @@
+/** Displays linked pull requests with expandable additional rows. */
+import { t } from "~/i18n";
 import { ThreadDetailsControl } from "./ThreadDetailsControl";
 import type { EnvironmentId, ScopedThreadRef, ThreadPullRequestLink } from "@t3tools/contracts";
 import {
@@ -61,6 +63,13 @@ function ThreadDetailsPrLinkRow({
   );
 }
 
+/**
+ * Renders the current pull request and an expandable list of linked pull requests.
+ * @param props - Required threadRef, links (possibly empty), and onOpenLink callback; currentLink
+ * may be null. Remaining props configure ThreadDetailsPrRow, including its nullable status/project
+ * and optional host-action callbacks.
+ * @returns The pull-request rows and any additional-links disclosure; never null.
+ */
 export function ThreadDetailsPrRows({
   threadRef,
   links,
@@ -123,7 +132,7 @@ export function ThreadDetailsPrRows({
         className="w-full active:scale-100"
       >
         <MorphIcon aria-hidden className="size-4 shrink-0" icon={expanded ? Minus : Plus} />
-        {expanded ? "Show less" : `Show ${rest.length} more`}
+        {expanded ? t.chat.details.showLess : t.chat.details.showMore(rest.length)}
       </ThreadDetailsControl>
     </>
   );

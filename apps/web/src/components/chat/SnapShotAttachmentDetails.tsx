@@ -1,3 +1,5 @@
+/** Displays capture metadata and verified accessibility details. */
+import { t } from "~/i18n";
 import type { SnapShotSource } from "@t3tools/contracts";
 import { ImageIcon, TextIcon } from "lucide-react";
 import { Suspense } from "react";
@@ -71,6 +73,12 @@ export function snapShotIncludesAccessibility(source: SnapShotSource): boolean {
   return Boolean(source.accessibility || source.accessibleText?.trim());
 }
 
+/**
+ * Renders a popover button exposing the text and accessibility data captured in a SnapShot.
+ * @param props - Required source with captured content; optional className and popover side, which
+ * defaults to top. None of the required fields may be null.
+ * @returns The contents button and popover; never null.
+ */
 export function SnapShotContentsButton({
   source,
   className,
@@ -83,7 +91,9 @@ export function SnapShotContentsButton({
   const includesAccessibility = snapShotIncludesAccessibility(source);
   const ContentsIcon = includesAccessibility ? TextIcon : ImageIcon;
   const accessibilityDetails = snapShotAccessibilityDetails(source);
-  const tooltip = includesAccessibility ? "Accessibility data" : "No accessibility data";
+  const tooltip = includesAccessibility
+    ? t.chat.media.accessibilityData
+    : t.chat.media.noAccessibilityData;
 
   return (
     <Popover>
@@ -94,7 +104,9 @@ export function SnapShotContentsButton({
               render={
                 <Button
                   aria-label={
-                    includesAccessibility ? "View accessibility data" : "No accessibility data"
+                    includesAccessibility
+                      ? t.chat.media.viewAccessibilityData
+                      : t.chat.media.noAccessibilityData
                   }
                   className={className}
                   onClick={(event) => event.stopPropagation()}
@@ -111,7 +123,7 @@ export function SnapShotContentsButton({
       </Tooltip>
       <PopoverPopup side={side} align="center" width="md">
         <div className="max-h-[min(28rem,70vh)] space-y-2 overflow-y-auto">
-          <PopoverTitle>Accessibility data</PopoverTitle>
+          <PopoverTitle>{t.chat.media.accessibilityData}</PopoverTitle>
           {accessibilityDetails ? (
             <SnapShotAccessibilityData
               details={accessibilityDetails}
@@ -119,12 +131,11 @@ export function SnapShotContentsButton({
             />
           ) : includesAccessibility ? (
             <div className="rounded-md border border-border/70 bg-muted/45 p-2.5 text-muted-foreground text-xs leading-4">
-              Structured accessibility elements were included, but they have no readable names or
-              values.
+              {t.chat.media.unreadableAccessibility}
             </div>
           ) : (
             <div className="rounded-md border border-border/70 bg-muted/45 p-2.5 text-muted-foreground text-xs leading-4">
-              The app or capture backend did not provide verified accessibility data.
+              {t.chat.media.missingAccessibility}
             </div>
           )}
         </div>
@@ -133,6 +144,12 @@ export function SnapShotContentsButton({
   );
 }
 
+/**
+ * Renders the captured URL, text, and accessibility details of a SnapShot attachment.
+ * @param props - Required source; className may be omitted. Content fields may be absent as allowed
+ * by SnapShotSource.
+ * @returns The attachment detail element; never null.
+ */
 export function SnapShotAttachmentDetails({
   source,
   className,
@@ -160,7 +177,7 @@ export function SnapShotAttachmentDetails({
           <SnapShotContentsButton source={source} className="pointer-events-auto" />
         </div>
         <div className="truncate text-3xs leading-3.5 text-white/70">
-          {source.windowTitle || "Captured window"}
+          {source.windowTitle || t.chat.media.capturedWindow}
         </div>
       </div>
     </div>

@@ -1,3 +1,5 @@
+/** Displays related threads and their navigation, merge and agent controls. */
+import { t } from "~/i18n";
 import { ThreadDetailsControl } from "./ThreadDetailsControl";
 import { ThreadHoverCardPopup } from "../ThreadHoverCard";
 import { ThreadDetailsSection } from "./ThreadDetailsSection";
@@ -79,6 +81,12 @@ export function resolveThreadLineageWindow<Row>(
   return { visibleRows, hiddenCount: rows.length - visibleRows.length };
 }
 
+/**
+ * Renders lineage rows and a disclosure for additional hidden relationships.
+ * @param props - Required hiddenCount and show-more callback; children may be null or empty. A zero
+ * hiddenCount omits the disclosure.
+ * @returns The lineage list element; never null.
+ */
 export function ThreadLineageRowList(props: {
   readonly hiddenCount: number;
   readonly onShowMore: () => void;
@@ -95,7 +103,7 @@ export function ThreadLineageRowList(props: {
         themselves and the container needs no extra tab stop of its own.
       */}
       <ul
-        aria-label="Related threads"
+        aria-label={t.chat.relationships.relatedThreads}
         className="m-0 max-h-[13.5rem] list-none overflow-y-auto overscroll-contain p-0"
       >
         {props.children}
@@ -107,7 +115,9 @@ export function ThreadLineageRowList(props: {
           className={`flex h-8 w-full cursor-pointer items-center rounded-lg ${THREAD_DETAILS_PANEL_ROW_CONTENT_CLASS} text-sm font-medium text-muted-foreground/70 hover:bg-black/[0.055] hover:text-foreground/80 dark:hover:bg-white/[0.075]`}
         >
           <PlusIcon aria-hidden className="size-4 shrink-0" />
-          Show {Math.min(props.hiddenCount, THREAD_LINEAGE_PAGE_COUNT)} more
+          {t.chat.relationships.showMorePrefix}
+          {Math.min(props.hiddenCount, THREAD_LINEAGE_PAGE_COUNT)}
+          {t.chat.relationships.showMoreSuffix}
         </button>
       ) : null}
     </>
@@ -153,12 +163,22 @@ function ThreadLineageGroup(props: {
   );
 }
 
+/**
+ * Names a relationship from the perspective of the current thread.
+ * @param edge - Required relationship edge, including its direction and kind.
+ * @param currentThreadId - Required thread ID whose perspective determines parent/child wording.
+ * @returns The localized relationship label; never null or empty.
+ */
 function relationshipLabel(edge: ThreadRelationshipEdge, currentThreadId: ThreadId) {
-  if (edge.kind === "transfer") return "Context transfer";
+  if (edge.kind === "transfer") return t.chat.relationships.contextTransfer;
   if (edge.kind === "subagent") {
-    return edge.sourceThreadId === currentThreadId ? "Subagent" : "Parent agent";
+    return edge.sourceThreadId === currentThreadId
+      ? t.chat.relationships.subagent
+      : t.chat.relationships.parentAgent;
   }
-  return edge.sourceThreadId === currentThreadId ? "Fork" : "Parent thread";
+  return edge.sourceThreadId === currentThreadId
+    ? t.chat.relationships.fork
+    : t.chat.relationships.parentThread;
 }
 
 function relationshipThreadTitle(input: {
@@ -193,6 +213,12 @@ function liveSubagent<Agent extends RuntimeSubagent>(
   };
 }
 
+/**
+ * Renders a thread's lineage and child tasks with navigation and stop controls.
+ * @param props - Required environmentId and threadId; neither may be null.
+ * @returns The relationship panel, or null when there are no relationship rows or running child
+ * tasks. Reads the scoped thread projection and invokes host actions on user interaction.
+ */
 export function ThreadRelationshipsPanel(props: {
   readonly environmentId: EnvironmentId;
   readonly threadId: ThreadId;
@@ -271,7 +297,7 @@ export function ThreadRelationshipsPanel(props: {
   const groups = [
     { id: "related", label: null, rows: related, expanded: true },
     { id: "active", label: null, rows: active, expanded: true },
-    { id: "previous", label: "Previous agents", rows: previous, expanded: false },
+    { id: "previous", label: t.chat.relationships.previousAgents, rows: previous, expanded: false },
   ];
   // Subagents without a child thread yet have no row, so count them separately.
   const runningCount =
@@ -324,7 +350,7 @@ export function ThreadRelationshipsPanel(props: {
     });
     setStoppingThreadId(null);
     if (result._tag === "Failure") {
-      toastManager.add({ type: "error", title: "Could not stop subagent" });
+      toastManager.add({ type: "error", title: t.chat.relationships.couldNotStopSubagent });
     }
   };
 
@@ -336,7 +362,11 @@ export function ThreadRelationshipsPanel(props: {
   return (
     <ThreadDetailsSection
       headingId="thread-details-lineage-heading"
-      title={runningCount > 0 ? `Lineage · ${runningCount} running` : "Lineage"}
+      title={
+        runningCount > 0
+          ? t.chat.relationships.lineageRunning(runningCount)
+          : t.chat.relationships.lineage
+      }
       data-thread-relationships-panel
       actions={
         canDetach ? (
@@ -347,7 +377,7 @@ export function ThreadRelationshipsPanel(props: {
                   size="icon-xs"
                   variant="ghost"
                   part="icon"
-                  aria-label="More thread actions"
+                  aria-label={t.chat.relationships.moreThreadActions}
                   disabled={busyAction !== null}
                 />
               }
@@ -357,7 +387,7 @@ export function ThreadRelationshipsPanel(props: {
             <MenuPopup align="end" className="min-w-60 max-w-(--available-width)">
               <MenuItem onClick={() => void detach()}>
                 <UnplugIcon className="size-3.5" />
-                Disconnect agent session
+                {t.chat.relationships.disconnectAgentSession}
               </MenuItem>
             </MenuPopup>
           </Menu>
@@ -400,8 +430,8 @@ export function ThreadRelationshipsPanel(props: {
               const providerDriver = agent?.driver ?? provider?.driver;
               const project = projects.find((project) => project.id === node?.thread?.projectId);
               const relationshipHint = node?.missing
-                ? "This related thread is unavailable"
-                : `Open ${relationship.toLowerCase()} in this chat`;
+                ? t.chat.relationships.thisRelatedThreadIsUnavailable
+                : t.chat.relationships.openRelated(relationship);
               const RelationshipPopup = agent ? ThreadHoverCardPopup : TooltipPopup;
               const relationshipTooltip = agent ? (
                 <SubagentTooltipContent
@@ -492,8 +522,8 @@ export function ThreadRelationshipsPanel(props: {
                               part="secondary"
                               aria-label={
                                 parentTitle
-                                  ? `Merge back to ${parentTitle}`
-                                  : "Merge back to source conversation"
+                                  ? t.chat.relationships.mergeBack(parentTitle)
+                                  : t.chat.relationships.mergeBackToSourceConversation
                               }
                               disabled={!canMerge || busyAction !== null}
                               onClick={() => void merge()}
@@ -508,10 +538,10 @@ export function ThreadRelationshipsPanel(props: {
                         />
                         <TooltipPopup side="left">
                           {latestMergeBackRun === null
-                            ? "Complete a run in this fork before merging it back"
+                            ? t.chat.relationships.completeARunInThisForkBefore
                             : parentTitle
-                              ? `Merge this conversation back into ${parentTitle}`
-                              : "Merge this conversation back into its source"}
+                              ? t.chat.relationships.mergeConversation(parentTitle)
+                              : t.chat.relationships.mergeThisConversationBackIntoItsSource}
                         </TooltipPopup>
                       </Tooltip>
                       <span className="shrink-0 border border-transparent ps-1 pe-2.5 text-2xs font-medium text-muted-foreground">
@@ -547,7 +577,7 @@ export function ThreadRelationshipsPanel(props: {
                               variant="ghost"
                               part="icon"
                               tone="destructive"
-                              aria-label={`Stop subagent ${threadTitle}`}
+                              aria-label={t.chat.relationships.stopAgent(threadTitle)}
                               disabled={stoppingThreadId !== null}
                               onClick={() => void stopSubagent(threadId)}
                             />
@@ -559,7 +589,7 @@ export function ThreadRelationshipsPanel(props: {
                             <SquareIcon aria-hidden className="size-3 fill-current" />
                           )}
                         </TooltipTrigger>
-                        <TooltipPopup side="left">Stop subagent</TooltipPopup>
+                        <TooltipPopup side="left">{t.chat.relationships.stopSubagent}</TooltipPopup>
                       </Tooltip>
                     </div>
                   ) : null}

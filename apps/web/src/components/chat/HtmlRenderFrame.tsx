@@ -1,3 +1,5 @@
+/** Displays a rendered HTML asset and its panel action. */
+import { t } from "~/i18n";
 import type { EnvironmentId } from "@t3tools/contracts";
 import {
   HTML_RENDER_COLUMN_WIDTH,
@@ -106,7 +108,7 @@ export function HtmlRenderFrame(props: {
               <TooltipTrigger
                 render={
                   <Button
-                    aria-label="Open in panel"
+                    aria-label={t.chat.markdown.openInPanel}
                     size="icon-xs"
                     variant="glass"
                     onClick={() =>
@@ -125,13 +127,13 @@ export function HtmlRenderFrame(props: {
               >
                 <Maximize2Icon className="size-3.5" />
               </TooltipTrigger>
-              <TooltipPopup side="left">Open in panel</TooltipPopup>
+              <TooltipPopup side="left">{t.chat.markdown.openInPanel}</TooltipPopup>
             </Tooltip>
           </div>
         </>
       ) : failed ? (
         <p className="flex size-full items-center justify-center text-muted-foreground text-xs">
-          Unable to load {title}
+          {t.chat.markdown.unableToLoad(title)}
         </p>
       ) : null}
     </div>

@@ -1,44 +1,52 @@
+/** Displays relationship status labels and icons without changing stored statuses. */
+import { t } from "~/i18n";
 import type { ProviderDriverKind, ServerProvider } from "@t3tools/contracts";
 import { BotIcon, type LucideIcon } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { ProviderInstanceIcon } from "./ProviderInstanceIcon";
 
+/**
+ * Formats the display status of a related thread without changing its stored discriminator.
+ * @param status - Stored status string, or null when no status is available; unknown and empty
+ * strings use the unknown label.
+ * @returns The localized status label; never null or empty.
+ */
 export function threadRelationshipStatusLabel(status: string | null): string {
   switch (status) {
     case "preparing":
     case "starting":
-      return "Starting";
+      return t.chat.relationships.starting;
     case "running":
     case "in_progress":
-      return "Running";
+      return t.chat.relationships.running;
     case "pending":
     case "queued":
-      return "Queued";
+      return t.chat.relationships.queued;
     case "waiting":
     case "blocked":
-      return "Waiting";
+      return t.chat.relationships.waiting;
     case "completed":
-      return "Done";
+      return t.chat.relationships.done;
     case "failed":
     case "error":
-      return "Failed";
+      return t.chat.relationships.failed;
     case "cancelled":
     case "interrupted":
-      return "Stopped";
+      return t.chat.relationships.stopped;
     case "rolled_back":
-      return "Reverted";
+      return t.chat.relationships.reverted;
     case "resolved_native":
-      return "Resolved (native)";
+      return t.chat.relationships.resolvedNative;
     case "resolved_portable":
-      return "Resolved (portable)";
+      return t.chat.relationships.resolvedPortable;
     case "consumed":
-      return "Consumed";
+      return t.chat.relationships.consumed;
     case "superseded":
-      return "Superseded";
+      return t.chat.relationships.superseded;
     case "idle":
-      return "Idle";
+      return t.chat.relationships.idle;
     default:
-      return "Unknown";
+      return t.chat.relationships.unknown;
   }
 }
 

@@ -1,3 +1,5 @@
+/** Summarizes observed subagent activity for display without mutating runtime state. */
+import { t } from "~/i18n";
 import {
   isActiveSubagentStatus,
   isTerminalSubagentStatus,
@@ -26,38 +28,36 @@ export function deriveAgentSpawnSummary({
   const live =
     coordinatorStatus !== undefined ? !isTerminalSubagentStatus(coordinatorStatus) : working > 0;
   const subjects = [
-    individuals > 0 ? `${individuals} subagent${individuals === 1 ? "" : "s"}` : null,
-    batches > 0
-      ? `${batches} ${individuals > 0 ? "" : "subagent "}batch${batches === 1 ? "" : "es"}`
-      : null,
+    individuals > 0 ? t.chat.subagents.individualCount(individuals) : null,
+    batches > 0 ? t.chat.subagents.batchCount(batches, individuals > 0) : null,
   ]
     .filter(Boolean)
-    .join(" and ");
-  const lead = `${batches > 0 ? "Launched" : live ? "Kicked off" : "Ran"} ${subjects || "subagents"}`;
+    .join(t.chat.subagents.and);
+  const lead = t.chat.subagents.lead(batches > 0, live, subjects || t.chat.subagents.subagents);
 
   const status = live
     ? working > 0
-      ? `${working} working`
-      : "working"
+      ? t.chat.subagents.workingCount(working)
+      : t.chat.subagents.working
     : coordinatorStatus === "failed"
-      ? "Workflow failed"
+      ? t.chat.subagents.workflowFailed
       : coordinatorStatus === "cancelled" || coordinatorStatus === "interrupted"
-        ? "Workflow stopped"
+        ? t.chat.subagents.workflowStopped
         : failed > 0
-          ? `${failed} failed`
+          ? t.chat.subagents.failedCount(failed)
           : stopped > 0
-            ? `${stopped} stopped`
+            ? t.chat.subagents.stoppedCount(stopped)
             : idle > 0
-              ? `${idle} idle`
+              ? t.chat.subagents.idleCount(idle)
               : coordinatorStatus !== "completed" &&
                   (agents.length === 0 || agents.length < agentCount)
-                ? "Status unavailable"
-                : "✓ completed";
+                ? t.chat.subagents.statusUnavailable
+                : t.chat.subagents.completed;
   const tone = live
     ? "working"
     : failed > 0 || coordinatorStatus === "failed"
       ? "failed"
-      : status === "✓ completed"
+      : status === t.chat.subagents.completed
         ? "completed"
         : "inactive";
   return { live, lead, status, tone };

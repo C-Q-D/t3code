@@ -1,3 +1,5 @@
+/** Displays provider-owned subagent progress and navigation to its parent. */
+import { t } from "~/i18n";
 import {
   formatProviderSubagentStatus,
   type ProviderSubagentStatus,
@@ -79,13 +81,15 @@ export function ProviderSubagentBar(props: {
         className="min-w-0 truncate text-muted-foreground tabular-nums"
       />
       <span role="status" className="sr-only">
-        {`${modelDescription} subagent: ${announcement}`}
+        {t.chat.subagents.announcement(modelDescription, announcement)}
       </span>
-      <span className="ms-auto shrink-0 text-muted-foreground max-sm:hidden">Runs on its own</span>
+      <span className="ms-auto shrink-0 text-muted-foreground max-sm:hidden">
+        {t.chat.subagents.runsOnItsOwn}
+      </span>
       {props.onOpenParent ? (
         <Button size="sm" variant="ghost" onClick={props.onOpenParent}>
           <ArrowUpLeftIcon />
-          Open parent
+          {t.chat.subagents.openParent}
         </Button>
       ) : null}
     </div>

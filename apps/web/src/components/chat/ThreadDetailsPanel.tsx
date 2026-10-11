@@ -1,3 +1,5 @@
+/** Composes thread workspace, version control, automation and relationship details. */
+import { t } from "~/i18n";
 import type {
   EditorId,
   EnvironmentId,
@@ -77,6 +79,17 @@ export interface ThreadDetailsPanelProps extends Pick<
   onDeleteProjectScript: (scriptId: string) => Promise<ProjectScriptActionResult>;
 }
 
+/**
+ * Renders thread environment, Git, project-script, and host-opening controls.
+ * @param props - Required environment/thread IDs, keybindings, editor/environment lists (possibly
+ * empty), environment/Git/lock flags, and host action callbacks. draftId, project name/scripts,
+ * auto-environment controls, branch override controls, checkout/open-change callbacks, and
+ * forceNewWorktree may be omitted. preferredScriptId, gitCwd, and versionMismatch may be null;
+ * activeThreadBranchOverride may also be null. Card anchor/handle/presentation options follow
+ * ThreadDetailsCardProps. Script mutation callbacks return their host action result asynchronously.
+ * @returns The details panel; never null. User interactions invoke the supplied environment,
+ * branch, script, and navigation actions.
+ */
 export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
   const fileScripts = useT3ProjectFileScripts(
     props.environmentId,
@@ -124,7 +137,7 @@ export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
         <>
           <ThreadDetailsSection
             headingId="thread-details-workspace-heading"
-            title="Workspace"
+            title={t.chat.details.workspace}
             separated={false}
             showHeading={false}
           >
@@ -132,16 +145,18 @@ export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
               <div className="mx-1 mb-2 flex gap-2 rounded-xl border border-warning/30 bg-warning/6 p-3">
                 <AlertTriangleIcon className="mt-0.5 size-3.5 shrink-0 text-warning" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-medium">Client and server versions differ</p>
+                  <p className="text-xs font-medium">
+                    {t.chat.details.clientAndServerVersionsDiffer}
+                  </p>
                   <p className="mt-1 text-2xs leading-relaxed text-muted-foreground">
-                    Client {props.versionMismatch.clientVersion} ·{" "}
+                    {t.chat.details.clientVersion(props.versionMismatch.clientVersion)}
                     {props.versionMismatch.serverLabel} {props.versionMismatch.serverVersion}
                   </p>
                 </div>
                 <Button
                   size="icon-xs"
                   variant="ghost"
-                  aria-label="Dismiss version mismatch warning"
+                  aria-label={t.chat.details.dismissVersionMismatchWarning}
                   onClick={props.onDismissVersionMismatch}
                 >
                   <XIcon className="size-3.5" />
@@ -197,7 +212,7 @@ export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
           {props.gitCwd ? (
             <ThreadDetailsSection
               headingId="thread-details-version-control-heading"
-              title="Version Control"
+              title={t.chat.details.versionControl}
               showHeading={false}
               separated={density === "full"}
             >

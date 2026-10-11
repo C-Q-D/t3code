@@ -1,3 +1,5 @@
+/** Derives web conversation timeline and runtime presentation from orchestration projections. */
+import { t } from "~/i18n";
 import { resolveThreadWorkingStartedAt } from "@t3tools/client-runtime/state/models";
 import {
   type AssetResource,
@@ -375,6 +377,13 @@ function projectedWorkEntryTone(item: OrchestrationV2TurnItem): WorkLogEntry["to
   }
 }
 
+/**
+ * Formats a provider error with retry progress and any pending retry delay.
+ * @param item - Required error turn item; retry metadata may be absent and its maximum attempt
+ * count or delay may be null.
+ * @returns A nonempty localized label and the retained failure message with any retry suffix.
+ * Detail may be empty when the failure message is empty; neither field is null.
+ */
 export function providerErrorPresentation(
   item: Extract<OrchestrationV2TurnItem, { readonly type: "error" }>,
 ): { readonly label: string; readonly detail: string } {
@@ -382,8 +391,8 @@ export function providerErrorPresentation(
     return {
       label:
         item.failure.class === "usage_limit"
-          ? "Usage limit reached"
-          : item.title?.trim() || "Provider error",
+          ? t.chat.workLog.usageLimitReached
+          : item.title?.trim() || t.chat.workLog.providerError,
       detail: item.failure.message,
     };
   }
@@ -393,17 +402,24 @@ export function providerErrorPresentation(
       : `${item.retry.attempt}/${item.retry.maxAttempts}`;
   const label =
     item.status === "running"
-      ? `Retrying provider (${progress})`
+      ? t.chat.workLog.retrying(progress)
       : item.status === "completed"
-        ? `Provider recovered (${progress} retries)`
+        ? t.chat.workLog.recovered(progress)
         : item.status === "failed"
-          ? `${item.failure.class === "usage_limit" ? "Usage limit reached" : "Provider error"} after ${progress} retries`
-          : `Provider retry stopped (${progress})`;
+          ? t.chat.workLog.failedAfterRetries(
+              item.failure.class === "usage_limit"
+                ? t.chat.workLog.usageLimitReached
+                : t.chat.workLog.providerError,
+              progress,
+            )
+          : t.chat.workLog.retryStopped(progress);
   const retryDelay =
     item.status === "running" && item.retry.retryDelayMs !== null && item.retry.retryDelayMs > 0
       ? item.retry.retryDelayMs < 1_000
-        ? ` Retrying in ${item.retry.retryDelayMs}ms.`
-        : ` Retrying in ${(item.retry.retryDelayMs / 1_000).toFixed(1).replace(/\.0$/u, "")}s.`
+        ? t.chat.workLog.retryDelayMs(item.retry.retryDelayMs)
+        : t.chat.workLog.retryDelaySeconds(
+            (item.retry.retryDelayMs / 1_000).toFixed(1).replace(/\.0$/u, ""),
+          )
       : "";
   return {
     label,
@@ -411,6 +427,12 @@ export function providerErrorPresentation(
   };
 }
 
+/**
+ * Projects a turn item into a work-log entry with localized fallback presentation.
+ * @param row - Required projected turn item; optional source title and item details may be absent.
+ * @returns The work-log entry with original structured payload and tool identifiers preserved.
+ * Optional detail/tool fields may be absent; the entry is never null.
+ */
 function projectedWorkEntry(row: OrchestrationV2ProjectedTurnItem): WorkLogEntry {
   const { item } = row;
   const title = item.title?.trim() || null;
@@ -430,7 +452,7 @@ function projectedWorkEntry(row: OrchestrationV2ProjectedTurnItem): WorkLogEntry
     case "thread_created":
       return {
         ...common,
-        label: "Created thread",
+        label: t.chat.workLog.createdThread,
       };
     case "compaction":
       return {
@@ -442,16 +464,16 @@ function projectedWorkEntry(row: OrchestrationV2ProjectedTurnItem): WorkLogEntry
     case "reasoning":
       return {
         ...common,
-        label: title ?? "Thinking",
+        label: title ?? t.chat.workLog.thinking,
         ...(item.text ? { detail: item.text } : {}),
       };
     case "command_execution":
       return {
         ...common,
-        label: title ?? "Ran command",
+        label: title ?? t.chat.workLog.ranCommand,
         command: item.input,
         rawCommand: item.input,
-        toolTitle: title ?? "Command",
+        toolTitle: title ?? t.chat.workLog.command,
         toolData: item,
       };
     case "file_change": {
@@ -460,33 +482,33 @@ function projectedWorkEntry(row: OrchestrationV2ProjectedTurnItem): WorkLogEntry
         label:
           title ??
           (item.changes !== undefined && item.changes.length > 1
-            ? `Changed ${item.changes.length} files`
-            : `Changed ${item.fileName}`),
+            ? t.chat.workLog.changedFiles(item.changes.length)
+            : t.chat.workLog.changedFile(item.fileName)),
         changedFiles: item.changes?.map((change) => change.path) ?? [item.fileName],
-        toolTitle: title ?? "File change",
+        toolTitle: title ?? t.chat.workLog.fileChange,
         toolData: item,
       };
     }
     case "file_search":
       return {
         ...common,
-        label: title ?? formatSearchToolLabel(item) ?? "Searched files",
+        label: title ?? formatSearchToolLabel(item) ?? t.chat.workLog.searchedFiles,
         ...(item.pattern ? { detail: item.pattern } : {}),
-        toolTitle: title ?? "File search",
+        toolTitle: title ?? t.chat.workLog.fileSearch,
         toolData: item,
       };
     case "web_search":
       return {
         ...common,
-        label: title ?? "Searched the web",
+        label: title ?? t.chat.workLog.searchedTheWeb,
         ...(item.patterns?.length ? { detail: item.patterns.join(", ") } : {}),
-        toolTitle: title ?? "Web search",
+        toolTitle: title ?? t.chat.workLog.webSearch,
         toolData: item,
       };
     case "checkpoint":
       return {
         ...common,
-        label: title ?? "Checkpoint captured",
+        label: title ?? t.chat.workLog.checkpointCaptured,
         changedFiles: item.files.map((file) => file.path),
         toolData: item,
       };
@@ -522,23 +544,27 @@ function projectedWorkEntry(row: OrchestrationV2ProjectedTurnItem): WorkLogEntry
           (classified === "read"
             ? formatReadToolLabel(readPath ?? "")
             : classified === "search"
-              ? (formatSearchToolLabel({ input: item.input }) ?? item.toolName ?? "Tool call")
-              : (item.toolName ?? "Tool call")),
-        toolTitle: title ?? item.toolName ?? "Tool",
+              ? (formatSearchToolLabel({ input: item.input }) ??
+                item.toolName ??
+                t.chat.workLog.toolCall)
+              : (item.toolName ?? t.chat.workLog.toolCall)),
+        toolTitle: title ?? item.toolName ?? t.chat.workLog.tool,
         toolData: { input: item.input, output: item.output },
       };
     }
     case "approval_request":
       return {
         ...common,
-        label: title ?? "Approval requested",
+        label: title ?? t.chat.workLog.approvalRequested,
         detail: item.prompt ?? item.requestKind,
         toolData: item,
       };
     case "user_input_request":
       return {
         ...common,
-        label: title ?? (item.questionAnswer ? "Answered questions" : "Input requested"),
+        label:
+          title ??
+          (item.questionAnswer ? t.chat.workLog.answeredQuestions : t.chat.workLog.inputRequested),
         ...(item.questionAnswer ? { questionAnswer: item.questionAnswer } : {}),
         toolData: item,
       };

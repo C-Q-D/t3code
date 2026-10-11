@@ -1,3 +1,5 @@
+/** Displays worktree preparation progress and its existing controls. */
+import { t } from "~/i18n";
 import {
   worktreeSetupStageLabel,
   type WorktreeSetupSnapshot,
@@ -103,18 +105,23 @@ function ShimmerOverlay({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * Selects the worktree setup heading for its phase and stage outcomes.
+ * @param snapshot - Required setup snapshot; stages may be empty.
+ * @returns The localized setup heading for the snapshot phase; never null or empty.
+ */
 function headerLabel(snapshot: WorktreeSetupSnapshot): string {
   switch (snapshot.phase) {
     case "running":
-      return "Setting up worktree…";
+      return t.chat.worktreeSetup.settingUpWorktree;
     case "done":
       return snapshot.stages.some((stage) => stage.status === "failed")
-        ? "Worktree ready, setup script failed"
-        : "Worktree ready";
+        ? t.chat.worktreeSetup.worktreeReadySetupScriptFailed
+        : t.chat.worktreeSetup.worktreeReady;
     case "failed":
-      return "Worktree setup failed";
+      return t.chat.worktreeSetup.worktreeSetupFailed;
     case "cancelled":
-      return "Worktree setup cancelled";
+      return t.chat.worktreeSetup.worktreeSetupCancelled;
   }
 }
 
@@ -254,12 +261,17 @@ function OutputTail({ lines, failed }: { lines: ReadonlyArray<string>; failed: b
   );
 }
 
+/**
+ * Renders available branch, base reference, path, and script metadata for worktree setup.
+ * @param props - Required snapshot; missing or empty metadata omits the corresponding detail row.
+ * @returns The detail list, which may contain no rows; never null.
+ */
 function SetupDetails({ snapshot }: { snapshot: WorktreeSetupSnapshot }) {
   return (
     <dl className="mt-1 mb-1.5 ml-8 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
       {snapshot.branch ? (
         <>
-          <dt className="text-foreground/80">Branch</dt>
+          <dt className="text-foreground/80">{t.chat.worktreeSetup.branch}</dt>
           <dd className="min-w-0 font-mono">
             <MiddleTruncate value={snapshot.branch} className="flex" />
           </dd>
@@ -267,7 +279,7 @@ function SetupDetails({ snapshot }: { snapshot: WorktreeSetupSnapshot }) {
       ) : null}
       {snapshot.baseRef ? (
         <>
-          <dt className="text-foreground/80">Base</dt>
+          <dt className="text-foreground/80">{t.chat.worktreeSetup.base}</dt>
           <dd className="min-w-0 font-mono">
             <MiddleTruncate value={snapshot.baseRef} className="flex" />
           </dd>
@@ -275,7 +287,7 @@ function SetupDetails({ snapshot }: { snapshot: WorktreeSetupSnapshot }) {
       ) : null}
       {snapshot.worktreePath ? (
         <>
-          <dt className="text-foreground/80">Path</dt>
+          <dt className="text-foreground/80">{t.chat.worktreeSetup.path}</dt>
           <dd className="min-w-0 font-mono">
             <MiddleTruncate value={snapshot.worktreePath} className="flex" />
           </dd>
@@ -283,7 +295,7 @@ function SetupDetails({ snapshot }: { snapshot: WorktreeSetupSnapshot }) {
       ) : null}
       {snapshot.setupScript ? (
         <>
-          <dt className="text-foreground/80">Setup</dt>
+          <dt className="text-foreground/80">{t.chat.worktreeSetup.setup}</dt>
           <dd className="truncate font-mono">{snapshot.setupScript.command}</dd>
         </>
       ) : null}
@@ -331,6 +343,14 @@ function CollapsedSummaryRow({
   );
 }
 
+/**
+ * Renders worktree bootstrap stages, script output, and available recovery controls.
+ * @param props - Required snapshot; onCancel, onWorkLocally, and onOpenTerminal may each be null to
+ * hide unavailable actions. Optional embedded defaults to false and lets the live turn own the
+ * header.
+ * @returns The setup card with expanded or collapsed stage presentation; never null. User actions
+ * call the supplied host callbacks.
+ */
 export function WorktreeSetupCard({
   snapshot,
   onCancel,
@@ -372,7 +392,10 @@ export function WorktreeSetupCard({
       (setupStage.status === "running" && setupStage.tail.length > 0));
 
   return (
-    <section aria-label="Worktree setup" data-worktree-setup-phase={snapshot.phase}>
+    <section
+      aria-label={t.chat.worktreeSetup.worktreeSetup}
+      data-worktree-setup-phase={snapshot.phase}
+    >
       {showHeader ? <SetupHeaderRow snapshot={snapshot} totalElapsed={totalElapsed} /> : null}
       {collapsed ? (
         <CollapsedSummaryRow snapshot={snapshot} totalElapsed={totalElapsed} />
@@ -410,24 +433,24 @@ export function WorktreeSetupCard({
           onClick={() => setDetailsOpen((open) => !open)}
         >
           <MorphIcon aria-hidden icon={detailsOpen ? ChevronDown : ChevronRight} />
-          Details
+          {t.chat.worktreeSetup.details}
         </Button>
         {showTerminal ? (
           <Button type="button" size="xs" variant="ghost-muted" onClick={onOpenTerminal}>
             <TerminalIcon aria-hidden />
-            Open terminal
+            {t.chat.worktreeSetup.openTerminal}
           </Button>
         ) : null}
         {onWorkLocally ? (
           <Button type="button" size="xs" variant="ghost-muted" onClick={onWorkLocally}>
             <LaptopIcon aria-hidden />
-            Work locally
+            {t.chat.worktreeSetup.workLocally}
           </Button>
         ) : null}
         {onCancel && running ? (
           <Button type="button" size="xs" variant="ghost-muted" onClick={onCancel}>
             <XIcon aria-hidden />
-            Cancel
+            {t.chat.worktreeSetup.cancel}
           </Button>
         ) : null}
       </div>

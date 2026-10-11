@@ -1,3 +1,5 @@
+/** Displays the message copy action without changing copied content. */
+import { t } from "~/i18n";
 import { memo, useRef } from "react";
 import { Check, Copy } from "lucide";
 import { Button } from "../ui/button";
@@ -38,7 +40,7 @@ export const MessageCopyButton = memo(function MessageCopyButton({
       <TooltipTrigger
         render={
           <Button
-            aria-label="Copy message"
+            aria-label={t.chat.markdown.copyMessage}
             disabled={isCopied}
             onClick={() => copyToClipboard(text)}
             ref={ref}
@@ -55,7 +57,7 @@ export const MessageCopyButton = memo(function MessageCopyButton({
         />
       </TooltipTrigger>
       <TooltipPopup>
-        <p>Copy message</p>
+        <p>{t.chat.markdown.copyMessage}</p>
       </TooltipPopup>
     </Tooltip>
   );

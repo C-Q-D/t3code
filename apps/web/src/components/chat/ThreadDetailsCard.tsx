@@ -1,3 +1,5 @@
+/** Places and sizes the thread details card within the chat canvas. */
+import { t } from "~/i18n";
 import { useLayoutEffect, useState, type ReactNode, type RefObject } from "react";
 import type { ScopedThreadRef } from "@t3tools/contracts";
 import { ScrollArea } from "../ui/scroll-area";
@@ -143,7 +145,7 @@ export function ThreadDetailsCard({
       {placement ? (
         inlineOpen ? (
           <aside
-            aria-label="Thread details"
+            aria-label={t.chat.details.threadDetails}
             className="absolute z-20"
             style={{
               left: placement.x,

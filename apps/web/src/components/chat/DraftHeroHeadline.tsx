@@ -1,3 +1,5 @@
+/** Renders the draft heading and inline project selection controls. */
+import { t } from "~/i18n";
 import type { DraftId } from "~/composerDraftStore";
 import { useComposerDraftStore } from "~/composerDraftStore";
 import { resolveEnvironmentMachineKind, type ScopedProjectRef } from "@t3tools/contracts";
@@ -50,6 +52,12 @@ interface DraftHeroHeadlineProps {
   readonly activeProjectTitle: string | null;
 }
 
+/**
+ * Renders the draft headline and project picker, applying project selection to the composer draft.
+ * @param props - draftId, activeProjectRef, and activeProjectTitle may each be null when their
+ * context is unavailable.
+ * @returns The headline and project selection controls; never null.
+ */
 export function DraftHeroHeadline({
   draftId,
   activeProjectRef,
@@ -242,7 +250,9 @@ export function DraftHeroHeadline({
           }
         >
           <span className="min-w-0 truncate">
-            {isScratchDraft ? "No project" : (activeProjectDisplayName ?? "Choose a project")}
+            {isScratchDraft
+              ? t.chat.draftHero.noProject
+              : (activeProjectDisplayName ?? t.chat.draftHero.chooseAProject)}
           </span>
         </TooltipTrigger>
         {activeProjectDisplayName && !isScratchDraft ? (
@@ -274,7 +284,7 @@ export function DraftHeroHeadline({
                 >
                   <MessageSquareDashedIcon className="size-full" />
                 </span>
-                No project
+                {t.chat.draftHero.noProject}
               </span>
             </MenuRadioItem>
           )}
@@ -304,7 +314,7 @@ export function DraftHeroHeadline({
         {projectPickerEntries.length > 0 ? <MenuSeparator /> : null}
         <MenuItem onClick={openAddProject}>
           <FolderPlusIcon />
-          Add project
+          {t.chat.draftHero.addProject}
         </MenuItem>
       </MenuPopup>
     </Menu>
@@ -314,7 +324,7 @@ export function DraftHeroHeadline({
       onClick={openAddProject}
       className="pointer-events-auto inline cursor-pointer border-muted-foreground/35 border-b border-dotted text-muted-foreground/60 transition-colors hover:border-muted-foreground/60 hover:text-muted-foreground/80 focus-visible:rounded-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
     >
-      {activeProjectTitle ?? "Add a project"}
+      {activeProjectTitle ?? t.chat.draftHero.addAProject}
     </button>
   );
 
@@ -323,12 +333,12 @@ export function DraftHeroHeadline({
   // in the h1; without an explicit label its widget state bleeds into the
   // announced phrase.
   const headingLabel = isScratchDraft
-    ? "What should we work on?"
+    ? t.chat.draftHero.whatShouldWeWorkOn
     : hasResolvedProject
-      ? `What should we build in ${activeProjectDisplayName}?`
+      ? t.chat.draftHero.buildIn(activeProjectDisplayName)
       : canChooseProject
-        ? `${activeProjectDisplayName ?? "Choose a project"} to start`
-        : "Add a project to start";
+        ? t.chat.draftHero.start(activeProjectDisplayName ?? t.chat.draftHero.chooseAProject)
+        : t.chat.draftHero.addAProjectToStart;
 
   // One click out of the project, phrased as the alternative to the question
   // above it. Focus moves to the project picker once this line has gone.
@@ -351,7 +361,7 @@ export function DraftHeroHeadline({
             />
           }
         >
-          or start without a project
+          {t.chat.draftHero.orStartWithoutAProject}
         </TooltipTrigger>
         {noProjectShortcut ? <TooltipPopup side="bottom">{noProjectShortcut}</TooltipPopup> : null}
       </Tooltip>
@@ -364,13 +374,20 @@ export function DraftHeroHeadline({
         className="w-full text-center font-normal text-2xl text-foreground tracking-tight sm:text-3xl"
       >
         {isScratchDraft ? (
-          <>What should we work on?</>
+          <>{t.chat.draftHero.whatShouldWeWorkOn}</>
         ) : hasResolvedProject ? (
-          <>What should we build in {projectSelector}?</>
+          <>
+            {t.chat.draftHero.buildPrefix}
+            {projectSelector}
+            {t.chat.draftHero.buildSuffix}
+          </>
         ) : canChooseProject ? (
-          <>{projectSelector} to start</>
+          <>
+            {projectSelector}
+            {t.chat.draftHero.startSuffix}
+          </>
         ) : (
-          <>Add a project to start</>
+          <>{t.chat.draftHero.addAProjectToStart}</>
         )}
       </h1>
       {/* Reserved whenever threads can skip a project, so the heading does not

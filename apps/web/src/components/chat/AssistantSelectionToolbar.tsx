@@ -1,3 +1,5 @@
+/** Offers citation actions for selected assistant text. */
+import { t } from "~/i18n";
 import {
   ASSISTANT_CITATION_MAX_TEXT_LENGTH,
   MessageId,
@@ -18,6 +20,13 @@ import {
 } from "~/lib/selectionActions";
 import { Button } from "../ui/button";
 
+/**
+ * Observes assistant text selection and offers a citation action above the selection.
+ * @param props - viewport may be null until mounted; threadRef identifies the citation source.
+ * Required onCite returns whether the citation was accepted, after which the selection is cleared.
+ * @returns A toolbar portal, or null when no eligible visible selection exists. Selection listeners
+ * are removed on unmount or viewport change.
+ */
 export function AssistantSelectionToolbar({
   viewport,
   threadRef,
@@ -133,7 +142,9 @@ export function AssistantSelectionToolbar({
       size="xs"
       variant="glass"
       disabled={tooLong}
-      aria-label={tooLong ? "Selection is too long to cite" : "Cite selection in composer"}
+      aria-label={
+        tooLong ? t.chat.citation.selectionIsTooLongToCite : t.chat.citation.citeSelectionInComposer
+      }
       className="fixed z-50 max-w-[calc(100vw-1rem)]"
       style={{ left: selection.position.x, top: selection.position.y }}
       onPointerDown={(event) => event.preventDefault()}
@@ -147,7 +158,7 @@ export function AssistantSelectionToolbar({
       }}
     >
       <QuoteIcon aria-hidden="true" className="size-3.5" />
-      {tooLong ? "Shorten selection" : "Cite"}
+      {tooLong ? t.chat.citation.shortenSelection : t.chat.citation.cite}
     </Button>,
     document.body,
   );

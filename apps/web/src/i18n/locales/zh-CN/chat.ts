@@ -349,4 +349,628 @@ export const chat: Messages["chat"] = {
     /** Formats the threadActions message from the supplied title. */
     threadActions: (title) => `${title} 的对话操作`,
   },
+  timeline: {
+    thought: "思考",
+    thinking: "正在思考",
+    webSearch: "网页搜索",
+    readFile: "读取文件",
+    running: "运行中",
+    failed: "失败",
+    declined: "已拒绝",
+    stopped: "已停止",
+    ran: "已运行",
+    command: "命令",
+    youStoppedThisResponse: "你已停止此回复",
+    worked: "已工作",
+    supersededAttempt: "已被替代的尝试",
+    subagentOf: "父Agent",
+    openParentThread: "打开父对话",
+    loadEarlierTurns: "加载更早的轮次",
+    loadingEarlierTurns: "正在加载更早的轮次…",
+    userMessage: "用户消息",
+    previousTurn: "上一轮",
+    nextTurn: "下一轮",
+    sentByAutomation: "由自动任务发送",
+    openSendingThread: "打开发送方对话",
+    sentByAnotherAgent: "由其他Agent发送",
+    you: "你",
+    queued: "排队中",
+    steer: "引导",
+    queuedBehindTheActiveTurn: "排在当前轮次之后",
+    originallyQueuedThenPromotedToSteerThe: "原先排队，随后改为引导当前轮次",
+    steeredTheActiveTurn: "已引导当前轮次",
+    editFromHere: "从这里编辑",
+    forkFromThisResponse: "从此回复创建分支",
+    interruptRequested: "已请求中断",
+    runInterrupted: "运行已中断",
+    contextHandoff: "上下文交接",
+    conversationFork: "对话分支",
+    contextCompacted: "上下文已压缩",
+    planUpdated: "计划已更新",
+    inherited: "继承",
+    synthetic: "合成",
+    activity: "活动",
+    toolCalls: "工具调用",
+    settingUpWorktree: "正在设置worktree…",
+    working: "正在工作…",
+    setupScript: "设置脚本",
+    toolCallFailed: "工具调用失败",
+    annotatedPreviewCrop: "带标注的预览截图",
+    previewAnnotation: "预览标注",
+    thisContextIsNoLongerAvailable: "此上下文已不可用。",
+    skill: "技能",
+    reviewComment: "审查评论",
+    showLess: "收起",
+    showFullMessage: "显示完整消息",
+    openSubagentThread: "打开子Agent对话",
+    contextCompactionFailed: "上下文压缩失败",
+    contextCompactionStopped: "上下文压缩已停止",
+    compactingContext: "正在压缩上下文",
+    forkedFromConversation: "源自对话分支",
+    openSourceConversation: "打开源对话",
+    openFork: "打开分支",
+    createdThread: "已创建对话",
+    createdThreadLabel: "新建的对话",
+    subagent: "子Agent",
+    waiting: "等待中",
+    idleResumable: "空闲 · 可继续",
+    completed: "已完成",
+    finished: "已结束",
+    updated: "已更新",
+    /** Formats a file path and the count of additional files. */
+    moreFiles: (path, count) => `${path}，另有${count}个`,
+    /** Formats the existing elapsed duration when the user stops. */
+    stoppedAfter: (duration) => `你在${duration}后停止了回复`,
+    /** Formats the existing elapsed duration without changing its units. */
+    workedFor: (duration) => `已工作${duration}`,
+    /** Names the message targeted by the timeline minimap. */
+    jumpToMessage: (text) => `跳转到消息：${text}`,
+    /** Names the media or file to preview. */
+    preview: (name) => `预览 ${name}`,
+    /** Names the file to download. */
+    download: (name) => `下载 ${name}`,
+    /** Names the continuation thread. */
+    continuesIn: (threadId) => `在 ${threadId} 中继续`,
+    /** Names the thread or card to open. */
+    open: (title) => `打开 ${title}`,
+    /** Names a file or video attachment and its formatted size. */
+    attachment: (isVideo, name, size) => `${isVideo ? "视频" : "文件"}附件，${name}，${size}`,
+    /** Names the selected browser element. */
+    browserElement: (label) => `浏览器元素，${label}`,
+    /** Names the preview annotation. */
+    annotation: (label) => `预览标注，${label}`,
+    /** Formats an optional already formatted usage reset time. */
+    usageLimit: (resetTime) => `已达到用量限制。${resetTime ? `请在${resetTime}后重试。` : ""}`,
+    sendAMessageToStartTheConversation: "发送消息以开始对话。",
+    partialOutputRetained: "已保留部分输出",
+    compacting: "正在压缩…",
+    screenshotUnavailable: "截图不可用",
+    retry: "重试",
+    openChat: "打开聊天",
+    openSubagent: "打开子Agent",
+    /** Names the source thread of an inherited or synthetic item. */
+    fromThread: (threadId) => `来自 ${threadId}`,
+    /** Names the running worktree setup script. */
+    setupStillRunning: (name) => `${name}仍在运行。显示设置进度。`,
+    /** Adds the tool failure announcement to an existing activity label. */
+    toolFailure: (label) => `${label}，工具调用失败`,
+    workingForPrefix: "已工作",
+  },
+  markdown: {
+    note: "备注",
+    tip: "提示",
+    important: "重要",
+    warning: "警告",
+    caution: "注意",
+    collapseTableCells: "折叠表格单元格",
+    expandTableCells: "展开表格单元格",
+    copied: "已复制",
+    copyTable: "复制表格",
+    copyAsMarkdown: "复制为Markdown",
+    copyAsCSV: "复制为CSV",
+    details: "详情",
+    disableLineWrap: "关闭自动换行",
+    wrapLines: "自动换行",
+    copyCode: "复制代码",
+    codeBlockActions: "代码块操作",
+    runInTerminal: "在终端运行",
+    showDiagram: "显示图表",
+    showCode: "显示代码",
+    videoUnavailable: "视频不可用",
+    imageUnavailable: "图片不可用",
+    loadingImage: "正在加载图片",
+    unableToOpenFile: "无法打开文件",
+    anErrorOccurred: "发生错误。",
+    unableToOpenFileInBrowser: "无法在浏览器中打开文件",
+    unableToRevealFile: "无法显示文件位置",
+    clipboardAPIUnavailable: "剪贴板API不可用。",
+    previewMedia: "预览媒体",
+    openInIntegratedBrowser: "在内置浏览器中打开",
+    copyRelativePath: "复制相对路径",
+    copyFullPath: "复制完整路径",
+    relativePath: "相对路径",
+    fullPath: "完整路径",
+    mediaUnavailable: "媒体不可用",
+    theFileCouldNotBeLoadedIt: "无法加载此文件。文件可能已移动或删除。",
+    thisConnectionCannotRevealFilesOnThis: "此连接无法在该环境中显示文件位置。",
+    previewAccessIsUnavailableForThisClient: "此客户端无法访问预览。",
+    unableToOpenLinkInBrowser: "无法在浏览器中打开链接",
+    environmentIsNotConnected: "环境未连接。",
+    toggleTask: "切换任务状态",
+    unableToLinkPullRequest: "无法关联拉取请求",
+    unableToUnlinkPullRequest: "无法取消关联拉取请求",
+    theRequestFailed: "请求失败。",
+    mermaidFailedToLoad: "Mermaid加载失败。",
+    theDiagramCouldNotBeRendered: "无法渲染图表。",
+    expandDiagram: "展开图表",
+    openInPanel: "在面板中打开",
+    copyMessage: "复制消息",
+    retry: "重试",
+    /** Names the code fence language. */
+    language: (language) => `语言：${language}`,
+    /** Names the media preview. */
+    preview: (name) => `预览 ${name}`,
+    /** Names the clipboard operation that failed. */
+    copyFailed: (title) => `无法复制${title}`,
+    /** Names the file whose menu is opened. */
+    fileOptions: (label) => `${label} 的文件选项`,
+    /** Combines the diagram error with the rendering failure. */
+    renderError: (message) => `无法渲染图表：${message}`,
+    applyTemplate: "使用模板",
+    renderingDiagram: "正在渲染图表",
+    /** Names the HTML render that failed to load. */
+    unableToLoad: (title) => `无法加载 ${title}`,
+  },
+  plan: {
+    couldNotCopyPlan: "无法复制计划",
+    anErrorOccurredWhileCopying: "复制时发生错误。",
+    proposedPlan: "建议计划",
+    workspacePathIsUnavailable: "工作区路径不可用",
+    thisThreadDoesNotHaveAWorkspace: "此对话没有可用于保存的工作区路径。",
+    enterAWorkspacePath: "请输入工作区路径",
+    planSavedToWorkspace: "计划已保存到工作区",
+    couldNotSavePlan: "无法保存计划",
+    anErrorOccurredWhileSaving: "保存时发生错误。",
+    plan: "计划",
+    planActions: "计划操作",
+    copied: "已复制！",
+    copyToClipboard: "复制到剪贴板",
+    downloadAsMarkdown: "下载为Markdown",
+    saveToWorkspace: "保存到工作区",
+    collapsePlan: "折叠计划",
+    expandPlan: "展开计划",
+    savePlanToWorkspace: "将计划保存到工作区",
+    theWorkspace: "工作区",
+    workspacePath: "工作区路径",
+    cancel: "取消",
+    saving: "正在保存…",
+    save: "保存",
+    pathPrefix: "输入相对于 ",
+    pathSuffix: " 的路径。",
+  },
+  citation: {
+    viewSource: "查看来源",
+    editCitationComment: "编辑引用评论",
+    addCommentToCitation: "为引用添加评论",
+    commentOnSelectedText: "评论所选文本",
+    enterToSaveTheCitationCommentCommand:
+      "按Enter保存引用评论；按Command/Ctrl+Enter保存并发送；按Shift+Enter换行。",
+    addAnOptionalComment: "添加评论（可选）…",
+    shortenComment: "缩短评论",
+    save: "保存",
+    couldNotOpenTheCitedResponse: "无法打开被引用的回复",
+    clickTheCitationToTryAgain: "点击引用以重试。",
+    theQuotedTextHasChanged: "被引用的文本已更改",
+    showingTheSourceResponseTheSavedQuote: "正在显示源回复。已保存的引用保持不变。",
+    selectionIsTooLongToCite: "所选文本过长，无法引用",
+    citeSelectionInComposer: "在输入框中引用所选文本",
+    shortenSelection: "缩短选择范围",
+    cite: "引用",
+    couldNotLoadTheCitedResponse: "无法加载被引用的回复",
+    loadEarlierTurnsThenClickTheCitation:
+      "加载更早的轮次，然后点击引用以重试。已保存的引用保持不变。",
+    theCitedResponseIsUnavailable: "被引用的回复不可用",
+    itMayHaveBeenRemovedTheSelected: "回复可能已删除。所选文本仍保存在引用中。",
+    theCitationDoesNotReferToAn: "此引用未指向助手回复",
+    theSelectedTextIsStillSavedIn: "所选文本仍保存在引用中。",
+    /** Names the saved citation excerpt to view. */
+    viewCitedText: (label) => `查看引用的助手文本：${label}`,
+    cancel: "取消",
+    /** Formats the existing localized citation comment length limit. */
+    commentLimit: (count) => `评论最多可包含${count}个字符。`,
+  },
+  details: {
+    workspace: "工作区",
+    clientAndServerVersionsDiffer: "客户端与服务器版本不同",
+    dismissVersionMismatchWarning: "关闭版本不匹配警告",
+    versionControl: "版本控制",
+    threadDetails: "对话详情",
+    resolve: "解决冲突",
+    preparing: "正在准备…",
+    ready: "就绪",
+    marking: "正在标记…",
+    fix: "修复",
+    merging: "正在合并…",
+    merge: "合并",
+    checkTheBranchOutAndResolveThe: "检出分支并在新对话中解决冲突",
+    markThisPullRequestAsReadyFor: "将此拉取请求标记为可审查",
+    fixTheFailingChecksInANew: "在新对话中修复失败的检查",
+    mergePullRequest: "合并拉取请求？",
+    cancel: "取消",
+    showLess: "收起",
+    couldNotUpdateAutomation: "无法更新自动任务",
+    couldNotRunAutomation: "无法运行自动任务",
+    automations: "自动任务",
+    manageScheduledTasks: "管理定时任务",
+    editAutomation: "编辑自动任务",
+    runNow: "立即运行",
+    watchingHint: "正在关注：检查完成、有人评论或分支出现冲突时，Agent会被唤醒。点击以停止。",
+    /** Formats the client version before the server version. */
+    clientVersion: (version) => `客户端 ${version} · `,
+    /** Names the pull request by number. */
+    pullRequest: (number) => `拉取请求 #${number}`,
+    /** Names the selected pull request merge method. */
+    mergeMethod: (method) => `合并此拉取请求（${method}）`,
+    /** Names the pull request watch to stop. */
+    stopWatching: (number) => `停止关注 #${number}`,
+    /** Names the pull request number and selected merge method. */
+    mergeDescription: (number, method) => `使用${method}合并 #${number}。`,
+    /** Names the branch with which the pull request conflicts. */
+    conflicts: (branch) => `与 ${branch} 存在合并冲突`,
+    /** Selects the English singular or plural file unit for the count. */
+    fileNoun: (_count) => "个文件",
+    /** Formats the count of additional pull requests. */
+    showMore: (count) => `再显示${count}项`,
+    /** Names the automation to edit. */
+    editTask: (title) => `编辑 ${title}`,
+    /** Names the automation to run immediately. */
+    runTask: (title) => `立即运行 ${title}`,
+    /** Names the automation to pause. */
+    pauseTask: (title) => `暂停 ${title}`,
+    /** Names the automation to resume. */
+    resumeTask: (title) => `继续 ${title}`,
+    /** Formats the added and deleted line counts for assistive readers. */
+    diffStat: (additions, deletions) => `新增${additions}行，删除${deletions}行`,
+    /** Formats the automation query error. */
+    loadAutomationsError: (error) => `无法加载自动任务：${error}`,
+  },
+  relationships: {
+    starting: "正在启动",
+    running: "运行中",
+    queued: "排队中",
+    waiting: "等待中",
+    done: "已完成",
+    failed: "失败",
+    stopped: "已停止",
+    reverted: "已还原",
+    resolvedNative: "已解决（原生）",
+    resolvedPortable: "已解决（可移植）",
+    consumed: "已使用",
+    superseded: "已被替代",
+    idle: "空闲",
+    unknown: "未知",
+    relatedThreads: "相关对话",
+    contextTransfer: "上下文转移",
+    subagent: "子Agent",
+    parentAgent: "父Agent",
+    fork: "分支",
+    parentThread: "父对话",
+    previousAgents: "之前的Agent",
+    couldNotStopSubagent: "无法停止子Agent",
+    lineage: "对话关系",
+    moreThreadActions: "更多对话操作",
+    thisRelatedThreadIsUnavailable: "此关联对话不可用",
+    mergeBackToSourceConversation: "合并回源对话",
+    completeARunInThisForkBefore: "请先在此分支中完成一次运行，再合并回去",
+    mergeThisConversationBackIntoItsSource: "将此对话合并回源对话",
+    stopSubagent: "停止子Agent",
+    /** Formats the running related agent count. */
+    lineageRunning: (count) => `对话关系 · ${count}个运行中`,
+    /** Names the related thread role to open. */
+    openRelated: (relationship) => `在此聊天中打开${relationship}`,
+    /** Names the parent conversation to merge back into. */
+    mergeBack: (title) => `合并回 ${title}`,
+    /** Names the source conversation receiving the merge. */
+    mergeConversation: (title) => `将此对话合并回 ${title}`,
+    /** Names the subagent to stop. */
+    stopAgent: (title) => `停止子Agent ${title}`,
+    disconnectAgentSession: "断开Agent会话",
+    showMorePrefix: "再显示",
+    showMoreSuffix: "项",
+  },
+  queue: {
+    collapseQueuedMessages: "折叠排队消息",
+    expandQueuedMessages: "展开排队消息",
+    queued: "排队中",
+    reorderQueuedMessageDragOrPressThe: "调整排队消息顺序（拖动或按方向键）",
+    savingQueuedMessage: "正在保存排队消息",
+    cancelEditingQueuedMessage: "取消编辑排队消息",
+    editQueuedMessage: "编辑排队消息",
+    thereIsNoActiveRunToSteer: "没有可引导的运行",
+    removeQueuedMessage: "移除排队消息",
+    removeFromQueue: "从队列中移除",
+    /** Formats the queued message count with the English plural. */
+    count: (count) => `${count}条排队消息`,
+    /** Formats the edit action with an optional shortcut. */
+    editInComposer: (shortcut) => `在输入框中编辑${shortcut ? `（${shortcut}）` : ""}`,
+    /** Formats the steer action with an optional shortcut. */
+    sendSteer: (shortcut) => `改为发送引导消息${shortcut ? `（${shortcut}）` : ""}`,
+    cancel: "取消",
+    steer: "引导",
+    retryOrRemoveFailedUploadsBeforeSaving: "保存前请重试或移除上传失败的附件。",
+    editingQueuedPrefix: "正在编辑排队消息：",
+  },
+  runtimeMode: {
+    supervised: "需审批",
+    askBeforeCommandsAndFileChanges: "执行命令和更改文件前询问。",
+    autoAcceptEdits: "自动接受编辑",
+    autoApproveEditsAskBeforeOtherActions: "自动批准编辑，其他操作前询问。",
+    auto: "自动",
+    supportedProvidersApproveRoutineActionsOthersStill:
+      "支持此模式的Provider会批准常规操作；其他Provider仍会询问。",
+    fullAccess: "完全访问",
+    allowCommandsAndEditsWithoutPrompts: "允许执行命令和编辑，无需询问。",
+    moreComposerControls: "更多输入框选项",
+    mode: "模式",
+    chat: "聊天",
+    plan: "计划",
+    access: "访问权限",
+  },
+  worktreeSetup: {
+    settingUpWorktree: "正在设置worktree…",
+    worktreeReadySetupScriptFailed: "worktree已就绪，设置脚本失败",
+    worktreeReady: "worktree已就绪",
+    worktreeSetupFailed: "worktree设置失败",
+    worktreeSetupCancelled: "worktree设置已取消",
+    branch: "分支",
+    base: "基准",
+    path: "路径",
+    setup: "设置",
+    worktreeSetup: "worktree设置",
+    details: "详情",
+    openTerminal: "打开终端",
+    workLocally: "本地工作",
+    cancel: "取消",
+  },
+  providerStatus: {
+    openProviderSetupToSignInWith: "打开Provider设置以使用Google登录。",
+    openProviderSetupToSignIn: "打开Provider设置以登录。",
+    signInViaTheCLIToAuthenticate: "通过CLI登录以重新认证。",
+    noModelsAreAvailableForThisProvider: "此Provider没有可用模型。",
+    openProviderSetup: "打开Provider设置",
+    chatGPTUsageLimitReached: "已达到ChatGPT用量限制",
+    reviewYourUsageSettingsInChatGPTTo: "请查看ChatGPT中的用量设置以继续。",
+    dismissError: "关闭错误",
+    /** Names the provider driver to install. */
+    install: (provider) => `打开Provider设置以在此环境中安装 ${provider}。`,
+    /** Names the unavailable provider. */
+    unavailable: (provider) => `${provider} Provider不可用。`,
+    /** Names the provider with limited availability. */
+    limited: (provider) => `${provider} Provider可用性受限。`,
+    /** Names the unauthenticated provider. */
+    unauthenticated: (provider) => `${provider} 未认证`,
+    /** Names the provider version and its compatibility state. */
+    incompatible: (provider, version, broken) =>
+      `${provider} ${version} ${broken ? "存在已知故障" : "不受支持"}`,
+    /** Names the provider status banner. */
+    status: (provider) => `${provider} Provider状态`,
+    /** Names the provider and reported status whose notice is dismissed. */
+    dismiss: (provider, status) =>
+      `关闭 ${provider} Provider${({ ready: "就绪", warning: "警告", error: "错误", disabled: "已禁用" } as Record<string, string>)[status] ?? status}通知`,
+    usingChatGPTPlan: "使用ChatGPT套餐",
+  },
+  media: {
+    showScreenshot: "显示截图",
+    showAccessibilityJSON: "显示无障碍JSON",
+    showExtractedText: "显示提取的文本",
+    previousMedia: "上一个媒体",
+    nextMedia: "下一个媒体",
+    thisImageCouldNotBeLoaded: "无法加载此图片。",
+    imageUnavailableTheFileMayHaveBeen: "图片不可用。文件可能已移动或删除。",
+    reconnectToThisEnvironmentAndOpenThe: "重新连接此环境，然后再次打开媒体。",
+    theEnvironmentReturnedAnInvalidMediaURL: "环境返回了无效的媒体URL。",
+    clickToZoomInOrReturnTo:
+      "点击以放大或恢复适应尺寸。滚动以缩放，拖动以平移。按Enter切换缩放，按加号或减号缩放，按0适应尺寸。",
+    accessibilityData: "无障碍数据",
+    noAccessibilityData: "没有无障碍数据",
+    viewAccessibilityData: "查看无障碍数据",
+    capturedWindow: "已捕获的窗口",
+    unreadableAccessibility: "已包含结构化无障碍元素，但没有可读的名称或值。",
+    missingAccessibility: "应用或捕获后端未提供经过验证的无障碍数据。",
+    /** Names the expanded image or video preview. */
+    expandedPreview: (video) => `展开的${video ? "视频" : "图片"}预览`,
+    /** Names the image or video preview to close. */
+    closePreview: (video) => `关闭${video ? "视频" : "图片"}预览`,
+    /** Names the image that supports zooming. */
+    zoomable: (name) => `${name}，可缩放图片`,
+  },
+  links: {
+    openInIntegratedBrowser: "在内置浏览器中打开",
+    openInSystemBrowser: "在系统浏览器中打开",
+    copyLink: "复制链接",
+    linkToThread: "关联到对话",
+    unlinkFromThread: "取消关联对话",
+  },
+  openIn: {
+    thisMachine: "此机器",
+    editor: "编辑器",
+    open: "打开",
+    /** Names the editor selected for opening the workspace. */
+    openIn: (editor) => `在 ${editor} 中打开`,
+    openInEditor: "在编辑器中打开",
+    openFileInPreferredEditor: "在首选编辑器中打开文件",
+    chooseEditor: "选择编辑器",
+    openInEllipsis: "打开方式…",
+    noInstalledEditorsFound: "未找到已安装的编辑器",
+    /** Names the environment lacking an SSH route. */
+    noSsh: (environment) => `没有通往 ${environment} 的SSH连接`,
+    /** Names the environment that needs the SSH key. */
+    sshHint: (environment) => `通过SSH打开。需要在 ${environment} 上配置你的密钥`,
+  },
+  panelLayout: {
+    rightPanelIsUnavailable: "右侧面板不可用",
+    toggleThreadDetailsPanel: "切换对话详情面板",
+    toggleTerminalDrawer: "切换终端抽屉",
+    terminalDrawerIsUnavailable: "终端抽屉不可用",
+    toggleRightPanel: "切换右侧面板",
+    restorePanelSize: "恢复面板尺寸",
+    maximizePanel: "最大化面板",
+    /** Formats the terminal drawer action with its optional shortcut. */
+    terminalShortcut: (shortcut) => `切换终端抽屉${shortcut ? `（${shortcut}）` : ""}`,
+    /** Formats the right panel action with its optional shortcut. */
+    rightShortcut: (shortcut) => `切换右侧面板${shortcut ? `（${shortcut}）` : ""}`,
+    /** Formats the thread details action with its optional shortcut. */
+    threadShortcut: (shortcut) => `切换对话详情${shortcut ? `（${shortcut}）` : ""}`,
+  },
+  draftHero: {
+    noProject: "无项目",
+    chooseAProject: "选择项目",
+    addAProject: "添加项目",
+    whatShouldWeWorkOn: "我们要做什么？",
+    addAProjectToStart: "添加项目以开始",
+    orStartWithoutAProject: "或不使用项目开始",
+    buildPrefix: "我们要在 ",
+    buildSuffix: " 中做什么？",
+    startSuffix: " 以开始",
+    /** Names the selected project in the draft heading. */
+    buildIn: (project) => `我们要在 ${project} 中做什么？`,
+    /** Names the project selector in the accessible draft heading. */
+    start: (project) => `${project}以开始`,
+    addProject: "添加项目",
+  },
+  limitRecovery: {
+    usageLimitReached: "已达到用量限制",
+    resetTimeUnavailableRetryManually: "重置时间不可用；请手动重试",
+    theResetTimeHasPassedRetryThe: "重置时间已过。请手动重试此对话。",
+    couldNotChangeLimitRecovery: "无法更改用量恢复设置。",
+    saving: "正在保存…",
+    cancelAutoResume: "取消自动继续",
+    resumeAtReset: "重置时继续",
+    snoozeUntilReset: "暂停至重置",
+    /** Formats the existing localized reset date. */
+    resets: (time) => `重置时间：${time}`,
+  },
+  subagents: {
+    workflowFailed: "工作流失败",
+    workflowStopped: "工作流已停止",
+    statusUnavailable: "状态不可用",
+    completed: "✓ 已完成",
+    working: "运行中",
+    subagents: "子Agent",
+    runsOnItsOwn: "独立运行",
+    openParent: "打开父对话",
+    and: "和",
+    /** Formats the individual subagent count with the English plural. */
+    individualCount: (count) => `${count}个子Agent`,
+    /** Formats the batch count and whether individual agents are also listed. */
+    batchCount: (count, hasIndividuals) => `${count}批${hasIndividuals ? "" : "子Agent"}`,
+    /** Formats the launch wording from batch presence, liveness and counted subjects. */
+    lead: (batches, live, subjects) =>
+      `${batches ? "已启动" : live ? "已开始" : "已运行"}${subjects}`,
+    /** Formats the active subagent count. */
+    workingCount: (count) => `${count}个运行中`,
+    /** Formats the failed subagent count. */
+    failedCount: (count) => `${count}个失败`,
+    /** Formats the stopped subagent count. */
+    stoppedCount: (count) => `${count}个已停止`,
+    /** Formats the idle subagent count. */
+    idleCount: (count) => `${count}个空闲`,
+    /** Combines the model description with the shared provider status text. */
+    announcement: (model, status) => `${model} 子Agent：${status}`,
+  },
+  inspector: {
+    outputIsNoLongerAvailable: "输出已不可用。",
+    loadingOutput: "正在加载输出…",
+    noOutput: "没有输出。",
+    searchResult: "搜索结果",
+    /** Formats the tool output loading error. */
+    outputError: (error) => `无法加载输出：${error}`,
+    rollBack: "回滚",
+    openFork: "打开分支",
+    openSubagentThread: "打开子Agent对话",
+    /** Formats the command exit code. */
+    exitCode: (code) => `退出码 ${code}`,
+    /** Formats the reported context transfer kind and status. */
+    transfer: (type, status) => `转移 ${type.replaceAll("_", " ")} · ${status}`,
+  },
+  terminalContext: {
+    capturedTerminalOutput: "已捕获的终端输出",
+    /** Names the captured terminal excerpt. */
+    excerpt: (label) => `终端摘录，${label}`,
+    /** Formats the inclusive captured terminal line range. */
+    lines: (start, end) => (start === end ? `第${start}行` : `第${start}–${end}行`),
+    /** Names the terminal excerpt and its expiry state. */
+    expiredLabel: (label, expired) => `终端摘录，${label}${expired ? "，已过期" : ""}`,
+    /** Names the terminal excerpt that must be attached again. */
+    expiredHint: (label) => `终端上下文已过期。请移除并重新添加 ${label}，以将其包含在消息中。`,
+  },
+  autoBalanceUpdate: {
+    updating: "正在更新",
+    couldNotUpdate: "无法更新",
+    updateAvailableFor: "有可用更新：",
+    manualUpdateRequired: "需要手动更新",
+    reconnectThisMachineToUpdate: "重新连接此机器以更新",
+    retry: "重试",
+    updateAll: "全部更新",
+    dismissUpdateNotice: "关闭更新通知",
+    /** Names the available target version. */
+    ready: (version) => `可更新至 ${version}`,
+    /** Formats the machine update count with the English plural. */
+    machineCount: (count) => `更新${count}台机器`,
+    /** Combines the update state prefix with the machine count. */
+    title: (prefix, count) => `${prefix}${count}台机器`,
+    /** Names the update notice whose machine list can be opened. */
+    viewMachines: (title) => `${title}。查看机器`,
+    /** Formats the count of machines requiring a manual update. */
+    manualCount: (count) => `${count}台需要手动更新`,
+  },
+  speed: {
+    fast: "快速",
+    normal: "普通",
+    ultrafastModeOn: "极速模式已开启",
+    fastModeOn: "快速模式已开启",
+  },
+  workLog: {
+    thinking: "正在思考",
+    command: "命令",
+    tool: "工具",
+    /** Formats the provider retry attempt progress. */
+    retrying: (progress) => `正在重试Provider（${progress}）`,
+    /** Formats the provider recovery retry count. */
+    recovered: (progress) => `Provider已恢复（重试${progress}次）`,
+    /** Combines the failure label with retry progress. */
+    failedAfterRetries: (label, progress) => `${label}，已重试${progress}次`,
+    /** Formats retry progress when retries stop. */
+    retryStopped: (progress) => `Provider重试已停止（${progress}）`,
+    /** Formats the retry delay in milliseconds. */
+    retryDelayMs: (delay) => ` 将在${delay}毫秒后重试。`,
+    /** Formats the already formatted retry delay in seconds. */
+    retryDelaySeconds: (delay) => ` 将在${delay}秒后重试。`,
+    /** Formats the changed file count. */
+    changedFiles: (count) => `已更改${count}个文件`,
+    /** Formats the name of the changed file. */
+    changedFile: (fileName) => `已更改 ${fileName}`,
+    usageLimitReached: "已达到用量限制",
+    providerError: "Provider错误",
+    createdThread: "已创建对话",
+    ranCommand: "已运行命令",
+    fileChange: "文件更改",
+    searchedFiles: "已搜索文件",
+    fileSearch: "文件搜索",
+    searchedTheWeb: "已搜索网页",
+    webSearch: "网页搜索",
+    checkpointCaptured: "已创建检查点",
+    toolCall: "工具调用",
+    approvalRequested: "已请求审批",
+    answeredQuestions: "已回答问题",
+    inputRequested: "已请求输入",
+  },
+  changedFiles: {
+    collapseAllFolders: "折叠所有文件夹",
+    expandAllFolders: "展开所有文件夹",
+    openDiff: "打开差异",
+    openTheFullDiff: "打开完整差异",
+    /** Formats the changed file count with the English plural. */
+    count: (count) => `已更改${count}个文件`,
+  },
 };

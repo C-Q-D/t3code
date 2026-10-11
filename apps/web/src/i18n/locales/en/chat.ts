@@ -375,4 +375,655 @@ export const chat = {
     /** Formats the threadActions message from the supplied title. */
     threadActions: (title: string) => `Thread actions for ${title}`,
   },
+  timeline: {
+    thought: "Thought",
+    thinking: "Thinking",
+    webSearch: "Web search",
+    readFile: "Read file",
+    running: "Running",
+    failed: "Failed",
+    declined: "Declined",
+    stopped: "Stopped",
+    ran: "Ran",
+    command: "command",
+    youStoppedThisResponse: "You stopped this response",
+    worked: "Worked",
+    supersededAttempt: "Superseded attempt",
+    subagentOf: "Subagent of",
+    openParentThread: "Open parent thread",
+    loadEarlierTurns: "Load earlier turns",
+    loadingEarlierTurns: "Loading earlier turns…",
+    userMessage: "User message",
+    previousTurn: "Previous turn",
+    nextTurn: "Next turn",
+    sentByAutomation: "Sent by automation",
+    openSendingThread: "Open sending thread",
+    sentByAnotherAgent: "Sent by another agent",
+    you: "You",
+    queued: "Queued",
+    steer: "Steer",
+    queuedBehindTheActiveTurn: "Queued behind the active turn",
+    originallyQueuedThenPromotedToSteerThe:
+      "Originally queued, then promoted to steer the active turn",
+    steeredTheActiveTurn: "Steered the active turn",
+    editFromHere: "Edit from here",
+    forkFromThisResponse: "Fork from this response",
+    interruptRequested: "Interrupt requested",
+    runInterrupted: "Run interrupted",
+    contextHandoff: "Context handoff",
+    conversationFork: "Conversation fork",
+    contextCompacted: "Context compacted",
+    planUpdated: "Plan updated",
+    inherited: "Inherited",
+    synthetic: "Synthetic",
+    activity: "Activity",
+    toolCalls: "Tool calls",
+    settingUpWorktree: "Setting up worktree…",
+    working: "Working...",
+    setupScript: "Setup script",
+    toolCallFailed: "Tool call failed",
+    annotatedPreviewCrop: "Annotated preview crop",
+    previewAnnotation: "Preview annotation",
+    thisContextIsNoLongerAvailable: "This context is no longer available.",
+    skill: "Skill",
+    reviewComment: "Review comment",
+    showLess: "Show less",
+    showFullMessage: "Show full message",
+    openSubagentThread: "Open subagent thread",
+    contextCompactionFailed: "Context compaction failed",
+    contextCompactionStopped: "Context compaction stopped",
+    compactingContext: "Compacting context",
+    forkedFromConversation: "Forked from conversation",
+    openSourceConversation: "Open source conversation",
+    openFork: "Open fork",
+    createdThread: "Created thread",
+    createdThreadLabel: "created thread",
+    subagent: "Subagent",
+    waiting: "Waiting",
+    idleResumable: "Idle · resumable",
+    completed: "Completed",
+    finished: "Finished",
+    updated: "Updated",
+    /** Formats a file path and the count of additional files. */
+    moreFiles: (path: string, count: number): string => `${path} +${count} more`,
+    /** Formats the existing elapsed duration when the user stops. */
+    stoppedAfter: (duration: string): string => `You stopped after ${duration}`,
+    /** Formats the existing elapsed duration without changing its units. */
+    workedFor: (duration: string): string => `Worked for ${duration}`,
+    /** Names the message targeted by the timeline minimap. */
+    jumpToMessage: (text: string): string => `Jump to message: ${text}`,
+    /** Names the media or file to preview. */
+    preview: (name: string): string => `Preview ${name}`,
+    /** Names the file to download. */
+    download: (name: string): string => `Download ${name}`,
+    /** Names the continuation thread. */
+    continuesIn: (threadId: string): string => `Continues in ${threadId}`,
+    /** Names the thread or card to open. */
+    open: (title: string): string => `Open ${title}`,
+    /** Names a file or video attachment and its formatted size. */
+    attachment: (isVideo: boolean, name: string, size: string): string =>
+      `${isVideo ? "Video" : "File"} attachment, ${name}, ${size}`,
+    /** Names the selected browser element. */
+    browserElement: (label: string): string => `Browser element, ${label}`,
+    /** Names the preview annotation. */
+    annotation: (label: string): string => `Preview annotation, ${label}`,
+    /** Formats an optional already formatted usage reset time. */
+    usageLimit: (resetTime: string | null): string =>
+      `Usage limit reached.${resetTime ? ` Retry after ${resetTime}.` : ""}`,
+    sendAMessageToStartTheConversation: "Send a message to start the conversation.",
+    partialOutputRetained: "Partial output retained",
+    compacting: "Compacting…",
+    screenshotUnavailable: "Screenshot unavailable",
+    retry: "Retry",
+    openChat: "Open chat",
+    openSubagent: "Open subagent",
+    /** Names the source thread of an inherited or synthetic item. */
+    fromThread: (threadId: string): string => `From ${threadId}`,
+    /** Names the running worktree setup script. */
+    setupStillRunning: (name: string): string => `${name} is still running. Show setup progress.`,
+    /** Adds the tool failure announcement to an existing activity label. */
+    toolFailure: (label: string): string => `${label}, tool call failed`,
+    workingForPrefix: "Working for ",
+  },
+  markdown: {
+    note: "Note",
+    tip: "Tip",
+    important: "Important",
+    warning: "Warning",
+    caution: "Caution",
+    collapseTableCells: "Collapse table cells",
+    expandTableCells: "Expand table cells",
+    copied: "Copied",
+    copyTable: "Copy table",
+    copyAsMarkdown: "Copy as Markdown",
+    copyAsCSV: "Copy as CSV",
+    details: "Details",
+    disableLineWrap: "Disable line wrap",
+    wrapLines: "Wrap lines",
+    copyCode: "Copy code",
+    codeBlockActions: "Code block actions",
+    runInTerminal: "Run in terminal",
+    showDiagram: "Show diagram",
+    showCode: "Show code",
+    videoUnavailable: "Video unavailable",
+    imageUnavailable: "Image unavailable",
+    loadingImage: "Loading image",
+    unableToOpenFile: "Unable to open file",
+    anErrorOccurred: "An error occurred.",
+    unableToOpenFileInBrowser: "Unable to open file in browser",
+    unableToRevealFile: "Unable to reveal file",
+    clipboardAPIUnavailable: "Clipboard API unavailable.",
+    previewMedia: "Preview media",
+    openInIntegratedBrowser: "Open in integrated browser",
+    copyRelativePath: "Copy relative path",
+    copyFullPath: "Copy full path",
+    relativePath: "Relative path",
+    fullPath: "Full path",
+    mediaUnavailable: "Media unavailable",
+    theFileCouldNotBeLoadedIt: "The file could not be loaded. It may have been moved or deleted.",
+    thisConnectionCannotRevealFilesOnThis:
+      "This connection cannot reveal files on this environment.",
+    previewAccessIsUnavailableForThisClient: "Preview access is unavailable for this client.",
+    unableToOpenLinkInBrowser: "Unable to open link in browser",
+    environmentIsNotConnected: "Environment is not connected.",
+    toggleTask: "Toggle task",
+    unableToLinkPullRequest: "Unable to link pull request",
+    unableToUnlinkPullRequest: "Unable to unlink pull request",
+    theRequestFailed: "The request failed.",
+    mermaidFailedToLoad: "Mermaid failed to load.",
+    theDiagramCouldNotBeRendered: "The diagram could not be rendered.",
+    expandDiagram: "Expand diagram",
+    openInPanel: "Open in panel",
+    copyMessage: "Copy message",
+    retry: "Retry",
+    /** Names the code fence language. */
+    language: (language: string): string => `Language: ${language}`,
+    /** Names the media preview. */
+    preview: (name: string): string => `Preview ${name}`,
+    /** Names the clipboard operation that failed. */
+    copyFailed: (title: string): string => `Failed to copy ${title.toLowerCase()}`,
+    /** Names the file whose menu is opened. */
+    fileOptions: (label: string): string => `File options for ${label}`,
+    /** Combines the diagram error with the rendering failure. */
+    renderError: (message: string): string => `Unable to render diagram: ${message}`,
+    applyTemplate: "Use template",
+    renderingDiagram: "Rendering diagram",
+    /** Names the HTML render that failed to load. */
+    unableToLoad: (title: string): string => `Unable to load ${title}`,
+  },
+  plan: {
+    couldNotCopyPlan: "Could not copy plan",
+    anErrorOccurredWhileCopying: "An error occurred while copying.",
+    proposedPlan: "Proposed plan",
+    workspacePathIsUnavailable: "Workspace path is unavailable",
+    thisThreadDoesNotHaveAWorkspace: "This thread does not have a workspace path to save into.",
+    enterAWorkspacePath: "Enter a workspace path",
+    planSavedToWorkspace: "Plan saved to workspace",
+    couldNotSavePlan: "Could not save plan",
+    anErrorOccurredWhileSaving: "An error occurred while saving.",
+    plan: "Plan",
+    planActions: "Plan actions",
+    copied: "Copied!",
+    copyToClipboard: "Copy to clipboard",
+    downloadAsMarkdown: "Download as markdown",
+    saveToWorkspace: "Save to workspace",
+    collapsePlan: "Collapse plan",
+    expandPlan: "Expand plan",
+    savePlanToWorkspace: "Save plan to workspace",
+    theWorkspace: "the workspace",
+    workspacePath: "Workspace path",
+    cancel: "Cancel",
+    saving: "Saving...",
+    save: "Save",
+    pathPrefix: "Enter a path relative to ",
+    pathSuffix: ".",
+  },
+  citation: {
+    viewSource: "View source",
+    editCitationComment: "Edit citation comment",
+    addCommentToCitation: "Add comment to citation",
+    commentOnSelectedText: "Comment on selected text",
+    enterToSaveTheCitationCommentCommand:
+      "Enter to save the citation comment; Command/Ctrl+Enter to save and send; Shift+Enter for a new line.",
+    addAnOptionalComment: "Add an optional comment...",
+    shortenComment: "Shorten comment",
+    save: "Save",
+    couldNotOpenTheCitedResponse: "Could not open the cited response",
+    clickTheCitationToTryAgain: "Click the citation to try again.",
+    theQuotedTextHasChanged: "The quoted text has changed",
+    showingTheSourceResponseTheSavedQuote:
+      "Showing the source response. The saved quote is unchanged.",
+    selectionIsTooLongToCite: "Selection is too long to cite",
+    citeSelectionInComposer: "Cite selection in composer",
+    shortenSelection: "Shorten selection",
+    cite: "Cite",
+    couldNotLoadTheCitedResponse: "Could not load the cited response",
+    loadEarlierTurnsThenClickTheCitation:
+      "Load earlier turns, then click the citation to try again. Your saved quote is unchanged.",
+    theCitedResponseIsUnavailable: "The cited response is unavailable",
+    itMayHaveBeenRemovedTheSelected:
+      "It may have been removed. The selected text is still saved in your citation.",
+    theCitationDoesNotReferToAn: "The citation does not refer to an assistant response",
+    theSelectedTextIsStillSavedIn: "The selected text is still saved in your citation.",
+    /** Names the saved citation excerpt to view. */
+    viewCitedText: (label: string): string => `View cited assistant text: ${label}`,
+    cancel: "Cancel",
+    /** Formats the existing localized citation comment length limit. */
+    commentLimit: (count: string): string => `Comments can contain up to ${count} characters.`,
+  },
+  details: {
+    workspace: "Workspace",
+    clientAndServerVersionsDiffer: "Client and server versions differ",
+    dismissVersionMismatchWarning: "Dismiss version mismatch warning",
+    versionControl: "Version Control",
+    threadDetails: "Thread details",
+    resolve: "Resolve",
+    preparing: "Preparing...",
+    ready: "Ready",
+    marking: "Marking...",
+    fix: "Fix",
+    merging: "Merging...",
+    merge: "Merge",
+    checkTheBranchOutAndResolveThe:
+      "Check the branch out and resolve the conflicts in a new thread",
+    markThisPullRequestAsReadyFor: "Mark this pull request as ready for review",
+    fixTheFailingChecksInANew: "Fix the failing checks in a new thread",
+    mergePullRequest: "Merge pull request?",
+    cancel: "Cancel",
+    showLess: "Show less",
+    couldNotUpdateAutomation: "Could not update automation",
+    couldNotRunAutomation: "Could not run automation",
+    automations: "Automations",
+    manageScheduledTasks: "Manage scheduled tasks",
+    editAutomation: "Edit automation",
+    runNow: "Run now",
+    watchingHint:
+      "Watching: the agent wakes when checks finish, someone comments, or the branch conflicts. Click to stop.",
+    /** Formats the client version before the server version. */
+    clientVersion: (version: string): string => `Client ${version} · `,
+    /** Names the pull request by number. */
+    pullRequest: (number: number): string => `Pull request #${number}`,
+    /** Names the selected pull request merge method. */
+    mergeMethod: (method: string): string => `Merge this pull request (${method})`,
+    /** Names the pull request watch to stop. */
+    stopWatching: (number: number): string => `Stop watching #${number}`,
+    /** Names the pull request number and selected merge method. */
+    mergeDescription: (number: number, method: string): string =>
+      `This merges #${number} using ${method}.`,
+    /** Names the branch with which the pull request conflicts. */
+    conflicts: (branch: string): string => `Merge conflicts with ${branch}`,
+    /** Selects the English singular or plural file unit for the count. */
+    fileNoun: (count: number): string => (count === 1 ? "file" : "files"),
+    /** Formats the count of additional pull requests. */
+    showMore: (count: number): string => `Show ${count} more`,
+    /** Names the automation to edit. */
+    editTask: (title: string): string => `Edit ${title}`,
+    /** Names the automation to run immediately. */
+    runTask: (title: string): string => `Run ${title} now`,
+    /** Names the automation to pause. */
+    pauseTask: (title: string): string => `Pause ${title}`,
+    /** Names the automation to resume. */
+    resumeTask: (title: string): string => `Resume ${title}`,
+    /** Formats the added and deleted line counts for assistive readers. */
+    diffStat: (additions: number, deletions: number): string =>
+      `${additions} additions, ${deletions} deletions`,
+    /** Formats the automation query error. */
+    loadAutomationsError: (error: string): string => `Could not load automations: ${error}`,
+  },
+  relationships: {
+    starting: "Starting",
+    running: "Running",
+    queued: "Queued",
+    waiting: "Waiting",
+    done: "Done",
+    failed: "Failed",
+    stopped: "Stopped",
+    reverted: "Reverted",
+    resolvedNative: "Resolved (native)",
+    resolvedPortable: "Resolved (portable)",
+    consumed: "Consumed",
+    superseded: "Superseded",
+    idle: "Idle",
+    unknown: "Unknown",
+    relatedThreads: "Related threads",
+    contextTransfer: "Context transfer",
+    subagent: "Subagent",
+    parentAgent: "Parent agent",
+    fork: "Fork",
+    parentThread: "Parent thread",
+    previousAgents: "Previous agents",
+    couldNotStopSubagent: "Could not stop subagent",
+    lineage: "Lineage",
+    moreThreadActions: "More thread actions",
+    thisRelatedThreadIsUnavailable: "This related thread is unavailable",
+    mergeBackToSourceConversation: "Merge back to source conversation",
+    completeARunInThisForkBefore: "Complete a run in this fork before merging it back",
+    mergeThisConversationBackIntoItsSource: "Merge this conversation back into its source",
+    stopSubagent: "Stop subagent",
+    /** Formats the running related agent count. */
+    lineageRunning: (count: number): string => `Lineage · ${count} running`,
+    /** Names the related thread role to open. */
+    openRelated: (relationship: string): string =>
+      `Open ${relationship.toLowerCase()} in this chat`,
+    /** Names the parent conversation to merge back into. */
+    mergeBack: (title: string): string => `Merge back to ${title}`,
+    /** Names the source conversation receiving the merge. */
+    mergeConversation: (title: string): string => `Merge this conversation back into ${title}`,
+    /** Names the subagent to stop. */
+    stopAgent: (title: string): string => `Stop subagent ${title}`,
+    disconnectAgentSession: "Disconnect agent session",
+    showMorePrefix: "Show ",
+    showMoreSuffix: " more",
+  },
+  queue: {
+    collapseQueuedMessages: "Collapse queued messages",
+    expandQueuedMessages: "Expand queued messages",
+    queued: "Queued",
+    reorderQueuedMessageDragOrPressThe: "Reorder queued message (drag, or press the arrow keys)",
+    savingQueuedMessage: "Saving queued message",
+    cancelEditingQueuedMessage: "Cancel editing queued message",
+    editQueuedMessage: "Edit queued message",
+    thereIsNoActiveRunToSteer: "There is no active run to steer",
+    removeQueuedMessage: "Remove queued message",
+    removeFromQueue: "Remove from queue",
+    /** Formats the queued message count with the English plural. */
+    count: (count: number): string => `${count} queued message${count === 1 ? "" : "s"}`,
+    /** Formats the edit action with an optional shortcut. */
+    editInComposer: (shortcut: string | null): string =>
+      `Edit in the composer${shortcut ? ` (${shortcut})` : ""}`,
+    /** Formats the steer action with an optional shortcut. */
+    sendSteer: (shortcut: string | null): string =>
+      `Send as a steer instead${shortcut ? ` (${shortcut})` : ""}`,
+    cancel: "Cancel",
+    steer: "Steer",
+    retryOrRemoveFailedUploadsBeforeSaving: "Retry or remove failed uploads before saving.",
+    editingQueuedPrefix: "Editing queued message: ",
+  },
+  runtimeMode: {
+    supervised: "Supervised",
+    askBeforeCommandsAndFileChanges: "Ask before commands and file changes.",
+    autoAcceptEdits: "Auto-accept edits",
+    autoApproveEditsAskBeforeOtherActions: "Auto-approve edits, ask before other actions.",
+    auto: "Auto",
+    supportedProvidersApproveRoutineActionsOthersStill:
+      "Supported providers approve routine actions; others still ask.",
+    fullAccess: "Full access",
+    allowCommandsAndEditsWithoutPrompts: "Allow commands and edits without prompts.",
+    moreComposerControls: "More composer controls",
+    mode: "Mode",
+    chat: "Chat",
+    plan: "Plan",
+    access: "Access",
+  },
+  worktreeSetup: {
+    settingUpWorktree: "Setting up worktree…",
+    worktreeReadySetupScriptFailed: "Worktree ready, setup script failed",
+    worktreeReady: "Worktree ready",
+    worktreeSetupFailed: "Worktree setup failed",
+    worktreeSetupCancelled: "Worktree setup cancelled",
+    branch: "Branch",
+    base: "Base",
+    path: "Path",
+    setup: "Setup",
+    worktreeSetup: "Worktree setup",
+    details: "Details",
+    openTerminal: "Open terminal",
+    workLocally: "Work locally",
+    cancel: "Cancel",
+  },
+  providerStatus: {
+    openProviderSetupToSignInWith: "Open provider setup to sign in with Google.",
+    openProviderSetupToSignIn: "Open provider setup to sign in.",
+    signInViaTheCLIToAuthenticate: "Sign in via the CLI to authenticate again.",
+    noModelsAreAvailableForThisProvider: "No models are available for this provider.",
+    openProviderSetup: "Open provider setup",
+    chatGPTUsageLimitReached: "ChatGPT usage limit reached",
+    reviewYourUsageSettingsInChatGPTTo: "Review your usage settings in ChatGPT to continue.",
+    dismissError: "Dismiss error",
+    /** Names the provider driver to install. */
+    install: (provider: string): string =>
+      `Open provider setup to install ${provider} on this environment.`,
+    /** Names the unavailable provider. */
+    unavailable: (provider: string): string => `${provider} provider is unavailable.`,
+    /** Names the provider with limited availability. */
+    limited: (provider: string): string => `${provider} provider has limited availability.`,
+    /** Names the unauthenticated provider. */
+    unauthenticated: (provider: string): string => `${provider} is unauthenticated`,
+    /** Names the provider version and its compatibility state. */
+    incompatible: (provider: string, version: string, broken: boolean): string =>
+      `${provider} ${version} is ${broken ? "known to be broken" : "unsupported"}`,
+    /** Names the provider status banner. */
+    status: (provider: string): string => `${provider} provider status`,
+    /** Names the provider and reported status whose notice is dismissed. */
+    dismiss: (provider: string, status: string): string => `Dismiss ${provider} provider ${status}`,
+    usingChatGPTPlan: "Using ChatGPT plan",
+  },
+  media: {
+    showScreenshot: "Show screenshot",
+    showAccessibilityJSON: "Show accessibility JSON",
+    showExtractedText: "Show extracted text",
+    previousMedia: "Previous media",
+    nextMedia: "Next media",
+    thisImageCouldNotBeLoaded: "This image could not be loaded.",
+    imageUnavailableTheFileMayHaveBeen:
+      "Image unavailable. The file may have been moved or deleted.",
+    reconnectToThisEnvironmentAndOpenThe: "Reconnect to this environment and open the media again.",
+    theEnvironmentReturnedAnInvalidMediaURL: "The environment returned an invalid media URL.",
+    clickToZoomInOrReturnTo:
+      "Click to zoom in or return to fit. Scroll to zoom, drag to pan. Use Enter to toggle zoom, plus or minus to zoom, and 0 to fit.",
+    accessibilityData: "Accessibility data",
+    noAccessibilityData: "No accessibility data",
+    viewAccessibilityData: "View accessibility data",
+    capturedWindow: "Captured window",
+    unreadableAccessibility:
+      "Structured accessibility elements were included, but they have no readable names or values.",
+    missingAccessibility: "The app or capture backend did not provide verified accessibility data.",
+    /** Names the expanded image or video preview. */
+    expandedPreview: (video: boolean): string => `Expanded ${video ? "video" : "image"} preview`,
+    /** Names the image or video preview to close. */
+    closePreview: (video: boolean): string => `Close ${video ? "video" : "image"} preview`,
+    /** Names the image that supports zooming. */
+    zoomable: (name: string): string => `${name}, zoomable image`,
+  },
+  links: {
+    openInIntegratedBrowser: "Open in integrated browser",
+    openInSystemBrowser: "Open in system browser",
+    copyLink: "Copy Link",
+    linkToThread: "Link to thread",
+    unlinkFromThread: "Unlink from thread",
+  },
+  openIn: {
+    thisMachine: "this machine",
+    editor: "editor",
+    open: "Open",
+    /** Names the editor selected for opening the workspace. */
+    openIn: (editor: string): string => `Open in ${editor}`,
+    openInEditor: "Open in editor",
+    openFileInPreferredEditor: "Open file in preferred editor",
+    chooseEditor: "Choose editor",
+    openInEllipsis: "Open in…",
+    noInstalledEditorsFound: "No installed editors found",
+    /** Names the environment lacking an SSH route. */
+    noSsh: (environment: string): string => `No SSH route to ${environment}`,
+    /** Names the environment that needs the SSH key. */
+    sshHint: (environment: string): string => `Opens over SSH. Needs your key on ${environment}`,
+  },
+  panelLayout: {
+    rightPanelIsUnavailable: "Right panel is unavailable",
+    toggleThreadDetailsPanel: "Toggle thread details panel",
+    toggleTerminalDrawer: "Toggle terminal drawer",
+    terminalDrawerIsUnavailable: "Terminal drawer is unavailable",
+    toggleRightPanel: "Toggle right panel",
+    restorePanelSize: "Restore panel size",
+    maximizePanel: "Maximize panel",
+    /** Formats the terminal drawer action with its optional shortcut. */
+    terminalShortcut: (shortcut: string | null): string =>
+      `Toggle terminal drawer${shortcut ? ` (${shortcut})` : ""}`,
+    /** Formats the right panel action with its optional shortcut. */
+    rightShortcut: (shortcut: string | null): string =>
+      `Toggle right panel${shortcut ? ` (${shortcut})` : ""}`,
+    /** Formats the thread details action with its optional shortcut. */
+    threadShortcut: (shortcut: string | null): string =>
+      `Toggle thread details${shortcut ? ` (${shortcut})` : ""}`,
+  },
+  draftHero: {
+    noProject: "No project",
+    chooseAProject: "Choose a project",
+    addAProject: "Add a project",
+    whatShouldWeWorkOn: "What should we work on?",
+    addAProjectToStart: "Add a project to start",
+    orStartWithoutAProject: "or start without a project",
+    buildPrefix: "What should we build in ",
+    buildSuffix: "?",
+    startSuffix: " to start",
+    /** Names the selected project in the draft heading. */
+    buildIn: (project: string | null): string => `What should we build in ${project}?`,
+    /** Names the project selector in the accessible draft heading. */
+    start: (project: string): string => `${project} to start`,
+    addProject: "Add project",
+  },
+  limitRecovery: {
+    usageLimitReached: "Usage limit reached",
+    resetTimeUnavailableRetryManually: "Reset time unavailable; retry manually",
+    theResetTimeHasPassedRetryThe: "The reset time has passed. Retry the thread manually.",
+    couldNotChangeLimitRecovery: "Could not change limit recovery.",
+    saving: "Saving...",
+    cancelAutoResume: "Cancel auto-resume",
+    resumeAtReset: "Resume at reset",
+    snoozeUntilReset: "Snooze until reset",
+    /** Formats the existing localized reset date. */
+    resets: (time: string): string => `Resets ${time}`,
+  },
+  subagents: {
+    workflowFailed: "Workflow failed",
+    workflowStopped: "Workflow stopped",
+    statusUnavailable: "Status unavailable",
+    completed: "✓ completed",
+    working: "working",
+    subagents: "subagents",
+    runsOnItsOwn: "Runs on its own",
+    openParent: "Open parent",
+    and: " and ",
+    /** Formats the individual subagent count with the English plural. */
+    individualCount: (count: number): string => `${count} subagent${count === 1 ? "" : "s"}`,
+    /** Formats the batch count and whether individual agents are also listed. */
+    batchCount: (count: number, hasIndividuals: boolean): string =>
+      `${count} ${hasIndividuals ? "" : "subagent "}batch${count === 1 ? "" : "es"}`,
+    /** Formats the launch wording from batch presence, liveness and counted subjects. */
+    lead: (batches: boolean, live: boolean, subjects: string): string =>
+      `${batches ? "Launched" : live ? "Kicked off" : "Ran"} ${subjects}`,
+    /** Formats the active subagent count. */
+    workingCount: (count: number): string => `${count} working`,
+    /** Formats the failed subagent count. */
+    failedCount: (count: number): string => `${count} failed`,
+    /** Formats the stopped subagent count. */
+    stoppedCount: (count: number): string => `${count} stopped`,
+    /** Formats the idle subagent count. */
+    idleCount: (count: number): string => `${count} idle`,
+    /** Combines the model description with the shared provider status text. */
+    announcement: (model: string, status: string): string => `${model} subagent: ${status}`,
+  },
+  inspector: {
+    outputIsNoLongerAvailable: "Output is no longer available.",
+    loadingOutput: "Loading output…",
+    noOutput: "No output.",
+    searchResult: "Search result",
+    /** Formats the tool output loading error. */
+    outputError: (error: string): string => `Couldn't load output: ${error}`,
+    rollBack: "Roll back",
+    openFork: "Open fork",
+    openSubagentThread: "Open subagent thread",
+    /** Formats the command exit code. */
+    exitCode: (code: number): string => `exit ${code}`,
+    /** Formats the reported context transfer kind and status. */
+    transfer: (type: string, status: string): string =>
+      `Transfer ${type.replaceAll("_", " ")} · ${status}`,
+  },
+  terminalContext: {
+    capturedTerminalOutput: "Captured terminal output",
+    /** Names the captured terminal excerpt. */
+    excerpt: (label: string): string => `Terminal excerpt, ${label}`,
+    /** Formats the inclusive captured terminal line range. */
+    lines: (start: number, end: number): string =>
+      start === end ? `Line ${start}` : `Lines ${start}–${end}`,
+    /** Names the terminal excerpt and its expiry state. */
+    expiredLabel: (label: string, expired: boolean): string =>
+      `Terminal excerpt, ${label}${expired ? ", expired" : ""}`,
+    /** Names the terminal excerpt that must be attached again. */
+    expiredHint: (label: string): string =>
+      `Terminal context expired. Remove and re-add ${label} to include it in your message.`,
+  },
+  autoBalanceUpdate: {
+    updating: "Updating",
+    couldNotUpdate: "Could not update",
+    updateAvailableFor: "Update available for",
+    manualUpdateRequired: "Manual update required",
+    reconnectThisMachineToUpdate: "Reconnect this machine to update",
+    retry: "Retry",
+    updateAll: "Update all",
+    dismissUpdateNotice: "Dismiss update notice",
+    /** Names the available target version. */
+    ready: (version: string): string => `Ready to update to ${version}`,
+    /** Formats the machine update count with the English plural. */
+    machineCount: (count: number): string =>
+      `Update ${count} ${count === 1 ? "machine" : "machines"}`,
+    /** Combines the update state prefix with the machine count. */
+    title: (prefix: string, count: number): string =>
+      `${prefix} ${count} ${count === 1 ? "machine" : "machines"}`,
+    /** Names the update notice whose machine list can be opened. */
+    viewMachines: (title: string): string => `${title}. View machines`,
+    /** Formats the count of machines requiring a manual update. */
+    manualCount: (count: number): string =>
+      `${count} ${count === 1 ? "needs" : "need"} a manual update`,
+  },
+  speed: {
+    fast: "Fast",
+    normal: "Normal",
+    ultrafastModeOn: "Ultrafast mode on",
+    fastModeOn: "Fast mode on",
+  },
+  workLog: {
+    thinking: "Thinking",
+    command: "Command",
+    tool: "Tool",
+    /** Formats the provider retry attempt progress. */
+    retrying: (progress: string): string => `Retrying provider (${progress})`,
+    /** Formats the provider recovery retry count. */
+    recovered: (progress: string): string => `Provider recovered (${progress} retries)`,
+    /** Combines the failure label with retry progress. */
+    failedAfterRetries: (label: string, progress: string): string =>
+      `${label} after ${progress} retries`,
+    /** Formats retry progress when retries stop. */
+    retryStopped: (progress: string): string => `Provider retry stopped (${progress})`,
+    /** Formats the retry delay in milliseconds. */
+    retryDelayMs: (delay: number): string => ` Retrying in ${delay}ms.`,
+    /** Formats the already formatted retry delay in seconds. */
+    retryDelaySeconds: (delay: string): string => ` Retrying in ${delay}s.`,
+    /** Formats the changed file count. */
+    changedFiles: (count: number): string => `Changed ${count} files`,
+    /** Formats the name of the changed file. */
+    changedFile: (fileName: string): string => `Changed ${fileName}`,
+    usageLimitReached: "Usage limit reached",
+    providerError: "Provider error",
+    createdThread: "Created thread",
+    ranCommand: "Ran command",
+    fileChange: "File change",
+    searchedFiles: "Searched files",
+    fileSearch: "File search",
+    searchedTheWeb: "Searched the web",
+    webSearch: "Web search",
+    checkpointCaptured: "Checkpoint captured",
+    toolCall: "Tool call",
+    approvalRequested: "Approval requested",
+    answeredQuestions: "Answered questions",
+    inputRequested: "Input requested",
+  },
+  changedFiles: {
+    collapseAllFolders: "Collapse all folders",
+    expandAllFolders: "Expand all folders",
+    openDiff: "Open diff",
+    openTheFullDiff: "Open the full diff",
+    /** Formats the changed file count with the English plural. */
+    count: (count: number): string => `${count} changed file${count === 1 ? "" : "s"}`,
+  },
 };

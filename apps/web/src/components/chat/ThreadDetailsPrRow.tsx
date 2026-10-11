@@ -1,3 +1,5 @@
+/** Displays a linked pull request and the action that can unblock it. */
+import { t } from "~/i18n";
 import { ThreadDetailsControl } from "./ThreadDetailsControl";
 import { PullRequestGlyph } from "../pullRequest/pullRequestIcons";
 /**
@@ -79,6 +81,14 @@ import {
   THREAD_DETAILS_PANEL_SPLIT_SEPARATOR_CLASS,
 } from "./threadDetailsPanelStyles";
 
+/**
+ * Renders one pull-request row with status and permission-aware host actions.
+ * @param props - Required environmentId, PR data, number, labels, and open callback. reference may
+ * be null or omitted; status and project may be null when unavailable. Optional onActed refreshes
+ * stale status after a mutation, and onStopWatching ends the server watch.
+ * @returns The pull-request row element; never null. Host actions execute only through user
+ * interaction.
+ */
 export function ThreadDetailsPrRow({
   environmentId,
   pr,
@@ -237,7 +247,9 @@ export function ThreadDetailsPrRow({
   // detail rows, so the two read as one family.
   const rowTooltip =
     detail === null || statePresentation === null ? (
-      <TooltipPopup side="top">{status?.tooltip ?? `Pull request #${number}`}</TooltipPopup>
+      <TooltipPopup side="top">
+        {status?.tooltip ?? t.chat.details.pullRequest(number)}
+      </TooltipPopup>
     ) : (
       <TooltipPopup
         side="top"
@@ -285,7 +297,7 @@ export function ThreadDetailsPrRow({
               <div className="flex min-w-0 items-start gap-2 text-destructive">
                 <TriangleAlertIcon aria-hidden className="mt-0.5 size-3 shrink-0 stroke-current" />
                 <div className="min-w-0 flex-1 wrap-break-word leading-5">
-                  Merge conflicts with {detail.baseBranch}
+                  {t.chat.details.conflicts(detail.baseBranch)}
                 </div>
               </div>
             ) : null}
@@ -293,7 +305,7 @@ export function ThreadDetailsPrRow({
               <FileDiffIcon className="size-3 shrink-0 stroke-muted-foreground" />
               <div className="min-w-0 flex items-baseline gap-1 truncate text-foreground/75">
                 {detail.changedFiles.toLocaleString()}{" "}
-                {detail.changedFiles === 1 ? "file" : "files"}
+                {t.chat.details.fileNoun(detail.changedFiles)}
                 <PullRequestDiffStat additions={detail.additions} deletions={detail.deletions} />
               </div>
             </div>
@@ -305,42 +317,42 @@ export function ThreadDetailsPrRow({
   const trailingAction =
     rowAction === "resolve"
       ? {
-          label: "Resolve",
-          pendingLabel: "Preparing...",
+          label: t.chat.details.resolve,
+          pendingLabel: t.chat.details.preparing,
           pending: handoff === "conflicts",
           destructive: true,
           suffix: <ArrowUpRightIcon aria-hidden className="size-3 shrink-0" />,
-          tooltip: "Check the branch out and resolve the conflicts in a new thread",
+          tooltip: t.chat.details.checkTheBranchOutAndResolveThe,
           onClick: startResolveConflicts,
         }
       : rowAction === "ready"
         ? {
-            label: "Ready",
-            pendingLabel: "Marking...",
+            label: t.chat.details.ready,
+            pendingLabel: t.chat.details.marking,
             pending: actionPending,
             destructive: false,
             suffix: null,
-            tooltip: "Mark this pull request as ready for review",
+            tooltip: t.chat.details.markThisPullRequestAsReadyFor,
             onClick: () => void perform("ready"),
           }
         : rowAction === "fix"
           ? {
-              label: "Fix",
-              pendingLabel: "Preparing...",
+              label: t.chat.details.fix,
+              pendingLabel: t.chat.details.preparing,
               pending: handoff === "findings",
               destructive: true,
               suffix: <ArrowUpRightIcon aria-hidden className="size-3 shrink-0" />,
-              tooltip: "Fix the failing checks in a new thread",
+              tooltip: t.chat.details.fixTheFailingChecksInANew,
               onClick: startFixChecks,
             }
           : rowAction === "merge"
             ? {
-                label: "Merge",
-                pendingLabel: "Merging...",
+                label: t.chat.details.merge,
+                pendingLabel: t.chat.details.merging,
                 pending: actionPending,
                 destructive: false,
                 suffix: null,
-                tooltip: `Merge this pull request (${selectedMergeMethod})`,
+                tooltip: t.chat.details.mergeMethod(selectedMergeMethod),
                 onClick: () => setConfirmingMerge(true),
               }
             : null;
@@ -359,7 +371,7 @@ export function ThreadDetailsPrRow({
               size="sm"
               part={part}
               className="group/watch"
-              aria-label={`Stop watching #${number}`}
+              aria-label={t.chat.details.stopWatching(number)}
               onClick={onStopWatching}
             />
           }
@@ -376,10 +388,7 @@ export function ThreadDetailsPrRow({
             )}
           />
         </TooltipTrigger>
-        <TooltipPopup side="top">
-          Watching: the agent wakes when checks finish, someone comments, or the branch conflicts.
-          Click to stop.
-        </TooltipPopup>
+        <TooltipPopup side="top">{t.chat.details.watchingHint}</TooltipPopup>
       </Tooltip>
     ) : null;
 
@@ -462,14 +471,14 @@ export function ThreadDetailsPrRow({
         <AlertDialog open={confirmingMerge} onOpenChange={(open) => setConfirmingMerge(open)}>
           <AlertDialogPopup>
             <AlertDialogHeader>
-              <AlertDialogTitle>Merge pull request?</AlertDialogTitle>
+              <AlertDialogTitle>{t.chat.details.mergePullRequest}</AlertDialogTitle>
               <AlertDialogDescription>
-                This merges #{number} using {selectedMergeMethod}.
+                {t.chat.details.mergeDescription(number, selectedMergeMethod)}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogClose render={<Button variant="outline" size="sm" />}>
-                Cancel
+                {t.chat.details.cancel}
               </AlertDialogClose>
               <Button
                 size="sm"
@@ -479,7 +488,7 @@ export function ThreadDetailsPrRow({
                   void perform("merge", selectedMergeMethod);
                 }}
               >
-                Merge
+                {t.chat.details.merge}
               </Button>
             </AlertDialogFooter>
           </AlertDialogPopup>

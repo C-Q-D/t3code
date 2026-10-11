@@ -1,3 +1,5 @@
+/** Defines display labels and stable actions for external link context menus. */
+import { t } from "~/i18n";
 import type { ContextMenuItem } from "@t3tools/contracts";
 
 export type ExternalLinkContextMenuAction =
@@ -24,9 +26,9 @@ const FAILURE_OPERATION_BY_ACTION = {
 } as const satisfies Record<ExternalLinkContextMenuAction, ExternalLinkContextMenuFailureOperation>;
 
 const EXTERNAL_LINK_CONTEXT_MENU_ITEMS = [
-  { id: "open-in-preview", label: "Open in integrated browser" },
-  { id: "open-external", label: "Open in system browser" },
-  { id: "copy-link", label: "Copy Link" },
+  { id: "open-in-preview", label: t.chat.links.openInIntegratedBrowser },
+  { id: "open-external", label: t.chat.links.openInSystemBrowser },
+  { id: "copy-link", label: t.chat.links.copyLink },
 ] as const satisfies readonly ContextMenuItem<ExternalLinkContextMenuAction>[];
 
 /**
@@ -47,7 +49,9 @@ function externalLinkContextMenuItems(options: {
     {
       id: options.threadLinkAction,
       label:
-        options.threadLinkAction === "link-to-thread" ? "Link to thread" : "Unlink from thread",
+        options.threadLinkAction === "link-to-thread"
+          ? t.chat.links.linkToThread
+          : t.chat.links.unlinkFromThread,
     },
     ...items,
   ];

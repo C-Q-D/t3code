@@ -1,3 +1,5 @@
+/** Displays an image with the existing zoom and pan interactions. */
+import { t } from "~/i18n";
 import {
   useCallback,
   useEffect,
@@ -147,8 +149,8 @@ export function ZoomableImage({
       <div
         ref={viewportRef}
         role="region"
-        aria-label={`${name}, zoomable image`}
-        aria-description="Click to zoom in or return to fit. Scroll to zoom, drag to pan. Use Enter to toggle zoom, plus or minus to zoom, and 0 to fit."
+        aria-label={t.chat.media.zoomable(name)}
+        aria-description={t.chat.media.clickToZoomInOrReturnTo}
         tabIndex={0}
         className="max-w-[var(--media-width)] overflow-auto overscroll-contain rounded-lg bg-background shadow-2xl ring-1 ring-border/70 outline-none focus-visible:ring-2 focus-visible:ring-ring"
         style={{

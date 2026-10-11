@@ -1,3 +1,5 @@
+/** Renders Mermaid source with retry and expanded preview controls. */
+import { t } from "~/i18n";
 import DOMPurify from "dompurify";
 import type { Mermaid } from "mermaid";
 import { use, useState } from "react";
@@ -60,6 +62,14 @@ function sanitizeMermaidSvg(svg: string): string {
 // there is worth a retry, unlike a syntax error.
 const CHUNK_LOAD_ERROR = /dynamically imported module|importing a module script|failed to fetch/i;
 
+/**
+ * Loads Mermaid and renders sanitized SVG using the requested theme.
+ * @param source - Required Mermaid source; empty or invalid source is handled as a render error.
+ * @param theme - Light or dark presentation theme.
+ * @returns A promise for sanitized SVG or a structured error with retryability; never null. Mutates
+ * Mermaid global configuration, so callers must serialize renders; temporary render nodes are
+ * removed.
+ */
 async function renderMermaid(
   source: string,
   theme: "light" | "dark",
@@ -69,7 +79,7 @@ async function renderMermaid(
   try {
     mermaid = await loadMermaid();
   } catch {
-    return { status: "error", message: "Mermaid failed to load.", retryable: true };
+    return { status: "error", message: t.chat.markdown.mermaidFailedToLoad, retryable: true };
   }
   try {
     // initialize() mutates global config, so renders run one at a time.
@@ -97,7 +107,8 @@ async function renderMermaid(
     const { svg } = await mermaid.render(id, source);
     return { status: "rendered", svg: sanitizeMermaidSvg(svg) };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "The diagram could not be rendered.";
+    const message =
+      error instanceof Error ? error.message : t.chat.markdown.theDiagramCouldNotBeRendered;
     return { status: "error", message, retryable: CHUNK_LOAD_ERROR.test(message) };
   } finally {
     document.getElementById(`d${id}`)?.remove();
@@ -177,7 +188,9 @@ export function MermaidDiagram({
     return (
       <div>
         <div className="flex items-center justify-between gap-2">
-          <p className="m-0 text-xs text-destructive">Unable to render diagram: {result.message}</p>
+          <p className="m-0 text-xs text-destructive">
+            {t.chat.markdown.renderError(result.message)}
+          </p>
           {result.retryable ? (
             <Button
               type="button"
@@ -188,7 +201,7 @@ export function MermaidDiagram({
                 setAttempt((attempt) => attempt + 1);
               }}
             >
-              Retry
+              {t.chat.markdown.retry}
             </Button>
           ) : null}
         </div>
@@ -203,7 +216,7 @@ export function MermaidDiagram({
     <div className="overflow-x-auto">
       <button
         type="button"
-        aria-label="Expand diagram"
+        aria-label={t.chat.markdown.expandDiagram}
         className="flex w-full cursor-zoom-in justify-center rounded-md focus-visible:outline-2 focus-visible:outline-ring [&_svg]:h-auto [&_svg]:max-w-full"
         onClick={() => onExpand(mermaidImageUrl(result.svg))}
         dangerouslySetInnerHTML={{ __html: result.svg }}

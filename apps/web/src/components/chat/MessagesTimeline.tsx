@@ -1,3 +1,5 @@
+/** Renders web conversation items, activity folds and attachment previews. */
+import { t } from "~/i18n";
 import { ComputerUseAppIcon } from "~/components/Icons";
 import { useChatCanvas } from "./ChatCanvasContext";
 import { WorkLogBlock, WorkLogButton, WorkLogDetails, WorkLogList, WorkLogRow } from "./WorkLog";
@@ -1277,10 +1279,10 @@ export const MessagesTimeline = memo(function MessagesTimeline({
         <div className="messages-timeline-row-frame">
           <div className="chat-content-lane pt-1 sm:pt-2">
             <TimelineSystemDivider
-              label="Subagent of"
+              label={t.chat.timeline.subagentOf}
               detail={parentThreadLink.title}
               icon={BotIcon}
-              actionLabel="Open parent thread"
+              actionLabel={t.chat.timeline.openParentThread}
               onAction={() => onOpenThread(parentThreadLink.threadId)}
             />
           </div>
@@ -1334,7 +1336,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
     return (
       <div className="flex h-full items-center justify-center">
         <p className="text-sm text-muted-foreground/30">
-          Send a message to start the conversation.
+          {t.chat.timeline.sendAMessageToStartTheConversation}
         </p>
       </div>
     );
@@ -1418,6 +1420,12 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   );
 });
 
+/**
+ * Renders earlier-history loading and retry controls.
+ * @param props - Required availability/loading flags and load callback; error is null when no load
+ * failure exists.
+ * @returns History controls, or null when there is neither more history nor an error.
+ */
 function TimelineHistoryControl(props: MessagesTimelineHistoryControls) {
   if (!props.hasMoreHistory && props.error === null) {
     return null;
@@ -1429,11 +1437,11 @@ function TimelineHistoryControl(props: MessagesTimelineHistoryControls) {
           <button
             type="button"
             disabled={props.loading}
-            aria-label="Load earlier turns"
+            aria-label={t.chat.timeline.loadEarlierTurns}
             onClick={props.onLoadEarlier}
             className="w-full py-1.5 text-xs text-muted-foreground/60 hover:text-foreground disabled:cursor-default"
           >
-            {props.loading ? "Loading earlier turns…" : "Load earlier turns"}
+            {props.loading ? t.chat.timeline.loadingEarlierTurns : t.chat.timeline.loadEarlierTurns}
           </button>
         ) : null}
         {props.error !== null ? (
@@ -1476,6 +1484,13 @@ function timelineMinimapEventTargetsPreview(target: EventTarget): boolean {
   return target instanceof Element && target.closest("[data-minimap-preview]") !== null;
 }
 
+/**
+ * Renders timeline markers and previous/next navigation for the visible conversation.
+ * @param props - Required gutter flag, hit-strip width in pixels, marker items (possibly empty),
+ * DOM marker map, and selection callback. currentIndex is null when no marker is current.
+ * @returns The minimap overlay and navigation controls, or null when there are fewer than two
+ * markers.
+ */
 function TimelineMinimap({
   hasPersistentGutter,
   hitStripWidth,
@@ -1589,7 +1604,9 @@ function TimelineMinimap({
             }}
           />
           <button
-            aria-label={`Jump to message: ${activeItem?.userText ?? "User message"}`}
+            aria-label={t.chat.timeline.jumpToMessage(
+              activeItem?.userText ?? t.chat.timeline.userMessage,
+            )}
             className="absolute inset-y-0 left-0 w-full cursor-pointer bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70"
             onBlur={() => setActiveIndex(null)}
             onClick={(event) => {
@@ -1688,7 +1705,7 @@ function TimelineMinimap({
               >
                 <span className="dropdown-glass block rounded-xl p-3 text-left text-popover-foreground shadow-xl shadow-black/25">
                   <span className="block max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-sm font-medium leading-5">
-                    {activeItem.userText ?? "User message"}
+                    {activeItem.userText ?? t.chat.timeline.userMessage}
                   </span>
                   {activeItem.assistantText ? (
                     <span
@@ -1720,6 +1737,12 @@ function TimelineMinimap({
   );
 }
 
+/**
+ * Renders one previous or next minimap navigation button.
+ * @param props - Required direction, disabled and interactive flags, and click callback; none are
+ * nullable.
+ * @returns The navigation button element; never null.
+ */
 function TimelineMinimapNavigationButton({
   direction,
   disabled,
@@ -1732,7 +1755,7 @@ function TimelineMinimapNavigationButton({
   onClick: () => void;
 }) {
   const previous = direction === "previous";
-  const label = previous ? "Previous turn" : "Next turn";
+  const label = previous ? t.chat.timeline.previousTurn : t.chat.timeline.nextTurn;
   const Icon = previous ? ChevronUpIcon : ChevronDownIcon;
 
   return (
@@ -1966,6 +1989,13 @@ function MessageAuthorHeading({ children }: { children: string }) {
   return <h3 className="sr-only select-none">{children}</h3>;
 }
 
+/**
+ * Renders a user message with attachments, context chips, and available message actions.
+ * @param props - Required message row, including any optional attachment/context metadata. Requires
+ * TimelineRowCtx from the parent timeline.
+ * @returns The user-message row; never null. User actions may open media, files, or context
+ * details.
+ */
 function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" }> }) {
   const ctx = use(TimelineRowCtx);
   const { onImageExpand, onFileOpen } = ctx;
@@ -2140,10 +2170,10 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
               }}
               className="rounded-sm hover:text-muted-foreground hover:underline focus-visible:outline-2 focus-visible:outline-ring"
             >
-              Sent by automation
+              {t.chat.timeline.sentByAutomation}
             </Link>
           ) : (
-            "Sent by automation"
+            t.chat.timeline.sentByAutomation
           )}
         </p>
       ) : row.message.createdBy === "agent" ? (
@@ -2152,12 +2182,12 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
             <InlineButton
               onClick={() => ctx.onOpenThread(senderThreadId)}
               tone="muted"
-              aria-label="Open sending thread"
+              aria-label={t.chat.timeline.openSendingThread}
             >
-              Sent by another agent
+              {t.chat.timeline.sentByAnotherAgent}
             </InlineButton>
           ) : (
-            "Sent by another agent"
+            t.chat.timeline.sentByAnotherAgent
           )}
         </p>
       ) : null}
@@ -2165,7 +2195,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
         <UserMessageIntentMarker intent={row.message.inputIntent} />
       ) : null}
       <div className="relative max-w-[80%] rounded-2xl bg-message p-3 text-message-foreground">
-        <MessageAuthorHeading>You</MessageAuthorHeading>
+        <MessageAuthorHeading>{t.chat.timeline.you}</MessageAuthorHeading>
         {(regularImages.length > 0 || userVideos.length > 0) && (
           <div className="mb-2 grid max-w-[210px] grid-cols-2 gap-2">
             {regularImages.map((image) => (
@@ -2182,7 +2212,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
                   <button
                     type="button"
                     className="block h-full w-full cursor-zoom-in"
-                    aria-label={`Preview ${image.name}`}
+                    aria-label={t.chat.timeline.preview(image.name)}
                     onClick={() => {
                       const preview = buildExpandedImagePreview(regularImages, image.id);
                       if (!preview) return;
@@ -2224,7 +2254,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
                   <div key={file.id} className="flex min-w-0 items-center gap-1">
                     <button
                       type="button"
-                      aria-label={`Preview ${file.name}`}
+                      aria-label={t.chat.timeline.preview(file.name)}
                       onClick={() => ctx.onFileOpen(file)}
                       className="focus-visible:ring-ring/70 flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md py-1 text-left text-sm hover:underline focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset"
                     >
@@ -2237,14 +2267,14 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
                           <Button
                             size="icon-xs"
                             variant="ghost-muted"
-                            aria-label={`Download ${file.name}`}
+                            aria-label={t.chat.timeline.download(file.name)}
                             onClick={() => ctx.onFileDownload(file)}
                           />
                         }
                       >
                         <DownloadIcon />
                       </TooltipTrigger>
-                      <TooltipPopup side="top">Download {file.name}</TooltipPopup>
+                      <TooltipPopup side="top">{t.chat.timeline.download(file.name)}</TooltipPopup>
                     </Tooltip>
                   </div>
                 );
@@ -2327,6 +2357,11 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
   );
 }
 
+/**
+ * Renders the marker identifying a non-null user input intent.
+ * @param props - Required intent discriminator; null and undefined are not accepted.
+ * @returns The intent marker element; never null.
+ */
 function UserMessageIntentMarker({
   intent,
 }: {
@@ -2335,16 +2370,16 @@ function UserMessageIntentMarker({
   const presentation =
     intent === "queued_turn"
       ? {
-          label: "Queued",
+          label: t.chat.timeline.queued,
           icon: null,
         }
       : intent === "promoted_queued_to_steer"
         ? {
-            label: "Steer",
+            label: t.chat.timeline.steer,
             icon: Redo2Icon,
           }
         : {
-            label: "Steer",
+            label: t.chat.timeline.steer,
             icon: Redo2Icon,
           };
   const IntentIcon = presentation.icon;
@@ -2363,10 +2398,10 @@ function UserMessageIntentMarker({
       </TooltipTrigger>
       <TooltipPopup side="top">
         {intent === "queued_turn"
-          ? "Queued behind the active turn"
+          ? t.chat.timeline.queuedBehindTheActiveTurn
           : intent === "promoted_queued_to_steer"
-            ? "Originally queued, then promoted to steer the active turn"
-            : "Steered the active turn"}
+            ? t.chat.timeline.originallyQueuedThenPromotedToSteerThe
+            : t.chat.timeline.steeredTheActiveTurn}
       </TooltipPopup>
     </Tooltip>
   );
@@ -2394,6 +2429,12 @@ export function resolvePreviewAnnotationImage(input: {
   );
 }
 
+/**
+ * Renders the action to revert the conversation to a user-message boundary.
+ * @param props - Required target turnCount and messageId; neither may be null. Uses TimelineRowCtx
+ * for pending state and the revert callback.
+ * @returns The revert button; never null. Invokes the host revert action only after a user click.
+ */
 function RevertUserMessageButton({
   turnCount,
   messageId,
@@ -2414,13 +2455,13 @@ function RevertUserMessageButton({
             variant="ghost"
             disabled={activity.isRevertingCheckpoint || activity.isWorking}
             onClick={() => ctx.onRevertToTurnCount(turnCount, messageId)}
-            aria-label="Edit from here"
+            aria-label={t.chat.timeline.editFromHere}
           />
         }
       >
         <Undo2Icon className="size-3" />
       </TooltipTrigger>
-      <TooltipPopup side="top">Edit from here</TooltipPopup>
+      <TooltipPopup side="top">{t.chat.timeline.editFromHere}</TooltipPopup>
     </Tooltip>
   );
 }
@@ -2489,6 +2530,12 @@ function TurnFoldTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "turn-
   );
 }
 
+/**
+ * Renders an attempt disclosure and toggles its expansion through the timeline context.
+ * @param props - Required attempt-fold row; requires TimelineRowCtx with disclosure state and
+ * callbacks.
+ * @returns The attempt disclosure row; never null.
+ */
 function AttemptFoldTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "attempt-fold" }> }) {
   const ctx = use(TimelineRowCtx);
 
@@ -2506,7 +2553,9 @@ function AttemptFoldTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "at
         icon={row.expanded ? ChevronDown : ChevronRight}
       />
       <span className="text-xs font-medium text-foreground/80">{row.label}</span>
-      <span className="text-2xs text-muted-foreground">Partial output retained</span>
+      <span className="text-2xs text-muted-foreground">
+        {t.chat.timeline.partialOutputRetained}
+      </span>
     </button>
   );
 }
@@ -2559,6 +2608,12 @@ function AssistantTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "mess
   );
 }
 
+/**
+ * Renders the action to fork a conversation from an assistant run.
+ * @param props - Required projected message item; its runId may be null. Requires TimelineRowCtx
+ * for fork permissions and execution.
+ * @returns The fork button, or null when forking is unavailable or the item has no run.
+ */
 function AssistantForkButton({
   projectedItem,
 }: {
@@ -2594,13 +2649,13 @@ function AssistantForkButton({
                 .onForkFromRun({ sourceThreadId: projectedItem.sourceThreadId, runId })
                 .finally(() => setBusy(false));
             }}
-            aria-label="Fork from this response"
+            aria-label={t.chat.timeline.forkFromThisResponse}
           />
         }
       >
         <GitForkIcon className={cn("size-3", busy && "animate-pulse")} />
       </TooltipTrigger>
-      <TooltipPopup side="top">Fork from this response</TooltipPopup>
+      <TooltipPopup side="top">{t.chat.timeline.forkFromThisResponse}</TooltipPopup>
     </Tooltip>
   );
 }
@@ -2738,6 +2793,12 @@ function HtmlRenderTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "htm
 
 type V2EventTone = "muted" | "warning" | "danger" | "success";
 
+/**
+ * Selects display text, icon, and tone for an orchestration timeline event.
+ * @param item - Required orchestration turn item with optional title and event-specific details.
+ * @returns Event presentation; detail is null when no applicable detail exists, while label, icon,
+ * and tone are always provided.
+ */
 function v2EventPresentation(item: OrchestrationV2TurnItem): {
   readonly label: string;
   readonly detail: string | null;
@@ -2760,21 +2821,21 @@ function v2EventPresentation(item: OrchestrationV2TurnItem): {
     }
     case "run_interrupt_request":
       return {
-        label: "Interrupt requested",
+        label: t.chat.timeline.interruptRequested,
         detail: item.message,
         tone: "warning",
         icon: CircleAlertIcon,
       };
     case "run_interrupt_result":
       return {
-        label: "Run interrupted",
+        label: t.chat.timeline.runInterrupted,
         detail: item.message,
         tone: "danger",
         icon: XIcon,
       };
     case "handoff":
       return {
-        label: "Context handoff",
+        label: t.chat.timeline.contextHandoff,
         detail:
           item.summary ??
           `${item.fromProviderInstanceIds.join(", ")} → ${item.toProviderInstanceId}`,
@@ -2783,8 +2844,8 @@ function v2EventPresentation(item: OrchestrationV2TurnItem): {
       };
     case "fork":
       return {
-        label: "Conversation fork",
-        detail: `Continues in ${item.targetThreadId}`,
+        label: t.chat.timeline.conversationFork,
+        detail: t.chat.timeline.continuesIn(item.targetThreadId),
         tone: "muted",
         icon: GitForkIcon,
       };
@@ -2794,7 +2855,7 @@ function v2EventPresentation(item: OrchestrationV2TurnItem): {
           ? null
           : `${item.beforeTokenCount ?? "?"} → ${item.afterTokenCount ?? "?"} tokens`;
       return {
-        label: "Context compacted",
+        label: t.chat.timeline.contextCompacted,
         detail: item.summary ?? tokenSummary,
         tone: item.status === "failed" ? "danger" : "muted",
         icon: MinusIcon,
@@ -2803,7 +2864,7 @@ function v2EventPresentation(item: OrchestrationV2TurnItem): {
     case "todo_list": {
       const steps = item.steps.map((step) => `${step.status}: ${step.text}`).join("\n");
       return {
-        label: "Plan updated",
+        label: t.chat.timeline.planUpdated,
         detail: [item.explanation, steps].filter(Boolean).join("\n\n") || null,
         tone: item.status === "failed" ? "danger" : "success",
         icon: CheckIcon,
@@ -2819,6 +2880,11 @@ function v2EventPresentation(item: OrchestrationV2TurnItem): {
   }
 }
 
+/**
+ * Renders an orchestration event with its timestamp and supported lifecycle details.
+ * @param props - Required event row; requires TimelineRowCtx for formatting and host actions.
+ * @returns The event timeline element; never null.
+ */
 function V2EventTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "event" }> }) {
   const ctx = use(TimelineRowCtx);
   const { item, visibility, sourceThreadId } = row.projectedItem;
@@ -2892,7 +2958,7 @@ function V2EventTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "event"
           ) : null}
           {visibility !== "local" ? (
             <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-3xs text-muted-foreground">
-              {visibility === "inherited" ? "Inherited" : "Synthetic"}
+              {visibility === "inherited" ? t.chat.timeline.inherited : t.chat.timeline.synthetic}
             </span>
           ) : null}
           <ChevronDownIcon className="size-3 shrink-0 text-muted-foreground/60 transition-transform group-open:rotate-180" />
@@ -2911,7 +2977,7 @@ function V2EventTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "event"
           ) : null}
           {visibility === "inherited" ? (
             <p className="mt-1 font-mono text-3xs text-muted-foreground/65">
-              From {sourceThreadId}
+              {t.chat.timeline.fromThread(sourceThreadId)}
             </p>
           ) : null}
           <div className={presentation.detail ? "mt-2" : undefined}>
@@ -2969,7 +3035,7 @@ function V2EventTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "event"
             ) : null}
             {visibility !== "local" ? (
               <span className="rounded-full bg-muted px-1.5 py-0.5 text-3xs text-muted-foreground">
-                {visibility === "inherited" ? "Inherited" : "Synthetic"}
+                {visibility === "inherited" ? t.chat.timeline.inherited : t.chat.timeline.synthetic}
               </span>
             ) : null}
           </div>
@@ -2986,7 +3052,7 @@ function V2EventTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "event"
           ) : null}
           {visibility === "inherited" ? (
             <p className="mt-1 font-mono text-3xs text-muted-foreground/65">
-              From {sourceThreadId}
+              {t.chat.timeline.fromThread(sourceThreadId)}
             </p>
           ) : null}
           <div className="mt-2">
@@ -3203,7 +3269,7 @@ const WorkGroupSection = memo(function WorkGroupSection({
   }
 
   return (
-    <section aria-label="Activity">
+    <section aria-label={t.chat.timeline.activity}>
       {nonEmptyEntries.map((workEntry) => (
         <SimpleWorkEntryRow
           key={workEntry.id}
@@ -3261,6 +3327,13 @@ function WorkingTimer({ createdAt }: { createdAt: string }) {
 // Matches the grouped WorkLog row's min-h-6.
 const compactWorkEntryHeight = 24;
 
+/**
+ * Renders an expanded work group while preserving its scroll and disclosure anchors.
+ * @param props - Required anchor keys and entry array, which may be empty; workspaceRoot may be
+ * undefined. Requires TimelineRowCtx for group state and entry toggles.
+ * @returns The expanded entry list; an empty list renders no entry rows, and the element is never
+ * null.
+ */
 function ExpandedWorkGroupEntries({
   anchorKey,
   disclosureAnchorKey,
@@ -3406,7 +3479,7 @@ function ExpandedWorkGroupEntries({
           onItemSizeChanged={updateExpandedContentHeight}
           tabIndex={0}
           role="region"
-          aria-label="Tool calls"
+          aria-label={t.chat.timeline.toolCalls}
           data-tool-group-scroll
           style={{ maxHeight: `calc(min(18rem, 50dvh) + ${expandedContentHeight}px)` }}
           className={cn(
@@ -3445,6 +3518,11 @@ function toolIconAcceptsTint(
   return toolIcon === undefined && iconName !== "computer";
 }
 
+/**
+ * Renders the current working indicator, including compaction or workspace preparation state.
+ * @param props - Required working row; requires TimelineRowCtx for live activity and setup state.
+ * @returns The working row element; never null.
+ */
 function WorkingTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "working" }> }) {
   const { isCompacting, isPreparingWorktree, backgroundWorktreeSetup } =
     use(TimelineRowActivityCtx);
@@ -3452,15 +3530,16 @@ function WorkingTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "workin
   // place instead of remounting the row.
   const shimmer = isPreparingWorktree || isCompacting;
   const label = isPreparingWorktree ? (
-    "Setting up worktree…"
+    t.chat.timeline.settingUpWorktree
   ) : isCompacting ? (
     <CompactingLabel />
   ) : row.createdAt ? (
     <>
-      Working for <WorkingTimer createdAt={row.createdAt} />
+      {t.chat.timeline.workingForPrefix}
+      <WorkingTimer createdAt={row.createdAt} />
     </>
   ) : (
-    "Working..."
+    t.chat.timeline.working
   );
   return (
     <div className="border-b border-border/60 pb-2 pt-1">
@@ -3493,7 +3572,7 @@ function BackgroundWorktreeSetupChip({ snapshot }: { snapshot: WorktreeSetupSnap
     () => (openTerminal && terminalId ? () => openTerminal(terminalId) : null),
     [openTerminal, terminalId],
   );
-  const scriptName = snapshot.setupScript?.name ?? "Setup script";
+  const scriptName = snapshot.setupScript?.name ?? t.chat.timeline.setupScript;
   return (
     <Popover>
       <PopoverTrigger
@@ -3502,7 +3581,7 @@ function BackgroundWorktreeSetupChip({ snapshot }: { snapshot: WorktreeSetupSnap
             variant="ghost-muted"
             size="micro"
             className="ml-auto min-w-0 shrink-0"
-            aria-label={`${scriptName} is still running. Show setup progress.`}
+            aria-label={t.chat.timeline.setupStillRunning(scriptName)}
           />
         }
       >
@@ -3522,21 +3601,33 @@ function BackgroundWorktreeSetupChip({ snapshot }: { snapshot: WorktreeSetupSnap
   );
 }
 
+/**
+ * Renders the context-compaction activity label with its visibility-aware shimmer.
+ * @returns The label element; never null.
+ */
 function CompactingLabel() {
   return (
     <span className="inline-flex items-center gap-1.5">
       <Minimize2Icon aria-hidden="true" className="size-3" />
-      Compacting…
+      {t.chat.timeline.compacting}
     </span>
   );
 }
 
+/**
+ * Renders live reasoning and its work-group disclosure when available.
+ * @param props - Required thinking row; requires TimelineRowCtx for active work and group state.
+ * @returns The reasoning row, or an empty-label placeholder while compaction or workspace
+ * preparation owns the activity slot; never null.
+ */
 function ThinkingTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "thinking" }> }) {
   const ctx = use(TimelineRowCtx);
   const { isCompacting, isPreparingWorktree } = use(TimelineRowActivityCtx);
   // Reserve the activity row during setup so the handoff keeps the same height.
   if (isPreparingWorktree || isCompacting) return <WorkLogRow label="" />;
-  const activity = <LiveActivityRow label="Thinking" iconName="brain" active shimmer />;
+  const activity = (
+    <LiveActivityRow label={t.chat.timeline.thinking} iconName="brain" active shimmer />
+  );
   const { groupId } = row;
   if (groupId === undefined) return activity;
   return (
@@ -3590,6 +3681,12 @@ function LiveActivityRow({
   );
 }
 
+/**
+ * Renders an activity label with tool status and optional failure announcement.
+ * @param props - label may be null or empty; iconName may be undefined and toolIcon is optional.
+ * failed, announceFailure, active, and highlighted default to false.
+ * @returns The activity content element; never null.
+ */
 function LiveActivityContent({
   label,
   iconName,
@@ -3624,7 +3721,7 @@ function LiveActivityContent({
                   : "text-icon-muted",
             )}
             role={announceFailure ? "img" : undefined}
-            aria-label={announceFailure ? "Tool call failed" : undefined}
+            aria-label={announceFailure ? t.chat.timeline.toolCallFailed : undefined}
           >
             <ToolActivityIconView
               icon={toolIcon}
@@ -3655,6 +3752,12 @@ function LiveActivityContent({
   );
 }
 
+/**
+ * Renders a live work entry with its status and optional expandable details.
+ * @param props - Required work-live row; requires TimelineRowCtx for workspace, timestamp, and
+ * interaction state.
+ * @returns The live work row element; never null.
+ */
 function LiveWorkEntryTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "work-live" }> }) {
   const ctx = use(TimelineRowCtx);
   const questionHeading = row.entry.questionAnswer
@@ -3667,7 +3770,7 @@ function LiveWorkEntryTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "
     <button
       type="button"
       className="group/live-work flex min-h-6 w-full max-w-full cursor-pointer items-center rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70"
-      aria-label={failed ? `${label}, tool call failed` : undefined}
+      aria-label={failed ? t.chat.timeline.toolFailure(label) : undefined}
       aria-expanded={row.expanded}
       onClick={() => ctx.onToggleWorkGroup(row.groupId, row.id)}
     >
@@ -3684,7 +3787,10 @@ function LiveWorkEntryTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "
             <ReactMarkdown
               remarkPlugins={[
                 remarkGfm,
-                [remarkThoughtPreview, row.active ? "Thinking" : "Thought"],
+                [
+                  remarkThoughtPreview,
+                  row.active ? t.chat.timeline.thinking : t.chat.timeline.thought,
+                ],
               ]}
             >
               {row.entry.detail ?? label}
@@ -3765,6 +3871,12 @@ function WorkGroupToggleTimelineRow({
   );
 }
 
+/**
+ * Renders a work-group disclosure header with its status icon and timestamp.
+ * @param props - Required label (possibly empty), iconName, expanded state, creation timestamp,
+ * timestamp format, and toggle callback. toolIcon, failed, and active may be undefined.
+ * @returns The work-group header element; never null.
+ */
 function WorkGroupHeader(props: {
   label: string;
   iconName: WorkEntryIconName;
@@ -3779,7 +3891,7 @@ function WorkGroupHeader(props: {
   return (
     <WorkLogButton
       ref={props.active && !props.failed ? observeVisibleAnimation : undefined}
-      aria-label={props.failed ? `${props.label}, tool call failed` : props.label}
+      aria-label={props.failed ? t.chat.timeline.toolFailure(props.label) : props.label}
       aria-expanded={props.expanded}
       onClick={props.onToggle}
       icon={
@@ -3894,6 +4006,12 @@ function AssistantChangedFilesSectionInner({
 // Leaf components
 // ---------------------------------------------------------------------------
 
+/**
+ * Renders a user-message file mention and its available open actions.
+ * @param props - Required mention record and copyMarkdown string, which may be empty. Requires
+ * TimelineRowCtx for workspace and file actions.
+ * @returns The mention chip element; never null.
+ */
 function UserMessageMentionChip(props: {
   record: Extract<KnownComposerContextRecord, { kind: "mention" }>;
   copyMarkdown: string;
@@ -3906,7 +4024,7 @@ function UserMessageMentionChip(props: {
           <ContextChip
             kind="mention"
             render={<button type="button" />}
-            aria-label={`Preview ${props.record.path}`}
+            aria-label={t.chat.timeline.preview(props.record.path)}
             data-markdown-copy={props.copyMarkdown}
             onClick={() => {
               if (ctx.threadRef)
@@ -3968,6 +4086,12 @@ function UserMessagePullRequestContextChip(props: {
   );
 }
 
+/**
+ * Renders the details and optional screenshot of a user preview annotation.
+ * @param props - Required annotation record; image is null when no screenshot attachment is
+ * available. Requires TimelineRowCtx for preview actions.
+ * @returns The annotation details element; never null.
+ */
 function UserMessagePreviewAnnotationDetails(props: {
   record: Extract<KnownComposerContextRecord, { kind: "preview-annotation" }>;
   image: ChatImageAttachment | null;
@@ -3980,7 +4104,7 @@ function UserMessagePreviewAnnotationDetails(props: {
         <button
           type="button"
           className="block max-h-64 w-full cursor-zoom-in overflow-hidden border-b border-border/70 bg-muted"
-          aria-label={`Preview ${props.image.name}`}
+          aria-label={t.chat.timeline.preview(props.image.name)}
           onClick={() => {
             if (!props.image) return;
             const preview = buildExpandedImagePreview([props.image], props.image.id);
@@ -3989,18 +4113,20 @@ function UserMessagePreviewAnnotationDetails(props: {
         >
           <img
             src={props.image.previewUrl}
-            alt="Annotated preview crop"
+            alt={t.chat.timeline.annotatedPreviewCrop}
             className="max-h-64 w-full object-contain"
           />
         </button>
       ) : (
         <div className="border-b border-border/70 bg-muted/40 px-3 py-2 text-secondary-label text-xs">
-          Screenshot unavailable
+          {t.chat.timeline.screenshotUnavailable}
         </div>
       )}
       <div className="min-w-0 px-3 py-2.5">
         <div className="text-message-foreground text-xs font-medium">
-          {props.record.pageTitle?.trim() || props.record.pageUrl || "Preview annotation"}
+          {props.record.pageTitle?.trim() ||
+            props.record.pageUrl ||
+            t.chat.timeline.previewAnnotation}
         </div>
         {props.record.comment ? (
           <div className="mt-1 whitespace-pre-wrap wrap-break-word text-sm">
@@ -4110,12 +4236,19 @@ interface UserMessageContextRenderContext {
   onOpenFile: (file: ChatFileAttachment) => void;
 }
 
+/**
+ * Renders an unresolved context chip while retaining its copyable reference.
+ * @param props - Required rendering context with reference and copyMarkdown (possibly empty);
+ * annotationImage and attachment may be null. Other context fields retain the host theme and action
+ * callbacks.
+ * @returns The unavailable-context chip element; never null.
+ */
 function UnavailableUserMessageContextChip(props: UserMessageContextRenderContext) {
   return (
     <UnresolvedChip
       label={props.reference.label}
       copyMarkdown={props.copyMarkdown}
-      tooltip="This context is no longer available."
+      tooltip={t.chat.timeline.thisContextIsNoLongerAvailable}
     />
   );
 }
@@ -4145,7 +4278,7 @@ const userMessageContextPresentationRegistry = createContextPresentationRegistry
           <UserMessageContextChip
             icon={<SkillChipIcon />}
             label={record.label || record.name}
-            kindLabel="Skill"
+            kindLabel={t.chat.timeline.skill}
             tooltip={`$${record.name}`}
             copyMarkdown={context.copyMarkdown}
             kind="skill"
@@ -4216,7 +4349,7 @@ const userMessageContextPresentationRegistry = createContextPresentationRegistry
             isVideo={isVideo}
             theme={context.resolvedTheme}
             disabled={disabled}
-            accessibleLabel={`${isVideo ? "Video" : "File"} attachment, ${record.name}, ${size}`}
+            accessibleLabel={t.chat.timeline.attachment(isVideo, record.name, size)}
             copyMarkdown={context.copyMarkdown}
             onOpen={() =>
               isVideo ? context.onExpandVideo(attachment) : context.onOpenFile(attachment)
@@ -4252,7 +4385,7 @@ const userMessageContextPresentationRegistry = createContextPresentationRegistry
         record.kind === "element" ? (
           <UserMessageContextPopover
             copyMarkdown={context.copyMarkdown}
-            accessibleLabel={`Browser element, ${record.label}`}
+            accessibleLabel={t.chat.timeline.browserElement(record.label)}
             kind="element"
             icon={<MousePointerClickIcon />}
             label={record.label}
@@ -4272,7 +4405,9 @@ const userMessageContextPresentationRegistry = createContextPresentationRegistry
         }
         const isPullRequest = isPullRequestSummaryContext(record);
         const label = reviewCommentContextLabel(record);
-        const kindLabel = isPullRequest ? pullRequestContextKindLabel(record) : "Review comment";
+        const kindLabel = isPullRequest
+          ? pullRequestContextKindLabel(record)
+          : t.chat.timeline.reviewComment;
         const pullRequestState = pullRequestContextDisplayState(record) ?? "unknown";
         if (isPullRequest && record.pullRequest !== undefined) {
           return (
@@ -4319,7 +4454,7 @@ const userMessageContextPresentationRegistry = createContextPresentationRegistry
         record.kind === "preview-annotation" ? (
           <UserMessageContextPopover
             copyMarkdown={context.copyMarkdown}
-            accessibleLabel={`Preview annotation, ${record.label}`}
+            accessibleLabel={t.chat.timeline.annotation(record.label)}
             kind="preview-annotation"
             icon={<MousePointerClickIcon />}
             label={record.label}
@@ -4434,7 +4569,7 @@ const CollapsibleUserMessageBody = memo(function CollapsibleUserMessageBody(prop
               onClick={() => setExpanded((value) => !value)}
               className="-ml-1"
             >
-              {expanded ? "Show less" : "Show full message"}
+              {expanded ? t.chat.timeline.showLess : t.chat.timeline.showFullMessage}
             </Button>
           ) : null}
           {props.footer ? (
@@ -5041,6 +5176,14 @@ const SimpleWorkEntryRow = memo(function SimpleWorkEntryRow(props: WorkEntryRowP
   );
 });
 
+/**
+ * Renders a work-log entry with inspectable details, failures, and available recovery actions.
+ * @param props - Required workEntry; workspaceRoot may be undefined, displayLabel optionally
+ * overrides the heading, and onToggleEntry optionally observes collapse changes. Requires
+ * TimelineRowCtx; WorkGroupViewCtx is optional.
+ * @returns The work-log row element; never null. User actions may expand details or invoke the host
+ * recovery callback.
+ */
 function WorkEntryLogRow(props: WorkEntryRowProps) {
   const { workEntry, workspaceRoot, displayLabel } = props;
   const ctx = use(TimelineRowCtx);
@@ -5074,9 +5217,7 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
     const warning = failureItem.failure.class === "usage_limit";
     const resetAt = failureItem.failure.resetAt;
     const resetTime = resetAt ? formatUpcomingTimestamp(resetAt, timestampFormat) : null;
-    const label = warning
-      ? `Usage limit reached.${resetTime ? ` Retry after ${resetTime}.` : ""}`
-      : workEntry.label;
+    const label = warning ? t.chat.timeline.usageLimit(resetTime) : workEntry.label;
     const retryRunId =
       failureItem.runId !== null &&
       retryableWorkspacePreparationRunIds.has(failureItem.runId) &&
@@ -5122,7 +5263,7 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
               onClick={() => onRetryWorkspacePreparation(retryRunId)}
             >
               <RotateCcwIcon aria-hidden />
-              Retry
+              {t.chat.timeline.retry}
             </Button>
           </div>
         ) : null}
@@ -5153,8 +5294,8 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
   const previewText =
     isReasoning && expanded
       ? workEntry.toolLifecycleStatus === "inProgress"
-        ? "Thinking"
-        : "Thought"
+        ? t.chat.timeline.thinking
+        : t.chat.timeline.thought
       : questionHeading || (displayLabel ?? workEntryDisplayLabel(workEntry, workspaceRoot));
   const answerPreview =
     workEntry.questionAnswer && hasQuestionAnswer(workEntry.questionAnswer)
@@ -5243,7 +5384,7 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
         : "text-foreground/80";
   const accessiblePreview = [previewText, answerPreview].filter(Boolean).join(": ");
   const accessibleDisplayText = showFailedIndicator
-    ? `${accessiblePreview}, tool call failed`
+    ? t.chat.timeline.toolFailure(accessiblePreview)
     : accessiblePreview;
   const rowToggleProps = canExpandProjectedItem
     ? {
@@ -5270,7 +5411,7 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
         <span
           className={iconWrapperClass}
           role={showFailedIndicator ? "img" : undefined}
-          aria-label={showFailedIndicator ? "Tool call failed" : undefined}
+          aria-label={showFailedIndicator ? t.chat.timeline.toolCallFailed : undefined}
         >
           <ToolActivityIconView
             icon={entryToolIcon}
@@ -5292,7 +5433,9 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
                     remarkGfm,
                     [
                       remarkThoughtPreview,
-                      workEntry.toolLifecycleStatus === "inProgress" ? "Thinking" : "Thought",
+                      workEntry.toolLifecycleStatus === "inProgress"
+                        ? t.chat.timeline.thinking
+                        : t.chat.timeline.thought,
                     ],
                   ]}
                 >
@@ -5325,26 +5468,28 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
             <button
               type="button"
               className="shrink-0 rounded-sm text-sm text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              aria-label={`Open ${createdThread.title ?? "created thread"}`}
+              aria-label={t.chat.timeline.open(
+                createdThread.title ?? t.chat.timeline.createdThreadLabel,
+              )}
               onClick={(event) => {
                 event.stopPropagation();
                 ctx.onOpenThread(createdThread.targetThreadId);
               }}
               onKeyDown={stopRowToggle}
             >
-              Open chat
+              {t.chat.timeline.openChat}
             </button>
           ) : null}
           {notifiedSubagentThreadId ? (
             <InlineButton
-              aria-label="Open subagent thread"
+              aria-label={t.chat.timeline.openSubagentThread}
               onClick={(event) => {
                 event.stopPropagation();
                 ctx.onOpenThread(notifiedSubagentThreadId);
               }}
               onKeyDown={stopRowToggle}
             >
-              Open subagent
+              {t.chat.timeline.openSubagent}
             </InlineButton>
           ) : null}
           {showFailedIndicator &&

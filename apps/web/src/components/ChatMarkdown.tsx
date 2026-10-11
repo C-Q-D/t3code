@@ -1,3 +1,5 @@
+/** Renders chat Markdown and media controls while preserving authored and exported content. */
+import { t } from "~/i18n";
 import { usePullRequestLinking } from "~/hooks/usePullRequestLinking";
 import { AuthFilesystemReadScope, AuthOrchestrationOperateScope } from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
@@ -296,6 +298,12 @@ const ARTIFACT_TEMPLATE_ICON_BY_KIND = {
   slack: MessageSquareIcon,
 } satisfies Record<CodexArtifactTemplateKind, LucideIcon>;
 
+/**
+ * Renders an artifact-template summary with an optional apply action.
+ * @param props - Required template metadata and optional onUse callback; omitting the callback
+ * hides the action.
+ * @returns The template card element; never null.
+ */
 function CodexArtifactTemplateCard(props: {
   readonly template: CodexArtifactTemplate;
   readonly onUse?: ((template: CodexArtifactTemplate) => void) | undefined;
@@ -335,7 +343,7 @@ function CodexArtifactTemplateCard(props: {
           className="shrink-0"
           onClick={() => props.onUse?.(props.template)}
         >
-          Use template
+          {t.chat.markdown.applyTemplate}
         </Button>
       ) : null}
     </div>
@@ -577,31 +585,31 @@ const GITHUB_ALERT_PRESENTATIONS: Record<
   { label: string; Icon: typeof InfoIcon; borderClassName: string; titleClassName: string }
 > = {
   note: {
-    label: "Note",
+    label: t.chat.markdown.note,
     Icon: InfoIcon,
     borderClassName: "border-blue-500/70",
     titleClassName: "text-blue-600 dark:text-blue-400",
   },
   tip: {
-    label: "Tip",
+    label: t.chat.markdown.tip,
     Icon: LightbulbIcon,
     borderClassName: "border-emerald-500/70",
     titleClassName: "text-emerald-600 dark:text-emerald-400",
   },
   important: {
-    label: "Important",
+    label: t.chat.markdown.important,
     Icon: MessageSquareWarningIcon,
     borderClassName: "border-purple-500/70",
     titleClassName: "text-purple-600 dark:text-purple-400",
   },
   warning: {
-    label: "Warning",
+    label: t.chat.markdown.warning,
     Icon: TriangleAlertIcon,
     borderClassName: "border-amber-500/70",
     titleClassName: "text-amber-600 dark:text-amber-500",
   },
   caution: {
-    label: "Caution",
+    label: t.chat.markdown.caution,
     Icon: OctagonAlertIcon,
     borderClassName: "border-red-500/70",
     titleClassName: "text-red-600 dark:text-red-400",
@@ -806,14 +814,22 @@ function readInitialWordWrapSetting(): boolean {
   return getClientSettings().wordWrap;
 }
 
+/**
+ * Renders a Markdown table with cell expansion and clipboard export controls.
+ * @param props - Native table attributes and children; children may be null or empty. Copy actions
+ * write Markdown or CSV to the clipboard and report failures to the console.
+ * @returns The table and its action toolbar; never null.
+ */
 function MarkdownTable({ children, ...props }: React.ComponentProps<"table">) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const tableRef = useRef<HTMLTableElement | null>(null);
   const [expanded, setExpanded] = useState(readInitialWordWrapSetting);
   const [copied, setCopied] = useState(false);
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const expandLabel = expanded ? "Collapse table cells" : "Expand table cells";
-  const copyLabel = copied ? "Copied" : "Copy table";
+  const expandLabel = expanded
+    ? t.chat.markdown.collapseTableCells
+    : t.chat.markdown.expandTableCells;
+  const copyLabel = copied ? t.chat.markdown.copied : t.chat.markdown.copyTable;
 
   function toggleExpanded() {
     const table = tableRef.current;
@@ -925,8 +941,10 @@ function MarkdownTable({ children, ...props }: React.ComponentProps<"table">) {
             <TooltipPopup side="top">{copyLabel}</TooltipPopup>
           </Tooltip>
           <MenuPopup align="end">
-            <MenuItem onClick={() => handleCopy("markdown")}>Copy as Markdown</MenuItem>
-            <MenuItem onClick={() => handleCopy("csv")}>Copy as CSV</MenuItem>
+            <MenuItem onClick={() => handleCopy("markdown")}>
+              {t.chat.markdown.copyAsMarkdown}
+            </MenuItem>
+            <MenuItem onClick={() => handleCopy("csv")}>{t.chat.markdown.copyAsCSV}</MenuItem>
           </MenuPopup>
         </Menu>
       </div>
@@ -934,6 +952,12 @@ function MarkdownTable({ children, ...props }: React.ComponentProps<"table">) {
   );
 }
 
+/**
+ * Renders a collapsible Markdown details section, using its summary child as the heading.
+ * @param props - Children, which may be null or empty, and optional initial open state, defaulting
+ * to false.
+ * @returns The disclosure element, with a fallback heading when no summary exists; never null.
+ */
 function MarkdownDetails({
   children,
   open = false,
@@ -947,7 +971,7 @@ function MarkdownDetails({
   const summary =
     isValidElement<{ children?: ReactNode }>(summaryNode) && summaryNode.props.children
       ? summaryNode.props.children
-      : "Details";
+      : t.chat.markdown.details;
   const content = childNodes.filter((_, index) => index !== summaryIndex);
 
   return (
@@ -1012,7 +1036,10 @@ function MarkdownCodeBlockTitleContent({
     <Tooltip>
       <TooltipTrigger
         render={
-          <span className="inline-flex shrink-0 rounded-sm" aria-label={`Language: ${language}`} />
+          <span
+            className="inline-flex shrink-0 rounded-sm"
+            aria-label={t.chat.markdown.language(language)}
+          />
         }
       >
         <PierreEntryIcon pathValue={fileName} kind="file" theme={theme} className="size-3.5" />
@@ -1022,6 +1049,15 @@ function MarkdownCodeBlockTitleContent({
   );
 }
 
+/**
+ * Renders code or diagram content with copy, wrapping, and optional shell execution controls.
+ * @param props - Required code and language strings (which may be empty), light/dark theme,
+ * streaming state, and children (which may be null). A null fenceTitle omits the filename; optional
+ * leadingActions may be empty. canWrap defaults to true and diagram to false. Optional
+ * onRunShellCommand receives complete eligible commands only after a user action.
+ * @returns The code block and available actions; never null. Clipboard failures are reported to the
+ * console.
+ */
 function MarkdownCodeBlock({
   code,
   language,
@@ -1049,8 +1085,8 @@ function MarkdownCodeBlock({
   const [copied, setCopied] = useState(false);
   const [wrapped, setWrapped] = useState(readInitialWordWrapSetting);
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const wrapLabel = wrapped ? "Disable line wrap" : "Wrap lines";
-  const copyLabel = copied ? "Copied" : "Copy code";
+  const wrapLabel = wrapped ? t.chat.markdown.disableLineWrap : t.chat.markdown.wrapLines;
+  const copyLabel = copied ? t.chat.markdown.copied : t.chat.markdown.copyCode;
   const command = code.trim();
   const canRun =
     onRunShellCommand !== undefined &&
@@ -1146,7 +1182,11 @@ function MarkdownCodeBlock({
             theme={theme}
           />
         </span>
-        <span className="flex items-center gap-0.5" role="toolbar" aria-label="Code block actions">
+        <span
+          className="flex items-center gap-0.5"
+          role="toolbar"
+          aria-label={t.chat.markdown.codeBlockActions}
+        >
           {leadingActions}
           {canWrap ? (
             <Tooltip>
@@ -1176,13 +1216,13 @@ function MarkdownCodeBlock({
                     variant="ghost-muted"
                     size="icon-xs"
                     onClick={() => onRunShellCommand(command)}
-                    aria-label="Run in terminal"
+                    aria-label={t.chat.markdown.runInTerminal}
                   />
                 }
               >
                 <PlayIcon className="size-3" />
               </TooltipTrigger>
-              <TooltipPopup side="top">Run in terminal</TooltipPopup>
+              <TooltipPopup side="top">{t.chat.markdown.runInTerminal}</TooltipPopup>
             </Tooltip>
           ) : null}
           {copyButton}
@@ -1214,7 +1254,7 @@ function MarkdownMermaidCodeBlock({
 }) {
   const [showCode, setShowCode] = useState(false);
   const showDiagram = !showCode && !isStreaming && code.trim().length > 0;
-  const toggleLabel = showCode ? "Show diagram" : "Show code";
+  const toggleLabel = showCode ? t.chat.markdown.showDiagram : t.chat.markdown.showCode;
   return (
     <MarkdownCodeBlock
       code={code}
@@ -1250,7 +1290,7 @@ function MarkdownMermaidCodeBlock({
           <Suspense
             fallback={
               <div className="flex min-h-36 items-center justify-center text-xs text-muted-foreground">
-                Rendering diagram
+                {t.chat.markdown.renderingDiagram}
               </div>
             }
           >
@@ -1570,6 +1610,12 @@ const CHAT_MARKDOWN_WORKSPACE_IMAGE_CLASS_NAME = cn(
 );
 const MarkdownLinkContext = React.createContext(false);
 
+/**
+ * Builds accessible image expansion handlers without intercepting linked images.
+ * @param onImageExpand - Gallery-opening callback, or undefined to disable expansion.
+ * @param alt - Image description; an empty or whitespace-only value uses the generic image name.
+ * @returns Button semantics and event handlers, or an empty object when expansion is disabled.
+ */
 function expandableMarkdownImageProps(
   onImageExpand: ((preview: ExpandedImagePreview) => void) | undefined,
   alt: string,
@@ -1586,7 +1632,7 @@ function expandableMarkdownImageProps(
   return {
     role: "button" as const,
     tabIndex: 0,
-    "aria-label": `Preview ${previewName}`,
+    "aria-label": t.chat.markdown.preview(previewName),
     onClick: expand,
     onKeyDown: (event: ReactKeyboardEvent) => {
       if (event.key === "Enter" || event.key === " ") expand(event);
@@ -1594,11 +1640,18 @@ function expandableMarkdownImageProps(
   };
 }
 
+/**
+ * Renders an unavailable-media warning and its optional authored description.
+ * @param props - Required alt text, which may be empty, and optional media kind; undefined defaults
+ * to an image warning.
+ * @returns The warning label element; never null.
+ */
 function ChatMarkdownMediaUnavailableLabel(props: {
   readonly alt: string;
   readonly kind?: "image" | "video" | undefined;
 }) {
-  const label = props.kind === "video" ? "Video unavailable" : "Image unavailable";
+  const label =
+    props.kind === "video" ? t.chat.markdown.videoUnavailable : t.chat.markdown.imageUnavailable;
   return (
     <span className="inline-flex items-center gap-1.5">
       <TriangleAlertIcon aria-hidden className="size-3.5 shrink-0" />
@@ -1734,7 +1787,7 @@ function ChatMarkdownImage(props: {
         id={props.imageProps?.id}
         data-markdown-copy={props.copyMarkdown}
         role="status"
-        aria-label="Loading image"
+        aria-label={t.chat.markdown.loadingImage}
         className={CHAT_MARKDOWN_MEDIA_LAYOUT_CLASS_NAME}
       />
     );
@@ -1752,7 +1805,7 @@ function ChatMarkdownImage(props: {
         style={props.style}
         {...(failed
           ? { role: "alert" as const }
-          : { role: "status" as const, "aria-label": "Loading image" })}
+          : { role: "status" as const, "aria-label": t.chat.markdown.loadingImage })}
       >
         {failed ? (
           <span className="flex size-full items-center justify-center p-2 text-center text-xs text-muted-foreground">
@@ -2154,8 +2207,8 @@ const MarkdownFileLink = memo(function MarkdownFileLink({
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Unable to open file",
-            description: error instanceof Error ? error.message : "An error occurred.",
+            title: t.chat.markdown.unableToOpenFile,
+            description: error instanceof Error ? error.message : t.chat.markdown.anErrorOccurred,
           }),
         );
       } catch (cause) {
@@ -2166,8 +2219,8 @@ const MarkdownFileLink = memo(function MarkdownFileLink({
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Unable to open file",
-            description: cause instanceof Error ? cause.message : "An error occurred.",
+            title: t.chat.markdown.unableToOpenFile,
+            description: cause instanceof Error ? cause.message : t.chat.markdown.anErrorOccurred,
           }),
         );
       }
@@ -2204,8 +2257,8 @@ const MarkdownFileLink = memo(function MarkdownFileLink({
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Unable to open file in browser",
-            description: error instanceof Error ? error.message : "An error occurred.",
+            title: t.chat.markdown.unableToOpenFileInBrowser,
+            description: error instanceof Error ? error.message : t.chat.markdown.anErrorOccurred,
           }),
         );
       } catch (cause) {
@@ -2216,8 +2269,8 @@ const MarkdownFileLink = memo(function MarkdownFileLink({
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Unable to open file in browser",
-            description: cause instanceof Error ? cause.message : "An error occurred.",
+            title: t.chat.markdown.unableToOpenFileInBrowser,
+            description: cause instanceof Error ? cause.message : t.chat.markdown.anErrorOccurred,
           }),
         );
       }
@@ -2242,8 +2295,8 @@ const MarkdownFileLink = memo(function MarkdownFileLink({
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Unable to reveal file",
-            description: error instanceof Error ? error.message : "An error occurred.",
+            title: t.chat.markdown.unableToRevealFile,
+            description: error instanceof Error ? error.message : t.chat.markdown.anErrorOccurred,
           }),
         );
       } catch (cause) {
@@ -2254,8 +2307,8 @@ const MarkdownFileLink = memo(function MarkdownFileLink({
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Unable to reveal file",
-            description: cause instanceof Error ? cause.message : "An error occurred.",
+            title: t.chat.markdown.unableToRevealFile,
+            description: cause instanceof Error ? cause.message : t.chat.markdown.anErrorOccurred,
           }),
         );
       }
@@ -2268,8 +2321,8 @@ const MarkdownFileLink = memo(function MarkdownFileLink({
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: `Failed to copy ${title.toLowerCase()}`,
-            description: "Clipboard API unavailable.",
+            title: t.chat.markdown.copyFailed(title),
+            description: t.chat.markdown.clipboardAPIUnavailable,
           }),
         );
         return;
@@ -2291,8 +2344,8 @@ const MarkdownFileLink = memo(function MarkdownFileLink({
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: `Failed to copy ${title.toLowerCase()}`,
-              description: error instanceof Error ? error.message : "An error occurred.",
+              title: t.chat.markdown.copyFailed(title),
+              description: error instanceof Error ? error.message : t.chat.markdown.anErrorOccurred,
             }),
           );
         },
@@ -2309,14 +2362,18 @@ const MarkdownFileLink = memo(function MarkdownFileLink({
       try {
         const clicked = await api.contextMenu.show(
           [
-            ...(onOpenMedia ? ([{ id: "preview-media", label: "Preview media" }] as const) : []),
+            ...(onOpenMedia
+              ? ([{ id: "preview-media", label: t.chat.markdown.previewMedia }] as const)
+              : []),
             ...(onOpen ? ([{ id: "open", label: openInEditorMenuLabel }] as const) : []),
             ...(onOpenInBrowser
-              ? ([{ id: "open-in-browser", label: "Open in integrated browser" }] as const)
+              ? ([
+                  { id: "open-in-browser", label: t.chat.markdown.openInIntegratedBrowser },
+                ] as const)
               : []),
             ...(onReveal && revealLabel ? ([{ id: "reveal", label: revealLabel }] as const) : []),
-            { id: "copy-relative", label: "Copy relative path" },
-            { id: "copy-full", label: "Copy full path" },
+            { id: "copy-relative", label: t.chat.markdown.copyRelativePath },
+            { id: "copy-full", label: t.chat.markdown.copyFullPath },
           ] as const,
           position,
         );
@@ -2338,11 +2395,11 @@ const MarkdownFileLink = memo(function MarkdownFileLink({
           return;
         }
         if (clicked === "copy-relative") {
-          handleCopy(displayPath, "Relative path");
+          handleCopy(displayPath, t.chat.markdown.relativePath);
           return;
         }
         if (clicked === "copy-full") {
-          handleCopy(targetPath, "Full path");
+          handleCopy(targetPath, t.chat.markdown.fullPath);
         }
       } catch (cause) {
         reportMarkdownActionFailure(
@@ -2430,7 +2487,7 @@ const MarkdownFileLink = memo(function MarkdownFileLink({
             <ContextChip
               kind="mention"
               render={<button type="button" />}
-              aria-label={`File options for ${label}`}
+              aria-label={t.chat.markdown.fileOptions(label)}
               aria-haspopup="menu"
               className={cn(MARKDOWN_FILE_LINK_CLASS_NAME, "select-text")}
               data-markdown-copy={copyMarkdown}
@@ -2478,6 +2535,16 @@ function areMarkdownFileLinkPropsEqual(
   );
 }
 
+/**
+ * Prepares Markdown renderers and permission-aware media, file, and task-list actions.
+ * @param props - Required text (possibly empty) and cwd (undefined when unknown). Optional
+ * threadRef, pullRequestPanelRef, and environmentId select the host context; imageBaseDir defaults
+ * to cwd. Optional callbacks handle task changes, templates, shell execution, media expansion, and
+ * context references. Streaming and GitHub media default to false, skills to an empty list, and
+ * headingLevelOffset to zero. Presentation and plugin options are passed by the caller.
+ * @returns Renderer state, container ref, and local media preview controls; the preview is null
+ * until opened. Registers hooks and cleans up stale media requests when the context changes.
+ */
 function useChatMarkdownState({
   text,
   cwd,
@@ -2555,11 +2622,9 @@ function useChatMarkdownState({
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "Media unavailable",
+              title: t.chat.markdown.mediaUnavailable,
               description:
-                error instanceof Error
-                  ? error.message
-                  : "The file could not be loaded. It may have been moved or deleted.",
+                error instanceof Error ? error.message : t.chat.markdown.theFileCouldNotBeLoadedIt,
             }),
           );
         },
@@ -2596,7 +2661,7 @@ function useChatMarkdownState({
       if (!readEnvironmentScope(environmentId, AuthOrchestrationOperateScope)) {
         return Promise.resolve(
           AsyncResult.failure<void, Error>(
-            Cause.fail(new Error("This connection cannot reveal files on this environment.")),
+            Cause.fail(new Error(t.chat.markdown.thisConnectionCannotRevealFilesOnThis)),
           ),
         );
       }
@@ -2708,7 +2773,7 @@ function useChatMarkdownState({
           AsyncResult.failure<void, BrowserPreviewUnavailableError>(
             Cause.fail(
               new BrowserPreviewUnavailableError({
-                message: "Preview access is unavailable for this client.",
+                message: t.chat.markdown.previewAccessIsUnavailableForThisClient,
               }),
             ),
           ),
@@ -2722,7 +2787,7 @@ function useChatMarkdownState({
             toastManager.add(
               stackedThreadToast({
                 type: "error",
-                title: "Unable to open link in browser",
+                title: t.chat.markdown.unableToOpenLinkInBrowser,
                 description: error.message,
               }),
             );
@@ -2740,7 +2805,7 @@ function useChatMarkdownState({
           AsyncResult.failure<void, BrowserPreviewUnavailableError>(
             Cause.fail(
               new BrowserPreviewUnavailableError({
-                message: "Environment is not connected.",
+                message: t.chat.markdown.environmentIsNotConnected,
               }),
             ),
           ),
@@ -3072,7 +3137,7 @@ const CHAT_MARKDOWN_COMPONENTS = {
         {...props}
         type="checkbox"
         name="markdown-task"
-        aria-label="Toggle task"
+        aria-label={t.chat.markdown.toggleTask}
         checked={checked}
         onChange={(event) => {
           const markerOffset = Number(event.currentTarget.closest("li")?.dataset.taskMarkerOffset);
@@ -3263,9 +3328,10 @@ const CHAT_MARKDOWN_COMPONENTS = {
                       type: "error",
                       title:
                         operation === "link-pull-request-to-thread"
-                          ? "Unable to link pull request"
-                          : "Unable to unlink pull request",
-                      description: cause instanceof Error ? cause.message : "The request failed.",
+                          ? t.chat.markdown.unableToLinkPullRequest
+                          : t.chat.markdown.unableToUnlinkPullRequest,
+                      description:
+                        cause instanceof Error ? cause.message : t.chat.markdown.theRequestFailed,
                     }),
                   );
                 }

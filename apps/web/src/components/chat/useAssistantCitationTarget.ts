@@ -1,3 +1,5 @@
+/** Loads and locates cited assistant responses without changing saved quotes. */
+import { t } from "~/i18n";
 import type { LegendListRef } from "@legendapp/list/react";
 import type { RunId } from "@t3tools/contracts";
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
@@ -93,8 +95,8 @@ export function useAssistantCitationTarget({
         const cursor = loadEarlier.cursor ?? entries[0]?.id ?? "first";
         if (navigation.requestedPages.has(cursor) || navigation.requestedPages.size >= 20) {
           fail(
-            "Could not load the cited response",
-            "Load earlier turns, then click the citation to try again. Your saved quote is unchanged.",
+            t.chat.citation.couldNotLoadTheCitedResponse,
+            t.chat.citation.loadEarlierTurnsThenClickTheCitation,
           );
           return;
         }
@@ -103,15 +105,15 @@ export function useAssistantCitationTarget({
         return;
       }
       fail(
-        "The cited response is unavailable",
-        "It may have been removed. The selected text is still saved in your citation.",
+        t.chat.citation.theCitedResponseIsUnavailable,
+        t.chat.citation.itMayHaveBeenRemovedTheSelected,
       );
       return;
     }
     if (source.kind !== "message" || source.message.role !== "assistant") {
       fail(
-        "The citation does not refer to an assistant response",
-        "The selected text is still saved in your citation.",
+        t.chat.citation.theCitationDoesNotReferToAn,
+        t.chat.citation.theSelectedTextIsStillSavedIn,
       );
       return;
     }

@@ -1,3 +1,5 @@
+/** Derives web timeline rows and display labels from conversation state. */
+import { t } from "~/i18n";
 import { worktreeSetupAgentStarted } from "@t3tools/client-runtime/worktree-setup";
 export { worktreeSetupAgentStarted } from "@t3tools/client-runtime/worktree-setup";
 import * as Equal from "effect/Equal";
@@ -78,15 +80,22 @@ function workEntryIsActiveTurnActivity(entry: WorkLogEntry): boolean {
   );
 }
 
+/**
+ * Selects a compact heading for a single settled tool call or reasoning entry.
+ * @param entry - Required work-log entry containing the source heading and optional tool metadata.
+ * @returns The preferred display heading; may be empty if the source heading is empty, but never
+ * null.
+ */
 function singleToolCallLabel(entry: WorkLogEntry): string {
-  if (entry.itemType === "reasoning") return entry.detail?.trim().replace(/\s+/g, " ") || "Thought";
+  if (entry.itemType === "reasoning")
+    return entry.detail?.trim().replace(/\s+/g, " ") || t.chat.timeline.thought;
   const toolPresentation = resolveWorkEntryToolPresentation(entry, "completed");
   if (toolPresentation) return toolPresentation.displayName;
   const item = entry.structuredPayload;
   const title = item?.type === "dynamic_tool" ? dynamicToolTitle(item.toolName, item.input) : null;
   if (title) return title;
   // A lone web search keeps its heading; the query stays in its detail.
-  if (entry.itemType === "web_search") return entry.toolTitle ?? "Web search";
+  if (entry.itemType === "web_search") return entry.toolTitle ?? t.chat.timeline.webSearch;
   return workEntryDisplayLabel(entry, undefined);
 }
 
@@ -115,6 +124,12 @@ function workEntryReadPaths(entry: WorkLogEntry, workspaceRoot: string | undefin
   );
 }
 
+/**
+ * Derives a compact work-log label from tool metadata, commands, details, or changed paths.
+ * @param entry - Required work-log entry; optional metadata and details may be absent.
+ * @param workspaceRoot - Root used to shorten file paths, or undefined when unknown.
+ * @returns The display label; may be empty for an empty source label, but never null.
+ */
 export function workEntryDisplayLabel(entry: WorkLogEntry, workspaceRoot: string | undefined) {
   if (entry.itemType === "system_notice") return entry.label;
   if (entry.itemType === "reasoning" || entry.tone === "thinking") {
@@ -156,10 +171,10 @@ export function workEntryDisplayLabel(entry: WorkLogEntry, workspaceRoot: string
     const path = formatWorkspaceRelativePath(firstPath, workspaceRoot);
     return entry.changedFiles!.length === 1
       ? path
-      : `${path} +${entry.changedFiles!.length - 1} more`;
+      : t.chat.timeline.moreFiles(path, entry.changedFiles!.length - 1);
   }
   if (action === "read" && !entry.viewedImagePath) {
-    return "Read file";
+    return t.chat.timeline.readFile;
   }
   const heading = normalizeCompactToolLabel(entry.toolTitle || entry.label);
   return `${heading.charAt(0).toUpperCase()}${heading.slice(1)}`;
@@ -194,6 +209,15 @@ export function workEntryReadOutput(
   return null;
 }
 
+/**
+ * Derives an activity label using the entry lifecycle and current active state.
+ * @param entry - Required work-log entry with optional lifecycle and tool metadata.
+ * @param workspaceRoot - Root used to shorten file paths, or undefined when unknown.
+ * @param active - Whether the entry belongs to ongoing activity when no explicit lifecycle status
+ * exists.
+ * @returns The activity label, falling back to the compact display label; may be empty but never
+ * null.
+ */
 export function liveWorkEntryLabel(
   entry: WorkLogEntry,
   workspaceRoot: string | undefined,
@@ -203,7 +227,7 @@ export function liveWorkEntryLabel(
   if (entry.itemType === "reasoning") {
     return (
       entry.detail?.trim().replace(/\s+/g, " ") ||
-      (status === "inProgress" ? "Thinking" : "Thought")
+      (status === "inProgress" ? t.chat.timeline.thinking : t.chat.timeline.thought)
     );
   }
   const toolPresentation = resolveWorkEntryToolPresentation({
@@ -215,15 +239,15 @@ export function liveWorkEntryLabel(
   if (command) {
     const verb =
       status === "inProgress"
-        ? "Running"
+        ? t.chat.timeline.running
         : status === "failed"
-          ? "Failed"
+          ? t.chat.timeline.failed
           : status === "declined"
-            ? "Declined"
+            ? t.chat.timeline.declined
             : status === "stopped"
-              ? "Stopped"
-              : "Ran";
-    return `${verb} ${commandProgramName(command) ?? "command"}`;
+              ? t.chat.timeline.stopped
+              : t.chat.timeline.ran;
+    return `${verb} ${commandProgramName(command) ?? t.chat.timeline.command}`;
   }
   return workEntryDisplayLabel(entry, workspaceRoot);
 }
@@ -1031,11 +1055,11 @@ function deriveTurnFolds(input: {
     const duration = elapsedMs !== null ? formatDuration(elapsedMs) : null;
     const label = isLatestInterruptedTurn
       ? duration
-        ? `You stopped after ${duration}`
-        : "You stopped this response"
+        ? t.chat.timeline.stoppedAfter(duration)
+        : t.chat.timeline.youStoppedThisResponse
       : duration
-        ? `Worked for ${duration}`
-        : "Worked";
+        ? t.chat.timeline.workedFor(duration)
+        : t.chat.timeline.worked;
 
     foldsByAnchorEntryId.set(group.anchorEntryId, {
       runId,
@@ -1199,6 +1223,16 @@ function settleSupersededReasoning(entries: ReadonlyArray<TimelineEntry>) {
   });
 }
 
+/**
+ * Projects ordered timeline entries into message, work, event, and disclosure rows.
+ * @param input - Required timelineEntries and turnDiffSummaries may be empty; isWorking and
+ * supportsConversationRollback control active and revert rows. latestRun, runningRunId,
+ * activeTurnStartedAt, and worktreeSetup may be omitted or null. Optional expanded ID sets control
+ * disclosures; runlessWorkActive defaults to inactive and liveAgentTaskIds identifies ongoing child
+ * work.
+ * @returns Rows in display order; an empty array when no source or active state produces a row.
+ * Does not mutate source entries.
+ */
 export function deriveMessagesTimelineRows(input: {
   timelineEntries: ReadonlyArray<TimelineEntry>;
   latestRun?: TimelineLatestRun | null;
@@ -1430,7 +1464,7 @@ export function deriveMessagesTimelineRows(input: {
         createdAt: supersededFold.createdAt,
         runId: supersededFold.runId,
         attemptId: supersededFold.attemptId,
-        label: "Superseded attempt",
+        label: t.chat.timeline.supersededAttempt,
         expanded: input.expandedAttemptIds?.has(supersededFold.attemptId) ?? false,
       });
     }

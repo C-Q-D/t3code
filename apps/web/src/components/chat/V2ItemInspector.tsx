@@ -1,3 +1,5 @@
+/** Displays inspectable orchestration item details and permitted item actions. */
+import { t } from "~/i18n";
 import type {
   EnvironmentId,
   OrchestrationV2ProjectedTurnItem,
@@ -129,7 +131,7 @@ function useFetchedTurnItem(
         item !== wireItem
           ? null
           : detail.data?.item === null
-            ? "Output is no longer available."
+            ? t.chat.inspector.outputIsNoLongerAvailable
             : detail.error,
       empty: fetches && item !== wireItem,
     },
@@ -146,6 +148,13 @@ interface ToolOutputState {
   readonly onImageExpand?: ((preview: ExpandedImagePreview) => void) | undefined;
 }
 
+/**
+ * Renders a tool's textual and image output, including its loading or unavailable state.
+ * @param props - Required environmentId, images (possibly empty), pending and empty flags. output
+ * and error may be null; onImageExpand may be undefined.
+ * @returns Tool output content or its availability message; an empty fragment when there is no
+ * content or state message, never null.
+ */
 function ToolOutput(props: ToolOutputState) {
   const images = props.images.map((resource) => (
     <ChatMarkdownAssetImage
@@ -160,11 +169,11 @@ function ToolOutput(props: ToolOutputState) {
   const text = props.output ? (
     <div className="max-h-80 overflow-auto text-muted-foreground">{props.output}</div>
   ) : props.pending ? (
-    <div className="text-muted-foreground italic">Loading output…</div>
+    <div className="text-muted-foreground italic">{t.chat.inspector.loadingOutput}</div>
   ) : props.error ? (
-    <div className="text-destructive">Couldn&apos;t load output: {props.error}</div>
+    <div className="text-destructive">{t.chat.inspector.outputError(props.error)}</div>
   ) : props.empty && images.length === 0 ? (
-    <div className="text-muted-foreground italic">No output.</div>
+    <div className="text-muted-foreground italic">{t.chat.inspector.noOutput}</div>
   ) : null;
   return (
     <>
@@ -213,7 +222,7 @@ function ToolCallBody(
       {call.argsText ? <StructuredValue value={call.argsText} highlightJson /> : null}
       <ToolOutput {...props} />
       {props.exitCode !== undefined && props.exitCode !== 0 ? (
-        <div className="text-destructive">exit {props.exitCode}</div>
+        <div className="text-destructive">{t.chat.inspector.exitCode(props.exitCode)}</div>
       ) : null}
     </div>
   );
@@ -271,7 +280,7 @@ export const V2ItemInspector = memo(function V2ItemInspector(props: V2ItemInspec
                 variant="outline"
                 onClick={() => props.onOpenTurnDiff(item.runId!, item.fileName)}
               >
-                Open diff
+                {t.chat.changedFiles.openDiff}
               </Button>
             ) : null}
           </div>
@@ -337,7 +346,7 @@ export const V2ItemInspector = memo(function V2ItemInspector(props: V2ItemInspec
                   </a>
                 ) : (
                   <p className="font-medium text-foreground">
-                    {result.title ?? result.url ?? "Search result"}
+                    {result.title ?? result.url ?? t.chat.inspector.searchResult}
                   </p>
                 )}
                 {result.snippet ? <p className="text-muted-foreground">{result.snippet}</p> : null}
@@ -384,7 +393,7 @@ export const V2ItemInspector = memo(function V2ItemInspector(props: V2ItemInspec
               }
             >
               <RotateCcwIcon className="size-3" />
-              Roll back
+              {t.chat.inspector.rollBack}
             </Button>
           ) : null}
         </div>
@@ -393,13 +402,13 @@ export const V2ItemInspector = memo(function V2ItemInspector(props: V2ItemInspec
       {item.type === "fork" ? (
         <Button size="xs" variant="outline" onClick={() => props.onOpenThread(item.targetThreadId)}>
           <GitBranchIcon className="size-3" />
-          Open fork
+          {t.chat.inspector.openFork}
         </Button>
       ) : null}
 
       {item.type === "subagent" && item.childThreadId !== null ? (
         <Button size="xs" variant="outline" onClick={() => props.onOpenThread(item.childThreadId!)}>
-          Open subagent thread
+          {t.chat.inspector.openSubagentThread}
         </Button>
       ) : null}
 
@@ -413,8 +422,10 @@ export const V2ItemInspector = memo(function V2ItemInspector(props: V2ItemInspec
           </p>
           {support.contextTransfer ? (
             <p>
-              Transfer {support.contextTransfer.type.replaceAll("_", " ")} ·{" "}
-              {support.contextTransfer.status}
+              {t.chat.inspector.transfer(
+                support.contextTransfer.type,
+                support.contextTransfer.status,
+              )}
             </p>
           ) : null}
         </div>

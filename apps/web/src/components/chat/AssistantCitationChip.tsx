@@ -1,3 +1,5 @@
+/** Renders saved assistant citations and their source and comment actions. */
+import { t } from "~/i18n";
 import type { AssistantCitation } from "@t3tools/contracts";
 import { serializeAssistantCitation } from "@t3tools/shared/assistantCitations";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -25,6 +27,12 @@ import { resolveAssistantCitationCommentDismissal } from "./assistantCitationCom
 import { observeAssistantCitationCommentSource } from "./AssistantCitationSource";
 import { composerFloatingLayerProps } from "./composerEventScope";
 
+/**
+ * Renders a citation chip with source navigation and optional comment editing.
+ * @param props - Required citation; composer defaults to false. Optional commentEditor supplies
+ * open state and save/focus callbacks; its sourceAnchor and auxiliary callbacks may be undefined.
+ * @returns The citation chip and any active editor; never null.
+ */
 export function AssistantCitationChip({
   citation,
   composer = false,
@@ -114,7 +122,7 @@ export function AssistantCitationChip({
     <Link
       {...sourceLinkProps}
       className="inline-flex h-full min-w-0 items-center gap-[0.33em] rounded-sm text-inherit no-underline focus-visible:outline-2 focus-visible:outline-foreground"
-      aria-label={`View cited assistant text: ${label}`}
+      aria-label={t.chat.citation.viewCitedText(label)}
     >
       <QuoteIcon aria-hidden="true" />
       <ContextChipLabel className="max-w-[16em]">{label}</ContextChipLabel>
@@ -124,7 +132,7 @@ export function AssistantCitationChip({
     <Link
       {...sourceLinkProps}
       className="inline-flex h-full min-w-0 items-center gap-[0.33em] rounded-sm text-inherit no-underline hover:bg-(--context-chip-accent)/17 focus-visible:outline-2 focus-visible:outline-foreground"
-      aria-label={`View cited assistant text: ${label}`}
+      aria-label={t.chat.citation.viewCitedText(label)}
     >
       <QuoteIcon aria-hidden="true" />
       <ContextChipLabel className="max-w-[16em]">{label}</ContextChipLabel>
@@ -142,7 +150,7 @@ export function AssistantCitationChip({
       ) : (
         <Tooltip>
           <TooltipTrigger render={chatSourceLink} />
-          <TooltipPopup side="top">View source</TooltipPopup>
+          <TooltipPopup side="top">{t.chat.citation.viewSource}</TooltipPopup>
         </Tooltip>
       )}
       {commentEditor ? (
@@ -157,7 +165,11 @@ export function AssistantCitationChip({
           }}
         >
           <PopoverTrigger
-            aria-label={citation.comment ? "Edit citation comment" : "Add comment to citation"}
+            aria-label={
+              citation.comment
+                ? t.chat.citation.editCitationComment
+                : t.chat.citation.addCommentToCitation
+            }
             data-citation-comment-trigger="true"
             render={<ContextChipAction />}
           >
@@ -189,7 +201,7 @@ export function AssistantCitationChip({
                   : undefined
               }
               ref={commentPopupRef}
-              aria-label="Edit citation comment"
+              aria-label={t.chat.citation.editCitationComment}
               width="md"
               padding="compact"
               onPointerDown={(event) => event.stopPropagation()}
