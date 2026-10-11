@@ -1064,6 +1064,8 @@ export const OrchestrationV2ProviderTurnTokenUsage = Schema.Struct({
   /** Prompt cache lifetime the provider wrote with this report. Clients treat
       the cache as cold once `updatedAt` is this old. */
   promptCacheTtlMs: Schema.optional(PositiveInt),
+  /** Token count at which the provider reports it will automatically compact context. */
+  autoCompactThreshold: Schema.optional(PositiveInt),
   /** ISO timestamp of the provider's report; string so wire encoding is stable. */
   updatedAt: Schema.String,
 });

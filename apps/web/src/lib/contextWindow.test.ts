@@ -84,6 +84,25 @@ describe("live provider-turn usage (#8144)", () => {
     expect(snapshot?.maxTokens).toBeNull();
     expect(snapshot?.usedPercentage).toBeNull();
   });
+
+  it("preserves the provider's live auto-compaction threshold", () => {
+    const snapshot = deriveLatestContextWindowSnapshot([], {
+      usedTokens: 42_000,
+      autoCompactThreshold: 345_000,
+      updatedAt: "2026-08-27T00:00:00.000Z",
+    });
+
+    expect(snapshot?.autoCompactThreshold).toBe(345_000);
+  });
+
+  it("uses null when the live report omits the auto-compaction threshold", () => {
+    const snapshot = deriveLatestContextWindowSnapshot([], {
+      usedTokens: 42_000,
+      updatedAt: "2026-08-27T00:00:00.000Z",
+    });
+
+    expect(snapshot?.autoCompactThreshold).toBeNull();
+  });
 });
 
 describe("latestProviderTurnTokenUsage", () => {
