@@ -221,7 +221,7 @@ export const chat: Messages["chat"] = {
     attachmentUploadIncomplete: (name) => `附件“${name}”尚未上传完成。`,
     /** Names the model that could not start. */
     startModelError: (model) => `无法启动 ${model}`,
-    /** Reports the number of background threads started; count selects the English plural. */
+    /** Reports the number of background threads started using the same Chinese wording for all counts. */
     backgroundThreadsStarted: (count) => `已在后台启动 ${count} 个对话`,
     /** Appends model-change guidance to the supplied localized reason description. */
     newThreadForModel: (description) => `${description} 请新建对话以使用此模型。`,

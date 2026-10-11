@@ -21,7 +21,7 @@ import {
 import { Button } from "./ui/button";
 import { resolveConfirmDialogCopy } from "./ConfirmDialogHost.logic";
 
-/** Hosts the confirmation queue and resolves user responses after the dialog closes. */
+/** Resolves user responses before closing the dialog and advances the queue after it closes. */
 export function ConfirmDialogHost() {
   const state = useSyncExternalStore(
     subscribeConfirmDialog,
