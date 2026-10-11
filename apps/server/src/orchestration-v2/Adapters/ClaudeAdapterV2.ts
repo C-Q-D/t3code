@@ -15,6 +15,7 @@ import {
 
 import { isWorkspaceImagePreviewPath } from "@t3tools/shared/filePreview";
 import { normalizeClaudeTurnTokenUsage } from "../../provider/ClaudeTurnTokenUsage.ts";
+import { readClaudeContextLimits, type ClaudeContextLimits } from "./claudeContextLimits.ts";
 import {
   type CanUseTool,
   forkSession as forkClaudeSession,
@@ -30,6 +31,7 @@ import {
   type Settings as ClaudeSdkSettings,
   type SDKAssistantMessage,
   type SDKAPIRetryMessage,
+  type SDKControlGetContextUsageResponse,
   type SDKMessage,
   type SDKRateLimitInfo,
   type SDKResultMessage,
@@ -189,6 +191,11 @@ function claudePromptCacheTtlMs(
   return undefined;
 }
 
+/**
+ * Projects Claude assistant message usage into provider turn tokenUsage.
+ * limits holds the current CLI process's effective window and compaction point.
+ * If omitted or null, uses the model catalog window without a compaction threshold.
+ */
 export function claudeProviderTurnTokenUsage(
   usage: {
     readonly input_tokens: number;
@@ -199,6 +206,7 @@ export function claudeProviderTurnTokenUsage(
   },
   modelSelection: ModelSelection,
   updatedAt: string,
+  limits?: ClaudeContextLimits | null,
 ) {
   const inputTokens =
     usage.input_tokens +
@@ -208,7 +216,10 @@ export function claudeProviderTurnTokenUsage(
   const promptCacheTtlMs = claudePromptCacheTtlMs(usage.cache_creation);
   return {
     usedTokens: inputTokens + outputTokens,
-    maxTokens: claudeContextWindow(modelSelection),
+    maxTokens: limits?.maxTokens ?? claudeContextWindow(modelSelection),
+    ...(limits?.autoCompactThreshold === undefined
+      ? {}
+      : { autoCompactThreshold: limits.autoCompactThreshold }),
     inputTokens,
     cachedInputTokens: usage.cache_read_input_tokens ?? 0,
     outputTokens,
@@ -378,6 +389,9 @@ export interface ClaudeAgentSdkQuerySession {
   readonly messages: Stream.Stream<SDKMessage, ClaudeAgentSdkQueryRunnerError>;
   readonly offer: (message: SDKUserMessage) => Effect.Effect<void, ClaudeAgentSdkQueryRunnerError>;
   readonly setModel: (model: string) => Effect.Effect<void, ClaudeAgentSdkQueryRunnerError>;
+  readonly getContextUsage?: (options: {
+    readonly detail: "summary";
+  }) => Effect.Effect<SDKControlGetContextUsageResponse, ClaudeAgentSdkQueryRunnerError>;
   readonly setPermissionMode: (
     mode: PermissionMode,
   ) => Effect.Effect<void, ClaudeAgentSdkQueryRunnerError>;
@@ -519,6 +533,14 @@ export type ClaudeAgentSdkProtocolLogEvent =
       readonly payload: {
         readonly type: "query.set_model";
         readonly model: string;
+      };
+    }
+  | {
+      readonly direction: "outgoing";
+      readonly stage: "decoded";
+      readonly payload: {
+        readonly type: "query.get_context_usage";
+        readonly options: { readonly detail: "summary" };
       };
     }
   | {
@@ -809,6 +831,22 @@ export const layerQueryRunner: Layer.Layer<
                   payload: {
                     type: "query.set_model",
                     model,
+                  },
+                }),
+              ),
+            ),
+          getContextUsage: (options) =>
+            Effect.tryPromise({
+              try: () => queryRuntime.getContextUsage(options),
+              catch: (cause) => queryRunnerError(cause, "getContextUsage"),
+            }).pipe(
+              Effect.tap(() =>
+                logProtocolEvent({
+                  direction: "outgoing",
+                  stage: "decoded",
+                  payload: {
+                    type: "query.get_context_usage",
+                    options,
                   },
                 }),
               ),
@@ -2973,6 +3011,8 @@ interface ActiveClaudeSubagent {
 interface ClaudeLiveQueryContext {
   readonly nativeThreadId: string;
   readonly query: ClaudeAgentSdkQuerySession;
+  // Written by the background CLI read; null until limits are available.
+  contextLimits: ClaudeContextLimits | null;
   readonly queryPolicyKey: string;
   readonly selectionKey: string;
   readonly closed: Deferred.Deferred<void, never>;
@@ -6809,7 +6849,12 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                   completedAt: null,
                   tokenUsage: {
                     usedTokens: afterTokenCount,
-                    maxTokens: claudeContextWindow(context.input.modelSelection),
+                    maxTokens:
+                      liveQuery.contextLimits?.maxTokens ??
+                      claudeContextWindow(context.input.modelSelection),
+                    ...(liveQuery.contextLimits?.autoCompactThreshold === undefined
+                      ? {}
+                      : { autoCompactThreshold: liveQuery.contextLimits.autoCompactThreshold }),
                     updatedAt: DateTime.formatIso(now),
                   },
                 },
@@ -6962,6 +7007,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                     message.message.usage,
                     context.input.modelSelection,
                     DateTime.formatIso(now),
+                    liveQuery.contextLimits,
                   ),
                 },
               });
@@ -8311,6 +8357,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
           const context: ClaudeLiveQueryContext = {
             nativeThreadId,
             query: querySession,
+            contextLimits: null,
             queryPolicyKey,
             selectionKey: compiledSelection.queryIdentity,
             closed,
@@ -8372,6 +8419,14 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             ),
             Effect.ensuring(Deferred.succeed(closed, undefined)),
             Effect.forkIn(sessionScope),
+          );
+          yield* readClaudeContextLimits(querySession).pipe(
+            Effect.tap((limits) =>
+              Effect.sync(() => {
+                context.contextLimits = limits;
+              }),
+            ),
+            Effect.forkIn(sessionScope, { startImmediately: true }),
           );
           return context;
         });

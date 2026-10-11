@@ -7,6 +7,8 @@ import * as NodeStream from "node:stream";
 
 import type {
   Query as ClaudeQuery,
+  SDKControlGetContextUsageResponse,
+  NonNullableUsage,
   SDKMessage,
   SDKResultMessage,
   SDKUserMessage,
@@ -881,6 +883,178 @@ describe("ClaudeAdapterV2 native protocol logging", () => {
 });
 
 describe("ClaudeAdapterV2 context usage", () => {
+  it.effect.each([
+    ["reports the CLI window and compaction threshold", true],
+    ["completes with the catalog window when the CLI limit read fails", false],
+  ] as const)("%s", (_name, succeeds) =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const fileSystem = yield* FileSystem.FileSystem;
+        const contextRead = yield* Deferred.make<void>();
+        const sdkMessages = yield* Queue.unbounded<SDKMessage>();
+        const modelSelection = { ...CLAUDE_TEST_MODEL_SELECTION, model: "claude-opus-5-5" };
+        const response = {
+          maxTokens: 378_000,
+          rawMaxTokens: 1_000_000,
+          autoCompactThreshold: 345_000,
+          isAutoCompactEnabled: true,
+          totalTokens: 0,
+          percentage: 0,
+          model: modelSelection.model,
+          categories: [],
+          gridRows: [],
+          memoryFiles: [],
+          mcpTools: [],
+          agents: [],
+          apiUsage: null,
+        } satisfies SDKControlGetContextUsageResponse;
+        const adapter = yield* ClaudeAdapterV2.makeClaudeAdapterV2({
+          instanceId: ClaudeAdapterV2.CLAUDE_DEFAULT_INSTANCE_ID,
+          settings: DEFAULT_CLAUDE_SETTINGS,
+          environment: {},
+          attachmentsDir: "/workspace/attachments",
+          fileSystem,
+          path: yield* Path.Path,
+          crypto: yield* Crypto.Crypto,
+          idAllocator: yield* IdAllocator.IdAllocatorV2,
+          queryRunner: {
+            allocateSessionId: Effect.succeed("native-context-limits"),
+            open: () =>
+              Effect.succeed({
+                messages: Stream.fromEffect(Deferred.await(contextRead)).pipe(
+                  Stream.flatMap(() => Stream.fromQueue(sdkMessages)),
+                ),
+                offer: () => Effect.void,
+                setModel: () => Effect.void,
+                getContextUsage: () =>
+                  (succeeds
+                    ? Effect.succeed(response)
+                    : Effect.fail(
+                        new ClaudeAdapterV2.ClaudeAgentSdkQueryRunnerError({
+                          method: "getContextUsage",
+                          cause: "unavailable",
+                        }),
+                      )
+                  ).pipe(Effect.ensuring(Deferred.succeed(contextRead, undefined))),
+                setPermissionMode: () => Effect.void,
+                stopTask: () => Effect.void,
+                interrupt: Effect.void,
+                close: Queue.shutdown(sdkMessages),
+              }),
+            forkSession: () => Effect.die("unused"),
+            subagentLaunchToolUseId: () => Effect.succeed(null),
+            assertComplete: Effect.void,
+          },
+        });
+        const threadId = ThreadId.make("thread-context-limits");
+        const runtime = yield* adapter.openSession({
+          threadId,
+          providerSessionId: ProviderSessionId.make("session-context-limits"),
+          modelSelection,
+          runtimePolicy: CLAUDE_TEST_RUNTIME_POLICY,
+        });
+        const providerThread = yield* runtime.ensureThread({
+          threadId,
+          modelSelection,
+          runtimePolicy: CLAUDE_TEST_RUNTIME_POLICY,
+        });
+        const usageEvent = yield* runtime.events.pipe(
+          Stream.filter(
+            (event) =>
+              event.type === "provider_turn.updated" && event.providerTurn.tokenUsage != null,
+          ),
+          Stream.runHead,
+          Effect.forkScoped,
+        );
+        const terminalEvent = yield* runtime.events.pipe(
+          Stream.filter((event) => event.type === "turn.terminal"),
+          Stream.runHead,
+          Effect.forkScoped,
+        );
+        yield* runtime.startTurn(
+          makeClaudeTestTurnInput({
+            threadId,
+            providerThread,
+            now: yield* DateTime.now,
+            attemptId: RunAttemptId.make("attempt-context-limits"),
+            text: "Check context usage.",
+            attachments: [],
+            modelSelection,
+          }),
+        );
+        assert.isTrue(yield* Deferred.isDone(contextRead), "the CLI limit read was not started");
+        const messageUsage = {
+          input_tokens: 134_000,
+          output_tokens: 1_000,
+          cache_creation_input_tokens: 0,
+          cache_read_input_tokens: 0,
+          cache_creation: { ephemeral_1h_input_tokens: 0, ephemeral_5m_input_tokens: 0 },
+          inference_geo: "not_available",
+          iterations: [],
+          server_tool_use: { web_search_requests: 0, web_fetch_requests: 0 },
+          service_tier: "standard",
+          speed: "standard",
+        } satisfies NonNullableUsage;
+        yield* Queue.offer(sdkMessages, {
+          type: "assistant",
+          uuid: "00000000-0000-4000-8000-000000000091",
+          session_id: "native-context-limits",
+          parent_tool_use_id: null,
+          message: {
+            id: "msg-context-limits",
+            type: "message",
+            role: "assistant",
+            model: modelSelection.model,
+            content: [{ type: "text", text: "Context checked.", citations: [] }],
+            container: null,
+            context_management: null,
+            stop_details: null,
+            stop_reason: "end_turn",
+            stop_sequence: null,
+            usage: messageUsage,
+          },
+        });
+        const event = yield* Fiber.join(usageEvent);
+        assert.isTrue(Option.isSome(event));
+        if (Option.isNone(event) || event.value.type !== "provider_turn.updated") return;
+        const usage = event.value.providerTurn.tokenUsage;
+        assert.equal(usage?.usedTokens, 135_000);
+        assert.equal(usage?.maxTokens, succeeds ? 378_000 : 1_000_000);
+        if (succeeds) {
+          assert.equal(usage?.autoCompactThreshold, 345_000);
+        } else {
+          assert.notProperty(usage, "autoCompactThreshold");
+        }
+        yield* Queue.offer(sdkMessages, {
+          type: "result",
+          subtype: "success",
+          uuid: "00000000-0000-4000-8000-000000000092",
+          session_id: "native-context-limits",
+          duration_ms: 1,
+          duration_api_ms: 1,
+          is_error: false,
+          num_turns: 1,
+          result: "Context checked.",
+          stop_reason: "end_turn",
+          total_cost_usd: 0,
+          usage: messageUsage,
+          modelUsage: {},
+          permission_denials: [],
+          terminal_reason: "completed",
+        });
+        const terminal = yield* Fiber.join(terminalEvent);
+        assert.isTrue(Option.isSome(terminal));
+        if (Option.isSome(terminal) && terminal.value.type === "turn.terminal") {
+          assert.equal(terminal.value.status, "completed");
+        }
+      }).pipe(
+        Effect.provide(
+          Layer.mergeAll(IdAllocator.layer, McpProviderSessions.layer, NodeServices.layer),
+        ),
+      ),
+    ),
+  );
+
   it("projects assistant usage against the selected context window", () => {
     const usage = ClaudeAdapterV2.claudeProviderTurnTokenUsage(
       {
