@@ -1,3 +1,4 @@
+/** Renders scoped settings panels through shared controls; server settings own validation and persistence. */
 import { SettingsGroup } from "./SettingsGroup";
 import { LanguageSetting } from "./LanguageSetting";
 import { t } from "~/i18n";
@@ -497,6 +498,11 @@ function AboutVersionSection() {
   );
 }
 
+/**
+ * Tracks changed settings and restores defaults through the selected settings scope.
+ * @param onRestored Optional notification after requesting the reset, not a persistence receipt.
+ * @returns Changed labels and a reset callback; server rows, including export location, use server defaults.
+ */
 export function useSettingsRestore(onRestored?: () => void) {
   const {
     theme,
@@ -636,6 +642,9 @@ export function useSettingsRestore(onRestored?: () => void) {
       ...(settings.addProjectBaseDirectory !== DEFAULT_UNIFIED_SETTINGS.addProjectBaseDirectory
         ? [t.settings.rows.addProjectStartsIn.ariaLabel]
         : []),
+      ...(settings.threadExportDirectory !== DEFAULT_UNIFIED_SETTINGS.threadExportDirectory
+        ? [t.settings.rows.threadExportDirectory.ariaLabel]
+        : []),
       ...(settings.confirmThreadUnpin !== DEFAULT_UNIFIED_SETTINGS.confirmThreadUnpin
         ? [t.settings.rows.unpinConfirmation.title]
         : []),
@@ -678,6 +687,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       settings.sendShortcut,
       settings.followUpBehavior,
       settings.addProjectBaseDirectory,
+      settings.threadExportDirectory,
       settings.defaultThreadEnvMode,
       settings.newWorktreesStartFromOrigin,
       settings.diffFilesCollapsed,
@@ -822,6 +832,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       defaultThreadEnvMode: DEFAULT_UNIFIED_SETTINGS.defaultThreadEnvMode,
       newWorktreesStartFromOrigin: DEFAULT_UNIFIED_SETTINGS.newWorktreesStartFromOrigin,
       addProjectBaseDirectory: DEFAULT_UNIFIED_SETTINGS.addProjectBaseDirectory,
+      threadExportDirectory: DEFAULT_UNIFIED_SETTINGS.threadExportDirectory,
       confirmThreadArchive: DEFAULT_UNIFIED_SETTINGS.confirmThreadArchive,
       confirmThreadDelete: DEFAULT_UNIFIED_SETTINGS.confirmThreadDelete,
       confirmThreadUnpin: DEFAULT_UNIFIED_SETTINGS.confirmThreadUnpin,
@@ -2227,7 +2238,12 @@ function LegacyFeaturesSection() {
   );
 }
 
-/** Renders device behavior and scoped defaults for the selected settings targets. */
+/**
+ * Renders general settings for targets selected by the enclosing settings scope, with no props.
+ * Server rows persist via the scoped settings command; mixed targets show an empty draft.
+ * Export location is an environment setting: empty means stateDir/exports on the destination server.
+ * @returns Existing settings rows and controls; mutation failures are handled by the settings command.
+ */
 export function GeneralSettingsPanel() {
   const modifierLabel = isMacPlatform(navigator.platform) ? "⌘" : "Ctrl";
   const sendShortcutOptions = [
@@ -2309,6 +2325,7 @@ export function GeneralSettingsPanel() {
   const backgroundActivityProfileOption = resolveBackgroundActivityProfileOption(settings);
   const mixedBackgroundActivity = useScopedSettingsMixed(["backgroundActivity"]);
   const mixedAddProjectBaseDirectory = useScopedSettingsMixed(["addProjectBaseDirectory"]);
+  const mixedThreadExportDirectory = useScopedSettingsMixed(["threadExportDirectory"]);
   const mixedTextGenerationModel = useScopedSettingsMixed(["textGenerationModelSelection"]);
   const backgroundActivityDescription =
     backgroundActivityProfileOption === "advanced"
@@ -3195,6 +3212,35 @@ export function GeneralSettingsPanel() {
               placeholder={mixedAddProjectBaseDirectory ? t.settings.general.mixed : "~/"}
               spellCheck={false}
               aria-label={t.settings.rows.addProjectStartsIn.ariaLabel}
+            />
+          }
+        />
+        <SettingsRow
+          serverScoped
+          settingKeys={["threadExportDirectory"]}
+          {...searchableSetting("thread-export-directory")}
+          description={t.settings.rows.threadExportDirectory.description}
+          resetAction={
+            settings.threadExportDirectory !== DEFAULT_UNIFIED_SETTINGS.threadExportDirectory ? (
+              <SettingResetButton
+                label={t.settings.rows.threadExportDirectory.resetLabel}
+                onClick={() =>
+                  updateSettings({
+                    threadExportDirectory: DEFAULT_UNIFIED_SETTINGS.threadExportDirectory,
+                  })
+                }
+              />
+            ) : null
+          }
+          control={
+            <DraftInput
+              size="sm"
+              className="w-full sm:w-72"
+              value={mixedThreadExportDirectory ? "" : settings.threadExportDirectory}
+              onCommit={(next) => updateSettings({ threadExportDirectory: next })}
+              placeholder={mixedThreadExportDirectory ? t.settings.general.mixed : ""}
+              spellCheck={false}
+              aria-label={t.settings.rows.threadExportDirectory.ariaLabel}
             />
           }
         />

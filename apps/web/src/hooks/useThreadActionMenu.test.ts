@@ -1,3 +1,4 @@
+/** Verifies observable thread action handling and grant checks at the native menu boundary. */
 import {
   AuthOrchestrationOperateScope,
   EnvironmentId,
@@ -66,10 +67,13 @@ vi.mock("../state/entities", () => ({
 }));
 vi.mock("../state/environments", () => ({ usePrimaryEnvironmentId: () => "primary" }));
 vi.mock("../state/threads", () => ({ threadEnvironment: { updateMetadata: "metadata" } }));
+vi.mock("../state/server", () => ({ serverEnvironment: { exportTranscript: "export" } }));
 vi.mock("../state/use-atom-command", () => ({
-  useAtomCommand: () => async () => {
-    recordEffect("metadata");
-    return AsyncResult.success(undefined);
+  useAtomCommand: (command: string) => async () => {
+    recordEffect(command === "export" ? "export" : "metadata");
+    return AsyncResult.success(
+      command === "export" ? { path: "C:/exports/thread.md", bytes: 123, itemCount: 3 } : undefined,
+    );
   },
 }));
 vi.mock("../localApi", () => ({
@@ -193,19 +197,24 @@ describe("thread menu permissions", () => {
     );
   });
 
-  it.each(["rename", "regenerate-title", "delete", "pin", "settle", "archive"] as const)(
-    "%s rechecks after the native menu closes",
-    async (action) => {
-      state.granted.add("secondary");
-      const choice = deferred<ThreadActionMenuId | null>();
-      state.show.mockReturnValue(choice.promise);
-      createMenu().openMenu(position);
-      state.granted.delete("secondary");
-      choice.resolve(action);
-      await state.completed.promise;
-      expect(state.effects).toEqual([]);
-    },
-  );
+  it.each([
+    "rename",
+    "regenerate-title",
+    "delete",
+    "pin",
+    "settle",
+    "archive",
+    "export-transcript",
+  ] as const)("%s rechecks after the native menu closes", async (action) => {
+    state.granted.add("secondary");
+    const choice = deferred<ThreadActionMenuId | null>();
+    state.show.mockReturnValue(choice.promise);
+    createMenu().openMenu(position);
+    state.granted.delete("secondary");
+    choice.resolve(action);
+    await state.completed.promise;
+    expect(state.effects).toEqual([]);
+  });
 
   it.each([
     ["new-thread-on-branch", "draft"],

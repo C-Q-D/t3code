@@ -1,3 +1,4 @@
+/** Verifies server settings persistence, normalization and notifications using isolated test state. */
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import {
   DEFAULT_SERVER_SETTINGS,
@@ -1237,6 +1238,7 @@ it.layer(NodeServices.layer)("server settings", (it) => {
 
       const next = yield* serverSettings.updateSettings({
         addProjectBaseDirectory: "  ~/Development  ",
+        threadExportDirectory: "  ~/exports  ",
         observability: {
           otlpTracesUrl: "  http://localhost:4318/v1/traces  ",
           otlpMetricsUrl: "  http://localhost:4318/v1/metrics  ",
@@ -1245,6 +1247,7 @@ it.layer(NodeServices.layer)("server settings", (it) => {
       });
 
       assert.equal(next.addProjectBaseDirectory, "~/Development");
+      assert.equal(next.threadExportDirectory, "~/exports");
       assert.deepEqual(next.observability, {
         otlpTracesUrl: "http://localhost:4318/v1/traces",
         otlpMetricsUrl: "http://localhost:4318/v1/metrics",

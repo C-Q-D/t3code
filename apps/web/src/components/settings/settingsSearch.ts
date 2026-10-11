@@ -1,3 +1,4 @@
+/** Indexes localized settings for navigation and search; panels own controls and persistence commands. */
 import { en } from "~/i18n/locales/en";
 import { t } from "~/i18n";
 import { HOSTED_APP_CHANNEL } from "~/branding";
@@ -540,6 +541,13 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/general",
     scope: "environment-defaults",
     searchTerms: ["base directory folder browser path home"],
+  },
+  {
+    id: "thread-export-directory",
+    title: t.settings.rows.threadExportDirectory.title,
+    to: "/settings/general",
+    scope: "environment-defaults",
+    searchTerms: ["conversation transcript export directory folder path markdown"],
   },
   {
     id: "unpin-confirmation",

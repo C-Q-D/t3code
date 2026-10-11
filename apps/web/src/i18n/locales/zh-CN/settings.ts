@@ -479,6 +479,12 @@ export const settings: Messages["settings"] = {
       resetLabel: "添加项目的基础目录",
       ariaLabel: "添加项目的基础目录",
     },
+    threadExportDirectory: {
+      title: "会话记录导出位置",
+      description: "导出文件保存的目录。留空时保存到 T3 数据目录下的 exports 文件夹。",
+      resetLabel: "会话记录导出位置",
+      ariaLabel: "会话记录导出位置",
+    },
     unpinConfirmation: {
       title: "取消置顶确认",
       description: "取消对话在置顶分区中的置顶前询问。",

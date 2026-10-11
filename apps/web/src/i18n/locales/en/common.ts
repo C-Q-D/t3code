@@ -10,6 +10,7 @@ export const common = {
   resetLabelToDefault: (label: string) => `Reset ${label} to default`,
 
   threadActions: {
+    exportTranscript: "Export conversation",
     /** Formats an already localized snooze preset and wake time. */
     snoozePreset: (label: string, time: string) => `${label} (${time})`,
     copy: "Copy",

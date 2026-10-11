@@ -8,6 +8,7 @@ export const common: Messages["common"] = {
   resetLabelToDefault: (label) => `将${label}恢复为默认值`,
 
   threadActions: {
+    exportTranscript: "导出会话记录",
     /** Formats an already localized snooze preset and wake time. */
     snoozePreset: (label, time) => `${label}（${time}）`,
     copy: "复制",

@@ -58,6 +58,8 @@ export const sidebar: Messages["sidebar"] = {
     remoteDescription: (labels: string) => `远程环境：${labels}`,
   },
   thread: {
+    exportTranscriptSuccess: "会话记录已导出",
+    exportTranscriptError: "导出会话记录失败",
     titleAriaLabel: "对话标题",
     rename: "重命名对话",
     emptyTitleToast: "对话标题不能为空",

@@ -518,6 +518,13 @@ export const settings = {
       resetLabel: "add project base directory",
       ariaLabel: "Add project base directory",
     },
+    threadExportDirectory: {
+      title: "Conversation export location",
+      description:
+        "Folder for exported conversation files. Leave empty to use the exports folder in the T3 data directory.",
+      resetLabel: "conversation export location",
+      ariaLabel: "Conversation export location",
+    },
     unpinConfirmation: {
       title: "Unpin confirmation",
       description: "Ask before unpinning a thread from the pinned section.",

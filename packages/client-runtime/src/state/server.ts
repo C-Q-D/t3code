@@ -1,3 +1,4 @@
+/** Builds environment-scoped server state and guarded commands; writes execute on the destination server. */
 import {
   type EnvironmentId,
   type ServerConfig,
@@ -7,6 +8,7 @@ import {
   type ServerSelfUpdateProgressEvent,
   type ServerSelfUpdateResult,
   WS_METHODS,
+  ORCHESTRATION_V2_WS_METHODS,
 } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
 import * as Duration from "effect/Duration";
@@ -609,6 +611,14 @@ export function resolveServerConfigValue(
   return initialConfig ?? projection?.config ?? null;
 }
 
+/**
+ * Builds destination-scoped server queries, subscriptions and guarded mutations on a shared runtime.
+ * @param runtime Application-owned connection/cache runtime; this factory does not create a server or runtime.
+ * @param options Supplies bootstrap configuration atoms; optional stream capabilities default to disabled.
+ * @returns Atoms and commands keyed by environment. Export additionally uses thread ID for singleFlight.
+ * Commands expose permissionAtom and recheck destination grants at execution; RPC/connection errors remain
+ * command failures. Export writes on the selected server and returns its absolute path.
+ */
 export function createServerEnvironmentAtoms<R, E>(
   runtime: Atom.AtomRuntime<
     EnvironmentRegistry.EnvironmentRegistry | Persistence.EnvironmentCacheStore | R,
@@ -983,6 +993,19 @@ export function createServerEnvironmentAtoms<R, E>(
 
   return {
     configValueAtom,
+    /**
+     * Exports the input thread on environmentId's server and returns path, UTF-8 bytes and item count.
+     * Requires operate on that destination; failures remain command results. Identical environment/thread
+     * calls share one flight, while other destinations or threads can export concurrently.
+     */
+    exportTranscript: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:orchestration:export-transcript",
+      tag: ORCHESTRATION_V2_WS_METHODS.exportTranscript,
+      concurrency: {
+        mode: "singleFlight",
+        key: ({ environmentId, input }) => JSON.stringify([environmentId, input.threadId]),
+      },
+    }),
     runStorageCleanup: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:server:run-storage-cleanup",
       tag: WS_METHODS.serverRunStorageCleanup,

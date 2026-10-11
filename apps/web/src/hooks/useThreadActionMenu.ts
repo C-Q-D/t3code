@@ -25,6 +25,8 @@ import {
 } from "../components/threadActionMenu.logic";
 import { stackedThreadToast, toastManager } from "../components/ui/toast";
 import { threadEnvironment } from "../state/threads";
+import { serverEnvironment } from "../state/server";
+import { useAtomCommand } from "../state/use-atom-command";
 import { useOrchestrationCommand } from "../state/use-orchestration-command";
 import { readEnvironmentScope } from "../state/session";
 import {
@@ -70,6 +72,9 @@ function failureToast(title: string, error: unknown) {
  * Unlike the sidebar, settle and snooze here never navigate away: the caller
  * is acting on the thread they are reading, and ChatView's parked-thread
  * banner already offers the way back.
+ * @param input Nullable thread destination, nullable fallback project path, and rename callback.
+ * @returns A menu-opening callback; no thread means no menu. Actions recheck destination grants.
+ * Export writes on the selected server and reports its path or failure reason in a toast.
  */
 export function useThreadActionMenu(input: {
   readonly threadRef: ScopedThreadRef | null;
@@ -78,6 +83,9 @@ export function useThreadActionMenu(input: {
   readonly onStartRename: () => void;
 }) {
   const { threadRef, projectCwd, onStartRename } = input;
+  const exportTranscript = useAtomCommand(serverEnvironment.exportTranscript, {
+    reportFailure: false,
+  });
   const router = useRouter();
   const projects = useProjects();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
@@ -305,6 +313,25 @@ export function useThreadActionMenu(input: {
           case "copy-thread-id":
             copyThreadIdToClipboard(thread.id, { threadId: thread.id });
             return;
+          case "export-transcript": {
+            const result = await exportTranscript({
+              environmentId: threadRef.environmentId,
+              input: { threadId: threadRef.threadId },
+            });
+            if (result._tag === "Success") {
+              toastManager.add({
+                type: "success",
+                title: t.sidebar.thread.exportTranscriptSuccess,
+                description: result.value.path,
+              });
+            } else if (!isAtomCommandInterrupted(result)) {
+              failureToast(
+                t.sidebar.thread.exportTranscriptError,
+                squashAtomCommandFailure(result),
+              );
+            }
+            return;
+          }
           case "archive": {
             if (confirmThreadArchive) {
               const confirmed = await settlePromise(() =>
@@ -368,6 +395,7 @@ export function useThreadActionMenu(input: {
       copyPathToClipboard,
       copyThreadIdToClipboard,
       deleteThread,
+      exportTranscript,
       handleNewThread,
       logicalProjectKeyByPhysicalKey,
       markThreadUnread,

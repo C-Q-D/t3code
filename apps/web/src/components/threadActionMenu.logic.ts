@@ -1,3 +1,4 @@
+/** Builds shared thread menus and permission availability; action execution belongs in the calling surface. */
 import { t } from "~/i18n";
 import type { ContextMenuItem } from "@t3tools/contracts";
 import type { SnoozePreset } from "@t3tools/client-runtime/state/thread-settled";
@@ -27,6 +28,7 @@ export type ThreadActionMenuId =
   | "copy"
   | "copy-path"
   | "copy-branch"
+  | "export-transcript"
   | "copy-thread-id"
   | "archive"
   | "delete";
@@ -84,6 +86,7 @@ export function buildDraftActionMenuItems(options: {
   ];
 }
 
+/** Snapshot of thread state and server capabilities used only to build menu availability. */
 export interface ThreadActionMenuState {
   readonly canOperate: boolean;
   readonly branch: string | null;
@@ -116,7 +119,11 @@ export interface ThreadActionMenuState {
   readonly snoozePresets: ReadonlyArray<SnoozePreset>;
 }
 
-/** Local navigation, read markers, and copying remain available to read-only clients. */
+/**
+ * Determines whether execution requires the destination's operate grant.
+ * @param action Closed menu identifier; export is an operation even though it reads a timeline.
+ * @returns False for local navigation, read markers and copying; true for server operations.
+ */
 export function threadActionRequiresOperate(action: ThreadActionMenuId): boolean {
   return ![
     "new-thread-on-branch",
@@ -133,6 +140,9 @@ export function threadActionRequiresOperate(action: ThreadActionMenuId): boolean
  * Single source for the per-thread action menu: the sidebar row's right-click
  * menu and the chat header menu share labels, ordering, and capability gating.
  * Each surface supplies state for the actions it supports.
+ * @param state Current destination permissions, thread lifecycle and optional capabilities.
+ * @returns Ordered menu entries; export follows Copy at the top level and is disabled without operate.
+ * This function performs no mutations; callers recheck grants when an item is selected.
  */
 export function buildThreadActionMenuItems(
   state: ThreadActionMenuState,
@@ -260,6 +270,7 @@ export function buildThreadActionMenuItems(
         { id: "copy-thread-id", label: t.common.threadActions.threadId, icon: "hash" },
       ],
     },
+    { id: "export-transcript", label: t.common.threadActions.exportTranscript, icon: "download" },
     { id: "project-settings", label: t.common.threadActions.projectSettings, icon: "settings" },
     // Archive removes the thread from the sidebar while keeping its
     // conversation under Settings > Archived threads — distinct from Settle

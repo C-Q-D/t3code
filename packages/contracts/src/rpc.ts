@@ -1,3 +1,4 @@
+/** Defines typed RPC methods, request groups and transport errors; contains no handlers. */
 import {
   OrchestrationV2SearchThreadError,
   OrchestrationV2SearchThreadInput,
@@ -25,7 +26,7 @@ import * as Schema from "effect/Schema";
 import * as Rpc from "effect/rpc/Rpc";
 import * as RpcGroup from "effect/rpc/RpcGroup";
 import * as RpcMiddleware from "effect/rpc/RpcMiddleware";
-import { NonNegativeInt, TrimmedNonEmptyString } from "./baseSchemas.ts";
+import { NonNegativeInt, ThreadId, TrimmedNonEmptyString } from "./baseSchemas.ts";
 import {
   CodexAuthCallbackInput,
   CodexAuthCallbackState,
@@ -1669,6 +1670,26 @@ const WsOrchestrationV2StopWorkflowRpc = Rpc.make(ORCHESTRATION_V2_WS_METHODS.st
   error: Schema.Union([OrchestrationV2StopWorkflowError, EnvironmentAuthorizationError]),
 });
 
+/** Export failure for one root thread; message includes the failed stage/reason and cause aids diagnostics. */
+export class OrchestrationV2ExportTranscriptError extends Schema.TaggedError<OrchestrationV2ExportTranscriptError>()(
+  "OrchestrationV2ExportTranscriptError",
+  { threadId: ThreadId, message: Schema.String, cause: Schema.optional(Schema.Defect()) },
+) {}
+
+/** Existing root ID in; absolute server path, UTF-8 bytes and all-thread item count out. Requires operate. */
+const WsOrchestrationV2ExportTranscriptRpc = Rpc.make(
+  ORCHESTRATION_V2_WS_METHODS.exportTranscript,
+  {
+    payload: Schema.Struct({ threadId: ThreadId }),
+    success: Schema.Struct({
+      path: Schema.String,
+      bytes: NonNegativeInt,
+      itemCount: NonNegativeInt,
+    }),
+    error: Schema.Union([OrchestrationV2ExportTranscriptError, EnvironmentAuthorizationError]),
+  },
+);
+
 const WsOrchestrationV2GetWorkflowScriptRpc = Rpc.make(
   ORCHESTRATION_V2_WS_METHODS.getWorkflowScript,
   {
@@ -2040,6 +2061,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsOrchestrationV2DispatchCommandRpc,
   WsOrchestrationV2GetWorkflowScriptRpc,
   WsOrchestrationV2StopWorkflowRpc,
+  WsOrchestrationV2ExportTranscriptRpc,
   WsOrchestrationV2GetTurnItemRpc,
   WsOrchestrationV2GetTurnDiffRpc,
   WsOrchestrationV2GetFullThreadDiffRpc,

@@ -1,4 +1,7 @@
+/** Renders project and thread navigation and dispatches scoped menu actions; server services own export IO. */
 import { t } from "~/i18n";
+import { serverEnvironment } from "../state/server";
+import { useAtomCommand } from "../state/use-atom-command";
 import { type EnvironmentId } from "@t3tools/contracts";
 import { ThreadHoverCard, ThreadHoverCardPopup } from "./ThreadHoverCard";
 import { CollapsibleSectionHeader } from "./ui/collapsible-section-header";
@@ -4609,6 +4612,9 @@ export default function Sidebar() {
     [copyBranchToClipboard, copyPathToClipboard, openProjectSettings, projectByKey],
   );
 
+  const exportTranscript = useAtomCommand(serverEnvironment.exportTranscript, {
+    reportFailure: false,
+  });
   const handleThreadContextMenu = useCallback(
     (threadRef: ScopedThreadRef, position: { x: number; y: number }) => {
       void (async () => {
@@ -4818,6 +4824,30 @@ export default function Sidebar() {
           case "copy-thread-id":
             copyThreadIdToClipboard(thread.id, { threadId: thread.id });
             return;
+          case "export-transcript": {
+            const result = await exportTranscript({
+              environmentId: threadRef.environmentId,
+              input: { threadId: threadRef.threadId },
+            });
+            if (result._tag === "Success") {
+              toastManager.add({
+                type: "success",
+                title: t.sidebar.thread.exportTranscriptSuccess,
+                description: result.value.path,
+              });
+            } else if (!isAtomCommandInterrupted(result)) {
+              const error = squashAtomCommandFailure(result);
+              toastManager.add(
+                stackedThreadToast({
+                  type: "error",
+                  title: t.sidebar.thread.exportTranscriptError,
+                  description:
+                    error instanceof Error ? error.message : t.sidebar.errors.genericError,
+                }),
+              );
+            }
+            return;
+          }
           case "archive": {
             if (confirmThreadArchive) {
               const confirmed = await settlePromise(() =>
@@ -4895,6 +4925,7 @@ export default function Sidebar() {
       copyThreadIdToClipboard,
       deleteThread,
       handleMultiSelectContextMenu,
+      exportTranscript,
       markThreadUnread,
       openProjectSettings,
       projectScopeKey,

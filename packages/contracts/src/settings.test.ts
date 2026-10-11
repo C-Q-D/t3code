@@ -1,3 +1,4 @@
+/** Verifies settings defaults, patches and normalization against their public schema contracts. */
 import { describe, expect, it } from "vite-plus/test";
 import * as Schema from "effect/Schema";
 
@@ -1109,5 +1110,21 @@ describe("server model preferences", () => {
     expect(decodeServerSettingsPatch({ migrateModelPreferences: input })).toEqual({
       migrateModelPreferences: input,
     });
+  });
+});
+
+describe("conversation export directory", () => {
+  it("defaults to empty and trims persisted values and patches", () => {
+    expect(decodeServerSettings({}).threadExportDirectory).toBe("");
+    expect(
+      decodeServerSettings({ threadExportDirectory: "  ~/exports  " }).threadExportDirectory,
+    ).toBe("~/exports");
+    expect(
+      decodeServerSettingsPatch({ threadExportDirectory: "  ~/next  " }).threadExportDirectory,
+    ).toBe("~/next");
+    expect(
+      encodeServerSettings({ ...decodeServerSettings({}), threadExportDirectory: "  ~/exports  " })
+        .threadExportDirectory,
+    ).toBe("~/exports");
   });
 });

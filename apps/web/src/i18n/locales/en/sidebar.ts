@@ -56,6 +56,8 @@ export const sidebar = {
     remoteDescription: (labels: string) => `Remote environment: ${labels}`,
   },
   thread: {
+    exportTranscriptSuccess: "Conversation exported",
+    exportTranscriptError: "Failed to export conversation",
     titleAriaLabel: "Thread title",
     rename: "Rename thread",
     emptyTitleToast: "Thread title cannot be empty",
