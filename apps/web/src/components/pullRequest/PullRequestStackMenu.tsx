@@ -1,3 +1,5 @@
+/** Owns pull request stack menu on the web pull-request surface; host data and agent context remain unchanged. */
+import { t } from "~/i18n";
 import { Tooltip, TooltipTrigger, TooltipPopup } from "../ui/tooltip";
 import type {
   EnvironmentId,
@@ -27,6 +29,11 @@ import { PullRequestStackHeader } from "./PullRequestStackHeader";
 import { PullRequestStackLayerContent } from "./PullRequestStackLayerContent";
 import { PullRequestGlyph } from "./pullRequestIcons";
 
+/**
+ * Renders pull request stack menu from the supplied display data and callbacks.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 export function PullRequestStackMenu({
   stack,
   reference,
@@ -104,16 +111,19 @@ export function PullRequestStackMenu({
     if (result._tag === "Failure") {
       toastManager.add({
         type: "error",
-        title: "Stack operation did not complete",
+        title: t.git.pullRequest.stackOperationDidNotComplete,
         description: String(squashAtomCommandFailure(result)),
       });
     } else {
       toastManager.add({
         type: "success",
-        title: action === "merge" ? "Stack merge request completed" : "Stack rebased",
+        title:
+          action === "merge"
+            ? t.git.pullRequest.stackMergeRequestCompleted
+            : t.git.pullRequest.stackRebased,
         description:
           action === "merge"
-            ? "GitHub merged the stack or added it to its merge queue."
+            ? t.git.pullRequest.gitHubMergedTheStackOrAddedItToItsMergeQueue
             : undefined,
       });
     }
@@ -130,7 +140,11 @@ export function PullRequestStackMenu({
                   <Button
                     variant="ghost"
                     size="xs"
-                    aria-label={`Stack ${stack.number}, layer ${position} of ${stack.layers.length}`}
+                    aria-label={t.git.pullRequest.stackLayer(
+                      stack.number,
+                      position,
+                      stack.layers.length,
+                    )}
                   />
                 }
               >
@@ -141,14 +155,16 @@ export function PullRequestStackMenu({
             }
           />
           <TooltipPopup>
-            View stack #{stack.number}, layer {position} of {stack.layers.length}
+            {t.git.pullRequest.viewStackLayer(stack.number, position, stack.layers.length)}
             {notice ? ` · ${notice}` : null}
           </TooltipPopup>
         </Tooltip>
         <MenuPopup align="start">
           <MenuGroup>
             <PullRequestStackHeader number={stack.number} notice={notice} stale={!!onRetry} />
-            {onRetry ? <MenuItem onClick={onRetry}>Retry stack refresh</MenuItem> : null}
+            {onRetry ? (
+              <MenuItem onClick={onRetry}>{t.git.pullRequest.retryStackRefresh}</MenuItem>
+            ) : null}
             <PullRequestStackLayers
               stack={stack}
               reference={reference}
@@ -169,7 +185,7 @@ export function PullRequestStackMenu({
               {canMerge ? (
                 <MenuItem disabled={mergeDisabled} onClick={() => setConfirmation("merge")}>
                   <PullRequestGlyph.merged aria-hidden />
-                  Merge stack ({mergeLayers.length})
+                  {t.git.pullRequest.mergeStackLayerCount(mergeLayers.length)}
                 </MenuItem>
               ) : null}
               {canRebase ? (
@@ -178,12 +194,12 @@ export function PullRequestStackMenu({
                   onClick={() => setConfirmation("update-branch")}
                 >
                   <RefreshCwIcon aria-hidden />
-                  Rebase stack
+                  {t.git.pullRequest.rebaseStack}
                 </MenuItem>
               ) : null}
               {mergeHasClosed || mergeLayers.some((layer) => layer.isDraft) ? (
                 <p className="px-2 py-1 text-xs text-muted-foreground">
-                  Every layer being merged must be open and ready for review.
+                  {t.git.pullRequest.everyLayerBeingMergedMustBeOpenAndReadyForReview}
                 </p>
               ) : null}
             </>
@@ -202,14 +218,13 @@ export function PullRequestStackMenu({
                   onClick={() => setConfirmation("merge")}
                 >
                   <PullRequestGlyph.merged aria-hidden className="size-3.5" />
-                  Merge stack
+                  {t.git.pullRequest.mergeStack}
                 </Button>
               </span>
             }
           />
           <TooltipPopup>
-            Merge stack through #{reference.number} into {stack.base} ({mergeLayers.length}{" "}
-            {mergeLayers.length === 1 ? "pull request" : "pull requests"})
+            {t.git.pullRequest.mergeStackThrough(reference.number, stack.base, mergeLayers.length)}
           </TooltipPopup>
         </Tooltip>
       ) : null}
@@ -223,13 +238,17 @@ export function PullRequestStackMenu({
           <DialogHeader>
             <DialogTitle>
               {confirmation === "merge"
-                ? `Merge ${mergeLayers.length} pull requests?`
-                : `Rebase ${unmerged.length} pull requests?`}
+                ? t.git.pullRequest.mergeStackCount(mergeLayers.length)
+                : t.git.pullRequest.rebaseStackCount(unmerged.length)}
             </DialogTitle>
             <DialogDescription>
               {confirmation === "merge"
-                ? `Merge #${reference.number} and its unmerged layers below into ${stack.base} using ${mergeMethod}. GitHub checks their rules before merging or queueing them and rebases the remaining stack after merging.`
-                : `Rebase the remote branches from bottom to top onto ${stack.base}. This rewrites branch history and may restart checks. If a layer fails, earlier updates remain.`}
+                ? t.git.pullRequest.mergeStackConfirmation(
+                    reference.number,
+                    stack.base,
+                    mergeMethod,
+                  )
+                : t.git.pullRequest.rebaseStackConfirmation(stack.base)}
             </DialogDescription>
           </DialogHeader>
           <DialogPanel>
@@ -246,10 +265,14 @@ export function PullRequestStackMenu({
           </DialogPanel>
           <DialogFooter>
             <Button variant="outline" disabled={pending} onClick={() => setConfirmation(null)}>
-              Cancel
+              {t.common.confirm.cancel}
             </Button>
             <Button disabled={pending} onClick={() => void run()}>
-              {pending ? "Working…" : confirmation === "merge" ? "Merge stack" : "Rebase stack"}
+              {pending
+                ? t.git.pullRequest.working
+                : confirmation === "merge"
+                  ? t.git.pullRequest.mergeStack
+                  : t.git.pullRequest.rebaseStack}
             </Button>
           </DialogFooter>
         </DialogPopup>

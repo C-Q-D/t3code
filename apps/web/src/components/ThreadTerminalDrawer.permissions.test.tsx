@@ -114,7 +114,6 @@ it("rechecks the target terminal grant when a retained surface callback reports 
         threadRef={threadRef}
         threadId={threadRef.threadId}
         terminalId="terminal-1"
-        terminalLabel="Terminal 1"
         cwd="/repo"
         onSessionExited={state.otherCommand}
         focusRequestId={0}

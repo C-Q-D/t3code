@@ -1,3 +1,5 @@
+/** Opens localized macOS permission guidance through the desktop Effect runtime. */
+import * as DesktopUiLocale from "../i18n/DesktopUiLocale.ts";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -23,17 +25,22 @@ export const layer = Layer.effect(
   Effect.gen(function* () {
     const environment = yield* DesktopEnvironment.DesktopEnvironment;
     const path = yield* Path.Path;
+    const uiLocale = yield* DesktopUiLocale.DesktopUiLocale;
     const helper = new MacPermissionHelper();
     yield* Effect.addFinalizer(() => Effect.sync(() => helper.close()));
     return MacPermissions.of({
       showHelper: Effect.fn("MacPermissions.showHelper")(function* (permission, owner, isGranted) {
         if (environment.platform !== "darwin" || !environment.isPackaged) return;
+        const m = yield* uiLocale.messages;
+        const locale = yield* uiLocale.current;
         yield* Effect.tryPromise(() =>
           helper.show(
             permission,
             path.join(environment.dirname, "mac-permission-preload.cjs"),
             owner,
             environment.resolveResourcePathCandidates("icon.png"),
+            m.permission,
+            locale,
             isGranted,
           ),
         ).pipe(

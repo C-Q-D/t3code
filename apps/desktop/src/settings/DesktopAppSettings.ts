@@ -1,4 +1,7 @@
+/** Loads and persists device-local desktop settings using atomic file replacement. */
 import {
+  UiLocalePreferenceSchema,
+  type UiLocalePreference,
   DesktopServerExposureModeSchema,
   DesktopUpdateChannelSchema,
   type DesktopServerExposureMode,
@@ -25,7 +28,9 @@ import {
 import { resolveDefaultDesktopUpdateChannel } from "../updates/updateChannels.ts";
 import { isValidDistroName } from "../wsl/wslPathParsing.ts";
 
+/** Normalized device-local preferences used by the native desktop runtime. */
 export interface DesktopSettings {
+  readonly uiLocalePreference: UiLocalePreference;
   readonly localEnvironmentEnabled: boolean;
   readonly linuxPasswordStore: LinuxPasswordStorePreference;
   readonly mainWindowBounds: DesktopWindowBounds | null;
@@ -52,6 +57,7 @@ export interface DesktopSettings {
   readonly wslOnly: boolean;
 }
 
+/** Updated settings and whether the requested operation changed their value. */
 export interface DesktopSettingsChange {
   readonly settings: DesktopSettings;
   readonly changed: boolean;
@@ -75,6 +81,7 @@ export const DEFAULT_MAIN_WINDOW_SIZE = {
 } as const;
 
 export const DEFAULT_DESKTOP_SETTINGS: DesktopSettings = {
+  uiLocalePreference: "system",
   localEnvironmentEnabled: true,
   linuxPasswordStore: DEFAULT_LINUX_PASSWORD_STORE,
   mainWindowBounds: null,
@@ -97,6 +104,7 @@ const DesktopWindowBoundsDocument = Schema.Struct({
 });
 
 const DesktopSettingsDocument = Schema.Struct({
+  uiLocalePreference: Schema.optionalKey(Schema.Unknown),
   localEnvironmentEnabled: Schema.optionalKey(Schema.Boolean),
   linuxPasswordStore: Schema.optionalKey(Schema.Unknown),
   mainWindowBounds: Schema.optionalKey(Schema.NullOr(DesktopWindowBoundsDocument)),
@@ -122,6 +130,7 @@ const DesktopSettingsJson = fromLenientJson(DesktopSettingsDocument);
 const decodeDesktopSettingsJson = Schema.decodeEffect(DesktopSettingsJson);
 const encodeDesktopSettingsJson = Schema.encodeEffect(DesktopSettingsJson);
 const decodeDesktopWindowBounds = Schema.decodeUnknownOption(DesktopWindowBoundsSchema);
+const isUiLocalePreference = Schema.is(UiLocalePreferenceSchema);
 const desktopWindowBoundsEquivalence = Schema.toEquivalence(DesktopWindowBoundsSchema);
 
 const settingsChange = (settings: DesktopSettings, changed: boolean): DesktopSettingsChange => ({
@@ -152,9 +161,14 @@ export class DesktopSettingsWriteError extends Schema.TaggedError<DesktopSetting
   }
 }
 
+/** Owns normalized desktop settings and persists updates before exposing them in memory. */
 export class DesktopAppSettings extends Context.Service<
   DesktopAppSettings,
   {
+    /** Persists a device-local preference; failure leaves the current settings unchanged. */
+    readonly setUiLocalePreference: (
+      preference: UiLocalePreference,
+    ) => Effect.Effect<DesktopSettingsChange, DesktopSettingsWriteError>;
     readonly load: Effect.Effect<DesktopSettings>;
     readonly get: Effect.Effect<DesktopSettings>;
     readonly setLocalEnvironmentEnabled: (
@@ -212,6 +226,12 @@ export function normalizeMainWindowBounds(value: unknown): DesktopWindowBounds |
   return Option.getOrNull(decodeDesktopWindowBounds(value));
 }
 
+/**
+ * Normalizes the decoded document without letting an invalid locale reset unrelated settings.
+ * @param parsed Lenient settings document; optional fields can be absent on older installs.
+ * @param appVersion Installed version used to derive the default update channel.
+ * @returns Complete settings with defaults and supported legacy settings resolved.
+ */
 function normalizeDesktopSettingsDocument(
   parsed: DesktopSettingsDocument,
   appVersion: string,
@@ -232,6 +252,9 @@ function normalizeDesktopSettingsDocument(
     (parsed.wslBackendEnabled === undefined && parsed.wslMode === "wsl");
 
   return {
+    uiLocalePreference: isUiLocalePreference(parsed.uiLocalePreference)
+      ? parsed.uiLocalePreference
+      : "system",
     localEnvironmentEnabled: parsed.localEnvironmentEnabled !== false,
     linuxPasswordStore: normalizeLinuxPasswordStorePreference(parsed.linuxPasswordStore),
     mainWindowBounds,
@@ -250,11 +273,20 @@ function normalizeDesktopSettingsDocument(
   };
 }
 
+/**
+ * Encodes only nondefault settings, retaining user choices and omitting the system locale default.
+ * @param settings Complete in-memory preferences to persist.
+ * @param defaults Version-specific defaults used to keep the document sparse.
+ * @returns The current settings document, without obsolete migrated fields.
+ */
 function toDesktopSettingsDocument(
   settings: DesktopSettings,
   defaults: DesktopSettings,
 ): DesktopSettingsDocument {
   const document: Mutable<DesktopSettingsDocument> = {};
+  if (settings.uiLocalePreference !== defaults.uiLocalePreference) {
+    document.uiLocalePreference = settings.uiLocalePreference;
+  }
 
   if (settings.localEnvironmentEnabled !== defaults.localEnvironmentEnabled) {
     document.localEnvironmentEnabled = settings.localEnvironmentEnabled;
@@ -295,6 +327,16 @@ function toDesktopSettingsDocument(
   }
 
   return document;
+}
+
+/** Keeps unchanged preferences referentially stable so repeated renderer reports do not write. */
+function setUiLocalePreference(
+  settings: DesktopSettings,
+  preference: UiLocalePreference,
+): DesktopSettings {
+  return settings.uiLocalePreference === preference
+    ? settings
+    : { ...settings, uiLocalePreference: preference };
 }
 
 function setServerExposureMode(
@@ -529,6 +571,10 @@ export const make = Effect.gen(function* () {
     });
 
   return DesktopAppSettings.of({
+    setUiLocalePreference: (preference) =>
+      persist((settings) => setUiLocalePreference(settings, preference)).pipe(
+        Effect.withSpan("desktop.settings.setUiLocalePreference"),
+      ),
     get: SynchronizedRef.get(settingsRef),
     load: Effect.gen(function* () {
       const settings = yield* readSettings(
@@ -591,6 +637,7 @@ export const make = Effect.gen(function* () {
 
 export const layer = Layer.effect(DesktopAppSettings, make);
 
+/** Supplies isolated in-memory settings initialized from the given preferences; performs no file writes. */
 export const layerTest = (initialSettings: DesktopSettings = DEFAULT_DESKTOP_SETTINGS) =>
   Layer.effect(
     DesktopAppSettings,
@@ -609,6 +656,8 @@ export const layerTest = (initialSettings: DesktopSettings = DEFAULT_DESKTOP_SET
         });
 
       return DesktopAppSettings.of({
+        setUiLocalePreference: (preference) =>
+          update((settings) => setUiLocalePreference(settings, preference)),
         get: SynchronizedRef.get(settingsRef),
         load: SynchronizedRef.get(settingsRef),
         setMainWindowBounds: (bounds, isMaximized) =>

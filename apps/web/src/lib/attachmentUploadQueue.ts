@@ -1,3 +1,5 @@
+/** Queues attachment uploads and exposes progress and recovery reasons without changing upload resource identifiers. */
+import { t } from "~/i18n";
 import {
   AuthOrchestrationOperateScope,
   PROVIDER_SEND_TURN_SUPPORTED_IMAGE_MIME_TYPES,
@@ -148,6 +150,7 @@ function deletePendingUpload(environmentId: EnvironmentId, attachmentId: string)
   });
 }
 
+/** Uploads input.file to input.url with its MIME type and fractional progress callback. Returns done and abort; done rejects on HTTP, transport, timeout, or cancellation failures. The request uses UPLOAD_TIMEOUT_MS without transport retries. */
 function uploadBytes(input: {
   readonly url: string;
   readonly file: File;
@@ -168,24 +171,25 @@ function uploadBytes(input: {
       if (xhr.status >= 200 && xhr.status < 300) {
         resolve();
       } else {
-        reject(new Error(`Upload rejected (${xhr.status})`));
+        reject(new Error(t.app.upload.rejected(xhr.status)));
       }
     });
-    xhr.addEventListener("error", () => reject(new Error("Upload failed")));
-    xhr.addEventListener("timeout", () => reject(new Error("Upload timed out")));
-    xhr.addEventListener("abort", () => reject(new Error("Upload cancelled")));
+    xhr.addEventListener("error", () => reject(new Error(t.app.upload.failed)));
+    xhr.addEventListener("timeout", () => reject(new Error(t.app.upload.timeout)));
+    xhr.addEventListener("abort", () => reject(new Error(t.app.upload.cancelled)));
     xhr.send(input.file);
   });
 
   return { done, abort: () => xhr.abort() };
 }
 
+/** Runs the supplied queued upload job and updates its attachment state; records translated failure reasons while preserving uploaded resource identifiers. */
 async function runUpload(job: UploadJob): Promise<void> {
   if (!readEnvironmentScope(job.environmentId, AuthOrchestrationOperateScope)) {
     setUploadState(job.image.id, {
       status: "failed",
       environmentId: job.environmentId,
-      reason: "This connection cannot upload attachments.",
+      reason: t.app.upload.denied,
       ...(job.previous ? { previous: job.previous } : {}),
     });
     return;
@@ -234,10 +238,7 @@ async function runUpload(job: UploadJob): Promise<void> {
       setUploadState(job.image.id, {
         status: "failed",
         environmentId: job.environmentId,
-        reason:
-          verification.status === "missing"
-            ? "Uploaded file expired. Remove it and attach it again."
-            : "Uploaded file could not be verified. Retry when the server reconnects.",
+        reason: verification.status === "missing" ? t.app.upload.expired : t.app.upload.verifyError,
         ...(job.previous ? { previous: job.previous } : {}),
       });
       return;
@@ -254,7 +255,7 @@ async function runUpload(job: UploadJob): Promise<void> {
     setUploadState(job.image.id, {
       status: "failed",
       environmentId: job.environmentId,
-      reason: "Unsupported image type",
+      reason: t.app.upload.unsupportedImage,
       ...(job.previous ? { previous: job.previous } : {}),
     });
     return;
@@ -264,7 +265,7 @@ async function runUpload(job: UploadJob): Promise<void> {
     setUploadState(job.image.id, {
       status: "failed",
       environmentId: job.environmentId,
-      reason: "Original file is no longer available",
+      reason: t.app.upload.originalMissing,
       ...(job.previous ? { previous: job.previous } : {}),
     });
     return;
@@ -275,7 +276,7 @@ async function runUpload(job: UploadJob): Promise<void> {
     setUploadState(job.image.id, {
       status: "failed",
       environmentId: job.environmentId,
-      reason: "This connection cannot upload attachments.",
+      reason: t.app.upload.denied,
       ...(job.previous ? { previous: job.previous } : {}),
     });
     return;
@@ -352,19 +353,20 @@ async function runUpload(job: UploadJob): Promise<void> {
     environmentId: job.environmentId,
     reason:
       result.step === "mint"
-        ? "Upload could not start"
+        ? t.app.upload.startError
         : result.step === "resolve-url"
           ? readEnvironmentScope(job.environmentId, AuthOrchestrationOperateScope)
-            ? "Not connected"
-            : "This connection cannot upload attachments."
+            ? t.app.upload.disconnected
+            : t.app.upload.denied
           : result.error instanceof Error
             ? result.error.message
-            : "Upload failed",
+            : t.app.upload.failed,
     ...(result.attachmentId ? { attachmentId: result.attachmentId } : {}),
     ...(job.previous ? { previous: job.previous } : {}),
   });
 }
 
+/** Starts queued attachment jobs while upload slots remain and records failures when a job cannot complete. */
 function pumpUploads(): void {
   for (let index = 0; index < queue.length;) {
     const job = queue[index]!;
@@ -385,7 +387,7 @@ function pumpUploads(): void {
           setUploadState(job.image.id, {
             status: "failed",
             environmentId: job.environmentId,
-            reason: "Upload failed",
+            reason: t.app.upload.failed,
             ...(job.previous ? { previous: job.previous } : {}),
           });
         }

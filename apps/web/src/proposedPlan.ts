@@ -1,3 +1,5 @@
+/** Builds plan previews, submission prompts, and exported files; only preview fallback text is localized. */
+import { t } from "~/i18n";
 export function proposedPlanTitle(planMarkdown: string): string | null {
   const heading = planMarkdown.match(/^\s{0,3}#{1,6}\s+(.+)$/m)?.[1]?.trim();
   return heading && heading.length > 0 ? heading : null;
@@ -19,6 +21,7 @@ export function stripDisplayedPlanMarkdown(planMarkdown: string): string {
   return sourceLines.join("\n");
 }
 
+/** Returns a compact preview of planMarkdown using the optional preview limits in options; uses a localized fallback when no title or preview is available. */
 export function buildCollapsedProposedPlanPreviewMarkdown(
   planMarkdown: string,
   options?: {
@@ -51,7 +54,7 @@ export function buildCollapsedProposedPlanPreviewMarkdown(
   }
 
   if (previewLines.length === 0) {
-    return proposedPlanTitle(planMarkdown) ?? "Plan preview unavailable.";
+    return proposedPlanTitle(planMarkdown) ?? t.app.plan.previewUnavailable;
   }
 
   if (hasMoreContent) {

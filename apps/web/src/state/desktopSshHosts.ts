@@ -1,3 +1,5 @@
+/** Localized desktop presentation and existing interaction behavior. */
+import { t } from "~/i18n";
 import type { DesktopBridge, DesktopDiscoveredSshHost } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
@@ -31,8 +33,9 @@ class DesktopSshDiscoveryUnavailableError extends Schema.TaggedError<DesktopSshD
   "DesktopSshDiscoveryUnavailableError",
   {},
 ) {
+  /** Returns the localized display message for this error while preserving its structured diagnostic fields. */
   override get message(): string {
-    return "Desktop SSH host discovery is unavailable.";
+    return t.account.desktop.sshDiscoveryUnavailable;
   }
 }
 
@@ -40,8 +43,9 @@ class DesktopSshDiscoveryError extends Schema.TaggedError<DesktopSshDiscoveryErr
   "DesktopSshDiscoveryError",
   { cause: Schema.Defect() },
 ) {
+  /** Returns the localized display message for this error while preserving its structured diagnostic fields. */
   override get message(): string {
-    return "Failed to discover SSH hosts.";
+    return t.account.desktop.sshDiscoveryFailed;
   }
 }
 

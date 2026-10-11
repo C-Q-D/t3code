@@ -1,3 +1,5 @@
+/** Localized cloud presentation and existing interaction behavior. */
+import { t } from "~/i18n";
 import { findErrorTraceId } from "@t3tools/client-runtime/errors";
 import {
   type EnvironmentConnectionPresentation,
@@ -165,11 +167,11 @@ export function CloudEnvironmentConnectRows({
       toastManager.add({
         type: "success",
         title: savedWithoutRelay.has(environment.environmentId)
-          ? "T3 Connect route added"
-          : "Environment added",
+          ? t.account.cloud.routeAdded
+          : t.account.cloud.environmentAdded,
         description: savedWithoutRelay.has(environment.environmentId)
-          ? `${environment.label} falls back to T3 Connect when its other routes are unreachable.`
-          : `Connecting to ${environment.label} through T3 Connect.`,
+          ? t.account.cloud.fallbackRoute(environment.label)
+          : t.account.cloud.connectingNamed(environment.label),
       });
       return true;
     }
@@ -177,18 +179,17 @@ export function CloudEnvironmentConnectRows({
       return false;
     }
     const cause = squashAtomCommandFailure(result);
-    const message =
-      cause instanceof Error ? cause.message : "Could not connect the T3 Connect environment.";
+    const message = cause instanceof Error ? cause.message : t.account.cloud.connectError;
     const traceId = findErrorTraceId(cause);
     console.error("[t3-connect] Could not connect environment", { message, traceId, cause });
     toastManager.add({
       type: "error",
-      title: "Could not connect environment",
+      title: t.account.cloud.connectFailed,
       description: message,
       data: traceId
         ? {
             secondaryActionProps: {
-              children: "Copy trace ID",
+              children: t.account.cloud.copyTraceId,
               onClick: () => void navigator.clipboard?.writeText(traceId),
             },
           }
@@ -294,13 +295,13 @@ export function CloudEnvironmentConnectRows({
     // A failed or offline discovery is not "no environments" — misreporting it
     // as empty would read as the user's devices having disappeared.
     const discoveryProblem = environmentsState.offline
-      ? "You appear to be offline."
+      ? t.account.cloud.offlineHint
       : (Option.getOrNull(environmentsState.error)?.message ?? null);
     if (discoveryProblem !== null && !environmentsState.refreshing) {
       return (
         <div className={ITEM_ROW_CLASSNAME}>
           <p className="text-sm font-medium text-destructive">
-            Could not load T3 Connect environments
+            {t.account.cloud.loadEnvironmentsFailed}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">{discoveryProblem}</p>
           <Button
@@ -309,7 +310,7 @@ export function CloudEnvironmentConnectRows({
             className="mt-3"
             onClick={() => void refreshRelayEnvironments()}
           >
-            Try again
+            {t.account.cloud.tryAgain}
           </Button>
         </div>
       );
@@ -342,7 +343,7 @@ export function CloudEnvironmentConnectRows({
     // "no answer". Shown for saved and unsaved rows alike.
     const offlineReason =
       availability === "offline" && relayStatus !== null
-        ? relayOfflineReasonMessage(relayStatus)
+        ? relayOfflineReasonMessage(relayStatus, t.chat.workLog.shared.relay)
         : null;
     const machineKind = resolveEnvironmentMachineKind(
       savedEnvironment?.serverConfig ??
@@ -364,23 +365,23 @@ export function CloudEnvironmentConnectRows({
             ? "bg-warning"
             : "bg-muted-foreground/35";
     const notAdded = savedWithoutRelay.has(environment.environmentId)
-      ? "Saved without T3 Connect"
-      : "Not added";
+      ? t.account.cloud.savedWithoutConnect
+      : t.account.cloud.notAdded;
     const statusText =
       unsupported && !savedEnvironment
-        ? `T3 Connect · ${notAdded} · Client not supported`
+        ? t.account.cloud.unsupportedStatus(notAdded)
         : offlineReason !== null
           ? offlineReason
           : savedConnection
             ? savedConnection.statusText
             : availability === "online"
-              ? `T3 Connect · ${notAdded} · Relay online`
+              ? t.account.cloud.onlineStatus(notAdded)
               : availability === "offline"
-                ? `T3 Connect · ${notAdded} · Relay offline`
+                ? t.account.cloud.offlineStatus(notAdded)
                 : availability === "checking"
-                  ? `T3 Connect · ${notAdded} · Checking relay status…`
+                  ? t.account.cloud.checkingStatus(notAdded)
                   : (Option.getOrNull(error)?.message ??
-                    `T3 Connect · ${notAdded} · Relay status unavailable`);
+                    t.account.cloud.unavailableStatus(notAdded));
     if (selection) {
       return (
         <label
@@ -414,15 +415,15 @@ export function CloudEnvironmentConnectRows({
               )}
             >
               {connectingEnvironmentIds.has(environment.environmentId)
-                ? "Connecting…"
+                ? t.account.cloud.connecting
                 : (savedConnection?.buttonLabel ??
                   (availability === "online"
-                    ? "Available"
+                    ? t.account.cloud.available
                     : availability === "offline"
-                      ? "Offline"
+                      ? t.account.cloud.offline
                       : availability === "error"
-                        ? "Unavailable"
-                        : "Checking…"))}
+                        ? t.account.cloud.unavailable
+                        : t.account.cloud.checking))}
             </TooltipTrigger>
             <TooltipPopup>{unsupportedDetail ?? statusText}</TooltipPopup>
           </Tooltip>
@@ -450,12 +451,13 @@ export function CloudEnvironmentConnectRows({
                       : savedConnection
                         ? savedConnection.statusText
                         : availability === "online"
-                          ? "Relay online"
+                          ? t.account.cloud.relayOnline
                           : availability === "offline"
-                            ? "Relay offline"
+                            ? t.account.cloud.relayOffline
                             : availability === "checking"
-                              ? "Checking relay status"
-                              : (Option.getOrNull(error)?.message ?? "Relay status unavailable")
+                              ? t.account.cloud.checkingRelay
+                              : (Option.getOrNull(error)?.message ??
+                                t.account.cloud.relayUnavailable)
                 }
               />
               <EnvironmentMachineIcon
@@ -482,10 +484,10 @@ export function CloudEnvironmentConnectRows({
             <Tooltip>
               <TooltipTrigger render={<span className="inline-flex" tabIndex={0} />}>
                 <Button size="sm" disabled>
-                  Add
+                  {t.account.cloud.add}
                 </Button>
               </TooltipTrigger>
-              <TooltipPopup>{unsupportedDetail ?? "Client not supported"}</TooltipPopup>
+              <TooltipPopup>{unsupportedDetail ?? t.account.cloud.unsupportedClient}</TooltipPopup>
             </Tooltip>
           ) : savedConnection ? (
             <Button size="sm" variant="outline" disabled>
@@ -498,10 +500,10 @@ export function CloudEnvironmentConnectRows({
               onClick={() => void connectEnvironment(environment)}
             >
               {connectingEnvironmentIds.has(environment.environmentId)
-                ? "Adding…"
+                ? t.account.cloud.adding
                 : savedWithoutRelay.has(environment.environmentId)
-                  ? "Add route"
-                  : "Add"}
+                  ? t.account.cloud.addRoute
+                  : t.account.cloud.add}
             </Button>
           )}
         </div>

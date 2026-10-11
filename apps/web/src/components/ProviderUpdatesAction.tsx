@@ -1,3 +1,5 @@
+/** Presents the action for updating all eligible providers. */
+import { t } from "~/i18n";
 import { PROVIDER_DISPLAY_NAMES } from "@t3tools/contracts";
 import { useMemo, useRef, useState } from "react";
 
@@ -93,7 +95,7 @@ export function ProviderUpdatesAction() {
             disabled={isPending}
             onClick={() => void handleUpdate()}
           >
-            {isPending ? "Updating…" : "Update all"}
+            {isPending ? t.common.providerUpdate.updatingStatus : t.app.actions.updateAll}
           </Button>
         }
       />

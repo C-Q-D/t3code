@@ -1,3 +1,5 @@
+/** Localized clerk presentation and existing interaction behavior. */
+import { t } from "~/i18n";
 import { UserButton, useAuth } from "@clerk/react";
 import { LogInIcon } from "lucide-react";
 
@@ -46,6 +48,7 @@ function ConfiguredT3ConnectSidebarAvatar() {
   );
 }
 
+/** Renders the configured account's sign-in control and opens its authentication flow on user action. */
 function ConfiguredT3ConnectSidebarSignIn() {
   const { isLoaded, isSignedIn } = useAuth();
   const { authPrompt, openAuthPrompt } = useT3ConnectAuthPrompt();
@@ -58,7 +61,7 @@ function ConfiguredT3ConnectSidebarSignIn() {
         <SidebarMenuItem>
           <SidebarMenuButton onClick={openAuthPrompt}>
             <LogInIcon />
-            <span>Sign in to T3 Connect</span>
+            <span>{t.account.clerk.signIn}</span>
           </SidebarMenuButton>
         </SidebarMenuItem>
       </SidebarMenu>

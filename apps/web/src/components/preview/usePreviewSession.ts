@@ -1,4 +1,7 @@
+/** Subscribes to scoped preview sessions and events; retains original thread identities. */
 "use client";
+
+import { t } from "~/i18n";
 
 import { useAtomValue } from "@effect/atom-react";
 import { parseScopedThreadKey, scopedThreadKey } from "@t3tools/client-runtime/environment";
@@ -13,12 +16,14 @@ import {
 } from "~/previewStateStore";
 import { previewEnvironment } from "~/state/preview";
 
+/** Invalid scoped preview subscription key; threadKey retains the original rejected value. */
 class PreviewSessionThreadKeyParseError extends Schema.TaggedError<PreviewSessionThreadKeyParseError>()(
   "PreviewSessionThreadKeyParseError",
   { threadKey: Schema.String },
 ) {
+  /** Returns the localized failure message for the original identifier; never returns empty text. */
   override get message(): string {
-    return `Invalid scoped preview thread key: ${this.threadKey}`;
+    return t.tools.preview.invalidSessionThreadKey(this.threadKey);
   }
 }
 

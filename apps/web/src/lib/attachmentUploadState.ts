@@ -1,3 +1,5 @@
+/** Derives send-blocking feedback and progress labels from attachment upload state. */
+import { t } from "~/i18n";
 import type { EnvironmentId } from "@t3tools/contracts";
 
 export type ReadyAttachmentUpload = {
@@ -27,6 +29,7 @@ export type AttachmentUploadState =
       readonly previous?: ReadyAttachmentUpload;
     };
 
+/** Checks input.imageIds against uploadsByImageId for environmentId. Returns a blocking message, prioritizing failures over pending uploads, or null when sending is unblocked. */
 export function attachmentUploadBlockReason(input: {
   readonly imageIds: ReadonlyArray<string>;
   readonly uploadsByImageId: Readonly<Record<string, AttachmentUploadState>>;
@@ -45,12 +48,10 @@ export function attachmentUploadBlockReason(input: {
   }
 
   if (failed > 0) {
-    return failed === 1
-      ? "Retry or remove the failed attachment"
-      : "Retry or remove the failed attachments";
+    return failed === 1 ? t.app.upload.retrySingle : t.app.upload.retryMultiple;
   }
   if (pending > 0) {
-    return pending === 1 ? "Attachment still uploading" : "Attachments still uploading";
+    return pending === 1 ? t.app.upload.uploadingSingle : t.app.upload.uploadingMultiple;
   }
   return null;
 }

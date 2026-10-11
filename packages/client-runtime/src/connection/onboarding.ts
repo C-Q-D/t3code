@@ -1,5 +1,13 @@
+import {
+  englishRemotePairingMessages,
+  type RemotePairingMessages,
+} from "@t3tools/shared/remoteLabels";
 import type { DesktopSshEnvironmentTarget, EnvironmentId } from "@t3tools/contracts";
-import { resolveRemotePairingTarget } from "@t3tools/shared/remote";
+import {
+  resolveRemotePairingTarget,
+  RemotePairingTargetError,
+  remotePairingTargetErrorMessage,
+} from "@t3tools/shared/remote";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -58,17 +66,20 @@ export interface BearerConnectionUpdateInput {
   readonly httpBaseUrl: string;
 }
 
+/** Registers connection routes and credentials; optional messages affect local validation feedback only. */
 export class ConnectionOnboarding extends Context.Service<
   ConnectionOnboarding,
   {
     readonly registerPairing: (
       input: PairingConnectionInput,
+      messages?: RemotePairingMessages,
     ) => Effect.Effect<
       EnvironmentId,
       ConnectionAttemptError | Persistence.ConnectionPersistenceError
     >;
     readonly registerSsh: (
       input: SshConnectionInput,
+      messages?: RemotePairingMessages,
     ) => Effect.Effect<
       EnvironmentId,
       ConnectionAttemptError | Persistence.ConnectionPersistenceError
@@ -79,14 +90,23 @@ export class ConnectionOnboarding extends Context.Service<
   }
 >()("@t3tools/client-runtime/connection/onboarding/ConnectionOnboarding") {}
 
+const isRemotePairingTargetError = Schema.is(RemotePairingTargetError);
+
 const resolvePairingTarget = Effect.fn("clientRuntime.connection.onboarding.resolvePairingTarget")(
-  function* (input: PairingConnectionInput) {
+  function* (
+    input: PairingConnectionInput,
+    messages: RemotePairingMessages = englishRemotePairingMessages,
+  ) {
     return yield* Effect.try({
       try: () => resolveRemotePairingTarget(input),
       catch: (cause) =>
         new ConnectionBlockedError({
           reason: "configuration",
-          detail: cause instanceof Error ? cause.message : "The pairing details are invalid.",
+          detail: isRemotePairingTargetError(cause)
+            ? remotePairingTargetErrorMessage(cause, messages)
+            : cause instanceof Error
+              ? cause.message
+              : messages.invalidDetails,
         }),
     });
   },
@@ -101,17 +121,21 @@ function bearerConnectionId(environmentId: EnvironmentId, httpBaseUrl: string): 
   return `bearer:${environmentId}:${new URL(httpBaseUrl).origin}`;
 }
 
-function differentMachineError(label: string) {
+/** Rejects a mismatched target using the display locale while preserving its server-supplied name. */
+function differentMachineError(label: string, messages: RemotePairingMessages) {
   return new ConnectionBlockedError({
     reason: "configuration",
-    detail: `That address reaches ${label}, a different machine. Add it as its own environment instead.`,
+    detail: messages.differentMachine(label),
   });
 }
 
 export const preparePairingRegistration = Effect.fn(
   "clientRuntime.connection.onboarding.preparePairingRegistration",
-)(function* (input: PairingConnectionInput) {
-  const target = yield* resolvePairingTarget(input);
+)(function* (
+  input: PairingConnectionInput,
+  messages: RemotePairingMessages = englishRemotePairingMessages,
+) {
+  const target = yield* resolvePairingTarget(input, messages);
   const presentation = yield* ClientCapabilities.ClientPresentation;
   const descriptor = yield* fetchRemoteEnvironmentDescriptor({
     httpBaseUrl: target.httpBaseUrl,
@@ -121,7 +145,7 @@ export const preparePairingRegistration = Effect.fn(
     input.expectedEnvironmentId !== undefined &&
     descriptor.environmentId !== input.expectedEnvironmentId
   ) {
-    return yield* differentMachineError(descriptor.label);
+    return yield* differentMachineError(descriptor.label, messages);
   }
   const compatibilityError = orchestrationProtocolCompatibilityError(descriptor);
   // An outdated server is still saved so it can be updated from this client.
@@ -156,8 +180,11 @@ export const preparePairingRegistration = Effect.fn(
 
 const registerPairingConnection = Effect.fn(
   "clientRuntime.connection.onboarding.registerPairingConnection",
-)(function* (input: PairingConnectionInput) {
-  const registration = yield* preparePairingRegistration(input);
+)(function* (
+  input: PairingConnectionInput,
+  messages: RemotePairingMessages = englishRemotePairingMessages,
+) {
+  const registration = yield* preparePairingRegistration(input, messages);
   const registry = yield* EnvironmentRegistry.EnvironmentRegistry;
   yield* registry.register(registration);
   return registration.target.environmentId;
@@ -281,13 +308,16 @@ export const prepareSshRegistration = Effect.fn(
 
 const registerSshConnection = Effect.fn(
   "clientRuntime.connection.onboarding.registerSshConnection",
-)(function* (input: SshConnectionInput) {
+)(function* (
+  input: SshConnectionInput,
+  messages: RemotePairingMessages = englishRemotePairingMessages,
+) {
   const registration = yield* prepareSshRegistration(input);
   if (
     input.expectedEnvironmentId !== undefined &&
     registration.target.environmentId !== input.expectedEnvironmentId
   ) {
-    return yield* differentMachineError(registration.target.label);
+    return yield* differentMachineError(registration.target.label, messages);
   }
   const registry = yield* EnvironmentRegistry.EnvironmentRegistry;
   yield* registry.register(registration);
@@ -303,14 +333,14 @@ export const make = Effect.gen(function* () {
   const credentials = yield* ConnectionCredentialStore.ConnectionCredentialStore;
 
   return ConnectionOnboarding.of({
-    registerPairing: (input) =>
-      registerPairingConnection(input).pipe(
+    registerPairing: (input, messages) =>
+      registerPairingConnection(input, messages).pipe(
         Effect.provideService(EnvironmentRegistry.EnvironmentRegistry, registry),
         Effect.provideService(ClientCapabilities.ClientPresentation, presentation),
         Effect.provideService(HttpClient.HttpClient, httpClient),
       ),
-    registerSsh: (input) =>
-      registerSshConnection(input).pipe(
+    registerSsh: (input, messages) =>
+      registerSshConnection(input, messages).pipe(
         Effect.provideService(EnvironmentRegistry.EnvironmentRegistry, registry),
         Effect.provideService(ClientCapabilities.SshEnvironmentGateway, ssh),
       ),

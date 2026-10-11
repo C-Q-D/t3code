@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { relayClerkTokenOptions } from "@t3tools/shared/relayAuth";
 import { normalizeSecureRelayUrl } from "@t3tools/shared/relayUrl";
 import * as Schema from "effect/Schema";
@@ -8,8 +9,9 @@ export class CloudPublicConfigMissingError extends Schema.TaggedError<CloudPubli
     key: Schema.Literal("T3CODE_CLERK_JWT_TEMPLATE"),
   },
 ) {
+  /** Presents a missing public configuration key without changing the diagnostic key itself. */
   override get message(): string {
-    return `${this.key} is not configured.`;
+    return t.account.cloud.configNotConfigured(this.key);
   }
 }
 

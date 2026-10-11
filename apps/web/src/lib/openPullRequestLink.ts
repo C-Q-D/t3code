@@ -1,3 +1,5 @@
+/** Parses host links and opens web pull-request views; URLs and request identifiers remain unchanged. */
+import { t } from "~/i18n";
 import type { EnvironmentId, PullRequestRef, ScopedThreadRef } from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
 import { useNavigate } from "@tanstack/react-router";
@@ -322,6 +324,11 @@ export function useOpenChangeRequestLink(
   );
 }
 
+/**
+ * Returns a callback that opens a pull request in this UI; unavailable targets and open failures produce a display toast.
+ * @param threadRef Optional destination thread and environment for opening a request.
+ * @returns The async opening callback; it reports open failures through a toast.
+ */
 export function useOpenPrLink(threadRef?: ScopedThreadRef) {
   const openChangeRequest = useOpenChangeRequestLink(threadRef);
   const openLink = useOpenLink(threadRef);
@@ -346,8 +353,8 @@ export function useOpenPrLink(threadRef?: ScopedThreadRef) {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Unable to open pull request link",
-            description: error instanceof Error ? error.message : "An error occurred.",
+            title: t.git.pullRequest.unableToOpenPullRequestLink,
+            description: error instanceof Error ? error.message : t.git.actions.anErrorOccurred,
           }),
         );
       });

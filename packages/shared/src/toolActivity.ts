@@ -1,3 +1,5 @@
+/** Classifies provider tool metadata and formats optional caller-owned display labels. */
+import { englishToolActivityLabels, type ToolActivityLabels } from "./toolActivityLabels.ts";
 import type { ToolLifecycleItemType } from "@t3tools/contracts";
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
@@ -32,10 +34,11 @@ export function claudeSkillInvocation(
 export function dynamicToolTitle(
   toolName: string | null | undefined,
   input: unknown,
+  labels: ToolActivityLabels = englishToolActivityLabels,
 ): string | undefined {
   if (toolName === "cua_repl.js") return asTrimmedString(asRecord(input)?.title);
   const skill = claudeSkillInvocation(toolName, input);
-  return skill === undefined ? undefined : `Skill: ${skill.name}`;
+  return skill === undefined ? undefined : labels.skill(skill.name);
 }
 
 function recordHasKeys(
@@ -339,37 +342,38 @@ function searchTargetName(value: string | undefined): string | undefined {
 /** Cursor-style row: "Searched files *.{ts,tsx} in t3chat-new". */
 export function formatSearchToolLabel(
   data: Record<string, unknown> | undefined,
+  labels: ToolActivityLabels = englishToolActivityLabels,
 ): string | undefined {
   const input = searchInputRecord(data);
   const query = firstInputString(input, SEARCH_QUERY_KEYS);
   const glob = firstInputString(input, SEARCH_GLOB_KEYS);
   const target = searchTargetName(firstInputString(input, SEARCH_TARGET_KEYS));
   if (query && target) {
-    return `Searched ${query} in ${target}`;
+    return labels.searchedQueryIn(query, target);
   }
   if (glob && target) {
-    return `Searched files ${glob} in ${target}`;
+    return labels.searchedFilesIn(glob, target);
   }
   if (glob) {
-    return `Searched files ${glob}`;
+    return labels.searchedFiles(glob);
   }
   if (query) {
-    return `Searched ${query}`;
+    return labels.searchedQuery(query);
   }
   if (target) {
-    return `Searched in ${target}`;
+    return labels.searchedIn(target);
   }
   return undefined;
 }
 
 /** Work-log heading for a file read: verb plus the structured path, never the path alone. */
-export function formatReadToolLabel(path: string, extraCount = 0): string {
+export function formatReadToolLabel(
+  path: string,
+  extraCount = 0,
+  labels: ToolActivityLabels = englishToolActivityLabels,
+): string {
   const trimmed = path.trim();
-  const suffix = extraCount > 0 ? ` +${extraCount} more` : "";
-  if (!trimmed) {
-    return `Read file${suffix}`;
-  }
-  return `Read ${trimmed}${suffix}`;
+  return trimmed ? labels.readPath(trimmed, extraCount) : labels.readFile(extraCount);
 }
 
 export interface ToolActivityPresentationInput {

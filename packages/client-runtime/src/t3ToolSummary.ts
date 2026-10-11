@@ -1,3 +1,5 @@
+/** Counts successful T3 effects and delegates display grammar to caller-owned messages. */
+import { englishWorkLogMessages, type WorkLogMessages } from "./work-log/messages.ts";
 import type { T3McpToolSummaryAction } from "@t3tools/shared/t3McpToolPresentation";
 
 export interface T3ToolSummaryCall {
@@ -76,14 +78,37 @@ function countEntities(ids: ReadonlyArray<string | undefined>): number {
   );
 }
 
-function quantity(count: number, noun: string, plural = `${noun}s`): string {
-  return `${count} ${count === 1 ? noun : plural}`;
-}
+/** Tool summaries with durable target identities count retries once per entity. */
+const SUMMARY_ENTITY_KEYS: Partial<Record<T3McpToolSummaryAction, string>> = {
+  delegate: "taskId",
+  "task-cancel": "taskId",
+  "schedule-create": "scheduledTaskId",
+  "schedule-update": "scheduledTaskId",
+  "schedule-delete": "scheduledTaskId",
+  "queue-read": "queuedRunId",
+  "queue-edit": "queuedRunId",
+  "queue-cancel": "queuedRunId",
+  "queue-reorder": "queuedRunId",
+  "queue-steer": "queuedRunId",
+  "question-read": "requestId",
+  "question-respond": "requestId",
+  "worktree-handoff": "worktreePath",
+  "project-clone": "cwd",
+  "attachment-prepare": "attachmentId",
+  "attachment-discard": "attachmentId",
+};
 
-/** Counts successful effects separately from failed or unfinished tool calls. */
+/**
+ * Counts successful effects separately from failed or unfinished calls, deduplicating known identities.
+ * @param action Semantic action shared by the grouped T3 tools.
+ * @param calls Retained inputs, outputs, and lifecycle outcomes; provider error envelopes still count as failures.
+ * @param messages Complete locale phrases; omitted messages preserve English for existing clients.
+ * @returns Display label and the number of failed calls, without changing source data.
+ */
 export function summarizeT3ToolCalls(
   action: T3McpToolSummaryAction,
   calls: ReadonlyArray<T3ToolSummaryCall>,
+  messages: WorkLogMessages["t3Tools"] = englishWorkLogMessages.t3Tools,
 ): { label: string; failedCount: number } {
   const results = calls.map((call) => {
     const result = readResult(call.output);
@@ -96,9 +121,7 @@ export function summarizeT3ToolCalls(
   const completed = results.filter((call) => call.outcome === "completed");
   const failedCount = results.filter((call) => call.outcome === "failed").length;
   const selected = completed.length > 0 ? completed : results;
-  const times = quantity(selected.length, "time");
-  const phrase = (past: string, infinitive: string, object: string) =>
-    `${completed.length > 0 ? past : `Tried to ${infinitive}`} ${object}`;
+  const succeeded = completed.length > 0;
   const entityIds = (key: string) =>
     selected.map((call) => id(call.output?.[key]) ?? id(call.input?.[key]));
   const projectIds = selected.map(
@@ -110,18 +133,28 @@ export function summarizeT3ToolCalls(
       id(asRecord(call.output?.thread)?.threadId) ??
       id(call.input?.threadId),
   );
+  const entityKey = SUMMARY_ENTITY_KEYS[action];
+  let count = selected.length;
+  if (entityKey !== undefined) {
+    count = countEntities(entityIds(entityKey));
+  } else if (action === "thread-update" || action === "thread-interrupt") {
+    count = countEntities(threadIds);
+  } else if (
+    action === "project-read" ||
+    action === "project-create" ||
+    action === "project-update" ||
+    action === "project-delete"
+  ) {
+    count = countEntities(projectIds);
+  }
   let label: string;
   switch (action) {
     case "thread-send": {
-      const messages = countEntities(selected.map((call) => id(call.output?.messageId)));
-      const targetsKnown = threadIds.every((value) => value !== undefined);
-      const threads = new Set(threadIds).size;
-      const object = targetsKnown
-        ? messages === threads && messages > 1
-          ? `messages to ${quantity(threads, "thread")}`
-          : `${quantity(messages, "message")} to ${quantity(threads, "thread")}`
-        : quantity(messages, "message");
-      label = phrase("Sent", "send", object);
+      const messageCount = countEntities(selected.map((call) => id(call.output?.messageId)));
+      const threads = threadIds.every((value) => value !== undefined)
+        ? new Set(threadIds).size
+        : undefined;
+      label = messages.sentMessages(messageCount, threads, succeeded);
       break;
     }
     case "thread-create": {
@@ -139,274 +172,51 @@ export function summarizeT3ToolCalls(
             return true;
           });
         });
-      label = resultsKnown
-        ? `Created ${quantity(new Set(createdIds).size, "thread")}`
-        : `Requested thread creation ${times}`;
+      label = messages.createdThreads(
+        resultsKnown ? new Set(createdIds).size : undefined,
+        selected.length,
+      );
       break;
     }
-    case "delegate":
-      label = phrase("Delegated", "delegate", quantity(countEntities(entityIds("taskId")), "task"));
-      break;
     case "thread-read":
     case "thread-wait": {
       const targets = threadIds.every((value) => value !== undefined)
-        ? quantity(new Set(threadIds).size, "thread")
-        : `threads ${times}`;
-      label =
-        action === "thread-read"
-          ? phrase("Read", "read", targets)
-          : phrase("Waited on", "wait on", targets);
+        ? new Set(threadIds).size
+        : undefined;
+      label = (action === "thread-read" ? messages.readThreads : messages.waitedThreads)(
+        targets,
+        selected.length,
+        succeeded,
+      );
       break;
     }
-    case "thread-list":
-      label = phrase("Listed", "list", `threads ${times}`);
-      break;
-    case "thread-interrupt":
-      label = phrase(
-        "Requested interrupts for",
-        "interrupt",
-        quantity(countEntities(threadIds), "thread"),
-      );
-      break;
-    case "task-status":
-      label = phrase("Checked", "check", `task status ${times}`);
-      break;
-    case "task-cancel":
-      label = phrase(
-        "Requested cancellation of",
-        "cancel",
-        quantity(countEntities(entityIds("taskId")), "task"),
-      );
-      break;
-    case "schedule-create":
-      label = phrase(
-        "Scheduled",
-        "schedule",
-        quantity(countEntities(entityIds("scheduledTaskId")), "task"),
-      );
-      break;
-    case "schedule-list":
-      label = phrase("Listed", "list", `scheduled tasks ${times}`);
-      break;
-    case "schedule-update":
-      label = phrase(
-        "Updated",
-        "update",
-        quantity(countEntities(entityIds("scheduledTaskId")), "scheduled task"),
-      );
-      break;
-    case "schedule-delete":
-      // A successful delete can report deleted:false; it still represents a deletion request.
-      label = phrase(
-        "Requested deletion of",
-        "delete",
-        quantity(countEntities(entityIds("scheduledTaskId")), "scheduled task"),
-      );
-      break;
-    case "schedule-run":
-      label = phrase("Requested", "request", quantity(selected.length, "scheduled task run"));
-      break;
-    case "thread-configuration":
-      label = phrase("Checked", "check", `thread configuration ${times}`);
-      break;
-    case "thread-configure":
-      label = phrase("Set", "set", `thread model ${times}`);
-      break;
-    case "thread-fork":
-      label = phrase("Requested", "request", quantity(selected.length, "thread fork"));
-      break;
-    case "thread-merge":
-      label = phrase("Requested", "request", quantity(selected.length, "context merge"));
-      break;
-    case "thread-search":
-      label = phrase("Searched", "search", `threads ${times}`);
-      break;
-    case "thread-transfers":
-      label = phrase("Checked", "check", `thread transfers ${times}`);
-      break;
-    case "thread-organize":
-      label = phrase("Organized", "organize", `threads ${times}`);
-      break;
-    case "thread-update":
-      label = phrase("Updated", "update", quantity(countEntities(threadIds), "thread"));
-      break;
-    case "queue-list":
-      label = phrase("Listed", "list", `queued messages ${times}`);
-      break;
-    case "queue-read":
-      label = phrase(
-        "Read",
-        "read",
-        quantity(countEntities(entityIds("queuedRunId")), "queued message"),
-      );
-      break;
-    case "queue-edit":
-      label = phrase(
-        "Edited",
-        "edit",
-        quantity(countEntities(entityIds("queuedRunId")), "queued message"),
-      );
-      break;
-    case "queue-cancel":
-      label = phrase(
-        "Requested cancellation of",
-        "cancel",
-        quantity(countEntities(entityIds("queuedRunId")), "queued run"),
-      );
-      break;
-    case "queue-reorder":
-      label = phrase(
-        "Reordered",
-        "reorder",
-        quantity(countEntities(entityIds("queuedRunId")), "queued run"),
-      );
-      break;
-    case "queue-steer":
-      label = phrase(
-        "Requested steering with",
-        "steer with",
-        quantity(countEntities(entityIds("queuedRunId")), "queued message"),
-      );
-      break;
-    case "question-list":
-      label = phrase("Listed", "list", `pending questions ${times}`);
-      break;
-    case "question-read":
-      label = phrase(
-        "Read",
-        "read",
-        quantity(countEntities(entityIds("requestId")), "pending question request"),
-      );
-      break;
-    case "question-respond":
-      label = phrase(
-        "Answered",
-        "answer",
-        quantity(countEntities(entityIds("requestId")), "pending question request"),
-      );
-      break;
-    case "secret-request":
-      label = phrase("Asked for", "ask for", quantity(selected.length, "secret"));
-      break;
-    case "worktree-handoff":
-      label = phrase(
-        "Handed off to",
-        "hand off to",
-        quantity(countEntities(entityIds("worktreePath")), "worktree"),
-      );
-      break;
-    case "worktree-list":
-      label = phrase("Listed", "list", `workspace branches ${times}`);
-      break;
-    case "worktree-status":
-      label = phrase("Checked", "check", `worktree status ${times}`);
-      break;
-    case "project-list":
-      label = phrase("Listed", "list", `projects ${times}`);
-      break;
-    case "project-read":
-      label = phrase("Read", "read", quantity(countEntities(projectIds), "project"));
-      break;
-    case "project-create":
-      label = phrase("Registered", "register", quantity(countEntities(projectIds), "project"));
-      break;
-    case "project-update":
-      label = phrase("Updated", "update", quantity(countEntities(projectIds), "project"));
-      break;
-    case "project-delete":
-      label = phrase("Deleted", "delete", quantity(countEntities(projectIds), "project"));
-      break;
-    case "project-clone":
-      label = phrase(
-        "Cloned",
-        "clone",
-        quantity(countEntities(entityIds("cwd")), "repository", "repositories"),
-      );
-      break;
-    case "environment-read":
-      label = phrase("Checked", "check", `environment preferences ${times}`);
-      break;
-    case "environment-update":
-      label = phrase("Updated", "update", `environment preferences ${times}`);
-      break;
-    case "attachment-prepare":
-      label = phrase(
-        "Prepared",
-        "prepare",
-        quantity(countEntities(entityIds("attachmentId")), "attachment upload"),
-      );
-      break;
-    case "attachment-discard":
-      label = phrase(
-        "Discarded",
-        "discard",
-        quantity(countEntities(entityIds("attachmentId")), "pending attachment"),
-      );
-      break;
     case "attachment-send": {
       // A message can contain several attachments. Count retries by message identity.
-      const messages = new Map<string, (typeof selected)[number]>();
+      const sentMessages = new Map<string, (typeof selected)[number]>();
       selected.forEach((call, index) =>
-        messages.set(id(call.output?.messageId) ?? `call-${index}`, call),
+        sentMessages.set(id(call.output?.messageId) ?? `call-${index}`, call),
       );
-      const attachmentCount = [...messages.values()].reduce(
+      const attachmentCount = [...sentMessages.values()].reduce(
         (count, call) =>
           count + (Array.isArray(call.input?.attachments) ? call.input.attachments.length : 0),
         0,
       );
-      const countsKnown = [...messages.values()].every(
+      const countsKnown = [...sentMessages.values()].every(
         (call) => Array.isArray(call.input?.attachments) && call.input.attachments.length > 0,
       );
       const targets = threadIds.every((value) => value !== undefined)
-        ? ` to ${quantity(new Set(threadIds).size, "thread")}`
-        : "";
-      label = phrase(
-        "Sent",
-        "send",
-        countsKnown
-          ? `${quantity(attachmentCount, "attachment")}${targets}`
-          : `attachments${targets} ${times}`,
+        ? new Set(threadIds).size
+        : undefined;
+      label = messages.sentAttachments(
+        countsKnown ? attachmentCount : undefined,
+        targets,
+        selected.length,
+        succeeded,
       );
       break;
     }
-    case "link-pr":
-      label = phrase("Linked", "link", quantity(selected.length, "pull request"));
-      break;
-    case "unlink-pr":
-      label = phrase("Unlinked", "unlink", quantity(selected.length, "pull request"));
-      break;
-    case "watch-pr":
-      label = phrase("Watching", "watch", quantity(selected.length, "pull request"));
-      break;
-    case "unwatch-pr":
-      label = phrase(
-        "Stopped watching",
-        "stop watching",
-        quantity(selected.length, "pull request"),
-      );
-      break;
-    case "list-prs":
-      label = phrase(
-        "Checked",
-        "check",
-        `linked pull requests${selected.length === 1 ? "" : ` ${times}`}`,
-      );
-      break;
-    case "browser":
-      label = phrase("Used", "use", `browser ${times}`);
-      break;
-    case "device":
-      label = phrase("Used", "use", `device controls ${times}`);
-      break;
-    case "html-preview":
-      label = phrase("Previewed", "preview", quantity(selected.length, "HTML page"));
-      break;
-    case "html-render":
-      label = phrase("Rendered", "render", quantity(selected.length, "HTML page"));
-      break;
-    case "capabilities":
-      label = phrase("Checked", "check", `orchestration capabilities ${times}`);
-      break;
+    default:
+      label = messages.summary[action](count, succeeded);
   }
   return { label, failedCount };
 }

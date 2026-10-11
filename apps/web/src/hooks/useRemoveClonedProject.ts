@@ -1,3 +1,5 @@
+/** Removes cloned projects and reports failures through the shared toast system. */
+import { t } from "~/i18n";
 import { useRouter } from "@tanstack/react-router";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import type { ScopedProjectRef } from "@t3tools/contracts";
@@ -35,8 +37,8 @@ export function useRemoveClonedProject() {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Failed to remove project",
-            description: error instanceof Error ? error.message : "An error occurred.",
+            title: t.app.projects.removeError,
+            description: error instanceof Error ? error.message : t.sidebar.errors.genericError,
           }),
         );
         return false;

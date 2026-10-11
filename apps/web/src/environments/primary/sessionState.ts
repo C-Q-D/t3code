@@ -1,3 +1,5 @@
+/** Localized connection presentation and existing interaction behavior. */
+import { t } from "~/i18n";
 import { useAtomValue } from "@effect/atom-react";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
@@ -23,6 +25,7 @@ function refreshPrimarySessionState(): void {
   appAtomRegistry.refresh(primarySessionStateAtom);
 }
 
+/** Returns the primary environment session, loading/error state and refresh action; no primary target yields an empty session. */
 export function usePrimarySessionState() {
   const result = useAtomValue(primarySessionStateAtom);
   const refresh = useCallback(() => {
@@ -31,7 +34,7 @@ export function usePrimarySessionState() {
   let error: string | null = null;
   if (result._tag === "Failure") {
     const cause = Cause.squash(result.cause);
-    error = cause instanceof Error ? cause.message : "Could not read environment session.";
+    error = cause instanceof Error ? cause.message : t.account.connection.readSessionFailed;
   }
   return {
     data: Option.getOrNull(AsyncResult.value(result)),

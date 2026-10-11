@@ -1,3 +1,4 @@
+import { englishRemotePairingMessages } from "@t3tools/shared/remoteLabels";
 import {
   AuthAdministrativeScopes,
   AuthStandardClientScopes,
@@ -413,3 +414,21 @@ describe("connection onboarding", () => {
     }),
   );
 });
+
+it.effect("reports localized pairing validation before any network request", () =>
+  Effect.gen(function* () {
+    const calls: Array<{ readonly url: string; readonly init: RequestInit }> = [];
+    const error = yield* preparePairingRegistration(
+      { host: "remote.example.test", pairingCode: "" },
+      {
+        ...englishRemotePairingMessages,
+        RemotePairingCodeMissingError: "请输入配对码。",
+      },
+    ).pipe(
+      Effect.provide(Layer.mergeAll(layerClientPresentation, layerPairingHttp(calls))),
+      Effect.flip,
+    );
+    expect(error).toMatchObject({ reason: "configuration", detail: "请输入配对码。" });
+    expect(calls).toEqual([]);
+  }),
+);

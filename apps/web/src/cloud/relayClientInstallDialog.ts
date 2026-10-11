@@ -1,3 +1,5 @@
+/** Localized terminal errors and existing runtime operations. */
+import { t } from "~/i18n";
 import {
   RelayClientInstallProgressStageSchema,
   type RelayClientInstallProgressEvent,
@@ -14,8 +16,13 @@ export class RelayClientInstallConfirmationConflictError extends Schema.TaggedEr
     activeInstallStage: Schema.optional(RelayClientInstallProgressStageSchema),
   },
 ) {
+  /** Returns the localized display message for this error while preserving its structured diagnostic fields. */
   override get message(): string {
-    return `Cannot confirm relay client installation ${this.requestedVersion}; installation ${this.activeVersion} has dialog status ${this.activeDialogStatus}.`;
+    return t.account.cloud.installConflict(
+      this.requestedVersion,
+      this.activeVersion,
+      this.activeDialogStatus,
+    );
   }
 }
 

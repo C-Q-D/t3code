@@ -1,3 +1,5 @@
+/** Localized browser UI and interactions; preserves user data, commands, and protocol values. */
+import { t } from "~/i18n";
 import type {
   AssetCreateUrlResult,
   AssetResource,
@@ -38,8 +40,9 @@ export class BrowserPreviewUnavailableError extends Data.TaggedError(
 export class BrowserSettingsReadError extends Data.TaggedError("BrowserSettingsReadError")<{
   readonly cause: unknown;
 }> {
+  /** Returns the current locale's browser-settings failure text while retaining the original cause. */
   override get message(): string {
-    return "Saved browser settings could not be loaded.";
+    return t.tools.browser.settingsLoadFailed;
   }
 }
 
@@ -83,6 +86,8 @@ export async function openUrlInPreview<E>(input: {
 /**
  * Opens a browser document in the integrated browser. Inside the workspace the
  * page may load sibling assets; a file outside it is served on its own.
+ * @param input Command context, item lists, and navigation callbacks defined by the input type.
+ * @returns The value described above, without changing user data or protocol identifiers.
  */
 export async function openFileInPreview<AssetError, PreviewError>(input: {
   readonly threadRef: ScopedThreadRef;
@@ -104,7 +109,7 @@ export async function openFileInPreview<AssetError, PreviewError>(input: {
     return AsyncResult.failure(
       Cause.fail(
         new BrowserPreviewUnavailableError({
-          message: "The integrated browser is unavailable in this runtime.",
+          message: t.tools.browser.unavailable,
         }),
       ),
     );
@@ -126,9 +131,7 @@ export async function openFileInPreview<AssetError, PreviewError>(input: {
   }
   const assetUrl = resolveAssetUrl(input.httpBaseUrl, assetResult.value.relativeUrl);
   if (assetUrl === null) {
-    return AsyncResult.failure(
-      Cause.die(new Error("The environment returned an invalid asset URL.")),
-    );
+    return AsyncResult.failure(Cause.die(new Error(t.tools.browser.invalidAssetUrl)));
   }
   return openUrlInPreview({
     threadRef: input.threadRef,

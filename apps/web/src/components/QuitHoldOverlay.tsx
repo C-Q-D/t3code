@@ -1,3 +1,5 @@
+/** Presents desktop quit-shortcut hints without changing the shortcut protocol or timing. */
+import { t } from "~/i18n";
 import { useEffect, useState } from "react";
 
 import { isMacPlatform } from "../lib/utils";
@@ -41,8 +43,8 @@ export function QuitHoldOverlay() {
   const shortcut = isMacPlatform(navigator.platform) ? "⌘Q" : "Ctrl+Q";
   const message =
     visibleMode === "hold"
-      ? `Hold ${shortcut} or press twice to quit`
-      : `Press ${shortcut} again to quit`;
+      ? t.app.quitHoldOverlay.holdOrPressTwice(shortcut)
+      : t.app.quitHoldOverlay.pressAgain(shortcut);
   return (
     <div
       role="status"

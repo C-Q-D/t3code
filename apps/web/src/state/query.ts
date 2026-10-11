@@ -1,3 +1,5 @@
+/** Adapts environment query results to UI state and displayable errors. */
+import { t } from "~/i18n";
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
 import * as Cause from "effect/Cause";
 import * as Option from "effect/Option";
@@ -17,11 +19,12 @@ export interface EnvironmentQueryView<A, E = unknown> {
   readonly refresh: () => void;
 }
 
+/** Extracts a message from the supplied failure cause, falling back to a localized environment-request error. */
 export function formatEnvironmentQueryError(cause: Cause.Cause<unknown>): string {
   const error = Cause.squash(cause);
   return error instanceof Error && error.message.trim().length > 0
     ? error.message
-    : "The environment request failed.";
+    : t.app.errors.environmentRequest;
 }
 
 export function useEnvironmentQuery<A, E>(

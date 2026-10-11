@@ -457,7 +457,7 @@ function projectedWorkEntry(row: OrchestrationV2ProjectedTurnItem): WorkLogEntry
     case "compaction":
       return {
         ...common,
-        label: contextCompactionLabel(item),
+        label: contextCompactionLabel(item, t.chat.workLog.shared),
         sourceActivityKind: "context-compaction",
         ...(item.summary ? { detail: item.summary } : {}),
       };
@@ -492,7 +492,10 @@ function projectedWorkEntry(row: OrchestrationV2ProjectedTurnItem): WorkLogEntry
     case "file_search":
       return {
         ...common,
-        label: title ?? formatSearchToolLabel(item) ?? t.chat.workLog.searchedFiles,
+        label:
+          title ??
+          formatSearchToolLabel(item, t.chat.workLog.shared.toolActivity) ??
+          t.chat.workLog.searchedFiles,
         ...(item.pattern ? { detail: item.pattern } : {}),
         toolTitle: title ?? t.chat.workLog.fileSearch,
         toolData: item,
@@ -542,9 +545,9 @@ function projectedWorkEntry(row: OrchestrationV2ProjectedTurnItem): WorkLogEntry
         label:
           title ??
           (classified === "read"
-            ? formatReadToolLabel(readPath ?? "")
+            ? formatReadToolLabel(readPath ?? "", 0, t.chat.workLog.shared.toolActivity)
             : classified === "search"
-              ? (formatSearchToolLabel({ input: item.input }) ??
+              ? (formatSearchToolLabel({ input: item.input }, t.chat.workLog.shared.toolActivity) ??
                 item.toolName ??
                 t.chat.workLog.toolCall)
               : (item.toolName ?? t.chat.workLog.toolCall)),

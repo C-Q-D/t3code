@@ -372,23 +372,48 @@ export function buildKeybindingCommandOptions(
   return [...commands].toSorted((left, right) => compareCommands(left, right, commandLabel));
 }
 
+/** Localizes display names while preserving dynamic script identifiers and executable command values. */
 export function commandLabel(command: KeybindingCommand): string {
-  if (command === "composer.sendAlternate") return "Composer: Opposite Queue or Steer Action";
-  if (command === "composer.sendBackground") return "Composer: Start in Background";
-  if (command === "composer.sendAndNewThread") return "Composer: Send and Start New Thread";
-  if (command === "thread.steerQueuedMessage") return "Queue: Send First Queued Message as Steer";
-  if (command === "thread.editQueuedMessage") return "Queue: Edit Last Queued Message";
-  if (command === "thread.copyReference") return "Pull Request: Copy Link or Thread ID";
+  if (command === "composer.sendAlternate")
+    return t.settings.keybindings.commandLabels.sendAlternate;
+  if (command === "composer.sendBackground")
+    return t.settings.keybindings.commandLabels.sendBackground;
+  if (command === "composer.sendAndNewThread")
+    return t.settings.keybindings.commandLabels.sendAndNewThread;
+  if (command === "thread.steerQueuedMessage")
+    return t.settings.keybindings.commandLabels.steerQueuedMessage;
+  if (command === "thread.editQueuedMessage")
+    return t.settings.keybindings.commandLabels.editQueuedMessage;
+  if (command === "thread.copyReference") return t.settings.keybindings.commandLabels.copyReference;
   const usageMetric = METRIC_OPTIONS.find((option) => option.command === command);
-  if (usageMetric) return `Usage: ${usageMetric.label}`;
+  if (usageMetric) return t.settings.keybindings.usageCommand(t.tools.usage[usageMetric.value]);
   const usagePeriod = WINDOW_OPTIONS.find((option) => option.command === command);
-  if (usagePeriod) return `Usage: Period: ${usagePeriod.label}`;
-  if (command === "view.reopenClosed") return "Reopen Closed Tab";
+  if (usagePeriod)
+    return t.settings.keybindings.usagePeriodCommand(
+      usagePeriod.days === 1
+        ? t.tools.usage.past24h
+        : usagePeriod.days === 7
+          ? t.tools.usage.sevenDays
+          : usagePeriod.days === 30
+            ? t.tools.usage.thirtyDays
+            : t.tools.usage.ninetyDays,
+    );
+  if (command === "view.reopenClosed") return t.settings.keybindings.commandLabels.reopenClosed;
   const raw = String(command);
   if (raw.startsWith("script.") && raw.endsWith(".run")) {
-    return `Run Script: ${titleCaseCommandSegment(raw.slice("script.".length, -".run".length))}`;
+    return t.settings.keybindings.runScriptCommand(
+      titleCaseCommandSegment(raw.slice("script.".length, -".run".length)),
+    );
   }
-  return raw.split(".").map(titleCaseCommandSegment).join(": ");
+  const segments = t.settings.keybindings.commandSegments;
+  return raw
+    .split(".")
+    .map((segment) =>
+      Object.hasOwn(segments, segment)
+        ? segments[segment as keyof typeof segments]
+        : titleCaseCommandSegment(segment),
+    )
+    .join(t.settings.keybindings.commandSeparator);
 }
 
 function titleCaseCommandSegment(segment: string): string {

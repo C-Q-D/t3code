@@ -1,3 +1,5 @@
+/** Presents provider updates grouped by environment and tracks per-environment update progress. */
+import { t } from "~/i18n";
 import { CheckIcon } from "lucide-react";
 import { type ReactNode, useCallback, useMemo, useRef, useState } from "react";
 import {
@@ -70,7 +72,8 @@ function toProviderUpdateOutcome(input: {
     const error = squashAtomCommandFailure(input.result);
     return {
       status: "rejected",
-      reason: error instanceof Error ? error : new Error("Provider update failed."),
+      reason:
+        error instanceof Error ? error : new Error(t.common.providerUpdate.updateFallbackError),
     };
   }
 
@@ -111,6 +114,7 @@ function rowToneClass(kind: ProviderUpdateRowStatusKind): string {
   }
 }
 
+/** Renders the provider update group and current status; onUpdate retries or starts the eligible updates. */
 function EnvironmentUpdateRow({
   group,
   status,
@@ -133,14 +137,14 @@ function EnvironmentUpdateRow({
     case "unchanged":
       trailing = (
         <Button size="xs" variant="outline" disabled={!canManageProviders} onClick={onUpdate}>
-          Retry
+          {t.app.actions.retry}
         </Button>
       );
       break;
     default:
       trailing = (
         <Button size="xs" variant="outline" disabled={!canManageProviders} onClick={onUpdate}>
-          Update
+          {t.app.actions.update}
         </Button>
       );
       break;
@@ -152,9 +156,7 @@ function EnvironmentUpdateRow({
         <span className="truncate font-medium text-foreground">{group.label}</span>
         <span className={cn("truncate text-xs", rowToneClass(status.kind))}>{status.text}</span>
         {!canManageProviders ? (
-          <span className="text-xs text-muted-foreground">
-            This connection cannot manage provider accounts.
-          </span>
+          <span className="text-xs text-muted-foreground">{t.app.provider.manageDenied}</span>
         ) : null}
       </div>
       <div className="shrink-0">{trailing}</div>
@@ -273,7 +275,7 @@ export function ProviderUpdateEnvironmentRows({
         inFlightEnvironmentsRef.current.delete(environmentId);
         clearPending(environmentId);
         setErrorByEnvironment((previous) =>
-          new Map(previous).set(environmentId, "Update timed out — try again."),
+          new Map(previous).set(environmentId, t.app.provider.timeout),
         );
       }, PENDING_EXPIRY_MS);
       try {
@@ -295,7 +297,10 @@ export function ProviderUpdateEnvironmentRows({
             } catch (error) {
               return {
                 status: "rejected",
-                reason: error instanceof Error ? error : new Error("Provider update failed."),
+                reason:
+                  error instanceof Error
+                    ? error
+                    : new Error(t.common.providerUpdate.updateFallbackError),
               };
             }
           }),
@@ -318,10 +323,7 @@ export function ProviderUpdateEnvironmentRows({
         });
         if (results.length === 0) {
           setErrorByEnvironment((previous) =>
-            new Map(previous).set(
-              environmentId,
-              "This environment isn’t connected — try again once it reconnects.",
-            ),
+            new Map(previous).set(environmentId, t.app.provider.disconnected),
           );
           return;
         }
@@ -353,7 +355,7 @@ export function ProviderUpdateEnvironmentRows({
           setErrorByEnvironment((previous) =>
             new Map(previous).set(
               environmentId,
-              error instanceof Error ? error.message : "Provider update failed.",
+              error instanceof Error ? error.message : t.common.providerUpdate.updateFallbackError,
             ),
           );
         }

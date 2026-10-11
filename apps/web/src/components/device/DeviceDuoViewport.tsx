@@ -1,3 +1,5 @@
+/** Localized device UI and interactions; preserves user data, commands, and protocol values. */
+import { t } from "~/i18n";
 import { useEffect, useRef, type RefObject } from "react";
 import type { DuoViewer } from "@t3tools/client-runtime/device/duo-viewer";
 import type { DeviceModelSource } from "@t3tools/client-runtime/device/model";
@@ -9,7 +11,10 @@ import { bindPhoneTrackpad } from "./phoneTrackpad";
 
 const loadDuoViewer = () => import("@t3tools/client-runtime/device/duo-viewer");
 
-/** Web shell for the framework-independent viewer. The decoded screen and input connection remain owned by DeviceStreamView. */
+/** Web shell for the framework-independent viewer. The decoded screen and input connection remain owned by DeviceStreamView.
+ * @param props Component properties and callbacks defined by the parameter type.
+ * @returns Rendered UI for the supplied props.
+ */
 export function DeviceDuoViewport(props: {
   readonly model: DeviceModelSource;
   readonly source: RefObject<HTMLCanvasElement | null>;
@@ -182,7 +187,7 @@ export function DeviceDuoViewport(props: {
         />
         <canvas
           ref={canvasRef}
-          aria-label="Interactive 3D iPhone Duo. Drag the screen to interact. Drag outside it or swipe with two fingers to turn. Pinch over the device to open or close its hinge."
+          aria-label={t.tools.device.duoInteraction}
           className="size-full touch-none"
           onPointerDown={(event) => {
             if (event.button !== 0) return;

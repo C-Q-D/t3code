@@ -1,4 +1,6 @@
+/** Shows a bounded delimited table without changing the source text or its cell values. */
 /* oxlint-disable react/no-array-index-key -- Table rows and columns have stable positions and may contain identical values. */
+import { t } from "~/i18n";
 import { parseDelimitedPreview } from "@t3tools/shared/delimitedPreview";
 import { useMemo } from "react";
 
@@ -18,9 +20,7 @@ export function DelimitedTablePreview(props: {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {table.truncated ? (
-        <FileSurfaceNotice>
-          Table limited to the first 100 rows and 30 columns. Switch to source for the rest.
-        </FileSurfaceNotice>
+        <FileSurfaceNotice>{t.tools.files.tableTruncated}</FileSurfaceNotice>
       ) : null}
       <div className="min-h-0 flex-1 overflow-auto">
         <table

@@ -1,3 +1,5 @@
+/** Shared account-page layout and refresh controls; caller-owned profile data is unchanged. */
+import { t } from "~/i18n";
 import { RefreshIcon } from "~/components/ui/refresh-icon";
 
 import type { ReactNode } from "react";
@@ -37,6 +39,7 @@ export function ClerkUserProfilePage({
   );
 }
 
+/** Renders the supplied refresh action, disabled while pending or explicitly disabled. */
 export function ClerkUserProfileRefreshButton({
   className,
   disabled = false,
@@ -57,7 +60,7 @@ export function ClerkUserProfileRefreshButton({
       onClick={onClick}
     >
       <RefreshIcon aria-hidden="true" size="sm" refreshing={isPending} />
-      Refresh
+      {t.account.clerk.refresh}
     </Button>
   );
 }

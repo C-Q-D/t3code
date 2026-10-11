@@ -274,3 +274,22 @@ export function definitionFromDraft(draft: CustomModelDraft): CustomModelDefinit
       descriptors.length > 0 ? createModelCapabilities({ optionDescriptors: descriptors }) : null,
   };
 }
+
+/** Localizes a built-in preset menu label without changing its persisted draft value. */
+export function descriptorPresetLabel(preset: DescriptorPreset): string {
+  switch (preset.id) {
+    case "reasoningEffort":
+    case "effort":
+    case "reasoning":
+    case "variant":
+      return t.settings.providerModels.reasoning;
+    case "thinking":
+      return t.settings.providerModels.thinking;
+    case "fastMode":
+      return t.settings.customModelPreset.fastMode;
+    case "serviceTier":
+      return t.settings.customModelPreset.speed;
+    default:
+      return preset.label;
+  }
+}

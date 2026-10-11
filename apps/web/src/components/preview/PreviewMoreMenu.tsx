@@ -1,4 +1,7 @@
+/** Localized preview UI and interactions; preserves user data, commands, and protocol values. */
 "use client";
+
+import { t } from "~/i18n";
 
 import type { DesktopPreviewColorScheme } from "@t3tools/contracts";
 import { Minus, MoreVertical, Plus as PlusIcon, RotateCcw } from "lucide-react";
@@ -24,9 +27,9 @@ const COLOR_SCHEME_OPTIONS: ReadonlyArray<{
   value: DesktopPreviewColorScheme;
   label: string;
 }> = [
-  { value: "system", label: "System" },
-  { value: "light", label: "Light" },
-  { value: "dark", label: "Dark" },
+  { value: "system", label: t.tools.preview.system },
+  { value: "light", label: t.tools.preview.light },
+  { value: "dark", label: t.tools.preview.dark },
 ];
 
 /**
@@ -66,22 +69,37 @@ interface Props {
   profileName: string | undefined;
 }
 
+/**
+ * Renders the preview menu's icon button with a localized accessible name and tooltip.
+ * Takes no props; its enclosing Menu provides the open state and trigger interaction.
+ * @returns The composed menu and tooltip trigger, ready for use inside PreviewMoreMenu.
+ */
 const MenuTriggerButton = () => (
   <Tooltip>
     <TooltipTrigger
       render={
         <MenuTrigger
-          render={<Button variant="ghost" size="icon-xs" type="button" aria-label="Preview menu" />}
+          render={
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              type="button"
+              aria-label={t.tools.preview.menu}
+            />
+          }
         />
       }
     >
       <MoreVertical />
     </TooltipTrigger>
-    <TooltipPopup>More</TooltipPopup>
+    <TooltipPopup>{t.tools.preview.more}</TooltipPopup>
   </Tooltip>
 );
 
-/** Three-dot menu in the chrome row; the same items for every kind of tab. */
+/** Three-dot menu in the chrome row; the same items for every kind of tab.
+ * @param props View data, control flags, and callbacks defined by the component props type; optional fields retain their declared defaults.
+ * @returns Rendered UI for the supplied props.
+ */
 export function PreviewMoreMenu({
   enabled,
   actions,
@@ -99,25 +117,25 @@ export function PreviewMoreMenu({
       <MenuTriggerButton />
       <MenuPopup align="end" sideOffset={6}>
         <MenuItem onClick={actions.hardReload} disabled={disabled}>
-          Hard reload
+          {t.tools.preview.hardReload}
         </MenuItem>
         {actions.openDevTools ? (
           <MenuItem onClick={actions.openDevTools} disabled={disabled}>
-            Open DevTools
+            {t.tools.preview.devTools}
           </MenuItem>
         ) : null}
         {actions.toggleNativePictureInPicture ? (
           <MenuItem onClick={actions.toggleNativePictureInPicture} disabled={disabled}>
             {nativePictureInPicture
-              ? "Close separate preview window"
-              : "Open separate preview window"}
+              ? t.tools.preview.closeSeparateWindow
+              : t.tools.preview.openSeparateWindow}
           </MenuItem>
         ) : null}
         <MenuItem onClick={onToggleDeviceToolbar} disabled={disabled}>
-          {deviceToolbarVisible ? "Hide device toolbar" : "Show device toolbar"}
+          {deviceToolbarVisible ? t.tools.preview.hideToolbar : t.tools.preview.showToolbar}
         </MenuItem>
         <MenuSub>
-          <MenuSubTrigger disabled={disabled}>Appearance</MenuSubTrigger>
+          <MenuSubTrigger disabled={disabled}>{t.tools.preview.appearance}</MenuSubTrigger>
           <MenuSubPopup>
             <MenuRadioGroup
               value={colorScheme}
@@ -142,14 +160,14 @@ export function PreviewMoreMenu({
           className="justify-between"
           disabled={disabled}
         >
-          <span>Zoom</span>
+          <span>{t.tools.preview.zoom}</span>
           <span className="flex items-center gap-1">
             <Button
               variant="outline"
               size="icon-xs"
               type="button"
               onClick={actions.zoomOut}
-              aria-label="Zoom out"
+              aria-label={t.tools.preview.zoomOut}
               disabled={disabled}
             >
               <Minus />
@@ -162,7 +180,7 @@ export function PreviewMoreMenu({
               size="icon-xs"
               type="button"
               onClick={actions.zoomIn}
-              aria-label="Zoom in"
+              aria-label={t.tools.preview.zoomIn}
               disabled={disabled}
             >
               <PlusIcon />
@@ -172,7 +190,7 @@ export function PreviewMoreMenu({
               size="icon-xs"
               type="button"
               onClick={actions.resetZoom}
-              aria-label="Reset zoom"
+              aria-label={t.tools.preview.resetZoom}
               disabled={disabled}
             >
               <RotateCcw />
@@ -191,11 +209,11 @@ export function PreviewMoreMenu({
             // Truncation needs a block box: `text-overflow` on an inline child
             // never applies and a long name would push the popup past its width.
             <MenuGroupLabel className="max-w-64">
-              <span className="block truncate">Profile: {profileName}</span>
+              <span className="block truncate">{t.tools.preview.profileLabel(profileName)}</span>
             </MenuGroupLabel>
           ) : null}
-          <MenuItem onClick={actions.clearCookies}>Clear cookies</MenuItem>
-          <MenuItem onClick={actions.clearCache}>Clear cache</MenuItem>
+          <MenuItem onClick={actions.clearCookies}>{t.tools.preview.clearCookies}</MenuItem>
+          <MenuItem onClick={actions.clearCache}>{t.tools.preview.clearCache}</MenuItem>
         </MenuGroup>
       </MenuPopup>
     </Menu>

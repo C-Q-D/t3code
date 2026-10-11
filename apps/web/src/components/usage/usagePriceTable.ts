@@ -1,3 +1,5 @@
+/** Localized usage presentation and existing interaction behavior. */
+import { t } from "~/i18n";
 import {
   parseUsagePriceForm,
   usagePriceForm,
@@ -38,12 +40,14 @@ function modelAlias(target: UsagePriceTarget, model: string) {
 /** The "Map to" cell across the selected environments, read like a price cell. */
 export function usageAliasCell(targets: readonly UsagePriceTarget[], model: string) {
   if (targets.some((target) => target.aliases === null))
-    return { value: "", placeholder: "Unavailable" };
+    return { value: "", placeholder: t.tools.usage.unavailable };
   const values = targets.map((target) => modelAlias(target, model) ?? "");
-  if (values.some((value) => value !== values[0])) return { value: "", placeholder: "Mixed" };
-  return { value: values[0] ?? "", placeholder: "None" };
+  if (values.some((value) => value !== values[0]))
+    return { value: "", placeholder: t.tools.usage.mixed };
+  return { value: values[0] ?? "", placeholder: t.tools.usage.none };
 }
 
+/** Returns the displayed price and placeholder for model/field across targets; unavailable or differing prices yield empty values with distinct localized placeholders. */
 export function usagePriceCell(
   targets: readonly UsagePriceTarget[],
   model: string,
@@ -54,11 +58,13 @@ export function usagePriceCell(
     modelPrice(target, model) ? usagePriceForm(model, modelPrice(target, model))[field] : null,
   );
   if (targets.some((target) => target.prices === null))
-    return { value: "", placeholder: "Unavailable" };
-  if (values.some((value) => value !== values[0])) return { value: "", placeholder: "Mixed" };
+    return { value: "", placeholder: t.tools.usage.unavailable };
+  if (values.some((value) => value !== values[0]))
+    return { value: "", placeholder: t.tools.usage.mixed };
   return {
     value: values[0] ?? "",
-    placeholder: values[0] === null ? "Automatic" : optional ? "Input rate" : "0.00",
+    placeholder:
+      values[0] === null ? t.tools.usage.automatic : optional ? t.tools.usage.inputRate : "0.00",
   };
 }
 
@@ -81,8 +87,8 @@ export function usagePriceTableChanges(
     // A mapped model is priced as its target, so mapping it drops its own price.
     const alias = (draft.alias ?? currentAlias ?? "").trim();
     if (alias !== "") {
-      if (model === "") errors.set(draft.id, "Enter a model ID.");
-      else if (alias === model) errors.set(draft.id, "Map to a different model.");
+      if (model === "") errors.set(draft.id, t.tools.usage.enterModelId);
+      else if (alias === model) errors.set(draft.id, t.tools.usage.differentModel);
       else {
         if (alias !== currentAlias) changes.push({ model, alias });
         if (modelPrice(target, model)) changes.push({ model, price: null });
@@ -108,10 +114,10 @@ export function usagePriceTableChanges(
       errors.set(
         draft.id,
         model === ""
-          ? "Enter a model ID."
+          ? t.tools.usage.enterModelId
           : missing
-            ? `${missing.label} is required on ${target.label}.`
-            : "Use non-negative numbers for prices.",
+            ? t.tools.usage.requiredPrice(missing.label, target.label)
+            : t.tools.usage.nonNegativePrices,
       );
       continue;
     }

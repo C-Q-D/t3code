@@ -179,10 +179,10 @@ export function ThreadAutomationsPanel(props: {
               <p className="truncate text-2xs text-muted-foreground">
                 {scheduleLabel(task.schedule)}
                 {task.enabled && task.nextRunAt !== null
-                  ? ` · next ${relativeLabel(task.nextRunAt)}`
+                  ? t.chat.details.nextRunSuffix(relativeLabel(task.nextRunAt))
                   : task.enabled
                     ? ""
-                    : " · paused"}
+                    : t.chat.details.pausedSuffix}
               </p>
             </div>
             <Tooltip>

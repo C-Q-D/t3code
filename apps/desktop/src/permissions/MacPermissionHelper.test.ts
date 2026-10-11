@@ -1,3 +1,4 @@
+import { desktopMessages } from "../i18n/desktopMessages.ts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import * as Electron from "electron";
 import { MacPermissionHelper, macAppBundlePath } from "./MacPermissionHelper.ts";
@@ -109,7 +110,14 @@ afterEach(() => {
 });
 const iconPaths = ["/bundle/prod-resources/icon.png"];
 const open = () =>
-  helper.show("accessibility", "/bundle/mac-permission-preload.cjs", null, iconPaths);
+  helper.show(
+    "accessibility",
+    "/bundle/mac-permission-preload.cjs",
+    null,
+    iconPaths,
+    desktopMessages("en").permission,
+    "en",
+  );
 function send(action: string, trusted = true) {
   const window = windows.at(-1)!;
   Electron.ipcMain.emit(
@@ -154,7 +162,14 @@ it("rechecks permissions and releases resources when granted", async () => {
 });
 it("keeps only one helper and cleans up on dismissal", async () => {
   await open();
-  await helper.show("screen-recording", "/preload.cjs", null, iconPaths);
+  await helper.show(
+    "screen-recording",
+    "/preload.cjs",
+    null,
+    iconPaths,
+    desktopMessages("en").permission,
+    "en",
+  );
   expect(windows[0]!.destroyed).toBe(true);
   expect(Electron.ipcMain.listenerCount(MAC_PERMISSION_HELPER_CHANNEL)).toBe(1);
   send("close");
@@ -190,7 +205,14 @@ it("offers the Finder fallback when native dragging fails", async () => {
 
 it("returns focus to onboarding when the permission is granted", async () => {
   const owner = new Electron.BrowserWindow({});
-  await helper.show("screen-recording", "/preload.cjs", owner, iconPaths);
+  await helper.show(
+    "screen-recording",
+    "/preload.cjs",
+    owner,
+    iconPaths,
+    desktopMessages("en").permission,
+    "en",
+  );
   mocks.granted = true;
   await vi.advanceTimersByTimeAsync(1000);
   expect(owner.show).toHaveBeenCalledOnce();
@@ -200,7 +222,14 @@ it("returns focus to onboarding when the permission is granted", async () => {
 });
 it("closes the helper and stops checking when onboarding's window closes", async () => {
   const owner = new Electron.BrowserWindow({});
-  await helper.show("accessibility", "/preload.cjs", owner, iconPaths);
+  await helper.show(
+    "accessibility",
+    "/preload.cjs",
+    owner,
+    iconPaths,
+    desktopMessages("en").permission,
+    "en",
+  );
   owner.destroy();
   expect(windows[1]!.destroyed).toBe(true);
   expect(Electron.ipcMain.listenerCount(MAC_PERMISSION_HELPER_CHANNEL)).toBe(0);
@@ -209,7 +238,14 @@ it("closes the helper and stops checking when onboarding's window closes", async
 
 it("uses the packaged PNG when an earlier resource candidate is absent", async () => {
   mocks.createFromPath.mockReturnValueOnce({ isEmpty: () => true });
-  await helper.show("accessibility", "/preload.cjs", null, ["/missing/icon.png", ...iconPaths]);
+  await helper.show(
+    "accessibility",
+    "/preload.cjs",
+    null,
+    ["/missing/icon.png", ...iconPaths],
+    desktopMessages("en").permission,
+    "en",
+  );
   send("drag");
   expect(mocks.startDrag).toHaveBeenCalled();
   expect(mocks.createFromPath).toHaveBeenLastCalledWith(iconPaths[0]);
@@ -241,7 +277,14 @@ it("docks inside Settings and hides when it is covered or closed", async () => {
 it("returns to onboarding when the Settings window disappears", async () => {
   const owner = new Electron.BrowserWindow({});
   owner.hide();
-  await helper.show("accessibility", "/preload.cjs", owner, iconPaths);
+  await helper.show(
+    "accessibility",
+    "/preload.cjs",
+    owner,
+    iconPaths,
+    desktopMessages("en").permission,
+    "en",
+  );
   mocks.settingsChanged!({ x: 100, y: 100, width: 723, height: 719, frontmost: true });
   mocks.settingsChanged!(null);
   expect(owner.show).toHaveBeenCalledOnce();
@@ -266,6 +309,8 @@ it("waits for an asynchronous Full Disk Access check and returns to the owner", 
     "/bundle/mac-permission-preload.cjs",
     owner,
     iconPaths,
+    desktopMessages("en").permission,
+    "en",
     probe,
   );
   const pending = Promise.withResolvers<boolean>();
@@ -287,6 +332,8 @@ it("keeps the helper open after a failed access check and retries", async () => 
     "/bundle/mac-permission-preload.cjs",
     null,
     iconPaths,
+    desktopMessages("en").permission,
+    "en",
     probe,
   );
   probe.mockRejectedValueOnce(new Error("temporarily unavailable"));
@@ -304,6 +351,8 @@ it("does not reopen a superseded helper when its initial probe completes", async
     "/bundle/mac-permission-preload.cjs",
     null,
     iconPaths,
+    desktopMessages("en").permission,
+    "en",
     () => pending.promise,
   );
   await open();
@@ -311,4 +360,22 @@ it("does not reopen a superseded helper when its initial probe completes", async
   await first;
   expect(windows).toHaveLength(1);
   expect(windows[0]!.destroyed).toBe(false);
+});
+
+it("renders translated permission instructions and keeps the native action identifiers", async () => {
+  await helper.show(
+    "screen-recording",
+    "/preload.cjs",
+    null,
+    iconPaths,
+    desktopMessages("zh-CN").permission,
+    "zh-CN",
+  );
+  const html = decodeURIComponent(mocks.loadURL.mock.calls[0]![0] as string);
+  expect(html).toContain('<html lang="zh-CN">');
+  expect(html).toContain("设置屏幕录制");
+  expect(html).toContain("将 T3 Code 拖入上方列表");
+  expect(html).toContain('aria-label="关闭权限提示"');
+  send("finder");
+  expect(mocks.showItemInFolder).toHaveBeenCalledWith("/Applications/T3 Code (Nightly).app");
 });

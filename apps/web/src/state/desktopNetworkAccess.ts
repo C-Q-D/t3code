@@ -1,3 +1,5 @@
+/** Localized desktop presentation and existing interaction behavior. */
+import { t } from "~/i18n";
 import type {
   AdvertisedEndpoint,
   DesktopBridge,
@@ -25,8 +27,9 @@ class DesktopNetworkAccessUnavailableError extends Schema.TaggedError<DesktopNet
   "DesktopNetworkAccessUnavailableError",
   {},
 ) {
+  /** Returns the localized display message for this error while preserving its structured diagnostic fields. */
   override get message(): string {
-    return "Desktop network access is unavailable.";
+    return t.account.desktop.networkUnavailable;
   }
 }
 
@@ -34,8 +37,9 @@ class DesktopServerExposureStateLoadError extends Schema.TaggedError<DesktopServ
   "DesktopServerExposureStateLoadError",
   { cause: Schema.Defect() },
 ) {
+  /** Returns the localized display message for this error while preserving its structured diagnostic fields. */
   override get message(): string {
-    return "Failed to load desktop server exposure state.";
+    return t.account.desktop.exposureFailed;
   }
 }
 
@@ -43,8 +47,9 @@ class DesktopAdvertisedEndpointsLoadError extends Schema.TaggedError<DesktopAdve
   "DesktopAdvertisedEndpointsLoadError",
   { cause: Schema.Defect() },
 ) {
+  /** Returns the localized display message for this error while preserving its structured diagnostic fields. */
   override get message(): string {
-    return "Failed to load advertised desktop endpoints.";
+    return t.account.desktop.endpointsFailed;
   }
 }
 

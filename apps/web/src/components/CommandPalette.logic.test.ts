@@ -1,8 +1,13 @@
-import { describe, expect, it, vi } from "vite-plus/test";
+/** Tests palette navigation, user-data ranking, and localized static command matching. */
+import { installMessages } from "~/i18n";
+import { en } from "~/i18n/locales/en";
+import { messages } from "~/i18n/locales/zh-CN";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { EnvironmentId, ProjectId, ProviderInstanceId, ThreadId } from "@t3tools/contracts";
 import type { Project, Thread } from "../types";
 import { makeThreadFixture } from "../test-fixtures";
 import {
+  getLocalizedCommandSearchTerms,
   buildBrowseGroups,
   buildCommandPaletteProjectMetadata,
   buildCommandPaletteRows,
@@ -892,5 +897,46 @@ describe("virtualized command palette rows", () => {
     expect(findHighlightedCommandPaletteItem(groups, "thread-b")?.value).toBe("thread-b");
     expect(findHighlightedCommandPaletteItem(groups, "offline")).toBeNull();
     expect(findHighlightedCommandPaletteItem(groups, null)).toBeNull();
+  });
+});
+
+describe("localized command search", () => {
+  afterEach(() => installMessages("en", en));
+
+  const command: CommandPaletteActionItem = {
+    kind: "action",
+    value: "action:settings",
+    title: "设置",
+    searchTerms: ["settings", "mcp"],
+    icon: null,
+    run: async () => {},
+  };
+
+  it("matches Chinese titles and ranks exact titles before later English keywords", () => {
+    installMessages("zh-CN", messages);
+    const exact = { ...command, value: "action:mcp", title: "MCP", searchTerms: ["open", "mcp"] };
+    const input = {
+      activeGroups: [{ value: "actions", label: "Actions", items: [command, exact] }],
+      isInSubmenu: false,
+      projectSearchItems: [],
+      threadSearchItems: [],
+    };
+    expect(filterCommandPaletteGroups({ ...input, query: "设置" })[0]?.items).toEqual([command]);
+    expect(
+      filterCommandPaletteGroups({ ...input, query: "MCP" })[0]?.items.map((item) => item.value),
+    ).toEqual(["action:mcp", "action:settings"]);
+  });
+
+  it("keeps every original English keyword unchanged in English sessions", () => {
+    installMessages("en", en);
+    expect(getLocalizedCommandSearchTerms(command)).toBe(command.searchTerms);
+    expect(getLocalizedCommandSearchTerms(command)).toEqual(["settings", "mcp"]);
+  });
+
+  it("does not prepend titles to recency-ranked items in Chinese sessions", () => {
+    installMessages("zh-CN", messages);
+    const recent = { ...command, searchRecency: 42 };
+    expect(getLocalizedCommandSearchTerms(recent)).toBe(recent.searchTerms);
+    expect(getLocalizedCommandSearchTerms(recent)).toEqual(["settings", "mcp"]);
   });
 });

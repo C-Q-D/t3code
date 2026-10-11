@@ -1,3 +1,5 @@
+/** Converts VS Code colors into local palettes while preserving source theme names. */
+import { t } from "~/i18n";
 import {
   createVividThemeColors,
   getStandardThemeColors,
@@ -187,8 +189,9 @@ function resolveName(value: Record<string, unknown>): string {
   return "VS Code theme";
 }
 
+/** Converts an unknown VS Code theme object to a validated palette; throws a displayable error if its object or editor background is missing. */
 export function parseVsCodeThemeFile(value: unknown): ThemeDefinition {
-  if (!isRecord(value)) throw new Error("Theme files must contain a JSON object.");
+  if (!isRecord(value)) throw new Error(t.app.themeImport.jsonObjectRequired);
   const colors = isRecord(value.colors) ? value.colors : {};
 
   /** First key that carries a usable color, in priority order. */
@@ -206,9 +209,7 @@ export function parseVsCodeThemeFile(value: unknown): ThemeDefinition {
 
   const canvasColor = pick("editor.background", "editorPane.background");
   if (!canvasColor) {
-    throw new Error(
-      'That VS Code theme has no "editor.background" color, so there is nothing to build a palette from.',
-    );
+    throw new Error(t.app.themeImport.missingEditorBackground);
   }
   const canvas = { r: canvasColor.r, g: canvasColor.g, b: canvasColor.b };
   const appearance = resolveAppearance(value, canvas);

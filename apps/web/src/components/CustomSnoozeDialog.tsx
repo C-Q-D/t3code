@@ -1,3 +1,5 @@
+/** Coordinates a single custom snooze request and its date or duration editor. */
+import { t } from "~/i18n";
 import { useEffect, useId, useState } from "react";
 import { create } from "zustand";
 import {
@@ -53,6 +55,7 @@ export function CustomSnoozeDialogHost() {
   return request ? <CustomSnoozeDialog /> : null;
 }
 
+/** Edits the pending snooze request and resolves it with a future timestamp; closing resolves null. */
 function CustomSnoozeDialog() {
   const id = useId();
   const [initial] = useState(() => new Date(Date.now() + 3_600_000));
@@ -79,24 +82,20 @@ function CustomSnoozeDialog() {
             event.preventDefault();
             const snoozedUntil = resolveCustomSnooze(input, new Date());
             if (!snoozedUntil) {
-              setError(
-                mode === "date"
-                  ? "Choose a valid date and time in the future."
-                  : "Enter a positive duration.",
-              );
+              setError(mode === "date" ? t.app.snooze.invalidDate : t.app.snooze.invalidDuration);
               return;
             }
             finish({ snoozedUntil });
           }}
         >
           <DialogHeader>
-            <DialogTitle>Custom snooze</DialogTitle>
-            <DialogDescription>Choose when snoozed threads return to your inbox.</DialogDescription>
+            <DialogTitle>{t.app.snooze.title}</DialogTitle>
+            <DialogDescription>{t.app.snooze.description}</DialogDescription>
           </DialogHeader>
           <DialogPanel>
             <div className="flex flex-col gap-4">
               <ToggleGroup
-                aria-label="Schedule type"
+                aria-label={t.app.snooze.scheduleType}
                 className="w-full *:flex-1"
                 value={[mode]}
                 onValueChange={(next) => {
@@ -105,14 +104,14 @@ function CustomSnoozeDialog() {
                   setError(null);
                 }}
               >
-                <Toggle value="date">Date and time</Toggle>
-                <Toggle value="duration">Duration</Toggle>
+                <Toggle value="date">{t.app.snooze.dateAndTime}</Toggle>
+                <Toggle value="duration">{t.app.snooze.duration}</Toggle>
               </ToggleGroup>
               <div className="flex flex-col gap-4">
                 {mode === "date" ? (
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div className="flex min-w-0 flex-col gap-1.5">
-                      <Label htmlFor={`${id}-date`}>Date</Label>
+                      <Label htmlFor={`${id}-date`}>{t.app.snooze.date}</Label>
                       <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
                         <PopoverTrigger
                           render={
@@ -130,7 +129,7 @@ function CustomSnoozeDialog() {
                           })}
                           <CalendarIcon className="size-4 text-muted-foreground" />
                         </PopoverTrigger>
-                        <PopoverPopup align="start" aria-label="Choose snooze date">
+                        <PopoverPopup align="start" aria-label={t.app.snooze.chooseDate}>
                           <Calendar
                             mode="single"
                             required
@@ -148,7 +147,7 @@ function CustomSnoozeDialog() {
                       </Popover>
                     </div>
                     <Label className="flex min-w-0 flex-col items-stretch" htmlFor={`${id}-time`}>
-                      Time
+                      {t.app.snooze.time}
                       <Input
                         nativeInput
                         id={`${id}-time`}
@@ -175,18 +174,22 @@ function CustomSnoozeDialog() {
                         setError(null);
                       }}
                     >
-                      <Label htmlFor={`${id}-amount`}>Snooze for</Label>
+                      <Label htmlFor={`${id}-amount`}>{t.app.snooze.snoozeFor}</Label>
                       <NumberFieldGroup>
-                        <NumberFieldDecrement aria-label="Decrease duration" />
+                        <NumberFieldDecrement aria-label={t.app.snooze.decreaseDuration} />
                         <NumberFieldInput required />
-                        <NumberFieldIncrement aria-label="Increase duration" />
+                        <NumberFieldIncrement aria-label={t.app.snooze.increaseDuration} />
                       </NumberFieldGroup>
                     </NumberField>
                     <Label className="flex min-w-0 flex-col items-stretch" htmlFor={`${id}-unit`}>
-                      Unit
+                      {t.app.snooze.unit}
                       <Select
                         value={unit}
-                        items={{ minutes: "Minutes", hours: "Hours", days: "Days" }}
+                        items={{
+                          minutes: t.app.snooze.minutes,
+                          hours: t.app.snooze.hours,
+                          days: t.app.snooze.days,
+                        }}
                         onValueChange={(value) => {
                           if (value === "minutes" || value === "hours" || value === "days")
                             setUnit(value);
@@ -197,9 +200,9 @@ function CustomSnoozeDialog() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectPopup>
-                          <SelectItem value="minutes">Minutes</SelectItem>
-                          <SelectItem value="hours">Hours</SelectItem>
-                          <SelectItem value="days">Days</SelectItem>
+                          <SelectItem value="minutes">{t.app.snooze.minutes}</SelectItem>
+                          <SelectItem value="hours">{t.app.snooze.hours}</SelectItem>
+                          <SelectItem value="days">{t.app.snooze.days}</SelectItem>
                         </SelectPopup>
                       </Select>
                     </Label>
@@ -215,9 +218,9 @@ function CustomSnoozeDialog() {
           </DialogPanel>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => finish(null)}>
-              Cancel
+              {t.common.confirm.cancel}
             </Button>
-            <Button type="submit">Snooze</Button>
+            <Button type="submit">{t.common.threadActions.snooze}</Button>
           </DialogFooter>
         </form>
       </DialogPopup>

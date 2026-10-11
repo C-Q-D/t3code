@@ -1,3 +1,5 @@
+/** Provides responsive sidebar layout, collapse state, and pointer resizing controls. */
+import { t } from "~/i18n";
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
 import { cva, type VariantProps } from "class-variance-authority";
@@ -180,6 +182,7 @@ function SidebarProvider({
   );
 }
 
+/** Renders sidebar children with the requested side, variant, collapse behavior, and resizing support; mobile layouts use a sheet. */
 function Sidebar({
   side = "left",
   variant = "sidebar",
@@ -252,8 +255,8 @@ function Sidebar({
             }
           >
             <SheetHeader className="sr-only">
-              <SheetTitle>Sidebar</SheetTitle>
-              <SheetDescription>Displays the mobile sidebar.</SheetDescription>
+              <SheetTitle>{t.app.sidebar.title}</SheetTitle>
+              <SheetDescription>{t.app.sidebar.description}</SheetDescription>
             </SheetHeader>
             <div
               className={cn(
@@ -322,6 +325,7 @@ function Sidebar({
   );
 }
 
+/** Renders the sidebar toggle; calls the supplied onClick before changing sidebar state and forwards remaining button props. */
 function SidebarTrigger({ className, onClick, ...props }: React.ComponentProps<typeof Button>) {
   const { toggleSidebar } = useSidebar();
   const isOpen = useSidebarVisibility();
@@ -344,7 +348,7 @@ function SidebarTrigger({ className, onClick, ...props }: React.ComponentProps<t
       {...props}
     >
       <MorphIcon className="size-4" icon={isOpen ? PanelLeftClose : PanelLeft} />
-      <span className="sr-only">Toggle Sidebar</span>
+      <span className="sr-only">{t.app.sidebar.toggle}</span>
     </Button>
   );
 }
@@ -353,6 +357,7 @@ function clampSidebarWidth(width: number, options: SidebarResolvedResizableOptio
   return Math.max(options.minWidth, Math.min(width, options.maxWidth));
 }
 
+/** Renders the sidebar edge control, forwarding the supplied pointer handlers and click action; enables resizing only when the sidebar context allows it. */
 function SidebarRail({
   className,
   onClick,
@@ -373,8 +378,8 @@ function SidebarRail({
     latestResizable.current = resolvedResizable;
   }, [resolvedResizable]);
   const canResize = resolvedResizable !== null && open;
-  const railLabel = canResize ? "Resize Sidebar" : "Toggle Sidebar";
-  const railTitle = canResize ? "Drag to resize sidebar" : "Toggle Sidebar";
+  const railLabel = canResize ? t.app.sidebar.resize : t.app.sidebar.toggle;
+  const railTitle = canResize ? t.app.sidebar.dragResize : t.app.sidebar.toggle;
   const resize = useResizeDrag<HTMLButtonElement>((event) => {
     if (!resolvedResizable || !open) return null;
     const rail = event.currentTarget;

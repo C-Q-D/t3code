@@ -236,6 +236,7 @@ function ProviderSettingsPlaceholder({
   );
 }
 
+/** Shows loading or unavailable access for a device, with expandable connection errors and optional device tabs. */
 function EnvironmentUnavailablePlaceholder({
   environment,
   access,
@@ -257,7 +258,7 @@ function EnvironmentUnavailablePlaceholder({
     ? access.reason === "permissions"
       ? t.settings.providerSettings.checkingWhatSessionAllowedChangeHint
       : t.settings.providerSettings.waitingForSConfiguration(environment.label)
-    : connectionStatusTitle(environment.connection);
+    : connectionStatusTitle(environment.connection, t.chat.workLog.shared.connection);
   const error = isLoading ? null : environment.connection.error;
   // No spinner: this state can persist indefinitely for a wedged device, and a
   // continuously repainting animation would run the whole time.
@@ -299,6 +300,7 @@ export function ProviderSettingsPanel(target: ProviderSettingsTarget) {
   );
 }
 
+/** Selects a provider settings device within the requested scope, preserving selection across reconnects and showing unavailable targets. */
 function ProviderSettingsPanelContent(target: ProviderSettingsTarget) {
   const { environments, isReady } = useEnvironments();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
@@ -390,7 +392,10 @@ function ProviderSettingsPanelContent(target: ProviderSettingsTarget) {
           {options.map((environment) => {
             const machine = resolveEnvironmentMachineKind(environment.serverConfig);
             const detail = providerEnvironmentDetail(environment);
-            const statusText = connectionStatusTitle(environment.connection);
+            const statusText = connectionStatusTitle(
+              environment.connection,
+              t.chat.workLog.shared.connection,
+            );
             return (
               <Tooltip key={environment.environmentId}>
                 <TooltipTrigger

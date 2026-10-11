@@ -1091,7 +1091,14 @@ export const DesktopPreviewRecordingSaveInputSchema = Schema.Struct({
 export const SystemSettingsPaneSchema = Schema.Literals(["full-disk-access"]);
 export type SystemSettingsPane = typeof SystemSettingsPaneSchema.Type;
 
+/** Device-local language choice shared with the native desktop shell. */
+export const UiLocalePreferenceSchema = Schema.Literals(["system", "en", "zh-CN"]);
+/** Supported device preference; system resolves against the desktop operating system language. */
+export type UiLocalePreference = typeof UiLocalePreferenceSchema.Type;
+
 export interface DesktopBridge {
+  /** Reports the local preference; optional when a newer web client uses an older shell. */
+  setUiLocalePreference?: (preference: UiLocalePreference) => Promise<void>;
   getAppBranding: () => DesktopAppBranding | null;
   /** Absolute path of a dropped or picked file; absent on desktop builds predating it. */
   getPathForFile?: (file: File) => string;

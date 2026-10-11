@@ -1,3 +1,5 @@
+/** Localized files presentation and existing interaction behavior. */
+import { t } from "~/i18n";
 import { workspaceRelativeFilePath } from "@t3tools/client-runtime/markdown-links";
 import type { ProjectReadFileError } from "@t3tools/contracts";
 import { isAbsolutePath } from "~/terminal-links";
@@ -14,18 +16,18 @@ export const isMarkdownPreviewFile = (path: string): boolean => /\.(?:md|mdx)$/i
 export function filePreviewReadErrorMessage(error: ProjectReadFileError): string {
   switch (error.failure) {
     case "path_not_file":
-      return "The path is a directory or special file, not a regular file.";
+      return t.tools.files.notRegularFile;
     case "binary_file":
-      return "The file is binary and cannot be displayed as text.";
+      return t.tools.files.binaryFile;
     case "workspace_path_outside_root":
-      return "The requested path is outside the workspace.";
+      return t.tools.files.outsideWorkspace;
     case "resolved_path_outside_root":
-      return "The path resolves to a location outside the workspace.";
+      return t.tools.files.resolvesOutside;
     case "operation_failed":
       // A realpath failure can mean a missing path, permissions, or another I/O error.
       return error.operation === "realpath-workspace-root"
-        ? "The workspace folder could not be accessed."
-        : "The file could not be accessed or read. It may be missing or inaccessible.";
+        ? t.tools.files.workspaceInaccessible
+        : t.tools.files.fileInaccessible;
     default:
       return error.message;
   }

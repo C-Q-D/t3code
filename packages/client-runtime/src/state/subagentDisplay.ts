@@ -1,3 +1,5 @@
+/** Derives subagent display metadata without changing provider identity or status. */
+import { englishWorkLogMessages, type WorkLogMessages } from "../work-log/messages.ts";
 import type {
   OrchestrationV2TurnItemStatus,
   OrchestrationV2ThreadShell,
@@ -25,9 +27,13 @@ export function subagentGroupSummary(
 /**
  * Counts a group's states in the order a reader scans them: what is still
  * running first, then outcomes, using the agents panel's words.
+ * @param statuses Group member states; active variants share the working count.
+ * @param messages Locale status names; defaults to English.
+ * @returns Nonzero counts in reader order, or an empty string for an empty group.
  */
 export function summarizeSubagentStatuses(
   statuses: ReadonlyArray<OrchestrationV2TurnItemStatus>,
+  messages: WorkLogMessages["subagentStatuses"] = englishWorkLogMessages.subagentStatuses,
 ): string {
   const counts = { working: 0, done: 0, failed: 0, stopped: 0, idle: 0 };
   for (const status of statuses) {
@@ -39,7 +45,7 @@ export function summarizeSubagentStatuses(
   }
   return (Object.keys(counts) as Array<keyof typeof counts>)
     .filter((key) => counts[key] > 0)
-    .map((key) => `${counts[key]} ${key}`)
+    .map((key) => `${counts[key]} ${messages[key]}`)
     .join(" · ");
 }
 

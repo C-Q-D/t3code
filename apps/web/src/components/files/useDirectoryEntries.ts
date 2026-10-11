@@ -1,3 +1,5 @@
+/** Localized files presentation and existing interaction behavior. */
+import { t } from "~/i18n";
 import type { EnvironmentId, ProjectEntry } from "@t3tools/contracts";
 import { executeAtomQuery } from "@t3tools/client-runtime/state/runtime";
 import * as Cause from "effect/Cause";
@@ -68,7 +70,7 @@ export function useDirectoryEntries(environmentId: EnvironmentId, cwd: string) {
             setErrors((previous) =>
               new Map(previous).set(
                 directoryPath,
-                cause instanceof Error ? cause.message : "Unable to load folder.",
+                cause instanceof Error ? cause.message : t.tools.files.folderFailed,
               ),
             );
           }

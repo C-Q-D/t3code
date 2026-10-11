@@ -1,3 +1,5 @@
+/** Localized device UI and interactions; preserves user data, commands, and protocol values. */
+import { t } from "~/i18n";
 import type { DevicePlatform, EnvironmentId } from "@t3tools/contracts";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
@@ -49,6 +51,8 @@ export interface DeviceStreamHandle {
  * the displayed frame and go to the device; keyboard input is forwarded while
  * the surface is focused. `visible=false` tears the stream down so a hidden
  * panel decodes nothing.
+ * @param props Component properties and callbacks defined by the parameter type.
+ * @returns Rendered UI for the supplied props.
  */
 export function DeviceStreamView(props: {
   readonly environmentId: EnvironmentId;
@@ -309,13 +313,13 @@ export function DeviceStreamView(props: {
 
   const phoneUnavailableReason =
     isDuo && !screen?.supportsHingeAngle
-      ? "iPhone Duo 3D requires Device Hub 0.11.0 or newer"
+      ? t.tools.device.duoNeedsHub
       : phoneUnavailable
-        ? "3D is unavailable on this browser"
+        ? t.tools.device.browser3dUnavailable
         : mjpegUrl
-          ? "3D requires the H.264 stream"
+          ? t.tools.device.needsH264
           : props.axOverlay
-            ? "Turn off accessibility frames to use 3D"
+            ? t.tools.device.disableFrames
             : null;
 
   const keyboardSource = deviceKeyboard(props.platform, props.deviceName ?? "");
@@ -395,7 +399,9 @@ export function DeviceStreamView(props: {
         )}
         tabIndex={0}
         role="application"
-        aria-label={`${props.platform === "ios" ? "iOS Simulator" : "Android Emulator"} screen`}
+        aria-label={t.tools.device.screen(
+          props.platform === "ios" ? "iOS Simulator" : "Android Emulator",
+        )}
         onKeyDown={(event) => {
           if (event.target !== event.currentTarget) return;
           if (event.metaKey && !["r", "R"].includes(event.key)) return;
@@ -510,7 +516,7 @@ export function DeviceStreamView(props: {
               size="xs"
               aria-pressed={!!showPhone}
               disabled={!!phoneUnavailableReason}
-              title={phoneUnavailableReason ?? "Show 3D phone"}
+              title={phoneUnavailableReason ?? t.tools.device.show3d}
               onClick={() => setPresentation("phone")}
             >
               3D
@@ -521,31 +527,37 @@ export function DeviceStreamView(props: {
               aria-pressed={!showPhone}
               onClick={() => setPresentation("flat")}
             >
-              Flat
+              {t.tools.device.flat}
             </Button>
           </div>
         ) : null}
         {status === "streaming" && !inputState.connected ? (
           <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center p-2">
             <span className="rounded-md bg-background/85 px-2 py-1 text-xs text-muted-foreground">
-              Input disconnected{inputState.detail ? ` (${inputState.detail})` : ""}, reconnecting…
+              {t.tools.device.inputDisconnected}
+              {inputState.detail ? ` (${inputState.detail})` : ""}
+              {t.tools.device.reconnectingSuffix}
             </span>
           </div>
         ) : null}
         {retainingAndroidFrame && showPhone && showRestartNotice ? (
           <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center p-2">
             <span className="rounded-md bg-background/85 px-2 py-1 text-xs text-muted-foreground">
-              Waiting for device video…
+              {t.tools.device.waitingVideo}
             </span>
           </div>
         ) : null}
         {status !== "streaming" && !(retainingAndroidFrame && showPhone) ? (
           <div className="absolute inset-0">
             <DeviceLoadingView
-              name={props.deviceName ?? "Device"}
+              name={props.deviceName ?? t.tools.device.device}
               description={props.deviceDescription ?? ""}
               stage="stream"
-              message={status === "error" ? (detail ?? "Stream failed.") : "Connecting video…"}
+              message={
+                status === "error"
+                  ? (detail ?? t.tools.device.streamFailed)
+                  : t.tools.device.connectingVideo
+              }
               error={status === "error"}
             >
               {status === "error" ? (
@@ -559,7 +571,7 @@ export function DeviceStreamView(props: {
                     clientRef.current?.start();
                   }}
                 >
-                  Reconnect
+                  {t.tools.device.reconnect}
                 </Button>
               ) : null}
             </DeviceLoadingView>

@@ -1,3 +1,5 @@
+/** Owns pull request checks popover on the web pull-request surface; host data and agent context remain unchanged. */
+import { t } from "~/i18n";
 import type * as React from "react";
 import type {
   EnvironmentId,
@@ -30,6 +32,8 @@ import {
  * The checks behind the rollup, for a row that only carries the rollup. Mounted by the popup, so
  * the read starts when somebody opens it rather than once per row of a listing — the detail read
  * is a request per pull request, and a page of them at rest would be a hundred.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
  */
 function LazyChecksBody({
   environmentId,
@@ -49,13 +53,20 @@ function LazyChecksBody({
   if (detailQuery.data === null) {
     return (
       <p className="text-muted-foreground text-xs">
-        {detailQuery.isPending ? "Loading checks…" : "No checks reported"}
+        {detailQuery.isPending
+          ? t.git.pullRequest.loadingChecks
+          : t.git.pullRequest.noChecksReported}
       </p>
     );
   }
   return <ChecksBody checks={detailQuery.data.checks} threadRef={threadRef} />;
 }
 
+/**
+ * Renders checks body from the supplied display data and callbacks.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 function ChecksBody({
   checks,
   threadRef,
@@ -69,7 +80,7 @@ function ChecksBody({
   const canCollapse = attention.length + running.length > 0 && completed.length > 0;
   const visibleChecks = [...attention, ...running, ...(showAll || !canCollapse ? completed : [])];
   if (checks.length === 0) {
-    return <p className="text-muted-foreground text-xs">No checks reported</p>;
+    return <p className="text-muted-foreground text-xs">{t.git.pullRequest.noChecksReported}</p>;
   }
   return (
     <>
@@ -97,11 +108,14 @@ function ChecksBody({
                     if (!check.url) return;
                     void openLink(check.url).catch((error: unknown) => {
                       console.error(error);
-                      toastManager.add({ type: "error", title: "Unable to open check details" });
+                      toastManager.add({
+                        type: "error",
+                        title: t.git.pullRequest.unableToOpenCheckDetails,
+                      });
                     });
                   }}
                 >
-                  Details
+                  {t.git.pullRequest.details}
                 </button>
               )}
             </li>
@@ -115,7 +129,7 @@ function ChecksBody({
           aria-expanded={showAll}
           onClick={() => setShowAll(!showAll)}
         >
-          {showAll ? "Show less" : "Show all"}
+          {showAll ? t.git.pullRequest.showLess : t.git.pullRequest.showAll}
         </Button>
       ) : null}
     </>
@@ -128,6 +142,8 @@ function ChecksBody({
  *
  * `checks` decides between the two. Given them, nothing is read; without them, the popup reads
  * the detail itself, which is why the row must also say which environment it came from.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
  */
 export function PullRequestChecksPopover({
   checksState,
@@ -168,8 +184,8 @@ export function PullRequestChecksPopover({
         nativeButton={variant === "count"}
         aria-label={
           variant === "count"
-            ? `Open checks: ${summary ?? presentation.label}`
-            : `Checks: ${presentation.label}`
+            ? t.git.pullRequest.openChecks(summary ?? presentation.label)
+            : t.git.pullRequest.checksLabel(presentation.label)
         }
         render={
           variant === "count" ? (
@@ -192,7 +208,10 @@ export function PullRequestChecksPopover({
                 {runningCount}/{checks.length}
               </span>
             ) : failedCount > 0 ? (
-              <span className="tabular-nums">{failedCount} failed</span>
+              <span className="tabular-nums">
+                {failedCount}
+                {t.git.pullRequest.failed}
+              </span>
             ) : null}
           </>
         ) : null}
@@ -202,7 +221,7 @@ export function PullRequestChecksPopover({
         {summary === null ? null : <p className="mb-2 text-muted-foreground text-xs">{summary}</p>}
         {stale ? (
           <p className="text-muted-foreground text-xs">
-            Check details are out of date. Refresh the pull request to update them.
+            {t.git.pullRequest.checkDetailsAreOutOfDateRefreshThePullRequestToUpdateThem}
           </p>
         ) : checks !== undefined ? (
           <ChecksBody checks={checks} threadRef={threadRef} />

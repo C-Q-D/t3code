@@ -1,3 +1,5 @@
+/** Localized palette UI and interactions; preserves user data, commands, and protocol values. */
+import { t } from "~/i18n";
 import { ArrowDownIcon, ArrowUpIcon } from "lucide-react";
 import { type ComponentProps, type ReactNode, useLayoutEffect, useRef } from "react";
 
@@ -24,10 +26,12 @@ type CommandPaletteContentProps = Omit<ComponentProps<typeof Command>, "children
  * Shared command palette chrome. Palette modes provide their query behavior,
  * results, and optional input accessory while retaining one input, panel, and
  * keyboard-hint gutter.
+ * @param props View data, control flags, and callbacks defined by the component props type; optional fields retain their declared defaults.
+ * @returns Rendered UI for the supplied props.
  */
 export function CommandPaletteContent({
   children,
-  escapeLabel = "Close",
+  escapeLabel = t.tools.palette.close,
   footerActionLabel,
   footerTrailing,
   inputAccessory,
@@ -73,7 +77,7 @@ export function CommandPaletteContent({
               <Kbd>
                 <ArrowDownIcon />
               </Kbd>
-              <span>Navigate</span>
+              <span>{t.tools.palette.navigate}</span>
             </KbdGroup>
             {footerActionLabel !== undefined ? (
               <KbdGroup>
@@ -84,7 +88,7 @@ export function CommandPaletteContent({
             {showBackHint ? (
               <KbdGroup>
                 <Kbd>Backspace</Kbd>
-                <span>Back</span>
+                <span>{t.tools.palette.back}</span>
               </KbdGroup>
             ) : null}
             <KbdGroup>

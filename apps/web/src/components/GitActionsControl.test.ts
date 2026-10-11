@@ -1,3 +1,4 @@
+/** Verifies Git control actions and localized hint icons without starting a client or provider. */
 import {
   AuthOrchestrationOperateScope,
   AuthSourceControlWriteScope,
@@ -7,6 +8,12 @@ import {
 import * as Cause from "effect/Cause";
 import { AsyncResult } from "effect/reactivity";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { isValidElement, type ReactNode } from "react";
+import { CloudUploadIcon, GitCommitIcon } from "lucide-react";
+import { installMessages } from "~/i18n";
+import { en } from "~/i18n/locales/en";
+import { messages } from "~/i18n/locales/zh-CN";
+import { resolveQuickAction, type GitQuickAction } from "./GitActionsControl.logic";
 
 const state = vi.hoisted(() => ({
   scopes: new Set<string>(),
@@ -169,6 +176,70 @@ vi.mock("~/components/ui/toggle", () => ({ toggleVariants: () => "" }));
 vi.mock("./AnimatedHeight", () => ({ AnimatedHeight: "AnimatedHeight" }));
 
 import GitActionsControl from "./GitActionsControl";
+
+/**
+ * Finds the private icon renderer in the real control tree without adding a production export.
+ * @param node React output to inspect, including child arrays and empty nodes.
+ * @returns The icon renderer, or null when this tree contains no quick-action icon.
+ */
+function findQuickActionIcon(
+  node: ReactNode,
+):
+  | ((props: { quickAction: GitQuickAction; SourceControlIcon: typeof GitCommitIcon }) => ReactNode)
+  | null {
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const found = findQuickActionIcon(child);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (!isValidElement<{ children?: ReactNode }>(node)) return null;
+  if (typeof node.type === "function" && node.type.name === "GitQuickActionIcon") {
+    return node.type as (props: {
+      quickAction: GitQuickAction;
+      SourceControlIcon: typeof GitCommitIcon;
+    }) => ReactNode;
+  }
+  return findQuickActionIcon(node.props.children);
+}
+
+describe("localized disabled quick action icons", () => {
+  it.each([
+    ["commit", null, GitCommitIcon],
+    [
+      "push",
+      {
+        isRepo: true,
+        hasPrimaryRemote: true,
+        isDefaultRef: false,
+        refName: "feature",
+        hasWorkingTreeChanges: false,
+        workingTree: { files: [], insertions: 0, deletions: 0 },
+        hasUpstream: false,
+        aheadCount: 0,
+        behindCount: 0,
+        pr: null,
+      },
+      CloudUploadIcon,
+    ],
+  ] as const)("keeps the %s icon for a Chinese hint label", (_name, status, expectedIcon) => {
+    installMessages("zh-CN", messages);
+    try {
+      const renderIcon = findQuickActionIcon(
+        GitActionsControl({ gitCwd: "/repo", activeThreadRef: null }),
+      );
+      expect(renderIcon).not.toBeNull();
+      const icon = renderIcon!({
+        quickAction: resolveQuickAction(status, false),
+        SourceControlIcon: GitCommitIcon,
+      });
+      expect(isValidElement(icon) && icon.type).toBe(expectedIcon);
+    } finally {
+      installMessages("en", en);
+    }
+  });
+});
 
 function renderActions() {
   GitActionsControl({

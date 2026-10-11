@@ -1,3 +1,5 @@
+/** Localized files presentation and existing interaction behavior. */
+import { t } from "~/i18n";
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
 import {
   type EnvironmentId,
@@ -180,13 +182,15 @@ function failureCause<A>(result: AsyncResult.AsyncResult<A, unknown>): unknown {
   return result._tag === "Failure" ? Cause.squash(result.cause) : null;
 }
 
+/** Returns a localized workspace-query failure for a non-null cause; null means no error, and Error instances keep their own message. */
 function errorMessage(cause: unknown): string | null {
   if (cause === null) return null;
-  return cause instanceof Error ? cause.message : "Workspace query failed.";
+  return cause instanceof Error ? cause.message : t.tools.files.queryFailed;
 }
 
 const isProjectReadFileError = Schema.is(ProjectReadFileError);
 
+/** Returns cached directory entries, access/loading errors and refresh for environmentId/cwd/directoryPath; disabled or denied access does not read host files. */
 export function useProjectEntriesQuery(
   environmentId: EnvironmentId,
   cwd: string,
@@ -206,7 +210,7 @@ export function useProjectEntriesQuery(
       ? null
       : canReadFiles
         ? errorMessage(failureCause(result))
-        : (fileAccess.error ?? "This connection cannot read host files."),
+        : (fileAccess.error ?? t.tools.files.cannotRead),
     isPending: fileAccess.isPending || result.waiting,
     refresh,
   };
@@ -247,6 +251,7 @@ export function useProjectFilePickerQuery(
   };
 }
 
+/** Returns cached contents, read/access errors and refresh for environmentId/cwd/relativePath; missing paths or denied access do not read host files. */
 export function useProjectFileQuery(
   environmentId: EnvironmentId,
   cwd: string,
@@ -280,7 +285,7 @@ export function useProjectFileQuery(
         ? null
         : canReadFiles
           ? errorMessage(cause)
-          : (fileAccess.error ?? "This connection cannot read host files."),
+          : (fileAccess.error ?? t.tools.files.cannotRead),
     isPending: isQueryEnabled && (fileAccess.isPending || result.waiting),
     readError,
     isNotFile: readError?.failure === "path_not_file",

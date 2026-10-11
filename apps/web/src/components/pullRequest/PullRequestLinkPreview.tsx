@@ -1,3 +1,5 @@
+/** Owns pull request link preview on the web pull-request surface; host data and agent context remain unchanged. */
+import { t } from "~/i18n";
 import type { PreviewCard as PreviewCardPrimitive } from "@base-ui/react/preview-card";
 import { isAtomCommandInterrupted } from "@t3tools/client-runtime/state/runtime";
 import type { EnvironmentId, PullRequestRef } from "@t3tools/contracts";
@@ -29,6 +31,11 @@ type PullRequestLinkElement = ReactElement<
   ComponentPropsWithoutRef<"a"> | ComponentPropsWithoutRef<"button">
 >;
 
+/**
+ * Renders pull request link preview from the supplied display data and callbacks.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 export function PullRequestLinkPreview({
   link,
   originalUrl,
@@ -140,7 +147,8 @@ export function PullRequestLinkPreview({
                   <span className="min-w-0 truncate">{authorLabel}</span>
                   <span aria-hidden>·</span>
                   <span className="shrink-0">
-                    opened {formatRelativeTimeLabel(detail.createdAt)}
+                    {t.git.pullRequest.opened}
+                    {formatRelativeTimeLabel(detail.createdAt)}
                   </span>
                 </div>
               </div>

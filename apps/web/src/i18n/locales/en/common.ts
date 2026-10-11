@@ -1,6 +1,8 @@
 /** Shared English UI labels; excludes persisted values and protocol strings. */
 import type { PullRequestState } from "@t3tools/contracts";
 
+const monthNameFormatter = new Intl.DateTimeFormat("en-US", { month: "long" });
+
 export const common = {
   system: "System default",
   resetToDefault: "Reset to default",
@@ -194,5 +196,43 @@ export const common = {
     description: "This action requires your confirmation.",
     cancel: "Cancel",
     confirm: "Confirm",
+  },
+  timestamp: {
+    justNow: "just now",
+    ago: "ago",
+    left: "left",
+    expired: "Expired",
+    soon: "Soon",
+    expiresSoon: "Expires in a moment",
+    /** Formats a wall-clock time on the previous calendar day. */
+    yesterday: (time: string) => `yesterday at ${time}`,
+    /** Formats a wall-clock time on the next calendar day. */
+    tomorrow: (time: string) => `tomorrow at ${time}`,
+    /** Formats a countdown from its already formatted duration. */
+    expiresIn: (duration: string) => `Expires in ${duration}`,
+    /** Formats a duration in whole seconds. */
+    seconds: (count: number) => `${count}s`,
+    /** Formats a duration in whole minutes. */
+    minutes: (count: number) => `${count}m`,
+    /** Formats a duration in whole hours. */
+    hours: (count: number) => `${count}h`,
+    /** Formats a duration in whole days. */
+    days: (count: number) => `${count}d`,
+    /** Formats time and local calendar components; month is one-based. */
+    tooltip: (time: string, day: number, month: number, year: number) => {
+      const lastTwo = day % 100;
+      const suffix =
+        lastTwo >= 11 && lastTwo <= 13
+          ? "th"
+          : day % 10 === 1
+            ? "st"
+            : day % 10 === 2
+              ? "nd"
+              : day % 10 === 3
+                ? "rd"
+                : "th";
+      const monthName = monthNameFormatter.format(new Date(2000, month - 1, day));
+      return `${time}, ${day}${suffix} ${monthName} ${year}`;
+    },
   },
 };

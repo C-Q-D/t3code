@@ -1,3 +1,5 @@
+/** Coordinates client and environment settings persistence and reports rejected updates. */
+import { t } from "~/i18n";
 /**
  * Environment-scoped settings hooks.
  *
@@ -418,8 +420,7 @@ export function usePrimarySettings<T = UnifiedSettings>(
   return useMergedSettings(useAtomValue(primaryServerSettingsAtom), selector);
 }
 
-export const PRIMARY_SETTINGS_UNAVAILABLE_MESSAGE =
-  "This setting is saved on a server, and the hosted app is not anchored to one. Change it from the desktop app or from the server's own address.";
+export const PRIMARY_SETTINGS_UNAVAILABLE_MESSAGE = t.app.settings.serverRequired;
 
 /**
  * Whether primary-scoped server settings have a server to live on. The
@@ -487,8 +488,8 @@ function useUpdateSettingsTarget(environmentId: EnvironmentId | null) {
       if (Object.keys(serverPatch).length > 0 && !canWriteServerPatch) {
         toastManager.add({
           type: "warning",
-          title: "Setting not saved",
-          description: "This connection does not have permission to change these settings.",
+          title: t.app.settings.notSaved,
+          description: t.app.settings.permissionDenied,
         });
       }
       if (Object.keys(serverPatch).length > 0 && canWriteServerPatch) {
@@ -497,7 +498,7 @@ function useUpdateSettingsTarget(environmentId: EnvironmentId | null) {
         const warnUnsaved = (description = PRIMARY_SETTINGS_UNAVAILABLE_MESSAGE) =>
           toastManager.add({
             type: "warning",
-            title: "Setting not saved",
+            title: t.app.settings.notSaved,
             description,
           });
         if (Object.keys(localPatch).length > 0) {
@@ -549,9 +550,9 @@ function useUpdateSettingsTarget(environmentId: EnvironmentId | null) {
           if (!wroteToTarget) {
             warnUnsaved(
               permissionDenied
-                ? "This connection does not have permission to change these settings."
+                ? t.app.settings.permissionDenied
                 : targets.size > 0
-                  ? "Update older servers to save this setting."
+                  ? t.app.settings.updateServers
                   : undefined,
             );
           }

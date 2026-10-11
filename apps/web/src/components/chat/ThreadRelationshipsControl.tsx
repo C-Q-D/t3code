@@ -124,6 +124,7 @@ export function ThreadLineageRowList(props: {
   );
 }
 
+/** Renders a collapsible page of related threads and their failure count; empty groups are omitted. */
 function ThreadLineageGroup(props: {
   readonly label: string | null;
   readonly rows: ReadonlyArray<ThreadRelationshipWalkRow>;
@@ -144,7 +145,11 @@ function ThreadLineageGroup(props: {
           expanded={expanded}
           onClick={() => setExpanded(!expanded)}
           accessory={
-            failedCount > 0 ? <SectionHeaderStatus>{failedCount} failed</SectionHeaderStatus> : null
+            failedCount > 0 ? (
+              <SectionHeaderStatus>
+                {t.chat.relationships.failedCount(failedCount)}
+              </SectionHeaderStatus>
+            ) : null
           }
         >
           {props.label}

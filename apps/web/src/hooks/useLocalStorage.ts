@@ -1,3 +1,5 @@
+/** Reads and persists browser preferences; operation failures can reach caller-owned UI feedback. */
+import { t } from "~/i18n";
 import * as Schema from "effect/Schema";
 import * as Record from "effect/Record";
 import { useCallback, useMemo, useSyncExternalStore } from "react";
@@ -10,8 +12,9 @@ export class LocalStorageOperationError extends Schema.TaggedError<LocalStorageO
     cause: Schema.Defect(),
   },
 ) {
+  /** Describes the failed operation and storage key in the active UI language. */
   override get message(): string {
-    return `Failed to ${this.operation} local storage item ${this.storageKey}.`;
+    return t.app.storage.failure(this.operation, this.storageKey);
   }
 }
 

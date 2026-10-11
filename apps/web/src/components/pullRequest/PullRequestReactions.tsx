@@ -1,3 +1,5 @@
+/** Owns pull request reactions on the web pull-request surface; host data and agent context remain unchanged. */
+import { t } from "~/i18n";
 import { useAtomCommand } from "~/state/use-atom-command";
 import type {
   EnvironmentId,
@@ -34,7 +36,10 @@ function reactionsSignature(reactions: ReadonlyArray<PullRequestReaction>): stri
     .join(" ");
 }
 
-/** Reaction counts and an always-visible picker, routed to the supplied host subject. */
+/** Reaction counts and an always-visible picker, routed to the supplied host subject.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 export function PullRequestReactionBar({
   reactions,
   canReact,
@@ -83,7 +88,7 @@ export function PullRequestReactionBar({
         next.delete(content);
         return { signature: current.signature, values: next };
       });
-      toastManager.add({ type: "error", title: "The reaction could not be saved" });
+      toastManager.add({ type: "error", title: t.git.pullRequest.theReactionCouldNotBeSaved });
       return;
     }
     onRefresh();
@@ -126,7 +131,7 @@ export function PullRequestReactionBar({
             render={
               <button
                 type="button"
-                aria-label="Add a reaction"
+                aria-label={t.git.pullRequest.addAReaction}
                 className={cn(
                   PILL_CLASS,
                   "border-border/70 px-1.5 text-muted-foreground hover:border-primary/60 hover:text-foreground",

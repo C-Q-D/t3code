@@ -1,3 +1,4 @@
+import * as DesktopUiLocale from "../i18n/DesktopUiLocale.ts";
 import { assert, describe, it } from "@effect/vitest";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -42,8 +43,10 @@ function makeStubInstance(
   };
 }
 
+/** Builds a pool with an observable label and inert external resources; no backends are spawned. */
 function layerPool(labelRef: Ref.Ref<string>): Layer.Layer<DesktopBackendPool.DesktopBackendPool> {
   return DesktopBackendPool.layer.pipe(
+    Layer.provide(DesktopUiLocale.layerTest()),
     Layer.provideMerge(
       Layer.mergeAll(
         FileSystem.layerNoop({}),

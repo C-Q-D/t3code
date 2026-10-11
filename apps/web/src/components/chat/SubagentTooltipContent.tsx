@@ -1,3 +1,5 @@
+/** Renders subagent metadata and state labels without changing provider status or workspace identifiers. */
+import { t } from "~/i18n";
 import type {
   OrchestrationV2ThreadShell,
   OrchestrationV2TurnItemStatus,
@@ -165,7 +167,7 @@ export function SubagentTooltipContent(props: {
           )}
         >
           <StatusIcon aria-hidden className="size-3 shrink-0" />
-          {props.status.replaceAll("_", " ")}
+          {t.app.subagent.status[props.status] ?? props.status.replaceAll("_", " ")}
         </span>
         {props.elapsed}
       </div>
@@ -174,7 +176,15 @@ export function SubagentTooltipContent(props: {
         return (
           <div key={label} className="flex min-w-0 items-center gap-2">
             <Icon aria-hidden className="size-3 shrink-0" />
-            <span className="sr-only">{label}</span>
+            <span className="sr-only">
+              {label === "Branch"
+                ? t.common.threadActions.branch
+                : label === "Worktree"
+                  ? t.app.subagent.worktree
+                  : label === "Project"
+                    ? t.app.subagent.project
+                    : label}
+            </span>
             <MiddleTruncate value={value} className="flex" showTitle={false} />
           </div>
         );

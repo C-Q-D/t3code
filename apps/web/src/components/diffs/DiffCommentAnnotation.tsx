@@ -1,3 +1,5 @@
+/** Owns diff comment annotation for web diff views; patch and comment context values remain unchanged. */
+import { t } from "~/i18n";
 import { MessageCircle, Trash2 } from "lucide-react";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
@@ -28,7 +30,10 @@ interface DiffCommentAnnotationProps {
   focusOnMount?: boolean;
 }
 
-/** The shared inline comment treatment for file previews, thread diffs, and pull-request diffs. */
+/** The shared inline comment treatment for file previews, thread diffs, and pull-request diffs.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 export function DiffCommentAnnotation({
   kind,
   rangeLabel,
@@ -37,8 +42,8 @@ export function DiffCommentAnnotation({
   onCancel,
   onComment,
   onDelete,
-  placeholder = "Add a comment…",
-  submitLabel = "Comment",
+  placeholder = t.git.diff.addAComment,
+  submitLabel = t.git.diff.comment,
   pending = false,
   secondaryAction,
   focusOnMount = true,
@@ -71,7 +76,7 @@ export function DiffCommentAnnotation({
             <Button
               variant="ghost-muted"
               size="icon-xs"
-              aria-label="Delete comment"
+              aria-label={t.git.diff.deleteComment}
               onClick={onDelete}
             >
               <Trash2 className="size-3" />
@@ -95,7 +100,7 @@ export function DiffCommentAnnotation({
         size="sm"
         value={displayedText}
         placeholder={placeholder}
-        aria-label={`Comment on lines ${rangeLabel}`}
+        aria-label={t.git.diff.commentLines(rangeLabel)}
         onChange={(event) => (onTextChange ?? setLocalDraftText)(event.target.value)}
         onFocus={(event) => {
           const end = event.currentTarget.value.length;
@@ -113,9 +118,11 @@ export function DiffCommentAnnotation({
         }}
       />
       <div className="mt-1.5 flex items-center gap-1">
-        <span className="mr-auto text-3xs text-muted-foreground/70">⌘/Ctrl Enter to send</span>
+        <span className="mr-auto text-3xs text-muted-foreground/70">
+          {t.git.diff.ctrlEnterToSend}
+        </span>
         <Button variant="ghost-muted" size="xs" onClick={onCancel}>
-          Cancel
+          {t.common.confirm.cancel}
         </Button>
         {secondaryAction ? (
           <Button

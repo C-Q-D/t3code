@@ -8,6 +8,7 @@
  * the toggle: they are separate texts going to separate places, and merging them would send a
  * summary as a comment or the reverse.
  */
+import { t } from "~/i18n";
 import type { EnvironmentId, PullRequestDetailView, PullRequestRef } from "@t3tools/contracts";
 import { MessageSquareIcon, Trash2Icon, XIcon } from "lucide-react";
 import { useRef, useState } from "react";
@@ -23,6 +24,11 @@ import {
   usePullRequestReviewStore,
 } from "./pullRequestReviewStore";
 
+/**
+ * Renders pull request composer from the supplied display data and callbacks.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 export function PullRequestComposer({
   environmentId,
   reference,
@@ -83,10 +89,10 @@ export function PullRequestComposer({
         // the icon is decorative and a reader who cannot see it still needs the number.
         aria-label={
           pendingComments.length > 0
-            ? `Review pull request, ${pendingComments.length} ${pendingComments.length === 1 ? "comment" : "comments"} pending`
+            ? t.git.pullRequest.pendingReview(pendingComments.length)
             : reviewStarted || !canComment
-              ? "Review pull request"
-              : "Comment on pull request"
+              ? t.git.pullRequest.reviewPullRequest
+              : t.git.pullRequest.commentOnPullRequest
         }
       >
         <MessageSquareIcon className="size-4" />
@@ -106,12 +112,12 @@ export function PullRequestComposer({
         sideOffset={8}
         width="lg"
         initialFocus={mode === "review" ? reviewRef : commentRef}
-        aria-label="Pull request composer"
+        aria-label={t.git.pullRequest.pullRequestComposer}
       >
         <div className="mb-3 flex items-center justify-between gap-2">
           {canComment && verdicts.length > 0 ? (
             <ToggleGroup
-              aria-label="Composer mode"
+              aria-label={t.git.pullRequest.composerMode}
               variant="segmented"
               value={[mode]}
               onValueChange={(next) => {
@@ -119,14 +125,18 @@ export function PullRequestComposer({
                 if (value === "comment" || value === "review") setRequestedMode(value);
               }}
             >
-              <Toggle value="comment">Comment</Toggle>
+              <Toggle value="comment">{t.git.diff.comment}</Toggle>
               <Toggle value="review">
-                {pendingComments.length > 0 ? `Review (${pendingComments.length})` : "Review"}
+                {pendingComments.length > 0
+                  ? t.git.pullRequest.reviewCount(pendingComments.length)
+                  : t.git.pullRequest.review}
               </Toggle>
             </ToggleGroup>
           ) : (
             <PopoverTitle>
-              {mode === "review" ? "Review pull request" : "Comment on pull request"}
+              {mode === "review"
+                ? t.git.pullRequest.reviewPullRequest
+                : t.git.pullRequest.commentOnPullRequest}
             </PopoverTitle>
           )}
           <div className="flex items-center gap-1">
@@ -134,8 +144,8 @@ export function PullRequestComposer({
               <Button
                 size="icon-xs"
                 variant="ghost"
-                aria-label="Discard pending line comments"
-                title="Discard pending line comments"
+                aria-label={t.git.pullRequest.discardPendingLineComments}
+                title={t.git.pullRequest.discardPendingLineComments}
                 disabled={reviewPending}
                 onClick={() => clearComments(reviewKey)}
               >
@@ -144,7 +154,7 @@ export function PullRequestComposer({
             ) : null}
             <PopoverClose
               render={<Button size="icon-xs" variant="ghost" />}
-              aria-label="Close composer"
+              aria-label={t.git.pullRequest.closeComposer}
             >
               <XIcon className="size-3.5" />
             </PopoverClose>

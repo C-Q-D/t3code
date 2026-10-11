@@ -242,7 +242,7 @@ export function ZoomableImage({
         />
       </div>
       <span className="sr-only" aria-live="polite">
-        {Math.round(zoom * 100)}% zoom
+        {t.chat.media.zoomPercent(Math.round(zoom * 100))}
       </span>
     </div>
   );

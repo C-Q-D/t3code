@@ -1,3 +1,5 @@
+/** Localized connection presentation and existing interaction behavior. */
+import { t } from "~/i18n";
 import type {
   AuthBrowserSessionResult,
   AuthClientMetadata,
@@ -61,8 +63,9 @@ export class PrimaryEnvironmentRequestError extends Schema.TaggedError<PrimaryEn
     });
   }
 
+  /** Returns the localized display message for this error while preserving its structured diagnostic fields. */
   override get message(): string {
-    return `Primary environment request failed during ${this.operation} (HTTP ${this.status}).`;
+    return t.account.connection.primaryRequestFailed(this.operation, this.status);
   }
 }
 
@@ -75,8 +78,9 @@ export class PrimaryEnvironmentPairingCredentialRejectedError extends Schema.Tag
     cause: Schema.Defect(),
   },
 ) {
+  /** Returns the localized display message for this error while preserving its structured diagnostic fields. */
   override get message(): string {
-    return "Invalid pairing token. Check the token and try again.";
+    return t.account.connection.invalidToken;
   }
 }
 
@@ -91,8 +95,9 @@ export class PrimaryEnvironmentAuthSessionTimeoutError extends Schema.TaggedErro
     elapsedMs: Schema.Number,
   },
 ) {
+  /** Returns the localized display message for this error while preserving its structured diagnostic fields. */
   override get message(): string {
-    return "Timed out waiting for authenticated session after bootstrap.";
+    return t.account.connection.sessionTimedOut;
   }
 }
 
@@ -102,8 +107,9 @@ export class PrimaryEnvironmentPairingCredentialRequiredError extends Schema.Tag
     providedLength: Schema.Number,
   },
 ) {
+  /** Returns the localized display message for this error while preserving its structured diagnostic fields. */
   override get message(): string {
-    return "Enter a pairing token to continue.";
+    return t.account.connection.enterToken;
   }
 }
 
@@ -309,6 +315,7 @@ function isTransientBootstrapError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
 }
 
+/** Bootstraps the current primary environment with optional urlCredential and returns its authentication gate; failed exchange/session reads become gate errors rather than implicit access. */
 async function bootstrapServerAuth(urlCredential: string | null): Promise<ServerAuthGateState> {
   const currentSession = await fetchSessionState();
   if (currentSession.authenticated && !urlCredential) {
@@ -331,7 +338,8 @@ async function bootstrapServerAuth(urlCredential: string | null): Promise<Server
     return {
       status: "requires-auth",
       auth: currentSession.auth,
-      errorMessage: error instanceof Error ? error.message : "Authentication failed.",
+      errorMessage:
+        error instanceof Error ? error.message : t.account.connection.authenticationFailed,
     };
   }
 }

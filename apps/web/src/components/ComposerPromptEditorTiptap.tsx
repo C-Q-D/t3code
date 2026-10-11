@@ -1,3 +1,5 @@
+/** Implements the rich-text composer and its inline context node views; preserves serialized agent context. */
+import { t } from "~/i18n";
 import { Extension, Node, wrappingInputRule, type JSONContent } from "@tiptap/core";
 import { TaskList } from "@tiptap/extension-task-list";
 import { ReactNodeViewRenderer, NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
@@ -225,6 +227,7 @@ const ComposerMentionExtension = Node.create({
   },
 });
 
+/** Renders the mention node as a file chip; node attributes supply the path and preview target. */
 function ComposerMentionNodeView({ node }: NodeViewProps) {
   const actions = use(ComposerContextActionsContext);
   const path = (node.attrs.path as string) ?? "";
@@ -233,7 +236,7 @@ function ComposerMentionNodeView({ node }: NodeViewProps) {
       kind="mention"
       render={<button type="button" />}
       onClick={() => actions.openMention(path)}
-      aria-label={`Preview ${path}`}
+      aria-label={t.app.composer.preview(path)}
       contentEditable={false}
       spellCheck={false}
       data-composer-mention-chip="true"
@@ -279,6 +282,7 @@ const ComposerSkillExtension = Node.create({
   },
 });
 
+/** Renders the skill node with its description and instruction link; missing descriptions use the UI fallback. */
 function ComposerSkillNodeView({ node }: NodeViewProps) {
   const actions = use(ComposerContextActionsContext);
   const skills = use(RichComposerSkillsContext);
@@ -292,18 +296,14 @@ function ComposerSkillNodeView({ node }: NodeViewProps) {
         kind="skill"
         icon={<SkillChipIcon />}
         label={skillLabel}
-        accessibleLabel={`Skill ${skillLabel}`}
+        accessibleLabel={t.app.composer.skill(skillLabel)}
       >
         <div className="space-y-3 p-2 text-sm">
           <p className="font-medium">{skillLabel}</p>
-          <p>
-            {skill?.description ??
-              skillDescription ??
-              "No description is available for this skill."}
-          </p>
+          <p>{skill?.description ?? skillDescription ?? t.app.composer.noSkillDescription}</p>
           {skill?.path ? (
             <Button variant="outline" size="sm" onClick={() => actions.openMention(skill.path)}>
-              View instructions
+              {t.app.composer.viewInstructions}
             </Button>
           ) : null}
         </div>

@@ -72,6 +72,7 @@ export function usageLimitsBannerItem(
   };
 }
 
+/** Renders account limits and localized fallback notices while preserving provider-supplied messages. */
 function UsageLimitsBannerBody({
   report,
   environmentId,
@@ -87,7 +88,7 @@ function UsageLimitsBannerBody({
           const resetCreditInput =
             account.resetCreditInput ??
             (account.instanceId ? { instanceId: account.instanceId } : undefined);
-          const notice = limitsNotice(account.limits);
+          const notice = limitsNotice(account.limits, t.chat.workLog.shared.usageLimits);
           const externalUsage = account.limits.externalUsage;
           return (
             <div key={account.id} className="flex min-w-0 flex-col gap-1">

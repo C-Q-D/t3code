@@ -1,3 +1,5 @@
+/** Localized routes presentation and existing interaction behavior. */
+import { t } from "~/i18n";
 import { AuthPreviewOperateScope } from "@t3tools/contracts";
 import { Outlet, createFileRoute, redirect, useParams } from "@tanstack/react-router";
 import { useAtomValue } from "@effect/atom-react";
@@ -30,6 +32,7 @@ import { useThreadSelectionStore } from "../threadSelectionStore";
 import { stackedThreadToast, toastManager } from "~/components/ui/toast";
 import { primaryServerKeybindingsAtom } from "~/state/server";
 
+/** Installs chat-route shortcut handlers, honoring focused surfaces and permissions; reports desktop-only actions and removes listeners on unmount. */
 function ChatRouteGlobalShortcuts() {
   const clearSelection = useThreadSelectionStore((state) => state.clearSelection);
   const selectedThreadKeysSize = useThreadSelectionStore((state) => state.selectedThreadKeys.size);
@@ -151,8 +154,8 @@ function ChatRouteGlobalShortcuts() {
           toastManager.add(
             stackedThreadToast({
               type: "info",
-              title: "Preview is desktop-only",
-              description: "Open T3 Code in the desktop app to use the in-app preview.",
+              title: t.account.routes.desktopPreview,
+              description: t.account.routes.desktopPreviewHint,
             }),
           );
           return;

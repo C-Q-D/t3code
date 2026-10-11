@@ -1,3 +1,4 @@
+import { englishWorkLogMessages } from "@t3tools/client-runtime/work-log/messages";
 /** Checks dictionary key trees and fixes TypeScript counterexamples for translation drift. */
 import { expect, it } from "vite-plus/test";
 import { en, type Messages } from "./en";
@@ -77,3 +78,7 @@ void [
   extraNestedKey,
   missingNestedKey,
 ];
+
+it("shares the package English defaults for generated work-log text", () => {
+  expect(en.chat.workLog.shared).toBe(englishWorkLogMessages);
+});

@@ -1,8 +1,15 @@
+/** Localized device UI and interactions; preserves user data, commands, and protocol values. */
+import { t } from "~/i18n";
 import type { ReactNode } from "react";
 import { Smartphone } from "lucide-react";
 
 import { Spinner } from "~/components/ui/spinner";
 
+/**
+ * Renders device opening or video connection progress, with optional failure recovery content.
+ * @param props Component properties and callbacks defined by the parameter type.
+ * @returns Rendered UI for the supplied props.
+ */
 export function DeviceLoadingView(props: {
   readonly name: string;
   readonly description?: string;
@@ -35,7 +42,7 @@ export function DeviceLoadingView(props: {
           <div
             className="flex w-24 gap-1"
             aria-label={
-              props.stage === "opening" ? "Step 1 of 2: open device" : "Step 2 of 2: connect video"
+              props.stage === "opening" ? t.tools.device.openStep : t.tools.device.videoStep
             }
           >
             <span className="h-1 flex-1 rounded-full bg-foreground/60" />

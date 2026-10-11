@@ -1,3 +1,5 @@
+/** Renders a linked conversation context chip with localized accessibility text. */
+import { t } from "~/i18n";
 import type { ThreadContextRecord } from "@t3tools/contracts";
 import { Link } from "@tanstack/react-router";
 import { MessagesSquareIcon } from "lucide-react";
@@ -24,7 +26,7 @@ export function ThreadContextChip(props: {
           <ContextChip
             kind="thread"
             render={<Link to="/$environmentId/$threadId" params={{ environmentId, threadId }} />}
-            aria-label={`Thread, ${title}`}
+            aria-label={t.app.thread.accessibleLabel(title)}
             data-markdown-copy={props.copyMarkdown}
             className="no-underline"
           >
@@ -33,7 +35,7 @@ export function ThreadContextChip(props: {
           </ContextChip>
         }
       />
-      <TooltipPopup side="top">{shell ? "Open thread" : "Thread no longer available"}</TooltipPopup>
+      <TooltipPopup side="top">{shell ? t.app.thread.open : t.app.thread.unavailable}</TooltipPopup>
     </Tooltip>
   );
 }

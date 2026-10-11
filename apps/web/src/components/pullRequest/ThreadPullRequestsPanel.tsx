@@ -1,3 +1,5 @@
+/** Owns thread pull requests panel on the web pull-request surface; host data and agent context remain unchanged. */
+import { t } from "~/i18n";
 import type { ProjectId, ScopedThreadRef, ThreadPullRequestLink } from "@t3tools/contracts";
 import { detectSourceControlProviderFromRemoteUrl } from "@t3tools/shared/sourceControl";
 import {
@@ -47,11 +49,11 @@ import { PullRequestGlyph } from "./pullRequestIcons";
 import { PullRequestSpeedActions } from "./PullRequestSpeedActions";
 
 const SOURCE_LABELS: Record<ThreadPullRequestLink["source"], string> = {
-  manual: "Linked by you",
-  created: "Created from this thread",
-  agent: "Linked by the agent",
-  stack: "Found in the stack",
-  "stack-dismissed": "Dismissed",
+  manual: t.git.pullRequest.linkedByYou,
+  created: t.git.pullRequest.createdFromThisThread,
+  agent: t.git.pullRequest.linkedByTheAgent,
+  stack: t.git.pullRequest.foundInTheStack,
+  "stack-dismissed": t.git.pullRequest.dismissed,
 };
 
 function ChecksGlyph({
@@ -74,6 +76,11 @@ function ChecksGlyph({
   );
 }
 
+/**
+ * Renders link row from the supplied display data and callbacks.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 function LinkRow({
   line,
   threadRef,
@@ -137,7 +144,7 @@ function LinkRow({
       {depth > 0 ? <span aria-hidden className="-ml-2 h-6 w-px shrink-0 bg-border/70" /> : null}
       {snapshot === null ? (
         <PullRequestGlyph.pullRequest
-          aria-label="Waiting for host state"
+          aria-label={t.git.pullRequest.waitingForHostState}
           className="size-4 shrink-0 text-muted-foreground"
         />
       ) : (
@@ -171,11 +178,17 @@ function LinkRow({
                 {watching ? (
                   <Tooltip>
                     <TooltipTrigger render={<span className="inline-flex shrink-0" />}>
-                      <EyeIcon role="img" aria-label="Watching" className="size-3.5" />
+                      <EyeIcon
+                        role="img"
+                        aria-label={t.git.pullRequest.watching}
+                        className="size-3.5"
+                      />
                     </TooltipTrigger>
                     <TooltipPopup>
-                      Watching: the agent wakes when checks finish, someone comments, or the branch
-                      conflicts
+                      {
+                        t.git.pullRequest
+                          .watchingTheAgentWakesWhenChecksFinishSomeoneCommentsOrTheBranchConflicts
+                      }
                     </TooltipPopup>
                   </Tooltip>
                 ) : null}
@@ -210,8 +223,8 @@ function LinkRow({
                   </TooltipTrigger>
                   <TooltipPopup>
                     {stack.kind === "native"
-                      ? `GitHub stack of ${stack.size}: merging a layer lands the ones below it.`
-                      : `${stack.size} pull requests chained by base branch.`}
+                      ? t.git.pullRequest.githubStack(stack.size)
+                      : t.git.pullRequest.chainedRequests(stack.size)}
                   </TooltipPopup>
                 </Tooltip>
               ) : null}
@@ -276,7 +289,7 @@ function LinkRow({
               <Button
                 variant="ghost"
                 size="icon-micro"
-                aria-label={`Actions for #${link.number}`}
+                aria-label={t.git.pullRequest.requestActions(link.number)}
                 className="relative"
               >
                 <MoreHorizontalIcon className="size-3.5" />
@@ -291,21 +304,23 @@ function LinkRow({
           >
             <MenuItem onClick={() => void writeTextToClipboard(link.url, "link")}>
               <LinkIcon className="size-3.5" />
-              Copy link
+              {t.git.pullRequest.copyLink}
             </MenuItem>
             <MenuItem onClick={(event) => openPrLink(event, link.url, threadRef)}>
               <ArrowUpRightIcon className="size-3.5" />
-              Open
+              {t.git.pullRequest.open}
             </MenuItem>
             {onSetWatching !== null && open ? (
               <MenuItem onClick={() => onSetWatching(link, !watching)}>
                 {watching ? <EyeOffIcon className="size-3.5" /> : <EyeIcon className="size-3.5" />}
-                {watching ? "Stop watching" : "Watch for changes"}
+                {watching ? t.git.pullRequest.stopWatching : t.git.pullRequest.watchForChanges}
               </MenuItem>
             ) : null}
             <MenuItem onClick={() => onUnlink(link)}>
               <PullRequestGlyph.unlink className="size-3.5" />
-              {link.source === "stack" ? "Dismiss from thread" : "Unlink from thread"}
+              {link.source === "stack"
+                ? t.git.pullRequest.dismissFromThread
+                : t.git.pullRequest.unlinkFromThread}
             </MenuItem>
           </MenuPopup>
         </Menu>
@@ -314,19 +329,29 @@ function LinkRow({
   );
 }
 
+/**
+ * Renders thread pull requests panel from the supplied display data and callbacks.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 export function ThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThreadRef }) {
   const configs = useServerConfigs();
   if (configs.get(threadRef.environmentId)?.environment.capabilities.threadPullRequests !== true) {
     return (
       <PullRequestsUnavailableState
-        title="Linked pull requests unavailable"
-        error="This environment does not support multiple linked pull requests."
+        title={t.git.pullRequest.linkedPullRequestsUnavailable}
+        error={t.git.pullRequest.thisEnvironmentDoesNotSupportMultipleLinkedPullRequests}
       />
     );
   }
   return <EnabledThreadPullRequestsPanel threadRef={threadRef} />;
 }
 
+/**
+ * Renders thread pull requests panel from the supplied display data and callbacks.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 function EnabledThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThreadRef }) {
   const thread = useThreadShell(threadRef);
   const projects = useProjects();
@@ -395,14 +420,16 @@ function EnabledThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThread
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
         <PullRequestGlyph.link aria-hidden className="size-6 text-muted-foreground/60" />
-        <p className="text-sm font-medium">No linked pull requests</p>
+        <p className="text-sm font-medium">{t.git.pullRequest.noLinkedPullRequests}</p>
         <p className="max-w-60 text-xs text-muted-foreground">
-          Pull requests the agent opens from this thread land here. Link one yourself from a URL or
-          a number.
+          {
+            t.git.pullRequest
+              .pullRequestsTheAgentOpensFromThisThreadLandHereLinkOneYourselfFromAURLOrANumber
+          }
         </p>
         <Button size="sm" variant="outline" onClick={openLinkDialog}>
           <PlusIcon className="size-3.5" />
-          Link pull request
+          {t.git.pullRequest.linkPullRequest}
         </Button>
       </div>
     );
@@ -433,12 +460,12 @@ function EnabledThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThread
       </ScrollArea>
       <footer className="flex items-center justify-between border-t border-border/60 px-2 py-1.5 text-2xs text-muted-foreground">
         <span>
-          {openCount} open · {links.length} linked
-          {lastSynced ? ` · synced ${formatRelativeTimeLabel(lastSynced)}` : ""}
+          {t.git.pullRequest.linkedRequestCounts(openCount, links.length)}
+          {lastSynced ? t.git.pullRequest.syncedAt(formatRelativeTimeLabel(lastSynced)) : ""}
         </span>
         <Button size="xs" variant="ghost" onClick={openLinkDialog}>
           <PlusIcon className="size-3.5" />
-          Link
+          {t.git.pullRequest.link}
         </Button>
       </footer>
     </div>

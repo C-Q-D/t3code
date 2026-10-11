@@ -1,14 +1,18 @@
+/** Localized browser errors and UI text; retains protocol values and user data. */
+import { t } from "~/i18n";
 import type { PreviewViewportSetting } from "@t3tools/contracts";
 
 type BrowserViewportHandler = (setting: PreviewViewportSetting) => Promise<void>;
 
 export const BROWSER_VIEWPORT_COMMIT_TIMEOUT_MS = 15_000;
 
+/** A caller-facing viewport commit timeout; tabId identifies the original runtime tab. */
 class BrowserViewportCommitTimeoutError extends Error {
   override readonly name = "BrowserViewportCommitTimeoutError";
 
+  /** Creates the timeout message for the runtime tab ID; retains that ID on the error. */
   constructor(readonly tabId: string) {
-    super(`Timed out committing the browser viewport for tab ${tabId}`);
+    super(t.tools.browser.viewportCommitTimeout(tabId));
   }
 }
 
@@ -73,6 +77,12 @@ export function subscribeBrowserViewportChange(
   };
 }
 
+/**
+ * Queues a visible-tab viewport mutation; rejects missing handlers and timed-out commits.
+ * @param tabId Original runtime browser tab ID.
+ * @param setting Requested viewport size and preset discriminator.
+ * @returns Promise for the operation result; callers must handle the failures described above.
+ */
 export function commitBrowserViewportChange(
   tabId: string,
   setting: PreviewViewportSetting,
@@ -81,7 +91,7 @@ export function commitBrowserViewportChange(
     const handler = handlers.get(tabId);
     return handler
       ? handler(setting)
-      : Promise.reject(new Error(`No visible browser viewport handler for tab ${tabId}`));
+      : Promise.reject(new Error(t.tools.browser.viewportHandlerMissing(tabId)));
   });
   // The queue follows the real handler lifetime, while the caller-facing
   // timeout starts only once this commit reaches the front of that queue.

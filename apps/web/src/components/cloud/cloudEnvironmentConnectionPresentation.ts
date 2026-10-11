@@ -1,3 +1,5 @@
+/** Localized cloud presentation and existing interaction behavior. */
+import { t } from "~/i18n";
 import {
   connectionStatusText,
   type EnvironmentConnectionPresentation,
@@ -20,45 +22,45 @@ export function presentSavedCloudEnvironmentConnection(
   switch (connection.phase) {
     case "connected":
       return {
-        buttonLabel: "Connected",
-        statusText: connectionStatusText(connection),
+        buttonLabel: t.account.cloud.connected,
+        statusText: connectionStatusText(connection, t.chat.workLog.shared.connection),
         tone: "connected",
       };
     case "connecting":
       return {
-        buttonLabel: "Connecting…",
-        statusText: connectionStatusText(connection),
+        buttonLabel: t.account.cloud.connecting,
+        statusText: connectionStatusText(connection, t.chat.workLog.shared.connection),
         tone: "connecting",
       };
     case "reconnecting":
       return {
-        buttonLabel: "Reconnecting…",
-        statusText: connectionStatusText(connection),
+        buttonLabel: t.account.cloud.reconnecting,
+        statusText: connectionStatusText(connection, t.chat.workLog.shared.connection),
         tone: "connecting",
       };
     // Not a failure: the machine is fine, this build just cannot talk to it.
     case "unsupported":
       return {
-        buttonLabel: "Client not supported",
-        statusText: connectionStatusText(connection),
+        buttonLabel: t.account.cloud.unsupportedClient,
+        statusText: connectionStatusText(connection, t.chat.workLog.shared.connection),
         tone: "idle",
       };
     case "error":
       return {
-        buttonLabel: "Connection failed",
-        statusText: connectionStatusText(connection),
+        buttonLabel: t.account.cloud.connectionFailed,
+        statusText: connectionStatusText(connection, t.chat.workLog.shared.connection),
         tone: "error",
       };
     case "offline":
       return {
-        buttonLabel: "Offline",
-        statusText: connectionStatusText(connection),
+        buttonLabel: t.account.cloud.offline,
+        statusText: connectionStatusText(connection, t.chat.workLog.shared.connection),
         tone: "idle",
       };
     case "available":
       return {
-        buttonLabel: "Not connected",
-        statusText: connectionStatusText(connection),
+        buttonLabel: t.account.cloud.notConnected,
+        statusText: connectionStatusText(connection, t.chat.workLog.shared.connection),
         tone: "idle",
       };
   }

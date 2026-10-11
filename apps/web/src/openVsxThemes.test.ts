@@ -1,3 +1,8 @@
+/** Verifies Open VSX search and package import through their public boundaries. */
+import { installMessages } from "~/i18n";
+import { en } from "~/i18n/locales/en";
+import { messages } from "~/i18n/locales/zh-CN";
+
 import { sha256 } from "@noble/hashes/sha2";
 import JSZip from "jszip";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
@@ -528,4 +533,48 @@ describe("Open VSX themes", () => {
 
     await expect(importOpenVsxThemeExtension(extension)).rejects.toThrow("integrity check");
   });
+});
+
+it("preserves the specific ZIP inspection error when importing in Chinese", async () => {
+  // A checksum-valid payload with no ZIP directory must retain its inspection
+  // error rather than becoming the generic package-open error.
+  const packageBytes = new Uint8Array(22);
+  const checksum = [...sha256(packageBytes)]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+  const detail = extensionDetail();
+  const extension: OpenVsxThemeExtension = {
+    id: "demo.theme",
+    collectionId: "open-vsx:demo.theme",
+    name: detail.displayName,
+    publisher: detail.namespace,
+    description: detail.description,
+    downloadCount: detail.downloadCount,
+    iconUrl: detail.files.icon,
+    sourceUrl: detail.repository,
+    manifestUrl: detail.files.manifest,
+    sha256Url: detail.files.sha256,
+    vsixUrl: detail.files.download,
+    version: detail.version,
+    license: detail.license,
+  };
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url === extension.manifestUrl) {
+        return new Response(
+          JSON.stringify({ contributes: { themes: [{ path: "./theme.json" }] } }),
+        );
+      }
+      if (url === extension.sha256Url) return new Response(checksum);
+      return new Response(packageBytes);
+    }),
+  );
+  installMessages("zh-CN", messages);
+  try {
+    await expect(importOpenVsxThemeExtension(extension)).rejects.toThrow("该扩展包没有 ZIP 目录。");
+  } finally {
+    installMessages("en", en);
+  }
 });

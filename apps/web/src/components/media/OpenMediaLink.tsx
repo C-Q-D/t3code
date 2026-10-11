@@ -1,3 +1,5 @@
+/** Localized media presentation and existing interaction behavior. */
+import { t } from "~/i18n";
 import { DownloadIcon, ExternalLinkIcon } from "lucide-react";
 
 import { resolveExternalWebLinkHost } from "../chat/externalLinkContextMenu";
@@ -39,7 +41,11 @@ export function OpenMediaLink(props: {
       }
     >
       {isBlob ? <DownloadIcon /> : <ExternalLinkIcon />}
-      {originalUrl ? "Open original" : isBlob ? "Download video" : "Open in browser"}
+      {originalUrl
+        ? t.tools.media.openOriginal
+        : isBlob
+          ? t.tools.media.downloadVideo
+          : t.tools.media.openBrowser}
     </Button>
   );
 }

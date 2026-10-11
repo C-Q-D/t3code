@@ -1,3 +1,4 @@
+import { englishConnectionMessages, type ConnectionMessages } from "./messages.ts";
 import type { ServerConfig } from "@t3tools/contracts";
 import * as Option from "effect/Option";
 
@@ -56,34 +57,40 @@ export function presentConnectionState(
   }
 }
 
-export function connectionStatusText(connection: EnvironmentConnectionPresentation): string {
+/** Formats a connection state with optional localized text, preserving diagnostic detail verbatim. */
+export function connectionStatusText(
+  connection: EnvironmentConnectionPresentation,
+  messages: ConnectionMessages = englishConnectionMessages,
+): string {
   switch (connection.phase) {
     case "available":
-      return "Available";
+      return messages.available;
     case "offline":
-      return "Offline";
+      return messages.offline;
     case "connecting":
-      return "Connecting...";
+      return messages.connecting;
     case "reconnecting":
       return connection.error
-        ? `Failed to connect. Reconnecting... Reason: ${connection.error}`
-        : "Reconnecting...";
+        ? messages.reconnectingWithReason(connection.error)
+        : messages.reconnecting;
     case "connected":
-      return "Connected";
+      return messages.connected;
     case "unsupported":
-      return "Client not supported";
+      return messages.unsupported;
     case "error":
-      return connection.error
-        ? `Connection failed. Reason: ${connection.error}`
-        : "Connection failed";
+      return connection.error ? messages.failedWithReason(connection.error) : messages.failed;
   }
 }
 
-export function connectionStatusTitle(connection: EnvironmentConnectionPresentation): string {
+/** Formats a concise connection title without the diagnostic detail. */
+export function connectionStatusTitle(
+  connection: EnvironmentConnectionPresentation,
+  messages: ConnectionMessages = englishConnectionMessages,
+): string {
   if (connection.phase === "reconnecting" && connection.error) {
-    return "Failed to connect. Reconnecting...";
+    return messages.reconnectingAfterFailure;
   }
-  return connectionStatusText({ ...connection, error: null });
+  return connectionStatusText({ ...connection, error: null }, messages);
 }
 
 export function presentEnvironmentConnection(

@@ -1,3 +1,5 @@
+/** Exposes environment entity operations and waits for client-side project visibility. */
+import { t } from "~/i18n";
 import { useAtomValue } from "@effect/atom-react";
 import type {
   EnvironmentProject,
@@ -175,7 +177,7 @@ export function waitForProject(
     let unsubscribe: (() => void) | null = null;
     const timeout = setTimeout(() => {
       unsubscribe?.();
-      reject(new Error("The project did not appear in the desktop app."));
+      reject(new Error(t.app.projects.desktopTimeout));
     }, timeoutMs);
     const finish = (project: EnvironmentProject | null) => {
       if (project === null) return;

@@ -74,3 +74,34 @@ describe("nextTerminalId", () => {
     ).toMatchObject({ terminalId: second });
   });
 });
+
+it("localizes only a confirmed idle default label, preserving process names and IDs", () => {
+  const messages = { numbered: (number: string) => `终端 ${number}` };
+  expect(getTerminalLabel("term-12", messages)).toBe("终端 12");
+  expect(
+    resolveTerminalSessionLabel(
+      "term-2",
+      { label: "Terminal 2", hasRunningSubprocess: false },
+      messages,
+    ),
+  ).toBe("终端 2");
+  expect(
+    resolveTerminalSessionLabel(
+      "term-2",
+      { label: "Terminal 2", hasRunningSubprocess: true },
+      messages,
+    ),
+  ).toBe("Terminal 2");
+  expect(resolveTerminalSessionLabel("term-2", { label: "Terminal 2" }, messages)).toBe(
+    "Terminal 2",
+  );
+  expect(
+    resolveTerminalSessionLabel(
+      "term-2",
+      { label: " bun ", hasRunningSubprocess: false },
+      messages,
+    ),
+  ).toBe("bun");
+  expect(resolveTerminalSessionLabel("term-2", null, messages)).toBe("终端 2");
+  expect(getTerminalLabel("custom-session", messages)).toBe("custom-session");
+});

@@ -1,3 +1,5 @@
+/** Builds display choices and progress for Git controls without changing action discriminants. */
+import { t } from "~/i18n";
 import type {
   GitRunStackedActionResult,
   GitStackedAction,
@@ -73,6 +75,11 @@ function resolveChangeRequestTerminology(
     : DEFAULT_CHANGE_REQUEST_TERMINOLOGY;
 }
 
+/**
+ * Builds inline progress for a running pull or source-control action; returns null for other operations or completed actions.
+ * @param input Operation-specific state and options described by the input type.
+ * @returns Inline status, optional hook output, and start time; null when this action has no inline progress.
+ */
 export function resolveGitActionProgressPresentation(input: {
   readonly isRunning: boolean;
   readonly operation: string | null;
@@ -93,11 +100,11 @@ export function resolveGitActionProgressPresentation(input: {
   const isPull = input.operation === "pull";
   return {
     status:
-      currentLabel && currentLabel !== "Running source control action"
+      currentLabel && currentLabel !== t.git.actions.runningSourceControlAction
         ? currentLabel
         : isPull
-          ? "Pulling latest changes..."
-          : "Starting source control action...",
+          ? t.git.actions.pullingLatestChanges
+          : t.git.actions.startingSourceControlAction,
     output: !isPull && output ? output : null,
     startedAtMs: isPull
       ? input.phaseStartedAtMs
@@ -105,6 +112,12 @@ export function resolveGitActionProgressPresentation(input: {
   };
 }
 
+/**
+ * Formats elapsed action time in seconds or minutes; returns null when no start time is available.
+ * @param startedAtMs Action start time in epoch milliseconds, or null when no action is timed.
+ * @param nowMs Current time in epoch milliseconds.
+ * @returns Elapsed display text, or null when the start time is absent.
+ */
 export function formatGitActionElapsed(startedAtMs: number | null, nowMs: number): string | null {
   if (startedAtMs === null) {
     return null;
@@ -112,14 +125,19 @@ export function formatGitActionElapsed(startedAtMs: number | null, nowMs: number
 
   const elapsedSeconds = Math.max(0, Math.floor((nowMs - startedAtMs) / 1_000));
   if (elapsedSeconds < 60) {
-    return `${elapsedSeconds}s`;
+    return t.git.actions.elapsedSeconds(elapsedSeconds);
   }
 
   const minutes = Math.floor(elapsedSeconds / 60);
   const seconds = elapsedSeconds % 60;
-  return `${minutes}m ${seconds}s`;
+  return t.git.actions.elapsedMinutes(minutes, seconds);
 }
 
+/**
+ * Builds ordered progress labels for the requested action and repository state.
+ * @param input Operation-specific state and options described by the input type.
+ * @returns Progress labels in execution order; omitted stages have no work in this action.
+ */
 export function buildGitActionProgressStages(input: {
   action: GitStackedAction;
   hasCustomCommitMessage: boolean;
@@ -130,12 +148,14 @@ export function buildGitActionProgressStages(input: {
   terminology?: ChangeRequestTerminology;
 }): string[] {
   const terminology = input.terminology ?? DEFAULT_CHANGE_REQUEST_TERMINOLOGY;
-  const branchStages = input.featureBranch ? ["Preparing feature ref..."] : [];
-  const pushStage = input.pushTarget ? `Pushing to ${input.pushTarget}...` : "Pushing...";
+  const branchStages = input.featureBranch ? [t.git.actions.preparingFeatureRef] : [];
+  const pushStage = input.pushTarget
+    ? t.git.actions.pushTo(input.pushTarget)
+    : t.git.actions.pushing;
   const prStages = [
-    `Preparing ${terminology.shortLabel}...`,
-    `Generating ${terminology.shortLabel} content...`,
-    `Creating ${terminology.singular}...`,
+    t.git.actions.prepareRequest(terminology.shortLabel),
+    t.git.actions.generateRequest(terminology.shortLabel),
+    t.git.actions.creatingRequest(terminology.singular),
   ];
 
   if (input.action === "push") {
@@ -149,8 +169,8 @@ export function buildGitActionProgressStages(input: {
   const commitStages = !shouldIncludeCommitStages
     ? []
     : input.hasCustomCommitMessage
-      ? ["Committing..."]
-      : ["Generating commit message...", "Committing..."];
+      ? [t.git.actions.committing]
+      : [t.git.actions.generatingCommitMessage, t.git.actions.committing];
   if (input.action === "commit") {
     return [...branchStages, ...commitStages];
   }
@@ -160,6 +180,13 @@ export function buildGitActionProgressStages(input: {
   return [...branchStages, ...commitStages, pushStage, ...prStages];
 }
 
+/**
+ * Builds commit, push, and change-request menu entries; returns an empty list when Git status is unavailable.
+ * @param gitStatus Current repository status, or null when status has not loaded.
+ * @param isBusy Whether another Git action prevents execution.
+ * @param hasPrimaryRemote Whether the repository has a primary remote; defaults to true.
+ * @returns Menu entries with stable action ids and current display labels; empty when Git status is absent.
+ */
 export function buildMenuItems(
   gitStatus: VcsStatusResult | null,
   isBusy: boolean,
@@ -192,7 +219,7 @@ export function buildMenuItems(
 
   const commitItem: GitActionMenuItem = {
     id: "commit",
-    label: "Commit",
+    label: t.git.actions.commit,
     disabled: !canCommit,
     icon: "commit",
     kind: "open_dialog",
@@ -205,7 +232,7 @@ export function buildMenuItems(
 
   const pushItem: GitActionMenuItem = {
     id: "push",
-    label: "Push",
+    label: t.git.actions.push,
     disabled: !canPush,
     icon: "push",
     kind: "open_dialog",
@@ -223,7 +250,7 @@ export function buildMenuItems(
     pushItem,
     {
       id: "pr",
-      label: `Create ${terminology.shortLabel}`,
+      label: t.git.actions.createRequest(terminology.shortLabel),
       disabled: !canCreatePr,
       icon: "pr",
       kind: "open_dialog",
@@ -232,6 +259,14 @@ export function buildMenuItems(
   ];
 }
 
+/**
+ * Selects the next Git action or a disabled hint from repository state and permissions.
+ * @param gitStatus Current repository status, or null when status has not loaded.
+ * @param isBusy Whether another Git action prevents execution.
+ * @param isDefaultRef Whether the current ref is the repository default.
+ * @param hasPrimaryRemote Whether the repository has a primary remote; defaults to true.
+ * @returns The action to run, publish, pull, or show as a disabled hint.
+ */
 export function resolveQuickAction(
   gitStatus: VcsStatusResult | null,
   isBusy: boolean,
@@ -239,15 +274,20 @@ export function resolveQuickAction(
   hasPrimaryRemote = true,
 ): GitQuickAction {
   if (isBusy) {
-    return { label: "Commit", disabled: true, kind: "show_hint", hint: "Git action in progress." };
+    return {
+      label: t.git.actions.commit,
+      disabled: true,
+      kind: "show_hint",
+      hint: t.git.actions.gitActionInProgress,
+    };
   }
 
   if (!gitStatus) {
     return {
-      label: "Commit",
+      label: t.git.actions.commit,
       disabled: true,
       kind: "show_hint",
-      hint: "Git status is unavailable.",
+      hint: t.git.actions.gitStatusIsUnavailable,
     };
   }
 
@@ -262,22 +302,27 @@ export function resolveQuickAction(
 
   if (!hasBranch) {
     return {
-      label: "Commit",
+      label: t.git.actions.commit,
       disabled: true,
       kind: "show_hint",
-      hint: `Create and checkout a ref before pushing or opening a ${terminology.singular}.`,
+      hint: t.git.actions.checkoutBeforeRequest(terminology.singular),
     };
   }
 
   if (hasChanges) {
     if (!gitStatus.hasUpstream && !hasPrimaryRemote) {
-      return { label: "Commit", disabled: false, kind: "run_action", action: "commit" };
+      return { label: t.git.actions.commit, disabled: false, kind: "run_action", action: "commit" };
     }
     if (hasOpenPr || isDefaultRef) {
-      return { label: "Commit & push", disabled: false, kind: "run_action", action: "commit_push" };
+      return {
+        label: t.git.actions.commitPush,
+        disabled: false,
+        kind: "run_action",
+        action: "commit_push",
+      };
     }
     return {
-      label: `Commit, push & ${terminology.shortLabel}`,
+      label: t.git.actions.commitPushRequest(terminology.shortLabel),
       disabled: false,
       kind: "run_action",
       action: "commit_push_pr",
@@ -287,7 +332,7 @@ export function resolveQuickAction(
   if (!gitStatus.hasUpstream) {
     if (!hasPrimaryRemote) {
       return {
-        label: "Publish repository",
+        label: t.git.actions.publishRepository,
         disabled: false,
         kind: "open_publish",
       };
@@ -295,29 +340,29 @@ export function resolveQuickAction(
     if (!isAhead) {
       if (hasOpenPr) {
         return {
-          label: "Commit",
+          label: t.git.actions.commit,
           disabled: true,
           kind: "show_hint",
-          hint: "Branch is up to date. No action needed.",
+          hint: t.git.actions.branchIsUpToDateNoActionNeeded,
         };
       }
       return {
-        label: "Push",
+        label: t.git.actions.push,
         disabled: true,
         kind: "show_hint",
-        hint: "No local commits to push.",
+        hint: t.git.actions.noLocalCommitsToPush,
       };
     }
     if (hasOpenPr || isDefaultRef) {
       return {
-        label: "Push",
+        label: t.git.actions.push,
         disabled: false,
         kind: "run_action",
         action: isDefaultRef ? "commit_push" : "push",
       };
     }
     return {
-      label: `Push & create ${terminology.shortLabel}`,
+      label: t.git.actions.pushCreateRequest(terminology.shortLabel),
       disabled: false,
       kind: "run_action",
       action: "create_pr",
@@ -326,16 +371,16 @@ export function resolveQuickAction(
 
   if (isDiverged) {
     return {
-      label: "Sync ref",
+      label: t.git.actions.syncRef,
       disabled: true,
       kind: "show_hint",
-      hint: "Branch has diverged from upstream. Rebase/merge first.",
+      hint: t.git.actions.branchHasDivergedFromUpstreamRebaseMergeFirst,
     };
   }
 
   if (isBehind) {
     return {
-      label: "Pull",
+      label: t.git.actions.pull,
       disabled: false,
       kind: "run_pull",
     };
@@ -344,14 +389,14 @@ export function resolveQuickAction(
   if (isAhead) {
     if (hasOpenPr || isDefaultRef) {
       return {
-        label: "Push",
+        label: t.git.actions.push,
         disabled: false,
         kind: "run_action",
         action: isDefaultRef ? "commit_push" : "push",
       };
     }
     return {
-      label: `Push & create ${terminology.shortLabel}`,
+      label: t.git.actions.pushCreateRequest(terminology.shortLabel),
       disabled: false,
       kind: "run_action",
       action: "create_pr",
@@ -362,16 +407,16 @@ export function resolveQuickAction(
   // details panel, so the action button rests in its disabled up-to-date state.
   if (hasOpenPr && gitStatus.hasUpstream) {
     return {
-      label: "Commit",
+      label: t.git.actions.commit,
       disabled: true,
       kind: "show_hint",
-      hint: "Branch is up to date. No action needed.",
+      hint: t.git.actions.branchIsUpToDateNoActionNeeded,
     };
   }
 
   if (hasDefaultBranchDelta && !isDefaultRef) {
     return {
-      label: `Create ${terminology.shortLabel}`,
+      label: t.git.actions.createRequest(terminology.shortLabel),
       disabled: false,
       kind: "run_action",
       action: "create_pr",
@@ -379,10 +424,10 @@ export function resolveQuickAction(
   }
 
   return {
-    label: "Commit",
+    label: t.git.actions.commit,
     disabled: true,
     kind: "show_hint",
-    hint: "Branch is up to date. No action needed.",
+    hint: t.git.actions.branchIsUpToDateNoActionNeeded,
   };
 }
 
@@ -399,6 +444,11 @@ export function requiresDefaultBranchConfirmation(
   );
 }
 
+/**
+ * Builds confirmation text for an action on the named default branch.
+ * @param input Operation-specific state and options described by the input type.
+ * @returns The title, description, and continue-button label for the requested action.
+ */
 export function resolveDefaultBranchActionDialogCopy(input: {
   action: DefaultBranchConfirmableAction;
   branchName: string;
@@ -406,35 +456,35 @@ export function resolveDefaultBranchActionDialogCopy(input: {
   terminology?: ChangeRequestTerminology;
 }): DefaultBranchActionDialogCopy {
   const branchLabel = input.branchName;
-  const suffix = ` on "${branchLabel}". You can continue on this ref or create a feature ref and run the same action there.`;
+  const suffix = t.git.actions.defaultBranchSuffix(branchLabel);
   const terminology = input.terminology ?? DEFAULT_CHANGE_REQUEST_TERMINOLOGY;
 
   if (input.action === "push" || input.action === "commit_push") {
     if (input.includesCommit) {
       return {
-        title: "Commit & push to default ref?",
-        description: `This action will commit and push changes${suffix}`,
-        continueLabel: `Commit & push to ${branchLabel}`,
+        title: t.git.actions.commitPushToDefaultRef,
+        description: t.git.actions.commitPushDescription(suffix),
+        continueLabel: t.git.actions.commitPushBranch(branchLabel),
       };
     }
     return {
-      title: "Push to default ref?",
-      description: `This action will push local commits${suffix}`,
-      continueLabel: `Push to ${branchLabel}`,
+      title: t.git.actions.pushToDefaultRef,
+      description: t.git.actions.pushDescription(suffix),
+      continueLabel: t.git.actions.pushBranch(branchLabel),
     };
   }
 
   if (input.includesCommit) {
     return {
-      title: `Commit, push & create ${terminology.shortLabel} from default ref?`,
-      description: `This action will commit, push, and create a ${terminology.singular}${suffix}`,
-      continueLabel: `Commit, push & create ${terminology.shortLabel}`,
+      title: t.git.actions.commitPushRequestDefault(terminology.shortLabel),
+      description: t.git.actions.commitPushRequestDescription(terminology.singular, suffix),
+      continueLabel: t.git.actions.commitPushCreateRequest(terminology.shortLabel),
     };
   }
   return {
-    title: `Push & create ${terminology.shortLabel} from default ref?`,
-    description: `This action will push local commits and create a ${terminology.singular}${suffix}`,
-    continueLabel: `Push & create ${terminology.shortLabel}`,
+    title: t.git.actions.pushRequestDefault(terminology.shortLabel),
+    description: t.git.actions.pushRequestDescription(terminology.singular, suffix),
+    continueLabel: t.git.actions.pushCreateRequest(terminology.shortLabel),
   };
 }
 

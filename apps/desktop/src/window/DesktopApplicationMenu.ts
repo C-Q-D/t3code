@@ -1,3 +1,6 @@
+/** Builds native menus and update dialogs using the current device language. */
+import * as DesktopUiLocale from "../i18n/DesktopUiLocale.ts";
+import { localizedRole } from "../i18n/desktopMessages.ts";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -36,7 +39,8 @@ export class DesktopApplicationMenu extends Context.Service<
 type DesktopApplicationMenuRuntimeServices =
   | DesktopUpdates.DesktopUpdates
   | DesktopWindow.DesktopWindow
-  | ElectronDialog.ElectronDialog;
+  | ElectronDialog.ElectronDialog
+  | DesktopUiLocale.DesktopUiLocale;
 
 const { logInfo: logUpdaterInfo } = makeComponentLogger("desktop-updater");
 
@@ -63,21 +67,22 @@ const checkForUpdatesFromMenu = Effect.gen(function* () {
   const electronDialog = yield* ElectronDialog.ElectronDialog;
   const result = yield* updates.check("menu");
   const updateState = result.state;
+  const m = yield* (yield* DesktopUiLocale.DesktopUiLocale).messages;
 
   if (updateState.status === "up-to-date") {
     yield* electronDialog.showMessageBox({
       type: "info",
-      title: "You're up to date!",
-      message: `T3 Code ${updateState.currentVersion} is currently the newest version available.`,
-      buttons: ["OK"],
+      title: m.updates.upToDateTitle,
+      message: m.updates.upToDateMessage(updateState.currentVersion),
+      buttons: [m.updates.ok],
     });
   } else if (updateState.status === "error") {
     yield* electronDialog.showMessageBox({
       type: "warning",
-      title: "Update check failed",
-      message: "Could not check for updates.",
-      detail: updateState.message ?? "An unknown error occurred. Please try again later.",
-      buttons: ["OK"],
+      title: m.updates.failedTitle,
+      message: m.updates.failedMessage,
+      detail: updateState.message ?? m.updates.unknownError,
+      buttons: [m.updates.ok],
     });
   }
 }).pipe(Effect.withSpan("desktop.menu.checkForUpdates"));
@@ -87,15 +92,16 @@ const handleCheckForUpdatesMenuClick = Effect.gen(function* () {
   const electronDialog = yield* ElectronDialog.ElectronDialog;
   const disabledReason = yield* updates.disabledReason;
   if (Option.isSome(disabledReason)) {
+    const m = yield* (yield* DesktopUiLocale.DesktopUiLocale).messages;
     yield* logUpdaterInfo("manual update check requested, but updates are disabled", {
       disabledReason: disabledReason.value,
     });
     yield* electronDialog.showMessageBox({
       type: "info",
-      title: "Updates unavailable",
-      message: "Automatic updates are not available right now.",
+      title: m.updates.unavailableTitle,
+      message: m.updates.unavailableMessage,
       detail: disabledReason.value,
-      buttons: ["OK"],
+      buttons: [m.updates.ok],
     });
     return;
   }
@@ -130,7 +136,13 @@ export const make = Effect.gen(function* () {
     );
   };
 
+  const uiLocale = yield* DesktopUiLocale.DesktopUiLocale;
   const configure = Effect.gen(function* () {
+    const m = yield* uiLocale.messages;
+    const locale = yield* uiLocale.current;
+    const labels = m.menu.roleLabels(appName, environment.platform);
+    const roleItem = (role: NonNullable<Electron.MenuItemConstructorOptions["role"]>) =>
+      localizedRole(role, labels);
     const checkForUpdatesClick = () => {
       runMenuEffect("check-for-updates", handleCheckForUpdatesMenuClick);
     };
@@ -159,80 +171,80 @@ export const make = Effect.gen(function* () {
       template.push({
         label: appName,
         submenu: [
-          { role: "about" },
+          roleItem("about"),
           {
-            label: "Check for Updates...",
+            label: m.menu.checkForUpdates,
             click: checkForUpdatesClick,
           },
           { type: "separator" },
           {
-            label: "Settings...",
+            label: m.menu.settings,
             accelerator: "CmdOrCtrl+,",
             click: settingsClick,
           },
           { type: "separator" },
-          { role: "services" },
+          roleItem("services"),
           { type: "separator" },
-          { role: "hide" },
-          { role: "hideOthers" },
-          { role: "unhide" },
+          roleItem("hide"),
+          roleItem("hideOthers"),
+          roleItem("unhide"),
           { type: "separator" },
-          { role: "quit" },
+          roleItem("quit"),
         ],
       });
     }
 
     template.push(
       {
-        label: "File",
+        label: m.menu.file,
         submenu: [
           ...(environment.platform === "darwin"
             ? []
             : [
                 {
-                  label: "Settings...",
+                  label: m.menu.settings,
                   accelerator: "CmdOrCtrl+,",
                   click: settingsClick,
                 },
                 { type: "separator" as const },
               ]),
-          { role: environment.platform === "darwin" ? "close" : "quit" },
+          roleItem(environment.platform === "darwin" ? "close" : "quit"),
         ],
       },
       {
-        label: "Edit",
+        label: m.menu.edit,
         submenu: [
-          { role: "undo" },
-          { role: "redo" },
+          roleItem("undo"),
+          roleItem("redo"),
           { type: "separator" },
-          { role: "cut" },
-          { role: "copy" },
-          { role: "paste" },
+          roleItem("cut"),
+          roleItem("copy"),
+          roleItem("paste"),
           {
-            label: "Paste as Text",
+            label: m.menu.pasteAsText,
             accelerator: "CmdOrCtrl+Shift+V",
             click: pasteAsTextClick,
           },
-          { role: "delete" },
+          roleItem("delete"),
           { type: "separator" },
-          { role: "selectAll" },
+          roleItem("selectAll"),
           ...(environment.platform === "darwin"
             ? [
                 { type: "separator" as const },
                 {
-                  label: "Speech",
-                  submenu: [{ role: "startSpeaking" as const }, { role: "stopSpeaking" as const }],
+                  label: m.menu.speech,
+                  submenu: [roleItem("startSpeaking"), roleItem("stopSpeaking")],
                 },
               ]
             : []),
         ],
       },
       {
-        label: "View",
+        label: m.menu.view,
         submenu: [
-          { role: "reload" },
-          { role: "forceReload" },
-          { role: "toggleDevTools" },
+          roleItem("reload"),
+          roleItem("forceReload"),
+          roleItem("toggleDevTools"),
           { type: "separator" },
           /*
             Not the zoom roles: those act on the focused webContents, so with
@@ -240,25 +252,33 @@ export const make = Effect.gen(function* () {
             page and the app UI appears stuck. These always zoom the main
             window (see DesktopWindow.zoomMain).
           */
-          { label: "Actual Size", accelerator: "CmdOrCtrl+0", click: zoomClick("reset") },
-          { label: "Zoom In", accelerator: "CmdOrCtrl+=", click: zoomClick("in") },
+          { label: m.menu.actualSize, accelerator: "CmdOrCtrl+0", click: zoomClick("reset") },
+          { label: m.menu.zoomIn, accelerator: "CmdOrCtrl+=", click: zoomClick("in") },
           {
-            label: "Zoom In",
+            label: m.menu.zoomIn,
             accelerator: "CmdOrCtrl+Plus",
             visible: false,
             click: zoomClick("in"),
           },
-          { label: "Zoom Out", accelerator: "CmdOrCtrl+-", click: zoomClick("out") },
+          { label: m.menu.zoomOut, accelerator: "CmdOrCtrl+-", click: zoomClick("out") },
           { type: "separator" },
-          { role: "togglefullscreen" },
+          roleItem("togglefullscreen"),
         ],
       },
-      { role: "windowMenu" },
+      locale === "en"
+        ? { role: "windowMenu" }
+        : {
+            ...roleItem("windowMenu"),
+            submenu:
+              environment.platform === "darwin"
+                ? [roleItem("minimize"), roleItem("zoom"), { type: "separator" }, roleItem("front")]
+                : [roleItem("minimize"), roleItem("zoom"), roleItem("close")],
+          },
       {
-        role: "help",
+        ...roleItem("help"),
         submenu: [
           {
-            label: "Check for Updates...",
+            label: m.menu.checkForUpdates,
             click: checkForUpdatesClick,
           },
         ],

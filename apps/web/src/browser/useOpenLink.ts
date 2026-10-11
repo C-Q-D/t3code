@@ -1,3 +1,5 @@
+/** Localized browser UI and interactions; preserves user data, commands, and protocol values. */
+import { t } from "~/i18n";
 import { AuthPreviewOperateScope, type ScopedThreadRef } from "@t3tools/contracts";
 import {
   isAtomCommandInterrupted,
@@ -30,6 +32,8 @@ const NO_MODIFIER = { metaKey: false, ctrlKey: false } as const;
  * dropping the click: the user asked for the link, and the setting only says
  * where it should go first. Failed settings reads reject without opening a
  * browser. The promise also rejects if the system-browser fallback fails.
+ * @param threadRef Owning scoped thread, or null/undefined when no conversation is available.
+ * @returns Link-opening callback; callers handle rejected opening operations.
  */
 export function useOpenLink(threadRef: ScopedThreadRef | null | undefined): (
   url: string,
@@ -64,7 +68,7 @@ export function useOpenLink(threadRef: ScopedThreadRef | null | undefined): (
         console.error(result.cause);
       }
       const api = readLocalApi();
-      if (!api) throw new Error("Link opening is unavailable.");
+      if (!api) throw new Error(t.tools.browser.linkUnavailable);
       await api.shell.openExternal(url);
     },
     [openPreview, threadRef],

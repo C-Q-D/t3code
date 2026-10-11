@@ -1,3 +1,5 @@
+/** Coordinates desktop startup, native failure reporting, and application lifetime. */
+import * as DesktopUiLocale from "../i18n/DesktopUiLocale.ts";
 import * as Cause from "effect/Cause";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -118,6 +120,7 @@ const handleFatalStartupError = Effect.fn("desktop.startup.handleFatalStartupErr
   | DesktopState.DesktopState
   | ElectronApp.ElectronApp
   | ElectronDialog.ElectronDialog
+  | DesktopUiLocale.DesktopUiLocale
 > {
   const shutdown = yield* DesktopShutdown.DesktopShutdown;
   const state = yield* DesktopState.DesktopState;
@@ -133,9 +136,10 @@ const handleFatalStartupError = Effect.fn("desktop.startup.handleFatalStartupErr
   });
   const wasQuitting = yield* Ref.getAndSet(state.quitting, true);
   if (!wasQuitting) {
+    const m = yield* (yield* DesktopUiLocale.DesktopUiLocale).messages;
     yield* electronDialog.showErrorBox(
-      "T3 Code failed to start",
-      `Stage: ${stage}\n${message}${detail}`,
+      m.startup.failedTitle,
+      `${m.startup.stage(stage)}\n${message}${detail}`,
     );
   }
   yield* shutdown.request;

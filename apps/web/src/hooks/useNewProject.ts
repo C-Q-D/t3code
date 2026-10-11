@@ -1,3 +1,5 @@
+/** Creates projects and reports repository publication and initial commit results. */
+import { t } from "~/i18n";
 import { scopeProjectRef } from "@t3tools/client-runtime/environment";
 import { getNewProjectGitHubRepository } from "@t3tools/client-runtime/operations/projects";
 import {
@@ -14,10 +16,11 @@ import { sourceControlEnvironment } from "~/state/sourceControl";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { useNewThreadHandler } from "./useHandleNewThread";
 
+/** Returns the supplied Error message or a localized fallback for an unknown failure. */
 function errorMessage(error: unknown): string {
   return error instanceof Error && error.message.trim().length > 0
     ? error.message
-    : "An error occurred.";
+    : t.sidebar.errors.genericError;
 }
 
 /**
@@ -55,8 +58,10 @@ export function useNewProject() {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "Could not create the GitHub repository",
-              description: `${errorMessage(squashAtomCommandFailure(result))} Use Publish Repository in the Git menu to try again.`,
+              title: t.app.projects.publishError,
+              description: t.app.projects.publishRetryHint(
+                errorMessage(squashAtomCommandFailure(result)),
+              ),
             }),
           );
         }
@@ -65,7 +70,7 @@ export function useNewProject() {
       toastManager.add(
         stackedThreadToast({
           type: "success",
-          title: "Published to GitHub",
+          title: t.app.projects.published,
           description: result.value.repository.nameWithOwner,
         }),
       );
@@ -88,7 +93,7 @@ export function useNewProject() {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "Could not create the project",
+              title: t.app.projects.createError,
               description: errorMessage(squashAtomCommandFailure(result)),
             }),
           );
@@ -101,11 +106,15 @@ export function useNewProject() {
       toastManager.add(
         stackedThreadToast(
           commitError === undefined
-            ? { type: "success", title: `Created ${input.name}`, description: workspaceRoot }
+            ? {
+                type: "success",
+                title: t.app.projects.created(input.name),
+                description: workspaceRoot,
+              }
             : {
                 type: "warning",
-                title: `Created ${input.name} without a first commit`,
-                description: `${commitError} The project is in ${workspaceRoot}.`,
+                title: t.app.projects.createdWithoutCommit(input.name),
+                description: t.app.projects.commitErrorHint(commitError, workspaceRoot),
               },
         ),
       );
@@ -124,8 +133,8 @@ export function useNewProject() {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Failed to open project",
-            description: `${errorMessage(error)} It will appear in the sidebar once this client catches up.`,
+            title: t.app.projects.openError,
+            description: t.app.projects.sidebarCatchupHint(errorMessage(error)),
           }),
         );
         return null;
@@ -135,7 +144,7 @@ export function useNewProject() {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Failed to open project",
+            title: t.app.projects.openError,
             description: errorMessage(error),
           }),
         );

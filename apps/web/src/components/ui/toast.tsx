@@ -1,4 +1,7 @@
+/** Renders managed and anchored notifications, their actions, and expandable details. */
 "use client";
+
+import { t } from "~/i18n";
 
 import { Spinner } from "~/components/ui/spinner";
 
@@ -110,9 +113,10 @@ function handleToastDismissClick(
   manager.close(toastId);
 }
 
+/** Copies the supplied error text and reports copied state through its accessible action label. */
 function CopyErrorButton({ text }: { text: string }) {
   const { copyToClipboard, isCopied } = useCopyToClipboard({ target: "error-message" });
-  const label = isCopied ? "Copied error" : "Copy error";
+  const label = isCopied ? t.app.clipboard.copiedError : t.app.clipboard.copyError;
 
   return (
     <Tooltip>
@@ -141,6 +145,7 @@ function CopyErrorButton({ text }: { text: string }) {
 const toastExpandablePanelClassName =
   "mt-2 max-h-40 min-h-0 overflow-y-auto overscroll-contain pr-0.5 select-text";
 
+/** Renders children behind a details toggle, using optional labels overrides for the collapsed and expanded actions. */
 function ToastExpandableSection({
   children,
   labels,
@@ -149,8 +154,8 @@ function ToastExpandableSection({
   labels: { expand?: string; collapse?: string };
 }) {
   const [open, setOpen] = useState(false);
-  const expandLabel = labels.expand ?? "Show details";
-  const collapseLabel = labels.collapse ?? "Hide details";
+  const expandLabel = labels.expand ?? t.app.details.show;
+  const collapseLabel = labels.collapse ?? t.app.details.hide;
 
   return (
     <div className="min-w-0">
@@ -172,6 +177,7 @@ function ToastExpandableSection({
   );
 }
 
+/** Renders toastDescription and optional expandable toastData content according to toastType; uses localized fallback action labels. */
 function ToastDescriptionAndExpandable({
   toastData,
   toastDescription,
@@ -203,8 +209,8 @@ function ToastDescriptionAndExpandable({
     );
   }
 
-  const expandLabel = labels.expand ?? "Show details";
-  const collapseLabel = labels.collapse ?? "Hide details";
+  const expandLabel = labels.expand ?? t.app.details.show;
+  const collapseLabel = labels.collapse ?? t.app.details.hide;
 
   const toggle = () => setOpen((v) => !v);
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -526,6 +532,7 @@ function ToastProvider({ children, position = "top-right", ...props }: ToastProv
   );
 }
 
+/** Renders managed toasts at position with accessible dismiss actions and their configured content. */
 function Toasts({ position }: { position: ToastPosition }) {
   const { toasts } = Toast.useToastManager<ThreadToastData>();
   const activeThreadRef = useActiveThreadRefFromRoute();
@@ -651,7 +658,7 @@ function Toasts({ position }: { position: ToastPosition }) {
               />
               <div className={toastCornerDismissClass}>
                 <button
-                  aria-label="Dismiss notification"
+                  aria-label={t.app.notifications.dismiss}
                   className={toastCornerOrbClass}
                   data-slot="toast-close"
                   onClick={() =>
@@ -699,6 +706,7 @@ function AnchoredToastProvider({ children, ...props }: Toast.Provider.Props) {
   );
 }
 
+/** Renders managed anchored toasts with their reference positions, content, and accessible dismiss actions. */
 function AnchoredToasts() {
   const { toasts } = Toast.useToastManager<ThreadToastData>();
   const activeThreadRef = useActiveThreadRefFromRoute();
@@ -742,7 +750,7 @@ function AnchoredToasts() {
                     <>
                       <div className={toastCornerDismissClass}>
                         <button
-                          aria-label="Dismiss notification"
+                          aria-label={t.app.notifications.dismiss}
                           className={toastCornerOrbClass}
                           data-slot="toast-close"
                           onClick={() =>

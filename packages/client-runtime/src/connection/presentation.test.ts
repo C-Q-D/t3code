@@ -219,3 +219,24 @@ describe("connection presentation", () => {
     });
   });
 });
+
+it("localizes connection state without translating diagnostic details", () => {
+  const messages = {
+    available: "可连接",
+    offline: "离线",
+    connecting: "正在连接…",
+    reconnecting: "正在重新连接…",
+    reconnectingAfterFailure: "连接失败，正在重新连接…",
+    connected: "已连接",
+    unsupported: "不支持此客户端",
+    failed: "连接失败",
+    failedWithReason: (reason: string) => `连接失败。原因：${reason}`,
+    reconnectingWithReason: (reason: string) => `连接失败，正在重新连接。原因：${reason}`,
+  };
+  const connection = { phase: "reconnecting" as const, error: "ECONNRESET", traceId: "trace-1" };
+  expect(connectionStatusText(connection, messages)).toBe(
+    "连接失败，正在重新连接。原因：ECONNRESET",
+  );
+  expect(connectionStatusTitle(connection, messages)).toBe("连接失败，正在重新连接…");
+  expect(connectionStatusText({ ...connection, phase: "connected" }, messages)).toBe("已连接");
+});

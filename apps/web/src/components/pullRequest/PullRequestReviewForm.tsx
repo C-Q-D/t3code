@@ -1,3 +1,5 @@
+/** Owns pull request review form on the web pull-request surface; host data and agent context remain unchanged. */
+import { t } from "~/i18n";
 import { useAtomCommand } from "~/state/use-atom-command";
 /**
  * The review half of the floating composer: the summary and the verdict that sends it, together
@@ -29,24 +31,29 @@ const VERDICTS: ReadonlyArray<{
 }> = [
   {
     value: "comment",
-    label: "Comment",
-    sent: "Review submitted",
+    label: t.git.diff.comment,
+    sent: t.git.pullRequest.reviewSubmitted,
     icon: <MessageSquareIcon className="size-3" />,
   },
   {
     value: "approve",
-    label: "Approve",
-    sent: "Pull request approved",
+    label: t.git.pullRequest.approve,
+    sent: t.git.pullRequest.pullRequestApproved,
     icon: <CheckIcon className="size-3" />,
   },
   {
     value: "request-changes",
-    label: "Request changes",
-    sent: "Changes requested",
+    label: t.git.pullRequest.requestChanges,
+    sent: t.git.pullRequest.changesRequested,
     icon: <XCircleIcon className="size-3" />,
   },
 ];
 
+/**
+ * Renders pull request review form from the supplied display data and callbacks.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 export function PullRequestReviewForm({
   environmentId,
   reference,
@@ -101,7 +108,7 @@ export function PullRequestReviewForm({
     onPendingChange(false);
     if (result._tag === "Failure") {
       // The draft is kept: whatever went wrong, retyping the review is not the answer.
-      toastManager.add({ type: "error", title: "The review could not be submitted" });
+      toastManager.add({ type: "error", title: t.git.pullRequest.theReviewCouldNotBeSubmitted });
       return;
     }
     // More remarks may have been added while the host was accepting this snapshot. Leave those,
@@ -129,10 +136,10 @@ export function PullRequestReviewForm({
         value={body}
         placeholder={
           requestChangesSummaryRequired && verdicts.includes("request-changes")
-            ? "Summarize your review (required to request changes)"
-            : "Summarize your review (optional)"
+            ? t.git.pullRequest.summarizeYourReviewRequiredToRequestChanges
+            : t.git.pullRequest.summarizeYourReviewOptional
         }
-        aria-label="Review summary"
+        aria-label={t.git.pullRequest.reviewSummary}
         onChange={(event) => setSummary(reviewKey, event.target.value)}
       />
       <div className="mt-2 flex justify-between gap-2">
@@ -143,7 +150,11 @@ export function PullRequestReviewForm({
             if (value !== null) setRequestedVerdict(value);
           }}
         >
-          <SelectTrigger size="xs" className="w-auto min-w-0" aria-label="Review verdict">
+          <SelectTrigger
+            size="xs"
+            className="w-auto min-w-0"
+            aria-label={t.git.pullRequest.reviewVerdict}
+          >
             <span className="flex items-center gap-1.5">
               {selectedVerdict?.icon}
               {selectedVerdict?.label}
@@ -167,7 +178,7 @@ export function PullRequestReviewForm({
             if (selectedVerdict !== undefined) void submit(selectedVerdict);
           }}
         >
-          {pending ? "Submitting..." : "Submit review"}
+          {pending ? t.git.pullRequest.submitting : t.git.pullRequest.submitReview}
         </Button>
       </div>
     </>

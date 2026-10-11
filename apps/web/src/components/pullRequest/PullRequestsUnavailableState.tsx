@@ -1,3 +1,5 @@
+/** Owns pull requests unavailable state on the web pull-request surface; host data and agent context remain unchanged. */
+import { t } from "~/i18n";
 import { RefreshIcon } from "~/components/ui/refresh-icon";
 import { ExternalLinkIcon } from "lucide-react";
 
@@ -5,8 +7,13 @@ import { Button } from "../ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../ui/empty";
 import { PullRequestGlyph } from "./pullRequestIcons";
 
+/**
+ * Renders pull requests unavailable state from the supplied display data and callbacks.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 export function PullRequestsUnavailableState({
-  title = "Could not load pull requests",
+  title = t.git.pullRequest.couldNotLoadPullRequests,
   error,
   onRetry,
   refreshing = false,
@@ -40,7 +47,7 @@ export function PullRequestsUnavailableState({
               aria-busy={refreshing}
             >
               <RefreshIcon size="sm" refreshing={refreshing} />
-              Retry
+              {t.git.pullRequest.retry}
             </Button>
           ) : null}
           {gitHubUrl ? (
@@ -50,7 +57,7 @@ export function PullRequestsUnavailableState({
               render={<a href={gitHubUrl} target="_blank" rel="noopener noreferrer" />}
             >
               <ExternalLinkIcon aria-hidden className="size-3.5" />
-              Open on GitHub
+              {t.git.pullRequest.openOnGitHub}
             </Button>
           ) : null}
         </div>

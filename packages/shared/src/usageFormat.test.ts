@@ -1,8 +1,11 @@
+import { englishUsageMessages } from "./usageLabels.ts";
 // @effect-diagnostics globalDate:off -- A fixed instant keeps calendar-window assertions deterministic.
 import { describe, expect, it, vi } from "vite-plus/test";
 
 import {
   enumerateHourStarts,
+  formatDayShort,
+  formatUsageContractMismatch,
   formatDateTimeShort,
   formatHourShort,
   formatPercent,
@@ -106,4 +109,26 @@ describe("hourly usage formatting", () => {
       resolvedOptions.mockRestore();
     }
   });
+});
+
+it("localizes usage calendar labels and mismatch notices while preserving invalid input", () => {
+  const messages = {
+    ...englishUsageMessages,
+    dateLocale: "zh-CN",
+    day: (month: number, day: number) => `${month}月${day}日`,
+    today: (hour: string) => `今天 ${hour}`,
+    yesterday: (hour: string) => `昨天 ${hour}`,
+    serverBehind: (environment: string) => `${environment} 服务端版本较旧，已排除用量。`,
+  };
+  expect(formatDayShort("2026-08-07", messages)).toBe("8月7日");
+  expect(
+    formatRelativeHourShort("2026-08-11T05:00:00Z", "2026-08-11T12:00:00Z", "UTC", messages),
+  ).toBe("今天 5时");
+  expect(
+    formatRelativeHourShort("2026-08-10T05:00:00Z", "2026-08-11T12:00:00Z", "UTC", messages),
+  ).toBe("昨天 5时");
+  expect(formatDateTimeShort("invalid", "UTC", messages)).toBe("invalid");
+  expect(formatUsageContractMismatch("Remote", { direction: "serverBehind" }, messages)).toBe(
+    "Remote 服务端版本较旧，已排除用量。",
+  );
 });

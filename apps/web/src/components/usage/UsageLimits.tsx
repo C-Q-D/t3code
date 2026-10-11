@@ -1,3 +1,5 @@
+/** Localized usage presentation and existing interaction behavior. */
+import { t } from "~/i18n";
 import {
   AuthProvidersManageScope,
   type EnvironmentId,
@@ -41,9 +43,9 @@ import { UsageLimitsPooled } from "./UsageLimitsPooled";
 import { PROVIDER_PRESENTATION } from "./usageProviders";
 
 const PACE: Record<LimitPace, { readonly label: string; readonly icon: typeof GaugeIcon }> = {
-  ahead: { label: "Ahead of pace: spending faster than the window elapses", icon: TrendingUpIcon },
-  on: { label: "On pace with the window", icon: GaugeIcon },
-  under: { label: "Under pace: headroom left for the rest of the window", icon: TrendingDownIcon },
+  ahead: { label: t.tools.usage.aheadOfPace, icon: TrendingUpIcon },
+  on: { label: t.tools.usage.onPace, icon: GaugeIcon },
+  under: { label: t.tools.usage.underPace, icon: TrendingDownIcon },
 };
 
 /** The series colour the cost chart uses for this driver, so the two views read as one. */
@@ -94,13 +96,11 @@ function WindowBar({
   const elapsed = elapsedShare(window, now);
   // The fill is quota left, so the even-spending mark is the time left.
   const timeLeft = elapsed === null ? null : Math.round((1 - elapsed) * 100);
-  const resetsIn = formatResetsIn(window, now);
+  const resetsIn = formatResetsIn(window, now, t.chat.workLog.shared.usageLimits);
   const resetsAt = window.resetsAt
     ? formatUpcomingTimestamp(window.resetsAt, timestampFormat, now)
     : null;
-  const summary = `${window.label}: ${remaining}% left${
-    timeLeft === null ? "" : `, ${timeLeft}% of the window left`
-  }${resetsIn ? `, ${resetsIn}` : ""}`;
+  const summary = t.tools.usage.windowSummary(window.label, remaining, timeLeft, resetsIn);
 
   return (
     <Tooltip>
@@ -132,14 +132,17 @@ function WindowBar({
       <TooltipPopup side="top">
         <div className="flex flex-col gap-0.5">
           <span className="text-foreground">
-            {remaining}% left{timeLeft !== null ? ` · ${timeLeft}% of the window left` : ""}
+            {remaining}
+            {t.tools.usage.percentLeft}
+            {timeLeft !== null ? t.tools.usage.timeLeftSuffix(timeLeft) : ""}
           </span>
           {timeLeft !== null ? (
-            <span className="text-muted-foreground">The line is where even spending would be.</span>
+            <span className="text-muted-foreground">{t.tools.usage.evenSpending}</span>
           ) : null}
           {resetsAt ? (
             <span className="text-muted-foreground">
-              Resets {resetsAt}
+              {t.tools.usage.resetsPrefix}
+              {resetsAt}
               {resetsIn ? ` · ${resetsIn}` : ""}
             </span>
           ) : null}
@@ -175,13 +178,14 @@ export function LimitWindows({
     >
       {windows.map((window) => {
         const pace = paceOf(window, now);
-        const resetsIn = formatResetsIn(window, now);
+        const resetsIn = formatResetsIn(window, now, t.chat.workLog.shared.usageLimits);
         return (
           <Fragment key={window.id}>
             <span className="flex min-w-0 items-center gap-2 text-xs">
               <span className="truncate text-muted-foreground">{window.label}</span>
               <span className="ms-auto shrink-0 font-medium text-foreground tabular-nums">
-                {remainingPercent(window)}% left
+                {remainingPercent(window)}
+                {t.tools.usage.percentLeft}
               </span>
             </span>
             <WindowBar color={color} window={window} now={now} />
@@ -197,10 +201,10 @@ export function LimitWindows({
 }
 
 const OUTCOME_TEXT: Record<ProviderConsumeResetCreditOutcome, string> = {
-  reset: "Reset applied. Your windows have cleared.",
-  nothingToReset: "Nothing to reset right now.",
-  noCredit: "No reset credit left.",
-  alreadyRedeemed: "That credit was already redeemed.",
+  reset: t.tools.usage.resetApplied,
+  nothingToReset: t.tools.usage.nothingToReset,
+  noCredit: t.tools.usage.noCredit,
+  alreadyRedeemed: t.tools.usage.alreadyRedeemed,
 };
 
 /** Everything a redeem needs: where to send it and what to say afterwards. */
@@ -228,7 +232,7 @@ export function useResetCredit(
     setStatus(
       "error" in result.cause && result.cause.error instanceof Error
         ? result.cause.error.message
-        : "Could not use the reset credit.",
+        : t.tools.usage.resetFailed,
     );
   };
 
@@ -256,16 +260,15 @@ export function ResetCreditDialog({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogPopup>
         <AlertDialogHeader>
-          <AlertDialogTitle>Use a reset credit?</AlertDialogTitle>
-          <AlertDialogDescription>
-            This redeems one credit on your account and clears the current rate-limit windows. It
-            cannot be undone.
-          </AlertDialogDescription>
+          <AlertDialogTitle>{t.tools.usage.confirmReset}</AlertDialogTitle>
+          <AlertDialogDescription>{t.tools.usage.resetHint}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
+          <AlertDialogClose render={<Button variant="outline" />}>
+            {t.common.confirm.cancel}
+          </AlertDialogClose>
           <Button disabled={disabled} onClick={onConfirm}>
-            Use credit
+            {t.tools.usage.redeemCredit}
           </Button>
         </AlertDialogFooter>
       </AlertDialogPopup>
@@ -280,14 +283,11 @@ export function resetCreditsSummary(
   compact = false,
 ): string {
   const expiresIn = credits.nextExpiresAt
-    ? formatDuration(Date.parse(credits.nextExpiresAt) - now)
+    ? formatDuration(Date.parse(credits.nextExpiresAt) - now, t.chat.workLog.shared.usageLimits)
     : null;
-  if (credits.availableCount === 0) return "No reset credits banked";
-  if (compact)
-    return `${credits.availableCount} banked${expiresIn ? ` · expires in ${expiresIn}` : ""}`;
-  return `${credits.availableCount} ${credits.availableCount === 1 ? "reset credit" : "reset credits"} banked${
-    expiresIn ? ` · next expires in ${expiresIn}` : ""
-  }`;
+  if (credits.availableCount === 0) return t.tools.usage.noResetCredits;
+  if (compact) return t.tools.usage.compactCredits(credits.availableCount, expiresIn);
+  return t.tools.usage.resetCredits(credits.availableCount, expiresIn);
 }
 
 /** Banked reset credits with the redeem button and its confirm, self-contained. */
@@ -319,7 +319,7 @@ export function ResetCredits({
             if (readEnvironmentScope(environmentId, AuthProvidersManageScope)) setConfirming(true);
           }}
         >
-          {busy ? "Using…" : "Use reset"}
+          {busy ? t.tools.usage.using : t.tools.usage.redeemReset}
         </Button>
       ) : null}
       {status ? <span className="text-foreground">{status}</span> : null}

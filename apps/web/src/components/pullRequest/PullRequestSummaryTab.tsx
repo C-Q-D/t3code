@@ -1,3 +1,5 @@
+/** Owns pull request summary tab on the web pull-request surface; host data and agent context remain unchanged. */
+import { t } from "~/i18n";
 import { useAtomCommand } from "~/state/use-atom-command";
 import type {
   EnvironmentId,
@@ -64,6 +66,11 @@ function reviewerKey(login: string): string {
   return login.toLowerCase();
 }
 
+/**
+ * Renders comment identity from the supplied display data and callbacks.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 function CommentIdentity({
   comment,
   detail,
@@ -98,13 +105,18 @@ function CommentIdentity({
         </TooltipTrigger>
         <TooltipPopup>
           {new Date(comment.createdAt).toLocaleString()}
-          {comment.url ? " · Open comment on host" : ""}
+          {comment.url ? t.git.pullRequest.openCommentOnHost : ""}
         </TooltipPopup>
       </Tooltip>
     </div>
   );
 }
 
+/**
+ * Renders the file and line location of a review comment; returns null for a comment without a path.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface; null under the conditions described above.
+ */
 function CommentLocation({
   comment,
   thread,
@@ -121,7 +133,7 @@ function CommentLocation({
         <TooltipTrigger render={<span className="truncate font-mono" />}>{label}</TooltipTrigger>
         <TooltipPopup>{label}</TooltipPopup>
       </Tooltip>
-      {thread?.isOutdated ? <span className="shrink-0">Outdated</span> : null}
+      {thread?.isOutdated ? <span className="shrink-0">{t.git.pullRequest.outdated2}</span> : null}
     </div>
   );
 }
@@ -147,6 +159,8 @@ interface CommentEditing {
 /**
  * A remark's words, and the pencil that swaps them for the editor. The pencil is revealed by
  * hovering the remark, like the reaction bar's own, so the parent must carry `group`.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
  */
 function CommentBody({
   comment,
@@ -165,7 +179,7 @@ function CommentBody({
         cwd={editing.cwd}
         environmentId={editing.environmentId}
         threadRef={editing.threadRef}
-        label="Edit comment"
+        label={t.git.pullRequest.editComment}
         saving={editing.saving}
         onSave={(body) => editing.onSave(comment, body)}
         onCancel={() => editing.onEdit(null)}
@@ -183,7 +197,10 @@ function CommentBody({
         threadRef={editing.threadRef}
       />
       {editing.canEdit(comment) ? (
-        <PullRequestEditButton aria-label="Edit comment" onClick={() => editing.onEdit(comment)} />
+        <PullRequestEditButton
+          aria-label={t.git.pullRequest.editComment}
+          onClick={() => editing.onEdit(comment)}
+        />
       ) : null}
     </div>
   );
@@ -349,6 +366,11 @@ function Section({
   );
 }
 
+/**
+ * Renders comment group from the supplied display data and callbacks.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 function CommentGroup({
   label,
   comments,
@@ -414,16 +436,16 @@ function CommentGroup({
               <span className="block text-xs font-medium text-foreground/90">{label}</span>
               <span className="flex flex-wrap gap-x-1.5 text-2xs text-muted-foreground">
                 <span>
-                  {authors.length} {authors.length === 1 ? "author" : "authors"}
+                  {authors.length} {t.git.pullRequest.authorWord(authors.length)}
                 </span>
                 {fileCount > 0 ? (
                   <span>
-                    · {fileCount} {fileCount === 1 ? "file" : "files"}
+                    · {fileCount} {t.git.pullRequest.fileWord(fileCount)}
                   </span>
                 ) : null}
                 {latest ? (
                   <span>
-                    · Latest{" "}
+                    {t.git.pullRequest.latest}{" "}
                     <Tooltip>
                       <TooltipTrigger render={<time dateTime={latest} />}>
                         {formatRelativeTimeLabel(latest)}
@@ -454,6 +476,11 @@ function CommentGroup({
  */
 const COMMENT_PAGE = 10;
 
+/**
+ * Renders pull request summary tab from the supplied display data and callbacks.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 export function PullRequestSummaryTab({
   environmentId,
   threadRef,
@@ -463,8 +490,8 @@ export function PullRequestSummaryTab({
   checksStale = false,
   activityError,
   pendingFinding,
-  fixFindingLabel = "Fix in a thread",
-  fixCheckLabel = "Fix",
+  fixFindingLabel = t.git.pullRequest.fixInAThread,
+  fixCheckLabel = t.git.pullRequest.fix,
   onFixFinding,
   onRefresh,
   onRefreshChecks = onRefresh,
@@ -526,8 +553,10 @@ export function PullRequestSummaryTab({
         className="w-full"
         onClick={() => setShown({ url: detail.url, count: shownComments + COMMENT_PAGE })}
       >
-        Show {Math.min(hiddenCommentCount, COMMENT_PAGE)} older comment
-        {hiddenCommentCount === 1 ? "" : "s"} ({hiddenCommentCount} hidden)
+        {t.git.pullRequest.olderComments(
+          Math.min(hiddenCommentCount, COMMENT_PAGE),
+          hiddenCommentCount,
+        )}
       </Button>
     ) : null;
   // Read from the whole conversation, not the window shown below it: a verdict older than the
@@ -571,7 +600,7 @@ export function PullRequestSummaryTab({
   const openCheck = (url: string) => {
     void openLink(url).catch((error: unknown) => {
       console.error(error);
-      toastManager.add({ type: "error", title: "Unable to open check details" });
+      toastManager.add({ type: "error", title: t.git.pullRequest.unableToOpenCheckDetails });
     });
   };
 
@@ -600,7 +629,7 @@ export function PullRequestSummaryTab({
     const result = await update({ environmentId, input: { ...reference, body } });
     setBodySaving(false);
     if (result._tag === "Failure") {
-      toastManager.add({ type: "error", title: "Could not save the description" });
+      toastManager.add({ type: "error", title: t.git.pullRequest.couldNotSaveTheDescription });
       return;
     }
     setBodyScope(null);
@@ -627,7 +656,7 @@ export function PullRequestSummaryTab({
       });
       setCommentSaving(false);
       if (result._tag === "Failure") {
-        toastManager.add({ type: "error", title: "Could not save the comment" });
+        toastManager.add({ type: "error", title: t.git.pullRequest.couldNotSaveTheComment });
         return;
       }
       setCommentScope(null);
@@ -688,7 +717,9 @@ export function PullRequestSummaryTab({
               onClick={() => onFixFinding(finding)}
             >
               <HammerIcon className="size-3" />
-              {pendingFinding === pullRequestFindingKey(finding) ? "Preparing..." : fixFindingLabel}
+              {pendingFinding === pullRequestFindingKey(finding)
+                ? t.git.pullRequest.preparing
+                : fixFindingLabel}
             </Button>
           ) : null}
           {reactionBar}
@@ -711,10 +742,10 @@ export function PullRequestSummaryTab({
     <div className="h-full overflow-y-auto" data-pull-request-summary-scroll>
       <section className="px-4 pt-2.5 pb-1">
         <div className="space-y-2">
-          <MetaRow icon={<UsersIcon className="size-3.5" />} label="Reviewers">
+          <MetaRow icon={<UsersIcon className="size-3.5" />} label={t.git.pullRequest.reviewers}>
             <span className="flex min-w-0 flex-wrap items-center gap-1.5">
               {reviewerEntries.length === 0 ? (
-                <span className="text-muted-foreground">None</span>
+                <span className="text-muted-foreground">{t.git.pullRequest.none}</span>
               ) : (
                 <span className="flex items-center -space-x-1">
                   {reviewerEntries.map((entry) => {
@@ -796,10 +827,10 @@ export function PullRequestSummaryTab({
           {/* The row is shown empty only where a label could be put on it from here; on a host
               with none to offer, an empty row is a row about nothing. */}
           {detail.labels.length > 0 || detail.capabilities.labels === true ? (
-            <MetaRow icon={<TagIcon className="size-3.5" />} label="Labels">
+            <MetaRow icon={<TagIcon className="size-3.5" />} label={t.git.pullRequest.labels}>
               <span className="flex min-w-0 flex-wrap items-center gap-1">
                 {detail.labels.length === 0 ? (
-                  <span className="text-muted-foreground">None</span>
+                  <span className="text-muted-foreground">{t.git.pullRequest.none}</span>
                 ) : (
                   detail.labels.map((label) => (
                     <PullRequestLabelChip
@@ -823,7 +854,7 @@ export function PullRequestSummaryTab({
         </div>
       </section>
 
-      <Section key={`description:${detail.url}`} title="Description" keepMounted>
+      <Section key={`description:${detail.url}`} title={t.git.pullRequest.description} keepMounted>
         <div className="group">
           {bodyScope === detail.url ? (
             <PullRequestMarkdownEditor
@@ -833,8 +864,8 @@ export function PullRequestSummaryTab({
               cwd={detail.workspaceRoot}
               environmentId={environmentId}
               threadRef={threadRef}
-              label="Pull request description"
-              placeholder="Describe this pull request"
+              label={t.git.pullRequest.pullRequestDescription}
+              placeholder={t.git.pullRequest.describeThisPullRequest}
               saving={bodySaving}
               onSave={(body) => void saveBody(body)}
               onCancel={() => setBodyScope(null)}
@@ -843,14 +874,18 @@ export function PullRequestSummaryTab({
             <div className="flex items-start gap-1">
               <PullRequestMarkdown
                 className="min-w-0 flex-1"
-                text={detail.body.trim().length > 0 ? detail.body : "_No description provided._"}
+                text={
+                  detail.body.trim().length > 0
+                    ? detail.body
+                    : t.git.pullRequest.noDescriptionProvided
+                }
                 cwd={detail.workspaceRoot}
                 environmentId={environmentId}
                 threadRef={threadRef}
               />
               {canEditPullRequestChangeRequest(detail) ? (
                 <PullRequestEditButton
-                  aria-label="Edit description"
+                  aria-label={t.git.pullRequest.editDescription}
                   onClick={() => setBodyScope(detail.url)}
                 />
               ) : null}
@@ -859,16 +894,16 @@ export function PullRequestSummaryTab({
         </div>
       </Section>
 
-      <Section key={`checks:${detail.url}`} title="Checks" defaultOpen={false}>
+      <Section key={`checks:${detail.url}`} title={t.git.pullRequest.checks} defaultOpen={false}>
         {checksStale ? (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span>Check details are out of date.</span>
+            <span>{t.git.pullRequest.checkDetailsAreOutOfDate}</span>
             <Button size="xs" variant="ghost" onClick={onRefreshChecks}>
-              Refresh
+              {t.git.pullRequest.refresh}
             </Button>
           </div>
         ) : detail.checks.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No checks reported.</p>
+          <p className="text-xs text-muted-foreground">{t.git.pullRequest.noChecksReported2}</p>
         ) : (
           detail.checks.map((check, index) => {
             const finding = { kind: "check", check } as const;
@@ -907,7 +942,7 @@ export function PullRequestSummaryTab({
                   >
                     <HammerIcon className="size-3" />
                     {pendingFinding === pullRequestFindingKey(finding)
-                      ? "Preparing..."
+                      ? t.git.pullRequest.preparing
                       : fixCheckLabel}
                   </Button>
                 ) : null}
@@ -918,7 +953,7 @@ export function PullRequestSummaryTab({
       </Section>
 
       <Section
-        title={`Comments (${detail.commentCount})`}
+        title={t.git.pullRequest.commentsCount(detail.commentCount)}
         actions={
           <Button
             size="xs"
@@ -926,13 +961,15 @@ export function PullRequestSummaryTab({
             className="shrink-0"
             aria-label={
               commentOrder === "newest"
-                ? "Show oldest comments first"
-                : "Show newest comments first"
+                ? t.git.pullRequest.showOldestCommentsFirst
+                : t.git.pullRequest.showNewestCommentsFirst
             }
             onClick={() => setCommentOrder((value) => (value === "newest" ? "oldest" : "newest"))}
           >
             <ArrowDownUpIcon aria-hidden className="size-3" />
-            {commentOrder === "newest" ? "Newest first" : "Oldest first"}
+            {commentOrder === "newest"
+              ? t.git.pullRequest.newestFirst
+              : t.git.pullRequest.oldestFirst}
           </Button>
         }
       >
@@ -944,12 +981,13 @@ export function PullRequestSummaryTab({
           <>
             {detail.commentsTruncated ? (
               <p className="mb-2 rounded-md border border-warning/30 bg-warning-surface px-2 py-1.5 text-xs">
-                This conversation is longer than this page reads in one go. The most recent{" "}
-                {detail.comments.length} are here; open it on the host to read the rest.
+                {t.git.pullRequest.truncatedComments(detail.comments.length)}
               </p>
             ) : null}
             {detail.comments.length === 0 ? (
-              <p className="py-2 text-xs text-muted-foreground">No comments yet.</p>
+              <p className="py-2 text-xs text-muted-foreground">
+                {t.git.pullRequest.noCommentsYet}
+              </p>
             ) : (
               <div className="space-y-3">
                 {commentOrder === "oldest" ? showOldestCommentsButton : null}
@@ -962,13 +1000,13 @@ export function PullRequestSummaryTab({
                     className="w-full"
                     onClick={() => setShown({ url: detail.url, count: COMMENT_PAGE })}
                   >
-                    Show only {COMMENT_PAGE} recent comments
+                    {t.git.pullRequest.recentComments(COMMENT_PAGE)}
                   </Button>
                 ) : null}
                 {botComments.length > 0 ? (
                   <CommentGroup
                     key={`bots:${detail.url}`}
-                    label={`${botComments.length} bot comment${botComments.length === 1 ? "" : "s"}`}
+                    label={t.git.pullRequest.botCommentsCount(botComments.length)}
                     comments={botComments}
                     detail={detail}
                     onOpenChange={(open) => {
@@ -993,8 +1031,12 @@ export function PullRequestSummaryTab({
                             })
                           }
                         >
-                          Show {Math.min(hiddenBotCommentCount, COMMENT_PAGE)} older bot comment
-                          {hiddenBotCommentCount === 1 ? "" : "s"} ({hiddenBotCommentCount} hidden)
+                          {t.git.pullRequest.showPrefix}
+                          {Math.min(hiddenBotCommentCount, COMMENT_PAGE)}
+                          {t.git.pullRequest.olderBotCommentStem}
+                          {t.git.pullRequest.commentPluralSuffix(hiddenBotCommentCount)} (
+                          {hiddenBotCommentCount}
+                          {t.git.pullRequest.hiddenSuffix}
                         </Button>
                       ) : null}
                       {shownBotComments > COMMENT_PAGE ? (
@@ -1004,7 +1046,9 @@ export function PullRequestSummaryTab({
                           className="w-full"
                           onClick={() => setShownBots({ url: detail.url, count: COMMENT_PAGE })}
                         >
-                          Show only {COMMENT_PAGE} recent bot comments
+                          {t.git.pullRequest.showOnlyPrefix}
+                          {COMMENT_PAGE}
+                          {t.git.pullRequest.recentBotCommentStem}
                         </Button>
                       ) : null}
                     </div>
@@ -1013,7 +1057,7 @@ export function PullRequestSummaryTab({
                 {finishedComments.length > 0 ? (
                   <CommentGroup
                     key={detail.url}
-                    label={`${finishedComments.length} resolved or dismissed comment${finishedComments.length === 1 ? "" : "s"}`}
+                    label={t.git.pullRequest.finishedCommentsCount(finishedComments.length)}
                     comments={finishedComments}
                     detail={detail}
                   >
@@ -1027,7 +1071,11 @@ export function PullRequestSummaryTab({
                             editing={commentEditing}
                             detail={detail}
                             thread={thread}
-                            label={thread?.isResolved ? "Resolved" : "Review dismissed"}
+                            label={
+                              thread?.isResolved
+                                ? t.git.pullRequest.resolved
+                                : t.git.pullRequest.reviewDismissed
+                            }
                             body={visibleBody(comment.body)}
                             reactionBar={
                               <PullRequestReactionBar

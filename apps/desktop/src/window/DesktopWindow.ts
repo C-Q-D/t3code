@@ -1,3 +1,6 @@
+/** Owns desktop windows, offline startup presentation and native context menus. */
+import * as DesktopUiLocale from "../i18n/DesktopUiLocale.ts";
+import { localizedRole } from "../i18n/desktopMessages.ts";
 import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -202,12 +205,17 @@ export function resolveInitialMainWindowBounds(
 // A self-contained "Connecting to WSL" splash, shown immediately in wsl-only
 // mode while the WSL backend (which serves the renderer) cold-boots. Inlined as
 // a data URL so it needs no bundled asset and no backend — pure CSS, no JS.
-function buildConnectingSplashDataUrl(shouldUseDarkColors: boolean): string {
+/** Builds an offline splash using a bundled label, with HTML metacharacters escaped. */
+function buildConnectingSplashDataUrl(shouldUseDarkColors: boolean, label: string): string {
+  const escapedLabel = label
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
   const background = getInitialWindowBackgroundColor(shouldUseDarkColors);
-  const label = shouldUseDarkColors ? "#9ca3af" : "#6b7280";
+  const labelColor = shouldUseDarkColors ? "#9ca3af" : "#6b7280";
   const accent = shouldUseDarkColors ? "#f8fafc" : "#1f2937";
   const track = shouldUseDarkColors ? "rgba(248,250,252,0.18)" : "rgba(31,41,55,0.18)";
-  const html = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><style>html,body{margin:0;height:100%}body{background:${background};color:${label};font-family:system-ui,-apple-system,'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;-webkit-user-select:none;user-select:none;-webkit-app-region:drag}.spinner{width:26px;height:26px;border:3px solid ${track};border-top-color:${accent};border-radius:50%;animation:spin .8s linear infinite}.label{font-size:13px}@keyframes spin{to{transform:rotate(360deg)}}</style></head><body><div class="spinner"></div><div class="label">Connecting to WSL…</div></body></html>`;
+  const html = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><style>html,body{margin:0;height:100%}body{background:${background};color:${labelColor};font-family:system-ui,-apple-system,'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;-webkit-user-select:none;user-select:none;-webkit-app-region:drag}.spinner{width:26px;height:26px;border:3px solid ${track};border-top-color:${accent};border-radius:50%;animation:spin .8s linear infinite}.label{font-size:13px}@keyframes spin{to{transform:rotate(360deg)}}</style></head><body><div class="spinner"></div><div class="label">${escapedLabel}</div></body></html>`;
   return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
 }
 
@@ -334,6 +342,7 @@ export const make = Effect.gen(function* () {
   // The transient "Connecting to WSL" splash window, tracked separately so it
   // is never mistaken for the real main window.
   const splashWindowRef = yield* Ref.make<Option.Option<Electron.BrowserWindow>>(Option.none());
+  const uiLocale = yield* DesktopUiLocale.DesktopUiLocale;
   const context = yield* Effect.context<DesktopWindowRuntimeServices>();
   const runFork = Effect.runForkWith(context);
   const runPromise = Effect.runPromiseWith(context);
@@ -543,58 +552,65 @@ export const make = Effect.gen(function* () {
         // the host renderer when the user right-clicks inside a browser guest.
         contents.focus();
 
-        const menuTemplate: Electron.MenuItemConstructorOptions[] = [];
-
-        if (params.misspelledWord) {
-          for (const suggestion of params.dictionarySuggestions.slice(0, 5)) {
-            menuTemplate.push({
-              label: suggestion,
-              click: () => {
-                if (!contents.isDestroyed()) contents.replaceMisspelling(suggestion);
-              },
-            });
-          }
-          if (params.dictionarySuggestions.length === 0) {
-            menuTemplate.push({ label: "No suggestions", enabled: false });
-          }
-          menuTemplate.push({ type: "separator" });
-        }
-
-        if (Option.isSome(ElectronShell.parseSafeExternalUrl(params.linkURL))) {
-          menuTemplate.push(
-            {
-              label: "Copy Link",
-              click: () => {
-                void runPromise(electronShell.copyText(params.linkURL));
-              },
-            },
-            { type: "separator" },
-          );
-        }
-
-        if (params.mediaType === "image") {
-          menuTemplate.push({
-            label: "Copy Image",
-            click: () => {
-              if (!contents.isDestroyed()) contents.copyImageAt(params.x, params.y);
-            },
-          });
-          menuTemplate.push({ type: "separator" });
-        }
-
-        menuTemplate.push(
-          { role: "cut", enabled: params.editFlags.canCut },
-          { role: "copy", enabled: params.editFlags.canCopy },
-          { role: "paste", enabled: params.editFlags.canPaste },
-          { role: "selectAll", enabled: params.editFlags.canSelectAll },
-        );
-
         void runPromise(
-          electronMenu.popupTemplate({
-            window: ownerWindow,
-            template: menuTemplate,
-            ...(params.frame ? { frame: params.frame } : {}),
-          }),
+          Effect.gen(function* () {
+            const m = yield* uiLocale.messages;
+            if (contents.isDestroyed() || ownerWindow.isDestroyed()) return;
+            const labels = m.menu.roleLabels("T3 Code", environment.platform);
+            const menuTemplate: Electron.MenuItemConstructorOptions[] = [];
+
+            if (params.misspelledWord) {
+              for (const suggestion of params.dictionarySuggestions.slice(0, 5)) {
+                menuTemplate.push({
+                  label: suggestion,
+                  click: () => {
+                    if (!contents.isDestroyed()) contents.replaceMisspelling(suggestion);
+                  },
+                });
+              }
+              if (params.dictionarySuggestions.length === 0) {
+                menuTemplate.push({ label: m.contextMenu.noSuggestions, enabled: false });
+              }
+              menuTemplate.push({ type: "separator" });
+            }
+
+            if (Option.isSome(ElectronShell.parseSafeExternalUrl(params.linkURL))) {
+              menuTemplate.push(
+                {
+                  label: m.contextMenu.copyLink,
+                  click: () => {
+                    void runPromise(electronShell.copyText(params.linkURL));
+                  },
+                },
+                { type: "separator" },
+              );
+            }
+
+            if (params.mediaType === "image") {
+              menuTemplate.push({
+                label: m.contextMenu.copyImage,
+                click: () => {
+                  if (!contents.isDestroyed()) contents.copyImageAt(params.x, params.y);
+                },
+              });
+              menuTemplate.push({ type: "separator" });
+            }
+
+            menuTemplate.push(
+              { ...localizedRole("cut", labels), enabled: params.editFlags.canCut },
+              { ...localizedRole("copy", labels), enabled: params.editFlags.canCopy },
+              { ...localizedRole("paste", labels), enabled: params.editFlags.canPaste },
+              { ...localizedRole("selectAll", labels), enabled: params.editFlags.canSelectAll },
+            );
+
+            yield* electronMenu.popupTemplate({
+              window: ownerWindow,
+              template: menuTemplate,
+              ...(params.frame ? { frame: params.frame } : {}),
+            });
+          }).pipe(
+            Effect.catchCause((cause) => Effect.logWarning("Could not show context menu", cause)),
+          ),
         );
       });
       contents.on("did-create-window", (popup) => {
@@ -919,7 +935,8 @@ export const make = Effect.gen(function* () {
         splash.show();
       }
     });
-    void splash.loadURL(buildConnectingSplashDataUrl(shouldUseDarkColors));
+    const m = yield* uiLocale.messages;
+    void splash.loadURL(buildConnectingSplashDataUrl(shouldUseDarkColors, m.startup.connecting));
     yield* logWindowInfo("connecting splash shown");
   }).pipe(
     // The splash is best-effort UX — never let it fail startup.

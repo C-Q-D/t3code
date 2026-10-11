@@ -1,3 +1,5 @@
+/** Localized preview UI and interactions; preserves user data, commands, and protocol values. */
+import { t } from "~/i18n";
 import type { ScopedThreadRef } from "@t3tools/contracts";
 import { DiscoveryListRow } from "../ui/discovery-list";
 
@@ -22,7 +24,12 @@ export function PreviewLocalServerCard({ threadRef, server, onOpen }: Props) {
   );
 }
 
+/**
+ * Returns the process name when known, otherwise the localized listening status.
+ * @param server Discovered local server; a missing process name uses the listening label.
+ * @returns The value described above, without changing user data or protocol identifiers.
+ */
 function describeServer(server: PreviewableServer): string {
   if (server.processName) return server.processName;
-  return "Listening";
+  return t.tools.preview.listening;
 }

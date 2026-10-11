@@ -1,3 +1,5 @@
+/** Loads environment-scoped preview configuration; error messages use the active UI language. */
+import { t } from "~/i18n";
 import { useAtomValue } from "@effect/atom-react";
 import type {
   DesktopPreviewBridge,
@@ -14,15 +16,18 @@ import { previewBridge } from "~/components/preview/previewBridge";
 const PREVIEW_CONFIG_STALE_TIME_MS = 5 * 60_000;
 const PREVIEW_CONFIG_IDLE_TTL_MS = 10 * 60_000;
 
+/** Missing desktop preview bridge for the original environmentId. */
 export class PreviewWebviewBridgeUnavailableError extends Schema.TaggedError<PreviewWebviewBridgeUnavailableError>()(
   "PreviewWebviewBridgeUnavailableError",
   { environmentId: Schema.String },
 ) {
+  /** Returns the localized failure message for the original identifier; never returns empty text. */
   override get message(): string {
-    return `Desktop preview configuration is unavailable for environment "${this.environmentId}".`;
+    return t.tools.browser.configUnavailable(this.environmentId);
   }
 }
 
+/** Configuration read failure for environmentId; cause retains the bridge rejection. */
 export class PreviewWebviewConfigLoadError extends Schema.TaggedError<PreviewWebviewConfigLoadError>()(
   "PreviewWebviewConfigLoadError",
   {
@@ -30,8 +35,9 @@ export class PreviewWebviewConfigLoadError extends Schema.TaggedError<PreviewWeb
     cause: Schema.Defect(),
   },
 ) {
+  /** Returns the localized failure message for the original identifier; never returns empty text. */
   override get message(): string {
-    return `Failed to load desktop preview configuration for environment "${this.environmentId}".`;
+    return t.tools.browser.configLoadFailed(this.environmentId);
   }
 }
 

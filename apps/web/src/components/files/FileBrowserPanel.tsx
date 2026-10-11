@@ -1,3 +1,5 @@
+/** Localized files presentation and existing interaction behavior. */
+import { t } from "~/i18n";
 import { RefreshIcon } from "~/components/ui/refresh-icon";
 import type {
   ContextMenuItem as TreeContextMenuItem,
@@ -46,6 +48,7 @@ function treePath(entry: ProjectEntry): string {
   return entry.kind === "directory" ? `${entry.path}/` : entry.path;
 }
 
+/** Renders a workspace refresh action from props' pending state and callback; does not initiate refresh during render. */
 function RefreshFilesButton(props: { isPending: boolean; onRefresh: () => void }) {
   return (
     <Tooltip>
@@ -55,18 +58,21 @@ function RefreshFilesButton(props: { isPending: boolean; onRefresh: () => void }
             type="button"
             variant="ghost"
             size="icon-xs"
-            aria-label="Refresh workspace files"
+            aria-label={t.tools.files.refreshWorkspace}
             onClick={props.onRefresh}
           />
         }
       >
         <RefreshIcon refreshing={props.isPending} />
       </TooltipTrigger>
-      <TooltipPopup>{props.isPending ? "Refreshing…" : "Refresh files"}</TooltipPopup>
+      <TooltipPopup>
+        {props.isPending ? t.tools.files.refreshing : t.tools.files.refresh}
+      </TooltipPopup>
     </Tooltip>
   );
 }
 
+/** Renders the controlled file query and input callbacks; Escape is handled only by the existing search dismissal path. */
 function FileSearchField(props: {
   ariaLabel: string;
   name: string;
@@ -82,7 +88,7 @@ function FileSearchField(props: {
         size="sm"
         value={props.value}
         aria-label={props.ariaLabel}
-        placeholder="Search files"
+        placeholder={t.tools.files.search}
         spellCheck={false}
         onChange={(event) => props.onValueChange(event.target.value)}
         onKeyDown={(event) => {
@@ -95,6 +101,7 @@ function FileSearchField(props: {
   );
 }
 
+/** Renders the selected workspace's searchable file tree and context actions; callbacks select/open files while access checks gate host operations. */
 export default function FileBrowserPanel({
   environmentId,
   cwd,
@@ -184,8 +191,8 @@ export default function FileBrowserPanel({
       const clicked = await api.contextMenu.show(
         [
           ...fileMenuItems,
-          { id: "copy-mention", label: "Copy mention" },
-          { id: "add-to-chat", label: "Add to chat" },
+          { id: "copy-mention", label: t.tools.files.copyMention },
+          { id: "add-to-chat", label: t.tools.files.addToChat },
         ],
         position,
       );
@@ -201,12 +208,16 @@ export default function FileBrowserPanel({
       if (clicked === "copy-mention") {
         try {
           await writeTextToClipboard(mention);
-          toastManager.add({ type: "success", title: "Mention copied", description: relativePath });
+          toastManager.add({
+            type: "success",
+            title: t.tools.files.mentionCopied,
+            description: relativePath,
+          });
         } catch (error) {
           toastManager.add({
             type: "error",
-            title: "Failed to copy mention",
-            description: error instanceof Error ? error.message : "An error occurred.",
+            title: t.tools.files.copyMentionFailed,
+            description: error instanceof Error ? error.message : t.tools.files.error,
           });
         }
         return;
@@ -216,8 +227,8 @@ export default function FileBrowserPanel({
         if (!composer) {
           toastManager.add({
             type: "error",
-            title: "Unable to add to chat",
-            description: "Open a chat for this project and try again.",
+            title: t.tools.files.addToChatFailed,
+            description: t.tools.files.openChatHint,
           });
           return;
         }
@@ -225,8 +236,8 @@ export default function FileBrowserPanel({
         if (!inserted) {
           toastManager.add({
             type: "error",
-            title: "Unable to add to chat",
-            description: "The chat isn't ready to accept input right now.",
+            title: t.tools.files.addToChatFailed,
+            description: t.tools.files.chatNotReady,
           });
         }
       }
@@ -495,7 +506,7 @@ export default function FileBrowserPanel({
         <RefreshFilesButton isPending={isPending} onRefresh={handleRefresh} />
         <FileSearchField
           name="project-files-search"
-          ariaLabel={`Search ${projectName} files`}
+          ariaLabel={t.tools.files.searchProject(projectName)}
           value={search.value}
           onValueChange={handleSearchValueChange}
           onClose={closeSearch}
@@ -510,8 +521,8 @@ export default function FileBrowserPanel({
                   variant="ghost"
                   aria-label={
                     expandAll || allDirectoriesExpanded
-                      ? "Collapse all folders"
-                      : "Expand all folders"
+                      ? t.tools.files.collapseFolders
+                      : t.tools.files.expandFolders
                   }
                   onClick={toggleAllDirectories}
                 />
@@ -523,7 +534,9 @@ export default function FileBrowserPanel({
               />
             </TooltipTrigger>
             <TooltipPopup>
-              {expandAll || allDirectoriesExpanded ? "Collapse all folders" : "Expand all folders"}
+              {expandAll || allDirectoriesExpanded
+                ? t.tools.files.collapseFolders
+                : t.tools.files.expandFolders}
             </TooltipPopup>
           </Tooltip>
         ) : null}
@@ -534,22 +547,21 @@ export default function FileBrowserPanel({
           onClick={handleRefresh}
           className="p-4 text-left text-xs leading-relaxed text-destructive"
         >
-          {error ?? pathSearch.error} Click to retry.
+          {error ?? pathSearch.error}
+          {t.tools.files.clickRetry}
         </button>
       ) : null}
       {query.trim() && pathSearch.truncated && !pathSearch.isPending ? (
-        <div className="px-3 py-1 text-xs text-muted-foreground">
-          More matches available. Refine your search.
-        </div>
+        <div className="px-3 py-1 text-xs text-muted-foreground">{t.tools.files.refineSearch}</div>
       ) : null}
       {(isPending || pathSearch.isPending) && (
         <div role="status" className="px-3 py-1 text-xs text-muted-foreground">
-          Loading files…
+          {t.tools.files.loadingFiles}
         </div>
       )}
       <FileTree
         model={model}
-        aria-label={`${projectName} files`}
+        aria-label={t.tools.files.projectFiles(projectName)}
         className="min-h-0 flex-1 overflow-hidden"
         style={pierreTreeStyle(resolvedTheme)}
       />

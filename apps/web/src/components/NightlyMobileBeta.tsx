@@ -1,3 +1,5 @@
+/** Explains Nightly mobile compatibility and presents the beta distribution links. */
+import { t } from "~/i18n";
 import { parseSemver } from "@t3tools/shared/semver";
 import { useNavigate } from "@tanstack/react-router";
 import * as Schema from "effect/Schema";
@@ -59,13 +61,12 @@ export function NightlyMobileBetaNotice() {
     if (!IS_NIGHTLY_BUILD || noticeShown || isNoticeDismissed()) return;
     noticeShown = true;
     const toastId = toastManager.add({
-      title: "Nightly needs the beta mobile app",
-      description:
-        "Nightly uses the new orchestrator. The App Store and Google Play versions of T3 Code cannot connect to it.",
+      title: t.app.mobile.nightlyTitle,
+      description: t.app.mobile.nightlyDescription,
       timeout: 0,
       onClose: dismissNotice,
       actionProps: {
-        children: "Get the beta app",
+        children: t.app.mobile.getBeta,
         onClick: () => {
           toastManager.close(toastId);
           void navigate({ to: "/settings/general", hash: ROW_ID });
@@ -75,7 +76,7 @@ export function NightlyMobileBetaNotice() {
         leadingIcon: <SmartphoneIcon className="size-4" />,
         actionLayout: "stacked-end",
         secondaryActionProps: {
-          children: "Dismiss",
+          children: t.app.actions.dismiss,
           onClick: () => toastManager.close(toastId),
         },
         secondaryActionVariant: "ghost",
@@ -95,7 +96,7 @@ function BetaLinkQr({ url, label }: { url: string; label: string }) {
         <QRCodeSvg value={url} size={128} level="M" marginSize={1} title={label} />
       </div>
       <Button size="xs" variant="outline" onClick={() => copyToClipboard(url)}>
-        {isCopied ? "Copied" : "Copy link"}
+        {isCopied ? t.app.actions.copied : t.app.actions.copyLink}
       </Button>
     </div>
   );
@@ -106,8 +107,8 @@ export function NightlyMobileBetaRow() {
   return (
     <SettingsRow
       id={ROW_ID}
-      title="Mobile app"
-      description="Nightly needs the beta app. The App Store and Google Play versions cannot connect."
+      title={t.app.mobile.title}
+      description={t.app.mobile.betaDescription}
       control={
         <div className="flex items-center gap-2">
           <Popover>
@@ -118,10 +119,10 @@ export function NightlyMobileBetaRow() {
             <PopoverPopup align="end">
               <div className="flex flex-col gap-3">
                 <div className="space-y-1">
-                  <PopoverTitle>TestFlight beta</PopoverTitle>
-                  <p className="text-xs text-muted-foreground">Scan with your iPhone camera.</p>
+                  <PopoverTitle>{t.app.mobile.testFlightBeta}</PopoverTitle>
+                  <p className="text-xs text-muted-foreground">{t.app.mobile.scanIphone}</p>
                 </div>
-                <BetaLinkQr url={IOS_TESTFLIGHT_URL} label="TestFlight beta link" />
+                <BetaLinkQr url={IOS_TESTFLIGHT_URL} label={t.app.mobile.testFlightLink} />
               </div>
             </PopoverPopup>
           </Popover>
@@ -133,20 +134,25 @@ export function NightlyMobileBetaRow() {
             <PopoverPopup align="end">
               <div className="flex flex-col gap-3">
                 <div className="space-y-1">
-                  <PopoverTitle>Google Play beta</PopoverTitle>
+                  <PopoverTitle>{t.app.mobile.googlePlayBeta}</PopoverTitle>
                   <p className="max-w-72 text-xs text-muted-foreground">
-                    Use the same Google account for both steps. Step 2 can take up to an hour to
-                    work after you join the group.
+                    {t.app.mobile.googleStepsHint}
                   </p>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <p className="text-center text-xs font-medium">1. Join the group</p>
-                    <BetaLinkQr url={ANDROID_BETA_GROUP_URL} label="Android beta group link" />
+                    <p className="text-center text-xs font-medium">{t.app.mobile.joinGroup}</p>
+                    <BetaLinkQr
+                      url={ANDROID_BETA_GROUP_URL}
+                      label={t.app.mobile.androidGroupLink}
+                    />
                   </div>
                   <div className="space-y-2">
-                    <p className="text-center text-xs font-medium">2. Become a tester</p>
-                    <BetaLinkQr url={ANDROID_PLAY_TESTING_URL} label="Google Play beta link" />
+                    <p className="text-center text-xs font-medium">{t.app.mobile.becomeTester}</p>
+                    <BetaLinkQr
+                      url={ANDROID_PLAY_TESTING_URL}
+                      label={t.app.mobile.googlePlayLink}
+                    />
                   </div>
                 </div>
               </div>

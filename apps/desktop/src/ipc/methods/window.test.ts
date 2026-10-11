@@ -1,3 +1,4 @@
+import * as DesktopUiLocale from "../../i18n/DesktopUiLocale.ts";
 import { assert, describe, it } from "@effect/vitest";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { HostProcessEnvironment, HostProcessPlatform } from "@t3tools/shared/hostProcess";
@@ -263,6 +264,7 @@ describe("pickProjectFavicon", () => {
     settings?: DesktopAppSettings.DesktopSettings,
   ) =>
     Layer.mergeAll(
+      DesktopUiLocale.layerTest(),
       Layer.mock(ElectronDialog.ElectronDialog)({ pickFiles }),
       Layer.mock(ElectronWindow.ElectronWindow)({
         focusedMainOrFirst: Effect.succeedNone,

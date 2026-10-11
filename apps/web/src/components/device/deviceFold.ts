@@ -1,3 +1,5 @@
+/** Localized device UI and interactions; preserves user data, commands, and protocol values. */
+import { t } from "~/i18n";
 import type { DeviceHubAccess } from "@t3tools/client-runtime/state/deviceHubAccess";
 import { withDeviceHubQuery } from "@t3tools/client-runtime/state/deviceHubAccess";
 
@@ -12,9 +14,14 @@ export interface AndroidFoldState {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
+/**
+ * Validates Android fold state received from the hub.
+ * @param payload Unknown response body; must contain supported, posture, and a valid nullable hinge angle.
+ * @returns Confirmed fold state; throws a localized response error for malformed fields.
+ */
 const parseFold = (payload: unknown): AndroidFoldState => {
   if (!isRecord(payload) || payload.ok !== true || !isRecord(payload.fold)) {
-    throw new Error("Unexpected Android fold response.");
+    throw new Error(t.tools.device.unexpectedFold);
   }
   const { supported, posture, hingeAngle } = payload.fold;
   if (
@@ -27,11 +34,19 @@ const parseFold = (payload: unknown): AndroidFoldState => {
       posture !== "tent") ||
     (hingeAngle !== null && (typeof hingeAngle !== "number" || !Number.isFinite(hingeAngle)))
   ) {
-    throw new Error("Unexpected Android fold response.");
+    throw new Error(t.tools.device.unexpectedFold);
   }
   return { supported, posture, hingeAngle };
 };
 
+/**
+ * Reads or sets Android fold posture without changing the protocol payload.
+ * @param access Authenticated hub endpoints and credential policy.
+ * @param deviceId Original target device identifier.
+ * @param posture Optional native posture to set; absence performs a read.
+ * @param signal Optional caller cancellation signal; no additional timeout or retry is applied here.
+ * @returns Promise for validated fold state; network, cancellation, and response failures reject.
+ */
 const foldRequest = async (
   access: DeviceHubAccess,
   deviceId: string,
@@ -55,7 +70,7 @@ const foldRequest = async (
     const payload: unknown = await response.json().catch(() => null);
     const error = isRecord(payload) ? payload.error : null;
     throw new Error(
-      typeof error === "string" ? error : `Fold command failed (${response.status}).`,
+      typeof error === "string" ? error : t.tools.device.foldCommandFailed(response.status),
     );
   }
   return parseFold(await response.json());

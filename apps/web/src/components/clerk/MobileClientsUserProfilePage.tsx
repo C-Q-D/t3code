@@ -1,3 +1,5 @@
+/** Localized clerk presentation and existing interaction behavior. */
+import { t } from "~/i18n";
 import type { RelayClientDeviceRecord } from "@t3tools/contracts/relay";
 import { SmartphoneIcon } from "lucide-react";
 
@@ -19,6 +21,7 @@ import {
 
 const MOBILE_CLIENT_SKELETON_ROWS = ["primary", "secondary"] as const;
 
+/** Renders the supplied capability label with its enabled/disabled state; does not change device preferences. */
 function MobileClientStatusBadge({
   enabled,
   label,
@@ -28,11 +31,12 @@ function MobileClientStatusBadge({
 }) {
   return (
     <Badge variant={enabled ? "success" : "outline"}>
-      {label}: {enabled ? "On" : "Off"}
+      {label}: {enabled ? t.account.clerk.on : t.account.clerk.off}
     </Badge>
   );
 }
 
+/** Renders the supplied mobile device's identity, activity capabilities and update status without modifying registration. */
 function MobileClientRow({ device }: { readonly device: RelayClientDeviceRecord }) {
   return (
     <ClerkUserProfileRow icon={<SmartphoneIcon className="size-4" />}>
@@ -52,9 +56,12 @@ function MobileClientRow({ device }: { readonly device: RelayClientDeviceRecord 
       <div className="mt-2 flex flex-wrap gap-1.5">
         <MobileClientStatusBadge
           enabled={device.notifications.enabled}
-          label="Push notifications"
+          label={t.account.clerk.pushNotifications}
         />
-        <MobileClientStatusBadge enabled={device.liveActivities.enabled} label="Live Activities" />
+        <MobileClientStatusBadge
+          enabled={device.liveActivities.enabled}
+          label={t.account.clerk.liveActivities}
+        />
       </div>
       <p className="mt-1.5 text-xs leading-4.5 text-muted-foreground/80">
         {mobileClientNotificationDetail(device)}
@@ -63,9 +70,10 @@ function MobileClientRow({ device }: { readonly device: RelayClientDeviceRecord 
   );
 }
 
+/** Renders the mobile-client list's accessible loading placeholder. */
 function MobileClientsSkeleton() {
   return (
-    <div aria-label="Loading mobile clients" className="divide-y border-t" role="status">
+    <div aria-label={t.account.clerk.loadingMobile} className="divide-y border-t" role="status">
       {MOBILE_CLIENT_SKELETON_ROWS.map((row) => (
         <div key={row} className="py-4">
           <div className="flex gap-3">
@@ -85,6 +93,7 @@ function MobileClientsSkeleton() {
   );
 }
 
+/** Renders installation guidance when the account has no registered mobile clients. */
 function EmptyMobileClients() {
   return (
     <Empty size="compact">
@@ -92,16 +101,14 @@ function EmptyMobileClients() {
         <SmartphoneIcon />
       </EmptyMedia>
       <EmptyHeader>
-        <EmptyTitle>No mobile clients</EmptyTitle>
-        <EmptyDescription>
-          Install T3 Code on your phone and sign in to T3 Connect to get push notifications and Live
-          Activities.
-        </EmptyDescription>
+        <EmptyTitle>{t.account.clerk.noMobile}</EmptyTitle>
+        <EmptyDescription>{t.account.clerk.installMobileHint}</EmptyDescription>
       </EmptyHeader>
     </Empty>
   );
 }
 
+/** Renders registered mobile devices from relay state, including loading, errors, retry and empty results. */
 export function MobileClientsUserProfilePage() {
   const devicesState = useManagedRelayDevices();
   const devices = devicesState.data ?? [];
@@ -111,8 +118,8 @@ export function MobileClientsUserProfilePage() {
 
   return (
     <ClerkUserProfilePage
-      title="Mobile clients"
-      description="Mobile devices that get notifications from your environments."
+      title={t.account.clerk.mobileClients}
+      description={t.account.clerk.mobileHint}
       action={
         <ClerkUserProfileRefreshButton
           isPending={devicesState.isPending}
@@ -128,12 +135,12 @@ export function MobileClientsUserProfilePage() {
           >
             <div>
               <p className="font-medium text-destructive-foreground">
-                Could not load mobile clients
+                {t.account.clerk.loadMobileFailed}
               </p>
               <p className="mt-0.5 text-xs text-muted-foreground">{devicesState.error}</p>
             </div>
             <Button size="xs" variant="outline" onClick={devicesState.refresh}>
-              Try again
+              {t.account.clerk.tryAgain}
             </Button>
           </div>
         ) : null}

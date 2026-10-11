@@ -1,7 +1,9 @@
+/** Checks subagent group status and display metadata. */
 import { ProjectId, ProviderDriverKind } from "@t3tools/contracts";
 import type { OrchestrationV2TurnItemStatus } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 import {
+  summarizeSubagentStatuses,
   subagentGroupSummary,
   resolveSubagentMetadata,
   subagentDetailPreview,
@@ -163,4 +165,19 @@ describe("subagentDetailPreview", () => {
     ).toBe("Last progress");
     expect(subagentDetailPreview({ status: "pending" })).toBeNull();
   });
+});
+
+it("summarizes all subagent outcomes in reader order and merges active states", () => {
+  expect(
+    summarizeSubagentStatuses([
+      "idle",
+      "failed",
+      "completed",
+      "cancelled",
+      "running",
+      "waiting",
+      "pending",
+    ]),
+  ).toBe("3 working · 1 done · 1 failed · 1 stopped · 1 idle");
+  expect(summarizeSubagentStatuses([])).toBe("");
 });

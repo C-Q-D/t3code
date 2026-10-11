@@ -1,3 +1,5 @@
+/** Owns pull request comment form on the web pull-request surface; host data and agent context remain unchanged. */
+import { t } from "~/i18n";
 import { useAtomCommand } from "~/state/use-atom-command";
 /**
  * The comment half of the floating composer: a remark on the pull request itself, optionally
@@ -14,6 +16,11 @@ import { Textarea } from "../ui/textarea";
 import { toastManager } from "../ui/toast";
 import { PullRequestGlyph } from "./pullRequestIcons";
 
+/**
+ * Renders pull request comment form from the supplied display data and callbacks.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 export function PullRequestCommentForm({
   environmentId,
   reference,
@@ -74,7 +81,7 @@ export function PullRequestCommentForm({
     });
     if (result._tag === "Failure") {
       setSubmitting(null);
-      toastManager.add({ type: "error", title: "Could not post the comment" });
+      toastManager.add({ type: "error", title: t.git.pullRequest.couldNotPostTheComment });
       return;
     }
     setBody("");
@@ -92,8 +99,8 @@ export function PullRequestCommentForm({
         disabled={submitting !== null || actionPending}
         value={body}
         rows={3}
-        placeholder="Leave a comment"
-        aria-label="Comment on this pull request"
+        placeholder={t.git.pullRequest.leaveAComment}
+        aria-label={t.git.pullRequest.commentOnThisPullRequest}
         onChange={(event) => setBody(event.target.value)}
         onKeyDown={(event) => {
           if (event.nativeEvent.isComposing || event.keyCode === 229) return;
@@ -124,11 +131,11 @@ export function PullRequestCommentForm({
             )}
             {submitting === followUpAction
               ? followUpAction === "close"
-                ? "Closing..."
-                : "Reopening..."
+                ? t.git.pullRequest.closing
+                : t.git.pullRequest.reopening
               : followUpAction === "close"
-                ? "Close with comment"
-                : "Reopen with comment"}
+                ? t.git.pullRequest.closeWithComment
+                : t.git.pullRequest.reopenWithComment}
           </Button>
         )}
         <Button
@@ -138,7 +145,7 @@ export function PullRequestCommentForm({
           onClick={() => void submit("comment")}
         >
           <SendIcon className="size-3.5" />
-          {submitting === "comment" ? "Posting..." : "Comment"}
+          {submitting === "comment" ? t.git.pullRequest.posting : t.git.diff.comment}
         </Button>
       </div>
     </div>

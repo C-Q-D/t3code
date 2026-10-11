@@ -67,3 +67,16 @@ export function writeLocalePreference(preference: LocalePreference): boolean {
 export function resolveActiveLocale(): Locale {
   return resolveLocale(readLocalePreference(), readSystemLocaleTags());
 }
+
+/**
+ * Reports this device's saved preference once at startup; no retries or startup blocking.
+ * A failed native write leaves the shell unchanged and is retried on the next page load.
+ */
+export async function reportLocalePreferenceToDesktop(): Promise<void> {
+  if (typeof window === "undefined") return;
+  try {
+    await window.desktopBridge?.setUiLocalePreference?.(readLocalePreference());
+  } catch (error) {
+    console.error("[i18n] Could not synchronize the desktop language.", error);
+  }
+}

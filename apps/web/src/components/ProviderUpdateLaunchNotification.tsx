@@ -1,3 +1,5 @@
+/** Coordinates provider update notices shown when the client starts. */
+import { t } from "~/i18n";
 import { useNavigate } from "@tanstack/react-router";
 import { DownloadIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -55,6 +57,7 @@ type ProviderUpdateToastId = ReturnType<typeof toastManager.add>;
 // suppress the primary's updates indefinitely.
 const SETTLING_GRACE_MS = 30_000;
 
+/** Coordinates provider-update notices across connected environments and opens settings from their actions; renders no DOM. */
 function ProviderUpdateEnvironmentsNotification() {
   const navigate = useNavigate();
   const { groups, isAnySettling } = useLocalEnvironmentUpdateGroups();
@@ -173,7 +176,7 @@ function ProviderUpdateEnvironmentsNotification() {
         ),
         timeout: 0,
         actionProps: {
-          children: "Settings",
+          children: t.sidebar.chrome.settings,
           onClick: openProviderSettings,
         },
         actionVariant: "outline",

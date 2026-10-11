@@ -1,3 +1,4 @@
+import { englishWorkLogMessages } from "../work-log/messages.ts";
 import {
   TurnItemId,
   NodeId,
@@ -717,4 +718,32 @@ describe("presentProviderGoal", () => {
       presentProviderGoal({ objective: "All tests pass", status: "active" }, false).title,
     ).toBe("Goal set");
   });
+});
+
+it("localizes provider subagent status while preserving whole-second timing", () => {
+  const messages = {
+    ...englishWorkLogMessages.subagentExecution,
+    starting: "启动中",
+    live: (label: string, elapsed: string) => `${label}：${elapsed}`,
+    completed: (label: string, elapsed: string) => `${label}，用时 ${elapsed}`,
+  };
+  expect(formatProviderSubagentStatus(null, 0, messages)).toBe("启动中");
+  expect(
+    formatProviderSubagentStatus(
+      { status: "running", startedAt: "2026-07-28T10:00:00Z", completedAt: null },
+      Date.parse("2026-07-28T10:01:05.400Z"),
+      messages,
+    ),
+  ).toBe("Working：1m 5s");
+  expect(
+    formatProviderSubagentStatus(
+      {
+        status: "completed",
+        startedAt: "2026-07-28T10:00:00Z",
+        completedAt: "2026-07-28T10:00:34Z",
+      },
+      0,
+      messages,
+    ),
+  ).toBe("Completed，用时 34s");
 });

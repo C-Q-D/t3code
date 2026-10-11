@@ -1,3 +1,5 @@
+/** Owns desktop backend instances and reports native WSL fallback failures. */
+import * as DesktopUiLocale from "../i18n/DesktopUiLocale.ts";
 // Pool registry for multiple backend processes. This file is the entry
 // point for the concurrent-Windows+WSL-backend feature; see the design
 // notes below before extending it.
@@ -229,6 +231,7 @@ export const layer = Layer.effect(
     // a fresh child scope but reuses these services so the instance gets
     // the same FileSystem, spawner, HTTP client and log factory the
     // primary instance uses.
+    const uiLocale = yield* DesktopUiLocale.DesktopUiLocale;
     const factoryContext = yield* Effect.context<BackendInstanceFactoryRequirements>();
 
     // A WSL preflight failure on the primary only happens in wsl-only mode.
@@ -238,14 +241,15 @@ export const layer = Layer.effect(
     const handlePrimaryPreflightFailure = Effect.fn("desktop.backendPool.primaryPreflightFailed")(
       function* (failure: DesktopBackendManager.PreflightFailure) {
         const { reason, fatal } = failure;
+        const m = yield* uiLocale.messages;
         if (!fatal) {
           yield* logBackendPoolWarning(
             "primary WSL preflight retry window exhausted; using Windows for this launch",
             { reason },
           );
           yield* electronDialog.showErrorBox(
-            "WSL backend is still unavailable",
-            `${reason}\n\nT3 Code will use the Windows backend for this launch and retry WSL the next time the app starts.`,
+            m.wsl.unavailableTitle,
+            `${reason}\n\n${m.wsl.unavailableDetail}`,
           );
           yield* appSettings.applyWslWindowsFallbackInMemory;
           return true;
@@ -254,10 +258,7 @@ export const layer = Layer.effect(
         yield* logBackendPoolWarning("primary WSL preflight failed; falling back to Windows", {
           reason,
         });
-        yield* electronDialog.showErrorBox(
-          "WSL backend couldn't start",
-          `${reason}\n\nFalling back to the Windows backend so T3 Code can open. Re-enable the WSL backend from Settings > Connections once the WSL distro is fixed.`,
-        );
+        yield* electronDialog.showErrorBox(m.wsl.failedTitle, `${reason}\n\n${m.wsl.failedDetail}`);
         // Fully disable the WSL backend — both flags, matching the "Switch to
         // Windows" recovery path — so the manager's next restart re-resolves the
         // primary as Windows and reconcile won't register a secondary WSL backend

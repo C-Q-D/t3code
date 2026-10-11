@@ -1,3 +1,5 @@
+/** Decodes project-script shortcuts and formats their stored keybinding values. */
+import { t } from "~/i18n";
 import {
   KeybindingRule as KeybindingRuleSchema,
   type KeybindingCommand,
@@ -6,7 +8,7 @@ import {
 } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
 
-export const PROJECT_SCRIPT_KEYBINDING_INVALID_MESSAGE = "Invalid keybinding.";
+export const PROJECT_SCRIPT_KEYBINDING_INVALID_MESSAGE = t.app.scripts.invalidKeybinding;
 
 const decodeKeybindingRule = Schema.decodeUnknownOption(KeybindingRuleSchema);
 

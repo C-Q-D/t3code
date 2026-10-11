@@ -1,3 +1,5 @@
+/** Starts conversations in scratch projects and reports creation failures. */
+import { t } from "~/i18n";
 import { scopeProjectRef } from "@t3tools/client-runtime/environment";
 import { availableScratchWorkspaceRoot } from "@t3tools/client-runtime/operations/projects";
 import {
@@ -14,12 +16,13 @@ import { projectEnvironment } from "~/state/projects";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { useNewThreadHandler } from "./useHandleNewThread";
 
+/** Reports error under the supplied title in a toast, using a fallback description for non-Error values. */
 function reportScratchFailure(title: string, error: unknown) {
   toastManager.add(
     stackedThreadToast({
       type: "error",
       title,
-      description: error instanceof Error ? error.message : "An error occurred.",
+      description: error instanceof Error ? error.message : t.sidebar.errors.genericError,
     }),
   );
 }
@@ -65,7 +68,7 @@ export function useScratchProject() {
   const openScratchProject = useCallback(
     async (
       environmentId: EnvironmentId,
-      failureTitle = "Could not start without a project",
+      failureTitle = t.app.projects.scratchError,
     ): Promise<EnvironmentProject | null> => {
       const result = await openScratch({ environmentId, input: {} });
       if (result._tag === "Success") return result.value;
@@ -82,7 +85,7 @@ export function useScratchProject() {
       const project = await openScratchProject(environmentId);
       if (project) {
         await handleNewThread(scopeProjectRef(project.environmentId, project.id)).catch(
-          (error: unknown) => reportScratchFailure("Could not start without a project", error),
+          (error: unknown) => reportScratchFailure(t.app.projects.scratchError, error),
         );
       }
     },

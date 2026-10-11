@@ -1,3 +1,5 @@
+/** Owns _chat.pull-requests for the web client; protocol and persisted identifiers remain unchanged. */
+import { t } from "~/i18n";
 import { RefreshIcon } from "~/components/ui/refresh-icon";
 import { Spinner } from "~/components/ui/spinner";
 import { useShortcutModifierState } from "~/shortcutModifierState";
@@ -231,26 +233,26 @@ function PullRequestGroupHeader({
 
 // The state filters wear the same glyphs the rows do, so the two read as one vocabulary.
 const INVOLVEMENT_TABS = [
-  { value: "all", label: "All", Icon: LayersIcon },
-  { value: "reviewing", label: "Reviewing", Icon: EyeIcon },
-  { value: "authored", label: "Authored", Icon: PenLineIcon },
+  { value: "all", label: t.git.pullRequest.all, Icon: LayersIcon },
+  { value: "reviewing", label: t.git.pullRequest.reviewing, Icon: EyeIcon },
+  { value: "authored", label: t.git.pullRequest.authored, Icon: PenLineIcon },
 ] as const satisfies ReadonlyArray<PullRequestFilterOption<PullRequestInvolvement>>;
 
 const STATE_TABS = [
-  { value: "all", label: "All", Icon: LayersIcon },
-  { value: "open", label: "Open", Icon: PullRequestGlyph.pullRequest },
-  { value: "closed", label: "Closed", Icon: PullRequestGlyph.closed },
-  { value: "merged", label: "Merged", Icon: PullRequestGlyph.merged },
+  { value: "all", label: t.git.pullRequest.all, Icon: LayersIcon },
+  { value: "open", label: t.git.pullRequest.open, Icon: PullRequestGlyph.pullRequest },
+  { value: "closed", label: t.git.pullRequest.closed, Icon: PullRequestGlyph.closed },
+  { value: "merged", label: t.git.pullRequest.merged, Icon: PullRequestGlyph.merged },
 ] as const satisfies ReadonlyArray<PullRequestFilterOption<PullRequestListState>>;
 
 const SORT_OPTIONS = [
-  { value: "ready", label: "Merge readiness", Icon: ListChecksIcon },
-  { value: "blocked", label: "Blocked on me", Icon: UserLockIcon },
-  { value: "updated", label: "Recently updated", Icon: ClockIcon },
-  { value: "newest", label: "Newest shown", Icon: CalendarArrowDownIcon },
-  { value: "oldest", label: "Oldest shown", Icon: CalendarArrowUpIcon },
-  { value: "largest", label: "Largest shown", Icon: Maximize2Icon },
-  { value: "smallest", label: "Smallest shown", Icon: Minimize2Icon },
+  { value: "ready", label: t.git.pullRequest.mergeReadiness, Icon: ListChecksIcon },
+  { value: "blocked", label: t.git.pullRequest.blockedOnMe, Icon: UserLockIcon },
+  { value: "updated", label: t.git.pullRequest.recentlyUpdated, Icon: ClockIcon },
+  { value: "newest", label: t.git.pullRequest.newestShown, Icon: CalendarArrowDownIcon },
+  { value: "oldest", label: t.git.pullRequest.oldestShown, Icon: CalendarArrowUpIcon },
+  { value: "largest", label: t.git.pullRequest.largestShown, Icon: Maximize2Icon },
+  { value: "smallest", label: t.git.pullRequest.smallestShown, Icon: Minimize2Icon },
 ] as const satisfies ReadonlyArray<PullRequestFilterOption<PullRequestListSort>>;
 
 /** Long enough that a keystroke does not become a request, short enough to feel answered. */
@@ -345,6 +347,10 @@ export const Route = createFileRoute("/_chat/pull-requests")({
   component: PullRequestsRouteView,
 });
 
+/**
+ * Renders workspace pull requests and their detail panel using the route's selected filters.
+ * @returns The rendered surface.
+ */
 function PullRequestsRouteView() {
   useEscapeToGoBack();
   const modifiers = useShortcutModifierState(true);
@@ -1848,7 +1854,7 @@ function PullRequestsRouteView() {
       rightPanelAvailable={rightPanelAvailable}
       rightPanelOpen={rightPanelState.isOpen}
       rightPanelShortcutLabel={shortcutLabelForCommand(keybindings, "rightPanel.toggle")}
-      rightPanelUnavailableLabel="Select a pull request first"
+      rightPanelUnavailableLabel={t.git.pullRequest.selectAPullRequestFirst}
       onToggleTerminal={() => undefined}
       onToggleRightPanel={toggleRightPanel}
     />
@@ -1878,8 +1884,8 @@ function PullRequestsRouteView() {
         <PullRequestListGhost rows={7} />
       ) : !pullRequestsSupported ? (
         <PullRequestsUnavailableState
-          title="Pull requests unavailable"
-          error="Update your T3 Code servers to browse pull requests."
+          title={t.git.pullRequest.pullRequestsUnavailable}
+          error={t.git.pullRequest.updateYourT3CodeServersToBrowsePullRequests}
         />
       ) : firstLoad ? (
         <PullRequestListGhost rows={7} />
@@ -1957,9 +1963,12 @@ function PullRequestsRouteView() {
 
       {listQuery.error && shownCount > 0 ? (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-warning/30 bg-warning-surface px-3 py-2 text-xs">
-          <span>{listQuery.error} Showing the last pull requests loaded.</span>
+          <span>
+            {listQuery.error}
+            {t.git.pullRequest.showingTheLastPullRequestsLoaded}
+          </span>
           <Button size="xs" variant="outline" onClick={() => listQuery.refresh()}>
-            Retry
+            {t.git.pullRequest.retry}
           </Button>
         </div>
       ) : null}
@@ -1968,7 +1977,9 @@ function PullRequestsRouteView() {
           {loadingMore ? (
             <span className="flex items-center gap-2">
               <Spinner aria-hidden size="sm" />
-              {sentCursors === null ? "Updating pull requests" : "Loading more"}
+              {sentCursors === null
+                ? t.git.pullRequest.updatingPullRequests
+                : t.git.pullRequest.loadingMore}
             </span>
           ) : canContinue || pageSize < MAX_PAGE_SIZE ? (
             <Button
@@ -1977,10 +1988,10 @@ function PullRequestsRouteView() {
               onClick={loadMore}
               disabled={listQuery.isPending || showingCarried}
             >
-              Load more pull requests
+              {t.git.pullRequest.loadMorePullRequests}
             </Button>
           ) : (
-            <span>Narrow your search to find more pull requests.</span>
+            <span>{t.git.pullRequest.narrowYourSearchToFindMorePullRequests}</span>
           )}
         </div>
       ) : null}
@@ -1991,7 +2002,7 @@ function PullRequestsRouteView() {
   // kind force the hostname to tell them apart.
   const hostEntries = hosts.length > 0 ? hosts : expectedHosts;
   const hostMenuOptions: ReadonlyArray<PullRequestFilterOption<string>> = [
-    { value: "", label: "All", Icon: Plug2Icon },
+    { value: "", label: t.git.pullRequest.all, Icon: Plug2Icon },
     ...hostEntries.map((entry) => {
       // `expectedHosts` stands in before the server has answered, and nothing is known to be
       // unreadable yet; once the summaries arrive they carry whether each one could be read.
@@ -2002,14 +2013,14 @@ function PullRequestsRouteView() {
         Icon: getSourceControlPresentationForKind(entry.kind).Icon,
         ...(summary === undefined || summary.configured
           ? {}
-          : { unavailable: summary.detail ?? "This host could not be read." }),
+          : { unavailable: summary.detail ?? t.git.pullRequest.thisHostCouldNotBeRead }),
       };
     }),
   ];
   // The same shape the host pills take, so the two groups read as one control. Each server
   // wears the machine it runs on.
   const serverMenuOptions: ReadonlyArray<PullRequestFilterOption<string>> = [
-    { value: "", label: "All servers", Icon: LayersIcon },
+    { value: "", label: t.git.pullRequest.allServers, Icon: LayersIcon },
     ...capableEnvironments.map((environment) => ({
       value: environment.environmentId,
       label: environment.label,
@@ -2018,9 +2029,9 @@ function PullRequestsRouteView() {
   ];
   const sortMenu = (
     <CompactFilterMenu
-      label="Sort pull requests"
+      label={t.git.pullRequest.sortPullRequests}
       triggerIcon={<ArrowDownUpIcon aria-hidden className="size-4" />}
-      triggerLabel="Sort"
+      triggerLabel={t.git.pullRequest.sort}
       outlined
       value={sort}
       options={SORT_OPTIONS}
@@ -2164,16 +2175,20 @@ function PullRequestsRouteView() {
     event.stopPropagation();
     if (event.repeat) return;
     const url = openPanelPullRequestUrl;
-    void writeTextToClipboard(url, "pull request link").then(
+    void writeTextToClipboard(url, t.git.pullRequest.pullRequestLink).then(
       (didCopy) => {
         if (didCopy)
-          toastManager.add({ type: "success", title: "PR link copied", description: url });
+          toastManager.add({
+            type: "success",
+            title: t.git.pullRequest.pRLinkCopied,
+            description: url,
+          });
       },
       (error) => {
         toastManager.add({
           type: "error",
-          title: "Failed to copy PR link",
-          description: error instanceof Error ? error.message : "An error occurred.",
+          title: t.git.pullRequest.failedToCopyPRLink,
+          description: error instanceof Error ? error.message : t.git.actions.anErrorOccurred,
         });
       },
     );
@@ -2428,6 +2443,8 @@ function CompactFilterMenu<Value extends string>({
  * The search, folded to an icon until asked for. Opening moves focus into the input — the
  * whole point of pressing it is to type. It stays open while it holds a query, so an active
  * search is never invisible; empty and blurred, it folds back.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
  */
 function ExpandableSearch({
   searchInput,
@@ -2482,7 +2499,7 @@ function ExpandableSearch({
     <Button
       size="icon-sm"
       variant="ghost"
-      aria-label="Search pull requests"
+      aria-label={t.git.pullRequest.searchPullRequests}
       onClick={() => onOpenChange(true)}
     >
       <SearchIcon className="size-4" />
@@ -2497,6 +2514,8 @@ function ExpandableSearch({
  * the right. Scrolled back up, the topbar returns to the plain title. The topbar is the
  * window drag region throughout; its interactive children opt out through the `.drag-region`
  * descendant rules.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
  */
 function PullRequestsColumn({
   refreshing,
@@ -2610,30 +2629,33 @@ function PullRequestsColumn({
       >
         {titlebarControls}
         {condensed ? (
-          <WorkspaceBreadcrumb ariaLabel="Pull request scope" className="overflow-hidden">
+          <WorkspaceBreadcrumb
+            ariaLabel={t.git.pullRequest.pullRequestScope}
+            className="overflow-hidden"
+          >
             {/* An expanded search owns the scarce horizontal space. The page title stays
                 available to readers while the live filters remain available in both states. */}
             <WorkspaceBreadcrumbItem current className={cn(searchExpanded && "sr-only")}>
-              <h1 className="truncate">Pull Requests</h1>
+              <h1 className="truncate">{t.git.pullRequest.pullRequests}</h1>
             </WorkspaceBreadcrumbItem>
             {searchExpanded ? null : <WorkspaceBreadcrumbSeparator />}
             <WorkspaceBreadcrumbItem className="shrink gap-1.5">
               <CompactFilterMenu
-                label="Filter by state"
+                label={t.git.pullRequest.filterByState}
                 value={state}
                 options={STATE_TABS}
                 onChange={onState}
                 className="shrink-0"
               />
               <CompactFilterMenu
-                label="Filter by involvement"
+                label={t.git.pullRequest.filterByInvolvement}
                 value={involvement}
                 options={INVOLVEMENT_TABS}
                 onChange={onInvolvement}
               />
               {hostMenuOptions.length > 2 ? (
                 <CompactFilterMenu
-                  label="Filter by host"
+                  label={t.git.pullRequest.filterByHost}
                   value={host ?? ""}
                   options={hostMenuOptions}
                   onChange={(next) => onHost(next === "" ? undefined : next)}
@@ -2642,9 +2664,9 @@ function PullRequestsColumn({
             </WorkspaceBreadcrumbItem>
           </WorkspaceBreadcrumb>
         ) : (
-          <WorkspaceBreadcrumb ariaLabel="Pull requests breadcrumb">
+          <WorkspaceBreadcrumb ariaLabel={t.git.pullRequest.pullRequestsBreadcrumb}>
             <WorkspaceBreadcrumbItem current>
-              <h1 className="truncate">Pull Requests</h1>
+              <h1 className="truncate">{t.git.pullRequest.pullRequests}</h1>
             </WorkspaceBreadcrumbItem>
           </WorkspaceBreadcrumb>
         )}
@@ -2683,11 +2705,11 @@ function PullRequestsColumn({
               {sortMenu}
               {filtersMenu}
               <CompactFilterMenu
-                label="Filter by provider"
+                label={t.git.pullRequest.filterByProvider}
                 outlined
                 iconOnly={host !== undefined}
                 triggerIcon={<Plug2Icon aria-hidden className="size-4" />}
-                triggerLabel="All"
+                triggerLabel={t.git.pullRequest.all}
                 value={host ?? ""}
                 options={hostMenuOptions}
                 onChange={(next) => onHost(next === "" ? undefined : next)}
@@ -2707,6 +2729,11 @@ function PullRequestsColumn({
   );
 }
 
+/**
+ * Renders pull request refresh control from the supplied display data and callbacks.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 function PullRequestRefreshControl({
   compact = false,
   refreshing,
@@ -2720,7 +2747,7 @@ function PullRequestRefreshControl({
     <Button
       size={compact ? "icon-sm" : "icon"}
       variant={compact ? "ghost" : "outline"}
-      aria-label="Refresh pull requests"
+      aria-label={t.git.pullRequest.refreshPullRequests}
       onClick={onRefresh}
       disabled={refreshing}
     >

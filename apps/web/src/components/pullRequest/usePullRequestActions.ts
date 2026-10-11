@@ -1,3 +1,5 @@
+/** Owns use pull request actions on the web pull-request surface; host data and agent context remain unchanged. */
+import { t } from "~/i18n";
 import { useAtomCommand } from "~/state/use-atom-command";
 /**
  * The actions a pull request offers, extracted from the detail panel so smaller surfaces — the
@@ -78,50 +80,55 @@ export function usePullRequestDefaultMergeMethodResolver(
 }
 
 const ACTION_SUCCESS_LABELS: Record<PullRequestAction, string> = {
-  merge: "Merge requested",
-  ready: "Marked ready for review",
-  draft: "Converted to draft",
-  close: "Pull request closed",
-  reopen: "Pull request reopened",
-  "update-branch": "Branch updated with the base branch",
-  "enable-auto-merge": "Auto-merge enabled",
-  "disable-auto-merge": "Auto-merge disabled",
-  revert: "Revert pull request opened",
-  "approve-workflows": "Workflows approved",
+  merge: t.git.pullRequest.mergeRequested,
+  ready: t.git.pullRequest.markedReadyForReview,
+  draft: t.git.pullRequest.convertedToDraft,
+  close: t.git.pullRequest.pullRequestClosed,
+  reopen: t.git.pullRequest.pullRequestReopened,
+  "update-branch": t.git.pullRequest.branchUpdatedWithTheBaseBranch,
+  "enable-auto-merge": t.git.pullRequest.autoMergeEnabled,
+  "disable-auto-merge": t.git.pullRequest.autoMergeDisabled,
+  revert: t.git.pullRequest.revertPullRequestOpened,
+  "approve-workflows": t.git.pullRequest.workflowsApproved,
 };
 
 /** Said as the thing that did not happen, rather than as the operation that returned an error. */
 const ACTION_FAILURE_LABELS: Record<PullRequestAction, string> = {
-  merge: "Could not merge this pull request",
-  ready: "Could not mark this ready for review",
-  draft: "Could not convert this to a draft",
-  close: "Could not close this pull request",
-  reopen: "Could not reopen this pull request",
-  "update-branch": "Could not update this branch",
-  "enable-auto-merge": "Could not enable auto-merge",
-  "disable-auto-merge": "Could not disable auto-merge",
-  revert: "Could not open a revert pull request",
-  "approve-workflows": "Could not approve workflows",
+  merge: t.git.pullRequest.couldNotMergeThisPullRequest,
+  ready: t.git.pullRequest.couldNotMarkThisReadyForReview,
+  draft: t.git.pullRequest.couldNotConvertThisToADraft,
+  close: t.git.pullRequest.couldNotCloseThisPullRequest,
+  reopen: t.git.pullRequest.couldNotReopenThisPullRequest,
+  "update-branch": t.git.pullRequest.couldNotUpdateThisBranch,
+  "enable-auto-merge": t.git.pullRequest.couldNotEnableAutoMerge,
+  "disable-auto-merge": t.git.pullRequest.couldNotDisableAutoMerge,
+  revert: t.git.pullRequest.couldNotOpenARevertPullRequest,
+  "approve-workflows": t.git.pullRequest.couldNotApproveWorkflows,
 };
 
 /** What to try, for the times the host says only that it refused. */
 const ACTION_FAILURE_HINTS: Record<PullRequestAction, string> = {
   merge:
-    "The host refused the merge. Check that you have write access, that the checks it requires have passed, and that the branch is not conflicting.",
-  ready: "The host refused it. Check that you have write access to this repository.",
-  draft: "The host refused it. Check that you have write access to this repository.",
-  close: "The host refused it. Check that you have write access, or that you opened it.",
-  reopen:
-    "The host refused it. Check that you have write access, and that the branch still exists.",
+    t.git.pullRequest
+      .theHostRefusedTheMergeCheckThatYouHaveWriteAccessThatTheChecksItRequiresHavePassedAnd,
+  ready: t.git.pullRequest.theHostRefusedItCheckThatYouHaveWriteAccessToThisRepository,
+  draft: t.git.pullRequest.theHostRefusedItCheckThatYouHaveWriteAccessToThisRepository,
+  close: t.git.pullRequest.theHostRefusedItCheckThatYouHaveWriteAccessOrThatYouOpenedIt,
+  reopen: t.git.pullRequest.theHostRefusedItCheckThatYouHaveWriteAccessAndThatTheBranchStillExists,
   "update-branch":
-    "The host refused it. Check that you have write access, and that the base branch has not diverged in a way the host cannot merge.",
+    t.git.pullRequest
+      .theHostRefusedItCheckThatYouHaveWriteAccessAndThatTheBaseBranchHasNotDivergedInAWayTh,
   "enable-auto-merge":
-    "The host refused it. Check that auto-merge is enabled for this repository and that you have write access.",
-  "disable-auto-merge": "The host refused it. Check that you have write access to this repository.",
+    t.git.pullRequest
+      .theHostRefusedItCheckThatAutoMergeIsEnabledForThisRepositoryAndThatYouHaveWriteAccess,
+  "disable-auto-merge":
+    t.git.pullRequest.theHostRefusedItCheckThatYouHaveWriteAccessToThisRepository,
   revert:
-    "The host refused it. Check that you have write access and that this pull request was merged on the host.",
+    t.git.pullRequest
+      .theHostRefusedItCheckThatYouHaveWriteAccessAndThatThisPullRequestWasMergedOnTheHost,
   "approve-workflows":
-    "The host refused it. Check that you have Actions write access and that these workflow runs are still awaiting approval.",
+    t.git.pullRequest
+      .theHostRefusedItCheckThatYouHaveActionsWriteAccessAndThatTheseWorkflowRunsAreStillAwa,
 };
 
 /**
@@ -177,7 +184,10 @@ export function usePullRequestActionRunner({
   return { actionPending, perform };
 }
 
-/** Queue a close sweep through the same environment lanes as individual actions. */
+/** Queue a close sweep through the same environment lanes as individual actions.
+ * @param onClosed Callback invoked with each request entry after it closes successfully.
+ * @returns The closing-key set and a close callback that notifies onClosed after each successful close.
+ */
 export function usePullRequestCloseBatch(onClosed: (entry: EnvironmentPullRequestEntry) => void) {
   const runAction = useAtomCommand(pullRequestEnvironment.runAction, { reportFailure: false });
   const pending = useRef(new Set<string>());
@@ -225,8 +235,8 @@ export function usePullRequestCloseBatch(onClosed: (entry: EnvironmentPullReques
         type: failures.length > 0 ? "error" : "success",
         title:
           failures.length > 0
-            ? `Closed ${closed} of ${batch.length} pull requests`
-            : `Closed ${closed} pull request${closed === 1 ? "" : "s"}`,
+            ? t.git.pullRequest.closedBatch(closed, batch.length)
+            : t.git.pullRequest.closedCount(closed),
         ...(failures.length > 0 ? { description: failures.slice(0, 3).join("\n") } : {}),
       });
     },
@@ -257,6 +267,8 @@ const lastHandoffPromptByDraft = new Map<DraftId, string>();
  * The hand-offs from a pull request into a thread: a question that needs nothing checked out, and
  * a task that needs the branch under the agent's feet first. One `handoff` key holds them all to
  * one at a time, whatever surface pressed the button.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns Question, checkout, and handoff callbacks plus their in-flight state.
  */
 export function usePullRequestHandoffs({
   environmentId,
@@ -329,20 +341,20 @@ export function usePullRequestHandoffs({
     if (opened === null) {
       toastManager.add({
         type: "error",
-        title: "Could not open a thread",
-        description: "Try again from the project, or open a thread first.",
+        title: t.git.pullRequest.couldNotOpenAThread,
+        description: t.git.pullRequest.tryAgainFromTheProjectOrOpenAThreadFirst,
       });
       return;
     }
     toastManager.add({
       type: "success",
-      title: "Asked in a thread",
+      title: t.git.pullRequest.askedInAThread,
       // "Ask" leaves the composer empty on purpose, so saying the question is in it would send
       // the reader looking for something that is not there. The chips are what landed.
       description:
         task.prompt.length > 0
-          ? "The question is in the composer — read it over, then send."
-          : "The pull request is in the composer — type your question, then send.",
+          ? t.git.pullRequest.theQuestionIsInTheComposerReadItOverThenSend
+          : t.git.pullRequest.thePullRequestIsInTheComposerTypeYourQuestionThenSend,
     });
   };
 
@@ -364,7 +376,7 @@ export function usePullRequestHandoffs({
     // never expires, and an explicit one would survive the update and pin the result on screen.
     const toastId = toastManager.add({
       type: "loading",
-      title: "Preparing the pull request checkout...",
+      title: t.git.pullRequest.preparingThePullRequestCheckout,
     });
     const projectRef = scopeProjectRef(environmentId, detail.projectId);
     // The thread is opened before the checkout rather than after it, because the project's setup
@@ -381,8 +393,8 @@ export function usePullRequestHandoffs({
       // working tree than to prepare a worktree nobody asked for.
       toastManager.update(toastId, {
         type: "error",
-        title: "Could not open a thread for the checkout",
-        description: "Try again from the project, or open a thread first.",
+        title: t.git.pullRequest.couldNotOpenAThreadForTheCheckout,
+        description: t.git.pullRequest.tryAgainFromTheProjectOrOpenAThreadFirst,
       });
       return;
     }
@@ -399,7 +411,7 @@ export function usePullRequestHandoffs({
         prepareThread.error instanceof Error ? prepareThread.error.message : null;
       toastManager.update(toastId, {
         type: "error",
-        title: "Could not prepare the pull request checkout",
+        title: t.git.pullRequest.couldNotPrepareThePullRequestCheckout,
         ...(detailMessage ? { description: detailMessage } : {}),
       });
       return;
@@ -421,8 +433,8 @@ export function usePullRequestHandoffs({
       // outcome worth stopping for, since it reads as success and is not.
       toastManager.update(toastId, {
         type: "error",
-        title: "Checked out, but the thread stayed where it was",
-        description: `The checkout is ready on \`${prepared.value.branch}\`. Point a thread at it from the branch picker, then ask again.`,
+        title: t.git.pullRequest.checkedOutButTheThreadStayedWhereItWas,
+        description: t.git.pullRequest.checkoutThreadHint(prepared.value.branch),
       });
       return;
     }
@@ -434,9 +446,10 @@ export function usePullRequestHandoffs({
     // success, because everything else about the handoff did happen.
     const staleCheckoutToast = {
       type: "warning",
-      title: "Checked out, but not on the latest commits",
+      title: t.git.pullRequest.checkedOutButNotOnTheLatestCommits,
       description:
-        "The checkout could not be moved onto the pull request's latest commits, so the code there is older than the pull request. Uncommitted work or local commits keep it where it is.",
+        t.git.pullRequest
+          .theCheckoutCouldNotBeMovedOntoThePullRequestSLatestCommitsSoTheCodeThereIsOlderThanTh,
     } as const;
     if (task === null) {
       toastManager.update(
@@ -444,11 +457,12 @@ export function usePullRequestHandoffs({
         prepared.value.isOnPullRequestHead
           ? {
               type: "success",
-              title: mode === "local" ? "Checked out here" : "Checked out",
+              title:
+                mode === "local" ? t.git.pullRequest.checkedOutHere : t.git.pullRequest.checkedOut,
               description:
                 mode === "local"
-                  ? "This repository is on the pull request's branch, with a thread open on it."
-                  : "The pull request is in its own worktree, with a thread open on it.",
+                  ? t.git.pullRequest.thisRepositoryIsOnThePullRequestSBranchWithAThreadOpenOnIt
+                  : t.git.pullRequest.thePullRequestIsInItsOwnWorktreeWithAThreadOpenOnIt,
             }
           : staleCheckoutToast,
       );
@@ -460,8 +474,8 @@ export function usePullRequestHandoffs({
       prepared.value.isOnPullRequestHead
         ? {
             type: "success",
-            title: "Checkout ready",
-            description: "The task is in the composer — read it over, then send.",
+            title: t.git.pullRequest.checkoutReady,
+            description: t.git.pullRequest.theTaskIsInTheComposerReadItOverThenSend,
           }
         : staleCheckoutToast,
     );

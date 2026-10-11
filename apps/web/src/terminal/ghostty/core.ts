@@ -1,3 +1,5 @@
+/** Localized terminal errors and existing runtime operations. */
+import { t } from "~/i18n";
 import {
   type GhosttyKeyboardLayoutMap,
   ghosttyConsumedMods,
@@ -1228,8 +1230,10 @@ export class GhosttyTerminalCore {
     };
   }
 
+  /** Throws a localized runtime error when result is not success, identifying operation; successful results have no side effects. */
   private assertSuccess(operation: string, result: number): void {
-    if (result !== GHOSTTY_SUCCESS) throw new Error(`${operation} failed with result ${result}`);
+    if (result !== GHOSTTY_SUCCESS)
+      throw new Error(t.tools.terminal.operationFailed(operation, result));
   }
 
   private ensureActive(): void {

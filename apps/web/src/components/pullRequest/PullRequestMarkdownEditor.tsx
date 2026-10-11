@@ -1,3 +1,5 @@
+/** Owns pull request markdown editor on the web pull-request surface; host data and agent context remain unchanged. */
+import { t } from "~/i18n";
 import { useState } from "react";
 import {
   AuthSourceControlWriteScope,
@@ -20,6 +22,8 @@ import { PullRequestMarkdown } from "./PullRequestMarkdown";
  *
  * Preview renders through the same component the saved body will be read through, which is the
  * only way to see what a host's markdown will actually become before it is sent.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
  */
 export function PullRequestMarkdownEditor({
   value,
@@ -90,7 +94,7 @@ export function PullRequestMarkdownEditor({
       }}
     >
       <ToggleGroup
-        aria-label="Markdown editor mode"
+        aria-label={t.git.pullRequest.markdownEditorMode}
         variant="segmented"
         value={[preview ? "preview" : "write"]}
         disabled={saving}
@@ -99,13 +103,13 @@ export function PullRequestMarkdownEditor({
           if (mode === "write" || mode === "preview") setPreview(mode === "preview");
         }}
       >
-        <Toggle value="write">Write</Toggle>
-        <Toggle value="preview">Preview</Toggle>
+        <Toggle value="write">{t.git.pullRequest.write}</Toggle>
+        <Toggle value="preview">{t.git.pullRequest.preview}</Toggle>
       </ToggleGroup>
       {preview ? (
         <div className="rounded-lg border border-border/60 px-3 py-2">
           {empty ? (
-            <p className="text-xs text-muted-foreground">Nothing to preview.</p>
+            <p className="text-xs text-muted-foreground">{t.git.pullRequest.nothingToPreview}</p>
           ) : (
             <PullRequestMarkdown
               text={draft}
@@ -128,7 +132,7 @@ export function PullRequestMarkdownEditor({
       )}
       <div className="flex justify-end gap-2">
         <Button size="xs" variant="ghost" disabled={saving} onClick={onCancel}>
-          Cancel
+          {t.common.confirm.cancel}
         </Button>
         <Button
           size="xs"
@@ -144,7 +148,7 @@ export function PullRequestMarkdownEditor({
             onSave(draft);
           }}
         >
-          {saving ? "Saving..." : "Save"}
+          {saving ? t.git.pullRequest.saving : t.git.pullRequest.save}
         </Button>
       </div>
     </div>

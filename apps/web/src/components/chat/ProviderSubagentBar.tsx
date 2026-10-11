@@ -31,6 +31,7 @@ export function ProviderSubagentBar(props: {
 }) {
   const statusRef = useRef<HTMLSpanElement>(null);
   const { status } = props;
+  const statusMessages = t.chat.workLog.shared.subagentExecution;
   const live = status !== null && isOrchestrationV2WorkActive(status.status);
   const modelDescription =
     props.effortLabel === null ? props.modelLabel : `${props.modelLabel}, ${props.effortLabel}`;
@@ -38,6 +39,7 @@ export function ProviderSubagentBar(props: {
   const announcement = formatProviderSubagentStatus(
     status === null ? null : { ...status, startedAt: null },
     0,
+    statusMessages,
   );
 
   // The label is written from an effect, and live bars tick through DOM
@@ -45,14 +47,18 @@ export function ProviderSubagentBar(props: {
   useLayoutEffect(() => {
     const update = () => {
       if (statusRef.current) {
-        statusRef.current.textContent = formatProviderSubagentStatus(status, Date.now());
+        statusRef.current.textContent = formatProviderSubagentStatus(
+          status,
+          Date.now(),
+          statusMessages,
+        );
       }
     };
     update();
     if (!live) return;
     const id = setInterval(update, 1_000);
     return () => clearInterval(id);
-  }, [live, status]);
+  }, [live, status, statusMessages]);
 
   return (
     <div className="flex min-h-12 items-center gap-3 rounded-3xl py-2 ps-5 pe-2 text-sm">

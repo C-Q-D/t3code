@@ -1,3 +1,5 @@
+/** Renders repository ref choices and worktree-origin controls without changing ref identifiers. */
+import { t } from "~/i18n";
 import type { VcsRef } from "@t3tools/contracts";
 import { LegendList, type LegendListRef } from "@legendapp/list/react";
 import {
@@ -28,7 +30,10 @@ import {
 } from "./ui/combobox";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 
-/** Shared composer picker UI. The caller owns selection and any checkout mutations. */
+/** Shared composer picker UI. The caller owns selection and any checkout mutations.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 export function BranchPicker({
   items,
   filteredItems,
@@ -176,7 +181,7 @@ export function BranchPicker({
       {children}
       <ComboboxPopup {...popupProps}>
         <ComboboxSearchInput
-          placeholder="Search refs..."
+          placeholder={t.git.branch.searchRefs}
           value={query}
           onChange={(event) => onQueryChange(event.target.value)}
           onKeyDown={(event) => {
@@ -194,7 +199,7 @@ export function BranchPicker({
           }}
         />
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <ComboboxEmpty>No refs found.</ComboboxEmpty>
+          <ComboboxEmpty>{t.git.branch.noRefsFound}</ComboboxEmpty>
           <div className="relative min-h-0 w-full max-h-56 flex-1 overflow-hidden">
             <ComboboxListVirtualized className="size-full min-w-0">
               <LegendList<string>
@@ -234,21 +239,23 @@ export function BranchPicker({
                   >
                     <span className="flex min-w-0 items-center gap-1.5 font-medium text-muted-foreground">
                       <RefreshIcon aria-hidden="true" className="size-3 shrink-0" />
-                      <span className="truncate">Start from origin</span>
+                      <span className="truncate">{t.git.branch.startFromOrigin}</span>
                     </span>
                     <Switch
                       id={startFromOriginSwitchId}
                       checked={originControl.checked}
                       size="sm"
-                      aria-label="Start worktree from origin"
+                      aria-label={t.git.branch.startWorktreeFromOrigin}
                       onCheckedChange={(checked) => originControl.onCheckedChange(Boolean(checked))}
                     />
                   </label>
                 }
               />
               <TooltipPopup side="top" className="max-w-72 whitespace-normal">
-                Creates the worktree from the latest matching branch on origin instead of your local
-                branch.
+                {
+                  t.git.branch
+                    .createsTheWorktreeFromTheLatestMatchingBranchOnOriginInsteadOfYourLocalBranch
+                }
               </TooltipPopup>
             </Tooltip>
           ) : null}
@@ -259,6 +266,11 @@ export function BranchPicker({
   );
 }
 
+/**
+ * Renders branch picker ref item from the supplied display data and callbacks.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 export function BranchPickerRefItem({
   branch: refName,
   projectCwd: activeProjectCwd,
@@ -280,13 +292,13 @@ export function BranchPickerRefItem({
   const hasSecondaryWorktree =
     refName.worktreePath && activeProjectCwd && refName.worktreePath !== activeProjectCwd;
   const badge = refName.current
-    ? "current"
+    ? t.git.branch.currentBadge
     : hasSecondaryWorktree
-      ? "worktree"
+      ? t.git.branch.worktreeBadge
       : refName.isRemote
-        ? "remote"
+        ? t.git.branch.remoteBadge
         : refName.isDefault
-          ? "default"
+          ? t.git.branch.defaultBadge
           : null;
   return (
     <ComboboxItem

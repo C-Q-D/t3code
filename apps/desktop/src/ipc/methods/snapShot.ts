@@ -1,3 +1,5 @@
+/** Handles authorized screenshot requests and native configuration file selection. */
+import * as DesktopUiLocale from "../../i18n/DesktopUiLocale.ts";
 import {
   DesktopPendingSnapShot,
   DesktopSnapShot as DesktopSnapShotSchema,
@@ -113,12 +115,13 @@ export const previewSnapShotConfig = DesktopIpc.makeIpcMethod({
     let selectedPath: string | undefined;
     if (request.chooseFile) {
       const state = yield* capture.state;
+      const messages = yield* (yield* DesktopUiLocale.DesktopUiLocale).messages;
       const paths = yield* (yield* ElectronDialog.ElectronDialog).pickFiles({
         owner: Option.some(window),
         defaultPath: Option.fromUndefinedOr(state.shortcutConfigPath),
         filters: [
           {
-            name: "Desktop config",
+            name: messages.filters.desktopConfig,
             extensions: state.linuxBackend === "niri" ? ["kdl"] : ["conf", "lua"],
           },
         ],

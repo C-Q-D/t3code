@@ -1,3 +1,5 @@
+/** Owns pull request detail logic on the web pull-request surface; host data and agent context remain unchanged. */
+import { t } from "~/i18n";
 import * as Schema from "effect/Schema";
 
 import {
@@ -38,9 +40,9 @@ import { reviewCommentContextId } from "~/lib/composerContextRecords";
 import { removeInlineContextReference } from "~/lib/composerContextReferences";
 
 export const PULL_REQUEST_MERGE_METHOD_LABELS: Record<PullRequestMergeMethod, string> = {
-  merge: "Merge",
-  squash: "Squash and merge",
-  rebase: "Rebase and merge",
+  merge: t.git.pullRequest.merge,
+  squash: t.git.pullRequest.squashAndMerge,
+  rebase: t.git.pullRequest.rebaseAndMerge,
 };
 
 /** Old environments keep their existing actions; new ones must finish stack discovery first. */
@@ -266,18 +268,21 @@ export function threadPullRequestPanelTarget(thread: {
   return legacy ?? thread.branchPullRequest ?? null;
 }
 
-/** Names where a pull-request task will land, without letting each surface guess independently. */
+/** Names where a pull-request task will land, without letting each surface guess independently.
+ * @param inThisThread Whether the handoff targets the current thread rather than a newly opened thread.
+ * @returns Labels for finding, check, and batch handoffs to the selected destination.
+ */
 export function pullRequestHandoffLabels(inThisThread: boolean) {
   return inThisThread
     ? {
-        fixFinding: "Fix in this thread",
-        fixCheck: "Fix in this thread",
-        fixFindings: "Fix findings in this thread",
+        fixFinding: t.git.pullRequest.fixInThisThread,
+        fixCheck: t.git.pullRequest.fixInThisThread,
+        fixFindings: t.git.pullRequest.fixFindingsInThisThread,
       }
     : {
-        fixFinding: "Fix in a thread",
-        fixCheck: "Fix",
-        fixFindings: "Fix findings in a thread",
+        fixFinding: t.git.pullRequest.fixInAThread,
+        fixCheck: t.git.pullRequest.fix,
+        fixFindings: t.git.pullRequest.fixFindingsInAThread,
       };
 }
 
@@ -372,9 +377,11 @@ export function classifyPullRequestChecks(
  * The checks with every live facet, unlike the single-facet summary: a run with failures in it
  * still says how much is in flight — "7 of 16 running · 1 failed" — because both numbers change
  * what a reader does next.
+ * @param checks Host-reported checks in their supplied order; may be empty.
+ * @returns The displayed check summary, including the empty-check state.
  */
 export function describePullRequestChecks(checks: ReadonlyArray<PullRequestCheck>): string {
-  if (checks.length === 0) return "No checks reported";
+  if (checks.length === 0) return t.git.pullRequest.noChecksReported;
   const failed = checks.filter(
     (check) => check.status === "failure" || check.status === "cancelled",
   ).length;
@@ -382,13 +389,20 @@ export function describePullRequestChecks(checks: ReadonlyArray<PullRequestCheck
   const actionRequired = checks.filter((check) => check.status === "action-required").length;
   const passed = checks.filter((check) => check.status === "success").length;
   const parts: string[] = [];
-  if (pending > 0) parts.push(`${pending} of ${checks.length} running`);
-  if (actionRequired > 0) parts.push(`${actionRequired} of ${checks.length} awaiting action`);
+  if (pending > 0) parts.push(t.git.pullRequest.checksRunning(pending, checks.length));
+  if (actionRequired > 0)
+    parts.push(t.git.pullRequest.checksAwaitingAction(actionRequired, checks.length));
   if (failed > 0) {
-    parts.push(parts.length > 0 ? `${failed} failed` : `${failed} of ${checks.length} failing`);
+    parts.push(
+      parts.length > 0
+        ? t.git.pullRequest.checksFailed(failed)
+        : t.git.pullRequest.checksFailing(failed, checks.length),
+    );
   }
   if (parts.length === 0) {
-    return passed === checks.length ? "All checks passed" : `${passed} of ${checks.length} passing`;
+    return passed === checks.length
+      ? t.git.pullRequest.allChecksPassed
+      : t.git.pullRequest.checksPassing(passed, checks.length);
   }
   return parts.join(" · ");
 }
@@ -627,6 +641,8 @@ export function visibleBody(body: string): string | null {
  *
  * Merged wins over closed: GitHub sets both timestamps on a merge, and reporting "closed" for a
  * merged pull request would misstate what happened.
+ * @param detail Loaded request lifecycle, comments, reviews, and commits used to form the timeline.
+ * @returns The combined timeline rows for the supplied request detail.
  */
 export function buildPullRequestTimeline(
   detail: Pick<
@@ -639,7 +655,7 @@ export function buildPullRequestTimeline(
       id: "created",
       at: detail.createdAt,
       kind: "opened" as const,
-      title: "opened this pull request",
+      title: t.git.pullRequest.openedThisPullRequest,
       body: null,
       markdown: false,
       url: null,
@@ -655,7 +671,7 @@ export function buildPullRequestTimeline(
       id: commit.oid,
       at: commit.committedDate,
       kind: "commit" as const,
-      title: `Commit ${commit.oid.slice(0, 7)}`,
+      title: t.git.pullRequest.commitTitle(commit.oid.slice(0, 7)),
       body: commit.messageHeadline || null,
       markdown: false,
       url: null,
@@ -689,7 +705,7 @@ export function buildPullRequestTimeline(
             id: "merged",
             at: detail.mergedAt,
             kind: "merged" as const,
-            title: "Pull request merged",
+            title: t.git.pullRequest.pullRequestMerged,
             body: null,
             markdown: false,
             url: null,
@@ -709,7 +725,7 @@ export function buildPullRequestTimeline(
             id: "closed",
             at: detail.closedAt,
             kind: "closed" as const,
-            title: "Pull request closed",
+            title: t.git.pullRequest.pullRequestClosed,
             body: null,
             markdown: false,
             url: null,

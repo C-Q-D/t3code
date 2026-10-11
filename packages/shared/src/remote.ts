@@ -1,3 +1,4 @@
+import { englishRemotePairingMessages, type RemotePairingMessages } from "./remoteLabels.ts";
 import * as Schema from "effect/Schema";
 
 const PAIRING_TOKEN_PARAM = "token";
@@ -12,8 +13,9 @@ export class RemoteBackendUrlMissingError extends Schema.TaggedError<RemoteBacke
   "RemoteBackendUrlMissingError",
   {},
 ) {
+  /** Supplies stable English diagnostics for callers that do not request a localized presentation. */
   override get message(): string {
-    return "Enter a backend URL.";
+    return englishRemotePairingMessages.RemoteBackendUrlMissingError;
   }
 }
 
@@ -24,8 +26,9 @@ export class RemotePairingUrlInvalidError extends Schema.TaggedError<RemotePairi
     protocol: Schema.optional(Schema.String),
   },
 ) {
+  /** Supplies stable English diagnostics for callers that do not request a localized presentation. */
   override get message(): string {
-    return "Pairing URL is invalid.";
+    return englishRemotePairingMessages.RemotePairingUrlInvalidError;
   }
 }
 
@@ -37,8 +40,9 @@ export class RemoteBackendUrlInvalidError extends Schema.TaggedError<RemoteBacke
     protocol: Schema.optional(Schema.String),
   },
 ) {
+  /** Supplies stable English diagnostics for callers that do not request a localized presentation. */
   override get message(): string {
-    return "Backend URL is invalid.";
+    return englishRemotePairingMessages.RemoteBackendUrlInvalidError;
   }
 }
 
@@ -46,8 +50,9 @@ export class RemotePairingTokenMissingError extends Schema.TaggedError<RemotePai
   "RemotePairingTokenMissingError",
   { host: Schema.String },
 ) {
+  /** Supplies stable English diagnostics for callers that do not request a localized presentation. */
   override get message(): string {
-    return "Pairing URL is missing its token.";
+    return englishRemotePairingMessages.RemotePairingTokenMissingError;
   }
 }
 
@@ -55,8 +60,9 @@ export class RemotePairingCodeMissingError extends Schema.TaggedError<RemotePair
   "RemotePairingCodeMissingError",
   { host: Schema.String },
 ) {
+  /** Supplies stable English diagnostics for callers that do not request a localized presentation. */
   override get message(): string {
-    return "Enter a pairing code.";
+    return englishRemotePairingMessages.RemotePairingCodeMissingError;
   }
 }
 
@@ -68,6 +74,14 @@ export const RemotePairingTargetError = Schema.Union([
   RemotePairingCodeMissingError,
 ]);
 export type RemotePairingTargetError = typeof RemotePairingTargetError.Type;
+
+/** Formats known local pairing validation errors without changing their protocol tags or causes. */
+export function remotePairingTargetErrorMessage(
+  error: RemotePairingTargetError,
+  messages: RemotePairingMessages = englishRemotePairingMessages,
+): string {
+  return messages[error._tag];
+}
 
 const hasSupportedRemoteBackendProtocol = (url: URL): boolean =>
   SUPPORTED_REMOTE_BACKEND_PROTOCOLS.has(url.protocol);

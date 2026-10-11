@@ -1,3 +1,5 @@
+/** Owns pull request reactions logic on the web pull-request surface; host data and agent context remain unchanged. */
+import { t } from "~/i18n";
 import type { PullRequestReaction, PullRequestReactionContent } from "@t3tools/contracts";
 
 /** The picker's order, which is GitHub's: the two verdicts first, then the rest as it lists them. */
@@ -23,10 +25,13 @@ const REACTION_EMOJI: Record<PullRequestReactionContent, string> = {
   eyes: "👀",
 };
 
-/** The spoken names GitHub uses in its own hover text, which is what a screen reader reads out. */
-const REACTION_NAME: Record<PullRequestReactionContent, string> = {
-  "thumbs-up": "thumbs up",
-  "thumbs-down": "thumbs down",
+/** Dictionary keys keep host reaction identifiers separate from their spoken UI names. */
+const REACTION_NAME: Record<
+  PullRequestReactionContent,
+  keyof typeof t.git.pullRequest.reactionNames
+> = {
+  "thumbs-up": "thumbsUp",
+  "thumbs-down": "thumbsDown",
   laugh: "laugh",
   hooray: "hooray",
   confused: "confused",
@@ -39,23 +44,37 @@ export function pullRequestReactionEmoji(content: PullRequestReactionContent): s
   return REACTION_EMOJI[content];
 }
 
+/**
+ * Returns the current UI dictionary's spoken name for a host reaction identifier.
+ * @param content Host reaction identifier; it is never localized.
+ * @returns The spoken UI name for the supplied host reaction id.
+ */
 export function pullRequestReactionName(content: PullRequestReactionContent): string {
-  return REACTION_NAME[content];
+  return t.git.pullRequest.reactionNames[REACTION_NAME[content]];
 }
 
 /** Past three names the sentence stops being readable and starts being a list. */
 const NAMED_ACTOR_LIMIT = 3;
 
+/**
+ * Joins supplied reaction actor names for display; returns an empty string for an empty list.
+ * @param parts Actor names to join in their supplied order; may be empty.
+ * @returns Joined actor names, or an empty string when no names are supplied.
+ */
 function joinNames(parts: ReadonlyArray<string>): string {
   if (parts.length <= 1) return parts[0] ?? "";
-  if (parts.length === 2) return `${parts[0]} and ${parts[1]}`;
-  return `${parts.slice(0, -1).join(", ")}, and ${parts.at(-1)}`;
+  if (parts.length === 2) return t.git.pullRequest.joinTwoNames(parts[0], parts[1]);
+  return t.git.pullRequest.joinMoreNames(parts.slice(0, -1).join(", "), parts.at(-1));
 }
 
-/** "others" only alongside somebody named; on its own a count is people, not other people. */
+/** "others" only alongside somebody named; on its own a count is people, not other people.
+ * @param count Number of unnamed actors reported by the host.
+ * @param named Whether at least one actor has already been named.
+ * @returns The localized unnamed-actor count.
+ */
 function countRemainder(count: number, named: boolean): string {
-  if (named) return `${count} ${count === 1 ? "other" : "others"}`;
-  return `${count} ${count === 1 ? "person" : "people"}`;
+  if (named) return t.git.pullRequest.reactionOthers(count);
+  return t.git.pullRequest.reactionPeople(count);
 }
 
 /**
@@ -69,15 +88,22 @@ function countRemainder(count: number, named: boolean): string {
  * is named as given instead. The cap still guards further: the sentence never names more people
  * than `count` claims, and the remainder is counted rather than named — a host reports fewer
  * logins than it counts, so `count` is the only trustworthy total.
+ * @param reaction Host count, actor logins, reaction identifier, and viewer reaction state.
+ * @returns A localized reaction sentence that names no more actors than the host count.
  */
 export function pullRequestReactionTooltip(reaction: PullRequestReaction): string {
   const viewerHasRoom = reaction.actors.length < reaction.count;
   const names =
-    reaction.viewerHasReacted && viewerHasRoom ? ["You", ...reaction.actors] : [...reaction.actors];
+    reaction.viewerHasReacted && viewerHasRoom
+      ? [t.git.pullRequest.reactionViewer, ...reaction.actors]
+      : [...reaction.actors];
   const shown = names.slice(0, Math.min(NAMED_ACTOR_LIMIT, reaction.count));
   const others = Math.max(0, reaction.count - shown.length);
   const parts = [...shown, ...(others > 0 ? [countRemainder(others, shown.length > 0)] : [])];
-  return `${joinNames(parts)} reacted with ${pullRequestReactionName(reaction.content)} emoji`;
+  return t.git.pullRequest.reactionTooltip(
+    joinNames(parts),
+    pullRequestReactionName(reaction.content),
+  );
 }
 
 /**

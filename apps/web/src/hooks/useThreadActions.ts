@@ -1,3 +1,5 @@
+/** Implements conversation mutations with permission checks, confirmation, cleanup, and undo feedback. */
+import { t } from "~/i18n";
 import {
   parseScopedThreadKey,
   scopeProjectRef,
@@ -68,8 +70,9 @@ export class ThreadArchiveBlockedError extends Schema.TaggedError<ThreadArchiveB
     threadId: ThreadId,
   },
 ) {
+  /** Returns the user-facing failure reason in the active UI language. */
   override get message(): string {
-    return "Cannot archive while the provider is active.";
+    return t.app.thread.archiveActiveError;
   }
 }
 
@@ -80,8 +83,9 @@ export class ThreadSettlementUnsupportedError extends Schema.TaggedError<ThreadS
     threadId: ThreadId,
   },
 ) {
+  /** Returns the user-facing failure reason in the active UI language. */
   override get message(): string {
-    return "This environment's server does not support settling yet. Update the server to use Settle.";
+    return t.app.thread.settleUnsupported;
   }
 }
 
@@ -92,8 +96,9 @@ export class ThreadSnoozeUnsupportedError extends Schema.TaggedError<ThreadSnooz
     threadId: ThreadId,
   },
 ) {
+  /** Returns the user-facing failure reason in the active UI language. */
   override get message(): string {
-    return "This environment's server does not support snoozing yet. Update the server to use Snooze.";
+    return t.app.thread.snoozeUnsupported;
   }
 }
 
@@ -104,8 +109,9 @@ export class ThreadSnoozeBlockedError extends Schema.TaggedError<ThreadSnoozeBlo
     threadId: ThreadId,
   },
 ) {
+  /** Returns the user-facing failure reason in the active UI language. */
   override get message(): string {
-    return "This thread is waiting on you. Respond to the pending request before snoozing it.";
+    return t.app.thread.snoozeBlocked;
   }
 }
 
@@ -128,8 +134,9 @@ export class ThreadAutoSettleOptOutUnsupportedError extends Schema.TaggedError<T
     threadId: ThreadId,
   },
 ) {
+  /** Returns the user-facing failure reason in the active UI language. */
   override get message(): string {
-    return "This environment's server does not support turning auto-settle off per thread yet. Update the server to use it.";
+    return t.app.thread.autoSettleUnsupported;
   }
 }
 
@@ -140,8 +147,9 @@ export class ThreadPinningUnsupportedError extends Schema.TaggedError<ThreadPinn
     threadId: ThreadId,
   },
 ) {
+  /** Returns the user-facing failure reason in the active UI language. */
   override get message(): string {
-    return "This environment's server does not support pinning yet. Update the server to use Pin.";
+    return t.app.thread.pinUnsupported;
   }
 }
 
@@ -152,8 +160,9 @@ export class ThreadPinReorderUnsupportedError extends Schema.TaggedError<ThreadP
     threadId: ThreadId,
   },
 ) {
+  /** Returns the user-facing failure reason in the active UI language. */
   override get message(): string {
-    return "This environment's server does not support reordering pinned threads yet. Update the server to reorder pins.";
+    return t.app.thread.pinReorderUnsupported;
   }
 }
 
@@ -164,11 +173,13 @@ export class ThreadActiveReorderUnsupportedError extends Schema.TaggedError<Thre
     threadId: ThreadId,
   },
 ) {
+  /** Returns the user-facing failure reason in the active UI language. */
   override get message(): string {
-    return "Update this environment's server to reorder active threads.";
+    return t.app.thread.reorderUnsupported;
   }
 }
 
+/** Uses input.confirm to ask about input.title when enabled; returns the confirmation result or a captured failure, without changing the thread. */
 export async function requestThreadUnpinConfirmation(input: {
   enabled: boolean;
   title: string;
@@ -180,12 +191,7 @@ export async function requestThreadUnpinConfirmation(input: {
   }
 
   return settlePromise(() =>
-    confirm(
-      [
-        `Unpin thread "${input.title}"?`,
-        "This will move the thread out of your pinned section.",
-      ].join("\n"),
-    ),
+    confirm([t.app.thread.confirmUnpin(input.title), t.app.thread.unpinHint].join("\n")),
   );
 }
 
@@ -197,8 +203,8 @@ export async function navigateAfterThreadDeletion(navigate: () => Promise<void>)
     toastManager.add(
       stackedThreadToast({
         type: "error",
-        title: "Thread deleted, but navigation failed",
-        description: error instanceof Error ? error.message : "An error occurred.",
+        title: t.app.thread.deleteNavigationError,
+        description: error instanceof Error ? error.message : t.sidebar.errors.genericError,
       }),
     );
   }
@@ -254,19 +260,21 @@ export function useAcknowledgeThreadWoke() {
   );
 }
 
+/** Returns a permission failure for the target thread when its environment cannot change threads; otherwise returns null. */
 function threadOperationFailure(target: ScopedThreadRef) {
   return readEnvironmentScope(target.environmentId, AuthOrchestrationOperateScope)
     ? null
     : AsyncResult.failure(
         Cause.fail(
           new EnvironmentAuthorizationError({
-            message: "This connection cannot change threads.",
+            message: t.app.thread.changeDenied,
             requiredScope: AuthOrchestrationOperateScope,
           }),
         ),
       );
 }
 
+/** Returns permission-checked conversation actions and confirmations for the current client, including undo notices for reversible operations. */
 export function useThreadActions() {
   const archiveThreadMutation = useOrchestrationCommand(threadEnvironment.archive, {
     reportFailure: false,
@@ -412,7 +420,7 @@ export function useThreadActions() {
         claim: action,
         // Undo also brings the reader back when archiving moved them to a draft.
         undo: () => unarchiveThread(threadRef, { navigate: shouldNavigateToDraft }),
-        failureTitle: "Failed to undo archive",
+        failureTitle: t.app.thread.undoArchiveError,
       });
 
       if (shouldNavigateToDraft) {
@@ -508,10 +516,10 @@ export function useThreadActions() {
         const confirmationResult = await settlePromise(() =>
           localApi.dialogs.confirm(
             [
-              "This thread is the only one linked to this worktree:",
+              t.app.thread.onlyWorktreeThread,
               displayWorktreePath ?? orphanedWorktreePath,
               "",
-              "Delete the worktree too?",
+              t.app.thread.deleteWorktreeQuestion,
             ].join("\n"),
             { variant: "destructive" },
           ),
@@ -592,7 +600,7 @@ export function useThreadActions() {
         : AsyncResult.failure(
             Cause.fail(
               new EnvironmentAuthorizationError({
-                message: "This connection can no longer remove worktrees.",
+                message: t.app.thread.removeWorktreeDenied,
                 requiredScope: AuthSourceControlWriteScope,
               }),
             ),
@@ -613,7 +621,7 @@ export function useThreadActions() {
       if (cleanupFailure) {
         const removalFailed = removeResult._tag === "Failure";
         const error = squashAtomCommandFailure(cleanupFailure);
-        const message = error instanceof Error ? error.message : "An error occurred.";
+        const message = error instanceof Error ? error.message : t.sidebar.errors.genericError;
         console.error("Worktree cleanup failed after thread deletion", {
           threadId: threadRef.threadId,
           projectCwd: threadProject.workspaceRoot,
@@ -624,10 +632,13 @@ export function useThreadActions() {
           stackedThreadToast({
             type: "error",
             title: removalFailed
-              ? "Failed to delete worktree"
-              : "Worktree deleted, but Git status refresh failed",
+              ? t.app.thread.deleteWorktreeError
+              : t.app.thread.worktreeRefreshError,
             description: removalFailed
-              ? `Could not remove ${displayWorktreePath ?? orphanedWorktreePath}. ${message}`
+              ? t.app.thread.removeWorktreeError(
+                  displayWorktreePath ?? orphanedWorktreePath,
+                  message,
+                )
               : message,
           }),
         );
@@ -754,7 +765,7 @@ export function useThreadActions() {
           action: "Unpinned",
           claim: action,
           undo: () => pinThread(target, orderKey === undefined ? {} : { orderKey }),
-          failureTitle: "Failed to undo unpin",
+          failureTitle: t.app.thread.undoUnpinError,
         });
       } else {
         action.finish();
@@ -824,7 +835,7 @@ export function useThreadActions() {
           }
           return unsettled;
         },
-        failureTitle: "Failed to undo settle",
+        failureTitle: t.app.thread.undoSettleError,
       });
       return result;
     },
@@ -846,7 +857,7 @@ export function useThreadActions() {
       const resolved = resolveThreadTarget(target);
       const confirmationResult = await requestThreadUnpinConfirmation({
         enabled: confirmThreadUnpin,
-        title: resolved?.thread.title ?? "this thread",
+        title: resolved?.thread.title ?? t.app.thread.thisThread,
         confirm: localApi ? (message) => localApi.dialogs.confirm(message) : null,
       });
       if (confirmationResult._tag === "Failure") {
@@ -966,7 +977,7 @@ export function useThreadActions() {
         action: "Snoozed",
         claim: action,
         undo: () => unsnoozeThread(target),
-        failureTitle: "Failed to wake thread",
+        failureTitle: t.sidebar.thread.wakeError,
       });
       return result;
     },
@@ -981,13 +992,10 @@ export function useThreadActions() {
       const resolved = resolveThreadTarget(target);
 
       if (confirmThreadDelete && localApi) {
-        const title = resolved?.thread.title ?? "this thread";
+        const title = resolved?.thread.title ?? t.app.thread.thisThread;
         const confirmationResult = await settlePromise(() =>
           localApi.dialogs.confirm(
-            [
-              `Delete thread "${title}"?`,
-              "This permanently clears conversation history for this thread.",
-            ].join("\n"),
+            [t.sidebar.confirm.deleteThread(title), t.sidebar.thread.deleteHistoryHint].join("\n"),
             { variant: "destructive" },
           ),
         );

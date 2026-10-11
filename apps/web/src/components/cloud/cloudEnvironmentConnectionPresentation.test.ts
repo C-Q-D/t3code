@@ -1,3 +1,6 @@
+import { installMessages } from "~/i18n";
+import { en } from "~/i18n/locales/en";
+import { messages as zh } from "~/i18n/locales/zh-CN";
 import type { EnvironmentConnectionPresentation } from "@t3tools/client-runtime/connection";
 import { describe, expect, it } from "vite-plus/test";
 
@@ -53,4 +56,17 @@ describe("saved cloud environment connection presentation", () => {
       ).toEqual({ buttonLabel, statusText, tone });
     },
   );
+});
+
+it("uses Chinese status text with the untranslated connection diagnostic", () => {
+  installMessages("zh-CN", zh);
+  try {
+    expect(
+      presentSavedCloudEnvironmentConnection(connection("reconnecting", "ECONNRESET")),
+    ).toMatchObject({
+      statusText: "连接失败，正在重新连接。原因：ECONNRESET",
+    });
+  } finally {
+    installMessages("en", en);
+  }
 });

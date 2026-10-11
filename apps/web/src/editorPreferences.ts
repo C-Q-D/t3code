@@ -1,3 +1,5 @@
+/** Resolves preferred editors and opens paths on the target environment. */
+import { t } from "~/i18n";
 import {
   AuthOrchestrationOperateScope,
   EDITORS,
@@ -27,8 +29,9 @@ export class PreferredEditorEnvironmentRequiredError extends Schema.TaggedError<
     targetPath: Schema.String,
   },
 ) {
+  /** Returns the user-facing failure reason in the active UI language. */
   override get message(): string {
-    return `Cannot open ${this.targetPath} because no environment is selected.`;
+    return t.app.editor.noEnvironment(this.targetPath);
   }
 }
 
@@ -40,8 +43,9 @@ export class PreferredEditorUnavailableError extends Schema.TaggedError<Preferre
     availableEditorIds: Schema.Array(EditorId),
   },
 ) {
+  /** Returns the user-facing failure reason in the active UI language. */
   override get message(): string {
-    return `No available editor can open ${this.targetPath} in environment ${this.environmentId}.`;
+    return t.app.editor.noAvailable(this.targetPath, this.environmentId);
   }
 }
 
@@ -65,6 +69,7 @@ function resolveAndPersistPreferredEditor(availableEditors: readonly EditorId[])
   return editor ?? null;
 }
 
+/** Returns an action that opens a path in an available editor on environmentId, respecting the stored preference; failures remain available to the caller. */
 export function useOpenInPreferredEditor(
   environmentId: EnvironmentId | null,
   availableEditors: readonly EditorId[],
@@ -100,7 +105,7 @@ export function useOpenInPreferredEditor(
           Cause.fail(
             new EnvironmentAuthorizationError({
               requiredScope: AuthOrchestrationOperateScope,
-              message: "This connection cannot open an editor on this environment.",
+              message: t.app.editor.openDenied,
             }),
           ),
         );

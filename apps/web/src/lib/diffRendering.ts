@@ -1,3 +1,5 @@
+/** Parses and styles diff patches; localizes display fallback reasons and preserves patch text. */
+import { t } from "~/i18n";
 import { parsePatchFiles } from "@pierre/diffs/utils/parsePatchFiles";
 import { parseDiffFromFile } from "@pierre/diffs";
 import type { FileDiffMetadata } from "@pierre/diffs/types";
@@ -162,6 +164,13 @@ function compactPartialHunkOffsets(file: FileDiffMetadata): FileDiffMetadata {
   };
 }
 
+/**
+ * Parses a patch for the code view; returns null for absent or blank input and raw text with a display reason when parsing cannot produce files.
+ * @param patch Unified patch text, or undefined when no patch is available.
+ * @param cacheScope Cache namespace for parsed file patches; defaults to diff-panel.
+ * @param options Whitespace filtering and partial-hunk display options.
+ * @returns Parsed files or raw patch text with a display reason; null for an absent or blank patch.
+ */
 export function getRenderablePatch(
   patch: string | undefined,
   cacheScope = "diff-panel",
@@ -188,13 +197,13 @@ export function getRenderablePatch(
     return {
       kind: "raw",
       text: normalizedPatch,
-      reason: "Unsupported diff format. Showing raw patch.",
+      reason: t.git.diff.unsupportedDiffFormatShowingRawPatch,
     };
   } catch {
     return {
       kind: "raw",
       text: normalizedPatch,
-      reason: "Failed to parse patch. Showing raw patch.",
+      reason: t.git.diff.failedToParsePatchShowingRawPatch,
     };
   }
 }

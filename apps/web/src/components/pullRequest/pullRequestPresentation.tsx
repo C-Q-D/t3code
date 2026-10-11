@@ -1,3 +1,5 @@
+/** Owns pull request presentation on the web pull-request surface; host data and agent context remain unchanged. */
+import { t } from "~/i18n";
 import { Spinner } from "~/components/ui/spinner";
 import type {
   PullRequestActor,
@@ -72,25 +74,27 @@ export function PullRequestLabelChip({
  * The review verdict as one glyph beside the checks glyph, so a row answers both "does it
  * build" and "did someone say yes" in the same spot. "Awaiting review" is only drawn when the
  * host reports it, which on GitHub means the branch rules require a review nobody has given.
+ * @param decision Host-reported review decision.
+ * @returns The display icon, label, and tone for the review decision.
  */
 function reviewDecisionPresentation(decision: PullRequestReviewDecision) {
   switch (decision) {
     case "approved":
       return {
         Icon: UserCheckIcon,
-        label: "Approved",
+        label: t.git.pullRequest.approved,
         toneClassName: CHECK_STATUS_PRESENTATION.success.toneClassName,
       };
     case "changes-requested":
       return {
         Icon: UserRoundXIcon,
-        label: "Changes requested",
+        label: t.git.pullRequest.changesRequested,
         toneClassName: "text-amber-600/90 dark:text-amber-400/80",
       };
     case "review-required":
       return {
         Icon: UserRoundIcon,
-        label: "Awaiting review",
+        label: t.git.pullRequest.awaitingReview,
         toneClassName: "text-muted-foreground/60",
       };
   }
@@ -134,6 +138,11 @@ export interface PullRequestConflictPresentation {
   readonly Icon: PullRequestGlyphIcon;
 }
 
+/**
+ * Returns a conflict presentation for an open, non-draft, conflicting request; otherwise returns null.
+ * @param input Operation-specific state and options described by the input type.
+ * @returns The conflict presentation, or null when no conflict warning applies.
+ */
 export function resolvePullRequestConflict(input: {
   readonly state: PullRequestState;
   readonly isDraft: boolean;
@@ -144,7 +153,9 @@ export function resolvePullRequestConflict(input: {
     return null;
   }
   return {
-    label: input.baseBranch ? `Conflicts with ${input.baseBranch}` : "Has conflicts",
+    label: input.baseBranch
+      ? t.git.pullRequest.conflictsWith(input.baseBranch)
+      : t.git.pullRequest.hasConflicts,
     toneClassName: "text-destructive",
     Icon: PullRequestGlyph.conflicting,
   };
@@ -211,21 +222,37 @@ export function PullRequestConflictGlyph({
 }
 
 const CHECK_STATUS_PRESENTATION = {
-  pending: { label: "Running", Icon: Spinner, toneClassName: "text-amber-500" },
+  pending: { label: t.git.pullRequest.running, Icon: Spinner, toneClassName: "text-amber-500" },
   "action-required": {
-    label: "Awaiting action",
+    label: t.git.pullRequest.awaitingAction,
     Icon: CircleDotIcon,
     toneClassName: "text-amber-600 dark:text-amber-400/90",
   },
   success: {
-    label: "Passed",
+    label: t.git.pullRequest.passed,
     Icon: CircleCheckIcon,
     toneClassName: "text-emerald-600 dark:text-emerald-300/90",
   },
-  failure: { label: "Failed", Icon: CircleXIcon, toneClassName: "text-destructive" },
-  cancelled: { label: "Cancelled", Icon: CircleXIcon, toneClassName: "text-destructive" },
-  skipped: { label: "Skipped", Icon: CircleDashedIcon, toneClassName: "text-muted-foreground/70" },
-  neutral: { label: "Neutral", Icon: CircleDashedIcon, toneClassName: "text-muted-foreground/70" },
+  failure: {
+    label: t.git.pullRequest.failed2,
+    Icon: CircleXIcon,
+    toneClassName: "text-destructive",
+  },
+  cancelled: {
+    label: t.git.pullRequest.cancelled,
+    Icon: CircleXIcon,
+    toneClassName: "text-destructive",
+  },
+  skipped: {
+    label: t.git.pullRequest.skipped,
+    Icon: CircleDashedIcon,
+    toneClassName: "text-muted-foreground/70",
+  },
+  neutral: {
+    label: t.git.pullRequest.neutral,
+    Icon: CircleDashedIcon,
+    toneClassName: "text-muted-foreground/70",
+  },
 } as const satisfies Record<
   PullRequestCheckStatus,
   { label: string; Icon: typeof CircleCheckIcon | typeof Spinner; toneClassName: string }
@@ -239,11 +266,16 @@ function isWorkflowApprovalCheck(check: Pick<PullRequestCheck, "status" | "url">
   );
 }
 
+/**
+ * Names a check status for display, including workflow approval when the check URL identifies it.
+ * @param check Host check status and URL used to detect required workflow approval.
+ * @returns The current display label for this host check.
+ */
 export function pullRequestCheckStatusLabel(
   check: Pick<PullRequestCheck, "status" | "url">,
 ): string {
   return isWorkflowApprovalCheck(check)
-    ? "Awaiting approval"
+    ? t.git.pullRequest.awaitingApproval
     : CHECK_STATUS_PRESENTATION[check.status].label;
 }
 
@@ -263,17 +295,17 @@ export function PullRequestCheckStatusIcon({ status }: { status: PullRequestChec
  */
 const CHECKS_STATE_PRESENTATION = {
   passing: {
-    label: "All checks have passed",
+    label: t.git.pullRequest.allChecksHavePassed,
     Icon: CircleCheckIcon,
     toneClassName: CHECK_STATUS_PRESENTATION.success.toneClassName,
   },
   failing: {
-    label: "Some checks were not successful",
+    label: t.git.pullRequest.someChecksWereNotSuccessful,
     Icon: CircleXIcon,
     toneClassName: "text-destructive",
   },
   pending: {
-    label: "Some checks haven't completed yet",
+    label: t.git.pullRequest.someChecksHavenTCompletedYet,
     Icon: CircleDotIcon,
     toneClassName: "text-amber-600 dark:text-amber-400/90",
   },
@@ -312,7 +344,7 @@ export function pullRequestChecksState(
  */
 const REVIEW_OUTCOME_PRESENTATION = {
   approved: {
-    label: "Approved",
+    label: t.git.pullRequest.approved,
     Icon: CircleCheckIcon,
     toneClassName: "text-emerald-600 dark:text-emerald-300/90",
     ringClassName: "ring-2 ring-emerald-500 dark:ring-emerald-400",
@@ -321,7 +353,7 @@ const REVIEW_OUTCOME_PRESENTATION = {
     badgeVariant: "success",
   },
   "changes-requested": {
-    label: "Changes requested",
+    label: t.git.pullRequest.changesRequested,
     Icon: CircleXIcon,
     toneClassName: "text-destructive",
     ringClassName: "ring-2 ring-destructive",
@@ -329,7 +361,7 @@ const REVIEW_OUTCOME_PRESENTATION = {
     badgeVariant: "error",
   },
   dismissed: {
-    label: "Review dismissed",
+    label: t.git.pullRequest.reviewDismissed,
     Icon: CircleDashedIcon,
     toneClassName: "text-muted-foreground/70",
     ringClassName: "ring-2 ring-muted-foreground/60",
@@ -371,9 +403,11 @@ export function pullRequestReviewOutcomeRingClassName(
 /**
  * What a superseded verdict says, which is the same word with when it applied added. Commits
  * landed after it, so it stands for code the branch no longer has.
+ * @param outcome Normalized host review verdict.
+ * @returns The review label qualified as applying to earlier changes.
  */
 export function pullRequestReviewOutcomeStaleLabel(outcome: PullRequestReviewOutcome): string {
-  return `${REVIEW_OUTCOME_PRESENTATION[outcome].label} earlier changes`;
+  return t.git.pullRequest.earlierReview(REVIEW_OUTCOME_PRESENTATION[outcome].label);
 }
 
 /** Decorative: every caller says which verdict this is in words beside it. */
@@ -451,6 +485,8 @@ export function PullRequestActorAvatar({
  *
  * An actor as a login beside its avatar, or as the avatar alone. With a profile URL the actor
  * is an inline link; `className` places it and never restyles it.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
  */
 export function PullRequestActorLabel({
   actor,
@@ -488,7 +524,7 @@ export function PullRequestActorLabel({
                   href={profileUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  aria-label={`Open ${login}'s profile`}
+                  aria-label={t.git.pullRequest.openActorProfile(login)}
                 />
               }
             />
@@ -501,7 +537,7 @@ export function PullRequestActorLabel({
       </TooltipTrigger>
       <TooltipPopup side="top">
         {actor?.name && actor.name !== login ? `${actor.name} (@${login})` : login}
-        {profileUrl ? " · Open profile" : ""}
+        {profileUrl ? t.git.pullRequest.openProfile : ""}
       </TooltipPopup>
     </Tooltip>
   );
@@ -569,8 +605,13 @@ export function PullRequestMetaLine({
   );
 }
 
+/**
+ * Summarizes checks with failures, required action, and running checks taking precedence over passed checks.
+ * @param checks Host-reported checks in their supplied order; may be empty.
+ * @returns A display summary, including a no-checks label for an empty collection.
+ */
 export function summarizePullRequestChecks(checks: ReadonlyArray<PullRequestCheck>): string {
-  if (checks.length === 0) return "No checks reported";
+  if (checks.length === 0) return t.git.pullRequest.noChecksReported;
   const actionRequired = checks.filter((check) => check.status === "action-required");
   const workflowApprovalRequired = actionRequired.filter(isWorkflowApprovalCheck).length;
   const otherActionRequired = actionRequired.length - workflowApprovalRequired;
@@ -579,16 +620,21 @@ export function summarizePullRequestChecks(checks: ReadonlyArray<PullRequestChec
   ).length;
   const pending = checks.filter((check) => check.status === "pending").length;
   const passed = checks.filter((check) => check.status === "success").length;
-  if (failed > 0) return `${failed} of ${checks.length} failing`;
+  if (failed > 0) return t.git.pullRequest.checksFailing(failed, checks.length);
   if (workflowApprovalRequired > 0 && otherActionRequired > 0) {
-    return `${workflowApprovalRequired} ${workflowApprovalRequired === 1 ? "workflow" : "workflows"} and ${otherActionRequired} ${otherActionRequired === 1 ? "check" : "checks"} awaiting action`;
+    return t.git.pullRequest.workflowsAndChecksAwaiting(
+      workflowApprovalRequired,
+      otherActionRequired,
+    );
   }
   if (workflowApprovalRequired > 0) {
-    return `${workflowApprovalRequired} ${workflowApprovalRequired === 1 ? "workflow" : "workflows"} awaiting approval`;
+    return t.git.pullRequest.workflowsAwaiting(workflowApprovalRequired);
   }
   if (otherActionRequired > 0) {
-    return `${otherActionRequired} ${otherActionRequired === 1 ? "check" : "checks"} awaiting action`;
+    return t.git.pullRequest.otherChecksAwaiting(otherActionRequired);
   }
-  if (pending > 0) return `${pending} of ${checks.length} running`;
-  return passed === checks.length ? "All checks passed" : `${passed} of ${checks.length} passing`;
+  if (pending > 0) return t.git.pullRequest.checksRunning(pending, checks.length);
+  return passed === checks.length
+    ? t.git.pullRequest.allChecksPassed
+    : t.git.pullRequest.checksPassing(passed, checks.length);
 }

@@ -1,3 +1,5 @@
+/** Derives conversation synchronization state and its visible progress label. */
+import { t } from "~/i18n";
 import type { EnvironmentThreadStatus } from "@t3tools/client-runtime/state/threads";
 
 export type ThreadSyncPhase = "loading" | "syncing";
@@ -22,6 +24,7 @@ export function resolveThreadSyncPhase(input: {
   }
 }
 
+/** Returns the message-loading or synchronization label for phase. */
 export function threadSyncLabel(phase: ThreadSyncPhase): string {
-  return phase === "loading" ? "Loading messages..." : "Syncing messages...";
+  return phase === "loading" ? t.app.thread.loadingMessages : t.app.thread.syncingMessages;
 }

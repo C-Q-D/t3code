@@ -1,3 +1,5 @@
+/** Localized desktop presentation and existing interaction behavior. */
+import { t } from "~/i18n";
 import type { DesktopBridge, DesktopWslState } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
@@ -13,8 +15,9 @@ class DesktopWslStateUnavailableError extends Schema.TaggedError<DesktopWslState
   "DesktopWslStateUnavailableError",
   {},
 ) {
+  /** Returns the localized display message for this error while preserving its structured diagnostic fields. */
   override get message(): string {
-    return "Desktop WSL state is unavailable.";
+    return t.account.desktop.wslUnavailable;
   }
 }
 
@@ -22,8 +25,9 @@ class DesktopWslStateLoadError extends Schema.TaggedError<DesktopWslStateLoadErr
   "DesktopWslStateLoadError",
   { cause: Schema.Defect() },
 ) {
+  /** Returns the localized display message for this error while preserving its structured diagnostic fields. */
   override get message(): string {
-    return "Failed to load WSL state.";
+    return t.account.desktop.wslFailed;
   }
 }
 

@@ -244,7 +244,6 @@ export const chat: Messages["chat"] = {
 
   rightPanel: {
     /** Formats a generated terminal fallback label; caller-supplied session labels bypass it. */
-    terminalLabel: (label) => label.replace(/^Terminal (\d+)$/, "终端$1"),
     browserDisabled: "浏览器预览仅在T3 Code桌面应用中可用。",
     terminalDisabled: "终端面板仅在项目对话中可用。",
     filesDisabled: "打开项目后才能使用文件功能。",
@@ -350,6 +349,10 @@ export const chat: Messages["chat"] = {
     threadActions: (title) => `${title} 的对话操作`,
   },
   timeline: {
+    emptyResponse: "（空响应）",
+    tokenChange: (before: number | string, after: number | string) =>
+      `${before} → ${after} 个 token`,
+    moreSelectedElements: (count: number) => `另外 ${count} 个已选元素`,
     thought: "思考",
     thinking: "正在思考",
     webSearch: "网页搜索",
@@ -457,6 +460,9 @@ export const chat: Messages["chat"] = {
     workingForPrefix: "已工作",
   },
   markdown: {
+    templateLabel: (name: string) => `${name} 模板`,
+    copiedTitle: (title: string) => `已复制${title}`,
+    mermaidDiagram: "Mermaid 图表",
     note: "备注",
     tip: "提示",
     important: "重要",
@@ -580,6 +586,8 @@ export const chat: Messages["chat"] = {
     commentLimit: (count) => `评论最多可包含${count}个字符。`,
   },
   details: {
+    nextRunSuffix: (relative: string) => ` · 下次运行：${relative}`,
+    pausedSuffix: " · 已暂停",
     workspace: "工作区",
     clientAndServerVersionsDiffer: "客户端与服务器版本不同",
     dismissVersionMismatchWarning: "关闭版本不匹配警告",
@@ -635,6 +643,7 @@ export const chat: Messages["chat"] = {
     loadAutomationsError: (error) => `无法加载自动任务：${error}`,
   },
   relationships: {
+    failedCount: (count: number) => `${count} 个失败`,
     starting: "正在启动",
     running: "运行中",
     queued: "排队中",
@@ -760,6 +769,9 @@ export const chat: Messages["chat"] = {
     usingChatGPTPlan: "使用ChatGPT套餐",
   },
   media: {
+    terminalSelection: "终端选区",
+    terminalInput: "终端输入",
+    zoomPercent: (percent: number) => `缩放 ${percent}%`,
     showScreenshot: "显示截图",
     showAccessibilityJSON: "显示无障碍JSON",
     showExtractedText: "显示提取的文本",
@@ -879,6 +891,8 @@ export const chat: Messages["chat"] = {
     announcement: (model, status) => `${model} 子Agent：${status}`,
   },
   inspector: {
+    fileCount: (count: number) => `${count} 个文件`,
+    toolOutputImage: "工具输出图片",
     outputIsNoLongerAvailable: "输出已不可用。",
     loadingOutput: "正在加载输出…",
     noOutput: "没有输出。",
@@ -931,6 +945,363 @@ export const chat: Messages["chat"] = {
     fastModeOn: "快速模式已开启",
   },
   workLog: {
+    subagentCount: (count: number) => `${count} 个子代理`,
+    shared: {
+      remotePairing: {
+        RemoteBackendUrlMissingError: "请输入后端 URL。",
+        RemotePairingUrlInvalidError: "配对 URL 无效。",
+        RemoteBackendUrlInvalidError: "后端 URL 无效。",
+        RemotePairingTokenMissingError: "配对 URL 缺少令牌。",
+        RemotePairingCodeMissingError: "请输入配对码。",
+        invalidDetails: "配对信息无效。",
+        differentMachine: (label: string) =>
+          `此地址连接的是另一台计算机 ${label}。请将其添加为独立环境。`,
+      },
+      relay: {
+        clockHint: "提示：请确认两台设备均已启用自动日期和时间，然后重试。",
+        unknownHint:
+          "提示：请重试。如果仍然失败，可能存在时钟偏差；请检查两台设备的自动日期和时间设置。",
+        retryHint: "提示：请重试。如果问题持续，请复制跟踪 ID。",
+        withHint: (message: string, hint: string) => `${message} ${hint}`,
+        rejectedToken: "中继拒绝了云会话令牌。",
+        rejectedProof: "中继拒绝了 DPoP 证明。",
+        rejectedRequest: "中继拒绝了已认证请求。",
+        expiredLinkProof: "中继拒绝了已过期的环境关联证明。",
+        invalidLinkProof: (reason: string) => `中继拒绝了环境关联证明（${reason}）。`,
+        missingLink: "中继没有此环境的有效关联。环境服务器可能尚未重新建立关联。",
+        rejectedConnection: (reason?: string) =>
+          reason ? `中继拒绝了环境连接请求（${reason}）。` : "中继拒绝了环境连接请求。",
+        endpointUnavailable: (reason: string) => `中继无法访问环境端点（${reason}）。`,
+        endpointTimeout: "中继联系环境端点超时。",
+        linkFailed: (reason: string) => `中继无法关联环境（${reason}）。`,
+        linkUnavailable: (reason: string) => `中继无法配置托管端点（${reason}）。`,
+        linkLimit: (maxTunnels: number) =>
+          `中继拒绝关联：此账户已达到 ${maxTunnels} 个托管隧道的上限。请解除一个环境的关联以释放名额。`,
+        expiredActivityProof: "中继拒绝了已过期的代理活动发布证明。",
+        invalidActivityProof: (reason: string) => `中继拒绝了代理活动发布证明（${reason}）。`,
+        internalError: (reason: string) => `中继发生内部错误（${reason}）。`,
+        tunnelReleased:
+          "由于长期离线，此环境的 T3 Connect 隧道已移除。请在那台计算机上启动 T3 Code 并更新至最新版本以重新连接。",
+      },
+      connection: {
+        available: "可连接",
+        offline: "离线",
+        connecting: "正在连接…",
+        reconnecting: "正在重新连接…",
+        reconnectingAfterFailure: "连接失败，正在重新连接…",
+        connected: "已连接",
+        unsupported: "不支持此客户端",
+        failed: "连接失败",
+        failedWithReason: (reason: string) => `连接失败。原因：${reason}`,
+        reconnectingWithReason: (reason: string) => `连接失败，正在重新连接。原因：${reason}`,
+      },
+      subagentExecution: {
+        starting: "启动中",
+        labels: {
+          idle: "空闲",
+          pending: "进行中",
+          running: "进行中",
+          waiting: "等待中",
+          completed: "已完成",
+          interrupted: "已中断",
+          failed: "失败",
+          cancelled: "已取消",
+          rolled_back: "已取消",
+        },
+        live: (label, elapsed) => `${label} ${elapsed}`,
+        completed: (label, elapsed) => `${label}，用时 ${elapsed}`,
+      },
+      terminal: { numbered: (number) => `终端 ${number}` },
+      usage: {
+        dateLocale: "zh-CN",
+        day: (month, day) => `${month}月${day}日`,
+        today: (hour) => `今天 ${hour}`,
+        yesterday: (hour) => `昨天 ${hour}`,
+        serverBehind: (environment) => `${environment} 的服务端版本较旧，其用量不计入总计。`,
+        clientBehind: (environment) =>
+          `此客户端的版本低于 ${environment} 的服务端，其用量不计入总计。`,
+      },
+      usageLimits: {
+        daysHours: (days, hours) => `${days}天 ${hours}小时`,
+        hoursMinutes: (hours, minutes) => `${hours}小时 ${minutes}分`,
+        minutes: (minutes) => `${minutes}分`,
+        resetsNow: "现在重置",
+        resetsIn: (duration) => `${duration}后重置`,
+        relativeReset: (duration) => `${duration}后`,
+        compactReset: (duration) => `↻ ${duration}`,
+        noSubscriptionLimits: "此账户没有订阅额度限制。",
+        couldNotReadLimits: "无法读取额度限制。",
+        noLimits: "未报告额度限制。",
+        noAccounts: "未报告账户。",
+        cursorWindows: {
+          totalPercentUsed: { label: "总计", description: "两项额度的合计用量，并非第三项额度。" },
+          autoPercentUsed: {
+            label: "Cursor 模型",
+            description: "Grok 和 Composer 优先使用此额度。Auto 可使用任一额度池。",
+          },
+          apiPercentUsed: {
+            label: "其他模型",
+            description:
+              "Claude、GPT 和 Gemini 使用此额度池。Grok 和 Composer 在首选额度耗尽后使用此额度。",
+          },
+        },
+      },
+      t3Tools: {
+        labels: {
+          link_pull_request: ["关联", "正在关联", "已关联", "拉取请求"],
+          unlink_pull_request: ["取消关联", "正在取消关联", "已取消关联", "拉取请求"],
+          list_thread_pull_requests: ["检查", "正在检查", "已检查", "关联的拉取请求"],
+          watch_pull_request: ["关注", "正在关注", "正在关注", "拉取请求"],
+          unwatch_pull_request: ["停止关注", "正在停止关注", "已停止关注", "拉取请求"],
+          orchestrator_capabilities: ["获取", "正在获取", "已获取", "编排能力"],
+          delegate_task: ["委派", "正在委派", "已委派", "子任务"],
+          task_status: ["获取", "正在获取", "已获取", "委派任务状态"],
+          task_cancel: ["取消", "正在取消", "已请求取消", "委派任务"],
+          schedule_task: ["安排", "正在安排", "已安排", "周期任务"],
+          list_scheduled_tasks: ["列出", "正在列出", "已列出", "定时任务"],
+          update_scheduled_task: ["更新", "正在更新", "已更新", "定时任务"],
+          delete_scheduled_task: ["删除", "正在删除", "已请求删除", "定时任务"],
+          request_secret: ["请求", "正在请求", "已请求", "密钥"],
+          create_threads: ["创建", "正在创建", "已创建", "T3 对话"],
+          t3_thread_start: ["启动", "正在启动", "已启动", "T3 对话"],
+          t3_thread_list: ["列出", "正在列出", "已列出", "T3 对话"],
+          t3_thread_read: ["读取", "正在读取", "已读取", "T3 对话"],
+          t3_thread_send: ["发送", "正在发送", "已发送", "至 T3 对话"],
+          t3_thread_wait: ["等待", "正在等待", "已等待", "T3 对话"],
+          t3_thread_interrupt: ["中断", "正在中断", "已请求中断", "T3 对话"],
+          t3_worktree_handoff: ["转交", "正在转交", "已转交", "对话至 Git 工作树"],
+          t3_worktree_status: ["获取", "正在获取", "已获取", "对话工作树状态"],
+          preview_status: ["获取", "正在获取", "已获取", "预览浏览器状态"],
+          preview_open: ["打开", "正在打开", "已打开", "预览浏览器页面"],
+          preview_navigate: ["导航", "正在导航", "已导航", "预览浏览器"],
+          preview_dialog: ["响应", "正在响应", "已响应", "预览浏览器对话框"],
+          preview_snapshot: ["获取快照：", "正在获取快照：", "已获取快照：", "预览页面"],
+          preview_click: ["点击", "正在点击", "已点击", "预览浏览器页面"],
+          preview_press: ["按下", "正在按下", "已按下", "预览浏览器中的按键"],
+          preview_type: ["输入", "正在输入", "已输入", "预览浏览器页面"],
+          preview_hover: ["悬停", "正在悬停", "已悬停", "预览浏览器页面"],
+          preview_select: ["选择", "正在选择", "已选择", "预览浏览器中的选项"],
+          preview_drag: ["拖动", "正在拖动", "已拖动", "预览浏览器页面"],
+          preview_upload: ["上传", "正在上传", "已上传", "文件至预览浏览器"],
+          preview_scroll: ["滚动", "正在滚动", "已滚动", "预览浏览器"],
+          preview_resize: ["调整大小：", "正在调整大小：", "已调整大小：", "预览浏览器"],
+          preview_evaluate: ["执行", "正在执行", "已执行", "预览浏览器中的脚本"],
+          preview_wait_for: ["等待", "正在等待", "已等待", "预览页面"],
+          preview_set_appearance: ["设置", "正在设置", "已设置", "预览浏览器外观"],
+          preview_recording_start: ["启动", "正在启动", "已启动", "预览浏览器录制"],
+          preview_recording_stop: ["停止", "正在停止", "已停止", "预览浏览器录制"],
+          device_list: ["列出", "正在列出", "已列出", "模拟器"],
+          device_open: ["打开", "正在打开", "已打开", "设备面板中的设备"],
+          device_screenshot: ["截图：", "正在截图：", "已截图：", "设备"],
+          device_close: ["关闭", "正在关闭", "已关闭", "设备"],
+          run_scheduled_task_now: ["运行", "正在运行", "已请求运行", "定时任务"],
+          t3_queue_list: ["列出", "正在列出", "已列出", "排队消息"],
+          t3_queue_read: ["读取", "正在读取", "已读取", "排队消息"],
+          t3_queue_edit: ["编辑", "正在编辑", "已编辑", "排队消息"],
+          t3_queue_cancel: ["取消", "正在取消", "已请求取消", "排队运行"],
+          t3_queue_reorder: ["调整顺序：", "正在调整顺序：", "已调整顺序：", "排队运行"],
+          t3_queue_promote_to_steer: [
+            "发送引导：",
+            "正在发送引导：",
+            "已请求发送引导：",
+            "排队消息",
+          ],
+          t3_pending_request_list: ["列出", "正在列出", "已列出", "待回答问题"],
+          t3_pending_request_read: ["读取", "正在读取", "已读取", "待回答问题"],
+          t3_pending_request_respond: ["回答", "正在回答", "已回答", "待回答问题"],
+          t3_thread_configuration: ["读取", "正在读取", "已读取", "对话配置"],
+          t3_thread_configure: ["设置", "正在设置", "已设置", "对话模型"],
+          t3_thread_fork: ["派生", "正在派生", "已请求派生", "当前对话"],
+          t3_thread_merge_back: ["合并", "正在合并", "已请求合并", "对话上下文"],
+          t3_thread_search: ["搜索", "正在搜索", "已搜索", "对话内容"],
+          t3_thread_transfers: ["读取", "正在读取", "已读取", "对话转交记录"],
+          t3_thread_organize: ["整理", "正在整理", "已整理", "对话"],
+          t3_thread_update: ["更新", "正在更新", "已更新", "T3 对话元数据"],
+          t3_worktree_list: ["列出", "正在列出", "已列出", "工作区分支"],
+          t3_preview_list: ["列出", "正在列出", "已列出", "预览标签页"],
+          t3_preview_close: ["关闭", "正在关闭", "已关闭", "预览标签页"],
+          t3_environment_read: ["读取", "正在读取", "已读取", "环境偏好设置"],
+          t3_environment_preferences_update: ["更新", "正在更新", "已更新", "环境偏好设置"],
+          t3_thread_launch: ["启动", "正在启动", "已启动", "项目对话"],
+          t3_project_list: ["列出", "正在列出", "已列出", "项目"],
+          t3_project_read: ["读取", "正在读取", "已读取", "项目"],
+          t3_project_create: ["登记", "正在登记", "已登记", "项目"],
+          t3_project_update: ["更新", "正在更新", "已更新", "项目"],
+          t3_project_delete: ["删除", "正在删除", "已删除", "项目"],
+          t3_project_clone: ["克隆", "正在克隆", "已克隆", "仓库"],
+          t3_attachment_prepare_upload: ["准备", "正在准备", "已准备", "附件上传"],
+          t3_attachment_discard: ["丢弃", "正在丢弃", "已丢弃", "待发送附件"],
+          t3_thread_send_attachments: ["发送", "正在发送", "已发送", "附件"],
+          html_preview: ["预览", "正在预览", "已预览", "HTML 页面"],
+          html_render: ["渲染", "正在渲染", "已渲染", "HTML 页面"],
+        },
+        failed: (action) => `未能${action}`,
+        declined: (action) => `已拒绝${action}`,
+        stopped: (running) => `已停止${running.replace(/^正在/, "")}`,
+        pullRequest: (number) => `拉取请求 #${number}`,
+        joinLabel: (verb, target) => `${verb}${target}`,
+        summary: {
+          delegate: (count, succeeded) => `${succeeded ? "已委派" : "尝试委派"} ${count} 个任务`,
+          "thread-list": (count, succeeded) =>
+            `${succeeded ? "已列出对话" : "尝试列出对话"} ${count} 次`,
+          "thread-interrupt": (count, succeeded) =>
+            `${succeeded ? "已请求中断" : "尝试中断"} ${count} 个对话`,
+          "task-status": (count, succeeded) =>
+            `${succeeded ? "已检查任务状态" : "尝试检查任务状态"} ${count} 次`,
+          "task-cancel": (count, succeeded) =>
+            `${succeeded ? "已请求取消" : "尝试取消"} ${count} 个任务`,
+          "schedule-create": (count, succeeded) =>
+            `${succeeded ? "已安排" : "尝试安排"} ${count} 个任务`,
+          "schedule-list": (count, succeeded) =>
+            `${succeeded ? "已列出定时任务" : "尝试列出定时任务"} ${count} 次`,
+          "schedule-update": (count, succeeded) =>
+            `${succeeded ? "已更新" : "尝试更新"} ${count} 个定时任务`,
+          "schedule-delete": (count, succeeded) =>
+            `${succeeded ? "已请求删除" : "尝试删除"} ${count} 个定时任务`,
+          "schedule-run": (count, succeeded) =>
+            `${succeeded ? "已请求" : "尝试请求"} ${count} 次定时任务运行`,
+          "thread-configuration": (count, succeeded) =>
+            `${succeeded ? "已检查对话配置" : "尝试检查对话配置"} ${count} 次`,
+          "thread-configure": (count, succeeded) =>
+            `${succeeded ? "已设置对话模型" : "尝试设置对话模型"} ${count} 次`,
+          "thread-fork": (count, succeeded) =>
+            `${succeeded ? "已请求" : "尝试请求"} ${count} 次对话派生`,
+          "thread-merge": (count, succeeded) =>
+            `${succeeded ? "已请求" : "尝试请求"} ${count} 次上下文合并`,
+          "thread-search": (count, succeeded) =>
+            `${succeeded ? "已搜索对话" : "尝试搜索对话"} ${count} 次`,
+          "thread-transfers": (count, succeeded) =>
+            `${succeeded ? "已检查对话转交记录" : "尝试检查对话转交记录"} ${count} 次`,
+          "thread-organize": (count, succeeded) =>
+            `${succeeded ? "已整理对话" : "尝试整理对话"} ${count} 次`,
+          "thread-update": (count, succeeded) =>
+            `${succeeded ? "已更新" : "尝试更新"} ${count} 个对话`,
+          "queue-list": (count, succeeded) =>
+            `${succeeded ? "已列出排队消息" : "尝试列出排队消息"} ${count} 次`,
+          "queue-read": (count, succeeded) =>
+            `${succeeded ? "已读取" : "尝试读取"} ${count} 条排队消息`,
+          "queue-edit": (count, succeeded) =>
+            `${succeeded ? "已编辑" : "尝试编辑"} ${count} 条排队消息`,
+          "queue-cancel": (count, succeeded) =>
+            `${succeeded ? "已请求取消" : "尝试取消"} ${count} 次排队运行`,
+          "queue-reorder": (count, succeeded) =>
+            `${succeeded ? "已调整" : "尝试调整"} ${count} 次排队运行的顺序`,
+          "queue-steer": (count, succeeded) =>
+            `${succeeded ? "已请求使用" : "尝试使用"} ${count} 条排队消息引导`,
+          "question-list": (count, succeeded) =>
+            `${succeeded ? "已列出待回答问题" : "尝试列出待回答问题"} ${count} 次`,
+          "question-read": (count, succeeded) =>
+            `${succeeded ? "已读取" : "尝试读取"} ${count} 项待回答问题请求`,
+          "question-respond": (count, succeeded) =>
+            `${succeeded ? "已回答" : "尝试回答"} ${count} 项待回答问题请求`,
+          "secret-request": (count, succeeded) =>
+            `${succeeded ? "已请求" : "尝试请求"} ${count} 个密钥`,
+          "worktree-handoff": (count, succeeded) =>
+            `${succeeded ? "已转交至" : "尝试转交至"} ${count} 个工作树`,
+          "worktree-list": (count, succeeded) =>
+            `${succeeded ? "已列出工作区分支" : "尝试列出工作区分支"} ${count} 次`,
+          "worktree-status": (count, succeeded) =>
+            `${succeeded ? "已检查工作树状态" : "尝试检查工作树状态"} ${count} 次`,
+          "project-list": (count, succeeded) =>
+            `${succeeded ? "已列出项目" : "尝试列出项目"} ${count} 次`,
+          "project-read": (count, succeeded) =>
+            `${succeeded ? "已读取" : "尝试读取"} ${count} 个项目`,
+          "project-create": (count, succeeded) =>
+            `${succeeded ? "已登记" : "尝试登记"} ${count} 个项目`,
+          "project-update": (count, succeeded) =>
+            `${succeeded ? "已更新" : "尝试更新"} ${count} 个项目`,
+          "project-delete": (count, succeeded) =>
+            `${succeeded ? "已删除" : "尝试删除"} ${count} 个项目`,
+          "project-clone": (count, succeeded) =>
+            `${succeeded ? "已克隆" : "尝试克隆"} ${count} 个仓库`,
+          "environment-read": (count, succeeded) =>
+            `${succeeded ? "已检查环境偏好设置" : "尝试检查环境偏好设置"} ${count} 次`,
+          "environment-update": (count, succeeded) =>
+            `${succeeded ? "已更新环境偏好设置" : "尝试更新环境偏好设置"} ${count} 次`,
+          "attachment-prepare": (count, succeeded) =>
+            `${succeeded ? "已准备" : "尝试准备"} ${count} 次附件上传`,
+          "attachment-discard": (count, succeeded) =>
+            `${succeeded ? "已丢弃" : "尝试丢弃"} ${count} 个待发送附件`,
+          "link-pr": (count, succeeded) =>
+            `${succeeded ? "已关联" : "尝试关联"} ${count} 个拉取请求`,
+          "unlink-pr": (count, succeeded) =>
+            `${succeeded ? "已取消关联" : "尝试取消关联"} ${count} 个拉取请求`,
+          "watch-pr": (count, succeeded) =>
+            `${succeeded ? "正在关注" : "尝试关注"} ${count} 个拉取请求`,
+          "unwatch-pr": (count, succeeded) =>
+            `${succeeded ? "已停止关注" : "尝试停止关注"} ${count} 个拉取请求`,
+          browser: (count, succeeded) =>
+            `${succeeded ? "已使用浏览器" : "尝试使用浏览器"} ${count} 次`,
+          device: (count, succeeded) =>
+            `${succeeded ? "已使用设备控制" : "尝试使用设备控制"} ${count} 次`,
+          "html-preview": (count, succeeded) =>
+            `${succeeded ? "已预览" : "尝试预览"} ${count} 个 HTML 页面`,
+          "html-render": (count, succeeded) =>
+            `${succeeded ? "已渲染" : "尝试渲染"} ${count} 个 HTML 页面`,
+          capabilities: (count, succeeded) =>
+            `${succeeded ? "已检查编排能力" : "尝试检查编排能力"} ${count} 次`,
+          "list-prs": (count, succeeded) =>
+            `${succeeded ? "已检查" : "尝试检查"}关联的拉取请求${count === 1 ? "" : ` ${count} 次`}`,
+        },
+        sentMessages: (count, threads, succeeded) =>
+          `${succeeded ? "已发送" : "尝试发送"} ${count} 条消息${threads === undefined ? "" : `至 ${threads} 个对话`}`,
+        createdThreads: (count, times) =>
+          count === undefined ? `已请求创建对话 ${times} 次` : `已创建 ${count} 个对话`,
+        readThreads: (count, times, succeeded) =>
+          `${succeeded ? "已读取" : "尝试读取"}${count === undefined ? `对话 ${times} 次` : ` ${count} 个对话`}`,
+        waitedThreads: (count, times, succeeded) =>
+          `${succeeded ? "已等待" : "尝试等待"}${count === undefined ? `对话 ${times} 次` : ` ${count} 个对话`}`,
+        sentAttachments: (count, threads, times, succeeded) =>
+          `${succeeded ? "已发送" : "尝试发送"}${count === undefined ? "附件" : ` ${count} 个附件`}${threads === undefined ? "" : `至 ${threads} 个对话`}${count === undefined ? ` ${times} 次` : ""}`,
+      },
+
+      toolActivity: {
+        searchedQueryIn: (query, target) => `已在 ${target} 中搜索 ${query}`,
+        searchedQuery: (query) => `已搜索 ${query}`,
+        searchedFilesIn: (glob, target) => `已在 ${target} 中搜索文件 ${glob}`,
+        searchedFiles: (glob) => `已搜索文件 ${glob}`,
+        searchedIn: (target) => `已在 ${target} 中搜索`,
+        readPath: (path, extraCount) =>
+          `已读取 ${path}${extraCount > 0 ? ` 及另外 ${extraCount} 个文件` : ""}`,
+        readFile: (extraCount) =>
+          `已读取文件${extraCount > 0 ? ` 及另外 ${extraCount} 个文件` : ""}`,
+        skill: (name) => `技能：${name}`,
+      },
+      compactingContext: "正在压缩上下文",
+      contextCompacted: "上下文已压缩",
+      contextCompactedTokens: (before, after) => `上下文已压缩 ${before} → ${after} 词元`,
+      thought: "思考",
+      thoughtTimes: (count) => `思考（×${count}）`,
+      groupAction: {
+        "link-pr": (count) => `已关联 ${count} 个拉取请求`,
+        "unlink-pr": (count) => `已取消关联 ${count} 个拉取请求`,
+        "watch-pr": (count) => `正在关注 ${count} 个拉取请求`,
+        "unwatch-pr": (count) => `已停止关注 ${count} 个拉取请求`,
+        "list-prs": (count) =>
+          count === 1 ? "已检查关联的拉取请求" : `已检查关联的拉取请求 ${count} 次`,
+        read: (count) => `已读取 ${count} 个文件`,
+        edit: (count) => `已更改${count}个文件`,
+        command: (count) => `已运行 ${count} 条命令`,
+        "thread-create": (count) => `已创建 ${count} 个对话`,
+        device: (count) => `已使用设备控制 ${count} 次`,
+        browser: (count) => `已使用浏览器 ${count} 次`,
+        search: (count) => `已搜索网页 ${count} 次`,
+        "code-search": (count) => `已搜索代码 ${count} 次`,
+        other: (count) => `已使用 ${count} 个工具`,
+        update: (count) => `已收到 ${count} 条更新`,
+      },
+      usedSources: (names, allIntegrations) =>
+        `已使用 ${names.join("、")}${allIntegrations ? " 集成" : ""}`,
+      performedOtherActions: (count) => `已执行另外 ${count} 项操作`,
+      joinSummary: (labels) => labels.join("，"),
+      subagentStatuses: {
+        working: "进行中",
+        done: "已完成",
+        failed: "失败",
+        stopped: "已停止",
+        idle: "空闲",
+      },
+    },
     thinking: "正在思考",
     command: "命令",
     tool: "工具",

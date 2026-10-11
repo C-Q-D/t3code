@@ -1,3 +1,5 @@
+/** Localized browser UI and interactions; preserves user data, commands, and protocol values. */
+import { t } from "~/i18n";
 import type {
   BrowserNavigationTarget,
   EnvironmentId,
@@ -15,12 +17,26 @@ export {
   isPublicFaviconHost,
 } from "@t3tools/shared/hostClassification";
 
+/**
+ * Reads the connected environment base URL.
+ * @param environmentId Original environment ID with a prepared connection.
+ * @returns Parsed connection URL; throws when the connection is missing or its URL is invalid.
+ */
 const readEnvironmentUrl = (environmentId: EnvironmentId): URL => {
   const connection = readPreparedConnection(environmentId);
-  if (!connection) throw new Error(`Environment ${environmentId} is not connected.`);
+  if (!connection) throw new Error(t.tools.browser.environmentDisconnected(environmentId));
   return new URL(connection.httpBaseUrl);
 };
 
+/**
+ * Resolves an environment-local port without changing the requested path or protocol.
+ * @param environmentId Environment that owns the target port.
+ * @param target Original port, protocol, and path selection.
+ * @param environmentUrl Prepared server base URL used for private-network reachability.
+ * @param requestedUrl Optional URL text retained in the resolution result.
+ * @param sourceUrl Optional parsed source URL whose remaining parts are retained.
+ * @returns Resolved URL metadata; throws when the server is not private-network reachable.
+ */
 const resolveEnvironmentPortTarget = (
   environmentId: EnvironmentId,
   target: Extract<BrowserNavigationTarget, { readonly kind: "environment-port" }>,
@@ -29,9 +45,7 @@ const resolveEnvironmentPortTarget = (
   sourceUrl?: URL,
 ): PreviewUrlResolution => {
   if (!isPrivateNetworkHost(environmentUrl.hostname)) {
-    throw new Error(
-      "This environment port needs the planned authenticated preview gateway; its server address is not directly private-network reachable.",
-    );
+    throw new Error(t.tools.browser.gatewayRequired);
   }
   const protocol = target.protocol ?? "http";
   const path = target.path?.startsWith("/") ? target.path : `/${target.path ?? ""}`;

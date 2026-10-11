@@ -1,3 +1,5 @@
+/** Localized files presentation and existing interaction behavior. */
+import { t } from "~/i18n";
 import { Spinner } from "~/components/ui/spinner";
 import {
   AuthPreviewOperateScope,
@@ -143,6 +145,7 @@ type FilePostRender = <LAnnotation>(
   phase: PostRenderPhase,
 ) => void;
 
+/** Loads the workspace image identified by props and its revision; renders an access/load error instead of a broken preview. */
 function WorkspaceImagePreview(props: {
   readonly environmentId: EnvironmentId;
   readonly threadRef: ScopedThreadRef;
@@ -178,7 +181,7 @@ function WorkspaceImagePreview(props: {
     return (
       <MediaActions source={actionsSource}>
         <div className="flex min-h-0 flex-1 items-center justify-center px-6 text-center text-xs leading-relaxed text-destructive">
-          Unable to load workspace image.
+          {t.tools.files.workspaceImageFailed}
         </div>
       </MediaActions>
     );
@@ -235,7 +238,7 @@ function WorkspaceBrowserPreview(props: {
   if (assetUrl._tag === "Failure") {
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center px-6 text-center text-xs leading-relaxed text-destructive">
-        Unable to load file preview.
+        {t.tools.files.previewFailed}
       </div>
     );
   }
@@ -309,6 +312,7 @@ function WorkspaceVideoPreview(props: {
   );
 }
 
+/** Loads the workspace audio identified by props and its revision; passes load errors to the existing preview surface. */
 function WorkspaceAudioPreview(props: {
   readonly environmentId: EnvironmentId;
   readonly threadRef: ScopedThreadRef;
@@ -342,7 +346,7 @@ function WorkspaceAudioPreview(props: {
   if (assetUrl._tag === "Failure" || (url !== null && failedUrl === url)) {
     return (
       <FileSurfaceFailure
-        message="Unable to load audio."
+        message={t.tools.files.audioFailed}
         onRetry={() => {
           setFailedUrl(null);
           void refreshAssetUrl().catch(() => undefined);
@@ -986,10 +990,12 @@ function RenderedMarkdownSurface({
   );
 }
 
+/** Returns the next view action for mode and the current rendered state, distinguishing markdown, HTML and delimited tables. */
 function renderedToggleLabel(mode: "markdown" | "html" | "table", rendered: boolean): string {
-  if (mode === "markdown") return rendered ? "Show markdown source" : "Show rendered markdown";
-  if (mode === "table") return rendered ? "Show source" : "Show table";
-  return rendered ? "Show HTML source" : "Show rendered page";
+  if (mode === "markdown")
+    return rendered ? t.tools.files.markdownSource : t.tools.files.renderedMarkdown;
+  if (mode === "table") return rendered ? t.tools.files.source : t.tools.files.table;
+  return rendered ? t.tools.files.htmlSource : t.tools.files.renderedPage;
 }
 
 function initialExplorerOpen(): boolean {
@@ -1001,6 +1007,7 @@ function initialExplorerOpen(): boolean {
   }
 }
 
+/** Renders props' selected workspace file or attachment with preview/editor controls; retains unsaved edits while write access is unavailable. */
 export default function FilePreviewPanel({
   environmentId,
   cwd,
@@ -1190,8 +1197,8 @@ export default function FilePreviewPanel({
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Unable to open file in browser",
-          description: error instanceof Error ? error.message : "An error occurred.",
+          title: t.tools.files.browserFailed,
+          description: error instanceof Error ? error.message : t.tools.files.error,
         }),
       );
     })();
@@ -1211,13 +1218,13 @@ export default function FilePreviewPanel({
       return (
         <div className="flex min-h-0 flex-1 items-center justify-center gap-2 text-sm text-muted-foreground">
           <Spinner className="size-4" />
-          Checking file access...
+          {t.tools.files.checkingAccess}
         </div>
       );
     }
     return (
       <div className="p-4 text-sm text-muted-foreground">
-        {fileAccess.error ?? "This connection cannot read host files."}
+        {fileAccess.error ?? t.tools.files.cannotRead}
       </div>
     );
   }
@@ -1277,7 +1284,7 @@ export default function FilePreviewPanel({
           ) : null}
           {showsRawText ? (
             <FileSurfaceAction
-              label={wordWrap ? "Disable word wrap" : "Enable word wrap"}
+              label={wordWrap ? t.tools.files.disableWrap : t.tools.files.enableWrap}
               pressed={wordWrap}
               onPress={() => updateClientSettings({ wordWrap: !wordWrap })}
             >
@@ -1285,13 +1292,13 @@ export default function FilePreviewPanel({
             </FileSurfaceAction>
           ) : null}
           {canOpenInBrowser ? (
-            <FileSurfaceAction label="Open file in preview browser" onPress={handleOpenInBrowser}>
+            <FileSurfaceAction label={t.tools.files.openBrowser} onPress={handleOpenInBrowser}>
               <Globe2 className="size-3.5" />
             </FileSurfaceAction>
           ) : null}
           {!isHostFile && previewPath !== null ? (
             <FileSurfaceAction
-              label={explorerOpen ? "Hide file explorer" : "Show file explorer"}
+              label={explorerOpen ? t.tools.files.hideExplorer : t.tools.files.showExplorer}
               pressed={explorerOpen}
               onPress={toggleExplorer}
             >
@@ -1302,7 +1309,7 @@ export default function FilePreviewPanel({
       ) : null}
       {relativePath && !attachment && !isHostFile && !canWriteFiles && !fileAccess.isPending ? (
         <div className="shrink-0 border-b px-3 py-1.5 text-2xs text-muted-foreground">
-          Read-only connection. Unsaved edits are kept until write access returns.
+          {t.tools.files.readOnlyHint}
         </div>
       ) : null}
       {previewPath &&
@@ -1311,7 +1318,7 @@ export default function FilePreviewPanel({
       !renderBrowserFile &&
       file.data?.truncated ? (
         <div className="shrink-0 border-b border-warning/20 bg-warning-surface px-3 py-1.5 text-2xs text-warning-foreground">
-          Preview limited to the first 1 MB of a {file.data.byteLength.toLocaleString()} byte file.
+          {t.tools.files.workspacePreviewLimit(file.data.byteLength.toLocaleString())}
         </div>
       ) : null}
       <div className="flex min-h-0 flex-1 overflow-hidden">
@@ -1374,7 +1381,7 @@ export default function FilePreviewPanel({
                 </p>
                 {attemptedPath ? (
                   <p className="text-muted-foreground">
-                    Attempted path
+                    {t.tools.files.attemptedPath}
                     <code className="block break-all font-mono text-foreground select-all">
                       {attemptedPath}
                     </code>
@@ -1382,11 +1389,11 @@ export default function FilePreviewPanel({
                 ) : null}
                 {!isHostFile ? (
                   <p className="text-muted-foreground">
-                    Workspace folder:{" "}
+                    {t.tools.files.workspaceFolder}{" "}
                     <code className="break-all font-mono select-all">
                       {file.readError?.cwd ?? cwd}
                     </code>
-                    . Check the link's path or locate the file in Files.
+                    {t.tools.files.checkPathHint}
                   </p>
                 ) : null}
               </div>

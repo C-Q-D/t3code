@@ -1,3 +1,5 @@
+/** Owns pull request stack popover on the web pull-request surface; host data and agent context remain unchanged. */
+import { t } from "~/i18n";
 import { Tooltip, TooltipTrigger, TooltipPopup } from "../ui/tooltip";
 import type { EnvironmentId, PullRequestRef, PullRequestStackMembership } from "@t3tools/contracts";
 import { useState } from "react";
@@ -7,7 +9,10 @@ import { PullRequestStackLayers } from "./PullRequestStackLayers";
 import { PullRequestStackHeader } from "./PullRequestStackHeader";
 import { PullRequestGlyph } from "./pullRequestIcons";
 
-/** Mounted only while the menu is open, so list rows do not each fetch a stack. */
+/** Mounted only while the menu is open, so list rows do not each fetch a stack.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 function StackBody({
   environmentId,
   reference,
@@ -28,7 +33,9 @@ function StackBody({
           notice={query.notice}
           stale={!!query.error}
         />
-        {query.error ? <MenuItem onClick={query.refresh}>Retry stack refresh</MenuItem> : null}
+        {query.error ? (
+          <MenuItem onClick={query.refresh}>{t.git.pullRequest.retryStackRefresh}</MenuItem>
+        ) : null}
         <PullRequestStackLayers stack={query.data} reference={reference} onSelect={onSelect} />
       </>
     );
@@ -38,12 +45,19 @@ function StackBody({
       <PullRequestStackHeader number={stackNumber} />
       <MenuGroupLabel>
         {query.error ??
-          (query.isPending ? "Loading stack…" : "This pull request is no longer in a stack.")}
+          (query.isPending
+            ? t.git.pullRequest.loadingStack
+            : t.git.pullRequest.thisPullRequestIsNoLongerInAStack)}
       </MenuGroupLabel>
     </>
   );
 }
 
+/**
+ * Renders pull request stack popover from the supplied display data and callbacks.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 export function PullRequestStackPopover({
   environmentId,
   reference,
@@ -70,7 +84,11 @@ export function PullRequestStackPopover({
                   className="inline-flex shrink-0 cursor-pointer items-center gap-1 text-xs font-normal text-muted-foreground"
                 />
               }
-              aria-label={`Stack ${membership.number}, layer ${membership.position} of ${membership.size}`}
+              aria-label={t.git.pullRequest.stackLayer(
+                membership.number,
+                membership.position,
+                membership.size,
+              )}
               onClick={(event) => event.stopPropagation()}
               onKeyDown={(event) => event.stopPropagation()}
             >
@@ -80,7 +98,11 @@ export function PullRequestStackPopover({
           }
         />
         <TooltipPopup>
-          View stack #{membership.number}, layer {membership.position} of {membership.size}
+          {t.git.pullRequest.viewStackLayer(
+            membership.number,
+            membership.position,
+            membership.size,
+          )}
         </TooltipPopup>
       </Tooltip>
       <MenuPopup

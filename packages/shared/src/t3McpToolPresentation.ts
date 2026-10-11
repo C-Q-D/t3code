@@ -1,3 +1,4 @@
+/** Defines T3 tool identities and English defaults independently of client state. */
 export type T3McpToolLogo = "t3-code";
 
 export interface T3McpToolPresentation {
@@ -82,7 +83,7 @@ function tool(
 const T3_MCP_SERVER_ALIASES = new Set(["t3-code", "t3_code", "t3code"]);
 
 // Cards, activity rows, summaries, and provider identity recovery share this inventory.
-const T3_MCP_TOOLS: Readonly<Record<string, T3McpToolDefinition>> = {
+const toolDefinitions = {
   link_pull_request: tool(
     ["Link", "Linking", "Linked", "a pull request"],
     "link-pr",
@@ -315,7 +316,14 @@ const T3_MCP_TOOLS: Readonly<Record<string, T3McpToolDefinition>> = {
   t3_thread_send_attachments: tool(["Send", "Sending", "Sent", "attachments"], "attachment-send"),
   html_preview: tool(["Preview", "Previewing", "Previewed", "an HTML page"], "html-preview"),
   html_render: tool(["Render", "Rendering", "Rendered", "an HTML page"], "html-render"),
-};
+} satisfies Record<string, T3McpToolDefinition>;
+
+const T3_MCP_TOOLS: Readonly<Record<string, T3McpToolDefinition>> = toolDefinitions;
+
+/** English phrases retain protocol-name keys without importing any runtime module. */
+export const englishT3ToolLabels = Object.fromEntries(
+  Object.entries(toolDefinitions).map(([name, definition]) => [name, definition.labels]),
+) as { readonly [Name in keyof typeof toolDefinitions]: T3McpToolDefinition["labels"] };
 
 /**
  * The T3 orchestration tool inventory, used to gate loose name matching on

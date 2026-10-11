@@ -1,3 +1,8 @@
+import { installMessages } from "../../i18n";
+import { en } from "../../i18n/locales/en";
+import { messages } from "../../i18n/locales/zh-CN";
+import { contextCompactionLabel } from "@t3tools/client-runtime/work-log/presentation";
+import { summarizeSubagentStatuses } from "@t3tools/client-runtime/state/subagent-display";
 import { ThreadId, type WorktreeSetupSnapshot } from "@t3tools/contracts";
 import {
   CheckpointRef,
@@ -4888,4 +4893,68 @@ describe("failed turn transcript", () => {
       });
     },
   );
+});
+
+describe("Chinese generated work-log text", () => {
+  it("localizes a mixed T3/read group and its rows without changing tool data", () => {
+    installMessages("zh-CN", messages);
+    try {
+      const read: WorkLogEntry = {
+        id: "read-zh",
+        createdAt: "2026-01-01T00:00:01Z",
+        label: "Read",
+        tone: "tool",
+        requestKind: "file-read",
+        toolData: { file_path: "src/Terminal.ts" },
+      };
+      const t3: WorkLogEntry = {
+        id: "t3-zh",
+        createdAt: "2026-01-01T00:00:02Z",
+        label: "T3-code.t3_project_list",
+        tone: "tool",
+        itemType: "dynamic_tool",
+        toolLifecycleStatus: "completed",
+      };
+      expect(workEntryDisplayLabel(read, undefined)).toBe("已读取 src/Terminal.ts");
+      expect(workEntryDisplayLabel(t3, undefined)).toBe("已列出项目");
+      expect(workEntryDisplayLabel({ ...t3, toolLifecycleStatus: "failed" }, undefined)).toBe(
+        "未能列出项目",
+      );
+      const search: WorkLogEntry = {
+        id: "search-zh",
+        createdAt: read.createdAt,
+        tone: "tool",
+        itemType: "web_search",
+        label: "Search",
+        toolData: { query: "Read in Terminal" },
+      };
+      expect(workEntryDisplayLabel(search, undefined)).toBe("已搜索 Read in Terminal");
+      const rows = deriveMessagesTimelineRows({
+        timelineEntries: [read, t3].map((entry) => ({
+          id: entry.id,
+          kind: "work" as const,
+          createdAt: entry.createdAt,
+          entry,
+        })),
+        isWorking: false,
+        activeTurnStartedAt: null,
+        turnDiffSummaries: [],
+        supportsConversationRollback: false,
+      });
+      expect(rows.find((row) => row.kind === "work-toggle")).toMatchObject({
+        summary: "已读取 1 个文件，已列出项目 1 次",
+      });
+      expect(contextCompactionLabel({ status: "running" }, messages.chat.workLog.shared)).toBe(
+        "正在压缩上下文",
+      );
+      expect(
+        summarizeSubagentStatuses(
+          ["running", "completed"],
+          messages.chat.workLog.shared.subagentStatuses,
+        ),
+      ).toBe("1 进行中 · 1 已完成");
+    } finally {
+      installMessages("en", en);
+    }
+  });
 });

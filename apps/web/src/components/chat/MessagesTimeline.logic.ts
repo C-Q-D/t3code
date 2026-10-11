@@ -89,10 +89,17 @@ function workEntryIsActiveTurnActivity(entry: WorkLogEntry): boolean {
 function singleToolCallLabel(entry: WorkLogEntry): string {
   if (entry.itemType === "reasoning")
     return entry.detail?.trim().replace(/\s+/g, " ") || t.chat.timeline.thought;
-  const toolPresentation = resolveWorkEntryToolPresentation(entry, "completed");
+  const toolPresentation = resolveWorkEntryToolPresentation(
+    entry,
+    "completed",
+    t.chat.workLog.shared.t3Tools,
+  );
   if (toolPresentation) return toolPresentation.displayName;
   const item = entry.structuredPayload;
-  const title = item?.type === "dynamic_tool" ? dynamicToolTitle(item.toolName, item.input) : null;
+  const title =
+    item?.type === "dynamic_tool"
+      ? dynamicToolTitle(item.toolName, item.input, t.chat.workLog.shared.toolActivity)
+      : null;
   if (title) return title;
   // A lone web search keeps its heading; the query stays in its detail.
   if (entry.itemType === "web_search") return entry.toolTitle ?? t.chat.timeline.webSearch;
@@ -136,7 +143,11 @@ export function workEntryDisplayLabel(entry: WorkLogEntry, workspaceRoot: string
     const thought = entry.detail?.trim().replace(/\s+/g, " ");
     return thought || entry.label;
   }
-  const toolPresentation = resolveWorkEntryToolPresentation(entry);
+  const toolPresentation = resolveWorkEntryToolPresentation(
+    entry,
+    undefined,
+    t.chat.workLog.shared.t3Tools,
+  );
   if (toolPresentation) return toolPresentation.displayName;
   if (entry.command?.trim()) return commandDisplayText(entry.command);
   const action = toolGroupAction(entry);
@@ -145,12 +156,16 @@ export function workEntryDisplayLabel(entry: WorkLogEntry, workspaceRoot: string
     const searchLabel =
       entry.itemType === "file_search"
         ? entry.label
-        : formatSearchToolLabel(workEntryToolDataRecord(entry));
+        : formatSearchToolLabel(workEntryToolDataRecord(entry), t.chat.workLog.shared.toolActivity);
     if (searchLabel) return searchLabel;
   }
   const readPaths = action === "read" ? workEntryReadPaths(entry, workspaceRoot) : [];
   if (action === "read" && readPaths[0]) {
-    return formatReadToolLabel(readPaths[0], readPaths.length - 1);
+    return formatReadToolLabel(
+      readPaths[0],
+      readPaths.length - 1,
+      t.chat.workLog.shared.toolActivity,
+    );
   }
   // Retrying providers keep their progress label; other diagnostics expose
   // the retained message instead of a generic error heading. File bodies
@@ -158,7 +173,10 @@ export function workEntryDisplayLabel(entry: WorkLogEntry, workspaceRoot: string
   const providerRetry =
     entry.projectedItem?.item.type === "error" && entry.projectedItem.item.retry !== undefined;
   const item = entry.structuredPayload;
-  const title = item?.type === "dynamic_tool" ? dynamicToolTitle(item.toolName, item.input) : null;
+  const title =
+    item?.type === "dynamic_tool"
+      ? dynamicToolTitle(item.toolName, item.input, t.chat.workLog.shared.toolActivity)
+      : null;
   if (title) return title;
   const compactDetail = entry.detail?.trim();
   const detailIsSearchOutput =
@@ -230,10 +248,14 @@ export function liveWorkEntryLabel(
       (status === "inProgress" ? t.chat.timeline.thinking : t.chat.timeline.thought)
     );
   }
-  const toolPresentation = resolveWorkEntryToolPresentation({
-    ...entry,
-    toolLifecycleStatus: status,
-  });
+  const toolPresentation = resolveWorkEntryToolPresentation(
+    {
+      ...entry,
+      toolLifecycleStatus: status,
+    },
+    undefined,
+    t.chat.workLog.shared.t3Tools,
+  );
   if (toolPresentation) return toolPresentation.displayName;
   const command = entry.command?.trim();
   if (command) {
@@ -1575,7 +1597,7 @@ export function deriveMessagesTimelineRows(input: {
             isExpandedToolGroup: false,
             displayLabel:
               toolGroupAction(singleEntry) === "edit"
-                ? summarizeToolGroup(visibleGroupedEntries).summary
+                ? summarizeToolGroup(visibleGroupedEntries, t.chat.workLog.shared).summary
                 : singleToolCallLabel(singleEntry),
           });
         } else {
@@ -1620,7 +1642,7 @@ export function deriveMessagesTimelineRows(input: {
               ? singleToolCallLabel(singleEntry)
               : singleEntry !== null && !workLogEntryIsToolLike(singleEntry)
                 ? singleEntry.label
-                : summarizeToolGroup(visibleGroupedEntries).summary,
+                : summarizeToolGroup(visibleGroupedEntries, t.chat.workLog.shared).summary,
             summaryKind,
             ...(groupToolSurface ? { toolSurface: groupToolSurface } : {}),
             ...(groupToolIcon ? { toolIcon: groupToolIcon } : {}),

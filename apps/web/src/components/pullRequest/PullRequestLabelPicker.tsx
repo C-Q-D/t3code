@@ -1,3 +1,5 @@
+/** Owns pull request label picker on the web pull-request surface; host data and agent context remain unchanged. */
+import { t } from "~/i18n";
 import { useAtomCommand } from "~/state/use-atom-command";
 /**
  * Putting a label on, and taking one off, from the row that says which it already wears.
@@ -29,6 +31,11 @@ function matches(candidate: PullRequestLabelCandidate, query: string): boolean {
   );
 }
 
+/**
+ * Renders pull request label picker from the supplied display data and callbacks.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 export function PullRequestLabelPicker({
   environmentId,
   reference,
@@ -69,11 +76,11 @@ export function PullRequestLabelPicker({
       toastManager.add({
         type: "error",
         title: candidate.isApplied
-          ? `Could not take ${candidate.name} off`
-          : `Could not put ${candidate.name} on`,
+          ? t.git.pullRequest.removeLabelError(candidate.name)
+          : t.git.pullRequest.addLabelError(candidate.name),
         description: readableFailure(
           squashAtomCommandFailure(result),
-          "The host refused it. Check that you have triage access on this repository.",
+          t.git.pullRequest.theHostRefusedItCheckThatYouHaveTriageAccessOnThisRepository,
         ),
       });
       return;
@@ -83,22 +90,24 @@ export function PullRequestLabelPicker({
   return (
     <PullRequestCandidatePicker
       icon={<TagIcon className="size-3.5" />}
-      label="Change labels"
+      label={t.git.pullRequest.changeLabels}
       allowed={allowed}
-      disabledReason="Changing labels needs triage access on this repository"
+      disabledReason={t.git.pullRequest.changingLabelsNeedsTriageAccessOnThisRepository}
       open={open}
       onOpenChange={setOpen}
       query={query}
       onQueryChange={setQuery}
-      searchLabel="Search labels"
+      searchLabel={t.git.pullRequest.searchLabels}
       isPending={candidatesQuery.isPending && candidatesQuery.data === null}
       error={candidatesQuery.data === null ? candidatesQuery.error : null}
       candidates={candidates}
-      emptyLabel="This repository has no labels."
-      noMatchLabel="No label matches that."
-      errorLabel="The labels could not be read."
+      emptyLabel={t.git.pullRequest.thisRepositoryHasNoLabels}
+      noMatchLabel={t.git.pullRequest.noLabelMatchesThat}
+      errorLabel={t.git.pullRequest.theLabelsCouldNotBeRead}
       truncated={candidatesQuery.data?.truncated === true}
-      truncatedLabel="This repository has more labels than are listed here. Apply the rest on the host."
+      truncatedLabel={
+        t.git.pullRequest.thisRepositoryHasMoreLabelsThanAreListedHereApplyTheRestOnTheHost
+      }
       candidateKey={(candidate) => candidate.name}
       disabled={pending !== null}
       onSelect={(candidate) => void toggle(candidate)}
@@ -119,7 +128,7 @@ export function PullRequestLabelPicker({
               ) : null}
             </span>
             {candidate.isApplied ? (
-              <CheckIcon aria-label="Applied" className="size-3.5 shrink-0" />
+              <CheckIcon aria-label={t.git.pullRequest.applied} className="size-3.5 shrink-0" />
             ) : null}
           </>
         );

@@ -168,6 +168,7 @@ import {
   resolveActiveThreadRouteRef,
   resolveThreadRouteTarget,
 } from "../threadRoutes";
+import { compactSidebarTimeLabel } from "./Sidebar.logic";
 import { formatRelativeTimeLabel, parseTimestampDate } from "../timestampFormat";
 import type { SidebarThreadSummary } from "../types";
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
@@ -322,11 +323,6 @@ function checkThreadOperations(
     description: t.sidebar.thread.operationDeniedHint,
   });
   return false;
-}
-
-function compactSidebarTimeLabel(label: string): string {
-  if (label === "just now") return t.sidebar.duration.now;
-  return label.endsWith(" ago") ? label.slice(0, -4) : label;
 }
 
 function threadTimeLabel(thread: SidebarThreadSummary): string {

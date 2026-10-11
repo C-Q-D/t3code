@@ -1,4 +1,7 @@
+/** Localized preview UI and interactions; preserves user data, commands, and protocol values. */
 "use client";
+
+import { t } from "~/i18n";
 
 import {
   AuthPreviewOperateScope,
@@ -25,6 +28,11 @@ interface Props {
   ) => void;
 }
 
+/**
+ * Renders the requested preview surface or the localized runtime and permission guidance.
+ * @param props View data, control flags, and callbacks defined by the component props type; optional fields retain their declared defaults.
+ * @returns Rendered UI for the supplied props.
+ */
 export function PreviewPanel({
   mode,
   threadRef,
@@ -40,9 +48,7 @@ export function PreviewPanel({
       <PreviewPanelShell mode={mode}>
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
           <p className="max-w-sm text-sm text-muted-foreground">
-            {canOperatePreview
-              ? "Preview is only available in the T3 Code desktop app."
-              : "Pair this client again with preview access to control browser previews."}
+            {canOperatePreview ? t.tools.preview.desktopOnly : t.tools.preview.pairAgain}
           </p>
         </div>
       </PreviewPanelShell>

@@ -1,4 +1,8 @@
+/** Verifies Git action decisions and progress, including comparisons under Chinese display labels. */
 import type { VcsStatusResult } from "@t3tools/contracts";
+import { installMessages, t } from "~/i18n";
+import { en } from "~/i18n/locales/en";
+import { messages } from "~/i18n/locales/zh-CN";
 import { assert, describe, it } from "vite-plus/test";
 import {
   buildGitActionProgressStages,
@@ -34,6 +38,27 @@ function status(overrides: Partial<VcsStatusResult> = {}): VcsStatusResult {
     ...overrides,
   };
 }
+
+describe("localized Git action progress", () => {
+  it("replaces the Chinese generic running label with startup progress", () => {
+    installMessages("zh-CN", messages);
+    try {
+      assert.equal(
+        resolveGitActionProgressPresentation({
+          isRunning: true,
+          operation: "run_change_request",
+          currentLabel: t.git.actions.runningSourceControlAction,
+          lastOutputLine: null,
+          phaseStartedAtMs: 1_000,
+          hookStartedAtMs: null,
+        })?.status,
+        "正在启动源码管理操作…",
+      );
+    } finally {
+      installMessages("en", en);
+    }
+  });
+});
 
 describe("git action progress presentation", () => {
   it("keeps the phase on the first row and hook output on the second", () => {

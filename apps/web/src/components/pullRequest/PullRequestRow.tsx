@@ -1,3 +1,5 @@
+/** Owns pull request row on the web pull-request surface; host data and agent context remain unchanged. */
+import { t } from "~/i18n";
 import { SearchIcon } from "lucide-react";
 import { PullRequestStackPopover } from "./PullRequestStackPopover";
 import {
@@ -79,6 +81,11 @@ export type PullRequestRowTarget = Pick<
   "environmentId" | "projectId" | "host" | "repository" | "number"
 >;
 
+/**
+ * Renders pull request row from the supplied display data and callbacks.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 function PullRequestRowImpl({
   entry,
   selected,
@@ -223,13 +230,15 @@ function PullRequestRowImpl({
                       <span className="flex min-w-6 items-center gap-1 overflow-hidden rounded-full border border-border/60 px-1 text-3xs" />
                     }
                   >
-                    <span className="sr-only">matched in the description</span>
+                    <span className="sr-only">{t.git.pullRequest.matchedInTheDescription}</span>
                     <SearchIcon aria-hidden className="size-3 shrink-0" />
                     <span aria-hidden className="hidden truncate @xs/pr-row-meta:block">
-                      matched in the description
+                      {t.git.pullRequest.matchedInTheDescription}
                     </span>
                   </TooltipTrigger>
-                  <TooltipPopup side="top">Matched in the description</TooltipPopup>
+                  <TooltipPopup side="top">
+                    {t.git.pullRequest.matchedInTheDescription2}
+                  </TooltipPopup>
                 </Tooltip>
               ) : null}
               {showProvider ? (

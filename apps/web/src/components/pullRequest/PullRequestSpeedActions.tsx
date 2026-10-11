@@ -1,3 +1,5 @@
+/** Owns pull request speed actions on the web pull-request surface; host data and agent context remain unchanged. */
+import { t } from "~/i18n";
 import { useAtomValue } from "@effect/atom-react";
 import type { PullRequestAction } from "@t3tools/contracts";
 import { pullRequestEnvironment } from "~/state/pullRequests";
@@ -23,7 +25,10 @@ export interface PullRequestSpeedActionResult<Entry = EnvironmentPullRequestEntr
   readonly action: PullRequestAction;
 }
 
-/** No detail or stack reads until a merge is clicked, even on a long list. */
+/** No detail or stack reads until a merge is clicked, even on a long list.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 export function PullRequestSpeedActions<Entry extends PullRequestSpeedActionEntry>({
   entry,
   visible,
@@ -61,7 +66,7 @@ export function PullRequestSpeedActions<Entry extends PullRequestSpeedActionEntr
         (method) => detail.mergeCapabilities[method],
       );
       if (allowed.length === 0)
-        throw new Error("No merge method is available for this repository.");
+        throw new Error(t.git.pullRequest.noMergeMethodIsAvailableForThisRepository);
       return resolvePullRequestMergeMethod(
         allowed,
         null,
@@ -82,7 +87,7 @@ export function PullRequestSpeedActions<Entry extends PullRequestSpeedActionEntr
       className="shrink-0 items-center gap-1 pr-3"
       style={{ display: visible || busy ? "flex" : "none" }}
       role="group"
-      aria-label={`Quick actions for pull request #${entry.number}`}
+      aria-label={t.git.pullRequest.quickActions(entry.number)}
       data-pull-request-action-pending={actionPending || closing}
     >
       {actions.map((action) => {
@@ -111,10 +116,10 @@ export function PullRequestSpeedActions<Entry extends PullRequestSpeedActionEntr
             </TooltipTrigger>
             <TooltipPopup>
               {action === "merge" && entry.stack
-                ? "Open this pull request to merge its stack"
+                ? t.git.pullRequest.openThisPullRequestToMergeItsStack
                 : action === "close" && onCloseSweepStart
-                  ? "Close immediately, or drag across rows to close several"
-                  : `${label} immediately`}
+                  ? t.git.pullRequest.closeImmediatelyOrDragAcrossRowsToCloseSeveral
+                  : t.git.pullRequest.immediately(label)}
             </TooltipPopup>
           </Tooltip>
         );
@@ -124,8 +129,8 @@ export function PullRequestSpeedActions<Entry extends PullRequestSpeedActionEntr
 }
 
 const ACTIONS = {
-  close: { label: "Close", Icon: PullRequestGlyph.closed },
-  merge: { label: "Merge", Icon: PullRequestGlyph.merged },
-  ready: { label: "Ready for review", Icon: PullRequestGlyph.pullRequest },
-  reopen: { label: "Reopen", Icon: PullRequestGlyph.reopen },
+  close: { label: t.git.pullRequest.close, Icon: PullRequestGlyph.closed },
+  merge: { label: t.git.pullRequest.merge, Icon: PullRequestGlyph.merged },
+  ready: { label: t.git.pullRequest.readyForReview, Icon: PullRequestGlyph.pullRequest },
+  reopen: { label: t.git.pullRequest.reopen, Icon: PullRequestGlyph.reopen },
 } as const;

@@ -1,3 +1,5 @@
+/** Detects client-server version mismatches and provides update guidance while preserving shell commands. */
+import { t } from "~/i18n";
 import type {
   EnvironmentId,
   ServerConfig,
@@ -85,7 +87,7 @@ export function resolveVersionMismatch(
   return {
     clientVersion: normalizedClientVersion,
     serverVersion: normalizedServerVersion,
-    hint: "Version mismatch. Try syncing the client and server to the same T3 Code version.",
+    hint: t.app.server.versionMismatch,
   };
 }
 
@@ -133,8 +135,9 @@ export function manualServerUpdateCommand(
   return `${runner} t3@${targetVersion}`;
 }
 
+/** Returns desktop-specific or generic update guidance for the supplied server self-update capability. */
 export function serverUpdateGuidance(capability: ServerSelfUpdateCapability): string {
-  return capability === "desktop-managed" ? "Update the desktop app" : "Update to stay in sync";
+  return capability === "desktop-managed" ? t.app.server.updateDesktop : t.app.server.updateToSync;
 }
 
 export function buildVersionMismatchDismissalKey(
@@ -190,6 +193,7 @@ export function dismissVersionMismatch(dismissalKey: string | null | undefined):
   });
 }
 
+/** Appends mismatch guidance to message when a version mismatch exists, preserving the original normalized message otherwise. */
 export function appendVersionMismatchHint(
   message: string | null | undefined,
   mismatch: VersionMismatch | null | undefined,
@@ -201,5 +205,5 @@ export function appendVersionMismatchHint(
   if (!mismatch) {
     return normalizedMessage;
   }
-  return `${normalizedMessage} Hint: ${mismatch.hint}`;
+  return t.app.server.mismatchHint(normalizedMessage, mismatch.hint);
 }

@@ -1,4 +1,5 @@
 /** English chat messages; interpolation leaves UI rendering to the caller. */
+import { englishWorkLogMessages } from "@t3tools/client-runtime/work-log/messages";
 import type { SourceControlProviderKind, WorktreeSubmodules } from "@t3tools/contracts";
 
 export const chat = {
@@ -269,7 +270,6 @@ export const chat = {
 
   rightPanel: {
     /** Formats a generated terminal fallback label; caller-supplied session labels bypass it. */
-    terminalLabel: (label: string) => label,
     browserDisabled: "Browser previews are only available in the T3 Code desktop app.",
     terminalDisabled: "Terminal surfaces are only available from a project thread.",
     filesDisabled: "Files are only available when a project is open.",
@@ -376,6 +376,9 @@ export const chat = {
     threadActions: (title: string) => `Thread actions for ${title}`,
   },
   timeline: {
+    emptyResponse: "(empty response)",
+    tokenChange: (before: number | string, after: number | string) => `${before} → ${after} tokens`,
+    moreSelectedElements: (count: number) => `${count} more selected elements`,
     thought: "Thought",
     thinking: "Thinking",
     webSearch: "Web search",
@@ -486,6 +489,9 @@ export const chat = {
     workingForPrefix: "Working for ",
   },
   markdown: {
+    templateLabel: (name: string) => `${name} template`,
+    copiedTitle: (title: string) => `${title} copied`,
+    mermaidDiagram: "Mermaid diagram",
     note: "Note",
     tip: "Tip",
     important: "Important",
@@ -612,6 +618,8 @@ export const chat = {
     commentLimit: (count: string): string => `Comments can contain up to ${count} characters.`,
   },
   details: {
+    nextRunSuffix: (relative: string) => ` · next ${relative}`,
+    pausedSuffix: " · paused",
     workspace: "Workspace",
     clientAndServerVersionsDiffer: "Client and server versions differ",
     dismissVersionMismatchWarning: "Dismiss version mismatch warning",
@@ -671,6 +679,7 @@ export const chat = {
     loadAutomationsError: (error: string): string => `Could not load automations: ${error}`,
   },
   relationships: {
+    failedCount: (count: number) => `${count} failed`,
     starting: "Starting",
     running: "Running",
     queued: "Queued",
@@ -799,6 +808,9 @@ export const chat = {
     usingChatGPTPlan: "Using ChatGPT plan",
   },
   media: {
+    terminalSelection: "terminal selection",
+    terminalInput: "terminal input",
+    zoomPercent: (percent: number) => `${percent}% zoom`,
     showScreenshot: "Show screenshot",
     showAccessibilityJSON: "Show accessibility JSON",
     showExtractedText: "Show extracted text",
@@ -924,6 +936,8 @@ export const chat = {
     announcement: (model: string, status: string): string => `${model} subagent: ${status}`,
   },
   inspector: {
+    fileCount: (count: number) => `${count} files`,
+    toolOutputImage: "Tool output image",
     outputIsNoLongerAvailable: "Output is no longer available.",
     loadingOutput: "Loading output…",
     noOutput: "No output.",
@@ -983,6 +997,8 @@ export const chat = {
     fastModeOn: "Fast mode on",
   },
   workLog: {
+    shared: englishWorkLogMessages,
+    subagentCount: (count: number) => `${count} ${count === 1 ? "subagent" : "subagents"}`,
     thinking: "Thinking",
     command: "Command",
     tool: "Tool",

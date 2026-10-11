@@ -1,3 +1,5 @@
+/** Localized cloud presentation and existing interaction behavior. */
+import { t } from "~/i18n";
 import { useAtomValue } from "@effect/atom-react";
 import {
   AuthRelayReadScope,
@@ -64,6 +66,7 @@ export function readCachedPrimaryCloudLinkState(target: CloudLinkTarget) {
   return result._tag === "Success" ? result.value : null;
 }
 
+/** Returns the primary target's cached cloud state, loading status, error and refresh action; no target yields an empty state. */
 export function usePrimaryCloudLinkState() {
   const primary = usePrimaryEnvironment();
   const canReadRelay = useEnvironmentScope(primary?.environmentId ?? null, AuthRelayReadScope);
@@ -91,7 +94,7 @@ export function usePrimaryCloudLinkState() {
   let error: string | null = null;
   if (result._tag === "Failure") {
     const cause = Cause.squash(result.cause);
-    error = cause instanceof Error ? cause.message : "Could not read T3 Connect link state.";
+    error = cause instanceof Error ? cause.message : t.account.cloud.connectStateFailed;
   }
 
   return {

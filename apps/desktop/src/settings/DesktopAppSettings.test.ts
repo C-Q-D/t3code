@@ -1,6 +1,7 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -11,6 +12,7 @@ import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
 import * as DesktopAppSettings from "./DesktopAppSettings.ts";
 
 const DesktopSettingsPatch = Schema.Struct({
+  uiLocalePreference: Schema.optionalKey(Schema.Unknown),
   linuxPasswordStore: Schema.optionalKey(
     Schema.Literals(["auto", "gnome-libsecret", "kwallet", "kwallet5", "kwallet6"]),
   ),
@@ -91,6 +93,64 @@ function writeSettingsPatch(patch: typeof DesktopSettingsPatch.Type) {
 }
 
 describe("DesktopSettings", () => {
+  it.effect("keeps the native preference unchanged when the settings file cannot be replaced", () =>
+    withSettings(
+      Effect.gen(function* () {
+        const settings = yield* DesktopAppSettings.DesktopAppSettings;
+        const environment = yield* DesktopEnvironment.DesktopEnvironment;
+        const fs = yield* FileSystem.FileSystem;
+        // The test-owned path is a directory, so atomic file replacement must fail.
+        yield* fs.makeDirectory(environment.desktopSettingsPath, { recursive: true });
+        const result = yield* Effect.exit(settings.setUiLocalePreference("zh-CN"));
+        assert.isTrue(Exit.isFailure(result));
+        assert.strictEqual((yield* settings.get).uiLocalePreference, "system");
+      }),
+    ),
+  );
+  it.effect("persists native language changes and omits the reset default", () =>
+    withSettings(
+      Effect.gen(function* () {
+        const settings = yield* DesktopAppSettings.DesktopAppSettings;
+        const environment = yield* DesktopEnvironment.DesktopEnvironment;
+        const fs = yield* FileSystem.FileSystem;
+        assert.strictEqual((yield* settings.setUiLocalePreference("zh-CN")).changed, true);
+        const saved = yield* decodeDesktopSettingsPatch(
+          yield* fs.readFileString(environment.desktopSettingsPath),
+        );
+        assert.strictEqual(saved.uiLocalePreference, "zh-CN");
+        assert.strictEqual((yield* settings.load).uiLocalePreference, "zh-CN");
+        assert.strictEqual((yield* settings.setUiLocalePreference("zh-CN")).changed, false);
+        yield* settings.setUiLocalePreference("system");
+        const reset = yield* decodeDesktopSettingsPatch(
+          yield* fs.readFileString(environment.desktopSettingsPath),
+        );
+        assert.strictEqual(reset.uiLocalePreference, undefined);
+        assert.strictEqual((yield* settings.load).uiLocalePreference, "system");
+      }),
+    ),
+  );
+  it.effect("loads a saved Chinese preference without resetting other settings", () =>
+    withSettings(
+      Effect.gen(function* () {
+        yield* writeSettingsPatch({ uiLocalePreference: "zh-CN", wslBackendEnabled: true });
+        const settings = yield* DesktopAppSettings.DesktopAppSettings;
+        const loaded = yield* settings.load;
+        assert.strictEqual(loaded.uiLocalePreference, "zh-CN");
+        assert.strictEqual(loaded.wslBackendEnabled, true);
+      }),
+    ),
+  );
+  it.effect("normalizes an unsupported preference without resetting other settings", () =>
+    withSettings(
+      Effect.gen(function* () {
+        yield* writeSettingsPatch({ uiLocalePreference: "fr", wslBackendEnabled: true });
+        const settings = yield* DesktopAppSettings.DesktopAppSettings;
+        const loaded = yield* settings.load;
+        assert.strictEqual(loaded.uiLocalePreference, "system");
+        assert.strictEqual(loaded.wslBackendEnabled, true);
+      }),
+    ),
+  );
   it.effect(
     "persists disabling and re-enabling local execution without clearing backend settings",
     () =>
@@ -124,6 +184,7 @@ describe("DesktopSettings", () => {
       DesktopAppSettings.resolveDefaultDesktopSettings("0.0.17-nightly.20260415.1"),
       {
         linuxPasswordStore: "auto",
+        uiLocalePreference: "system",
         localEnvironmentEnabled: true,
         mainWindowBounds: null,
         mainWindowMaximized: false,
@@ -154,6 +215,7 @@ describe("DesktopSettings", () => {
 
         assert.deepEqual(yield* settings.load, {
           linuxPasswordStore: "gnome-libsecret",
+          uiLocalePreference: "system",
           localEnvironmentEnabled: true,
           mainWindowBounds: null,
           mainWindowMaximized: false,
@@ -262,6 +324,7 @@ describe("DesktopSettings", () => {
 
         assert.deepEqual(yield* settings.load, {
           linuxPasswordStore: "auto",
+          uiLocalePreference: "system",
           localEnvironmentEnabled: true,
           mainWindowBounds: { x: 120, y: 80, width: 1280, height: 900 },
           mainWindowMaximized: false,
@@ -319,6 +382,7 @@ describe("DesktopSettings", () => {
 
           assert.deepEqual(yield* settings.load, {
             linuxPasswordStore: "auto",
+            uiLocalePreference: "system",
             localEnvironmentEnabled: true,
             mainWindowBounds: null,
             mainWindowMaximized: false,
@@ -396,6 +460,7 @@ describe("DesktopSettings", () => {
 
         assert.deepEqual(yield* settings.load, {
           linuxPasswordStore: "auto",
+          uiLocalePreference: "system",
           localEnvironmentEnabled: true,
           mainWindowBounds: null,
           mainWindowMaximized: false,
@@ -425,6 +490,7 @@ describe("DesktopSettings", () => {
 
         assert.deepEqual(yield* settings.load, {
           linuxPasswordStore: "auto",
+          uiLocalePreference: "system",
           localEnvironmentEnabled: true,
           mainWindowBounds: null,
           mainWindowMaximized: false,
@@ -453,6 +519,7 @@ describe("DesktopSettings", () => {
 
         assert.deepEqual(yield* settings.load, {
           linuxPasswordStore: "auto",
+          uiLocalePreference: "system",
           localEnvironmentEnabled: true,
           mainWindowBounds: null,
           mainWindowMaximized: false,

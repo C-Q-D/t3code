@@ -1,3 +1,5 @@
+/** Provides thread-link mutations for scoped requests; persisted link values remain unchanged. */
+import { t } from "~/i18n";
 import { useMemo } from "react";
 import { sourceControlRepositorySelector } from "@t3tools/shared/sourceControl";
 import type {
@@ -28,7 +30,10 @@ import { useProjects, useServerConfigs } from "~/state/entities";
 import { threadEnvironment } from "~/state/threads";
 import { useAtomCommand } from "~/state/use-atom-command";
 
-/** Routes link actions through the command advertised by this environment. */
+/** Routes link actions through the command advertised by this environment.
+ * @param environmentId Caller-supplied environmentId used by this operation.
+ * @returns Link mode, availability checks, and a mutation callback that rejects unsupported targets.
+ */
 export function usePullRequestLinking(environmentId: EnvironmentId | null | undefined) {
   const configs = useServerConfigs();
   const projects = useProjects();
@@ -76,7 +81,7 @@ export function usePullRequestLinking(environmentId: EnvironmentId | null | unde
     const changeLink = async (threadRef: ScopedThreadRef, url: string, linked: boolean) => {
       const parsed = parseChangeRequestUrl(url);
       if (parsed === null || threadRef.environmentId !== environmentId || (linked && !canLink(url)))
-        throw new Error("The pull request is not available in this environment.");
+        throw new Error(t.git.pullRequest.thePullRequestIsNotAvailableInThisEnvironment);
       const legacyProject = findProjectForChangeRequest(environmentProjects, parsed);
       const mutation = planThreadPullRequestMutation({
         capabilities,
@@ -88,14 +93,15 @@ export function usePullRequestLinking(environmentId: EnvironmentId | null | unde
         linked,
       });
       if (mutation === null)
-        throw new Error("This environment does not support linking this pull request.");
+        throw new Error(t.git.pullRequest.thisEnvironmentDoesNotSupportLinkingThisPullRequest);
       const result = await (mutation.type === "thread.meta.update"
         ? updateMetadata({ environmentId: threadRef.environmentId, input: mutation.input })
         : mutation.type === "thread.pull-request.link"
           ? link({ environmentId: threadRef.environmentId, input: mutation.input })
           : unlink({ environmentId: threadRef.environmentId, input: mutation.input }));
       if (result._tag === "Failure") {
-        if (isAtomCommandInterrupted(result)) throw new Error("Link update interrupted.");
+        if (isAtomCommandInterrupted(result))
+          throw new Error(t.git.pullRequest.linkUpdateInterrupted);
         throw squashAtomCommandFailure(result);
       }
     };

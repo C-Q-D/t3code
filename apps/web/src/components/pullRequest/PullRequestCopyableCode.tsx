@@ -1,8 +1,15 @@
+/** Owns pull request copyable code on the web pull-request surface; host data and agent context remain unchanged. */
+import { t } from "~/i18n";
 import { useCopyToClipboard } from "~/hooks/useCopyToClipboard";
 import { cn } from "~/lib/utils";
 
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
+/**
+ * Renders pull request copyable code from the supplied display data and callbacks.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 export function PullRequestCopyableCode({
   value,
   target,
@@ -55,11 +62,11 @@ export function PullRequestCopyableCode({
             isCopied ? "opacity-100" : "opacity-0",
           )}
         >
-          Copied
+          {t.git.diff.copied}
         </span>
       </TooltipTrigger>
       <TooltipPopup variant="code" side={tooltipSide}>
-        {`${isCopied ? "Copied" : copyLabel}: ${value}`}
+        {`${isCopied ? t.git.diff.copied : copyLabel}: ${value}`}
       </TooltipPopup>
     </Tooltip>
   );

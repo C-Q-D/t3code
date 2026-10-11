@@ -1,3 +1,5 @@
+/** Handles renderer requests for native windows, dialogs and operating-system integration. */
+import * as DesktopUiLocale from "../../i18n/DesktopUiLocale.ts";
 import {
   ContextMenuItemSchema,
   DesktopAppBrandingSchema,
@@ -264,13 +266,14 @@ export const pickProjectFavicon = DesktopIpc.makeIpcMethod({
     if (!(yield* appSettings.get).localEnvironmentEnabled) {
       return null;
     }
+    const messages = yield* (yield* DesktopUiLocale.DesktopUiLocale).messages;
     const paths = yield* dialog.pickFiles({
       owner: yield* electronWindow.focusedMainOrFirst,
       defaultPath: Option.fromNullishOr(initialPath),
       multiple: false,
       filters: [
         {
-          name: "Images",
+          name: messages.filters.images,
           extensions: WORKSPACE_IMAGE_PREVIEW_EXTENSIONS.map((extension) => extension.slice(1)),
         },
       ],
@@ -402,10 +405,16 @@ export const pickThemeFiles = DesktopIpc.makeIpcMethod({
     const defaultPath = yield* fileSystem
       .exists(extensionsDir)
       .pipe(Effect.orElseSucceed(() => false));
+    const messages = yield* (yield* DesktopUiLocale.DesktopUiLocale).messages;
     const paths = yield* dialog.pickFiles({
       owner: yield* electronWindow.focusedMainOrFirst,
       defaultPath: defaultPath ? Option.some(extensionsDir) : Option.none(),
-      filters: [{ name: "JSON", extensions: ["json"] }],
+      filters: [
+        {
+          name: messages.filters.json,
+          extensions: ["json"],
+        },
+      ],
       multiple: true,
     });
     if (paths.length === 0) {

@@ -1,3 +1,5 @@
+/** Notifies clients when their environment pairing permissions have changed. */
+import { t } from "~/i18n";
 import { useAtomValue } from "@effect/atom-react";
 import { sessionHasLegacyPermissions, type EnvironmentId } from "@t3tools/contracts";
 import { useNavigate } from "@tanstack/react-router";
@@ -12,6 +14,7 @@ import { toastManager } from "./ui/toast";
 // Keep an active toast across remounts, including Strict Mode effect replay.
 const shown = new Set<EnvironmentId>();
 
+/** Shows a dismissible permission-change notice for environmentId using label as its display name; renders no DOM. */
 function EnvironmentPermissionNotice({
   environmentId,
   label,
@@ -48,13 +51,12 @@ function EnvironmentPermissionNotice({
       toastManager.close(id);
     };
     const id = toastManager.add({
-      title: `Permissions have changed for ${label}`,
-      description:
-        "This connection still uses the old permissions, so some actions may no longer be available. Pair again using a new link with the permissions you need.",
+      title: t.app.permissions.changed(label),
+      description: t.app.permissions.changedHint,
       timeout: 0,
       onClose: persistDismissal,
       actionProps: {
-        children: "Open Connections",
+        children: t.app.permissions.openConnections,
         onClick: () => {
           dismiss();
           void navigate({ to: "/settings/connections" });
@@ -62,7 +64,7 @@ function EnvironmentPermissionNotice({
       },
       data: {
         actionLayout: "stacked-end",
-        secondaryActionProps: { children: "Dismiss", onClick: dismiss },
+        secondaryActionProps: { children: t.app.actions.dismiss, onClick: dismiss },
         secondaryActionVariant: "ghost",
       },
     });

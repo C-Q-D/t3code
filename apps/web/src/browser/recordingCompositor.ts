@@ -1,3 +1,5 @@
+/** Localized browser UI and interactions; preserves user data, commands, and protocol values. */
+import { t } from "~/i18n";
 import type { DesktopPreviewRecordingInput } from "@t3tools/contracts";
 
 import { readPreviewAnnotationTheme } from "./annotationTheme";
@@ -8,7 +10,12 @@ interface RecordingDecorationOptions {
   readonly frameRate: number;
 }
 
-/** Decorates a detached canvas; no recording UI is inserted into the preview page. */
+/** Decorates a detached canvas; no recording UI is inserted into the preview page.
+ * @param source Captured source stream whose frames are composed.
+ * @param options Recording decoration settings for cursor and keyboard overlays.
+ * @param subscribe Registers recording input notifications and returns their cleanup callback.
+ * @returns Recording stream and cleanup controls owned by the caller.
+ */
 export async function createRecordingCompositor(
   source: MediaStream,
   options: RecordingDecorationOptions,
@@ -17,7 +24,7 @@ export async function createRecordingCompositor(
   if (!options.showKeyPresses && !options.showMousePresses) return null;
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("2d", { alpha: false });
-  if (!context) throw new Error("Recording canvas is unavailable.");
+  if (!context) throw new Error(t.tools.browser.canvasUnavailable);
   const video = document.createElement("video");
   video.muted = true;
   video.playsInline = true;

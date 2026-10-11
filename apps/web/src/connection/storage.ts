@@ -1,3 +1,5 @@
+/** Localized connection presentation and existing interaction behavior. */
+import { t } from "~/i18n";
 import {
   ConnectionCatalogDocument,
   type ConnectionCatalogDocument as ConnectionCatalogDocumentType,
@@ -75,13 +77,15 @@ const encodeStoredServerConfig = Schema.encodeEffect(StoredServerConfigJson);
 const decodeStoredVcsRefs = Schema.decodeUnknownEffect(StoredVcsRefsJson);
 const encodeStoredVcsRefs = Schema.encodeEffect(StoredVcsRefsJson);
 
+/** Wraps a catalog operation and its diagnostic cause in the localized connection error shown to callers. */
 function catalogError(operation: string, cause: unknown) {
   return new ConnectionTransientError({
     reason: "remote-unavailable",
-    detail: `Could not ${operation} the local connection catalog: ${String(cause)}`,
+    detail: t.account.connection.catalogFailure(operation, String(cause)),
   });
 }
 
+/** Wraps a persistence operation identifier and its diagnostic cause without changing the structured operation field. */
 function persistenceError(
   operation:
     | "list-targets"
@@ -106,16 +110,14 @@ function persistenceError(
 ) {
   return new Persistence.ConnectionPersistenceError({
     operation,
-    message: `Could not ${operation.replaceAll("-", " ")}: ${String(cause)}`,
+    message: t.account.connection.persistenceFailure(operation, String(cause)),
   });
 }
 
 const openDatabase = Effect.fn("web.connectionStorage.openDatabase")(function* () {
   return yield* Effect.callback<IDBDatabase, ConnectionTransientError>((resume) => {
     if (typeof indexedDB === "undefined") {
-      resume(
-        Effect.fail(catalogError("open", "IndexedDB is unavailable in this browser context.")),
-      );
+      resume(Effect.fail(catalogError("open", t.account.connection.indexedDbUnavailable)));
       return;
     }
     try {
@@ -138,7 +140,9 @@ const openDatabase = Effect.fn("web.connectionStorage.openDatabase")(function* (
         }
       });
       request.addEventListener("error", () => {
-        resume(Effect.fail(catalogError("open", request.error ?? "Unknown IndexedDB error")));
+        resume(
+          Effect.fail(catalogError("open", request.error ?? t.account.connection.indexedDbError)),
+        );
       });
       request.addEventListener("success", () => {
         resume(Effect.succeed(request.result));
@@ -225,12 +229,23 @@ function withDatabase<A>(
   );
 }
 
+/**
+ * Reads one value using an already-open database connection.
+ * @param database Connection owned by the caller.
+ * @param storeName Object store to read.
+ * @param key Key identifying the stored value.
+ * @returns An effect yielding the value, or undefined for a missing key, with storage failures mapped to ConnectionTransientError.
+ */
 function readDatabaseValueOnConnection(database: IDBDatabase, storeName: string, key: IDBValidKey) {
   return Effect.callback<unknown, ConnectionTransientError>((resume) => {
     try {
       const request = database.transaction(storeName, "readonly").objectStore(storeName).get(key);
       request.addEventListener("error", () => {
-        resume(Effect.fail(catalogError("read", request.error ?? "Unknown IndexedDB read error")));
+        resume(
+          Effect.fail(
+            catalogError("read", request.error ?? t.account.connection.indexedDbReadError),
+          ),
+        );
       });
       request.addEventListener("success", () => {
         resume(Effect.succeed(request.result));
@@ -241,6 +256,14 @@ function readDatabaseValueOnConnection(database: IDBDatabase, storeName: string,
   }).pipe(Effect.withSpan("web.connectionStorage.readDatabaseValue"));
 }
 
+/**
+ * Inserts or replaces a value using an already-open database connection.
+ * @param database Connection owned by the caller.
+ * @param storeName Object store to update.
+ * @param key Key under which to store the value.
+ * @param value Value to persist through IndexedDB structured cloning.
+ * @returns An effect completing after the transaction commits, or failing with ConnectionTransientError.
+ */
 function writeDatabaseValueOnConnection(
   database: IDBDatabase,
   storeName: string,
@@ -254,7 +277,9 @@ function writeDatabaseValueOnConnection(
       // QuotaExceededError, fires only "abort" and no "error".
       transaction.addEventListener("abort", () => {
         resume(
-          Effect.fail(catalogError("write", transaction.error ?? "Unknown IndexedDB write error")),
+          Effect.fail(
+            catalogError("write", transaction.error ?? t.account.connection.indexedDbWriteError),
+          ),
         );
       });
       transaction.addEventListener("complete", () => {
@@ -267,6 +292,13 @@ function writeDatabaseValueOnConnection(
   }).pipe(Effect.withSpan("web.connectionStorage.writeDatabaseValue"));
 }
 
+/**
+ * Removes a key using an already-open connection; missing keys are harmless.
+ * @param database Connection owned by the caller.
+ * @param storeName Object store to update.
+ * @param key Key to remove.
+ * @returns An effect completing after the transaction commits, or failing with ConnectionTransientError.
+ */
 function removeDatabaseValueOnConnection(
   database: IDBDatabase,
   storeName: string,
@@ -278,7 +310,7 @@ function removeDatabaseValueOnConnection(
       transaction.addEventListener("abort", () => {
         resume(
           Effect.fail(
-            catalogError("remove", transaction.error ?? "Unknown IndexedDB remove error"),
+            catalogError("remove", transaction.error ?? t.account.connection.indexedDbRemoveError),
           ),
         );
       });
@@ -292,6 +324,13 @@ function removeDatabaseValueOnConnection(
   }).pipe(Effect.withSpan("web.connectionStorage.removeDatabaseValue"));
 }
 
+/**
+ * Removes all keys in a range within one IndexedDB transaction.
+ * @param database Already-open connection owned by the caller.
+ * @param storeName Object store to update.
+ * @param range Inclusive or exclusive key bounds to delete.
+ * @returns An effect completing after the transaction commits, or failing with ConnectionTransientError.
+ */
 function removeDatabaseValuesInRangeOnConnection(
   database: IDBDatabase,
   storeName: string,
@@ -303,7 +342,7 @@ function removeDatabaseValuesInRangeOnConnection(
       transaction.addEventListener("abort", () => {
         resume(
           Effect.fail(
-            catalogError("remove", transaction.error ?? "Unknown IndexedDB cursor error"),
+            catalogError("remove", transaction.error ?? t.account.connection.indexedDbCursorError),
           ),
         );
       });
@@ -313,7 +352,9 @@ function removeDatabaseValuesInRangeOnConnection(
       const request = transaction.objectStore(storeName).openCursor(range);
       request.addEventListener("error", () => {
         resume(
-          Effect.fail(catalogError("remove", request.error ?? "Unknown IndexedDB cursor error")),
+          Effect.fail(
+            catalogError("remove", request.error ?? t.account.connection.indexedDbCursorError),
+          ),
         );
       });
       request.addEventListener("success", () => {
@@ -393,6 +434,11 @@ export interface CatalogBackend {
   readonly quarantine?: (raw: string) => Effect.Effect<void, ConnectionTransientError>;
 }
 
+/**
+ * Selects desktop catalog storage when available, otherwise IndexedDB storage.
+ * @param database Shared database handle used by the browser fallback.
+ * @returns Deferred catalog read/write effects with ConnectionTransientError failures; only the IndexedDB backend supports quarantining corrupt content.
+ */
 export function makeCatalogBackend(database: DatabaseHandle): CatalogBackend {
   const bridge = window.desktopBridge;
   if (bridge?.getConnectionCatalog !== undefined && bridge.setConnectionCatalog !== undefined) {
@@ -409,12 +455,7 @@ export function makeCatalogBackend(database: DatabaseHandle): CatalogBackend {
           Effect.flatMap((stored) =>
             stored
               ? Effect.void
-              : Effect.fail(
-                  catalogError(
-                    "save",
-                    "Desktop secure storage is unavailable in this system context.",
-                  ),
-                ),
+              : Effect.fail(catalogError("save", t.account.connection.secureStorageUnavailable)),
           ),
         ),
     };
@@ -582,7 +623,7 @@ export function makeBrowserGitHubRoutingPermissions(
         return Effect.fail(
           new ConnectionBlockedError({
             reason: "configuration",
-            detail: "This environment does not have a saved connection endpoint.",
+            detail: t.account.connection.noSavedEndpoint,
           }),
         );
       return write(

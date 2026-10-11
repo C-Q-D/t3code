@@ -1,6 +1,6 @@
 /** Installs UI dictionaries before main evaluates; keeps non-English messages in lazy chunks. */
 import { en, type Messages } from "./locales/en";
-import { resolveActiveLocale, type Locale } from "./locale";
+import { reportLocalePreferenceToDesktop, resolveActiveLocale, type Locale } from "./locale";
 
 export let t: Messages = en;
 export let activeLocale: Locale = "en";
@@ -39,6 +39,7 @@ export async function installLocaleMessages(
   ) {
     return;
   }
+  void reportLocalePreferenceToDesktop();
   const resolvedLocale = locale ?? resolveActiveLocale();
   if (resolvedLocale === "en") {
     installMessages("en", en);

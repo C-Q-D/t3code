@@ -1,3 +1,4 @@
+import * as DesktopUiLocale from "./i18n/DesktopUiLocale.ts";
 import * as MacPermissions from "./permissions/MacPermissions.ts";
 for (const stream of [process.stdout, process.stderr]) {
   stream.on("error", (err: NodeJS.ErrnoException) => {
@@ -139,12 +140,14 @@ const layerElectron = Layer.mergeAll(
   DesktopIpc.layer(Electron.ipcMain),
 );
 
+const layerDesktopLocale = DesktopUiLocale.layer.pipe(Layer.provideMerge(DesktopAppSettings.layer));
+
 const layerDesktopFoundation = Layer.mergeAll(
-  MacPermissions.layer,
+  MacPermissions.layer.pipe(Layer.provide(layerDesktopLocale)),
   DesktopState.layer,
   DesktopShutdown.layer,
   DesktopLegacyLocalStorage.layer,
-  DesktopAppSettings.layer,
+  layerDesktopLocale,
   DesktopClientSettings.layer,
   DesktopConnectionCatalogStore.layer.pipe(Layer.provideMerge(DesktopSavedEnvironments.layer)),
   DesktopAssets.layer,

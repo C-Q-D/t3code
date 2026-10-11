@@ -1,3 +1,5 @@
+/** Localized terminal presentation and existing interaction behavior. */
+import { t } from "~/i18n";
 import ghosttyWasmUrl from "./vendor/ghostty-vt.wasm?url";
 import ghosttyWritePtyWasmUrl from "./vendor/ghostty-write-pty.wasm?url&no-inline";
 
@@ -28,11 +30,12 @@ export class GhosttyRuntime {
   private nextPtyWriterId = 1;
   private writePtyFunctionIndex = 0;
 
+  /** Initializes the runtime from instance's exported memory and type layouts; throws when required WebAssembly memory or exports are absent. */
   private constructor(instance: WebAssembly.Instance) {
     this.exports = instance.exports;
     const memory = instance.exports.memory;
     if (!(memory instanceof WebAssembly.Memory)) {
-      throw new Error("libghostty-vt did not export WebAssembly memory");
+      throw new Error(t.tools.terminal.memoryMissing);
     }
     this.memory = memory;
     this.memoryView = new DataView(memory.buffer);
@@ -43,10 +46,11 @@ export class GhosttyRuntime {
     this.layouts = JSON.parse(textDecoder.decode(bytes.subarray(jsonPointer, end))) as TypeLayouts;
   }
 
+  /** Loads and instantiates the bundled terminal WASM and PTY trampoline, returning the runtime; fetch/instantiation failures propagate without retry or an extra timeout. */
   static async load(): Promise<GhosttyRuntime> {
     const response = await fetch(ghosttyWasmUrl);
     if (!response.ok) {
-      throw new Error(`Unable to load libghostty-vt (${response.status})`);
+      throw new Error(t.tools.terminal.loadRuntimeFailed(response.status));
     }
     let instance: WebAssembly.Instance | undefined;
     const imports = {
@@ -67,23 +71,26 @@ export class GhosttyRuntime {
     return runtime;
   }
 
+  /** Calls the named WASM export with numeric args and returns its result; throws when the export is missing. */
   call(name: string, ...args: Array<number | bigint>): number {
     const fn = this.exports[name];
     if (typeof fn !== "function") {
-      throw new Error(`libghostty-vt export is unavailable: ${name}`);
+      throw new Error(t.tools.terminal.missingExport(name));
     }
     return (fn as WasmFunction)(...args);
   }
 
+  /** Returns the named WASM structure layout or throws when that layout is unavailable. */
   layout(name: string): TypeLayout {
     const layout = this.layouts[name];
-    if (!layout) throw new Error(`libghostty-vt type layout is unavailable: ${name}`);
+    if (!layout) throw new Error(t.tools.terminal.missingLayout(name));
     return layout;
   }
 
+  /** Allocates and zeroes size bytes in WASM memory; returns a nonzero pointer owned by the caller, which must later free it, or throws on allocation failure. */
   alloc(size: number): number {
     const pointer = this.call("ghostty_wasm_alloc_u8_array", size);
-    if (pointer === 0) throw new Error(`libghostty-vt failed to allocate ${size} bytes`);
+    if (pointer === 0) throw new Error(t.tools.terminal.allocationFailed(size));
     new Uint8Array(this.memory.buffer, pointer, size).fill(0);
     return pointer;
   }
@@ -142,9 +149,10 @@ export class GhosttyRuntime {
     return this.memoryView;
   }
 
+  /** Writes value to fieldName of structName at pointer using the declared scalar layout; throws for absent fields or unsupported field types. */
   setField(pointer: number, structName: string, fieldName: string, value: number): void {
     const field = this.layout(structName).fields[fieldName];
-    if (!field) throw new Error(`libghostty-vt field is unavailable: ${structName}.${fieldName}`);
+    if (!field) throw new Error(t.tools.terminal.missingField(structName, fieldName));
     const view = this.currentMemoryView();
     const offset = pointer + field.offset;
     switch (field.type) {
@@ -166,13 +174,14 @@ export class GhosttyRuntime {
         view.setBigUint64(offset, BigInt(value), true);
         return;
       default:
-        throw new Error(`Unsupported libghostty-vt field type: ${field.type}`);
+        throw new Error(t.tools.terminal.unsupportedField(field.type));
     }
   }
 
+  /** Reads fieldName of structName at pointer as a number using its scalar layout; throws for absent fields or unsupported field types. */
   readField(pointer: number, structName: string, fieldName: string): number {
     const field = this.layout(structName).fields[fieldName];
-    if (!field) throw new Error(`libghostty-vt field is unavailable: ${structName}.${fieldName}`);
+    if (!field) throw new Error(t.tools.terminal.missingField(structName, fieldName));
     const view = this.currentMemoryView();
     const offset = pointer + field.offset;
     switch (field.type) {
@@ -189,14 +198,15 @@ export class GhosttyRuntime {
       case "u64":
         return Number(view.getBigUint64(offset, true));
       default:
-        throw new Error(`Unsupported libghostty-vt field type: ${field.type}`);
+        throw new Error(t.tools.terminal.unsupportedField(field.type));
     }
   }
 
+  /** Loads the bundled callback trampoline and binds PTY writes to registered writers; fetch/instantiation failures propagate without retry or an extra timeout. */
   private async installWritePtyTrampoline(): Promise<void> {
     const response = await fetch(ghosttyWritePtyWasmUrl);
     if (!response.ok) {
-      throw new Error(`Unable to load the libghostty-vt PTY trampoline (${response.status})`);
+      throw new Error(t.tools.terminal.loadTrampolineFailed(response.status));
     }
     const result = await WebAssembly.instantiate(await response.arrayBuffer(), {
       env: {

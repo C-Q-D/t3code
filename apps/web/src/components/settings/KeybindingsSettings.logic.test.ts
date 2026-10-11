@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vite-plus/test";
 import type { ResolvedKeybindingsConfig } from "@t3tools/contracts";
 import { DEFAULT_RESOLVED_KEYBINDINGS } from "@t3tools/shared/keybindings";
+import { installMessages } from "~/i18n";
+import { en } from "~/i18n/locales/en";
+import { messages as zhCN } from "~/i18n/locales/zh-CN";
 
 import {
   buildKeybindingRows,
@@ -18,6 +21,21 @@ import {
 } from "./KeybindingsSettings.logic";
 
 describe("KeybindingsSettings.logic", () => {
+  it("finds commands by Chinese labels while retaining executable values and script names", () => {
+    installMessages("zh-CN", zhCN);
+    try {
+      expect(commandLabel("composer.sendBackground")).toBe("输入框：在后台启动");
+      expect(commandLabel("commandPalette.toggle")).toBe("命令面板：切换");
+      expect(commandLabel("usage.cost")).toBe("用量：费用");
+      expect(commandLabel("usage.period.week")).toBe("用量：周期：7天");
+      expect(commandLabel("script.setup-db.run")).toBe("运行脚本：Setup Db");
+      const rows = buildKeybindingRows(DEFAULT_RESOLVED_KEYBINDINGS, "命令面板");
+      expect(rows.length).toBeGreaterThan(0);
+      expect(rows.every((row) => row.command === "commandPalette.toggle")).toBe(true);
+    } finally {
+      installMessages("en", en);
+    }
+  });
   it("lists composer, provider, and pull request commands with editable defaults", () => {
     const rows = buildKeybindingRows(DEFAULT_RESOLVED_KEYBINDINGS, "");
     for (const command of [

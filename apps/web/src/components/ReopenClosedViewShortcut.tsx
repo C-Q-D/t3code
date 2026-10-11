@@ -1,3 +1,5 @@
+/** Connects the reopen-view shortcut to stored closed views and displays operation failures. */
+import { t } from "~/i18n";
 import { useAtomValue } from "@effect/atom-react";
 import {
   scopeProjectRef,
@@ -46,6 +48,7 @@ import { toastManager } from "./ui/toast";
 const isGlobalPullRequests = (ref: ScopedThreadRef) =>
   scopedThreadKey(ref) === scopedThreadKey(PULL_REQUESTS_PANEL_REF);
 
+/** Registers the reopen shortcut for the current environment and reports failures through a toast; renders no DOM. */
 export function ReopenClosedViewShortcut() {
   const navigate = useNavigate();
   const params = useParams({ strict: false });
@@ -132,7 +135,7 @@ export function ReopenClosedViewShortcut() {
       .catch((error: unknown) => {
         toastManager.add({
           type: "error",
-          title: "Could not reopen view",
+          title: t.app.errors.reopenView,
           description: error instanceof Error ? error.message : String(error),
         });
       });

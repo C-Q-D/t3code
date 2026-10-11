@@ -1,3 +1,5 @@
+/** Derives thread execution state and optional locale-owned subagent status text. */
+import { englishWorkLogMessages, type WorkLogMessages } from "../work-log/messages.ts";
 import {
   latestRootProviderFailure,
   latestUnheldRun,
@@ -185,28 +187,21 @@ export function formatModelSelectionEffort(
   return null;
 }
 
-const SUBAGENT_STATUS_LABELS: Record<OrchestrationV2ExecutionNode["status"], string> = {
-  idle: "Idle",
-  pending: "Working",
-  running: "Working",
-  waiting: "Waiting",
-  completed: "Completed",
-  interrupted: "Interrupted",
-  failed: "Failed",
-  cancelled: "Cancelled",
-  rolled_back: "Cancelled",
-};
-
 /**
  * One line for the read-only subagent bar: "Working 12s", "Completed in 34s",
  * or just the status when no duration is known.
+ * @param status Provider-native subagent timing and state, or null before it arrives.
+ * @param nowMs Current epoch milliseconds used only for active elapsed time.
+ * @param messages Locale status names and phrases; defaults to existing English output.
+ * @returns Display text using whole-second elapsed time; terminal failures have no duration.
  */
 export function formatProviderSubagentStatus(
   status: ProviderSubagentStatus | null,
   nowMs: number,
+  messages: WorkLogMessages["subagentExecution"] = englishWorkLogMessages.subagentExecution,
 ): string {
-  if (status === null) return "Starting";
-  const label = SUBAGENT_STATUS_LABELS[status.status];
+  if (status === null) return messages.starting;
+  const label = messages.labels[status.status];
   const live = isOrchestrationV2WorkActive(status.status);
   if (!live && status.status !== "completed") return label;
   const start = status.startedAt === null ? Number.NaN : Date.parse(status.startedAt);
@@ -218,7 +213,7 @@ export function formatProviderSubagentStatus(
   if (!Number.isFinite(start) || !Number.isFinite(end)) return label;
   // Whole seconds: a ticking label must not flicker through tenths.
   const elapsed = formatDuration(Math.max(1_000, Math.floor((end - start) / 1_000) * 1_000));
-  return live ? `${label} ${elapsed}` : `${label} in ${elapsed}`;
+  return live ? messages.live(label, elapsed) : messages.completed(label, elapsed);
 }
 
 export function deriveThreadRuntime(

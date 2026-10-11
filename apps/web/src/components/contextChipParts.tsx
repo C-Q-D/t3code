@@ -1,3 +1,5 @@
+/** Provides context chip presentations and their accessible labels while preserving referenced content. */
+import { t } from "~/i18n";
 import type { EnvironmentId, PullRequestContextMetadata } from "@t3tools/contracts";
 import { CircleDashedIcon, FilmIcon, ImageIcon } from "lucide-react";
 import {
@@ -77,7 +79,7 @@ export function ContextChipPopover(props: {
           <ContextChip
             kind={props.kind}
             render={<button type="button" />}
-            aria-label={`${props.accessibleLabel}. Show details`}
+            aria-label={t.app.context.showDetails(props.accessibleLabel)}
             data-markdown-copy={props.copyMarkdown}
           />
         }
@@ -93,6 +95,7 @@ export function ContextChipPopover(props: {
   );
 }
 
+/** Renders the pull-request context described by props, keeping identifiers intact in its accessible label. */
 export function PullRequestChip(props: {
   metadata: PullRequestContextMetadata;
   environmentId: EnvironmentId | null;
@@ -110,7 +113,7 @@ export function PullRequestChip(props: {
     <ContextChip
       kind={props.kind}
       render={<button type="button" />}
-      aria-label={`Open ${props.kindLabel} ${props.label}: ${props.metadata.title}`}
+      aria-label={t.app.context.open(props.kindLabel, props.label, props.metadata.title)}
       data-markdown-copy={props.copyMarkdown}
       onClick={(event) => props.onOpen(event, props.metadata.url)}
     >
@@ -167,6 +170,7 @@ function averageImageColor(image: HTMLImageElement): string | undefined {
   }
 }
 
+/** Renders an image attachment using name, previewUrl, and formatted size; suffix, style, and remaining props customize its presentation and interactions. */
 export function ImageChipButton({
   name,
   previewUrl,
@@ -188,7 +192,7 @@ export function ImageChipButton({
     <ContextChip
       kind="image"
       render={<button type="button" />}
-      aria-label={`Image attachment, ${name}, ${size}`}
+      aria-label={t.app.context.imageAttachment(name, size)}
       style={{ ...style, ...(accent ? { "--context-chip-accent": accent } : {}) } as CSSProperties}
       {...props}
     >
@@ -290,13 +294,14 @@ function FileChipContent(props: {
   );
 }
 
+/** Renders unavailable context from props with its original label and a localized accessibility description. */
 export function UnresolvedChip(props: { label: string; tooltip: string; copyMarkdown?: string }) {
   return (
     <ContextChipShell
       icon={<CircleDashedIcon />}
       label={props.label}
       state="unresolved"
-      aria-label={`Unavailable context, ${props.label}`}
+      aria-label={t.app.context.unavailable(props.label)}
       data-markdown-copy={props.copyMarkdown}
       tooltip={props.tooltip}
     />

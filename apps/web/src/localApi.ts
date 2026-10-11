@@ -1,3 +1,5 @@
+/** Provides browser-backed local UI operations and the cached client API. */
+import { t } from "~/i18n";
 import type { ConfirmDialogOptions, ContextMenuItem, LocalApi } from "@t3tools/contracts";
 
 import { requestConfirmDialog } from "./confirmDialog";
@@ -6,6 +8,7 @@ import { readBrowserClientSettings, writeBrowserClientSettings } from "./clientP
 
 let cachedApi: LocalApi | undefined;
 
+/** Creates browser-backed dialogs and navigation APIs; operations reject when the corresponding host action fails. */
 function createBrowserLocalApi(): LocalApi {
   return {
     dialogs: {
@@ -22,7 +25,7 @@ function createBrowserLocalApi(): LocalApi {
         if (window.desktopBridge) {
           const opened = await window.desktopBridge.openExternal(url);
           if (!opened) {
-            throw new Error("Unable to open link.");
+            throw new Error(t.app.errors.openLink);
           }
           return;
         }
@@ -33,11 +36,11 @@ function createBrowserLocalApi(): LocalApi {
       // desktop shells that predate this method) have nothing to open.
       openSystemSettings: async (pane) => {
         if (!window.desktopBridge?.openSystemSettings) {
-          throw new Error("Unable to open System Settings.");
+          throw new Error(t.app.errors.openSystemSettings);
         }
         const opened = await window.desktopBridge.openSystemSettings(pane);
         if (!opened) {
-          throw new Error("Unable to open System Settings.");
+          throw new Error(t.app.errors.openSystemSettings);
         }
       },
     },

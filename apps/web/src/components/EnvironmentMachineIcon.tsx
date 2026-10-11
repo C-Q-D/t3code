@@ -1,3 +1,5 @@
+/** Maps environment machine kinds to icons and localized display labels without changing kind identifiers. */
+import { t } from "~/i18n";
 import type { EnvironmentMachineKind } from "@t3tools/contracts";
 import { CloudIcon, LaptopIcon, MonitorIcon, ServerIcon, type LucideProps } from "lucide-react";
 import type { FunctionComponent, SVGProps } from "react";
@@ -54,13 +56,13 @@ const ICON_BY_KIND: Record<EnvironmentMachineKind, FunctionComponent<LucideProps
 };
 
 export const ENVIRONMENT_MACHINE_KIND_LABELS: Record<EnvironmentMachineKind, string> = {
-  server: "Server",
-  cloud: "Cloud VM",
+  server: t.app.machine.server,
+  cloud: t.app.machine.cloudVm,
   linux: "Linux/WSL",
-  desktop: "Desktop",
-  laptop: "Laptop",
-  "mac-mini": "Mini PC",
-  "mac-studio": "Workstation",
+  desktop: t.app.machine.desktop,
+  laptop: t.app.machine.laptop,
+  "mac-mini": t.app.machine.miniPc,
+  "mac-studio": t.app.machine.workstation,
 };
 
 export function environmentMachineIcon(

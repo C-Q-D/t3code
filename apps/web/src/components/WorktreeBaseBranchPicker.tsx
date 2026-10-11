@@ -1,3 +1,5 @@
+/** Renders worktree base-ref selection and loading counts without changing ref values. */
+import { t } from "~/i18n";
 import type { EnvironmentId } from "@t3tools/contracts";
 import { ChevronDownIcon, GitBranchIcon } from "lucide-react";
 import { useDeferredValue, useMemo, useState } from "react";
@@ -11,7 +13,10 @@ import { MiddleTruncate } from "./ui/middle-truncate";
 import { Button } from "./ui/button";
 import { ComboboxTrigger } from "./ui/combobox";
 
-/** Select a future worktree's base without changing the project's current checkout. */
+/** Select a future worktree's base without changing the project's current checkout.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 export function WorktreeBaseBranchPicker({
   environmentId,
   cwd,
@@ -66,11 +71,11 @@ export function WorktreeBaseBranchPicker({
   const statusText =
     branches.error ??
     (branches.isPending && branches.data === null
-      ? "Loading refs..."
+      ? t.git.branch.loadingRefs
       : branches.isFetchingNextPage
-        ? "Loading more refs..."
+        ? t.git.branch.loadingMoreRefs
         : hasNextPage
-          ? `Showing ${branches.refs.length} of ${branches.data?.totalCount} refs`
+          ? t.git.branch.showingRefs(branches.refs.length, branches.data?.totalCount)
           : null);
   const handleOpenChange = (next: boolean) => {
     setOpen(next);

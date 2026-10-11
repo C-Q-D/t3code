@@ -2,6 +2,7 @@
  * Pull-request-specific annotations: conversations already on the host and comments queued for
  * the review being written. New comment composition uses the shared diff annotation.
  */
+import { t } from "~/i18n";
 import type {
   EnvironmentId,
   PullRequestRef,
@@ -53,7 +54,10 @@ function submitKeys(input: {
   };
 }
 
-/** A comment waiting to be sent with the rest of the review. */
+/** A comment waiting to be sent with the rest of the review.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 export function PendingReviewCommentCard({
   comment,
   onRemove,
@@ -69,12 +73,12 @@ export function PendingReviewCommentCard({
     >
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <MessageSquareIcon className="size-3.5" />
-        <span>Pending — sent when you submit the review</span>
+        <span>{t.git.pullRequest.pendingSentWhenYouSubmitTheReview}</span>
         <Button
           size="icon-xs"
           variant="ghost"
           className="ml-auto"
-          aria-label="Discard this comment"
+          aria-label={t.git.pullRequest.discardThisComment}
           onClick={onRemove}
         >
           <Trash2Icon className="size-3.5" />
@@ -85,7 +89,10 @@ export function PendingReviewCommentCard({
   );
 }
 
-/** A conversation already on the host, with whatever this host lets the reader do to it. */
+/** A conversation already on the host, with whatever this host lets the reader do to it.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 export function ReviewThreadCard({
   thread,
   workspaceRoot,
@@ -96,7 +103,7 @@ export function ReviewThreadCard({
   reference,
   pending,
   fixPending,
-  fixLabel = "Fix in a thread",
+  fixLabel = t.git.pullRequest.fixInAThread,
   onFix,
   onReply,
   onLoadMore,
@@ -225,10 +232,10 @@ export function ReviewThreadCard({
           aria-expanded={expanded}
           onClick={() => setExpanded((current) => !current)}
         >
-          {thread.isResolved ? "Resolved" : "Open"} · {commentCount}{" "}
-          {commentCount === 1 ? "comment" : "comments"}
+          {thread.isResolved ? t.git.pullRequest.resolved : t.git.pullRequest.open} · {commentCount}{" "}
+          {t.git.pullRequest.commentWord(commentCount)}
         </button>
-        {thread.isOutdated ? <span>outdated</span> : null}
+        {thread.isOutdated ? <span>{t.git.pullRequest.outdated}</span> : null}
         {onFix ? (
           <Button
             size="xs"
@@ -238,7 +245,7 @@ export function ReviewThreadCard({
             onClick={onFix}
           >
             <HammerIcon className="size-3" />
-            {fixPending ? "Preparing..." : fixLabel}
+            {fixPending ? t.git.pullRequest.preparing : fixLabel}
           </Button>
         ) : null}
         {canResolve ? (
@@ -249,7 +256,7 @@ export function ReviewThreadCard({
             disabled={pending}
             onClick={onToggleResolved}
           >
-            {thread.isResolved ? "Unresolve" : "Resolve"}
+            {thread.isResolved ? t.git.pullRequest.unresolve : t.git.pullRequest.resolve}
           </Button>
         ) : null}
       </div>
@@ -278,7 +285,7 @@ export function ReviewThreadCard({
                     value={comment.body}
                     cwd={workspaceRoot}
                     environmentId={environmentId}
-                    label="Edit comment"
+                    label={t.git.pullRequest.editComment}
                     saving={savingEdit}
                     onSave={(body) => void saveEdit(comment.id, body)}
                     onCancel={() => setEditingId(null)}
@@ -293,7 +300,7 @@ export function ReviewThreadCard({
                     />
                     {canEditComment(comment) ? (
                       <PullRequestEditButton
-                        aria-label="Edit comment"
+                        aria-label={t.git.pullRequest.editComment}
                         onClick={() => setEditingId(comment.id)}
                       />
                     ) : null}
@@ -310,7 +317,7 @@ export function ReviewThreadCard({
                 disabled={loadingMore}
                 onClick={() => void loadMore()}
               >
-                {loadingMore ? "Loading..." : "Load more comments"}
+                {loadingMore ? t.git.pullRequest.loading : t.git.pullRequest.loadMoreComments}
               </Button>
             </div>
           ) : null}
@@ -322,8 +329,8 @@ export function ReviewThreadCard({
                   autoFocus
                   size="sm"
                   value={reply}
-                  placeholder="Reply"
-                  aria-label="Reply to this conversation"
+                  placeholder={t.git.pullRequest.reply}
+                  aria-label={t.git.pullRequest.replyToThisConversation}
                   onChange={(event) => setReply(event.target.value)}
                   onKeyDown={submitKeys({
                     value: reply,
@@ -334,20 +341,20 @@ export function ReviewThreadCard({
                 />
                 <div className="mt-2 flex justify-end gap-2">
                   <Button size="xs" variant="ghost" onClick={() => setReplying(false)}>
-                    Cancel
+                    {t.common.confirm.cancel}
                   </Button>
                   <Button
                     size="xs"
                     disabled={pending || reply.trim().length === 0}
                     onClick={() => void send()}
                   >
-                    Reply
+                    {t.git.pullRequest.reply}
                   </Button>
                 </div>
               </div>
             ) : (
               <Button size="xs" variant="ghost" className="mt-2" onClick={() => setReplying(true)}>
-                Reply
+                {t.git.pullRequest.reply}
               </Button>
             )
           ) : null}

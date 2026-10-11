@@ -16,6 +16,35 @@ afterEach(() => {
 });
 
 describe("installLocaleMessages", () => {
+  it("reports the saved preference to the desktop while installing messages", async () => {
+    const setUiLocalePreference = vi.fn(async () => {});
+    vi.stubGlobal("window", {
+      localStorage: { getItem: () => "zh-CN" },
+      desktopBridge: { setUiLocalePreference },
+    });
+    await installLocaleMessages();
+    expect(setUiLocalePreference).toHaveBeenCalledWith("zh-CN");
+    expect(activeLocale).toBe("zh-CN");
+  });
+  it.each(["throw", "reject"])(
+    "keeps startup working when desktop sync fails by %s",
+    async (failure) => {
+      const error = new Error("settings unavailable");
+      const log = vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.stubGlobal("window", {
+        localStorage: { getItem: () => "zh-CN" },
+        desktopBridge: {
+          setUiLocalePreference: () => {
+            if (failure === "throw") throw error;
+            return Promise.reject(error);
+          },
+        },
+      });
+      await installLocaleMessages();
+      expect(activeLocale).toBe("zh-CN");
+      expect(log).toHaveBeenCalledWith("[i18n] Could not synchronize the desktop language.", error);
+    },
+  );
   it("installs English synchronously without loading a chunk", async () => {
     installMessages("zh-CN", messages);
     const loader = vi.fn(async () => ({ messages }));

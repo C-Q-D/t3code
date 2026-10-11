@@ -1,3 +1,4 @@
+import * as DesktopUiLocale from "../../i18n/DesktopUiLocale.ts";
 import { assert, describe, it } from "@effect/vitest";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
@@ -50,6 +51,7 @@ describe("window capture IPC", () => {
     }).pipe(
       Effect.provide(
         Layer.mergeAll(
+          DesktopUiLocale.layerTest(),
           Layer.succeed(ElectronWindow.ElectronWindow, {
             main: Effect.succeedSome({ webContents: { id: 7 } }),
           } as ElectronWindow.ElectronWindow["Service"]),
@@ -86,6 +88,7 @@ describe("window capture IPC", () => {
     }).pipe(
       Effect.provide(
         Layer.mergeAll(
+          DesktopUiLocale.layerTest(),
           Layer.succeed(ElectronWindow.ElectronWindow, {
             main: Effect.succeedSome({ webContents: { id: 7 } }),
           } as ElectronWindow.ElectronWindow["Service"]),
@@ -119,6 +122,7 @@ describe("window capture IPC", () => {
     }).pipe(
       Effect.provide(
         Layer.mergeAll(
+          DesktopUiLocale.layerTest(),
           Layer.succeed(ElectronWindow.ElectronWindow, {
             main: Effect.succeedSome({ webContents: { id: 7 } }),
           } as ElectronWindow.ElectronWindow["Service"]),
@@ -153,6 +157,7 @@ describe("window capture IPC", () => {
     let received: unknown;
     const webContents = { id: 7, getZoomFactor: () => 1.25 };
     const layer = Layer.mergeAll(
+      DesktopUiLocale.layerTest(),
       Layer.succeed(
         ElectronWindow.ElectronWindow,
         ElectronWindow.ElectronWindow.of({
@@ -215,6 +220,7 @@ describe("window capture IPC", () => {
     let includeAccessibility: boolean | undefined;
     const webContents = { id: 7 };
     const layer = Layer.mergeAll(
+      DesktopUiLocale.layerTest(),
       Layer.succeed(
         ElectronWindow.ElectronWindow,
         ElectronWindow.ElectronWindow.of({
@@ -274,6 +280,7 @@ describe("window capture IPC", () => {
     }).pipe(
       Effect.provide(
         Layer.mergeAll(
+          DesktopUiLocale.layerTest(),
           Layer.succeed(ElectronWindow.ElectronWindow, {
             main: Effect.succeedSome({ webContents: { id: 7 } }),
           } as ElectronWindow.ElectronWindow["Service"]),
@@ -290,6 +297,7 @@ describe("window capture IPC", () => {
 
   it.effect("checks shortcut availability for a trusted renderer", () => {
     const layer = Layer.mergeAll(
+      DesktopUiLocale.layerTest(),
       Layer.succeed(
         ElectronWindow.ElectronWindow,
         ElectronWindow.ElectronWindow.of({
@@ -315,6 +323,7 @@ describe("window capture IPC", () => {
   it.effect("suppresses the active shortcut for a trusted renderer", () => {
     let suppressed = false;
     const layer = Layer.mergeAll(
+      DesktopUiLocale.layerTest(),
       Layer.succeed(
         ElectronWindow.ElectronWindow,
         ElectronWindow.ElectronWindow.of({

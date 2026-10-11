@@ -6,6 +6,7 @@
  */
 import { UsageDay, type UsageResolution, type UsageSummaryInput } from "@t3tools/contracts";
 
+import { englishUsageMessages, type UsageMessages } from "./usageLabels.ts";
 import type { UsageContractMismatch } from "./usageMerge.ts";
 
 const CURRENCY = new Intl.NumberFormat("en-US", {
@@ -51,34 +52,31 @@ export function formatPercent(share: number, digits = 1): string {
   return `${percent.toFixed(digits)}%`;
 }
 
+/**
+ * Explains excluded usage without changing the environment name or compatibility decision.
+ * @param environmentLabel Original environment display name.
+ * @param mismatch Which side of the contract is older.
+ * @param messages Locale text, defaulting to English.
+ * @returns An exclusion notice for the older server or client.
+ */
 export function formatUsageContractMismatch(
   environmentLabel: string,
   mismatch: Pick<UsageContractMismatch, "direction">,
+  messages: UsageMessages = englishUsageMessages,
 ): string {
   return mismatch.direction === "serverBehind"
-    ? `${environmentLabel} runs an older server version and is excluded from totals.`
-    : `This client is older than the server on ${environmentLabel}; its usage is excluded from totals.`;
+    ? messages.serverBehind(environmentLabel)
+    : messages.clientBehind(environmentLabel);
 }
 
 /** `2026-08-07` to `Aug 7`. */
-export function formatDayShort(day: string): string {
+export function formatDayShort(
+  day: string,
+  messages: UsageMessages = englishUsageMessages,
+): string {
   const [year, month, dayOfMonth] = day.split("-").map((part) => Number(part));
   if (year === undefined || month === undefined || dayOfMonth === undefined) return day;
-  const MONTHS = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-  ];
-  return `${MONTHS[month - 1] ?? ""} ${dayOfMonth}`;
+  return messages.day(month, dayOfMonth);
 }
 
 /** Inclusive day list between two `YYYY-MM-DD` bounds. */
@@ -132,11 +130,15 @@ export function enumerateHourStarts(sinceTime: string, untilTime: string): reado
  * Repeated wall-clock hours during a fall-back transition include their short
  * zone name so the two distinct buckets remain distinguishable.
  */
-export function formatHourShort(hourStart: string, timeZone?: string): string {
+export function formatHourShort(
+  hourStart: string,
+  timeZone?: string,
+  messages: UsageMessages = englishUsageMessages,
+): string {
   const instant = new Date(hourStart);
   if (Number.isNaN(instant.getTime())) return hourStart;
   const options = timeZone === undefined ? {} : { timeZone };
-  const hourFormat = dateTimeFormatter("en-US", {
+  const hourFormat = dateTimeFormatter(messages.dateLocale, {
     ...options,
     hour: "numeric",
   });
@@ -154,7 +156,7 @@ export function formatHourShort(hourStart: string, timeZone?: string): string {
   );
 
   if (!isRepeatedHour) return hourFormat.format(instant);
-  return dateTimeFormatter("en-US", {
+  return dateTimeFormatter(messages.dateLocale, {
     ...(timeZone === undefined ? {} : { timeZone }),
     hour: "numeric",
     timeZoneName: "short",
@@ -162,10 +164,14 @@ export function formatHourShort(hourStart: string, timeZone?: string): string {
 }
 
 /** `2026-08-11T14:37:00Z` to `Aug 11, 2 PM` in the requested zone. */
-export function formatDateTimeShort(instant: string, timeZone?: string): string {
+export function formatDateTimeShort(
+  instant: string,
+  timeZone?: string,
+  messages: UsageMessages = englishUsageMessages,
+): string {
   const date = new Date(instant);
   if (Number.isNaN(date.getTime())) return instant;
-  return dateTimeFormatter("en-US", {
+  return dateTimeFormatter(messages.dateLocale, {
     ...(timeZone === undefined ? {} : { timeZone }),
     month: "short",
     day: "numeric",
@@ -178,11 +184,12 @@ export function formatRelativeHourShort(
   hourStart: string,
   relativeTo: string,
   timeZone?: string,
+  messages: UsageMessages = englishUsageMessages,
 ): string {
   const instant = new Date(hourStart);
   const reference = new Date(relativeTo);
   if (Number.isNaN(instant.getTime()) || Number.isNaN(reference.getTime())) {
-    return formatDateTimeShort(hourStart, timeZone);
+    return formatDateTimeShort(hourStart, timeZone, messages);
   }
 
   const dayFormat = dateTimeFormatter("en-CA", {
@@ -194,11 +201,11 @@ export function formatRelativeHourShort(
   const instantDay = Date.parse(`${dayFormat.format(instant)}T00:00:00Z`);
   const referenceDay = Date.parse(`${dayFormat.format(reference)}T00:00:00Z`);
   const calendarDaysAgo = Math.round((referenceDay - instantDay) / (24 * HOUR_MS));
-  const hour = formatHourShort(hourStart, timeZone);
+  const hour = formatHourShort(hourStart, timeZone, messages);
 
-  if (calendarDaysAgo === 0) return `${hour} today`;
-  if (calendarDaysAgo === 1) return `${hour} yesterday`;
-  return formatDateTimeShort(hourStart, timeZone);
+  if (calendarDaysAgo === 0) return messages.today(hour);
+  if (calendarDaysAgo === 1) return messages.yesterday(hour);
+  return formatDateTimeShort(hourStart, timeZone, messages);
 }
 
 /**

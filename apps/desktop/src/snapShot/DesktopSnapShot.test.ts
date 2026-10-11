@@ -1,3 +1,4 @@
+import * as DesktopUiLocale from "../i18n/DesktopUiLocale.ts";
 import * as MacPermissions from "../permissions/MacPermissions.ts";
 import { assert, it } from "@effect/vitest";
 import {
@@ -494,6 +495,7 @@ const layerTest = (
   > = Effect.succeed(initialSettings),
 ) =>
   MacPermissions.layer.pipe(
+    Layer.provide(DesktopUiLocale.layerTest()),
     Layer.provideMerge(
       Layer.mergeAll(
         Layer.succeed(

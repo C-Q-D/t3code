@@ -2560,9 +2560,11 @@ function AttemptFoldTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "at
   );
 }
 
+/** Renders an assistant message using timeline context; completed empty messages receive a localized placeholder while streaming remains blank. */
 function AssistantTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" }> }) {
   const ctx = use(TimelineRowCtx);
-  const messageText = row.message.text || (row.message.streaming ? "" : "(empty response)");
+  const messageText =
+    row.message.text || (row.message.streaming ? "" : t.chat.timeline.emptyResponse);
 
   return (
     <>
@@ -2853,7 +2855,7 @@ function v2EventPresentation(item: OrchestrationV2TurnItem): {
       const tokenSummary =
         item.beforeTokenCount === undefined && item.afterTokenCount === undefined
           ? null
-          : `${item.beforeTokenCount ?? "?"} → ${item.afterTokenCount ?? "?"} tokens`;
+          : t.chat.timeline.tokenChange(item.beforeTokenCount ?? "?", item.afterTokenCount ?? "?");
       return {
         label: t.chat.timeline.contextCompacted,
         detail: item.summary ?? tokenSummary,
@@ -3139,8 +3141,11 @@ const V2SubagentGroup = memo(function V2SubagentGroup({
     };
   });
   const summary = subagentGroupSummary(agents);
-  const label = `${members.length} ${members.length === 1 ? "subagent" : "subagents"}`;
-  const statusSummary = summarizeSubagentStatuses(agents.map(({ status }) => status));
+  const label = t.chat.workLog.subagentCount(members.length);
+  const statusSummary = summarizeSubagentStatuses(
+    agents.map(({ status }) => status),
+    t.chat.workLog.shared.subagentStatuses,
+  );
   const toggleExpanded = (open: boolean) => {
     ctx.onToggleWorkEntry(row.id, expanded);
     if (open) ctx.workGroupViewState.expandedEntries.add(groupId);
@@ -4174,8 +4179,9 @@ function UserMessagePreviewAnnotationDetails(props: {
             })}
             {(props.record.elements?.length ?? 0) > visibleElements.length ? (
               <div className="text-secondary-label text-3xs">
-                {(props.record.elements?.length ?? 0) - visibleElements.length} more selected
-                elements
+                {t.chat.timeline.moreSelectedElements(
+                  (props.record.elements?.length ?? 0) - visibleElements.length,
+                )}
               </div>
             ) : null}
           </div>

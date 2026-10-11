@@ -1,3 +1,5 @@
+/** Presents entry actions when the current workspace has no projects. */
+import { t } from "~/i18n";
 import { MessageSquareDashedIcon, PlusIcon } from "lucide-react";
 import { useCallback } from "react";
 
@@ -10,6 +12,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "./ui/empty";
 import { SidebarInset } from "./ui/sidebar";
 import { WorkspacePageHeader } from "./WorkspacePageHeader";
 
+/** Offers project creation and, when an eligible environment exists, starting a scratch conversation. */
 export function NoProjectsHero() {
   const openAddProject = useCallback(() => openCommandPalette({ open: "add-project" }), []);
   const primaryEnvironmentId = usePrimaryEnvironmentId();
@@ -24,16 +27,16 @@ export function NoProjectsHero() {
         <Empty size="hero" className="flex-1">
           <div className="w-full max-w-lg px-8 py-12">
             <EmptyHeader className="max-w-none">
-              <EmptyTitle>What should we work on?</EmptyTitle>
+              <EmptyTitle>{t.app.projects.heroTitle}</EmptyTitle>
               <EmptyDescription>
                 {scratchTargetEnvironmentId === null
-                  ? "Add a project to start your first thread."
-                  : "Add a project, or start without one."}
+                  ? t.app.projects.addFirst
+                  : t.app.projects.addOrStart}
               </EmptyDescription>
               <div className="mt-6 flex justify-center gap-2">
                 <Button size="sm" onClick={openAddProject}>
                   <PlusIcon className="size-4" />
-                  Add project
+                  {t.sidebar.header.addProject}
                 </Button>
                 {scratchTargetEnvironmentId === null ? null : (
                   <Button
@@ -42,7 +45,7 @@ export function NoProjectsHero() {
                     onClick={() => void startScratchThread(scratchTargetEnvironmentId)}
                   >
                     <MessageSquareDashedIcon className="size-4" />
-                    Start without a project
+                    {t.app.projects.startWithout}
                   </Button>
                 )}
               </div>

@@ -1,3 +1,5 @@
+/** Owns pull request stack snapshot on the web pull-request surface; host data and agent context remain unchanged. */
+import { t } from "~/i18n";
 import type { PullRequestRef, PullRequestStack, ThreadPullRequestLink } from "@t3tools/contracts";
 
 /** Saved native membership is enough for navigation, but never supplies action head SHAs. */
@@ -47,7 +49,11 @@ export function savedPullRequestStack(
   };
 }
 
-/** A fresh absence overrides saved membership; failed refreshes preserve available navigation. */
+/** A fresh absence overrides saved membership; failed refreshes preserve available navigation.
+ * @param query Current stack query data, success/pending flags, and optional refresh error.
+ * @param saved Previously observed stack, or null when no saved membership exists.
+ * @returns Stack data, freshness state, and an optional refresh notice; data may be null.
+ */
 export function pullRequestStackView(
   query: {
     data: PullRequestStack | null;
@@ -65,9 +71,9 @@ export function pullRequestStackView(
       data === null
         ? null
         : query.error
-          ? "Stack data may be stale. We couldn’t refresh it."
+          ? t.git.pullRequest.stackDataMayBeStaleWeCouldnTRefreshIt
           : !query.isSuccess || query.isPending
-            ? "Refreshing stack… Showing saved data."
+            ? t.git.pullRequest.refreshingStackShowingSavedData
             : null,
   };
 }

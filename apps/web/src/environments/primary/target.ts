@@ -1,3 +1,5 @@
+/** Localized connection presentation and existing interaction behavior. */
+import { t } from "~/i18n";
 import { PRIMARY_LOCAL_ENVIRONMENT_ID, type DesktopEnvironmentBootstrap } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
 
@@ -26,8 +28,9 @@ export class PrimaryEnvironmentUrlInvalidError extends Schema.TaggedError<Primar
     cause: Schema.Defect(),
   },
 ) {
+  /** Returns the localized display message for this error while preserving its structured diagnostic fields. */
   override get message(): string {
-    return `Could not parse ${this.urlKind} for the ${this.source} primary environment target.`;
+    return t.account.connection.parseTargetFailed(this.urlKind, this.source);
   }
 }
 
@@ -38,8 +41,9 @@ export class PrimaryEnvironmentProtocolUnsupportedError extends Schema.TaggedErr
     protocol: Schema.String,
   },
 ) {
+  /** Returns the localized display message for this error while preserving its structured diagnostic fields. */
   override get message(): string {
-    return `The ${this.source} primary environment target uses unsupported protocol ${this.protocol}.`;
+    return t.account.connection.unsupportedProtocol(this.source, this.protocol);
   }
 }
 
@@ -50,12 +54,13 @@ export class DesktopEnvironmentBootstrapIncompleteError extends Schema.TaggedErr
     hasWsBaseUrl: Schema.Boolean,
   },
 ) {
+  /** Returns the localized display message for this error while preserving its structured diagnostic fields. */
   override get message(): string {
     const missing = [
       ...(this.hasHttpBaseUrl ? [] : ["httpBaseUrl"]),
       ...(this.hasWsBaseUrl ? [] : ["wsBaseUrl"]),
     ];
-    return `Desktop bootstrap is missing ${missing.join(" and ")} for the local environment.`;
+    return t.account.connection.missingBootstrap(missing.join(" and "));
   }
 }
 
@@ -63,8 +68,9 @@ export class PrimaryEnvironmentDisabledError extends Schema.TaggedError<PrimaryE
   "PrimaryEnvironmentDisabledError",
   {},
 ) {
+  /** Returns the localized display message for this error while preserving its structured diagnostic fields. */
   override get message(): string {
-    return "The local environment is disabled.";
+    return t.account.connection.localDisabled;
   }
 }
 

@@ -1,3 +1,5 @@
+/** Checks tool classification, retained metadata, and generated display labels. */
+import { englishToolActivityLabels } from "./toolActivityLabels.ts";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
@@ -132,4 +134,16 @@ describe("toolActivity", () => {
     expect(dynamicToolTitle("Skill", { skill: " " })).toBeUndefined();
     expect(dynamicToolTitle("Read", { skill: "full-send" })).toBeUndefined();
   });
+});
+
+it("formats parsed search targets and file counts with caller-owned labels", () => {
+  const labels = {
+    ...englishToolActivityLabels,
+    searchedQueryIn: (query: string, target: string) => `在 ${target} 中找 ${query}`,
+    readPath: (path: string, count: number) => `读 ${path}，另 ${count} 个`,
+  };
+  expect(formatSearchToolLabel({ query: "Searched files", path: "/workspace/src" }, labels)).toBe(
+    "在 src 中找 Searched files",
+  );
+  expect(formatReadToolLabel(" src/Read.ts ", 2, labels)).toBe("读 src/Read.ts，另 2 个");
 });

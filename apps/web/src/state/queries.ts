@@ -1,3 +1,5 @@
+/** Provides environment-scoped query hooks and localized fallback errors. */
+import { t } from "~/i18n";
 import { useAtomValue } from "@effect/atom-react";
 import {
   type CheckpointDiffTarget,
@@ -100,6 +102,7 @@ export function useThreadSearch(
   };
 }
 
+/** Returns branch pages and pagination state for target; a missing target disables the query and failures include a user-facing fallback. */
 export function usePaginatedBranches(target: VcsRefTarget) {
   const query = target.query?.trim() ?? "";
   const targetKey =
@@ -169,7 +172,7 @@ export function usePaginatedBranches(target: VcsRefTarget) {
           const cause = Cause.squash(failed.cause);
           return cause instanceof Error && cause.message.trim().length > 0
             ? cause.message
-            : "Failed to load refs.";
+            : t.app.errors.loadRefs;
         })()
       : null;
   const refresh = useCallback(() => {
@@ -221,6 +224,7 @@ export function areProjectPathSearchTargetsEqual(
   );
 }
 
+/** Searches paths for target up to limit using the supplied options; returns permission failures as displayable error text. */
 export function useProjectPathSearch(
   target: ProjectPathSearchTarget,
   limit: number,
@@ -268,7 +272,7 @@ export function useProjectPathSearch(
         ? null
         : canReadFiles
           ? result.error
-          : (fileAccess.error ?? "This connection cannot search host files."),
+          : (fileAccess.error ?? t.app.errors.searchFilesDenied),
     isPending:
       !areProjectPathSearchTargetsEqual(normalizedTarget, debouncedTarget) ||
       (hasTarget && (fileAccess.isPending || result.isPending)),
@@ -291,6 +295,7 @@ interface ProjectContentSearchTarget {
   readonly useRegex: boolean;
 }
 
+/** Searches project content for target and exposes a displayable permission error when host-file access is unavailable. */
 export function useProjectContentSearch(target: ProjectContentSearchTarget) {
   const hasTarget = target.environmentId !== null && target.cwd !== null;
   const fileAccess = useFilesystemReadAccess(target.environmentId);
@@ -330,7 +335,7 @@ export function useProjectContentSearch(target: ProjectContentSearchTarget) {
         ? null
         : canReadFiles
           ? result.error
-          : (fileAccess.error ?? "This connection cannot search host files."),
+          : (fileAccess.error ?? t.app.errors.searchFilesDenied),
     isPending:
       isCheckingAccess ||
       (canReadFiles && hasQuery && (query !== debouncedQuery || result.isPending)),

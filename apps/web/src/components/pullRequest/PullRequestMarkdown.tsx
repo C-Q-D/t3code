@@ -1,3 +1,5 @@
+/** Owns pull request markdown on the web pull-request surface; host data and agent context remain unchanged. */
+import { t } from "~/i18n";
 import { ExternalLinkIcon, PaperclipIcon } from "lucide-react";
 import { markdownImageSourceFragment } from "@t3tools/client-runtime/markdown-images";
 import { githubMediaFetchUrl } from "@t3tools/shared/githubMedia";
@@ -22,6 +24,8 @@ export const PullRequestMarkdownContext = createContext<{
  * A video GitHub hosts for the repository. It plays through a signed asset URL the server
  * fetches with the repository's GitHub credential, which is what a private repository's
  * uploads need; the URL is re-signed on retry, so a stale one recovers without a reload.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
  */
 function PullRequestGitHubVideo({
   environmentId,
@@ -50,7 +54,7 @@ function PullRequestGitHubVideo({
     <MediaVideoPlayer
       src={src === null ? null : src + markdownImageSourceFragment(url)}
       originalUrl={url}
-      label="Pull request video"
+      label={t.git.pullRequest.pullRequestVideo}
       className="w-full"
       videoClassName="rounded-lg border border-border/60"
       onRetry={refreshAssetUrl}
@@ -58,7 +62,10 @@ function PullRequestGitHubVideo({
   );
 }
 
-/** Renders PR uploads inline, with retry and an original link when video playback fails. */
+/** Renders PR uploads inline, with retry and an original link when video playback fails.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 export function PullRequestMarkdown({
   text,
   cwd,
@@ -122,7 +129,7 @@ export function PullRequestMarkdown({
               key={`${segment.id}:${segment.url}`}
               src={segment.url}
               originalUrl={segment.url}
-              label="Pull request video"
+              label={t.git.pullRequest.pullRequestVideo}
               className="w-full"
               videoClassName="rounded-lg border border-border/60"
             />
@@ -140,7 +147,9 @@ export function PullRequestMarkdown({
             className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm hover:bg-muted/60"
           >
             <PaperclipIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
-            <span className="min-w-0 flex-1 truncate">Open attachment on GitHub</span>
+            <span className="min-w-0 flex-1 truncate">
+              {t.git.pullRequest.openAttachmentOnGitHub}
+            </span>
             <ExternalLinkIcon aria-hidden className="size-3 shrink-0 text-muted-foreground" />
           </a>
         );

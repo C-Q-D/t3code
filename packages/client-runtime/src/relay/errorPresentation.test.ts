@@ -1,3 +1,4 @@
+import { englishRelayMessages } from "./messages.ts";
 import { RelayAuthInvalidError } from "@t3tools/contracts/relay";
 import { describe, expect, it } from "@effect/vitest";
 
@@ -6,6 +7,7 @@ import {
   DPOP_RETRY_HINT,
   DPOP_UNKNOWN_HINT,
   relayProtectedErrorMessage,
+  relayOfflineReasonMessage,
 } from "./errorPresentation.ts";
 
 describe("relayProtectedErrorMessage", () => {
@@ -54,4 +56,26 @@ describe("relayProtectedErrorMessage", () => {
 
     expect(relayProtectedErrorMessage(error)).toBe("Relay rejected the cloud session token.");
   });
+});
+
+it("localizes a structured DPoP failure and the offline tunnel explanation", () => {
+  const messages = {
+    ...englishRelayMessages,
+    rejectedProof: "中继拒绝了 DPoP 证明。",
+    clockHint: "请检查两台设备的自动时间设置。",
+    tunnelReleased: "长期离线，隧道已移除。",
+  };
+  const error = new RelayAuthInvalidError({
+    code: "auth_invalid",
+    reason: "invalid_dpop",
+    dpopFailureReason: "time_window",
+    traceId: "trace-1",
+  });
+  expect(relayProtectedErrorMessage(error, messages)).toBe(
+    "中继拒绝了 DPoP 证明。 请检查两台设备的自动时间设置。",
+  );
+  expect(relayOfflineReasonMessage({ offlineReason: "tunnel_released" }, messages)).toBe(
+    "长期离线，隧道已移除。",
+  );
+  expect(relayOfflineReasonMessage({}, messages)).toBeNull();
 });

@@ -26,6 +26,7 @@ of the selected theme.
 On web and desktop, open **Settings → Appearance → Language** and choose **Follow system**,
 **English**, or **简体中文**. The choice is saved on each device or browser.
 Changing the language reloads the page.
+Native menus and dialogs in the desktop app follow the same setting.
 
 ## Composer context
 

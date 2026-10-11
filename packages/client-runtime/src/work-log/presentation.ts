@@ -1,3 +1,5 @@
+/** Derives work-log presentation from retained tool data; locale messages affect display only. */
+import { englishWorkLogMessages, type WorkLogMessages } from "./messages.ts";
 import {
   isToolLifecycleItemType,
   type AssetResource,
@@ -10,6 +12,7 @@ import {
 } from "@t3tools/contracts";
 import {
   resolveT3McpToolDefinition,
+  resolveT3McpToolId,
   type T3McpToolDefinition,
   type T3McpToolSummaryAction,
 } from "@t3tools/shared/t3McpToolPresentation";
@@ -49,17 +52,27 @@ export function toolItemForDisplay(item: OrchestrationV2TurnItem): Orchestration
   }
 }
 
+/**
+ * Formats a compaction milestone without changing token counts.
+ * @param item Retained compaction status and optional before/after token counts.
+ * @param messages Locale text, defaulting to the existing English output.
+ * @returns A running, completed, or completed-with-counts label.
+ */
 export function contextCompactionLabel(
   item: Pick<
     Extract<OrchestrationV2TurnItem, { type: "compaction" }>,
     "status" | "beforeTokenCount" | "afterTokenCount"
   >,
+  messages: WorkLogMessages = englishWorkLogMessages,
 ): string {
-  if (item.status === "running") return "Compacting context";
+  if (item.status === "running") return messages.compactingContext;
   if (item.beforeTokenCount !== undefined && item.afterTokenCount !== undefined) {
-    return `Context compacted ${formatTokens(item.beforeTokenCount)} → ${formatTokens(item.afterTokenCount)} tokens`;
+    return messages.contextCompactedTokens(
+      formatTokens(item.beforeTokenCount),
+      formatTokens(item.afterTokenCount),
+    );
   }
-  return "Context compacted";
+  return messages.contextCompacted;
 }
 
 export interface WorkLogPresentationEntry {
@@ -138,10 +151,19 @@ function workEntryToolOutput(
     : (data?.output ?? data?.result ?? data?.rawOutput ?? data?.content);
 }
 
+/**
+ * Builds one T3 tool label from its resolved definition and lifecycle state.
+ * @param definition Tool identity with locale-owned verb forms, or null for another tool.
+ * @param status Retained or fallback lifecycle state; unknown states use the running form.
+ * @param data Retained arguments used to identify a pull request target, when available.
+ * @param messages Locale prefixes, target labels, and phrase joining rules.
+ * @returns Display text and stable icon/action metadata, or null for an unrecognized tool.
+ */
 function resolveT3McpToolPresentation(
   definition: T3McpToolDefinition | null,
   status: string | undefined,
-  data?: unknown,
+  data: unknown,
+  messages: WorkLogMessages["t3Tools"],
 ) {
   if (!definition) return null;
   const [action, running, completed, detail] = definition.labels;
@@ -151,11 +173,11 @@ function resolveT3McpToolPresentation(
       : status === "completed"
         ? completed
         : status === "failed"
-          ? `Failed to ${action.toLowerCase()}`
+          ? messages.failed(action)
           : status === "declined"
-            ? `Declined to ${action.toLowerCase()}`
+            ? messages.declined(action)
             : status === "stopped"
-              ? `Stopped ${running.toLowerCase()}`
+              ? messages.stopped(running)
               : running;
 
   const actionKind =
@@ -177,10 +199,10 @@ function resolveT3McpToolPresentation(
     typeof number === "number" &&
     Number.isSafeInteger(number) &&
     number > 0
-      ? `PR #${number}`
+      ? messages.pullRequest(number)
       : detail;
   return {
-    displayName: `${verb} ${target}`,
+    displayName: messages.joinLabel(verb, target),
     icon: definition.icon,
     ...(actionKind === undefined ? {} : { action: actionKind }),
   };
@@ -195,20 +217,33 @@ export function liveActivityToolStatus(status: string | undefined, presentTense:
   return "completed";
 }
 
-/** Resolves tool identity before choosing labels or icons in either client. */
+/**
+ * Resolves tool identity before choosing display labels or icons.
+ * @param entry Retained provider identity, tool data, and lifecycle state.
+ * @param fallbackStatus Status used only when the entry has no lifecycle state.
+ * @param messages Locale phrases; omitted messages preserve existing English output.
+ * @returns A T3 tool presentation, or null for another tool; identity and icons remain locale-independent.
+ */
 export function resolveWorkEntryToolPresentation(
   entry: Pick<
     WorkLogPresentationEntry,
     "label" | "toolTitle" | "toolData" | "toolLifecycleStatus" | "structuredPayload"
   >,
   fallbackStatus?: "inProgress" | "completed",
+  messages: WorkLogMessages["t3Tools"] = englishWorkLogMessages.t3Tools,
 ) {
   const definition = resolveT3McpToolDefinition(workEntryToolName(entry));
   const status = entry.toolLifecycleStatus ?? fallbackStatus;
+  const name = resolveT3McpToolId(workEntryToolName(entry));
+  const localizedDefinition =
+    definition && name && Object.hasOwn(messages.labels, name)
+      ? { ...definition, labels: messages.labels[name as keyof typeof messages.labels] }
+      : definition;
   return resolveT3McpToolPresentation(
-    definition,
+    localizedDefinition,
     definition && t3ToolResultIndicatesFailure(workEntryToolOutput(entry)) ? "failed" : status,
     entry.toolData,
+    messages,
   );
 }
 
@@ -540,43 +575,6 @@ function toolGroupActionCount(
   return changedFiles.size + editsWithoutFileDetails;
 }
 
-function toolGroupActionLabel(action: ToolGroupAction, count: number): string {
-  switch (action) {
-    case "link-pr":
-      return `Linked ${count} ${count === 1 ? "pull request" : "pull requests"}`;
-    case "unlink-pr":
-      return `Unlinked ${count} ${count === 1 ? "pull request" : "pull requests"}`;
-    case "watch-pr":
-      return `Watching ${count} ${count === 1 ? "pull request" : "pull requests"}`;
-    case "unwatch-pr":
-      return `Stopped watching ${count} ${count === 1 ? "pull request" : "pull requests"}`;
-    case "list-prs":
-      return count === 1
-        ? "Checked linked pull requests"
-        : `Checked linked pull requests ${count} times`;
-    case "read":
-      return `Read ${count} ${count === 1 ? "file" : "files"}`;
-    case "edit":
-      return `Changed ${count} ${count === 1 ? "file" : "files"}`;
-    case "command":
-      return `Ran ${count} ${count === 1 ? "command" : "commands"}`;
-    case "thread-create":
-      return `Created ${count} ${count === 1 ? "thread" : "threads"}`;
-    case "device":
-      return `Used device controls ${count} ${count === 1 ? "time" : "times"}`;
-    case "browser":
-      return `Used browser ${count} ${count === 1 ? "time" : "times"}`;
-    case "search":
-      return `Searched the web ${count} ${count === 1 ? "time" : "times"}`;
-    case "code-search":
-      return `Searched code ${count} ${count === 1 ? "time" : "times"}`;
-    case "other":
-      return `Used ${count} ${count === 1 ? "tool" : "tools"}`;
-    case "update":
-      return `Received ${count} ${count === 1 ? "update" : "updates"}`;
-  }
-}
-
 function t3ToolSummaryCall(entry: WorkLogPresentationEntry): T3ToolSummaryCall {
   const item = entry.structuredPayload;
   const data =
@@ -641,15 +639,23 @@ function summaryActionPriority(action: ToolGroupAction | T3McpToolSummaryAction)
   }
 }
 
-/** Summarizes at most two action categories; every omitted call still counts in the remainder. */
-export function summarizeToolGroup(entries: ReadonlyArray<WorkLogPresentationEntry>): {
+/**
+ * Summarizes at most two action categories; every omitted call still counts in the remainder.
+ * @param entries Visible entries, including reasoning and source metadata.
+ * @param messages Locale-owned sentences and joining rules; defaults to English.
+ * @returns Summary and failure presence without changing the entries or their order.
+ */
+export function summarizeToolGroup(
+  entries: ReadonlyArray<WorkLogPresentationEntry>,
+  messages: WorkLogMessages = englishWorkLogMessages,
+): {
   summary: string;
   hasFailure: boolean;
 } {
   const toolEntries = entries.filter((entry) => entry.itemType !== "reasoning");
   if (entries.length > 0 && toolEntries.length === 0) {
     return {
-      summary: entries.length === 1 ? "Thought" : `Thought (×${entries.length})`,
+      summary: entries.length === 1 ? messages.thought : messages.thoughtTimes(entries.length),
       hasFailure: false,
     };
   }
@@ -680,10 +686,9 @@ export function summarizeToolGroup(entries: ReadonlyArray<WorkLogPresentationEnt
     count: group.entries.length,
     priority: summaryActionPriority(action),
     ...(group.t3Action
-      ? summarizeT3ToolCalls(group.t3Action, group.entries.map(t3ToolSummaryCall))
+      ? summarizeT3ToolCalls(group.t3Action, group.entries.map(t3ToolSummaryCall), messages.t3Tools)
       : {
-          label: toolGroupActionLabel(
-            group.action,
+          label: messages.groupAction[group.action](
             toolGroupActionCount(group.action, group.entries),
           ),
           failedCount: group.entries.filter(workEntryDisplayIndicatesToolFailure).length,
@@ -697,15 +702,11 @@ export function summarizeToolGroup(entries: ReadonlyArray<WorkLogPresentationEnt
   if (sources.size > 0) {
     const sourceValues = [...sources.values()];
     const sourceNames = sourceValues.map((source) => source.name);
-    const formattedNames =
-      sourceNames.length < 2
-        ? sourceNames[0]!
-        : sourceNames.length === 2
-          ? sourceNames.join(" and ")
-          : `${sourceNames.slice(0, -1).join(", ")}, and ${sourceNames.at(-1)}`;
-    const allIntegrations = sourceValues.every((source) => source.kind === "integration");
     labels.unshift(
-      `Used ${formattedNames}${allIntegrations ? ` ${sources.size === 1 ? "integration" : "integrations"}` : ""}`,
+      messages.usedSources(
+        sourceNames,
+        sourceValues.every((source) => source.kind === "integration"),
+      ),
     );
   }
   const sourcedCount = entries.filter(
@@ -716,15 +717,9 @@ export function summarizeToolGroup(entries: ReadonlyArray<WorkLogPresentationEnt
   const remainingCount =
     entries.length - sourcedCount - selected.reduce((count, group) => count + group.count, 0);
   if (remainingCount > 0) {
-    labels.push(`Performed ${remainingCount} other ${remainingCount === 1 ? "action" : "actions"}`);
+    labels.push(messages.performedOtherActions(remainingCount));
   }
-  const sentenceLabels = labels.map((label, index) =>
-    index === 0 ? label : label.charAt(0).toLowerCase() + label.slice(1),
-  );
-  const summary =
-    sentenceLabels.length < 3
-      ? sentenceLabels.join(" and ")
-      : `${sentenceLabels.slice(0, -1).join(", ")}, and ${sentenceLabels.at(-1)}`;
+  const summary = messages.joinSummary(labels);
   return { summary, hasFailure: summaries.some((group) => group.failedCount > 0) };
 }
 

@@ -1,3 +1,5 @@
+/** Queries resource telemetry and reports permission failures when restarting the monitor. */
+import { t } from "~/i18n";
 import { AuthDiagnosticsReadScope } from "@t3tools/contracts";
 import { AuthEnvironmentMaintainScope } from "@t3tools/contracts";
 import type {
@@ -22,6 +24,7 @@ export interface ResourceTelemetryState {
   readonly retry: () => Promise<ResourceTelemetrySnapshot>;
 }
 
+/** Returns resource diagnostics for targetEnvironmentId, defaulting to the primary environment when omitted; retry rejects if the target is absent or permission is denied. */
 export function useResourceTelemetry(
   targetEnvironmentId?: EnvironmentId | null,
 ): ResourceTelemetryState {
@@ -41,13 +44,13 @@ export function useResourceTelemetry(
   });
   const retry = useCallback(async () => {
     if (environmentId === null) {
-      throw new Error("No environment is selected.");
+      throw new Error(t.app.errors.noEnvironment);
     }
     if (
       !readEnvironmentScope(environmentId, AuthEnvironmentMaintainScope) ||
       !readEnvironmentScope(environmentId, AuthDiagnosticsReadScope)
     ) {
-      throw new Error("This connection cannot restart the resource monitor.");
+      throw new Error(t.app.errors.resourceMonitorDenied);
     }
     const result = await retryCommand({ environmentId, input: {} });
     if (result._tag === "Failure") {

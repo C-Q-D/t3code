@@ -1,3 +1,5 @@
+/** Shares diff highlighting workers and their loading UI; worker diagnostics remain in English. */
+import { t } from "~/i18n";
 import { WorkerPoolContext, useWorkerPool } from "@pierre/diffs/react";
 import { WorkerPoolManager } from "@pierre/diffs/worker";
 import DiffsWorker from "@pierre/diffs/worker/worker.js?worker";
@@ -95,6 +97,11 @@ function DiffWorkerThemeSync({ themeName }: { themeName: DiffThemeName }) {
 }
 
 // Plain-text views do not queue a highlight task that could retry a blank first render.
+/**
+ * Renders children when the highlight worker is ready, otherwise renders the loading state.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 function DiffWorkerReady({ children }: { children?: ReactNode }) {
   const workerPool = useWorkerPool();
   const [readyPool, setReadyPool] = useState<WorkerPoolManager>();
@@ -123,7 +130,7 @@ function DiffWorkerReady({ children }: { children?: ReactNode }) {
       role="status"
       className="flex min-h-0 flex-1 items-center justify-center p-4 text-xs text-muted-foreground"
     >
-      Loading code...
+      {t.git.diff.loadingCode}
     </div>
   );
 }

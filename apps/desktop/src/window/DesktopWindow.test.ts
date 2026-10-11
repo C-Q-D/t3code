@@ -1,3 +1,4 @@
+import * as DesktopUiLocale from "../i18n/DesktopUiLocale.ts";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, it } from "@effect/vitest";
 import * as Deferred from "effect/Deferred";
@@ -232,6 +233,7 @@ function layerTest(input: {
   const layerDesktopAppSettings = Layer.succeed(DesktopAppSettings.DesktopAppSettings, {
     get: Effect.sync(() => desktopSettings),
     load: Effect.sync(() => desktopSettings),
+    setUiLocalePreference: () => Effect.die("unexpected locale write"),
     setMainWindowBounds: (bounds, isMaximized) =>
       Effect.gen(function* () {
         if (input.beforeMainWindowBoundsUpdate) {
@@ -284,6 +286,7 @@ function layerTest(input: {
   } satisfies ElectronWindow.ElectronWindow["Service"]);
 
   return DesktopWindow.layer.pipe(
+    Layer.provide(DesktopUiLocale.layerTest()),
     Layer.provide(
       Layer.mergeAll(
         layerDesktopAssets,
@@ -404,6 +407,7 @@ const makeSplashScenario = (createOutcomes: readonly (Electron.BrowserWindow | n
     } satisfies ElectronWindow.ElectronWindow["Service"];
 
     const layer = DesktopWindow.layer.pipe(
+      Layer.provide(DesktopUiLocale.layerTest()),
       Layer.provide(
         Layer.mergeAll(
           layerDesktopAssets,

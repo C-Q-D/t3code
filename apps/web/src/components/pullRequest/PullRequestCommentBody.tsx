@@ -1,10 +1,15 @@
+/** Owns pull request comment body on the web pull-request surface; host data and agent context remain unchanged. */
+import { t } from "~/i18n";
 import { useEffect, useId, useRef, useState, type ComponentProps } from "react";
 
 import { cn } from "~/lib/utils";
 import { Button } from "../ui/button";
 import { PullRequestMarkdown } from "./PullRequestMarkdown";
 
-/** Keep the complete markdown intact while limiting long reports to a readable preview. */
+/** Keep the complete markdown intact while limiting long reports to a readable preview.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 export function PullRequestCommentBody({
   className,
   ...props
@@ -53,7 +58,7 @@ export function PullRequestCommentBody({
             setExpanded(!expanded);
           }}
         >
-          {expanded ? "Show less" : "Show full comment"}
+          {expanded ? t.git.pullRequest.showLess : t.git.pullRequest.showFullComment}
         </Button>
       ) : null}
     </div>

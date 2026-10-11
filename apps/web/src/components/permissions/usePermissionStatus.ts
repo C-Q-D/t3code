@@ -1,5 +1,8 @@
+/** Polls permission availability and exposes recoverable checking errors to the UI. */
+import { t } from "~/i18n";
 import { useEffect, useEffectEvent, useState } from "react";
 
+/** Checks permissions with check when enabled, starting from initialStatus. Returns status, error, and a required-permission predicate; polls while visible and ignores results after disposal. */
 export function usePermissionStatus<Id extends string>(
   check: () => Promise<Record<Id, boolean>>,
   initialStatus: Record<Id, boolean>,
@@ -22,7 +25,7 @@ export function usePermissionStatus<Id extends string>(
           setError(null);
         }
       } catch {
-        if (!disposed) setError("Could not check permissions. We'll try again automatically.");
+        if (!disposed) setError(t.app.permissions.checkError);
       }
       checking = false;
     };

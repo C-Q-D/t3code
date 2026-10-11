@@ -1,3 +1,5 @@
+/** Wraps scoped source-control commands with permission and progress state; only display copy is localized. */
+import { t } from "~/i18n";
 import { useAtomValue } from "@effect/atom-react";
 import type {
   AtomCommandFailure,
@@ -70,6 +72,11 @@ const ACTION_OPERATION = {
   preparePullRequestThread: "prepare_pull_request_thread",
 } as const satisfies Record<SourceControlActionKind, VcsActionOperation>;
 
+/**
+ * Wraps a scoped source-control command with permission checks and progress tracking; denied runs return an authorization failure.
+ * @param input Operation-specific state and options described by the input type.
+ * @returns Permission, operation error, pending state, reset, and run controls for the scoped command.
+ */
 function useAction<
   TArgs extends ReadonlyArray<unknown>,
   R extends AtomCommandResult<unknown, unknown>,
@@ -100,7 +107,7 @@ function useAction<
           Cause.fail(
             new EnvironmentAuthorizationError({
               requiredScope: AuthSourceControlWriteScope,
-              message: "This connection cannot change source control.",
+              message: t.git.actions.thisConnectionCannotChangeSourceControl,
             }),
           ),
         );
@@ -160,6 +167,11 @@ export function useSourceControlActionRunning(
   );
 }
 
+/**
+ * Returns permission, progress, and execution controls for initializing the scoped repository.
+ * @param scope Destination environment and repository working directory; null members mean no runnable repository.
+ * @returns Permission, operation error, pending state, reset, and run controls for the scoped command.
+ */
 export function useVcsInitAction(scope: SourceControlActionScope) {
   const init = useAtomCommand(vcsEnvironment.init, { reportFailure: false });
   const action = useCallback(async () => {
@@ -180,9 +192,14 @@ export function useVcsInitAction(scope: SourceControlActionScope) {
       input: { cwd: target.cwd },
     });
   }, [init, scope]);
-  return useAction({ kind: "init", label: "Initializing repository", scope, action });
+  return useAction({ kind: "init", label: t.git.actions.initializingRepository, scope, action });
 }
 
+/**
+ * Returns permission, progress, and execution controls for pulling the scoped repository.
+ * @param scope Destination environment and repository working directory; null members mean no runnable repository.
+ * @returns The pull action's permission, error, pending, reset, and run controls.
+ */
 export function useVcsPullAction(scope: SourceControlActionScope) {
   const pull = useAtomCommand(vcsEnvironment.pull, { reportFailure: false });
   const status = useEnvironmentQuery(
@@ -213,13 +230,18 @@ export function useVcsPullAction(scope: SourceControlActionScope) {
   }, [pull, scope]);
   return useAction({
     kind: "pull",
-    label: "Pulling latest changes...",
+    label: t.git.actions.pullingLatestChanges,
     scope,
     action,
     onSuccess: status.refresh,
   });
 }
 
+/**
+ * Returns permission, progress, and execution controls for the scoped commit/push/change-request action.
+ * @param scope Destination environment and repository working directory; null members mean no runnable repository.
+ * @returns The stacked action's permission, error, pending, reset, and run controls.
+ */
 export function useGitStackedAction(scope: SourceControlActionScope) {
   const runStackedAction = useAtomCommand(vcsActionManager.runStackedAction(scope), {
     reportFailure: false,
@@ -253,7 +275,7 @@ export function useGitStackedAction(scope: SourceControlActionScope) {
 
   return useAction({
     kind: "runStackedAction",
-    label: "Running source control action",
+    label: t.git.actions.runningSourceControlAction,
     scope,
     action,
     onSuccess: status.refresh,
@@ -261,6 +283,11 @@ export function useGitStackedAction(scope: SourceControlActionScope) {
   });
 }
 
+/**
+ * Returns permission, progress, and execution controls for publishing the scoped repository.
+ * @param scope Destination environment and repository working directory; null members mean no runnable repository.
+ * @returns The publish action's permission, error, pending, reset, and run controls.
+ */
 export function useSourceControlPublishRepositoryAction(scope: SourceControlActionScope) {
   const publishRepository = useAtomCommand(sourceControlEnvironment.publishRepository, {
     reportFailure: false,
@@ -305,13 +332,18 @@ export function useSourceControlPublishRepositoryAction(scope: SourceControlActi
   );
   return useAction({
     kind: "publishRepository",
-    label: "Publishing repository",
+    label: t.git.actions.publishingRepository,
     scope,
     action,
     onSuccess: status.refresh,
   });
 }
 
+/**
+ * Returns controls for preparing a pull-request checkout and thread; execution also checks the thread-operation grant.
+ * @param scope Destination environment and repository working directory; null members mean no runnable repository.
+ * @returns The preparation action's permission, error, pending, reset, and run controls.
+ */
 export function usePreparePullRequestThreadAction(scope: SourceControlActionScope) {
   const preparePullRequestThread = useAtomCommand(gitEnvironment.preparePullRequestThread, {
     reportFailure: false,
@@ -339,7 +371,7 @@ export function usePreparePullRequestThreadAction(scope: SourceControlActionScop
           Cause.fail(
             new EnvironmentAuthorizationError({
               requiredScope: AuthOrchestrationOperateScope,
-              message: "This connection cannot change threads.",
+              message: t.git.actions.thisConnectionCannotChangeThreads,
             }),
           ),
         );
@@ -358,7 +390,7 @@ export function usePreparePullRequestThreadAction(scope: SourceControlActionScop
   );
   return useAction({
     kind: "preparePullRequestThread",
-    label: "Preparing pull request thread",
+    label: t.git.actions.preparingPullRequestThread,
     scope,
     action,
   });

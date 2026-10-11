@@ -1,3 +1,6 @@
+import { installMessages } from "~/i18n";
+import { en } from "~/i18n/locales/en";
+import { messages as zhCN } from "~/i18n/locales/zh-CN";
 import { presentThreadShell } from "@t3tools/client-runtime/state/models";
 import * as DateTime from "effect/DateTime";
 import { deriveActiveWorkStartedAt } from "../session-logic.ts";
@@ -7,6 +10,7 @@ import * as Cause from "effect/Cause";
 import { AsyncResult } from "effect/reactivity";
 import {
   animateSidebarLayoutChanges,
+  compactSidebarTimeLabel,
   archiveSelectedThreadEntries,
   buildBulkTitleRegenerationContextMenuItem,
   buildBulkUnpinContextMenuItem,
@@ -2314,5 +2318,14 @@ describe("Working shelf (beta)", () => {
         unsnooze: false,
       });
     });
+  });
+});
+
+describe("compactSidebarTimeLabel localization", () => {
+  afterEach(() => installMessages("en", en));
+  it("removes the localized ago suffix while keeping compact ages", () => {
+    installMessages("zh-CN", zhCN);
+    expect(compactSidebarTimeLabel("3分钟 前")).toBe("3分钟");
+    expect(compactSidebarTimeLabel("刚刚")).toBe("刚刚");
   });
 });

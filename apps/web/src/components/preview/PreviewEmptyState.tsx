@@ -1,3 +1,5 @@
+/** Localized preview UI and interactions; preserves user data, commands, and protocol values. */
+import { t } from "~/i18n";
 import type { EnvironmentId, ScopedThreadRef } from "@t3tools/contracts";
 import { Globe, History, RadioTower } from "lucide-react";
 
@@ -18,6 +20,11 @@ interface Props {
   onOpenUrl: (url: string) => void;
 }
 
+/**
+ * Renders valid recent URLs and discovered local servers, or the localized empty guidance.
+ * @param props View data, control flags, and callbacks defined by the component props type; optional fields retain their declared defaults.
+ * @returns Rendered UI for the supplied props.
+ */
 export function PreviewEmptyState({
   threadRef,
   environmentId,
@@ -38,11 +45,8 @@ export function PreviewEmptyState({
         <EmptyMedia variant="icon">
           <Globe className="size-4.5 text-muted-foreground" />
         </EmptyMedia>
-        <EmptyTitle>No preview yet</EmptyTitle>
-        <EmptyDescription>
-          Type a URL above, or run a dev script. Browser-ready localhost servers will show up here
-          automatically.
-        </EmptyDescription>
+        <EmptyTitle>{t.tools.preview.emptyTitle}</EmptyTitle>
+        <EmptyDescription>{t.tools.preview.emptyHint}</EmptyDescription>
       </Empty>
     );
   }
@@ -54,7 +58,7 @@ export function PreviewEmptyState({
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <History className="size-4 shrink-0" />
-              <h2 className="font-medium">Recently used</h2>
+              <h2 className="font-medium">{t.tools.preview.recentlyUsed}</h2>
             </div>
             <DiscoveryList>
               {recents.map((entry) => (
@@ -73,7 +77,7 @@ export function PreviewEmptyState({
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <RadioTower className="size-4 shrink-0" />
-              <h2 className="font-medium">Local servers</h2>
+              <h2 className="font-medium">{t.tools.preview.localServers}</h2>
             </div>
             <DiscoveryList>
               {servers.map((server) => (
@@ -85,9 +89,7 @@ export function PreviewEmptyState({
                 />
               ))}
             </DiscoveryList>
-            <p className="px-1 text-xs text-muted-foreground">
-              Select a live local server to open it in this browser tab.
-            </p>
+            <p className="px-1 text-xs text-muted-foreground">{t.tools.preview.localServersHint}</p>
           </div>
         ) : null}
       </div>

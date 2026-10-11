@@ -1,3 +1,5 @@
+/** Localized browser errors and UI text; retains protocol values and user data. */
+import { t } from "~/i18n";
 import { DESKTOP_PREVIEW_RECORDING_CAPTURE_TRIGGER } from "@t3tools/contracts";
 import type { DesktopPreviewRecordingArtifact, ScopedThreadRef } from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
@@ -12,17 +14,20 @@ import { createRecordingCompositor } from "./recordingCompositor";
 
 import { acquireBrowserSurfaceActivity } from "./browserSurfaceStore";
 
+/** Missing recording bridge; tabId identifies the requested runtime tab. */
 export class BrowserRecordingUnavailableError extends Schema.TaggedError<BrowserRecordingUnavailableError>()(
   "BrowserRecordingUnavailableError",
   {
     tabId: Schema.String,
   },
 ) {
+  /** Returns the active locale message with the original error context; never returns empty text. */
   override get message(): string {
-    return `Browser recording is unavailable for tab ${this.tabId}.`;
+    return t.tools.browser.recordingUnavailable(this.tabId);
   }
 }
 
+/** Recording conflict between requestedTabId and the already activeTabId. */
 export class BrowserRecordingConflictError extends Schema.TaggedError<BrowserRecordingConflictError>()(
   "BrowserRecordingConflictError",
   {
@@ -30,31 +35,37 @@ export class BrowserRecordingConflictError extends Schema.TaggedError<BrowserRec
     activeTabId: Schema.String,
   },
 ) {
+  /** Returns the active locale message with the original error context; never returns empty text. */
   override get message(): string {
-    return `Cannot record tab ${this.requestedTabId} while tab ${this.activeTabId} is already being recorded.`;
+    return t.tools.browser.recordingConflict(this.requestedTabId, this.activeTabId);
   }
 }
 
+/** Cancelled startup for the runtime tab identified by tabId. */
 export class BrowserRecordingStartCancelledError extends Schema.TaggedError<BrowserRecordingStartCancelledError>()(
   "BrowserRecordingStartCancelledError",
   {
     tabId: Schema.String,
   },
 ) {
+  /** Returns the active locale message with the original error context; never returns empty text. */
   override get message(): string {
-    return `Browser recording start was cancelled for tab ${this.tabId}.`;
+    return t.tools.browser.recordingCancelled(this.tabId);
   }
 }
 
+/** Missing media output format for the runtime tab identified by tabId. */
 export class BrowserRecordingFormatUnavailableError extends Schema.TaggedError<BrowserRecordingFormatUnavailableError>()(
   "BrowserRecordingFormatUnavailableError",
   { tabId: Schema.String },
 ) {
+  /** Returns the active locale message with the original error context; never returns empty text. */
   override get message(): string {
-    return `MediaRecorder did not report an output format for tab ${this.tabId}.`;
+    return t.tools.browser.recordingFormat(this.tabId);
   }
 }
 
+/** Media capture timeout for tabId after timeoutMs milliseconds. */
 export class BrowserRecordingCaptureTimeoutError extends Schema.TaggedError<BrowserRecordingCaptureTimeoutError>()(
   "BrowserRecordingCaptureTimeoutError",
   {
@@ -62,11 +73,13 @@ export class BrowserRecordingCaptureTimeoutError extends Schema.TaggedError<Brow
     timeoutMs: Schema.Number,
   },
 ) {
+  /** Returns the active locale message with the original error context; never returns empty text. */
   override get message(): string {
-    return `Browser recording media capture for tab ${this.tabId} did not settle within ${this.timeoutMs}ms.`;
+    return t.tools.browser.recordingTimeout(this.tabId, this.timeoutMs);
   }
 }
 
+/** Failed recording operation on tabId; cause retains the original failure. */
 export class BrowserRecordingOperationError extends Schema.TaggedError<BrowserRecordingOperationError>()(
   "BrowserRecordingOperationError",
   {
@@ -85,8 +98,9 @@ export class BrowserRecordingOperationError extends Schema.TaggedError<BrowserRe
     cause: Schema.Defect(),
   },
 ) {
+  /** Returns the active locale message with the original error context; never returns empty text. */
   override get message(): string {
-    return `Browser recording operation ${this.operation} failed for tab ${this.tabId}.`;
+    return t.tools.browser.recordingOperation(this.operation, this.tabId);
   }
 }
 
@@ -418,6 +432,13 @@ const waitForBrowserRecordingPaint = async (): Promise<void> => {
   }
 };
 
+/**
+ * Stops capture resources after startup fails and releases the active recording slot.
+ * @param bridge Preview bridge that owns the tab's screencast.
+ * @param recording Failed startup state whose recorder, stream, and activity lease need cleanup.
+ * @returns Undefined when capture cleanup succeeds, its single error, or an AggregateError
+ * for multiple failures; the caller combines this result with the original startup error.
+ */
 const cleanupFailedRecordingStart = async (
   bridge: NonNullable<typeof previewBridge>,
   recording: ActiveRecording,
@@ -442,16 +463,20 @@ const cleanupFailedRecordingStart = async (
   }
   if (errors.length === 0) return undefined;
   if (errors.length === 1) return errors[0];
-  return new AggregateError(
-    errors,
-    `Browser recording startup cleanup failed for tab ${recording.tabId}.`,
-    { cause: errors[0] },
-  );
+  return new AggregateError(errors, t.tools.browser.startupCleanupFailed(recording.tabId), {
+    cause: errors[0],
+  });
 };
 
+/**
+ * Constructs the start-operation failure for a recording cancelled during startup.
+ * @param recording Startup state supplying the affected tab ID.
+ * @param cause Original cancellation cause; defaults to a localized cancellation Error.
+ * @returns A BrowserRecordingOperationError for start-screencast; does not throw it.
+ */
 const recordingStartupCancelledError = (
   recording: ActiveRecording,
-  cause: unknown = new Error(`Browser recording startup was cancelled for tab ${recording.tabId}.`),
+  cause: unknown = new Error(t.tools.browser.startupCancelled(recording.tabId)),
 ): BrowserRecordingOperationError =>
   new BrowserRecordingOperationError({
     operation: "start-screencast",
@@ -462,6 +487,12 @@ const recordingStartupCancelledError = (
 const isRecordingStarting = (recording: ActiveRecording): boolean =>
   activeRecordings.get(recording.tabId) === recording && recording.lifecycle.phase === "starting";
 
+/**
+ * Waits for startup to settle before stopping capture, bounded by the startup settle timeout.
+ * @param recording Active recording whose startupSettled promise must finish.
+ * @returns Resolves without a value when startup settles; always clears the deadline timer.
+ * @throws BrowserRecordingOperationError with operation wait-startup on rejection or timeout.
+ */
 const waitForRecordingStartupToSettle = async (recording: ActiveRecording): Promise<void> => {
   let timeout: ReturnType<typeof setTimeout> | null = null;
   try {
@@ -469,7 +500,7 @@ const waitForRecordingStartupToSettle = async (recording: ActiveRecording): Prom
       recording.startupSettled,
       new Promise<void>((_, reject) => {
         timeout = setTimeout(() => {
-          reject(new Error(`Browser recording startup did not settle for tab ${recording.tabId}.`));
+          reject(new Error(t.tools.browser.startupUnsettled(recording.tabId)));
         }, BROWSER_RECORDING_STARTUP_SETTLE_TIMEOUT_MS);
       }),
     ]);
@@ -487,6 +518,13 @@ const waitForRecordingStartupToSettle = async (recording: ActiveRecording): Prom
 const isStartupWaitTimeout = (error: unknown): error is BrowserRecordingOperationError =>
   isBrowserRecordingOperationError(error) && error.operation === "wait-startup";
 
+/**
+ * Starts tab recording and captures media; rejects conflicts and capture or initialization failures.
+ * @param tabId Original runtime browser tab ID.
+ * @param threadRef Owning scoped thread, or null/undefined when no conversation is available.
+ * @param serverTabId Server tab ID; defaults to the runtime tab ID.
+ * @returns Promise for the operation result; callers must handle the failures described above.
+ */
 export async function startBrowserRecording(
   tabId: string,
   threadRef: ScopedThreadRef | null = null,
@@ -553,8 +591,8 @@ export async function startBrowserRecording(
         throw recordingStartupCancelledError(
           recording,
           new AggregateError(
-            [new Error(`Browser recording startup was cancelled for tab ${tabId}.`), cause],
-            `Browser recording startup cancellation failed for tab ${tabId}.`,
+            [new Error(t.tools.browser.startupCancelled(tabId)), cause],
+            t.tools.browser.startupCancellationFailed(tabId),
             { cause },
           ),
         );
@@ -604,7 +642,7 @@ export async function startBrowserRecording(
               ? cause
               : new AggregateError(
                   [cause, cleanupCause],
-                  `Browser media capture and cleanup failed for tab ${tabId}.`,
+                  t.tools.browser.mediaCleanupFailed(tabId),
                   { cause },
                 ),
         });
@@ -648,7 +686,7 @@ export async function startBrowserRecording(
             ? cause
             : new AggregateError(
                 [cause, cleanupCause],
-                `Browser recording initialization and cleanup failed for tab ${tabId}.`,
+                t.tools.browser.initializationCleanupFailed(tabId),
                 { cause },
               ),
       });
@@ -665,7 +703,7 @@ export async function startBrowserRecording(
             ? cause
             : new AggregateError(
                 [cause, cleanupCause],
-                `Browser media recorder start and cleanup failed for tab ${tabId}.`,
+                t.tools.browser.recorderStartCleanupFailed(tabId),
                 { cause },
               ),
       });
@@ -679,6 +717,14 @@ export async function startBrowserRecording(
   }
 }
 
+/**
+ * Stops capture, saves the encoded recording, and releases its active resources.
+ * @param bridge Preview bridge used to stop screencasting and persist the artifact.
+ * @param recording Active state supplying capture resources, chunks, and the target tab.
+ * @returns The saved artifact, or null if startup produced no media recorder.
+ * @throws Recording, format, save, or cleanup failures. A startup wait failure leaves the
+ * active slot reserved so the caller can discard capture when late startup finishes.
+ */
 const finalizeBrowserRecording = async (
   bridge: NonNullable<typeof previewBridge>,
   recording: ActiveRecording,
@@ -775,11 +821,9 @@ const finalizeBrowserRecording = async (
           cause:
             cleanupErrors.length === 1
               ? cleanupErrors[0]
-              : new AggregateError(
-                  cleanupErrors,
-                  `Browser recording media cleanup failed for tab ${tabId}.`,
-                  { cause: cleanupErrors[0] },
-                ),
+              : new AggregateError(cleanupErrors, t.tools.browser.recordingCleanupFailed(tabId), {
+                  cause: cleanupErrors[0],
+                }),
         });
 
   if (result._tag === "Failure") {
@@ -789,7 +833,7 @@ const finalizeBrowserRecording = async (
         tabId,
         cause: new AggregateError(
           [result.error, cleanupError],
-          `Browser recording stop and cleanup failed for tab ${tabId}.`,
+          t.tools.browser.recordingStopCleanupFailed(tabId),
           { cause: result.error },
         ),
       });

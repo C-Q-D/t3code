@@ -1,4 +1,7 @@
+/** Synchronizes preview navigation with its owning scoped thread and desktop surface. */
 "use client";
+
+import { t } from "~/i18n";
 
 import type {
   DesktopPreviewTabState,
@@ -49,7 +52,7 @@ export function usePreviewBridge(input: {
   const threadKey = scopedThreadKey(threadRef);
   const stableThreadRef = useMemo(() => {
     const parsed = parseScopedThreadKey(threadKey);
-    if (!parsed) throw new Error(`Invalid scoped thread key: ${threadKey}`);
+    if (!parsed) throw new Error(t.tools.preview.invalidThreadKey(threadKey));
     return parsed;
   }, [threadKey]);
   const projectRef = useFaviconProjectRefForThread(stableThreadRef);

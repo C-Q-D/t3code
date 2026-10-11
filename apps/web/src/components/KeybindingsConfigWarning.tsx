@@ -1,3 +1,5 @@
+/** Displays keybinding configuration warnings and opens their source file in an authorized editor. */
+import { t } from "~/i18n";
 import {
   AuthOrchestrationOperateScope,
   type EditorId,
@@ -10,6 +12,7 @@ import { useEnvironmentScope } from "../state/session";
 import { Button } from "./ui/button";
 import { stackedThreadToast, toastManager } from "./ui/toast";
 
+/** Shows the supplied configuration message and opens configPath in an available editor on environmentId; failures produce a toast. */
 export function KeybindingsConfigWarning({
   message,
   environmentId,
@@ -40,13 +43,14 @@ export function KeybindingsConfigWarning({
             toastManager.add(
               stackedThreadToast({
                 type: "error",
-                title: "Unable to open keybindings file",
-                description: error instanceof Error ? error.message : "Unknown error opening file.",
+                title: t.app.keybindings.openError,
+                description:
+                  error instanceof Error ? error.message : t.app.keybindings.unknownOpenError,
               }),
             );
           }}
         >
-          Open keybindings.json
+          {t.app.keybindings.openFile}
         </Button>
       </span>
     </>

@@ -1,3 +1,5 @@
+/** Owns pull request thread links on the web pull-request surface; host data and agent context remain unchanged. */
+import { t } from "~/i18n";
 import { Tooltip, TooltipTrigger, TooltipPopup } from "../ui/tooltip";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import type { EnvironmentId, PullRequestRef, ScopedThreadRef, ThreadId } from "@t3tools/contracts";
@@ -41,6 +43,11 @@ export function PullRequestThreadLinks(props: PullRequestThreadLinksProps) {
   return <EnabledPullRequestThreadLinks key={`${props.environmentId}:${props.url}`} {...props} />;
 }
 
+/**
+ * Renders supported thread-link controls; returns null for an invalid URL or an unlinked target that cannot be linked.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface; null under the conditions described above.
+ */
 function EnabledPullRequestThreadLinks({
   environmentId,
   reference,
@@ -81,7 +88,9 @@ function EnabledPullRequestThreadLinks({
     } catch (error) {
       toastManager.add({
         type: "error",
-        title: remove ? "Could not unlink the pull request" : "Could not link the pull request",
+        title: remove
+          ? t.git.pullRequest.couldNotUnlinkThePullRequest
+          : t.git.pullRequest.couldNotLinkThePullRequest2,
         description: error instanceof Error ? error.message : String(error),
       });
       return;
@@ -104,8 +113,8 @@ function EnabledPullRequestThreadLinks({
     linking.mode === "multiple" ? ((relations.data ?? lastRelations)?.threads ?? []) : [];
   const linkedThreadsLabel =
     linkedThreads.length > 0
-      ? `Linked from ${linkedThreads.length} ${linkedThreads.length === 1 ? "thread" : "threads"}`
-      : "Linked threads";
+      ? t.git.pullRequest.linkedThreadsCount(linkedThreads.length)
+      : t.git.pullRequest.linkedThreads;
   return (
     <>
       {display === "count" && (linkedThreads.length > 0 || relations.error !== null) ? (
@@ -130,7 +139,10 @@ function EnabledPullRequestThreadLinks({
               </Button>
             }
           />
-          <TooltipPopup>{linkedThreadsLabel}. Search in the command palette.</TooltipPopup>
+          <TooltipPopup>
+            {linkedThreadsLabel}
+            {t.git.pullRequest.searchInTheCommandPalette}
+          </TooltipPopup>
         </Tooltip>
       ) : null}
       {display === "menu-item" ? (
@@ -150,16 +162,18 @@ function EnabledPullRequestThreadLinks({
             <PullRequestGlyph.link aria-hidden className="size-3.5" />
           )}
           {linkedHere
-            ? "Unlink from this thread"
+            ? t.git.pullRequest.unlinkFromThisThread
             : currentThreadRef
-              ? "Link to this thread"
-              : "Link to thread"}
+              ? t.git.pullRequest.linkToThisThread
+              : t.git.pullRequest.linkToThread}
         </MenuItem>
       ) : null}
       {display === "picker" ? (
         <Dialog open onOpenChange={onPickerOpenChange}>
           <DialogPopup className="max-w-md" showCloseButton={false}>
-            <DialogTitle className="sr-only">Link pull request to a thread</DialogTitle>
+            <DialogTitle className="sr-only">
+              {t.git.pullRequest.linkPullRequestToAThread}
+            </DialogTitle>
             <ThreadPicker
               environmentId={environmentId}
               url={url}
@@ -173,6 +187,11 @@ function EnabledPullRequestThreadLinks({
   );
 }
 
+/**
+ * Renders thread picker from the supplied display data and callbacks.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 function ThreadPicker({
   environmentId,
   url,
@@ -205,12 +224,17 @@ function ThreadPicker({
     )
     .toSorted((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   return (
-    <Command mode="none" value={query} onValueChange={setQuery} aria-label="Choose a thread">
-      <CommandInput placeholder="Search threads or projects..." disabled={pending} />
+    <Command
+      mode="none"
+      value={query}
+      onValueChange={setQuery}
+      aria-label={t.git.pullRequest.chooseAThread}
+    >
+      <CommandInput placeholder={t.git.pullRequest.searchThreadsOrProjects} disabled={pending} />
       <CommandList className="max-h-80 overflow-y-auto">
         {candidates.length === 0 ? (
           <div className="px-3 py-6 text-center text-sm text-muted-foreground">
-            No active threads found.
+            {t.git.pullRequest.noActiveThreadsFound}
           </div>
         ) : (
           candidates.map((thread) => {
@@ -224,7 +248,9 @@ function ThreadPicker({
               >
                 <MessageSquareIcon aria-hidden className="size-4 shrink-0" />
                 <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate">{thread.title || "Untitled thread"}</span>
+                  <span className="truncate">
+                    {thread.title || t.git.pullRequest.untitledThread}
+                  </span>
                   <span className="truncate text-xs text-muted-foreground">
                     {projectNames.get(thread.projectId)}
                   </span>
@@ -232,7 +258,9 @@ function ThreadPicker({
                 {linked ? (
                   <>
                     <CheckIcon aria-hidden className="size-3.5" />
-                    <span className="text-xs text-muted-foreground">Linked</span>
+                    <span className="text-xs text-muted-foreground">
+                      {t.git.pullRequest.linked}
+                    </span>
                   </>
                 ) : null}
               </CommandItem>

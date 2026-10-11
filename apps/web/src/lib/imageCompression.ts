@@ -1,3 +1,5 @@
+/** Prepares image attachments for upload and reports file-reading failures. */
+import { t } from "~/i18n";
 /**
  * Downscale + re-encode for image attachments that are too big for where
  * they're headed. Two consumers share the same pipeline:
@@ -143,6 +145,7 @@ async function validateHeicImageDimensions(
   return foundImageDimensions ? null : "unreadable";
 }
 
+/** Reads file as a data URL; rejects on reader failures or a non-string result. */
 export function readFileAsDataUrl(file: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -151,10 +154,10 @@ export function readFileAsDataUrl(file: Blob): Promise<string> {
         resolve(reader.result);
         return;
       }
-      reject(new Error("Could not read image data."));
+      reject(new Error(t.app.upload.readDataError));
     });
     reader.addEventListener("error", () => {
-      reject(reader.error ?? new Error("Failed to read image."));
+      reject(reader.error ?? new Error(t.app.upload.readImageError));
     });
     reader.readAsDataURL(file);
   });

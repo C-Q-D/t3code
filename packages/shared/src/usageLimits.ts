@@ -1,3 +1,4 @@
+import { englishUsageLimitsMessages, type UsageLimitsMessages } from "./usageLabels.ts";
 /**
  * Selection and pace maths for the provider limits view, shared by web and
  * mobile so both agree on which providers show, what "ahead of pace" means,
@@ -33,23 +34,30 @@ export function usesChatGptSharing(provider: ServerProvider | null | undefined):
 export const CURSOR_USAGE_WINDOWS = [
   {
     id: "totalPercentUsed",
-    label: "Overall",
-    description: "Combined usage across both allowances, not a third quota.",
+    ...englishUsageLimitsMessages.cursorWindows.totalPercentUsed,
   },
   {
     id: "autoPercentUsed",
-    label: "Cursor Models",
-    description: "Grok and Composer use this first. Auto can use either pool.",
+    ...englishUsageLimitsMessages.cursorWindows.autoPercentUsed,
   },
   {
     id: "apiPercentUsed",
-    label: "Other Models",
-    description: "Claude, GPT, and Gemini use this pool. Grok and Composer fall back here.",
+    ...englishUsageLimitsMessages.cursorWindows.apiPercentUsed,
   },
 ] as const;
 
-export function cursorUsageWindowDetails(id: string) {
-  return CURSOR_USAGE_WINDOWS.find((window) => window.id === id);
+/**
+ * Finds a known Cursor window's display text; IDs and ranking remain protocol values.
+ * @param id Provider-supplied window ID.
+ * @param messages Locale labels and explanations; defaults to English.
+ * @returns Window ID and display details, or undefined for an unknown window.
+ */
+export function cursorUsageWindowDetails(
+  id: string,
+  messages: UsageLimitsMessages = englishUsageLimitsMessages,
+) {
+  const window = CURSOR_USAGE_WINDOWS.find((window) => window.id === id);
+  return window ? { ...window, ...messages.cursorWindows[window.id] } : undefined;
 }
 
 function cursorUsageWindowRank(id: string): number {
@@ -292,7 +300,10 @@ export function collectLimitAccounts(presentations: LimitPresentations): readonl
  * are left out; there is nothing for the user to act on. The environment
  * is named only when more than one is connected.
  */
-export function collectLimitNotices(presentations: LimitPresentations): readonly string[] {
+export function collectLimitNotices(
+  presentations: LimitPresentations,
+  messages: UsageLimitsMessages = englishUsageLimitsMessages,
+): readonly string[] {
   const label = (environmentLabel: string, subject: string) =>
     presentations.size > 1 ? `${environmentLabel} · ${subject}` : subject;
   const notices: string[] = [];
@@ -302,7 +313,7 @@ export function collectLimitNotices(presentations: LimitPresentations): readonly
       // An account that can never report (API key) is left out; one that
       // failed, or reported nothing at all, is worth a line.
       if (provider.usageLimits?.unavailable?.reason === "unsupported") continue;
-      const notice = provider.usageLimits ? limitsNotice(provider.usageLimits) : null;
+      const notice = provider.usageLimits ? limitsNotice(provider.usageLimits, messages) : null;
       const name = provider.displayName?.trim() || String(provider.driver);
       if (notice) notices.push(`${label(environmentLabel, name)}: ${notice}`);
     }
@@ -310,7 +321,7 @@ export function collectLimitNotices(presentations: LimitPresentations): readonly
       if (source.error) {
         notices.push(`${label(environmentLabel, source.label)}: ${source.error}`);
       } else if (source.accounts.length === 0) {
-        notices.push(`${label(environmentLabel, source.label)}: No accounts reported.`);
+        notices.push(`${label(environmentLabel, source.label)}: ${messages.noAccounts}`);
       }
     }
   }
@@ -475,14 +486,17 @@ function poolWindows(accounts: readonly LimitAccount[], now: number): readonly L
 }
 
 /** The one-line status under a provider heading when there are no bars to draw. */
-export function limitsNotice(limits: ServerProviderUsageLimits): string | null {
+export function limitsNotice(
+  limits: ServerProviderUsageLimits,
+  messages: UsageLimitsMessages = englishUsageLimitsMessages,
+): string | null {
   if (limits.unavailable?.reason === "unsupported") {
-    return limits.unavailable.message ?? "This account has no subscription limits.";
+    return limits.unavailable.message ?? messages.noSubscriptionLimits;
   }
   if (limits.unavailable?.reason === "probeFailed") {
-    return limits.unavailable.message ?? "Could not read limits.";
+    return limits.unavailable.message ?? messages.couldNotReadLimits;
   }
-  return limits.windows.length === 0 ? "No limits reported." : null;
+  return limits.windows.length === 0 ? messages.noLimits : null;
 }
 
 /** Quota left in the window, 0..100. Bars and labels show what remains, as Codex does. */
@@ -525,21 +539,40 @@ function paceOfShares(usedPercent: number, elapsed: number): LimitPace {
 }
 
 /** `2h 13m`, `3d 4h`, `12m`. */
-export function formatDuration(ms: number): string {
+export function formatDuration(
+  ms: number,
+  messages: UsageLimitsMessages = englishUsageLimitsMessages,
+): string {
   const remaining = Math.max(0, ms);
   const days = Math.floor(remaining / DAY);
   const hours = Math.floor((remaining % DAY) / HOUR);
   const minutes = Math.floor((remaining % HOUR) / MINUTE);
-  if (days > 0) return `${days}d ${hours}h`;
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  return `${minutes}m`;
+  if (days > 0) return messages.daysHours(days, hours);
+  if (hours > 0) return messages.hoursMinutes(hours, minutes);
+  return messages.minutes(minutes);
 }
 
-/** `resets in 2h 13m`, or null when the window has no reset. */
-export function formatResetsIn(window: ServerProviderUsageWindow, now: number): string | null {
+/**
+ * Formats a reset countdown from its timestamp without parsing any displayed text.
+ * @param window Provider window with an optional reset timestamp.
+ * @param now Current time in epoch milliseconds.
+ * @param messages Locale duration and reset phrases; defaults to English.
+ * @param style Full label, relative suffix, or compact icon label. An elapsed reset uses resetsNow in every mode.
+ * @returns Countdown text, or null for an absent or invalid reset time.
+ */
+export function formatResetsIn(
+  window: ServerProviderUsageWindow,
+  now: number,
+  messages: UsageLimitsMessages = englishUsageLimitsMessages,
+  style: "full" | "relative" | "compact" = "full",
+): string | null {
   const resetsAt = resetMillis(window);
   if (resetsAt === null) return null;
-  return resetsAt <= now ? "resets now" : `resets in ${formatDuration(resetsAt - now)}`;
+  if (resetsAt <= now) return messages.resetsNow;
+  const duration = formatDuration(resetsAt - now, messages);
+  if (style === "relative") return messages.relativeReset(duration);
+  if (style === "compact") return messages.compactReset(duration);
+  return messages.resetsIn(duration);
 }
 
 /** Limit commands are served by T3 from the same snapshots as Usage → Limits. */

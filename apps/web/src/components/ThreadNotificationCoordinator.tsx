@@ -1,3 +1,5 @@
+/** Routes conversation state changes to configured desktop, toast, badge, and sound notifications. */
+import { t } from "~/i18n";
 import { presentThreadShell } from "@t3tools/client-runtime/state/models";
 import { useAtomValue } from "@effect/atom-react";
 import { useNavigate, useParams } from "@tanstack/react-router";
@@ -94,6 +96,7 @@ interface NotificationState {
   readonly completion: number | null;
 }
 
+/** Observes thread progress in environmentId and calls onNotification for eligible state changes; renders no DOM. */
 function EnvironmentNotifications({
   environmentId,
   onNotification,
@@ -156,14 +159,14 @@ function EnvironmentNotifications({
       if (!kind) continue;
       const title =
         kind === "completion"
-          ? "Thread completed"
+          ? t.app.thread.completed
           : status === "approval"
-            ? "Approval needed"
+            ? t.app.thread.approvalNeeded
             : status === "limited"
-              ? "Usage limit reached"
+              ? t.sidebar.thread.usageLimitHint
               : status === "failed"
-                ? "Thread failed"
-                : "Input needed";
+                ? t.app.thread.failed
+                : t.app.thread.inputNeeded;
       if (hasNotificationSound(mode)) {
         void playNotificationSound(kind, () =>
           hasNotificationSound(getClientSettings().notificationMode),
@@ -193,7 +196,7 @@ function EnvironmentNotifications({
               ),
           },
           actionProps: {
-            children: "Open thread",
+            children: t.app.thread.open,
             onClick: () => {
               toastManager.close(toastId);
               void navigate({

@@ -1,3 +1,5 @@
+/** Owns use pull request files viewed on the web pull-request surface; host data and agent context remain unchanged. */
+import { t } from "~/i18n";
 import { isAtomCommandInterrupted } from "@t3tools/client-runtime/state/runtime";
 import type { EnvironmentId, PullRequestRef } from "@t3tools/contracts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -54,6 +56,8 @@ export interface PullRequestFilesViewedView {
  * tab, so a review carried on from another machine picks up where it was left. Presses show
  * immediately and are held over the server's answer until a read that could have seen them comes
  * back, so the checkbox never waits on a round trip and never outlasts the record behind it.
+ * @param options Whitespace filtering and partial-hunk display options.
+ * @returns Viewed-file state and callbacks for updating it; host and environment errors remain available to the caller.
  */
 export function usePullRequestFilesViewed(options: {
   readonly environmentId: EnvironmentId;
@@ -136,7 +140,7 @@ export function usePullRequestFilesViewed(options: {
         // back, and when the connection went away mid-flight, which the reader is already being
         // told about and which the host never refused.
         if (owned.size > 0 && !isAtomCommandInterrupted(result)) {
-          toastManager.add({ type: "error", title: "Could not update viewed files" });
+          toastManager.add({ type: "error", title: t.git.pullRequest.couldNotUpdateViewedFiles });
         }
         return;
       }

@@ -1455,3 +1455,10 @@ export function sortScopedProjectsForSidebar<
       left.id.localeCompare(right.id),
   );
 }
+
+/** Compacts a formatted age for sidebar rows; unrelated labels pass through unchanged. */
+export function compactSidebarTimeLabel(label: string): string {
+  if (label === t.common.timestamp.justNow) return t.sidebar.duration.now;
+  const suffix = ` ${t.common.timestamp.ago}`;
+  return label.endsWith(suffix) ? label.slice(0, -suffix.length) : label;
+}

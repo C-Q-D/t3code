@@ -1,3 +1,5 @@
+/** Localized clerk presentation and existing interaction behavior. */
+import { t } from "~/i18n";
 import type { RelayClientDeviceRecord } from "@t3tools/contracts/relay";
 
 const mobileClientUpdatedAtFormatter = new Intl.DateTimeFormat(undefined, {
@@ -6,10 +8,10 @@ const mobileClientUpdatedAtFormatter = new Intl.DateTimeFormat(undefined, {
 });
 
 const NOTIFICATION_PREFERENCES = [
-  ["notifyOnApproval", "approvals"],
-  ["notifyOnInput", "input requests"],
-  ["notifyOnCompletion", "completions"],
-  ["notifyOnFailure", "failures"],
+  ["notifyOnApproval", t.account.clerk.approvals],
+  ["notifyOnInput", t.account.clerk.inputRequests],
+  ["notifyOnCompletion", t.account.clerk.completions],
+  ["notifyOnFailure", t.account.clerk.failures],
 ] as const satisfies ReadonlyArray<
   readonly [keyof RelayClientDeviceRecord["notifications"], string]
 >;
@@ -24,22 +26,24 @@ export function mobileClientPlatformLabel(device: RelayClientDeviceRecord): stri
   return `${platform}${device.appVersion ? ` · T3 Code ${device.appVersion}` : ""}`;
 }
 
+/** Describes the supplied device's enabled notification preferences; reports disabled notifications or an empty selection explicitly. */
 export function mobileClientNotificationDetail(device: RelayClientDeviceRecord): string {
   if (!device.notifications.enabled) {
-    return "Push notifications are disabled on this device.";
+    return t.account.clerk.pushDisabled;
   }
 
   const enabledPreferences = NOTIFICATION_PREFERENCES.flatMap(([preference, label]) =>
     device.notifications[preference] ? [label] : [],
   );
   return enabledPreferences.length > 0
-    ? `Alerts enabled for ${enabledPreferences.join(", ")}.`
-    : "Push notifications are enabled, but no alert types are selected.";
+    ? t.account.clerk.alertsEnabled(enabledPreferences.join(", "))
+    : t.account.clerk.noAlertTypes;
 }
 
+/** Formats updatedAt for display, returning an unavailable label when the timestamp is invalid. */
 export function mobileClientUpdatedAtLabel(updatedAt: string): string {
   const date = new Date(updatedAt);
   return Number.isNaN(date.getTime())
-    ? "Update time unavailable"
-    : `Updated ${mobileClientUpdatedAtFormatter.format(date)}`;
+    ? t.account.clerk.updateTimeUnavailable
+    : t.account.clerk.updatedAt(mobileClientUpdatedAtFormatter.format(date));
 }

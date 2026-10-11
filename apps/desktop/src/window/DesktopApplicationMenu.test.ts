@@ -1,3 +1,5 @@
+import type { UiLocale } from "../i18n/desktopMessages.ts";
+import * as DesktopUiLocale from "../i18n/DesktopUiLocale.ts";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, it } from "@effect/vitest";
 import * as Deferred from "effect/Deferred";
@@ -100,9 +102,15 @@ const layerElectronMenu = (
     showContextMenu: () => Effect.succeedNone,
   } satisfies ElectronMenu.ElectronMenu["Service"]);
 
+/**
+ * Builds the actual menu for a test language/platform and captures its template and dispatched action.
+ * Defaults exercise the preexisting English Linux menu behavior.
+ */
 const configureMenu = (
   selectedAction: Deferred.Deferred<string>,
   applicationMenuTemplate: Deferred.Deferred<readonly Electron.MenuItemConstructorOptions[]>,
+  locale: UiLocale = "en",
+  platform: "darwin" | "win32" | "linux" = "linux",
 ) =>
   Effect.gen(function* () {
     const menu = yield* DesktopApplicationMenu.DesktopApplicationMenu;
@@ -110,13 +118,14 @@ const configureMenu = (
   }).pipe(
     Effect.provide(
       DesktopApplicationMenu.layer.pipe(
+        Layer.provide(DesktopUiLocale.layerTest(locale)),
         Layer.provideMerge(layerElectronMenu(applicationMenuTemplate)),
         Layer.provideMerge(layerDesktopWindow(selectedAction)),
         Layer.provideMerge(layerDesktopUpdates),
         Layer.provideMerge(layerElectronDialog),
         Layer.provideMerge(layerElectronApp),
         Layer.provideMerge(
-          DesktopEnvironment.layer(environmentInput).pipe(
+          DesktopEnvironment.layer({ ...environmentInput, platform }).pipe(
             Layer.provide(Layer.mergeAll(NodeServices.layer, DesktopConfig.layerTest({}))),
           ),
         ),
@@ -125,6 +134,54 @@ const configureMenu = (
   );
 
 describe("DesktopApplicationMenu", () => {
+  it.effect.each(["darwin", "win32", "linux"] as const)(
+    "translates native menus on %s without changing roles or paste routing",
+    (platform) =>
+      Effect.gen(function* () {
+        const selectedAction = yield* Deferred.make<string>();
+        const result = yield* Deferred.make<readonly Electron.MenuItemConstructorOptions[]>();
+        yield* configureMenu(selectedAction, result, "zh-CN", platform);
+        const template = yield* Deferred.await(result);
+        assert.isDefined(template.find((item) => item.label === "文件"));
+        assert.isDefined(template.find((item) => item.label === "视图"));
+        const edit = template.find((item) => item.label === "编辑");
+        assert.isDefined(edit);
+        assert.isArray(edit.submenu);
+        const submenu = edit.submenu as Electron.MenuItemConstructorOptions[];
+        assert.strictEqual(submenu.find((item) => item.role === "copy")?.label, "复制");
+        const paste = submenu.find((item) => item.label === "粘贴为纯文本");
+        assert.isDefined(paste);
+        assert.strictEqual(paste.accelerator, "CmdOrCtrl+Shift+V");
+        assert.isDefined(paste.click);
+        paste.click({} as Electron.MenuItem, {} as Electron.BrowserWindow, {} as KeyboardEvent);
+        assert.strictEqual(yield* Deferred.await(selectedAction), "paste-as-text");
+        const window = template.find((item) => item.role === "windowMenu");
+        assert.isDefined(window);
+        assert.strictEqual(window.label, "窗口");
+        assert.isArray(window?.submenu);
+        assert.deepEqual(
+          (window.submenu as Electron.MenuItemConstructorOptions[]).map(
+            (item) => item.role ?? item.type,
+          ),
+          platform === "darwin"
+            ? ["minimize", "zoom", "separator", "front"]
+            : ["minimize", "zoom", "close"],
+        );
+      }),
+  );
+  it.effect("leaves English role labels to Electron", () =>
+    Effect.gen(function* () {
+      const selectedAction = yield* Deferred.make<string>();
+      const result = yield* Deferred.make<readonly Electron.MenuItemConstructorOptions[]>();
+      yield* configureMenu(selectedAction, result);
+      const template = yield* Deferred.await(result);
+      const roles = template
+        .flatMap((item) => [item, ...(Array.isArray(item.submenu) ? item.submenu : [])])
+        .filter((item) => item.role);
+      assert.isAbove(roles.length, 0);
+      assert.isTrue(roles.every((item) => !("label" in item)));
+    }),
+  );
   it.effect("installs the native menu and routes Settings through DesktopWindow", () =>
     Effect.gen(function* () {
       const selectedAction = yield* Deferred.make<string>();

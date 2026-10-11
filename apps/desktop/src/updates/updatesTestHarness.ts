@@ -39,6 +39,7 @@ export interface UpdatesHarnessOptions {
   readonly packageType?: string | undefined;
 }
 
+/** Builds update-service dependencies and captured actions; options supply platform and failure scenarios. */
 export function makeHarness(options: UpdatesHarnessOptions = {}) {
   let checkCount = 0;
   let quitAndInstallCount = 0;
@@ -180,6 +181,7 @@ export function makeHarness(options: UpdatesHarnessOptions = {}) {
       ? Layer.succeed(DesktopAppSettings.DesktopAppSettings, {
           get: Effect.sync(() => testSettings),
           load: Effect.sync(() => testSettings),
+          setUiLocalePreference: () => Effect.die("unexpected locale write"),
           setMainWindowBounds: () => Effect.die("unexpected main window bounds update"),
           setServerExposureMode: () => Effect.die("unexpected server exposure update"),
           setTailscaleServe: () => Effect.die("unexpected Tailscale Serve update"),

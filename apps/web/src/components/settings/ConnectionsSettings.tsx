@@ -1732,9 +1732,10 @@ function SavedBackendListRow({
 
   const statusTooltip = t.settings.connections.environment.statusTooltip(
     unsupported
-      ? (environment.connection.error ?? connectionStatusText(environment.connection))
+      ? (environment.connection.error ??
+          connectionStatusText(environment.connection, t.chat.workLog.shared.connection))
       : enabled
-        ? connectionStatusText(environment.connection)
+        ? connectionStatusText(environment.connection, t.chat.workLog.shared.connection)
         : t.settings.connections.environment.switchedOff,
     versionMismatch?.serverVersion ?? null,
     versionMismatch?.clientVersion ?? null,

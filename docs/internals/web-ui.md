@@ -20,6 +20,8 @@ Annotate each Chinese namespace literal with `Messages["namespace"]` to catch ex
 Keep English string leaves wide: do not use `as const`. Use typed functions for interpolation and plurals;
 components assemble rich text. Modules under `i18n/**` must not import React, TSX files, or web modules
 outside i18n, because bootstrap imports this small module graph before the UI.
+Shared presentation helpers accept optional messages with English defaults exported from leaf modules;
+the web English dictionary references those defaults directly, while other clients keep their existing output.
 
 ## Styles
 

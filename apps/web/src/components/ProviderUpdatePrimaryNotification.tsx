@@ -1,3 +1,5 @@
+/** Builds update notices and actions for providers on the primary environment. */
+import { t } from "~/i18n";
 import { useNavigate } from "@tanstack/react-router";
 import { useAtomValue } from "@effect/atom-react";
 import { DownloadIcon } from "lucide-react";
@@ -61,6 +63,7 @@ function ProviderUpdateToastIcon({ provider }: { provider: ServerProvider }) {
   );
 }
 
+/** Creates a provider-update toast from input status, providers, and actions; returns the toast identifier for later updates. */
 function addProviderUpdateToast(input: {
   readonly view: ProviderUpdateToastView;
   readonly openSettings: (toastId: ProviderUpdateToastId) => void;
@@ -89,7 +92,7 @@ function addProviderUpdateToast(input: {
       description: input.view.description,
       timeout: 0,
       actionProps: {
-        children: "Settings",
+        children: t.sidebar.chrome.settings,
         onClick: () => input.openSettings(toastId),
       },
       actionVariant: "outline",
@@ -247,7 +250,7 @@ export function ProviderUpdatePrimaryNotification() {
               addProviderUpdateToast({
                 view: getProviderUpdateRejectedToastView(
                   providerCount,
-                  "This connection cannot manage provider accounts.",
+                  t.app.provider.manageDenied,
                 ),
                 openSettings: openProviderSettings,
               });
@@ -299,19 +302,17 @@ export function ProviderUpdatePrimaryNotification() {
     const toastOptions = stackedThreadToast({
       type: initialView.type,
       title: initialView.title,
-      description: canManageProviders
-        ? initialView.description
-        : "This connection cannot manage provider accounts. View provider settings for update details.",
+      description: canManageProviders ? initialView.description : t.app.provider.manageDeniedHint,
       timeout: 0,
       actionProps:
         oneClickProviders.length > 0
           ? {
-              children: "Update",
+              children: t.app.actions.update,
               disabled: !canManageProviders,
               onClick: runUpdates,
             }
           : {
-              children: "Settings",
+              children: t.sidebar.chrome.settings,
               onClick: openSettings,
             },
       actionVariant: "outline",
@@ -325,7 +326,7 @@ export function ProviderUpdatePrimaryNotification() {
         ...(oneClickProviders.length > 0
           ? {
               secondaryActionProps: {
-                children: "Settings",
+                children: t.sidebar.chrome.settings,
                 onClick: openSettings,
               },
               secondaryActionVariant: "outline" as const,

@@ -583,6 +583,7 @@ function RightPanelEmptyState(props: {
   );
 }
 
+/** Chooses the tab title from supplied session names or localized defaults without changing the surface identity. */
 function surfaceTitle(
   surface: RightPanelSurface,
   sessions: Readonly<Record<string, PreviewSessionSnapshot>>,
@@ -600,7 +601,7 @@ function surfaceTitle(
     case "terminal":
       return (
         terminalLabelsById.get(surface.activeTerminalId) ??
-        t.chat.rightPanel.terminalLabel(getTerminalLabel(surface.activeTerminalId))
+        getTerminalLabel(surface.activeTerminalId, t.chat.workLog.shared.terminal)
       );
     case "pull-request":
       return `#${surface.number}`;

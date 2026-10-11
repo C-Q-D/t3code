@@ -1,3 +1,5 @@
+/** Localized device UI and interactions; preserves user data, commands, and protocol values. */
+import { t } from "~/i18n";
 import { withDeviceHubQuery } from "@t3tools/client-runtime/state/deviceHubAccess";
 import type { DeviceHubAccess } from "@t3tools/client-runtime/state/deviceHubAccess";
 import type { DevicePlatform } from "@t3tools/contracts";
@@ -106,6 +108,12 @@ const flattenIosAxTree = (roots: ReadonlyArray<unknown>): ReadonlyArray<DeviceAx
   return elements;
 };
 
+/**
+ * Reads accessibility elements; reports malformed payloads through the returned error list.
+ * @param target Original environment port navigation target.
+ * @param signal Optional abort signal forwarded to the request.
+ * @returns The value described above, without changing user data or protocol identifiers.
+ */
 export async function fetchDeviceAxTree(
   target: Target,
   signal?: AbortSignal,
@@ -118,7 +126,7 @@ export async function fetchDeviceAxTree(
     );
     if (!Array.isArray(payload)) {
       const error = isRecord(payload) && typeof payload.error === "string" ? payload.error : null;
-      return { elements: [], errors: [error ?? "Unexpected accessibility payload."] };
+      return { elements: [], errors: [error ?? t.tools.device.unexpectedAccessibility] };
     }
     return { elements: flattenIosAxTree(payload), errors: [] };
   }
@@ -129,7 +137,7 @@ export async function fetchDeviceAxTree(
   );
   if (!isRecord(payload) || !Array.isArray(payload.nodes)) {
     const error = isRecord(payload) && typeof payload.error === "string" ? payload.error : null;
-    return { elements: [], errors: [error ?? "Unexpected accessibility payload."] };
+    return { elements: [], errors: [error ?? t.tools.device.unexpectedAccessibility] };
   }
   // uiautomator reports pixel bounds; the first node is the full window.
   const nodes = payload.nodes.filter(

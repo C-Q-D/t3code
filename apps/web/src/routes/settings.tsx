@@ -1,3 +1,5 @@
+/** Localized routes presentation and existing interaction behavior. */
+import { t } from "~/i18n";
 import { Outlet, createFileRoute, redirect, useLocation } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
 import { RotateCcwIcon } from "lucide-react";
@@ -28,6 +30,7 @@ import {
   isSettingsSearchScopeAvailable,
 } from "../components/settings/settingsSearch";
 
+/** Renders a restore action for the supplied changed settings and restoreDefaults callback; no changes disables the action. */
 function RestoreDeviceDefaultsButton({ onRestored }: { onRestored: () => void }) {
   const { changedSettingLabels, restoreDefaults } = useSettingsRestore(onRestored);
   return (
@@ -38,11 +41,12 @@ function RestoreDeviceDefaultsButton({ onRestored }: { onRestored: () => void })
       onClick={() => void restoreDefaults()}
     >
       <RotateCcwIcon className="mx-1 size-3.5" />
-      Restore device defaults
+      {t.account.routes.restoreDefaults}
     </Button>
   );
 }
 
+/** Renders children only when the supplied settings scope supports the selected target; otherwise explains reconnection or scope selection. */
 function SettingsScopeBoundary({ pathname, children }: { pathname: string; children: ReactNode }) {
   const { scope, connectedEnvironments } = useSettingsScope();
   const { environments } = useEnvironments();
@@ -64,8 +68,8 @@ function SettingsScopeBoundary({ pathname, children }: { pathname: string; child
         eligibleEnvironmentIds={autoSettlementAvailability.eligibleEnvironmentIds}
       >
         {autoSettlementAvailability.eligibleEnvironmentIds.length > 0
-          ? `${searchTarget.title} requires a supporting environment. Choose one to continue.`
-          : `${searchTarget.title} requires a supporting environment. Connect or update an environment to continue.`}
+          ? t.account.routes.chooseSupporting(searchTarget.title)
+          : t.account.routes.connectSupporting(searchTarget.title)}
       </SettingsScopeNotice>
     );
   }
@@ -82,7 +86,7 @@ function SettingsScopeBoundary({ pathname, children }: { pathname: string; child
         : "all";
     return (
       <SettingsScopeNotice target={target} targetId={hash}>
-        {`${searchTarget.title} is not available for the selected target. Choose its owning scope to continue.`}
+        {t.account.routes.chooseScope(searchTarget.title)}
       </SettingsScopeNotice>
     );
   }
@@ -102,7 +106,7 @@ function SettingsScopeBoundary({ pathname, children }: { pathname: string; child
     return (
       <SettingsPageContainer>
         <p className="text-sm text-muted-foreground">
-          Reconnect {scope.label} to change its settings.
+          {t.account.routes.reconnectSettings(scope.label)}
         </p>
       </SettingsPageContainer>
     );

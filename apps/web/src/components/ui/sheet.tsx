@@ -1,4 +1,7 @@
+/** Wraps the sheet primitive with shared layout, transitions, and accessible dismissal controls. */
 "use client";
+
+import { t } from "~/i18n";
 
 import { Dialog as SheetPrimitive } from "@base-ui/react/dialog";
 import { XIcon } from "lucide-react";
@@ -51,6 +54,7 @@ function SheetViewport({
   );
 }
 
+/** Renders sheet children on side using variant, optional transitionDurationMs and style; keepMounted controls retention and showCloseButton controls dismissal. */
 function SheetPopup({
   className,
   children,
@@ -109,7 +113,7 @@ function SheetPopup({
           {children}
           {showCloseButton && (
             <SheetPrimitive.Close
-              aria-label="Close"
+              aria-label={t.app.actions.close}
               className="absolute end-2 top-2"
               render={<Button size="icon" variant="ghost" />}
             >

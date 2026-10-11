@@ -3,6 +3,10 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./work-log/messages": {
+      "types": "./src/work-log/messages.ts",
+      "default": "./src/work-log/messages.ts"
+    },
     "./composerThreadItems": {
       "types": "./src/composerThreadItems.ts",
       "default": "./src/composerThreadItems.ts"

@@ -1,3 +1,5 @@
+/** Localized clerk presentation and existing interaction behavior. */
+import { t } from "~/i18n";
 import { findErrorTraceId } from "@t3tools/client-runtime/errors";
 import {
   isAtomCommandInterrupted,
@@ -25,19 +27,22 @@ import {
 
 const linkedAtFormatter = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
 
+/** Formats the supplied link timestamp, returning an unavailable label for an invalid date. */
 function linkedAtLabel(value: string): string {
   const linkedAt = new Date(value);
   return Number.isNaN(linkedAt.getTime())
-    ? "Link date unavailable"
-    : `Linked ${linkedAtFormatter.format(linkedAt)}`;
+    ? t.account.clerk.linkDateUnavailable
+    : t.account.clerk.linkedAt(linkedAtFormatter.format(linkedAt));
 }
 
+/** Describes whether the supplied environment publishes activity only or exposes a managed tunnel. */
 function endpointLabel(environment: RelayClientEnvironmentRecord): string {
   return environment.endpoint.providerKind === "cloudflare_tunnel"
-    ? "Managed tunnel"
-    : "Activity publishing only";
+    ? t.account.clerk.managedTunnel
+    : t.account.clerk.activityOnly;
 }
 
+/** Renders props.environment and its deregistration confirmation; supplied pending state gates controls and callbacks own the mutation. */
 export function T3ConnectEnvironmentRow(props: {
   readonly environment: RelayClientEnvironmentRecord;
   readonly confirmationOpen: boolean;
@@ -61,7 +66,7 @@ export function T3ConnectEnvironmentRow(props: {
           <CollapsibleTrigger
             render={
               <Button size="sm" variant="destructive-outline" disabled={props.mutationPending}>
-                Deregister
+                {t.account.clerk.deregister}
               </Button>
             }
           />
@@ -72,17 +77,16 @@ export function T3ConnectEnvironmentRow(props: {
             <div
               className="rounded-lg border border-input bg-muted/32 px-5 py-4 shadow-xs/5"
               role="group"
-              aria-label={`Confirm deregistration of ${environment.label}`}
+              aria-label={t.account.clerk.confirmDeregister(environment.label)}
             >
               <h4 className="text-sm leading-4.5 font-semibold text-foreground">
-                Deregister server
+                {t.account.clerk.deregisterServer}
               </h4>
               <p className="mt-1 text-xs leading-4.5 text-muted-foreground">
-                “{environment.label}” will be removed from this account.
+                {t.account.clerk.removedFromAccount(environment.label)}
               </p>
               <p className="mt-4 max-w-xl text-xs leading-4.5 text-muted-foreground">
-                T3 Connect access will be revoked, any managed tunnel will be removed, and a host
-                space will become available. Local connections on your devices are not changed.
+                {t.account.clerk.deregisterHint}
               </p>
               <div className="mt-4 flex justify-end gap-2">
                 <Button
@@ -91,7 +95,7 @@ export function T3ConnectEnvironmentRow(props: {
                   disabled={props.mutationPending}
                   onClick={() => props.onConfirmationChange(false)}
                 >
-                  Cancel
+                  {t.common.confirm.cancel}
                 </Button>
                 <Button
                   size="sm"
@@ -99,7 +103,9 @@ export function T3ConnectEnvironmentRow(props: {
                   disabled={props.mutationPending}
                   onClick={() => props.onDeregister(environment)}
                 >
-                  {props.mutationPending ? "Deregistering…" : "Deregister"}
+                  {props.mutationPending
+                    ? t.account.clerk.deregistering
+                    : t.account.clerk.deregister}
                 </Button>
               </div>
             </div>
@@ -110,6 +116,7 @@ export function T3ConnectEnvironmentRow(props: {
   );
 }
 
+/** Lists relay environments and handles confirmed deregistration; reports success/failure and preserves device-local connections. */
 export function T3ConnectUserProfilePage() {
   const environmentsState = useManagedRelayEnvironments();
   const deregisterEnvironment = useAtomCommand(deregisterManagedRelayEnvironmentCommand, {
@@ -149,15 +156,15 @@ export function T3ConnectUserProfilePage() {
       environmentsState.refresh();
       toastManager.add({
         type: "success",
-        title: "Server deregistered",
-        description: "T3 Connect access was revoked and a host space is now available.",
+        title: t.account.clerk.serverDeregistered,
+        description: t.account.clerk.deregisteredHint,
       });
       return;
     }
     if (isAtomCommandInterrupted(result)) return;
 
     const cause = squashAtomCommandFailure(result);
-    const message = cause instanceof Error ? cause.message : "Could not deregister the server.";
+    const message = cause instanceof Error ? cause.message : t.account.clerk.deregisterError;
     const traceId = findErrorTraceId(cause);
     console.error("[t3-connect] Could not deregister environment", {
       environmentId: environment.environmentId,
@@ -167,12 +174,12 @@ export function T3ConnectUserProfilePage() {
     });
     toastManager.add({
       type: "error",
-      title: "Could not deregister server",
+      title: t.account.clerk.deregisterFailed,
       description: message,
       data: traceId
         ? {
             secondaryActionProps: {
-              children: "Copy trace ID",
+              children: t.account.clerk.copyTraceId,
               onClick: () => void navigator.clipboard?.writeText(traceId),
             },
           }
@@ -194,7 +201,7 @@ export function T3ConnectUserProfilePage() {
   return (
     <ClerkUserProfilePage
       title="T3 Connect"
-      description="Environments registered to your account. Connections on this device are managed in Settings."
+      description={t.account.clerk.environmentsHint}
       action={
         <ClerkUserProfileRefreshButton
           disabled={deregisteringEnvironmentId !== null}
@@ -207,7 +214,7 @@ export function T3ConnectUserProfilePage() {
         {environmentsState.error ? (
           <div className="mb-4 border-t border-destructive/35 py-3 text-xs" role="alert">
             <p className="font-medium text-destructive-foreground">
-              Could not load T3 Connect environments
+              {t.account.clerk.loadEnvironmentsFailed}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">{environmentsState.error}</p>
           </div>
@@ -215,7 +222,7 @@ export function T3ConnectUserProfilePage() {
 
         {isInitialLoad ? (
           <p className="border-t py-4 text-xs text-muted-foreground" role="status">
-            Loading environments…
+            {t.account.clerk.loadingEnvironments}
           </p>
         ) : environments.length > 0 ? (
           <ul className="border-t">
@@ -239,11 +246,8 @@ export function T3ConnectUserProfilePage() {
                 <ServerIcon />
               </EmptyMedia>
               <EmptyHeader>
-                <EmptyTitle>No T3 Connect environments</EmptyTitle>
-                <EmptyDescription>
-                  Link an environment from its local Settings to make it available through T3
-                  Connect.
-                </EmptyDescription>
+                <EmptyTitle>{t.account.clerk.noEnvironments}</EmptyTitle>
+                <EmptyDescription>{t.account.clerk.linkEnvironmentHint}</EmptyDescription>
               </EmptyHeader>
             </Empty>
           </div>

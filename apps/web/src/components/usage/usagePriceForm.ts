@@ -1,10 +1,12 @@
+/** Localized usage presentation and existing interaction behavior. */
+import { t } from "~/i18n";
 import type { UsageModelPriceOverride } from "@t3tools/contracts";
 
 export const USAGE_PRICE_FIELDS = [
-  { key: "inputCostPerMillionTokens", label: "Input", optional: false },
-  { key: "outputCostPerMillionTokens", label: "Output", optional: false },
-  { key: "cacheReadCostPerMillionTokens", label: "Cache read", optional: true },
-  { key: "cacheWriteCostPerMillionTokens", label: "Cache write", optional: true },
+  { key: "inputCostPerMillionTokens", label: t.tools.usage.input, optional: false },
+  { key: "outputCostPerMillionTokens", label: t.tools.usage.output, optional: false },
+  { key: "cacheReadCostPerMillionTokens", label: t.tools.usage.cacheRead, optional: true },
+  { key: "cacheWriteCostPerMillionTokens", label: t.tools.usage.cacheWrite, optional: true },
 ] as const;
 
 export type UsagePriceForm = { model: string } & Record<

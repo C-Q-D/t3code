@@ -1,3 +1,5 @@
+/** Owns pull request timeline tab on the web pull-request surface; host data and agent context remain unchanged. */
+import { t } from "~/i18n";
 import { useAtomCommand } from "~/state/use-atom-command";
 import type {
   EnvironmentId,
@@ -160,13 +162,18 @@ function ReviewStateBadge({ state }: { state: string }) {
   );
 }
 
+/**
+ * Renders the activity link button; disables opening when the supplied host URL is absent.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 function OpenOnHostButton({ url, onOpen }: { url: string | null; onOpen: (url: string) => void }) {
   return url === null ? null : (
     <Button
       size="icon-xs"
       variant="ghost-muted"
       className="-mr-1 -mt-1 shrink-0"
-      aria-label="Open activity on host"
+      aria-label={t.git.pullRequest.openActivityOnHost}
       onClick={() => onOpen(url)}
     >
       <ExternalLinkIcon className="size-3" />
@@ -174,6 +181,11 @@ function OpenOnHostButton({ url, onOpen }: { url: string | null; onOpen: (url: s
   );
 }
 
+/**
+ * Renders conversation card from the supplied display data and callbacks.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 function ConversationCard({
   event,
   editable,
@@ -205,7 +217,7 @@ function ConversationCard({
     });
     setSaving(false);
     if (result._tag === "Failure") {
-      toastManager.add({ type: "error", title: "Could not save the comment" });
+      toastManager.add({ type: "error", title: t.git.pullRequest.couldNotSaveTheComment });
       return;
     }
     setEditing(false);
@@ -235,7 +247,7 @@ function ConversationCard({
           {editable !== null && !editing ? (
             <PullRequestEditButton
               className="-mt-1"
-              aria-label="Edit comment"
+              aria-label={t.git.pullRequest.editComment}
               onClick={() => setEditing(true)}
             />
           ) : null}
@@ -260,7 +272,7 @@ function ConversationCard({
             cwd={cwd}
             environmentId={reactions.environmentId}
             threadRef={reactions.threadRef}
-            label="Edit comment"
+            label={t.git.pullRequest.editComment}
             saving={saving}
             onSave={(body) => void save(body)}
             onCancel={() => setEditing(false)}
@@ -290,6 +302,11 @@ function uniqueConversationActors(events: ReadonlyArray<PullRequestTimelineEvent
   return [...actors.values()];
 }
 
+/**
+ * Renders a collapsible timeline conversation group; returns null when the supplied event list is empty.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface; null under the conditions described above.
+ */
 function ConversationGroup({
   events,
   editable,
@@ -326,10 +343,10 @@ function ConversationGroup({
           >
             <span className="min-w-0 flex-1">
               <span className="block text-xs font-semibold">
-                {events.length.toLocaleString()} {events.length === 1 ? "comment" : "comments"}
+                {events.length.toLocaleString()} {t.git.pullRequest.commentWord(events.length)}
               </span>
               <span className="block truncate text-3xs text-muted-foreground">
-                {actors.length.toLocaleString()} {actors.length === 1 ? "author" : "authors"} ·{" "}
+                {actors.length.toLocaleString()} {t.git.pullRequest.authorWord(actors.length)} ·{" "}
                 {formatRelativeTimeLabel(first.at)}
               </span>
             </span>
@@ -366,6 +383,11 @@ function ConversationGroup({
   );
 }
 
+/**
+ * Renders commit event from the supplied display data and callbacks.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 function CommitEvent({
   event,
   onOpen,
@@ -377,7 +399,7 @@ function CommitEvent({
     <button
       type="button"
       className="group relative mb-5 block w-full cursor-pointer rounded-sm pl-12 text-left outline-none [contain-intrinsic-block-size:48px] [content-visibility:auto] focus-visible:ring-2 focus-visible:ring-ring"
-      aria-label={`View commit ${event.id}`}
+      aria-label={t.git.pullRequest.viewCommit(event.id)}
       onClick={() => onOpen(event.id)}
     >
       <ActorTimelineMarker
@@ -387,7 +409,7 @@ function CommitEvent({
       <div className="flex min-w-0 items-center gap-2.5 py-1.5">
         <div className="min-w-0 flex-1">
           <div className="truncate text-xs font-semibold text-foreground transition-colors group-hover:text-primary">
-            {event.body ?? "Untitled commit"}
+            {event.body ?? t.git.pullRequest.untitledCommit}
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-3xs text-muted-foreground">
             <code className="font-mono">{event.id.slice(0, 7)}</code>
@@ -406,21 +428,26 @@ function CommitEvent({
   );
 }
 
+/**
+ * Renders lifecycle event from the supplied display data and callbacks.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 function LifecycleEvent({ event }: { event: PullRequestTimelineEvent }) {
   const presentation =
     event.kind === "opened"
       ? {
           icon: <PullRequestGlyph.pullRequest className="size-3.5" />,
-          label: "Pull request opened",
+          label: t.git.pullRequest.pullRequestOpened,
         }
       : event.kind === "merged"
         ? {
             icon: <PullRequestGlyph.merged className="size-3.5" />,
-            label: "Pull request merged",
+            label: t.git.pullRequest.pullRequestMerged,
           }
         : {
             icon: <PullRequestGlyph.closed className="size-3.5" />,
-            label: "Pull request closed",
+            label: t.git.pullRequest.pullRequestClosed,
           };
 
   return (
@@ -443,6 +470,8 @@ function LifecycleEvent({ event }: { event: PullRequestTimelineEvent }) {
  * A verdict, as its own row rather than a line inside a collapsed conversation. It wears the
  * reviewer's face on the rail and the verdict's own icon beside their name, so "approved" reads
  * at a glance from the same place a merge or a commit does.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
  */
 function ReviewVerdictEvent({
   event,
@@ -492,7 +521,9 @@ function ReviewVerdictEvent({
                 }
               >
                 {pullRequestReviewOutcomeLabel(outcome)}
-                {stale ? <span className="sr-only">, before the latest commits</span> : null}
+                {stale ? (
+                  <span className="sr-only">{t.git.pullRequest.beforeTheLatestCommits}</span>
+                ) : null}
               </TooltipTrigger>
               <TooltipPopup>{pullRequestReviewOutcomeStaleLabel(outcome)}</TooltipPopup>
             </Tooltip>
@@ -537,6 +568,11 @@ function ReviewVerdictEvent({
   );
 }
 
+/**
+ * Renders pull request timeline tab from the supplied display data and callbacks.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 export function PullRequestTimelineTab({
   detail,
   environmentId,
@@ -619,7 +655,7 @@ export function PullRequestTimelineTab({
         {events.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
             <PullRequestGlyph.pullRequest className="mb-2 size-5" />
-            <p className="text-xs">No activity yet.</p>
+            <p className="text-xs">{t.git.pullRequest.noActivityYet}</p>
           </div>
         ) : null}
       </div>

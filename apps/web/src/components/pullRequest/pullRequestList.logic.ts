@@ -1,3 +1,5 @@
+/** Owns pull request list logic on the web pull-request surface; host data and agent context remain unchanged. */
+import { t } from "~/i18n";
 import * as Schema from "effect/Schema";
 
 import {
@@ -73,9 +75,9 @@ const pullRequestViewerKey = (entry: ScopedEntry): string =>
   `${entry.environmentId ?? ""} ${entry.host}`;
 
 const GROUP_LABELS: Record<PullRequestGroupKey, string> = {
-  reviewRequested: "Review requested",
-  authored: "Authored",
-  others: "Others",
+  reviewRequested: t.git.pullRequest.reviewRequested,
+  authored: t.git.pullRequest.authored,
+  others: t.git.pullRequest.others,
 };
 
 function normalize(value: string | null | undefined): string | null {

@@ -1,4 +1,7 @@
+/** Localized browser UI and interactions; preserves user data, commands, and protocol values. */
 "use client";
+
+import { t } from "~/i18n";
 
 import type {
   CSSProperties,
@@ -34,6 +37,11 @@ const EDGE_BUTTON_CLASS =
 const EDGE_GRIP_CLASS =
   "pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center text-muted-foreground/55 transition-colors duration-150 group-hover:text-foreground/85 group-focus-visible:text-foreground group-active:text-foreground";
 
+/**
+ * Renders an accessible viewport resize handle with pointer and keyboard callbacks.
+ * @param props Component properties and callbacks defined by the parameter type.
+ * @returns Rendered UI for the supplied props.
+ */
 function ResizeHandle(props: {
   readonly direction: BrowserViewportResizeDirection;
   readonly label: string;
@@ -59,7 +67,7 @@ function ResizeHandle(props: {
   return (
     <button
       type="button"
-      aria-label={`${label}. Use arrow keys to resize.`}
+      aria-label={t.tools.browser.resizeKeys(label)}
       className={cn(EDGE_BUTTON_CLASS, kind === "corner" && "z-30", cursorClassName)}
       style={style}
       onPointerDown={(event) => onPointerDown(direction, event)}
@@ -98,6 +106,11 @@ function ResizeHandle(props: {
   );
 }
 
+/**
+ * Renders resize handles around the supplied browser layout and marks the active direction.
+ * @param props View data, control flags, and callbacks defined by the component props type; optional fields retain their declared defaults.
+ * @returns Rendered UI for the supplied props.
+ */
 export function BrowserViewportResizeHandles({
   layout,
   activeDirection,
@@ -115,7 +128,7 @@ export function BrowserViewportResizeHandles({
     <>
       <ResizeHandle
         direction="west"
-        label="Resize browser viewport from left edge"
+        label={t.tools.browser.resizeLeft}
         kind="vertical"
         cursorClassName="cursor-ew-resize"
         style={{ left: left - railSize, top, width: railSize, height: layout.viewportHeight }}
@@ -125,7 +138,7 @@ export function BrowserViewportResizeHandles({
       />
       <ResizeHandle
         direction="east"
-        label="Resize browser viewport from right edge"
+        label={t.tools.browser.resizeRight}
         kind="vertical"
         cursorClassName="cursor-ew-resize"
         style={{ left: right, top, width: railSize, height: layout.viewportHeight }}
@@ -135,7 +148,7 @@ export function BrowserViewportResizeHandles({
       />
       <ResizeHandle
         direction="south"
-        label="Resize browser viewport from bottom edge"
+        label={t.tools.browser.resizeBottom}
         kind="horizontal"
         cursorClassName="cursor-ns-resize"
         style={{ left, top: bottom, width: layout.viewportWidth, height: railSize }}
@@ -145,7 +158,7 @@ export function BrowserViewportResizeHandles({
       />
       <ResizeHandle
         direction="southwest"
-        label="Resize browser viewport from bottom-left corner"
+        label={t.tools.browser.resizeBottomLeft}
         kind="corner"
         cursorClassName="cursor-nesw-resize"
         style={{ left: left - railSize, top: bottom, width: railSize, height: railSize }}
@@ -156,7 +169,7 @@ export function BrowserViewportResizeHandles({
       />
       <ResizeHandle
         direction="southeast"
-        label="Resize browser viewport from bottom-right corner"
+        label={t.tools.browser.resizeBottomRight}
         kind="corner"
         cursorClassName="cursor-nwse-resize"
         style={{ left: right, top: bottom, width: railSize, height: railSize }}

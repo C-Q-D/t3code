@@ -1,3 +1,5 @@
+/** Localized clerk presentation and existing interaction behavior. */
+import { t } from "~/i18n";
 import { useState } from "react";
 
 import {
@@ -43,12 +45,10 @@ export function RemoveT3ConnectEnvironmentDialog({
       >
         <AlertDialogPopup>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove {shownLabel} from this device?</AlertDialogTitle>
+            <AlertDialogTitle>{t.account.clerk.removeFromDevice(shownLabel)}</AlertDialogTitle>
+            <AlertDialogDescription>{t.account.clerk.forgetHint}</AlertDialogDescription>
             <AlertDialogDescription>
-              This forgets its pairing, credentials, and cached threads here.
-            </AlertDialogDescription>
-            <AlertDialogDescription>
-              It stays on your T3 Connect account and keeps its host space. Deregister it in{" "}
+              {t.account.clerk.keepAccountHint}{" "}
               {openAccountPage ? (
                 <InlineButton
                   onClick={() => {
@@ -56,18 +56,20 @@ export function RemoveT3ConnectEnvironmentDialog({
                     openAccountPage();
                   }}
                 >
-                  T3 Connect settings
+                  {t.account.clerk.connectSettings}
                 </InlineButton>
               ) : (
-                "T3 Connect settings"
+                t.account.clerk.connectSettings
               )}{" "}
-              to free it.
+              {t.account.clerk.freeSpaceSuffix}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
+            <AlertDialogClose render={<Button variant="outline" />}>
+              {t.common.confirm.cancel}
+            </AlertDialogClose>
             <Button variant="destructive" onClick={onConfirm}>
-              Remove from this device
+              {t.account.clerk.removeDevice}
             </Button>
           </AlertDialogFooter>
         </AlertDialogPopup>

@@ -1,3 +1,5 @@
+/** Localized usage presentation and existing interaction behavior. */
+import { t } from "~/i18n";
 /**
  * Multi-environment usage state.
  *
@@ -74,7 +76,7 @@ const usageByWindowAtom = Atom.family((windowKey: string) =>
         label: presentation.entry.target.label,
         isPending: result.waiting,
         canReadDiagnostics: true,
-        error: result._tag === "Failure" ? "This environment could not report usage." : null,
+        error: result._tag === "Failure" ? t.tools.usage.environmentUsageFailed : null,
         summary,
         needsCursorKeychainAccess: needsCursorKeychainAccess(
           summary,

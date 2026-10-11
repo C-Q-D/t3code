@@ -1,3 +1,5 @@
+/** Checks work-log grouping and display contracts across default and injected messages. */
+import { englishWorkLogMessages } from "./messages.ts";
 import { describe, expect, it } from "vite-plus/test";
 
 import { ThreadId, TurnItemId, type OrchestrationV2TurnItem } from "@t3tools/contracts";
@@ -5,6 +7,7 @@ import * as DateTime from "effect/DateTime";
 import { T3_MCP_TOOL_NAMES } from "@t3tools/shared/t3McpToolPresentation";
 
 import {
+  contextCompactionLabel,
   commandDetailRepeatsCommand,
   extractCommandOutputText,
   resolveViewedImageAsset,
@@ -959,4 +962,143 @@ describe("device group summaries", () => {
       ]).summary,
     ).toBe("Used 1 tool");
   });
+});
+
+describe("English work-log compatibility", () => {
+  const entry = (fields: Partial<WorkLogPresentationEntry>): WorkLogPresentationEntry => ({
+    id: "compat",
+    createdAt: "2026-09-01T00:00:00Z",
+    label: "Unknown",
+    tone: "tool",
+    ...fields,
+  });
+  it.each([
+    [
+      { label: "t3-code.link_pull_request", toolLifecycleStatus: "completed" },
+      "Linked 1 pull request",
+      "Linked 2 pull requests",
+    ],
+    [
+      { label: "t3-code.unlink_pull_request", toolLifecycleStatus: "completed" },
+      "Unlinked 1 pull request",
+      "Unlinked 2 pull requests",
+    ],
+    [
+      { label: "t3-code.watch_pull_request", toolLifecycleStatus: "completed" },
+      "Watching 1 pull request",
+      "Watching 2 pull requests",
+    ],
+    [
+      { label: "t3-code.unwatch_pull_request", toolLifecycleStatus: "completed" },
+      "Stopped watching 1 pull request",
+      "Stopped watching 2 pull requests",
+    ],
+    [
+      { label: "t3-code.list_thread_pull_requests", toolLifecycleStatus: "completed" },
+      "Checked linked pull requests",
+      "Checked linked pull requests 2 times",
+    ],
+    [
+      { label: "t3-code.preview_click", toolLifecycleStatus: "completed" },
+      "Used browser 1 time",
+      "Used browser 2 times",
+    ],
+    [
+      { label: "t3-code.device_open", toolLifecycleStatus: "completed" },
+      "Used device controls 1 time",
+      "Used device controls 2 times",
+    ],
+    [{ requestKind: "file-read" }, "Read 1 file", "Read 2 files"],
+    [{ itemType: "file_change" }, "Changed 1 file", "Changed 2 files"],
+    [{ itemType: "command_execution" }, "Ran 1 command", "Ran 2 commands"],
+    [{ itemType: "thread_created" }, "Created 1 thread", "Created 2 threads"],
+    [{ itemType: "web_search" }, "Searched the web 1 time", "Searched the web 2 times"],
+    [{ itemType: "file_search" }, "Searched code 1 time", "Searched code 2 times"],
+    [{ itemType: "dynamic_tool" }, "Used 1 tool", "Used 2 tools"],
+    [{ tone: "info" }, "Received 1 update", "Received 2 updates"],
+  ] as const)("preserves whole sentences for %j", (fields, one, two) => {
+    expect(summarizeToolGroup([entry(fields)]).summary).toBe(one);
+    expect(summarizeToolGroup([entry(fields), entry(fields)]).summary).toBe(two);
+  });
+  it.each([
+    [["Alpha"], "Used Alpha", "Used Alpha integration"],
+    [["Alpha", "Beta"], "Used Alpha and Beta", "Used Alpha and Beta integrations"],
+    [
+      ["Alpha", "Beta", "Gamma"],
+      "Used Alpha, Beta, and Gamma",
+      "Used Alpha, Beta, and Gamma integrations",
+    ],
+  ] as const)("preserves named-source punctuation for %j", (names, plain, integrations) => {
+    expect(
+      summarizeToolGroup(
+        names.map((name) => entry({ toolSource: { key: name, name, kind: "browser" } })),
+      ).summary,
+    ).toBe(plain);
+    expect(
+      summarizeToolGroup(
+        names.map((name) => entry({ toolSource: { key: name, name, kind: "integration" } })),
+      ).summary,
+    ).toBe(integrations);
+  });
+  it.each([1, 2])("counts omitted categories: %s", (count) => {
+    expect(
+      summarizeToolGroup([
+        entry({ itemType: "command_execution" }),
+        entry({ itemType: "file_change" }),
+        ...Array.from({ length: count }, () => entry({ requestKind: "file-read" })),
+      ]).summary,
+    ).toBe(
+      count === 1
+        ? "Ran 1 command, changed 1 file, and performed 1 other action"
+        : "Ran 1 command, changed 1 file, and performed 2 other actions",
+    );
+  });
+  it("preserves compaction states and token formatting", () => {
+    expect(contextCompactionLabel({ status: "running" })).toBe("Compacting context");
+    expect(contextCompactionLabel({ status: "completed" })).toBe("Context compacted");
+    expect(
+      contextCompactionLabel({
+        status: "completed",
+        beforeTokenCount: 2000,
+        afterTokenCount: 1000,
+      }),
+    ).toBe("Context compacted 2K → 1K tokens");
+  });
+});
+
+it("passes localized T3 sentences into mixed summaries while preserving failure state", () => {
+  const messages = {
+    ...englishWorkLogMessages,
+    groupAction: { ...englishWorkLogMessages.groupAction, read: (count: number) => `读 ${count}` },
+    joinSummary: (parts: readonly string[]) => parts.join("；"),
+    t3Tools: {
+      ...englishWorkLogMessages.t3Tools,
+      summary: {
+        ...englishWorkLogMessages.t3Tools.summary,
+        "project-list": (count: number, succeeded: boolean) =>
+          `${succeeded ? "已列出" : "尝试列出"}项目 ${count}`,
+      },
+    },
+  };
+  expect(
+    summarizeToolGroup(
+      [
+        {
+          id: "read",
+          createdAt: "2026-01-01T00:00:00Z",
+          tone: "tool",
+          label: "Read",
+          requestKind: "file-read",
+        },
+        {
+          id: "t3",
+          createdAt: "2026-01-01T00:00:01Z",
+          tone: "tool",
+          label: "T3-code.t3_project_list",
+          toolLifecycleStatus: "failed",
+        },
+      ],
+      messages,
+    ),
+  ).toEqual({ summary: "读 1；尝试列出项目 1", hasFailure: true });
 });

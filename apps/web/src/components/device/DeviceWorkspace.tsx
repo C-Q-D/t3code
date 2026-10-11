@@ -1,3 +1,5 @@
+/** Localized device UI and interactions; preserves user data, commands, and protocol values. */
+import { t } from "~/i18n";
 import type { DeviceSummary, EnvironmentId } from "@t3tools/contracts";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -10,7 +12,10 @@ import { DeviceStreamView, type DeviceStreamHandle } from "./DeviceStreamView";
 import { DeviceToolsPanel } from "./DeviceToolsPanel";
 import { useDeviceControls } from "./useDeviceControls";
 
-/** Keyed by environment and device; the screen, quick controls and drawer share the same session. */
+/** Keyed by environment and device; the screen, quick controls and drawer share the same session.
+ * @param props Component properties and callbacks defined by the parameter type.
+ * @returns Rendered UI for the supplied props.
+ */
 export function DeviceWorkspace(props: {
   environmentId: EnvironmentId;
   device: DeviceSummary;
@@ -65,7 +70,7 @@ export function DeviceWorkspace(props: {
           if (cause instanceof DeviceScreenshotError && cause.status === 401)
             refreshDeviceHubAccess(props.environmentId);
           setScreenshotError(
-            cause instanceof Error ? cause.message : "Screenshot capture failed. Try again.",
+            cause instanceof Error ? cause.message : t.tools.device.screenshotFailed,
           );
         }
       })

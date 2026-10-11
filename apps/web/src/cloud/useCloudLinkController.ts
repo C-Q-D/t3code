@@ -1,3 +1,5 @@
+/** Localized cloud presentation and existing interaction behavior. */
+import { t } from "~/i18n";
 import { useAuth } from "@clerk/react";
 import { findErrorTraceId } from "@t3tools/client-runtime/errors";
 import { EnvironmentId, AuthRelayReadScope, AuthRelayWriteScope } from "@t3tools/contracts";
@@ -55,18 +57,18 @@ export function useCloudLinkController() {
   const [operationError, setOperationError] = useState<string | null>(null);
 
   const reportUpdateFailure = (cause: unknown) => {
-    const message = cause instanceof Error ? cause.message : "Could not update T3 Connect access.";
+    const message = cause instanceof Error ? cause.message : t.account.cloud.updateAccessFailed;
     const traceId = findErrorTraceId(cause);
     console.error("[t3-connect] Could not update T3 Connect", { message, traceId, cause });
-    setOperationError(traceId ? `${message} Trace ID: ${traceId}` : message);
+    setOperationError(traceId ? t.account.cloud.traceMessage(message, traceId) : message);
     toastManager.add({
       type: "error",
-      title: "Could not update T3 Connect",
+      title: t.account.cloud.updateConnectFailed,
       description: message,
       data: traceId
         ? {
             secondaryActionProps: {
-              children: "Copy trace ID",
+              children: t.account.cloud.copyTraceId,
               onClick: () => void navigator.clipboard?.writeText(traceId),
             },
           }
@@ -86,7 +88,7 @@ export function useCloudLinkController() {
     setOperationError(null);
     const target = primaryCloudLinkState.target;
     if (!target) {
-      reportUpdateFailure(new Error("Local environment is not ready yet."));
+      reportUpdateFailure(new Error(t.account.cloud.localNotReady));
       return false;
     }
     const environmentId = EnvironmentId.make(target.environmentId);
@@ -95,9 +97,7 @@ export function useCloudLinkController() {
         !readEnvironmentScope(environmentId, AuthRelayReadScope) ||
         !readEnvironmentScope(environmentId, AuthRelayWriteScope)
       ) {
-        reportUpdateFailure(
-          new Error("This connection needs permission to view and manage T3 Connect settings."),
-        );
+        reportUpdateFailure(new Error(t.account.cloud.permissionRequired));
         return false;
       }
       return true;
@@ -105,7 +105,7 @@ export function useCloudLinkController() {
     const readLinkState = () => {
       const state = readCachedPrimaryCloudLinkState(target);
       if (state === null) {
-        reportUpdateFailure(new Error("Wait until the current T3 Connect settings can be read."));
+        reportUpdateFailure(new Error(t.account.cloud.waitForSettings));
       }
       return state;
     };
@@ -142,7 +142,7 @@ export function useCloudLinkController() {
       }
       const clerkToken = tokenResult.value;
       if (!clerkToken) {
-        reportUpdateFailure(new Error("Sign in to T3 Connect before enabling this."));
+        reportUpdateFailure(new Error(t.account.cloud.signInBeforeEnabling));
         return false;
       }
       const currentManagedTunnel = currentLinkState.managedTunnelActive ?? currentLinkState.linked;

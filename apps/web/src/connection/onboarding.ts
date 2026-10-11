@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { ConnectionOnboarding } from "@t3tools/client-runtime/connection";
 import {
   createAtomCommandScheduler,
@@ -19,7 +20,9 @@ export const connectPairing = createRuntimeCommand(connectionAtomRuntime, {
   },
   execute: (input: ConnectionOnboarding.PairingConnectionInput) =>
     ConnectionOnboarding.ConnectionOnboarding.pipe(
-      Effect.flatMap((onboarding) => onboarding.registerPairing(input)),
+      Effect.flatMap((onboarding) =>
+        onboarding.registerPairing(input, t.chat.workLog.shared.remotePairing),
+      ),
     ),
 });
 
@@ -32,6 +35,8 @@ export const connectSshEnvironment = createRuntimeCommand(connectionAtomRuntime,
   },
   execute: (input: ConnectionOnboarding.SshConnectionInput) =>
     ConnectionOnboarding.ConnectionOnboarding.pipe(
-      Effect.flatMap((onboarding) => onboarding.registerSsh(input)),
+      Effect.flatMap((onboarding) =>
+        onboarding.registerSsh(input, t.chat.workLog.shared.remotePairing),
+      ),
     ),
 });

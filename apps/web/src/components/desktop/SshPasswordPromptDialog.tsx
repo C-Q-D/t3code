@@ -1,3 +1,5 @@
+/** Localized desktop presentation and existing interaction behavior. */
+import { t } from "~/i18n";
 import type { DesktopSshPasswordPromptRequest } from "@t3tools/contracts";
 import { useEffect, useId, useRef, useState } from "react";
 
@@ -21,10 +23,11 @@ function formatRemainingSeconds(seconds: number): string {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
+/** Returns the supplied SSH response error, replacing expired or no-longer-pending responses with reconnection guidance. */
 function getPromptErrorMessage(error: unknown): string {
-  const message = error instanceof Error ? error.message : "SSH password prompt failed.";
+  const message = error instanceof Error ? error.message : t.account.desktop.sshPromptFailed;
   return message.includes("expired") || message.includes("no longer pending")
-    ? "This SSH password prompt expired. Try connecting again."
+    ? t.account.desktop.sshExpired
     : message;
 }
 
@@ -60,6 +63,7 @@ export function SshPasswordPromptDialog() {
   );
 }
 
+/** Renders the supplied pending SSH request with countdown and response controls; submits a password only for the active request and does not persist it. */
 function ActiveSshPasswordPrompt({
   request,
   onRemove,
@@ -100,9 +104,7 @@ function ActiveSshPasswordPrompt({
   const remainingSeconds = remainingMs === null ? null : Math.ceil(remainingMs / 1_000);
   const remainingLabel =
     remainingSeconds === null ? null : formatRemainingSeconds(remainingSeconds);
-  const visibleResponseError = isExpired
-    ? "This SSH password prompt expired. Try connecting again."
-    : responseError;
+  const visibleResponseError = isExpired ? t.account.desktop.sshExpired : responseError;
 
   const respond = async (nextPassword: string | null) => {
     if (isRespondingRef.current) {
@@ -111,7 +113,7 @@ function ActiveSshPasswordPrompt({
 
     const requestId = request.requestId;
     if (nextPassword !== null && isExpired) {
-      setResponseError("This SSH password prompt expired. Try connecting again.");
+      setResponseError(t.account.desktop.sshExpired);
       return;
     }
 
@@ -158,10 +160,11 @@ function ActiveSshPasswordPrompt({
     >
       <DialogPopup className="max-w-md" showCloseButton={false}>
         <DialogHeader>
-          <DialogTitle>SSH Password Required</DialogTitle>
+          <DialogTitle>{t.account.desktop.sshPasswordRequired}</DialogTitle>
           <DialogDescription>
-            T3 needs your SSH password to connect to <code>{target}</code>. The password is passed
-            to the local SSH process for this connection attempt and is not saved by T3 Code.
+            {t.account.desktop.sshPasswordPrefix}
+            <code>{target}</code>
+            {t.account.desktop.sshPasswordSuffix}
           </DialogDescription>
         </DialogHeader>
         <DialogPanel scrollFade={false}>
@@ -184,7 +187,7 @@ function ActiveSshPasswordPrompt({
                         : "shrink-0 text-xs text-muted-foreground"
                     }
                   >
-                    {isExpired ? "Expired" : remainingLabel}
+                    {isExpired ? t.account.desktop.expired : remainingLabel}
                   </span>
                 ) : null}
               </div>
@@ -201,18 +204,16 @@ function ActiveSshPasswordPrompt({
             {visibleResponseError ? (
               <p className="text-sm text-destructive">{visibleResponseError}</p>
             ) : (
-              <p className="text-sm text-muted-foreground">
-                Use SSH keys to avoid repeated password prompts on new SSH sessions.
-              </p>
+              <p className="text-sm text-muted-foreground">{t.account.desktop.sshKeysHint}</p>
             )}
           </form>
         </DialogPanel>
         <DialogFooter>
           <Button disabled={isResponding} type="button" variant="outline" onClick={cancelPrompt}>
-            {isExpired ? "Dismiss" : "Cancel"}
+            {isExpired ? t.account.desktop.dismiss : t.common.confirm.cancel}
           </Button>
           <Button disabled={isResponding || isExpired} form={formId} type="submit">
-            Continue
+            {t.account.desktop.continue}
           </Button>
         </DialogFooter>
       </DialogPopup>

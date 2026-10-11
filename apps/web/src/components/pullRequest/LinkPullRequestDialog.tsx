@@ -1,3 +1,5 @@
+/** Owns link pull request dialog on the web pull-request surface; host data and agent context remain unchanged. */
+import { t } from "~/i18n";
 import { changeRequestUrlFor as changeRequestWebUrl } from "@t3tools/shared/changeRequestUrl";
 export { changeRequestUrlFor as changeRequestWebUrl } from "@t3tools/shared/changeRequestUrl";
 import {
@@ -77,6 +79,8 @@ interface ResolvedLink {
  * Which pull request an input names, or why it cannot. A URL carries its own host and
  * repository and may point at any repository on a host this environment has a project for; a
  * bare `#123` can only mean the thread's own repository.
+ * @param input Operation-specific state and options described by the input type.
+ * @returns A link target, an error presentation, or null for blank input.
  */
 export function resolveLinkPullRequestInput(input: {
   readonly reference: string;
@@ -95,7 +99,7 @@ export function resolveLinkPullRequestInput(input: {
   const url = parseChangeRequestUrl(parsed);
   if (url !== null) {
     if (!input.hasProject({ ...url, url: parsed })) {
-      return { error: `No project in this environment can read ${url.host}/${url.repository}.` };
+      return { error: t.git.pullRequest.noReadableProject(url.host, url.repository) };
     }
     return {
       link: { host: url.host, repository: url.repository, number: url.number, url: parsed },
@@ -104,18 +108,23 @@ export function resolveLinkPullRequestInput(input: {
   const number = Number(parsed);
   if (!Number.isSafeInteger(number) || number < 1) return null;
   if (input.project === null) {
-    return { error: "Paste a full URL to link a pull request from another repository." };
+    return { error: t.git.pullRequest.pasteAFullURLToLinkAPullRequestFromAnotherRepository };
   }
   const webUrl = input.project.webUrl(number);
   const webReference = webUrl === null ? null : parseChangeRequestUrl(webUrl);
   if (webUrl === null || webReference === null) {
-    return { error: "Paste a full URL; this project's host has no known pull request URL." };
+    return { error: t.git.pullRequest.pasteAFullURLThisProjectSHostHasNoKnownPullRequestURL };
   }
   return {
     link: { ...webReference, url: webUrl },
   };
 }
 
+/**
+ * Renders link pull request dialog from the supplied display data and callbacks.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 function LinkPullRequestDialog({
   open,
   threadRef,
@@ -180,7 +189,9 @@ function LinkPullRequestDialog({
     try {
       await linking.changeLink(threadRef, resolved.link.url, true);
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : "Could not link the pull request.");
+      setSubmitError(
+        error instanceof Error ? error.message : t.git.pullRequest.couldNotLinkThePullRequest,
+      );
       return;
     } finally {
       setPending(false);
@@ -191,9 +202,9 @@ function LinkPullRequestDialog({
   const validation = !dirty
     ? null
     : reference.trim().length === 0
-      ? "Paste a pull request URL or enter 123 / #123."
+      ? t.git.pullRequest.pasteAPullRequestURLOrEnter123123
       : resolved === null
-        ? "Use a pull request URL, 123, or #123."
+        ? t.git.pullRequest.applyAPullRequestURL123Or123
         : "error" in resolved
           ? resolved.error
           : null;
@@ -202,16 +213,18 @@ function LinkPullRequestDialog({
     <Dialog open={open} onOpenChange={(next) => (pending ? undefined : onOpenChange(next))}>
       <DialogPopup className="max-w-xl">
         <DialogHeader>
-          <DialogTitle>Link pull request</DialogTitle>
+          <DialogTitle>{t.git.pullRequest.linkPullRequest}</DialogTitle>
           <DialogDescription>
-            Attach a pull request to this thread. A full URL can point at any repository on a host
-            this environment has a project for.
+            {
+              t.git.pullRequest
+                .attachAPullRequestToThisThreadAFullURLCanPointAtAnyRepositoryOnAHostThisEnvironmentHa
+            }
           </DialogDescription>
         </DialogHeader>
         <DialogPanel>
           <Input
             ref={inputRef}
-            placeholder="Pull request URL or #42"
+            placeholder={t.git.pullRequest.pullRequestURLOr42}
             value={reference}
             onChange={(event) => {
               setDirty(true);
@@ -240,7 +253,7 @@ function LinkPullRequestDialog({
             onClick={() => onOpenChange(false)}
             disabled={pending}
           >
-            Cancel
+            {t.common.confirm.cancel}
           </Button>
           <Button
             type="button"
@@ -248,7 +261,7 @@ function LinkPullRequestDialog({
             onClick={() => void submit()}
             disabled={pending || resolved === null || "error" in resolved}
           >
-            {pending ? "Linking..." : "Link"}
+            {pending ? t.git.pullRequest.linking : t.git.pullRequest.link}
           </Button>
         </DialogFooter>
       </DialogPopup>

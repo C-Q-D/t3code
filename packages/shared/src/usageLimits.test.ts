@@ -1,3 +1,4 @@
+import { englishUsageLimitsMessages } from "./usageLabels.ts";
 import {
   EnvironmentId,
   ProviderDriverKind,
@@ -1204,4 +1205,20 @@ describe("ChatGPT sharing presentation", () => {
       }),
     ).toBe(false);
   });
+});
+
+it("formats reset modes from the timestamp without rewriting provider text", () => {
+  const messages = {
+    ...englishUsageLimitsMessages,
+    hoursMinutes: (hours: number, minutes: number) => `${hours}小时${minutes}分`,
+    resetsNow: "现在重置",
+    resetsIn: (duration: string) => `${duration}后重置`,
+    relativeReset: (duration: string) => `${duration}后`,
+    compactReset: (duration: string) => `↻ ${duration}`,
+  };
+  expect(formatResetsIn(window, now, messages)).toBe("2小时0分后重置");
+  expect(formatResetsIn(window, now, messages, "relative")).toBe("2小时0分后");
+  expect(formatResetsIn(window, now, messages, "compact")).toBe("↻ 2小时0分");
+  expect(formatResetsIn(window, Date.parse(window.resetsAt), messages, "compact")).toBe("现在重置");
+  expect(formatResetsIn({ ...window, resetsAt: "invalid" }, now, messages)).toBeNull();
 });

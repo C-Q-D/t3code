@@ -3,6 +3,18 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./remoteLabels": {
+      "types": "./src/remoteLabels.ts",
+      "default": "./src/remoteLabels.ts"
+    },
+    "./usageLabels": {
+      "types": "./src/usageLabels.ts",
+      "import": "./src/usageLabels.ts"
+    },
+    "./toolActivityLabels": {
+      "types": "./src/toolActivityLabels.ts",
+      "import": "./src/toolActivityLabels.ts"
+    },
     "./orchestrationV2ThreadError": {
       "types": "./src/orchestrationV2ThreadError.ts",
       "import": "./src/orchestrationV2ThreadError.ts"

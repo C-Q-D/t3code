@@ -1,3 +1,5 @@
+/** Builds palette rows and search rankings; keeps user data and command identities unchanged. */
+import { activeLocale, t } from "~/i18n";
 import { threadPullRequestSearchTerms } from "@t3tools/shared/threadPullRequests";
 import type { CommandPaletteLinkedThreads } from "../commandPaletteBus";
 import {
@@ -20,7 +22,10 @@ export const RECENT_THREAD_LIMIT = 12;
 export const ITEM_ICON_CLASS = "size-4 text-icon-muted";
 export const ADDON_ICON_CLASS = "size-4";
 
-/** A PR's relations include archived threads that normal palette search omits. */
+/** A PR's relations include archived threads that normal palette search omits.
+ * @param input Command context, item lists, and navigation callbacks defined by the input type.
+ * @returns Items or groups in display order; empty input or no matches yields an empty list.
+ */
 export function buildLinkedThreadActionItems(
   input: CommandPaletteLinkedThreads & {
     query: string;
@@ -31,8 +36,9 @@ export function buildLinkedThreadActionItems(
   return input.threads.map((thread) => ({
     kind: "action",
     value: `thread:${input.environmentId}:${thread.id}`,
-    title: thread.title || "Untitled thread",
-    description: thread.archivedAt === null ? "Linked thread" : "Archived thread",
+    title: thread.title || t.tools.palette.untitledThread,
+    description:
+      thread.archivedAt === null ? t.tools.palette.linkedThread : t.tools.palette.archivedThread,
     searchTerms: [input.query, thread.title],
     icon: input.icon,
     run: () => input.runThread({ environmentId: input.environmentId, id: thread.id }),
@@ -127,11 +133,14 @@ export interface CommandPaletteThreadContentMatch {
   readonly query: string;
 }
 
+/** Searchable palette entry; value and original keywords remain stable across UI languages. */
 export interface CommandPaletteItem {
   readonly kind: "action" | "submenu";
   readonly value: string;
   readonly searchTerms: ReadonlyArray<string>;
   readonly title: ReactNode;
+  /** Localized plain text for rich command titles; omitted for ordinary text and user data. */
+  readonly searchTitle?: string;
   readonly description?: ReactNode;
   readonly threadContentMatch?: CommandPaletteThreadContentMatch;
   readonly timestamp?: string;
@@ -251,6 +260,12 @@ export type CommandPaletteMode = "root" | "root-browse" | "submenu" | "submenu-b
 // every other surface uses the real title, so overriding it desyncs the icon.
 export type CommandPaletteProject = Project & { readonly displayName: string };
 
+/**
+ * Collects search terms and location labels for projects grouped into one palette entry.
+ * @param input Member projects and their environment labels; missing labels use localized Remote.
+ * @returns Titles, roots, and labels in project order, plus unique labels in first-seen order.
+ * Both arrays are empty when there are no projects.
+ */
 export function buildCommandPaletteProjectMetadata(input: {
   readonly projects: ReadonlyArray<Pick<Project, "environmentId" | "title" | "workspaceRoot">>;
   readonly locationByEnvironmentId: ReadonlyMap<EnvironmentId, { readonly label: string }>;
@@ -259,7 +274,9 @@ export function buildCommandPaletteProjectMetadata(input: {
   const environmentLabels = new Set<string>();
 
   for (const project of input.projects) {
-    const label = input.locationByEnvironmentId.get(project.environmentId)?.label ?? "Remote";
+    const label =
+      input.locationByEnvironmentId.get(project.environmentId)?.label ??
+      t.common.threadStatus.remote;
     searchTerms.push(project.title, project.workspaceRoot, label);
     environmentLabels.add(label);
   }
@@ -313,6 +330,11 @@ export type BuildThreadActionItemsThread = Pick<
   latestUserMessageAt?: string | null;
 };
 
+/**
+ * Builds visible, sorted thread commands; preserves title search priority and recency tie-breaking.
+ * @param input Command context, item lists, and navigation callbacks defined by the input type.
+ * @returns Items or groups in display order; empty input or no matches yields an empty list.
+ */
 export function buildThreadActionItems<TThread extends BuildThreadActionItemsThread>(input: {
   threads: ReadonlyArray<TThread>;
   activeThreadId?: Thread["id"];
@@ -347,7 +369,7 @@ export function buildThreadActionItems<TThread extends BuildThreadActionItemsThr
       descriptionParts.push(`#${thread.branch}`);
     }
     if (thread.id === input.activeThreadId) {
-      descriptionParts.push("Current thread");
+      descriptionParts.push(t.tools.palette.currentThread);
     }
 
     const leadingContent = input.renderLeadingContent?.(thread);
@@ -390,6 +412,34 @@ export function buildThreadActionItems<TThread extends BuildThreadActionItemsThr
   });
 }
 
+/**
+ * Supplies searchable UI text for static commands without changing their English keywords.
+ * @param item Palette action or submenu; searchTitle is plain text when title contains JSX.
+ * @returns Original keywords for English, user-data entries, or recency-ranked threads;
+ * otherwise the localized title followed by the original keywords, including empty terms.
+ */
+export function getLocalizedCommandSearchTerms(item: CommandPaletteItem): ReadonlyArray<string> {
+  const isStaticCommand =
+    item.value.startsWith("action:") ||
+    item.value.startsWith("appearance:") ||
+    item.value.startsWith("setting:") ||
+    item.value === "new-thread-in:no-project" ||
+    item.value === "new-project:existing" ||
+    item.value === "new-project:github";
+  const title = item.searchTitle ?? (typeof item.title === "string" ? item.title : undefined);
+  if (
+    activeLocale === "en" ||
+    item.searchRecency !== undefined ||
+    !isStaticCommand ||
+    !title ||
+    item.searchTerms[0] === title ||
+    item.value.startsWith("action:add-project:environment:")
+  ) {
+    return item.searchTerms;
+  }
+  return [title, ...item.searchTerms];
+}
+
 function rankSearchFieldMatch(
   field: string,
   normalizedQuery: string,
@@ -414,12 +464,20 @@ function rankSearchFieldMatch(
   return 0;
 }
 
+/**
+ * Scores the first localized search field containing every query token for group sorting.
+ * @param item Action or submenu entry with ordered search fields and optional thread recency.
+ * @param normalizedQuery Normalized full query used to prefer exact and prefix matches.
+ * @param queryTokens Tokens from that query; each must occur in the same field to score it.
+ * @returns Field-priority score, or zero when no field matches. Non-exact thread-title
+ * matches share a tier so the caller can break those ties using recency.
+ */
 function rankCommandPaletteItemMatch(
   item: CommandPaletteActionItem | CommandPaletteSubmenuItem,
   normalizedQuery: string,
   queryTokens: ReadonlyArray<string>,
 ): number {
-  const terms = item.searchTerms.filter((term) => term.length > 0);
+  const terms = getLocalizedCommandSearchTerms(item).filter((term) => term.length > 0);
   if (terms.length === 0) {
     return 0;
   }
@@ -438,6 +496,11 @@ function rankCommandPaletteItemMatch(
   return 0;
 }
 
+/**
+ * Filters and ranks items within each group using localized command text and original keywords.
+ * @param input Command context, item lists, and navigation callbacks defined by the input type.
+ * @returns Items or groups in display order; empty input or no matches yields an empty list.
+ */
 export function filterCommandPaletteGroups(input: {
   activeGroups: ReadonlyArray<CommandPaletteGroup>;
   query: string;
@@ -470,21 +533,21 @@ export function filterCommandPaletteGroups(input: {
     if (input.projectSearchItems.length > 0) {
       searchableGroups.push({
         value: "projects-search",
-        label: "Projects",
+        label: t.tools.palette.projects,
         items: input.projectSearchItems,
       });
     }
     if (input.settingsSearchItems && input.settingsSearchItems.length > 0) {
       searchableGroups.push({
         value: "settings-search",
-        label: "Settings",
+        label: t.tools.palette.settings,
         items: input.settingsSearchItems,
       });
     }
     if (input.threadSearchItems.length > 0) {
       searchableGroups.push({
         value: "threads-search",
-        label: "Threads",
+        label: t.tools.palette.threads,
         items: input.threadSearchItems,
       });
     }
@@ -492,7 +555,7 @@ export function filterCommandPaletteGroups(input: {
 
   return searchableGroups.flatMap((group) => {
     const items = Arr.filterMap(group.items, (item, index) => {
-      const haystack = normalizeSearchText(item.searchTerms.join(" "));
+      const haystack = normalizeSearchText(getLocalizedCommandSearchTerms(item).join(" "));
       if (!queryTokens.every((token) => haystack.includes(token))) {
         return Result.failVoid;
       }
@@ -520,6 +583,11 @@ export function filterCommandPaletteGroups(input: {
   });
 }
 
+/**
+ * Builds directory navigation items and an optional parent entry; paths remain unmodified.
+ * @param input Command context, item lists, and navigation callbacks defined by the input type.
+ * @returns Items or groups in display order; empty input or no matches yields an empty list.
+ */
 export function buildBrowseGroups(input: {
   browseEntries: ReadonlyArray<FilesystemBrowseEntry>;
   browseQuery: string;
@@ -559,7 +627,7 @@ export function buildBrowseGroups(input: {
     });
   }
 
-  return [{ value: "directories", label: "Directories", items }];
+  return [{ value: "directories", label: t.tools.palette.directories, items }];
 }
 
 export function filterPinnedBrowseEntries(input: {
@@ -591,33 +659,43 @@ export function getCommandPaletteMode(input: {
   return input.isBrowsing ? "root-browse" : "root";
 }
 
+/**
+ * Builds action and recent-thread groups, omitting groups whose item lists are empty.
+ * @param input Command context, item lists, and navigation callbacks defined by the input type.
+ * @returns Items or groups in display order; empty input or no matches yields an empty list.
+ */
 export function buildRootGroups(input: {
   actionItems: ReadonlyArray<CommandPaletteActionItem | CommandPaletteSubmenuItem>;
   recentThreadItems: ReadonlyArray<CommandPaletteActionItem>;
 }): CommandPaletteGroup[] {
   const groups: CommandPaletteGroup[] = [];
   if (input.actionItems.length > 0) {
-    groups.push({ value: "actions", label: "Actions", items: input.actionItems });
+    groups.push({ value: "actions", label: t.tools.palette.actions, items: input.actionItems });
   }
   if (input.recentThreadItems.length > 0) {
     groups.push({
       value: "recent-threads",
-      label: "Recent Threads",
+      label: t.tools.palette.recentThreads,
       items: input.recentThreadItems,
     });
   }
   return groups;
 }
 
+/**
+ * Returns the localized input hint for the current palette navigation mode.
+ * @param mode Current navigation mode that selects the input hint.
+ * @returns The value described above, without changing user data or protocol identifiers.
+ */
 export function getCommandPaletteInputPlaceholder(mode: CommandPaletteMode): string {
   switch (mode) {
     case "root":
-      return "Search commands, projects, and threads...";
+      return t.tools.palette.searchPlaceholder;
     case "root-browse":
-      return "Enter project path (e.g. ~/projects/my-app)";
+      return t.tools.palette.projectPathPlaceholder;
     case "submenu":
-      return "Search...";
+      return t.tools.palette.search;
     case "submenu-browse":
-      return "Enter path (e.g. ~/projects/my-app)";
+      return t.tools.palette.pathPlaceholder;
   }
 }

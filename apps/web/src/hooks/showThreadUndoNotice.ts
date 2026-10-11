@@ -1,3 +1,5 @@
+/** Groups reversible thread actions into a shared undo notice and expires their claims. */
+import { t } from "~/i18n";
 import {
   type AtomCommandResult,
   isAtomCommandInterrupted,
@@ -30,6 +32,7 @@ export const useThreadUndoNotice = create<{ notice: UndoNotice | null }>(() => (
 let liveUndos: UndoOptions[] = [];
 let expiry: ReturnType<typeof setTimeout> | undefined;
 
+/** Rebuilds the latest undo group from current claims, commits expired entries, and clears the notice when no claims remain. */
 function refreshNotice() {
   const stale = liveUndos.filter(({ claim }) => !claim.isCurrent());
   liveUndos = liveUndos.filter((entry) => !stale.includes(entry));
@@ -66,7 +69,8 @@ function refreshNotice() {
                 stackedThreadToast({
                   type: "error",
                   title: failureTitle,
-                  description: error instanceof Error ? error.message : "An error occurred.",
+                  description:
+                    error instanceof Error ? error.message : t.sidebar.errors.genericError,
                 }),
               );
             };

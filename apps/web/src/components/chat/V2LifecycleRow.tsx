@@ -116,7 +116,7 @@ export function V2LifecycleRow(props: {
     const tokenDetail =
       item.beforeTokenCount === undefined && item.afterTokenCount === undefined
         ? null
-        : `${item.beforeTokenCount ?? "?"} → ${item.afterTokenCount ?? "?"} tokens`;
+        : t.chat.timeline.tokenChange(item.beforeTokenCount ?? "?", item.afterTokenCount ?? "?");
     const label =
       item.status === "failed"
         ? t.chat.timeline.contextCompactionFailed

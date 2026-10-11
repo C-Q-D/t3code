@@ -1,3 +1,5 @@
+/** Presents permission status and the actions required to grant missing permissions. */
+import { t } from "~/i18n";
 import { CircleCheckIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 import { Button } from "../ui/button";
@@ -11,6 +13,7 @@ export interface PermissionItem {
   onAllow: () => void;
 }
 
+/** Renders the supplied permission entries and their request actions; busy disables concurrent requests. */
 export function PermissionChecklist({
   permissions,
   busy = false,
@@ -30,11 +33,11 @@ export function PermissionChecklist({
           {permission.granted ? (
             <span role="status" className="flex items-center gap-1 text-xs text-success">
               <CircleCheckIcon className="size-4" aria-hidden="true" />
-              Allowed
+              {t.app.permissions.allowed}
             </span>
           ) : (
             <Button size="xs" variant="outline" disabled={busy} onClick={permission.onAllow}>
-              Allow
+              {t.app.permissions.allow}
             </Button>
           )}
         </div>
@@ -43,10 +46,11 @@ export function PermissionChecklist({
   );
 }
 
+/** Renders a continue action, disabled unless ready and not busy; children override the default label and remaining props configure the button. */
 export function PermissionContinueButton({
   ready,
   busy = false,
-  children = "Continue",
+  children = t.app.actions.continue,
   ...props
 }: Omit<ComponentProps<typeof Button>, "disabled"> & { ready: boolean; busy?: boolean }) {
   return (
