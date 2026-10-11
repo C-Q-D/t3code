@@ -2,10 +2,89 @@
 import type { Messages } from "../en";
 
 export const chat: Messages["chat"] = {
+  modelPicker: {
+    updateRequiredMessages: {
+      /** Joins provider-supplied model names for the update notice. */
+      formatModelList: (names: ReadonlyArray<string>) => names.join("、"),
+      /** Names the provider version required to enable the supplied models. */
+      updateRequired: (provider: string, version: string, models: string) =>
+        `请将 ${provider} 更新至 ${version} 或更新版本，以使用 ${models}。`,
+      codexRuntime: "Codex CLI",
+    },
+  },
+  providerSettingsLink: "Provider 设置",
+  threadFind: {
+    searching: "正在搜索…",
+    failed: "搜索失败",
+    label: "在线程中查找",
+    retry: "重试",
+    previous: "上一个匹配项",
+    next: "下一个匹配项",
+    close: "关闭查找",
+  },
+  newComponents: {
+    threadUnavailable: "线程已不可用",
+  },
+  codeLanguage: {
+    plainText: "纯文本",
+    search: "搜索语言",
+    empty: "没有匹配的语言。",
+    /** Formats label with the supplied display values. */
+    label: (language: string) => `代码语言：${language}`,
+  },
+  workflow: {
+    stopEntire: "停止整个工作流",
+    failed: "失败",
+    noAgents: "暂无代理",
+    /** Formats openChat with the supplied display values. */
+    openChat: (title: string) => `打开 ${title} 对话`,
+    /** Formats stop with the supplied display values. */
+    stop: (label: string) => `停止工作流 ${label}`,
+    /** Formats collapse with the supplied display values. */
+    collapse: (label: string) => `收起 ${label}`,
+    /** Formats expand with the supplied display values. */
+    expand: (label: string) => `展开 ${label}`,
+    /** Formats phaseLabel with the supplied display values. */
+    phaseLabel: (open: boolean, title: string, status: string) =>
+      `${open ? "收起" : "展开"} ${title} 阶段，${status}`,
+    /** Formats agentProgress with the supplied display values. */
+    agentProgress: (settled: number, total: number) => `${settled}/${total} 个代理`,
+    status: {
+      running: "运行中",
+      failed: "失败",
+      stopped: "已停止",
+      done: "已完成",
+      notStarted: "未开始",
+    },
+  },
+  mcpApp: {
+    show: "显示应用",
+    exitFullscreen: "退出全屏",
+    /** Formats allowTool with the supplied display values. */
+    allowTool: (server: string, name: string, args: string) =>
+      `允许 ${server} 运行 ${name}？\n${args}`,
+    /** Formats sendMessage with the supplied display values. */
+    sendMessage: (server: string, text: string) => `发送来自 ${server} 的这条消息？\n${text}`,
+    /** Formats saveFiles with the supplied display values. */
+    saveFiles: (names: string, server: string) => `保存来自 ${server} 的 ${names}？`,
+    /** Formats closed with the supplied display values. */
+    closed: (server: string) => `${server} 应用已关闭`,
+    /** Formats navigatedAway with the supplied display values. */
+    navigatedAway: (server: string) => `${server} 应用已离开其页面并停止`,
+    /** Formats title with the supplied display values. */
+    title: (server: string) => `${server} 应用`,
+    /** Formats loadFailed with the supplied display values. */
+    loadFailed: (server: string) => `无法加载 ${server} 应用`,
+  },
   /** Formats a conversation count without an English plural branch. */
   threadCount: (count) => `${count} 个对话`,
 
   view: {
+    appNeedsStartedThread: "应用消息需要已启动的线程。",
+    appMessageFailed: "无法发送应用消息。",
+    /** Describes how many child agents await user input. */
+    subagentsNeedInput: (count: number) => `${count} 个子代理需要输入`,
+    openQuestion: "打开问题",
     genericError: "发生错误。",
     terminalOpen: "打开终端",
     terminalWrite: "写入终端",
@@ -337,6 +416,8 @@ export const chat: Messages["chat"] = {
     modelWorktreeHint: "每个模型都在独立的worktree中启动。",
   },
   header: {
+    /** Labels navigation to the named parent thread. */
+    openParentThread: (title: string) => `打开父线程：${title}`,
     emptyTitleError: "对话标题不能为空",
     renameError: "重命名对话失败",
     genericError: "发生错误。",
@@ -349,6 +430,14 @@ export const chat: Messages["chat"] = {
     threadActions: (title) => `${title} 的对话操作`,
   },
   timeline: {
+    threadReadPrefixes: {
+      running: "正在读取线程",
+      completed: "已读取线程",
+      failed: "未能读取线程",
+      stopped: "已停止读取线程",
+      declined: "已拒绝读取线程",
+    },
+    cutOffBySteer: "被追加指令中断",
     emptyResponse: "（空响应）",
     tokenChange: (before: number | string, after: number | string) =>
       `${before} → ${after} 个 token`,
@@ -445,7 +534,6 @@ export const chat: Messages["chat"] = {
     /** Formats an optional already formatted usage reset time. */
     usageLimit: (resetTime) => `已达到用量限制。${resetTime ? `请在${resetTime}后重试。` : ""}`,
     sendAMessageToStartTheConversation: "发送消息以开始对话。",
-    partialOutputRetained: "已保留部分输出",
     compacting: "正在压缩…",
     screenshotUnavailable: "截图不可用",
     retry: "重试",
@@ -555,6 +643,9 @@ export const chat: Messages["chat"] = {
     pathSuffix: " 的路径。",
   },
   citation: {
+    /** Identifies the quoted assistant text by its display label. */
+    quotedText: (label: string) => `引用的助手文本：${label}`,
+    goToSource: "转到来源",
     viewSource: "查看来源",
     editCitationComment: "编辑引用评论",
     addCommentToCitation: "为引用添加评论",
@@ -589,8 +680,6 @@ export const chat: Messages["chat"] = {
     nextRunSuffix: (relative: string) => ` · 下次运行：${relative}`,
     pausedSuffix: " · 已暂停",
     workspace: "工作区",
-    clientAndServerVersionsDiffer: "客户端与服务器版本不同",
-    dismissVersionMismatchWarning: "关闭版本不匹配警告",
     versionControl: "版本控制",
     threadDetails: "对话详情",
     resolve: "解决冲突",
@@ -613,8 +702,6 @@ export const chat: Messages["chat"] = {
     editAutomation: "编辑自动任务",
     runNow: "立即运行",
     watchingHint: "正在关注：检查完成、有人评论或分支出现冲突时，Agent会被唤醒。点击以停止。",
-    /** Formats the client version before the server version. */
-    clientVersion: (version) => `客户端 ${version} · `,
     /** Names the pull request by number. */
     pullRequest: (number) => `拉取请求 #${number}`,
     /** Names the selected pull request merge method. */
@@ -643,6 +730,7 @@ export const chat: Messages["chat"] = {
     loadAutomationsError: (error) => `无法加载自动任务：${error}`,
   },
   relationships: {
+    stopWorkflowFailed: "无法停止工作流",
     failedCount: (count: number) => `${count} 个失败`,
     starting: "正在启动",
     running: "运行中",
@@ -1048,6 +1136,7 @@ export const chat: Messages["chat"] = {
       },
       t3Tools: {
         labels: {
+          t3_workflow_stop: ["停止", "正在停止", "已请求停止", "工作流"],
           link_pull_request: ["关联", "正在关联", "已关联", "拉取请求"],
           unlink_pull_request: ["取消关联", "正在取消关联", "已取消关联", "拉取请求"],
           list_thread_pull_requests: ["检查", "正在检查", "已检查", "关联的拉取请求"],
@@ -1141,6 +1230,9 @@ export const chat: Messages["chat"] = {
         pullRequest: (number) => `拉取请求 #${number}`,
         joinLabel: (verb, target) => `${verb}${target}`,
         summary: {
+          /** Describes stop requests for the supplied workflow count and outcome. */
+          "workflow-stop": (count: number, succeeded: boolean) =>
+            `${succeeded ? "已请求停止" : "尝试停止"} ${count} 个工作流`,
           delegate: (count, succeeded) => `${succeeded ? "已委派" : "尝试委派"} ${count} 个任务`,
           "thread-list": (count, succeeded) =>
             `${succeeded ? "已列出对话" : "尝试列出对话"} ${count} 次`,

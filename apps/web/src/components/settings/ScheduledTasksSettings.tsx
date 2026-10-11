@@ -1185,6 +1185,7 @@ function ScheduledTaskEditorDialog({
 
             <Field label={t.settings.scheduledTasks.editor.modelLabel}>
               <ProviderModelPicker
+                environmentId={environmentId}
                 disabled={saving || !connected}
                 activeInstanceId={activeInstanceId}
                 model={activeModel}

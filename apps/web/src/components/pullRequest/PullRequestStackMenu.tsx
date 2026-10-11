@@ -35,6 +35,7 @@ import { PullRequestGlyph } from "./pullRequestIcons";
  * @returns The rendered surface.
  */
 export function PullRequestStackMenu({
+  hostLabel,
   stack,
   reference,
   environmentId,
@@ -46,6 +47,8 @@ export function PullRequestStackMenu({
   notice,
   onRetry,
 }: {
+  /** The host's name, which reports what it did with the stack. */
+  hostLabel: string;
   notice?: string | null;
   onRetry?: (() => void) | undefined;
   stack: PullRequestStack;
@@ -94,6 +97,11 @@ export function PullRequestStackMenu({
       layer.headSha ? [{ number: layer.number, headSha: layer.headSha }] : [],
     );
     setPending(true);
+    setConfirmation(null);
+    const toastId = toastManager.add({
+      type: "loading",
+      title: action === "merge" ? "Merging stack..." : "Rebasing stack...",
+    });
     const result = await runAction({
       environmentId,
       input: {
@@ -106,25 +114,24 @@ export function PullRequestStackMenu({
       },
     });
     setPending(false);
-    setConfirmation(null);
     onActed();
     if (result._tag === "Failure") {
-      toastManager.add({
+      toastManager.update(toastId, {
         type: "error",
-        title: t.git.pullRequest.stackOperationDidNotComplete,
+        title:
+          action === "merge"
+            ? t.git.pullRequest.couldNotMergeStack
+            : t.git.pullRequest.couldNotRebaseStack,
         description: String(squashAtomCommandFailure(result)),
       });
     } else {
-      toastManager.add({
+      toastManager.update(toastId, {
         type: "success",
         title:
           action === "merge"
             ? t.git.pullRequest.stackMergeRequestCompleted
             : t.git.pullRequest.stackRebased,
-        description:
-          action === "merge"
-            ? t.git.pullRequest.gitHubMergedTheStackOrAddedItToItsMergeQueue
-            : undefined,
+        description: action === "merge" ? t.git.pullRequest.hostMergedStack(hostLabel) : undefined,
       });
     }
   };
@@ -231,10 +238,10 @@ export function PullRequestStackMenu({
       <Dialog
         open={confirmation !== null}
         onOpenChange={(value) => {
-          if (!value && !pending) setConfirmation(null);
+          if (!value) setConfirmation(null);
         }}
       >
-        <DialogPopup className="max-w-md" showCloseButton={!pending}>
+        <DialogPopup className="max-w-md">
           <DialogHeader>
             <DialogTitle>
               {confirmation === "merge"
@@ -247,6 +254,7 @@ export function PullRequestStackMenu({
                     reference.number,
                     stack.base,
                     mergeMethod,
+                    hostLabel,
                   )
                 : t.git.pullRequest.rebaseStackConfirmation(stack.base)}
             </DialogDescription>
@@ -264,15 +272,13 @@ export function PullRequestStackMenu({
             </ul>
           </DialogPanel>
           <DialogFooter>
-            <Button variant="outline" disabled={pending} onClick={() => setConfirmation(null)}>
+            <Button variant="outline" onClick={() => setConfirmation(null)}>
               {t.common.confirm.cancel}
             </Button>
-            <Button disabled={pending} onClick={() => void run()}>
-              {pending
-                ? t.git.pullRequest.working
-                : confirmation === "merge"
-                  ? t.git.pullRequest.mergeStack
-                  : t.git.pullRequest.rebaseStack}
+            <Button onClick={() => void run()}>
+              {confirmation === "merge"
+                ? t.git.pullRequest.mergeStack
+                : t.git.pullRequest.rebaseStack}
             </Button>
           </DialogFooter>
         </DialogPopup>

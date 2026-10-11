@@ -16,14 +16,26 @@ const en = {
     settings: "Settings...",
     checkForUpdates: "Check for Updates...",
     pasteAsText: "Paste as Text",
+    reload: "Reload",
+    forceReload: "Force Reload",
+    toggleDevTools: "Toggle Developer Tools",
     actualSize: "Actual Size",
     zoomIn: "Zoom In",
     zoomOut: "Zoom Out",
-    // Leaving English roles unlabeled preserves Electron's platform-specific defaults.
-    roleLabels: (
-      _appName: string,
-      _platform: string,
-    ): Readonly<Partial<Record<MenuRole, string>>> => ({}),
+    // Brand the application roles on macOS; Electron supplies other platform defaults.
+    roleLabels: (appName: string, platform: string): Readonly<Partial<Record<MenuRole, string>>> =>
+      platform === "darwin"
+        ? { about: `About ${appName}`, hide: `Hide ${appName}`, quit: `Quit ${appName}` }
+        : {},
+  },
+  preview: {
+    open: "Open",
+    cancel: "Cancel",
+    openLink: (protocol: string) => `Open this ${protocol} link?`,
+    externalApplicationDetail: (url: string) =>
+      `A page in the browser wants to open another application:\n\n${url}`,
+    choosePasskey: "Choose a passkey",
+    unnamedPasskey: "Unnamed passkey",
   },
   updates: {
     upToDateTitle: "You're up to date!",
@@ -71,6 +83,9 @@ const zhCN: DesktopMessages = {
     settings: "设置…",
     checkForUpdates: "检查更新…",
     pasteAsText: "粘贴为纯文本",
+    reload: "重新加载",
+    forceReload: "强制重新加载",
+    toggleDevTools: "切换开发者工具",
     actualSize: "实际大小",
     zoomIn: "放大",
     zoomOut: "缩小",
@@ -101,6 +116,14 @@ const zhCN: DesktopMessages = {
       zoom: "缩放",
       front: "全部前置",
     }),
+  },
+  preview: {
+    open: "打开",
+    cancel: "取消",
+    openLink: (protocol) => `打开此 ${protocol} 链接？`,
+    externalApplicationDetail: (url) => `浏览器中的页面想要打开其他应用程序：\n\n${url}`,
+    choosePasskey: "选择通行密钥",
+    unnamedPasskey: "未命名的通行密钥",
   },
   updates: {
     upToDateTitle: "已是最新版本",

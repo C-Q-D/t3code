@@ -40,6 +40,7 @@ import {
   useResourceTelemetryHistory,
 } from "../../lib/resourceTelemetryState";
 import { cn } from "../../lib/utils";
+import { formatBytes } from "../../lib/formatBytes";
 import { ensureLocalApi } from "../../localApi";
 import { serverEnvironment } from "../../state/server";
 import { readEnvironmentScope, useEnvironmentScope } from "../../state/session";
@@ -81,18 +82,6 @@ const HISTORY_WINDOWS = [
     bucketMs: 2 * 60_000,
   },
 ] satisfies readonly [unknown, ...unknown[]];
-
-function formatBytes(value: number): string {
-  if (value < 1_024) return `${Math.round(value)} B`;
-  const units = ["KB", "MB", "GB", "TB"] as const;
-  let next = value;
-  let unitIndex = -1;
-  do {
-    next /= 1_024;
-    unitIndex += 1;
-  } while (next >= 1_024 && unitIndex < units.length - 1);
-  return `${next.toFixed(next >= 100 ? 0 : next >= 10 ? 1 : 2)} ${units[unitIndex]}`;
-}
 
 function formatRate(value: number): string {
   return `${formatBytes(value)}/s`;

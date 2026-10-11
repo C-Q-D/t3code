@@ -1,6 +1,7 @@
 /** English tool labels; excludes user data, persisted values, and protocol strings. */
 export const tools = {
   palette: {
+    pullRequestNumber: (number: number) => `Pull request #${number}`,
     untitledThread: "Untitled thread",
     linkedThread: "Linked thread",
     archivedThread: "Archived thread",
@@ -74,8 +75,11 @@ export const tools = {
     addExisting: "Add existing project",
     openOrClone: "Open a folder or clone a repository",
     options: "Options",
-    privateRepository: "Create private repository on GitHub",
-    githubAccount: "Your GitHub account",
+    privateRepository: "Create private repository",
+    privateRepositoryOn: (provider: string) => `Create private repository on ${provider}`,
+    providerAccount: (provider: string) => `Your ${provider} account`,
+    newRepositoryHost: "Host for the new repository",
+    findInThread: "Find in current thread",
     projectName: "Project name",
     createAndClone: "Create & Clone",
     clone: "Clone",
@@ -366,6 +370,15 @@ export const tools = {
     view3d: "3D view",
   },
   preview: {
+    fileNotShown: "This file can’t be shown here",
+    fileDownloaded: (host: string) => ` from ${host} was downloaded instead.`,
+    openInBrowser: "Open in browser",
+    download: "Download",
+    checkEnvironmentBrowser: "Opening it in the environment’s browser, which reaches its network",
+    environmentFallback: "the environment",
+    openEnvironmentBrowser: (label: string) => `Open in ${label}'s browser`,
+    openOnComputer: "Open on this computer",
+    moveFailed: "Unable to move the browser tab",
     navigation: "Navigation",
     back: "Back",
     forward: "Forward",
@@ -588,6 +601,12 @@ export const tools = {
       `Failed to load desktop preview configuration for environment "${environmentId}".`,
   },
   usage: {
+    providerCount: (count: number) => `${count} providers`,
+    connecting: "Connecting…",
+    allProviders: "All providers",
+    noProviders: "No providers",
+    updatingProviders: (count: number) => `Updating ${count} providers…`,
+    updatingProvider: (label: string) => `Updating ${label}…`,
     aheadOfPace: "Ahead of pace: spending faster than the window elapses",
     onPace: "On pace with the window",
     underPace: "Under pace: headroom left for the rest of the window",
@@ -805,6 +824,7 @@ export const tools = {
     modelPriceLabel: (field: string, model: string) => `${field} price for ${model || "new model"}`,
   },
   files: {
+    loading: "Loading…",
     tableTruncated:
       "Table limited to the first 100 rows and 30 columns. Switch to source for the rest.",
     markdownSource: "Show markdown source",
@@ -991,6 +1011,8 @@ export const tools = {
       `${matches}${truncated ? "+" : ""} results in ${files} files`,
   },
   terminal: {
+    selectAll: "Select all",
+    jumpToLatest: "Jump to latest",
     stopProcessHint: "This stops the running process and clears its history.",
     addToChat: "Add to chat",
     paste: "Paste",

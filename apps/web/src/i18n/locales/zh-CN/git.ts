@@ -2,7 +2,49 @@
 import type { Messages } from "../en";
 
 export const git: Messages["git"] = {
+  diffSearch: {
+    noResults: "无结果",
+    /** Formats the total number of matching results. */
+    results: (count: number) => `${count} 个结果`,
+    /** Formats the one-based current match index and total count. */
+    currentResult: (index: number, count: number) => `第 ${index} 项，共 ${count} 项`,
+    matchCase: "区分大小写",
+    wholeWord: "全字匹配",
+    regexp: "正则表达式",
+    replace: "替换",
+    replaceAll: "全部替换",
+    search: "查找",
+    previous: "上一个",
+    next: "下一个",
+    close: "关闭",
+  },
   pullRequest: {
+    attachByUrlOrNumber: "通过 URL 或此对话仓库中的请求编号，将拉取请求关联到此对话。",
+    couldNotMergeStack: "无法合并堆叠",
+    couldNotRebaseStack: "无法对堆叠变基",
+    confirmAutoMerge: "确认自动合并？",
+    confirmMerge: "确认合并？",
+    confirmClose: "确认关闭？",
+    confirmRevert: "确认撤销？",
+    confirmApprove: "确认批准？",
+    filterComments: "筛选评论",
+    filter: "筛选",
+    show: "显示",
+    botComments: "机器人评论",
+    resolvedOrDismissed: "已解决或已撤销",
+    runContext: "运行环境",
+    /** Formats the host-opening action for the selected provider. */
+    openOnHostName: (host) => `在 ${host} 上打开`,
+    /** Names the provider that merged or queued the stack. */
+    hostMergedStack: (host) => `${host} 已合并堆叠或将其加入合并队列。`,
+    /** Describes the selected host stack and its merge behavior. */
+    hostStack: (host, count) => `${host} 堆叠包含 ${count} 层：合并一层会同时合入下方层。`,
+    /** Counts comments excluded by the current filter. */
+    hiddenComments: (count) => `已隐藏 ${count} 条`,
+    /** Explains when the filter hides every comment. */
+    allCommentsHidden: (count) =>
+      count === 1 ? "唯一一条评论已被筛选器隐藏。" : `全部 ${count} 条评论已被筛选器隐藏。`,
+
     showPrefix: "显示",
     showOnlyPrefix: "仅显示",
     olderBotCommentStem: "条更早的机器人评论",
@@ -161,8 +203,8 @@ export const git: Messages["git"] = {
     /** Formats rebaseStackCount using count. */
     rebaseStackCount: (count) => `要变基${count}个拉取请求吗？`,
     /** Formats mergeStackConfirmation using number, base, method. */
-    mergeStackConfirmation: (number, base, method) =>
-      `使用 ${method} 将 #${number} 及下方未合并的层合并到 ${base}。GitHub会检查规则后合并或加入队列，并在合并后对剩余堆叠变基。`,
+    mergeStackConfirmation: (number, base, method, host) =>
+      `使用 ${method} 将 #${number} 及下方未合并的层合并到 ${base}。${host} 会检查规则后合并或加入队列，并在合并后对剩余堆叠变基。`,
     /** Formats rebaseStackConfirmation using base. */
     rebaseStackConfirmation: (base) =>
       `从底层到顶层将远程分支变基到${base}。此操作会重写分支历史，并可能重启检查。某层失败时，先前的更新会保留。`,
@@ -176,8 +218,6 @@ export const git: Messages["git"] = {
     linkedThreadsCount: (count) => `来自${count}个对话的关联`,
     /** Formats viewCommit using commit. */
     viewCommit: (commit) => `查看提交${commit}`,
-    /** Formats githubStack using count. */
-    githubStack: (count) => `GitHub堆叠包含${count}层：合并一层会同时合入下方层。`,
     /** Formats chainedRequests using count. */
     chainedRequests: (count) => `${count}个拉取请求按基准分支串联。`,
     /** Formats requestActions using number. */
@@ -231,8 +271,6 @@ export const git: Messages["git"] = {
     pasteAPullRequestURLOrEnter123123: "粘贴拉取请求URL，或输入123 / #123。",
     applyAPullRequestURL123Or123: "使用拉取请求URL、123或#123。",
     linkPullRequest: "关联拉取请求",
-    attachAPullRequestToThisThreadAFullURLCanPointAtAnyRepositoryOnAHostThisEnvironmentHa:
-      "将拉取请求关联到此对话。完整URL可指向此环境中已有项目所在托管平台的任意仓库。",
     pullRequestURLOr42: "拉取请求URL或#42",
     linking: "正在关联…",
     link: "关联",
@@ -562,7 +600,6 @@ export const git: Messages["git"] = {
     stackOperationDidNotComplete: "堆叠操作未完成",
     stackMergeRequestCompleted: "堆叠合并请求已完成",
     stackRebased: "堆叠已变基",
-    gitHubMergedTheStackOrAddedItToItsMergeQueue: "GitHub已合并堆叠或将其加入合并队列。",
     retryStackRefresh: "重试刷新堆叠",
     rebaseStack: "变基堆叠",
     everyLayerBeingMergedMustBeOpenAndReadyForReview: "要合并的每层必须开放且可评审。",
@@ -873,6 +910,11 @@ export const git: Messages["git"] = {
     preparingPullRequestThread: "正在准备拉取请求对话",
   },
   diff: {
+    diffOptions: "差异选项",
+    wrapLines: "自动换行",
+    stacked: "上下排列",
+    split: "并排显示",
+
     /** Formats expandFile using path. */
     expandFile: (path) => `展开${path}`,
     /** Formats collapseFile using path. */

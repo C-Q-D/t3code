@@ -77,7 +77,8 @@ import { Button } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import {
   THREAD_DETAILS_PANEL_ICON_CLASS,
-  THREAD_DETAILS_PANEL_LINK_SPLIT_GROUP_CLASS,
+  THREAD_DETAILS_PANEL_LABEL_CLASS,
+  THREAD_DETAILS_PANEL_SPLIT_GROUP_CLASS,
   THREAD_DETAILS_PANEL_SPLIT_SEPARATOR_CLASS,
 } from "./threadDetailsPanelStyles";
 
@@ -392,7 +393,7 @@ export function ThreadDetailsPrRow({
       </Tooltip>
     ) : null;
 
-  const openRow = (text: string, part: "row" | "link-primary") => (
+  const openRow = (text: string, part: "row" | "primary") => (
     <Tooltip>
       <TooltipTrigger
         render={
@@ -407,7 +408,9 @@ export function ThreadDetailsPrRow({
         }
       >
         {icon}
-        <span className="min-w-0 flex-1 truncate text-left">{text}</span>
+        <span className={cn("min-w-0 flex-1 truncate text-left", THREAD_DETAILS_PANEL_LABEL_CLASS)}>
+          {text}
+        </span>
       </TooltipTrigger>
       {rowTooltip}
     </Tooltip>
@@ -459,8 +462,8 @@ export function ThreadDetailsPrRow({
           </div>
         </div>
       ) : watching ? (
-        <div className={THREAD_DETAILS_PANEL_LINK_SPLIT_GROUP_CLASS}>
-          {openRow(label, "link-primary")}
+        <div className={THREAD_DETAILS_PANEL_SPLIT_GROUP_CLASS}>
+          {openRow(label, "primary")}
           <span aria-hidden="true" className={THREAD_DETAILS_PANEL_SPLIT_SEPARATOR_CLASS} />
           {watchControl("secondary")}
         </div>

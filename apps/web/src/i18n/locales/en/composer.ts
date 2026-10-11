@@ -132,8 +132,17 @@ export const composer = {
     implement: "Implement",
     implementationActions: "Implementation actions",
     implementNewThread: "Implement in a new thread",
+    fullLabel: "Full",
+    compactLabel: "Compact",
+    /** Labels the compaction toggle using a formatted history token count. */
+    compactHistoryAria: (tokens: string) => `Compact ${tokens} tokens of history before sending`,
+    /** Describes the full-history setting and how to switch to compaction. */
+    keepHistoryTooltip: (tokens: string) =>
+      `Next send keeps all ${tokens} tokens. Click to compact first`,
+    /** Describes the compaction setting and how to keep the full history. */
+    compactHistoryTooltip: (tokens: string) =>
+      `Next send compacts ${tokens} tokens first. Click to keep full history`,
     compactSend: "Compact and send",
-    sendOptions: "Send options",
     updateQueued: "Update queued message",
     queue: "Queue message",
     steer: "Steer message",
@@ -152,8 +161,6 @@ export const composer = {
       `Click to ${behavior}, Ctrl/⌘-click${shortcut ? ` or ${shortcut}` : ""} to ${alternateAction}`,
     /** Describes compaction using an already formatted history token count. */
     summarizeHistory: (tokens: string) => `Summarize ${tokens} tokens of history, then send`,
-    /** Describes sending without compaction using a formatted history token count. */
-    fullHistory: (tokens: string) => `Send with full history (${tokens} tokens)`,
     submitting: "Submitting...",
   },
   stash: {

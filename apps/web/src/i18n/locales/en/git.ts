@@ -1,6 +1,52 @@
 /** English UI labels for PRs, Git operations, diffs, and branches; excludes persisted values and protocol strings. */
 export const git = {
+  diffSearch: {
+    noResults: "No results",
+    /** Formats the total number of matching results. */
+    results: (count: number) => `${count} results`,
+    /** Formats the one-based current match index and total count. */
+    currentResult: (index: number, count: number) => `${index} of ${count}`,
+    matchCase: "Match Case",
+    wholeWord: "Whole Word",
+    regexp: "Regexp",
+    replace: "Replace",
+    replaceAll: "Replace All",
+    search: "Search",
+    previous: "Previous",
+    next: "Next",
+    close: "Close",
+  },
   pullRequest: {
+    attachByUrlOrNumber:
+      "Attach a pull request to this thread by its URL, or by its number for this thread's repository.",
+    couldNotMergeStack: "Could not merge the stack",
+    couldNotRebaseStack: "Could not rebase the stack",
+    confirmAutoMerge: "Confirm auto-merge?",
+    confirmMerge: "Confirm merge?",
+    confirmClose: "Confirm close?",
+    confirmRevert: "Confirm revert?",
+    confirmApprove: "Confirm approve?",
+    filterComments: "Filter comments",
+    filter: "Filter",
+    show: "Show",
+    botComments: "Bot comments",
+    resolvedOrDismissed: "Resolved or dismissed",
+    runContext: "Run context",
+    /** Formats the host-opening action for the selected provider. */
+    openOnHostName: (host: string) => `Open on ${host}`,
+    /** Names the provider that merged or queued the stack. */
+    hostMergedStack: (host: string) => `${host} merged the stack or added it to its merge queue.`,
+    /** Describes the selected host stack and its merge behavior. */
+    hostStack: (host: string, count: number) =>
+      `${host} stack of ${count}: merging a layer lands the ones below it.`,
+    /** Counts comments excluded by the current filter. */
+    hiddenComments: (count: number) => `${count} hidden`,
+    /** Explains when the filter hides every comment. */
+    allCommentsHidden: (count: number) =>
+      count === 1
+        ? "The only comment is hidden by the filter."
+        : `All ${count} comments are hidden by the filter.`,
+
     showPrefix: "Show ",
     showOnlyPrefix: "Show only ",
     olderBotCommentStem: " older bot comment",
@@ -173,8 +219,8 @@ export const git = {
     /** Formats rebaseStackCount using count. */
     rebaseStackCount: (count: number) => `Rebase ${count} pull requests?`,
     /** Formats mergeStackConfirmation using number, base, method. */
-    mergeStackConfirmation: (number: number, base: string, method: string) =>
-      `Merge #${number} and its unmerged layers below into ${base} using ${method}. GitHub checks their rules before merging or queueing them and rebases the remaining stack after merging.`,
+    mergeStackConfirmation: (number: number, base: string, method: string, host: string) =>
+      `Merge #${number} and its unmerged layers below into ${base} using ${method}. ${host} checks their rules before merging or queueing them and rebases the remaining stack after merging.`,
     /** Formats rebaseStackConfirmation using base. */
     rebaseStackConfirmation: (base: string) =>
       `Rebase the remote branches from bottom to top onto ${base}. This rewrites branch history and may restart checks. If a layer fails, earlier updates remain.`,
@@ -190,9 +236,6 @@ export const git = {
       `Linked from ${count} ${count === 1 ? "thread" : "threads"}`,
     /** Formats viewCommit using commit. */
     viewCommit: (commit: string) => `View commit ${commit}`,
-    /** Formats githubStack using count. */
-    githubStack: (count: number) =>
-      `GitHub stack of ${count}: merging a layer lands the ones below it.`,
     /** Formats chainedRequests using count. */
     chainedRequests: (count: number) => `${count} pull requests chained by base branch.`,
     /** Formats requestActions using number. */
@@ -251,8 +294,6 @@ export const git = {
     pasteAPullRequestURLOrEnter123123: "Paste a pull request URL or enter 123 / #123.",
     applyAPullRequestURL123Or123: "Use a pull request URL, 123, or #123.",
     linkPullRequest: "Link pull request",
-    attachAPullRequestToThisThreadAFullURLCanPointAtAnyRepositoryOnAHostThisEnvironmentHa:
-      "Attach a pull request to this thread. A full URL can point at any repository on a host this environment has a project for.",
     pullRequestURLOr42: "Pull request URL or #42",
     linking: "Linking...",
     link: "Link",
@@ -594,8 +635,6 @@ export const git = {
     stackOperationDidNotComplete: "Stack operation did not complete",
     stackMergeRequestCompleted: "Stack merge request completed",
     stackRebased: "Stack rebased",
-    gitHubMergedTheStackOrAddedItToItsMergeQueue:
-      "GitHub merged the stack or added it to its merge queue.",
     retryStackRefresh: "Retry stack refresh",
     rebaseStack: "Rebase stack",
     everyLayerBeingMergedMustBeOpenAndReadyForReview:
@@ -924,6 +963,11 @@ export const git = {
     preparingPullRequestThread: "Preparing pull request thread",
   },
   diff: {
+    diffOptions: "Diff options",
+    wrapLines: "Wrap lines",
+    stacked: "Stacked",
+    split: "Split",
+
     /** Formats expandFile using path. */
     expandFile: (path: string) => `Expand ${path}`,
     /** Formats collapseFile using path. */

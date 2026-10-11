@@ -17,6 +17,132 @@ import type {
 import type { ThemeColorRole } from "@t3tools/shared/themePalettes";
 
 export const settings = {
+  sourceControlHostFields: {
+    bitbucket: {
+      accessToken: {
+        label: "Access token",
+        description:
+          "Scoped to one repository, project, or workspace. Create it in that item's Bitbucket settings.",
+      },
+      email: {
+        label: "Atlassian account email",
+        description: "With an API token instead of an access token.",
+      },
+      apiToken: {
+        label: "API token",
+        description:
+          "Reaches every repository your Atlassian account can. Give it read and write access to repositories and pull requests, and read:user:bitbucket.",
+      },
+    },
+  },
+  merge: {
+    saveHostSettings: (label: string) => `save ${label} settings`,
+    hostRemove: "Remove",
+    cliInstallFailed: "Could not install t3",
+    cliRemoveFailed: "Could not remove t3",
+    cliFailure: "Something went wrong.",
+    cliDescription: "Run T3 Code's CLI as `t3` from any terminal.",
+    cliRemove: "Remove",
+    cliInstall: "Install",
+    cliShadowed: (path: string) =>
+      `Another t3 at ${path} runs first in a new terminal. Remove it to use T3 Code's.`,
+    cliInstalled: (path: string) => `Installed at ${path}. Open a new terminal to use it.`,
+    cliMissingPath: (path: string) =>
+      `Installed at ${path}, which is not on your PATH yet. Add its folder to your PATH to run \`t3\`.`,
+    telemetryOff: "Off",
+    telemetryUnchecked: "Not checked",
+    telemetryChecking: "Checking…",
+    telemetryTimeout: "Timed out",
+    telemetryUnreachable: "Unreachable",
+    telemetrySaved: "Saved. Restart the server to apply.",
+    telemetryConnected: (latency: number) => `Connected · ${latency} ms`,
+    telemetryRejected: (status: number) => `Rejected · HTTP ${status}`,
+    telemetryTitle: "OpenTelemetry export",
+    telemetryChooseEnvironment: "Choose one environment to configure its telemetry exports.",
+    telemetryDescription:
+      "Send traces, metrics, and logs to an OTLP HTTP receiver. Restart the server to apply. Environment variables override these settings.",
+    telemetryNoPermission: (environment: string) =>
+      `This connection lacks permission to change settings on ${environment}.`,
+    telemetrySelectedEnvironment: "the selected environment",
+    telemetryEndpoint: (signal: string) => `${signal} endpoint`,
+    telemetryTraces: "Traces",
+    telemetryMetrics: "Metrics",
+    telemetryLogs: "Logs",
+    telemetryEndpointHint: "Enter an HTTP or HTTPS endpoint, or leave empty to disable export.",
+    telemetryTest: "Test",
+    telemetryRunning: (endpoint: string) => `Running: ${endpoint}`,
+    telemetryDisabled: "Disabled",
+    telemetryDiscard: "Discard",
+    telemetrySaving: "Saving…",
+    telemetrySave: "Save",
+    storageAnyFiles: "Any local files",
+    storageUncommitted: "Uncommitted changes",
+    storageTracked: "Edited tracked files",
+    storageWorktrees: "Worktrees",
+    storageRotatedLogs: "Rotated logs",
+    storageBrowserArtifacts: "Browser artifacts",
+    storageLoadFailed: "Could not load the last run.",
+    storageLoadingRun: "Loading last run…",
+    storageNotRun: "Cleanup hasn't run yet.",
+    storageEnableRule: "Turn on a cleanup rule to use this.",
+    storageDeleting: "Deleting…",
+    storageDeleteNow: "Delete now",
+    storageAnyFilesHint: "Includes ignored files, except node_modules.",
+    storageTrackedHint: "Deletes untracked and ignored files, including .env.",
+    storageUncommittedHint:
+      "Keeps edits and untracked files. Deletes ignored files, including .env.",
+    storageMixed: "Mixed",
+    storageCleanup: "Cleanup",
+    storageLastRun: "Last run",
+    storageKeepLocal: "Keep worktrees with local changes",
+    storageFiles: (count: number) => `${count.toLocaleString()} ${count === 1 ? "file" : "files"}`,
+    storageMoreResults: (count: number) => `${count.toLocaleString()} more results.`,
+    storageNothingToClean: "Nothing needed cleanup.",
+    storageRunSummary: (time: string, bytes: string, failed: number) =>
+      `Last run ${time}. ${bytes} recovered.${failed > 0 ? ` ${failed} ${failed === 1 ? "item" : "items"} couldn't be removed.` : ""}`,
+    storageCleanupFailed: (environment: string) => `Cleanup failed on ${environment}`,
+    storageRunFailed: (environment: string) => `Could not run cleanup on ${environment}`,
+    storageResultCounts: (removed: number, kept: number, failed: number) =>
+      `${removed} removed, ${kept} kept${failed > 0 ? `, ${failed} failed` : ""}`,
+    hostCredentials: (label: string) => `${label} credentials`,
+    search: "Search",
+    version: "Version",
+    t3Command: "t3 command",
+
+    licenseTimeout: "The license manifest took too long to load.",
+    updating: "Updating",
+    modelPreferencesShared:
+      "Model preferences and custom models are saved on the selected environment and shared across connected devices.",
+    selectedEnvironment: "the selected environment",
+    primaryEnvironment: "the primary environment",
+    saveFailed: "The save failed. Try reconnecting and saving again.",
+    modelPreferencesNotSaved: "Model preferences not saved",
+    loadModelPreferencesFailed: "Could not load saved model preferences. Try again.",
+    favoritesNotSaved: "Favorites not saved",
+    startingUpdate: "Starting update",
+    storedSecret: "Stored secret, enter a new value to replace",
+    notSet: "Not set",
+    searchMatches: "Search matches",
+    currentMatch: "Current match",
+    keepLocalChanges: "Keep worktrees with local changes",
+    deleteNow: "Delete now",
+    telemetryExport: "OpenTelemetry export",
+    permissions: "Permissions",
+    activeRoutePermissions:
+      "These permissions apply to your active route. Other routes may have different permissions.",
+    currentConnectionPermissions: "These permissions apply to this client’s current connection.",
+    permissionAllowed: "Allowed",
+    permissionNotGranted: "Not granted",
+    permissionsNotChecked:
+      "Permissions not checked. Connect to this environment to view this session’s permissions.",
+    reorderRoutes: "Reorder routes",
+    permissionOn: (label: string) =>
+      `This connection lacks permission to change settings on ${label}.`,
+    couldNotSaveOn: (label: string, message: string) => `Could not save on ${label}: ${message}`,
+    savedOn: (labels: string) => `Saved on ${labels}.`,
+    updatingProgress: (progress: string) => `Updating · ${progress}`,
+  },
+
   sections: {
     appearanceLanguage: "Language",
     organization: "Organization",
@@ -617,9 +743,6 @@ export const settings = {
     },
     githubAccounts: {
       title: "GitHub accounts and token",
-    },
-    bitbucketCredentials: {
-      title: "Bitbucket credentials",
     },
     sourceControlWritingStyle: {
       title: "Source control writing style",
@@ -2139,28 +2262,6 @@ export const settings = {
     description: (environmentLabel: string) =>
       `Show the quota of every account the hub pools, next to the providers on ${environmentLabel}. The key stays on that server.`,
   },
-  bitbucketCredentials: {
-    accessToken: "Access token",
-    scopedOneRepositoryProjectWorkspaceHint:
-      "Scoped to one repository, project, or workspace. Create it in that item's Bitbucket settings.",
-    learnMore: "Learn more",
-    apiToken: "API token",
-    usesAtlassianAccountReachesEveryHint:
-      "Uses your Atlassian account, so it reaches every repository you can. Give it read and write access to repositories and pull requests, and read:user:bitbucket.",
-    createAnApiToken: "Create an API token",
-    storedSecretEnterValueReplace: "Stored secret, enter a new value to replace",
-    notSet: "Not set",
-    saveBitbucketCredentials: "save Bitbucket credentials",
-    bitbucketSignInMethod: "Bitbucket sign-in method",
-    atlassianAccountEmail: "Atlassian account email",
-    withoutSavedTokenServerFallsHint:
-      "Without a saved token, the server falls back to its T3CODE_BITBUCKET_* environment variables.",
-    savingReplacesYour: (
-      methodsCurrentLabelToLowerCase: string | number | boolean | null | undefined,
-    ) => `Saving replaces your ${methodsCurrentLabelToLowerCase}.`,
-    remove: "Remove",
-    save: "Save",
-  },
   branchNaming: {
     worktreeBranchesNamedFirstMessageHint:
       "Choose how new worktree branches are named from your first message.",
@@ -3619,6 +3720,10 @@ ${address}`
       terminalCursor: "Terminal Cursor",
       terminalSelection: "Terminal Selection",
       terminalScrollbar: "Terminal Scrollbar",
+      searchMatchActiveBackground: "Current search match background",
+      searchMatchActiveForeground: "Current search match text",
+      searchMatchBackground: "Search match background",
+      searchMatchForeground: "Search match text",
       terminalScrollbarHover: "Terminal Scrollbar Hover",
     } satisfies Record<ThemeColorRole, string>,
   },

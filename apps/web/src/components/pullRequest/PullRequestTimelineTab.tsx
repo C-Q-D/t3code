@@ -398,7 +398,7 @@ function CommitEvent({
   return (
     <button
       type="button"
-      className="group relative mb-5 block w-full cursor-pointer rounded-sm pl-12 text-left outline-none [contain-intrinsic-block-size:48px] [content-visibility:auto] focus-visible:ring-2 focus-visible:ring-ring"
+      className="group relative mb-5 block w-full cursor-pointer rounded-sm pl-12 text-left outline-none [contain-intrinsic-block-size:48px] [content-visibility:auto] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       aria-label={t.git.pullRequest.viewCommit(event.id)}
       onClick={() => onOpen(event.id)}
     >
@@ -574,6 +574,7 @@ function ReviewVerdictEvent({
  * @returns The rendered surface.
  */
 export function PullRequestTimelineTab({
+  scrollerRef,
   detail,
   environmentId,
   threadRef = null,
@@ -582,6 +583,7 @@ export function PullRequestTimelineTab({
   onOpenCommit,
   onRefresh,
 }: {
+  scrollerRef: (node: HTMLDivElement | null) => void;
   detail: PullRequestDetailView;
   environmentId: EnvironmentId;
   threadRef?: ScopedThreadRef | null;
@@ -613,7 +615,7 @@ export function PullRequestTimelineTab({
   };
 
   return (
-    <div className="h-full overflow-y-auto px-4 py-5">
+    <div ref={scrollerRef} className="scrollbar-gutter-both h-full overflow-y-auto px-4 py-5">
       <div className="mx-auto max-w-3xl">
         <div className="relative">
           <span aria-hidden className="absolute bottom-5 left-[15px] top-1 w-px bg-border/45" />

@@ -1,6 +1,10 @@
 /** Owns pull request link context menu on the web pull-request surface; host data and agent context remain unchanged. */
 import { t } from "~/i18n";
 import type { ContextMenuItem } from "@t3tools/contracts";
+import {
+  type SourceControlClientDefinition,
+  UNKNOWN_SOURCE_CONTROL_CLIENT,
+} from "@t3tools/client-runtime/source-control-clients";
 
 import { writeTextToClipboard } from "~/hooks/useCopyToClipboard";
 import { readLocalApi } from "~/localApi";
@@ -10,21 +14,10 @@ import { toastManager } from "../ui/toast";
 export type PullRequestLinkContextMenuAction = "copy-link" | "open-external";
 
 /** Named for the host rather than "externally": the point is where you will land. */
-const OPEN_ON_HOST_LABELS: Partial<Record<string, string>> = {
-  github: t.git.pullRequest.openOnGitHub,
-  gitlab: t.git.pullRequest.openOnGitLab,
-  forgejo: t.git.pullRequest.openOnForgejo,
-  bitbucket: t.git.pullRequest.openOnBitbucket,
-  "azure-devops": t.git.pullRequest.openOnAzureDevOps,
-};
-
-/**
- * Names the open-on-host action for a provider; unknown providers receive the generic host label.
- * @param provider Host provider identifier used only to select the menu label.
- * @returns The localized host-opening label, with a generic fallback for unknown hosts.
- */
-export const openOnHostLabel = (provider: string): string =>
-  OPEN_ON_HOST_LABELS[provider] ?? t.git.pullRequest.openOnHost;
+export const openOnHostLabel = (host: SourceControlClientDefinition): string =>
+  host === UNKNOWN_SOURCE_CONTROL_CLIENT
+    ? t.git.pullRequest.openOnHost
+    : t.git.pullRequest.openOnHostName(host.label);
 
 /** Copy first: it is the reason to right-click a number rather than click it.
  * @param openLabel Localized action label for opening this request on its host.

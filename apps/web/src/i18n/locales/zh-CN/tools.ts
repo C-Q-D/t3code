@@ -3,6 +3,7 @@ import type { Messages } from "../en";
 
 export const tools: Messages["tools"] = {
   palette: {
+    pullRequestNumber: (number: number) => `拉取请求 #${number}`,
     untitledThread: "未命名对话",
     linkedThread: "关联对话",
     archivedThread: "已归档对话",
@@ -75,8 +76,11 @@ export const tools: Messages["tools"] = {
     addExisting: "添加现有项目",
     openOrClone: "打开文件夹或克隆仓库",
     options: "选项",
-    privateRepository: "在 GitHub 上创建私有仓库",
-    githubAccount: "你的 GitHub 账户",
+    privateRepository: "创建私有仓库",
+    privateRepositoryOn: (provider: string) => `在 ${provider} 上创建私有仓库`,
+    providerAccount: (provider: string) => `你的 ${provider} 账户`,
+    newRepositoryHost: "新仓库的托管平台",
+    findInThread: "在当前线程中查找",
     projectName: "项目名称",
     createAndClone: "创建并克隆",
     clone: "克隆",
@@ -361,6 +365,15 @@ export const tools: Messages["tools"] = {
     view3d: "3D 视图",
   },
   preview: {
+    fileNotShown: "无法在此处显示该文件",
+    fileDownloaded: (host: string) => ` 来自 ${host}，已改为下载。`,
+    openInBrowser: "在浏览器中打开",
+    download: "下载",
+    checkEnvironmentBrowser: "在该环境的浏览器中打开，以访问其网络",
+    environmentFallback: "该环境",
+    openEnvironmentBrowser: (label: string) => `在 ${label} 的浏览器中打开`,
+    openOnComputer: "在此电脑上打开",
+    moveFailed: "无法移动浏览器标签页",
     navigation: "导航",
     back: "后退",
     forward: "前进",
@@ -564,6 +577,12 @@ export const tools: Messages["tools"] = {
     configLoadFailed: (environmentId) => `无法加载环境“${environmentId}”的桌面预览配置。`,
   },
   usage: {
+    providerCount: (count: number) => `${count} 个提供商`,
+    connecting: "正在连接…",
+    allProviders: "所有提供商",
+    noProviders: "未选择提供商",
+    updatingProviders: (count: number) => `正在更新 ${count} 个提供商…`,
+    updatingProvider: (label: string) => `正在更新 ${label}…`,
     aheadOfPace: "超出进度：消耗速度快于时段流逝速度",
     onPace: "消耗速度与时段进度一致",
     underPace: "低于进度：本时段剩余时间仍有可用额度",
@@ -768,6 +787,7 @@ export const tools: Messages["tools"] = {
     modelPriceLabel: (field, model) => `${model || "新模型"}的${field}价格`,
   },
   files: {
+    loading: "加载中…",
     tableTruncated: "表格仅显示前100行和30列。切换到源码查看其余内容。",
     markdownSource: "显示Markdown源码",
     renderedMarkdown: "显示渲染后的Markdown",
@@ -948,6 +968,8 @@ export const tools: Messages["tools"] = {
       `${files} 个文件中有 ${matches}${truncated ? "+" : ""} 个结果`,
   },
   terminal: {
+    selectAll: "全选",
+    jumpToLatest: "跳到最新输出",
     stopProcessHint: "这会停止正在运行的进程并清除其历史记录。",
     addToChat: "添加到对话",
     paste: "粘贴",

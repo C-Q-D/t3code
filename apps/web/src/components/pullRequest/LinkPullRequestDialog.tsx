@@ -1,12 +1,7 @@
-/** Owns link pull request dialog on the web pull-request surface; host data and agent context remain unchanged. */
+/** Links change requests by URL or number without changing host data. */
 import { t } from "~/i18n";
-import { changeRequestUrlFor as changeRequestWebUrl } from "@t3tools/shared/changeRequestUrl";
-export { changeRequestUrlFor as changeRequestWebUrl } from "@t3tools/shared/changeRequestUrl";
-import {
-  pullRequestHostOf,
-  type ScopedThreadRef,
-  type SourceControlProviderKind,
-} from "@t3tools/contracts";
+import { pullRequestHostOf, type ScopedThreadRef } from "@t3tools/contracts";
+import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import { useAtomValue } from "@effect/atom-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -77,10 +72,7 @@ interface ResolvedLink {
 
 /**
  * Which pull request an input names, or why it cannot. A URL carries its own host and
- * repository and may point at any repository on a host this environment has a project for; a
- * bare `#123` can only mean the thread's own repository.
- * @param input Operation-specific state and options described by the input type.
- * @returns A link target, an error presentation, or null for blank input.
+ * repository; a bare `#123` can only mean the thread's own repository.
  */
 export function resolveLinkPullRequestInput(input: {
   readonly reference: string;
@@ -148,15 +140,19 @@ function LinkPullRequestDialog({
       identity.displayName ??
       (identity.owner && identity.name ? `${identity.owner}/${identity.name}` : null);
     if (repository === null) return null;
-    const kind = identity.provider as SourceControlProviderKind;
-    const host = pullRequestHostOf(identity, kind);
+    const definition = sourceControlClients.get(identity.provider ?? "unknown");
+    const host = pullRequestHostOf(identity, definition.kind);
     return {
       host,
       repository,
       webUrl: (number: number) =>
-        kind === "forgejo" && identity.webUrl
-          ? `${identity.webUrl.replace(/\/+$/, "")}/pulls/${number}`
-          : changeRequestWebUrl(kind, host, repository, number, identity.locator.remoteUrl),
+        definition.changeRequestUrl({
+          host,
+          repository,
+          number,
+          remoteUrl: identity.locator.remoteUrl,
+          webUrl: identity.webUrl,
+        }),
     };
   }, [environmentProjects, projectId]);
   const linking = usePullRequestLinking(threadRef.environmentId);
@@ -214,12 +210,7 @@ function LinkPullRequestDialog({
       <DialogPopup className="max-w-xl">
         <DialogHeader>
           <DialogTitle>{t.git.pullRequest.linkPullRequest}</DialogTitle>
-          <DialogDescription>
-            {
-              t.git.pullRequest
-                .attachAPullRequestToThisThreadAFullURLCanPointAtAnyRepositoryOnAHostThisEnvironmentHa
-            }
-          </DialogDescription>
+          <DialogDescription>{t.git.pullRequest.attachByUrlOrNumber}</DialogDescription>
         </DialogHeader>
         <DialogPanel>
           <Input

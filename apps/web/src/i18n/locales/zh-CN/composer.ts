@@ -130,8 +130,16 @@ export const composer: Messages["composer"] = {
     implement: "实施",
     implementationActions: "实施操作",
     implementNewThread: "在新对话中实施",
+    fullLabel: "完整",
+    compactLabel: "压缩",
+    /** Labels the compaction toggle using a formatted history token count. */
+    compactHistoryAria: (tokens: string) => `发送前压缩 ${tokens} 个 token 的历史记录`,
+    /** Describes the full-history setting and how to switch to compaction. */
+    keepHistoryTooltip: (tokens: string) => `下次发送保留全部 ${tokens} 个 token。点击可先压缩`,
+    /** Describes the compaction setting and how to keep the full history. */
+    compactHistoryTooltip: (tokens: string) =>
+      `下次发送先压缩 ${tokens} 个 token。点击可保留完整历史`,
     compactSend: "压缩并发送",
-    sendOptions: "发送选项",
     updateQueued: "更新排队的消息",
     queue: "排队发送消息",
     steer: "引导消息",
@@ -150,8 +158,6 @@ export const composer: Messages["composer"] = {
       `点击以${behavior === "queue" ? "排队发送" : "引导"}，按住Ctrl/⌘ 点击${shortcut ? `或按 ${shortcut}` : ""}以${alternateAction === "queue" ? "排队发送" : alternateAction === "restart" ? "重新运行" : "引导"}`,
     /** Describes compaction using an already formatted history token count. */
     summarizeHistory: (tokens: string) => `总结 ${tokens} 个token的历史记录，然后发送`,
-    /** Describes sending without compaction using a formatted history token count. */
-    fullHistory: (tokens: string) => `带完整历史记录发送（${tokens} 个token）`,
     submitting: "正在提交…",
   },
   stash: {

@@ -164,6 +164,24 @@ const THEME_EDITOR_ROLE_GROUPS: ReadonlyArray<{
     ],
   },
   {
+    id: "search",
+    title: t.settings.merge.search,
+    families: [
+      {
+        id: "search-matches",
+        label: t.settings.merge.searchMatches,
+        role: "searchMatchBackground",
+        roles: ["searchMatchBackground", "searchMatchForeground"],
+      },
+      {
+        id: "current-match",
+        label: t.settings.merge.currentMatch,
+        role: "searchMatchActiveBackground",
+        roles: ["searchMatchActiveBackground", "searchMatchActiveForeground"],
+      },
+    ],
+  },
+  {
     id: "context",
     title: t.settings.themeEditor.context,
     families: [

@@ -1,5 +1,6 @@
 /** App shell and shared UI messages; excludes protocol and persisted values. */
 export const app = {
+  desktopWebLinkCouldNotOpen: "Could not open the link",
   quitHoldOverlay: {
     /** Formats the hold-or-double-press hint using the platform's quit shortcut. */
     holdOrPressTwice: (shortcut: string) => `Hold ${shortcut} or press twice to quit`,
@@ -117,11 +118,11 @@ export const app = {
     startWithout: "Start without a project",
     open: "Open project",
     remove: "Remove project",
-    publishError: "Could not create the GitHub repository",
+    publishError: (provider: string) => `Could not create the ${provider} repository`,
     /** Formats the message using message. */
     publishRetryHint: (message: string) =>
       `${message} Use Publish Repository in the Git menu to try again.`,
-    published: "Published to GitHub",
+    published: (provider: string) => `Published to ${provider}`,
     createError: "Could not create the project",
     /** Formats the message using name. */
     created: (name: string) => `Created ${name}`,

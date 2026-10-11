@@ -20,6 +20,7 @@ import {
   mergeEnvironmentSettings,
   persistClientSettingsPatch,
   useClientSettings,
+  useMigrateModelPreferences,
 } from "../../hooks/useSettings";
 import { serverEnvironment } from "../../state/server";
 import { useAtomCommand } from "../../state/use-atom-command";
@@ -43,6 +44,7 @@ export function useScopedSettings<T = UnifiedSettings>(
   const { target } = useSettingsScope();
   const clientSettings = useClientSettings();
   const serverSettings = target?.settings ?? DEFAULT_SERVER_SETTINGS;
+  useMigrateModelPreferences(target?.environmentId ?? null, target?.settings ?? null);
   const settings = useMemo(
     () => mergeEnvironmentSettings(serverSettings, clientSettings),
     [clientSettings, serverSettings],
@@ -91,7 +93,7 @@ function useRunScopedPlan() {
           return persistServer(request);
         },
         persistClientSettingsPatch,
-      ).then(({ failedEnvironments, savedEnvironmentCount }) => {
+      ).then(({ failedEnvironments, savedEnvironments, savedEnvironmentCount }) => {
         if (failedEnvironments.length === 0) return;
         toastManager.add({
           type: "error",
@@ -99,10 +101,14 @@ function useRunScopedPlan() {
             savedEnvironmentCount > 0
               ? t.settings.scoped.settingSavedOnSomeEnvironments
               : t.settings.scoped.settingNotSaved,
-          description: t.settings.scoped.couldNotUpdate(
-            failedEnvironments.map((environment) => environment.label).join(", "),
-            Boolean(savedEnvironmentCount > 0),
-          ),
+          description: [
+            ...failedEnvironments.map(({ label, message }) =>
+              t.settings.merge.couldNotSaveOn(label, message),
+            ),
+            ...(savedEnvironmentCount > 0
+              ? [t.settings.merge.savedOn(savedEnvironments.map(({ label }) => label).join(", "))]
+              : []),
+          ].join("\n"),
         });
       });
     },

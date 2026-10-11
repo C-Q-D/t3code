@@ -78,8 +78,10 @@ export const account: Messages["account"] = {
     yourProjects: "你的项目",
     lookingForProjects: "正在查找Claude Code和Codex项目…",
     dontImport: "不导入项目",
-    chooseProjects: "选择你的项目",
-    importHint: "从所选电脑导入项目和对话。",
+    chooseProjects: "导入你的项目",
+    importHint: "从所选电脑上的 Claude Code 和 Codex 导入项目及对话。",
+    skippedSetup: (labels: string, _count: number) =>
+      `由于未连接，设置将跳过 ${labels}。你可以稍后在设置中配置。`,
     selectAll: "全选",
     selectNone: "取消全选",
     scanningProjects: "正在查找项目…",

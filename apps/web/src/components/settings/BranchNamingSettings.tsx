@@ -34,6 +34,11 @@ export function BranchNamingSettings() {
         settingKeys={["branchNamingMode"]}
         {...searchableSetting("worktree-branch-naming")}
         description={t.settings.branchNaming.worktreeBranchesNamedFirstMessageHint}
+        status={
+          !modeMixed && settings.branchNamingMode === "semantic"
+            ? t.settings.branchNaming.modelChoosesPrefixDescribesWorkHint
+            : undefined
+        }
         resetAction={
           settings.branchNamingMode !== DEFAULT_SERVER_SETTINGS.branchNamingMode || modeMixed ? (
             <SettingResetButton
@@ -109,11 +114,6 @@ export function BranchNamingSettings() {
             />
           }
         />
-      ) : null}
-      {!modeMixed && settings.branchNamingMode === "semantic" ? (
-        <p className="pb-3 text-sm text-muted-foreground">
-          {t.settings.branchNaming.modelChoosesPrefixDescribesWorkHint}
-        </p>
       ) : null}
       {!modeMixed && settings.branchNamingMode === "custom" ? (
         <SettingsRow

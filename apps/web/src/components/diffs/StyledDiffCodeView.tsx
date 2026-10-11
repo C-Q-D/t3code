@@ -1,3 +1,4 @@
+/** Applies shared web styling and localized search controls to Pierre's viewer. */
 /* oxlint-disable eslint/no-restricted-imports -- This is the single styled adapter around Pierre's raw viewer. */
 import {
   CodeView,
@@ -8,6 +9,7 @@ import {
 } from "@pierre/diffs/react";
 /* oxlint-enable eslint/no-restricted-imports */
 import type { Ref } from "react";
+import { t } from "~/i18n";
 
 import { DIFF_SURFACE_THEME_UNSAFE_CSS } from "~/lib/diffRendering";
 import { DiffWorkerPoolProvider } from "../DiffWorkerPoolProvider";
@@ -300,6 +302,7 @@ export function StyledDiffCodeView<LAnnotation = undefined>({
         }
         options={{
           ...options,
+          searchMessages: t.git.diffSearch,
           unsafeCSS: unsafeCSSExtra
             ? `${DIFF_VIEW_UNSAFE_CSS}\n${unsafeCSSExtra}`
             : DIFF_VIEW_UNSAFE_CSS,

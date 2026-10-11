@@ -1,3 +1,4 @@
+/** Lists and reorders saved connection routes without changing their credentials. */
 import { t } from "~/i18n";
 import {
   DndContext,
@@ -68,7 +69,7 @@ export function EnvironmentRoutesList({
     prepared._tag === "Some" && environment.connection.phase === "connected"
       ? connectionRouteId(prepared.value.target)
       : null;
-  const reorder = useAtomCommand(environmentCatalog.reorderRoutes, "Reorder routes");
+  const reorder = useAtomCommand(environmentCatalog.reorderRoutes, t.settings.merge.reorderRoutes);
   const removeRoute = useAtomCommand(
     environmentCatalog.removeRoute,
     t.settings.environmentRoutesList.removeRoute,
@@ -111,7 +112,7 @@ export function EnvironmentRoutesList({
   };
 
   return (
-    <div className="mt-2 rounded-md border border-border/70">
+    <div className="mt-2 border-t border-border/50 py-2">
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
@@ -138,7 +139,7 @@ export function EnvironmentRoutesList({
           </ol>
         </SortableContext>
       </DndContext>
-      <div className="border-t border-border/70 px-1 py-1">
+      <div className="-ml-1.5 pt-1">
         <Button size="xs" variant="ghost-muted" onClick={onAddRoute}>
           <PlusIcon className="size-3" />
           {t.settings.connections.environment.addRoute}
@@ -179,20 +180,10 @@ function SortableRouteRow({
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}
       className={cn(
-        "flex items-center gap-2 border-b border-border/70 px-1 py-1.5 last:border-b-0",
+        "flex items-center gap-2 py-2",
         isDragging && "relative z-10 rounded-md bg-background shadow-md",
       )}
     >
-      <button
-        type="button"
-        ref={setActivatorNodeRef}
-        {...attributes}
-        {...listeners}
-        aria-label={t.settings.environmentRoutesList.reorderPosition(label, position)}
-        className="flex size-6 shrink-0 cursor-grab touch-none items-center justify-center rounded text-muted-foreground/70 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing"
-      >
-        <GripVerticalIcon className="size-3.5" />
-      </button>
       <div className="min-w-0 flex-1">
         <p className="flex items-center gap-1.5 text-xs font-medium text-foreground">
           {label}
@@ -209,6 +200,16 @@ function SortableRouteRow({
           </p>
         ) : null}
       </div>
+      <button
+        type="button"
+        ref={setActivatorNodeRef}
+        {...attributes}
+        {...listeners}
+        aria-label={t.settings.environmentRoutesList.reorderPosition(label, position)}
+        className="flex size-6 shrink-0 cursor-grab touch-none items-center justify-center rounded text-muted-foreground/70 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:cursor-grabbing"
+      >
+        <GripVerticalIcon className="size-3.5" />
+      </button>
       {removable ? (
         <Tooltip>
           <TooltipTrigger

@@ -2,6 +2,7 @@
 import type { Messages } from "../en";
 
 export const app: Messages["app"] = {
+  desktopWebLinkCouldNotOpen: "无法打开链接",
   quitHoldOverlay: {
     holdOrPressTwice: (shortcut) => `按住${shortcut}或连按两次以退出`,
     pressAgain: (shortcut) => `再按一次${shortcut}以退出`,
@@ -113,10 +114,10 @@ export const app: Messages["app"] = {
     startWithout: "不创建项目，直接开始",
     open: "打开项目",
     remove: "移除项目",
-    publishError: "无法创建GitHub仓库",
+    publishError: (provider: string) => `无法创建 ${provider} 仓库`,
     /** Formats the message using message. */
     publishRetryHint: (message) => `${message} 请使用Git菜单中的“发布仓库”重试。`,
-    published: "已发布到GitHub",
+    published: (provider: string) => `已发布到 ${provider}`,
     createError: "无法创建项目",
     /** Formats the message using name. */
     created: (name) => `已创建 ${name}`,

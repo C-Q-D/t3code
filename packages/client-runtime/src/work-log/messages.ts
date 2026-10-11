@@ -57,6 +57,8 @@ export const englishWorkLogMessages = {
         phrase(succeeded, "Listed", "list", `threads ${quantity(count, "time")}`),
       "thread-interrupt": (count: number, succeeded: boolean) =>
         phrase(succeeded, "Requested interrupts for", "interrupt", quantity(count, "thread")),
+      "workflow-stop": (count: number, succeeded: boolean) =>
+        phrase(succeeded, "Requested stops for", "stop", quantity(count, "workflow")),
       "task-status": (count: number, succeeded: boolean) =>
         phrase(succeeded, "Checked", "check", `task status ${quantity(count, "time")}`),
       "task-cancel": (count: number, succeeded: boolean) =>

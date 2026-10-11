@@ -81,6 +81,7 @@ function countEntities(ids: ReadonlyArray<string | undefined>): number {
 /** Tool summaries with durable target identities count retries once per entity. */
 const SUMMARY_ENTITY_KEYS: Partial<Record<T3McpToolSummaryAction, string>> = {
   delegate: "taskId",
+  "workflow-stop": "subagentId",
   "task-cancel": "taskId",
   "schedule-create": "scheduledTaskId",
   "schedule-update": "scheduledTaskId",

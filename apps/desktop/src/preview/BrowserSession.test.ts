@@ -1,8 +1,10 @@
+/** Exercises preview permissions and native ceremony behavior with controlled Electron boundaries. */
 import { assert, describe, it } from "@effect/vitest";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as DesktopUiLocale from "../i18n/DesktopUiLocale.ts";
 import * as PlatformError from "effect/PlatformError";
 import { beforeEach, vi } from "vite-plus/test";
 
@@ -21,15 +23,35 @@ const { fromPartition, sessions } = vi.hoisted(() => ({
   >(),
 }));
 
+const { fromWebContents } = vi.hoisted(() => ({
+  fromWebContents: vi.fn<(webContents: unknown) => unknown>(() => null),
+}));
+
 vi.mock("electron", () => ({
+  BrowserWindow: { fromWebContents },
   session: {
     fromPartition,
   },
 }));
 
+import * as ElectronDialog from "../electron/ElectronDialog.ts";
 import * as BrowserSession from "./BrowserSession.ts";
 
-const layer = BrowserSession.layer.pipe(Layer.provide(NodeServices.layer));
+const { showMessageBox } = vi.hoisted(() => ({
+  showMessageBox: vi.fn<
+    (options: Electron.MessageBoxOptions, owner?: Electron.BrowserWindow) => number
+  >(() => 1),
+}));
+const layerDialog = Layer.succeed(ElectronDialog.ElectronDialog, {
+  pickFolder: () => Effect.die("unused"),
+  pickFiles: () => Effect.die("unused"),
+  showMessageBox: (options, owner) =>
+    Effect.sync(() => ({ response: showMessageBox(options, owner), checkboxChecked: false })),
+  showErrorBox: () => Effect.void,
+});
+const layer = BrowserSession.layer.pipe(
+  Layer.provide(Layer.mergeAll(NodeServices.layer, layerDialog, DesktopUiLocale.layerTest())),
+);
 
 describe("BrowserSession", () => {
   beforeEach(() => {
@@ -168,6 +190,7 @@ describe("BrowserSession", () => {
         "clipboard-sanitized-write",
         "notifications",
         "geolocation",
+        "fullscreen",
       ]) {
         assert.isTrue(requestAllows(permission), `request handler should allow ${permission}`);
         assert.isTrue(
@@ -186,6 +209,86 @@ describe("BrowserSession", () => {
           `check handler should deny ${permission}`,
         );
       }
+    }).pipe(Effect.provide(layer)),
+  );
+
+  it.effect("opens custom-scheme links externally only after the user confirms", () =>
+    Effect.gen(function* () {
+      const browserSessions = yield* BrowserSession.BrowserSession;
+      const partition = yield* browserSessions.getPartition("scope-a");
+      yield* browserSessions.getSession("scope-a");
+      const requestHandler =
+        sessions.get(partition)?.setPermissionRequestHandler.mock.calls[0]?.[0];
+      assert.isFunction(requestHandler);
+
+      const request = (externalURL: string) =>
+        Effect.callback<boolean>((resume) => {
+          requestHandler(
+            null,
+            "openExternal",
+            (granted: boolean) => resume(Effect.succeed(granted)),
+            { externalURL },
+          );
+        });
+
+      showMessageBox.mockReset();
+      showMessageBox.mockReturnValueOnce(0).mockReturnValueOnce(1);
+      assert.isTrue(yield* request("slack://open?team=T1"));
+      assert.deepInclude(showMessageBox.mock.calls[0]?.[0], {
+        message: "打开此 slack 链接？",
+        detail: "浏览器中的页面想要打开其他应用程序：\n\nslack://open?team=T1",
+        buttons: ["打开", "取消"],
+      });
+      assert.isFalse(yield* request("zoommtg://zoom.us/join"));
+      assert.strictEqual(showMessageBox.mock.calls.length, 2);
+
+      for (const url of ["file:///etc/passwd", "javascript:alert(1)", "data:text/html,x"]) {
+        assert.isFalse(yield* request(url), `${url} must never open externally`);
+      }
+      assert.strictEqual(showMessageBox.mock.calls.length, 2);
+    }).pipe(
+      Effect.provide(
+        BrowserSession.layer.pipe(
+          Layer.provide(
+            Layer.mergeAll(NodeServices.layer, layerDialog, DesktopUiLocale.layerTest("zh-CN")),
+          ),
+        ),
+      ),
+    ),
+  );
+
+  // A prompt without an owner can open behind the app window, leaving the one
+  // prompt slot taken and every later link silently denied.
+  it.effect("attaches the open-externally prompt to the window hosting the preview", () =>
+    Effect.gen(function* () {
+      const browserSessions = yield* BrowserSession.BrowserSession;
+      const partition = yield* browserSessions.getPartition("scope-a");
+      yield* browserSessions.getSession("scope-a");
+      const requestHandler =
+        sessions.get(partition)?.setPermissionRequestHandler.mock.calls[0]?.[0];
+      assert.isFunction(requestHandler);
+
+      const hostWindow = { id: 7 } as unknown as Electron.BrowserWindow;
+      const host = { isDestroyed: () => false };
+      const guest = { isDestroyed: () => false, hostWebContents: host };
+      fromWebContents.mockImplementation((webContents) =>
+        webContents === host ? hostWindow : null,
+      );
+      showMessageBox.mockReset();
+      showMessageBox.mockReturnValueOnce(1);
+
+      yield* Effect.callback<boolean>((resume) => {
+        requestHandler(
+          guest,
+          "openExternal",
+          (granted: boolean) => resume(Effect.succeed(granted)),
+          {
+            externalURL: "slack://open?team=T1",
+          },
+        );
+      });
+
+      assert.strictEqual(showMessageBox.mock.calls[0]?.[1], hostWindow);
     }).pipe(Effect.provide(layer)),
   );
 
@@ -218,7 +321,15 @@ describe("BrowserSession", () => {
         "Failed to derive a desktop preview browser partition for scope environment-a.",
       );
       assert.notInclude(error.message, nativeCause.message);
-    }).pipe(Effect.provide(BrowserSession.layer.pipe(Layer.provide(layerFailingCrypto))));
+    }).pipe(
+      Effect.provide(
+        BrowserSession.layer.pipe(
+          Layer.provide(
+            Layer.mergeAll(layerFailingCrypto, layerDialog, DesktopUiLocale.layerTest()),
+          ),
+        ),
+      ),
+    );
   });
 
   it.effect("preserves session scope, partition, and the Electron failure", () =>

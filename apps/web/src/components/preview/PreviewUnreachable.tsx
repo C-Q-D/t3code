@@ -13,20 +13,66 @@ interface Props {
   /** Stringified Chromium error, e.g. "ERR_NAME_NOT_RESOLVED". */
   description: string;
   onReload: () => void;
+  /** Reopens the page in a browser that may reach it, such as the environment's. */
+  move?: { readonly label: string; readonly onMove: () => void };
+}
+
+/**
+ * A server tab's address was a file its browser cannot show (a PDF), so the
+ * browser downloaded it. Offers the address in the user's own browser, or the
+ * file the server already saved.
+ */
+export function PreviewFileNotShown({
+  url,
+  fileName,
+  downloadUrl,
+  onOpen,
+}: {
+  url: string;
+  fileName: string;
+  downloadUrl: string | null;
+  onOpen: () => void;
+}) {
+  const host = safeHost(url) ?? url;
+  return (
+    <div className="scrollbar-gutter-both relative flex h-full min-h-0 w-full overflow-y-auto bg-background">
+      <div className="mx-auto flex w-full max-w-xl flex-1 flex-col px-8 py-12 sm:py-16">
+        <ErrorIcon className="mb-6 size-12 text-muted-foreground/70" />
+        <h1 className="mb-3 text-2xl font-semibold leading-tight text-foreground">
+          {t.tools.preview.fileNotShown}
+        </h1>
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          <span className="font-semibold text-foreground">{fileName}</span>
+          {t.tools.preview.fileDownloaded(host)}
+        </p>
+        <div className="mt-auto flex items-center gap-2 pt-8">
+          <div className="flex-1" />
+          <Button type="button" variant="outline" size="sm" onClick={onOpen}>
+            {t.tools.preview.openInBrowser}
+          </Button>
+          {downloadUrl ? (
+            <Button type="button" size="sm" render={<a href={downloadUrl} download={fileName} />}>
+              {t.tools.preview.download}
+            </Button>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 /** Theme-aware tailwind port of Chromium's "This site can't be reached" page.
  * @param props View data, control flags, and callbacks defined by the component props type; optional fields retain their declared defaults.
  * @returns Rendered UI for the supplied props.
  */
-export function PreviewUnreachable({ url, code, description, onReload }: Props) {
+export function PreviewUnreachable({ url, code, description, onReload, move }: Props) {
   const [showDetails, setShowDetails] = useState(false);
   const host = safeHost(url) ?? url;
   const friendly = describePreviewError(description);
   const errorLabel = description.length > 0 ? description : `ERR_${Math.abs(code) || "FAILED"}`;
 
   return (
-    <div className="relative flex h-full min-h-0 w-full overflow-y-auto bg-background">
+    <div className="scrollbar-gutter-both relative flex h-full min-h-0 w-full overflow-y-auto bg-background">
       <div className="mx-auto flex w-full max-w-xl flex-1 flex-col px-8 py-12 sm:py-16">
         <ErrorIcon className="mb-6 size-12 text-muted-foreground/70" />
         <h1 className="mb-3 text-2xl font-semibold leading-tight text-foreground">
@@ -42,6 +88,7 @@ export function PreviewUnreachable({ url, code, description, onReload }: Props) 
             <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
               <li>{t.tools.preview.checkConnection}</li>
               <li>{t.tools.preview.checkServer}</li>
+              {move ? <li>{t.tools.preview.checkEnvironmentBrowser}</li> : null}
               <li>{t.tools.preview.checkProxy}</li>
             </ul>
           </div>
@@ -61,6 +108,11 @@ export function PreviewUnreachable({ url, code, description, onReload }: Props) 
             {showDetails ? t.tools.preview.hideDetails : t.tools.preview.details}
           </Button>
           <div className="flex-1" />
+          {move ? (
+            <Button type="button" variant="outline" size="sm" onClick={move.onMove}>
+              {move.label}
+            </Button>
+          ) : null}
           <Button type="button" size="sm" onClick={onReload}>
             {t.tools.preview.reload}
           </Button>

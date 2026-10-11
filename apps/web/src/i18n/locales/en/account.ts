@@ -80,8 +80,11 @@ export const account = {
     yourProjects: "Your projects",
     lookingForProjects: "Looking for projects from Claude Code and Codex…",
     dontImport: "Do not import projects",
-    chooseProjects: "Choose your projects",
-    importHint: "Import projects and conversations from your selected computers.",
+    chooseProjects: "Import your projects",
+    importHint:
+      "Import projects and conversations from Claude Code and Codex on your selected computers.",
+    skippedSetup: (labels: string, count: number) =>
+      `Not connected, so setup skips ${labels}. You can set ${count === 1 ? "it" : "them"} up later from Settings.`,
     selectAll: "Select all",
     selectNone: "Select none",
     scanningProjects: "Looking for projects…",

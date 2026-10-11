@@ -1,4 +1,7 @@
+/** Manages saved environments, pairing, and desktop connection settings. */
 import { t } from "~/i18n";
+import { SessionPermissions, authScopeMessages } from "./SessionPermissions";
+import { AUTH_SCOPE_OPTIONS as PAIRING_SCOPE_OPTIONS } from "@t3tools/shared/authScopeOptions";
 import {
   ChevronRightIcon,
   ChevronsLeftRightEllipsisIcon,
@@ -24,20 +27,13 @@ import {
 import {
   AuthAccessReadScope,
   AuthAccessWriteScope,
-  AuthSettingsWriteScope,
-  AuthProvidersManageScope,
   AuthEnvironmentMaintainScope,
   AuthDiagnosticsReadScope,
-  AuthOrchestrationOperateScope,
   AuthOrchestrationReadScope,
-  AuthPreviewOperateScope,
   AuthRelayReadScope,
   AuthRelayWriteScope,
-  AuthSourceControlWriteScope,
   AuthFilesystemReadScope,
-  AuthFilesystemWriteScope,
   AuthStandardClientScopes,
-  AuthTerminalOperateScope,
   AuthTerminalReadScope,
   type AuthClientSession,
   type AuthEnvironmentScope,
@@ -231,93 +227,6 @@ function formatAccessTimestamp(value: string): string {
   }
   return accessTimestampFormatter.format(parsed);
 }
-
-const PAIRING_SCOPE_OPTIONS: ReadonlyArray<{
-  readonly scope: AuthGrantScope;
-  readonly title: string;
-  readonly description: string;
-}> = [
-  {
-    scope: AuthOrchestrationReadScope,
-    title: t.settings.connections.scopes.orchestrationRead.title,
-    description: t.settings.connections.scopes.orchestrationRead.description,
-  },
-  {
-    scope: AuthOrchestrationOperateScope,
-    title: t.settings.connections.scopes.orchestrationOperate.title,
-    description: t.settings.connections.scopes.orchestrationOperate.description,
-  },
-  {
-    scope: AuthSettingsWriteScope,
-    title: t.settings.connections.scopes.settingsWrite.title,
-    description: t.settings.connections.scopes.settingsWrite.description,
-  },
-  {
-    scope: AuthProvidersManageScope,
-    title: t.settings.connections.scopes.providersManage.title,
-    description: t.settings.connections.scopes.providersManage.description,
-  },
-  {
-    scope: AuthEnvironmentMaintainScope,
-    title: t.settings.connections.scopes.environmentMaintain.title,
-    description: t.settings.connections.scopes.environmentMaintain.description,
-  },
-  {
-    scope: AuthPreviewOperateScope,
-    title: t.settings.connections.scopes.previewOperate.title,
-    description: t.settings.connections.scopes.previewOperate.description,
-  },
-  {
-    scope: AuthDiagnosticsReadScope,
-    title: t.settings.connections.scopes.diagnosticsRead.title,
-    description: t.settings.connections.scopes.diagnosticsRead.description,
-  },
-  {
-    scope: AuthTerminalReadScope,
-    title: t.settings.connections.scopes.terminalRead.title,
-    description: t.settings.connections.scopes.terminalRead.description,
-  },
-  {
-    scope: AuthTerminalOperateScope,
-    title: t.settings.connections.scopes.terminalOperate.title,
-    description: t.settings.connections.scopes.terminalOperate.description,
-  },
-  {
-    scope: AuthSourceControlWriteScope,
-    title: t.settings.connections.scopes.sourceControlWrite.title,
-    description: t.settings.connections.scopes.sourceControlWrite.description,
-  },
-  {
-    scope: AuthFilesystemReadScope,
-    title: t.settings.connections.scopes.filesystemRead.title,
-    description: t.settings.connections.scopes.filesystemRead.description,
-  },
-  {
-    scope: AuthFilesystemWriteScope,
-    title: t.settings.connections.scopes.filesystemWrite.title,
-    description: t.settings.connections.scopes.filesystemWrite.description,
-  },
-  {
-    scope: AuthAccessReadScope,
-    title: t.settings.connections.scopes.accessRead.title,
-    description: t.settings.connections.scopes.accessRead.description,
-  },
-  {
-    scope: AuthAccessWriteScope,
-    title: t.settings.connections.scopes.accessWrite.title,
-    description: t.settings.connections.scopes.accessWrite.description,
-  },
-  {
-    scope: AuthRelayReadScope,
-    title: t.settings.connections.scopes.relayRead.title,
-    description: t.settings.connections.scopes.relayRead.description,
-  },
-  {
-    scope: AuthRelayWriteScope,
-    title: t.settings.connections.scopes.relayWrite.title,
-    description: t.settings.connections.scopes.relayWrite.description,
-  },
-];
 
 function AccessScopeSummary({
   scopes,
@@ -974,7 +883,7 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
                       role="radio"
                       aria-checked={isSelected}
                       className={cn(
-                        "flex w-full items-baseline gap-2 rounded-lg border px-2.5 py-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                        "flex w-full items-baseline gap-2 rounded-lg border px-2.5 py-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
                         isSelected
                           ? "border-foreground/60 bg-muted/30"
                           : "border-border/50 hover:bg-muted/20",
@@ -1296,7 +1205,7 @@ const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHeaderActio
               </div>
               <div className="divide-y divide-border/60 rounded-lg border border-input bg-muted/25">
                 {PAIRING_SCOPE_OPTIONS.filter(({ scope }) => delegatableScopes.includes(scope)).map(
-                  ({ scope, title, description }) => (
+                  ({ scope }) => (
                     <label
                       key={scope}
                       className="flex cursor-pointer items-start gap-3 px-3 py-2.5 transition-colors hover:bg-muted/40"
@@ -1308,9 +1217,11 @@ const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHeaderActio
                         onCheckedChange={(checked) => togglePairingScope(scope, checked === true)}
                       />
                       <span className="min-w-0">
-                        <span className="block text-xs font-medium text-foreground">{title}</span>
+                        <span className="block text-xs font-medium text-foreground">
+                          {authScopeMessages[scope].title}
+                        </span>
                         <span className="block text-xs leading-snug text-muted-foreground">
-                          {description}
+                          {authScopeMessages[scope].description}
                         </span>
                       </span>
                     </label>
@@ -1622,6 +1533,7 @@ function SavedBackendListRow({
   onAddRoute,
 }: SavedBackendListRowProps) {
   const [routesOpen, setRoutesOpen] = useState(false);
+  const [permissionsOpen, setPermissionsOpen] = useState(false);
   const environmentId = environment.environmentId;
   const unsupported = environment.connection.phase === "unsupported";
   const enabled = environment.entry.enabled && !unsupported;
@@ -1701,21 +1613,20 @@ function SavedBackendListRow({
   ) {
     setLastRelayHttpBaseUrl(discoveredRelayHttpBaseUrl);
   }
+  const prepared = usePreparedConnection(environmentId);
+  const connectedTarget = isConnected && prepared._tag === "Some" ? prepared.value.target : null;
   const mcpUrl = environmentMcpUrl({
     entry: environment.entry,
     relayHttpBaseUrl: discoveredRelayHttpBaseUrl ?? lastRelayHttpBaseUrl,
+    connectedTarget,
   });
   const machineKind = resolveEnvironmentMachineKind(
     environment.serverConfig ??
       (lastDescriptor === undefined ? null : { environment: lastDescriptor }),
   );
-  const prepared = usePreparedConnection(environmentId);
   const routeCount = connectionRoutes(environment.entry).length;
   const subtitleText = [
-    environmentTransportLabel(
-      environment,
-      isConnected && prepared._tag === "Some" ? prepared.value.target : null,
-    ),
+    environmentTransportLabel(environment, connectedTarget),
     resumingServerUpdate ? t.settings.connections.status.restarting : status.text,
     enabled && versionMismatch ? serverVersion : null,
   ]
@@ -1778,7 +1689,7 @@ function SavedBackendListRow({
             type="button"
             aria-expanded={routesOpen}
             onClick={() => setRoutesOpen((open) => !open)}
-            className="inline-flex shrink-0 items-center gap-0.5 rounded-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+            className="inline-flex shrink-0 items-center gap-0.5 rounded-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring"
           >
             {routeCount === 1
               ? t.settings.connections.environment.routes
@@ -1788,6 +1699,25 @@ function SavedBackendListRow({
               className={cn(
                 "size-3 shrink-0 transition-transform duration-150 motion-reduce:transition-none",
                 routesOpen && "rotate-90",
+              )}
+            />
+          </button>
+          <span aria-hidden className="shrink-0">
+            ·
+          </span>
+          <button
+            type="button"
+            aria-expanded={permissionsOpen}
+            aria-controls={`remote-permissions-${environmentId}`}
+            onClick={() => setPermissionsOpen((open) => !open)}
+            className="inline-flex shrink-0 items-center gap-0.5 rounded-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring"
+          >
+            {t.settings.merge.permissions}
+            <ChevronRightIcon
+              aria-hidden
+              className={cn(
+                "size-3 shrink-0 transition-transform duration-150 motion-reduce:transition-none",
+                permissionsOpen && "rotate-90",
               )}
             />
           </button>
@@ -1801,12 +1731,26 @@ function SavedBackendListRow({
         ) : null
       }
       detail={
-        routesOpen ? (
-          <EnvironmentRoutesList
-            environment={environment}
-            onAddRoute={() => onAddRoute(environment)}
-          />
-        ) : null
+        <>
+          {routesOpen && (
+            <EnvironmentRoutesList
+              environment={environment}
+              onAddRoute={() => onAddRoute(environment)}
+            />
+          )}
+          {permissionsOpen && (
+            <div
+              id={`remote-permissions-${environmentId}`}
+              className="mt-2 border-t border-border/50"
+            >
+              <SessionPermissions
+                environmentId={environmentId}
+                connected={isConnected}
+                routeContext
+              />
+            </div>
+          )}
+        </>
       }
     >
       {unsupported &&
@@ -3904,6 +3848,21 @@ export function ConnectionsSettings() {
                 ) : null}
               </>
             ) : null}
+            {primaryEnvironment ? (
+              <details className="group px-3 sm:px-4">
+                <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-md text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+                  {t.settings.merge.permissions}
+                  <ChevronRightIcon
+                    aria-hidden
+                    className="size-3 text-muted-foreground group-open:rotate-90"
+                  />
+                </summary>
+                <SessionPermissions
+                  environmentId={primaryEnvironment.environmentId}
+                  connected={primaryEnvironment.connection.phase === "connected"}
+                />
+              </details>
+            ) : null}
           </SettingsSection>
 
           {canReadAccess || canWriteAccess ? (
@@ -4232,6 +4191,8 @@ export function ConnectionsSettings() {
             title={t.settings.connections.environment.noSelection}
             description={t.settings.connections.environment.connectHint}
           />
+          {/* A turned-off local environment leaves no primary environment, so its switch lives here too. */}
+          <LocalEnvironmentSetting />
           {canReadRelay || canManageRelay ? (
             <CloudLinkRow canReadRelay={canReadRelay} canManageRelay={canManageRelay} />
           ) : null}
@@ -4241,7 +4202,7 @@ export function ConnectionsSettings() {
   );
 
   return (
-    <SettingsPageContainer width="wide">
+    <SettingsPageContainer>
       {primarySettings}
       <SettingsSection
         {...searchableSetting("remote-environments")}

@@ -19,7 +19,16 @@ import { Input } from "../ui/input";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { Switch } from "../ui/switch";
 import { Textarea } from "../ui/textarea";
-import type { ProviderClientDefinition } from "./providerDriverMeta";
+import type { ProviderClientDefinition } from "@t3tools/provider-core/client";
+
+/** What the form reads from a definition: an agent provider's, or a source control host's. */
+export type SettingsFormDefinition = Pick<ProviderClientDefinition, "settingsSchema"> & {
+  readonly driverKind?: ProviderClientDefinition["driverKind"];
+  /** Client-only presentation overrides keyed by schema field; never changes stored values. */
+  readonly fieldMessages?: Readonly<
+    Record<string, { readonly label: string; readonly description: string }>
+  >;
+};
 import { SettingsRow } from "./settingsLayout";
 
 export interface ProviderSettingsFieldModel {
@@ -29,6 +38,8 @@ export interface ProviderSettingsFieldModel {
   readonly description?: string | undefined;
   readonly placeholder?: string | undefined;
   readonly clearWhenEmpty: "omit" | "persist";
+  /** Kept in the server's secret store: a saved value arrives as `SECRET_REDACTED` and never shows. */
+  readonly secret?: boolean | undefined;
   readonly defaultBooleanValue?: boolean | undefined;
   /** Choices for a `select` control. The first entry is the default. */
   readonly options?: ReadonlyArray<ProviderSettingsFormOption> | undefined;
@@ -64,7 +75,7 @@ function readProviderSettingsFormAnnotation(
 }
 
 function readProviderSettingsFormSchemaAnnotation(
-  definition: ProviderClientDefinition,
+  definition: SettingsFormDefinition,
 ): ProviderSettingsFormSchemaAnnotation {
   return Schema.resolveAnnotations(definition.settingsSchema)?.providerSettingsFormSchema ?? {};
 }
@@ -77,12 +88,20 @@ function readFieldBooleanDefault(
   return Option.isSome(decoded) && typeof decoded.value === "boolean" ? decoded.value : undefined;
 }
 
+/**
+ * Derives visible fields in schema order, including local ACP visibility rules.
+ * @param definition Schema and optional field messages; messages override only labels and
+ * descriptions, without changing schema validation, secret handling, or saved values.
+ * @param value Current configuration, used to select the local ACP field subset when present.
+ * @returns Visible field models; hidden fields are omitted and schema defaults stay intact.
+ */
 export function deriveProviderSettingsFields(
-  definition: ProviderClientDefinition,
+  definition: SettingsFormDefinition,
   value?: unknown,
 ): ReadonlyArray<ProviderSettingsFieldModel> {
   const isLocalAcp =
-    definition.value === "acpRegistry" && readProviderConfigString(value, "source") === "local";
+    definition.driverKind === "acpRegistry" &&
+    readProviderConfigString(value, "source") === "local";
   const schemaAnnotation = readProviderSettingsFormSchemaAnnotation(definition);
   const orderedKeys = new Map(
     (schemaAnnotation.order ?? []).map((key, index) => [key, index] as const),
@@ -124,12 +143,14 @@ export function deriveProviderSettingsFields(
               ? { placeholder: formAnnotation.placeholder }
               : {}),
           clearWhenEmpty: formAnnotation.clearWhenEmpty ?? "omit",
+          ...(formAnnotation.secret ? { secret: true } : {}),
           ...(formAnnotation.control === "switch"
             ? { defaultBooleanValue: readFieldBooleanDefault(fieldSchema) }
             : {}),
           ...(formAnnotation.control === "select" && formAnnotation.options
             ? { options: formAnnotation.options }
             : {}),
+          ...definition.fieldMessages?.[key],
         } satisfies ProviderSettingsFieldModel,
       ];
     });
@@ -145,6 +166,12 @@ function commandArgumentsEqual(left: ReadonlyArray<string>, right: ReadonlyArray
   return left.length === right.length && left.every((argument, index) => argument === right[index]);
 }
 
+/**
+ * Edits local ACP arguments as literal rows; localized labels never alter argument values.
+ * @param props Current configuration and callback receiving the updated configuration after
+ * an argument is added, removed, or committed. The caller owns persistence and save errors.
+ * @returns Argument controls that preserve unrelated configuration fields and external updates.
+ */
 function ProviderCommandArguments({
   value,
   onChange,
@@ -247,6 +274,19 @@ function readProviderConfigString(config: unknown, key: string): string {
   return typeof value === "string" ? value : "";
 }
 
+/**
+ * A secret field never shows its saved value: it starts empty, and its placeholder says whether
+ * one is saved. Saving one is typing a new value; clearing it is the host form's job.
+ */
+function secretFieldInputProps(field: ProviderSettingsFieldModel, config: unknown) {
+  const saved = readProviderConfigString(config, field.key);
+  if (!field.secret) return { value: saved, placeholder: field.placeholder };
+  return {
+    value: "",
+    placeholder: saved.length > 0 ? t.settings.merge.storedSecret : t.settings.merge.notSet,
+  };
+}
+
 function readProviderConfigBoolean(config: unknown, key: string, defaultValue = false): boolean {
   if (config === null || typeof config !== "object") return defaultValue;
   const value = (config as Record<string, unknown>)[key];
@@ -281,7 +321,7 @@ export function nextProviderConfigWithFieldValue(
 }
 
 interface ProviderSettingsFormProps {
-  readonly definition: ProviderClientDefinition;
+  readonly definition: SettingsFormDefinition;
   readonly value: unknown;
   readonly idPrefix: string;
   /**
@@ -410,9 +450,12 @@ function ProviderSettingsFieldRow({
           className="w-full max-w-full @min-[32rem]/settings-row:w-56"
           type={field.control === "password" ? "password" : undefined}
           autoComplete={field.control === "password" ? "off" : undefined}
-          value={readProviderConfigString(value, field.key)}
-          onCommit={(next) => onChange(nextProviderConfigWithFieldValue(value, field, next))}
-          placeholder={field.placeholder}
+          {...secretFieldInputProps(field, value)}
+          onCommit={(next) => {
+            // An untouched saved secret commits empty; only a typed value replaces it.
+            if (field.secret && next === "") return;
+            onChange(nextProviderConfigWithFieldValue(value, field, next));
+          }}
           spellCheck={false}
         />
       );
@@ -538,7 +581,8 @@ export function ProviderSettingsForm({
     [definition, value],
   );
   const isLocalAcp =
-    definition.value === "acpRegistry" && readProviderConfigString(value, "source") === "local";
+    definition.driverKind === "acpRegistry" &&
+    readProviderConfigString(value, "source") === "local";
 
   if (fields.length === 0) {
     return null;

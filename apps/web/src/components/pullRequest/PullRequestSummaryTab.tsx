@@ -1,5 +1,6 @@
-/** Owns pull request summary tab on the web pull-request surface; host data and agent context remain unchanged. */
+/** Owns the pull request summary and conversation filters; host content remains unchanged. */
 import { t } from "~/i18n";
+import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import { useAtomCommand } from "~/state/use-atom-command";
 import type {
   EnvironmentId,
@@ -14,12 +15,15 @@ import {
   ChevronDownIcon,
   ChevronRightIcon,
   HammerIcon,
+  ListFilterIcon,
   TagIcon,
   UsersIcon,
 } from "lucide-react";
+import * as Schema from "effect/Schema";
 import { useRef, useState, type ReactNode } from "react";
 
 import { pullRequestEnvironment } from "~/state/pullRequests";
+import { useLocalStorage } from "~/hooks/useLocalStorage";
 import { cn } from "~/lib/utils";
 import { useOpenLink } from "~/browser/useOpenLink";
 import { formatRelativeTimeLabel } from "~/timestampFormat";
@@ -27,6 +31,14 @@ import { formatRelativeTimeLabel } from "~/timestampFormat";
 import { Button } from "../ui/button";
 import { PullRequestEditButton } from "./PullRequestEditButton";
 import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "../ui/collapsible";
+import {
+  Menu,
+  MenuCheckboxItem,
+  MenuGroup,
+  MenuGroupLabel,
+  MenuPopup,
+  MenuTrigger,
+} from "../ui/menu";
 import { toastManager } from "../ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import {
@@ -79,10 +91,9 @@ function CommentIdentity({
   detail: PullRequestDetailView;
 }) {
   const actor = comment.author;
-  const profileUrl =
-    detail.provider === "github" && actor && !actor.login.endsWith("[bot]")
-      ? new URL(`/${encodeURIComponent(actor.login)}`, detail.url).toString()
-      : null;
+  const profileUrl = actor
+    ? sourceControlClients.get(detail.provider).authorProfileUrl(actor.login, detail.url)
+    : null;
   return (
     <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-xs">
       <PullRequestActorLabel actor={actor} profileUrl={profileUrl} className="max-w-full" />
@@ -367,121 +378,23 @@ function Section({
 }
 
 /**
- * Renders comment group from the supplied display data and callbacks.
- * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
- * @returns The rendered surface.
- */
-function CommentGroup({
-  label,
-  comments,
-  detail,
-  children,
-  onOpenChange,
-}: {
-  label: string;
-  comments: readonly PullRequestComment[];
-  detail: PullRequestDetailView;
-  children: ReactNode;
-  onOpenChange?: (open: boolean) => void;
-}) {
-  const authors = [
-    ...new Map(
-      comments.map((comment) => [reviewerKey(comment.author?.login ?? "ghost"), comment.author]),
-    ).values(),
-  ];
-  const fileCount = new Set(comments.flatMap((comment) => (comment.path ? [comment.path] : [])))
-    .size;
-  const latest = comments.reduce<string | null>(
-    (date, comment) => (date === null || comment.createdAt > date ? comment.createdAt : date),
-    null,
-  );
-  return (
-    <div className="overflow-hidden rounded-lg border border-border bg-background">
-      <Collapsible onOpenChange={onOpenChange}>
-        <div className="flex items-center gap-3 pl-3">
-          <div className="flex shrink-0 -space-x-1.5">
-            {authors.slice(0, 3).map((actor) => (
-              // The ring separates the overlapping faces; it belongs to the stack, not the actor.
-              <span
-                key={actor?.login ?? "ghost"}
-                className="relative flex rounded-full ring-2 ring-background hover:z-10 focus-within:z-10"
-              >
-                <PullRequestActorLabel
-                  actor={actor}
-                  profileUrl={
-                    detail.provider === "github" && actor
-                      ? new URL(
-                          actor.isBot || actor.login.endsWith("[bot]")
-                            ? `/apps/${encodeURIComponent(actor.login.replace(/\[bot\]$/, ""))}`
-                            : `/${encodeURIComponent(actor.login)}`,
-                          detail.url,
-                        ).toString()
-                      : null
-                  }
-                  variant="avatar"
-                />
-              </span>
-            ))}
-            {authors.length > 3 ? (
-              <span className="relative flex size-6 items-center justify-center rounded-full bg-muted text-3xs text-muted-foreground ring-2 ring-background">
-                +{authors.length - 3}
-              </span>
-            ) : null}
-          </div>
-          <CollapsibleTrigger
-            aria-label={label}
-            className="group flex min-w-0 flex-1 items-center gap-3 rounded-md py-3 pr-3 text-left hover:bg-muted/30"
-          >
-            <span className="min-w-0 flex-1 space-y-1">
-              <span className="block text-xs font-medium text-foreground/90">{label}</span>
-              <span className="flex flex-wrap gap-x-1.5 text-2xs text-muted-foreground">
-                <span>
-                  {authors.length} {t.git.pullRequest.authorWord(authors.length)}
-                </span>
-                {fileCount > 0 ? (
-                  <span>
-                    · {fileCount} {t.git.pullRequest.fileWord(fileCount)}
-                  </span>
-                ) : null}
-                {latest ? (
-                  <span>
-                    {t.git.pullRequest.latest}{" "}
-                    <Tooltip>
-                      <TooltipTrigger render={<time dateTime={latest} />}>
-                        {formatRelativeTimeLabel(latest)}
-                      </TooltipTrigger>
-                      <TooltipPopup>{new Date(latest).toLocaleString()}</TooltipPopup>
-                    </Tooltip>
-                  </span>
-                ) : null}
-              </span>
-            </span>
-            <ChevronRightIcon
-              aria-hidden
-              className="size-3.5 shrink-0 text-muted-foreground transition-transform group-data-panel-open:rotate-90"
-            />
-          </CollapsibleTrigger>
-        </div>
-        <CollapsiblePanel keepMounted>
-          <div className="border-t border-border/60 px-3 pb-3">{children}</div>
-        </CollapsiblePanel>
-      </Collapsible>
-    </div>
-  );
-}
-
-/**
  * What a first render of the conversation carries. A pull request with two hundred comments is
  * two hundred markdown documents, and the ones worth arriving for are the recent ones.
  */
 const COMMENT_PAGE = 10;
 
 /**
- * Renders pull request summary tab from the supplied display data and callbacks.
- * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
- * @returns The rendered surface.
+ * Which kinds of comment the conversation shows. Kept per browser rather than per pull request:
+ * whether a reader wants bot reports and finished threads in front of them is a habit, not a
+ * property of one change.
  */
+const COMMENT_FILTER_STORAGE_KEY = "t3code:pull-request-comment-filter:v1";
+const CommentFilterSchema = Schema.Struct({ bots: Schema.Boolean, resolved: Schema.Boolean });
+const DEFAULT_COMMENT_FILTER: typeof CommentFilterSchema.Type = { bots: false, resolved: false };
+
+/** Renders pull request metadata, checks and filtered comments using host data and caller actions. */
 export function PullRequestSummaryTab({
+  scrollerRef,
   environmentId,
   threadRef,
   reference,
@@ -496,6 +409,7 @@ export function PullRequestSummaryTab({
   onRefresh,
   onRefreshChecks = onRefresh,
 }: {
+  scrollerRef: (node: HTMLDivElement | null) => void;
   environmentId: EnvironmentId;
   threadRef: ScopedThreadRef | null;
   reference: PullRequestRef;
@@ -514,10 +428,12 @@ export function PullRequestSummaryTab({
   // Keyed by the pull request, so opening another one starts at the end of its conversation
   // rather than wherever the last one had been read back to.
   const [shown, setShown] = useState({ url: detail.url, count: COMMENT_PAGE });
-  const [openedBotGroup, setOpenedBotGroup] = useState<string | null>(null);
-  const [shownBots, setShownBots] = useState({ url: detail.url, count: COMMENT_PAGE });
-  const shownBotComments = shownBots.url === detail.url ? shownBots.count : COMMENT_PAGE;
   const shownComments = shown.url === detail.url ? shown.count : COMMENT_PAGE;
+  const [commentFilter, setCommentFilter] = useLocalStorage(
+    COMMENT_FILTER_STORAGE_KEY,
+    DEFAULT_COMMENT_FILTER,
+    CommentFilterSchema,
+  );
   // A comment that already lives on a review thread is that thread: the thread carries the line
   // and side the bare comment has lost, and a resolved one is finished work nobody should be
   // invited to fix again — the same call the whole-review hand-off makes.
@@ -527,22 +443,24 @@ export function PullRequestSummaryTab({
     ),
   );
 
-  const activeComments: PullRequestComment[] = [];
-  const finishedComments: PullRequestComment[] = [];
-  const botComments: PullRequestComment[] = [];
-  for (const comment of detail.comments) {
-    const finished =
-      threadByCommentId.get(comment.id)?.isResolved ||
-      pullRequestReviewOutcome(comment.reviewState) === "dismissed";
-    const bot = comment.author?.isBot === true || comment.author?.login.endsWith("[bot]");
-    (finished ? finishedComments : bot ? botComments : activeComments).push(comment);
-  }
+  const isFinished = (comment: PullRequestComment) =>
+    threadByCommentId.get(comment.id)?.isResolved === true ||
+    pullRequestReviewOutcome(comment.reviewState) === "dismissed";
+  const isBot = (comment: PullRequestComment) =>
+    comment.author?.isBot === true || comment.author?.login.endsWith("[bot]") === true;
+  const filteredComments = detail.comments.filter(
+    (comment) =>
+      (commentFilter.bots || !isBot(comment)) && (commentFilter.resolved || !isFinished(comment)),
+  );
+  // The one count the filter shows. Per-kind counts would overlap, since a resolved bot comment
+  // is both kinds and needs both shown.
+  const filteredOutCount = detail.comments.length - filteredComments.length;
   // Windowed by recency regardless of display order: expanding always reaches further back in
   // time, whether the newest comment currently reads first or last.
-  const recentComments = activeComments.slice(Math.max(0, activeComments.length - shownComments));
-  const hiddenCommentCount = activeComments.length - recentComments.length;
-  const recentBotComments = botComments.slice(Math.max(0, botComments.length - shownBotComments));
-  const hiddenBotCommentCount = botComments.length - recentBotComments.length;
+  const recentComments = filteredComments.slice(
+    Math.max(0, filteredComments.length - shownComments),
+  );
+  const hiddenCommentCount = filteredComments.length - recentComments.length;
   const [commentOrder, setCommentOrder] = useState<"newest" | "oldest">("newest");
   const visibleComments = orderPullRequestComments(recentComments, commentOrder);
   const showOldestCommentsButton =
@@ -667,6 +585,32 @@ export function PullRequestSummaryTab({
   const renderComment = (comment: PullRequestComment) => {
     const thread = threadByCommentId.get(comment.id);
     const body = visibleBody(comment.body);
+    if (isFinished(comment)) {
+      return (
+        <CollapsedComment
+          key={`${detail.url}:${comment.id}`}
+          comment={comment}
+          editing={commentEditing}
+          detail={detail}
+          thread={thread}
+          label={
+            thread?.isResolved ? t.git.pullRequest.resolved : t.git.pullRequest.reviewDismissed
+          }
+          body={body}
+          reactionBar={
+            <PullRequestReactionBar
+              className="ml-auto justify-end"
+              reactions={comment.reactions ?? []}
+              canReact={detail.capabilities.reactions === true}
+              subjectId={comment.id}
+              environmentId={environmentId}
+              reference={reference}
+              onRefresh={onRefresh}
+            />
+          }
+        />
+      );
+    }
     const outcome = pullRequestReviewOutcome(comment.reviewState);
     // An approval is a verdict, not a finding: there is nothing in it to fix.
     const finding: PullRequestFinding | null =
@@ -739,7 +683,7 @@ export function PullRequestSummaryTab({
   };
 
   return (
-    <div className="h-full overflow-y-auto" data-pull-request-summary-scroll>
+    <div ref={scrollerRef} className="h-full overflow-y-auto" data-pull-request-summary-scroll>
       <section className="px-4 pt-2.5 pb-1">
         <div className="space-y-2">
           <MetaRow icon={<UsersIcon className="size-3.5" />} label={t.git.pullRequest.reviewers}>
@@ -955,22 +899,55 @@ export function PullRequestSummaryTab({
       <Section
         title={t.git.pullRequest.commentsCount(detail.commentCount)}
         actions={
-          <Button
-            size="xs"
-            variant="ghost-muted"
-            className="shrink-0"
-            aria-label={
-              commentOrder === "newest"
-                ? t.git.pullRequest.showOldestCommentsFirst
-                : t.git.pullRequest.showNewestCommentsFirst
-            }
-            onClick={() => setCommentOrder((value) => (value === "newest" ? "oldest" : "newest"))}
-          >
-            <ArrowDownUpIcon aria-hidden className="size-3" />
-            {commentOrder === "newest"
-              ? t.git.pullRequest.newestFirst
-              : t.git.pullRequest.oldestFirst}
-          </Button>
+          <div className="flex shrink-0 items-center gap-1">
+            <Menu>
+              <MenuTrigger
+                render={<Button size="xs" variant="ghost-muted" />}
+                aria-label={t.git.pullRequest.filterComments}
+              >
+                <ListFilterIcon aria-hidden className="size-3" />
+                {filteredOutCount > 0
+                  ? t.git.pullRequest.hiddenComments(filteredOutCount)
+                  : t.git.pullRequest.filter}
+              </MenuTrigger>
+              <MenuPopup align="end">
+                <MenuGroup>
+                  <MenuGroupLabel>{t.git.pullRequest.show}</MenuGroupLabel>
+                  <MenuCheckboxItem
+                    checked={commentFilter.bots}
+                    closeOnClick={false}
+                    onCheckedChange={(bots) => setCommentFilter((value) => ({ ...value, bots }))}
+                  >
+                    {t.git.pullRequest.botComments}
+                  </MenuCheckboxItem>
+                  <MenuCheckboxItem
+                    checked={commentFilter.resolved}
+                    closeOnClick={false}
+                    onCheckedChange={(resolved) =>
+                      setCommentFilter((value) => ({ ...value, resolved }))
+                    }
+                  >
+                    {t.git.pullRequest.resolvedOrDismissed}
+                  </MenuCheckboxItem>
+                </MenuGroup>
+              </MenuPopup>
+            </Menu>
+            <Button
+              size="xs"
+              variant="ghost-muted"
+              aria-label={
+                commentOrder === "newest"
+                  ? t.git.pullRequest.showOldestCommentsFirst
+                  : t.git.pullRequest.showNewestCommentsFirst
+              }
+              onClick={() => setCommentOrder((value) => (value === "newest" ? "oldest" : "newest"))}
+            >
+              <ArrowDownUpIcon aria-hidden className="size-3" />
+              {commentOrder === "newest"
+                ? t.git.pullRequest.newestFirst
+                : t.git.pullRequest.oldestFirst}
+            </Button>
+          </div>
         }
       >
         {activityPending ? (
@@ -988,6 +965,10 @@ export function PullRequestSummaryTab({
               <p className="py-2 text-xs text-muted-foreground">
                 {t.git.pullRequest.noCommentsYet}
               </p>
+            ) : filteredComments.length === 0 ? (
+              <p className="py-2 text-xs text-muted-foreground">
+                {t.git.pullRequest.allCommentsHidden(filteredOutCount)}
+              </p>
             ) : (
               <div className="space-y-3">
                 {commentOrder === "oldest" ? showOldestCommentsButton : null}
@@ -1002,97 +983,6 @@ export function PullRequestSummaryTab({
                   >
                     {t.git.pullRequest.recentComments(COMMENT_PAGE)}
                   </Button>
-                ) : null}
-                {botComments.length > 0 ? (
-                  <CommentGroup
-                    key={`bots:${detail.url}`}
-                    label={t.git.pullRequest.botCommentsCount(botComments.length)}
-                    comments={botComments}
-                    detail={detail}
-                    onOpenChange={(open) => {
-                      if (open) setOpenedBotGroup(detail.url);
-                    }}
-                  >
-                    <div className="space-y-3 pt-2">
-                      {openedBotGroup === detail.url
-                        ? orderPullRequestComments(recentBotComments, commentOrder).map(
-                            renderComment,
-                          )
-                        : null}
-                      {hiddenBotCommentCount > 0 ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="w-full"
-                          onClick={() =>
-                            setShownBots({
-                              url: detail.url,
-                              count: shownBotComments + COMMENT_PAGE,
-                            })
-                          }
-                        >
-                          {t.git.pullRequest.showPrefix}
-                          {Math.min(hiddenBotCommentCount, COMMENT_PAGE)}
-                          {t.git.pullRequest.olderBotCommentStem}
-                          {t.git.pullRequest.commentPluralSuffix(hiddenBotCommentCount)} (
-                          {hiddenBotCommentCount}
-                          {t.git.pullRequest.hiddenSuffix}
-                        </Button>
-                      ) : null}
-                      {shownBotComments > COMMENT_PAGE ? (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="w-full"
-                          onClick={() => setShownBots({ url: detail.url, count: COMMENT_PAGE })}
-                        >
-                          {t.git.pullRequest.showOnlyPrefix}
-                          {COMMENT_PAGE}
-                          {t.git.pullRequest.recentBotCommentStem}
-                        </Button>
-                      ) : null}
-                    </div>
-                  </CommentGroup>
-                ) : null}
-                {finishedComments.length > 0 ? (
-                  <CommentGroup
-                    key={detail.url}
-                    label={t.git.pullRequest.finishedCommentsCount(finishedComments.length)}
-                    comments={finishedComments}
-                    detail={detail}
-                  >
-                    <div className="space-y-2 pt-2">
-                      {orderPullRequestComments(finishedComments, commentOrder).map((comment) => {
-                        const thread = threadByCommentId.get(comment.id);
-                        return (
-                          <CollapsedComment
-                            key={comment.id}
-                            comment={comment}
-                            editing={commentEditing}
-                            detail={detail}
-                            thread={thread}
-                            label={
-                              thread?.isResolved
-                                ? t.git.pullRequest.resolved
-                                : t.git.pullRequest.reviewDismissed
-                            }
-                            body={visibleBody(comment.body)}
-                            reactionBar={
-                              <PullRequestReactionBar
-                                className="ml-auto justify-end"
-                                reactions={comment.reactions ?? []}
-                                canReact={detail.capabilities.reactions === true}
-                                subjectId={comment.id}
-                                environmentId={environmentId}
-                                reference={reference}
-                                onRefresh={onRefresh}
-                              />
-                            }
-                          />
-                        );
-                      })}
-                    </div>
-                  </CommentGroup>
                 ) : null}
               </div>
             )}

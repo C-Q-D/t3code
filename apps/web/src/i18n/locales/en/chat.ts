@@ -3,10 +3,94 @@ import { englishWorkLogMessages } from "@t3tools/client-runtime/work-log/message
 import type { SourceControlProviderKind, WorktreeSubmodules } from "@t3tools/contracts";
 
 export const chat = {
+  modelPicker: {
+    updateRequiredMessages: {
+      /** Joins provider-supplied model names for the update notice. */
+      formatModelList: (names: ReadonlyArray<string>) =>
+        names.length <= 2
+          ? names.join(" and ")
+          : `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`,
+      /** Names the provider version required to enable the supplied models. */
+      updateRequired: (provider: string, version: string, models: string) =>
+        `Update ${provider} to ${version} or newer to use ${models}.`,
+      codexRuntime: "the Codex CLI",
+    },
+  },
+  providerSettingsLink: "Provider settings",
+  threadFind: {
+    searching: "Searching…",
+    failed: "Search failed",
+    label: "Find in thread",
+    retry: "Retry",
+    previous: "Previous match",
+    next: "Next match",
+    close: "Close find",
+  },
+  newComponents: {
+    threadUnavailable: "Thread no longer available",
+  },
+  codeLanguage: {
+    plainText: "Plain text",
+    search: "Search languages",
+    empty: "No matching languages.",
+    /** Formats label with the supplied display values. */
+    label: (language: string) => `Code language: ${language}`,
+  },
+  workflow: {
+    stopEntire: "Stop entire workflow",
+    failed: "Failed",
+    noAgents: "No agents yet",
+    /** Formats openChat with the supplied display values. */
+    openChat: (title: string) => `Open ${title} chat`,
+    /** Formats stop with the supplied display values. */
+    stop: (label: string) => `Stop workflow ${label}`,
+    /** Formats collapse with the supplied display values. */
+    collapse: (label: string) => `Collapse ${label}`,
+    /** Formats expand with the supplied display values. */
+    expand: (label: string) => `Expand ${label}`,
+    /** Formats phaseLabel with the supplied display values. */
+    phaseLabel: (open: boolean, title: string, status: string) =>
+      `${open ? "Collapse" : "Expand"} ${title} phase, ${status}`,
+    /** Formats agentProgress with the supplied display values. */
+    agentProgress: (settled: number, total: number) =>
+      `${settled}/${total} ${total === 1 ? "agent" : "agents"}`,
+    status: {
+      running: "running",
+      failed: "failed",
+      stopped: "stopped",
+      done: "done",
+      notStarted: "not started",
+    },
+  },
+  mcpApp: {
+    show: "Show app",
+    exitFullscreen: "Exit full screen",
+    /** Formats allowTool with the supplied display values. */
+    allowTool: (server: string, name: string, args: string) =>
+      `Allow ${server} to run ${name}?\n${args}`,
+    /** Formats sendMessage with the supplied display values. */
+    sendMessage: (server: string, text: string) => `Send this message from ${server}?\n${text}`,
+    /** Formats saveFiles with the supplied display values. */
+    saveFiles: (names: string, server: string) => `Save ${names} from ${server}?`,
+    /** Formats closed with the supplied display values. */
+    closed: (server: string) => `The ${server} app was closed`,
+    /** Formats navigatedAway with the supplied display values. */
+    navigatedAway: (server: string) => `The ${server} app left its page and was stopped`,
+    /** Formats title with the supplied display values. */
+    title: (server: string) => `${server} app`,
+    /** Formats loadFailed with the supplied display values. */
+    loadFailed: (server: string) => `Unable to load the ${server} app`,
+  },
   /** Formats a conversation count; count is the number of threads to describe. */
   threadCount: (count: number) => (count === 1 ? "1 thread" : `${count} threads`),
 
   view: {
+    appNeedsStartedThread: "Messages from apps need a started thread.",
+    appMessageFailed: "Could not send the app's message.",
+    /** Describes how many child agents await user input. */
+    subagentsNeedInput: (count: number) =>
+      count === 1 ? "Subagent needs input" : `${count} subagents need input`,
+    openQuestion: "Open question",
     genericError: "An error occurred.",
     terminalOpen: "terminal open",
     terminalWrite: "terminal write",
@@ -364,6 +448,8 @@ export const chat = {
     modelWorktreeHint: "Each model starts in its own worktree.",
   },
   header: {
+    /** Labels navigation to the named parent thread. */
+    openParentThread: (title: string) => `Open parent thread: ${title}`,
     emptyTitleError: "Thread title cannot be empty",
     renameError: "Failed to rename thread",
     genericError: "An error occurred.",
@@ -376,6 +462,14 @@ export const chat = {
     threadActions: (title: string) => `Thread actions for ${title}`,
   },
   timeline: {
+    threadReadPrefixes: {
+      running: "Reading thread",
+      completed: "Read thread",
+      failed: "Failed to read thread",
+      stopped: "Stopped reading thread",
+      declined: "Declined to read thread",
+    },
+    cutOffBySteer: "Cut off by a steer",
     emptyResponse: "(empty response)",
     tokenChange: (before: number | string, after: number | string) => `${before} → ${after} tokens`,
     moreSelectedElements: (count: number) => `${count} more selected elements`,
@@ -474,7 +568,6 @@ export const chat = {
     usageLimit: (resetTime: string | null): string =>
       `Usage limit reached.${resetTime ? ` Retry after ${resetTime}.` : ""}`,
     sendAMessageToStartTheConversation: "Send a message to start the conversation.",
-    partialOutputRetained: "Partial output retained",
     compacting: "Compacting…",
     screenshotUnavailable: "Screenshot unavailable",
     retry: "Retry",
@@ -585,6 +678,9 @@ export const chat = {
     pathSuffix: ".",
   },
   citation: {
+    /** Identifies the quoted assistant text by its display label. */
+    quotedText: (label: string) => `Quoted assistant text: ${label}`,
+    goToSource: "Go to source",
     viewSource: "View source",
     editCitationComment: "Edit citation comment",
     addCommentToCitation: "Add comment to citation",
@@ -621,8 +717,6 @@ export const chat = {
     nextRunSuffix: (relative: string) => ` · next ${relative}`,
     pausedSuffix: " · paused",
     workspace: "Workspace",
-    clientAndServerVersionsDiffer: "Client and server versions differ",
-    dismissVersionMismatchWarning: "Dismiss version mismatch warning",
     versionControl: "Version Control",
     threadDetails: "Thread details",
     resolve: "Resolve",
@@ -647,8 +741,6 @@ export const chat = {
     runNow: "Run now",
     watchingHint:
       "Watching: the agent wakes when checks finish, someone comments, or the branch conflicts. Click to stop.",
-    /** Formats the client version before the server version. */
-    clientVersion: (version: string): string => `Client ${version} · `,
     /** Names the pull request by number. */
     pullRequest: (number: number): string => `Pull request #${number}`,
     /** Names the selected pull request merge method. */
@@ -679,6 +771,7 @@ export const chat = {
     loadAutomationsError: (error: string): string => `Could not load automations: ${error}`,
   },
   relationships: {
+    stopWorkflowFailed: "Could not stop workflow",
     failedCount: (count: number) => `${count} failed`,
     starting: "Starting",
     running: "Running",

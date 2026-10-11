@@ -10,7 +10,6 @@ import * as Schema from "effect/Schema";
 import type * as Electron from "electron";
 
 import { makeComponentLogger } from "../app/DesktopObservability.ts";
-import * as ElectronApp from "../electron/ElectronApp.ts";
 import * as ElectronDialog from "../electron/ElectronDialog.ts";
 import * as ElectronMenu from "../electron/ElectronMenu.ts";
 import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
@@ -60,6 +59,13 @@ const zoomMainWindow = Effect.fn("desktop.menu.zoomMainWindow")(function* (
 ): Effect.fn.Return<void, never, DesktopWindow.DesktopWindow> {
   const desktopWindow = yield* DesktopWindow.DesktopWindow;
   yield* desktopWindow.zoomMain(direction);
+});
+
+const runMainContentsCommand = Effect.fn("desktop.menu.runMainContentsCommand")(function* (
+  command: DesktopWindow.MainWindowContentsCommand,
+): Effect.fn.Return<void, never, DesktopWindow.DesktopWindow> {
+  const desktopWindow = yield* DesktopWindow.DesktopWindow;
+  yield* desktopWindow.runMainContentsCommand(command);
 });
 
 const checkForUpdatesFromMenu = Effect.gen(function* () {
@@ -113,10 +119,8 @@ const handleCheckForUpdatesMenuClick = Effect.gen(function* () {
 
 /** @public Service construction is part of the canonical Effect module API. */
 export const make = Effect.gen(function* () {
-  const electronApp = yield* ElectronApp.ElectronApp;
   const electronMenu = yield* ElectronMenu.ElectronMenu;
   const environment = yield* DesktopEnvironment.DesktopEnvironment;
-  const appName = yield* electronApp.name;
   const context = yield* Effect.context<DesktopApplicationMenuRuntimeServices>();
   const runPromise = Effect.runPromiseWith(context);
 
@@ -140,7 +144,7 @@ export const make = Effect.gen(function* () {
   const configure = Effect.gen(function* () {
     const m = yield* uiLocale.messages;
     const locale = yield* uiLocale.current;
-    const labels = m.menu.roleLabels(appName, environment.platform);
+    const labels = m.menu.roleLabels(environment.displayName, environment.platform);
     const roleItem = (role: NonNullable<Electron.MenuItemConstructorOptions["role"]>) =>
       localizedRole(role, labels);
     const checkForUpdatesClick = () => {
@@ -165,11 +169,14 @@ export const make = Effect.gen(function* () {
     const zoomClick = (direction: DesktopWindow.MainWindowZoomDirection) => () => {
       runMenuEffect(`zoom-${direction}`, zoomMainWindow(direction));
     };
+    const mainContentsClick = (command: DesktopWindow.MainWindowContentsCommand) => () => {
+      runMenuEffect(command, runMainContentsCommand(command));
+    };
     const template: Electron.MenuItemConstructorOptions[] = [];
 
     if (environment.platform === "darwin") {
       template.push({
-        label: appName,
+        label: environment.displayName,
         submenu: [
           roleItem("about"),
           {
@@ -242,16 +249,24 @@ export const make = Effect.gen(function* () {
       {
         label: m.menu.view,
         submenu: [
-          roleItem("reload"),
-          roleItem("forceReload"),
-          roleItem("toggleDevTools"),
-          { type: "separator" },
           /*
-            Not the zoom roles: those act on the focused webContents, so with
-            an embedded preview WebContentsView focused they zoom the guest
-            page and the app UI appears stuck. These always zoom the main
-            window (see DesktopWindow.zoomMain).
+            Not the reload, DevTools or zoom roles: those act on the focused
+            webContents, so with a browser page focused they reload or zoom
+            the guest page and the app UI appears stuck. These always target
+            the main window (see DesktopWindow.zoomMain).
           */
+          { label: m.menu.reload, accelerator: "CmdOrCtrl+R", click: mainContentsClick("reload") },
+          {
+            label: m.menu.forceReload,
+            accelerator: "Shift+CmdOrCtrl+R",
+            click: mainContentsClick("forceReload"),
+          },
+          {
+            label: m.menu.toggleDevTools,
+            accelerator: environment.platform === "darwin" ? "Alt+Command+I" : "Ctrl+Shift+I",
+            click: mainContentsClick("toggleDevTools"),
+          },
+          { type: "separator" },
           { label: m.menu.actualSize, accelerator: "CmdOrCtrl+0", click: zoomClick("reset") },
           { label: m.menu.zoomIn, accelerator: "CmdOrCtrl+=", click: zoomClick("in") },
           {
