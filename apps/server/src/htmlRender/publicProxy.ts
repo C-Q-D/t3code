@@ -1,3 +1,4 @@
+/** Filters preview browser connections before opening SOCKS tunnels; carries accepted bytes unchanged. */
 // @effect-diagnostics nodeBuiltinImport:off - Effect has no SOCKS proxy or address block list.
 import * as NodeDnsPromises from "node:dns/promises";
 import * as NodeNet from "node:net";
@@ -15,7 +16,6 @@ for (const [network, prefix] of [
   ["169.254.0.0", 16],
   ["172.16.0.0", 12],
   ["192.168.0.0", 16],
-  ["198.18.0.0", 15],
   ["224.0.0.0", 3],
 ] as const) {
   LOCAL_ADDRESSES.addSubnet(network, prefix, "ipv4");
@@ -37,6 +37,12 @@ const NAT64 = new NodeNet.BlockList();
 NAT64.addSubnet("64:ff9b::", 96, "ipv6");
 const SIX_TO_FOUR = new NodeNet.BlockList();
 SIX_TO_FOUR.addSubnet("2002::", 16, "ipv6");
+
+// Fake-IP proxies resolve public names into this range and route them by name.
+// A literal address names no destination, so only resolved IPv4 is exempt.
+// Such a proxy can still route a name to a LAN device; that remains reachable.
+const FAKE_IP_RANGE = new NodeNet.BlockList();
+FAKE_IP_RANGE.addSubnet("198.18.0.0", 15, "ipv4");
 
 /** The sixteen-bit groups of an IPv6 address, which may end in dotted IPv4. */
 const ipv6Groups = (address: string) => {
@@ -79,27 +85,60 @@ const ownAddresses = () => {
 
 /**
  * Whether `address` belongs to a local network or to this machine itself,
- * including a public address one of its interfaces holds. Both lists match
- * IPv4-mapped IPv6 against their IPv4 entries.
+ * including a public address one of its interfaces holds. `family` is 4 or 6;
+ * `resolvedFromName` defaults to false and exempts only resolved IPv4 fake-IP.
+ * All block lists match IPv4-mapped IPv6 against their IPv4 entries. Embedded
+ * IPv4 is checked as a literal so IPv6 never inherits the fake-IP exemption.
  */
-const isLocal = (address: string, family: number): boolean => {
+const isLocal = (address: string, family: number, resolvedFromName = false): boolean => {
   const type = family === 6 ? "ipv6" : "ipv4";
   if (LOCAL_ADDRESSES.check(address, type) || ownAddresses().check(address, type)) return true;
+  if (!(resolvedFromName && family === 4) && FAKE_IP_RANGE.check(address, type)) return true;
   const embedded = family === 6 ? embeddedIPv4(address) : undefined;
   return embedded !== undefined && isLocal(embedded, 4);
 };
 
 /**
- * The addresses to connect to for `host`, or undefined when any address it
- * resolves to is local. The caller connects only to addresses checked here,
+ * The addresses to connect to for `host` (a literal IP or name), or undefined
+ * when lookup fails, returns no addresses, or any address is local. `resolve`
+ * defaults to system DNS and supplies all addresses in resolver order.
+ * Literal IPs bypass lookup and never receive the resolved IPv4 fake-IP exemption.
+ * Names exclude IPs with a trailing dot, WHATWG IPv4 numeric endings, colons,
+ * and localhost or its subdomains (case-insensitive, with an optional final dot).
+ * These are refused before lookup: a fake-IP resolver may otherwise disguise
+ * numeric or loopback destinations as public names. Other names keep their
+ * original case and final dot for lookup and the upstream connection.
+ * The caller connects only to addresses checked here,
  * so a name that later resolves elsewhere (DNS rebinding) changes nothing.
  */
-const publicAddresses = async (host: string) => {
-  const addresses = NodeNet.isIP(host)
-    ? [{ address: host, family: NodeNet.isIP(host) }]
-    : await NodeDnsPromises.lookup(host, { all: true, verbatim: true }).catch(() => []);
+export const publicAddresses = async (
+  host: string,
+  resolve: (
+    host: string,
+    options: { all: true; verbatim: true },
+  ) => Promise<Array<{ address: string; family: number }>> = NodeDnsPromises.lookup,
+) => {
+  const literalFamily = NodeNet.isIP(host);
+  if (!literalFamily) {
+    const name = (host.endsWith(".") ? host.slice(0, -1) : host).toLowerCase();
+    const lastLabel = name.slice(name.lastIndexOf(".") + 1);
+    // WHATWG's "ends in a number" also includes 0x with no following digits.
+    // Reject these spellings rather than let DNS grant them the name exemption.
+    if (
+      NodeNet.isIP(name) ||
+      /^(?:[0-9]+|0x[0-9a-f]*)$/.test(lastLabel) ||
+      name.includes(":") ||
+      name === "localhost" ||
+      name.endsWith(".localhost")
+    ) {
+      return undefined;
+    }
+  }
+  const addresses = literalFamily
+    ? [{ address: host, family: literalFamily }]
+    : await resolve(host, { all: true, verbatim: true }).catch(() => []);
   if (addresses.length === 0) return undefined;
-  const local = addresses.some(({ address, family }) => isLocal(address, family));
+  const local = addresses.some(({ address, family }) => isLocal(address, family, !literalFamily));
   return local ? undefined : addresses;
 };
 
@@ -140,8 +179,9 @@ const readRequest = (data: Buffer) => {
 /**
  * Starts a SOCKS5 proxy on loopback for the life of the scope and returns its
  * port. The preview browser sends every connection through it, and it only
- * connects to public addresses. Chrome's Local Network Access misses some
- * requests, such as speculation-rules prefetches; nothing misses this. It
+ * connects to checked addresses, including IPv4 fake-IP resolved from names.
+ * Chrome's Local Network Access misses some requests, such as speculation-rules
+ * prefetches; this proxy checks every connection. It
  * carries bytes only, so HTTP, TLS, and WebSockets pass through unchanged.
  */
 export const publicProxy = Effect.acquireRelease(

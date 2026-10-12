@@ -1,3 +1,4 @@
+/** Verifies preview address filtering and SOCKS refusal/resource lifetime contracts. */
 // @effect-diagnostics nodeBuiltinImport:off - raw sockets speak SOCKS5 to the proxy.
 import { describe, expect, it } from "@effect/vitest";
 import { vi } from "vite-plus/test";
@@ -5,7 +6,7 @@ import * as Effect from "effect/Effect";
 import * as NodeNet from "node:net";
 import * as NodeOS from "node:os";
 
-import { publicProxy } from "./publicProxy.ts";
+import { publicAddresses, publicProxy } from "./publicProxy.ts";
 
 // A public IPv4 address this machine holds, which no private range covers.
 const OWN_PUBLIC_IPV4 = "198.51.100.7";
@@ -23,6 +24,14 @@ vi.mock("node:os", async (importOriginal) => {
           mac: "00:00:00:00:00:00",
           internal: false,
           cidr: `${OWN_PUBLIC_IPV4}/24`,
+        },
+        {
+          address: "198.18.0.1",
+          netmask: "255.254.0.0",
+          family: "IPv4",
+          mac: "00:00:00:00:00:00",
+          internal: false,
+          cidr: "198.18.0.1/15",
         },
       ],
     }),
@@ -47,6 +56,7 @@ const connectThrough = (proxyPort: number, target: Buffer, version = 5) =>
     socket.on("close", () => resume(Effect.succeed({ code: received[3] ?? -1, socket })));
   });
 
+/** Encodes a dotted IPv4 address and destination port as a SOCKS5 CONNECT target. */
 const ipv4Target = (address: string, port: number) => {
   const target = Buffer.alloc(7);
   target[0] = 1;
@@ -55,6 +65,7 @@ const ipv4Target = (address: string, port: number) => {
   return target;
 };
 
+/** Encodes a hexadecimal IPv6 address (including compressed groups) and destination port. */
 const ipv6Target = (address: string, port: number) => {
   const target = Buffer.alloc(19);
   target[0] = 4;
@@ -73,6 +84,7 @@ const toHexPair = (address: string) => {
   return `${((a << 8) | b).toString(16)}:${((c << 8) | d).toString(16)}`;
 };
 
+/** Encodes a hostname and destination port so the proxy, rather than the client, resolves it. */
 const domainTarget = (host: string, port: number) => {
   const name = Buffer.from(host, "latin1");
   const target = Buffer.alloc(4 + name.length);
@@ -84,6 +96,94 @@ const domainTarget = (host: string, port: number) => {
 };
 
 describe("publicProxy", () => {
+  it.each([
+    "198.18.10.121.",
+    "127.0.0.1.",
+    "192.168.1.1.",
+    "127.1",
+    "2130706433",
+    "0x7f000001",
+    "0x7f.1",
+    "::1.",
+    "localhost",
+    "localhost.",
+    "foo.localhost",
+    "FOO.LOCALHOST.",
+    "LOCALHOST.",
+    "cdn.123",
+    "cdn.0X7F",
+    "cdn.0x",
+  ])("refuses ambiguous or loopback host %s before fake-IP lookup", async (host) => {
+    expect(
+      await publicAddresses(host, async () => [{ address: "198.18.10.157", family: 4 }]),
+    ).toBeUndefined();
+  });
+
+  it("accepts a mixed-case domain with a trailing dot and IPv4 fake-IP", async () => {
+    expect(
+      await publicAddresses("CDN.Example.", async () => [{ address: "198.18.10.157", family: 4 }]),
+    ).toEqual([{ address: "198.18.10.157", family: 4 }]);
+  });
+
+  it.effect.each(["127.0.0.1.", "127.1", "localhost."])(
+    "refuses ambiguous SOCKS domain target %s",
+    (host) =>
+      Effect.gen(function* () {
+        const port = yield* publicProxy;
+        const { code, socket } = yield* connectThrough(port, domainTarget(host, 80));
+        socket.destroy();
+        expect(code).toBe(2);
+      }),
+  );
+
+  it("accepts IPv4 fake-IP addresses resolved from a name", async () => {
+    const addresses = [{ address: "198.18.10.121", family: 4 }];
+    expect(await publicAddresses("cdn.example", async () => addresses)).toEqual(addresses);
+  });
+
+  it.each([
+    {
+      name: "a literal fake-IP address",
+      host: "198.18.10.121",
+      addresses: [{ address: "198.18.10.121", family: 4 }],
+    },
+    {
+      name: "a name mixing fake-IP and private IPv4 addresses",
+      host: "cdn.example",
+      addresses: [
+        { address: "198.18.10.121", family: 4 },
+        { address: "10.0.0.1", family: 4 },
+      ],
+    },
+    {
+      name: "a literal NAT64 address embedding fake-IP",
+      host: "64:ff9b::c612:a79",
+      addresses: [{ address: "64:ff9b::c612:a79", family: 6 }],
+    },
+    {
+      name: "a literal IPv4-mapped address embedding fake-IP",
+      host: "::ffff:c612:a79",
+      addresses: [{ address: "::ffff:c612:a79", family: 6 }],
+    },
+    {
+      name: "a name resolving to IPv4-mapped fake-IP",
+      host: "cdn.example",
+      addresses: [{ address: "::ffff:c612:a79", family: 6 }],
+    },
+    {
+      name: "a name resolving to NAT64 fake-IP",
+      host: "cdn.example",
+      addresses: [{ address: "64:ff9b::c612:a79", family: 6 }],
+    },
+    {
+      name: "a name resolving to this machine's fake-IP interface",
+      host: "cdn.example",
+      addresses: [{ address: "198.18.0.1", family: 4 }],
+    },
+  ])("refuses $name", async ({ host, addresses }) => {
+    expect(await publicAddresses(host, async () => addresses)).toBeUndefined();
+  });
+
   it.effect("refuses loopback and private targets, by address or by name", () =>
     Effect.gen(function* () {
       const port = yield* publicProxy;
