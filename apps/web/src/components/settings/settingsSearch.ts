@@ -26,6 +26,7 @@ export type SettingsPath =
   | "/settings/providers"
   | "/settings/integrations"
   | "/settings/scheduled-tasks"
+  | "/settings/discussions"
   | "/settings/source-control"
   | "/settings/storage"
   | "/settings/connections"
@@ -105,6 +106,7 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/providers": t.settings.pages.providers,
   "/settings/integrations": t.settings.pages.integrations,
   "/settings/scheduled-tasks": t.settings.pages.scheduledTasks,
+  "/settings/discussions": t.settings.pages.discussions,
   "/settings/source-control": t.settings.pages.sourceControl,
   "/settings/storage": t.settings.pages.storage,
   "/settings/connections": t.settings.pages.connections,
@@ -120,6 +122,7 @@ const ENGLISH_SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = 
   "/settings/providers": en.settings.pages.providers,
   "/settings/integrations": en.settings.pages.integrations,
   "/settings/scheduled-tasks": en.settings.pages.scheduledTasks,
+  "/settings/discussions": en.settings.pages.discussions,
   "/settings/source-control": en.settings.pages.sourceControl,
   "/settings/storage": en.settings.pages.storage,
   "/settings/connections": en.settings.pages.connections,
@@ -182,6 +185,14 @@ const SOURCE_CONTROL_HOST_SEARCH_ITEMS = sourceControlClients.definitions.flatMa
  * that may not be mounted point at their nearest stable section instead.
  */
 export const SETTINGS_SEARCH_ITEMS = [
+  {
+    id: "discussion-personas",
+    title: t.settings.discussions.title,
+    to: "/settings/discussions",
+    searchTerms: [
+      "discussions persona summary templates identity prompts 身份 梳理 讨论 模板 提示词",
+    ],
+  },
   {
     id: "storage-worktree-keep-when",
     targetId: "storage-worktrees",
@@ -1034,6 +1045,7 @@ const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScop
   "/settings/storage": "project-defaults",
   "/settings/connections": "connections",
   "/settings/scheduled-tasks": null,
+  "/settings/discussions": null,
   "/settings/archived": "project-defaults",
 };
 

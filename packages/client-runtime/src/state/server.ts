@@ -1122,6 +1122,16 @@ export function createServerEnvironmentAtoms<R, E>(
       label: "environment-data:server:scheduled-tasks:live",
       tag: WS_METHODS.scheduledTasksSubscribe,
     }),
+    /** Prompt snapshot on subscribe, then complete snapshots after edits; callers never refetch after writes. */
+    discussionPromptsLive: createEnvironmentRpcSubscriptionAtomFamily(runtime, {
+      label: "environment-data:server:discussion-prompts:live",
+      tag: WS_METHODS.discussionPromptsSubscribe,
+    }),
+    /** Ordered discussion-template snapshots scoped to the destination environment. */
+    discussionTemplatesLive: createEnvironmentRpcSubscriptionAtomFamily(runtime, {
+      label: "environment-data:server:discussion-templates:live",
+      tag: WS_METHODS.discussionTemplatesSubscribe,
+    }),
     // A cold transcript scan is measured in seconds, so keep the result around
     // long enough that switching windows or re-rendering does not rescan.
     // Slow sources answer from cache first: that summary stays on screen, with
@@ -1322,6 +1332,34 @@ export function createServerEnvironmentAtoms<R, E>(
     signalProcess: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:server:signal-process",
       tag: WS_METHODS.serverSignalProcess,
+    }),
+    /** Creates or edits a persona/summary prompt on the shared configuration command lane. */
+    upsertDiscussionPrompt: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:discussion-prompt:upsert",
+      tag: WS_METHODS.discussionPromptsUpsert,
+      scheduler: configScheduler,
+      concurrency: configConcurrency,
+    }),
+    /** Deletes custom prompts; the server rejects builtin and referenced prompts. */
+    deleteDiscussionPrompt: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:discussion-prompt:delete",
+      tag: WS_METHODS.discussionPromptsDelete,
+      scheduler: configScheduler,
+      concurrency: configConcurrency,
+    }),
+    /** Restores builtin content while preserving its durable identity. */
+    restoreDiscussionPromptBuiltin: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:discussion-prompt:restore-builtin",
+      tag: WS_METHODS.discussionPromptsRestoreBuiltin,
+      scheduler: configScheduler,
+      concurrency: configConcurrency,
+    }),
+    /** Deletes a saved seat configuration; subscription snapshots carry the resulting list. */
+    deleteDiscussionTemplate: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:discussion-template:delete",
+      tag: WS_METHODS.discussionTemplatesDelete,
+      scheduler: configScheduler,
+      concurrency: configConcurrency,
     }),
     upsertScheduledTask: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:server:scheduled-task:upsert",
