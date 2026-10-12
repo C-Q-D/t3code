@@ -1,3 +1,4 @@
+/** Presents server projections and shells as environment-scoped client data. */
 import { backgroundWorkHoldsCompletion } from "@t3tools/shared/orchestrationV2PendingBackgroundWork";
 import { threadPullRequestsOf } from "@t3tools/shared/threadPullRequests";
 import type {
@@ -86,7 +87,9 @@ function threadRunStatusIsActive(status: ThreadRuntimeSummary["status"]): boolea
   );
 }
 
+/** Environment-scoped shell presentation for client lists and notifications. */
 export interface EnvironmentThreadShell {
+  readonly discussion?: OrchestrationV2ThreadShell["discussion"];
   readonly environmentId: EnvironmentId;
   readonly id: ThreadId;
   readonly projectId: ProjectId;
@@ -205,6 +208,12 @@ export function scopeProject(
   return { ...project, environmentId };
 }
 
+/**
+ * Presents a server shell without inventing ownership metadata for older threads.
+ * @param environmentId Environment that owns this shell.
+ * @param thread Server shell with decoded timestamps and optional discussion ownership.
+ * @returns Environment-scoped list and notification data; absent discussion stays absent.
+ */
 export function presentThreadShell(
   environmentId: EnvironmentId,
   thread: OrchestrationV2ThreadShell,
@@ -229,6 +238,7 @@ export function presentThreadShell(
   return {
     environmentId,
     id: thread.id,
+    ...(thread.discussion === undefined ? {} : { discussion: thread.discussion }),
     projectId: thread.projectId,
     title:
       thread.lineage.relationshipToParent === "subagent"

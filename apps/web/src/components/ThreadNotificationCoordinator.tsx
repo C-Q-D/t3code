@@ -156,7 +156,8 @@ function EnvironmentNotifications({
           : completion !== null && (prior.completion === null || completion > prior.completion)
             ? "completion"
             : null;
-      if (!kind) continue;
+      // Seat completions are routine discussion traffic; attention still needs the user.
+      if (!kind || (kind === "completion" && thread.discussion !== undefined)) continue;
       const title =
         kind === "completion"
           ? t.app.thread.completed

@@ -1,3 +1,4 @@
+/** Shared scalar schemas and branded identities; independent of domain contracts. */
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
@@ -25,6 +26,13 @@ const isNonBlank = Schema.makeFilter((value: string) => value.trim().length > 0,
   arbitraryConstraint: { minLength: 1 },
 });
 export const TrimmedNonEmptyString = TrimmedString.check(isNonBlank);
+
+export const DiscussionId = TrimmedNonEmptyString.pipe(Schema.brand("DiscussionId"));
+/** Durable discussion identity, independent of its seat threads. */
+export type DiscussionId = typeof DiscussionId.Type;
+export const DiscussionSeatId = TrimmedNonEmptyString.pipe(Schema.brand("DiscussionSeatId"));
+/** Seat identity within a discussion. */
+export type DiscussionSeatId = typeof DiscussionSeatId.Type;
 
 export const NonNegativeInt = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
 export const PositiveInt = Schema.Int.check(Schema.isGreaterThanOrEqualTo(1));

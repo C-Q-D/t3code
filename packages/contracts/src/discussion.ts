@@ -2,6 +2,8 @@
 import * as Schema from "effect/Schema";
 import {
   CheckpointRef,
+  DiscussionId,
+  DiscussionSeatId,
   IsoDateTime,
   NonNegativeInt,
   PositiveInt,
@@ -13,12 +15,6 @@ import {
 import { ModelSelection } from "./modelSelection.ts";
 import { OrchestrationV2Actor, OrchestrationV2CreationSource } from "./orchestrationV2.ts";
 
-export const DiscussionId = TrimmedNonEmptyString.pipe(Schema.brand("DiscussionId"));
-/** Durable discussion identity, independent of its seat threads. */
-export type DiscussionId = typeof DiscussionId.Type;
-export const DiscussionSeatId = TrimmedNonEmptyString.pipe(Schema.brand("DiscussionSeatId"));
-/** Seat identity within a discussion. */
-export type DiscussionSeatId = typeof DiscussionSeatId.Type;
 export const DiscussionEntryId = TrimmedNonEmptyString.pipe(Schema.brand("DiscussionEntryId"));
 /** Stable identity for one transcript entry. */
 export type DiscussionEntryId = typeof DiscussionEntryId.Type;

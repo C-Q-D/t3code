@@ -1,3 +1,4 @@
+/** Verifies internal thread launching with isolated persistence and controlled external services. */
 import * as Scheduler from "../scheduling/Scheduler.ts";
 import * as WorktreeSetupTracker from "../project/WorktreeSetupTracker.ts";
 import * as ProjectCloneTracker from "../project/ProjectCloneTracker.ts";
@@ -15,6 +16,8 @@ import {
   ComposerContextId,
   type ChatAttachment,
   CommandId,
+  DiscussionId,
+  DiscussionSeatId,
   DEFAULT_SERVER_SETTINGS,
   GitCommandError,
   MessageId,
@@ -2529,4 +2532,34 @@ it.effect.each([
       });
     }).pipe(Effect.provide(harness.layer));
   }),
+);
+
+it.effect.each([true, false])(
+  "preserves optional discussion ownership on internal launch: %s",
+  (isSeat) => {
+    const harness = makeHarness();
+    return Effect.gen(function* () {
+      const launches = yield* ThreadLaunch.ThreadLaunchService;
+      const launched = yield* launches.launch({
+        ...launchInput({
+          command: "command:discussion-launch",
+          thread: "thread:discussion-launch",
+        }),
+        ...(isSeat
+          ? {
+              discussion: {
+                discussionId: DiscussionId.make("discussion-launch"),
+                seatId: DiscussionSeatId.make("seat-launch"),
+              },
+            }
+          : {}),
+      });
+      assert.deepEqual(
+        Object.hasOwn(launched.projection.thread, "discussion")
+          ? launched.projection.thread.discussion
+          : "absent",
+        isSeat ? { discussionId: "discussion-launch", seatId: "seat-launch" } : "absent",
+      );
+    }).pipe(Effect.provide(harness.layer));
+  },
 );

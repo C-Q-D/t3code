@@ -1,3 +1,4 @@
+/** Serializes orchestration commands, commits their events, and schedules provider effects. */
 import type {
   OrchestrationV2SearchThreadInput,
   OrchestrationV2SearchThreadResult,
@@ -2213,6 +2214,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       createdBy: command.createdBy,
       creationSource: command.creationSource,
       id: command.threadId,
+      ...(command.discussion === undefined ? {} : { discussion: command.discussion }),
       projectId: command.projectId,
       title: command.title,
       providerInstanceId: command.modelSelection.instanceId,

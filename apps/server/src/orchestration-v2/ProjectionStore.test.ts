@@ -1,5 +1,11 @@
+/** Verifies persisted projections and shell contracts with isolated SQLite state. */
 import { assert, it, vi } from "@effect/vitest";
 import {
+  DiscussionId,
+  DiscussionSeatId,
+  OrchestrationV2Command,
+  OrchestrationV2DomainEvent,
+  OrchestrationV2ThreadShell,
   EnvironmentId,
   EventId,
   CommandId,
@@ -35,6 +41,10 @@ import { projectThreadAwarenessV2 } from "@t3tools/shared/agentAwareness";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import { CodexProviderCapabilitiesV2 } from "./Adapters/CodexAdapterV2.ts";
 import * as ProjectionStore from "./ProjectionStore.ts";
+import * as Orchestrator from "./Orchestrator.ts";
+import * as ProviderReplayHarness from "./testkit/ProviderReplayHarness.ts";
+import * as ProviderAdapterRegistry from "./ProviderAdapterRegistry.ts";
+import type * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
 import {
   buildBoundedThreadProjection,
   decodeThreadHistoryCursor,
@@ -5479,3 +5489,84 @@ it.layer(layerTest)("ProjectionStoreV2", (it) => {
     }),
   );
 });
+
+it.effect.each([true, false])(
+  "persists optional discussion ownership from thread.create through event and both shells: %s",
+  (isSeat) => {
+    const adapter = {
+      instanceId: providerInstanceId,
+      driver,
+      getCapabilities: () => Effect.succeed(CodexProviderCapabilitiesV2),
+      planSelectionTransition: () => Effect.succeed({ type: "apply_on_next_turn" as const }),
+      openSession: () => Effect.die("provider execution is disabled in discussion ownership tests"),
+    } as ProviderAdapter.ProviderAdapterV2["Service"];
+    const layer = ProviderReplayHarness.layerWithRegistry(
+      { name: "discussion-ownership" },
+      ProviderAdapterRegistry.layerFromAdapters([adapter]),
+      { databaseLayer: SqlitePersistence.layerMemory, runEffectWorker: false },
+    );
+    return Effect.gen(function* () {
+      const orchestrator = yield* Orchestrator.OrchestratorV2;
+      const threadId = ThreadId.make("thread:discussion-ownership");
+      const command = yield* Schema.decodeEffect(OrchestrationV2Command)({
+        type: "thread.create",
+        commandId: CommandId.make("command:discussion-ownership"),
+        threadId,
+        projectId: ProjectId.make("project:discussion-ownership"),
+        title: "Discussion seat",
+        modelSelection,
+        runtimeMode: "full-access",
+        interactionMode: "default",
+        branch: null,
+        worktreePath: null,
+        createdBy: "agent",
+        creationSource: "mcp",
+        ...(isSeat
+          ? {
+              discussion: {
+                discussionId: DiscussionId.make("discussion-ownership"),
+                seatId: DiscussionSeatId.make("seat-ownership"),
+              },
+            }
+          : {}),
+      });
+      if (command.type !== "thread.create") return assert.fail("Expected thread.create");
+      assert.deepEqual(
+        command.discussion,
+        isSeat ? { discussionId: "discussion-ownership", seatId: "seat-ownership" } : undefined,
+      );
+      assert.equal(Object.hasOwn(command, "discussion"), isSeat);
+      const result = yield* orchestrator.dispatch(command);
+      const created = result.storedEvents.find(
+        (stored) => stored.event.type === "thread.created",
+      )?.event;
+      if (created?.type !== "thread.created") return assert.fail("Missing thread.created");
+      assert.equal(Object.hasOwn(created.payload, "discussion"), isSeat);
+      const decodedEvent = yield* Schema.decodeEffect(OrchestrationV2DomainEvent)(
+        yield* Schema.encodeEffect(OrchestrationV2DomainEvent)(created),
+      );
+      if (decodedEvent.type !== "thread.created") return assert.fail("Expected thread.created");
+      const payload = decodedEvent.payload;
+      assert.deepEqual(
+        Object.hasOwn(payload, "discussion") ? payload.discussion : "absent",
+        isSeat ? { discussionId: "discussion-ownership", seatId: "seat-ownership" } : "absent",
+      );
+      const projection = yield* orchestrator.getThreadProjection(threadId);
+      const projectedShell = ProjectionStore.threadShellFromProjection(projection);
+      const storedShell = yield* orchestrator.getThreadShell(threadId);
+      if (storedShell === null) return assert.fail("Missing persisted shell");
+      assert.equal(Object.hasOwn(storedShell, "discussion"), isSeat);
+      const decodedShell = yield* Schema.decodeEffect(OrchestrationV2ThreadShell)(
+        yield* Schema.encodeEffect(OrchestrationV2ThreadShell)(storedShell),
+      );
+      assert.deepEqual(
+        Object.hasOwn(decodedShell, "discussion") ? decodedShell.discussion : "absent",
+        isSeat ? { discussionId: "discussion-ownership", seatId: "seat-ownership" } : "absent",
+      );
+      assert.deepEqual(
+        Object.hasOwn(projectedShell, "discussion") ? projectedShell.discussion : "absent",
+        isSeat ? { discussionId: "discussion-ownership", seatId: "seat-ownership" } : "absent",
+      );
+    }).pipe(Effect.provide(layer));
+  },
+);

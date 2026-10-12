@@ -1,3 +1,4 @@
+/** Launches server threads and prepares their workspaces; transports supply authorized options. */
 import * as WorktreeSetupTracker from "../project/WorktreeSetupTracker.ts";
 import * as ProjectCloneTracker from "../project/ProjectCloneTracker.ts";
 import * as TerminalManager from "../terminal/Manager.ts";
@@ -8,6 +9,7 @@ import {
   type MessageId,
   type ModelSelection,
   type OrchestrationV2Actor,
+  type OrchestrationV2AppThread,
   type OrchestrationV2CreationSource,
   type OrchestrationV2ProviderThreadNativeMetadata,
   type OrchestrationV2ThreadProjection,
@@ -72,7 +74,9 @@ export interface ThreadLaunchInitialMessage {
   readonly context?: import("@t3tools/contracts").OrchestrationMessageContext | undefined;
 }
 
+/** Internal launch options; discussion ownership is reserved for server-driven seat threads. */
 export interface ThreadLaunchInput {
+  readonly discussion?: OrchestrationV2AppThread["discussion"];
   readonly commandId: CommandId;
   readonly threadId?: ThreadId;
   readonly reuseExistingThread?: boolean;
@@ -843,6 +847,7 @@ const make = Effect.gen(function* () {
                 interactionMode: input.interactionMode,
                 branch: initialBranch,
                 worktreePath: initialWorktreePath,
+                ...(input.discussion === undefined ? {} : { discussion: input.discussion }),
                 ...(input.importedNativeThread === undefined
                   ? {}
                   : { importedNativeThread: input.importedNativeThread }),

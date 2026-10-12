@@ -1,3 +1,4 @@
+/** Stores event-derived thread projections and builds shells; persistence is isolated behind this service. */
 import { projectTurnItemForWire } from "./WireProjection.ts";
 import * as Stream from "effect/Stream";
 import { makeThreadFind, findProjectedThreadItems } from "./ThreadFind.ts";
@@ -1483,6 +1484,9 @@ export function threadShellFromProjection(
     lineage: projection.thread.lineage,
     forkedFrom: projection.thread.forkedFrom,
     activeProviderThreadId: projection.thread.activeProviderThreadId,
+    ...(projection.thread.discussion === undefined
+      ? {}
+      : { discussion: projection.thread.discussion }),
     ...(projection.thread.historyOrigin === undefined
       ? {}
       : { historyOrigin: projection.thread.historyOrigin }),
@@ -1751,6 +1755,9 @@ function shellFromState(input: {
     lineage: input.state.thread.lineage,
     forkedFrom: input.state.thread.forkedFrom,
     activeProviderThreadId: input.state.thread.activeProviderThreadId,
+    ...(input.state.thread.discussion === undefined
+      ? {}
+      : { discussion: input.state.thread.discussion }),
     ...(input.state.thread.historyOrigin === undefined
       ? {}
       : { historyOrigin: input.state.thread.historyOrigin }),

@@ -1,3 +1,4 @@
+/** Verifies notification transitions and channels without launching a client or native notifications. */
 import type { ClientSettings } from "@t3tools/contracts/settings";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
@@ -19,6 +20,7 @@ const state = vi.hoisted(() => ({
   sessionError: false,
   turnError: false,
   limited: false,
+  discussion: false,
   subagent: false,
   background: [] as Array<{ taskId: string; kind: "command" | "monitor" }>,
   add: vi.fn(
@@ -52,6 +54,7 @@ function mockThreadShell() {
       parentThreadId: state.subagent ? "parent" : null,
       relationshipToParent: state.subagent ? "subagent" : null,
     },
+    ...(state.discussion ? { discussion: { discussionId: "discussion-1", seatId: "seat-1" } } : {}),
     forkedFrom: null,
     createdBy: "user",
     creationSource: "web",
@@ -152,6 +155,7 @@ beforeEach(() => {
     sessionError: false,
     turnError: false,
     limited: false,
+    discussion: false,
     subagent: false,
     background: [],
   });
@@ -175,6 +179,36 @@ afterEach(async () => {
 });
 
 describe("thread notifications", () => {
+  it.each([true, false])("keeps discussion completions silent with focus=%s", async (focused) => {
+    state.discussion = true;
+    state.focused = focused;
+    state.mode = "notifications-and-sound";
+    await render();
+    await complete();
+    expect(state.sound).not.toHaveBeenCalled();
+    expect(state.add).not.toHaveBeenCalled();
+    expect(state.notification).not.toHaveBeenCalled();
+  });
+
+  it.each(["input", "approval", "sessionError", "turnError", "limited"] as const)(
+    "preserves discussion %s attention alerts",
+    async (event) => {
+      state.discussion = true;
+      state.mode = "notifications-and-sound";
+      await render();
+      state[event] = true;
+      await render();
+      expect(state.add).toHaveBeenCalledTimes(1);
+      expect(state.sound).toHaveBeenCalledWith("input", expect.any(Function));
+      state[event] = false;
+      await render();
+      state.focused = false;
+      state[event] = true;
+      await render();
+      expect(state.notification).toHaveBeenCalledTimes(1);
+    },
+  );
+
   it.each([true, false])("keeps subagents silent with focus=%s", async (focused) => {
     state.subagent = true;
     state.focused = focused;

@@ -1,3 +1,4 @@
+/** Verifies sidebar presentation, visibility and user actions with controlled thread fixtures. */
 import { installMessages } from "~/i18n";
 import { en } from "~/i18n/locales/en";
 import { messages as zhCN } from "~/i18n/locales/zh-CN";
@@ -67,7 +68,15 @@ import {
 } from "./Sidebar.logic";
 import { threadSearchMatchKey } from "@t3tools/client-runtime/state/thread-search";
 import { sortSettledThreads } from "@t3tools/client-runtime/state/thread-sort";
-import { EnvironmentId, ProjectId, ProviderInstanceId, RunId, ThreadId } from "@t3tools/contracts";
+import {
+  DiscussionId,
+  DiscussionSeatId,
+  EnvironmentId,
+  ProjectId,
+  ProviderInstanceId,
+  RunId,
+  ThreadId,
+} from "@t3tools/contracts";
 
 import {
   DEFAULT_INTERACTION_MODE,
@@ -431,6 +440,16 @@ describe("sidebar thread lineage helpers", () => {
         relationshipToParent: "fork",
       },
     });
+    const discussion = presentThreadShell(environmentId, {
+      ...root.source,
+      id: ThreadId.make("thread-discussion-seat"),
+      discussion: {
+        discussionId: DiscussionId.make("discussion-1"),
+        seatId: DiscussionSeatId.make("seat-1"),
+      },
+    });
+    expect(discussion.discussion).toEqual({ discussionId: "discussion-1", seatId: "seat-1" });
+    expect(Object.hasOwn(root, "discussion")).toBe(false);
     const archived = makeThreadFixture({
       id: ThreadId.make("thread-archived"),
       environmentId,
@@ -445,7 +464,7 @@ describe("sidebar thread lineage helpers", () => {
 
     expect(
       filterSidebarV2VisibleThreads(
-        [root, subagent, fork, archived, otherProject],
+        [root, subagent, fork, discussion, archived, otherProject],
         new Set([`${environmentId}:${projectId}`]),
       ).map((thread) => thread.id),
     ).toEqual([parentId, fork.id]);

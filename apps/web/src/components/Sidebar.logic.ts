@@ -1,3 +1,4 @@
+/** Derives sidebar visibility, ordering and actions from environment-scoped thread state. */
 import { t } from "~/i18n";
 import { resolveThreadWorkingStartedAt } from "@t3tools/client-runtime/state/models";
 import { backgroundWorkHoldsCompletion } from "@t3tools/shared/orchestrationV2PendingBackgroundWork";
@@ -568,8 +569,25 @@ export function isSidebarSubagentThread(thread: Pick<SidebarThreadSummary, "line
   return thread.lineage.relationshipToParent === "subagent";
 }
 
+/**
+ * Identifies server-owned discussion seats that must stay out of the sidebar.
+ * @param thread Shell ownership metadata; absent ownership means an ordinary thread.
+ * @returns Whether a discussion owns this thread, regardless of discussion state.
+ */
+export function isSidebarDiscussionThread(
+  thread: Pick<SidebarThreadSummary, "discussion">,
+): boolean {
+  return thread.discussion !== undefined;
+}
+
+/**
+ * Keeps ordinary and fork threads in the requested project scope; hides background seats and subagents.
+ * @param threads Environment-scoped shells to filter, in display order.
+ * @param scopedProjectKeys Allowed environment/project keys; null includes every project.
+ * @returns Unarchived visible threads in their original order.
+ */
 export function filterSidebarV2VisibleThreads<
-  T extends Pick<SidebarThreadSummary, "archivedAt" | "lineage"> & {
+  T extends Pick<SidebarThreadSummary, "archivedAt" | "lineage" | "discussion"> & {
     environmentId: string;
     projectId: string;
   },
@@ -578,6 +596,7 @@ export function filterSidebarV2VisibleThreads<
     (thread) =>
       thread.archivedAt === null &&
       !isSidebarSubagentThread(thread) &&
+      !isSidebarDiscussionThread(thread) &&
       (scopedProjectKeys === null ||
         scopedProjectKeys.has(`${thread.environmentId}:${thread.projectId}`)),
   );

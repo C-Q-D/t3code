@@ -13,6 +13,8 @@ import {
   CommandId,
   ContextHandoffId,
   ContextTransferId,
+  DiscussionId,
+  DiscussionSeatId,
   EventId,
   IsoDateTime,
   MessageId,
@@ -363,6 +365,9 @@ export const OrchestrationV2LimitRecoveryUpdate = Schema.Struct({
 export type OrchestrationV2LimitRecoveryUpdate = typeof OrchestrationV2LimitRecoveryUpdate.Type;
 
 export const OrchestrationV2AppThread = Schema.Struct({
+  discussion: Schema.optional(
+    Schema.Struct({ discussionId: DiscussionId, seatId: DiscussionSeatId }),
+  ),
   ...OrchestrationV2CreationFields,
   id: ThreadId,
   projectId: ProjectId,
@@ -1928,6 +1933,9 @@ export type OrchestrationV2LatestVisibleMessageSummary =
   typeof OrchestrationV2LatestVisibleMessageSummary.Type;
 
 export const OrchestrationV2ThreadShell = Schema.Struct({
+  discussion: Schema.optional(
+    Schema.Struct({ discussionId: DiscussionId, seatId: DiscussionSeatId }),
+  ),
   ...OrchestrationV2CreationFields,
   id: ThreadId,
   projectId: ProjectId,
@@ -2716,6 +2724,9 @@ export const OrchestrationV2Command = Schema.Union([
     interactionMode: ProviderInteractionMode,
     branch: Schema.NullOr(TrimmedNonEmptyString),
     worktreePath: Schema.NullOr(TrimmedNonEmptyString),
+    discussion: Schema.optional(
+      Schema.Struct({ discussionId: DiscussionId, seatId: DiscussionSeatId }),
+    ),
     importedNativeThread: Schema.optional(
       Schema.Struct({
         ref: Schema.Struct({
