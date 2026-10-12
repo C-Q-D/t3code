@@ -126,6 +126,8 @@ export function HtmlRenderDocument(props: {
       title={props.title}
       // Never allow-same-origin: the opaque origin keeps the page out of the app's session.
       sandbox="allow-scripts allow-forms"
+      // Let copy buttons write to the clipboard without granting clipboard reads.
+      allow="clipboard-write"
       loading="lazy"
       onLoad={() => {
         setLoaded(true);
