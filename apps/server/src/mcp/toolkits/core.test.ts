@@ -1,3 +1,4 @@
+/** Verifies production MCP registration, caller scope, and tool-result contracts. */
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, it } from "@effect/vitest";
@@ -19,6 +20,7 @@ import {
   type OrchestrationV2ThreadShell,
 } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
 import * as TestClock from "effect/testing/TestClock";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
@@ -81,6 +83,29 @@ const decodeThreadReadResult = Schema.decodeUnknownEffect(OrchestratorMcpThreadR
 const layerThreadToolkit = McpHttpServer.layerThreadToolkit.pipe(
   Layer.provide(Layer.mock(ThreadSearch.ThreadSearch)({})),
   Layer.provide(Layer.mock(ScheduledTaskService.ScheduledTaskService)({})),
+);
+
+// Real HTML publication uses an isolated home, so attachment checks cannot touch live state.
+const layerHtmlToolkit = McpHttpServer.layerHtmlToolkit.pipe(
+  Layer.provideMerge(McpServer.McpServer.layer),
+  Layer.provide(PreviewBrowser.layer),
+  Layer.provideMerge(ServerConfig.layerTest(process.cwd(), { prefix: "t3-mcp-html-render-" })),
+  Layer.provideMerge(NodeServices.layer),
+  // The preview browser is not installed in a fresh home, so nothing downloads.
+  Layer.provide(FetchHttpClient.layer),
+  Layer.provide(
+    Layer.mock(ThreadManagement.ThreadManagementService)({
+      // A live run: publishing stores a page, so it needs the caller's active turn.
+      getThreadShell: () =>
+        Effect.succeed({
+          id: threadId,
+          deletedAt: null,
+          archivedAt: null,
+          activeRunId: RunId.make("mcp-core-run"),
+          providerInstanceId: ProviderInstanceId.make("codex"),
+        } as OrchestrationV2ThreadShell),
+    }),
+  ),
 );
 
 it("publishes unique tool names with reference-free object-root inputs", () => {
@@ -268,7 +293,7 @@ it.effect("returns an HTML render reference that Codex and Claude tool rows both
     const result = yield* server
       .callTool({
         name: "html_render",
-        arguments: { html: "<p>Revenue</p>", title: "Revenue", height: 240 },
+        arguments: { html: "<p>Revenue</p>", title: "Revenue", maxHeight: 240 },
       })
       .pipe(
         Effect.provideService(McpInvocationContext.McpInvocationContext, scope),
@@ -282,31 +307,80 @@ it.effect("returns an HTML render reference that Codex and Claude tool rows both
     expect(
       htmlRenderFromToolItem({ toolName: "mcp__t3-code__html_render", output: result.content }),
     ).toEqual(reference);
-  }).pipe(
-    Effect.provide(
-      McpHttpServer.layerHtmlToolkit.pipe(
-        Layer.provideMerge(McpServer.McpServer.layer),
-        Layer.provide(PreviewBrowser.layer),
-        Layer.provide(ServerConfig.layerTest(process.cwd(), { prefix: "t3-mcp-html-render-" })),
-        Layer.provide(NodeServices.layer),
-        // The preview browser is not installed in a fresh home, so nothing downloads.
-        Layer.provide(FetchHttpClient.layer),
-        Layer.provide(
-          Layer.mock(ThreadManagement.ThreadManagementService)({
-            // A live run: publishing stores a page, so it needs the caller's active turn.
-            getThreadShell: () =>
-              Effect.succeed({
-                id: threadId,
-                deletedAt: null,
-                archivedAt: null,
-                activeRunId: RunId.make("mcp-core-run"),
-                providerInstanceId: ProviderInstanceId.make("codex"),
-              } as OrchestrationV2ThreadShell),
-          }),
-        ),
-      ),
-    ),
-  ),
+    const uncappedResult = yield* server
+      .callTool({
+        name: "html_render",
+        arguments: { html: "<p>Auto height</p>", title: "Auto height" },
+      })
+      .pipe(
+        Effect.provideService(McpInvocationContext.McpInvocationContext, scope),
+        Effect.provideService(McpSchema.McpServerClient, client),
+      );
+    const uncapped = htmlRenderFromToolItem({
+      toolName: "t3-code.html_render",
+      output: uncappedResult.structuredContent,
+    });
+    expect(uncapped).toMatchObject({ title: "Auto height" });
+    expect(uncapped).not.toHaveProperty("height");
+    expect(uncappedResult.structuredContent).toMatchObject({
+      htmlRender: { attachmentId: expect.any(String), title: "Auto height" },
+    });
+    expect(uncappedResult.structuredContent).not.toHaveProperty("htmlRender.height");
+  }).pipe(Effect.provide(layerHtmlToolkit)),
+);
+
+it.effect.each([
+  { maxHeight: 80, expectedHeight: 80 },
+  { maxHeight: 2000, expectedHeight: 2000 },
+])("accepts html_render maxHeight boundary $maxHeight", ({ maxHeight, expectedHeight }) =>
+  Effect.gen(function* () {
+    const server = yield* McpServer.McpServer;
+    const result = yield* server
+      .callTool({
+        name: "html_render",
+        arguments: { html: "<p>Boundary height</p>", title: "Boundary height", maxHeight },
+      })
+      .pipe(
+        Effect.provideService(McpInvocationContext.McpInvocationContext, scope),
+        Effect.provideService(McpSchema.McpServerClient, client),
+      );
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      htmlRender: {
+        attachmentId: expect.any(String),
+        title: "Boundary height",
+        height: expectedHeight,
+      },
+    });
+  }).pipe(Effect.provide(layerHtmlToolkit)),
+);
+
+it.effect.each([79, 2001, 240.5])(
+  "rejects invalid html_render maxHeight %s without writing attachments",
+  (maxHeight) =>
+    Effect.gen(function* () {
+      const server = yield* McpServer.McpServer;
+      const fileSystem = yield* FileSystem.FileSystem;
+      const config = yield* ServerConfig.ServerConfig;
+      expect(yield* fileSystem.readDirectory(config.attachmentsDir, { recursive: true })).toEqual(
+        [],
+      );
+      const error = yield* server
+        .callTool({
+          name: "html_render",
+          arguments: { html: "<p>Invalid height</p>", title: "Invalid height", maxHeight },
+        })
+        .pipe(
+          Effect.provideService(McpInvocationContext.McpInvocationContext, scope),
+          Effect.provideService(McpSchema.McpServerClient, client),
+          Effect.flip,
+        );
+      expect(error._tag).toBe("InvalidParams");
+      // Check real storage as well as the error: rejection must happen before publication.
+      expect(yield* fileSystem.readDirectory(config.attachmentsDir, { recursive: true })).toEqual(
+        [],
+      );
+    }).pipe(Effect.provide(layerHtmlToolkit)),
 );
 
 it.effect("returns invalid parameter errors through the production registration", () =>

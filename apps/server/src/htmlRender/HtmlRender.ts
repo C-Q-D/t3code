@@ -1,3 +1,4 @@
+/** Prepares, stores, and measures agent HTML pages; transports only call this service. */
 import type { ThreadId } from "@t3tools/contracts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import {
@@ -93,6 +94,7 @@ export interface HtmlPreview {
   readonly missingImages?: ReadonlyArray<string>;
 }
 
+/** Owns HTML attachment publication and private previews without changing thread state. */
 export class HtmlRender extends Context.Service<
   HtmlRender,
   {
@@ -102,12 +104,14 @@ export class HtmlRender extends Context.Service<
      * Stores a prepared page as a thread attachment for clients to show inline,
      * measuring its height at each client width when the preview browser is
      * already installed.
+     * maxHeight is an optional CSS pixel cap for scrolling pages, clamped to
+     * 80-2000; omitting it lets clients fit the page without a stored cap.
      */
     readonly publish: (input: {
       readonly threadId: ThreadId;
       readonly html: string;
       readonly title: string;
-      readonly height: number;
+      readonly maxHeight?: number | undefined;
     }) => Effect.Effect<HtmlRenderReference, HtmlRenderPrepareError | HtmlRenderStoreError>;
     /** Screenshots a page in headless Chrome, tolerating unreadable local images. */
     readonly preview: (input: {
@@ -417,7 +421,7 @@ const make = Effect.gen(function* () {
     readonly threadId: ThreadId;
     readonly html: string;
     readonly title: string;
-    readonly height: number;
+    readonly maxHeight?: number | undefined;
   }) {
     const html = yield* prepare(input.html);
     // The `-html` id suffix makes the asset route serve it as a sandboxed text/html document.
@@ -442,7 +446,7 @@ const make = Effect.gen(function* () {
     return {
       attachmentId,
       title: input.title.trim().slice(0, HTML_RENDER_MAX_TITLE_LENGTH) || "HTML",
-      height: clampHtmlRenderHeight(input.height),
+      ...(input.maxHeight === undefined ? {} : { height: clampHtmlRenderHeight(input.maxHeight) }),
       ...(heights === undefined ? {} : { heights }),
     } satisfies HtmlRenderReference;
   });

@@ -1,3 +1,4 @@
+/** Supplies shared T3 instructions through each provider's supported prompt channel. */
 import type { ProviderInteractionMode } from "@t3tools/contracts";
 
 export const T3_CODE_ORCHESTRATION_INSTRUCTIONS = `
@@ -33,7 +34,7 @@ ACP fallback: some ACP agents accept the injected MCP server but fail to expose 
 
 ### Showing visuals
 
-When a chart, table, diagram, image collage, or mockup would say more than prose, build a self-contained HTML page, check it with \`html_preview\`, then publish it with \`html_render\` before your final reply. The reader sees the page above that reply, so don't announce or restate it; add only what it doesn't say.
+When a chart, table, diagram, image collage, or mockup would say more than prose, build a self-contained HTML page and check it with \`html_preview\`; only you see the preview. Write the paragraph the page explains, publish it with \`html_render\`, then continue writing. The page appears directly below that paragraph, and both stay visible when the turn ends; other intermediate text folds into the work log. Don't announce or restate the page, or say "see above" or "see below"; add only what it doesn't say.
 `;
 
 export const T3_CODE_BROWSER_TOOL_INSTRUCTIONS = `

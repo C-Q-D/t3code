@@ -1,3 +1,4 @@
+/** Maps caller-scoped HTML tool requests to the publication service and MCP failures. */
 import { OrchestratorMcpFailure } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 
@@ -49,7 +50,7 @@ const handlers = {
       return {
         htmlRender: reference,
         message:
-          "Shown to the reader above your reply. Don't mention or describe the page; reply with only what it doesn't already say.",
+          "Shown to the reader below the text you just wrote, and kept visible with that text. Continue your reply without mentioning or describing the page; add only what it doesn't already say.",
       };
     }),
   ),

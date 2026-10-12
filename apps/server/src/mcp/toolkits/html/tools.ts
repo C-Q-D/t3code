@@ -1,3 +1,4 @@
+/** Defines private preview and reader-visible publication contracts for HTML tools. */
 import { OrchestratorMcpFailure } from "@t3tools/contracts";
 import {
   HTML_RENDER_COLUMN_WIDTH,
@@ -23,7 +24,7 @@ const PAGE_RULES =
   'Write one self-contained document with inline <style> and <script>. Local images written as absolute file paths (src="/abs/shot.png", CSS url(/abs/bg.webp), or a JS string) are inlined automatically; remote http(s) URLs, such as a CDN chart library, load as-is.';
 
 export const HtmlPreviewTool = Tool.make("html_preview", {
-  description: `Render an HTML page in T3's headless browser and get back a PNG screenshot, contentHeight (the height the page needs at this width), and its console output: log, info, warning, error, and uncaught exceptions, with stack traces pointing into page.html. console.log is a fine way to report your own checks. Use it to check and iterate on a page before html_render. The first preview on a machine can report that T3 is still installing its preview browser; call again a minute later. ${PAGE_RULES} The page gets the theme variables and layout described in html_render.`,
+  description: `Render an HTML page in T3's headless browser and get back a PNG screenshot, contentHeight (the height the page needs at this width), and its console output: log, info, warning, error, and uncaught exceptions, with stack traces pointing into page.html. Only you see the screenshot, contentHeight, and console output; the reader sees nothing from this tool. Call html_render to show the page to the reader. console.log is a fine way to report your own checks. Use it to check and iterate on a page before html_render. The first preview on a machine can report that T3 is still installing its preview browser; call again a minute later. ${PAGE_RULES} The page gets the theme variables and layout described in html_render.`,
   parameters: Schema.Struct({
     html: Html,
     width: Schema.optional(
@@ -72,22 +73,26 @@ export const HtmlPreviewTool = Tool.make("html_preview", {
 // touches no workspace, so plan mode and read-only sandboxes can use it.
 // Open-world, since the page may load remote resources, as in a preview.
 const HtmlRenderTool = Tool.make(HTML_RENDER_TOOL_NAME, {
-  description: `Show a finished HTML page (chart, table, diagram, collage, mockup) inline in this thread, above your final text reply; call it before writing that reply. The reader already sees the page, so the reply should not announce it, say where it is, or restate it: add only what the page doesn't say. Preview with html_preview first. T3 fits the frame to the page's height at each reader's width. A height below the page's contentHeight caps the frame there, and the rest scrolls inside it. ${PAGE_RULES} ${HTML_RENDER_LAYOUT_GUIDE} ${HTML_RENDER_THEME_GUIDE}`,
+  description: `Show a finished HTML page (chart, table, diagram, collage, mockup) inline in this thread at the point where you call this tool, directly below the text you just wrote. When the turn ends, the immediately preceding text stays visible with the page; other intermediate text folds into the work log. Write the sentence or paragraph the page explains, call html_render, then continue writing. Do not restate the page's content or say "see above" or "see below"; add only what the page doesn't say. Check with html_preview first; the reader cannot see previews. T3 fits the frame to the page's height at each reader's width, up to ${HTML_RENDER_MAX_HEIGHT} CSS pixels. Pass maxHeight only when you want a long page to scroll inside a shorter frame. The page can write to the clipboard after a reader click, so copy buttons work. ${PAGE_RULES} ${HTML_RENDER_LAYOUT_GUIDE} ${HTML_RENDER_THEME_GUIDE}`,
   parameters: Schema.Struct({
     html: Html,
     title: Schema.String.check(
       Schema.isMinLength(1),
       Schema.isMaxLength(HTML_RENDER_MAX_TITLE_LENGTH),
     ).annotate({ description: "Short name for the page." }),
-    height: Schema.Int.annotate({
-      description: `The frame height in CSS pixels, ${HTML_RENDER_MIN_HEIGHT}-${HTML_RENDER_MAX_HEIGHT}. Use html_preview's contentHeight, or less to make long content scroll inside the frame.`,
-    }),
+    maxHeight: Schema.optional(
+      Schema.Int.check(
+        Schema.isBetween({ minimum: HTML_RENDER_MIN_HEIGHT, maximum: HTML_RENDER_MAX_HEIGHT }),
+      ).annotate({
+        description: `Maximum frame height in CSS pixels, ${HTML_RENDER_MIN_HEIGHT}-${HTML_RENDER_MAX_HEIGHT}. Pass only when you want a long page to scroll inside a shorter frame.`,
+      }),
+    ),
   }),
   success: Schema.Struct({
     htmlRender: Schema.Struct({
       attachmentId: Schema.String,
       title: Schema.String,
-      height: Schema.Number,
+      height: Schema.optional(Schema.Number),
       heights: Schema.optional(Schema.Array(Schema.Tuple([Schema.Int, Schema.Int]))),
     }),
     message: Schema.String,

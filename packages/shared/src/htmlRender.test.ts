@@ -1,3 +1,4 @@
+/** Protects HTML reference decoding, frame sizing, and shared page bootstrap behavior. */
 import { describe, expect, it } from "vite-plus/test";
 
 import {
@@ -144,6 +145,19 @@ describe("htmlRenderTheme", () => {
 });
 
 describe("readHtmlRenderReference", () => {
+  it("accepts references without a height cap", () => {
+    const uncapped = { attachmentId: "page-html", title: "Page" };
+    expect(readHtmlRenderReference(uncapped)).toEqual(uncapped);
+    expect(readHtmlRenderReference(uncapped)).not.toHaveProperty("height");
+  });
+
+  it.each([Infinity, -Infinity, "320", null, undefined])(
+    "rejects an explicitly present invalid height %s",
+    (height) => {
+      expect(readHtmlRenderReference({ ...reference, height })).toBeUndefined();
+    },
+  );
+
   it("clamps height and rejects malformed references", () => {
     expect(readHtmlRenderReference({ ...reference, height: 99_999 })?.height).toBe(2000);
     expect(readHtmlRenderReference({ ...reference, title: "  " })?.title).toBe("HTML");
@@ -180,6 +194,25 @@ describe("htmlRenderFromToolItem", () => {
 });
 
 describe("htmlRenderFrameHeight", () => {
+  it("fits measured pages without an explicit height cap", () => {
+    const uncapped = {
+      attachmentId: "page-html",
+      title: "Page",
+      heights: [[728, 648]] as const,
+    };
+    expect(htmlRenderFrameHeight(uncapped, 728)).toBe(648);
+    expect(htmlRenderFrameHeight(uncapped, 728, 700)).toBe(700);
+    expect(htmlRenderFrameHeight(uncapped, 728, 5000)).toBe(2000);
+  });
+
+  it("uses a temporary height until an unmeasured page reports its height", () => {
+    const unmeasured = { attachmentId: "page-html", title: "Page" };
+    expect(htmlRenderFrameHeight(unmeasured, 728)).toBe(320);
+    expect(htmlRenderFrameHeight(unmeasured, 728, 700)).toBe(700);
+    expect(htmlRenderFrameHeight(unmeasured, 728, 5000)).toBe(2000);
+    expect(htmlRenderFrameHeight(unmeasured, 728, 20)).toBe(80);
+  });
+
   const measured = readHtmlRenderReference({
     ...reference,
     height: 1500,

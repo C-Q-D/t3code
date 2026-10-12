@@ -16,14 +16,16 @@ import {
 export const HTML_RENDER_TOOL_NAME = "html_render";
 export const HTML_RENDER_MIN_HEIGHT = 80;
 export const HTML_RENDER_MAX_HEIGHT = 2000;
+/** Temporary frame height until a page can be measured, in CSS pixels. */
+export const HTML_RENDER_UNMEASURED_HEIGHT = 320;
 export const HTML_RENDER_MAX_TITLE_LENGTH = 200;
 
 /** What the `html_render` tool result carries so clients can show the page. */
 export interface HtmlRenderReference {
   readonly attachmentId: string;
   readonly title: string;
-  /** The agent's frame height in CSS pixels, and the cap on any measured height. */
-  readonly height: number;
+  /** Optional frame cap in CSS pixels; retained for stored references from older calls. */
+  readonly height?: number;
   /**
    * `[width, contentHeight]` pairs the server measured at publish, ascending by
    * width. Absent when the preview browser was not installed yet.
@@ -62,6 +64,11 @@ function readMeasuredHeights(value: unknown) {
     : undefined;
 }
 
+/**
+ * Reads a stored or tool-result reference, accepting uncapped pages and legacy
+ * height caps. Returns undefined for invalid identity fields or a present,
+ * non-finite height; valid sizes are clamped to the supported CSS pixel range.
+ */
 export function readHtmlRenderReference(value: unknown): HtmlRenderReference | undefined {
   if (typeof value !== "object" || value === null) return undefined;
   const { attachmentId, title, height, heights } = value as Record<string, unknown>;
@@ -70,8 +77,7 @@ export function readHtmlRenderReference(value: unknown): HtmlRenderReference | u
     attachmentId.length === 0 ||
     attachmentId.length > 256 ||
     typeof title !== "string" ||
-    typeof height !== "number" ||
-    !Number.isFinite(height)
+    ("height" in value && (typeof height !== "number" || !Number.isFinite(height)))
   ) {
     return undefined;
   }
@@ -79,7 +85,7 @@ export function readHtmlRenderReference(value: unknown): HtmlRenderReference | u
   return {
     attachmentId,
     title: title.trim().slice(0, HTML_RENDER_MAX_TITLE_LENGTH) || "HTML",
-    height: clampHtmlRenderHeight(height),
+    ...(typeof height === "number" ? { height: clampHtmlRenderHeight(height) } : {}),
     ...(measured === undefined ? {} : { heights: measured }),
   };
 }
@@ -111,9 +117,12 @@ function measuredHeight(heights: NonNullable<HtmlRenderReference["heights"]>, wi
  * The frame height for a page at a frame width. It is the page's own reported
  * `contentHeight` when the client has one, else the server's measurement for
  * that width. A page even a few pixels taller than its frame scrolls inside it
- * and takes the reader's scroll, so the frame fits the page. The agent's height
- * caps it only when it is below the page's height at the column width (the
- * agent asked for a scrolling frame) or when the page was never measured.
+ * and takes the reader's scroll, so uncapped frames fit the page up to the
+ * supported maximum. Existing height caps retain their stored behavior: they
+ * apply when below the column-width measurement or when no measurement exists.
+ * Without measurements or a cap, use a temporary height until the client reports
+ * contentHeight. Width and contentHeight are CSS pixels; the result is clamped
+ * to the supported height range.
  */
 export function htmlRenderFrameHeight(
   reference: HtmlRenderReference,
@@ -122,9 +131,13 @@ export function htmlRenderFrameHeight(
 ) {
   const heights = reference.heights;
   if (heights === undefined || heights.length === 0) {
-    return clampHtmlRenderHeight(Math.min(reference.height, contentHeight ?? reference.height));
+    const fallback = reference.height ?? HTML_RENDER_UNMEASURED_HEIGHT;
+    return clampHtmlRenderHeight(
+      Math.min(reference.height ?? HTML_RENDER_MAX_HEIGHT, contentHeight ?? fallback),
+    );
   }
   const cap =
+    reference.height !== undefined &&
     measuredHeight(heights, HTML_RENDER_COLUMN_WIDTH) > reference.height
       ? reference.height
       : HTML_RENDER_MAX_HEIGHT;

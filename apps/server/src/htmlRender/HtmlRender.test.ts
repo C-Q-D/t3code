@@ -1,3 +1,4 @@
+/** Exercises HTML storage and preview boundaries with isolated homes and optional browser tests. */
 // @effect-diagnostics nodeBuiltinImport:off - plain local servers stand in for LAN services.
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { describe, expect, it } from "@effect/vitest";
@@ -180,7 +181,7 @@ describe("HtmlRender", () => {
         threadId: ThreadId.make("thread-html-render"),
         html: "<p>Quarterly revenue</p>",
         title: "  Revenue  ",
-        height: 9_000,
+        maxHeight: 9_000,
       });
 
       // Without an installed preview browser the page publishes unmeasured.
@@ -200,6 +201,19 @@ describe("HtmlRender", () => {
     }).pipe(Effect.provide(layerTest)),
   );
 
+  it.effect("publishes without a height cap when maxHeight is omitted", () =>
+    Effect.gen(function* () {
+      const htmlRender = yield* HtmlRender.HtmlRender;
+      const reference = yield* htmlRender.publish({
+        threadId: ThreadId.make("thread-html-auto-height"),
+        html: "<p>Auto height</p>",
+        title: "Auto height",
+      });
+      expect(reference).toEqual({ attachmentId: expect.any(String), title: "Auto height" });
+      expect(reference).not.toHaveProperty("height");
+    }).pipe(Effect.provide(layerTest)),
+  );
+
   it.effect("removes the page when publishing is interrupted", () =>
     Effect.gen(function* () {
       const measuring = yield* Deferred.make<void>();
@@ -216,7 +230,7 @@ describe("HtmlRender", () => {
             threadId: ThreadId.make("thread-html-cancel"),
             html: "<p>x</p>",
             title: "X",
-            height: 200,
+            maxHeight: 200,
           })
           .pipe(Effect.forkChild);
         yield* Deferred.await(measuring);
@@ -393,7 +407,7 @@ describe("HtmlRender", () => {
             threadId: ThreadId.make("thread-html-measure"),
             html: '<div id="chart"></div><script>document.getElementById("chart").style.height = innerWidth / 2 + "px";</script>',
             title: "Chart",
-            height: 600,
+            maxHeight: 600,
           });
 
           expect(reference.heights).toEqual(
