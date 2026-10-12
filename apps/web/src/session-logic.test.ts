@@ -1,3 +1,4 @@
+/** Tests session projections and their observable timeline behavior. */
 import {
   MessageId,
   RuntimeRequestId,
@@ -1317,6 +1318,252 @@ describe("HTML renders in the timeline", () => {
       "work",
       "message",
     ]);
+  });
+
+  const assistant = (id: string, second: number, text: string): OrchestrationV2TurnItem => ({
+    ...base(id, second),
+    type: "assistant_message",
+    messageId: MessageId.make(id),
+    text,
+    streaming: false,
+  });
+  const completedRender = (id: string, second: number): OrchestrationV2TurnItem => ({
+    ...base(id, second),
+    type: "dynamic_tool",
+    toolName: "mcp__t3-code__html_render",
+    input: { title: "Chart", height: 420 },
+    output: { structuredContent: { htmlRender }, content: [] },
+  });
+  const captionEntries = (items: OrchestrationV2TurnItem[]) => {
+    const original = turn(completedRender("render", 2));
+    return [
+      original[0]!,
+      ...deriveTimelineEntriesFromVisibleTurnItems({
+        visibleTurnItems: items.map(visible),
+        optimisticMessages: [],
+      }),
+      original.at(-1)!,
+    ];
+  };
+  const captionRows = (entries: TimelineEntry[], expanded = false) =>
+    deriveMessagesTimelineRows({
+      timelineEntries: entries,
+      ...(expanded ? { expandedRunIds: new Set([runId]) } : {}),
+      isWorking: false,
+      turnDiffSummaries: [],
+      supportsConversationRollback: false,
+    });
+  const captionRowLabels = (entries: TimelineEntry[], expanded = false) =>
+    captionRows(entries, expanded).map((row) =>
+      row.kind === "message" ? row.message.text : row.kind === "html-render" ? row.id : row.kind,
+    );
+
+  it("keeps the caption immediately above its render across a completed preview call", () => {
+    const entries = captionEntries([
+      assistant("caption", 1, "caption"),
+      {
+        ...base("preview", 2),
+        type: "dynamic_tool",
+        toolName: "mcp__t3-code__html_preview",
+        input: { html: "<p>Chart</p>" },
+        output: { content: [] },
+      },
+      completedRender("render", 3),
+      command("after", 4),
+    ]);
+    expect(rowsFor(entries, false)).toEqual([
+      "message",
+      "turn-fold",
+      "message",
+      "html-render",
+      "message",
+    ]);
+    expect(captionRowLabels(entries)).toEqual([
+      "Chart it",
+      "turn-fold",
+      "caption",
+      "render",
+      "Here it is.",
+    ]);
+    expect(captionRowLabels(entries, true)).toEqual([
+      "Chart it",
+      "turn-fold",
+      "caption",
+      "work",
+      "render",
+      "work",
+      "Here it is.",
+    ]);
+  });
+
+  it("keeps only the nearest assistant message as the render caption", () => {
+    const entries = captionEntries([
+      assistant("earlier", 1, "A"),
+      command("between", 2),
+      assistant("caption", 3, "B"),
+      completedRender("render", 4),
+    ]);
+    expect(captionRowLabels(entries)).toEqual([
+      "Chart it",
+      "turn-fold",
+      "B",
+      "render",
+      "Here it is.",
+    ]);
+  });
+
+  it("keeps both captions immediately above their own renders", () => {
+    const entries = captionEntries([
+      assistant("first-caption", 1, "First chart"),
+      completedRender("first-render", 2),
+      assistant("second-caption", 3, "Second chart"),
+      completedRender("second-render", 4),
+      command("after", 5),
+    ]);
+    expect(captionRowLabels(entries)).toEqual([
+      "Chart it",
+      "turn-fold",
+      "First chart",
+      "first-render",
+      "Second chart",
+      "second-render",
+      "Here it is.",
+    ]);
+  });
+
+  it("does not add a work fold when only a caption precedes the final reply", () => {
+    const entries = captionEntries([
+      assistant("caption", 1, "caption"),
+      completedRender("render", 2),
+    ]);
+    expect(captionRowLabels(entries)).toEqual(["Chart it", "caption", "render", "Here it is."]);
+  });
+
+  it.each([
+    ["another render", { ...completedRender("barrier-render", 2), runId: RunId.make("other-run") }],
+    [
+      "an MCP app",
+      {
+        ...base("barrier-app", 2),
+        type: "dynamic_tool",
+        toolName: "weather.get_weather",
+        input: {},
+        output: {
+          t3McpApp: {
+            attachmentId: "weather-app",
+            server: "weather",
+            tool: "get_weather",
+            resourceUri: "ui://weather/dashboard",
+          },
+          result: { content: [] },
+        },
+      },
+    ],
+    [
+      "a user message",
+      {
+        ...base("barrier-user", 2),
+        type: "user_message",
+        messageId: MessageId.make("barrier-user"),
+        inputIntent: "steer",
+        text: "Change the chart",
+        createdBy: "user",
+        creationSource: "server",
+        attachments: [],
+      },
+    ],
+    ["work from another run", { ...command("barrier-work", 2), runId: RunId.make("other-run") }],
+    ["work without a run", { ...command("barrier-work", 2), runId: null }],
+  ] satisfies Array<[string, OrchestrationV2TurnItem]>)(
+    "does not carry a caption across %s",
+    (_label, barrier) => {
+      const entries = captionEntries([
+        assistant("earlier", 1, "Earlier text"),
+        barrier,
+        completedRender("render", 3),
+        command("after", 4),
+      ]);
+      expect(captionRowLabels(entries).filter((label) => label === "Earlier text")).toEqual([]);
+      expect(captionRowLabels(entries, true).filter((label) => label === "Earlier text")).toEqual([
+        "Earlier text",
+      ]);
+    },
+  );
+
+  it("keeps a render caption visible when its superseded attempt folds", () => {
+    const attempt: OrchestrationV2RunAttempt = {
+      id: RunAttemptId.make("caption-attempt-superseded"),
+      runId,
+      attemptOrdinal: 1,
+      rootNodeId: NodeId.make("caption-node-superseded"),
+      providerInstanceId: ProviderInstanceId.make("codex-default"),
+      providerThreadId: ProviderThreadId.make("provider-thread"),
+      providerTurnId: null,
+      reason: "initial",
+      status: "superseded",
+      startedAt: at(0),
+      completedAt: at(4),
+    };
+    const entries = captionEntries([
+      command("before", 1),
+      assistant("caption", 2, "caption"),
+      completedRender("render", 3),
+      command("after", 4),
+    ]).map((entry) =>
+      entry.kind === "message" && entry.message.role === "user" ? entry : { ...entry, attempt },
+    );
+    expect(captionRowLabels(entries, true)).toEqual([
+      "Chart it",
+      "turn-fold",
+      "attempt-fold",
+      "caption",
+      "render",
+    ]);
+  });
+
+  it("anchors a superseded attempt fold above its opening render caption", () => {
+    const attempt: OrchestrationV2RunAttempt = {
+      id: RunAttemptId.make("opening-caption-attempt"),
+      runId,
+      attemptOrdinal: 1,
+      rootNodeId: NodeId.make("opening-caption-node"),
+      providerInstanceId: ProviderInstanceId.make("codex-default"),
+      providerThreadId: ProviderThreadId.make("provider-thread"),
+      providerTurnId: null,
+      reason: "initial",
+      status: "superseded",
+      startedAt: at(0),
+      completedAt: at(5),
+    };
+    const entries = captionEntries([
+      assistant("caption", 1, "caption"),
+      {
+        ...base("preview", 2),
+        type: "dynamic_tool",
+        toolName: "mcp__t3-code__html_preview",
+        input: { html: "<p>Chart</p>" },
+        output: { content: [] },
+      },
+      completedRender("render", 3),
+      command("after", 4),
+    ])
+      .slice(0, -1)
+      .map((entry) =>
+        entry.kind === "message" && entry.message.role === "user" ? entry : { ...entry, attempt },
+      );
+    expect(captionRowLabels(entries, true)).toEqual([
+      "Chart it",
+      "turn-fold",
+      "attempt-fold",
+      "caption",
+      "render",
+    ]);
+    const rows = captionRows(entries, true);
+    const renderIndex = rows.findIndex((row) => row.kind === "html-render");
+    expect(rows[renderIndex - 1]).toMatchObject({
+      kind: "message",
+      message: { id: "caption" },
+    });
   });
 
   it("hosts a captured MCP app in place, from any provider's tool", () => {

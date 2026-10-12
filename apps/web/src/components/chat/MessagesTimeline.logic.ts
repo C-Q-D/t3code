@@ -858,11 +858,45 @@ function completeSupersededReplyEntryIds(
 }
 
 /**
+ * Keeps an agent's explanation with the page it introduces after work folds.
+ * @param entries - Timeline entries in display order; only same-run work may separate a
+ * caption from its page. Entries without a run and all other kinds break adjacency.
+ * @returns Assistant entry IDs to keep visible in both turn and superseded-attempt folds.
+ * Scans once without changing the entries; each page consumes its nearest caption.
+ */
+function htmlRenderCaptionEntryIds(entries: ReadonlyArray<TimelineEntry>): ReadonlySet<string> {
+  const captionEntryIds = new Set<string>();
+  let caption: Extract<TimelineEntry, { kind: "message" }> | null = null;
+  for (const entry of entries) {
+    if (
+      entry.kind === "message" &&
+      entry.message.role === "assistant" &&
+      entry.message.runId != null
+    ) {
+      caption = entry;
+      continue;
+    }
+    if (caption !== null) {
+      if (entry.kind === "work" && entry.entry.runId === caption.message.runId) {
+        continue;
+      }
+      if (entry.kind === "html-render" && entry.runId === caption.message.runId) {
+        captionEntryIds.add(caption.id);
+      }
+    }
+    caption = null;
+  }
+  return captionEntryIds;
+}
+
+/**
  * Groups only provider output owned by an explicitly superseded V2 attempt
  * that the steer cut off. An attempt that had already finished its reply is
  * left in the timeline like any other turn output.
  * User messages remain visible because they are inputs to the logical run,
  * including the steer message that started the replacement attempt.
+ * An opening page caption can anchor the fold without being hidden, so the
+ * disclosure stays above the explanation instead of separating it from its page.
  */
 function deriveSupersededAttemptFolds(
   timelineEntries: ReadonlyArray<TimelineEntry>,
@@ -870,12 +904,14 @@ function deriveSupersededAttemptFolds(
   liveSubagentEntryIds: ReadonlySet<string>,
   completeReplyEntryIds: ReadonlySet<string>,
 ): ReadonlyMap<string, SupersededAttemptFold> {
+  const captionEntryIds = htmlRenderCaptionEntryIds(timelineEntries);
   const completeAttemptIds = new Set(
     timelineEntries.flatMap((entry) =>
       entry.attempt !== undefined && completeReplyEntryIds.has(entry.id) ? [entry.attempt.id] : [],
     ),
   );
   const entriesByAttemptId = new Map<RunAttemptId, TimelineEntry[]>();
+  const anchorEntryByAttemptId = new Map<RunAttemptId, TimelineEntry>();
   for (const entry of timelineEntries) {
     if (
       entry.attempt?.status !== "superseded" ||
@@ -892,6 +928,10 @@ function deriveSupersededAttemptFolds(
     ) {
       continue;
     }
+    if (!anchorEntryByAttemptId.has(entry.attempt.id)) {
+      anchorEntryByAttemptId.set(entry.attempt.id, entry);
+    }
+    if (captionEntryIds.has(entry.id)) continue;
     const entries = entriesByAttemptId.get(entry.attempt.id) ?? [];
     entries.push(entry);
     entriesByAttemptId.set(entry.attempt.id, entries);
@@ -902,11 +942,12 @@ function deriveSupersededAttemptFolds(
     const firstEntry = entries[0];
     const attempt = firstEntry?.attempt;
     if (firstEntry === undefined || attempt === undefined) continue;
-    foldsByAnchorEntryId.set(firstEntry.id, {
+    const anchorEntry = anchorEntryByAttemptId.get(attempt.id) ?? firstEntry;
+    foldsByAnchorEntryId.set(anchorEntry.id, {
       runId: attempt.runId,
       attemptId: attempt.id,
-      anchorEntryId: firstEntry.id,
-      createdAt: firstEntry.createdAt,
+      anchorEntryId: anchorEntry.id,
+      createdAt: anchorEntry.createdAt,
       hiddenEntryIds: new Set(entries.map((entry) => entry.id)),
     });
   }
@@ -1084,6 +1125,7 @@ function deriveTurnFolds(input: {
   /** Finished replies a steer superseded; they answer their prompt, so they stay out. */
   completeSupersededReplyEntryIds: ReadonlySet<string>;
 }): ReadonlyMap<string, TurnFold> {
+  const captionEntryIds = htmlRenderCaptionEntryIds(input.timelineEntries);
   const interruptedRunIds = new Set<RunId>();
   for (const entry of input.timelineEntries) {
     if (
@@ -1200,7 +1242,8 @@ function deriveTurnFolds(input: {
       if (
         timelineEntryIsPersistentResourceCard(entry) ||
         input.liveSubagentEntryIds.has(entry.id) ||
-        input.completeSupersededReplyEntryIds.has(entry.id)
+        input.completeSupersededReplyEntryIds.has(entry.id) ||
+        captionEntryIds.has(entry.id)
       ) {
         continue;
       }
