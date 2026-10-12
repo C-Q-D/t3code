@@ -49,6 +49,7 @@ import * as ProviderEventIngestor from "./ProviderEventIngestor.ts";
 import * as McpAppModelContext from "../mcpApps/McpAppModelContext.ts";
 import * as RunExecutionService from "./RunExecutionService.ts";
 import * as RunFinalizationService from "./RunFinalizationService.ts";
+import * as ThreadDeveloperContext from "./ThreadDeveloperContext.ts";
 
 const driver = ProviderDriverKind.make("codex");
 
@@ -3814,6 +3815,64 @@ it.effect("keeps completed runs completed when pull request refresh fails", () =
   }),
 );
 
+it.effect("delivers the owning thread's developer context to the adapter", () =>
+  Effect.gen(function* () {
+    const received = yield* Deferred.make<ProviderAdapter.ProviderAdapterV2TurnInput>();
+    yield* captureRootRunTermination({
+      key: "developer-context",
+      shouldFinalizeRun: () => Effect.succeed(false),
+      developerContext: {
+        forThread: (threadId) =>
+          Effect.succeed(
+            threadId === ThreadId.make("thread:developer-context")
+              ? [{ key: "seat_role", text: "Act as the architect." }]
+              : [{ key: "wrong_thread", text: "Act as the tester." }],
+          ),
+      },
+      startTurn: (turnInput) => Deferred.succeed(received, turnInput).pipe(Effect.asVoid),
+    });
+    assert.deepEqual((yield* Deferred.await(received)).developerContext, [
+      { key: "seat_role", text: "Act as the architect." },
+    ]);
+  }),
+);
+
+it.effect("omits developerContext from adapter input with the default port", () =>
+  Effect.gen(function* () {
+    const received = yield* Deferred.make<ProviderAdapter.ProviderAdapterV2TurnInput>();
+    yield* captureRootRunTermination({
+      key: "default-developer-context",
+      shouldFinalizeRun: () => Effect.succeed(false),
+      startTurn: (turnInput) => Deferred.succeed(received, turnInput).pipe(Effect.asVoid),
+    });
+    assert.isFalse(Object.hasOwn(yield* Deferred.await(received), "developerContext"));
+  }),
+);
+
+/**
+ * Runs one root-run termination scenario with a fake provider and captured sink
+ * writes. Waits for the provider event subscription to close before returning,
+ * so callers can assert the resulting termination observations without polling.
+ *
+ * @param input.key Namespace for this scenario's fixture identifiers.
+ * @param input.shouldFinalizeRun Determines whether the root run may finalize.
+ * @param input.rejectTerminalWrite When true, rejects the conditional terminal
+ * write while still recording its submitted effects; omitted means it commits.
+ * @param input.hasUnpairedRunInterruptRequest Optional interrupt-state lookup
+ * forwarded to run execution; omission uses run execution's default behavior.
+ * @param input.seedOpenSubagent Whether to seed running child-work events in the
+ * default stream; omitted means no child work is seeded.
+ * @param input.events Optional provider event stream factory. Omission emits an
+ * interrupted root turn, preceded by child-work events when requested.
+ * @param input.startTurn Optional fake adapter start callback; defaults to a no-op.
+ * @param input.developerContext Optional thread-context implementation injected
+ * into the service layer. Omission uses the default empty ThreadDeveloperContext,
+ * so the adapter turn input does not contain a developerContext key.
+ * @param input.refreshAfterTurn Optional effect run after recording the refresh
+ * marker; defaults to a no-op and can model a blocked or failing refresh.
+ * @returns An effect yielding written turn items, observed run-status and refresh
+ * labels, submitted outbox effects, and effects accepted by the fake sink.
+ */
 function captureRootRunTermination(input: {
   readonly key: string;
   readonly shouldFinalizeRun: () => Effect.Effect<boolean, ProjectionStore.ProjectionStoreV2Error>;
@@ -3827,6 +3886,7 @@ function captureRootRunTermination(input: {
     ProviderAdapter.ProviderAdapterV2Error
   >;
   readonly startTurn?: ProviderAdapter.ProviderAdapterV2SessionRuntime["startTurn"];
+  readonly developerContext?: typeof ThreadDeveloperContext.ThreadDeveloperContext.Service;
   readonly refreshAfterTurn?: Effect.Effect<void>;
 }) {
   return Effect.gen(function* () {
@@ -3896,6 +3956,14 @@ function captureRootRunTermination(input: {
             ingestNormalized: () => Effect.succeed([]),
           }),
           ServerSettings.layerTest(),
+          ...(input.developerContext === undefined
+            ? []
+            : [
+                Layer.succeed(
+                  ThreadDeveloperContext.ThreadDeveloperContext,
+                  input.developerContext,
+                ),
+              ]),
           Layer.succeed(RunFinalizationService.RunFinalizationObserver, {
             refresh: () => Effect.void,
             refreshAfterTurn: () =>

@@ -457,6 +457,68 @@ describe("CodexAdapterV2 runtime policy", () => {
     }),
   );
 
+  it.effect.each([
+    { label: "omitted", developerContext: undefined },
+    { label: "empty", developerContext: [] },
+  ])("preserves Codex params without developer context $label", ({ developerContext }) =>
+    Effect.gen(function* () {
+      const params = yield* CodexAdapterV2.buildCodexTurnStartParams({
+        nativeThreadId: "native-developer-context",
+        codexInput: [{ type: "text", text: "Discuss dependencies." }],
+        runtimePolicy: { runtimeMode: "full-access", interactionMode: "default", cwd: null },
+        modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5.4" },
+        developerContext,
+        appContext: [{ key: "app_notes", text: "External notes." }],
+      });
+      assert.deepEqual(params, {
+        threadId: "native-developer-context",
+        input: [{ type: "text", text: "Discuss dependencies." }],
+        cwd: null,
+        model: "gpt-5.4",
+        summary: "detailed",
+        approvalsReviewer: "user",
+        approvalPolicy: "never",
+        sandboxPolicy: { type: "dangerFullAccess" },
+        additionalContext: { app_notes: { kind: "untrusted", value: "External notes." } },
+      });
+    }),
+  );
+
+  it.effect.each([false, true])(
+    "sends trusted Codex developer context with T3 MCP=%s",
+    (hasT3Mcp) =>
+      Effect.gen(function* () {
+        const params = yield* CodexAdapterV2.buildCodexTurnStartParams({
+          nativeThreadId: "native-developer-context",
+          codexInput: [{ type: "text", text: "Discuss dependencies." }],
+          runtimePolicy: { runtimeMode: "full-access", interactionMode: "default", cwd: null },
+          modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5.4" },
+          hasT3Mcp,
+          developerContext: [
+            { key: "seat_role", text: "Act as the architect." },
+            { key: "seat_focus", text: "Review dependency boundaries." },
+          ],
+          ...(hasT3Mcp ? { appContext: [{ key: "app_notes", text: "External notes." }] } : {}),
+        });
+        assert.deepEqual(params.additionalContext?.seat_role, {
+          kind: "application",
+          value: "Act as the architect.",
+        });
+        assert.deepEqual(params.additionalContext?.seat_focus, {
+          kind: "application",
+          value: "Review dependency boundaries.",
+        });
+        assert.equal(
+          params.additionalContext?.t3_code_runtime?.kind,
+          hasT3Mcp ? "application" : undefined,
+        );
+        assert.deepEqual(
+          params.additionalContext?.app_notes,
+          hasT3Mcp ? { kind: "untrusted", value: "External notes." } : undefined,
+        );
+      }),
+  );
+
   it.effect("sends MCP app model context as untrusted Codex context", () =>
     Effect.gen(function* () {
       const policy = { runtimeMode: "full-access", interactionMode: "default", cwd: null } as const;
@@ -3121,6 +3183,130 @@ describe("CodexAdapterV2 post-settle continuation", () => {
             text: "work",
           }),
         );
+        yield* harness.firstTerminal;
+        assert.equal(harness.terminalEvents()[0]?.status, "completed");
+      }).pipe(
+        Effect.provide(
+          Layer.mergeAll(IdAllocator.layer, McpProviderSessions.layer, NodeServices.layer),
+        ),
+      ),
+    ),
+  );
+
+  it.effect("restores the seat's developer context after Codex compaction", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const nativeThreadId = "seat-context-thread";
+        const nativeTurnId = "seat-context-turn";
+        const injected = yield* Deferred.make<unknown>();
+        const entries = codexReplayPreamble({ nativeThreadId, nativeTurnId, prompt: "work" });
+        const transcript = makeCodexReplayTranscript({
+          scenario: "restore-seat-context",
+          entries: [
+            ...entries.slice(0, 5),
+            {
+              type: "expect_outbound",
+              label: "seat context turn",
+              frame: {
+                id: 3,
+                method: "turn/start",
+                params: {
+                  threadId: nativeThreadId,
+                  input: [{ type: "text", text: "work" }],
+                  cwd: "/workspace",
+                  model: "gpt-5.4",
+                  approvalPolicy: "never",
+                  approvalsReviewer: "user",
+                  sandboxPolicy: { type: "dangerFullAccess" },
+                  summary: "detailed",
+                  additionalContext: {
+                    seat_role: { kind: "application", value: "Act as the architect." },
+                  },
+                },
+              },
+            },
+            ...entries.slice(6),
+            {
+              type: "emit_inbound",
+              label: "seat context compacted",
+              frame: {
+                method: "item/completed",
+                params: {
+                  threadId: nativeThreadId,
+                  turnId: nativeTurnId,
+                  item: { type: "contextCompaction", id: "compact-seat-context" },
+                },
+              },
+            },
+            {
+              type: "expect_outbound",
+              label: "restore seat context",
+              frame: {
+                id: 4,
+                method: "thread/inject_items",
+                params: {
+                  threadId: nativeThreadId,
+                  items: [
+                    {
+                      type: "message",
+                      role: "developer",
+                      content: [
+                        {
+                          type: "input_text",
+                          text: "<seat_role>Act as the architect.</seat_role>",
+                        },
+                      ],
+                    },
+                  ],
+                },
+              },
+            },
+            { type: "emit_inbound", label: "seat context restored", frame: { id: 4, result: {} } },
+            {
+              type: "emit_inbound",
+              label: "done",
+              frame: {
+                method: "turn/completed",
+                params: {
+                  threadId: nativeThreadId,
+                  turn: makeCodexReplayTurn({ id: nativeTurnId, status: "completed" }),
+                },
+              },
+            },
+          ],
+        });
+        const harness = yield* makeCodexReplayHarness(
+          transcript,
+          () => Effect.void,
+          (method, params) =>
+            method === "thread/inject_items"
+              ? Deferred.succeed(injected, params).pipe(Effect.asVoid)
+              : Effect.void,
+        );
+        yield* harness.runtime.startTurn({
+          ...makeCodexTestTurnInput({
+            threadId: harness.threadId,
+            providerThread: harness.providerThread,
+            now: yield* DateTime.now,
+            attemptId: RunAttemptId.make("seat-context-attempt"),
+            text: "work",
+          }),
+          developerContext: [{ key: "seat_role", text: "Act as the architect." }],
+        });
+        // Assert on the actual request: restoration failures are logged by the
+        // adapter, so a replay mismatch alone must not be the test's only guard.
+        assert.deepEqual(yield* Deferred.await(injected), {
+          threadId: nativeThreadId,
+          items: [
+            {
+              type: "message",
+              role: "developer",
+              content: [
+                { type: "input_text", text: "<seat_role>Act as the architect.</seat_role>" },
+              ],
+            },
+          ],
+        });
         yield* harness.firstTerminal;
         assert.equal(harness.terminalEvents()[0]?.status, "completed");
       }).pipe(

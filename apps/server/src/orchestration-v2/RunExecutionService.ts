@@ -37,6 +37,7 @@ import * as Stream from "effect/Stream";
 
 import * as McpSessionRegistry from "../mcp/McpSessionRegistry.ts";
 import * as McpAppModelContext from "../mcpApps/McpAppModelContext.ts";
+import * as ThreadDeveloperContext from "./ThreadDeveloperContext.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as CheckpointService from "./CheckpointService.ts";
 import * as EventSink from "./EventSink.ts";
@@ -578,6 +579,7 @@ export const layer: Layer.Layer<
     const providerEventIngestor = yield* ProviderEventIngestor.ProviderEventIngestorV2;
     const serverSettings = yield* ServerSettings.ServerSettingsService;
     const mcpAppModelContext = yield* McpAppModelContext.McpAppModelContext;
+    const threadDeveloperContext = yield* ThreadDeveloperContext.ThreadDeveloperContext;
     const finalizationObserver = yield* RunFinalizationService.RunFinalizationObserver;
 
     const writeFinalRunEvents = (input: {
@@ -1414,6 +1416,7 @@ export const layer: Layer.Layer<
             key: `mcp_app_${entry.itemId.replace(/[^\w.-]/g, "_")}`,
             text: entry.text,
           }));
+          const developerContext = yield* threadDeveloperContext.forThread(input.run.threadId);
           const turnInput = {
             appThread: input.appThread,
             threadId: input.run.threadId,
@@ -1435,6 +1438,7 @@ export const layer: Layer.Layer<
             modelSelection: input.modelSelection,
             runtimePolicy: input.runtimePolicy,
             ...(appContext.length === 0 ? {} : { appContext }),
+            ...(developerContext.length === 0 ? {} : { developerContext }),
           };
           const compact =
             input.message.attachments.length === 0 &&

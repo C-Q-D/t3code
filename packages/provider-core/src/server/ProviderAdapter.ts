@@ -423,6 +423,12 @@ export interface ProviderAdapterV2TurnInput {
    * application context; others never receive any.
    */
   readonly appContext?: ReadonlyArray<{ readonly key: string; readonly text: string }>;
+  /**
+   * Trusted developer instructions, separate from the untrusted MCP `appContext`.
+   * Only adapters with `capabilities.context.acceptsDeveloperContext` use these
+   * entries; omission leaves the provider's existing instructions unchanged.
+   */
+  readonly developerContext?: ReadonlyArray<{ readonly key: string; readonly text: string }>;
 }
 
 export interface ProviderAdapterV2SteerInput {

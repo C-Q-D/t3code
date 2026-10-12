@@ -983,6 +983,13 @@ export const layerQueryRunner: Layer.Layer<
   }),
 );
 
+/**
+ * Builds options for opening a Claude query. Optional developerContext entries
+ * append trusted instructions in order; absent or empty entries preserve prompt bytes.
+ * Context takes effect when the query opens, not when an existing query is reused.
+ * Discussion seats snapshot their identity at creation, so a stable query is sufficient;
+ * changes within a thread take effect on its next query open.
+ */
 export function makeClaudeQueryOptions(input: {
   readonly modelSelection: ModelSelection;
   readonly nativeThreadId: string;
@@ -1000,6 +1007,7 @@ export function makeClaudeQueryOptions(input: {
   readonly sdkSettings?: string | ClaudeSdkSettings;
   readonly environment?: NodeJS.ProcessEnv;
   readonly mcpServers?: ClaudeQueryOptions["mcpServers"];
+  readonly developerContext?: ProviderAdapter.ProviderAdapterV2TurnInput["developerContext"];
   readonly tools?: ClaudeAgentSdkQueryTools;
   readonly allowedTools?: ReadonlyArray<string>;
   readonly disallowedTools?: ReadonlyArray<string>;
@@ -1092,7 +1100,10 @@ export function makeClaudeQueryOptions(input: {
       preset: "claude_code" as const,
       append:
         buildRuntimeInstructions({ harness: "Claude Code" }) +
-        (input.mcpServers === undefined ? "" : T3_CODE_ORCHESTRATION_INSTRUCTIONS),
+        (input.mcpServers === undefined ? "" : T3_CODE_ORCHESTRATION_INSTRUCTIONS) +
+        (input.developerContext === undefined || input.developerContext.length === 0
+          ? ""
+          : "\n\n" + input.developerContext.map((entry) => entry.text).join("\n\n")),
     },
     ...(Object.keys(extraArgs).length === 0 ? {} : { extraArgs }),
   };
@@ -8285,6 +8296,9 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             resumeSessionAt !== undefined || openedWithResume || hasPersistedProviderTurn;
           const queryOptions = makeClaudeQueryOptions({
             modelSelection: turnInput.modelSelection,
+            ...(turnInput.developerContext === undefined
+              ? {}
+              : { developerContext: turnInput.developerContext }),
             nativeThreadId,
             resume: shouldResume,
             ...(resumeSessionAt === undefined ? {} : { resumeSessionAt }),

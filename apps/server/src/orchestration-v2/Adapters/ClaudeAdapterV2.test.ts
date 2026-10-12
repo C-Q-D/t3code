@@ -1,5 +1,6 @@
 // @effect-diagnostics nodeBuiltinImport:off -- workflow fixtures use files and the fake Claude CLI uses Node streams
 import * as NodeEvents from "node:events";
+import { createHash } from "node:crypto";
 import * as NodeFS from "node:fs";
 import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
@@ -212,6 +213,49 @@ function makeClaudeTestTurnInput(input: {
 }
 
 describe("ClaudeAdapterV2 runtime query policy", () => {
+  // Fixed before the feature change: guard exact existing prompt bytes, not a recomputed expectation.
+  it.each([
+    { label: "omitted", developerContext: undefined },
+    { label: "empty", developerContext: [] },
+  ])("preserves the Claude prompt without developer context $label", ({ developerContext }) => {
+    const options = ClaudeAdapterV2.makeClaudeQueryOptions({
+      modelSelection: CLAUDE_TEST_MODEL_SELECTION,
+      nativeThreadId: "developer-context-thread",
+      resume: false,
+      cwd: null,
+      developerContext,
+      mcpServers: {},
+    });
+    assert.isObject(options.systemPrompt);
+    assert.equal(
+      createHash("sha256")
+        .update((options.systemPrompt as { append: string }).append)
+        .digest("hex"),
+      "b20dffe8bd18b518c56ba95310480a5ef6646fca02519e12286b09ff7fc8d7bb",
+    );
+  });
+
+  it("appends trusted developer context after the existing Claude instructions", () => {
+    const options = ClaudeAdapterV2.makeClaudeQueryOptions({
+      modelSelection: CLAUDE_TEST_MODEL_SELECTION,
+      nativeThreadId: "developer-context-thread",
+      resume: false,
+      cwd: null,
+      mcpServers: {},
+      developerContext: [
+        { key: "seat_role", text: "Act as the architect." },
+        { key: "seat_focus", text: "Review dependency boundaries." },
+      ],
+    });
+    const append = (options.systemPrompt as { append: string }).append;
+    const suffix = "\n\nAct as the architect.\n\nReview dependency boundaries.";
+    assert.isTrue(append.endsWith(suffix));
+    assert.equal(
+      createHash("sha256").update(append.slice(0, -suffix.length)).digest("hex"),
+      "b20dffe8bd18b518c56ba95310480a5ef6646fca02519e12286b09ff7fc8d7bb",
+    );
+  });
+
   it.each([false, true])("requests thinking summaries with resume=%s", (resume) => {
     const options = ClaudeAdapterV2.makeClaudeQueryOptions({
       modelSelection: CLAUDE_TEST_MODEL_SELECTION,

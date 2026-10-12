@@ -711,6 +711,11 @@ function codexRuntimeModeTurnDefaults(runtimeMode: RuntimeMode): {
   }
 }
 
+/**
+ * Builds a native turn request with trusted developerContext as application entries.
+ * Optional context is omitted when empty; runtime and untrusted app entries retain
+ * their existing behavior. Runtime-policy decoding failures stay in the error channel.
+ */
 export function buildCodexTurnStartParams(input: {
   readonly nativeThreadId: string;
   readonly codexInput: ReadonlyArray<CodexSchema.V2TurnStartParams__UserInput>;
@@ -723,6 +728,7 @@ export function buildCodexTurnStartParams(input: {
   readonly omitServiceTier?: boolean;
   /** What the thread's MCP Apps want the agent to know (`ui/update-model-context`). */
   readonly appContext?: ProviderAdapter.ProviderAdapterV2TurnInput["appContext"];
+  readonly developerContext?: ProviderAdapter.ProviderAdapterV2TurnInput["developerContext"];
 }) {
   return Effect.gen(function* () {
     const runtimeModeDefaults = codexRuntimeModeTurnDefaults(input.runtimePolicy.runtimeMode);
@@ -750,7 +756,8 @@ export function buildCodexTurnStartParams(input: {
         : buildCodexDeveloperInstructions(input.runtimePolicy.interactionMode);
     // An app's context is text an MCP server wrote, so it goes in as untrusted
     // context: Codex renders it as quoted user-side input, never as developer
-    // instructions. Codex resends it only when it changes.
+    // instructions. T3 sends the full context each turn; Codex app-server only
+    // adds an entry to model context when its value changes.
     const appContext = Object.fromEntries(
       (input.appContext ?? []).map((entry) => [
         entry.key,
@@ -767,10 +774,21 @@ export function buildCodexTurnStartParams(input: {
             },
           )
         : undefined;
+    const developerContext = Object.fromEntries(
+      (input.developerContext ?? []).map((entry) => [
+        entry.key,
+        { kind: "application" as const, value: entry.text },
+      ]),
+    );
+    // Trusted thread instructions win key collisions, so untrusted app text
+    // cannot replace a seat's identity. Otherwise keep the existing app-over-runtime
+    // precedence. Repeated keys within one source use its last entry.
     const additionalContext =
-      t3Context === undefined && Object.keys(appContext).length === 0
+      t3Context === undefined &&
+      Object.keys(appContext).length === 0 &&
+      Object.keys(developerContext).length === 0
         ? undefined
-        : { ...t3Context, ...appContext };
+        : { ...t3Context, ...appContext, ...developerContext };
     const collaborationMode: CodexSchema.ClientRequest__CollaborationMode | undefined =
       input.runtimePolicy.interactionMode !== "plan" && developerInstructions === undefined
         ? undefined
@@ -1742,8 +1760,10 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
             NonNullable<CodexTurnStartParamsWithCollaborationMode["additionalContext"]>
           >(),
         );
-        // Codex drops client developer messages during compaction but only
-        // resends additionalContext when it changes. Restore the current entries.
+        // This Map is only a restoration cache: T3 sends full additionalContext
+        // each turn, without comparing values locally. Codex app-server adds
+        // unchanged entries only once and drops client developer messages during
+        // compaction, so restore the cached entries when compaction completes.
         const restoreAdditionalContext = (threadId: string) =>
           Effect.gen(function* () {
             const context = (yield* Ref.get(additionalContextByThread)).get(threadId);
@@ -6221,6 +6241,9 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
               deviceToolsAvailable: mcpSession?.capabilities?.has("device") ?? false,
               omitServiceTier: adapterOptions.resolveRuntime !== undefined,
               ...(turnInput.appContext === undefined ? {} : { appContext: turnInput.appContext }),
+              ...(turnInput.developerContext === undefined
+                ? {}
+                : { developerContext: turnInput.developerContext }),
             });
             yield* Ref.update(pendingRootTurns, (current) => {
               const updated = new Map(current);
