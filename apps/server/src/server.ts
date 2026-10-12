@@ -16,6 +16,8 @@ import * as Cause from "effect/Cause";
 import * as Duration from "effect/Duration";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
+import type * as FileSystem from "effect/FileSystem";
+import type * as Path from "effect/Path";
 import * as Option from "effect/Option";
 import * as Layer from "effect/Layer";
 import * as Stream from "effect/Stream";
@@ -37,6 +39,7 @@ import * as NodePtyAdapter from "./terminal/NodePtyAdapter.ts";
 import * as PullRequestHttp from "./pullRequest/http.ts";
 import * as PullRequestProviderRegistry from "./pullRequest/PullRequestProviderRegistry.ts";
 import * as PullRequestService from "./pullRequest/PullRequestService.ts";
+import * as DiscussionTemplates from "./discussions/DiscussionTemplateService.ts";
 import * as SqlitePersistence from "./persistence/Sqlite.ts";
 import * as PullRequestFilesViewed from "./persistence/PullRequestFilesViewed.ts";
 import * as ServerLifecycleEvents from "./serverLifecycleEvents.ts";
@@ -545,6 +548,7 @@ const layerProviderInstallationRefresh = Layer.effectDiscard(
 );
 
 const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
+  DiscussionTemplates.layer,
   AgentAwarenessRelay.layer,
   // Asks T3 Connect to deliver webhooks it held while this environment was offline.
   HeldHooksWaker.layer,
@@ -1109,5 +1113,13 @@ const layerMakeServer = Layer.unwrap(
   }),
 );
 
-// The CLI supplies configuration.
-export const runServer = Layer.launch(layerMakeServer);
+/**
+ * Launches the server until interrupted; the CLI supplies filesystem, paths and configuration.
+ * This type boundary keeps requirements concrete for CLI consumers: deriving them from
+ * the composite layer still widens them to any at that boundary. Errors remain layer-derived.
+ */
+export const runServer: Effect.Effect<
+  never,
+  Layer.Error<typeof layerMakeServer>,
+  FileSystem.FileSystem | Path.Path | ServerConfig.ServerConfig
+> = Layer.launch(layerMakeServer);

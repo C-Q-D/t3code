@@ -1,0 +1,233 @@
+/** Real in-memory SQLite round trips guard storage, sequence allocation and deletion boundaries. */
+import { assert, it } from "@effect/vitest";
+import {
+  Discussion,
+  DiscussionEntryId,
+  DiscussionPrompt,
+  DiscussionTemplate,
+  DiscussionError,
+  DiscussionId,
+  DiscussionSeatId,
+  RunId,
+} from "@t3tools/contracts";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
+import * as SqlClient from "effect/sql/SqlClient";
+import * as SqlitePersistence from "../persistence/Sqlite.ts";
+import * as DiscussionStore from "./DiscussionStore.ts";
+
+const timestamp = "2026-10-12T01:00:00.000Z";
+const discussion = Schema.decodeUnknownSync(Discussion)({
+  id: "discussion:test",
+  projectId: "project:test",
+  title: "实现边界",
+  topic: "后端方案",
+  seats: [
+    {
+      id: "seat:test",
+      personaName: "审查者快照",
+      personaPrompt: "检查边界",
+      modelSelection: { instanceId: "codex", model: "gpt-5" },
+      threadId: "thread:test",
+    },
+  ],
+  status: "speaking",
+  cursor: { seatIndex: 0, turnNo: 1, runId: "run:first", dispatchedEntrySeq: 0 },
+  pause: null,
+  closing: null,
+  createdBy: "user",
+  creationSource: "web",
+  createdAt: timestamp,
+  updatedAt: timestamp,
+  endedAt: null,
+});
+const entry: DiscussionStore.DiscussionEntryAppend = {
+  id: DiscussionEntryId.make("entry:first"),
+  discussionId: discussion.id,
+  kind: "statement",
+  seatId: discussion.seats[0]!.id,
+  threadId: discussion.seats[0]!.threadId,
+  runId: RunId.make("run:first"),
+  text: "第一条发言",
+  files: [{ path: "src/example.ts", additions: 3, deletions: 2 }],
+  status: "completed",
+  checkpointRef: null,
+  createdAt: timestamp,
+};
+
+it.effect("prompt and ordered template records persist edits and deletion", () =>
+  Effect.gen(function* () {
+    const store = yield* DiscussionStore.DiscussionStore;
+    const prompt = yield* Schema.decodeUnknownEffect(DiscussionPrompt)({
+      id: "prompt:custom",
+      kind: "persona",
+      name: "定制审查",
+      prompt: "检查错误",
+      builtin: false,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    });
+    const template = yield* Schema.decodeUnknownEffect(DiscussionTemplate)({
+      id: "template:custom",
+      name: "双席",
+      seats: [
+        { personaPromptId: prompt.id, modelSelection: { instanceId: "codex", model: "gpt-5" } },
+        {
+          personaPromptId: "builtin:persona:architect",
+          modelSelection: { instanceId: "claude-code", model: "sonnet" },
+        },
+      ],
+      summaryPromptId: "builtin:summary:default",
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    });
+    yield* store.upsertPrompt(prompt);
+    yield* store.upsertTemplate(template);
+    assert.deepEqual(yield* store.getPrompt(prompt.id), prompt);
+    assert.deepEqual(yield* store.getTemplate(template.id), template);
+    yield* store.upsertPrompt({ ...prompt, name: "改名", prompt: "改后的正文" });
+    yield* store.upsertTemplate({ ...template, name: "改后的讨论", summaryPromptId: null });
+    assert.equal((yield* store.getPrompt(prompt.id))?.prompt, "改后的正文");
+    assert.deepEqual(
+      (yield* store.listTemplates()).map((value) => [value.name, value.summaryPromptId]),
+      [["改后的讨论", null]],
+    );
+    assert.equal((yield* store.listPrompts()).filter((value) => value.id === prompt.id).length, 1);
+    yield* store.deleteTemplate(template.id);
+    yield* store.deletePrompt(prompt.id);
+    assert.isNull(yield* store.getTemplate(template.id));
+    assert.isNull(yield* store.getPrompt(prompt.id));
+  }).pipe(
+    Effect.provide(DiscussionStore.layer.pipe(Layer.provideMerge(SqlitePersistence.layerMemory))),
+  ),
+);
+
+it.effect(
+  "discussion snapshots round trip nullable and nested state and remain project scoped",
+  () =>
+    Effect.gen(function* () {
+      const store = yield* DiscussionStore.DiscussionStore;
+      yield* store.createDiscussion(discussion);
+      yield* store.createDiscussion({
+        ...discussion,
+        id: DiscussionId.make("discussion:other"),
+        projectId: yield* Schema.decodeUnknownEffect(Discussion.fields.projectId)("project:other"),
+      });
+      assert.deepEqual(yield* store.getDiscussion(discussion.id), discussion);
+      const updated: Discussion = {
+        ...discussion,
+        title: "暂停后的讨论",
+        status: "paused",
+        cursor: { seatIndex: 0, turnNo: 2, runId: null, dispatchedEntrySeq: 5 },
+        pause: {
+          reason: "seat_failed",
+          seatId: discussion.seats[0]!.id,
+          message: "等待重试",
+          resetAt: timestamp,
+        },
+        closing: {
+          summarizerSeatId: discussion.seats[0]!.id,
+          summaryPrompt: "汇总",
+          remainingFinalSeatIds: [discussion.seats[0]!.id],
+          phase: "final_round",
+        },
+        updatedAt: "2026-10-12T02:00:00.000Z",
+        endedAt: timestamp,
+      };
+      yield* store.updateDiscussion(updated);
+      assert.deepEqual(yield* store.getDiscussion(discussion.id), updated);
+      assert.deepEqual(yield* store.listDiscussions(discussion.projectId), [updated]);
+      assert.isNull(yield* store.getDiscussion(DiscussionId.make("missing")));
+      const error = yield* store
+        .updateDiscussion({ ...discussion, id: DiscussionId.make("missing") })
+        .pipe(Effect.flip);
+      assert.instanceOf(error, DiscussionError);
+      assert.equal(error.reason, "not_found");
+    }).pipe(
+      Effect.provide(DiscussionStore.layer.pipe(Layer.provideMerge(SqlitePersistence.layerMemory))),
+    ),
+);
+
+it.effect(
+  "concurrent appends allocate increasing seq and duplicate runs leave only one record",
+  () =>
+    Effect.gen(function* () {
+      const store = yield* DiscussionStore.DiscussionStore;
+      yield* store.createDiscussion(discussion);
+      const first = yield* store.appendEntry(entry);
+      assert.deepEqual(first, { ...entry, seq: 1 });
+      const failure = yield* store
+        .appendEntry({ ...entry, id: DiscussionEntryId.make("entry:duplicate") })
+        .pipe(Effect.flip);
+      assert.instanceOf(failure, DiscussionError);
+      assert.equal(failure.reason, "orchestration_error");
+      assert.deepEqual(yield* store.getEntryByRunId(RunId.make("run:first")), first);
+      const { runId: _runId, ...withoutRun } = entry;
+      yield* Effect.all(
+        [
+          store.appendEntry({
+            ...withoutRun,
+            id: DiscussionEntryId.make("entry:second"),
+            text: "第二条",
+          }),
+          store.appendEntry({
+            ...withoutRun,
+            id: DiscussionEntryId.make("entry:third"),
+            text: "第三条",
+          }),
+        ],
+        { concurrency: "unbounded" },
+      );
+      assert.deepEqual(
+        (yield* store.listEntries(discussion.id)).map((value) => value.seq),
+        [1, 2, 3],
+      );
+      assert.deepEqual(
+        (yield* store.listEntries(discussion.id, 1, 2)).map((value) => value.seq),
+        [2],
+      );
+      const sql = yield* SqlClient.SqlClient;
+      assert.deepEqual(
+        yield* sql<{
+          count: number;
+        }>`SELECT COUNT(*) AS count FROM discussion_entries WHERE run_id = 'run:first'`,
+        [{ count: 1 }],
+      );
+      assert.isNull(yield* store.getEntryByRunId(RunId.make("missing")));
+    }).pipe(
+      Effect.provide(DiscussionStore.layer.pipe(Layer.provideMerge(SqlitePersistence.layerMemory))),
+    ),
+);
+
+it.effect(
+  "deleting one discussion removes its entries and seat delivery while preserving another",
+  () =>
+    Effect.gen(function* () {
+      const store = yield* DiscussionStore.DiscussionStore;
+      const otherId = DiscussionId.make("discussion:other");
+      const seatId = DiscussionSeatId.make("seat:test");
+      yield* store.createDiscussion(discussion);
+      yield* store.createDiscussion({ ...discussion, id: otherId });
+      yield* store.appendEntry(entry);
+      yield* store.appendEntry({
+        ...entry,
+        discussionId: otherId,
+        id: DiscussionEntryId.make("entry:other"),
+        runId: RunId.make("run:other"),
+      });
+      assert.isNull(yield* store.getSeatDelivery(discussion.id, seatId));
+      yield* store.setSeatDelivery(discussion.id, seatId, 1);
+      yield* store.setSeatDelivery(discussion.id, seatId, 4);
+      yield* store.setSeatDelivery(otherId, seatId, 2);
+      assert.equal(yield* store.getSeatDelivery(discussion.id, seatId), 4);
+      yield* store.deleteDiscussion(discussion.id);
+      assert.isNull(yield* store.getDiscussion(discussion.id));
+      assert.deepEqual(yield* store.listEntries(discussion.id), []);
+      assert.isNull(yield* store.getSeatDelivery(discussion.id, seatId));
+      assert.equal((yield* store.listEntries(otherId)).length, 1);
+      assert.equal(yield* store.getSeatDelivery(otherId, seatId), 2);
+    }).pipe(
+      Effect.provide(DiscussionStore.layer.pipe(Layer.provideMerge(SqlitePersistence.layerMemory))),
+    ),
+);

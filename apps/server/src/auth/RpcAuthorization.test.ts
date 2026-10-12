@@ -1,3 +1,5 @@
+/** Verifies RPC authorization before handlers run, including persisted template behavior. */
+import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import {
   AuthEnvironmentMaintainScope,
   AuthDiagnosticsReadScope,
@@ -18,11 +20,17 @@ import {
   AuthTerminalOperateScope,
   WS_METHODS,
   WsRpcGroup,
+  DiscussionPromptId,
+  type AuthEnvironmentScope,
 } from "@t3tools/contracts";
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as RpcTest from "effect/rpc/RpcTest";
+import type * as RpcGroup from "effect/rpc/RpcGroup";
+import * as Stream from "effect/Stream";
+import * as DiscussionTemplates from "../discussions/DiscussionTemplateService.ts";
+import * as SqlitePersistence from "../persistence/Sqlite.ts";
 
 import {
   RPC_REQUIRED_SCOPES,
@@ -30,6 +38,218 @@ import {
   requiredScopeForDeviceList,
 } from "./RpcAuthorization.ts";
 import * as RpcAuthorization from "./RpcAuthorization.ts";
+
+const discussionMethods = [
+  WS_METHODS.discussionPromptsList,
+  WS_METHODS.discussionPromptsSubscribe,
+  WS_METHODS.discussionPromptsUpsert,
+  WS_METHODS.discussionPromptsDelete,
+  WS_METHODS.discussionPromptsRestoreBuiltin,
+  WS_METHODS.discussionTemplatesList,
+  WS_METHODS.discussionTemplatesSubscribe,
+  WS_METHODS.discussionTemplatesUpsert,
+  WS_METHODS.discussionTemplatesDelete,
+] as const;
+const discussionGroup = WsRpcGroup.omit(
+  ...[...WsRpcGroup.requests.keys()].filter(
+    (
+      tag,
+    ): tag is Exclude<
+      RpcGroup.Rpcs<typeof WsRpcGroup>["_tag"],
+      (typeof discussionMethods)[number]
+    > => !(discussionMethods as ReadonlyArray<string>).includes(tag),
+  ),
+);
+const discussionLayer = DiscussionTemplates.layer.pipe(
+  Layer.provide(NodeCrypto.layer),
+  Layer.provide(SqlitePersistence.layerMemory),
+);
+
+/** Runs the real template service through RPC middleware; scopes belong to this isolated connection. */
+const makeDiscussionClient = (scopes: ReadonlyArray<AuthEnvironmentScope>) =>
+  Effect.gen(function* () {
+    const service = yield* DiscussionTemplates.DiscussionTemplateService;
+    return yield* RpcTest.makeClient(discussionGroup).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          discussionGroup.toLayer(
+            Effect.succeed({
+              [WS_METHODS.discussionPromptsList]: (input) => service.listPrompts(input),
+              [WS_METHODS.discussionPromptsSubscribe]: (input) => service.subscribePrompts(input),
+              [WS_METHODS.discussionPromptsUpsert]: (input) => service.upsertPrompt(input),
+              [WS_METHODS.discussionPromptsDelete]: (input) => service.deletePrompt(input),
+              [WS_METHODS.discussionPromptsRestoreBuiltin]: (input) =>
+                service.restoreBuiltin(input),
+              [WS_METHODS.discussionTemplatesList]: () => service.listTemplates(),
+              [WS_METHODS.discussionTemplatesSubscribe]: () => service.subscribeTemplates(),
+              [WS_METHODS.discussionTemplatesUpsert]: (input) => service.upsertTemplate(input),
+              [WS_METHODS.discussionTemplatesDelete]: (input) => service.deleteTemplate(input),
+            }),
+          ),
+          RpcAuthorization.layer(scopes),
+        ),
+      ),
+    );
+  });
+
+describe("discussion template RPC authorization", () => {
+  it.effect(
+    "read-only connections can list and subscribe but cannot mutate persisted templates",
+    () =>
+      Effect.gen(function* () {
+        const service = yield* DiscussionTemplates.DiscussionTemplateService;
+        const builtinId = DiscussionPromptId.make("builtin:persona:architect");
+        const { prompt } = yield* service.upsertPrompt({
+          kind: "persona",
+          name: "权限测试身份",
+          prompt: "原始正文。",
+        });
+        yield* service.upsertPrompt({
+          id: builtinId,
+          kind: "persona",
+          name: "用户定制架构师",
+          prompt: "用户定制正文。",
+        });
+        const templateInput = {
+          name: "权限测试配置",
+          seats: [
+            {
+              personaPromptId: builtinId,
+              modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5" },
+            },
+          ],
+          summaryPromptId: null,
+        };
+        const { template } = yield* service.upsertTemplate(templateInput);
+        const client = yield* makeDiscussionClient([AuthOrchestrationReadScope]);
+        expect((yield* client[WS_METHODS.discussionPromptsList]({})).prompts.length).toBe(7);
+        expect(
+          (yield* client[WS_METHODS.discussionTemplatesList]({})).templates.map(
+            (item) => item.name,
+          ),
+        ).toEqual(["权限测试配置"]);
+        const promptSnapshots = yield* client[WS_METHODS.discussionPromptsSubscribe]({
+          kind: "summary",
+        }).pipe(Stream.take(1), Stream.runCollect);
+        expect(promptSnapshots.map((list) => list.prompts.map((item) => item.name))).toEqual([
+          ["默认"],
+        ]);
+        const templateSnapshots = yield* client[WS_METHODS.discussionTemplatesSubscribe]({}).pipe(
+          Stream.take(1),
+          Stream.runCollect,
+        );
+        expect(templateSnapshots.map((list) => list.templates.map((item) => item.name))).toEqual([
+          ["权限测试配置"],
+        ]);
+
+        const denied = {
+          _tag: "EnvironmentAuthorizationError",
+          requiredPermission: AuthOrchestrationOperateScope,
+        };
+        expect(
+          yield* client[WS_METHODS.discussionPromptsUpsert]({
+            id: prompt.id,
+            kind: "persona",
+            name: "未经授权修改",
+            prompt: "替换正文。",
+          }).pipe(Effect.flip),
+        ).toMatchObject(denied);
+        expect(
+          yield* client[WS_METHODS.discussionPromptsDelete]({ id: prompt.id }).pipe(Effect.flip),
+        ).toMatchObject(denied);
+        expect(
+          yield* client[WS_METHODS.discussionPromptsRestoreBuiltin]({ id: builtinId }).pipe(
+            Effect.flip,
+          ),
+        ).toMatchObject(denied);
+        expect(
+          yield* client[WS_METHODS.discussionTemplatesUpsert]({
+            ...templateInput,
+            id: template.id,
+            name: "未经授权配置",
+          }).pipe(Effect.flip),
+        ).toMatchObject(denied);
+        expect(
+          yield* client[WS_METHODS.discussionTemplatesDelete]({ id: template.id }).pipe(
+            Effect.flip,
+          ),
+        ).toMatchObject(denied);
+
+        const { prompts } = yield* client[WS_METHODS.discussionPromptsList]({});
+        expect(
+          prompts.filter((item) => item.id === prompt.id).map((item) => [item.name, item.prompt]),
+        ).toEqual([["权限测试身份", "原始正文。"]]);
+        expect(
+          prompts.filter((item) => item.id === builtinId).map((item) => [item.name, item.prompt]),
+        ).toEqual([["用户定制架构师", "用户定制正文。"]]);
+        expect(
+          (yield* client[WS_METHODS.discussionTemplatesList]({})).templates.map(
+            (item) => item.name,
+          ),
+        ).toEqual(["权限测试配置"]);
+      }).pipe(Effect.provide(discussionLayer), Effect.scoped),
+  );
+
+  it.effect("operate connections can create, edit, restore and delete persisted templates", () =>
+    Effect.gen(function* () {
+      const service = yield* DiscussionTemplates.DiscussionTemplateService;
+      const client = yield* makeDiscussionClient([AuthOrchestrationOperateScope]);
+      const { prompt } = yield* client[WS_METHODS.discussionPromptsUpsert]({
+        kind: "persona",
+        name: "可写身份",
+        prompt: "初始正文。",
+      });
+      yield* client[WS_METHODS.discussionPromptsUpsert]({
+        id: prompt.id,
+        kind: "persona",
+        name: "改后的身份",
+        prompt: "修改正文。",
+      });
+      expect(
+        (yield* service.listPrompts()).prompts
+          .filter((item) => item.id === prompt.id)
+          .map((item) => [item.name, item.prompt]),
+      ).toEqual([["改后的身份", "修改正文。"]]);
+      const builtinId = DiscussionPromptId.make("builtin:persona:architect");
+      yield* client[WS_METHODS.discussionPromptsUpsert]({
+        id: builtinId,
+        kind: "persona",
+        name: "定制默认",
+        prompt: "改写默认正文。",
+      });
+      yield* client[WS_METHODS.discussionPromptsRestoreBuiltin]({ id: builtinId });
+      expect(
+        (yield* service.listPrompts()).prompts.find((item) => item.id === builtinId)?.name,
+      ).toBe("架构师");
+      const input = {
+        name: "可写配置",
+        seats: [
+          {
+            personaPromptId: prompt.id,
+            modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5" },
+          },
+        ],
+        summaryPromptId: null,
+      };
+      const { template } = yield* client[WS_METHODS.discussionTemplatesUpsert](input);
+      yield* client[WS_METHODS.discussionTemplatesUpsert]({
+        ...input,
+        id: template.id,
+        name: "改后的配置",
+      });
+      expect((yield* service.listTemplates()).templates.map((item) => item.name)).toEqual([
+        "改后的配置",
+      ]);
+      yield* client[WS_METHODS.discussionTemplatesDelete]({ id: template.id });
+      yield* client[WS_METHODS.discussionPromptsDelete]({ id: prompt.id });
+      expect(yield* service.listTemplates()).toEqual({ templates: [] });
+      expect((yield* service.listPrompts()).prompts.length).toBe(6);
+      expect((yield* service.listPrompts()).prompts.some((item) => item.id === prompt.id)).toBe(
+        false,
+      );
+    }).pipe(Effect.provide(discussionLayer), Effect.scoped),
+  );
+});
 
 describe("RPC authorization scopes", () => {
   it("declares exactly one scope for every RPC in the server group", () => {

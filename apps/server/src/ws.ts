@@ -123,6 +123,7 @@ import * as ProviderSessionManager from "./orchestration-v2/ProviderSessionManag
 import * as ThreadLaunchService from "./orchestration-v2/ThreadLaunchService.ts";
 import * as ThreadMessageIntake from "./orchestration-v2/ThreadMessageIntake.ts";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
+import * as DiscussionTemplates from "./discussions/DiscussionTemplateService.ts";
 import * as ScheduledTasks from "./scheduledTasks/ScheduledTaskService.ts";
 import * as SecretRequests from "./secrets/SecretRequests.ts";
 import {
@@ -1184,6 +1185,16 @@ export const subscribeOrchestrationV2Shell = Effect.fn("ws.orchestrationV2.subsc
   },
 );
 
+/**
+ * Builds handlers for one authenticated WebSocket connection. Handlers call server services;
+ * the RPC authorization middleware checks the session's scopes before each request.
+ * @param currentSession Authenticated session used for connection identity and scoped operations.
+ * @param clientOrigin Client surface recorded as the origin of orchestration commands.
+ * @param clientAnalyticsProps Connection metadata attached to analytics events.
+ * @param previewAutomationBroker Broker for this connection's preview automation requests.
+ * @param serverBrowser Browser service used by preview and browser RPC handlers.
+ * @returns Handler layer requiring the backing server services; RPC errors retain their declared schemas.
+ */
 const layerWsRpc = (
   currentSession: EnvironmentAuth.AuthenticatedSession,
   clientOrigin: OrchestrationClientOrigin,
@@ -1226,6 +1237,7 @@ const layerWsRpc = (
       };
       const threadLaunch = yield* ThreadLaunchService.ThreadLaunchService;
       const providerSessionManager = yield* ProviderSessionManager.ProviderSessionManagerV2;
+      const discussionTemplates = yield* DiscussionTemplates.DiscussionTemplateService;
       const scheduledTasks = yield* ScheduledTasks.ScheduledTaskService;
       const secretRequests = yield* SecretRequests.SecretRequests;
       const pullRequests = yield* PullRequestService.PullRequestService;
@@ -2056,6 +2068,20 @@ const layerWsRpc = (
               Effect.andThen(subscribeOrchestrationV2Thread(input)),
             ),
           ),
+        [WS_METHODS.discussionPromptsList]: (input) => discussionTemplates.listPrompts(input),
+        [WS_METHODS.discussionPromptsSubscribe]: (input) =>
+          discussionTemplates.subscribePrompts(input),
+        [WS_METHODS.discussionPromptsUpsert]: (input) => discussionTemplates.upsertPrompt(input),
+        [WS_METHODS.discussionPromptsDelete]: (input) => discussionTemplates.deletePrompt(input),
+        [WS_METHODS.discussionPromptsRestoreBuiltin]: (input) =>
+          discussionTemplates.restoreBuiltin(input),
+        [WS_METHODS.discussionTemplatesList]: (_input) => discussionTemplates.listTemplates(),
+        [WS_METHODS.discussionTemplatesSubscribe]: (_input) =>
+          discussionTemplates.subscribeTemplates(),
+        [WS_METHODS.discussionTemplatesUpsert]: (input) =>
+          discussionTemplates.upsertTemplate(input),
+        [WS_METHODS.discussionTemplatesDelete]: (input) =>
+          discussionTemplates.deleteTemplate(input),
         [WS_METHODS.scheduledTasksList]: (_input) =>
           scheduledTasks.list().pipe(Effect.map(withVisibleWebhookUrls)),
         [WS_METHODS.scheduledTasksSubscribe]: (_input) =>

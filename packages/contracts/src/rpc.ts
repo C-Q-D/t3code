@@ -1,5 +1,21 @@
 /** Defines typed RPC methods, request groups and transport errors; contains no handlers. */
 import {
+  DiscussionError,
+  DiscussionPromptDeleteInput,
+  DiscussionPromptDeleteResult,
+  DiscussionPromptListInput,
+  DiscussionPromptListResult,
+  DiscussionPromptMutationResult,
+  DiscussionPromptRestoreBuiltinInput,
+  DiscussionPromptUpsertInput,
+  DiscussionTemplateDeleteInput,
+  DiscussionTemplateDeleteResult,
+  DiscussionTemplateListInput,
+  DiscussionTemplateListResult,
+  DiscussionTemplateMutationResult,
+  DiscussionTemplateUpsertInput,
+} from "./discussion.ts";
+import {
   OrchestrationV2SearchThreadError,
   OrchestrationV2SearchThreadInput,
   OrchestrationV2SearchThreadResult,
@@ -512,6 +528,15 @@ export const WS_METHODS = {
   serverRefreshUsageRates: "server.refreshUsageRates",
 
   // Scheduled tasks
+  discussionPromptsList: "discussionPrompts.list",
+  discussionPromptsSubscribe: "discussionPrompts.subscribe",
+  discussionPromptsUpsert: "discussionPrompts.upsert",
+  discussionPromptsDelete: "discussionPrompts.delete",
+  discussionPromptsRestoreBuiltin: "discussionPrompts.restoreBuiltin",
+  discussionTemplatesList: "discussionTemplates.list",
+  discussionTemplatesSubscribe: "discussionTemplates.subscribe",
+  discussionTemplatesUpsert: "discussionTemplates.upsert",
+  discussionTemplatesDelete: "discussionTemplates.delete",
   scheduledTasksList: "scheduledTasks.list",
   scheduledTasksSubscribe: "scheduledTasks.subscribe",
   scheduledTasksUpsert: "scheduledTasks.upsert",
@@ -1780,6 +1805,62 @@ const WsSubscribeServerLifecycleRpc = Rpc.make(WS_METHODS.subscribeServerLifecyc
   stream: true,
 });
 
+const WsDiscussionPromptsListRpc = Rpc.make(WS_METHODS.discussionPromptsList, {
+  payload: DiscussionPromptListInput,
+  success: DiscussionPromptListResult,
+  error: Schema.Union([DiscussionError, EnvironmentAuthorizationError]),
+});
+
+const WsDiscussionPromptsSubscribeRpc = Rpc.make(WS_METHODS.discussionPromptsSubscribe, {
+  payload: DiscussionPromptListInput,
+  success: DiscussionPromptListResult,
+  error: Schema.Union([DiscussionError, EnvironmentAuthorizationError]),
+  stream: true,
+});
+
+const WsDiscussionPromptsUpsertRpc = Rpc.make(WS_METHODS.discussionPromptsUpsert, {
+  payload: DiscussionPromptUpsertInput,
+  success: DiscussionPromptMutationResult,
+  error: Schema.Union([DiscussionError, EnvironmentAuthorizationError]),
+});
+
+const WsDiscussionPromptsDeleteRpc = Rpc.make(WS_METHODS.discussionPromptsDelete, {
+  payload: DiscussionPromptDeleteInput,
+  success: DiscussionPromptDeleteResult,
+  error: Schema.Union([DiscussionError, EnvironmentAuthorizationError]),
+});
+
+const WsDiscussionPromptsRestoreBuiltinRpc = Rpc.make(WS_METHODS.discussionPromptsRestoreBuiltin, {
+  payload: DiscussionPromptRestoreBuiltinInput,
+  success: DiscussionPromptMutationResult,
+  error: Schema.Union([DiscussionError, EnvironmentAuthorizationError]),
+});
+
+const WsDiscussionTemplatesListRpc = Rpc.make(WS_METHODS.discussionTemplatesList, {
+  payload: DiscussionTemplateListInput,
+  success: DiscussionTemplateListResult,
+  error: Schema.Union([DiscussionError, EnvironmentAuthorizationError]),
+});
+
+const WsDiscussionTemplatesSubscribeRpc = Rpc.make(WS_METHODS.discussionTemplatesSubscribe, {
+  payload: DiscussionTemplateListInput,
+  success: DiscussionTemplateListResult,
+  error: Schema.Union([DiscussionError, EnvironmentAuthorizationError]),
+  stream: true,
+});
+
+const WsDiscussionTemplatesUpsertRpc = Rpc.make(WS_METHODS.discussionTemplatesUpsert, {
+  payload: DiscussionTemplateUpsertInput,
+  success: DiscussionTemplateMutationResult,
+  error: Schema.Union([DiscussionError, EnvironmentAuthorizationError]),
+});
+
+const WsDiscussionTemplatesDeleteRpc = Rpc.make(WS_METHODS.discussionTemplatesDelete, {
+  payload: DiscussionTemplateDeleteInput,
+  success: DiscussionTemplateDeleteResult,
+  error: Schema.Union([DiscussionError, EnvironmentAuthorizationError]),
+});
+
 const WsScheduledTasksListRpc = Rpc.make(WS_METHODS.scheduledTasksList, {
   payload: ScheduledTaskListInput,
   success: ScheduledTaskListResult,
@@ -1932,6 +2013,15 @@ export const WsRpcGroup = RpcGroup.make(
   WsServerGetUsageSummaryRpc,
   WsServerRefreshUsageRatesRpc,
   WsServerSignalProcessRpc,
+  WsDiscussionPromptsListRpc,
+  WsDiscussionPromptsSubscribeRpc,
+  WsDiscussionPromptsUpsertRpc,
+  WsDiscussionPromptsDeleteRpc,
+  WsDiscussionPromptsRestoreBuiltinRpc,
+  WsDiscussionTemplatesListRpc,
+  WsDiscussionTemplatesSubscribeRpc,
+  WsDiscussionTemplatesUpsertRpc,
+  WsDiscussionTemplatesDeleteRpc,
   WsScheduledTasksListRpc,
   WsScheduledTasksSubscribeRpc,
   WsScheduledTasksUpsertRpc,
