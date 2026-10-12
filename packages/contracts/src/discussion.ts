@@ -27,16 +27,28 @@ export const DiscussionTemplateId = TrimmedNonEmptyString.pipe(
 /** Identity of a reusable ordered seat configuration. */
 export type DiscussionTemplateId = typeof DiscussionTemplateId.Type;
 
+export const DiscussionPersonaAvatar = Schema.Literals([
+  "architect",
+  "opponent",
+  "implementer",
+  "reviewer",
+  "product",
+]);
+/** Persona-only avatars in picker order; the user's own avatar is not assignable. */
+export type DiscussionPersonaAvatar = typeof DiscussionPersonaAvatar.Type;
+
 export const DiscussionPrompt = Schema.Struct({
   id: DiscussionPromptId,
   kind: Schema.Literals(["persona", "summary"]),
   name: TrimmedNonEmptyString,
   prompt: TrimmedNonEmptyString,
+  avatar: Schema.NullOr(DiscussionPersonaAvatar),
+  description: Schema.String,
   builtin: Schema.Boolean,
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
 });
-/** Editable prompt; builtin identity remains fixed so defaults can be restored. */
+/** Editable prompt with an untrimmed, possibly empty description; summary avatars are null. Builtin identity remains fixed for restoration. */
 export type DiscussionPrompt = typeof DiscussionPrompt.Type;
 
 export const DiscussionTemplate = Schema.Struct({
@@ -56,10 +68,11 @@ export const DiscussionSeat = Schema.Struct({
   id: DiscussionSeatId,
   personaName: TrimmedNonEmptyString,
   personaPrompt: Schema.String,
+  avatar: DiscussionPersonaAvatar,
   modelSelection: ModelSelection,
   threadId: ThreadId,
 });
-/** A seat owns an independent app thread and a frozen persona prompt. */
+/** A seat freezes persona name, prompt and avatar at discussion start; later persona edits do not change it. */
 export type DiscussionSeat = typeof DiscussionSeat.Type;
 
 export const Discussion = Schema.Struct({
@@ -126,8 +139,18 @@ export const DiscussionPromptListInput = Schema.Struct({
 });
 /** Omit kind to list both prompt categories. */
 export type DiscussionPromptListInput = typeof DiscussionPromptListInput.Type;
+export const DiscussionPromptWithModified = Schema.Struct({
+  ...DiscussionPrompt.fields,
+  modified: Schema.Boolean,
+});
+/**
+ * Response-only comparison of builtin name, prompt, avatar and description against current defaults.
+ * Reverting all four clears modified; a later release changing defaults can mark untouched rows modified.
+ * Custom prompts and builtin ids absent from the defaults are false. This flag is never persisted.
+ */
+export type DiscussionPromptWithModified = typeof DiscussionPromptWithModified.Type;
 export const DiscussionPromptListResult = Schema.Struct({
-  prompts: Schema.Array(DiscussionPrompt),
+  prompts: Schema.Array(DiscussionPromptWithModified),
 });
 /** Complete prompt snapshot for list and subscription responses. */
 export type DiscussionPromptListResult = typeof DiscussionPromptListResult.Type;
@@ -136,8 +159,10 @@ export const DiscussionPromptUpsertInput = Schema.Struct({
   kind: DiscussionPrompt.fields.kind,
   name: TrimmedNonEmptyString,
   prompt: TrimmedNonEmptyString,
+  avatar: Schema.NullOr(DiscussionPersonaAvatar),
+  description: Schema.String,
 });
-/** Missing id creates a custom prompt; present id updates an existing prompt of the same kind. */
+/** Missing id creates a custom prompt; present id updates the same kind. Persona avatars are required; summary avatars are null. Descriptions are saved unchanged. */
 export type DiscussionPromptUpsertInput = typeof DiscussionPromptUpsertInput.Type;
 export const DiscussionPromptDeleteInput = Schema.Struct({ id: DiscussionPromptId });
 /** Prompt selected for deletion or builtin restoration. */
@@ -145,7 +170,9 @@ export type DiscussionPromptDeleteInput = typeof DiscussionPromptDeleteInput.Typ
 export const DiscussionPromptRestoreBuiltinInput = DiscussionPromptDeleteInput;
 /** Restoration retains the builtin's durable identity and creation time. */
 export type DiscussionPromptRestoreBuiltinInput = typeof DiscussionPromptRestoreBuiltinInput.Type;
-export const DiscussionPromptMutationResult = Schema.Struct({ prompt: DiscussionPrompt });
+export const DiscussionPromptMutationResult = Schema.Struct({
+  prompt: DiscussionPromptWithModified,
+});
 /** Persisted prompt after creation, update or restoration. */
 export type DiscussionPromptMutationResult = typeof DiscussionPromptMutationResult.Type;
 export const DiscussionPromptDeleteResult = DiscussionPromptDeleteInput;

@@ -5,6 +5,7 @@ import {
   DiscussionTemplateId,
   DiscussionPromptUpsertInput,
   DiscussionTemplateUpsertInput,
+  type DiscussionPrompt,
   type DiscussionPromptListInput,
   type DiscussionPromptListResult,
   type DiscussionPromptMutationResult,
@@ -48,7 +49,7 @@ export class DiscussionTemplateService extends Context.Service<
     readonly deletePrompt: (
       input: DiscussionPromptDeleteInput,
     ) => Effect.Effect<DiscussionPromptDeleteResult, DiscussionError>;
-    /** Restores builtin name and text, keeping identity and createdAt; custom prompts fail invalid_state. */
+    /** Restores builtin name, text, avatar and description, keeping identity and createdAt; custom prompts fail invalid_state. */
     readonly restoreBuiltin: (
       input: DiscussionPromptDeleteInput,
     ) => Effect.Effect<DiscussionPromptMutationResult, DiscussionError>;
@@ -67,7 +68,27 @@ export class DiscussionTemplateService extends Context.Service<
   }
 >()("t3/discussions/DiscussionTemplateService") {}
 
-/** Acquires application SQL/Crypto; seed is owned by migration 61 so rebuilding this service preserves edits. */
+/**
+ * Adds response metadata without writing it to storage. Compares the persisted prompt's four
+ * editable fields with current defaults, so reverting edits clears the flag and future default
+ * changes can set it. Custom prompts and unknown builtin ids remain unmodified.
+ * @param prompt Persisted prompt with no response-only metadata.
+ * @returns Complete prompt response with a derived modified flag; does not mutate the input.
+ */
+const withModified = (prompt: DiscussionPrompt) => {
+  const builtin = prompt.builtin ? builtinPrompts.find((item) => item.id === prompt.id) : undefined;
+  return {
+    ...prompt,
+    modified:
+      builtin !== undefined &&
+      (prompt.name !== builtin.name ||
+        prompt.prompt !== builtin.prompt ||
+        prompt.avatar !== builtin.avatar ||
+        prompt.description !== builtin.description),
+  };
+};
+
+/** Acquires application SQL/Crypto; migrations own defaults so rebuilding this service preserves edits. */
 const make = Effect.gen(function* () {
   const store = yield* DiscussionStore.DiscussionStore;
   const sql = yield* SqlClient.SqlClient;
@@ -83,10 +104,10 @@ const make = Effect.gen(function* () {
   const listPrompts: DiscussionTemplateService["Service"]["listPrompts"] = (input = {}) =>
     store.listPrompts().pipe(
       Effect.map((prompts) => ({
-        prompts:
-          input.kind === undefined
-            ? prompts
-            : prompts.filter((prompt) => prompt.kind === input.kind),
+        prompts: (input.kind === undefined
+          ? prompts
+          : prompts.filter((prompt) => prompt.kind === input.kind)
+        ).map(withModified),
       })),
     );
   const listTemplates: DiscussionTemplateService["Service"]["listTemplates"] = () =>
@@ -210,6 +231,17 @@ const make = Effect.gen(function* () {
                 }),
             ),
           );
+          if (
+            (value.kind === "persona" && value.avatar === null) ||
+            (value.kind === "summary" && value.avatar !== null)
+          ) {
+            return yield* Effect.fail(
+              new DiscussionError({
+                reason: "invalid_state",
+                message: "Persona prompts require an avatar; summary prompts must not have one.",
+              }),
+            );
+          }
           const existing = value.id === undefined ? null : yield* requirePrompt(value.id);
           if (existing !== null && existing.kind !== value.kind)
             return yield* Effect.fail(
@@ -227,7 +259,7 @@ const make = Effect.gen(function* () {
             updatedAt: timestamp,
           };
           yield* store.upsertPrompt(prompt);
-          return { prompt };
+          return { prompt: withModified(prompt) };
         }),
         "prompt",
       ),
@@ -273,7 +305,7 @@ const make = Effect.gen(function* () {
             );
           const prompt = { ...existing, ...builtin, updatedAt: yield* now };
           yield* store.upsertPrompt(prompt);
-          return { prompt };
+          return { prompt: withModified(prompt) };
         }),
         "prompt",
       ),

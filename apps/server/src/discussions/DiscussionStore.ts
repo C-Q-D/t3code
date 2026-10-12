@@ -89,6 +89,8 @@ interface PromptRow {
   kind: string;
   name: string;
   prompt: string;
+  avatar: string | null;
+  description: string;
   builtin: number;
   created_at: string;
   updated_at: string;
@@ -163,6 +165,8 @@ const decodePrompt = (row: PromptRow) =>
     kind: row.kind,
     name: row.name,
     prompt: row.prompt,
+    avatar: row.avatar,
+    description: row.description,
     builtin: row.builtin === 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -281,11 +285,13 @@ const make = Effect.gen(function* () {
             kind: prompt.kind,
             name: prompt.name,
             prompt: prompt.prompt,
+            avatar: prompt.avatar,
+            description: prompt.description,
             builtin: prompt.builtin ? 1 : 0,
             created_at: prompt.createdAt,
             updated_at: prompt.updatedAt,
           })} ON CONFLICT(prompt_id) DO UPDATE SET kind = excluded.kind, name = excluded.name,
-        prompt = excluded.prompt, builtin = excluded.builtin, created_at = excluded.created_at, updated_at = excluded.updated_at`;
+        prompt = excluded.prompt, avatar = excluded.avatar, description = excluded.description, builtin = excluded.builtin, created_at = excluded.created_at, updated_at = excluded.updated_at`;
         }),
       ),
     deletePrompt: (id) =>

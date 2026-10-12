@@ -101,12 +101,16 @@ describe("discussion template RPC authorization", () => {
         const builtinId = DiscussionPromptId.make("builtin:persona:architect");
         const { prompt } = yield* service.upsertPrompt({
           kind: "persona",
+          avatar: "architect",
+          description: "",
           name: "权限测试身份",
           prompt: "原始正文。",
         });
         yield* service.upsertPrompt({
           id: builtinId,
           kind: "persona",
+          avatar: "architect",
+          description: "",
           name: "用户定制架构师",
           prompt: "用户定制正文。",
         });
@@ -150,6 +154,8 @@ describe("discussion template RPC authorization", () => {
           yield* client[WS_METHODS.discussionPromptsUpsert]({
             id: prompt.id,
             kind: "persona",
+            avatar: "architect",
+            description: "",
             name: "未经授权修改",
             prompt: "替换正文。",
           }).pipe(Effect.flip),
@@ -196,12 +202,16 @@ describe("discussion template RPC authorization", () => {
       const client = yield* makeDiscussionClient([AuthOrchestrationOperateScope]);
       const { prompt } = yield* client[WS_METHODS.discussionPromptsUpsert]({
         kind: "persona",
+        avatar: "architect",
+        description: "",
         name: "可写身份",
         prompt: "初始正文。",
       });
       yield* client[WS_METHODS.discussionPromptsUpsert]({
         id: prompt.id,
         kind: "persona",
+        avatar: "architect",
+        description: "",
         name: "改后的身份",
         prompt: "修改正文。",
       });
@@ -214,6 +224,8 @@ describe("discussion template RPC authorization", () => {
       yield* client[WS_METHODS.discussionPromptsUpsert]({
         id: builtinId,
         kind: "persona",
+        avatar: "architect",
+        description: "",
         name: "定制默认",
         prompt: "改写默认正文。",
       });

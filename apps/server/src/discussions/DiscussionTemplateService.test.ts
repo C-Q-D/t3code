@@ -21,8 +21,20 @@ import * as DiscussionTemplates from "./DiscussionTemplateService.ts";
 import * as DiscussionStore from "./DiscussionStore.ts";
 
 const serviceLayer = DiscussionTemplates.layer.pipe(Layer.provide(NodeCrypto.layer));
-const personaInput = { kind: "persona" as const, name: "自定义身份", prompt: "检查实现边界。" };
-const summaryInput = { kind: "summary" as const, name: "自定义梳理", prompt: "列出结论。" };
+const personaInput = {
+  kind: "persona" as const,
+  name: "自定义身份",
+  prompt: "检查实现边界。",
+  avatar: "architect" as const,
+  description: "",
+};
+const summaryInput = {
+  kind: "summary" as const,
+  name: "自定义梳理",
+  prompt: "列出结论。",
+  avatar: null,
+  description: "",
+};
 const modelSelection = { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5" };
 
 it.effect("a cancelled request still publishes its committed template change", () =>
@@ -101,6 +113,7 @@ it.effect("prompt create, update and delete persist custom values and preserve i
     const { prompt } = yield* service.upsertPrompt(personaInput);
     assert.equal(prompt.name, "自定义身份");
     assert.isFalse(prompt.builtin);
+    assert.isFalse(prompt.modified);
     const { prompt: edited } = yield* service.upsertPrompt({
       ...personaInput,
       id: prompt.id,
@@ -129,6 +142,8 @@ it.effect(
       yield* service.upsertPrompt({
         id,
         kind: "persona",
+        avatar: "opponent",
+        description: "改过的简介",
         name: "我的架构师",
         prompt: "我的正文。",
       });
@@ -142,15 +157,23 @@ it.effect(
         "你从整体结构和长期维护成本审视方案。关注模块边界、依赖方向与数据归属。用具体场景检验扩展性，避免为假设中的需求增加复杂度。说明关键取舍和它们带来的维护负担。",
       );
       assert.isTrue(prompt.builtin);
+      assert.equal(prompt.avatar, "architect");
+      assert.equal(prompt.description, "关注整体结构和长期维护成本");
+      assert.isFalse(prompt.modified);
       const summaryId = DiscussionPromptId.make("builtin:summary:default");
       yield* service.upsertPrompt({
         id: summaryId,
         kind: "summary",
+        avatar: null,
+        description: "改过的梳理简介",
         name: "我的总结",
         prompt: "短文。",
       });
       const { prompt: summary } = yield* service.restoreBuiltin({ id: summaryId });
       assert.equal(summary.name, "默认");
+      assert.isNull(summary.avatar);
+      assert.equal(summary.description, "共识 / 分歧 / 待你决定");
+      assert.isFalse(summary.modified);
       assert.equal(
         summary.prompt,
         "你负责把材料整理成清楚的结论。按“共识 / 分歧 / 待你决定”三段输出。共识只记录已经一致的观点，分歧写清不同观点和依据。待你决定列出需要用户选择的事项及主要取舍，不把未决事项写成结论。",
@@ -217,7 +240,9 @@ it.effect.each([{ kind: "persona" as const }, { kind: "summary" as const }])(
   ({ kind }) =>
     Effect.gen(function* () {
       const service = yield* DiscussionTemplates.DiscussionTemplateService;
-      const { prompt } = yield* service.upsertPrompt({ ...personaInput, kind });
+      const { prompt } = yield* service.upsertPrompt(
+        kind === "persona" ? personaInput : summaryInput,
+      );
       const { template } = yield* service.upsertTemplate({
         name: "引用者",
         seats: [
@@ -293,6 +318,8 @@ it.effect(
         yield* service.upsertPrompt({
           id: DiscussionPromptId.make("builtin:persona:architect"),
           kind: "persona",
+          avatar: "architect",
+          description: "",
           name: "改过的内置身份",
           prompt: "保持修改。",
         });
@@ -393,4 +420,119 @@ it.effect("template subscription emits fresh lists on upsert and delete", () =>
     Effect.provide(serviceLayer.pipe(Layer.provide(SqlitePersistence.layerMemory))),
     Effect.scoped,
   ),
+);
+
+it.effect.each([
+  { label: "persona without avatar", input: { ...personaInput, avatar: null } },
+  { label: "summary with avatar", input: { ...summaryInput, avatar: "architect" as const } },
+])("rejects $label without saving a prompt", ({ input }) =>
+  Effect.gen(function* () {
+    const service = yield* DiscussionTemplates.DiscussionTemplateService;
+    const failure = yield* service.upsertPrompt(input).pipe(Effect.flip);
+    assert.instanceOf(failure, DiscussionError);
+    assert.equal(failure.reason, "invalid_state");
+    assert.equal((yield* service.listPrompts()).prompts.length, 6);
+  }).pipe(Effect.provide(serviceLayer.pipe(Layer.provide(SqlitePersistence.layerMemory)))),
+);
+
+const architectDefaults = {
+  id: DiscussionPromptId.make("builtin:persona:architect"),
+  kind: "persona" as const,
+  name: "架构师",
+  prompt:
+    "你从整体结构和长期维护成本审视方案。关注模块边界、依赖方向与数据归属。用具体场景检验扩展性，避免为假设中的需求增加复杂度。说明关键取舍和它们带来的维护负担。",
+  avatar: "architect" as const,
+  description: "关注整体结构和长期维护成本",
+};
+
+it.effect.each([
+  { field: "name", edit: { name: "我的身份" } },
+  { field: "prompt", edit: { prompt: "我的正文" } },
+  { field: "avatar", edit: { avatar: "reviewer" as const } },
+  { field: "description", edit: { description: "  我的简介\n" } },
+])("builtin $field edits set modified and reverting clears it", ({ edit }) =>
+  Effect.gen(function* () {
+    const service = yield* DiscussionTemplates.DiscussionTemplateService;
+    const { prompt: edited } = yield* service.upsertPrompt({ ...architectDefaults, ...edit });
+    assert.isTrue(edited.modified);
+    assert.isTrue(
+      (yield* service.listPrompts()).prompts.find((item) => item.id === architectDefaults.id)
+        ?.modified,
+    );
+    const { prompt: reverted } = yield* service.upsertPrompt(architectDefaults);
+    assert.isFalse(reverted.modified);
+    assert.isFalse(
+      (yield* service.listPrompts({ kind: "persona" })).prompts.find(
+        (item) => item.id === architectDefaults.id,
+      )?.modified,
+    );
+  }).pipe(Effect.provide(serviceLayer.pipe(Layer.provide(SqlitePersistence.layerMemory)))),
+);
+
+it.effect("custom descriptions survive unchanged and unknown builtin ids are not modified", () =>
+  Effect.gen(function* () {
+    const service = yield* DiscussionTemplates.DiscussionTemplateService;
+    const store = yield* DiscussionStore.DiscussionStore;
+    const { prompt } = yield* service.upsertPrompt({ ...personaInput, description: "  简介\n" });
+    assert.equal(prompt.description, "  简介\n");
+    assert.isFalse(prompt.modified);
+    const persisted = yield* store.getPrompt(prompt.id);
+    assert.isNotNull(persisted);
+    assert.notProperty(persisted, "modified");
+    yield* store.upsertPrompt({
+      ...prompt,
+      id: DiscussionPromptId.make("builtin:persona:unknown"),
+      builtin: true,
+    });
+    const list = yield* service.listPrompts();
+    assert.equal(list.prompts.find((item) => item.id === prompt.id)?.description, "  简介\n");
+    assert.isFalse(list.prompts.find((item) => item.id === "builtin:persona:unknown")?.modified);
+  }).pipe(
+    Effect.provide(
+      Layer.mergeAll(serviceLayer, DiscussionStore.layer).pipe(
+        Layer.provideMerge(SqlitePersistence.layerMemory),
+      ),
+    ),
+  ),
+);
+
+it.effect(
+  "prompt snapshots report modified on initial, edited, reverted and restored builtin values",
+  () =>
+    Effect.gen(function* () {
+      const service = yield* DiscussionTemplates.DiscussionTemplateService;
+      yield* service.upsertPrompt({ ...architectDefaults, description: "订阅前修改" });
+      const snapshots = yield* Queue.unbounded<DiscussionPromptListResult>();
+      yield* service.subscribePrompts({ kind: "persona" }).pipe(
+        Stream.runForEach((list) => Queue.offer(snapshots, list)),
+        Effect.forkScoped,
+      );
+      assert.isTrue(
+        (yield* Queue.take(snapshots)).prompts.find((item) => item.id === architectDefaults.id)
+          ?.modified,
+      );
+      yield* service.upsertPrompt(architectDefaults);
+      assert.isFalse(
+        (yield* Queue.take(snapshots)).prompts.find((item) => item.id === architectDefaults.id)
+          ?.modified,
+      );
+      yield* service.upsertPrompt({ ...architectDefaults, avatar: "product" });
+      assert.isTrue(
+        (yield* Queue.take(snapshots)).prompts.find((item) => item.id === architectDefaults.id)
+          ?.modified,
+      );
+      yield* service.restoreBuiltin({ id: architectDefaults.id });
+      assert.isFalse(
+        (yield* Queue.take(snapshots)).prompts.find((item) => item.id === architectDefaults.id)
+          ?.modified,
+      );
+      const { prompt } = yield* service.upsertPrompt(personaInput);
+      const created = yield* Queue.take(snapshots);
+      assert.equal(created.prompts.length, 6);
+      assert.isTrue(created.prompts.every((item) => item.kind === "persona"));
+      assert.isFalse(created.prompts.find((item) => item.id === prompt.id)?.modified);
+    }).pipe(
+      Effect.provide(serviceLayer.pipe(Layer.provide(SqlitePersistence.layerMemory))),
+      Effect.scoped,
+    ),
 );

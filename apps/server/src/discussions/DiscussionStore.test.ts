@@ -27,6 +27,7 @@ const discussion = Schema.decodeUnknownSync(Discussion)({
     {
       id: "seat:test",
       personaName: "审查者快照",
+      avatar: "reviewer",
       personaPrompt: "检查边界",
       modelSelection: { instanceId: "codex", model: "gpt-5" },
       threadId: "thread:test",
@@ -64,6 +65,8 @@ it.effect("prompt and ordered template records persist edits and deletion", () =
       kind: "persona",
       name: "定制审查",
       prompt: "检查错误",
+      avatar: "opponent",
+      description: "  自定义简介\n",
       builtin: false,
       createdAt: timestamp,
       updatedAt: timestamp,
@@ -85,10 +88,35 @@ it.effect("prompt and ordered template records persist edits and deletion", () =
     yield* store.upsertPrompt(prompt);
     yield* store.upsertTemplate(template);
     assert.deepEqual(yield* store.getPrompt(prompt.id), prompt);
+    assert.equal((yield* store.getPrompt(prompt.id))?.avatar, "opponent");
+    assert.equal((yield* store.getPrompt(prompt.id))?.description, "  自定义简介\n");
     assert.deepEqual(yield* store.getTemplate(template.id), template);
-    yield* store.upsertPrompt({ ...prompt, name: "改名", prompt: "改后的正文" });
+    yield* store.upsertPrompt({
+      ...prompt,
+      name: "改名",
+      prompt: "改后的正文",
+      avatar: "product",
+      description: "",
+    });
     yield* store.upsertTemplate({ ...template, name: "改后的讨论", summaryPromptId: null });
     assert.equal((yield* store.getPrompt(prompt.id))?.prompt, "改后的正文");
+    assert.equal((yield* store.getPrompt(prompt.id))?.avatar, "product");
+    assert.equal((yield* store.getPrompt(prompt.id))?.description, "");
+    assert.deepEqual(
+      (yield* store.listPrompts())
+        .filter((value) => value.id === prompt.id)
+        .map((value) => [value.avatar, value.description]),
+      [["product", ""]],
+    );
+    const summary = {
+      ...prompt,
+      id: yield* Schema.decodeUnknownEffect(DiscussionPrompt.fields.id)("prompt:summary"),
+      kind: "summary" as const,
+      avatar: null,
+      description: "梳理简介",
+    };
+    yield* store.upsertPrompt(summary);
+    assert.deepEqual(yield* store.getPrompt(summary.id), summary);
     assert.deepEqual(
       (yield* store.listTemplates()).map((value) => [value.name, value.summaryPromptId]),
       [["改后的讨论", null]],
@@ -115,9 +143,11 @@ it.effect(
         projectId: yield* Schema.decodeUnknownEffect(Discussion.fields.projectId)("project:other"),
       });
       assert.deepEqual(yield* store.getDiscussion(discussion.id), discussion);
+      assert.equal((yield* store.getDiscussion(discussion.id))?.seats[0]?.avatar, "reviewer");
       const updated: Discussion = {
         ...discussion,
         title: "暂停后的讨论",
+        seats: [{ ...discussion.seats[0]!, avatar: "implementer" }],
         status: "paused",
         cursor: { seatIndex: 0, turnNo: 2, runId: null, dispatchedEntrySeq: 5 },
         pause: {
@@ -137,6 +167,7 @@ it.effect(
       };
       yield* store.updateDiscussion(updated);
       assert.deepEqual(yield* store.getDiscussion(discussion.id), updated);
+      assert.equal((yield* store.getDiscussion(discussion.id))?.seats[0]?.avatar, "implementer");
       assert.deepEqual(yield* store.listDiscussions(discussion.projectId), [updated]);
       assert.isNull(yield* store.getDiscussion(DiscussionId.make("missing")));
       const error = yield* store
