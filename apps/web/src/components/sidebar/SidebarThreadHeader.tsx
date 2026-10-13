@@ -11,6 +11,7 @@
  * the picker's popup can anchor to that width rather than to its 28px trigger.
  */
 import { t } from "~/i18n";
+import { useLocation } from "@tanstack/react-router";
 import { FolderPlusIcon, MessagesSquareIcon, SearchIcon, SquarePenIcon, XIcon } from "lucide-react";
 import {
   type ComponentProps,
@@ -34,8 +35,6 @@ export interface SidebarThreadHeaderProps {
   /** The project scope combobox, rendered as the first icon of the group. */
   projectScope: ReactNode;
   onNewProject: () => void;
-  /** Route pathname drives selection independently of the active thread. */
-  pathname: string;
   onOpenDiscussions: () => void;
   /** Receives the click so Shift+click can skip the project picker. */
   onNewThread: (event: ReactMouseEvent) => void;
@@ -54,13 +53,12 @@ export interface SidebarThreadHeaderProps {
   onClearSearch: () => void;
 }
 
-/** Renders header actions from the supplied workspace state; route selection never depends on a thread. */
+/** Owns route selection so pathname updates stay in the header instead of subscribing the full sidebar. */
 export function SidebarThreadHeader({
   searchFieldRef,
   hasProjects,
   projectScope,
   onNewProject,
-  pathname,
   onOpenDiscussions,
   onNewThread,
   newThreadDisabled,
@@ -76,6 +74,7 @@ export function SidebarThreadHeader({
   activeSearchResultIndex,
   onClearSearch,
 }: SidebarThreadHeaderProps) {
+  const pathname = useLocation({ select: (location) => location.pathname });
   const resultsVisible = isSearching && searchResultCount > 0;
   const discussions = discussionNavigationState(hasProjects, pathname);
   // Results shrink as the query narrows, so the active index can outrun the
