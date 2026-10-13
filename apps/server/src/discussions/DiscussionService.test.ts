@@ -2322,3 +2322,196 @@ it.effect(
       }),
     ),
 );
+
+/**
+ * Collects every closing snapshot through the retry's durable run binding, without sleeps.
+ * @param discussion Identity whose subscription is mounted before End or Continue.
+ * @returns Recorded snapshots and a barrier reached after the final dispatch has a run ID.
+ */
+const observeClosingRetry = (discussion: Discussion) =>
+  Effect.gen(function* () {
+    const service = yield* Discussions.DiscussionService;
+    const ready = yield* Deferred.make<void>();
+    const bound = yield* Deferred.make<void>();
+    const snapshots: Discussion[] = [];
+    yield* service.subscribe({ discussionId: discussion.id }).pipe(
+      Stream.runForEach((event) =>
+        Effect.gen(function* () {
+          if (event.type !== "snapshot" && event.type !== "discussion.updated") return;
+          if (event.type === "snapshot") yield* Deferred.succeed(ready, undefined);
+          if (!event.discussion.closing) return;
+          snapshots.push(event.discussion);
+          if (event.discussion.status === "closing" && event.discussion.cursor.runId !== null)
+            yield* Deferred.succeed(bound, undefined);
+        }),
+      ),
+      Effect.forkScoped,
+    );
+    yield* Deferred.await(ready);
+    return { snapshots, bound: Deferred.await(bound) };
+  });
+
+it.effect("C4b End retries a final assignment after attachment preparation fails with no run", () =>
+  withDiscussionHarness((h) =>
+    Effect.gen(function* () {
+      const service = yield* Discussions.DiscussionService;
+      const store = yield* Store.DiscussionStore;
+      yield* h.failAttachmentWrites;
+      assert.isTrue(
+        Exit.isFailure(
+          yield* Effect.exit(service.create({ ...input, topic: "超长材料".repeat(40_000) })),
+        ),
+      );
+      const discussion = (yield* store.listDiscussions(projectId))[0]!;
+      assert.equal(discussion.status, "paused");
+      assert.equal(discussion.cursor.runId, null);
+      assert.equal(discussion.cursor.dispatchNo, 0);
+      const observed = yield* observeClosingRetry(discussion);
+      assert.isTrue(
+        Exit.isFailure(
+          yield* Effect.exit(
+            service.end({ discussionId: discussion.id, summarizerSeatId: discussion.seats[0]!.id }),
+          ),
+        ),
+      );
+      const failed = (yield* store.getDiscussion(discussion.id))!;
+      assert.equal(failed.status, "paused");
+      assert.equal(failed.cursor.phase, "final_round");
+      assert.equal(failed.cursor.runId, null);
+      assert.equal(failed.cursor.dispatchedEntrySeq, 0);
+      assert.equal(failed.cursor.dispatchNo, 0, "failure preceded prepared cursor persistence");
+      yield* h.restoreAttachmentWrites;
+      yield* service.continue({ discussionId: discussion.id });
+      const final = yield* next(h, discussion, 1);
+      yield* observed.bound;
+      assert.equal(final.threadId, discussion.seats[0]!.threadId);
+      assert.isTrue(final.message.text.endsWith("本次阶段：最后陈述。"));
+      assert.deepEqual(
+        observed.snapshots.map((s) => s.cursor.phase),
+        observed.snapshots.map(() => "final_round" as const),
+      );
+      yield* finish(h, final, ["当前座位最后陈述"]);
+      yield* next(h, discussion, 2);
+      assert.deepEqual(
+        (yield* store.listEntries(discussion.id)).map((e) => [e.kind, e.text, e.finalStatement]),
+        [
+          ["system", "讨论到此", undefined],
+          ["statement", "当前座位最后陈述", true],
+        ],
+      );
+    }),
+  ),
+);
+
+it.effect(
+  "C4b completed ordinary End retries the next seat's final assignment after attachment failure",
+  () =>
+    withDiscussionHarness(
+      (h) =>
+        Effect.gen(function* () {
+          const service = yield* Discussions.DiscussionService;
+          const store = yield* Store.DiscussionStore;
+          const { discussion, turn } = yield* create(h, input.seats, "超长材料".repeat(40_000));
+          yield* finish(h, turn, ["已完成普通发言"]);
+          const observed = yield* observeClosingRetry(discussion);
+          yield* h.failAttachmentWrites;
+          assert.isTrue(
+            Exit.isFailure(
+              yield* Effect.exit(
+                service.end({
+                  discussionId: discussion.id,
+                  summarizerSeatId: discussion.seats[0]!.id,
+                }),
+              ),
+            ),
+          );
+          const failed = (yield* store.getDiscussion(discussion.id))!;
+          assert.equal(failed.status, "paused");
+          assert.equal(failed.cursor.phase, "final_round");
+          assert.equal(failed.cursor.seatIndex, 1);
+          assert.equal(failed.cursor.runId, null);
+          assert.equal(
+            failed.cursor.dispatchNo,
+            1,
+            "failure preceded next prepared cursor persistence",
+          );
+          assert.equal(failed.cursor.dispatchedEntrySeq, 0);
+          yield* h.restoreAttachmentWrites;
+          yield* service.continue({ discussionId: discussion.id });
+          const final = yield* next(h, discussion, 2);
+          yield* observed.bound;
+          assert.equal(final.threadId, discussion.seats[1]!.threadId);
+          assert.isTrue(final.message.text.endsWith("本次阶段：最后陈述。"));
+          assert.deepEqual(
+            observed.snapshots.map((s) => s.cursor.phase),
+            observed.snapshots.map(() => "final_round" as const),
+          );
+          assert.equal(
+            h.started.length,
+            2,
+            "one ordinary dispatch, then the successor final dispatch",
+          );
+          assert.deepEqual(
+            (yield* store.listEntries(discussion.id)).map((e) => [
+              e.kind,
+              e.text,
+              e.finalStatement,
+            ]),
+            [
+              ["statement", "已完成普通发言", undefined],
+              ["system", "讨论到此", undefined],
+            ],
+          );
+        }),
+      { startReactor: false },
+    ),
+);
+
+it.effect("C4b legacy cursor without phase resumes ordinary speech from its dispatch marker", () =>
+  withDiscussionHarness(
+    (h) =>
+      Effect.gen(function* () {
+        const { discussion, turn } = yield* create(h);
+        const service = yield* Discussions.DiscussionService;
+        const store = yield* Store.DiscussionStore;
+        yield* finish(h, turn, [], "completed");
+        const snapshot = (yield* store.getDiscussion(discussion.id))!;
+        const cursor = { ...snapshot.cursor };
+        delete cursor.phase;
+        yield* store.updateDiscussion({ ...snapshot, status: "paused", cursor });
+        yield* service.continue({ discussionId: discussion.id });
+        const resumed = yield* next(h, discussion, 2);
+        assert.isTrue(resumed.message.text.endsWith("本次阶段：普通讨论发言。"));
+      }),
+    { startReactor: false },
+  ),
+);
+
+it.effect(
+  "C4b legacy cursor without phase resumes a final statement from its dispatch marker",
+  () =>
+    withDiscussionHarness((h) =>
+      Effect.gen(function* () {
+        const { discussion, turn } = yield* create(h);
+        const service = yield* Discussions.DiscussionService;
+        const store = yield* Store.DiscussionStore;
+        yield* service.end({
+          discussionId: discussion.id,
+          summarizerSeatId: discussion.seats[0]!.id,
+        });
+        yield* finish(h, turn);
+        const final = yield* next(h, discussion, 2);
+        yield* service.stop({ discussionId: discussion.id });
+        yield* Worker.OrchestrationEffectWorkerV2.use((w) => w.drain());
+        yield* awaitRun(final.threadId, final.runId, "interrupted");
+        const snapshot = (yield* store.getDiscussion(discussion.id))!;
+        const cursor = { ...snapshot.cursor };
+        delete cursor.phase;
+        yield* store.updateDiscussion({ ...snapshot, cursor });
+        yield* service.continue({ discussionId: discussion.id });
+        const resumed = yield* next(h, discussion, 3);
+        assert.isTrue(resumed.message.text.endsWith("本次阶段：最后陈述。"));
+        assert.equal(resumed.threadId, discussion.seats[1]!.threadId);
+      }),
+    ),
+);

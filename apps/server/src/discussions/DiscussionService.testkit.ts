@@ -71,6 +71,9 @@ export interface DiscussionHarness {
   readonly holdCaptures: Effect.Effect<void>;
   readonly releaseCaptures: Effect.Effect<void>;
   readonly failCaptures: Effect.Effect<void>;
+  /** Fails only discussion attachment writes before prepared cursor persistence; restoring permits retry. */
+  readonly failAttachmentWrites: Effect.Effect<void>;
+  readonly restoreAttachmentWrites: Effect.Effect<void>;
   /** Holds the external interrupt response so End can commit before the run's terminal event. */
   readonly holdInterrupts: Effect.Effect<void>;
   readonly releaseInterrupts: Effect.Effect<void>;
@@ -157,6 +160,13 @@ export function withDiscussionHarness<A, E, R>(
           ? { ...common, status, failureItemOrdinal: 1, failure: failure! }
           : { ...common, status, failure: null };
       };
+      let attachmentWritesFail = false;
+      // A directory write supplies a real filesystem failure without changing orchestration or stored state.
+      const attachmentFileSystem = Layer.succeed(FileSystem.FileSystem, {
+        ...fs,
+        writeFile: (file, bytes, options) =>
+          fs.writeFile(attachmentWritesFail ? cwd : file, bytes, options),
+      });
       const harness: DiscussionHarness = {
         cwd,
         starts,
@@ -164,6 +174,12 @@ export function withDiscussionHarness<A, E, R>(
         interrupted,
         launched,
         captureStarted,
+        failAttachmentWrites: Effect.sync(() => {
+          attachmentWritesFail = true;
+        }),
+        restoreAttachmentWrites: Effect.sync(() => {
+          attachmentWritesFail = false;
+        }),
         holdCaptures: Effect.sync(() => {
           holdCaptures = true;
         }),
@@ -372,6 +388,7 @@ export function withDiscussionHarness<A, E, R>(
         Outbox.layer,
       ).pipe(Layer.provideMerge(runtime));
       const layer = Discussions.layer.pipe(
+        Layer.provide(attachmentFileSystem),
         Layer.provideMerge(dependencies),
         Layer.provideMerge(Adapters.layerFromProviderInstanceRegistry),
         Layer.provideMerge(database),

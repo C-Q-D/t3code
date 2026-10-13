@@ -368,11 +368,16 @@ const make = Effect.gen(function* () {
     );
 
   /**
-   * Reads the assignment from the durable dispatched message. A resumed ordinary run may already
-   * include the End marker, so its transcript boundary alone cannot distinguish it from a final statement.
+   * Uses cursor.phase for the current or next dispatch, including failures before prepared persistence.
+   * Only legacy cursors without phase infer from closing state, the durable message and transcript boundary.
+   * @param discussion Snapshot whose cursor identifies the current or next seat assignment.
+   * @param entries Ordered transcript, consulted only by the legacy fallback.
+   * @returns Assignment phase; legacy projection read failures propagate to the caller.
    */
   const currentPhase = (discussion: Discussion, entries: ReadonlyArray<DiscussionEntry>) =>
     Effect.gen(function* () {
+      if (discussion.cursor.phase !== undefined) return discussion.cursor.phase;
+      // Legacy snapshots alone need message/End inference; cursor.phase survives preparation failures.
       if (!discussion.closing) return "regular" as const;
       if (discussion.closing.phase === "summarizing") return "summarizing" as const;
       const context = yield* projections.getThreadRecords(
@@ -384,9 +389,9 @@ const make = Effect.gen(function* () {
       const endMarker = entries.findLast(
         (item) => item.kind === "system" && item.text === "讨论到此",
       );
-      // End assigns this seat a final statement when paused or when an unfinished ordinary run
-      // became terminal before reactor bookkeeping. The marker retains that seat even while its
-      // capture is pending; an active or successfully completed ordinary run has no seat owner.
+      // Only legacy inference reads the End marker seat owner. End assigns a final statement when paused
+      // or when an unfinished ordinary run became terminal before reactor bookkeeping. Its owner survives
+      // while capture is pending; active or successfully completed ordinary runs have no seat owner.
       if (
         endMarker?.seatId === discussion.seats[discussion.cursor.seatIndex]!.id &&
         message?.text.endsWith(discussionBriefPhaseMarker("regular"))
