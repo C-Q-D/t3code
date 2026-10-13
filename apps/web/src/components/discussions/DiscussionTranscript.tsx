@@ -10,6 +10,7 @@ import { shouldPreserveAssistantLineBreaks } from "@t3tools/shared/markdownPipel
 import { DiscussionFiles } from "./DiscussionFiles";
 import { MemoizedDiscussionLiveRow } from "./DiscussionLiveRow";
 import { orderDiscussionEntries } from "./discussionLive.logic";
+import { discussionLiveWave } from "./discussionMotion.logic";
 import { Link } from "@tanstack/react-router";
 import { memo, useLayoutEffect, useMemo, useRef } from "react";
 import { t } from "~/i18n";
@@ -377,6 +378,7 @@ export function DiscussionTranscript({
                   modelLabel={modelLabels[item.seatIndex] ?? ""}
                   round={item.round}
                   phase={item.phase}
+                  showWave={discussionLiveWave(item)}
                 />
               </article>
             );

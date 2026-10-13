@@ -1,8 +1,10 @@
-/** Renders the shared discussion sprites in a static tile; turn-state animation belongs to the discussion view. */
+/** Renders shared discussion sprites; only the explicit speaking state enables seat motion. */
 import type { DiscussionPersonaAvatar } from "@t3tools/contracts";
 import { CheckIcon } from "lucide-react";
 import { t } from "~/i18n";
 import { discussionSeatColor } from "./discussionSeatColors";
+import type { CSSProperties } from "react";
+import "./discussionMotion";
 
 const MAPS = {
   architect: [
@@ -104,11 +106,11 @@ const PAL: Readonly<Record<string, string>> = {
 };
 
 /**
- * Static avatar with a seat-colored outfit and a localized accessible name.
+ * Avatar with a seat-colored outfit and a localized accessible name.
  * @param props.role Persona sprite, or the user's nonassignable sprite.
  * @param props.seat Zero for neutral previews; positive integer for speaking order.
  * @param props.size Tile dimensions in CSS pixels; sprite pixels remain integer-scaled.
- * @param props.state Turn appearance; idle preserves existing callers. No state adds animation.
+ * @param props.state Turn appearance; only speaking animates, while idle preserves existing callers.
  * @returns A fixed-size tile; done adds a check only above 20 CSS pixels.
  */
 export function PixelAvatar({
@@ -135,8 +137,21 @@ export function PixelAvatar({
       role="img"
       aria-label={t.settings.discussions.avatars[role]}
       className="relative inline-flex shrink-0 align-middle"
-      style={{ width: size, height: size }}
+      style={
+        {
+          width: size,
+          height: size,
+          borderRadius: isUser ? "50%" : Math.round(size * 0.3),
+          "--discussion-avatar-color": color,
+        } as CSSProperties
+      }
     >
+      {state === "speaking" ? (
+        <>
+          <span aria-hidden="true" data-discussion-motion="seatRipple" />
+          <span aria-hidden="true" data-discussion-motion="seatRipple" />
+        </>
+      ) : null}
       <span
         className="flex size-full items-end justify-center overflow-hidden"
         style={{
@@ -164,6 +179,7 @@ export function PixelAvatar({
           viewBox="0 0 12 12"
           shapeRendering="crispEdges"
           className="block shrink-0"
+          data-discussion-motion={state === "speaking" ? "spriteBob" : undefined}
           style={{
             marginBottom: size <= 20 ? 1 : 0,
             opacity: state === "next" ? 0.45 : undefined,

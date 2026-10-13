@@ -14,6 +14,8 @@ import { Button } from "../ui/button";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "../ui/empty";
 import { SidebarInset } from "../ui/sidebar";
 import { PixelAvatar } from "./PixelAvatar";
+import { DiscussionWave } from "./DiscussionWave";
+import { discussionSeatMotion } from "./discussionMotion.logic";
 import { DiscussionTranscript } from "./DiscussionTranscript";
 import { discussionSeatColor } from "./discussionSeatColors";
 import {
@@ -133,12 +135,7 @@ function DiscussionSeatBar({ discussion }: { discussion: Discussion }) {
         const segment = items
           .slice(0, position)
           .findLast((candidate) => candidate.kind === "segment");
-        const avatarState =
-          item.state === "current"
-            ? discussion.status === "paused"
-              ? "idle"
-              : "speaking"
-            : item.state;
+        const motion = discussionSeatMotion(item, discussion.status);
         return (
           <Fragment key={`seat-${segment?.label}-${segment?.round ?? ""}-${seat.id}`}>
             {connection}
@@ -146,7 +143,12 @@ function DiscussionSeatBar({ discussion }: { discussion: Discussion }) {
               role="listitem"
               className="flex shrink-0 items-center gap-2 whitespace-nowrap text-sm"
             >
-              <PixelAvatar role={seat.avatar} seat={item.index + 1} size={28} state={avatarState} />
+              <PixelAvatar
+                role={seat.avatar}
+                seat={item.index + 1}
+                size={28}
+                state={motion.avatarState}
+              />
               <span
                 className={
                   item.state === "current"
@@ -158,6 +160,7 @@ function DiscussionSeatBar({ discussion }: { discussion: Discussion }) {
               >
                 {seat.personaName}
               </span>
+              {motion.wave ? <DiscussionWave seat={item.index + 1} /> : null}
               {item.tags.map((tag) =>
                 tag === "next" ? (
                   <span

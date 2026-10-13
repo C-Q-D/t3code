@@ -1,0 +1,66 @@
+/* Layout/style containment keeps each transform local without clipping the expanded ripple. */
+[data-discussion-motion] {
+  contain: layout style;
+}
+[data-discussion-motion="seatRipple"] {
+  position: absolute;
+  inset: 0;
+  border: 1.5px solid var(--discussion-avatar-color);
+  border-radius: inherit;
+  box-sizing: border-box;
+  pointer-events: none;
+  animation: seatRipple 2.4s cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
+}
+[data-discussion-motion="seatRipple"]:nth-of-type(2) {
+  animation-delay: 1.2s;
+}
+[data-discussion-motion="spriteBob"] {
+  animation: spriteBob 0.9s linear infinite;
+}
+[data-discussion-motion="seatWave"] {
+  width: 2px;
+  height: 14px;
+  border-radius: 1px;
+  background: currentColor;
+  transform-origin: center;
+  transform: scaleY(0.3);
+  animation: seatWave var(--discussion-wave-duration) ease-in-out var(--discussion-wave-delay)
+    infinite;
+}
+@keyframes seatRipple {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(1.9);
+    opacity: 0;
+  }
+}
+@keyframes spriteBob {
+  0%,
+  49% {
+    transform: translateY(0);
+  }
+  50%,
+  100% {
+    transform: translateY(-2px);
+  }
+}
+@keyframes seatWave {
+  0%,
+  100% {
+    transform: scaleY(0.3);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+html[data-discussion-motion-paused] [data-discussion-motion] {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-discussion-motion] {
+    animation: none !important;
+  }
+}

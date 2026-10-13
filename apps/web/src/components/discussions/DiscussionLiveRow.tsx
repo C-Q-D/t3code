@@ -19,6 +19,7 @@ import { DiscussionFiles } from "./DiscussionFiles";
 import { discussionLiveContent, discussionLiveStage } from "./discussionLive.logic";
 import { discussionSeatColor } from "./discussionSeatColors";
 import "./DiscussionLiveRow.css";
+import { DiscussionWave } from "./DiscussionWave";
 /** A single dispatch identity with stable heading fields; the component unmounts once it is recorded. */
 type DiscussionLiveRowProps = {
   environmentId: EnvironmentId;
@@ -31,6 +32,7 @@ type DiscussionLiveRowProps = {
   modelLabel: string;
   round: number;
   phase: Discussion["cursor"]["phase"];
+  showWave: boolean;
 };
 /**
  * Reads this seat's visible projection and presents only the bound run in opening position.
@@ -63,6 +65,7 @@ function DiscussionLiveRow(props: DiscussionLiveRowProps) {
       >
         <div className="flex min-h-7 items-center gap-2 text-sm">
           <span className="max-w-32 shrink-0 truncate font-medium">{props.personaName}</span>
+          {props.showWave ? <DiscussionWave seat={props.seatNumber} /> : null}
           <span className="min-w-0 truncate text-xs text-muted-foreground">{props.modelLabel}</span>
           {stage.roundLabel ? (
             <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">
