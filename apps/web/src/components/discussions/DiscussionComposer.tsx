@@ -10,7 +10,6 @@ import { useRef, useState } from "react";
 import { t } from "~/i18n";
 import { serverEnvironment } from "~/state/server";
 import { useAtomCommand } from "~/state/use-atom-command";
-import { Button } from "../ui/button";
 import { toastManager } from "../ui/toast";
 import {
   discussionComposerView,
@@ -93,15 +92,15 @@ export function DiscussionComposer({
             />
           </div>
           <div className="flex justify-end px-2.5 pt-1 pb-2.5">
-            <Button
-              variant={view.disabled ? "secondary" : "default"}
-              size="icon"
+            <button
+              type="button"
+              className={`relative isolate flex size-8 items-center justify-center overflow-hidden rounded-full shadow-xs transition-all duration-150 enabled:cursor-pointer enabled:inset-shadow-control-highlight hover:scale-105 active:inset-shadow-control-pressed active:shadow-none disabled:pointer-events-none disabled:opacity-64 disabled:shadow-none disabled:hover:scale-100 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&_svg]:pointer-events-none ${view.disabled ? "bg-foreground/10 text-muted-foreground" : "bg-message-action text-message-action-foreground enabled:shadow-message-action/24 hover:bg-message-action-hover"}`}
               disabled={sendable === null}
               aria-label={t.discussions.page.sendInterjection}
               onClick={() => void send()}
             >
-              <ArrowUpIcon />
-            </Button>
+              <ArrowUpIcon className="size-4" />
+            </button>
           </div>
         </div>
       </div>
