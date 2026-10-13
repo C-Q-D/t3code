@@ -6,7 +6,7 @@ import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { t } from "~/i18n";
 import { isElectron } from "~/env";
 import { useEnvironments } from "~/state/environments";
@@ -189,6 +189,13 @@ function SeatDraft({
   const [templateEditorOpen, setTemplateEditorOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const submissionPending = useRef(false);
+  const unmounted = useRef(false);
+  useEffect(() => {
+    unmounted.current = false;
+    return () => {
+      unmounted.current = true;
+    };
+  }, []);
   const navigate = useNavigate();
   const create = useAtomCommand(serverEnvironment.createDiscussion);
   const canCreate = useAtomValue(serverEnvironment.createDiscussion.permissionAtom(environmentId));
@@ -230,6 +237,9 @@ function SeatDraft({
         });
       return;
     }
+    // Leaving is allowed: suppress navigation after unmount, without cancelling the server's
+    // create. The discussion still exists in the list; failures retain the existing toast path.
+    if (unmounted.current) return;
     // Keep the successful create locked until navigation replaces and unmounts this form.
     await navigate(discussionCreatedRoute(environmentId, result.value.discussion.id));
   };
@@ -303,7 +313,7 @@ function SeatDraft({
               onChange={(event) => onTopicChange(event.target.value)}
               placeholder={t.discussions.topicPlaceholder}
               rows={2}
-              className="block min-h-11 w-full resize-y bg-transparent text-sm leading-relaxed text-foreground outline-none placeholder:text-muted-foreground focus-visible:rounded-md focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+              className="field-sizing-content block max-h-52 min-h-11 w-full resize-none overflow-y-auto bg-transparent text-sm leading-relaxed text-foreground outline-none placeholder:text-muted-foreground focus-visible:rounded-md focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
             />
           </div>
           <div className="flex items-center gap-2 pt-2 pr-3 pb-3 pl-5">

@@ -50,6 +50,8 @@ import {
  * @param props.environmentId Catalog and capability destination; remount when it changes.
  * @param props.seats Caller-owned seat array; duplicates are allowed.
  * @param props.onChange Replaces the caller's array after a local edit; no RPC mutation occurs.
+ * The caller must retain the received array reference; copying it is treated as an external
+ * replacement and resets card identities and open editors.
  * @param props.headerAction Optional template selector, omitted by template dialogs.
  * @returns Sortable cards and accessible persona/model popovers; loading or missing defaults disable adding.
  */

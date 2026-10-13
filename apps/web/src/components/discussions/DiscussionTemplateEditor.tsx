@@ -43,7 +43,11 @@ export function DiscussionTemplateEditor({
   readonly onClose: () => void;
 }) {
   const fieldId = useId();
-  const [draft, setDraft] = useState(() => initialDiscussionTemplateDraft(template, initialSeats));
+  const [draft, setDraft] = useState<{
+    name: string;
+    seats: readonly DiscussionDraftSeat[];
+    summaryPromptId: DiscussionTemplate["summaryPromptId"];
+  }>(() => initialDiscussionTemplateDraft(template, initialSeats));
   const [saving, setSaving] = useState(false);
   const submissionPending = useRef(false);
   const support = useEnvironmentQuery(
@@ -128,7 +132,7 @@ export function DiscussionTemplateEditor({
                 <DiscussionSeats
                   environmentId={environmentId}
                   seats={draft.seats}
-                  onChange={(seats) => setDraft((current) => ({ ...current, seats: [...seats] }))}
+                  onChange={(seats) => setDraft((current) => ({ ...current, seats }))}
                 />
               </fieldset>
             </div>
