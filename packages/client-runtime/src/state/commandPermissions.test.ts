@@ -12,6 +12,9 @@ import {
   AuthSettingsWriteScope,
   AuthSourceControlWriteScope,
   ThreadId,
+  DiscussionId,
+  DiscussionSeatId,
+  type ServerConfig,
   EnvironmentId,
   ScheduledTaskId,
   WS_METHODS,
@@ -20,6 +23,7 @@ import {
 } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
+import * as Deferred from "effect/Deferred";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as TestClock from "effect/testing/TestClock";
@@ -27,6 +31,8 @@ import { Atom, AtomRegistry, AsyncResult } from "effect/reactivity";
 import { EnvironmentRegistry } from "../connection/registry.ts";
 import { createCommandPermissions } from "./commandPermissions.ts";
 import { createEnvironmentRpcCommand } from "./runtime.ts";
+import { createServerEnvironmentAtoms } from "./server.ts";
+import { EnvironmentCacheStore } from "../platform/persistence.ts";
 
 vi.mock("./session.ts", () => ({
   createEnvironmentSessionAtoms: () => ({ sessionStateAtom: sessions }),
@@ -58,6 +64,163 @@ const setup = Effect.gen(function* () {
   registry.mount(sessions(env));
   yield* Effect.addFinalizer(() => Effect.sync(() => registry.dispose()));
   return registry;
+});
+
+/**
+ * Creates real discussion commands with observable RPCs and a blocked first interjection.
+ * @returns Command registry, arrival records and explicit entry/completion gates.
+ * The scope owns the registry; no live environment or database is accessed.
+ */
+const discussionPermissionHarness = Effect.fn("DiscussionPermissionTest.harness")(function* () {
+  const entered = yield* Deferred.make<void>();
+  const release = yield* Deferred.make<void>();
+  const calls: string[] = [];
+  const client = Object.fromEntries(
+    [
+      WS_METHODS.discussionsInterject,
+      WS_METHODS.discussionsStop,
+      WS_METHODS.discussionsContinue,
+      WS_METHODS.discussionsEnd,
+      WS_METHODS.discussionsDelete,
+    ].map((method) => [
+      method,
+      () =>
+        Effect.gen(function* () {
+          calls.push(method);
+          if (method === WS_METHODS.discussionsInterject) {
+            yield* Deferred.succeed(entered, undefined);
+            yield* Deferred.await(release);
+          }
+          return {};
+        }),
+    ]),
+  );
+  // These acknowledgements are deliberately unused; permission tests observe RPC entry only.
+  const supervisor = {
+    target: { environmentId: env, label: "test" },
+    session: yield* SubscriptionRef.make(Option.some({ client } as unknown as RpcSession)),
+  } as unknown as EnvironmentSupervisor["Service"];
+  const cache = EnvironmentCacheStore.of({
+    loadShell: () => Effect.succeedNone,
+    saveShell: () => Effect.void,
+    loadThread: () => Effect.succeedNone,
+    saveThread: () => Effect.void,
+    removeThread: () => Effect.void,
+    loadServerConfig: () => Effect.succeedNone,
+    saveServerConfig: () => Effect.void,
+    loadVcsRefs: () => Effect.succeedNone,
+    saveVcsRefs: () => Effect.void,
+    removeVcsRefs: () => Effect.void,
+    clearVcsRefs: () => Effect.void,
+    clear: () => Effect.void,
+  });
+  const discussionRuntime = Atom.runtime(
+    Layer.mergeAll(
+      Layer.succeed(EnvironmentCacheStore, cache),
+      Layer.succeed(EnvironmentRegistry, {
+        run: (_id: EnvironmentId, effect: Effect.Effect<unknown>) =>
+          Effect.provideService(effect, EnvironmentSupervisor, supervisor),
+      } as unknown as EnvironmentRegistry["Service"]),
+    ),
+  );
+  const commands = createServerEnvironmentAtoms(discussionRuntime, {
+    initialConfigValueAtom: () => Atom.make<ServerConfig | null>(null),
+  });
+  const registry = yield* Effect.acquireRelease(Effect.sync(AtomRegistry.make), (registry) =>
+    Effect.sync(() => registry.dispose()),
+  );
+  registry.mount(sessions(env));
+  return { registry, commands, calls, entered, release };
+});
+
+describe("discussion command permissions", () => {
+  it.effect("denies all five real lifecycle commands without the destination operate grant", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const h = yield* discussionPermissionHarness();
+        h.registry.set(sessions(env), AsyncResult.success(grant(false)));
+        const target = {
+          environmentId: env,
+          input: { discussionId: DiscussionId.make("discussion") },
+        };
+        for (const command of [
+          h.commands.interjectDiscussion,
+          h.commands.stopDiscussion,
+          h.commands.continueDiscussion,
+          h.commands.endDiscussion,
+          h.commands.deleteDiscussion,
+        ])
+          expect(h.registry.get(command.permissionAtom(env))).toBe(false);
+        const invoke = () =>
+          Promise.all([
+            h.commands.interjectDiscussion.run(h.registry, {
+              ...target,
+              input: { ...target.input, text: "idea" },
+            }),
+            h.commands.stopDiscussion.run(h.registry, target),
+            h.commands.continueDiscussion.run(h.registry, target),
+            h.commands.endDiscussion.run(h.registry, {
+              ...target,
+              input: { ...target.input, summarizerSeatId: DiscussionSeatId.make("seat") },
+            }),
+            h.commands.deleteDiscussion.run(h.registry, target),
+          ]);
+        const results = yield* Effect.promise(invoke);
+        expect(results.map((result) => result._tag)).toEqual([
+          "Failure",
+          "Failure",
+          "Failure",
+          "Failure",
+          "Failure",
+        ]);
+        expect(h.calls).toEqual([]);
+        // Prove every replacement RPC is reachable; denial must not pass because the harness is broken.
+        h.registry.set(sessions(env), AsyncResult.success(grant(true)));
+        yield* Deferred.succeed(h.release, undefined);
+        const allowed = yield* Effect.promise(invoke);
+        expect(allowed.map((result) => result._tag)).toEqual([
+          "Success",
+          "Success",
+          "Success",
+          "Success",
+          "Success",
+        ]);
+        expect(h.calls).toEqual([
+          WS_METHODS.discussionsInterject,
+          WS_METHODS.discussionsStop,
+          WS_METHODS.discussionsContinue,
+          WS_METHODS.discussionsEnd,
+          WS_METHODS.discussionsDelete,
+        ]);
+      }),
+    ),
+  );
+  it.effect("rechecks the operate grant when a queued discussion command reaches its turn", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const h = yield* discussionPermissionHarness();
+        h.registry.set(sessions(env), AsyncResult.success(grant(true)));
+        const target = {
+          environmentId: env,
+          input: { discussionId: DiscussionId.make("discussion") },
+        };
+        expect(h.registry.get(h.commands.stopDiscussion.permissionAtom(env))).toBe(true);
+        const first = h.commands.interjectDiscussion.run(h.registry, {
+          ...target,
+          input: { ...target.input, text: "idea" },
+        });
+        yield* Deferred.await(h.entered);
+        const second = h.commands.stopDiscussion.run(h.registry, target);
+        yield* Effect.yieldNow;
+        expect(h.calls).toEqual([WS_METHODS.discussionsInterject]);
+        h.registry.set(sessions(env), AsyncResult.success(grant(false)));
+        yield* Deferred.succeed(h.release, undefined);
+        const results = yield* Effect.promise(() => Promise.all([first, second]));
+        expect(results.map((result) => result._tag)).toEqual(["Success", "Failure"]);
+        expect(h.calls).toEqual([WS_METHODS.discussionsInterject]);
+      }),
+    ),
+  );
 });
 
 describe("command permissions", () => {

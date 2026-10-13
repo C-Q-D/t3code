@@ -275,9 +275,11 @@ export function DiscussionTranscript({
   }, [hasSnapshot]);
   useLayoutEffect(() => {
     const content = contentRef.current;
-    if (!content) return;
-    // Markdown code/media can grow after React commits; observing content covers that delayed layout.
-    return observeResize(content, () => {
+    const viewport = viewportRef.current;
+    if (!content || !viewport) return;
+    // Content covers delayed Markdown layout; viewport covers the growing composer taking space.
+    // Both preserve the reader's existing follow choice rather than forcing scrolled-away readers down.
+    return observeResize([content, viewport], () => {
       const viewport = viewportRef.current;
       if (viewport && initialized.current && followsBottom.current)
         viewport.scrollTop = viewport.scrollHeight;

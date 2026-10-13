@@ -16,12 +16,27 @@ export type DiscussionStripItem =
       state: "done" | "current" | "next";
       tags: ("speaking" | "interrupted" | "failed" | "next" | "summarizer")[];
     };
-/** Header actions remain disabled until the command implementation is added. */
+/** Header presentation and the action positions available in the current discussion state. */
 export type DiscussionHeaderView = {
   label: string;
   variant: "info" | "warning" | "secondary";
   actions: ("stop" | "resume" | "end" | "more")[];
 };
+
+/**
+ * Gates the implemented header commands without enabling the later end/delete controls.
+ * @param action Action selected by the current header presentation.
+ * @param pending Whether any header command is already submitted.
+ * @param permitted Whether the destination grants this action's command.
+ * @returns Whether this header button can execute now.
+ */
+export function discussionHeaderActionEnabled(
+  action: DiscussionHeaderView["actions"][number],
+  pending: boolean,
+  permitted: boolean,
+): boolean {
+  return (action === "stop" || action === "resume") && !pending && permitted;
+}
 
 /**
  * Gates subscription creation in the route boundary.

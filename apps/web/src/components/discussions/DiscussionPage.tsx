@@ -1,18 +1,27 @@
-/** Displays the discussion frame and speaking sequence; transcript and command controls are separate work. */
+/** Displays the live discussion frame, speaking sequence and guarded user commands. */
+import { useAtomValue } from "@effect/atom-react";
 import type { Discussion, EnvironmentId } from "@t3tools/contracts";
+import {
+  isAtomCommandInterrupted,
+  squashAtomCommandFailure,
+} from "@t3tools/client-runtime/state/runtime";
 import { Link } from "@tanstack/react-router";
-import { Fragment } from "react";
+import { Fragment, useRef, useState } from "react";
 import { EllipsisIcon, PauseIcon, PlayIcon } from "lucide-react";
 import { isElectron } from "../../env";
 import { useEnvironmentSettings } from "../../hooks/useSettings";
 import { useProjects } from "../../state/entities";
 import { formatDayAwareTimestamp } from "../../timestampFormat";
 import { t } from "~/i18n";
+import { serverEnvironment } from "~/state/server";
+import { useAtomCommand } from "~/state/use-atom-command";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "../ui/empty";
 import { SidebarInset } from "../ui/sidebar";
+import { toastManager } from "../ui/toast";
+import { DiscussionComposer } from "./DiscussionComposer";
 import { PixelAvatar } from "./PixelAvatar";
 import { DiscussionWave } from "./DiscussionWave";
 import { discussionSeatMotion } from "./discussionMotion.logic";
@@ -20,6 +29,7 @@ import { DiscussionTranscript } from "./DiscussionTranscript";
 import { discussionSeatColor } from "./discussionSeatColors";
 import {
   discussionHeaderView,
+  discussionHeaderActionEnabled,
   discussionSeatStrip,
   type DiscussionStripItem,
 } from "./discussionPage.logic";
@@ -195,10 +205,10 @@ function DiscussionSeatBar({ discussion }: { discussion: Discussion }) {
 }
 
 /**
- * Displays the live snapshot's title, project and disabled action positions.
+ * Displays the live snapshot's title, project and lifecycle actions.
  * @param props.discussion Subscription snapshot scoped to this environment.
  * @param props.environmentId Destination used to disambiguate project IDs and timestamp settings.
- * @returns Workspace frame and persisted records; no discussion command is executed.
+ * @returns Workspace frame with independent header and interjection submission locks.
  */
 export function DiscussionPage({
   discussion,
@@ -207,6 +217,35 @@ export function DiscussionPage({
   discussion: Discussion;
   environmentId: EnvironmentId;
 }) {
+  const [headerPending, setHeaderPending] = useState(false);
+  const submissionPending = useRef(false);
+  const stop = useAtomCommand(serverEnvironment.stopDiscussion);
+  const resume = useAtomCommand(serverEnvironment.continueDiscussion);
+  const canStop = useAtomValue(serverEnvironment.stopDiscussion.permissionAtom(environmentId));
+  const canResume = useAtomValue(
+    serverEnvironment.continueDiscussion.permissionAtom(environmentId),
+  );
+  const permitted = (action: "stop" | "resume" | "end" | "more") =>
+    action === "stop" ? canStop : action === "resume" && canResume;
+  const act = async (action: "stop" | "resume" | "end" | "more") => {
+    if (!discussionHeaderActionEnabled(action, submissionPending.current, permitted(action)))
+      return;
+    // The header has its own synchronous lock; interjections can still queue before/after it.
+    submissionPending.current = true;
+    setHeaderPending(true);
+    const result = await (action === "stop" ? stop : resume)({
+      environmentId,
+      input: { discussionId: discussion.id },
+    });
+    if (result._tag === "Failure" && !isAtomCommandInterrupted(result))
+      toastManager.add({
+        type: "error",
+        title: action === "stop" ? t.discussions.page.stopFailed : t.discussions.page.resumeFailed,
+        description: String(squashAtomCommandFailure(result)),
+      });
+    submissionPending.current = false;
+    setHeaderPending(false);
+  };
   const projects = useProjects();
   const project = projects.find(
     (candidate) =>
@@ -232,7 +271,8 @@ export function DiscussionPage({
           {header.actions.map((action) => (
             <Button
               key={action}
-              disabled
+              disabled={!discussionHeaderActionEnabled(action, headerPending, permitted(action))}
+              onClick={() => void act(action)}
               variant={action === "resume" ? "default" : "outline"}
               size={action === "more" ? "icon-sm" : "sm"}
               aria-label={t.discussions.page[action]}
@@ -256,6 +296,11 @@ export function DiscussionPage({
         discussion={discussion}
         environmentId={environmentId}
         cwd={project?.workspaceRoot}
+      />
+      <DiscussionComposer
+        key={`composer:${environmentId}:${discussion.id}`}
+        discussion={discussion}
+        environmentId={environmentId}
       />
     </SidebarInset>
   );

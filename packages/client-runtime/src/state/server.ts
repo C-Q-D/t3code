@@ -642,6 +642,19 @@ export function createServerEnvironmentAtoms<R, E>(
   },
 ) {
   const configScheduler = createAtomCommandScheduler();
+  // A discussion's lifecycle commands must reach the server in click order across all five
+  // commands. Queuing does not deduplicate clicks; the UI's pending locks prevent duplicates.
+  const discussionScheduler = createAtomCommandScheduler();
+  const discussionConcurrency = {
+    mode: "serial" as const,
+    key: ({
+      environmentId,
+      input,
+    }: {
+      readonly environmentId: string;
+      readonly input: { readonly discussionId: string };
+    }) => JSON.stringify([environmentId, input.discussionId]),
+  };
   // Updates stay serial end-to-end, but only their handoff phase occupies the config lane.
   const updateScheduler = createAtomCommandScheduler();
   const configConcurrency = {
@@ -1407,26 +1420,36 @@ export function createServerEnvironmentAtoms<R, E>(
     interjectDiscussion: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:server:discussion:interject",
       tag: WS_METHODS.discussionsInterject,
+      scheduler: discussionScheduler,
+      concurrency: discussionConcurrency,
     }),
     /** Interrupts the current provider run and pauses further seat dispatch. */
     stopDiscussion: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:server:discussion:stop",
       tag: WS_METHODS.discussionsStop,
+      scheduler: discussionScheduler,
+      concurrency: discussionConcurrency,
     }),
     /** Resumes seat dispatch using the server's persisted cursor. */
     continueDiscussion: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:server:discussion:continue",
       tag: WS_METHODS.discussionsContinue,
+      scheduler: discussionScheduler,
+      concurrency: discussionConcurrency,
     }),
     /** Begins closing with the chosen summarizer and optional summary prompt. */
     endDiscussion: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:server:discussion:end",
       tag: WS_METHODS.discussionsEnd,
+      scheduler: discussionScheduler,
+      concurrency: discussionConcurrency,
     }),
     /** Deletes the discussion; subscribers receive the final deletion event. */
     deleteDiscussion: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:server:discussion:delete",
       tag: WS_METHODS.discussionsDelete,
+      scheduler: discussionScheduler,
+      concurrency: discussionConcurrency,
     }),
     upsertScheduledTask: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:server:scheduled-task:upsert",

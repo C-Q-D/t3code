@@ -54,6 +54,17 @@ export const discussions = {
     resume: "Continue",
     end: "End discussion",
     more: "More",
+    composerFallback: "Interject…",
+    composerSpeaking: (current: string, next: string) =>
+      `Interject… ${current} won't be interrupted. ${next} will read it when they speak next`,
+    composerSingle: (current: string) =>
+      `Interject… ${current} won't be interrupted. They will read it when they speak again`,
+    composerPaused: (next: string) => `Interject… ${next} will read it when they speak again`,
+    composerClosing: "Closing discussion. Interjections are disabled",
+    sendInterjection: "Send interjection",
+    interjectFailed: "Could not send interjection",
+    stopFailed: "Could not stop discussion",
+    resumeFailed: "Could not continue discussion",
     final: "Final statements",
     summary: "Summary",
     summarizer: "Summarizer",
