@@ -19,7 +19,8 @@ it.effect(
       (discussion_id, seq, entry_id, kind, run_id, text, files_json, status, checkpoint_ref, created_at, round, read_by_seat_id)
       VALUES ('discussion:c3-old', 1, 'entry:c3-old', 'statement', 'run:c3-old', '完整保留', '[{"path":"a.ts","additions":2,"deletions":1}]', 'interrupted', 'refs/c3/old', '2026-10-13T00:00:00.000Z', 3, 'seat:c3-reader')`;
       const before = yield* sql`SELECT * FROM discussion_entries`;
-      yield* runMigrations();
+      // Keep later schema additions out of this migration's full-row assertions.
+      yield* runMigrations({ toMigrationInclusive: 64 });
       const columns = yield* sql<{
         name: string;
         type: string;
@@ -35,7 +36,7 @@ it.effect(
       assert.deepEqual(yield* sql`SELECT * FROM discussion_entries`, [
         { ...before[0], final_statement: 0 },
       ]);
-      assert.deepEqual(yield* runMigrations(), []);
+      assert.deepEqual(yield* runMigrations({ toMigrationInclusive: 64 }), []);
       yield* migration64;
       yield* migration64;
       assert.deepEqual(yield* sql`SELECT * FROM discussion_entries`, [
