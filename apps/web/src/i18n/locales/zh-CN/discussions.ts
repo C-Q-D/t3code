@@ -1,9 +1,19 @@
-/** Chinese copy for discussion navigation, the list and future page placeholders. */
+/** Chinese copy for discussion navigation, lists, seat editing and the transcript placeholder. */
 import type { Messages } from "../en";
 
 export const discussions: Messages["discussions"] = {
   title: "讨论",
   newTitle: "新建讨论",
+  seatsHeading: "座位 · 从左到右依次发言",
+  addSeat: "添加座位",
+  removeSeat: "移除座位",
+  editSeat: (name: string, position: number) => `编辑座位 ${position}：${name}`,
+  moveSeat: (name: string, position: number) => `移动座位 ${position}：${name}`,
+  persona: "身份",
+  model: "模型",
+  unsupported: "暂不支持",
+  loadingModels: "正在加载…",
+  noModels: "没有可用模型",
   ongoing: (count: number) => `进行中 · ${count}`,
   endedGroup: (count: number) => `已结束 · ${count}`,
   round: (round: number) => `第 ${round} 轮`,
@@ -17,6 +27,5 @@ export const discussions: Messages["discussions"] = {
   empty: "还没有讨论",
   loading: "正在加载讨论…",
   loadFailed: "加载讨论失败",
-  newPlaceholder: "新建讨论在后续版本提供",
   pagePlaceholder: "讨论页在后续版本提供",
 };

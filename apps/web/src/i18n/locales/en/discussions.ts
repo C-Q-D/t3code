@@ -1,7 +1,17 @@
-/** English copy for discussion navigation, the list and future page placeholders. */
+/** English copy for discussion navigation, lists, seat editing and the transcript placeholder. */
 export const discussions = {
   title: "Discussions",
   newTitle: "New discussion",
+  seatsHeading: "Seats · Speak from left to right",
+  addSeat: "Add seat",
+  removeSeat: "Remove seat",
+  editSeat: (name: string, position: number) => `Edit seat ${position}: ${name}`,
+  moveSeat: (name: string, position: number) => `Move seat ${position}: ${name}`,
+  persona: "Persona",
+  model: "Model",
+  unsupported: "Not supported yet",
+  loadingModels: "Loading…",
+  noModels: "No models available",
   ongoing: (count: number) => `In progress · ${count}`,
   endedGroup: (count: number) => `Ended · ${count}`,
   round: (round: number) => `Round ${round}`,
@@ -15,6 +25,5 @@ export const discussions = {
   empty: "No discussions yet",
   loading: "Loading discussions…",
   loadFailed: "Could not load discussions",
-  newPlaceholder: "Creating discussions will be available in a later version.",
   pagePlaceholder: "The discussion page will be available in a later version.",
 };
