@@ -384,8 +384,9 @@ const make = Effect.gen(function* () {
       const endMarker = entries.findLast(
         (item) => item.kind === "system" && item.text === "讨论到此",
       );
-      // End while paused assigns the stopped seat a final statement, even if its capture is still
-      // pending. The system entry retains that seat; End during an ordinary run has no seat owner.
+      // End assigns this seat a final statement when paused or when an unfinished ordinary run
+      // became terminal before reactor bookkeeping. The marker retains that seat even while its
+      // capture is pending; an active or successfully completed ordinary run has no seat owner.
       if (
         endMarker?.seatId === discussion.seats[discussion.cursor.seatIndex]!.id &&
         message?.text.endsWith(discussionBriefPhaseMarker("regular"))
@@ -1119,7 +1120,7 @@ const make = Effect.gen(function* () {
                   id: DiscussionEntryId.make(yield* uuid),
                   discussionId: discussion.id,
                   kind: "system",
-                  ...(discussion.status === "paused"
+                  ...(!active && !ordinaryCompleted
                     ? { seatId: discussion.seats[discussion.cursor.seatIndex]!.id }
                     : {}),
                   text: "讨论到此",
@@ -1140,9 +1141,9 @@ const make = Effect.gen(function* () {
                         runId: null,
                         round: discussion.cursor.round + (firstIndex === 0 ? 1 : 0),
                       }
-                    : discussion.status === "paused"
-                      ? { ...discussion.cursor, phase: "final_round" }
-                      : discussion.cursor,
+                    : active
+                      ? discussion.cursor
+                      : { ...discussion.cursor, phase: "final_round" },
                   closing: {
                     summarizerSeatId: input.summarizerSeatId,
                     summaryPrompt: prompt.prompt,

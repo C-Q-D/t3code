@@ -489,8 +489,18 @@ it.effect(
               [1, "statement", undefined, "completed"],
               [2, "system", undefined, "completed"],
             ]);
+            assert.deepEqual(
+              (yield* Store.DiscussionStore.use((store) => store.listEntries(discussion.id))).map(
+                (entry) => [entry.kind, entry.text],
+              ),
+              [
+                ["statement", "尚未由 reactor 记账的普通发言"],
+                ["system", "讨论到此"],
+              ],
+            );
             yield* Deferred.succeed(release, undefined);
             const final = yield* next(h, discussion, 2);
+            assert.include(final.message.text, "这是你本次讨论的最后一次发言");
             yield* expectPhase(discussion, final, "final_round");
             assert.equal(final.threadId, discussion.seats[1]!.threadId);
             yield* finish(h, final);
@@ -508,6 +518,133 @@ it.effect(
               [4, "statement", true, "completed"],
               [5, "summary", undefined, "completed"],
             ]);
+          }).pipe(Effect.provide(Discussions.layer.pipe(Layer.provide(delayed), Layer.fresh)));
+        }),
+      { startReactor: false },
+    ),
+);
+
+it.effect.each([
+  { status: "failed" as const, capturePending: false },
+  { status: "interrupted" as const, capturePending: false },
+  { status: "cancelled" as const, capturePending: false },
+  { status: "failed" as const, capturePending: true },
+  { status: "interrupted" as const, capturePending: true },
+  { status: "cancelled" as const, capturePending: true },
+])(
+  "End publishes finals for terminal $status before reactor, capture pending=$capturePending",
+  ({ status, capturePending }) =>
+    withDiscussionHarness(
+      (h) =>
+        Effect.gen(function* () {
+          const sink = yield* EventSink.EventSinkV2;
+          const parked = yield* Deferred.make<void>();
+          const release = yield* Deferred.make<void>();
+          let held = false;
+          const delayed = Layer.succeed(EventSink.EventSinkV2, {
+            ...sink,
+            stream: (options) =>
+              sink.stream(options).pipe(
+                Stream.mapEffect((item) =>
+                  Effect.gen(function* () {
+                    if (
+                      !held &&
+                      item.event.type === "run.updated" &&
+                      item.event.payload.status === "interrupted"
+                    ) {
+                      held = true;
+                      yield* Deferred.succeed(parked, undefined);
+                      yield* Deferred.await(release);
+                    }
+                    return item;
+                  }),
+                ),
+              ),
+          });
+          yield* Effect.gen(function* () {
+            const service = yield* Discussions.DiscussionService;
+            yield* service.start();
+            const { discussion, turn } = yield* create(h);
+            const projection = yield* Projections.ProjectionStoreV2;
+            const worker = yield* Worker.OrchestrationEffectWorkerV2;
+            if (capturePending) yield* h.holdCaptures;
+            yield* h.finish(turn, "interrupted", ["终态已落库的普通发言"]);
+            yield* awaitRun(turn.threadId, turn.runId, "interrupted");
+            yield* Deferred.await(parked);
+            const draining = yield* worker.drain().pipe(Effect.forkScoped);
+            if (capturePending) yield* Queue.take(h.captureStarted);
+            else yield* Fiber.join(draining);
+            const terminal = (yield* sink
+              .stream({ threadId: turn.threadId, eventType: "run.updated", bounded: true })
+              .pipe(
+                Stream.filter(
+                  ({ event }) =>
+                    event.type === "run.updated" && event.payload.status === "interrupted",
+                ),
+                Stream.take(1),
+                Stream.runCollect,
+              ))[0]!.event;
+            if (terminal.type !== "run.updated")
+              return yield* Effect.die("Missing terminal fixture event");
+            const records = yield* projection.getThreadRecords(turn.threadId, ["runs"]);
+            const run = records.runs.find((candidate) => candidate.id === turn.runId)!;
+            // Restore the terminal projection through its real event sink, independently of discussion bookkeeping.
+            // Captures remain real worker effects, including a previously queued capture for a failed terminal fixture.
+            yield* sink.write({
+              events: [
+                {
+                  ...terminal,
+                  id: EventId.make(`${terminal.id}:terminal:${status}`),
+                  payload: { ...run, status },
+                },
+              ],
+            });
+            yield* awaitRun(turn.threadId, turn.runId, status);
+            const store = yield* Store.DiscussionStore;
+            assert.equal((yield* store.getDiscussion(discussion.id))?.status, "speaking");
+            const subscribed = yield* Deferred.make<void>();
+            const updates = yield* service.subscribe({ discussionId: discussion.id }).pipe(
+              Stream.tap((event) =>
+                event.type === "snapshot" ? Deferred.succeed(subscribed, undefined) : Effect.void,
+              ),
+              Stream.filter((event) => event.type === "discussion.updated"),
+              Stream.takeUntil(
+                (event) =>
+                  event.type === "discussion.updated" &&
+                  event.discussion.cursor.dispatchNo === 2 &&
+                  event.discussion.cursor.runId !== null,
+              ),
+              Stream.runCollect,
+              Effect.forkScoped,
+            );
+            yield* Deferred.await(subscribed);
+            const ending = yield* service.end({
+              discussionId: discussion.id,
+              summarizerSeatId: discussion.seats[0]!.id,
+            });
+            assert.equal(
+              ending.discussion.cursor.phase,
+              "final_round",
+              "End response before capture release",
+            );
+            assert.equal(ending.discussion.cursor.seatIndex, 0);
+            assert.equal(ending.discussion.cursor.round, 1);
+            yield* h.releaseCaptures;
+            yield* Fiber.join(draining);
+            yield* Deferred.succeed(release, undefined);
+            const final = yield* next(h, discussion, 2);
+            yield* expectPhase(discussion, final, "final_round");
+            const events = yield* Fiber.join(updates);
+            assert.isAtLeast(events.length, 2, "include End transition and dispatch binding");
+            for (const [index, event] of events.entries()) {
+              if (event.type !== "discussion.updated")
+                return yield* Effect.die("Unexpected subscription fixture event");
+              assert.equal(
+                event.discussion.cursor.phase,
+                "final_round",
+                `subscribed update ${index}, ${status}/${capturePending}`,
+              );
+            }
           }).pipe(Effect.provide(Discussions.layer.pipe(Layer.provide(delayed), Layer.fresh)));
         }),
       { startReactor: false },
