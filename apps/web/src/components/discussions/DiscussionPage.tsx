@@ -6,7 +6,7 @@ import {
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
 import { Link, useNavigate, useRouter } from "@tanstack/react-router";
-import { Fragment, useRef, useState } from "react";
+import { Fragment, useCallback, useRef, useState } from "react";
 import { EllipsisIcon, PauseIcon, PlayIcon, Trash2Icon } from "lucide-react";
 import { Menu, MenuTrigger, MenuPopup, MenuItem } from "../ui/menu";
 import { DiscussionEndDialog } from "./DiscussionEndDialog";
@@ -25,6 +25,11 @@ import { Button } from "../ui/button";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "../ui/empty";
 import { SidebarInset } from "../ui/sidebar";
 import { toastManager } from "../ui/toast";
+import { useMediaQuery } from "~/hooks/useMediaQuery";
+import { RIGHT_PANEL_INLINE_LAYOUT_MEDIA_QUERY } from "~/rightPanelLayout";
+import { RightPanelSheet } from "../RightPanelSheet";
+import { DiscussionDiffPanel } from "./DiscussionDiffPanel";
+import { discussionDiffKey, type DiscussionDiffSelection } from "./discussionDiff.logic";
 import { DiscussionComposer } from "./DiscussionComposer";
 import { PixelAvatar } from "./PixelAvatar";
 import { DiscussionWave } from "./DiscussionWave";
@@ -222,6 +227,12 @@ export function DiscussionPage({
   discussion: Discussion;
   environmentId: EnvironmentId;
 }) {
+  const [selectedDiff, setSelectedDiff] = useState<DiscussionDiffSelection | null>(null);
+  const openDiff = useCallback(
+    (selection: DiscussionDiffSelection) => setSelectedDiff(selection),
+    [],
+  );
+  const useSheet = useMediaQuery(RIGHT_PANEL_INLINE_LAYOUT_MEDIA_QUERY);
   const [headerPending, setHeaderPending] = useState(false);
   const [endOpen, setEndOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -328,69 +339,102 @@ export function DiscussionPage({
   );
   return (
     <SidebarInset>
-      <WorkspacePageHeader electron={isElectron} className="border-b">
-        <div className="flex min-w-0 flex-1 items-center gap-3">
-          <h1 className="min-w-0 truncate text-sm font-medium">{discussion.title}</h1>
-          <span className="max-w-32 shrink-0 truncate text-xs text-muted-foreground">
-            {project?.title ?? t.discussions.deletedProject}
-          </span>
-          <Badge variant={header.variant}>{header.label}</Badge>
-        </div>
-        <div className="ml-auto flex shrink-0 items-center gap-2">
-          {header.actions.map((action) =>
-            action === "more" ? (
-              <Menu key={action}>
-                <MenuTrigger
-                  render={
-                    <Button
-                      variant="outline"
-                      size="icon-sm"
-                      disabled={!discussionHeaderActionEnabled(action, headerPending, canDelete)}
-                      aria-label={t.discussions.page.more}
-                    />
-                  }
-                >
-                  <EllipsisIcon />
-                </MenuTrigger>
-                <MenuPopup align="end">
-                  <MenuItem
-                    variant="destructive"
-                    disabled={headerPending || !canDelete}
-                    onClick={() => setDeleteOpen(true)}
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <WorkspacePageHeader electron={isElectron} className="border-b">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              <h1 className="min-w-0 truncate text-sm font-medium">{discussion.title}</h1>
+              <span className="max-w-32 shrink-0 truncate text-xs text-muted-foreground">
+                {project?.title ?? t.discussions.deletedProject}
+              </span>
+              <Badge variant={header.variant}>{header.label}</Badge>
+            </div>
+            <div className="ml-auto flex shrink-0 items-center gap-2">
+              {header.actions.map((action) =>
+                action === "more" ? (
+                  <Menu key={action}>
+                    <MenuTrigger
+                      render={
+                        <Button
+                          variant="outline"
+                          size="icon-sm"
+                          disabled={
+                            !discussionHeaderActionEnabled(action, headerPending, canDelete)
+                          }
+                          aria-label={t.discussions.page.more}
+                        />
+                      }
+                    >
+                      <EllipsisIcon />
+                    </MenuTrigger>
+                    <MenuPopup align="end">
+                      <MenuItem
+                        variant="destructive"
+                        disabled={headerPending || !canDelete}
+                        onClick={() => setDeleteOpen(true)}
+                      >
+                        <Trash2Icon />
+                        {t.discussions.page.deleteDiscussion}
+                      </MenuItem>
+                    </MenuPopup>
+                  </Menu>
+                ) : (
+                  <Button
+                    key={action}
+                    disabled={
+                      !discussionHeaderActionEnabled(action, headerPending, permitted(action))
+                    }
+                    onClick={() => void act(action)}
+                    variant={action === "resume" ? "default" : "outline"}
+                    size="sm"
+                    aria-label={t.discussions.page[action]}
                   >
-                    <Trash2Icon />
-                    {t.discussions.page.deleteDiscussion}
-                  </MenuItem>
-                </MenuPopup>
-              </Menu>
-            ) : (
-              <Button
-                key={action}
-                disabled={!discussionHeaderActionEnabled(action, headerPending, permitted(action))}
-                onClick={() => void act(action)}
-                variant={action === "resume" ? "default" : "outline"}
-                size="sm"
-                aria-label={t.discussions.page[action]}
-              >
-                {action === "stop" ? <PauseIcon /> : action === "resume" ? <PlayIcon /> : null}
-                {t.discussions.page[action]}
-              </Button>
-            ),
-          )}
+                    {action === "stop" ? <PauseIcon /> : action === "resume" ? <PlayIcon /> : null}
+                    {t.discussions.page[action]}
+                  </Button>
+                ),
+              )}
+            </div>
+          </WorkspacePageHeader>
+          <DiscussionSeatBar discussion={discussion} />
+          <DiscussionTranscript
+            key={`${environmentId}:${discussion.id}`}
+            discussion={discussion}
+            environmentId={environmentId}
+            cwd={project?.workspaceRoot}
+            selectedDiff={selectedDiff}
+            onOpenDiff={openDiff}
+          />
+          <DiscussionComposer
+            key={`composer:${environmentId}:${discussion.id}`}
+            discussion={discussion}
+            environmentId={environmentId}
+          />
         </div>
-      </WorkspacePageHeader>
-      <DiscussionSeatBar discussion={discussion} />
-      <DiscussionTranscript
-        key={`${environmentId}:${discussion.id}`}
-        discussion={discussion}
-        environmentId={environmentId}
-        cwd={project?.workspaceRoot}
-      />
-      <DiscussionComposer
-        key={`composer:${environmentId}:${discussion.id}`}
-        discussion={discussion}
-        environmentId={environmentId}
-      />
+        {selectedDiff ? (
+          useSheet ? (
+            <RightPanelSheet open animationDurationMs={0} onClose={() => setSelectedDiff(null)}>
+              <DiscussionDiffPanel
+                key={discussionDiffKey(environmentId, discussion.id, selectedDiff.entryId)}
+                discussion={discussion}
+                environmentId={environmentId}
+                selection={selectedDiff}
+                mode="sheet"
+                onClose={() => setSelectedDiff(null)}
+              />
+            </RightPanelSheet>
+          ) : (
+            <DiscussionDiffPanel
+              key={discussionDiffKey(environmentId, discussion.id, selectedDiff.entryId)}
+              discussion={discussion}
+              environmentId={environmentId}
+              selection={selectedDiff}
+              mode="inline"
+              onClose={() => setSelectedDiff(null)}
+            />
+          )
+        ) : null}
+      </div>
       {endOpen ? (
         <DiscussionEndDialog
           discussion={discussion}

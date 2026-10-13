@@ -41,6 +41,15 @@ export const discussions: Messages["discussions"] = {
   empty: "还没有讨论",
   loading: "正在加载讨论…",
   loadFailed: "加载讨论失败",
+  diff: {
+    close: "关闭",
+    loading: "正在读取这次发言的改动…",
+    failed: (message: string) =>
+      message ? `读取这次发言的改动失败：${message}。` : "读取这次发言的改动失败。",
+    empty: "这次发言没有可显示的改动。",
+    retry: "重试",
+    missing: (path: string) => `没有找到 ${path} 的改动，下面是这次发言的全部改动。`,
+  },
   alerts: {
     stopped: (name: string) => `讨论已停下。点"继续"，${name}会重新发言。`,
     restarted: '桌面端重启过，讨论已停下。点"继续"恢复。',

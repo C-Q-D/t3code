@@ -7,6 +7,7 @@ import type {
   EnvironmentId,
 } from "@t3tools/contracts";
 import { shouldPreserveAssistantLineBreaks } from "@t3tools/shared/markdownPipeline";
+import { discussionFilesCanOpen, type DiscussionDiffSelection } from "./discussionDiff.logic";
 import { DiscussionFiles } from "./DiscussionFiles";
 import { MemoizedDiscussionLiveRow } from "./DiscussionLiveRow";
 import { orderDiscussionEntries } from "./discussionLive.logic";
@@ -47,6 +48,8 @@ type DiscussionEntryRowProps = DiscussionStatementHeading & {
   receiptSeatNumber: number;
   receiptAvatarState: "idle" | "next";
   userRead: boolean;
+  selectedPath: string | undefined;
+  onOpenDiff: (selection: DiscussionDiffSelection) => void;
 };
 
 /**
@@ -69,7 +72,9 @@ type DiscussionEntryRowProps = DiscussionStatementHeading & {
  * @param props.threadId Entry-specific thread, seat fallback, or null when unavailable.
  * @param props.statusLabel Interrupted/failed text, null for completed entries.
  * @param props.badgeVariant Warning/error presentation, null for completed entries.
- * @returns A 28px avatar column and text/file presentation. File rows have no actions.
+ * @param props.selectedPath Selected file within this entry, undefined when unselected.
+ * @param props.onOpenDiff Opens a persisted statement patch at the activated file.
+ * @returns A 28px avatar column and text/file presentation with persisted diff actions.
  */
 function DiscussionEntryRow(props: DiscussionEntryRowProps) {
   const { entry } = props;
@@ -152,7 +157,16 @@ function DiscussionEntryRow(props: DiscussionEntryRowProps) {
             }
           />
         ) : null}
-        <DiscussionFiles files={entry.files} hideEmpty={entry.kind === "summary"} />
+        <DiscussionFiles
+          files={entry.files}
+          hideEmpty={entry.kind === "summary"}
+          selectedPath={props.selectedPath}
+          onOpenFile={
+            discussionFilesCanOpen(entry.id, entry.files)
+              ? (filePath) => props.onOpenDiff({ entryId: entry.id, filePath })
+              : undefined
+          }
+        />
       </div>
     </div>
   );
@@ -217,16 +231,22 @@ const MemoizedDiscussionTopicRow = memo(DiscussionTopicRow);
  * @param props.discussion Frozen seat attribution and subscription identity; cursor changes do not change row props.
  * @param props.environmentId Registered environment already validated by the route.
  * @param props.cwd Project directory used by Markdown links and media.
+ * @param props.selectedDiff Open persisted entry/file selection, null when the panel is closed.
+ * @param props.onOpenDiff Activates the statement diff independently of the thread process link.
  * @returns A centered 768px record column. Remount per discussion to reset initial-scroll ownership.
  */
 export function DiscussionTranscript({
   discussion,
   environmentId,
   cwd,
+  selectedDiff,
+  onOpenDiff,
 }: {
   discussion: Discussion;
   environmentId: EnvironmentId;
   cwd: string | undefined;
+  selectedDiff: DiscussionDiffSelection | null;
+  onOpenDiff: (selection: DiscussionDiffSelection) => void;
 }) {
   // The family keys by environment and discussion ID, so this reads the route's existing stream.
   // Transport retries and release are owned by client-runtime, not by individual entry rows.
@@ -428,6 +448,10 @@ export function DiscussionTranscript({
                 receiptSeatNumber={userView?.seatIndex == null ? 0 : userView.seatIndex + 1}
                 receiptAvatarState={userView?.avatarState ?? "idle"}
                 userRead={userView?.read ?? true}
+                selectedPath={
+                  selectedDiff?.entryId === entry.id ? selectedDiff.filePath : undefined
+                }
+                onOpenDiff={onOpenDiff}
                 {...heading}
               />
             </article>

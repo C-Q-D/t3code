@@ -39,6 +39,18 @@ export const discussions = {
   empty: "No discussions yet",
   loading: "Loading discussions…",
   loadFailed: "Could not load discussions",
+  diff: {
+    close: "Close",
+    loading: "Loading this statement’s changes…",
+    failed: (message: string) =>
+      message
+        ? `Could not load this statement’s changes: ${message}.`
+        : "Could not load this statement’s changes.",
+    empty: "This statement has no changes to display.",
+    retry: "Retry",
+    missing: (path: string) =>
+      `No changes were found for ${path}. All changes from this statement are shown below.`,
+  },
   alerts: {
     stopped: (name: string) =>
       `The discussion is paused. Select "Continue" and ${name} will speak again.`,
