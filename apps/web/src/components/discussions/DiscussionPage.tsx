@@ -303,7 +303,13 @@ export function DiscussionPage({
     const result = await remove({ environmentId, input: { discussionId: discussion.id } });
     if (result._tag === "Success") {
       if (
-        discussionDeleteShouldNavigate(router.state.location.pathname, environmentId, discussion.id)
+        discussionDeleteShouldNavigate(
+          router.state.matches.find(
+            (match) => match.routeId === "/_chat/discussions/$environmentId/$discussionId",
+          )?.params,
+          environmentId,
+          discussion.id,
+        )
       )
         await navigate({ to: "/discussions", replace: true });
       return;
