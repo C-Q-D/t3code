@@ -60,6 +60,8 @@ export const tools: Messages["tools"] = {
     changeAppearance: "更改外观",
     themeEditor: "切换主题编辑器",
     openPullRequests: "打开 PR",
+    newDiscussion: "新建讨论",
+    openDiscussions: "打开讨论列表",
     openUsage: "打开用量",
     openSettings: "打开设置",
     addFailed: "添加项目失败",

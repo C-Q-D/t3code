@@ -9,6 +9,7 @@ import { git } from "./git";
 import { tools } from "./tools";
 import { app } from "./app";
 import { account } from "./account";
+import { discussions } from "./discussions";
 
 export const messages: Messages = {
   common,
@@ -20,4 +21,5 @@ export const messages: Messages = {
   tools,
   app,
   account,
+  discussions,
 };

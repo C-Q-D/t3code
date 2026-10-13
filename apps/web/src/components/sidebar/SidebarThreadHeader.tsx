@@ -1,8 +1,8 @@
 /**
- * The sidebar header: one row holding search, project scope and new thread.
+ * The sidebar header: one row holding search, project scope, discussions and new thread.
  *
  * Search owns the row's text and spans it. Project scope collapses to an icon
- * that sits with new-project and new-thread as a segmented group at the end.
+ * that sits with new-project, discussions and new-thread as a segmented group at the end.
  * The scope icon swaps to the project favicon while a project is selected,
  * so the header still names the scope after the row that showed it is gone.
  *
@@ -11,7 +11,7 @@
  * the picker's popup can anchor to that width rather than to its 28px trigger.
  */
 import { t } from "~/i18n";
-import { FolderPlusIcon, SearchIcon, SquarePenIcon, XIcon } from "lucide-react";
+import { FolderPlusIcon, MessagesSquareIcon, SearchIcon, SquarePenIcon, XIcon } from "lucide-react";
 import {
   type ComponentProps,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -21,6 +21,7 @@ import {
 } from "react";
 
 import { cn } from "~/lib/utils";
+import { discussionNavigationState } from "../discussions/discussionNavigation.logic";
 import { Button } from "../ui/button";
 import { SidebarInput, SidebarMenuButton } from "../ui/sidebar";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
@@ -33,6 +34,9 @@ export interface SidebarThreadHeaderProps {
   /** The project scope combobox, rendered as the first icon of the group. */
   projectScope: ReactNode;
   onNewProject: () => void;
+  /** Route pathname drives selection independently of the active thread. */
+  pathname: string;
+  onOpenDiscussions: () => void;
   /** Receives the click so Shift+click can skip the project picker. */
   onNewThread: (event: ReactMouseEvent) => void;
   newThreadDisabled: boolean;
@@ -50,11 +54,14 @@ export interface SidebarThreadHeaderProps {
   onClearSearch: () => void;
 }
 
+/** Renders header actions from the supplied workspace state; route selection never depends on a thread. */
 export function SidebarThreadHeader({
   searchFieldRef,
   hasProjects,
   projectScope,
   onNewProject,
+  pathname,
+  onOpenDiscussions,
   onNewThread,
   newThreadDisabled,
   newThreadShortcutLabel,
@@ -70,6 +77,7 @@ export function SidebarThreadHeader({
   onClearSearch,
 }: SidebarThreadHeaderProps) {
   const resultsVisible = isSearching && searchResultCount > 0;
+  const discussions = discussionNavigationState(hasProjects, pathname);
   // Results shrink as the query narrows, so the active index can outrun the
   // list; pointing aria-activedescendant at a removed option strands the
   // screen reader on nothing.
@@ -133,6 +141,15 @@ export function SidebarThreadHeader({
             </SidebarHeaderIconButton>
           </>
         ) : null}
+        {discussions.visible ? (
+          <SidebarHeaderIconButton
+            label={t.sidebar.header.discussions}
+            isActive={discussions.isActive}
+            onClick={onOpenDiscussions}
+          >
+            <MessagesSquareIcon />
+          </SidebarHeaderIconButton>
+        ) : null}
         <SidebarHeaderIconButton
           label={t.sidebar.header.newThread}
           tooltip={
@@ -158,7 +175,7 @@ export function SidebarThreadHeader({
 }
 
 /**
- * Icon button with a tooltip, sized for the header's segmented pair. Spreads
+ * Icon button with a tooltip, sized for the header's segmented group. Spreads
  * unknown props through so it can serve as a popup trigger's render target,
  * which injects its own handlers, ref and aria state.
  */
@@ -176,7 +193,7 @@ export function SidebarHeaderIconButton({
   children?: ReactNode;
 } & Omit<
   ComponentProps<typeof SidebarMenuButton>,
-  "children" | "className" | "tooltip" | "isActive" | "aria-label"
+  "children" | "className" | "tooltip" | "aria-label"
 >) {
   return (
     <Tooltip>

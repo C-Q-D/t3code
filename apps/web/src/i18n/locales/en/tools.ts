@@ -59,6 +59,8 @@ export const tools = {
     changeAppearance: "Change appearance",
     themeEditor: "Toggle theme editor",
     openPullRequests: "Open pull requests",
+    newDiscussion: "New discussion",
+    openDiscussions: "Open discussion list",
     openUsage: "Open usage",
     openSettings: "Open settings",
     addFailed: "Failed to add project",

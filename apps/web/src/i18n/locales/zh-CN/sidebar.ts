@@ -23,6 +23,7 @@ export const sidebar: Messages["sidebar"] = {
     showLess: "收起",
   },
   header: {
+    discussions: "讨论",
     addProject: "添加项目",
     newThread: "新建对话",
     searchPlaceholder: "搜索",

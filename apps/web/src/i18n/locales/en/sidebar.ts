@@ -21,6 +21,7 @@ export const sidebar = {
     showLess: "Show less",
   },
   header: {
+    discussions: "Discussions",
     addProject: "Add project",
     newThread: "New thread",
     searchPlaceholder: "Search",

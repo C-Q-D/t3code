@@ -72,6 +72,7 @@ import {
   MessageSquareDashedIcon,
   LinkIcon,
   MessageSquareIcon,
+  MessagesSquareIcon,
   MonitorIcon,
   MoonIcon,
   PaletteIcon,
@@ -2195,6 +2196,30 @@ function OpenCommandPaletteDialog(props: {
       },
     });
   }
+
+  if (projectGroups.length > 0) {
+    actionItems.push({
+      kind: "action",
+      value: "action:new-discussion",
+      searchTerms: ["new discussion", "discuss", "meeting", "新建讨论", "讨论"],
+      title: t.tools.palette.newDiscussion,
+      icon: <MessagesSquareIcon className={ITEM_ICON_CLASS} />,
+      run: async () => {
+        await navigate({ to: "/discussions/new" });
+      },
+    });
+  }
+
+  actionItems.push({
+    kind: "action",
+    value: "action:discussions",
+    searchTerms: ["discussions", "discussion list", "meeting", "讨论列表", "讨论"],
+    title: t.tools.palette.openDiscussions,
+    icon: <MessagesSquareIcon className={ITEM_ICON_CLASS} />,
+    run: async () => {
+      await navigate({ to: "/discussions" });
+    },
+  });
 
   actionItems.push({
     kind: "action",
