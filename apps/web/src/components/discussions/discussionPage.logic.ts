@@ -1,20 +1,25 @@
 /** Derives route eligibility and the discussion header/seat strip without starting subscriptions. */
 import type { Discussion, DiscussionId, EnvironmentId } from "@t3tools/contracts";
+import type { AnyRouter } from "@tanstack/react-router";
 import * as Option from "effect/Option";
 import type { discussions } from "~/i18n/locales/en/discussions";
 
 /**
  * Keeps a delayed deletion response from replacing a page the user has since opened.
- * @param currentDiscussion Decoded parameters of the current discussion-detail match, or undefined on another route.
+ * @param router Router supplying its latest address and synchronous route matching, including unfinished navigation.
  * @param environmentId Environment containing the deleted discussion.
  * @param discussionId Discussion whose deletion was submitted.
  * @returns Whether the current route still belongs to that discussion, even after its projection disappears.
  */
 export function discussionDeleteShouldNavigate(
-  currentDiscussion: { environmentId: string; discussionId: string } | undefined,
+  router: Pick<AnyRouter, "latestLocation" | "matchRoutes">,
   environmentId: string,
   discussionId: string,
 ): boolean {
+  // Committed matches can still describe the deleted discussion while another page loads.
+  const currentDiscussion = router
+    .matchRoutes(router.latestLocation)
+    .find((match) => match.routeId === "/_chat/discussions/$environmentId/$discussionId")?.params;
   return (
     currentDiscussion?.environmentId === environmentId &&
     currentDiscussion.discussionId === discussionId

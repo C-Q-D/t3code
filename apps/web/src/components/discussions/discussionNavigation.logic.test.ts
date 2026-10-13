@@ -36,16 +36,31 @@ describe("discussionNavigationState", () => {
   });
 });
 
-/** Creates real installed-router matches while excluding application subscriptions and RPCs. */
-function createDiscussionRouter(pathname: string) {
+/**
+ * Creates real router matches without application subscriptions or RPCs.
+ * @param pathname Initial history address.
+ * @param threadLoader Optional controlled loader for a destination thread.
+ * @param detailLoader Optional controlled loader for discussion content.
+ * @returns An isolated memory-history router using the installed implementation.
+ */
+function createDiscussionRouter(
+  pathname: string,
+  threadLoader?: () => Promise<void>,
+  detailLoader?: () => Promise<void>,
+) {
   const root = createRootRoute();
   const chat = createRoute({ getParentRoute: () => root, id: "_chat" });
   const detail = createRoute({
     getParentRoute: () => chat,
     path: "discussions/$environmentId/$discussionId",
+    ...(detailLoader ? { loader: detailLoader } : {}),
   });
   const list = createRoute({ getParentRoute: () => chat, path: "discussions" });
-  const thread = createRoute({ getParentRoute: () => chat, path: "$environmentId/$threadId" });
+  const thread = createRoute({
+    getParentRoute: () => chat,
+    path: "$environmentId/$threadId",
+    ...(threadLoader ? { loader: threadLoader } : {}),
+  });
   return createRouter({
     routeTree: root.addChildren([chat.addChildren([detail, list, thread])]),
     history: createMemoryHistory({ initialEntries: [pathname] }),
@@ -53,6 +68,59 @@ function createDiscussionRouter(pathname: string) {
 }
 
 describe("discussion deletion navigation", () => {
+  it("does not redirect after leaving a discussion while the destination loader is pending", async () => {
+    let enterLoader!: () => void;
+    let finishLoader!: () => void;
+    const entered = new Promise<void>((resolve) => {
+      enterLoader = resolve;
+    });
+    const unfinished = new Promise<void>((resolve) => {
+      finishLoader = resolve;
+    });
+    const router = createDiscussionRouter("/discussions/env/a", async () => {
+      enterLoader();
+      await unfinished;
+    });
+    await router.load();
+    router.history.push("/env/thread");
+    const loading = router.load();
+    await entered;
+    try {
+      expect(router.latestLocation.pathname).toBe("/env/thread");
+      expect(router.state.matches.at(-1)?.routeId).toBe(
+        "/_chat/discussions/$environmentId/$discussionId",
+      );
+      expect(discussionDeleteShouldNavigate(router, "env", "a")).toBe(false);
+    } finally {
+      finishLoader();
+      await loading;
+    }
+  });
+
+  it("still redirects when deletion removes content without changing the discussion address", async () => {
+    let enterLoader!: () => void;
+    let finishLoader!: () => void;
+    const entered = new Promise<void>((resolve) => {
+      enterLoader = resolve;
+    });
+    const unfinished = new Promise<void>((resolve) => {
+      finishLoader = resolve;
+    });
+    const router = createDiscussionRouter("/discussions/env/a", undefined, async () => {
+      enterLoader();
+      await unfinished;
+    });
+    const loading = router.load();
+    await entered;
+    try {
+      expect(router.state.matches).toEqual([]);
+      expect(discussionDeleteShouldNavigate(router, "env", "a")).toBe(true);
+    } finally {
+      finishLoader();
+      await loading;
+    }
+  });
+
   it.each([
     { pathname: "/discussions/env/a", expected: true },
     { pathname: "/discussions/env/b", expected: false },
@@ -62,15 +130,7 @@ describe("discussion deletion navigation", () => {
   ])("$pathname", async ({ pathname, expected }) => {
     const router = createDiscussionRouter(pathname);
     await router.load();
-    expect(
-      discussionDeleteShouldNavigate(
-        router.state.matches.find(
-          (match) => match.routeId === "/_chat/discussions/$environmentId/$discussionId",
-        )?.params,
-        "env",
-        "a",
-      ),
-    ).toBe(expected);
+    expect(discussionDeleteShouldNavigate(router, "env", "a")).toBe(expected);
   });
 });
 
@@ -85,14 +145,6 @@ describe("encoded discussion identity", () => {
       `/discussions/${encodeURIComponent(environmentId)}/${encodeURIComponent(discussionId)}`,
     );
     await router.load();
-    expect(
-      discussionDeleteShouldNavigate(
-        router.state.matches.find(
-          (match) => match.routeId === "/_chat/discussions/$environmentId/$discussionId",
-        )?.params,
-        environmentId,
-        discussionId,
-      ),
-    ).toBe(true);
+    expect(discussionDeleteShouldNavigate(router, environmentId, discussionId)).toBe(true);
   });
 });

@@ -302,15 +302,7 @@ export function DiscussionPage({
     setHeaderPending(true);
     const result = await remove({ environmentId, input: { discussionId: discussion.id } });
     if (result._tag === "Success") {
-      if (
-        discussionDeleteShouldNavigate(
-          router.state.matches.find(
-            (match) => match.routeId === "/_chat/discussions/$environmentId/$discussionId",
-          )?.params,
-          environmentId,
-          discussion.id,
-        )
-      )
+      if (discussionDeleteShouldNavigate(router, environmentId, discussion.id))
         await navigate({ to: "/discussions", replace: true });
       return;
     }
