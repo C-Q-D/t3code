@@ -50,6 +50,13 @@ export const discussions: Messages["discussions"] = {
     retry: "重试",
     missing: (path: string) => `没有找到 ${path} 的改动，下面是这次发言的全部改动。`,
   },
+  seatThread: {
+    title: (title: string, persona: string | null) =>
+      persona ? `这是讨论「${title}」中${persona}的座位线程` : `这是讨论「${title}」的座位线程`,
+    fallback: "这是一场讨论的座位线程",
+    description: "发言由讨论驱动，在这里发的消息不会进入讨论记录。",
+    open: "打开讨论",
+  },
   alerts: {
     stopped: (name: string) => `讨论已停下。点"继续"，${name}会重新发言。`,
     restarted: '桌面端重启过，讨论已停下。点"继续"恢复。',

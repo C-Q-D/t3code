@@ -2,6 +2,7 @@
 import { t } from "~/i18n";
 import { ThreadFind, ThreadFindCanvas, type ThreadFindControls } from "./chat/ThreadFindProvider";
 import { THREAD_FIND_BAR_RESERVED_HEIGHT } from "./chat/ThreadFindBar";
+import { useDiscussionSeatBanner } from "./discussions/DiscussionSeatBanner";
 import { usageLimitRecoveryBannerItem } from "./chat/UsageLimitRecoveryBanner";
 import {
   resolveBackgroundDraftWorkspaceOptions,
@@ -7849,7 +7850,13 @@ export default function ChatView(props: ChatViewProps) {
           },
         })
       : null;
+  const discussionSeatBanner = useDiscussionSeatBanner(
+    isServerThread && activeThreadShell?.discussion
+      ? { environmentId, ...activeThreadShell.discussion }
+      : null,
+  );
   const composerBannerItems = useMemo<ComposerBannerStackItem[]>(() => {
+    const discussionSeatItems = discussionSeatBanner === null ? [] : [discussionSeatBanner];
     const limitRecoveryItems = limitRecoveryBanner === null ? [] : [limitRecoveryBanner];
     const backgroundWorkItems = [
       childInputBannerItem,
@@ -7867,6 +7874,7 @@ export default function ChatView(props: ChatViewProps) {
         ...projectCloneItems,
         ...systemComposerBannerItems,
         ...backgroundWorkItems,
+        ...discussionSeatItems,
       ];
     }
     return [
@@ -7876,6 +7884,7 @@ export default function ChatView(props: ChatViewProps) {
       ...projectCloneItems,
       ...systemComposerBannerItems,
       ...backgroundWorkItems,
+      ...discussionSeatItems,
       {
         id: `branch-mismatch:${activeBranchMismatchKey}`,
         variant: "info",
@@ -7921,6 +7930,7 @@ export default function ChatView(props: ChatViewProps) {
       },
     ];
   }, [
+    discussionSeatBanner,
     activeBranchMismatchKey,
     activeThreadShell,
     serverRuntime?.usageLimitResetAt,

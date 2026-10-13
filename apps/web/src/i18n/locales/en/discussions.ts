@@ -51,6 +51,16 @@ export const discussions = {
     missing: (path: string) =>
       `No changes were found for ${path}. All changes from this statement are shown below.`,
   },
+  seatThread: {
+    title: (title: string, persona: string | null) =>
+      persona
+        ? `This is ${persona}’s seat thread in the discussion “${title}”`
+        : `This is a seat thread in the discussion “${title}”`,
+    fallback: "This is a discussion seat thread",
+    description:
+      "Speaking turns are driven by the discussion. Messages sent here will not be added to the discussion record.",
+    open: "Open discussion",
+  },
   alerts: {
     stopped: (name: string) =>
       `The discussion is paused. Select "Continue" and ${name} will speak again.`,
