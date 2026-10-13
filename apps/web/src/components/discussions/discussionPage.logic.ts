@@ -128,16 +128,19 @@ export function discussionSeatStrip(discussion: Discussion): DiscussionStripItem
     }
     return items;
   }
-  // end() lets an in-flight ordinary statement finish before its next seat begins the final round.
+  // End preserves the ordinary assignment, including its paused retry. Legacy snapshots lack
+  // phase, so only their multi-seat order can distinguish that assignment from a final statement.
   const ordinaryInFlight =
-    discussion.status === "closing" &&
+    (discussion.status === "closing" || paused) &&
     plan?.phase === "final_round" &&
-    discussion.seats.length > 1 &&
-    discussion.seats[currentIndex]?.id !== plan.remainingFinalSeatIds[0];
+    (discussion.cursor.phase === undefined
+      ? discussion.seats.length > 1 &&
+        discussion.seats[currentIndex]?.id !== plan.remainingFinalSeatIds[0]
+      : discussion.cursor.phase === "regular");
   if (ordinaryInFlight)
     items.push(
       { kind: "segment", label: "round", round: discussion.cursor.round },
-      { kind: "seat", index: currentIndex, state: "current", tags: ["speaking"] },
+      { kind: "seat", index: currentIndex, state: "current", tags: [...currentTags] },
     );
   items.push({ kind: "segment", label: "final" });
   discussion.seats.forEach((seat, index) => {

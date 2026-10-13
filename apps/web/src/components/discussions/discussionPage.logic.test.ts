@@ -45,6 +45,7 @@ const base = Schema.decodeSync(Discussion)({
   ],
   status: "speaking",
   cursor: {
+    phase: "regular",
     seatIndex: 1,
     round: 3,
     dispatchNo: 0,
@@ -97,15 +98,30 @@ describe("discussion header", () => {
       expected: { label: "已停下", variant: "warning", actions: ["resume", "end"] },
     },
     {
-      snapshot: { ...base, status: "closing", closing },
+      snapshot: {
+        ...base,
+        status: "closing",
+        cursor: { ...base.cursor, phase: "final_round" },
+        closing,
+      },
       expected: { label: "收尾中 · 最后陈述", variant: "info", actions: ["stop"] },
     },
     {
-      snapshot: { ...base, status: "closing", closing: { ...closing, phase: "summarizing" } },
+      snapshot: {
+        ...base,
+        status: "closing",
+        cursor: { ...base.cursor, phase: "summarizing" },
+        closing: { ...closing, phase: "summarizing" },
+      },
       expected: { label: "收尾中 · 梳理", variant: "info", actions: ["stop"] },
     },
     {
-      snapshot: { ...base, status: "paused", closing },
+      snapshot: {
+        ...base,
+        status: "paused",
+        cursor: { ...base.cursor, phase: "final_round" },
+        closing,
+      },
       expected: { label: "已停下", variant: "warning", actions: ["resume"] },
     },
     {
@@ -161,7 +177,12 @@ describe("ordered discussion seat strip", () => {
     },
     {
       name: "final statements",
-      snapshot: { ...base, status: "closing", closing },
+      snapshot: {
+        ...base,
+        status: "closing",
+        cursor: { ...base.cursor, phase: "final_round" },
+        closing,
+      },
       expected: [
         "final",
         "0:done:summarizer",
@@ -197,6 +218,7 @@ describe("ordered discussion seat strip", () => {
       snapshot: {
         ...base,
         status: "closing",
+        cursor: { ...base.cursor, phase: "final_round" },
         closing: { ...closing, remainingFinalSeatIds: [base.seats[1]!.id] },
       },
       expected: [
@@ -213,6 +235,7 @@ describe("ordered discussion seat strip", () => {
       snapshot: {
         ...base,
         status: "closing",
+        cursor: { ...base.cursor, seatIndex: 0, phase: "summarizing" },
         closing: { ...closing, phase: "summarizing", remainingFinalSeatIds: [] },
       },
       expected: [
@@ -226,7 +249,13 @@ describe("ordered discussion seat strip", () => {
     },
     {
       name: "paused final statement",
-      snapshot: { ...base, status: "paused", pause: { reason: "stopped" }, closing },
+      snapshot: {
+        ...base,
+        status: "paused",
+        cursor: { ...base.cursor, phase: "final_round" },
+        pause: { reason: "stopped" },
+        closing,
+      },
       expected: [
         "final",
         "0:done:summarizer",
@@ -241,6 +270,7 @@ describe("ordered discussion seat strip", () => {
       snapshot: {
         ...base,
         status: "paused",
+        cursor: { ...base.cursor, seatIndex: 0, phase: "summarizing" },
         pause: { reason: "seat_failed" },
         closing: { ...closing, phase: "summarizing", remainingFinalSeatIds: [] },
       },
@@ -258,9 +288,126 @@ describe("ordered discussion seat strip", () => {
       snapshot: {
         ...base,
         status: "ended",
+        cursor: { ...base.cursor, seatIndex: 0, phase: "summarizing" },
         closing: { ...closing, phase: "summarizing", remainingFinalSeatIds: [] },
       },
       expected: ["final", "0:done:", "1:done:", "2:done:", "summary", "0:done:summarizer"],
+    },
+    {
+      name: "two seats stop the ordinary statement after End",
+      snapshot: {
+        ...base,
+        seats: base.seats.slice(0, 2),
+        status: "paused",
+        cursor: { ...base.cursor, seatIndex: 0, phase: "regular" },
+        pause: { reason: "stopped" },
+        closing: { ...closing, remainingFinalSeatIds: [base.seats[1]!.id, base.seats[0]!.id] },
+      },
+      expected: [
+        "round:3",
+        "0:current:interrupted,next",
+        "final",
+        "0:next:summarizer",
+        "1:next:",
+        "summary",
+        "0:next:",
+      ],
+    },
+    {
+      name: "two seats fail the ordinary statement after End",
+      snapshot: {
+        ...base,
+        seats: base.seats.slice(0, 2),
+        status: "paused",
+        cursor: { ...base.cursor, seatIndex: 0, phase: "regular" },
+        pause: { reason: "seat_failed" },
+        closing: { ...closing, remainingFinalSeatIds: [base.seats[1]!.id, base.seats[0]!.id] },
+      },
+      expected: [
+        "round:3",
+        "0:current:failed,next",
+        "final",
+        "0:next:summarizer",
+        "1:next:",
+        "summary",
+        "0:next:",
+      ],
+    },
+    {
+      name: "single seat completes its ordinary statement before the final statement",
+      snapshot: {
+        ...base,
+        seats: base.seats.slice(0, 1),
+        status: "closing",
+        cursor: { ...base.cursor, seatIndex: 0, phase: "regular" },
+        closing: { ...closing, remainingFinalSeatIds: [base.seats[0]!.id] },
+      },
+      expected: [
+        "round:3",
+        "0:current:speaking",
+        "final",
+        "0:next:next,summarizer",
+        "summary",
+        "0:next:",
+      ],
+    },
+    {
+      name: "single seat retries its paused ordinary statement before the final statement",
+      snapshot: {
+        ...base,
+        seats: base.seats.slice(0, 1),
+        status: "paused",
+        cursor: { ...base.cursor, seatIndex: 0, phase: "regular" },
+        pause: { reason: "stopped" },
+        closing: { ...closing, remainingFinalSeatIds: [base.seats[0]!.id] },
+      },
+      expected: [
+        "round:3",
+        "0:current:interrupted,next",
+        "final",
+        "0:next:summarizer",
+        "summary",
+        "0:next:",
+      ],
+    },
+    {
+      name: "single seat final statement leads directly to summary",
+      snapshot: {
+        ...base,
+        seats: base.seats.slice(0, 1),
+        status: "closing",
+        cursor: { ...base.cursor, seatIndex: 0, phase: "final_round" },
+        closing: { ...closing, remainingFinalSeatIds: [base.seats[0]!.id] },
+      },
+      expected: ["final", "0:current:speaking,summarizer", "summary", "0:next:next"],
+    },
+    {
+      name: "legacy paused ordinary statement uses the final seat order fallback",
+      snapshot: {
+        ...base,
+        seats: base.seats.slice(0, 2),
+        status: "paused",
+        cursor: {
+          seatIndex: 0,
+          round: 3,
+          dispatchNo: 0,
+          runId: null,
+          dispatchedEntrySeq: 0,
+          briefChars: 0,
+          briefSentAsFile: false,
+        },
+        pause: { reason: "stopped" },
+        closing: { ...closing, remainingFinalSeatIds: [base.seats[1]!.id, base.seats[0]!.id] },
+      },
+      expected: [
+        "round:3",
+        "0:current:interrupted,next",
+        "final",
+        "0:next:summarizer",
+        "1:next:",
+        "summary",
+        "0:next:",
+      ],
     },
     {
       name: "ended without closing plan",
