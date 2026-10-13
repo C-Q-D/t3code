@@ -1,8 +1,20 @@
-/** English copy for discussion navigation and placeholder routes. */
+/** English copy for discussion navigation, the list and future page placeholders. */
 export const discussions = {
   title: "Discussions",
   newTitle: "New discussion",
-  listPlaceholder: "The discussion list will be available in a later version.",
+  ongoing: (count: number) => `In progress · ${count}`,
+  endedGroup: (count: number) => `Ended · ${count}`,
+  round: (round: number) => `Round ${round}`,
+  totalRounds: (round: number) => `${round} rounds total`,
+  speaking: (personaName: string) => (personaName ? `Speaking · ${personaName}` : "Speaking"),
+  closing: "Closing",
+  paused: "Stopped",
+  seatFailed: "Stopped · Speaking failed",
+  ended: "Ended",
+  deletedProject: "Deleted project",
+  empty: "No discussions yet",
+  loading: "Loading discussions…",
+  loadFailed: "Could not load discussions",
   newPlaceholder: "Creating discussions will be available in a later version.",
   pagePlaceholder: "The discussion page will be available in a later version.",
 };

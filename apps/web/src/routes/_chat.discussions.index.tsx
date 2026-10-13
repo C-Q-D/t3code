@@ -1,16 +1,5 @@
-/** Reserves the all-project discussion list route until its list view is available. */
+/** Mounts the all-project discussion list under the persistent chat sidebar. */
 import { createFileRoute } from "@tanstack/react-router";
-import { DiscussionPlaceholderPage } from "../components/discussions/DiscussionPlaceholderPage";
-import { t } from "~/i18n";
+import { DiscussionListPage } from "../components/discussions/DiscussionListPage";
 
-/** Displays the list route's localized title and availability message. */
-function DiscussionListRoute() {
-  return (
-    <DiscussionPlaceholderPage
-      title={t.discussions.title}
-      message={t.discussions.listPlaceholder}
-    />
-  );
-}
-
-export const Route = createFileRoute("/_chat/discussions/")({ component: DiscussionListRoute });
+export const Route = createFileRoute("/_chat/discussions/")({ component: DiscussionListPage });
