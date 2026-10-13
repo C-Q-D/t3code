@@ -1,4 +1,4 @@
-/** Renders persisted discussion records; live speaking blocks, read receipts and closing entries are separate work. */
+/** Renders persisted discussion records, read receipts and closing results; live speaking belongs to its own block. */
 import { useAtomValue } from "@effect/atom-react";
 import type {
   Discussion,
@@ -21,7 +21,8 @@ import { PixelAvatar } from "./PixelAvatar";
 import { discussionModelLabel } from "./discussionModelLabel";
 import { discussionSeatColor } from "./discussionSeatColors";
 import {
-  discussionFilesSummary,
+  discussionEntryFiles,
+  discussionUserView,
   discussionStatementHeading,
   discussionTranscriptItems,
   type DiscussionStatementHeading,
@@ -37,6 +38,11 @@ type DiscussionEntryRowProps = DiscussionStatementHeading & {
   cwd: string | undefined;
   seatNumber: number;
   avatar: DiscussionPersonaAvatar;
+  receiptLabel: string | null;
+  receiptAvatar: DiscussionPersonaAvatar;
+  receiptSeatNumber: number;
+  receiptAvatarState: "idle" | "next";
+  userRead: boolean;
 };
 
 /**
@@ -49,6 +55,13 @@ type DiscussionEntryRowProps = DiscussionStatementHeading & {
  * @param props.personaName Resolved heading identity or the deleted-persona fallback.
  * @param props.modelLabel Shared instance/model label, with catalog fallbacks applied.
  * @param props.roundLabel Persisted entry round, null when not provided.
+ * @param props.turnBadge Final-statement or summary tag, null for ordinary statements.
+ * @param props.avatarState Done for summary entries, idle for persisted statements.
+ * @param props.receiptLabel Interjection receipt text, null for the topic and AI entries.
+ * @param props.receiptAvatar Frozen seat sprite shown with the receipt.
+ * @param props.receiptSeatNumber One-based receipt color, zero when no avatar is available.
+ * @param props.receiptAvatarState Idle when read, next when pending for a known seat.
+ * @param props.userRead Whether the bubble uses a solid border; the topic counts as read.
  * @param props.threadId Entry-specific thread, seat fallback, or null when unavailable.
  * @param props.statusLabel Interrupted/failed text, null for completed entries.
  * @param props.badgeVariant Warning/error presentation, null for completed entries.
@@ -60,21 +73,47 @@ function DiscussionEntryRow(props: DiscussionEntryRowProps) {
     return (
       <div className="grid grid-cols-[28px_minmax(0,1fr)] gap-x-3.5">
         <PixelAvatar role="user" seat={0} size={28} />
-        <div className="flex min-w-0 justify-end">
-          <div
-            className="max-w-[80%] whitespace-pre-wrap break-words rounded-2xl border border-border px-3.5 py-2.5 text-sm leading-relaxed"
-            style={{ background: "color-mix(in srgb, var(--foreground) 6%, var(--card))" }}
-          >
-            {entry.text}
+        <div className="flex min-w-0 flex-col gap-1.5">
+          {props.receiptLabel ? (
+            <div className="flex min-h-7 items-center gap-2">
+              <span
+                aria-hidden="true"
+                className="min-w-4 flex-1 border-t border-dashed border-foreground/15"
+              />
+              <span className="text-xs text-muted-foreground">{props.receiptLabel}</span>
+              {props.receiptSeatNumber > 0 ? (
+                <PixelAvatar
+                  role={props.receiptAvatar}
+                  seat={props.receiptSeatNumber}
+                  size={18}
+                  state={props.receiptAvatarState}
+                />
+              ) : null}
+            </div>
+          ) : null}
+          <div className="flex justify-end">
+            <div
+              className={`max-w-[80%] whitespace-pre-wrap break-words rounded-2xl border border-border px-3.5 py-2.5 text-sm leading-relaxed ${props.userRead ? "" : "border-dashed"}`}
+              style={{ background: "color-mix(in srgb, var(--foreground) 6%, var(--card))" }}
+            >
+              {entry.text}
+            </div>
           </div>
         </div>
       </div>
     );
-  const files = discussionFilesSummary(entry.files, t.discussions);
+  const files = discussionEntryFiles(entry, t.discussions);
   return (
     <div className="grid grid-cols-[28px_minmax(0,1fr)] gap-x-3.5">
-      <PixelAvatar role={props.avatar} seat={props.seatNumber} size={28} />
-      <div className="flex min-w-0 flex-col gap-2">
+      <PixelAvatar
+        role={props.avatar}
+        seat={props.seatNumber}
+        size={28}
+        state={props.avatarState}
+      />
+      <div
+        className={`flex min-w-0 flex-col gap-2 ${entry.kind === "summary" ? "rounded-xl border bg-card p-3.5" : ""}`}
+      >
         <div className="flex min-h-7 items-center gap-2 text-sm">
           <span className="max-w-32 shrink-0 truncate font-medium">{props.personaName}</span>
           <span className="min-w-0 truncate text-xs text-muted-foreground">{props.modelLabel}</span>
@@ -83,6 +122,7 @@ function DiscussionEntryRow(props: DiscussionEntryRowProps) {
               {props.roundLabel}
             </span>
           ) : null}
+          {props.turnBadge ? <Badge variant="secondary">{props.turnBadge}</Badge> : null}
           {props.statusLabel && props.badgeVariant ? (
             <Badge variant={props.badgeVariant}>{props.statusLabel}</Badge>
           ) : null}
@@ -108,7 +148,7 @@ function DiscussionEntryRow(props: DiscussionEntryRowProps) {
             }
           />
         ) : null}
-        {files.kind !== "files" ? (
+        {files === null ? null : files.kind !== "files" ? (
           <p className="text-xs text-muted-foreground">{files.label}</p>
         ) : (
           <div className="overflow-hidden rounded-lg border bg-card">
@@ -134,6 +174,36 @@ function DiscussionEntryRow(props: DiscussionEntryRowProps) {
 }
 
 const MemoizedDiscussionEntryRow = memo(DiscussionEntryRow);
+
+/**
+ * Shows the shared next assignment without rerendering when unrelated stream text grows.
+ * @param props.avatar Frozen persona sprite.
+ * @param props.seatNumber One-based seat color.
+ * @param props.personaName Next speaker's frozen identity.
+ * @param props.label Unread-interjection notice, null when none remain.
+ * @returns A pending avatar, next badge and optional notice.
+ */
+function DiscussionNextRow(props: {
+  avatar: DiscussionPersonaAvatar;
+  seatNumber: number;
+  personaName: string;
+  label: string | null;
+}) {
+  return (
+    <div className="grid grid-cols-[28px_minmax(0,1fr)] items-center gap-x-3.5">
+      <PixelAvatar role={props.avatar} seat={props.seatNumber} size={28} state="next" />
+      <div className="flex min-w-0 flex-wrap items-center gap-2 text-muted-foreground">
+        <span className="text-sm font-medium">{props.personaName}</span>
+        <span className="text-muted-foreground">
+          <Badge variant="outline">{t.discussions.page.next}</Badge>
+        </span>
+        {props.label ? <span className="text-xs">{props.label}</span> : null}
+      </div>
+    </div>
+  );
+}
+
+const MemoizedDiscussionNextRow = memo(DiscussionNextRow);
 
 /**
  * Reads the route's shared subscription atom and follows growth only while the reader is near the bottom.
@@ -180,7 +250,11 @@ export function DiscussionTranscript({
       return discussionModelLabel(seat.modelSelection, instance, model);
     });
   }, [discussion.seats, providers, settings]);
-  const items = useMemo(() => discussionTranscriptItems(entries), [entries]);
+  const items = useMemo(
+    () => discussionTranscriptItems(entries, discussion, t.discussions),
+    [entries, discussion],
+  );
+  const topicId = entries.find((entry) => entry.kind === "user")?.id;
   const viewportRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const followsBottom = useRef(true);
@@ -229,9 +303,44 @@ export function DiscussionTranscript({
               </div>
             );
           }
+          if (item.kind === "closing")
+            return (
+              <div
+                key={`closing-${item.id}`}
+                className="flex items-center gap-3 text-xs text-muted-foreground"
+              >
+                <span aria-hidden="true" className="h-px min-w-0 flex-1 bg-foreground/12" />
+                <span>{item.label}</span>
+                <span aria-hidden="true" className="h-px min-w-0 flex-1 bg-foreground/12" />
+              </div>
+            );
+          if (item.kind === "footer")
+            return (
+              <p key="ended-footer" className="text-center text-xs text-muted-foreground">
+                {item.label}
+              </p>
+            );
+          if (item.kind === "next") {
+            const seat = discussion.seats[item.seatIndex]!;
+            return (
+              <MemoizedDiscussionNextRow
+                key="next-speaker"
+                avatar={seat.avatar}
+                seatNumber={item.seatIndex + 1}
+                personaName={seat.personaName}
+                label={item.label}
+              />
+            );
+          }
           const entry = item.entry;
           const seatIndex = discussion.seats.findIndex((seat) => seat.id === entry.seatId);
           const seat = discussion.seats[seatIndex];
+          const userView =
+            entry.kind === "user"
+              ? discussionUserView(entry, entry.id === topicId, discussion, t.discussions)
+              : null;
+          const receiptSeat =
+            userView?.seatIndex == null ? undefined : discussion.seats[userView.seatIndex];
           const heading = discussionStatementHeading(
             entry,
             seat,
@@ -248,8 +357,7 @@ export function DiscussionTranscript({
                   style={
                     entry.kind === "user"
                       ? {
-                          borderLeft:
-                            "1px dashed color-mix(in srgb, var(--foreground) 18%, transparent)",
+                          borderLeft: `1px ${userView?.read ? "solid" : "dashed"} color-mix(in srgb, var(--foreground) 18%, transparent)`,
                         }
                       : {
                           width: 1,
@@ -264,6 +372,11 @@ export function DiscussionTranscript({
                 cwd={cwd}
                 seatNumber={seatIndex + 1}
                 avatar={seat?.avatar ?? "architect"}
+                receiptLabel={userView?.label ?? null}
+                receiptAvatar={receiptSeat?.avatar ?? "architect"}
+                receiptSeatNumber={userView?.seatIndex == null ? 0 : userView.seatIndex + 1}
+                receiptAvatarState={userView?.avatarState ?? "idle"}
+                userRead={userView?.read ?? true}
                 {...heading}
               />
             </article>

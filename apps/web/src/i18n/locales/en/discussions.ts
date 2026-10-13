@@ -67,5 +67,18 @@ export const discussions = {
     filesPending: "Change statistics are not available yet",
     changedFiles: (count: number) => `${count} ${count === 1 ? "file" : "files"} changed`,
     transcript: "Discussion record",
+    interjection: "Interjection",
+    interjectionRead: (name: string) => `Interjection · Read by ${name}`,
+    interjectionPaused: (name: string) =>
+      `Interjection · ${name} will read it when they speak again`,
+    interjectionUnread: (name: string) => `Interjection · ${name} will read it when they speak`,
+    nextUnreadPaused: (count: number) =>
+      `Will read the ${count} ${count === 1 ? "interjection" : "interjections"} above when speaking again`,
+    nextUnread: (count: number) =>
+      `Will read the ${count} ${count === 1 ? "interjection" : "interjections"} above when speaking`,
+    closingBoundaryPlain: "Discussion ends here",
+    closingBoundary: (name: string) => `Discussion ends here · Summarizer: ${name}`,
+    endedFooter:
+      "This discussion has ended. The record is kept. Start a new discussion to continue.",
   },
 };
