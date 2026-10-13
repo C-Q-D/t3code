@@ -1,4 +1,6 @@
 import * as UsageLimitRecoveryWorker from "./UsageLimitRecoveryWorker.ts";
+import * as DiscussionDeveloperContext from "../discussions/DiscussionDeveloperContext.ts";
+import * as DiscussionCheckpointRecovery from "../discussions/DiscussionCheckpointRecovery.ts";
 import * as Scheduler from "../scheduling/Scheduler.ts";
 import * as Layer from "effect/Layer";
 import * as OrchestrationCommandReceipts from "../persistence/OrchestrationCommandReceipts.ts";
@@ -143,6 +145,7 @@ const layerProviderAuthServiceProvided = ProviderAuthService.layer.pipe(
 const layerRunExecutionServiceProvided = RunExecutionService.layer.pipe(
   Layer.provide(
     Layer.mergeAll(
+      DiscussionDeveloperContext.layer.pipe(Layer.provide(ProjectionStore.layer)),
       McpAppModelContext.layer,
       layerCheckpointServiceProvided,
       layerEventSinkProvided,
@@ -310,7 +313,15 @@ const layerEffectExecutorProvided = EffectWorker.layerExecutor.pipe(
   ),
 );
 const layerEffectWorkerProvided = EffectWorker.layer.pipe(
-  Layer.provide(Layer.merge(layerStores, layerEffectExecutorProvided)),
+  Layer.provide(
+    Layer.merge(
+      layerStores,
+      DiscussionCheckpointRecovery.layerExecutor.pipe(
+        Layer.provide(layerEffectExecutorProvided),
+        Layer.provide(DiscussionCheckpointRecovery.layer),
+      ),
+    ),
+  ),
 );
 const layerProviderRuntimeRecoveryProvided = ProviderRuntimeRecoveryService.layer.pipe(
   Layer.provide(

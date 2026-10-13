@@ -40,6 +40,8 @@ import * as PullRequestHttp from "./pullRequest/http.ts";
 import * as PullRequestProviderRegistry from "./pullRequest/PullRequestProviderRegistry.ts";
 import * as PullRequestService from "./pullRequest/PullRequestService.ts";
 import * as DiscussionTemplates from "./discussions/DiscussionTemplateService.ts";
+import * as Discussions from "./discussions/DiscussionService.ts";
+import * as DiscussionStore from "./discussions/DiscussionStore.ts";
 import * as SqlitePersistence from "./persistence/Sqlite.ts";
 import * as PullRequestFilesViewed from "./persistence/PullRequestFilesViewed.ts";
 import * as ServerLifecycleEvents from "./serverLifecycleEvents.ts";
@@ -549,6 +551,19 @@ const layerProviderInstallationRefresh = Layer.effectDiscard(
 
 const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
   DiscussionTemplates.layer,
+  Layer.effectDiscard(
+    Effect.gen(function* () {
+      const discussions = yield* Discussions.DiscussionService;
+      yield* discussions.start();
+    }),
+  ).pipe(
+    Layer.provideMerge(Discussions.layer),
+    Layer.provide(DiscussionStore.layer),
+    Layer.provide(RuntimeLayer.layerEventSink),
+    Layer.provide(ProviderAdapterRegistry.layerFromProviderInstanceRegistry),
+    Layer.provide(layerCheckpointStore),
+    Layer.provide(ProjectionStoreV2.layer),
+  ),
   AgentAwarenessRelay.layer,
   // Asks T3 Connect to deliver webhooks it held while this environment was offline.
   HeldHooksWaker.layer,

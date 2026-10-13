@@ -6,6 +6,7 @@ import {
   DiscussionPrompt,
   DiscussionTemplate,
   type DiscussionId,
+  type DiscussionEntryId,
   type DiscussionPromptId,
   type DiscussionTemplateId,
   type DiscussionSeatId,
@@ -51,9 +52,9 @@ export class DiscussionStore extends Context.Service<
     readonly updateDiscussion: (discussion: Discussion) => Effect.Effect<void, DiscussionError>;
     /** Returns null when id is absent. */
     readonly getDiscussion: (id: DiscussionId) => Effect.Effect<Discussion | null, DiscussionError>;
-    /** Lists only the selected project's discussions by creation time then id. */
+    /** Omitted projectId lists all projects; newest update first, then id for stable ties. */
     readonly listDiscussions: (
-      projectId: ProjectId,
+      projectId?: ProjectId,
     ) => Effect.Effect<ReadonlyArray<Discussion>, DiscussionError>;
     /** Deletes discussion, entries and delivery progress in a transaction. */
     readonly deleteDiscussion: (id: DiscussionId) => Effect.Effect<void, DiscussionError>;
@@ -69,6 +70,16 @@ export class DiscussionStore extends Context.Service<
     ) => Effect.Effect<ReadonlyArray<DiscussionEntry>, DiscussionError>;
     /** Returns the entry for a globally unique provider run, or null. */
     readonly getEntryByRunId: (id: RunId) => Effect.Effect<DiscussionEntry | null, DiscussionError>;
+    /**
+     * Patches the entry identified by id and returns its updated value; omitted fields keep their
+     * existing values. Explicit null files or checkpointRef clears the respective known result.
+     * Callers must ensure readBySeatId is written only for the first reader; this store does not enforce
+     * that rule. Missing entries fail not_found.
+     */
+    readonly updateEntry: (
+      id: DiscussionEntryId,
+      changes: Partial<Pick<DiscussionEntry, "files" | "checkpointRef" | "readBySeatId">>,
+    ) => Effect.Effect<DiscussionEntry, DiscussionError>;
     /** Returns persisted progress, or null for an undelivered seat. */
     readonly getSeatDelivery: (
       id: DiscussionId,
@@ -130,6 +141,8 @@ interface EntryRow {
   seat_id: string | null;
   thread_id: string | null;
   run_id: string | null;
+  round: number | null;
+  read_by_seat_id: string | null;
   text: string;
   files_json: string | null;
   status: string;
@@ -223,6 +236,8 @@ const decodeEntry = (row: EntryRow) =>
       ...(row.seat_id === null ? {} : { seatId: row.seat_id }),
       ...(row.thread_id === null ? {} : { threadId: row.thread_id }),
       ...(row.run_id === null ? {} : { runId: row.run_id }),
+      ...(row.round === null ? {} : { round: row.round }),
+      ...(row.read_by_seat_id === null ? {} : { readBySeatId: row.read_by_seat_id }),
       text: row.text,
       files:
         row.files_json === null
@@ -365,9 +380,10 @@ const make = Effect.gen(function* () {
     listDiscussions: (projectId) =>
       storageFailure(
         "list discussions",
-        sql<DiscussionRow>`SELECT * FROM discussions WHERE project_id = ${projectId} ORDER BY created_at, discussion_id`.pipe(
-          Effect.flatMap((rows) => Effect.forEach(rows, decodeDiscussion)),
-        ),
+        (projectId === undefined
+          ? sql<DiscussionRow>`SELECT * FROM discussions ORDER BY updated_at DESC, discussion_id`
+          : sql<DiscussionRow>`SELECT * FROM discussions WHERE project_id = ${projectId} ORDER BY updated_at DESC, discussion_id`
+        ).pipe(Effect.flatMap((rows) => Effect.forEach(rows, decodeDiscussion))),
       ),
     deleteDiscussion: (id) =>
       storageFailure(
@@ -390,9 +406,9 @@ const make = Effect.gen(function* () {
             entry.files === null ? null : yield* Schema.encodeEffect(filesJson)(entry.files);
           // One statement owns allocation and insertion, so concurrent writers cannot both claim the same seq.
           const rows = yield* sql<EntryRow>`INSERT INTO discussion_entries
-        (discussion_id, seq, entry_id, kind, seat_id, thread_id, run_id, text, files_json, status, checkpoint_ref, created_at)
+        (discussion_id, seq, entry_id, kind, seat_id, thread_id, run_id, round, read_by_seat_id, text, files_json, status, checkpoint_ref, created_at)
         SELECT ${entry.discussionId}, COALESCE(MAX(seq), 0) + 1, ${entry.id}, ${entry.kind},
-          ${entry.seatId ?? null}, ${entry.threadId ?? null}, ${entry.runId ?? null}, ${entry.text},
+          ${entry.seatId ?? null}, ${entry.threadId ?? null}, ${entry.runId ?? null}, ${entry.round ?? null}, ${entry.readBySeatId ?? null}, ${entry.text},
           ${files}, ${entry.status}, ${entry.checkpointRef}, ${entry.createdAt}
         FROM discussion_entries WHERE discussion_id = ${entry.discussionId} RETURNING *`;
           const row = rows[0];
@@ -418,6 +434,27 @@ const make = Effect.gen(function* () {
         "read discussion run entry",
         sql<EntryRow>`SELECT * FROM discussion_entries WHERE run_id = ${id}`.pipe(
           Effect.flatMap((rows) => (rows[0] ? decodeEntry(rows[0]) : Effect.succeed(null))),
+        ),
+      ),
+    updateEntry: (id, changes) =>
+      storageFailure(
+        "update discussion entry",
+        sql.withTransaction(
+          Effect.gen(function* () {
+            const rows =
+              yield* sql<EntryRow>`SELECT * FROM discussion_entries WHERE entry_id = ${id}`;
+            if (!rows[0])
+              return yield* new DiscussionError({
+                reason: "not_found",
+                message: "Discussion entry not found.",
+              });
+            const entry = { ...(yield* decodeEntry(rows[0])), ...changes };
+            yield* Schema.encodeEffect(DiscussionEntry)(entry);
+            const files =
+              entry.files === null ? null : yield* Schema.encodeEffect(filesJson)(entry.files);
+            yield* sql`UPDATE discussion_entries SET files_json = ${files}, checkpoint_ref = ${entry.checkpointRef}, read_by_seat_id = ${entry.readBySeatId ?? null} WHERE entry_id = ${id}`;
+            return entry;
+          }),
         ),
       ),
     getSeatDelivery: (id, seatId) =>

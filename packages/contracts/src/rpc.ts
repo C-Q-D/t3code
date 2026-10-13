@@ -1,6 +1,18 @@
 /** Defines typed RPC methods, request groups and transport errors; contains no handlers. */
 import {
   DiscussionError,
+  DiscussionListInput,
+  DiscussionListResult,
+  DiscussionIdInput,
+  DiscussionSubscriptionEvent,
+  DiscussionProviderSupportResult,
+  DiscussionEntryDiffInput,
+  DiscussionEntryDiffResult,
+  DiscussionCreateInput,
+  DiscussionMutationResult,
+  DiscussionInterjectInput,
+  DiscussionInterjectResult,
+  DiscussionEndInput,
   DiscussionPromptDeleteInput,
   DiscussionPromptDeleteResult,
   DiscussionPromptListInput,
@@ -529,6 +541,17 @@ export const WS_METHODS = {
 
   // Scheduled tasks
   discussionPromptsList: "discussionPrompts.list",
+  discussionsList: "discussions.list",
+  discussionsSubscribeList: "discussions.subscribeList",
+  discussionsSubscribe: "discussions.subscribe",
+  discussionsProviderSupport: "discussions.providerSupport",
+  discussionsGetEntryDiff: "discussions.getEntryDiff",
+  discussionsCreate: "discussions.create",
+  discussionsInterject: "discussions.interject",
+  discussionsStop: "discussions.stop",
+  discussionsContinue: "discussions.continue",
+  discussionsEnd: "discussions.end",
+  discussionsDelete: "discussions.delete",
   discussionPromptsSubscribe: "discussionPrompts.subscribe",
   discussionPromptsUpsert: "discussionPrompts.upsert",
   discussionPromptsDelete: "discussionPrompts.delete",
@@ -1805,6 +1828,74 @@ const WsSubscribeServerLifecycleRpc = Rpc.make(WS_METHODS.subscribeServerLifecyc
   stream: true,
 });
 
+const WsDiscussionsListRpc = Rpc.make(WS_METHODS.discussionsList, {
+  payload: DiscussionListInput,
+  success: DiscussionListResult,
+  error: DiscussionError,
+});
+
+const WsDiscussionsSubscribeListRpc = Rpc.make(WS_METHODS.discussionsSubscribeList, {
+  payload: DiscussionListInput,
+  success: DiscussionListResult,
+  error: DiscussionError,
+  stream: true,
+});
+
+const WsDiscussionsSubscribeRpc = Rpc.make(WS_METHODS.discussionsSubscribe, {
+  payload: DiscussionIdInput,
+  success: DiscussionSubscriptionEvent,
+  error: DiscussionError,
+  stream: true,
+});
+
+const WsDiscussionsProviderSupportRpc = Rpc.make(WS_METHODS.discussionsProviderSupport, {
+  payload: DiscussionListInput,
+  success: DiscussionProviderSupportResult,
+  error: DiscussionError,
+});
+
+const WsDiscussionsGetEntryDiffRpc = Rpc.make(WS_METHODS.discussionsGetEntryDiff, {
+  payload: DiscussionEntryDiffInput,
+  success: DiscussionEntryDiffResult,
+  error: DiscussionError,
+});
+
+const WsDiscussionsCreateRpc = Rpc.make(WS_METHODS.discussionsCreate, {
+  payload: DiscussionCreateInput,
+  success: DiscussionMutationResult,
+  error: DiscussionError,
+});
+
+const WsDiscussionsInterjectRpc = Rpc.make(WS_METHODS.discussionsInterject, {
+  payload: DiscussionInterjectInput,
+  success: DiscussionInterjectResult,
+  error: DiscussionError,
+});
+
+const WsDiscussionsStopRpc = Rpc.make(WS_METHODS.discussionsStop, {
+  payload: DiscussionIdInput,
+  success: DiscussionMutationResult,
+  error: DiscussionError,
+});
+
+const WsDiscussionsContinueRpc = Rpc.make(WS_METHODS.discussionsContinue, {
+  payload: DiscussionIdInput,
+  success: DiscussionMutationResult,
+  error: DiscussionError,
+});
+
+const WsDiscussionsEndRpc = Rpc.make(WS_METHODS.discussionsEnd, {
+  payload: DiscussionEndInput,
+  success: DiscussionMutationResult,
+  error: DiscussionError,
+});
+
+const WsDiscussionsDeleteRpc = Rpc.make(WS_METHODS.discussionsDelete, {
+  payload: DiscussionIdInput,
+  success: DiscussionIdInput,
+  error: DiscussionError,
+});
+
 const WsDiscussionPromptsListRpc = Rpc.make(WS_METHODS.discussionPromptsList, {
   payload: DiscussionPromptListInput,
   success: DiscussionPromptListResult,
@@ -1961,6 +2052,25 @@ export class RpcScopeAuthorization extends RpcMiddleware.Service<RpcScopeAuthori
   "t3/contracts/RpcScopeAuthorization",
   { error: EnvironmentAuthorizationError },
 ) {}
+
+/**
+ * Combining discussion handlers with the original server handler set produced eight TS377030
+ * diagnostics with requirements inferred as any. This group lets ws.ts build their Layer separately
+ * before merging; that arrangement passed typecheck and preserves the complete public RPC group.
+ */
+export const WsDiscussionsRpcGroup = RpcGroup.make(
+  WsDiscussionsListRpc,
+  WsDiscussionsSubscribeListRpc,
+  WsDiscussionsSubscribeRpc,
+  WsDiscussionsProviderSupportRpc,
+  WsDiscussionsGetEntryDiffRpc,
+  WsDiscussionsCreateRpc,
+  WsDiscussionsInterjectRpc,
+  WsDiscussionsStopRpc,
+  WsDiscussionsContinueRpc,
+  WsDiscussionsEndRpc,
+  WsDiscussionsDeleteRpc,
+);
 
 export const WsRpcGroup = RpcGroup.make(
   WsServerProbeRpc,
@@ -2164,4 +2274,6 @@ export const WsRpcGroup = RpcGroup.make(
   WsOrchestrationV2SubscribeArchivedShellRpc,
   WsOrchestrationV2SubscribeShellRpc,
   WsOrchestrationV2SubscribeThreadRpc,
-).middleware(RpcScopeAuthorization);
+)
+  .merge(WsDiscussionsRpcGroup)
+  .middleware(RpcScopeAuthorization);

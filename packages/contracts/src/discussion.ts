@@ -13,7 +13,11 @@ import {
   TrimmedNonEmptyString,
 } from "./baseSchemas.ts";
 import { ModelSelection } from "./modelSelection.ts";
+import { ProviderInstanceId } from "./providerInstance.ts";
 import { OrchestrationV2Actor, OrchestrationV2CreationSource } from "./orchestrationV2.ts";
+
+/** Clients warn before the transport's hard limit; material remains complete. */
+export const DISCUSSION_BRIEF_WARN_CHARS = 60_000;
 
 export const DiscussionEntryId = TrimmedNonEmptyString.pipe(Schema.brand("DiscussionEntryId"));
 /** Stable identity for one transcript entry. */
@@ -84,15 +88,19 @@ export const Discussion = Schema.Struct({
   status: Schema.Literals(["speaking", "paused", "closing", "ended"]),
   cursor: Schema.Struct({
     seatIndex: NonNegativeInt,
-    turnNo: NonNegativeInt,
+    round: PositiveInt,
+    dispatchNo: NonNegativeInt,
     runId: Schema.NullOr(RunId),
     dispatchedEntrySeq: NonNegativeInt,
+    briefChars: NonNegativeInt,
+    briefSentAsFile: Schema.Boolean,
   }),
   pause: Schema.NullOr(
     Schema.Struct({
       reason: Schema.Literals(["stopped", "seat_failed", "server_restarted"]),
       seatId: Schema.optionalKey(DiscussionSeatId),
       message: Schema.optionalKey(Schema.String),
+      failureKind: Schema.optionalKey(Schema.Literals(["usage_limit", "error"])),
       resetAt: Schema.optionalKey(IsoDateTime),
     }),
   ),
@@ -121,6 +129,8 @@ export const DiscussionEntry = Schema.Struct({
   seatId: Schema.optionalKey(DiscussionSeatId),
   threadId: Schema.optionalKey(ThreadId),
   runId: Schema.optionalKey(RunId),
+  round: Schema.optionalKey(PositiveInt),
+  readBySeatId: Schema.optionalKey(DiscussionSeatId),
   text: Schema.String,
   files: Schema.NullOr(
     Schema.Array(
@@ -133,6 +143,98 @@ export const DiscussionEntry = Schema.Struct({
 });
 /** Ordered transcript entry; a provider run may produce at most one persisted entry. */
 export type DiscussionEntry = typeof DiscussionEntry.Type;
+
+export const DiscussionListItem = Schema.Struct({
+  id: DiscussionId,
+  projectId: ProjectId,
+  title: Discussion.fields.title,
+  status: Discussion.fields.status,
+  seats: Schema.Array(
+    Schema.Struct({
+      id: DiscussionSeatId,
+      personaName: DiscussionSeat.fields.personaName,
+      avatar: DiscussionPersonaAvatar,
+      modelSelection: ModelSelection,
+    }),
+  ),
+  cursor: Schema.Struct({ seatIndex: NonNegativeInt, round: PositiveInt }),
+  pause: Schema.NullOr(
+    Schema.Struct({ reason: Schema.Literals(["stopped", "seat_failed", "server_restarted"]) }),
+  ),
+  createdAt: IsoDateTime,
+  updatedAt: IsoDateTime,
+  endedAt: Schema.NullOr(IsoDateTime),
+});
+/** Small all-project list snapshot; excludes topic and trusted persona text. */
+export type DiscussionListItem = typeof DiscussionListItem.Type;
+export const DiscussionListInput = Schema.Struct({});
+export const DiscussionListResult = Schema.Struct({
+  discussions: Schema.Array(DiscussionListItem),
+});
+/** All discussions ordered by descending updatedAt. */
+export type DiscussionListResult = typeof DiscussionListResult.Type;
+export const DiscussionIdInput = Schema.Struct({ discussionId: DiscussionId });
+/** Selects one durable discussion. */
+export type DiscussionIdInput = typeof DiscussionIdInput.Type;
+export const DiscussionMutationResult = Schema.Struct({ discussion: Discussion });
+/** Snapshot after a successful lifecycle command. */
+export type DiscussionMutationResult = typeof DiscussionMutationResult.Type;
+export const DiscussionCreateInput = Schema.Struct({
+  projectId: ProjectId,
+  topic: Schema.String.check(Schema.isPattern(/\S/)),
+  seats: DiscussionTemplate.fields.seats,
+});
+/** Ordered seats reference persona templates, copied at creation. */
+export type DiscussionCreateInput = typeof DiscussionCreateInput.Type;
+export const DiscussionInterjectInput = Schema.Struct({
+  discussionId: DiscussionId,
+  text: Schema.String.check(Schema.isPattern(/\S/)),
+});
+/** Adds user material without steering the active provider run. */
+export type DiscussionInterjectInput = typeof DiscussionInterjectInput.Type;
+export const DiscussionInterjectResult = Schema.Struct({ entry: DiscussionEntry });
+/** Newly persisted user transcript entry. */
+export type DiscussionInterjectResult = typeof DiscussionInterjectResult.Type;
+export const DiscussionEndInput = Schema.Struct({
+  discussionId: DiscussionId,
+  summarizerSeatId: DiscussionSeatId,
+  summaryPromptId: Schema.optionalKey(DiscussionPromptId),
+});
+/** Locks the summarizer and a summary prompt snapshot; omission selects the builtin default. */
+export type DiscussionEndInput = typeof DiscussionEndInput.Type;
+export const DiscussionProviderSupportResult = Schema.Struct({
+  instances: Schema.Array(
+    Schema.Struct({ instanceId: ProviderInstanceId, supported: Schema.Boolean }),
+  ),
+});
+/** Capability support for every configured provider instance. */
+export type DiscussionProviderSupportResult = typeof DiscussionProviderSupportResult.Type;
+export const DiscussionEntryDiffInput = Schema.Struct({
+  discussionId: DiscussionId,
+  entryId: DiscussionEntryId,
+});
+/** Selects the statement whose workspace delta is requested. */
+export type DiscussionEntryDiffInput = typeof DiscussionEntryDiffInput.Type;
+export const DiscussionEntryDiffResult = Schema.Struct({
+  discussionId: DiscussionId,
+  entryId: DiscussionEntryId,
+  diff: Schema.String,
+});
+/** Unified patch using the same checkpoint pair as transcript file statistics. */
+export type DiscussionEntryDiffResult = typeof DiscussionEntryDiffResult.Type;
+export const DiscussionSubscriptionEvent = Schema.Union([
+  Schema.Struct({
+    type: Schema.Literal("snapshot"),
+    discussion: Discussion,
+    entries: Schema.Array(DiscussionEntry),
+  }),
+  Schema.Struct({ type: Schema.Literal("discussion.updated"), discussion: Discussion }),
+  Schema.Struct({ type: Schema.Literal("entry.appended"), entry: DiscussionEntry }),
+  Schema.Struct({ type: Schema.Literal("entry.updated"), entry: DiscussionEntry }),
+  Schema.Struct({ type: Schema.Literal("discussion.deleted"), discussionId: DiscussionId }),
+]);
+/** Initial consistent snapshot followed by lossless changes; deletion is the final event. */
+export type DiscussionSubscriptionEvent = typeof DiscussionSubscriptionEvent.Type;
 
 export const DiscussionPromptListInput = Schema.Struct({
   kind: Schema.optionalKey(DiscussionPrompt.fields.kind),

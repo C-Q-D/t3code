@@ -41,6 +41,12 @@ export const CLIENT_GUARDED_RPC_SCOPES = {
   [WS_METHODS.vcsInit]: AuthSourceControlWriteScope,
 
   [WS_METHODS.discussionPromptsUpsert]: AuthOrchestrationOperateScope,
+  [WS_METHODS.discussionsCreate]: AuthOrchestrationOperateScope,
+  [WS_METHODS.discussionsInterject]: AuthOrchestrationOperateScope,
+  [WS_METHODS.discussionsStop]: AuthOrchestrationOperateScope,
+  [WS_METHODS.discussionsContinue]: AuthOrchestrationOperateScope,
+  [WS_METHODS.discussionsEnd]: AuthOrchestrationOperateScope,
+  [WS_METHODS.discussionsDelete]: AuthOrchestrationOperateScope,
   [WS_METHODS.discussionPromptsDelete]: AuthOrchestrationOperateScope,
   [WS_METHODS.discussionPromptsRestoreBuiltin]: AuthOrchestrationOperateScope,
   [WS_METHODS.discussionTemplatesUpsert]: AuthOrchestrationOperateScope,

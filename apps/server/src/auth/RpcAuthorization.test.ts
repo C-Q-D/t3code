@@ -31,6 +31,8 @@ import type * as RpcGroup from "effect/rpc/RpcGroup";
 import * as Stream from "effect/Stream";
 import * as DiscussionTemplates from "../discussions/DiscussionTemplateService.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
+import { DiscussionError, CLIENT_GUARDED_RPC_SCOPES } from "@t3tools/contracts";
+import { discussionFixture } from "../discussions/discussionFixtures.testkit.ts";
 
 import {
   RPC_REQUIRED_SCOPES,
@@ -50,6 +52,168 @@ const discussionMethods = [
   WS_METHODS.discussionTemplatesUpsert,
   WS_METHODS.discussionTemplatesDelete,
 ] as const;
+
+const lifecycleMethods = [
+  WS_METHODS.discussionsList,
+  WS_METHODS.discussionsSubscribeList,
+  WS_METHODS.discussionsSubscribe,
+  WS_METHODS.discussionsProviderSupport,
+  WS_METHODS.discussionsGetEntryDiff,
+  WS_METHODS.discussionsCreate,
+  WS_METHODS.discussionsInterject,
+  WS_METHODS.discussionsStop,
+  WS_METHODS.discussionsContinue,
+  WS_METHODS.discussionsEnd,
+  WS_METHODS.discussionsDelete,
+] as const;
+const lifecycleGroup = WsRpcGroup.omit(
+  ...[...WsRpcGroup.requests.keys()].filter(
+    (
+      tag,
+    ): tag is Exclude<
+      RpcGroup.Rpcs<typeof WsRpcGroup>["_tag"],
+      (typeof lifecycleMethods)[number]
+    > => !(lifecycleMethods as ReadonlyArray<string>).includes(tag),
+  ),
+);
+
+/** External domain handlers fail with a sentinel only after middleware permits execution. */
+const makeLifecycleClient = (scopes: ReadonlyArray<AuthEnvironmentScope>, calls: string[]) => {
+  const write = (method: string) =>
+    Effect.sync(() => calls.push(method)).pipe(
+      Effect.andThen(
+        Effect.fail(
+          new DiscussionError({ reason: "invalid_state", message: "t4:authorized-handler" }),
+        ),
+      ),
+    );
+  return RpcTest.makeClient(lifecycleGroup).pipe(
+    Effect.provide(
+      Layer.mergeAll(
+        lifecycleGroup.toLayer(
+          Effect.succeed({
+            [WS_METHODS.discussionsList]: () => Effect.succeed({ discussions: [] }),
+            [WS_METHODS.discussionsSubscribeList]: () => Stream.succeed({ discussions: [] }),
+            [WS_METHODS.discussionsSubscribe]: () =>
+              Stream.succeed({
+                type: "snapshot" as const,
+                discussion: discussionFixture,
+                entries: [],
+              }),
+            [WS_METHODS.discussionsProviderSupport]: () => Effect.succeed({ instances: [] }),
+            [WS_METHODS.discussionsGetEntryDiff]: (input) => Effect.succeed({ ...input, diff: "" }),
+            [WS_METHODS.discussionsCreate]: () => write("discussions.create"),
+            [WS_METHODS.discussionsInterject]: () => write("discussions.interject"),
+            [WS_METHODS.discussionsStop]: () => write("discussions.stop"),
+            [WS_METHODS.discussionsContinue]: () => write("discussions.continue"),
+            [WS_METHODS.discussionsEnd]: () => write("discussions.end"),
+            [WS_METHODS.discussionsDelete]: () => write("discussions.delete"),
+          }),
+        ),
+        RpcAuthorization.layer(scopes),
+      ),
+    ),
+  );
+};
+
+describe("discussion lifecycle RPC authorization", () => {
+  for (const writable of [false, true])
+    it.effect(
+      writable
+        ? "operate reaches all six lifecycle handlers"
+        : "read-only can read and stream but all six writes are rejected before execution",
+      () =>
+        Effect.scoped(
+          Effect.gen(function* () {
+            const calls: string[] = [];
+            const client = yield* makeLifecycleClient(
+              [writable ? AuthOrchestrationOperateScope : AuthOrchestrationReadScope],
+              calls,
+            );
+            if (!writable) {
+              expect(yield* client[WS_METHODS.discussionsList]({})).toEqual({ discussions: [] });
+              expect(
+                yield* client[WS_METHODS.discussionsSubscribeList]({}).pipe(
+                  Stream.take(1),
+                  Stream.runCollect,
+                ),
+              ).toEqual([{ discussions: [] }]);
+              expect(
+                (yield* client[WS_METHODS.discussionsSubscribe]({
+                  discussionId: discussionFixture.id,
+                }).pipe(Stream.take(1), Stream.runCollect))[0]?.type,
+              ).toBe("snapshot");
+              expect(yield* client[WS_METHODS.discussionsProviderSupport]({})).toEqual({
+                instances: [],
+              });
+              expect(
+                (yield* client[WS_METHODS.discussionsGetEntryDiff]({
+                  discussionId: discussionFixture.id,
+                  entryId: "entry:t4" as import("@t3tools/contracts").DiscussionEntryId,
+                })).diff,
+              ).toBe("");
+            }
+            const id = { discussionId: discussionFixture.id };
+            const results = [
+              yield* client[WS_METHODS.discussionsCreate]({
+                projectId: discussionFixture.projectId,
+                topic: "权限测试",
+                seats: [
+                  {
+                    personaPromptId: DiscussionPromptId.make("builtin:persona:architect"),
+                    modelSelection: discussionFixture.seats[0]!.modelSelection,
+                  },
+                ],
+              }).pipe(Effect.flip),
+              yield* client[WS_METHODS.discussionsInterject]({ ...id, text: "插话" }).pipe(
+                Effect.flip,
+              ),
+              yield* client[WS_METHODS.discussionsStop](id).pipe(Effect.flip),
+              yield* client[WS_METHODS.discussionsContinue](id).pipe(Effect.flip),
+              yield* client[WS_METHODS.discussionsEnd]({
+                ...id,
+                summarizerSeatId: discussionFixture.seats[0]!.id,
+              }).pipe(Effect.flip),
+              yield* client[WS_METHODS.discussionsDelete](id).pipe(Effect.flip),
+            ];
+            for (const result of results)
+              expect(result).toMatchObject(
+                writable
+                  ? { _tag: "DiscussionError", message: "t4:authorized-handler" }
+                  : {
+                      _tag: "EnvironmentAuthorizationError",
+                      requiredPermission: AuthOrchestrationOperateScope,
+                    },
+              );
+            expect(calls).toEqual(
+              writable
+                ? [
+                    "discussions.create",
+                    "discussions.interject",
+                    "discussions.stop",
+                    "discussions.continue",
+                    "discussions.end",
+                    "discussions.delete",
+                  ]
+                : [],
+            );
+          }),
+        ),
+    );
+
+  it("client permission map protects exactly the six discussion writes", () => {
+    expect(
+      Object.entries(CLIENT_GUARDED_RPC_SCOPES).filter(([name]) => name.startsWith("discussions.")),
+    ).toEqual([
+      ["discussions.create", AuthOrchestrationOperateScope],
+      ["discussions.interject", AuthOrchestrationOperateScope],
+      ["discussions.stop", AuthOrchestrationOperateScope],
+      ["discussions.continue", AuthOrchestrationOperateScope],
+      ["discussions.end", AuthOrchestrationOperateScope],
+      ["discussions.delete", AuthOrchestrationOperateScope],
+    ]);
+  });
+});
 const discussionGroup = WsRpcGroup.omit(
   ...[...WsRpcGroup.requests.keys()].filter(
     (

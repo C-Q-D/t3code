@@ -102,6 +102,7 @@ import {
   type PullRequestRef,
   WS_METHODS,
   WsRpcGroup,
+  WsDiscussionsRpcGroup,
 } from "@t3tools/contracts";
 import { resolveServerBackgroundActivitySettings } from "@t3tools/shared/backgroundActivitySettings";
 import {
@@ -124,6 +125,7 @@ import * as ThreadLaunchService from "./orchestration-v2/ThreadLaunchService.ts"
 import * as ThreadMessageIntake from "./orchestration-v2/ThreadMessageIntake.ts";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import * as DiscussionTemplates from "./discussions/DiscussionTemplateService.ts";
+import * as Discussions from "./discussions/DiscussionService.ts";
 import * as ScheduledTasks from "./scheduledTasks/ScheduledTaskService.ts";
 import * as SecretRequests from "./secrets/SecretRequests.ts";
 import {
@@ -545,6 +547,20 @@ const PROVIDER_STATUS_DEBOUNCE_MS = 200;
 
 // Middleware added later wraps middleware added earlier, so instrumentation wraps authorization.
 const ServerWsRpcGroup = WsRpcGroup.middleware(RpcInstrumentation);
+// Literal tags keep omit's inferred union precise; requests.keys() would erase every handler.
+const BaseWsRpcGroup = ServerWsRpcGroup.omit(
+  WS_METHODS.discussionsList,
+  WS_METHODS.discussionsSubscribeList,
+  WS_METHODS.discussionsSubscribe,
+  WS_METHODS.discussionsProviderSupport,
+  WS_METHODS.discussionsGetEntryDiff,
+  WS_METHODS.discussionsCreate,
+  WS_METHODS.discussionsInterject,
+  WS_METHODS.discussionsStop,
+  WS_METHODS.discussionsContinue,
+  WS_METHODS.discussionsEnd,
+  WS_METHODS.discussionsDelete,
+);
 // When a resuming client's cursor is more than this many events behind the
 // current head, skip the per-event catch-up replay and send a fresh shell
 // snapshot instead. Replaying each intervening event costs a shell refetch;
@@ -1202,7 +1218,7 @@ const layerWsRpc = (
   previewAutomationBroker: PreviewAutomationBroker.PreviewAutomationBroker["Service"],
   serverBrowser: ServerBrowser.ServerBrowser["Service"],
 ) =>
-  ServerWsRpcGroup.toLayer(
+  BaseWsRpcGroup.toLayer(
     Effect.gen(function* () {
       const currentSessionId = currentSession.sessionId;
       const sql = yield* SqlClient.SqlClient;
@@ -1830,7 +1846,7 @@ const layerWsRpc = (
         return result;
       });
 
-      const handlers = ServerWsRpcGroup.of({
+      const handlers = BaseWsRpcGroup.of({
         [ORCHESTRATION_V2_WS_METHODS.dispatchCommand]: (command) =>
           Effect.annotateCurrentSpan({
             "orchestration_v2.command_id": command.commandId,
@@ -3165,6 +3181,29 @@ const layerWsRpc = (
     }),
   );
 
+/**
+ * Adding these handlers to the original handler set produced eight TS377030 diagnostics with
+ * requirements inferred as any. Building this Layer separately and then merging it passed typecheck;
+ * both handler groups still share the server-lifetime discussion service and public RPC server.
+ */
+const layerDiscussionWsRpc = WsDiscussionsRpcGroup.toLayer(
+  Effect.map(Discussions.DiscussionService, (discussions) =>
+    WsDiscussionsRpcGroup.of({
+      [WS_METHODS.discussionsList]: () => discussions.list(),
+      [WS_METHODS.discussionsSubscribeList]: () => discussions.subscribeList(),
+      [WS_METHODS.discussionsSubscribe]: (input) => discussions.subscribe(input),
+      [WS_METHODS.discussionsProviderSupport]: () => discussions.providerSupport(),
+      [WS_METHODS.discussionsGetEntryDiff]: (input) => discussions.getEntryDiff(input),
+      [WS_METHODS.discussionsCreate]: (input) => discussions.create(input),
+      [WS_METHODS.discussionsInterject]: (input) => discussions.interject(input),
+      [WS_METHODS.discussionsStop]: (input) => discussions.stop(input),
+      [WS_METHODS.discussionsContinue]: (input) => discussions.continue(input),
+      [WS_METHODS.discussionsEnd]: (input) => discussions.end(input),
+      [WS_METHODS.discussionsDelete]: (input) => discussions.delete(input),
+    }),
+  ),
+);
+
 // A defect in a handler's effect fails only its own request. RpcServer's default
 // sends a socket-level Defect frame instead, and the client ends every pending
 // request on the socket with it. DefectReporter logs these defects.
@@ -3179,6 +3218,7 @@ export const layer = Layer.unwrap(
     const serverBrowser = yield* ServerBrowser.ServerBrowser;
     const serverSelfUpdate = yield* ServerSelfUpdate.ServerSelfUpdate;
     const pullRequests = yield* PullRequestService.PullRequestService;
+    const discussions = yield* Discussions.DiscussionService;
     const sql = yield* SqlClient.SqlClient;
     return HttpRouter.add(
       "GET",
@@ -3227,12 +3267,15 @@ export const layer = Layer.unwrap(
           return httpEffect;
         }).pipe(
           Effect.provide(
-            layerWsRpc(
-              session,
-              clientOrigin,
-              clientAnalyticsProps,
-              previewAutomationBroker,
-              serverBrowser,
+            Layer.merge(
+              layerWsRpc(
+                session,
+                clientOrigin,
+                clientAnalyticsProps,
+                previewAutomationBroker,
+                serverBrowser,
+              ),
+              layerDiscussionWsRpc,
             ).pipe(
               Layer.provideMerge(RpcSerialization.layerJson),
               // Request fibers run in the handlers' context, so this reporter sees
@@ -3245,6 +3288,7 @@ export const layer = Layer.unwrap(
               // One server-lifetime service means clients share the same PR caches, and a WS
               // mutation invalidates the HTTP diff cache that every client reads from.
               Layer.provide(Layer.succeed(PullRequestService.PullRequestService, pullRequests)),
+              Layer.provide(Layer.succeed(Discussions.DiscussionService, discussions)),
               Layer.provide(OtlpEndpointCheck.layer),
               Layer.provide(ThreadTranscriptExport.layer),
               Layer.provide(
