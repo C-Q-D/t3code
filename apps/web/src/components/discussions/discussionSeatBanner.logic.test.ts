@@ -1,5 +1,7 @@
 /** Protects permanent seat-thread attribution and independently specified localized copy. */
 import { DiscussionListItem } from "@t3tools/contracts";
+import { Cause, Option } from "effect";
+import { AsyncResult } from "effect/reactivity";
 import * as Schema from "effect/Schema";
 import { describe, it, expect } from "vite-plus/test";
 import { discussions as zh } from "~/i18n/locales/zh-CN/discussions";
@@ -34,7 +36,11 @@ const description = "发言由讨论驱动，在这里发的消息不会进入�
 describe("seat thread banner", () => {
   it("names both the discussion and matching seat", () =>
     expect(
-      discussionSeatBannerView(association, discussionSeatBannerMetadata(association, [item]), zh),
+      discussionSeatBannerView(
+        association,
+        discussionSeatBannerMetadata(association, AsyncResult.success({ discussions: [item] })),
+        zh,
+      ),
     ).toEqual({
       id: "discussion-seat-thread",
       variant: "info",
@@ -45,7 +51,13 @@ describe("seat thread banner", () => {
     }));
   it("keeps the discussion link when the seat is absent", () => {
     const ref = { ...association, seatId: "missing" };
-    expect(discussionSeatBannerView(ref, discussionSeatBannerMetadata(ref, [item]), zh)).toEqual({
+    expect(
+      discussionSeatBannerView(
+        ref,
+        discussionSeatBannerMetadata(ref, AsyncResult.success({ discussions: [item] })),
+        zh,
+      ),
+    ).toEqual({
       id: "discussion-seat-thread",
       variant: "info",
       priority: "notice",
@@ -55,12 +67,17 @@ describe("seat thread banner", () => {
     });
   });
   it.each([
-    { reason: "loading", list: null },
-    { reason: "failure", list: null },
-    { reason: "discussion missing", list: [] },
-  ])("shows an unlinked fallback for $reason", ({ list }) =>
+    { reason: "loading (Initial)", result: AsyncResult.initial() },
+    {
+      reason: "failure with previous success",
+      result: AsyncResult.failure(Cause.fail(new Error("offline")), {
+        previousSuccess: Option.some(AsyncResult.success({ discussions: [item] })),
+      }),
+    },
+    { reason: "discussion missing", result: AsyncResult.success({ discussions: [] }) },
+  ])("shows an unlinked fallback for $reason", ({ result }) =>
     expect(
-      discussionSeatBannerView(association, discussionSeatBannerMetadata(association, list), zh),
+      discussionSeatBannerView(association, discussionSeatBannerMetadata(association, result), zh),
     ).toEqual({
       id: "discussion-seat-thread",
       variant: "info",

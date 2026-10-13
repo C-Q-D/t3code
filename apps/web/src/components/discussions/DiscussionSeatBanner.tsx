@@ -38,10 +38,7 @@ export function useDiscussionSeatBanner(
     let previous: DiscussionSeatBannerMetadata | null = null;
     return Atom.make((get) => {
       const result = get(serverEnvironment.discussionsLive({ environmentId, input: {} }));
-      const next = discussionSeatBannerMetadata(
-        { discussionId, seatId },
-        result._tag === "Success" ? result.value.discussions : null,
-      );
+      const next = discussionSeatBannerMetadata({ discussionId, seatId }, result);
       // The full list is shared, but unrelated titles/seats/status updates must not rerender ChatView.
       if (previous?.title === next?.title && previous?.personaName === next?.personaName)
         return previous;

@@ -1,5 +1,6 @@
 /** Selects seat-thread identity and localized notice data without subscriptions or navigation effects. */
-import type { DiscussionListItem } from "@t3tools/contracts";
+import type { DiscussionListResult } from "@t3tools/contracts";
+import { AsyncResult } from "effect/reactivity";
 import type { discussions } from "~/i18n/locales/en/discussions";
 
 /** Stored association from a server thread shell; drafts and ordinary threads provide null. */
@@ -8,15 +9,16 @@ export type DiscussionSeatAssociation = { discussionId: string; seatId: string }
 export type DiscussionSeatBannerMetadata = { title: string; personaName: string | null };
 
 /**
- * Selects metadata from a current successful list; unavailable lists pass null.
+ * Selects metadata only from a current success; failures must not reuse a stale title or link.
  * @param association Stored server-thread discussion and seat identity.
- * @param list Successful discussion list, null while loading or failed.
+ * @param result Shared list subscription result, including initial and failed states.
  * @returns Matching title/persona, or null when the title cannot be read.
  */
 export function discussionSeatBannerMetadata(
   association: DiscussionSeatAssociation,
-  list: readonly Pick<DiscussionListItem, "id" | "title" | "seats">[] | null,
+  result: AsyncResult.AsyncResult<DiscussionListResult, unknown>,
 ): DiscussionSeatBannerMetadata | null {
+  const list = result._tag === "Success" ? result.value.discussions : null;
   const item = list?.find((candidate) => candidate.id === association.discussionId);
   if (!item?.title) return null;
   return {
