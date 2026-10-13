@@ -2515,3 +2515,66 @@ it.effect(
       }),
     ),
 );
+
+it.effect.each([1, 2])(
+  "C4c %i seats keep the stopped ordinary speaker's final statement when completion beats interrupt",
+  (seatCount) =>
+    withDiscussionHarness((h) =>
+      Effect.gen(function* () {
+        const { discussion, turn } = yield* create(h, input.seats.slice(0, seatCount));
+        const service = yield* Discussions.DiscussionService;
+        const store = yield* Store.DiscussionStore;
+        yield* h.holdInterruptEvents;
+        yield* service.stop({ discussionId: discussion.id });
+        const ending = yield* service.end({
+          discussionId: discussion.id,
+          summarizerSeatId: discussion.seats[0]!.id,
+        });
+        assert.equal(ending.discussion.cursor.phase, "final_round");
+        assert.equal(ending.discussion.cursor.runId, turn.runId);
+        yield* finish(h, turn, ["中断生效之前自然完成的普通发言"]);
+        const final = yield* next(h, discussion, 2);
+        const snapshot = (yield* store.getDiscussion(discussion.id))!;
+        const ordinary = (yield* store.listEntries(discussion.id)).find(
+          (e) => e.runId === turn.runId,
+        )!;
+        assert.deepEqual(
+          [ordinary.kind, ordinary.text, Object.hasOwn(ordinary, "finalStatement")],
+          ["statement", "中断生效之前自然完成的普通发言", false],
+        );
+        assert.equal(
+          final.threadId,
+          discussion.seats[0]!.threadId,
+          "current seat still owes its final statement",
+        );
+        assert.isTrue(final.message.text.endsWith("本次阶段：最后陈述。"));
+        assert.equal(
+          snapshot.closing?.phase,
+          "final_round",
+          "summary must wait for the final statement",
+        );
+        assert.deepEqual(
+          snapshot.closing?.remainingFinalSeatIds,
+          discussion.seats.map((s) => s.id),
+        );
+        assert.equal(
+          snapshot.cursor.round,
+          ordinary.round,
+          "same-seat final retry must not increment the round",
+        );
+        assert.equal(snapshot.cursor.round, discussion.cursor.round);
+        assert.equal(
+          h.interrupted.length,
+          1,
+          "interrupt reached the provider boundary before its held terminal event",
+        );
+        yield* h.releaseInterruptEvents;
+        yield* Worker.OrchestrationEffectWorkerV2.use((w) => w.drain());
+        assert.equal(
+          (yield* store.getDiscussion(discussion.id))!.cursor.dispatchNo,
+          2,
+          "late interrupt cannot dispatch twice",
+        );
+      }),
+    ),
+);

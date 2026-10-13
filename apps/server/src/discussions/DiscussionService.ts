@@ -652,7 +652,11 @@ const make = Effect.gen(function* () {
       }),
     );
 
-  /** Advances only completed statements; closing uses the frozen final seat order and marks summaries ended. */
+  /**
+   * Advances completed statements and marks summaries ended. A final seat is consumed only when the
+   * completed entry carries finalStatement: the cursor describes the next dispatch and may already
+   * name final_round when a stopped ordinary run wins the race against its interrupt.
+   */
   const advance = (discussion: Discussion, entry: DiscussionEntry) =>
     Effect.gen(function* () {
       if (entry.kind === "summary")
@@ -661,10 +665,7 @@ const make = Effect.gen(function* () {
       let phase: DiscussionBriefPhase = "regular";
       let closing = discussion.closing;
       if (closing) {
-        if (
-          (yield* currentPhase(discussion, yield* store.listEntries(discussion.id))) ===
-          "final_round"
-        )
+        if (entry.finalStatement === true)
           closing = { ...closing, remainingFinalSeatIds: closing.remainingFinalSeatIds.slice(1) };
         const next = closing.remainingFinalSeatIds[0];
         if (next !== undefined) {
@@ -676,6 +677,12 @@ const make = Effect.gen(function* () {
           phase = "summarizing";
         }
       }
+      // A stopped ordinary run completing after End must retry this seat without advancing its round.
+      const sameSeatFinalRetry =
+        closing !== null &&
+        entry.finalStatement !== true &&
+        discussion.cursor.phase === "final_round" &&
+        seatIndex === discussion.cursor.seatIndex;
       const next = yield* save({
         ...discussion,
         closing,
@@ -683,7 +690,9 @@ const make = Effect.gen(function* () {
           ...discussion.cursor,
           phase,
           seatIndex,
-          round: discussion.cursor.round + (seatIndex === 0 && phase !== "summarizing" ? 1 : 0),
+          round:
+            discussion.cursor.round +
+            (seatIndex === 0 && phase !== "summarizing" && !sameSeatFinalRetry ? 1 : 0),
           runId: null,
         },
       });

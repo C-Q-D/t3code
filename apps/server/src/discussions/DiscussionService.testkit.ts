@@ -77,6 +77,9 @@ export interface DiscussionHarness {
   /** Holds the external interrupt response so End can commit before the run's terminal event. */
   readonly holdInterrupts: Effect.Effect<void>;
   readonly releaseInterrupts: Effect.Effect<void>;
+  /** Delays provider interrupt terminal events, while allowing checkpoint effects to complete naturally. */
+  readonly holdInterruptEvents: Effect.Effect<void>;
+  readonly releaseInterruptEvents: Effect.Effect<void>;
   readonly finish: (
     turn: ProviderAdapter.ProviderAdapterV2TurnInput,
     status: "completed" | "failed" | "interrupted",
@@ -118,6 +121,8 @@ export function withDiscussionHarness<A, E, R>(
       const interruptGate = yield* Deferred.make<void>();
       let holdCaptures = false;
       let holdInterrupts = false;
+      let holdInterruptEvents = false;
+      let interruptDeliveries: Effect.Effect<void>[] = [];
       let failCaptures = false;
       const checkpointStore = Layer.effect(
         CheckpointStore.CheckpointStore,
@@ -191,6 +196,14 @@ export function withDiscussionHarness<A, E, R>(
           holdInterrupts = true;
         }),
         releaseInterrupts: Deferred.succeed(interruptGate, undefined).pipe(Effect.asVoid),
+        holdInterruptEvents: Effect.sync(() => {
+          holdInterruptEvents = true;
+        }),
+        releaseInterruptEvents: Effect.gen(function* () {
+          holdInterruptEvents = false;
+          yield* Effect.all(interruptDeliveries, { discard: true });
+          interruptDeliveries = [];
+        }),
         finish: (turn, status, texts = [], failure) =>
           Effect.gen(function* () {
             const queue = queues.get(turn.threadId)!;
@@ -299,7 +312,10 @@ export function withDiscussionHarness<A, E, R>(
                   const turn = started.findLast(
                     (turn) => turn.providerThread.id === input.providerThread.id,
                   )!;
-                  yield* Queue.offer(queue, terminalEvent(turn, "interrupted", null));
+                  const delivery = Queue.offer(queue, terminalEvent(turn, "interrupted", null));
+                  // The external acknowledgement may precede its terminal event; keep domain processing real.
+                  if (holdInterruptEvents) interruptDeliveries.push(delivery);
+                  else yield* delivery;
                 }),
               steerTurn: () => Effect.die("Discussion must not steer a provider turn"),
               respondToRuntimeRequest: () => Effect.die("unused runtime response"),
