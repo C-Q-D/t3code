@@ -14,6 +14,7 @@ import { Button } from "../ui/button";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "../ui/empty";
 import { SidebarInset } from "../ui/sidebar";
 import { PixelAvatar } from "./PixelAvatar";
+import { DiscussionTranscript } from "./DiscussionTranscript";
 import { discussionSeatColor } from "./discussionSeatColors";
 import {
   discussionHeaderView,
@@ -194,7 +195,7 @@ function DiscussionSeatBar({ discussion }: { discussion: Discussion }) {
  * Displays the live snapshot's title, project and disabled action positions.
  * @param props.discussion Subscription snapshot scoped to this environment.
  * @param props.environmentId Destination used to disambiguate project IDs and timestamp settings.
- * @returns Workspace frame with an empty record area; no discussion command is executed.
+ * @returns Workspace frame and persisted records; no discussion command is executed.
  */
 export function DiscussionPage({
   discussion,
@@ -247,7 +248,12 @@ export function DiscussionPage({
         </div>
       </WorkspacePageHeader>
       <DiscussionSeatBar discussion={discussion} />
-      <div className="min-h-0 flex-1" />
+      <DiscussionTranscript
+        key={`${environmentId}:${discussion.id}`}
+        discussion={discussion}
+        environmentId={environmentId}
+        cwd={project?.workspaceRoot}
+      />
     </SidebarInset>
   );
 }

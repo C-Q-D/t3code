@@ -34,6 +34,7 @@ import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
 import { Select, SelectTrigger, SelectValue, SelectPopup, SelectItem } from "../ui/select";
 import { Tooltip, TooltipTrigger, TooltipPopup } from "../ui/tooltip";
 import { PixelAvatar } from "./PixelAvatar";
+import { discussionModelLabel } from "./discussionModelLabel";
 import { getTriggerDisplayModelName } from "../chat/providerIconUtils";
 import {
   addDiscussionSeat,
@@ -163,7 +164,7 @@ export function DiscussionSeats({
                   onOpenChange={(open) => setOpenId(open ? id : null)}
                   index={index}
                   name={persona?.name ?? t.settings.discussions.deletedPersona}
-                  modelLabel={`${entry?.displayName ?? seat.modelSelection.instanceId} · ${model ? getTriggerDisplayModelName({ ...model, subProvider: entry?.driverKind === "claudeAgent" ? "Claude" : model.subProvider }) : seat.modelSelection.model}`}
+                  modelLabel={discussionModelLabel(seat.modelSelection, entry, model)}
                   avatar={persona?.avatar ?? "architect"}
                   onRemove={() => {
                     setOpenId(null);

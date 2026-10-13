@@ -64,5 +64,10 @@ export const discussions: Messages["discussions"] = {
     failed: "发言失败",
     speaking: "发言中",
     seats: "发言顺序",
+    viewProcess: "查看过程",
+    noFiles: "未改文件",
+    filesPending: "改动统计暂不可用",
+    changedFiles: (count: number) => `改动 ${count} 个文件`,
+    transcript: "讨论记录",
   },
 };

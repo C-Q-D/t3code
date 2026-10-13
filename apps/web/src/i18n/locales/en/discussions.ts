@@ -62,5 +62,10 @@ export const discussions = {
     failed: "Speaking failed",
     speaking: "Speaking",
     seats: "Speaking order",
+    viewProcess: "View process",
+    noFiles: "No files changed",
+    filesPending: "Change statistics are not available yet",
+    changedFiles: (count: number) => `${count} ${count === 1 ? "file" : "files"} changed`,
+    transcript: "Discussion record",
   },
 };
