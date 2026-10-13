@@ -62,6 +62,7 @@ interface EditorLaunch {
   readonly target: string;
   readonly command: string;
   readonly args: ReadonlyArray<string>;
+  readonly detached?: boolean;
 }
 
 interface ProcessLaunch {
@@ -636,11 +637,17 @@ const resolveFileManagerRevealLaunch = Effect.fn("resolveFileManagerRevealLaunch
   }
 
   if (platform === "win32") {
-    return fileExplorerRevealLaunch(
-      target,
-      normalizeWindowsFileManagerPath(target),
-      resolvePowerShellPath(env),
-    );
+    return {
+      ...fileExplorerRevealLaunch(
+        target,
+        normalizeWindowsFileManagerPath(target),
+        resolvePowerShellPath(env),
+      ),
+      // Windows PowerShell 5.1 can exit successfully without executing its
+      // script under DETACHED_PROCESS. The Node spawner hides the window when
+      // detached is false; unref still lets Explorer outlive this request.
+      detached: false,
+    };
   }
 
   if (
@@ -744,7 +751,7 @@ const launchEditorProcess = Effect.fn("externalLauncher.launchEditorProcess")(fu
       command: spawnCommand.command,
       args: spawnCommand.args,
       options: {
-        detached: true,
+        detached: launch.detached ?? true,
         shell: spawnCommand.shell,
         stdin: "ignore",
         stdout: "ignore",

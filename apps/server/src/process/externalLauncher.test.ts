@@ -345,60 +345,121 @@ it.effect("reveals a file in File Explorer through PowerShell on Windows", () =>
 );
 
 // Real-chain smoke check for the Explorer selection contract: runs the exact
-// PowerShell source the reveal launch encodes, against a stub that records
+// production spawn options and PowerShell source, against a stub that records
 // the raw argument tail it receives, and asserts a spaced path arrives as the
 // single `/select,"<path>"` switch. Mock argv assertions cannot prove this —
 // only Windows' own PowerShell -> CreateProcess quoting chain can, so the
 // test runs only where that chain exists.
 // oxlint-disable-next-line t3code/no-global-process-runtime -- the skip decision needs the real host platform, outside any Effect runtime.
-it.skipIf(process.platform !== "win32")(
+it.effect.skipIf(process.platform !== "win32")(
   "delivers the raw /select switch for spaced paths through real PowerShell",
-  { timeout: 60_000 },
-  async () => {
-    const tempDir = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-reveal-smoke-"));
-    try {
-      const recorderPath = NodePath.join(tempDir, "recorder.cmd");
-      const outputPath = NodePath.join(tempDir, "argv.txt");
-      NodeFS.writeFileSync(recorderPath, `@echo off\r\n>"${outputPath}" echo(%*\r\n`);
+  () =>
+    Effect.gen(function* () {
+      const tempDir = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-reveal-smoke-"));
+      try {
+        const recorderPath = NodePath.join(tempDir, "recorder.exe");
+        const recorderSourcePath = NodePath.join(tempDir, "recorder.cs");
+        const outputPath = NodePath.join(tempDir, "argv.txt");
+        // Record the raw command line, before any argv parser can hide quoting
+        // errors. A standalone executable also avoids a cmd.exe intermediary.
+        NodeFS.writeFileSync(
+          recorderSourcePath,
+          `using System;
+using System.IO;
+class Recorder {
+  static void Main() {
+    string raw = Environment.CommandLine;
+    string output = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "argv.txt");
+    File.WriteAllText(output + ".tmp", raw.Substring(raw.IndexOf("/select,", StringComparison.Ordinal)));
+    File.Move(output + ".tmp", output);
+  }
+}`,
+        );
+        const systemRoot = process.env.SYSTEMROOT ?? "C:\\Windows";
+        NodeChildProcess.execFileSync(
+          NodePath.join(systemRoot, "Microsoft.NET", "Framework64", "v4.0.30319", "csc.exe"),
+          ["/nologo", "/target:winexe", `/out:${recorderPath}`, recorderSourcePath],
+          { windowsHide: true },
+        );
 
-      const target = "C:/workspace with spaces/media/author's clip.mp4";
-      const explorerTarget = target.replaceAll("/", "\\");
-      const source = ExternalLauncher.buildFileExplorerRevealPowerShellSource(
-        recorderPath,
-        explorerTarget,
-      );
-      const powerShellPath = `${process.env.SYSTEMROOT ?? "C:\\Windows"}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe`;
-      NodeChildProcess.execFileSync(
-        powerShellPath,
-        [
-          "-NoProfile",
-          "-NonInteractive",
-          "-ExecutionPolicy",
-          "Bypass",
-          "-EncodedCommand",
-          Buffer.from(source, "utf16le").toString("base64"),
-        ],
-        { timeout: 30_000 },
-      );
+        let spawned: ChildProcess.StandardCommand | undefined;
+        yield* Effect.gen(function* () {
+          const launcher = yield* ExternalLauncher.ExternalLauncher;
+          yield* launcher.launchEditor({
+            editor: "file-manager",
+            cwd: "C:/workspace with spaces/media/author's clip.mp4",
+            reveal: true,
+          });
+        }).pipe(
+          Effect.provide(
+            layerTest({
+              platform: "win32",
+              env: { SYSTEMROOT: systemRoot, PATH: systemRoot },
+              onSpawn: (command) => {
+                spawned = command;
+              },
+            }),
+          ),
+        );
+        assert.ok(spawned);
 
-      // Start-Process returns before the recorder runs; wait for its output.
-      // The waits run outside the Effect runtime on purpose: the test
-      // exercises the real Windows process chain in real time.
-      // @effect-diagnostics-next-line globalTimers:off
-      const sleep = (millis: number) => new Promise((resolve) => setTimeout(resolve, millis));
-      // @effect-diagnostics-next-line globalDate:off
-      const deadline = Date.now() + 20_000;
-      // @effect-diagnostics-next-line globalDate:off
-      while (!NodeFS.existsSync(outputPath) && Date.now() < deadline) {
-        await sleep(100);
+        const target = "C:/workspace with spaces/media/author's clip.mp4";
+        const explorerTarget = target.replaceAll("/", "\\");
+        const source = ExternalLauncher.buildFileExplorerRevealPowerShellSource(
+          recorderPath,
+          explorerTarget,
+        );
+        const command = ChildProcess.make(
+          spawned.command,
+          [...spawned.args.slice(0, -1), Buffer.from(source, "utf16le").toString("base64")],
+          spawned.options,
+        );
+        yield* Effect.gen(function* () {
+          const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+          const handle = yield* spawner.spawn(command);
+          yield* Effect.asVoid(handle.unref);
+          assert.equal(yield* handle.exitCode, 0);
+        }).pipe(Effect.scoped, Effect.provide(NodeServices.layer));
+
+        // The recorder atomically renames its output. Watch that milestone,
+        // including a write that finished before PowerShell exited, rather than
+        // sleeping for an assumed process startup time.
+        yield* Effect.promise(
+          () =>
+            new Promise<void>((resolve, reject) => {
+              const watcher = NodeFS.watch(tempDir, () => {
+                if (NodeFS.existsSync(outputPath)) {
+                  clearTimeout(timeout);
+                  watcher.close();
+                  resolve();
+                }
+              });
+              // @effect-diagnostics-next-line globalTimers:off
+              const timeout = setTimeout(() => {
+                watcher.close();
+                reject(new Error("PowerShell did not run the selection recorder"));
+              }, 20_000);
+              watcher.on("error", (error) => {
+                clearTimeout(timeout);
+                watcher.close();
+                reject(error);
+              });
+              if (NodeFS.existsSync(outputPath)) {
+                clearTimeout(timeout);
+                watcher.close();
+                resolve();
+              }
+            }),
+        );
+        const recorded = NodeFS.readFileSync(outputPath, "utf8").trim();
+        assert.equal(recorded, `/select,"${explorerTarget}"`);
+      } finally {
+        // Windows can retain the executable mapping briefly after the recorder
+        // publishes its output. Retry only cleanup, never the launch/assertion.
+        NodeFS.rmSync(tempDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
       }
-      await sleep(200);
-      const recorded = NodeFS.readFileSync(outputPath, "utf8").trim();
-      assert.equal(recorded, `/select,"${explorerTarget}"`);
-    } finally {
-      NodeFS.rmSync(tempDir, { recursive: true, force: true });
-    }
-  },
+    }),
+  { timeout: 60_000 },
 );
 
 it.effect("does not advertise reveal on Windows when PowerShell is missing", () =>
