@@ -1,0 +1,35 @@
+/* Keeps the brief's seat tint and end cursor static; C5 owns all discussion motion. */
+[data-discussion-live] {
+  --discussion-cursor-color: var(--discussion-seat-fg-light);
+  border-color: color-mix(in srgb, var(--discussion-seat-color) 22%, transparent);
+  background: color-mix(in srgb, var(--discussion-seat-color) 5%, transparent);
+}
+.dark [data-discussion-live] {
+  --discussion-cursor-color: var(--discussion-seat-fg-dark);
+  background: color-mix(in srgb, var(--discussion-seat-color) 8%, transparent);
+}
+/* Paragraphs accept the cursor inline; block endings and empty output get their own cursor line. */
+[data-discussion-live] .chat-markdown::after,
+[data-discussion-live] .chat-markdown > p:last-child::after {
+  content: "";
+  width: 2px;
+  height: 16px;
+  background: var(--discussion-cursor-color);
+  vertical-align: -2px;
+}
+[data-discussion-live] .chat-markdown::after {
+  display: block;
+}
+[data-discussion-live] .chat-markdown > p:last-child::after {
+  display: inline-block;
+  margin-left: 4px;
+}
+[data-discussion-live] .chat-markdown:has(> p:last-child)::after {
+  display: none;
+}
+/* ChatMarkdown's shared streaming reveal is disabled for this static C4 surface. */
+[data-discussion-live] .chat-markdown * {
+  animation: none !important;
+  transition: none !important;
+  opacity: 1 !important;
+}

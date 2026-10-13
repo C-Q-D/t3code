@@ -16,7 +16,7 @@ import {
   discussionStatementHeading,
   discussionTranscriptItems,
   discussionUserView,
-  discussionEntryFiles,
+  discussionFilesView,
 } from "./discussionTranscript.logic";
 
 const decodeEntryId = Schema.decodeSync(DiscussionEntry.fields.id);
@@ -43,7 +43,12 @@ const base = Schema.decodeSync(DiscussionEntry)({
   createdAt: "2026-10-13T00:00:00.000Z",
 });
 const interruption: DiscussionEntry = {
-  ...base,
+  discussionId: base.discussionId,
+  text: "插话",
+  files: [],
+  status: "completed",
+  checkpointRef: null,
+  createdAt: base.createdAt,
   kind: "user",
   id: decodeEntryId("interruption"),
   seq: 3,
@@ -83,7 +88,12 @@ const closing = {
   phase: "final_round" as const,
 };
 const marker: DiscussionEntry = {
-  ...base,
+  discussionId: base.discussionId,
+  seq: 1,
+  files: [],
+  status: "completed",
+  checkpointRef: null,
+  createdAt: base.createdAt,
   id: decodeEntryId("end"),
   kind: "system",
   text: "讨论到此",
@@ -99,7 +109,9 @@ function itemKey(item: ReturnType<typeof discussionTranscriptItems>[number]) {
         ? item.entry.id
         : item.kind === "next"
           ? `next:${item.seatIndex}`
-          : `${item.kind}:${item.label}`;
+          : item.kind === "live"
+            ? `live:${item.runId}`
+            : `${item.kind}:${item.label}`;
 }
 
 describe("discussion transcript ordering", () => {
@@ -138,7 +150,7 @@ describe("discussion transcript ordering", () => {
     {
       name: "unrelated system is hidden and summary is retained",
       entries: [
-        { ...base, kind: "system" },
+        { ...marker, text: "其他通知" },
         { ...base, id: decodeEntryId("summary"), kind: "summary" },
         base,
       ],
@@ -425,7 +437,7 @@ describe("C3 receipt and closing presentation", () => {
       statusLabel: null,
       badgeVariant: null,
     });
-    expect(discussionEntryFiles(entry, copy)).toEqual(
+    expect(discussionFilesView(entry.files, true, copy)).toEqual(
       files?.length
         ? { kind: "files", label: "改动 1 个文件", count: 1, additions: 7, deletions: 2 }
         : null,

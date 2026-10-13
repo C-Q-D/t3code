@@ -1,6 +1,11 @@
 /** Projects persisted discussion entries into record order, heading fields and file summaries. */
 import type { Discussion, DiscussionEntry, DiscussionSeat } from "@t3tools/contracts";
 import type { discussions } from "~/i18n/locales/en/discussions";
+import {
+  discussionLiveAssignment,
+  discussionOpeningSeq,
+  type DiscussionLiveAssignment,
+} from "./discussionLive.logic";
 import { discussionSeatStrip } from "./discussionPage.logic";
 
 /** Round separators preserve the original entry references for memoized rendering. */
@@ -8,6 +13,7 @@ export type DiscussionTranscriptItem =
   | { kind: "round"; round: number }
   | { kind: "topic"; text: string }
   | { kind: "entry"; entry: DiscussionEntry }
+  | ({ kind: "live" } & DiscussionLiveAssignment)
   | { kind: "closing"; id: DiscussionEntry["id"]; label: string }
   | { kind: "footer"; label: string }
   | { kind: "next"; seatIndex: number; label: string | null; round: number | null };
@@ -29,7 +35,7 @@ export type DiscussionFilesSummary =
 
 /**
  * Inserts round boundaries after any intervening user entries.
- * @param entries Subscription entries in ascending seq order; input objects are retained.
+ * @param entries Subscription entries sorted once by their opening anchors; input objects are retained.
  * @param discussion Persisted topic, current closing plan and shared next-seat assignment.
  * @param copy Localized boundaries and placeholder text.
  * @returns Initial round and topic, ordered records, closing boundaries and a final next-seat or ended footer item.
@@ -45,8 +51,20 @@ export function discussionTranscriptItems(
   ];
   let previousStatementRound: number | undefined;
   let closingStarted = false;
-  for (const entry of entries) {
-    if (entry.kind === "system") {
+  const records: (
+    | Extract<DiscussionTranscriptItem, { kind: "entry" }>
+    | Extract<DiscussionTranscriptItem, { kind: "live" }>
+  )[] = entries.map((entry) => ({ kind: "entry", entry }));
+  const live = discussionLiveAssignment(discussion, entries);
+  if (live) {
+    const following = entries.findIndex(
+      (entry) => discussionOpeningSeq(entry) > live.dispatchedEntrySeq,
+    );
+    records.splice(following < 0 ? records.length : following, 0, { kind: "live", ...live });
+  }
+  for (const record of records) {
+    const entry = record.kind === "entry" ? record.entry : null;
+    if (entry?.kind === "system") {
       if (entry.text === "讨论到此") {
         closingStarted = true;
         const summarizer = discussion.seats.find(
@@ -62,18 +80,21 @@ export function discussionTranscriptItems(
       }
       continue;
     }
-    if (
-      entry.kind === "statement" &&
-      entry.round !== undefined &&
-      !closingStarted &&
-      !entry.finalStatement
-    ) {
-      // User interruptions belong to the round in which they arrived, above the next AI boundary.
-      if (previousStatementRound !== undefined && entry.round > previousStatementRound)
-        items.push({ kind: "round", round: entry.round });
-      previousStatementRound = entry.round;
+    const ordinaryRound =
+      record.kind === "live"
+        ? record.phase === "regular"
+          ? record.round
+          : undefined
+        : entry?.kind === "statement" && !entry.finalStatement
+          ? entry.round
+          : undefined;
+    if (ordinaryRound !== undefined && !closingStarted) {
+      // Interjections stay above the next speaker's round boundary after opening-order projection.
+      if (previousStatementRound !== undefined && ordinaryRound > previousStatementRound)
+        items.push({ kind: "round", round: ordinaryRound });
+      previousStatementRound = ordinaryRound;
     }
-    items.push({ kind: "entry", entry });
+    items.push(record);
   }
   if (discussion.status === "ended") {
     items.push({ kind: "footer", label: copy.page.endedFooter });
@@ -205,17 +226,19 @@ export function discussionUserView(
 }
 
 /**
- * Applies the summary card's statistics visibility rule.
- * @param entry Statement or summary record with persisted statistics.
+ * Applies the shared statistics visibility rule for persisted and live cards.
+ * @param files Checkpoint or current-run file statistics.
+ * @param hideEmpty Summaries and live cards suppress pending or empty statistics.
  * @param copy Localized file count and availability labels.
- * @returns Statistics presentation, or null when a summary has no file changes.
+ * @returns Statistics presentation, or null when empty statistics should be suppressed.
  */
-export function discussionEntryFiles(
-  entry: DiscussionEntry,
+export function discussionFilesView(
+  files: DiscussionEntry["files"],
+  hideEmpty: boolean,
   copy: typeof discussions,
 ): DiscussionFilesSummary | null {
-  if (entry.kind === "summary" && !entry.files?.length) return null;
-  return discussionFilesSummary(entry.files, copy);
+  if (hideEmpty && !files?.length) return null;
+  return discussionFilesSummary(files, copy);
 }
 
 /**

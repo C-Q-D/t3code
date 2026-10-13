@@ -62,6 +62,7 @@ export const discussions = {
     failed: "Speaking failed",
     speaking: "Speaking",
     seats: "Speaking order",
+    runningCommand: "Running",
     viewProcess: "View process",
     noFiles: "No files changed",
     filesPending: "Change statistics are not available yet",

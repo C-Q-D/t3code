@@ -1,4 +1,4 @@
-/** Renders persisted discussion records, read receipts and closing results; live speaking belongs to its own block. */
+/** Renders opening-ordered discussion records and mounts one independently subscribed live seat. */
 import { useAtomValue } from "@effect/atom-react";
 import type {
   Discussion,
@@ -6,6 +6,10 @@ import type {
   DiscussionPersonaAvatar,
   EnvironmentId,
 } from "@t3tools/contracts";
+import { shouldPreserveAssistantLineBreaks } from "@t3tools/shared/markdownPipeline";
+import { DiscussionFiles } from "./DiscussionFiles";
+import { MemoizedDiscussionLiveRow } from "./DiscussionLiveRow";
+import { orderDiscussionEntries } from "./discussionLive.logic";
 import { Link } from "@tanstack/react-router";
 import { memo, useLayoutEffect, useMemo, useRef } from "react";
 import { t } from "~/i18n";
@@ -21,7 +25,6 @@ import { PixelAvatar } from "./PixelAvatar";
 import { discussionModelLabel } from "./discussionModelLabel";
 import { discussionSeatColor } from "./discussionSeatColors";
 import {
-  discussionEntryFiles,
   discussionUserView,
   discussionStatementHeading,
   discussionTranscriptItems,
@@ -29,7 +32,7 @@ import {
 } from "./discussionTranscript.logic";
 
 const EMPTY_ENTRIES: readonly DiscussionEntry[] = [];
-const FOLLOW_BOTTOM_DISTANCE_PX = 80;
+const FOLLOW_BOTTOM_DISTANCE_PX = 8;
 
 /** Stable entry reference and primitive presentation fields let memo skip unaffected Markdown rows. */
 type DiscussionEntryRowProps = DiscussionStatementHeading & {
@@ -102,7 +105,6 @@ function DiscussionEntryRow(props: DiscussionEntryRowProps) {
         </div>
       </div>
     );
-  const files = discussionEntryFiles(entry, t.discussions);
   return (
     <div className="grid grid-cols-[28px_minmax(0,1fr)] gap-x-3.5">
       <PixelAvatar
@@ -139,6 +141,7 @@ function DiscussionEntryRow(props: DiscussionEntryRowProps) {
         {entry.text ? (
           <ChatMarkdown
             text={entry.text}
+            lineBreaks={shouldPreserveAssistantLineBreaks(entry.text)}
             cwd={props.cwd}
             environmentId={props.environmentId}
             threadRef={
@@ -148,26 +151,7 @@ function DiscussionEntryRow(props: DiscussionEntryRowProps) {
             }
           />
         ) : null}
-        {files === null ? null : files.kind !== "files" ? (
-          <p className="text-xs text-muted-foreground">{files.label}</p>
-        ) : (
-          <div className="overflow-hidden rounded-lg border bg-card">
-            <div className="flex h-7.5 items-center gap-1.5 border-b px-3 text-xs">
-              <span className="font-medium">{files.label}</span>
-              <span className="text-success-foreground">+{files.additions}</span>
-              <span className="text-destructive-foreground">−{files.deletions}</span>
-            </div>
-            <ul className="divide-y">
-              {entry.files?.map((file) => (
-                <li key={file.path} className="flex min-h-7 items-center gap-2 px-3 py-1 text-xs">
-                  <span className="min-w-0 flex-1 break-all font-mono">{file.path}</span>
-                  <span className="shrink-0 text-success-foreground">+{file.additions}</span>
-                  <span className="shrink-0 text-destructive-foreground">−{file.deletions}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        <DiscussionFiles files={entry.files} hideEmpty={entry.kind === "summary"} />
       </div>
     </div>
   );
@@ -249,6 +233,7 @@ export function DiscussionTranscript({
     serverEnvironment.discussionLive({ environmentId, input: { discussionId: discussion.id } }),
   );
   const entries = query.data?.entries ?? EMPTY_ENTRIES;
+  const orderedEntries = useMemo(() => orderDiscussionEntries(entries), [entries]);
   const providers =
     useAtomValue(serverEnvironment.providersValueAtom(environmentId)) ?? EMPTY_SERVER_PROVIDERS;
   const settings = useEnvironmentSettings(environmentId);
@@ -273,8 +258,8 @@ export function DiscussionTranscript({
     });
   }, [discussion.seats, providers, settings]);
   const items = useMemo(
-    () => discussionTranscriptItems(entries, discussion, t.discussions),
-    [entries, discussion],
+    () => discussionTranscriptItems(orderedEntries, discussion, t.discussions),
+    [orderedEntries, discussion],
   );
   const viewportRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -369,6 +354,33 @@ export function DiscussionTranscript({
               />
             );
           }
+          if (item.kind === "live") {
+            const seat = discussion.seats[item.seatIndex]!;
+            const color = discussionSeatColor(item.seatIndex + 1).color;
+            return (
+              <article key={item.runId} className="relative">
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute top-12 -bottom-5 left-3.25 w-0.5 rounded-full"
+                  style={{
+                    background: `linear-gradient(to bottom, color-mix(in srgb, ${color} 70%, transparent), color-mix(in srgb, ${color} 25%, transparent))`,
+                  }}
+                />
+                <MemoizedDiscussionLiveRow
+                  environmentId={environmentId}
+                  threadId={seat.threadId}
+                  runId={item.runId}
+                  cwd={cwd}
+                  seatNumber={item.seatIndex + 1}
+                  avatar={seat.avatar}
+                  personaName={seat.personaName}
+                  modelLabel={modelLabels[item.seatIndex] ?? ""}
+                  round={item.round}
+                  phase={item.phase}
+                />
+              </article>
+            );
+          }
           const entry = item.entry;
           const seatIndex = discussion.seats.findIndex((seat) => seat.id === entry.seatId);
           const seat = discussion.seats[seatIndex];
@@ -384,7 +396,7 @@ export function DiscussionTranscript({
             t.settings.discussions.deletedPersona,
           );
           return (
-            <article key={entry.id} className="relative">
+            <article key={entry.runId ?? entry.id} className="relative">
               {position < items.length - 1 ? (
                 <span
                   aria-hidden="true"
