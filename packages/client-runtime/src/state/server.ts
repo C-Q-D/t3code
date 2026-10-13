@@ -40,6 +40,7 @@ import * as EnvironmentSupervisor from "../connection/supervisor.ts";
 import { safeErrorLogAttributes } from "../errors/safeLog.ts";
 import * as Persistence from "../platform/persistence.ts";
 import { runCachePersistence } from "./cachePersistence.ts";
+import { applyDiscussionSubscriptionEvent, type DiscussionState } from "./discussionReducer.ts";
 import {
   isRpcClientError,
   request,
@@ -58,6 +59,7 @@ import {
 
 // Exported server state includes this type in its inferred public return type.
 export type { ServerConfigProjection } from "./serverConfigProjection.ts";
+export type { DiscussionState } from "./discussionReducer.ts";
 
 export type ServerUpdateStage = "downloading" | "installing" | "resuming";
 
@@ -1132,6 +1134,32 @@ export function createServerEnvironmentAtoms<R, E>(
       label: "environment-data:server:discussion-templates:live",
       tag: WS_METHODS.discussionTemplatesSubscribe,
     }),
+    /** Full all-project list snapshots; the subscription owns refresh after mutations. */
+    discussionsLive: createEnvironmentRpcSubscriptionAtomFamily(runtime, {
+      label: "environment-data:server:discussions:live",
+      tag: WS_METHODS.discussionsSubscribeList,
+    }),
+    /** Fold wire deltas into one transcript; retain the final tombstone when the stream ends. */
+    discussionLive: createEnvironmentRpcSubscriptionAtomFamily(runtime, {
+      label: "environment-data:server:discussion:live",
+      tag: WS_METHODS.discussionsSubscribe,
+      completeWhen: (state: DiscussionState) => state.deleted,
+      transform: (stream) =>
+        stream.pipe(
+          Stream.scan((): DiscussionState | null => null, applyDiscussionSubscriptionEvent),
+          Stream.filter((state): state is DiscussionState => state !== null),
+        ),
+    }),
+    /** Provider capabilities are queried on mount through the standard environment query cache. */
+    discussionProviderSupport: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:server:discussion:provider-support",
+      tag: WS_METHODS.discussionsProviderSupport,
+    }),
+    /** Fetches the persisted checkpoint diff without changing the discussion or workspace. */
+    discussionEntryDiff: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:server:discussion:entry-diff",
+      tag: WS_METHODS.discussionsGetEntryDiff,
+    }),
     // A cold transcript scan is measured in seconds, so keep the result around
     // long enough that switching windows or re-rendering does not rescan.
     // Slow sources answer from cache first: that summary stays on screen, with
@@ -1360,6 +1388,45 @@ export function createServerEnvironmentAtoms<R, E>(
       tag: WS_METHODS.discussionTemplatesDelete,
       scheduler: configScheduler,
       concurrency: configConcurrency,
+    }),
+    /** Serializes saved seat edits with other configuration writes. */
+    upsertDiscussionTemplate: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:discussion-template:upsert",
+      tag: WS_METHODS.discussionTemplatesUpsert,
+      scheduler: configScheduler,
+      concurrency: configConcurrency,
+    }),
+    // Lifecycle commands use the standard guarded RPC boundary without automatic retries.
+    // Keep provider execution off the configuration lane so it cannot block settings edits.
+    /** Creates a discussion and starts its first provider turn on the destination server. */
+    createDiscussion: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:discussion:create",
+      tag: WS_METHODS.discussionsCreate,
+    }),
+    /** Adds user material; the live transcript receives the persisted entry. */
+    interjectDiscussion: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:discussion:interject",
+      tag: WS_METHODS.discussionsInterject,
+    }),
+    /** Interrupts the current provider run and pauses further seat dispatch. */
+    stopDiscussion: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:discussion:stop",
+      tag: WS_METHODS.discussionsStop,
+    }),
+    /** Resumes seat dispatch using the server's persisted cursor. */
+    continueDiscussion: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:discussion:continue",
+      tag: WS_METHODS.discussionsContinue,
+    }),
+    /** Begins closing with the chosen summarizer and optional summary prompt. */
+    endDiscussion: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:discussion:end",
+      tag: WS_METHODS.discussionsEnd,
+    }),
+    /** Deletes the discussion; subscribers receive the final deletion event. */
+    deleteDiscussion: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:discussion:delete",
+      tag: WS_METHODS.discussionsDelete,
     }),
     upsertScheduledTask: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:server:scheduled-task:upsert",
