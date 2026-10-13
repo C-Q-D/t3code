@@ -1,8 +1,8 @@
-/** Reserves the full-page discussion creation route without starting any provider session. */
+/** Hosts discussion creation under the chat layout, retaining its sidebar. */
 import { createFileRoute } from "@tanstack/react-router";
 import { DiscussionSeatDraftPage } from "../components/discussions/DiscussionSeatDraftPage";
 
-/** Hosts local seat editing while the full creation form remains a later task. */
+/** Displays the complete creation form; provider execution requires its explicit start command. */
 function NewDiscussionRoute() {
   return <DiscussionSeatDraftPage />;
 }
