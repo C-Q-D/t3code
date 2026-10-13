@@ -8,6 +8,7 @@ import {
 import { ArrowUpIcon } from "lucide-react";
 import { useRef, useState } from "react";
 import { t } from "~/i18n";
+import { cn } from "~/lib/utils";
 import { serverEnvironment } from "~/state/server";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { toastManager } from "../ui/toast";
@@ -64,7 +65,10 @@ export function DiscussionComposer({
     <div className="shrink-0 px-6 pb-4">
       <div className="mx-auto flex w-full max-w-192 flex-col gap-2 pl-10.5">
         <div
-          className={`rounded-3xl border shadow-sm focus-within:ring-2 focus-within:ring-inset focus-within:ring-ring dark:shadow-none ${view.disabled ? "bg-muted/30" : "bg-card"}`}
+          className={cn(
+            "rounded-3xl border shadow-sm focus-within:ring-2 focus-within:ring-inset focus-within:ring-ring dark:shadow-none",
+            view.disabled ? "bg-muted/30" : "bg-card",
+          )}
         >
           <div className="px-5 pt-3.5 pb-1">
             <textarea
@@ -94,7 +98,12 @@ export function DiscussionComposer({
           <div className="flex justify-end px-2.5 pt-1 pb-2.5">
             <button
               type="button"
-              className={`relative isolate flex size-8 items-center justify-center overflow-hidden rounded-full shadow-xs transition-all duration-150 enabled:cursor-pointer enabled:inset-shadow-control-highlight hover:scale-105 active:inset-shadow-control-pressed active:shadow-none disabled:pointer-events-none disabled:opacity-64 disabled:shadow-none disabled:hover:scale-100 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&_svg]:pointer-events-none ${view.disabled ? "bg-foreground/10 text-muted-foreground" : "bg-message-action text-message-action-foreground enabled:shadow-message-action/24 hover:bg-message-action-hover"}`}
+              className={cn(
+                "relative isolate flex size-8 items-center justify-center overflow-hidden rounded-full shadow-xs transition-all duration-150 enabled:cursor-pointer enabled:inset-shadow-control-highlight hover:scale-105 active:inset-shadow-control-pressed active:shadow-none disabled:pointer-events-none disabled:shadow-none disabled:hover:scale-100 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&_svg]:pointer-events-none",
+                view.disabled
+                  ? "bg-foreground/10 text-muted-foreground"
+                  : "bg-message-action text-message-action-foreground enabled:shadow-message-action/24 hover:bg-message-action-hover disabled:opacity-64",
+              )}
               disabled={sendable === null}
               aria-label={t.discussions.page.sendInterjection}
               onClick={() => void send()}

@@ -25,7 +25,7 @@ export function DiscussionDeleteDialog({
         if (!open && !pending) onClose();
       }}
     >
-      <AlertDialogPopup className="w-100" bottomStickOnMobile={false}>
+      <AlertDialogPopup className="max-w-100" bottomStickOnMobile={false}>
         <div className="flex flex-col gap-2 p-5">
           <AlertDialogTitle>{t.discussions.page.deleteTitle}</AlertDialogTitle>
           <AlertDialogDescription>{t.discussions.page.deleteDescription}</AlertDialogDescription>

@@ -1,6 +1,7 @@
 /** Protects discussion entry visibility and route selection independently of rendered markup. */
 import { describe, expect, it } from "vite-plus/test";
 
+import { discussionDeleteShouldNavigate } from "./discussionPage.logic";
 import { discussionNavigationState } from "./discussionNavigation.logic";
 
 describe("discussionNavigationState", () => {
@@ -26,5 +27,17 @@ describe("discussionNavigationState", () => {
       visible: true,
       isActive: false,
     });
+  });
+});
+
+describe("discussion deletion navigation", () => {
+  it.each([
+    { pathname: "/discussions/env/a", expected: true },
+    { pathname: "/discussions/env/b", expected: false },
+    { pathname: "/discussions/other/a", expected: false },
+    { pathname: "/discussions", expected: false },
+    { pathname: "/env/thread", expected: false },
+  ])("$pathname", ({ pathname, expected }) => {
+    expect(discussionDeleteShouldNavigate(pathname, "env", "a")).toBe(expected);
   });
 });

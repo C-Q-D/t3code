@@ -50,7 +50,10 @@ export function discussionEndInput(
     ...(promptId ? { summaryPromptId: promptId } : {}),
   };
 }
-/** Closes an obsolete selection dialog unless this page is still awaiting its own end response. */
+/**
+ * Closes an obsolete selection dialog unless this page is still awaiting its own end response.
+ * Persisted closing also closes after dispatch failure: ending already took effect, so another end submission cannot help.
+ */
 export function discussionEndShouldClose(discussion: Discussion, ending: boolean): boolean {
   return (
     !ending &&

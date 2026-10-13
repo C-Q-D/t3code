@@ -5,7 +5,7 @@ import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { Fragment, useRef, useState } from "react";
 import { EllipsisIcon, PauseIcon, PlayIcon, Trash2Icon } from "lucide-react";
 import { Menu, MenuTrigger, MenuPopup, MenuItem } from "../ui/menu";
@@ -34,6 +34,7 @@ import { discussionSeatColor } from "./discussionSeatColors";
 import {
   discussionHeaderView,
   discussionHeaderActionEnabled,
+  discussionDeleteShouldNavigate,
   discussionSeatStrip,
   type DiscussionStripItem,
 } from "./discussionPage.logic";
@@ -226,6 +227,7 @@ export function DiscussionPage({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [ending, setEnding] = useState(false);
   const navigate = useNavigate();
+  const router = useRouter();
   const end = useAtomCommand(serverEnvironment.endDiscussion);
   const remove = useAtomCommand(serverEnvironment.deleteDiscussion);
   const canEnd = useAtomValue(serverEnvironment.endDiscussion.permissionAtom(environmentId));
@@ -300,7 +302,10 @@ export function DiscussionPage({
     setHeaderPending(true);
     const result = await remove({ environmentId, input: { discussionId: discussion.id } });
     if (result._tag === "Success") {
-      await navigate({ to: "/discussions", replace: true });
+      if (
+        discussionDeleteShouldNavigate(router.state.location.pathname, environmentId, discussion.id)
+      )
+        await navigate({ to: "/discussions", replace: true });
       return;
     }
     submissionPending.current = false;

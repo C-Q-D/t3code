@@ -58,7 +58,11 @@ function DiscussionRoute() {
   if (query.data?.deleted)
     return <DiscussionPageMessage title={copy.deleted} description={copy.deletedDescription} />;
   return query.data && state.kind === "subscribe" ? (
-    <DiscussionPage discussion={query.data.discussion} environmentId={state.environmentId} />
+    <DiscussionPage
+      key={`${state.environmentId}:${state.discussionId}`}
+      discussion={query.data.discussion}
+      environmentId={state.environmentId}
+    />
   ) : (
     <DiscussionPageMessage title={null} />
   );

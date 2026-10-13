@@ -3,6 +3,7 @@ import { useAtomValue } from "@effect/atom-react";
 import type { Discussion, EnvironmentId, DiscussionEndInput } from "@t3tools/contracts";
 import { useEffect, useState } from "react";
 import { t } from "~/i18n";
+import { cn } from "~/lib/utils";
 import { serverEnvironment } from "~/state/server";
 import { useEnvironmentQuery } from "~/state/query";
 import { useEnvironmentSettings } from "~/hooks/useSettings";
@@ -71,7 +72,7 @@ export function DiscussionEndDialog({
         if (!open && !pending) onClose();
       }}
     >
-      <DialogPopup className="w-110" showCloseButton={false} bottomStickOnMobile={false}>
+      <DialogPopup className="max-w-110" showCloseButton={false} bottomStickOnMobile={false}>
         <div className="flex flex-col gap-4.5 p-5">
           <DialogTitle>{t.discussions.page.end}</DialogTitle>
           <div className="flex flex-col gap-2">
@@ -101,7 +102,10 @@ export function DiscussionEndDialog({
                     return (
                       <label
                         key={seat.id}
-                        className={`flex cursor-pointer items-center gap-2.5 border-b px-3 py-2.5 text-sm last:border-b-0 hover:bg-accent ${seatId === seat.id ? "bg-accent" : ""}`}
+                        className={cn(
+                          "flex cursor-pointer items-center gap-2.5 border-b px-3 py-2.5 text-sm last:border-b-0 hover:bg-accent",
+                          seatId === seat.id && "bg-accent",
+                        )}
                       >
                         <Radio value={seat.id} />
                         <PixelAvatar role={seat.avatar} seat={index + 1} size={26} />

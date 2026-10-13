@@ -188,11 +188,13 @@ describe("end discussion selections", () => {
       summarizerSeatId: "b",
       summaryPromptId: "builtin:summary:default",
     }));
+  it("closes after its own end response fails with persisted closing", () =>
+    expect(discussionEndShouldClose({ ...d, status: "paused", closing }, false)).toBe(true));
   it.each([
     { status: "speaking" as const, closing: null, ending: false, expected: false },
     { status: "paused" as const, closing: null, ending: false, expected: false },
     { status: "ended" as const, closing: null, ending: false, expected: true },
-    { status: "paused" as const, closing, ending: false, expected: true },
+
     { status: "closing" as const, closing, ending: false, expected: true },
     { status: "closing" as const, closing, ending: true, expected: false },
   ])("automatic close $status own-end=$ending", ({ status, closing, ending, expected }) =>

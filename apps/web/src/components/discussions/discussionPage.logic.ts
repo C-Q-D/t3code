@@ -3,6 +3,24 @@ import type { Discussion, DiscussionId, EnvironmentId } from "@t3tools/contracts
 import * as Option from "effect/Option";
 import type { discussions } from "~/i18n/locales/en/discussions";
 
+/**
+ * Keeps a delayed deletion response from replacing a page the user has since opened.
+ * @param pathname Router's current pathname when the deletion response arrives.
+ * @param environmentId Environment containing the deleted discussion.
+ * @param discussionId Discussion whose deletion was submitted.
+ * @returns Whether the current route still belongs to that discussion, even after its projection disappears.
+ */
+export function discussionDeleteShouldNavigate(
+  pathname: string,
+  environmentId: string,
+  discussionId: string,
+): boolean {
+  return (
+    pathname ===
+    `/discussions/${encodeURIComponent(environmentId)}/${encodeURIComponent(discussionId)}`
+  );
+}
+
 /** A route can subscribe only after both IDs and the environment directory are valid. */
 export type DiscussionRouteState =
   | { kind: "invalid" | "waiting" | "unknown-environment" }
