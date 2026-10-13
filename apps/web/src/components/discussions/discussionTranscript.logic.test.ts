@@ -42,13 +42,17 @@ const base = Schema.decodeSync(DiscussionEntry)({
   checkpointRef: null,
   createdAt: "2026-10-13T00:00:00.000Z",
 });
-const topic: DiscussionEntry = { ...base, kind: "user", id: decodeEntryId("topic") };
-const interruption: DiscussionEntry = { ...topic, id: decodeEntryId("interruption"), seq: 3 };
+const interruption: DiscussionEntry = {
+  ...base,
+  kind: "user",
+  id: decodeEntryId("interruption"),
+  seq: 3,
+};
 const discussion = Schema.decodeSync(Discussion)({
   id: "discussion",
   projectId: "project",
   title: "议题",
-  topic: "议题",
+  topic: "独立议题\n第二行",
   seats: [
     seat,
     { ...seat, id: "b", personaName: "反方", avatar: "opponent", threadId: "b-thread" },
@@ -89,34 +93,38 @@ const marker: DiscussionEntry = {
 function itemKey(item: ReturnType<typeof discussionTranscriptItems>[number]) {
   return item.kind === "round"
     ? `round:${item.round}`
-    : item.kind === "entry"
-      ? item.entry.id
-      : item.kind === "next"
-        ? `next:${item.seatIndex}`
-        : `${item.kind}:${item.label}`;
+    : item.kind === "topic"
+      ? `topic:${item.text}`
+      : item.kind === "entry"
+        ? item.entry.id
+        : item.kind === "next"
+          ? `next:${item.seatIndex}`
+          : `${item.kind}:${item.label}`;
 }
 
 describe("discussion transcript ordering", () => {
   it.each([
     {
       name: "initial divider even before statements",
-      entries: [topic],
-      expected: ["round:1", "topic"],
+      entries: [],
+      expected: ["round:1", "topic:独立议题\n第二行"],
     },
     {
       name: "same round has no second divider",
-      entries: [topic, base, { ...base, id: decodeEntryId("second"), seq: 3 }],
-      expected: ["round:1", "topic", "entry", "second"],
+      entries: [base, { ...base, id: decodeEntryId("second"), seq: 3 }],
+      expected: ["round:1", "topic:独立议题\n第二行", "entry", "second"],
     },
     {
       name: "interruption remains above the next round",
-      entries: [
-        topic,
-        base,
-        interruption,
-        { ...base, id: decodeEntryId("next-round"), seq: 4, round: 2 },
+      entries: [base, interruption, { ...base, id: decodeEntryId("next-round"), seq: 4, round: 2 }],
+      expected: [
+        "round:1",
+        "topic:独立议题\n第二行",
+        "entry",
+        "interruption",
+        "round:2",
+        "next-round",
       ],
-      expected: ["round:1", "topic", "entry", "interruption", "round:2", "next-round"],
     },
     {
       name: "only increasing rounds separate",
@@ -125,17 +133,16 @@ describe("discussion transcript ordering", () => {
         { ...base, id: decodeEntryId("later"), seq: 2, round: 3 },
         { ...base, id: decodeEntryId("older"), seq: 3, round: 2 },
       ],
-      expected: ["round:1", "entry", "round:3", "later", "older"],
+      expected: ["round:1", "topic:独立议题\n第二行", "entry", "round:3", "later", "older"],
     },
     {
       name: "unrelated system is hidden and summary is retained",
       entries: [
-        topic,
         { ...base, kind: "system" },
         { ...base, id: decodeEntryId("summary"), kind: "summary" },
         base,
       ],
-      expected: ["round:1", "topic", "summary", "entry"],
+      expected: ["round:1", "topic:独立议题\n第二行", "summary", "entry"],
     },
   ] satisfies { name: string; entries: DiscussionEntry[]; expected: string[] }[])(
     "$name",
@@ -146,7 +153,7 @@ describe("discussion transcript ordering", () => {
         entries.filter((entry) => entry.kind !== "system"),
       );
       expect(items.find((item) => item.kind === "entry")?.entry).toBe(
-        entries.find((entry) => entry.kind === "user" || entry.kind === "statement"),
+        entries.find((entry) => entry.kind !== "system"),
       );
     },
   );
@@ -224,32 +231,37 @@ describe("checkpoint statistics", () => {
 });
 
 describe("C3 receipt and closing presentation", () => {
+  it("topic comes from the discussion before any real entries", () => {
+    expect(discussionTranscriptItems([interruption], discussion, copy).slice(0, 3)).toEqual([
+      { kind: "round", round: 1 },
+      { kind: "topic", text: "独立议题\n第二行" },
+      { kind: "entry", entry: interruption },
+    ]);
+  });
+  it("first unread interjection counts even when it is the only user entry", () => {
+    expect(discussionTranscriptItems([interruption], discussion, copy).at(-1)).toEqual({
+      kind: "next",
+      seatIndex: 1,
+      round: null,
+      label: "开口时读到上面 1 条插话",
+    });
+  });
   it.each([
     {
-      name: "topic has no receipt",
-      entry: topic,
-      topic: true,
-      snapshot: discussion,
-      expected: { label: null, seatIndex: null, avatarState: "idle", read: true },
-    },
-    {
-      name: "read receipt",
+      name: "first interjection read receipt",
       entry: { ...interruption, readBySeatId: seat.id },
-      topic: false,
       snapshot: discussion,
       expected: { label: "插话 · 架构师已读到", seatIndex: 0, avatarState: "idle", read: true },
     },
     {
-      name: "speaking unread",
+      name: "first interjection unread",
       entry: interruption,
-      topic: false,
       snapshot: discussion,
       expected: { label: "插话 · 反方开口时读到", seatIndex: 1, avatarState: "next", read: false },
     },
     {
       name: "last seat wraps",
       entry: interruption,
-      topic: false,
       snapshot: { ...discussion, cursor: { ...discussion.cursor, seatIndex: 1 } },
       expected: {
         label: "插话 · 架构师开口时读到",
@@ -261,7 +273,6 @@ describe("C3 receipt and closing presentation", () => {
     {
       name: "paused retries",
       entry: interruption,
-      topic: false,
       snapshot: { ...discussion, status: "paused" as const },
       expected: {
         label: "插话 · 架构师重新开口时读到",
@@ -273,7 +284,6 @@ describe("C3 receipt and closing presentation", () => {
     {
       name: "closing goes to next final seat",
       entry: interruption,
-      topic: false,
       snapshot: {
         ...discussion,
         status: "closing" as const,
@@ -285,14 +295,13 @@ describe("C3 receipt and closing presentation", () => {
     {
       name: "ended unread has no avatar",
       entry: interruption,
-      topic: false,
       snapshot: { ...discussion, status: "ended" as const },
       expected: { label: "插话", seatIndex: null, avatarState: "idle", read: false },
     },
-  ])("$name", ({ entry, topic: isTopic, snapshot, expected }) => {
-    expect(discussionUserView(entry, isTopic, snapshot, copy)).toEqual(expected);
-    if (!isTopic && !entry.readBySeatId && snapshot.status !== "ended") {
-      expect(discussionUserView(entry, isTopic, snapshot, copy).seatIndex).toBe(
+  ])("$name", ({ entry, snapshot, expected }) => {
+    expect(discussionUserView(entry, snapshot, copy)).toEqual(expected);
+    if (!entry.readBySeatId && snapshot.status !== "ended") {
+      expect(discussionUserView(entry, snapshot, copy).seatIndex).toBe(
         discussionSeatStrip(snapshot).find(
           (item): item is Extract<typeof item, { kind: "seat" }> =>
             item.kind === "seat" && item.tags.includes("next"),
@@ -315,7 +324,6 @@ describe("C3 receipt and closing presentation", () => {
     };
     const items = discussionTranscriptItems(
       [
-        topic,
         { ...interruption, readBySeatId: seat.id },
         { ...interruption, id: decodeEntryId("unread") },
       ],
@@ -325,13 +333,13 @@ describe("C3 receipt and closing presentation", () => {
     expect(items.at(-1)).toEqual({ kind: "next", seatIndex: index, label, round: null });
   });
   it("zero unread next has no text and no same-round divider", () => {
-    expect(discussionTranscriptItems([topic, base], discussion, copy).map(itemKey)).toEqual([
+    expect(discussionTranscriptItems([base], discussion, copy).map(itemKey)).toEqual([
       "round:1",
-      "topic",
+      "topic:独立议题\n第二行",
       "entry",
       "next:1",
     ]);
-    expect(discussionTranscriptItems([topic], discussion, copy).at(-1)).toEqual({
+    expect(discussionTranscriptItems([], discussion, copy).at(-1)).toEqual({
       kind: "next",
       seatIndex: 1,
       label: null,
@@ -340,9 +348,14 @@ describe("C3 receipt and closing presentation", () => {
   });
   it("wrap divider remains below interjections and directly above next", () => {
     const snapshot = { ...discussion, cursor: { ...discussion.cursor, seatIndex: 1 } };
-    expect(
-      discussionTranscriptItems([topic, base, interruption], snapshot, copy).map(itemKey),
-    ).toEqual(["round:1", "topic", "entry", "interruption", "round:2", "next:0"]);
+    expect(discussionTranscriptItems([base, interruption], snapshot, copy).map(itemKey)).toEqual([
+      "round:1",
+      "topic:独立议题\n第二行",
+      "entry",
+      "interruption",
+      "round:2",
+      "next:0",
+    ]);
   });
   it("closing marker suppresses later round dividers including placeholder wraps", () => {
     const snapshot = {
@@ -353,12 +366,10 @@ describe("C3 receipt and closing presentation", () => {
     };
     const later = { ...base, id: decodeEntryId("late-ordinary"), round: 3 };
     expect(
-      discussionTranscriptItems([topic, base, marker, interruption, later], snapshot, copy).map(
-        itemKey,
-      ),
+      discussionTranscriptItems([base, marker, interruption, later], snapshot, copy).map(itemKey),
     ).toEqual([
       "round:1",
-      "topic",
+      "topic:独立议题\n第二行",
       "entry",
       "closing:讨论到此 · 梳理人：架构师",
       "interruption",
@@ -373,7 +384,7 @@ describe("C3 receipt and closing presentation", () => {
         { ...discussion, closing: null },
         copy,
       ).map(itemKey),
-    ).toEqual(["round:1", "closing:讨论到此", "next:1"]);
+    ).toEqual(["round:1", "topic:独立议题\n第二行", "closing:讨论到此", "next:1"]);
   });
   it("final attribution overrides round and retains interrupted status", () => {
     expect(
@@ -424,13 +435,13 @@ describe("C3 receipt and closing presentation", () => {
     const summary = { ...base, kind: "summary" as const, id: decodeEntryId("summary") };
     expect(
       discussionTranscriptItems(
-        [topic, marker, summary],
+        [marker, summary],
         { ...discussion, status: "ended", closing },
         copy,
       ).map(itemKey),
     ).toEqual([
       "round:1",
-      "topic",
+      "topic:独立议题\n第二行",
       "closing:讨论到此 · 梳理人：架构师",
       "summary",
       "footer:讨论已结束，记录保留。要接着讨论，请新建一场。",

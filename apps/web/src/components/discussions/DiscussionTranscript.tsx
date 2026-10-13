@@ -206,6 +206,28 @@ function DiscussionNextRow(props: {
 const MemoizedDiscussionNextRow = memo(DiscussionNextRow);
 
 /**
+ * Displays the discussion topic independently of subscription entries; receipts belong only to interjections.
+ * @param props.text Persisted discussion.topic, rendered as plain text with original line breaks.
+ * @returns User avatar and a solid right-aligned bubble; memoization depends only on the topic string.
+ */
+function DiscussionTopicRow({ text }: { text: string }) {
+  return (
+    <div className="grid grid-cols-[28px_minmax(0,1fr)] gap-x-3.5">
+      <PixelAvatar role="user" seat={0} size={28} />
+      <div className="flex justify-end">
+        <div
+          className="max-w-[80%] whitespace-pre-wrap break-words rounded-2xl border border-border px-3.5 py-2.5 text-sm leading-relaxed"
+          style={{ background: "color-mix(in srgb, var(--foreground) 6%, var(--card))" }}
+        >
+          {text}
+        </div>
+      </div>
+    </div>
+  );
+}
+const MemoizedDiscussionTopicRow = memo(DiscussionTopicRow);
+
+/**
  * Reads the route's shared subscription atom and follows growth only while the reader is near the bottom.
  * @param props.discussion Frozen seat attribution and subscription identity; cursor changes do not change row props.
  * @param props.environmentId Registered environment already validated by the route.
@@ -254,7 +276,6 @@ export function DiscussionTranscript({
     () => discussionTranscriptItems(entries, discussion, t.discussions),
     [entries, discussion],
   );
-  const topicId = entries.find((entry) => entry.kind === "user")?.id;
   const viewportRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const followsBottom = useRef(true);
@@ -303,6 +324,22 @@ export function DiscussionTranscript({
               </div>
             );
           }
+          if (item.kind === "topic")
+            return (
+              <article key="discussion-topic" className="relative">
+                {position < items.length - 1 ? (
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute top-8.5 -bottom-5 left-3.5"
+                    style={{
+                      borderLeft:
+                        "1px solid color-mix(in srgb, var(--foreground) 18%, transparent)",
+                    }}
+                  />
+                ) : null}
+                <MemoizedDiscussionTopicRow text={item.text} />
+              </article>
+            );
           if (item.kind === "closing")
             return (
               <div
@@ -336,9 +373,7 @@ export function DiscussionTranscript({
           const seatIndex = discussion.seats.findIndex((seat) => seat.id === entry.seatId);
           const seat = discussion.seats[seatIndex];
           const userView =
-            entry.kind === "user"
-              ? discussionUserView(entry, entry.id === topicId, discussion, t.discussions)
-              : null;
+            entry.kind === "user" ? discussionUserView(entry, discussion, t.discussions) : null;
           const receiptSeat =
             userView?.seatIndex == null ? undefined : discussion.seats[userView.seatIndex];
           const heading = discussionStatementHeading(

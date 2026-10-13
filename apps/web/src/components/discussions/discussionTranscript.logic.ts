@@ -6,6 +6,7 @@ import { discussionSeatStrip } from "./discussionPage.logic";
 /** Round separators preserve the original entry references for memoized rendering. */
 export type DiscussionTranscriptItem =
   | { kind: "round"; round: number }
+  | { kind: "topic"; text: string }
   | { kind: "entry"; entry: DiscussionEntry }
   | { kind: "closing"; id: DiscussionEntry["id"]; label: string }
   | { kind: "footer"; label: string }
@@ -29,16 +30,19 @@ export type DiscussionFilesSummary =
 /**
  * Inserts round boundaries after any intervening user entries.
  * @param entries Subscription entries in ascending seq order; input objects are retained.
- * @param discussion Current closing plan and shared next-seat assignment.
+ * @param discussion Persisted topic, current closing plan and shared next-seat assignment.
  * @param copy Localized boundaries and placeholder text.
- * @returns Ordered records, closing boundaries and a final next-seat or ended footer item.
+ * @returns Initial round and topic, ordered records, closing boundaries and a final next-seat or ended footer item.
  */
 export function discussionTranscriptItems(
   entries: readonly DiscussionEntry[],
   discussion: Discussion,
   copy: typeof discussions,
 ): DiscussionTranscriptItem[] {
-  const items: DiscussionTranscriptItem[] = [{ kind: "round", round: 1 }];
+  const items: DiscussionTranscriptItem[] = [
+    { kind: "round", round: 1 },
+    { kind: "topic", text: discussion.topic },
+  ];
   let previousStatementRound: number | undefined;
   let closingStarted = false;
   for (const entry of entries) {
@@ -94,10 +98,7 @@ export function discussionTranscriptItems(
       round = preceding.round;
       if (previousStatementRound !== round) items.push({ kind: "round", round });
     }
-    let userCount = 0;
-    const unread = entries.filter(
-      (entry) => entry.kind === "user" && ++userCount > 1 && !entry.readBySeatId,
-    ).length;
+    const unread = entries.filter((entry) => entry.kind === "user" && !entry.readBySeatId).length;
     items.push({
       kind: "next",
       seatIndex: next.index,
@@ -160,20 +161,17 @@ export type DiscussionUserView = {
 };
 
 /**
- * Resolves a topic or interjection receipt against the shared seat strip.
+ * Resolves every persisted user entry as an interjection against the shared seat strip.
  * @param entry User record being presented.
- * @param isTopic Whether this is the first user record.
  * @param discussion Current cursor, status and frozen seats.
  * @param copy Localized receipt text.
  * @returns Bubble/connector state and receipt avatar assignment.
  */
 export function discussionUserView(
   entry: DiscussionEntry,
-  isTopic: boolean,
   discussion: Discussion,
   copy: typeof discussions,
 ): DiscussionUserView {
-  if (isTopic) return { label: null, seatIndex: null, avatarState: "idle", read: true };
   if (entry.readBySeatId) {
     const seatIndex = discussion.seats.findIndex((seat) => seat.id === entry.readBySeatId);
     return {
