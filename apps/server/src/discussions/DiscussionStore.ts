@@ -143,6 +143,7 @@ interface EntryRow {
   run_id: string | null;
   round: number | null;
   read_by_seat_id: string | null;
+  final_statement: number;
   text: string;
   files_json: string | null;
   status: string;
@@ -238,6 +239,7 @@ const decodeEntry = (row: EntryRow) =>
       ...(row.run_id === null ? {} : { runId: row.run_id }),
       ...(row.round === null ? {} : { round: row.round }),
       ...(row.read_by_seat_id === null ? {} : { readBySeatId: row.read_by_seat_id }),
+      ...(row.final_statement === 1 ? { finalStatement: true } : {}),
       text: row.text,
       files:
         row.files_json === null
@@ -406,9 +408,9 @@ const make = Effect.gen(function* () {
             entry.files === null ? null : yield* Schema.encodeEffect(filesJson)(entry.files);
           // One statement owns allocation and insertion, so concurrent writers cannot both claim the same seq.
           const rows = yield* sql<EntryRow>`INSERT INTO discussion_entries
-        (discussion_id, seq, entry_id, kind, seat_id, thread_id, run_id, round, read_by_seat_id, text, files_json, status, checkpoint_ref, created_at)
+        (discussion_id, seq, entry_id, kind, seat_id, thread_id, run_id, round, read_by_seat_id, final_statement, text, files_json, status, checkpoint_ref, created_at)
         SELECT ${entry.discussionId}, COALESCE(MAX(seq), 0) + 1, ${entry.id}, ${entry.kind},
-          ${entry.seatId ?? null}, ${entry.threadId ?? null}, ${entry.runId ?? null}, ${entry.round ?? null}, ${entry.readBySeatId ?? null}, ${entry.text},
+          ${entry.seatId ?? null}, ${entry.threadId ?? null}, ${entry.runId ?? null}, ${entry.round ?? null}, ${entry.readBySeatId ?? null}, ${entry.finalStatement === true ? 1 : 0}, ${entry.text},
           ${files}, ${entry.status}, ${entry.checkpointRef}, ${entry.createdAt}
         FROM discussion_entries WHERE discussion_id = ${entry.discussionId} RETURNING *`;
           const row = rows[0];

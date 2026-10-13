@@ -87,6 +87,8 @@ export const Discussion = Schema.Struct({
   seats: Schema.Array(DiscussionSeat).check(Schema.isMinLength(1)),
   status: Schema.Literals(["speaking", "paused", "closing", "ended"]),
   cursor: Schema.Struct({
+    /** Current dispatch assignment; absent only on snapshots written before phase publication. */
+    phase: Schema.optionalKey(Schema.Literals(["regular", "final_round", "summarizing"])),
     seatIndex: NonNegativeInt,
     round: PositiveInt,
     dispatchNo: NonNegativeInt,
@@ -131,6 +133,8 @@ export const DiscussionEntry = Schema.Struct({
   runId: Schema.optionalKey(RunId),
   round: Schema.optionalKey(PositiveInt),
   readBySeatId: Schema.optionalKey(DiscussionSeatId),
+  /** Dispatch-time final statement attribution, independent of later cursor movement. */
+  finalStatement: Schema.optionalKey(Schema.Literal(true)),
   text: Schema.String,
   files: Schema.NullOr(
     Schema.Array(

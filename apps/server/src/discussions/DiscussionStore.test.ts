@@ -9,6 +9,7 @@ import {
   DiscussionId,
   DiscussionSeatId,
   RunId,
+  CheckpointRef,
 } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -64,6 +65,50 @@ const entry: DiscussionStore.DiscussionEntryAppend = {
   checkpointRef: null,
   createdAt: timestamp,
 };
+
+it.effect("final attribution survives entry enrichment and old cursor JSON remains readable", () =>
+  Effect.gen(function* () {
+    const store = yield* DiscussionStore.DiscussionStore;
+    const sql = yield* SqlClient.SqlClient;
+    yield* store.createDiscussion(discussion);
+    const rows = yield* sql<{ cursor_json: string }>`SELECT cursor_json FROM discussions`;
+    assert.notProperty(JSON.parse(rows[0]!.cursor_json), "phase");
+    assert.deepEqual((yield* store.getDiscussion(discussion.id))?.cursor, discussion.cursor);
+    const first = yield* store.appendEntry({ ...entry, finalStatement: true });
+    const ordinary = yield* store.appendEntry({
+      ...entry,
+      id: DiscussionEntryId.make("entry:ordinary"),
+      runId: RunId.make("run:ordinary"),
+    });
+    assert.deepEqual(
+      (yield* store.listEntries(discussion.id)).map((e) => [
+        e.seq,
+        e.finalStatement,
+        Object.hasOwn(e, "finalStatement"),
+      ]),
+      [
+        [1, true, true],
+        [2, undefined, false],
+      ],
+    );
+    yield* store.updateEntry(first.id, {
+      files: [{ path: "later.ts", additions: 7, deletions: 4 }],
+      checkpointRef: CheckpointRef.make("refs/c3/final"),
+      readBySeatId: discussion.seats[0]!.id,
+    });
+    yield* store.updateEntry(ordinary.id, { files: [] });
+    assert.deepEqual(
+      (yield* store.listEntries(discussion.id)).map((e) => [e.seq, e.finalStatement, e.files]),
+      [
+        [1, true, [{ path: "later.ts", additions: 7, deletions: 4 }]],
+        [2, undefined, []],
+      ],
+    );
+    assert.equal((yield* store.getEntryByRunId(entry.runId!))?.finalStatement, true);
+  }).pipe(
+    Effect.provide(DiscussionStore.layer.pipe(Layer.provideMerge(SqlitePersistence.layerMemory))),
+  ),
+);
 
 it.effect("prompt and ordered template records persist edits and deletion", () =>
   Effect.gen(function* () {

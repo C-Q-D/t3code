@@ -96,6 +96,142 @@ const next = (h: DiscussionHarness, discussion: Discussion, dispatchNo: number) 
     return turn;
   });
 
+/**
+ * Checks the public cursor and durable dispatch against an independently specified phase.
+ * @param discussion Identity whose latest stored cursor is checked.
+ * @param turn Provider input, or null when End must publish before any dispatch.
+ * @param phase Assignment required by this test's lifecycle step.
+ * @returns Assertion effect; no production phase helper computes the expectation.
+ */
+const expectPhase = (
+  discussion: Discussion,
+  turn: DiscussionHarness["started"][number] | null,
+  phase: "regular" | "final_round" | "summarizing",
+) =>
+  Effect.gen(function* () {
+    const snapshot = yield* Store.DiscussionStore.use((store) =>
+      store.getDiscussion(discussion.id),
+    );
+    assert.equal(
+      snapshot?.cursor.phase,
+      phase,
+      `published phase for dispatch ${snapshot?.cursor.dispatchNo}`,
+    );
+    if (turn)
+      assert.isTrue(
+        turn.message.text.endsWith(
+          {
+            regular: "本次阶段：普通讨论发言。",
+            final_round: "本次阶段：最后陈述。",
+            summarizing: "本次阶段：梳理。",
+          }[phase],
+        ),
+        `dispatch suffix must match ${phase}`,
+      );
+  });
+
+/**
+ * Reads complete ordered attribution, including missing properties rather than false placeholders.
+ * @param discussion Transcript identity; the store owns ordering by seq.
+ * @returns Tuples of seq, kind, finalStatement and status for full literal comparisons.
+ */
+const attribution = (discussion: Discussion) =>
+  Store.DiscussionStore.use((store) => store.listEntries(discussion.id)).pipe(
+    Effect.map((entries) =>
+      entries.map((entry) => [entry.seq, entry.kind, entry.finalStatement, entry.status]),
+    ),
+  );
+
+it.effect("the first persisted and published creation snapshot already assigns regular", () =>
+  withDiscussionHarness(() =>
+    Effect.gen(function* () {
+      const store = yield* Store.DiscussionStore;
+      const observed: Discussion[] = [];
+      const recording = Layer.succeed(Store.DiscussionStore, {
+        ...store,
+        createDiscussion: (discussion) => {
+          observed.push(discussion);
+          return store.createDiscussion(discussion);
+        },
+      });
+      yield* Discussions.DiscussionService.use((service) => service.create(input)).pipe(
+        Effect.provide(Discussions.layer.pipe(Layer.provide(recording), Layer.fresh)),
+      );
+      assert.equal(observed.length, 1);
+      assert.equal(observed[0]!.cursor.phase, "regular");
+    }),
+  ),
+);
+
+it.effect("every subscribed closing snapshot matches its current or next dispatch assignment", () =>
+  withDiscussionHarness((h) =>
+    Effect.gen(function* () {
+      const { discussion, turn } = yield* create(h);
+      const service = yield* Discussions.DiscussionService;
+      const ready = yield* Deferred.make<void>();
+      const ended = yield* Deferred.make<void>();
+      const snapshots: Discussion[] = [];
+      yield* service.subscribe({ discussionId: discussion.id }).pipe(
+        Stream.runForEach((event) =>
+          Effect.gen(function* () {
+            if (event.type === "snapshot" || event.type === "discussion.updated") {
+              snapshots.push(event.discussion);
+              if (event.type === "snapshot") yield* Deferred.succeed(ready, undefined);
+              if (event.discussion.status === "ended") yield* Deferred.succeed(ended, undefined);
+            }
+          }),
+        ),
+        Effect.forkScoped,
+      );
+      yield* Deferred.await(ready);
+      yield* service.end({
+        discussionId: discussion.id,
+        summarizerSeatId: discussion.seats[0]!.id,
+      });
+      yield* finish(h, turn);
+      const finalB = yield* next(h, discussion, 2);
+      yield* finish(h, finalB);
+      const finalA = yield* next(h, discussion, 3);
+      yield* finish(h, finalA);
+      const summary = yield* next(h, discussion, 4);
+      yield* finish(h, summary);
+      yield* Deferred.await(ended);
+      assert.isAbove(
+        snapshots.length,
+        10,
+        "include preparation, acknowledgement and transition increments",
+      );
+      for (const [index, snapshot] of snapshots.entries()) {
+        const { cursor } = snapshot;
+        assert.isDefined(cursor.phase);
+        if (snapshot.closing?.phase === "summarizing") assert.equal(cursor.phase, "summarizing");
+        const assignedRun =
+          cursor.runId ??
+          snapshots
+            .slice(index)
+            .find(
+              (later) => later.cursor.runId !== null && later.cursor.seatIndex === cursor.seatIndex,
+            )?.cursor.runId;
+        const assigned = h.started.find((dispatch) => dispatch.runId === assignedRun);
+        assert.isDefined(
+          assigned,
+          `dispatch assignment for ${cursor.dispatchNo}/${cursor.seatIndex}`,
+        );
+        assert.equal(assigned!.threadId, snapshot.seats[cursor.seatIndex]!.threadId);
+        const suffix = {
+          regular: "本次阶段：普通讨论发言。",
+          final_round: "本次阶段：最后陈述。",
+          summarizing: "本次阶段：梳理。",
+        }[cursor.phase!];
+        assert.isTrue(
+          assigned!.message.text.endsWith(suffix),
+          `phase at dispatch ${cursor.dispatchNo}, run ${cursor.runId}`,
+        );
+      }
+    }),
+  ),
+);
+
 it.effect(
   "interjections are recorded immediately without steering, delivered once per seat and marked on first read",
   () =>
@@ -197,44 +333,42 @@ it.effect("stop and continue retry the same seat with new material after capture
   ),
 );
 
-for (const kind of ["unknown", "usage_limit"] as const) {
-  it.effect(
-    `failure ${kind} pauses with raw details and manual continue starts the same seat`,
-    () =>
-      withDiscussionHarness((h) =>
-        Effect.gen(function* () {
-          const { discussion, turn } = yield* create(h);
-          const service = yield* Discussions.DiscussionService;
-          const store = yield* Store.DiscussionStore;
-          const failure: OrchestrationV2ProviderFailure = {
-            class: kind,
-            message: "原始 provider 失败信息",
-            code: null,
-            retryable: false,
-            ...(kind === "usage_limit" ? { resetAt: "2026-10-13T00:00:00.000Z" } : {}),
-          };
-          yield* finish(h, turn, ["失败前部分发言"], "failed", failure);
-          yield* awaitDiscussion(discussion, (value) => value.status === "paused");
-          const paused = (yield* store.getDiscussion(discussion.id))!;
-          assert.deepEqual(paused.pause, {
-            reason: "seat_failed",
-            seatId: discussion.seats[0]!.id,
-            failureKind: kind === "usage_limit" ? "usage_limit" : "error",
-            message: "原始 provider 失败信息",
-            ...(kind === "usage_limit" ? { resetAt: "2026-10-13T00:00:00.000Z" } : {}),
-          });
-          const entry = (yield* store.listEntries(discussion.id))[0]!;
-          assert.equal(entry.status, "failed");
-          assert.equal(entry.text, "失败前部分发言");
-          assert.isNull(entry.checkpointRef);
-          yield* service.continue({ discussionId: discussion.id });
-          const retry = yield* next(h, discussion, 2);
-          assert.equal(retry.threadId, turn.threadId);
-          assert.notEqual(retry.message.messageId, turn.message.messageId);
-        }),
-      ),
-  );
-}
+it.effect.each(["unknown", "usage_limit"] as const)(
+  "failure %s pauses with raw details and manual continue starts the same seat",
+  (kind) =>
+    withDiscussionHarness((h) =>
+      Effect.gen(function* () {
+        const { discussion, turn } = yield* create(h);
+        const service = yield* Discussions.DiscussionService;
+        const store = yield* Store.DiscussionStore;
+        const failure: OrchestrationV2ProviderFailure = {
+          class: kind,
+          message: "原始 provider 失败信息",
+          code: null,
+          retryable: false,
+          ...(kind === "usage_limit" ? { resetAt: "2026-10-13T00:00:00.000Z" } : {}),
+        };
+        yield* finish(h, turn, ["失败前部分发言"], "failed", failure);
+        yield* awaitDiscussion(discussion, (value) => value.status === "paused");
+        const paused = (yield* store.getDiscussion(discussion.id))!;
+        assert.deepEqual(paused.pause, {
+          reason: "seat_failed",
+          seatId: discussion.seats[0]!.id,
+          failureKind: kind === "usage_limit" ? "usage_limit" : "error",
+          message: "原始 provider 失败信息",
+          ...(kind === "usage_limit" ? { resetAt: "2026-10-13T00:00:00.000Z" } : {}),
+        });
+        const entry = (yield* store.listEntries(discussion.id))[0]!;
+        assert.equal(entry.status, "failed");
+        assert.equal(entry.text, "失败前部分发言");
+        assert.isNull(entry.checkpointRef);
+        yield* service.continue({ discussionId: discussion.id });
+        const retry = yield* next(h, discussion, 2);
+        assert.equal(retry.threadId, turn.threadId);
+        assert.notEqual(retry.message.messageId, turn.message.messageId);
+      }),
+    ),
+);
 
 it.effect(
   "end waits for the ordinary run, rotates a full final round and uses a frozen summary template",
@@ -247,6 +381,7 @@ it.effect(
         const prompt = (yield* store.getPrompt(
           DiscussionPromptId.make("builtin:summary:default"),
         ))!;
+        yield* expectPhase(discussion, turn, "regular");
         const ending = yield* service.end({
           discussionId: discussion.id,
           summarizerSeatId: discussion.seats[0]!.id,
@@ -255,6 +390,7 @@ it.effect(
           discussion.seats[1]!.id,
           discussion.seats[0]!.id,
         ]);
+        assert.equal(ending.discussion.cursor.phase, "regular");
         yield* store.upsertPrompt({ ...prompt, prompt: "改后的模板不得进入此次梳理" });
         assert.equal(
           (yield* service
@@ -264,15 +400,18 @@ it.effect(
         );
         yield* finish(h, turn, ["普通发言"]);
         const b = yield* next(h, discussion, 2);
+        yield* expectPhase(discussion, b, "final_round");
         assert.equal(b.threadId, discussion.seats[1]!.threadId);
         assert.include(b.message.text, "讨论到此");
         assert.include(b.message.text, "这是你本次讨论的最后一次发言");
         yield* finish(h, b, ["B 最后陈述"]);
         const a = yield* next(h, discussion, 3);
+        yield* expectPhase(discussion, a, "final_round");
         assert.equal(a.threadId, discussion.seats[0]!.threadId);
         assert.include(a.message.text, "这是你本次讨论的最后一次发言");
         yield* finish(h, a, ["A 最后陈述"]);
         const summary = yield* next(h, discussion, 4);
+        yield* expectPhase(discussion, summary, "summarizing");
         assert.equal(summary.threadId, discussion.seats[0]!.threadId);
         assert.include(summary.message.text, prompt.prompt);
         assert.notInclude(summary.message.text, "改后的模板不得");
@@ -280,6 +419,14 @@ it.effect(
         yield* awaitDiscussion(discussion, (value) => value.status === "ended");
         const ended = (yield* store.getDiscussion(discussion.id))!;
         assert.isNotNull(ended.endedAt);
+        assert.equal(ended.cursor.phase, "summarizing");
+        assert.deepEqual(yield* attribution(discussion), [
+          [1, "system", undefined, "completed"],
+          [2, "statement", undefined, "completed"],
+          [3, "statement", true, "completed"],
+          [4, "statement", true, "completed"],
+          [5, "summary", undefined, "completed"],
+        ]);
         assert.deepEqual(
           (yield* store.listEntries(discussion.id)).map((entry) => [entry.kind, entry.text]),
           [
@@ -300,93 +447,178 @@ it.effect(
     withDiscussionHarness(
       (h) =>
         Effect.gen(function* () {
-          const { discussion, turn } = yield* create(h);
-          yield* finish(h, turn, ["尚未由 reactor 记账的普通发言"]);
-          const service = yield* Discussions.DiscussionService;
-          const { discussion: closing } = yield* service.end({
-            discussionId: discussion.id,
-            summarizerSeatId: discussion.seats[0]!.id,
+          const sink = yield* EventSink.EventSinkV2;
+          const parked = yield* Deferred.make<void>();
+          const release = yield* Deferred.make<void>();
+          let held = false;
+          // Gate only delivery to the discussion reactor; the run and checkpoint commit through real orchestration.
+          const delayed = Layer.succeed(EventSink.EventSinkV2, {
+            ...sink,
+            stream: (options) =>
+              sink.stream(options).pipe(
+                Stream.mapEffect((item) =>
+                  Effect.gen(function* () {
+                    if (
+                      !held &&
+                      item.event.type === "run.updated" &&
+                      item.event.payload.status === "completed"
+                    ) {
+                      held = true;
+                      yield* Deferred.succeed(parked, undefined);
+                      yield* Deferred.await(release);
+                    }
+                    return item;
+                  }),
+                ),
+              ),
           });
-          assert.equal(closing.cursor.seatIndex, 1);
-          const final = yield* next(h, discussion, 2);
-          assert.equal(final.threadId, discussion.seats[1]!.threadId);
-          assert.include(final.message.text, "这是你本次讨论的最后一次发言");
-          const entries = yield* Store.DiscussionStore.use((store) =>
-            store.listEntries(discussion.id),
-          );
-          assert.deepEqual(
-            entries.map((entry) => [entry.kind, entry.text]),
-            [
-              ["statement", "尚未由 reactor 记账的普通发言"],
-              ["system", "讨论到此"],
-            ],
-          );
+          yield* Effect.gen(function* () {
+            const service = yield* Discussions.DiscussionService;
+            yield* service.start();
+            const { discussion, turn } = yield* create(h);
+            yield* finish(h, turn, ["尚未由 reactor 记账的普通发言"]);
+            yield* Deferred.await(parked);
+            assert.deepEqual(yield* attribution(discussion), []);
+            const { discussion: closing } = yield* service.end({
+              discussionId: discussion.id,
+              summarizerSeatId: discussion.seats[0]!.id,
+            });
+            assert.equal(closing.cursor.seatIndex, 1);
+            assert.equal(closing.cursor.phase, "final_round");
+            assert.deepEqual(yield* attribution(discussion), [
+              [1, "statement", undefined, "completed"],
+              [2, "system", undefined, "completed"],
+            ]);
+            yield* Deferred.succeed(release, undefined);
+            const final = yield* next(h, discussion, 2);
+            yield* expectPhase(discussion, final, "final_round");
+            assert.equal(final.threadId, discussion.seats[1]!.threadId);
+            yield* finish(h, final);
+            const last = yield* next(h, discussion, 3);
+            yield* expectPhase(discussion, last, "final_round");
+            yield* finish(h, last);
+            const summary = yield* next(h, discussion, 4);
+            yield* expectPhase(discussion, summary, "summarizing");
+            yield* finish(h, summary);
+            yield* awaitDiscussion(discussion, (value) => value.status === "ended");
+            assert.deepEqual(yield* attribution(discussion), [
+              [1, "statement", undefined, "completed"],
+              [2, "system", undefined, "completed"],
+              [3, "statement", true, "completed"],
+              [4, "statement", true, "completed"],
+              [5, "summary", undefined, "completed"],
+            ]);
+          }).pipe(Effect.provide(Discussions.layer.pipe(Layer.provide(delayed), Layer.fresh)));
         }),
       { startReactor: false },
     ),
 );
 
-for (const seatCount of [1, 2])
-  it.effect(`ending while paused starts at the stopped seat with ${seatCount} final seats`, () =>
+it.effect.each([1, 2])(
+  "ending while paused starts at the stopped seat with %i final seats",
+  (seatCount) =>
     withDiscussionHarness((h) =>
       Effect.gen(function* () {
         const { discussion, turn } = yield* create(h, input.seats.slice(0, seatCount));
         const service = yield* Discussions.DiscussionService;
         yield* service.stop({ discussionId: discussion.id });
-        yield* service.end({
+        const ending = yield* service.end({
           discussionId: discussion.id,
           summarizerSeatId: discussion.seats[0]!.id,
         });
+        assert.equal(ending.discussion.cursor.phase, "final_round");
         const final = yield* next(h, discussion, 2);
+        yield* expectPhase(discussion, final, "final_round");
         assert.equal(final.threadId, turn.threadId);
         assert.include(final.message.text, "这是你本次讨论的最后一次发言");
         yield* finish(h, final, ["唯一座位最后陈述"]);
         if (seatCount === 2) {
           const last = yield* next(h, discussion, 3);
+          yield* expectPhase(discussion, last, "final_round");
           assert.equal(last.threadId, discussion.seats[1]!.threadId);
           assert.include(last.message.text, "这是你本次讨论的最后一次发言");
           yield* finish(h, last, ["第二位最后陈述"]);
         }
         const summary = yield* next(h, discussion, seatCount + 2);
+        yield* expectPhase(discussion, summary, "summarizing");
         assert.include(summary.message.text, "梳理模板");
         yield* finish(h, summary, ["总结"]);
         yield* awaitDiscussion(discussion, (value) => value.status === "ended");
+        assert.deepEqual(
+          yield* attribution(discussion),
+          seatCount === 1
+            ? [
+                [1, "system", undefined, "completed"],
+                [2, "statement", undefined, "interrupted"],
+                [3, "statement", true, "completed"],
+                [4, "summary", undefined, "completed"],
+              ]
+            : [
+                [1, "system", undefined, "completed"],
+                [2, "statement", undefined, "interrupted"],
+                [3, "statement", true, "completed"],
+                [4, "statement", true, "completed"],
+                [5, "summary", undefined, "completed"],
+              ],
+        );
       }),
     ),
-  );
+);
 
-for (const seatCount of [1, 2])
-  it.effect(
-    `stopping the ordinary run after End preserves its phase before ${seatCount} final seats`,
-    () =>
-      withDiscussionHarness((h) =>
-        Effect.gen(function* () {
-          const { discussion, turn } = yield* create(h, input.seats.slice(0, seatCount));
-          const service = yield* Discussions.DiscussionService;
-          yield* service.end({
-            discussionId: discussion.id,
-            summarizerSeatId: discussion.seats[0]!.id,
-          });
-          yield* service.stop({ discussionId: discussion.id });
-          yield* service.continue({ discussionId: discussion.id });
-          yield* Worker.OrchestrationEffectWorkerV2.use((worker) => worker.drain());
-          yield* awaitRun(turn.threadId, turn.runId, "interrupted");
-          const resumed = yield* next(h, discussion, 2);
-          assert.equal(resumed.threadId, turn.threadId);
-          assert.notInclude(resumed.message.text, "这是你本次讨论的最后一次发言");
-          yield* finish(h, resumed, ["普通发言重说完成"]);
-          for (let offset = 0; offset < seatCount; offset++) {
-            const final = yield* next(h, discussion, offset + 3);
-            assert.equal(final.threadId, discussion.seats[(1 + offset) % seatCount]!.threadId);
-            assert.include(final.message.text, "这是你本次讨论的最后一次发言");
-            yield* finish(h, final, ["最后陈述"]);
-          }
-          const summary = yield* next(h, discussion, seatCount + 3);
-          yield* finish(h, summary, ["梳理"]);
-          yield* awaitDiscussion(discussion, (value) => value.status === "ended");
-        }),
-      ),
-  );
+it.effect.each([1, 2])(
+  "stopping the ordinary run after End preserves its phase before %i final seats",
+  (seatCount) =>
+    withDiscussionHarness((h) =>
+      Effect.gen(function* () {
+        const { discussion, turn } = yield* create(h, input.seats.slice(0, seatCount));
+        const service = yield* Discussions.DiscussionService;
+        yield* service.end({
+          discussionId: discussion.id,
+          summarizerSeatId: discussion.seats[0]!.id,
+        });
+        yield* service.stop({ discussionId: discussion.id });
+        yield* expectPhase(discussion, null, "regular");
+        yield* service.continue({ discussionId: discussion.id });
+        yield* Worker.OrchestrationEffectWorkerV2.use((worker) => worker.drain());
+        yield* awaitRun(turn.threadId, turn.runId, "interrupted");
+        const resumed = yield* next(h, discussion, 2);
+        yield* expectPhase(discussion, resumed, "regular");
+        assert.equal(resumed.threadId, turn.threadId);
+        assert.notInclude(resumed.message.text, "这是你本次讨论的最后一次发言");
+        yield* finish(h, resumed, ["普通发言重说完成"]);
+        for (let offset = 0; offset < seatCount; offset++) {
+          const final = yield* next(h, discussion, offset + 3);
+          yield* expectPhase(discussion, final, "final_round");
+          assert.equal(final.threadId, discussion.seats[(1 + offset) % seatCount]!.threadId);
+          assert.include(final.message.text, "这是你本次讨论的最后一次发言");
+          yield* finish(h, final, ["最后陈述"]);
+        }
+        const summary = yield* next(h, discussion, seatCount + 3);
+        yield* expectPhase(discussion, summary, "summarizing");
+        yield* finish(h, summary, ["梳理"]);
+        yield* awaitDiscussion(discussion, (value) => value.status === "ended");
+        assert.deepEqual(
+          yield* attribution(discussion),
+          seatCount === 1
+            ? [
+                [1, "system", undefined, "completed"],
+                [2, "statement", undefined, "interrupted"],
+                [3, "statement", undefined, "completed"],
+                [4, "statement", true, "completed"],
+                [5, "summary", undefined, "completed"],
+              ]
+            : [
+                [1, "system", undefined, "completed"],
+                [2, "statement", undefined, "interrupted"],
+                [3, "statement", undefined, "completed"],
+                [4, "statement", true, "completed"],
+                [5, "statement", true, "completed"],
+                [6, "summary", undefined, "completed"],
+              ],
+        );
+      }),
+    ),
+);
 
 it.effect(
   "oversized material is sent whole as a Markdown attachment and the discussion keeps speaking",
@@ -413,6 +645,132 @@ it.effect(
         yield* finish(h, turn);
         const second = yield* next(h, discussion, 2);
         assert.equal(second.threadId, turn.threadId);
+      }),
+    ),
+);
+
+it.effect(
+  "single-seat End leaves the active ordinary assignment regular until final dispatch",
+  () =>
+    withDiscussionHarness((h) =>
+      Effect.gen(function* () {
+        const { discussion, turn } = yield* create(h, [input.seats[0]!]);
+        const service = yield* Discussions.DiscussionService;
+        yield* service.interject({ discussionId: discussion.id, text: "结束前的插话" });
+        const ending = yield* service.end({
+          discussionId: discussion.id,
+          summarizerSeatId: discussion.seats[0]!.id,
+        });
+        assert.equal(ending.discussion.cursor.phase, "regular");
+        yield* expectPhase(discussion, turn, "regular");
+        yield* finish(h, turn);
+        const final = yield* next(h, discussion, 2);
+        yield* expectPhase(discussion, final, "final_round");
+        yield* finish(h, final);
+        const summary = yield* next(h, discussion, 3);
+        yield* expectPhase(discussion, summary, "summarizing");
+        yield* finish(h, summary);
+        yield* awaitDiscussion(discussion, (value) => value.status === "ended");
+        yield* expectPhase(discussion, null, "summarizing");
+        assert.deepEqual(yield* attribution(discussion), [
+          [1, "user", undefined, "completed"],
+          [2, "system", undefined, "completed"],
+          [3, "statement", undefined, "completed"],
+          [4, "statement", true, "completed"],
+          [5, "summary", undefined, "completed"],
+        ]);
+      }),
+    ),
+);
+
+it.effect(
+  "a stopped ordinary terminal arriving after End keeps dispatch-time ordinary attribution",
+  () =>
+    withDiscussionHarness((h) =>
+      Effect.gen(function* () {
+        const { discussion, turn } = yield* create(h);
+        const service = yield* Discussions.DiscussionService;
+        const projection = yield* Projections.ProjectionStoreV2;
+        yield* h.holdInterrupts;
+        yield* service.stop({ discussionId: discussion.id });
+        const ending = yield* service.end({
+          discussionId: discussion.id,
+          summarizerSeatId: discussion.seats[0]!.id,
+        });
+        assert.equal(
+          (yield* projection.getThreadRecords(turn.threadId, ["runs"])).runs.find(
+            (run) => run.id === turn.runId,
+          )?.status,
+          "running",
+          "ordinary run has no terminal event at End",
+        );
+        assert.equal(ending.discussion.cursor.phase, "final_round");
+        assert.deepEqual(yield* attribution(discussion), [[1, "system", undefined, "completed"]]);
+        yield* h.releaseInterrupts;
+        const final = yield* next(h, discussion, 2);
+        yield* expectPhase(discussion, final, "final_round");
+        yield* finish(h, final);
+        const last = yield* next(h, discussion, 3);
+        yield* expectPhase(discussion, last, "final_round");
+        yield* finish(h, last);
+        const summary = yield* next(h, discussion, 4);
+        yield* expectPhase(discussion, summary, "summarizing");
+        yield* finish(h, summary);
+        yield* awaitDiscussion(discussion, (value) => value.status === "ended");
+        assert.deepEqual(yield* attribution(discussion), [
+          [1, "system", undefined, "completed"],
+          [2, "statement", undefined, "interrupted"],
+          [3, "statement", true, "completed"],
+          [4, "statement", true, "completed"],
+          [5, "summary", undefined, "completed"],
+        ]);
+      }),
+    ),
+);
+
+it.effect.each(["interrupted", "failed"] as const)(
+  "a %s final statement and its retry retain final attribution",
+  (outcome) =>
+    withDiscussionHarness((h) =>
+      Effect.gen(function* () {
+        const { discussion, turn } = yield* create(h, [input.seats[0]!]);
+        const service = yield* Discussions.DiscussionService;
+        yield* service.end({
+          discussionId: discussion.id,
+          summarizerSeatId: discussion.seats[0]!.id,
+        });
+        yield* finish(h, turn);
+        const final = yield* next(h, discussion, 2);
+        yield* expectPhase(discussion, final, "final_round");
+        if (outcome === "interrupted") {
+          yield* service.stop({ discussionId: discussion.id });
+          yield* Worker.OrchestrationEffectWorkerV2.use((worker) => worker.drain());
+          yield* awaitRun(final.threadId, final.runId, "interrupted");
+        } else {
+          yield* finish(h, final, ["失败的最后陈述"], "failed", {
+            class: "unknown",
+            message: "最后陈述失败",
+            code: null,
+            retryable: false,
+          });
+          yield* awaitDiscussion(discussion, (value) => value.status === "paused");
+        }
+        yield* expectPhase(discussion, null, "final_round");
+        yield* service.continue({ discussionId: discussion.id });
+        const retry = yield* next(h, discussion, 3);
+        yield* expectPhase(discussion, retry, "final_round");
+        yield* finish(h, retry);
+        const summary = yield* next(h, discussion, 4);
+        yield* expectPhase(discussion, summary, "summarizing");
+        yield* finish(h, summary);
+        yield* awaitDiscussion(discussion, (value) => value.status === "ended");
+        assert.deepEqual(yield* attribution(discussion), [
+          [1, "system", undefined, "completed"],
+          [2, "statement", undefined, "completed"],
+          [3, "statement", true, outcome],
+          [4, "statement", true, "completed"],
+          [5, "summary", undefined, "completed"],
+        ]);
       }),
     ),
 );
@@ -544,63 +902,77 @@ it.effect(
     ),
 );
 
-for (const closing of [false, true])
-  it.effect(
-    `${closing ? "end" : "continue"} accepts a pending stopped capture, updates the same entry, and dispatches only after its file snapshot`,
-    () =>
-      withDiscussionHarness((h) =>
-        Effect.gen(function* () {
-          const { discussion, turn } = yield* create(h);
-          const service = yield* Discussions.DiscussionService;
-          const fs = yield* FileSystem.FileSystem;
-          const path = yield* Path.Path;
-          yield* fs.writeFileString(path.join(h.cwd, "a.ts"), "export const interrupted = true;\n");
-          yield* h.holdCaptures;
-          yield* service.stop({ discussionId: discussion.id });
-          const worker = yield* Worker.OrchestrationEffectWorkerV2;
-          const draining = yield* worker.drain().pipe(Effect.forkScoped);
-          yield* Queue.take(h.captureStarted);
-          const store = yield* Store.DiscussionStore;
-          const resumed = closing
-            ? yield* service.end({
-                discussionId: discussion.id,
-                summarizerSeatId: discussion.seats[0]!.id,
-              })
-            : yield* service.continue({ discussionId: discussion.id });
-          assert.equal(resumed.discussion.status, closing ? "closing" : "speaking");
-          assert.equal(resumed.discussion.cursor.dispatchNo, 1);
-          const pendingEntry = (yield* store.listEntries(discussion.id))[0]!;
-          assert.equal(pendingEntry.status, "interrupted");
-          assert.isNull(pendingEntry.checkpointRef);
-          assert.isNull(pendingEntry.files);
-          assert.equal(h.started.length, 1);
-          const eventsReady = yield* Deferred.make<void>();
-          const updates = yield* service.subscribe({ discussionId: discussion.id }).pipe(
-            Stream.tap((event) =>
-              event.type === "snapshot" ? Deferred.succeed(eventsReady, undefined) : Effect.void,
-            ),
-            Stream.filter((event) => event.type === "entry.updated"),
-            Stream.take(1),
-            Stream.runCollect,
-            Effect.forkScoped,
-          );
-          yield* Deferred.await(eventsReady);
-          yield* h.releaseCaptures;
-          yield* Fiber.join(draining);
-          const retry = yield* next(h, discussion, 2);
-          const events = yield* Fiber.join(updates);
-          const update = events[0]!;
-          assert.equal(update.type === "entry.updated" ? update.entry.id : "", pendingEntry.id);
-          assert.deepEqual(update.type === "entry.updated" ? update.entry.files : [], [
-            { path: "a.ts", additions: 1, deletions: 0 },
-          ]);
-          assert.equal(retry.threadId, turn.threadId);
-          assert.include(retry.message.text, "a.ts：+1 / -0 行");
-          if (closing) assert.include(retry.message.text, "这是你本次讨论的最后一次发言");
-          assert.equal((yield* store.listEntries(discussion.id)).length, closing ? 2 : 1);
-        }),
-      ),
-  );
+it.effect.each([
+  { closing: false, name: "continue" },
+  { closing: true, name: "end" },
+])(
+  "$name accepts a pending stopped capture, updates the same entry, and dispatches only after its file snapshot",
+  ({ closing }) =>
+    withDiscussionHarness((h) =>
+      Effect.gen(function* () {
+        const { discussion, turn } = yield* create(h);
+        const service = yield* Discussions.DiscussionService;
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        yield* fs.writeFileString(path.join(h.cwd, "a.ts"), "export const interrupted = true;\n");
+        yield* h.holdCaptures;
+        yield* service.stop({ discussionId: discussion.id });
+        const worker = yield* Worker.OrchestrationEffectWorkerV2;
+        const draining = yield* worker.drain().pipe(Effect.forkScoped);
+        yield* Queue.take(h.captureStarted);
+        const store = yield* Store.DiscussionStore;
+        const resumed = closing
+          ? yield* service.end({
+              discussionId: discussion.id,
+              summarizerSeatId: discussion.seats[0]!.id,
+            })
+          : yield* service.continue({ discussionId: discussion.id });
+        assert.equal(resumed.discussion.status, closing ? "closing" : "speaking");
+        assert.equal(resumed.discussion.cursor.dispatchNo, 1);
+        assert.equal(resumed.discussion.cursor.phase, closing ? "final_round" : "regular");
+        const pendingEntry = (yield* store.listEntries(discussion.id))[0]!;
+        assert.equal(pendingEntry.status, "interrupted");
+        assert.isNull(pendingEntry.checkpointRef);
+        assert.isNull(pendingEntry.files);
+        assert.isUndefined(pendingEntry.finalStatement);
+        assert.equal(h.started.length, 1);
+        const eventsReady = yield* Deferred.make<void>();
+        const updates = yield* service.subscribe({ discussionId: discussion.id }).pipe(
+          Stream.tap((event) =>
+            event.type === "snapshot" ? Deferred.succeed(eventsReady, undefined) : Effect.void,
+          ),
+          Stream.filter((event) => event.type === "entry.updated"),
+          Stream.take(1),
+          Stream.runCollect,
+          Effect.forkScoped,
+        );
+        yield* Deferred.await(eventsReady);
+        yield* h.releaseCaptures;
+        yield* Fiber.join(draining);
+        const retry = yield* next(h, discussion, 2);
+        const events = yield* Fiber.join(updates);
+        const update = events[0]!;
+        assert.equal(update.type === "entry.updated" ? update.entry.id : "", pendingEntry.id);
+        assert.deepEqual(update.type === "entry.updated" ? update.entry.files : [], [
+          { path: "a.ts", additions: 1, deletions: 0 },
+        ]);
+        assert.equal(retry.threadId, turn.threadId);
+        yield* expectPhase(discussion, retry, closing ? "final_round" : "regular");
+        assert.include(retry.message.text, "a.ts：+1 / -0 行");
+        if (closing) assert.include(retry.message.text, "这是你本次讨论的最后一次发言");
+        assert.equal((yield* store.listEntries(discussion.id)).length, closing ? 2 : 1);
+        assert.deepEqual(
+          yield* attribution(discussion),
+          closing
+            ? [
+                [1, "statement", undefined, "interrupted"],
+                [2, "system", undefined, "completed"],
+              ]
+            : [[1, "statement", undefined, "interrupted"]],
+        );
+      }),
+    ),
+);
 
 it.effect(
   "an exhausted stopped capture wakes an already accepted continue and leaves changes unknown",
@@ -1000,183 +1372,174 @@ it.effect(
     ),
 );
 
-for (const priorSnapshot of [false, true])
-  it.effect(
-    priorSnapshot
-      ? "real Git attribution skips a failed seat and starts at the nearest earlier statement snapshot"
-      : "real Git attribution after a first failed seat starts at the first run baseline",
-    () =>
-      withDiscussionHarness((h) =>
+it.effect.each([
+  {
+    priorSnapshot: true,
+    name: "real Git attribution skips a failed seat and starts at the nearest earlier statement snapshot",
+  },
+  {
+    priorSnapshot: false,
+    name: "real Git attribution after a first failed seat starts at the first run baseline",
+  },
+])("$name", ({ priorSnapshot }) =>
+  withDiscussionHarness((h) =>
+    Effect.gen(function* () {
+      const { discussion, turn } = yield* create(h);
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const store = yield* Store.DiscussionStore;
+      const threads = yield* Threads.ThreadManagementService;
+      const service = yield* Discussions.DiscussionService;
+      yield* fs.writeFileString(path.join(h.cwd, "a.ts"), "export const a = 1;\n");
+      let failed = turn;
+      if (priorSnapshot) {
+        yield* finish(h, turn);
+        failed = yield* next(h, discussion, 2);
+        yield* fs.writeFileString(path.join(h.cwd, "b.ts"), "export const b = 1;\n");
+      }
+      yield* finish(h, failed, ["失败的发言"], "failed", {
+        class: "provider_error",
+        message: "无法完成",
+        code: null,
+        retryable: false,
+      });
+      yield* awaitDiscussion(discussion, (value) => value.status === "paused");
+      const paused = (yield* store.getDiscussion(discussion.id))!;
+      const seatIndex = priorSnapshot ? 0 : 1;
+      const seat = discussion.seats[seatIndex]!;
+      // Reconstructed durable handoff fixture isolates attribution from the normal failure pause/retry policy.
+      const sent = yield* threads.sendToThread({
+        projectId,
+        commandId: CommandId.make("t4:restored-handoff"),
+        threadId: seat.threadId,
+        messageId: MessageId.make("t4:restored-handoff"),
+        text: "恢复的下一位发言",
+        attachments: [],
+        mode: "queue",
+        createdBy: "user",
+        creationSource: "server",
+      });
+      yield* store.updateDiscussion({
+        ...paused,
+        status: "speaking",
+        pause: null,
+        cursor: {
+          ...paused.cursor,
+          seatIndex,
+          runId: sent.run.id,
+          dispatchNo: paused.cursor.dispatchNo + 1,
+        },
+      });
+      yield* Worker.OrchestrationEffectWorkerV2.use((worker) => worker.drain());
+      const success = yield* Queue.take(h.starts);
+      yield* awaitProviderTurn(success);
+      yield* fs.writeFileString(
+        path.join(h.cwd, priorSnapshot ? "c.ts" : "b.ts"),
+        "export const later = 1;\n",
+      );
+      yield* finish(h, success);
+      yield* awaitDiscussion(
+        discussion,
+        (value) =>
+          value.cursor.dispatchNo === paused.cursor.dispatchNo + 2 && value.cursor.runId !== null,
+      );
+      const entries = yield* store.listEntries(discussion.id);
+      assert.isNull(entries.find((entry) => entry.runId === failed.runId)!.checkpointRef);
+      const entry = entries.find((entry) => entry.runId === success.runId)!;
+      assert.deepEqual(
+        entry.files?.map((file) => file.path),
+        priorSnapshot ? ["b.ts", "c.ts"] : ["a.ts", "b.ts"],
+      );
+      const diff = yield* service.getEntryDiff({
+        discussionId: discussion.id,
+        entryId: entry.id,
+      });
+      assert.include(diff.diff, "diff --git a/b.ts b/b.ts");
+      if (priorSnapshot) assert.notInclude(diff.diff, "a.ts");
+      else assert.include(diff.diff, "diff --git a/a.ts b/a.ts");
+    }),
+  ),
+);
+
+it.effect.each(["running", "speaking", "closing", "interrupted", "failed", "unbound"] as const)(
+  "a freshly rebuilt service repairs persisted %s state and pauses without advancing",
+  (state) =>
+    withDiscussionHarness(
+      (h) =>
         Effect.gen(function* () {
           const { discussion, turn } = yield* create(h);
-          const fs = yield* FileSystem.FileSystem;
-          const path = yield* Path.Path;
-          const store = yield* Store.DiscussionStore;
-          const threads = yield* Threads.ThreadManagementService;
           const service = yield* Discussions.DiscussionService;
-          yield* fs.writeFileString(path.join(h.cwd, "a.ts"), "export const a = 1;\n");
-          let failed = turn;
-          if (priorSnapshot) {
-            yield* finish(h, turn);
-            failed = yield* next(h, discussion, 2);
-            yield* fs.writeFileString(path.join(h.cwd, "b.ts"), "export const b = 1;\n");
+          const store = yield* Store.DiscussionStore;
+          if (state === "closing")
+            yield* service.end({
+              discussionId: discussion.id,
+              summarizerSeatId: discussion.seats[0]!.id,
+            });
+          if (state === "interrupted") yield* service.stop({ discussionId: discussion.id });
+          if (state === "interrupted") {
+            yield* Worker.OrchestrationEffectWorkerV2.use((worker) => worker.drain());
+            yield* awaitRun(turn.threadId, turn.runId, "interrupted");
+            yield* store.updateDiscussion({
+              ...(yield* store.getDiscussion(discussion.id))!,
+              status: "speaking",
+              pause: null,
+            });
+          } else if (state !== "running")
+            yield* finish(
+              h,
+              turn,
+              ["重启前尚未记账的原文"],
+              state === "failed" ? "failed" : "completed",
+              state === "failed"
+                ? { class: "provider_error", message: "失败原文", code: null, retryable: false }
+                : undefined,
+            );
+          if (state === "unbound") {
+            yield* store.updateDiscussion({
+              ...(yield* store.getDiscussion(discussion.id))!,
+              cursor: { ...discussion.cursor, runId: null },
+            });
+            const sql = yield* SqlClient.SqlClient;
+            yield* sql`DELETE FROM discussion_seat_delivery WHERE discussion_id = ${discussion.id}`;
           }
-          yield* finish(h, failed, ["失败的发言"], "failed", {
-            class: "provider_error",
-            message: "无法完成",
-            code: null,
-            retryable: false,
-          });
-          yield* awaitDiscussion(discussion, (value) => value.status === "paused");
-          const paused = (yield* store.getDiscussion(discussion.id))!;
-          const seatIndex = priorSnapshot ? 0 : 1;
-          const seat = discussion.seats[seatIndex]!;
-          // Reconstructed durable handoff fixture isolates attribution from the normal failure pause/retry policy.
-          const sent = yield* threads.sendToThread({
-            projectId,
-            commandId: CommandId.make("t4:restored-handoff"),
-            threadId: seat.threadId,
-            messageId: MessageId.make("t4:restored-handoff"),
-            text: "恢复的下一位发言",
-            attachments: [],
-            mode: "queue",
-            createdBy: "user",
-            creationSource: "server",
-          });
-          yield* store.updateDiscussion({
-            ...paused,
-            status: "speaking",
-            pause: null,
-            cursor: {
-              ...paused.cursor,
-              seatIndex,
-              runId: sent.run.id,
-              dispatchNo: paused.cursor.dispatchNo + 1,
-            },
-          });
-          yield* Worker.OrchestrationEffectWorkerV2.use((worker) => worker.drain());
-          const success = yield* Queue.take(h.starts);
-          yield* awaitProviderTurn(success);
-          yield* fs.writeFileString(
-            path.join(h.cwd, priorSnapshot ? "c.ts" : "b.ts"),
-            "export const later = 1;\n",
-          );
-          yield* finish(h, success);
-          yield* awaitDiscussion(
-            discussion,
-            (value) =>
-              value.cursor.dispatchNo === paused.cursor.dispatchNo + 2 &&
-              value.cursor.runId !== null,
-          );
-          const entries = yield* store.listEntries(discussion.id);
-          assert.isNull(entries.find((entry) => entry.runId === failed.runId)!.checkpointRef);
-          const entry = entries.find((entry) => entry.runId === success.runId)!;
-          assert.deepEqual(
-            entry.files?.map((file) => file.path),
-            priorSnapshot ? ["b.ts", "c.ts"] : ["a.ts", "b.ts"],
-          );
-          const diff = yield* service.getEntryDiff({
-            discussionId: discussion.id,
-            entryId: entry.id,
-          });
-          assert.include(diff.diff, "diff --git a/b.ts b/b.ts");
-          if (priorSnapshot) assert.notInclude(diff.diff, "a.ts");
-          else assert.include(diff.diff, "diff --git a/a.ts b/a.ts");
-        }),
-      ),
-  );
-
-for (const state of [
-  "running",
-  "speaking",
-  "closing",
-  "interrupted",
-  "failed",
-  "unbound",
-] as const) {
-  it.effect(
-    `a freshly rebuilt service repairs persisted ${state} state and pauses without advancing`,
-    () =>
-      withDiscussionHarness(
-        (h) =>
-          Effect.gen(function* () {
-            const { discussion, turn } = yield* create(h);
-            const service = yield* Discussions.DiscussionService;
-            const store = yield* Store.DiscussionStore;
-            if (state === "closing")
-              yield* service.end({
-                discussionId: discussion.id,
-                summarizerSeatId: discussion.seats[0]!.id,
-              });
-            if (state === "interrupted") yield* service.stop({ discussionId: discussion.id });
-            if (state === "interrupted") {
-              yield* Worker.OrchestrationEffectWorkerV2.use((worker) => worker.drain());
-              yield* awaitRun(turn.threadId, turn.runId, "interrupted");
-              yield* store.updateDiscussion({
-                ...(yield* store.getDiscussion(discussion.id))!,
-                status: "speaking",
-                pause: null,
-              });
-            } else if (state !== "running")
-              yield* finish(
-                h,
-                turn,
-                ["重启前尚未记账的原文"],
-                state === "failed" ? "failed" : "completed",
+          const beforeRepair = yield* store.listEntries(discussion.id);
+          assert.equal(beforeRepair.length, state === "closing" ? 1 : 0);
+          if (state === "closing") assert.equal(beforeRepair[0]?.text, "讨论到此");
+          yield* Effect.gen(function* () {
+            const rebuilt = yield* Discussions.DiscussionService;
+            yield* rebuilt.start();
+            const repaired = (yield* store.getDiscussion(discussion.id))!;
+            assert.equal(repaired.status, "paused");
+            assert.equal(repaired.pause?.reason, "server_restarted");
+            assert.equal(repaired.cursor.dispatchNo, 1);
+            assert.equal(repaired.cursor.seatIndex, 0);
+            const entry = (yield* store.listEntries(discussion.id)).find(
+              (item) => item.runId === turn.runId,
+            );
+            if (state === "running") assert.isUndefined(entry);
+            else {
+              assert.equal(
+                entry?.status,
                 state === "failed"
-                  ? { class: "provider_error", message: "失败原文", code: null, retryable: false }
-                  : undefined,
+                  ? "failed"
+                  : state === "interrupted"
+                    ? "interrupted"
+                    : "completed",
               );
-            if (state === "unbound") {
-              yield* store.updateDiscussion({
-                ...(yield* store.getDiscussion(discussion.id))!,
-                cursor: { ...discussion.cursor, runId: null },
-              });
-              const sql = yield* SqlClient.SqlClient;
-              yield* sql`DELETE FROM discussion_seat_delivery WHERE discussion_id = ${discussion.id}`;
+              if (state !== "interrupted") assert.equal(entry?.text, "重启前尚未记账的原文");
             }
-            const beforeRepair = yield* store.listEntries(discussion.id);
-            assert.equal(beforeRepair.length, state === "closing" ? 1 : 0);
-            if (state === "closing") assert.equal(beforeRepair[0]?.text, "讨论到此");
-            yield* Effect.gen(function* () {
-              const rebuilt = yield* Discussions.DiscussionService;
-              yield* rebuilt.start();
-              const repaired = (yield* store.getDiscussion(discussion.id))!;
-              assert.equal(repaired.status, "paused");
-              assert.equal(repaired.pause?.reason, "server_restarted");
-              assert.equal(repaired.cursor.dispatchNo, 1);
-              assert.equal(repaired.cursor.seatIndex, 0);
-              const entry = (yield* store.listEntries(discussion.id)).find(
-                (item) => item.runId === turn.runId,
-              );
-              if (state === "running") assert.isUndefined(entry);
-              else {
-                assert.equal(
-                  entry?.status,
-                  state === "failed"
-                    ? "failed"
-                    : state === "interrupted"
-                      ? "interrupted"
-                      : "completed",
-                );
-                if (state !== "interrupted") assert.equal(entry?.text, "重启前尚未记账的原文");
-              }
-              assert.equal(h.started.length, 1);
-              if (state === "unbound") {
-                assert.equal(
-                  yield* store.getSeatDelivery(discussion.id, discussion.seats[0]!.id),
-                  0,
-                );
-                yield* rebuilt.continue({ discussionId: discussion.id });
-                const retry = yield* next(h, discussion, 2);
-                assert.notInclude(retry.message.text, "议题全文第二行");
-              }
-            }).pipe(Effect.provide(Discussions.layer.pipe(Layer.fresh)));
-          }),
-        { startReactor: false },
-      ),
-  );
-}
+            assert.equal(h.started.length, 1);
+            if (state === "unbound") {
+              assert.equal(yield* store.getSeatDelivery(discussion.id, discussion.seats[0]!.id), 0);
+              yield* rebuilt.continue({ discussionId: discussion.id });
+              const retry = yield* next(h, discussion, 2);
+              assert.notInclude(retry.message.text, "议题全文第二行");
+            }
+          }).pipe(Effect.provide(Discussions.layer.pipe(Layer.fresh)));
+        }),
+      { startReactor: false },
+    ),
+);
 
 it.effect("replayed completed run events append once and dispatch the next seat once", () =>
   withDiscussionHarness((h) =>

@@ -505,6 +505,7 @@ const make = Effect.gen(function* () {
           ...discussion,
           cursor: {
             ...discussion.cursor,
+            phase,
             dispatchNo,
             runId: null,
             dispatchedEntrySeq: throughSeq,
@@ -551,7 +552,12 @@ const make = Effect.gen(function* () {
       ),
     );
 
-  /** Builds a transcript entry from every assistant message belonging to this run, in durable ordinal order. */
+  /**
+   * Records assistant messages in durable ordinal order and freezes the run's dispatched assignment.
+   * @param discussion Current snapshot; its next assignment must not reclassify an older ordinary run.
+   * @param run Tracked terminal run whose userMessageId identifies the original dispatched material.
+   * @returns Entry plus capture-pending and first-insertion flags; enrichment keeps existing attribution.
+   */
   const recordRun = (discussion: Discussion, run: OrchestrationV2Run) =>
     domain(
       Effect.gen(function* () {
@@ -594,13 +600,20 @@ const make = Effect.gen(function* () {
           .map((message) => message.text)
           .join("\n\n");
         const transcript = yield* store.listEntries(discussion.id);
+        const kind =
+          (yield* currentPhase(discussion, transcript)) === "summarizing" ? "summary" : "statement";
+        const dispatchedMessage = context.messages.find(
+          (message) => message.id === run.userMessageId,
+        );
         const value: DiscussionStore.DiscussionEntryAppend = {
           id: DiscussionEntryId.make(`discussion:${discussion.id}:run:${run.id}`),
           discussionId: discussion.id,
-          kind:
-            (yield* currentPhase(discussion, transcript)) === "summarizing"
-              ? "summary"
-              : "statement",
+          kind,
+          // End while paused changes the NEXT assignment, but this run retains its original brief phase.
+          ...(kind === "statement" &&
+          dispatchedMessage?.text.endsWith(discussionBriefPhaseMarker("final_round"))
+            ? { finalStatement: true as const }
+            : {}),
           seatId: seat.id,
           threadId: seat.threadId,
           runId: run.id,
@@ -660,6 +673,7 @@ const make = Effect.gen(function* () {
         closing,
         cursor: {
           ...discussion.cursor,
+          phase,
           seatIndex,
           round: discussion.cursor.round + (seatIndex === 0 && phase !== "summarizing" ? 1 : 0),
           runId: null,
@@ -892,6 +906,7 @@ const make = Effect.gen(function* () {
               status: "speaking",
               cursor: {
                 seatIndex: 0,
+                phase: "regular",
                 round: 1,
                 dispatchNo: 0,
                 runId: null,
@@ -1120,11 +1135,14 @@ const make = Effect.gen(function* () {
                   cursor: ordinaryCompleted
                     ? {
                         ...discussion.cursor,
+                        phase: "final_round",
                         seatIndex: firstIndex,
                         runId: null,
                         round: discussion.cursor.round + (firstIndex === 0 ? 1 : 0),
                       }
-                    : discussion.cursor,
+                    : discussion.status === "paused"
+                      ? { ...discussion.cursor, phase: "final_round" }
+                      : discussion.cursor,
                   closing: {
                     summarizerSeatId: input.summarizerSeatId,
                     summaryPrompt: prompt.prompt,

@@ -71,6 +71,9 @@ export interface DiscussionHarness {
   readonly holdCaptures: Effect.Effect<void>;
   readonly releaseCaptures: Effect.Effect<void>;
   readonly failCaptures: Effect.Effect<void>;
+  /** Holds the external interrupt response so End can commit before the run's terminal event. */
+  readonly holdInterrupts: Effect.Effect<void>;
+  readonly releaseInterrupts: Effect.Effect<void>;
   readonly finish: (
     turn: ProviderAdapter.ProviderAdapterV2TurnInput,
     status: "completed" | "failed" | "interrupted",
@@ -109,7 +112,9 @@ export function withDiscussionHarness<A, E, R>(
       const rawCheckpointStore = CheckpointStore.layer.pipe(Layer.provide(vcs));
       const captureStarted = yield* Queue.unbounded<void>();
       const captureGate = yield* Deferred.make<void>();
+      const interruptGate = yield* Deferred.make<void>();
       let holdCaptures = false;
+      let holdInterrupts = false;
       let failCaptures = false;
       const checkpointStore = Layer.effect(
         CheckpointStore.CheckpointStore,
@@ -166,6 +171,10 @@ export function withDiscussionHarness<A, E, R>(
         failCaptures: Effect.sync(() => {
           failCaptures = true;
         }),
+        holdInterrupts: Effect.sync(() => {
+          holdInterrupts = true;
+        }),
+        releaseInterrupts: Deferred.succeed(interruptGate, undefined).pipe(Effect.asVoid),
         finish: (turn, status, texts = [], failure) =>
           Effect.gen(function* () {
             const queue = queues.get(turn.threadId)!;
@@ -270,6 +279,7 @@ export function withDiscussionHarness<A, E, R>(
               interruptTurn: (input) =>
                 Effect.gen(function* () {
                   interrupted.push(input);
+                  if (holdInterrupts) yield* Deferred.await(interruptGate);
                   const turn = started.findLast(
                     (turn) => turn.providerThread.id === input.providerThread.id,
                   )!;
