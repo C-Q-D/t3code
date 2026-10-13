@@ -93,27 +93,32 @@ export function DiscussionListPage() {
                         params={{ environmentId: item.environmentId, discussionId: item.id }}
                         className="flex min-h-16 items-center gap-3.5 rounded-[inherit] px-4 py-3 text-sm outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                       >
-                        <span className="min-w-0 flex-1 truncate font-medium">{item.title}</span>
                         <span
-                          className="flex shrink-0 items-center -space-x-1.5"
+                          className="flex min-w-15.5 shrink-0 items-center -space-x-1.5"
                           aria-label={item.seats.map((seat) => seat.personaName).join("、")}
                         >
                           {item.seats.map((seat, index) => (
-                            <span key={seat.id} className="rounded-lg ring-2 ring-card">
+                            <span key={seat.id} className="shrink-0 rounded-lg ring-2 ring-card">
                               <PixelAvatar role={seat.avatar} seat={index + 1} size={24} />
                             </span>
                           ))}
                         </span>
-                        <span className="max-w-28 truncate text-xs text-muted-foreground">
-                          {project?.title ?? t.discussions.deletedProject}
-                        </span>
-                        <span className="shrink-0 text-xs text-muted-foreground">
-                          {row.roundLabel}
+                        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                          <span className="truncate font-medium">{item.title}</span>
+                          <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                            <span className="min-w-0 truncate">
+                              {project?.title ?? t.discussions.deletedProject}
+                            </span>
+                            <span className="shrink-0" aria-hidden="true">
+                              ·
+                            </span>
+                            <span className="shrink-0 whitespace-nowrap">{row.roundLabel}</span>
+                          </span>
                         </span>
                         <Badge variant={row.badgeVariant}>{row.statusLabel}</Badge>
                         <time
                           dateTime={item.updatedAt}
-                          className="w-20 shrink-0 text-right text-xs text-muted-foreground"
+                          className="w-16 shrink-0 text-right text-xs text-muted-foreground"
                         >
                           {formatRelativeTimeLabel(item.updatedAt)}
                         </time>
