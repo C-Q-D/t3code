@@ -77,6 +77,7 @@ import Migration0061 from "./Migrations/061_Discussions.ts";
 import Migration0062 from "./Migrations/062_DiscussionPromptAppearance.ts";
 import Migration0063 from "./Migrations/063_DiscussionEntryProgress.ts";
 import Migration0064 from "./Migrations/064_DiscussionEntryFinalStatement.ts";
+import Migration0065 from "./Migrations/065_DiscussionEntryDispatchedEntrySeq.ts";
 import Migration0060 from "./Migrations/060_ThreadSnapshotWindowIndexes.ts";
 
 /**
@@ -156,6 +157,7 @@ export const migrationEntries = [
   [62, "DiscussionPromptAppearance", Migration0062],
   [63, "DiscussionEntryProgress", Migration0063],
   [64, "DiscussionEntryFinalStatement", Migration0064],
+  [65, "DiscussionEntryDispatchedEntrySeq", Migration0065],
 ] as const;
 
 export const migrationManifest = migrationEntries.map(([id, name]) => [id, name] as const);

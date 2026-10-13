@@ -142,6 +142,23 @@ const attribution = (discussion: Discussion) =>
     ),
   );
 
+/**
+ * Reads dispatch-time positions and key presence from the complete durable transcript.
+ * @param discussion Identity whose store-ordered entries are checked.
+ * @returns Seq, kind, position and presence tuples for literal expectations independent of the cursor.
+ */
+const dispatchPositions = (discussion: Discussion) =>
+  Store.DiscussionStore.use((store) => store.listEntries(discussion.id)).pipe(
+    Effect.map((entries) =>
+      entries.map((entry) => [
+        entry.seq,
+        entry.kind,
+        entry.dispatchedEntrySeq,
+        Object.hasOwn(entry, "dispatchedEntrySeq"),
+      ]),
+    ),
+  );
+
 it.effect("the first persisted and published creation snapshot already assigns regular", () =>
   withDiscussionHarness(() =>
     Effect.gen(function* () {
@@ -420,6 +437,13 @@ it.effect(
         const ended = (yield* store.getDiscussion(discussion.id))!;
         assert.isNotNull(ended.endedAt);
         assert.equal(ended.cursor.phase, "summarizing");
+        assert.deepEqual(yield* dispatchPositions(discussion), [
+          [1, "system", undefined, false],
+          [2, "statement", 0, true],
+          [3, "statement", 2, true],
+          [4, "statement", 3, true],
+          [5, "summary", 4, true],
+        ]);
         assert.deepEqual(yield* attribution(discussion), [
           [1, "system", undefined, "completed"],
           [2, "statement", undefined, "completed"],
@@ -485,6 +509,10 @@ it.effect(
             });
             assert.equal(closing.cursor.seatIndex, 1);
             assert.equal(closing.cursor.phase, "final_round");
+            assert.deepEqual(yield* dispatchPositions(discussion), [
+              [1, "statement", 0, true],
+              [2, "system", undefined, false],
+            ]);
             assert.deepEqual(yield* attribution(discussion), [
               [1, "statement", undefined, "completed"],
               [2, "system", undefined, "completed"],
@@ -500,6 +528,10 @@ it.effect(
             );
             yield* Deferred.succeed(release, undefined);
             const final = yield* next(h, discussion, 2);
+            assert.deepEqual(yield* dispatchPositions(discussion), [
+              [1, "statement", 0, true],
+              [2, "system", undefined, false],
+            ]);
             assert.include(final.message.text, "这是你本次讨论的最后一次发言");
             yield* expectPhase(discussion, final, "final_round");
             assert.equal(final.threadId, discussion.seats[1]!.threadId);
@@ -634,6 +666,10 @@ it.effect.each([
             yield* Deferred.succeed(release, undefined);
             const final = yield* next(h, discussion, 2);
             yield* expectPhase(discussion, final, "final_round");
+            assert.deepEqual(yield* dispatchPositions(discussion), [
+              [1, "statement", 0, true],
+              [2, "system", undefined, false],
+            ]);
             const events = yield* Fiber.join(updates);
             assert.isAtLeast(events.length, 2, "include End transition and dispatch binding");
             for (const [index, event] of events.entries()) {
@@ -1072,6 +1108,7 @@ it.effect.each([
         assert.isNull(pendingEntry.checkpointRef);
         assert.isNull(pendingEntry.files);
         assert.isUndefined(pendingEntry.finalStatement);
+        assert.equal(pendingEntry.dispatchedEntrySeq, 0);
         assert.equal(h.started.length, 1);
         const eventsReady = yield* Deferred.make<void>();
         const updates = yield* service.subscribe({ discussionId: discussion.id }).pipe(
@@ -1090,6 +1127,10 @@ it.effect.each([
         const events = yield* Fiber.join(updates);
         const update = events[0]!;
         assert.equal(update.type === "entry.updated" ? update.entry.id : "", pendingEntry.id);
+        assert.equal(
+          update.type === "entry.updated" ? update.entry.dispatchedEntrySeq : undefined,
+          0,
+        );
         assert.deepEqual(update.type === "entry.updated" ? update.entry.files : [], [
           { path: "a.ts", additions: 1, deletions: 0 },
         ]);
@@ -2204,6 +2245,80 @@ it.effect(
           (yield* store.listEntries(discussion.id)).map((entry) => entry.round),
           [1, 1],
         );
+      }),
+    ),
+);
+
+it.effect(
+  "each interrupted and retried opening freezes its own position around intervening interjections",
+  () =>
+    withDiscussionHarness((h) =>
+      Effect.gen(function* () {
+        const { discussion, turn } = yield* create(h);
+        const service = yield* Discussions.DiscussionService;
+        const store = yield* Store.DiscussionStore;
+        const first = yield* service.interject({
+          discussionId: discussion.id,
+          text: "首次开口之后",
+        });
+        yield* service.stop({ discussionId: discussion.id });
+        yield* Worker.OrchestrationEffectWorkerV2.use((worker) => worker.drain());
+        yield* awaitRun(turn.threadId, turn.runId, "interrupted");
+        const between = yield* service.interject({
+          discussionId: discussion.id,
+          text: "两次开口之间",
+        });
+        yield* service.continue({ discussionId: discussion.id });
+        const retry = yield* next(h, discussion, 2);
+        const during = yield* service.interject({
+          discussionId: discussion.id,
+          text: "重新开口之后",
+        });
+        yield* finish(h, retry, ["重说的普通发言"]);
+        yield* next(h, discussion, 3);
+        assert.equal(retry.threadId, turn.threadId);
+        assert.deepEqual(yield* dispatchPositions(discussion), [
+          [1, "user", undefined, false],
+          [2, "statement", 0, true],
+          [3, "user", undefined, false],
+          [4, "user", undefined, false],
+          [5, "statement", 3, true],
+        ]);
+        const old = (yield* store.getEntryByRunId(turn.runId))!;
+        const retried = (yield* store.getEntryByRunId(retry.runId))!;
+        assert.equal(old.status, "interrupted");
+        assert.equal(retried.status, "completed");
+        assert.isAbove(first.entry.seq, old.dispatchedEntrySeq!);
+        assert.isAbove(between.entry.seq, old.dispatchedEntrySeq!);
+        assert.isAtMost(between.entry.seq, retried.dispatchedEntrySeq!);
+        assert.isAbove(during.entry.seq, retried.dispatchedEntrySeq!);
+      }),
+    ),
+);
+
+it.effect(
+  "a failed ordinary statement retains the position of its dispatch before a later interjection",
+  () =>
+    withDiscussionHarness((h) =>
+      Effect.gen(function* () {
+        const { discussion, turn } = yield* create(h);
+        const service = yield* Discussions.DiscussionService;
+        yield* service.interject({ discussionId: discussion.id, text: "失败前插话" });
+        yield* finish(h, turn, ["失败发言正文"], "failed", {
+          class: "unknown",
+          message: "目标失败",
+          code: null,
+          retryable: false,
+        });
+        yield* awaitDiscussion(discussion, (value) => value.status === "paused");
+        assert.deepEqual(yield* dispatchPositions(discussion), [
+          [1, "user", undefined, false],
+          [2, "statement", 0, true],
+        ]);
+        const entry = yield* Store.DiscussionStore.use((store) =>
+          store.getEntryByRunId(turn.runId),
+        );
+        assert.equal(entry?.status, "failed");
       }),
     ),
 );

@@ -135,6 +135,11 @@ export const DiscussionEntry = Schema.Struct({
   readBySeatId: Schema.optionalKey(DiscussionSeatId),
   /** Dispatch-time final statement attribution, independent of later cursor movement. */
   finalStatement: Schema.optionalKey(Schema.Literal(true)),
+  /**
+   * This statement or summary run's cursor.dispatchedEntrySeq: the last transcript seq visible
+   * when its seat opened. User, system and entries written before this field omit it.
+   */
+  dispatchedEntrySeq: Schema.optionalKey(NonNegativeInt),
   text: Schema.String,
   files: Schema.NullOr(
     Schema.Array(

@@ -56,3 +56,28 @@ it("wire entries accept true or absent final attribution and reject false", () =
   expect(decodeEntry(entry)).toEqual(entry);
   expect(() => decodeEntry({ ...entry, finalStatement: false })).toThrow();
 });
+
+it("wire entries preserve dispatch positions including zero, accept legacy absence and reject invalid positions", () => {
+  const entry = {
+    id: "entry:c4a",
+    discussionId: "discussion:c4a",
+    seq: 8,
+    kind: "statement",
+    text: "AI 发言",
+    files: null,
+    status: "completed",
+    checkpointRef: null,
+    createdAt: "2026-10-13T00:00:00.000Z",
+  };
+  expect(decodeEntry({ ...entry, dispatchedEntrySeq: 7 })).toEqual({
+    ...entry,
+    dispatchedEntrySeq: 7,
+  });
+  expect(decodeEntry({ ...entry, dispatchedEntrySeq: 0 })).toEqual({
+    ...entry,
+    dispatchedEntrySeq: 0,
+  });
+  expect(decodeEntry(entry)).toEqual(entry);
+  expect(() => decodeEntry({ ...entry, dispatchedEntrySeq: -1 })).toThrow();
+  expect(() => decodeEntry({ ...entry, dispatchedEntrySeq: 1.5 })).toThrow();
+});

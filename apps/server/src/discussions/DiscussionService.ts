@@ -557,7 +557,8 @@ const make = Effect.gen(function* () {
    * Records assistant messages in durable ordinal order and freezes the run's dispatched assignment.
    * @param discussion Current snapshot; its next assignment must not reclassify an older ordinary run.
    * @param run Tracked terminal run whose userMessageId identifies the original dispatched material.
-   * @returns Entry plus capture-pending and first-insertion flags; enrichment keeps existing attribution.
+   * @returns Entry plus capture-pending and first-insertion flags; enrichment keeps original attribution
+   * and the dispatch-time transcript position, even after a later cursor assignment.
    */
   const recordRun = (discussion: Discussion, run: OrchestrationV2Run) =>
     domain(
@@ -619,6 +620,7 @@ const make = Effect.gen(function* () {
           threadId: seat.threadId,
           runId: run.id,
           round: discussion.cursor.round,
+          dispatchedEntrySeq: discussion.cursor.dispatchedEntrySeq,
           text,
           files: null,
           status:

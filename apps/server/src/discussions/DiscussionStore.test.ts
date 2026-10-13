@@ -323,3 +323,56 @@ it.effect(
       Effect.provide(DiscussionStore.layer.pipe(Layer.provideMerge(SqlitePersistence.layerMemory))),
     ),
 );
+
+it.effect(
+  "dispatch positions round trip zero, positive and legacy absence without changing on enrichment",
+  () =>
+    Effect.gen(function* () {
+      const store = yield* DiscussionStore.DiscussionStore;
+      yield* store.createDiscussion(discussion);
+      const first = yield* store.appendEntry({ ...entry, dispatchedEntrySeq: 0 });
+      const second = yield* store.appendEntry({
+        ...entry,
+        id: DiscussionEntryId.make("entry:position"),
+        runId: RunId.make("run:position"),
+        dispatchedEntrySeq: 7,
+      });
+      const legacy = yield* store.appendEntry({
+        ...entry,
+        id: DiscussionEntryId.make("entry:legacy"),
+        runId: RunId.make("run:legacy"),
+      });
+      assert.deepEqual(
+        (yield* store.listEntries(discussion.id)).map((value) => [
+          value.dispatchedEntrySeq,
+          Object.hasOwn(value, "dispatchedEntrySeq"),
+        ]),
+        [
+          [0, true],
+          [7, true],
+          [undefined, false],
+        ],
+      );
+      yield* store.updateEntry(first.id, { files: [] });
+      yield* store.updateEntry(second.id, {
+        files: [{ path: "enriched.ts", additions: 2, deletions: 1 }],
+        checkpointRef: CheckpointRef.make("refs/c4a/capture"),
+        readBySeatId: discussion.seats[0]!.id,
+      });
+      yield* store.updateEntry(legacy.id, { files: [] });
+      assert.deepEqual(
+        (yield* store.listEntries(discussion.id)).map((value) => [
+          value.dispatchedEntrySeq,
+          Object.hasOwn(value, "dispatchedEntrySeq"),
+        ]),
+        [
+          [0, true],
+          [7, true],
+          [undefined, false],
+        ],
+      );
+      assert.equal((yield* store.getEntryByRunId(second.runId!))?.dispatchedEntrySeq, 7);
+    }).pipe(
+      Effect.provide(DiscussionStore.layer.pipe(Layer.provideMerge(SqlitePersistence.layerMemory))),
+    ),
+);
