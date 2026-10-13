@@ -39,6 +39,31 @@ export const discussions = {
   empty: "No discussions yet",
   loading: "Loading discussions…",
   loadFailed: "Could not load discussions",
+  alerts: {
+    stopped: (name: string) =>
+      `The discussion is paused. Select "Continue" and ${name} will speak again.`,
+    restarted:
+      'The desktop app restarted and the discussion is paused. Select "Continue" to resume.',
+    retry: (canEnd: boolean): string =>
+      canEnd
+        ? 'You can select "Continue" later to retry, or end the discussion.'
+        : 'You can select "Continue" later to retry.',
+    failed: (name: string, message: string) =>
+      message ? `${name} could not speak: ${message}. ` : `${name} could not speak. `,
+    usageLimit: (name: string, provider: string) =>
+      `${name} could not speak: ${provider} usage limit reached. `,
+    command: (name: string) =>
+      `${name} is waiting for you to approve a command. The discussion is still running; they will continue speaking after approval.`,
+    operation: (name: string) =>
+      `${name} is waiting for you to approve an operation. The discussion is still running; they will continue speaking after approval.`,
+    questions: (name: string) =>
+      `${name} is waiting for you to answer questions. The discussion is still running; they will continue speaking after your response.`,
+    long: (name: string, chars: string, limit: string) =>
+      `The material for ${name} is now ${chars} characters long. Above ${limit} characters, it will be sent as a file.`,
+    file: (name: string, chars: string, limit: string) =>
+      `The material for ${name} is ${chars} characters long, exceeding the ${limit}-character message limit. It was sent as a file.`,
+    openThread: "Open seat thread",
+  },
   page: {
     notFound: "Discussion not found",
     notFoundDescription: "The discussion in this link does not exist or has been deleted.",

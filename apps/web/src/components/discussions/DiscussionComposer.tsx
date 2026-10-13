@@ -12,6 +12,7 @@ import { cn } from "~/lib/utils";
 import { serverEnvironment } from "~/state/server";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { toastManager } from "../ui/toast";
+import { DiscussionAlert } from "./DiscussionAlert";
 import {
   discussionComposerView,
   discussionEnterSends,
@@ -64,6 +65,7 @@ export function DiscussionComposer({
   return (
     <div className="shrink-0 px-6 pb-4">
       <div className="mx-auto flex w-full max-w-192 flex-col gap-2 pl-10.5">
+        <DiscussionAlert discussion={discussion} environmentId={environmentId} />
         <div
           className={cn(
             "rounded-3xl border shadow-sm focus-within:ring-2 focus-within:ring-inset focus-within:ring-ring dark:shadow-none",

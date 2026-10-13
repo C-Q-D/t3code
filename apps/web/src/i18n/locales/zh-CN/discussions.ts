@@ -41,6 +41,23 @@ export const discussions: Messages["discussions"] = {
   empty: "还没有讨论",
   loading: "正在加载讨论…",
   loadFailed: "加载讨论失败",
+  alerts: {
+    stopped: (name: string) => `讨论已停下。点"继续"，${name}会重新发言。`,
+    restarted: '桌面端重启过，讨论已停下。点"继续"恢复。',
+    retry: (canEnd: boolean) =>
+      canEnd ? '可以稍后点"继续"重试，或者结束讨论。' : '可以稍后点"继续"重试。',
+    failed: (name: string, message: string) =>
+      message ? `${name}发言失败：${message}。` : `${name}发言失败。`,
+    usageLimit: (name: string, provider: string) => `${name}发言失败：${provider}用量已达上限。`,
+    command: (name: string) => `${name}在等你批准一条命令。讨论没有停下，批准后它会接着发言。`,
+    operation: (name: string) => `${name}在等你批准一项操作。讨论没有停下，批准后它会接着发言。`,
+    questions: (name: string) => `${name}在等你回答问题。讨论没有停下，回答后它会接着发言。`,
+    long: (name: string, chars: string, limit: string) =>
+      `给${name}的材料已有 ${chars} 字符。超过 ${limit} 字符时会改为文件发送。`,
+    file: (name: string, chars: string, limit: string) =>
+      `给${name}的材料有 ${chars} 字符，超过单条消息上限 ${limit} 字符，已改为文件发送。`,
+    openThread: "打开座位线程",
+  },
   page: {
     notFound: "找不到这场讨论",
     notFoundDescription: "链接里的讨论不存在，或已被删除。",
