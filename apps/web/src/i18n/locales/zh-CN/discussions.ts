@@ -1,4 +1,4 @@
-/** Chinese copy for discussion navigation, lists, seat editing and the transcript placeholder. */
+/** Chinese copy for discussion navigation, lists, seat editing and the discussion page. */
 import type { Messages } from "../en";
 
 export const discussions: Messages["discussions"] = {
@@ -41,5 +41,28 @@ export const discussions: Messages["discussions"] = {
   empty: "还没有讨论",
   loading: "正在加载讨论…",
   loadFailed: "加载讨论失败",
-  pagePlaceholder: "讨论页在后续版本提供",
+  page: {
+    notFound: "找不到这场讨论",
+    notFoundDescription: "链接里的讨论不存在，或已被删除。",
+    unknownEnvironment: "找不到讨论所在的环境",
+    unknownEnvironmentDescription: "这个环境可能已断开或已被移除。",
+    deleted: "这场讨论已删除",
+    deletedDescription: "讨论记录已删除，座位线程已归档。",
+    back: "返回讨论列表",
+    roundSpeaking: (round: number) => `第 ${round} 轮 · 发言中`,
+    closingFinal: "收尾中 · 最后陈述",
+    closingSummary: "收尾中 · 梳理",
+    stop: "停下",
+    resume: "继续",
+    end: "结束讨论",
+    more: "更多",
+    final: "最后陈述",
+    summary: "梳理",
+    summarizer: "梳理人",
+    next: "下一位",
+    interrupted: "已中止",
+    failed: "发言失败",
+    speaking: "发言中",
+    seats: "发言顺序",
+  },
 };

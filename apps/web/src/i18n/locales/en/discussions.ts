@@ -1,4 +1,4 @@
-/** English copy for discussion navigation, lists, seat editing and the transcript placeholder. */
+/** English copy for discussion navigation, lists, seat editing and the discussion page. */
 export const discussions = {
   title: "Discussions",
   newTitle: "New discussion",
@@ -39,5 +39,28 @@ export const discussions = {
   empty: "No discussions yet",
   loading: "Loading discussions…",
   loadFailed: "Could not load discussions",
-  pagePlaceholder: "The discussion page will be available in a later version.",
+  page: {
+    notFound: "Discussion not found",
+    notFoundDescription: "The discussion in this link does not exist or has been deleted.",
+    unknownEnvironment: "Discussion environment not found",
+    unknownEnvironmentDescription: "This environment may have disconnected or been removed.",
+    deleted: "This discussion has been deleted",
+    deletedDescription: "The discussion record has been deleted and its seat threads archived.",
+    back: "Back to discussions",
+    roundSpeaking: (round: number) => `Round ${round} · Speaking`,
+    closingFinal: "Closing · Final statements",
+    closingSummary: "Closing · Summary",
+    stop: "Stop",
+    resume: "Continue",
+    end: "End discussion",
+    more: "More",
+    final: "Final statements",
+    summary: "Summary",
+    summarizer: "Summarizer",
+    next: "Next",
+    interrupted: "Interrupted",
+    failed: "Speaking failed",
+    speaking: "Speaking",
+    seats: "Speaking order",
+  },
 };

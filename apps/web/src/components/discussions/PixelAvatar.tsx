@@ -1,5 +1,6 @@
 /** Renders the shared discussion sprites in a static tile; turn-state animation belongs to the discussion view. */
 import type { DiscussionPersonaAvatar } from "@t3tools/contracts";
+import { CheckIcon } from "lucide-react";
 import { t } from "~/i18n";
 import { discussionSeatColor } from "./discussionSeatColors";
 
@@ -107,16 +108,19 @@ const PAL: Readonly<Record<string, string>> = {
  * @param props.role Persona sprite, or the user's nonassignable sprite.
  * @param props.seat Zero for neutral previews; positive integer for speaking order.
  * @param props.size Tile dimensions in CSS pixels; sprite pixels remain integer-scaled.
- * @returns A fixed-size tile. Optional turn state can be added later without changing these props.
+ * @param props.state Turn appearance; idle preserves existing callers. No state adds animation.
+ * @returns A fixed-size tile; done adds a check only above 20 CSS pixels.
  */
 export function PixelAvatar({
   role,
   seat,
   size,
+  state = "idle",
 }: {
   readonly role: DiscussionPersonaAvatar | "user";
   readonly seat: number;
   readonly size: number;
+  readonly state?: "idle" | "speaking" | "next" | "done";
 }) {
   const isUser = role === "user";
   const color = discussionSeatColor(isUser ? 0 : seat).color;
@@ -137,10 +141,20 @@ export function PixelAvatar({
         className="flex size-full items-end justify-center overflow-hidden"
         style={{
           borderRadius: isUser ? "50%" : Math.round(size * 0.3),
-          background: isUser
-            ? "color-mix(in srgb, var(--foreground) 8%, var(--background))"
-            : `linear-gradient(160deg, color-mix(in srgb, ${color} 34%, var(--background)), color-mix(in srgb, ${color} 10%, var(--background)))`,
-          boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${isUser ? "var(--foreground)" : color} ${isUser ? 14 : 45}%, transparent)`,
+          background:
+            state === "next"
+              ? "transparent"
+              : isUser
+                ? "color-mix(in srgb, var(--foreground) 8%, var(--background))"
+                : `linear-gradient(160deg, color-mix(in srgb, ${color} 34%, var(--background)), color-mix(in srgb, ${color} 10%, var(--background)))`,
+          boxShadow:
+            state === "next"
+              ? "none"
+              : `inset 0 0 0 1px color-mix(in srgb, ${isUser ? "var(--foreground)" : color} ${isUser ? 14 : state === "speaking" ? 70 : 45}%, transparent)`,
+          border:
+            state === "next"
+              ? `1px dashed color-mix(in srgb, ${color} 65%, transparent)`
+              : undefined,
         }}
       >
         <svg
@@ -150,7 +164,11 @@ export function PixelAvatar({
           viewBox="0 0 12 12"
           shapeRendering="crispEdges"
           className="block shrink-0"
-          style={{ marginBottom: size <= 20 ? 1 : 0 }}
+          style={{
+            marginBottom: size <= 20 ? 1 : 0,
+            opacity: state === "next" ? 0.45 : undefined,
+            filter: state === "next" ? "grayscale(1)" : undefined,
+          }}
         >
           {MAPS[role].flatMap((row, y) =>
             [...row].flatMap((character, x) =>
@@ -170,6 +188,14 @@ export function PixelAvatar({
           )}
         </svg>
       </span>
+      {state === "done" && size > 20 ? (
+        <span
+          aria-hidden="true"
+          className="absolute -right-1 -bottom-1 flex size-3.5 items-center justify-center rounded-full bg-background text-success-foreground"
+        >
+          <CheckIcon className="size-2.5" />
+        </span>
+      ) : null}
     </span>
   );
 }
