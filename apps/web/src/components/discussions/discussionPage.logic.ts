@@ -24,7 +24,7 @@ export type DiscussionHeaderView = {
 };
 
 /**
- * Gates the implemented header commands without enabling the later end/delete controls.
+ * Gates each header action using its destination permission and the shared submission lock.
  * @param action Action selected by the current header presentation.
  * @param pending Whether any header command is already submitted.
  * @param permitted Whether the destination grants this action's command.
@@ -35,7 +35,8 @@ export function discussionHeaderActionEnabled(
   pending: boolean,
   permitted: boolean,
 ): boolean {
-  return (action === "stop" || action === "resume") && !pending && permitted;
+  void action;
+  return !pending && permitted;
 }
 
 /**

@@ -178,14 +178,14 @@ describe("discussion header command availability", () => {
       discussion: base,
       pending: false,
       permitted: true,
-      expected: [true, false],
+      expected: [true, true],
     },
     {
       name: "paused",
       discussion: { ...base, status: "paused" as const },
       pending: false,
       permitted: true,
-      expected: [true, false],
+      expected: [true, true],
     },
     {
       name: "closing",
@@ -207,7 +207,7 @@ describe("discussion header command availability", () => {
       discussion: { ...base, status: "ended" as const },
       pending: false,
       permitted: true,
-      expected: [false],
+      expected: [true],
     },
   ])("$name", ({ discussion, pending, permitted, expected }) => {
     expect(

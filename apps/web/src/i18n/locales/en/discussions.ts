@@ -54,6 +54,22 @@ export const discussions = {
     resume: "Continue",
     end: "End discussion",
     more: "More",
+    summarizerLabel: "Summarizer",
+    summaryTemplate: "Summary template",
+    summaryLoading: "Loading summary templates…",
+    summaryFailed: "Could not load summary templates. The default template will be used",
+    summaryOption: (name: string, description: string) =>
+      description ? `${name} (${description})` : name,
+    endNotice: (name: string) =>
+      `${name} is speaking. Final statements will begin when they finish`,
+    endSubmit: "End and summarize",
+    endFailed: "Could not end discussion",
+    deleteDiscussion: "Delete discussion",
+    deleteTitle: "Delete this discussion?",
+    deleteDescription: "The discussion record will be deleted and the seat threads archived.",
+    deleteFailed: "Could not delete discussion",
+    cancel: "Cancel",
+    delete: "Delete",
     composerFallback: "Interject…",
     composerSpeaking: (current: string, next: string) =>
       `Interject… ${current} won't be interrupted. ${next} will read it when they speak next`,
