@@ -1541,6 +1541,8 @@ export const settings = {
       "No discussion templates yet. Set up seats on the new discussion page and choose “Save as template”, or choose “New”.",
     newPersona: "New persona",
     editPersona: "Edit persona",
+    newTemplate: "New discussion template",
+    editTemplate: "Edit discussion template",
     newSummary: "New summary template",
     editSummary: "Edit summary template",
     name: "Name",

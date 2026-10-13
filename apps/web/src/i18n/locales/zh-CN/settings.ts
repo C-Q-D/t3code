@@ -1467,6 +1467,8 @@ export const settings: Messages["settings"] = {
     editPersona: "编辑身份",
     newSummary: "新建梳理模板",
     editSummary: "编辑梳理模板",
+    newTemplate: "新建讨论模板",
+    editTemplate: "编辑讨论模板",
     name: "名称",
     avatar: "形象",
     description: "简介",

@@ -21,6 +21,7 @@ import { useEnvironmentQuery } from "../../state/query";
 import { EMPTY_SERVER_PROVIDERS, serverEnvironment } from "../../state/server";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { PixelAvatar } from "../discussions/PixelAvatar";
+import { DiscussionTemplateEditor } from "../discussions/DiscussionTemplateEditor";
 import {
   AlertDialog,
   AlertDialogClose,
@@ -61,7 +62,7 @@ type PromptEditor = {
   readonly kind: "persona" | "summary";
   readonly prompt: DiscussionPromptWithModified | null;
 };
-/** Destructive or restorative operation awaiting confirmation; template editing is outside this page. */
+/** Destructive or restorative operation awaiting confirmation, separate from draft editors. */
 type Confirmation =
   | { readonly action: "deletePrompt" | "restore"; readonly target: DiscussionPromptWithModified }
   | { readonly action: "deleteTemplate"; readonly target: DiscussionTemplate };
@@ -133,10 +134,16 @@ function DiscussionEnvironmentSettings({
   const canDeleteTemplate = useAtomValue(
     serverEnvironment.deleteDiscussionTemplate.permissionAtom(environmentId),
   );
+  const canUpsertTemplate = useAtomValue(
+    serverEnvironment.upsertDiscussionTemplate.permissionAtom(environmentId),
+  );
   const removePrompt = useAtomCommand(serverEnvironment.deleteDiscussionPrompt);
   const restorePrompt = useAtomCommand(serverEnvironment.restoreDiscussionPromptBuiltin);
   const removeTemplate = useAtomCommand(serverEnvironment.deleteDiscussionTemplate);
   const [editor, setEditor] = useState<PromptEditor | null>(null);
+  const [templateEditor, setTemplateEditor] = useState<{
+    readonly template: DiscussionTemplate | null;
+  } | null>(null);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [busy, setBusy] = useState(false);
   const mutationPending = useRef(false);
@@ -305,7 +312,20 @@ function DiscussionEnvironmentSettings({
           )}
         </SettingsSection>
       ))}
-      <SettingsSection title={t.settings.discussions.templates}>
+      <SettingsSection
+        title={t.settings.discussions.templates}
+        headerAction={
+          <Button
+            size="xs"
+            variant="ghost-muted"
+            disabled={!canUpsertTemplate || busy}
+            onClick={() => setTemplateEditor({ template: null })}
+          >
+            <PlusIcon className="size-3" />
+            {t.settings.discussions.new}
+          </Button>
+        }
+      >
         {templatesLoadError ? (
           <SettingsRow title={t.settings.discussions.loadError} description={templatesLoadError} />
         ) : !templatesQuery.data || !prompts ? (
@@ -345,6 +365,14 @@ function DiscussionEnvironmentSettings({
                   )}
                 </p>
               </div>
+              <Button
+                size="xs"
+                variant="outline"
+                disabled={!canUpsertTemplate || busy}
+                onClick={() => setTemplateEditor({ template })}
+              >
+                {t.settings.discussions.edit}
+              </Button>
               <Tooltip>
                 <TooltipTrigger
                   render={
@@ -367,6 +395,14 @@ function DiscussionEnvironmentSettings({
           ))
         )}
       </SettingsSection>
+      {templateEditor ? (
+        <DiscussionTemplateEditor
+          key={templateEditor.template?.id ?? "new-template"}
+          environmentId={environmentId}
+          template={templateEditor.template}
+          onClose={() => setTemplateEditor(null)}
+        />
+      ) : null}
       {editor ? (
         <DiscussionPromptEditor
           key={editor.prompt?.id ?? editor.kind}

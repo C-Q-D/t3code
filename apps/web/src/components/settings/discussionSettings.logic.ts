@@ -1,5 +1,13 @@
 /** Derives discussion settings presentation and validates prompt drafts independently of transport. */
-import type { DiscussionPromptWithModified, DiscussionTemplate } from "@t3tools/contracts";
+import type {
+  DiscussionPromptWithModified,
+  DiscussionTemplate,
+  DiscussionProviderSupportResult,
+} from "@t3tools/contracts";
+import {
+  canSelectDiscussionModel,
+  type DiscussionDraftSeat,
+} from "../discussions/discussionSeats.logic";
 
 /**
  * Selects the error for a template group whose seat summaries also depend on the prompt subscription.
@@ -72,4 +80,46 @@ export function canSaveDiscussionPrompt(
   busy: boolean,
 ) {
   return writable && !busy && draft.name.trim().length > 0 && draft.prompt.trim().length > 0;
+}
+
+/**
+ * Initializes an editor from a saved template or externally supplied speaking order.
+ * @param template Existing snapshot, or null/omitted for creation.
+ * @param initialSeats External prefill used only for creation.
+ * @returns Editable name and seats with the summary reference retained for saved templates.
+ */
+export function initialDiscussionTemplateDraft(
+  template: DiscussionTemplate | null = null,
+  initialSeats: readonly DiscussionDraftSeat[] = [],
+) {
+  return {
+    name: template?.name ?? "",
+    seats: [...(template?.seats ?? initialSeats)],
+    summaryPromptId: template?.summaryPromptId ?? null,
+  };
+}
+
+/**
+ * Gates template writes against content, provider support, permission and in-flight submission.
+ * @param draft Untrimmed name and ordered seats.
+ * @param support Destination provider capabilities; null means not yet known.
+ * @param writable Destination command permission.
+ * @param busy Whether this editor already submitted a write.
+ * @returns True only for a named, nonempty, supported configuration in an idle writable editor.
+ */
+export function canSaveDiscussionTemplate(
+  draft: { readonly name: string; readonly seats: readonly DiscussionDraftSeat[] },
+  support: DiscussionProviderSupportResult | null,
+  writable: boolean,
+  busy: boolean,
+) {
+  return (
+    writable &&
+    !busy &&
+    draft.name.trim().length > 0 &&
+    draft.seats.length > 0 &&
+    draft.seats.every((seat) =>
+      canSelectDiscussionModel(seat.modelSelection.instanceId, support, true),
+    )
+  );
 }

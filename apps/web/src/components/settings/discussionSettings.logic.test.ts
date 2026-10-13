@@ -2,11 +2,16 @@
 import {
   DiscussionPromptId,
   ProviderInstanceId,
+  DiscussionTemplateId,
   type DiscussionPromptWithModified,
+  type DiscussionTemplate,
+  type DiscussionProviderSupportResult,
 } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 import {
   canSaveDiscussionPrompt,
+  canSaveDiscussionTemplate,
+  initialDiscussionTemplateDraft,
   discussionPromptRow,
   discussionSeatSummary,
   discussionTemplatesLoadError,
@@ -111,4 +116,153 @@ describe("discussion settings", () => {
       expect(canSaveDiscussionPrompt({ name, prompt }, writable, busy)).toBe(expected);
     },
   );
+});
+
+const templateSeats = Object.freeze([
+  Object.freeze({
+    personaPromptId: customId,
+    modelSelection: { instanceId: ProviderInstanceId.make("personal_codex"), model: "gpt" },
+  }),
+  Object.freeze({
+    personaPromptId: personaId,
+    modelSelection: { instanceId: ProviderInstanceId.make("claude"), model: "sonnet" },
+  }),
+]);
+const template: DiscussionTemplate = {
+  id: DiscussionTemplateId.make("review"),
+  name: "方案评审",
+  seats: templateSeats,
+  summaryPromptId: DiscussionPromptId.make("summary"),
+  createdAt: "2026-10-12T00:00:00.000Z",
+  updatedAt: "2026-10-12T00:00:00.000Z",
+};
+const templateSupport: DiscussionProviderSupportResult = {
+  instances: [
+    { instanceId: ProviderInstanceId.make("personal_codex"), supported: true },
+    { instanceId: ProviderInstanceId.make("claude"), supported: true },
+    { instanceId: ProviderInstanceId.make("cursor"), supported: false },
+  ],
+};
+
+describe("discussion template drafts", () => {
+  it("starts a new template with no name, seats or summary", () => {
+    expect(initialDiscussionTemplateDraft()).toEqual({
+      name: "",
+      seats: [],
+      summaryPromptId: null,
+    });
+  });
+  it("loads an existing template's name, speaking order and summary reference", () => {
+    expect(initialDiscussionTemplateDraft(template)).toEqual({
+      name: "方案评审",
+      seats: [
+        {
+          personaPromptId: "custom",
+          modelSelection: { instanceId: "personal_codex", model: "gpt" },
+        },
+        { personaPromptId: "architect", modelSelection: { instanceId: "claude", model: "sonnet" } },
+      ],
+      summaryPromptId: "summary",
+    });
+  });
+  it("prefills external seats in order without borrowing a name or summary", () => {
+    expect(initialDiscussionTemplateDraft(null, templateSeats)).toEqual({
+      name: "",
+      seats: [
+        {
+          personaPromptId: "custom",
+          modelSelection: { instanceId: "personal_codex", model: "gpt" },
+        },
+        { personaPromptId: "architect", modelSelection: { instanceId: "claude", model: "sonnet" } },
+      ],
+      summaryPromptId: null,
+    });
+  });
+  it.each([
+    {
+      case: "valid",
+      name: "  评审  ",
+      seats: templateSeats,
+      support: templateSupport,
+      writable: true,
+      busy: false,
+      expected: true,
+    },
+    {
+      case: "blank name",
+      name: " \n\t ",
+      seats: templateSeats,
+      support: templateSupport,
+      writable: true,
+      busy: false,
+      expected: false,
+    },
+    {
+      case: "no seats",
+      name: "评审",
+      seats: [],
+      support: templateSupport,
+      writable: true,
+      busy: false,
+      expected: false,
+    },
+    {
+      case: "unsupported second seat",
+      name: "评审",
+      seats: [
+        templateSeats[0]!,
+        {
+          personaPromptId: personaId,
+          modelSelection: { instanceId: ProviderInstanceId.make("cursor"), model: "gpt" },
+        },
+      ],
+      support: templateSupport,
+      writable: true,
+      busy: false,
+      expected: false,
+    },
+    {
+      case: "unknown instance",
+      name: "评审",
+      seats: [
+        {
+          personaPromptId: personaId,
+          modelSelection: { instanceId: ProviderInstanceId.make("another_codex"), model: "gpt" },
+        },
+      ],
+      support: templateSupport,
+      writable: true,
+      busy: false,
+      expected: false,
+    },
+    {
+      case: "support pending",
+      name: "评审",
+      seats: templateSeats,
+      support: null,
+      writable: true,
+      busy: false,
+      expected: false,
+    },
+    {
+      case: "permission denied",
+      name: "评审",
+      seats: templateSeats,
+      support: templateSupport,
+      writable: false,
+      busy: false,
+      expected: false,
+    },
+    {
+      case: "submission pending",
+      name: "评审",
+      seats: templateSeats,
+      support: templateSupport,
+      writable: true,
+      busy: true,
+      expected: false,
+    },
+  ])("gates saving for $case", ({ name, seats, support, writable, busy, expected }) => {
+    expect(canSaveDiscussionTemplate({ name, seats }, support, writable, busy)).toBe(expected);
+  });
 });
