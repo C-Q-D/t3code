@@ -379,7 +379,9 @@ function DiscussionSeatCard(props: {
           }
           aria-label={t.discussions.editSeat(props.name, props.index + 1)}
         >
-          <PixelAvatar role={props.avatar} seat={props.index + 1} size={28} />
+          <span className="flex shrink-0" aria-hidden="true">
+            <PixelAvatar role={props.avatar} seat={props.index + 1} size={28} />
+          </span>
           <span className="flex min-w-0 flex-col pr-1 text-left">
             <span className="truncate text-sm font-medium leading-5">{props.name}</span>
             <span className="truncate text-xs leading-4 text-muted-foreground">

@@ -24,7 +24,8 @@ import {
   type ScopedDiscussionListItem,
 } from "./discussionList.logic";
 
-// Dynamic atom dependencies release subscriptions for disconnected environments.
+// Disconnected environments leave the atom's dependencies; the subscription factory
+// releases their underlying subscriptions after its idle TTL.
 // The runtime owns connection retries; full list snapshots replace previous values.
 const discussionListsAtom = Atom.make((get) => {
   const items: ScopedDiscussionListItem[] = [];
@@ -45,6 +46,9 @@ const discussionListsAtom = Atom.make((get) => {
 export function DiscussionListPage() {
   const list = useAtomValue(discussionListsAtom);
   const projects = useProjects();
+  const projectsByEnvironmentAndId = new Map(
+    projects.map((project) => [JSON.stringify([project.environmentId, project.id]), project]),
+  );
   const groups = groupDiscussions(list.items, t.discussions);
   return (
     <SidebarInset>
@@ -79,9 +83,8 @@ export function DiscussionListPage() {
               <ul className="divide-y rounded-lg border bg-card">
                 {group.items.map((item) => {
                   const row = discussionListRow(item, t.discussions);
-                  const project = projects.find(
-                    (project) =>
-                      project.environmentId === item.environmentId && project.id === item.projectId,
+                  const project = projectsByEnvironmentAndId.get(
+                    JSON.stringify([item.environmentId, item.projectId]),
                   );
                   return (
                     <li
@@ -95,10 +98,15 @@ export function DiscussionListPage() {
                       >
                         <span
                           className="flex min-w-15.5 shrink-0 items-center -space-x-1.5"
+                          role="img"
                           aria-label={item.seats.map((seat) => seat.personaName).join("、")}
                         >
                           {item.seats.map((seat, index) => (
-                            <span key={seat.id} className="shrink-0 rounded-lg ring-2 ring-card">
+                            <span
+                              key={seat.id}
+                              className="shrink-0 rounded-lg ring-2 ring-card"
+                              aria-hidden="true"
+                            >
                               <PixelAvatar role={seat.avatar} seat={index + 1} size={24} />
                             </span>
                           ))}
