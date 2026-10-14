@@ -93,6 +93,7 @@ export const tools = {
     unexpectedError: "An unexpected error occurred.",
     wslAddFailed: "Could not add WSL project",
     wslBackendHint: "Start the matching WSL backend, then choose the folder again.",
+    createWithShortcut: (shortcut: string) => `Create (${shortcut})`,
     createEnter: "Create (Enter)",
     creating: "Creating",
     create: "Create",

@@ -94,6 +94,7 @@ export const tools: Messages["tools"] = {
     unexpectedError: "发生意外错误。",
     wslAddFailed: "无法添加 WSL 项目",
     wslBackendHint: "启动对应的 WSL 后端，然后重新选择文件夹。",
+    createWithShortcut: (shortcut: string) => `创建（${shortcut}）`,
     createEnter: "创建（Enter）",
     creating: "正在创建",
     create: "创建",

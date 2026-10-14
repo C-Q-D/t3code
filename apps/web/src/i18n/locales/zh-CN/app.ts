@@ -99,13 +99,9 @@ export const app: Messages["app"] = {
     testFlightBeta: "TestFlight测试版",
     scanIphone: "使用iPhone相机扫描。",
     testFlightLink: "TestFlight测试版链接",
-    googlePlayBeta: "Google Play测试版",
-    googleStepsHint:
-      "两个步骤请使用同一个Google账号。加入群组后，步骤2最多可能需要一小时才能生效。",
-    joinGroup: "1. 加入群组",
-    androidGroupLink: "Android测试版群组链接",
-    becomeTester: "2. 成为测试者",
-    googlePlayLink: "Google Play测试版链接",
+    androidApk: "Android 测试版 APK",
+    androidApkHint: "用手机扫码，然后下载并安装 APK。",
+    androidApkLink: "Android 测试版 APK 链接",
   },
   projects: {
     heroTitle: "我们要做什么？",

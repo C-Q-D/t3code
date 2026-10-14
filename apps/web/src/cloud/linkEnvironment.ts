@@ -24,7 +24,7 @@ import {
 import { EnvironmentRegistry } from "@t3tools/client-runtime/connection";
 import { request, runStream } from "@t3tools/client-runtime/rpc";
 import { makeEnvironmentHttpApiClient } from "@t3tools/client-runtime/rpc";
-import { ManagedRelay, relayProtectedErrorMessage } from "@t3tools/client-runtime/relay";
+import { ManagedRelay, relayRequestFailureDetail } from "@t3tools/client-runtime/relay";
 
 import * as PrimaryEnvironmentHttpLayer from "../environments/primary/httpLayer";
 import { resolveCloudPublicConfig } from "./publicConfig";
@@ -122,12 +122,9 @@ const isEnvironmentCloudApiError = Schema.is(
 /** Converts a structured relay cause into localized link feedback while retaining its cause and trace ID. */
 function decodedRelayClientError(message: string) {
   return (cause: ManagedRelay.ManagedRelayClientError) => {
-    const relayError =
-      cause._tag === "ManagedRelayRequestFailedError" ? cause.relayError : undefined;
-    const traceId = cause._tag === "ManagedRelayRequestFailedError" ? cause.traceId : undefined;
-    const detail = relayError
-      ? relayProtectedErrorMessage(relayError, t.chat.workLog.shared.relay)
-      : null;
+    const failed = cause._tag === "ManagedRelayRequestFailedError" ? cause : undefined;
+    const traceId = failed?.traceId;
+    const detail = failed ? relayRequestFailureDetail(failed, t.chat.workLog.shared.relay) : null;
     return new CloudEnvironmentLinkError({
       message: detail ? `${message}: ${detail}` : message,
       cause,

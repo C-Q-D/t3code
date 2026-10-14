@@ -61,6 +61,7 @@ export function DiscussionEndDialog({
   const instances = applyProviderInstanceSettings(
     deriveProviderInstanceEntries(providers),
     settings,
+    discussion.projectId,
   );
   useEffect(() => {
     if (discussionEndShouldClose(discussion, ending)) onClose();

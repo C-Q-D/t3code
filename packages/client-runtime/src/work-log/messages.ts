@@ -176,6 +176,24 @@ export const englishWorkLogMessages = {
           `orchestration capabilities ${quantity(count, "time")}`,
         ),
     },
+    reviewGuidesFailed: (count: number) => `Could not start ${quantity(count, "review guide")}`,
+    reviewGuidesStarted: (
+      started: number,
+      failed: number,
+      calls: number,
+      known: boolean,
+      succeeded: boolean,
+    ) =>
+      phrase(
+        succeeded,
+        "Started",
+        "start",
+        known
+          ? `${quantity(started, "review guide")}${failed > 0 ? `, ${failed} failed` : ""}`
+          : `review guides ${quantity(calls, "time")}`,
+      ),
+    readReviewGuides: (count: number, succeeded: boolean) =>
+      phrase(succeeded, "Read", "read", quantity(count, "review guide")),
     sentMessages: (count: number, threads: number | undefined, succeeded: boolean) =>
       phrase(
         succeeded,

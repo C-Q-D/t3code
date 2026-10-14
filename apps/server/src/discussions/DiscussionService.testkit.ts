@@ -392,6 +392,7 @@ export function withDiscussionHarness<A, E, R>(
                 };
               }),
             checkWorktreeBase: () => Effect.void,
+            prepareRun: () => Effect.die("unused worktree preparation"),
             retryPreparation: () => Effect.die("unused preparation retry"),
           });
         }),

@@ -62,6 +62,7 @@ export const common: Messages["common"] = {
     linkedSummary: (tooltip, otherCount, label) =>
       `${tooltip}，另有关联 ${otherCount} 个；总体为${label}`,
     chain: "链",
+    openRunningTerminal: (count: number) => `有 ${count} 个终端进程正在运行。打开终端`,
     terminalRunning: "终端进程正在运行",
     /** Formats the worktreeBranch message from the supplied path, branch. */
     worktreeBranch: (path, branch) => `对话的 worktree：${path}（${branch}）`,

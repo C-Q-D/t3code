@@ -525,8 +525,10 @@ function PoolWindowCard({
           <span className="text-3xl font-semibold text-foreground tabular-nums">
             {pool.remainingPercent}%
           </span>
-          <span className="text-sm text-muted-foreground">{t.tools.usage.remaining}</span>
-          {pool.pace ? <PaceIcon pace={pool.pace} /> : null}
+          <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+            <span>{t.tools.usage.remaining}</span>
+            {pool.pace ? <PaceIcon pace={pool.pace} /> : null}
+          </span>
         </span>
         {nextRefill && pool.columns.length > 1 ? (
           <span className="text-xs font-medium text-foreground tabular-nums">

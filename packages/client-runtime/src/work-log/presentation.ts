@@ -702,7 +702,7 @@ export function summarizeToolGroup(
   const labels = selected.map(({ label }) => label);
   if (sources.size > 0) {
     const sourceValues = [...sources.values()];
-    const sourceNames = sourceValues.map((source) => source.name);
+    const sourceNames = [...new Set(sourceValues.map((source) => source.name))];
     labels.unshift(
       messages.usedSources(
         sourceNames,

@@ -25,8 +25,9 @@ export const IS_NIGHTLY_BUILD =
   parseSemver(APP_VERSION)?.prerelease[0] === "nightly" || HOSTED_APP_CHANNEL === "nightly";
 
 const IOS_TESTFLIGHT_URL = "https://testflight.apple.com/join/XgaxaRtd";
-const ANDROID_BETA_GROUP_URL = "https://groups.google.com/g/t3-code-v2-beta";
-const ANDROID_PLAY_TESTING_URL = "https://play.google.com/apps/testing/com.t3tools.t3code";
+// Google banned the Play testing group, so new testers can't join it. CI mirrors
+// the Play-signed beta APK to this release instead (mobile-android-apk.yml).
+const ANDROID_APK_RELEASE_URL = "https://github.com/pingdotgg/t3code/releases/tag/android-nightly";
 
 const ROW_ID = "nightly-mobile-beta";
 const NOTICE_DISMISSED_STORAGE_KEY = "t3code:nightly-mobile-beta-notice-dismissed:v1";
@@ -134,27 +135,12 @@ export function NightlyMobileBetaRow() {
             <PopoverPopup align="end">
               <div className="flex flex-col gap-3">
                 <div className="space-y-1">
-                  <PopoverTitle>{t.app.mobile.googlePlayBeta}</PopoverTitle>
-                  <p className="max-w-72 text-xs text-muted-foreground">
-                    {t.app.mobile.googleStepsHint}
+                  <PopoverTitle>{t.app.mobile.androidApk}</PopoverTitle>
+                  <p className="max-w-56 text-xs text-muted-foreground">
+                    {t.app.mobile.androidApkHint}
                   </p>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <p className="text-center text-xs font-medium">{t.app.mobile.joinGroup}</p>
-                    <BetaLinkQr
-                      url={ANDROID_BETA_GROUP_URL}
-                      label={t.app.mobile.androidGroupLink}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-center text-xs font-medium">{t.app.mobile.becomeTester}</p>
-                    <BetaLinkQr
-                      url={ANDROID_PLAY_TESTING_URL}
-                      label={t.app.mobile.googlePlayLink}
-                    />
-                  </div>
-                </div>
+                <BetaLinkQr url={ANDROID_APK_RELEASE_URL} label={t.app.mobile.androidApkLink} />
               </div>
             </PopoverPopup>
           </Popover>

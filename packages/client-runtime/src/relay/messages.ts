@@ -1,5 +1,9 @@
 /** Relay presentation defaults are separate from transport state and authentication. */
 export const englishRelayMessages = {
+  tunnelSettingUp: "The environment's T3 Connect tunnel is still being set up.",
+  gatewayTimeout:
+    "Relay timed out before it finished the request (HTTP 504). Try again in a few minutes. If it keeps failing, copy the trace ID when you report it.",
+  unexpectedStatus: (status: number) => `Relay returned an unexpected HTTP ${status}.`,
   clockHint: "Hint: Check that automatic date and time is enabled on both devices, then try again.",
   unknownHint:
     "Hint: Try again. If it still fails, clock skew may be the cause; check that automatic date and time is enabled on both devices.",

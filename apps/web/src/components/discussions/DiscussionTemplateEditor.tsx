@@ -130,6 +130,7 @@ export function DiscussionTemplateEditor({
                   />
                 </div>
                 <DiscussionSeats
+                  projectId={null}
                   environmentId={environmentId}
                   seats={draft.seats}
                   onChange={(seats) => setDraft((current) => ({ ...current, seats }))}

@@ -142,7 +142,7 @@ const make = Effect.gen(function* () {
       ),
     );
   const now = DateTime.now.pipe(Effect.map(DateTime.formatIso));
-  const newId = crypto.randomUUIDv4.pipe(
+  const newId = crypto.randomUUIDv4().pipe(
     Effect.mapError(
       (cause) =>
         new DiscussionError({

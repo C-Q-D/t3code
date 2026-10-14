@@ -45,6 +45,7 @@ export function DiscussionAlert({
     const instances = applyProviderInstanceSettings(
       deriveProviderInstanceEntries(providers),
       settings,
+      discussion.projectId,
     );
     return new Map(
       discussion.seats.map((candidate) => [
@@ -55,7 +56,7 @@ export function DiscussionAlert({
         ),
       ]),
     );
-  }, [discussion.seats, providers, settings]);
+  }, [discussion.projectId, discussion.seats, providers, settings]);
   const view = discussionAlertView(
     discussion,
     requests,

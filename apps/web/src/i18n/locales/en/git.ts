@@ -17,6 +17,7 @@ export const git = {
     close: "Close",
   },
   pullRequest: {
+    guide: "Guide",
     attachByUrlOrNumber:
       "Attach a pull request to this thread by its URL, or by its number for this thread's repository.",
     couldNotMergeStack: "Could not merge the stack",

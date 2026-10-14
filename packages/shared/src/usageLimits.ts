@@ -637,6 +637,7 @@ export function formatResetsIn(
   const resetsAt = resetMillis(window);
   if (resetsAt === null) return null;
   if (resetsAt <= now) return messages.resetsNow;
+  if (resetsAt - now < MINUTE) return messages.resetsMomentarily;
   const duration = formatDuration(resetsAt - now, messages);
   if (style === "relative") return messages.relativeReset(duration);
   if (style === "compact") return messages.compactReset(duration);

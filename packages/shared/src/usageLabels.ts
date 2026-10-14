@@ -34,6 +34,7 @@ export const englishUsageLimitsMessages = {
   daysHours: (days: number, hours: number) => `${days}d ${hours}h`,
   hoursMinutes: (hours: number, minutes: number) => `${hours}h ${minutes}m`,
   minutes: (minutes: number) => `${minutes}m`,
+  resetsMomentarily: "Resets momentarily",
   resetsNow: "resets now",
   resetsIn: (duration: string) => `resets in ${duration}`,
   relativeReset: (duration: string) => `in ${duration}`,

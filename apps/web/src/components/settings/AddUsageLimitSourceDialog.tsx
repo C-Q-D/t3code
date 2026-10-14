@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from "../ui/dialog";
 import { Input } from "../ui/input";
+import { SecretInput } from "./SecretInput";
 import { Label } from "../ui/label";
 
 /**
@@ -120,10 +121,8 @@ export function AddUsageLimitSourceDialog({
               <Label htmlFor="usage-source-key">
                 {t.settings.addUsageLimitSource.managementKey}
               </Label>
-              <Input
+              <SecretInput
                 id="usage-source-key"
-                type="password"
-                autoComplete="off"
                 value={managementKey}
                 onChange={(event) => setManagementKey(event.target.value)}
               />

@@ -179,7 +179,7 @@ const make = Effect.gen(function* () {
   let started = false;
 
   const now = DateTime.now.pipe(Effect.map(DateTime.formatIso));
-  const uuid = domain(crypto.randomUUIDv4);
+  const uuid = domain(crypto.randomUUIDv4());
   const invalid = (message: string) => new DiscussionError({ reason: "invalid_state", message });
 
   /** Reads required state; missing identity never silently creates a new discussion. */

@@ -19,6 +19,7 @@ export const git: Messages["git"] = {
     close: "关闭",
   },
   pullRequest: {
+    guide: "审阅指南",
     attachByUrlOrNumber: "通过 URL 或此对话仓库中的请求编号，将 PR 关联到此对话。",
     couldNotMergeStack: "无法合并 PR stack",
     couldNotRebaseStack: "无法对 PR stack 执行 rebase",

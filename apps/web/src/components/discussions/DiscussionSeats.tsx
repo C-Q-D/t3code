@@ -15,7 +15,7 @@ import {
   sortableKeyboardCoordinates,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import type { EnvironmentId } from "@t3tools/contracts";
+import type { EnvironmentId, ProjectId } from "@t3tools/contracts";
 import { CheckIcon, GripVerticalIcon, PlusIcon, XIcon } from "lucide-react";
 import { useId, useState, type ReactNode } from "react";
 import { t } from "~/i18n";
@@ -58,11 +58,14 @@ import {
  */
 export function DiscussionSeats({
   environmentId,
+  projectId,
   seats,
   onChange,
   headerAction,
 }: {
   readonly environmentId: EnvironmentId;
+  /** Null for reusable templates; a project applies its provider availability overrides. */
+  readonly projectId: ProjectId | null;
   readonly seats: readonly DiscussionDraftSeat[];
   readonly onChange: (seats: readonly DiscussionDraftSeat[]) => void;
   readonly headerAction?: ReactNode;
@@ -94,7 +97,7 @@ export function DiscussionSeats({
   );
   const personas = prompts.data?.prompts.filter((prompt) => prompt.kind === "persona") ?? [];
   const entries = sortProviderInstanceEntries(
-    applyProviderInstanceSettings(deriveProviderInstanceEntries(providers), settings),
+    applyProviderInstanceSettings(deriveProviderInstanceEntries(providers), settings, projectId),
   );
   const defaultModel = resolveDefaultProviderModelSelection(
     providers,

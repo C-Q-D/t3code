@@ -262,6 +262,7 @@ function SeatDraft({
         ) : null}
         <fieldset disabled={saving || !initialized} className="min-w-0">
           <DiscussionSeats
+            projectId={projectId}
             environmentId={environmentId}
             seats={seats}
             onChange={setSeats}

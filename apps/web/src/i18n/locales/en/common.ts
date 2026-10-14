@@ -65,6 +65,8 @@ export const common = {
     linkedSummary: (tooltip: string, otherCount: number, label: string) =>
       `${tooltip}, and ${otherCount} more linked; overall ${label}`,
     chain: "chain",
+    openRunningTerminal: (count: number) =>
+      `${count} terminal ${count === 1 ? "process" : "processes"} running. Open terminal`,
     terminalRunning: "Terminal process running",
     /** Formats the worktreeBranch message from the supplied path, branch. */
     worktreeBranch: (path: string, branch: string) => `Worktree: ${path} (${branch})`,

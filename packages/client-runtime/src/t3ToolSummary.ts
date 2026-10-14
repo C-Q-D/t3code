@@ -120,7 +120,7 @@ export function summarizeT3ToolCalls(
     };
   });
   const completed = results.filter((call) => call.outcome === "completed");
-  const failedCount = results.filter((call) => call.outcome === "failed").length;
+  let failedCount = results.filter((call) => call.outcome === "failed").length;
   const selected = completed.length > 0 ? completed : results;
   const succeeded = completed.length > 0;
   const entityIds = (key: string) =>
@@ -216,6 +216,32 @@ export function summarizeT3ToolCalls(
       );
       break;
     }
+    case "write-pr-guides": {
+      // One call writes many guides, and reports a refusal per guide rather than failing.
+      const outcomes = selected.flatMap((call) =>
+        Array.isArray(call.output?.guides)
+          ? call.output.guides.map((guide) => asRecord(guide)?.outcome)
+          : [],
+      );
+      const started = outcomes.filter((outcome) => outcome !== "failed").length;
+      const failed = outcomes.length - started;
+      failedCount += failed;
+      if (outcomes.length > 0 && started === 0) {
+        label = messages.reviewGuidesFailed(failed);
+      } else {
+        label = messages.reviewGuidesStarted(
+          started,
+          failed,
+          selected.length,
+          outcomes.length > 0,
+          succeeded,
+        );
+      }
+      break;
+    }
+    case "read-pr-guide":
+      label = messages.readReviewGuides(selected.length, succeeded);
+      break;
     default:
       label = messages.summary[action](count, succeeded);
   }

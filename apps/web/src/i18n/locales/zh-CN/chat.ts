@@ -475,6 +475,7 @@ export const chat: Messages["chat"] = {
     forkFromThisResponse: "从此回复派生对话",
     interruptRequested: "已请求中断",
     runInterrupted: "运行已中断",
+    contextHandoffPending: "等待上下文交接",
     contextHandoff: "上下文交接",
     conversationFork: "派生对话",
     contextCompacted: "上下文已压缩",
@@ -597,6 +598,11 @@ export const chat: Messages["chat"] = {
     mermaidFailedToLoad: "Mermaid加载失败。",
     theDiagramCouldNotBeRendered: "无法渲染图表。",
     expandDiagram: "展开图表",
+    zoomIn: "放大",
+    zoomOut: "缩小",
+    resetZoom: "重置缩放",
+    expandedPreview: (title: string) => `全屏预览 ${title}`,
+    openFullScreen: "全屏打开",
     openInPanel: "在面板中打开",
     copyMessage: "复制消息",
     retry: "重试",
@@ -1046,6 +1052,9 @@ export const chat: Messages["chat"] = {
           `此地址连接的是另一台计算机 ${label}。请将其添加为独立环境。`,
       },
       relay: {
+        tunnelSettingUp: "此环境的 T3 Connect 隧道仍在设置中。",
+        gatewayTimeout: "中继请求超时（HTTP 504）。请稍后重试；若仍失败，请复制追踪编号用于反馈。",
+        unexpectedStatus: (status) => `中继返回了意外的 HTTP ${status}。`,
         clockHint: "提示：请确认两台设备均已启用自动日期和时间，然后重试。",
         unknownHint:
           "提示：请重试。如果仍然失败，可能存在时钟偏差；请检查两台设备的自动日期和时间设置。",
@@ -1113,6 +1122,7 @@ export const chat: Messages["chat"] = {
         daysHours: (days, hours) => `${days}天 ${hours}小时`,
         hoursMinutes: (hours, minutes) => `${hours}小时 ${minutes}分`,
         minutes: (minutes) => `${minutes}分`,
+        resetsMomentarily: "即将重置",
         resetsNow: "现在重置",
         resetsIn: (duration) => `${duration}后重置`,
         relativeReset: (duration) => `${duration}后`,
@@ -1221,6 +1231,8 @@ export const chat: Messages["chat"] = {
           t3_attachment_prepare_upload: ["准备", "正在准备", "已准备", "附件上传"],
           t3_attachment_discard: ["丢弃", "正在丢弃", "已丢弃", "待发送附件"],
           t3_thread_send_attachments: ["发送", "正在发送", "已发送", "附件"],
+          write_pull_request_guides: ["编写", "正在编写", "已编写", "审阅指南"],
+          read_pull_request_guide: ["读取", "正在读取", "已读取", "审阅指南"],
           html_preview: ["预览", "正在预览", "已预览", "HTML 页面"],
           html_render: ["渲染", "正在渲染", "已渲染", "HTML 页面"],
         },
@@ -1333,6 +1345,11 @@ export const chat: Messages["chat"] = {
           "list-prs": (count, succeeded) =>
             `${succeeded ? "已检查" : "尝试检查"}关联的 PR${count === 1 ? "" : ` ${count} 次`}`,
         },
+        reviewGuidesFailed: (count) => `未能启动 ${count} 份审阅指南`,
+        reviewGuidesStarted: (started, failed, calls, known, succeeded) =>
+          `${succeeded ? "已启动" : "尝试启动"}${known ? ` ${started} 份审阅指南${failed > 0 ? `，${failed} 份失败` : ""}` : `审阅指南 ${calls} 次`}`,
+        readReviewGuides: (count, succeeded) =>
+          `${succeeded ? "已读取" : "尝试读取"} ${count} 份审阅指南`,
         sentMessages: (count, threads, succeeded) =>
           `${succeeded ? "已发送" : "尝试发送"} ${count} 条消息${threads === undefined ? "" : `至 ${threads} 个对话`}`,
         createdThreads: (count, times) =>

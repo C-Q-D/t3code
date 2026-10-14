@@ -262,6 +262,7 @@ export function DiscussionTranscript({
     const instances = applyProviderInstanceSettings(
       deriveProviderInstanceEntries(providers),
       settings,
+      discussion.projectId,
     );
     return discussion.seats.map((seat) => {
       const instance = instances.find(
@@ -277,7 +278,7 @@ export function DiscussionTranscript({
         ?.find((option) => option.slug === seat.modelSelection.model);
       return discussionModelLabel(seat.modelSelection, instance, model);
     });
-  }, [discussion.seats, providers, settings]);
+  }, [discussion.projectId, discussion.seats, providers, settings]);
   const items = useMemo(
     () => discussionTranscriptItems(orderedEntries, discussion, t.discussions),
     [orderedEntries, discussion],

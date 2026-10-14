@@ -399,6 +399,7 @@ export function commandLabel(command: KeybindingCommand): string {
             : t.tools.usage.ninetyDays,
     );
   if (command === "view.reopenClosed") return t.settings.keybindings.commandLabels.reopenClosed;
+  if (command === "preview.focusUrl") return t.settings.keybindings.focusPreviewUrl;
   const raw = String(command);
   if (raw.startsWith("script.") && raw.endsWith(".run")) {
     return t.settings.keybindings.runScriptCommand(

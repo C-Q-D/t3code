@@ -103,13 +103,9 @@ export const app = {
     testFlightBeta: "TestFlight beta",
     scanIphone: "Scan with your iPhone camera.",
     testFlightLink: "TestFlight beta link",
-    googlePlayBeta: "Google Play beta",
-    googleStepsHint:
-      "Use the same Google account for both steps. Step 2 can take up to an hour to work after you join the group.",
-    joinGroup: "1. Join the group",
-    androidGroupLink: "Android beta group link",
-    becomeTester: "2. Become a tester",
-    googlePlayLink: "Google Play beta link",
+    androidApk: "Android beta APK",
+    androidApkHint: "Scan with your phone, then download and install the APK.",
+    androidApkLink: "Android beta APK link",
   },
   projects: {
     heroTitle: "What should we work on?",

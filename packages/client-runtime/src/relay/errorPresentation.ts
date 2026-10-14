@@ -49,6 +49,7 @@ export function relayProtectedErrorMessage(
       if (error.reason === "environment_link_not_found") {
         return messages.missingLink;
       }
+      if (error.reason === "managed_endpoint_allocation_not_ready") return messages.tunnelSettingUp;
       return messages.rejectedConnection(error.reason);
     case "RelayEnvironmentEndpointUnavailableError":
       return messages.endpointUnavailable(error.reason);
@@ -67,6 +68,29 @@ export function relayProtectedErrorMessage(
     case "RelayInternalError":
       return messages.internalError(error.reason);
   }
+}
+
+// The relay cuts off a request it cannot finish in time with a 504 that no
+// endpoint declares, so the client sees only the status.
+export const RELAY_GATEWAY_TIMEOUT_MESSAGE =
+  "Relay timed out before it finished the request (HTTP 504). Try again in a few minutes. If it keeps failing, copy the trace ID when you report it.";
+
+/**
+ * User-facing detail for a failed relay request: the relay's typed error, or
+ * the HTTP status when the relay sent a response the contract does not declare.
+ * Null when the request got no response.
+ */
+export function relayRequestFailureDetail(
+  error: {
+    readonly relayError?: RelayProtectedError | undefined;
+    readonly status?: number | undefined;
+  },
+  messages: RelayMessages = englishRelayMessages,
+): string | null {
+  if (error.relayError) return relayProtectedErrorMessage(error.relayError, messages);
+  if (error.status === 504) return messages.gatewayTimeout;
+  if (error.status !== undefined) return messages.unexpectedStatus(error.status);
+  return null;
 }
 
 // A host with a current build gets a new tunnel on its own within minutes of

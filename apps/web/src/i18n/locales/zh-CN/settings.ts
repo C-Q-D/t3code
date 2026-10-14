@@ -431,7 +431,7 @@ export const settings: Messages["settings"] = {
     },
     providerUpdateChecks: {
       title: "Provider 更新检查",
-      description: "检查已安装 ProviderCLI 是否有新版本。",
+      description: "检查已安装 Provider CLI 的新版本并更新模型目录。关闭后可能无法看到新模型。",
       resetLabel: "Provider 更新检查",
       ariaLabel: "检查 Provider 版本",
     },
@@ -840,7 +840,7 @@ export const settings: Messages["settings"] = {
     seconds: "秒",
     providerHealth: {
       title: "Provider 健康检查间隔",
-      description: "刷新 Provider 可用性、版本、认证状态和模型元数据。",
+      description: "刷新 Provider 可用性、版本和认证状态。模型目录更新由 Provider 更新检查控制。",
       decreaseAriaLabel: "缩短 Provider 健康检查间隔",
       ariaLabel: "Provider 健康检查间隔（秒）",
       increaseAriaLabel: "延长 Provider 健康检查间隔",
@@ -2577,6 +2577,7 @@ ${address}`
     save: "保存",
   },
   keybindings: {
+    focusPreviewUrl: "预览：聚焦地址栏",
     commandLabels: {
       sendAlternate: "输入框：执行相反的排队或引导操作",
       sendBackground: "输入框：在后台启动",
@@ -3280,6 +3281,7 @@ ${address}`
     ) => `无法更新 ${value}。${savedEnvironmentCount0 ? "其他所选环境已保存更改。" : ""}`,
   },
   settingInheritance: {
+    sourceControlWriterModel: "源代码管理写作模型",
     repositoryConventions: "仓库惯例",
     conventionalCommits: "Conventional Commits",
     customInstructions: "自定义指令",

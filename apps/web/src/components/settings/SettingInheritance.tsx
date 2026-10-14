@@ -46,9 +46,11 @@ function formatValue(key: keyof ServerSettings, value: unknown): string {
           ? t.settings.settingInheritance.automatic
           : key === "sourceControlWriterModelSelection"
             ? t.settings.rows.textGenerationModel.title
-            : key === "defaultThreadEnvMode" || key === "worktreeSubmodules"
-              ? t.settings.settingInheritance.inherit
-              : t.settings.settingInheritance.notSet;
+            : key === "reviewGuideModelSelection"
+              ? t.settings.settingInheritance.sourceControlWriterModel
+              : key === "defaultThreadEnvMode" || key === "worktreeSubmodules"
+                ? t.settings.settingInheritance.inherit
+                : t.settings.settingInheritance.notSet;
   }
   if (typeof value === "boolean")
     return value ? t.settings.settingInheritance.on : t.settings.connections.status.off;

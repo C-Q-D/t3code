@@ -464,7 +464,8 @@ export const settings = {
     },
     providerUpdateChecks: {
       title: "Provider update checks",
-      description: "Check installed provider CLIs for newer available versions.",
+      description:
+        "Check installed provider CLIs for newer available versions and fetch model catalog updates. When off, new models may not appear.",
       resetLabel: "provider update checks",
       ariaLabel: "Check provider versions",
     },
@@ -889,7 +890,8 @@ export const settings = {
     seconds: "seconds",
     providerHealth: {
       title: "Provider health interval",
-      description: "Refresh provider availability, versions, auth state, and model metadata.",
+      description:
+        "Refresh provider availability, versions, and auth state. Model catalog updates follow Provider update checks.",
       decreaseAriaLabel: "Decrease provider health interval",
       ariaLabel: "Provider health interval in seconds",
       increaseAriaLabel: "Increase provider health interval",
@@ -2695,6 +2697,7 @@ ${address}`
     save: "Save",
   },
   keybindings: {
+    focusPreviewUrl: "Preview: Focus URL",
     commandLabels: {
       sendAlternate: "Composer: Opposite Queue or Steer Action",
       sendBackground: "Composer: Start in Background",
@@ -3456,6 +3459,7 @@ ${address}`
       `Could not update ${value}.${savedEnvironmentCount0 ? " The other selected environments saved the change." : ""}`,
   },
   settingInheritance: {
+    sourceControlWriterModel: "Source control writer model",
     repositoryConventions: "Repository conventions",
     conventionalCommits: "Conventional Commits",
     customInstructions: "Custom instructions",
