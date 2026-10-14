@@ -7596,20 +7596,30 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
           }
           if (
             message.type === "assistant" &&
-            assistantText !== null &&
-            assistantText.text.length > 0
+            !message.parent_tool_use_id &&
+            assistantText !== null
           ) {
             if (context.assistant.snapshots.has(message.uuid)) return;
             context.assistant.snapshots.add(message.uuid);
-            // Count text blocks separately from thinking and tool blocks, on both SDK paths.
+            const messageId = typeof message.message.id === "string" ? message.message.id : null;
+            if (messageId === null) {
+              // Without an API message ID, preserve the original whole-frame uuid identity and text.
+              if (assistantText.text.length > 0) {
+                yield* ensureAssistantBlock(context, message.uuid);
+                yield* assistantDeltas.complete({
+                  turnId: context.nativeTurnId,
+                  itemId: message.uuid,
+                  finalText: assistantText.text,
+                });
+              }
+              return;
+            }
+            // Empty snapshots still occupy a text index; skipping them would shift later IDs.
             for (const block of message.message.content) {
               if (block.type !== "text") continue;
-              const messageId = typeof message.message.id === "string" ? message.message.id : null;
-              const index =
-                messageId === null ? 0 : (context.assistant.snapshotBlockIndex.get(messageId) ?? 0);
-              if (messageId !== null)
-                context.assistant.snapshotBlockIndex.set(messageId, index + 1);
-              const itemId = messageId === null ? message.uuid : `${messageId}:text:${index}`;
+              const index = context.assistant.snapshotBlockIndex.get(messageId) ?? 0;
+              context.assistant.snapshotBlockIndex.set(messageId, index + 1);
+              const itemId = `${messageId}:text:${index}`;
               if (block.text.length === 0) continue;
               yield* ensureAssistantBlock(context, itemId);
               yield* assistantDeltas.complete({

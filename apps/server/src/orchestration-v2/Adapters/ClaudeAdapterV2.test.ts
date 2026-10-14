@@ -3136,6 +3136,92 @@ describe("ClaudeAdapterV2 background wake turns", () => {
     ),
   );
 
+  it.effect("counts an empty Claude text snapshot before aligning the next text block", () =>
+    Effect.gen(function* () {
+      const harness = yield* makeTextStreamHarness;
+      yield* harness.stream({ type: "message_start", message: { id: "text-message" } });
+      yield* harness.stream({
+        type: "content_block_start",
+        index: 0,
+        content_block: { type: "text", text: "" },
+      });
+      yield* harness.snapshot("empty-text-snapshot", [{ type: "text", text: "" }]);
+      yield* harness.snapshot("empty-text-snapshot", [{ type: "text", text: "" }]);
+      yield* harness.stream({ type: "content_block_stop", index: 0 });
+      yield* TestClock.adjust("50 millis");
+      assert.equal(harness.items().length, 0, "empty blocks must not emit empty replies");
+      assert.equal(harness.messages().length, 0);
+      yield* harness.stream({
+        type: "content_block_start",
+        index: 2,
+        content_block: { type: "text", text: "Draft reply" },
+      });
+      yield* TestClock.adjust("50 millis");
+      const streamed = yield* Queue.take(harness.assistantItemReceipts);
+      assert.equal(streamed.nativeItemRef?.nativeId, "text-message:text:1");
+      assert.equal(streamed.text, "Draft reply");
+      yield* harness.snapshot("nonempty-text-snapshot", [{ type: "text", text: "Final reply" }]);
+      yield* harness.stream({ type: "content_block_stop", index: 2 });
+      yield* harness.offerAndWait(makeResultFrame({ uuid: "empty-block-result", result: "" }));
+      yield* Queue.take(harness.terminalReceipts);
+      const latest = new Map(harness.items().map((item) => [item.id, item]));
+      assert.equal(latest.size, 1, "the empty snapshot must not shift the final text ID");
+      assert.equal(latest.get(streamed.id)?.text, "Final reply");
+      assert.equal(latest.get(streamed.id)?.streaming, false);
+      assert.equal(latest.get(streamed.id)?.status, "completed");
+      assert.deepEqual(
+        harness.messages().map((message) => message.text),
+        ["Final reply"],
+      );
+    }).pipe(
+      Effect.scoped,
+      Effect.provide(
+        Layer.mergeAll(IdAllocator.layer, McpProviderSessions.layer, NodeServices.layer),
+      ),
+    ),
+  );
+
+  it.effect("preserves all Claude text blocks in one uuid fallback item without a message ID", () =>
+    Effect.gen(function* () {
+      const harness = yield* makeTextStreamHarness;
+      const snapshot = claudeSdkFrame({
+        type: "assistant",
+        uuid: "uuid-fallback-snapshot",
+        session_id: WAKE_NATIVE_SESSION,
+        parent_tool_use_id: null,
+        message: {
+          model: "<synthetic>",
+          content: [
+            { type: "text", text: "First" },
+            { type: "text", text: "Second" },
+          ],
+        },
+      });
+      yield* harness.offerAndWait(snapshot);
+      yield* harness.offerAndWait(snapshot);
+      yield* harness.offerAndWait(makeResultFrame({ uuid: "uuid-fallback-result", result: "" }));
+      yield* Queue.take(harness.terminalReceipts);
+      const items = harness.items();
+      assert.deepEqual(
+        items.map((item) => item.text),
+        ["FirstSecond"],
+      );
+      assert.equal(items[0]?.nativeItemRef?.nativeId, "uuid-fallback-snapshot");
+      assert.equal(items[0]?.streaming, false);
+      assert.equal(items[0]?.status, "completed");
+      assert.deepEqual(
+        harness.messages().map((message) => message.text),
+        ["FirstSecond"],
+      );
+      assert.equal(harness.messages()[0]?.streaming, false);
+    }).pipe(
+      Effect.scoped,
+      Effect.provide(
+        Layer.mergeAll(IdAllocator.layer, McpProviderSessions.layer, NodeServices.layer),
+      ),
+    ),
+  );
+
   it.effect.each(["separate snapshots", "combined snapshot"] as const)(
     "aligns separated Claude text blocks with %s and ignores duplicate snapshots",
     (mode) =>
