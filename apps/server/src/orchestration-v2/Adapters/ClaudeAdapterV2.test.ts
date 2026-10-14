@@ -2586,6 +2586,16 @@ describe("ClaudeAdapterV2 background wake turns", () => {
         yield* Queue.unbounded<
           Extract<ProviderAdapter.ProviderAdapterV2Event, { type: "turn_item.updated" }>
         >();
+      const assistantItemReceipts =
+        yield* Queue.unbounded<
+          Extract<
+            Extract<
+              ProviderAdapter.ProviderAdapterV2Event,
+              { type: "turn_item.updated" }
+            >["turnItem"],
+            { type: "assistant_message" }
+          >
+        >();
       let openedOptions: ClaudeAdapterV2.ClaudeAgentSdkQueryOptions | undefined;
       const adapter = yield* ClaudeAdapterV2.makeClaudeAdapterV2({
         instanceId: ClaudeAdapterV2.CLAUDE_DEFAULT_INSTANCE_ID,
@@ -2687,6 +2697,9 @@ describe("ClaudeAdapterV2 background wake turns", () => {
             if (event.type === "turn_item.updated" && event.turnItem.type === "system_notice") {
               yield* Queue.offer(systemNoticeReceipts, event);
             }
+            if (event.type === "turn_item.updated" && event.turnItem.type === "assistant_message") {
+              yield* Queue.offer(assistantItemReceipts, event.turnItem);
+            }
           }),
         ),
         Effect.forkScoped,
@@ -2723,6 +2736,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
         terminalReceipts,
         subagentReceipts,
         systemNoticeReceipts,
+        assistantItemReceipts,
         getOpenedOptions: () => openedOptions,
         terminalEvents,
         hasPendingBackgroundWork,
@@ -2996,6 +3010,124 @@ describe("ClaudeAdapterV2 background wake turns", () => {
       assert.equal(harness.messages()[0]?.text, "Authoritative reply");
       assert.equal(harness.messages()[0]?.streaming, false);
       assert.deepEqual(harness.messages()[0]?.createdAt, streamed[0]?.startedAt);
+    }).pipe(
+      Effect.scoped,
+      Effect.provide(
+        Layer.mergeAll(IdAllocator.layer, McpProviderSessions.layer, NodeServices.layer),
+      ),
+    ),
+  );
+
+  it.effect.each(["completed", "interrupted"] as const)(
+    "preserves unfinished Claude text when the turn is %s without duplicating result text",
+    (status) =>
+      Effect.gen(function* () {
+        const harness = yield* makeTextStreamHarness;
+        yield* harness.stream({ type: "message_start", message: { id: "text-message" } });
+        yield* harness.stream({
+          type: "content_block_start",
+          index: 1,
+          content_block: { type: "text", text: "" },
+        });
+        yield* harness.stream({
+          type: "content_block_delta",
+          index: 1,
+          delta: { type: "text_delta", text: "Partial " },
+        });
+        yield* TestClock.adjust("50 millis");
+        const streamed = harness.items().at(-1);
+        assert.equal(streamed?.text, "Partial ");
+        assert.equal(streamed?.streaming, true);
+        assert.equal(harness.messages().length, 0);
+        // End before the next coalescing window to also protect the buffered suffix.
+        yield* harness.stream({
+          type: "content_block_delta",
+          index: 1,
+          delta: { type: "text_delta", text: "reply" },
+        });
+        yield* harness.offerAndWait(
+          makeResultFrame({
+            uuid: "unfinished-text-result",
+            result: "Result fallback must not appear",
+            ...(status === "interrupted" ? { terminalReason: "aborted_streaming" as const } : {}),
+          }),
+        );
+        const terminal = yield* Queue.take(harness.terminalReceipts);
+        assert.equal(terminal.status, status);
+        const final = harness
+          .items()
+          .filter((item) => item.id === streamed?.id)
+          .at(-1);
+        assert.equal(final?.text, "Partial reply");
+        assert.equal(final?.streaming, false);
+        assert.equal(final?.status, "completed");
+        assert.equal(final?.ordinal, streamed?.ordinal);
+        assert.deepEqual(final?.startedAt, streamed?.startedAt);
+        assert.isNotNull(final?.completedAt);
+        assert.equal(new Set(harness.items().map((item) => item.id)).size, 1);
+        assert.deepEqual(
+          harness.messages().map((message) => message.text),
+          ["Partial reply"],
+        );
+        assert.equal(harness.messages()[0]?.streaming, false);
+        assert.deepEqual(harness.messages()[0]?.createdAt, streamed?.startedAt);
+      }).pipe(
+        Effect.scoped,
+        Effect.provide(
+          Layer.mergeAll(IdAllocator.layer, McpProviderSessions.layer, NodeServices.layer),
+        ),
+      ),
+  );
+
+  it.effect("closes unfinished Claude text immediately when the next message starts", () =>
+    Effect.gen(function* () {
+      const harness = yield* makeTextStreamHarness;
+      yield* harness.stream({ type: "message_start", message: { id: "text-message" } });
+      yield* harness.stream({
+        type: "content_block_start",
+        index: 1,
+        content_block: { type: "text", text: "" },
+      });
+      yield* harness.stream({
+        type: "content_block_delta",
+        index: 1,
+        delta: { type: "text_delta", text: "First " },
+      });
+      yield* TestClock.adjust("50 millis");
+      const streamed = yield* Queue.take(harness.assistantItemReceipts);
+      assert.equal(streamed?.text, "First ");
+      assert.equal(streamed?.streaming, true);
+      yield* harness.stream({
+        type: "content_block_delta",
+        index: 1,
+        delta: { type: "text_delta", text: "partial" },
+      });
+      // Stop clears the SDK index mapping, but the missing snapshot still needs closure.
+      yield* harness.stream({ type: "content_block_stop", index: 1 });
+      yield* harness.stream({ type: "message_start", message: { id: "next-text-message" } });
+      // SDK processing and public event collection are separate fibers; await the item itself.
+      const final = yield* Queue.take(harness.assistantItemReceipts);
+      assert.equal(final?.id, streamed?.id);
+      assert.equal(final?.text, "First partial");
+      assert.equal(final?.streaming, false);
+      assert.equal(final?.status, "completed");
+      assert.deepEqual(final?.startedAt, streamed?.startedAt);
+      assert.equal(final?.ordinal, streamed?.ordinal);
+      assert.deepEqual(
+        harness.messages().map((message) => message.text),
+        ["First partial"],
+      );
+      assert.equal(harness.messages()[0]?.streaming, false);
+      assert.equal(harness.terminalEvents().length, 0, "closure must precede turn termination");
+      yield* harness.offerAndWait(
+        makeResultFrame({
+          uuid: "next-message-result",
+          result: "Result fallback must not appear",
+        }),
+      );
+      yield* Queue.take(harness.terminalReceipts);
+      assert.equal(harness.messages().length, 1, "turn termination must not close the item twice");
+      assert.equal(new Set(harness.items().map((item) => item.id)).size, 1);
     }).pipe(
       Effect.scoped,
       Effect.provide(

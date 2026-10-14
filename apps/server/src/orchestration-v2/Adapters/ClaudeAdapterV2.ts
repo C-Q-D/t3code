@@ -2958,7 +2958,7 @@ interface ActiveClaudeTurnContext {
   readonly assistant: {
     fallbackText: string;
     fallbackNativeItemId: string;
-    emittedNativeItemIds: Set<string>;
+    hasEmittedText: boolean;
     messageId: string | null;
     readonly streamBlocks: Map<number, string>;
     readonly nextBlockIndex: Map<string, number>;
@@ -5728,7 +5728,8 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               if (block.completed && block.text === update.text) return;
               block.text = update.text;
               block.completed = update.completed;
-              if (update.completed) context.assistant.emittedNativeItemIds.add(update.itemId);
+              // A partial reply already counts as output; result must not add another reply.
+              context.assistant.hasEmittedText = true;
               const artifacts = buildAssistantArtifacts({
                 idAllocator,
                 turnInput: context.input,
@@ -5824,6 +5825,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
           readonly result?: SDKResultMessage;
         }) {
           yield* reasoningDeltas.flushTurn(input.context.nativeTurnId);
+          yield* assistantDeltas.flushTurn(input.context.nativeTurnId);
           if (input.status !== "completed") {
             // The run stops following its subagents once its root turn fails or is
             // interrupted, so a workflow it follows is stopped rather than left
@@ -5882,7 +5884,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
           }
 
           if (
-            input.context.assistant.emittedNativeItemIds.size === 0 &&
+            !input.context.assistant.hasEmittedText &&
             input.context.assistant.fallbackText.length > 0
           ) {
             const ordinal = yield* resolveItemOrdinal(
@@ -6796,6 +6798,8 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             const reasoning = context.reasoning;
             const assistant = context.assistant;
             if (event.type === "message_start") {
+              // Stop frames remove index mappings, so close pending text from the turn buffer.
+              yield* assistantDeltas.flushTurn(context.nativeTurnId);
               reasoning.messageId = event.message.id;
               reasoning.streamBlocks.clear();
               assistant.messageId = event.message.id;
@@ -7681,7 +7685,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               ? null
               : resultTextFromSdkMessage(message);
           if (
-            context.assistant.emittedNativeItemIds.size === 0 &&
+            !context.assistant.hasEmittedText &&
             context.assistant.fallbackText.length === 0 &&
             resultText !== null &&
             resultText.text.length > 0
@@ -8595,7 +8599,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               assistant: {
                 fallbackText: "",
                 fallbackNativeItemId: `assistant:${turnInput.runId}`,
-                emittedNativeItemIds: new Set(),
+                hasEmittedText: false,
                 messageId: null,
                 streamBlocks: new Map(),
                 nextBlockIndex: new Map(),
