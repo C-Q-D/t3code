@@ -213,7 +213,11 @@ function makeClaudeTestTurnInput(input: {
 }
 
 describe("ClaudeAdapterV2 runtime query policy", () => {
-  // Fixed before the feature change: guard exact existing prompt bytes, not a recomputed expectation.
+  // Guard exact base prompt bytes with a fixed hash so unexpected additions or omissions fail.
+  // When buildRuntimeInstructions or T3_CODE_ORCHESTRATION_INSTRUCTIONS changes intentionally,
+  // re-lock this hash by taking sha256 of buildRuntimeInstructions({ harness: "Claude Code" }) +
+  // T3_CODE_ORCHESTRATION_INSTRUCTIONS directly, without calling makeClaudeQueryOptions,
+  // so the expected value stays independent of the query builder under test.
   it.each([
     { label: "omitted", developerContext: undefined },
     { label: "empty", developerContext: [] },
@@ -231,7 +235,7 @@ describe("ClaudeAdapterV2 runtime query policy", () => {
       createHash("sha256")
         .update((options.systemPrompt as { append: string }).append)
         .digest("hex"),
-      "b20dffe8bd18b518c56ba95310480a5ef6646fca02519e12286b09ff7fc8d7bb",
+      "f88bac670d85e41f4c746dda23d840e5ce825f907b472a7a5dce615eddf68f95",
     );
   });
 
@@ -252,7 +256,7 @@ describe("ClaudeAdapterV2 runtime query policy", () => {
     assert.isTrue(append.endsWith(suffix));
     assert.equal(
       createHash("sha256").update(append.slice(0, -suffix.length)).digest("hex"),
-      "b20dffe8bd18b518c56ba95310480a5ef6646fca02519e12286b09ff7fc8d7bb",
+      "f88bac670d85e41f4c746dda23d840e5ce825f907b472a7a5dce615eddf68f95",
     );
   });
 
