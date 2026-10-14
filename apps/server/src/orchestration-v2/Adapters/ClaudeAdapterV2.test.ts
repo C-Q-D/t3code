@@ -1,3 +1,4 @@
+/** Verifies Claude SDK translation and turn lifecycle through adapter events and controlled SDK input. */
 // @effect-diagnostics nodeBuiltinImport:off -- workflow fixtures use files and the fake Claude CLI uses Node streams
 import * as NodeEvents from "node:events";
 import { createHash } from "node:crypto";
@@ -2901,6 +2902,173 @@ describe("ClaudeAdapterV2 background wake turns", () => {
           Effect.provide(
             Layer.mergeAll(IdAllocator.layer, McpProviderSessions.layer, NodeServices.layer),
           ),
+        ),
+      ),
+  );
+
+  // Exercise SDK input and public events; no production-only test hooks are needed.
+  const makeTextStreamHarness = Effect.gen(function* () {
+    const harness = yield* makeWakeHarness;
+    yield* harness.runtime.startTurn(
+      makeClaudeTestTurnInput({
+        threadId: harness.threadId,
+        providerThread: harness.providerThread,
+        now: yield* DateTime.now,
+        attemptId: RunAttemptId.make("text-stream-attempt"),
+        text: "Write a reply",
+        attachments: [],
+      }),
+    );
+    const stream = (event: unknown) =>
+      harness.offerAndWait(
+        claudeSdkFrame({
+          type: "stream_event",
+          event,
+          parent_tool_use_id: null,
+          session_id: WAKE_NATIVE_SESSION,
+          uuid: "text-stream-frame",
+        }),
+      );
+    const snapshot = (uuid: string, content: unknown[]) =>
+      harness.offerAndWait(
+        claudeSdkFrame({
+          type: "assistant",
+          uuid,
+          session_id: WAKE_NATIVE_SESSION,
+          parent_tool_use_id: null,
+          message: { id: "text-message", model: "claude-sonnet-4-6", content },
+        }),
+      );
+    const items = () =>
+      harness.events.flatMap((event) =>
+        event.type === "turn_item.updated" && event.turnItem.type === "assistant_message"
+          ? [event.turnItem]
+          : [],
+      );
+    const messages = () =>
+      harness.events.flatMap((event) =>
+        event.type === "message.updated" && event.message.role === "assistant"
+          ? [event.message]
+          : [],
+      );
+    return { ...harness, stream, snapshot, items, messages };
+  });
+
+  it.effect("streams Claude text before its authoritative snapshot closes the same item", () =>
+    Effect.gen(function* () {
+      const harness = yield* makeTextStreamHarness;
+      yield* harness.stream({ type: "message_start", message: { id: "text-message" } });
+      yield* harness.stream({
+        type: "content_block_start",
+        index: 1,
+        content_block: { type: "text", text: "" },
+      });
+      yield* harness.stream({
+        type: "content_block_delta",
+        index: 1,
+        delta: { type: "text_delta", text: "Hello " },
+      });
+      yield* harness.stream({
+        type: "content_block_delta",
+        index: 1,
+        delta: { type: "text_delta", text: "world" },
+      });
+      yield* TestClock.adjust("50 millis");
+      const streamed = harness.items();
+      assert.equal(streamed.length, 1, "text must be visible before the snapshot");
+      assert.equal(streamed[0]?.text, "Hello world");
+      assert.equal(streamed[0]?.streaming, true);
+      assert.equal(streamed[0]?.status, "running");
+      assert.equal(harness.messages().length, 0);
+      yield* harness.snapshot("text-snapshot", [{ type: "text", text: "Authoritative reply" }]);
+      yield* harness.stream({ type: "content_block_stop", index: 1 });
+      yield* harness.offerAndWait(makeResultFrame({ uuid: "text-result", result: "" }));
+      yield* Queue.take(harness.terminalReceipts);
+      const final = harness.items().at(-1);
+      assert.equal(final?.id, streamed[0]?.id);
+      assert.equal(final?.ordinal, streamed[0]?.ordinal);
+      assert.deepEqual(final?.startedAt, streamed[0]?.startedAt);
+      assert.equal(final?.text, "Authoritative reply");
+      assert.equal(final?.streaming, false);
+      assert.equal(final?.status, "completed");
+      assert.equal(new Set(harness.items().map((item) => item.id)).size, 1);
+      assert.equal(harness.messages().length, 1);
+      assert.equal(harness.messages()[0]?.text, "Authoritative reply");
+      assert.equal(harness.messages()[0]?.streaming, false);
+      assert.deepEqual(harness.messages()[0]?.createdAt, streamed[0]?.startedAt);
+    }).pipe(
+      Effect.scoped,
+      Effect.provide(
+        Layer.mergeAll(IdAllocator.layer, McpProviderSessions.layer, NodeServices.layer),
+      ),
+    ),
+  );
+
+  it.effect.each(["separate snapshots", "combined snapshot"] as const)(
+    "aligns separated Claude text blocks with %s and ignores duplicate snapshots",
+    (mode) =>
+      Effect.gen(function* () {
+        const harness = yield* makeTextStreamHarness;
+        yield* harness.stream({ type: "message_start", message: { id: "text-message" } });
+        yield* harness.stream({
+          type: "content_block_start",
+          index: 1,
+          content_block: { type: "text", text: "First draft" },
+        });
+        yield* TestClock.adjust("50 millis");
+        const first = harness.items().at(-1);
+        assert.equal(first?.text, "First draft");
+        if (mode === "separate snapshots") {
+          yield* harness.snapshot("first-text", [{ type: "text", text: "First final" }]);
+          yield* harness.snapshot("first-text", [{ type: "text", text: "First final" }]);
+        }
+        yield* harness.stream({ type: "content_block_stop", index: 1 });
+        yield* harness.stream({
+          type: "content_block_start",
+          index: 3,
+          content_block: { type: "thinking", thinking: "Thinking" },
+        });
+        yield* harness.stream({ type: "content_block_stop", index: 3 });
+        yield* harness.stream({
+          type: "content_block_start",
+          index: 5,
+          content_block: { type: "text", text: "Second draft" },
+        });
+        yield* TestClock.adjust("50 millis");
+        const second = harness.items().at(-1);
+        assert.equal(second?.text, "Second draft");
+        const content =
+          mode === "combined snapshot"
+            ? [
+                { type: "text", text: "First final" },
+                { type: "thinking", thinking: "Thinking", signature: "signature" },
+                { type: "text", text: "Second final" },
+              ]
+            : [{ type: "text", text: "Second final" }];
+        yield* harness.snapshot("last-text", content);
+        yield* harness.snapshot("last-text", content);
+        yield* harness.stream({ type: "content_block_stop", index: 5 });
+        yield* harness.offerAndWait(makeResultFrame({ uuid: "text-result", result: "" }));
+        yield* Queue.take(harness.terminalReceipts);
+        const latest = new Map(harness.items().map((item) => [item.id, item]));
+        assert.equal(latest.size, 2);
+        assert.deepEqual(
+          [...latest.values()].map((item) => item.text),
+          ["First final", "Second final"],
+        );
+        assert.equal(latest.get(first!.id)?.streaming, false);
+        assert.equal(latest.get(second!.id)?.streaming, false);
+        assert.equal(latest.get(first!.id)?.status, "completed");
+        assert.equal(latest.get(second!.id)?.status, "completed");
+        assert.isBelow(first!.ordinal, second!.ordinal);
+        assert.deepEqual(
+          harness.messages().map((message) => message.text),
+          ["First final", "Second final"],
+        );
+      }).pipe(
+        Effect.scoped,
+        Effect.provide(
+          Layer.mergeAll(IdAllocator.layer, McpProviderSessions.layer, NodeServices.layer),
         ),
       ),
   );
