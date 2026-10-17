@@ -842,6 +842,10 @@ export const tools = {
     modelPriceLabel: (field: string, model: string) => `${field} price for ${model || "new model"}`,
   },
   files: {
+    previewMode: "Preview mode",
+    sourceTab: "Source",
+    renderedTab: "Rendered",
+    wordWrap: "Word wrap",
     loading: "Loading…",
     tableTruncated:
       "Table limited to the first 100 rows and 30 columns. Switch to source for the rest.",

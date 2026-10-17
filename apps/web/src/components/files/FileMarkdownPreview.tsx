@@ -1,8 +1,10 @@
+/** Renders workspace Markdown with relative assets and existing task-list editing. */
 import type { ScopedThreadRef } from "@t3tools/contracts";
 
 import ChatMarkdown from "~/components/ChatMarkdown";
 import { resolvePathLinkTarget } from "@t3tools/shared/fileLinks";
 
+/** Resolves image paths relative to the file, then delegates links and task actions to ChatMarkdown. */
 export function FileMarkdownPreview(props: {
   readonly cwd: string;
   readonly relativePath: string;
@@ -27,7 +29,7 @@ export function FileMarkdownPreview(props: {
       cwd={props.cwd}
       imageBaseDir={imageBaseDir}
       threadRef={props.threadRef}
-      className="mx-auto max-w-4xl px-6 py-5"
+      className="files-markdown mx-auto w-full max-w-4xl px-4.5 py-4"
       onTaskListChange={props.onTaskListChange}
     />
   );

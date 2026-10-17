@@ -423,3 +423,35 @@
 .pn6-search-option[aria-pressed="true"] {
   @apply bg-pn6-search-option text-foreground shadow-pn6-search-option;
 }
+
+/* PN2.1 — 其余屏-1 K3 imports Panel8a: 196px tree, 26px rows, 14px wells.
+   Colors and depth below are the file surface's design values, not new theme roles. */
+@theme {
+  --color-files-tree: #1a1a1d;
+  /* Panel8a.dc.html / 其余屏-1 K3: recessed search is #121214, distinct from bg-input's #131315. */
+  --color-files-search: #121214;
+  --color-files-modified: #f0b84a;
+  --radius-files-well: 14px;
+  --shadow-files-tree:
+    inset 1.5px 2px 3px rgba(0, 0, 0, 0.6), inset -1px -1px 0 rgba(255, 255, 255, 0.05);
+  --shadow-files-preview:
+    inset 2px 3px 6px rgba(0, 0, 0, 0.75), inset -1px -1px 0 rgba(255, 255, 255, 0.06);
+  --shadow-files-track: inset 2px 3px 5px rgba(0, 0, 0, 0.66);
+  --leading-files-prose: 1.7;
+  --text-files-title: 24px;
+  --text-files-title--line-height: 1.7;
+}
+
+/* Generated Markdown has no call-site classes for its document elements. */
+.chat-markdown.files-markdown {
+  @apply text-code-foreground leading-files-prose;
+  & h1 {
+    @apply font-serif text-files-title font-bold text-foreground;
+  }
+  & :is(h2, h3, h4, strong) {
+    @apply text-foreground;
+  }
+  & .chat-markdown-shiki pre {
+    @apply rounded-tag bg-sidebar px-3 py-2 font-mono text-secondary-copy text-fg-detail;
+  }
+}

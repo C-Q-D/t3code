@@ -94,6 +94,7 @@ const twMerge = extendTailwindMerge({
         "pr-list-meta",
         "pr-link-title",
         "pn6-empty-title",
+        "files-title",
       ],
       shadow: [
         "slab",
@@ -248,6 +249,9 @@ const twMerge = extendTailwindMerge({
         "keybindings-keycap",
         "pn6-empty-icon",
         "pn6-search-option",
+        "files-tree",
+        "files-preview",
+        "files-track",
       ],
       "inset-shadow": [
         "selected",
@@ -342,6 +346,7 @@ const twMerge = extendTailwindMerge({
         "pn6-error-icon",
         "pn6-search-option",
         "pn6-match",
+        "files-well",
       ],
       leading: [
         "code",
@@ -360,6 +365,7 @@ const twMerge = extendTailwindMerge({
         "sidebar-update",
         "callout",
         "composer-banner",
+        "files-prose",
       ],
       tracking: ["brand", "chat-draft", "timeline-secret"],
     },

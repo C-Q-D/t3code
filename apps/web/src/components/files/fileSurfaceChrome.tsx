@@ -4,7 +4,6 @@ import type { ReactNode } from "react";
 
 import { Spinner } from "~/components/ui/spinner";
 import { Button } from "~/components/ui/button";
-import { Toggle } from "~/components/ui/toggle";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
 import { DIFF_SURFACE_THEME_UNSAFE_CSS } from "~/lib/diffRendering";
 import { cn } from "~/lib/utils";
@@ -15,8 +14,7 @@ import { cn } from "~/lib/utils";
  * left, icon-only actions on the right. Attachments and workspace files must
  * not grow separate chrome.
  */
-export const FILE_SURFACE_SUBHEADER_CLASS =
-  "flex h-10 min-h-10 shrink-0 items-center gap-2 border-b border-border/60 bg-background px-3 in-data-[preview-panel-mode=inline]:mb-3 in-data-[preview-panel-mode=inline]:h-7 in-data-[preview-panel-mode=inline]:min-h-7 in-data-[preview-panel-mode=inline]:border-b-transparent";
+export const FILE_SURFACE_SUBHEADER_CLASS = "flex h-8.5 min-h-8.5 shrink-0 items-center gap-1";
 
 export const FILE_LINK_REVEAL_ATTRIBUTE = "data-file-link-reveal";
 
@@ -70,12 +68,13 @@ export const FILE_LINK_REVEAL_UNSAFE_CSS = `
  * An icon-only header action with its label in a tooltip, the same control workspace files use.
  * A `pressed` action is a toggle and says so; a command (Copy, Save, Close) is a plain button,
  * because announcing it as an unpressed toggle tells a screen reader it has a state it has not.
+ * Disabled design placeholders omit onPress; enabled actions supply their existing handler.
  */
 export function FileSurfaceAction(props: {
   readonly label: string;
   readonly pressed?: boolean;
   readonly disabled?: boolean;
-  readonly onPress: () => void;
+  readonly onPress?: () => void;
   readonly children: ReactNode;
 }) {
   const pressed = props.pressed;
@@ -83,31 +82,19 @@ export function FileSurfaceAction(props: {
     <Tooltip>
       <TooltipTrigger
         render={
-          pressed === undefined ? (
-            <Button
-              type="button"
-              className="shrink-0"
-              disabled={props.disabled ?? false}
-              onClick={props.onPress}
-              aria-label={props.label}
-              variant="ghost"
-              size="icon-sm"
-            >
-              {props.children}
-            </Button>
-          ) : (
-            <Toggle
-              className="shrink-0"
-              pressed={pressed}
-              disabled={props.disabled ?? false}
-              onPressedChange={props.onPress}
-              aria-label={props.label}
-              variant="ghost"
-              size="sm"
-            >
-              {props.children}
-            </Toggle>
-          )
+          <Button
+            type="button"
+            className="shrink-0"
+            disabled={props.disabled ?? false}
+            onClick={props.onPress}
+            aria-label={props.label}
+            aria-pressed={pressed}
+            data-pressed={pressed || undefined}
+            variant="ghost-muted"
+            size="icon-compact-key"
+          >
+            {props.children}
+          </Button>
         }
       />
       <TooltipPopup>{props.label}</TooltipPopup>
@@ -115,6 +102,7 @@ export function FileSurfaceAction(props: {
   );
 }
 
+/** Announces existing truncation/access notices without altering the file or its save state. */
 export function FileSurfaceNotice(props: { readonly children: ReactNode }) {
   return (
     <div
@@ -154,13 +142,9 @@ export function FileSurfaceFailure(props: {
     >
       <p className="text-destructive">{props.message}</p>
       {props.onRetry ? (
-        <button
-          type="button"
-          onClick={props.onRetry}
-          className="rounded-md border border-input px-2.5 py-1 text-xs text-foreground hover:bg-accent focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-        >
+        <Button type="button" onClick={props.onRetry} variant="secondary" size="md">
           {t.tools.files.tryAgain}
-        </button>
+        </Button>
       ) : null}
     </div>
   );

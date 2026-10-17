@@ -9,10 +9,11 @@ import type { EnvironmentId, ProjectEntry } from "@t3tools/contracts";
 import { FileTree, useFileTree, useFileTreeSearch, useFileTreeSelector } from "@pierre/trees/react";
 import { serializeComposerFileLink } from "@t3tools/shared/composerTrigger";
 import { ChevronsDownUp, ChevronsUpDown } from "lucide";
+import { Search } from "lucide-react";
+import { Input as SearchInput } from "@base-ui/react/input";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "~/components/ui/button";
-import { InputGroup, InputGroupInput } from "~/components/ui/input-group";
 import { MorphIcon } from "~/components/MorphIcon";
 import { toastManager } from "~/components/ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
@@ -23,7 +24,7 @@ import { useWorkspaceMutationRefresh } from "~/hooks/useWorkspaceMutationRefresh
 import { useFileContextMenu, type FileContextMenuAction } from "~/fileContextMenu";
 import { readLocalApi } from "~/localApi";
 import { T3_PIERRE_ICONS } from "~/pierre-icons";
-import { PIERRE_TREE_UNSAFE_CSS, pierreTreeStyle } from "~/pierre-tree-theme";
+import { FILE_TREE_APPEARANCE, FILE_TREE_ROW_HEIGHT } from "./fileTreeAppearance";
 
 import { createFileTreeDragMentionController } from "./fileTreeDragMention";
 import { areAllDirectoriesExpanded, setAllDirectoriesExpanded } from "./fileTreeExpansion";
@@ -56,8 +57,8 @@ function RefreshFilesButton(props: { isPending: boolean; onRefresh: () => void }
         render={
           <Button
             type="button"
-            variant="ghost"
-            size="icon-xs"
+            variant="ghost-muted"
+            size="icon-compact-key"
             aria-label={t.tools.files.refreshWorkspace}
             onClick={props.onRefresh}
           />
@@ -81,11 +82,12 @@ function FileSearchField(props: {
   value: string;
 }) {
   return (
-    <InputGroup variant="ghost" className="h-7 min-w-0 flex-1">
-      <InputGroupInput
+    <div className="flex h-7.5 min-w-0 flex-1 items-center gap-1.5 rounded-full bg-files-search px-2.5 shadow-well-track focus-within:inset-shadow-focus">
+      <Search className="size-3.25 shrink-0" />
+      <SearchInput
+        className="h-full min-w-0 flex-1 bg-transparent text-secondary-copy-medium text-foreground outline-none placeholder:text-placeholder"
         type="search"
         name={props.name}
-        size="sm"
         value={props.value}
         aria-label={props.ariaLabel}
         placeholder={t.tools.files.search}
@@ -97,7 +99,7 @@ function FileSearchField(props: {
           event.currentTarget.blur();
         }}
       />
-    </InputGroup>
+    </div>
   );
 }
 
@@ -275,6 +277,7 @@ export default function FileBrowserPanel({
     // composer; rearranging files inside the tree stays off.
     dragAndDrop: { canDrop: () => false },
     density: "compact",
+    itemHeight: FILE_TREE_ROW_HEIGHT,
     fileTreeSearchMode: "hide-non-matches",
     flattenEmptyDirectories: true,
     initialExpansion: "closed",
@@ -306,7 +309,7 @@ export default function FileBrowserPanel({
         : null,
     search: false,
     onSearchChange: (value) => setQuery(value ?? ""),
-    unsafeCSS: PIERRE_TREE_UNSAFE_CSS,
+    unsafeCSS: FILE_TREE_APPEARANCE,
   });
   useEffect(() => {
     if (loadingDirectoriesRef.current === loadingDirectories) return;
@@ -512,14 +515,10 @@ export default function FileBrowserPanel({
   return (
     <div
       ref={panelRef}
-      className="flex min-h-0 flex-1 flex-col bg-background"
+      className="flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 rounded-files-well bg-files-tree px-1.5 py-2 shadow-files-tree"
       data-file-browser-panel={`${environmentId}:${cwd}`}
     >
-      <div
-        className="flex h-10 min-h-10 shrink-0 items-center gap-1 border-b border-border/60 bg-background px-2 in-data-[preview-panel-mode=inline]:mb-1 in-data-[preview-panel-mode=inline]:h-9 in-data-[preview-panel-mode=inline]:min-h-9 in-data-[preview-panel-mode=inline]:border-b-transparent"
-        data-surface-subheader
-      >
-        <RefreshFilesButton isPending={isPending} onRefresh={handleRefresh} />
+      <div className="flex h-7.5 shrink-0 items-center gap-0.5" data-surface-subheader>
         <FileSearchField
           name="project-files-search"
           ariaLabel={t.tools.files.searchProject(projectName)}
@@ -527,14 +526,15 @@ export default function FileBrowserPanel({
           onValueChange={handleSearchValueChange}
           onClose={closeSearch}
         />
+        <RefreshFilesButton isPending={isPending} onRefresh={handleRefresh} />
         {directoryPaths.length > 0 ? (
           <Tooltip>
             <TooltipTrigger
               render={
                 <Button
                   type="button"
-                  size="icon-xs"
-                  variant="ghost"
+                  size="icon-compact-key"
+                  variant="ghost-muted"
                   aria-label={
                     expandAll || allDirectoriesExpanded
                       ? t.tools.files.collapseFolders
@@ -579,7 +579,7 @@ export default function FileBrowserPanel({
         model={model}
         aria-label={t.tools.files.projectFiles(projectName)}
         className="min-h-0 flex-1 overflow-hidden"
-        style={pierreTreeStyle(resolvedTheme)}
+        style={{ colorScheme: resolvedTheme }}
       />
     </div>
   );
