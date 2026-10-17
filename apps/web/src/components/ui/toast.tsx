@@ -16,6 +16,7 @@ import {
 import { useParams } from "@tanstack/react-router";
 import { type ScopedThreadRef, type ThreadId } from "@t3tools/contracts";
 import {
+  CircleAlertIcon,
   CircleXIcon,
   CircleCheckIcon,
   HourglassIcon,
@@ -40,7 +41,10 @@ import {
 } from "./toast.logic";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./tooltip";
 
+/** Optional notification context and presentation; omitted appearance retains the standard H3 card. */
 export type ThreadToastData = {
+  /** L4 compact error card; leaves default notifications unchanged. */
+  appearance?: "error-stripe";
   threadRef?: ScopedThreadRef | null;
   threadId?: ThreadId | null;
   leadingIcon?: ReactNode;
@@ -256,14 +260,19 @@ interface ToastBodyDescriptor {
   readonly hasTrailingControls: boolean;
 }
 
-/** Derives H3 defaults from toast type while honoring caller action variants and full error-copy text. */
+/** Derives H3 controls by default; L4 keeps raw description text without the extra copy action. */
 function deriveToastBodyDescriptor(toast: {
   readonly type?: string | undefined;
   readonly description?: unknown;
   readonly actionProps?: unknown;
   readonly data?: ThreadToastData | undefined;
 }): ToastBodyDescriptor {
-  const Icon = toast.type ? TOAST_ICONS[toast.type as keyof typeof TOAST_ICONS] : null;
+  const Icon =
+    toast.data?.appearance === "error-stripe"
+      ? CircleAlertIcon
+      : toast.type
+        ? TOAST_ICONS[toast.type as keyof typeof TOAST_ICONS]
+        : null;
   const stackedActionLayout =
     hasVisibleToastAction(toast.actionProps) && toast.data?.actionLayout === "stacked-end";
   const actionVariant: NonNullable<ThreadToastData["actionVariant"]> =
@@ -271,7 +280,10 @@ function deriveToastBodyDescriptor(toast: {
   const secondaryActionVariant: NonNullable<ThreadToastData["secondaryActionVariant"]> =
     toast.data?.secondaryActionVariant ?? "outline";
   const copyErrorText =
-    toast.type === "error" && typeof toast.description === "string" && !toast.data?.hideCopyButton
+    toast.type === "error" &&
+    typeof toast.description === "string" &&
+    !toast.data?.hideCopyButton &&
+    toast.data?.appearance !== "error-stripe"
       ? toast.description
       : null;
   const hasAdditionalActions = (toast.data?.additionalActions?.length ?? 0) > 0;
@@ -546,22 +558,32 @@ function ThreadToastVisibleAutoDismiss({
   return null;
 }
 
+/** Keeps the configured H3 position; opt-in L4 errors use their separate bottom-right stack. */
 function ToastProvider({ children, position = "top-right", ...props }: ToastProviderProps) {
   return (
     <Toast.Provider toastManager={toastManager} {...props}>
       {children}
       <Toasts position={position} />
+      <Toasts position="bottom-right" appearance="error-stripe" />
     </Toast.Provider>
   );
 }
 
-/** Renders managed toasts at position with accessible dismiss actions and their configured content. */
-function Toasts({ position }: { position: ToastPosition }) {
+/** Renders managed toasts at position; appearance is opt-in and dismissal remains keyboard accessible. */
+function Toasts({
+  position,
+  appearance,
+}: {
+  position: ToastPosition;
+  appearance?: "error-stripe";
+}) {
   const { toasts } = Toast.useToastManager<ThreadToastData>();
   const activeThreadRef = useActiveThreadRefFromRoute();
   const isTop = position.startsWith("top");
-  const visibleToasts = toasts.filter((toast) =>
-    shouldRenderThreadScopedToast(toast.data, activeThreadRef),
+  const visibleToasts = toasts.filter(
+    (toast) =>
+      toast.data?.appearance === appearance &&
+      shouldRenderThreadScopedToast(toast.data, activeThreadRef),
   );
   const visibleToastLayout = buildVisibleToastLayout(visibleToasts);
 
@@ -573,6 +595,8 @@ function Toasts({ position }: { position: ToastPosition }) {
       }
     }
   }, [toasts]);
+
+  if (appearance && visibleToasts.length === 0) return null;
 
   return (
     <Toast.Portal data-slot="toast-portal">
@@ -605,6 +629,7 @@ function Toasts({ position }: { position: ToastPosition }) {
 
           return (
             <Toast.Root
+              data-appearance={toast.data?.appearance}
               className={cn(
                 "dropdown-glass absolute z-[calc(9999-var(--toast-index))] w-full overflow-visible select-none rounded-overlay text-foreground text-shadow-stone [transition:transform_.5s_cubic-bezier(.22,1,.36,1),opacity_.5s,height_.15s]",
                 // Base positioning using data-position
@@ -693,6 +718,7 @@ function Toasts({ position }: { position: ToastPosition }) {
                 </button>
               </div>
               <Toast.Content
+                data-slot="toast-content"
                 className={cn(
                   // `overflow-x: clip` avoids the CSS quirk where pairing `hidden` + `y: visible`
                   // forces `y` to `auto`. Expandable detail panels can extend below without being cut off.
@@ -757,6 +783,7 @@ function AnchoredToasts() {
                 toast={toast}
               >
                 <Toast.Root
+                  data-appearance={toast.data?.appearance}
                   className={cn(
                     "dropdown-glass relative overflow-visible rounded-overlay text-foreground text-shadow-stone transition-[scale,opacity] data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0",
                   )}
@@ -787,6 +814,7 @@ function AnchoredToasts() {
                         </button>
                       </div>
                       <Toast.Content
+                        data-slot="toast-content"
                         className={cn(
                           "pointer-events-auto min-h-0 overflow-y-visible py-3 pr-11.5 pl-3 text-secondary-copy-large [overflow-x:clip]",
                           stackedActionLayout

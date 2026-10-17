@@ -1491,6 +1491,10 @@ export const settings: Messages["settings"] = {
     },
   },
   discussions: {
+    disconnected: "环境已断开",
+    reconnectHint: (name: string) => `重新连接 ${name} 以查看讨论模板。`,
+    noEnvironments: "没有可用环境",
+    connectHint: "连接环境以管理讨论模板。",
     title: "讨论",
     personas: "身份模板",
     summaries: "梳理模板",

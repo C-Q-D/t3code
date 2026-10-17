@@ -316,6 +316,11 @@ const twMerge = extendTailwindMerge({
         "connections-qr",
         "diagnostics-well",
         "licenses-well",
+        "discussion-settings-divider",
+        "toast-error-stripe",
+        "discussion-avatar-choice",
+        "discussion-avatar-selected",
+        "discussion-settings-empty",
       ],
       "inset-shadow": [
         "selected",

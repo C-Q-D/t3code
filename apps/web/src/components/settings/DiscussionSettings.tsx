@@ -1,4 +1,5 @@
 /** Manages discussion prompt templates and saved seat configurations for one settings environment. */
+import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { Radio } from "@base-ui/react/radio";
 import { RadioGroup } from "@base-ui/react/radio-group";
 import { useAtomValue } from "@effect/atom-react";
@@ -12,7 +13,14 @@ import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
-import { MessagesSquareIcon, PlusIcon, RotateCcwIcon, Trash2Icon } from "lucide-react";
+import {
+  ListChecksIcon,
+  MessagesSquareIcon,
+  PlusIcon,
+  RotateCcwIcon,
+  Trash2Icon,
+  UnplugIcon,
+} from "lucide-react";
 import { useId, useRef, useState } from "react";
 import { t } from "~/i18n";
 import { deriveProviderInstanceEntries } from "../../providerInstances";
@@ -20,32 +28,19 @@ import type { EnvironmentPresentation } from "../../state/environments";
 import { useEnvironmentQuery } from "../../state/query";
 import { EMPTY_SERVER_PROVIDERS, serverEnvironment } from "../../state/server";
 import { useAtomCommand } from "../../state/use-atom-command";
-import { PixelAvatar } from "../discussions/PixelAvatar";
+import { PixelSeat } from "../discussions/PixelSeat";
 import { DiscussionTemplateEditor } from "../discussions/DiscussionTemplateEditor";
 import {
   AlertDialog,
   AlertDialogClose,
   AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
   AlertDialogPopup,
   AlertDialogTitle,
 } from "../ui/alert-dialog";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
-import {
-  Dialog,
-  DialogClose,
-  DialogFooter,
-  DialogHeader,
-  DialogPanel,
-  DialogPopup,
-  DialogTitle,
-} from "../ui/dialog";
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../ui/empty";
+import { Dialog, DialogClose, DialogBackdrop, DialogPortal, DialogViewport } from "../ui/dialog";
 import { Input } from "../ui/input";
-import { Label } from "../ui/label";
-import { Textarea } from "../ui/textarea";
 import { toastManager } from "../ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { useSettingsScope } from "./SettingsScopeContext";
@@ -67,32 +62,35 @@ type Confirmation =
   | { readonly action: "deletePrompt" | "restore"; readonly target: DiscussionPromptWithModified }
   | { readonly action: "deleteTemplate"; readonly target: DiscussionTemplate };
 
-/** Displays scope failures before mounting environment-specific subscriptions and commands. */
+/** Displays L5 scope states before mounting the selected environment; L1 keeps existing search targets. */
 export function DiscussionSettings() {
   const { scope, environments, connectedEnvironments, environment } = useSettingsScope();
   const selected = environment ?? connectedEnvironments[0];
   return (
-    <SettingsPageContainer>
-      <div className="px-3 sm:px-4">
-        <h1 className="text-lg font-semibold">{t.settings.discussions.title}</h1>
-      </div>
+    <SettingsPageContainer className="discussion-settings gap-2">
+      <h1 className="sr-only">{t.settings.discussions.title}</h1>
       {scope.kind === "unavailable" ? (
         <SettingsSection title={t.settings.scheduledTasks.unavailableScope}>
           <SettingsRow title={scope.message} />
         </SettingsSection>
       ) : environments.length === 0 ? (
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <MessagesSquareIcon />
-            </EmptyMedia>
-            <EmptyTitle>{t.settings.scheduledTasks.noEnvironments}</EmptyTitle>
-            <EmptyDescription>{t.settings.scheduledTasks.connectHint}</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <div className="flex h-55 flex-col items-center justify-center gap-2 text-center">
+          <span className="discussion-settings-empty-icon">
+            <MessagesSquareIcon className="size-6" />
+          </span>
+          <h2 className="mt-1 text-plan-title font-bold">
+            {t.settings.discussions.noEnvironments}
+          </h2>
+          <p className="text-body text-secondary-label">{t.settings.discussions.connectHint}</p>
+        </div>
       ) : !selected ? (
         <SettingsSection title={t.settings.discussions.title}>
-          <SettingsRow title={t.settings.scheduledTasks.disconnected} />
+          <div className="discussion-settings-state">
+            <span className="flex items-center gap-2 text-foreground">
+              <UnplugIcon className="size-4" />
+              {t.settings.discussions.disconnected}
+            </span>
+          </div>
         </SettingsSection>
       ) : (
         <DiscussionEnvironmentSettings key={selected.environmentId} environment={selected} />
@@ -102,7 +100,7 @@ export function DiscussionSettings() {
 }
 
 /**
- * Owns subscriptions and mutations for one selected destination; changing environments unmounts drafts.
+ * Owns L1 lists and subscriptions for one destination; changing environments unmounts drafts.
  * @param props.environment Selected settings environment, including its connection and provider snapshot.
  * @returns The three template groups and their controlled dialogs; writes never trigger manual refetches.
  */
@@ -186,6 +184,7 @@ function DiscussionEnvironmentSettings({
         failure.reason === "in_use";
       toastManager.add({
         type: "error",
+        data: { appearance: "error-stripe" },
         title: inUse
           ? t.settings.discussions.inUseTitle(confirmation.target.name)
           : t.settings.discussions.updateError,
@@ -197,10 +196,15 @@ function DiscussionEnvironmentSettings({
   if (!connected)
     return (
       <SettingsSection title={t.settings.discussions.title}>
-        <SettingsRow
-          title={t.settings.scheduledTasks.disconnected}
-          description={t.settings.scheduledTasks.reconnectHint(environment.label)}
-        />
+        <div className="discussion-settings-state">
+          <p className="flex items-center gap-2 text-foreground">
+            <UnplugIcon className="size-4" />
+            {t.settings.discussions.disconnected}
+          </p>
+          <p className="text-secondary-copy-medium">
+            {t.settings.discussions.reconnectHint(environment.label)}
+          </p>
+        </div>
       </SettingsSection>
     );
 
@@ -215,38 +219,50 @@ function DiscussionEnvironmentSettings({
           }
           headerAction={
             <Button
-              size="xs"
+              size="settings-list"
               variant="ghost-muted"
               disabled={!canUpsert || busy}
               onClick={() => setEditor({ kind, prompt: null })}
             >
-              <PlusIcon className="size-3" />
+              <PlusIcon className="size-3.25" />
               {t.settings.discussions.new}
             </Button>
           }
         >
           {promptsQuery.error ? (
-            <SettingsRow
-              title={t.settings.discussions.loadError}
-              description={promptsQuery.error}
-            />
+            <div className="discussion-settings-state py-2.5" role="alert">
+              <p className="text-foreground">{t.settings.discussions.loadError}</p>
+              <p className="text-secondary-copy-medium">{promptsQuery.error}</p>
+            </div>
           ) : !prompts ? (
-            <SettingsRow title={t.settings.discussions.loading} role="status" />
+            <div className="discussion-settings-state" role="status">
+              {t.settings.discussions.loading}
+            </div>
           ) : prompts.filter((prompt) => prompt.kind === kind).length === 0 ? (
-            <SettingsRow title={t.settings.discussions.emptyPrompts} />
+            <div className="discussion-settings-state">{t.settings.discussions.emptyPrompts}</div>
           ) : (
             prompts
               .filter((prompt) => prompt.kind === kind)
               .map((prompt) => {
                 const row = discussionPromptRow(prompt);
                 return (
-                  <div key={prompt.id} className="flex items-center gap-3 px-3 py-3 sm:px-4">
+                  <div key={prompt.id} className="discussion-settings-row">
                     {kind === "persona" ? (
-                      <PixelAvatar role={prompt.avatar ?? "architect"} seat={0} size={32} />
-                    ) : null}
+                      <PixelSeat
+                        role={prompt.avatar ?? "architect"}
+                        seatIndex={-1}
+                        size={32}
+                        state="idle"
+                        label={t.settings.discussions.avatars[prompt.avatar ?? "architect"]}
+                      />
+                    ) : (
+                      <span className="discussion-settings-icon-well">
+                        <ListChecksIcon className="size-4" />
+                      </span>
+                    )}
                     <div className="min-w-0 flex-1">
-                      <div className="flex min-w-0 flex-wrap items-center gap-2">
-                        <span className="truncate text-sm font-medium">{prompt.name}</span>
+                      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                        <span className="truncate text-body font-bold">{prompt.name}</span>
                         {row.labels.map((label) => (
                           <Badge
                             key={label}
@@ -257,7 +273,7 @@ function DiscussionEnvironmentSettings({
                           </Badge>
                         ))}
                       </div>
-                      <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                      <p className="truncate text-secondary-copy text-secondary-label">
                         {prompt.description}
                       </p>
                     </div>
@@ -266,19 +282,19 @@ function DiscussionEnvironmentSettings({
                         action === "restore" ? (
                           <Button
                             key={action}
-                            size="xs"
+                            size="settings-list"
                             variant="ghost"
                             disabled={!canRestore || busy}
                             onClick={() => setConfirmation({ action: "restore", target: prompt })}
                           >
-                            <RotateCcwIcon className="size-3" />
+                            <RotateCcwIcon className="size-3.25" />
                             {t.settings.discussions.restore}
                           </Button>
                         ) : action === "edit" ? (
                           <Button
                             key={action}
-                            size="xs"
-                            variant="outline"
+                            size="settings-list"
+                            variant="dialog-secondary"
                             disabled={!canUpsert || busy}
                             onClick={() => setEditor({ kind, prompt })}
                           >
@@ -289,7 +305,7 @@ function DiscussionEnvironmentSettings({
                             <TooltipTrigger
                               render={
                                 <Button
-                                  size="icon-xs"
+                                  size="icon-sm"
                                   variant="ghost-destructive"
                                   aria-label={t.settings.discussions.delete}
                                   disabled={!canDeletePrompt || busy}
@@ -316,47 +332,55 @@ function DiscussionEnvironmentSettings({
         title={t.settings.discussions.templates}
         headerAction={
           <Button
-            size="xs"
+            size="settings-list"
             variant="ghost-muted"
             disabled={!canUpsertTemplate || busy}
             onClick={() => setTemplateEditor({ template: null })}
           >
-            <PlusIcon className="size-3" />
+            <PlusIcon className="size-3.25" />
             {t.settings.discussions.new}
           </Button>
         }
       >
         {templatesLoadError ? (
-          <SettingsRow title={t.settings.discussions.loadError} description={templatesLoadError} />
-        ) : !templatesQuery.data || !prompts ? (
-          <SettingsRow title={t.settings.discussions.loading} role="status" />
-        ) : templatesQuery.data.templates.length === 0 ? (
-          <div className="px-3 py-4 text-xs text-muted-foreground sm:px-4">
-            {t.settings.discussions.emptyTemplates}
+          <div className="discussion-settings-state py-2.5" role="alert">
+            <p className="text-foreground">{t.settings.discussions.loadError}</p>
+            <p className="text-secondary-copy-medium">{templatesLoadError}</p>
           </div>
+        ) : !templatesQuery.data || !prompts ? (
+          <div className="discussion-settings-state" role="status">
+            {t.settings.discussions.loading}
+          </div>
+        ) : templatesQuery.data.templates.length === 0 ? (
+          <div className="discussion-settings-state">{t.settings.discussions.emptyTemplates}</div>
         ) : (
           templatesQuery.data.templates.map((template) => (
-            <div key={template.id} className="flex items-center gap-3 px-3 py-3 sm:px-4">
-              <div className="flex shrink-0 items-center -space-x-1.5">
+            <div key={template.id} className="discussion-settings-row">
+              <div className="flex min-w-15.5 shrink-0 items-center -space-x-1.5">
                 {template.seats.map((seat, index) => (
                   <span
                     key={`${index}:${seat.personaPromptId}`}
-                    className="rounded-lg ring-2 ring-card"
+                    className="rounded-tag ring-2 ring-surface-raised"
                   >
-                    <PixelAvatar
+                    <PixelSeat
                       role={
                         personas.find((prompt) => prompt.id === seat.personaPromptId)?.avatar ??
                         "architect"
                       }
-                      seat={index + 1}
+                      seatIndex={index}
+                      state="idle"
+                      label={
+                        personas.find((prompt) => prompt.id === seat.personaPromptId)?.name ??
+                        t.settings.discussions.deletedPersona
+                      }
                       size={24}
                     />
                   </span>
                 ))}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{template.name}</p>
-                <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                <p className="truncate text-body font-bold">{template.name}</p>
+                <p className="truncate text-secondary-copy text-secondary-label">
                   {discussionSeatSummary(
                     template.seats,
                     personas,
@@ -366,8 +390,8 @@ function DiscussionEnvironmentSettings({
                 </p>
               </div>
               <Button
-                size="xs"
-                variant="outline"
+                size="settings-list"
+                variant="dialog-secondary"
                 disabled={!canUpsertTemplate || busy}
                 onClick={() => setTemplateEditor({ template })}
               >
@@ -377,7 +401,7 @@ function DiscussionEnvironmentSettings({
                 <TooltipTrigger
                   render={
                     <Button
-                      size="icon-xs"
+                      size="icon-sm"
                       variant="ghost-destructive"
                       aria-label={t.settings.discussions.delete}
                       disabled={!canDeleteTemplate || busy}
@@ -427,7 +451,7 @@ function DiscussionEnvironmentSettings({
 }
 
 /**
- * Edits a persona or summary while keeping the destination fixed for the lifetime of the dialog.
+ * Edits a persona or summary in L2; the 512px shell keeps the destination fixed until close.
  * @param props.environmentId Destination environment for the command and its permission atom.
  * @param props.editor Existing snapshot, or null prompt for custom creation.
  * @param props.onClose Removes the editor after cancellation or a successful save.
@@ -485,6 +509,7 @@ function DiscussionPromptEditor({
       if (!isAtomCommandInterrupted(result))
         toastManager.add({
           type: "error",
+          data: { appearance: "error-stripe" },
           title: t.settings.discussions.saveError,
           description: String(squashAtomCommandFailure(result)),
         });
@@ -499,101 +524,142 @@ function DiscussionPromptEditor({
         if (!open && !submissionPending.current) onClose();
       }}
     >
-      <DialogPopup
-        aria-describedby={`${fieldId}-hint`}
-        render={
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              void save();
-            }}
-          />
-        }
-      >
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-        </DialogHeader>
-        <DialogPanel>
-          <div className="space-y-1.5">
-            <Label htmlFor={`${fieldId}-name`}>{t.settings.discussions.name}</Label>
-            <Input
-              id={`${fieldId}-name`}
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              disabled={saving}
-              autoFocus
-            />
-          </div>
-          {editor.kind === "persona" ? (
-            <div className="space-y-1.5">
-              <Label id={`${fieldId}-avatar`}>{t.settings.discussions.avatar}</Label>
-              <RadioGroup
-                aria-labelledby={`${fieldId}-avatar`}
-                value={avatar}
-                disabled={saving}
-                onValueChange={(value) => {
-                  const selectedAvatar = DiscussionPersonaAvatar.literals.find(
-                    (role) => role === value,
-                  );
-                  if (selectedAvatar) setAvatar(selectedAvatar);
+      <DialogPortal>
+        <DialogBackdrop />
+        <DialogViewport>
+          <DialogPrimitive.Popup
+            className="dialog-glass relative row-start-2 flex max-h-full w-full max-w-128 flex-col overflow-y-auto rounded-dialog p-6 text-foreground outline-none"
+            aria-describedby={`${fieldId}-hint`}
+            render={
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void save();
                 }}
-              >
-                <div className="flex flex-wrap gap-2.5">
-                  {DiscussionPersonaAvatar.literals.map((role) => (
-                    <Radio.Root
-                      key={role}
-                      value={role}
-                      aria-label={t.settings.discussions.avatars[role]}
-                      className="cursor-pointer rounded-xl p-1 outline-none hover:bg-accent data-checked:bg-accent data-checked:ring-2 data-checked:ring-inset data-checked:ring-primary focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring data-disabled:cursor-default data-disabled:opacity-64"
-                    >
-                      <PixelAvatar role={role} seat={0} size={40} />
-                    </Radio.Root>
-                  ))}
+              />
+            }
+          >
+            <DialogPrimitive.Title className="font-serif text-discussion-template-heading font-bold">
+              {title}
+            </DialogPrimitive.Title>
+            <div className="mt-4 space-y-4">
+              <div className="space-y-1.5">
+                <label
+                  className="block text-secondary-copy-large font-semibold text-code-foreground"
+                  htmlFor={`${fieldId}-name`}
+                >
+                  {t.settings.discussions.name}
+                </label>
+                <Input
+                  id={`${fieldId}-name`}
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  disabled={saving}
+                  autoFocus
+                />
+              </div>
+              {editor.kind === "persona" ? (
+                <div className="space-y-1.5">
+                  <label
+                    className="block text-secondary-copy-large font-semibold text-code-foreground"
+                    id={`${fieldId}-avatar`}
+                  >
+                    {t.settings.discussions.avatar}
+                  </label>
+                  <RadioGroup
+                    aria-labelledby={`${fieldId}-avatar`}
+                    value={avatar}
+                    disabled={saving}
+                    onValueChange={(value) => {
+                      const selectedAvatar = DiscussionPersonaAvatar.literals.find(
+                        (role) => role === value,
+                      );
+                      if (selectedAvatar) setAvatar(selectedAvatar);
+                    }}
+                  >
+                    <div className="flex flex-wrap gap-2">
+                      {DiscussionPersonaAvatar.literals.map((role) => (
+                        <Radio.Root
+                          key={role}
+                          value={role}
+                          aria-label={t.settings.discussions.avatars[role]}
+                          className="discussion-settings-avatar"
+                        >
+                          <PixelSeat
+                            role={role}
+                            seatIndex={-1}
+                            size={40}
+                            state="idle"
+                            label={t.settings.discussions.avatars[role]}
+                          />
+                          <span className="text-meta-large text-secondary-label">
+                            {t.settings.discussions.avatars[role]}
+                          </span>
+                        </Radio.Root>
+                      ))}
+                    </div>
+                  </RadioGroup>
                 </div>
-              </RadioGroup>
+              ) : null}
+              <div className="space-y-1.5">
+                <label
+                  className="block text-secondary-copy-large font-semibold text-code-foreground"
+                  htmlFor={`${fieldId}-description`}
+                >
+                  {t.settings.discussions.description}
+                </label>
+                <Input
+                  id={`${fieldId}-description`}
+                  placeholder={t.settings.discussions.descriptionPlaceholder}
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  disabled={saving}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label
+                  className="block text-secondary-copy-large font-semibold text-code-foreground"
+                  htmlFor={`${fieldId}-prompt`}
+                >
+                  {t.settings.discussions.prompt}
+                </label>
+                <div className="surface-glass discussion-settings-prompt-well">
+                  <textarea
+                    className="h-38.5 w-full resize-y rounded-overlay px-3.5 py-2.5 text-body leading-5.5 text-fg-detail outline-none focus-visible:inset-shadow-focus"
+                    rows={7}
+                    id={`${fieldId}-prompt`}
+                    value={prompt}
+                    onChange={(event) => setPrompt(event.target.value)}
+                    disabled={saving}
+                  />
+                </div>
+              </div>
             </div>
-          ) : null}
-          <div className="space-y-1.5">
-            <Label htmlFor={`${fieldId}-description`}>{t.settings.discussions.description}</Label>
-            <Input
-              id={`${fieldId}-description`}
-              placeholder={t.settings.discussions.descriptionPlaceholder}
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              disabled={saving}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor={`${fieldId}-prompt`}>{t.settings.discussions.prompt}</Label>
-            <Textarea
-              rows={7}
-              id={`${fieldId}-prompt`}
-              value={prompt}
-              onChange={(event) => setPrompt(event.target.value)}
-              disabled={saving}
-            />
-          </div>
-        </DialogPanel>
-        <DialogFooter>
-          <div className="flex flex-1 items-center">
-            <p id={`${fieldId}-hint`} className="text-xs text-muted-foreground">
-              {t.settings.discussions.futureOnly}
-            </p>
-          </div>
-          <DialogClose disabled={saving} render={<Button variant="outline" />}>
-            {t.common.confirm.cancel}
-          </DialogClose>
-          <Button type="submit" disabled={!saveEnabled}>
-            {t.settings.discussions.save}
-          </Button>
-        </DialogFooter>
-      </DialogPopup>
+            <div className="mt-4.5 flex items-center gap-2">
+              <div className="flex flex-1 items-center">
+                <p id={`${fieldId}-hint`} className="text-secondary-copy text-secondary-label">
+                  {t.settings.discussions.futureOnly}
+                </p>
+              </div>
+              <DialogClose
+                disabled={saving}
+                render={<Button variant="dialog-secondary" size="dialog-action" />}
+              >
+                {t.common.confirm.cancel}
+              </DialogClose>
+              <Button type="submit" size="dialog-action-wide" disabled={!saveEnabled}>
+                {t.settings.discussions.save}
+              </Button>
+            </div>
+          </DialogPrimitive.Popup>
+        </DialogViewport>
+      </DialogPortal>
     </Dialog>
   );
 }
 
 /**
- * Confirms deletions and restoration with operation-specific labels and retained closing content.
+ * Confirms deletion/restoration in the compact L4 shell with retained closing content.
  * @param props.confirmation Pending operation; null closes the dialog without blanking its last title.
  * @param props.busy Whether the confirmed mutation is in flight.
  * @param props.canConfirm Current permission for that destination operation.
@@ -638,23 +704,27 @@ function DiscussionConfirmation({
         if (!open && !busy) onCancel();
       }}
     >
-      <AlertDialogPopup>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{title}</AlertDialogTitle>
-          <AlertDialogDescription>{hint}</AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogClose disabled={busy} render={<Button variant="outline" />}>
+      <AlertDialogPopup size="compact" bottomStickOnMobile={false}>
+        <div className="flex min-w-0 flex-col gap-2.5 px-6 pt-6 text-left">
+          <AlertDialogTitle size="lg">{title}</AlertDialogTitle>
+          <AlertDialogDescription variant="confirmation">{hint}</AlertDialogDescription>
+        </div>
+        <div data-slot="alert-dialog-footer" className="flex justify-end gap-2 px-6 pt-5 pb-6">
+          <AlertDialogClose
+            disabled={busy}
+            render={<Button variant="dialog-secondary" size="dialog-action" />}
+          >
             {t.common.confirm.cancel}
           </AlertDialogClose>
           <Button
-            variant={restoring ? "default" : "destructive"}
+            size="dialog-action-wide"
+            variant={restoring ? "default" : "danger-key"}
             disabled={!canConfirm || busy}
             onClick={onConfirm}
           >
             {restoring ? t.settings.discussions.restore : t.settings.discussions.delete}
           </Button>
-        </AlertDialogFooter>
+        </div>
       </AlertDialogPopup>
     </AlertDialog>
   );

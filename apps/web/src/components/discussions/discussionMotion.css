@@ -10,19 +10,6 @@
     box-shadow 0.12s;
 }
 
-/* PixelAvatar still emits these until DC1 replaces it; suppress the duplicate ripple. */
-[data-discussion-motion="seatRipple"] {
-  position: absolute;
-  inset: -4px;
-  border: 2px solid var(--discussion-avatar-color);
-  border-radius: inherit;
-  box-sizing: border-box;
-  pointer-events: none;
-}
-[data-discussion-motion="seatRipple"]:nth-of-type(2) {
-  display: none;
-}
-
 [data-discussion-motion="spriteBob"] {
   animation: spriteBob 0.9s steps(1, end) infinite;
 }

@@ -516,7 +516,7 @@
   border: 1.5px dashed var(--color-discussion-loading-border);
 }
 
-/* Only the new-discussion entry supplies this scope; settings keeps its existing editor layout. */
+/* L3 is shared by settings creation/editing and the new-discussion snapshot entry. */
 .discussion-template-draft .discussion-seats-well {
   border-radius: var(--radius-dialog);
 }

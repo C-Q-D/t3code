@@ -378,3 +378,79 @@
 .licenses-notice-row [data-slot="collapsible-trigger"] {
   @apply rounded-settings-row-surface focus-visible:inset-shadow-focus;
 }
+
+/* DC6 · 讨论设置-8a L1/L2/L4/L5: row separators and the opt-in error notification. */
+@theme {
+  --color-discussion-avatar-choice: #232326;
+  --shadow-discussion-avatar-choice: inset 1px 1.5px 3px rgba(0, 0, 0, 0.5);
+  --shadow-discussion-avatar-selected: 0 2px 0 var(--color-raise-edge);
+  --shadow-discussion-settings-empty:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.09), 0 0 0 1px rgba(0, 0, 0, 0.5),
+    0 3px 0 var(--color-raise-edge);
+  --shadow-discussion-settings-divider:
+    0 -1px 0 rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  --shadow-toast-error-stripe:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.1), inset 3px 0 0 var(--color-error),
+    0 0 0 1px rgba(0, 0, 0, 0.6), 0 4px 0 var(--color-stone-edge),
+    14px 22px 30px -8px rgba(0, 0, 0, 0.8);
+}
+
+@layer components {
+  .discussion-settings-row {
+    @apply flex min-h-12.5 items-center gap-3 rounded-settings-row-surface py-1.5 pr-2.5 pl-3;
+  }
+  .discussion-settings-row + .discussion-settings-row {
+    @apply rounded-none shadow-discussion-settings-divider;
+  }
+  .discussion-settings-icon-well {
+    @apply flex size-8 shrink-0 items-center justify-center rounded-settings-row-surface bg-well-surface shadow-well;
+  }
+  .discussion-settings-state {
+    @apply px-3.5 py-3 text-body text-secondary-label;
+  }
+  .discussion-settings-avatar {
+    @apply flex h-19.5 w-21 shrink-0 cursor-pointer flex-col items-center justify-center gap-1 rounded-settings-row-surface bg-discussion-avatar-choice shadow-discussion-avatar-choice outline-none hover:bg-secondary data-checked:bg-accent data-checked:shadow-discussion-avatar-selected data-checked:inset-shadow-selected-control focus-visible:inset-shadow-focus data-disabled:cursor-default data-disabled:opacity-45;
+  }
+}
+
+/* L2 owns this multiline field; retain the shared material opacity behavior. */
+.surface-glass.discussion-settings-prompt-well {
+  @apply flex rounded-overlay;
+  --stone-surface-color: var(--input);
+  box-shadow: var(--shadow-input-well);
+}
+
+/* Only the explicit L4 appearance changes the shared Toast. dropdown-glass owns the base color. */
+.dropdown-glass[data-appearance="error-stripe"] {
+  --shadow-overlay: var(--shadow-toast-error-stripe);
+}
+[data-appearance="error-stripe"] [data-slot="toast-icon"] {
+  @apply mt-0.5 size-4 rounded-none bg-transparent text-error;
+  --lucide-hue-override: currentColor;
+}
+[data-appearance="error-stripe"] [data-slot="toast-icon"] svg {
+  @apply size-4;
+}
+[data-appearance="error-stripe"] [data-slot="toast-title"] {
+  @apply text-body;
+}
+[data-appearance="error-stripe"] [data-slot="toast-description"] {
+  @apply text-secondary-copy-large text-code-foreground;
+}
+
+/* L5's empty environment mark is a single raised tile, not the generic stacked empty illustration. */
+.discussion-settings-empty-icon {
+  @apply flex size-13 items-center justify-center rounded-overlay bg-popover shadow-discussion-settings-empty;
+}
+[data-appearance="error-stripe"] [data-slot="toast-content"] {
+  @apply px-3.5;
+}
+/* L4 has no visible corner action; retain a keyboard-reachable dismiss control. */
+[data-appearance="error-stripe"] [data-slot="toast-close"] {
+  @apply sr-only focus:not-sr-only;
+}
+
+/* L1 explicitly uses a compact sans heading within the existing settings section/search structure. */
+.discussion-settings section > div[data-settings-scroll-target] h2 {
+  @apply font-sans text-secondary-copy-large font-bold text-code-foreground;
+}

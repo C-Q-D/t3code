@@ -1569,6 +1569,10 @@ export const settings = {
     },
   },
   discussions: {
+    disconnected: "Environment disconnected",
+    reconnectHint: (name: string) => `Reconnect ${name} to view discussion templates.`,
+    noEnvironments: "No environments available",
+    connectHint: "Connect an environment to manage discussion templates.",
     title: "Discussions",
     personas: "Persona templates",
     summaries: "Summary templates",
