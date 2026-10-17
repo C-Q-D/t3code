@@ -51,10 +51,9 @@ export const TimelineStatusBanner = memo(function TimelineStatusBanner({
         <AlertTitle>{item.title}</AlertTitle>
         {item.description || item.children ? (
           <AlertDescription>
-            <div>
-              {item.description}
-              {item.children}
-            </div>
+            {" "}
+            {item.description}
+            {item.children}
           </AlertDescription>
         ) : null}
         {item.actions || item.onDismiss ? (

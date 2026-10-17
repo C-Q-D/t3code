@@ -1618,7 +1618,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
     !isWorking &&
     parentThreadLink === null &&
     historyControls === undefined &&
-    // A status line (settled, snoozed) still needs the list, whose footer renders it.
+    // Pending handoff content still needs the list footer even when no rows exist.
     footer === null
   ) {
     if (hideEmptyPlaceholder) {
