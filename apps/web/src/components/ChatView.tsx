@@ -3571,6 +3571,20 @@ export default function ChatView(props: ChatViewProps) {
         : null,
     [environmentId, usageLimitsPanel, usageLimitsReport],
   );
+  // The context popup reads live limits independently of the banner. It needs no countdown clock,
+  // so use the provider snapshot timestamp instead of reading the wall clock during rendering.
+  const contextUsageLimitsReport = useMemo(
+    () =>
+      activeProviderInstanceId !== null && activeProviderStatus !== null
+        ? collectProviderUsageLimits(
+            activeProviderInstanceId,
+            providerStatuses,
+            usageLimitSources,
+            Date.parse(activeProviderStatus.checkedAt),
+          )
+        : null,
+    [activeProviderInstanceId, activeProviderStatus, providerStatuses, usageLimitSources],
+  );
   // T3 owns /usage-limits only where Limits has data for the selected provider;
   // elsewhere the name stays the provider's own and is sent through untouched.
   const usageLimitsOffered =
@@ -11804,6 +11818,7 @@ export default function ChatView(props: ChatViewProps) {
                                   ? openUsageLimits
                                   : undefined
                               }
+                              usageLimitsReport={contextUsageLimitsReport}
                               environmentUnavailable={activeEnvironmentUnavailableState}
                               activePendingApproval={activePendingApproval}
                               pendingApprovals={pendingApprovals}

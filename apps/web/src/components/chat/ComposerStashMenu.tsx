@@ -1,12 +1,12 @@
+/** Presents saved drafts in the U7 list while retaining composer-owned keyboard and persistence behavior. */
 import { t } from "~/i18n";
-import { BookmarkIcon, FileIcon, FileTextIcon } from "lucide-react";
+import { FileIcon, XIcon } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
 import { assistantCitationsToPlainText } from "@t3tools/shared/assistantCitations";
 
 import { formatRelativeTimeLabel } from "../../timestampFormat";
-import { cn } from "~/lib/utils";
 import { type PromptStashEntry } from "../../promptStashStore";
-import { ComposerBanner } from "./ComposerBanner";
+import { Button } from "../ui/button";
 
 const SNIPPET_MAX_CHARS = 90;
 
@@ -15,6 +15,7 @@ function missingImageCount(entry: PromptStashEntry): number {
   return entry.droppedImageNames.length + (entry.unreadableImageNames?.length ?? 0);
 }
 
+/** Formats one saved draft for a single line; attachment-only drafts retain their attachment kind. */
 function stashEntrySnippet(entry: PromptStashEntry): string {
   const trimmed = assistantCitationsToPlainText(entry.prompt).trim().replace(/\s+/g, " ");
   if (trimmed.length > 0) {
@@ -31,7 +32,7 @@ function stashEntrySnippet(entry: PromptStashEntry): string {
 }
 
 /**
- * Attached banner listing the stashed prompts. Opened by the stash badge or ⌘S
+ * Floating list of saved prompts. Opened by the stash badge or ⌘S
  * when the empty composer cannot restore a single entry. Navigated with arrows,
  * restored with Enter, dismissed with Escape. The listener runs capture-phase
  * on window so it wins over the composer's handlers while the menu is open.
@@ -114,116 +115,108 @@ export const ComposerStashMenu = memo(function ComposerStashMenu(props: {
   }, [entries, highlightedEntry, onClose, onDelete, onRestore]);
 
   return (
-    <ComposerBanner.Root ref={drawerRef} data-composer-stash-drawer="true">
-      <ComposerBanner.Row
-        render={<button type="button" />}
+    <div
+      ref={drawerRef}
+      data-composer-stash-drawer="true"
+      className="composer-stash-menu dropdown-glass relative flex w-80 max-w-full flex-col gap-px rounded-overlay p-1.5"
+    >
+      <button
+        type="button"
+        className="cursor-pointer rounded-menu-row px-2.5 pt-1.5 pb-0.5 text-left text-meta-large text-composer-notice-count outline-none focus-visible:inset-shadow-focus"
         aria-label={t.composer.stash.close}
         aria-expanded="true"
         onPointerDown={(event) => event.preventDefault()}
         onClick={onClose}
       >
-        <ComposerBanner.Icon>
-          <BookmarkIcon />
-        </ComposerBanner.Icon>
-        <ComposerBanner.Content className="text-muted-foreground">
-          {t.composer.stash.title}
-        </ComposerBanner.Content>
-        <ComposerBanner.Actions>
-          <ComposerBanner.Count>{entries.length}</ComposerBanner.Count>
-          <ComposerBanner.ToggleIcon expanded />
-        </ComposerBanner.Actions>
-      </ComposerBanner.Row>
-      <ComposerBanner.Scroll>
-        <ComposerBanner.Children
-          render={<ul role="list" />}
-          aria-label={t.composer.stash.listAriaLabel}
-        >
-          {entries.length === 0 ? (
-            <ComposerBanner.Row render={<li />}>
-              <ComposerBanner.Icon />
-              <ComposerBanner.Content className="text-muted-foreground">
-                {t.composer.stash.empty}
-                {stashShortcutLabel ? t.composer.stash.shortcutHint(stashShortcutLabel) : null}
-              </ComposerBanner.Content>
-            </ComposerBanner.Row>
-          ) : (
-            entries.map((entry) => (
-              <ComposerBanner.Row
-                render={<li />}
-                key={entry.id}
-                data-stash-entry={entry.id}
-                data-highlighted={highlightedEntry?.id === entry.id || undefined}
-                className={cn(
-                  "relative rounded-sm",
-                  highlightedEntry?.id === entry.id && "bg-accent text-accent-foreground",
-                )}
-                onMouseMove={() => {
-                  if (highlightedId !== entry.id) setHighlightedId(entry.id);
-                }}
-                onFocus={() => setHighlightedId(entry.id)}
+        {t.composer.stash.title}
+        <span className="sr-only"> · {entries.length}</span>
+      </button>
+      <ul
+        role="list"
+        className="flex max-h-72 min-h-0 flex-col gap-px overflow-y-auto"
+        aria-label={t.composer.stash.listAriaLabel}
+      >
+        {entries.length === 0 ? (
+          <li className="px-2.5 py-3.5 text-center text-control text-secondary-label">
+            {t.composer.stash.empty}
+            {stashShortcutLabel ? (
+              <span className="mt-1 block text-secondary-copy">
+                {t.composer.stash.shortcutHint(stashShortcutLabel)}
+              </span>
+            ) : null}
+          </li>
+        ) : (
+          entries.map((entry) => (
+            <li
+              key={entry.id}
+              data-stash-entry={entry.id}
+              data-highlighted={highlightedEntry?.id === entry.id || undefined}
+              className="composer-stash-row relative flex min-h-8.5 shrink-0 items-center gap-2.5 rounded-menu-row px-2.5 py-1 text-control text-composer-notice-label data-highlighted:bg-accent data-highlighted:text-foreground"
+              onMouseMove={() => {
+                if (highlightedId !== entry.id) setHighlightedId(entry.id);
+              }}
+              onFocus={() => setHighlightedId(entry.id)}
+            >
+              <button
+                type="button"
+                className="min-w-0 flex-1 cursor-pointer truncate text-left outline-none before:absolute before:inset-0 before:rounded-menu-row"
+                data-stash-restore={entry.id}
+                aria-label={t.composer.stash.restoreAriaLabel(stashEntrySnippet(entry))}
+                onPointerDown={(event) => event.preventDefault()}
+                onClick={() => onRestore(entry)}
               >
-                <ComposerBanner.Icon>
-                  <FileTextIcon />
-                </ComposerBanner.Icon>
-                <ComposerBanner.Content>
-                  <button
-                    type="button"
-                    className="min-w-0 flex-1 cursor-pointer truncate text-left text-foreground/80 outline-none before:absolute before:inset-0 before:rounded-sm focus-visible:before:ring-2 focus-visible:before:ring-inset focus-visible:before:ring-ring"
-                    data-stash-restore={entry.id}
-                    aria-label={t.composer.stash.restoreAriaLabel(stashEntrySnippet(entry))}
-                    onPointerDown={(event) => event.preventDefault()}
-                    onClick={() => onRestore(entry)}
-                  >
-                    {stashEntrySnippet(entry)}
-                  </button>
-                </ComposerBanner.Content>
-                <ComposerBanner.Actions>
-                  {entry.pendingImageCount ? (
-                    <span className="shrink-0 text-muted-foreground">
-                      {t.composer.stash.savingImagesHint(entry.pendingImageCount)}
-                    </span>
-                  ) : missingImageCount(entry) > 0 ? (
-                    <span className="shrink-0 text-warning-foreground">
-                      {t.composer.stash.droppedImagesCountHint(missingImageCount(entry))}
-                    </span>
-                  ) : null}
-                  {entry.attachments.length > 0 ? (
-                    <span className="flex shrink-0 items-center -space-x-1.5">
-                      {entry.attachments.slice(0, 3).map((attachment) => (
-                        <img
-                          key={attachment.id}
-                          src={attachment.dataUrl}
-                          alt=""
-                          aria-hidden="true"
-                          className="size-4 rounded border border-border/70 object-cover"
-                        />
-                      ))}
-                    </span>
-                  ) : null}
-                  {(entry.files?.length ?? 0) > 0 ? (
-                    <span className="flex shrink-0 items-center gap-1 text-muted-foreground">
-                      <FileIcon className="size-3" aria-hidden />
-                      {entry.files!.length}
-                    </span>
-                  ) : null}
-                  <time
-                    dateTime={entry.createdAt}
-                    className="shrink-0 text-muted-foreground tabular-nums max-sm:hidden"
-                  >
-                    {formatRelativeTimeLabel(entry.createdAt)}
-                  </time>
-                  <ComposerBanner.Dismiss
-                    className="z-10"
-                    aria-label={t.composer.stash.delete}
-                    onPointerDown={(event) => event.preventDefault()}
-                    onClick={() => onDelete(entry)}
-                  />
-                </ComposerBanner.Actions>
-              </ComposerBanner.Row>
-            ))
-          )}
-        </ComposerBanner.Children>
-      </ComposerBanner.Scroll>
-    </ComposerBanner.Root>
+                {stashEntrySnippet(entry)}
+              </button>
+              <span className="flex shrink-0 items-center gap-1.5 text-meta-large">
+                {entry.pendingImageCount ? (
+                  <span className="shrink-0 text-secondary-label">
+                    {t.composer.stash.savingImagesHint(entry.pendingImageCount)}
+                  </span>
+                ) : missingImageCount(entry) > 0 ? (
+                  <span className="shrink-0 text-warning-foreground">
+                    {t.composer.stash.droppedImagesCountHint(missingImageCount(entry))}
+                  </span>
+                ) : null}
+                {entry.attachments.length > 0 ? (
+                  <span className="flex shrink-0 items-center -space-x-1.5">
+                    {entry.attachments.slice(0, 3).map((attachment) => (
+                      <img
+                        key={attachment.id}
+                        src={attachment.dataUrl}
+                        alt=""
+                        aria-hidden="true"
+                        className="size-4 rounded-sm border border-border object-cover"
+                      />
+                    ))}
+                  </span>
+                ) : null}
+                {(entry.files?.length ?? 0) > 0 ? (
+                  <span className="flex shrink-0 items-center gap-1 text-secondary-label">
+                    <FileIcon className="size-3" aria-hidden />
+                    {entry.files!.length}
+                  </span>
+                ) : null}
+                <time
+                  dateTime={entry.createdAt}
+                  className="shrink-0 text-secondary-label tabular-nums max-sm:hidden"
+                >
+                  {formatRelativeTimeLabel(entry.createdAt)}
+                </time>
+                <Button
+                  size="icon-micro"
+                  variant="ghost-destructive"
+                  className="z-10"
+                  aria-label={t.composer.stash.delete}
+                  onPointerDown={(event) => event.preventDefault()}
+                  onClick={() => onDelete(entry)}
+                >
+                  <XIcon aria-hidden="true" />
+                </Button>
+              </span>
+            </li>
+          ))
+        )}
+      </ul>
+    </div>
   );
 });

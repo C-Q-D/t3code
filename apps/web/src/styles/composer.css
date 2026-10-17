@@ -466,3 +466,45 @@
     }
   }
 }
+
+/* 补充屏-2.dc.html · U6–U7: two-column statistics and a detached stash list.
+ * Stash rows share H2's default 34px density and 10px corners; its keyboard stays composer-owned. */
+@layer components {
+  html[data-theme-id="graphite"] {
+    .composer-context-stats {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .composer-stash-menu {
+      /* The existing command layer reserves 17px for an attached banner seam. */
+      @apply -translate-y-4.25;
+    }
+
+    .composer-stash-row:has([data-stash-restore]:focus-visible) {
+      @apply inset-shadow-focus;
+    }
+  }
+}
+
+/* 补充屏-2.dc.html · U6: the recessed rule under context statistics. */
+@theme {
+  --shadow-composer-usage-divider: 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* U5/U6 retain the shared popup material and row density. */
+@layer components {
+  html[data-theme-id="graphite"] {
+    [data-composer-runtime-popup] {
+      @apply w-80;
+      max-width: calc(100vw - var(--spacing) * 8);
+    }
+
+    [data-composer-runtime-popup] [data-slot="select-list"] {
+      @apply flex flex-col gap-px;
+    }
+
+    .composer-usage-manage {
+      @apply shrink-0 cursor-pointer rounded-sm text-secondary-copy-medium text-composer-notice-label underline decoration-border underline-offset-3 outline-none hover:text-foreground focus-visible:inset-shadow-focus disabled:cursor-not-allowed disabled:text-fg-control-disabled disabled:no-underline;
+    }
+  }
+}

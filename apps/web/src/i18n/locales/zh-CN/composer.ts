@@ -355,7 +355,12 @@ export const composer: Messages["composer"] = {
     usedTokensAriaLabel: (tokens: string) => `上下文窗口已使用 ${tokens} 个 token`,
     title: "上下文窗口",
     usageAriaLabel: "上下文窗口用量",
+    used: "已用",
+    /** Labels the actual quota remaining in one provider window. */
+    remaining: (percentage: number) => `剩余 ${percentage}%`,
     totalProcessed: "累计处理",
+    /** Adds the token unit to the already formatted cumulative usage. */
+    processedTokens: (tokens: string) => `${tokens} token`,
     cost: "费用",
     compact: "压缩上下文",
   },

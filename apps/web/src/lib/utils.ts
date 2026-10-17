@@ -241,6 +241,7 @@ const twMerge = extendTailwindMerge({
         "composer-attachment-failed",
         "composer-model-check",
         "composer-trait-switch",
+        "composer-usage-divider",
       ],
       "inset-shadow": [
         "selected",

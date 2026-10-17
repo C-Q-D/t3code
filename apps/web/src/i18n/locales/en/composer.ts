@@ -361,7 +361,12 @@ export const composer = {
     usedTokensAriaLabel: (tokens: string) => `Context window ${tokens} tokens used`,
     title: "Context Window",
     usageAriaLabel: "Context window usage",
+    used: "Used",
+    /** Labels the actual quota remaining in one provider window. */
+    remaining: (percentage: number) => `${percentage}% remaining`,
     totalProcessed: "Total processed",
+    /** Adds the token unit to the already formatted cumulative usage. */
+    processedTokens: (tokens: string) => `${tokens} token`,
     cost: "Cost",
     compact: "Compact context",
   },

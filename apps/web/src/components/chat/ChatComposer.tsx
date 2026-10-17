@@ -5,6 +5,7 @@ import { formatProviderSkillDisplayName } from "@t3tools/shared/inlineSkills";
 import { useComposerTypingGuard } from "./useComposerTypingGuard";
 import { DESKTOP_PASTE_AS_TEXT_EVENT } from "../../lib/desktopPasteAsText";
 import { runtimeModeConfig, runtimeModeOptions as runtimeModes } from "./runtimeModeConfig";
+import { CheckIcon } from "lucide-react";
 import { isLocalEnvironmentDisabled } from "../../localEnvironment";
 import { usePrimaryEnvironmentId } from "../../state/environments";
 import { useRightPanelStore } from "~/rightPanelStore";
@@ -44,6 +45,7 @@ import type {
   ServerProvider,
   ThreadId,
   SnapShotSource,
+  UsageLimitsReport,
 } from "@t3tools/contracts";
 import {
   AuthOrchestrationOperateScope,
@@ -1336,26 +1338,33 @@ const ComposerFooterModeControls = memo(function ComposerFooterModeControls(prop
             <ComposerControlIcon icon={RuntimeModeIcon} size={size} />
             <SelectValue data-composer-control-label>{runtimeModeOption.label}</SelectValue>
           </TooltipTrigger>
-          <SelectPopup alignItemWithTrigger={false} {...composerFloatingLayerProps}>
+          <SelectPopup
+            alignItemWithTrigger={false}
+            data-composer-runtime-popup
+            {...composerFloatingLayerProps}
+          >
             {props.runtimeModeOptions.map((option) => {
               const OptionIcon = option.icon;
               return (
-                <SelectItem
-                  key={option.mode}
-                  value={option.mode}
-                  hideIndicator
-                  className="min-w-64"
-                >
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div className="grid min-w-0 flex-1 gap-0.5">
-                      <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
-                        <OptionIcon className="size-3.5 shrink-0 text-muted-foreground" />
-                        {option.label}
-                      </span>
-                      <span className="text-muted-foreground text-xs leading-4">
+                <SelectItem key={option.mode} value={option.mode} hideIndicator>
+                  <div className="flex min-w-0 items-start gap-2.5">
+                    <OptionIcon className="mt-0.5 size-3.75 shrink-0" />
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <span className="font-semibold">{option.label}</span>
+                      <span
+                        className={cn(
+                          "text-secondary-copy",
+                          option.mode === props.runtimeMode
+                            ? "text-composer-notice-label"
+                            : "text-secondary-label",
+                        )}
+                      >
                         {option.description}
                       </span>
                     </div>
+                    {option.mode === props.runtimeMode ? (
+                      <CheckIcon aria-hidden="true" className="size-3.5 shrink-0" />
+                    ) : null}
                   </div>
                 </SelectItem>
               );
@@ -1374,6 +1383,7 @@ const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryActions(
   compact: boolean;
   canOperateThread: boolean;
   activeContextWindow: ContextWindowSnapshot | null;
+  usageLimitsReport?: UsageLimitsReport | null | undefined;
   reserveContextWindowMeter: boolean;
   activeThreadModelDisplayName: string | null;
   isPreparingWorktree: boolean;
@@ -1415,6 +1425,7 @@ const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryActions(
       {props.activeContextWindow ? (
         <ContextWindowMeter
           usage={props.activeContextWindow}
+          usageLimitsReport={props.usageLimitsReport}
           modelDisplayName={props.activeThreadModelDisplayName}
           onCompact={props.onCompactContext}
           compactDisabled={props.compactDisabled}
@@ -1578,6 +1589,8 @@ export interface ChatComposerProps {
   onToggleKeepFullHistory: () => void;
   /** Picking /usage-limits from the menu is the action itself; the draft keeps nothing of it. */
   onUsageLimitsCommand?: (() => void) | undefined;
+  /** Cached report for the context popup; independent of the dismissible usage banner. */
+  usageLimitsReport?: UsageLimitsReport | null | undefined;
   environmentUnavailable: {
     readonly label: string;
     readonly connection: EnvironmentConnectionPresentation;
@@ -7903,6 +7916,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     </>
                   ) : null}
                   <ComposerFooterPrimaryActions
+                    usageLimitsReport={props.usageLimitsReport}
                     compact={
                       !showDesktopQuestionPanel &&
                       (isComposerResting || isComposerPrimaryActionsCompact)

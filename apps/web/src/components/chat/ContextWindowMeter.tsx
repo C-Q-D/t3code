@@ -10,7 +10,13 @@ import {
 import { Minimize2Icon } from "lucide-react";
 import { composerFloatingLayerProps } from "./composerEventScope";
 import { cn } from "~/lib/utils";
+import { memo, useMemo } from "react";
+import type { UsageLimitsReport } from "@t3tools/contracts";
+import { contextWindowUsageAccounts } from "./ContextWindowUsage.logic";
+import { ensureLocalApi } from "../../localApi";
+import { RedactedSensitiveText } from "../settings/RedactedSensitiveText";
 
+/** Formats snapshot percentages, preserving one decimal below 10%; missing or nonfinite usage has no label. */
 function formatPercentage(value: number | null): string | null {
   if (value === null || !Number.isFinite(value)) {
     return null;
@@ -25,24 +31,30 @@ function formatPercentage(value: number | null): string | null {
  * Shows context usage as a compact meter with the existing details and compaction popover.
  * @param props Current usage snapshot; optional model name labels details. onCompact enables
  * compaction when supplied; compactDisabled and its nullable reason describe host restrictions.
+ * usageLimitsReport supplies live quota windows and optional provider management links.
  * @returns The usage trigger and its details; unavailable usage retains the snapshot's empty state.
  */
 export function ContextWindowMeter(props: {
   usage: ContextWindowSnapshot;
+  usageLimitsReport?: UsageLimitsReport | null | undefined;
   modelDisplayName?: string | null;
   onCompact?: (() => void) | undefined;
   compactDisabled?: boolean | undefined;
   compactDisabledReason?: string | null | undefined;
 }) {
-  const { usage, modelDisplayName, onCompact, compactDisabled, compactDisabledReason } = props;
+  const {
+    usage,
+    modelDisplayName,
+    onCompact,
+    compactDisabled,
+    compactDisabledReason,
+    usageLimitsReport,
+  } = props;
   const usedPercentage = formatPercentage(usage.usedPercentage);
   const normalizedPercentage = Math.max(0, Math.min(100, usage.usedPercentage ?? 0));
   const totalProcessedTokens = usage.totalProcessedTokens ?? null;
   const showTotalProcessed = totalProcessedTokens !== null && totalProcessedTokens > 0;
   const isOverloaded = normalizedPercentage > 90;
-  const usageColor = isOverloaded
-    ? "var(--color-error)"
-    : "color-mix(in oklab, var(--color-muted-foreground) 72%, transparent)";
 
   return (
     <Popover>
@@ -80,36 +92,18 @@ export function ContextWindowMeter(props: {
       />
       <PopoverPopup
         {...composerFloatingLayerProps}
-        tooltipStyle
         side="top"
         align="end"
         padding="none"
-        width="sm"
-        className="text-left whitespace-normal"
+        width="md"
       >
-        <div className="flex flex-col gap-2 p-(--floating-content-inset)">
-          <div className="flex items-center justify-between gap-3">
-            <div className="font-medium text-muted-foreground text-xs">
-              {t.composer.contextWindow.title}
-            </div>
-            {usage.maxTokens !== null && usedPercentage ? (
-              <div className="text-secondary-label text-2xs tabular-nums">
-                <span>{usedPercentage}</span>
-                <span className="mx-1">·</span>
-                <span>
-                  {formatContextWindowTokens(usage.usedTokens)}/
-                  {formatContextWindowTokens(usage.maxTokens ?? null)}
-                </span>
-              </div>
-            ) : (
-              <div className="text-secondary-label text-2xs tabular-nums">
-                {formatContextWindowTokens(usage.usedTokens)}
-              </div>
-            )}
-          </div>
+        <div className="flex flex-col gap-2.5 p-3.5 text-left whitespace-normal">
+          <h3 className="font-serif text-card-title font-bold text-foreground">
+            {t.composer.contextWindow.title}
+          </h3>
           {usage.maxTokens !== null ? (
             <div
-              className="h-1.5 w-full overflow-hidden rounded-full bg-muted/60"
+              className="h-2 w-full overflow-hidden rounded-full bg-input"
               role="progressbar"
               aria-valuemin={0}
               aria-valuemax={100}
@@ -117,40 +111,56 @@ export function ContextWindowMeter(props: {
               aria-label={t.composer.contextWindow.usageAriaLabel}
             >
               <div
-                className="h-full rounded-full transition-[width,background-color] duration-500 ease-out motion-reduce:transition-none"
-                style={{ width: `${normalizedPercentage}%`, backgroundColor: usageColor }}
+                className={cn(
+                  "h-full rounded-full",
+                  isOverloaded ? "bg-error" : "bg-composer-context-fill",
+                )}
+                style={{ width: `${normalizedPercentage}%` }}
               />
             </div>
           ) : null}
-          {showTotalProcessed ? (
-            <div className="flex items-center justify-between gap-3 text-2xs leading-4">
-              <span className="text-secondary-label">
-                {t.composer.contextWindow.totalProcessed}
-              </span>
-              <span className="font-medium tabular-nums text-secondary-label">
-                {formatContextWindowTokens(totalProcessedTokens)}
-              </span>
-            </div>
-          ) : null}
-          {usage.cost != null ? (
-            <div className="flex items-center justify-between gap-3 text-2xs leading-4">
-              <span className="text-secondary-label">{t.composer.contextWindow.cost}</span>
-              <span className="font-medium tabular-nums text-secondary-label">
-                {formatContextWindowCost(usage.cost)}
-              </span>
-            </div>
-          ) : null}
+          <dl className="composer-context-stats grid gap-x-2.5 gap-y-1 text-secondary-copy-medium">
+            <dt className="text-secondary-label">{t.composer.contextWindow.used}</dt>
+            <dd className="text-right font-mono text-foreground tabular-nums">
+              {usage.maxTokens !== null && usedPercentage ? (
+                <>
+                  {usedPercentage} · {formatContextWindowTokens(usage.usedTokens)} /{" "}
+                  {formatContextWindowTokens(usage.maxTokens ?? null)}
+                </>
+              ) : (
+                formatContextWindowTokens(usage.usedTokens)
+              )}
+            </dd>
+            {showTotalProcessed ? (
+              <>
+                <dt className="text-secondary-label">{t.composer.contextWindow.totalProcessed}</dt>
+                <dd className="text-right font-mono text-foreground tabular-nums">
+                  {t.composer.contextWindow.processedTokens(
+                    formatContextWindowTokens(totalProcessedTokens),
+                  )}
+                </dd>
+              </>
+            ) : null}
+            {usage.cost != null ? (
+              <>
+                <dt className="text-secondary-label">{t.composer.contextWindow.cost}</dt>
+                <dd className="text-right font-mono text-foreground tabular-nums">
+                  {formatContextWindowCost(usage.cost)}
+                </dd>
+              </>
+            ) : null}
+          </dl>
           {usage.compactsAutomatically ? (
-            <div className="mt-1 text-pretty text-secondary-label text-2xs font-medium">
+            <div className="text-pretty text-secondary-label text-secondary-copy">
               {formatContextWindowCompactionMessage(modelDisplayName, usage.autoCompactThreshold)}
             </div>
           ) : null}
           {onCompact ? (
             <>
               <Button
-                size="xs"
-                variant="outline"
-                className="mt-1 w-full justify-center"
+                size="toolbar"
+                variant="secondary"
+                className="w-full"
                 disabled={compactDisabled}
                 onClick={onCompact}
               >
@@ -158,17 +168,94 @@ export function ContextWindowMeter(props: {
                 {t.composer.contextWindow.compact}
               </Button>
               {compactDisabled && compactDisabledReason ? (
-                <div className="text-pretty text-secondary-label text-2xs">
+                <div className="text-pretty text-secondary-label text-secondary-copy">
                   {compactDisabledReason}
                 </div>
               ) : null}
             </>
           ) : null}
+          <ContextWindowUsageLimits report={usageLimitsReport} />
         </div>
       </PopoverPopup>
     </Popover>
   );
 }
+
+/** Renders real quota windows only inside the open popup; management uses the banner's external-link path. */
+const ContextWindowUsageLimits = memo(function ContextWindowUsageLimits({
+  report,
+}: {
+  report: UsageLimitsReport | null | undefined;
+}) {
+  const accounts = useMemo(() => contextWindowUsageAccounts(report), [report]);
+  if (accounts.length === 0) return null;
+  return (
+    <>
+      <div className="h-px bg-black/60 shadow-composer-usage-divider" />
+      {accounts.map((account) => (
+        <section key={account.id} className="flex flex-col gap-2.5">
+          <div className="flex items-center justify-between gap-2 text-secondary-copy-medium">
+            <h4 className="min-w-0 font-bold">
+              {t.composer.usageLimits.title}
+              {accounts.length > 1 ? (
+                <>
+                  {" · "}
+                  {account.label.includes("@") ? (
+                    <RedactedSensitiveText
+                      value={account.label}
+                      ariaLabel={t.composer.usageLimits.toggleAccount}
+                      revealTooltip={t.composer.usageLimits.revealAccount}
+                      hideTooltip={t.composer.usageLimits.hideAccount}
+                    />
+                  ) : (
+                    account.label
+                  )}
+                </>
+              ) : null}
+            </h4>
+            <button
+              type="button"
+              className="composer-usage-manage"
+              disabled={account.managementUrl === null}
+              onClick={
+                account.managementUrl === null
+                  ? undefined
+                  : () => void ensureLocalApi().shell.openExternal(account.managementUrl!)
+              }
+            >
+              {t.composer.usageLimits.manage}
+            </button>
+          </div>
+          {account.windows.map((window) => (
+            <div key={window.id} className="flex flex-col gap-1">
+              {account.windows.length > 1 ? (
+                <span className="text-meta-large text-secondary-label">{window.label}</span>
+              ) : null}
+              <div className="flex items-center gap-2 text-secondary-copy text-secondary-label">
+                <div
+                  role="progressbar"
+                  aria-label={`${window.label}: ${t.composer.contextWindow.used}`}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={window.usedPercent}
+                  className="h-1.25 min-w-0 flex-1 overflow-hidden rounded-full bg-input"
+                >
+                  <div
+                    className="h-full rounded-full bg-success"
+                    style={{ width: `${window.usedPercent}%` }}
+                  />
+                </div>
+                <span className="shrink-0 tabular-nums">
+                  {t.composer.contextWindow.remaining(window.remainingPercent)}
+                </span>
+              </div>
+            </div>
+          ))}
+        </section>
+      ))}
+    </>
+  );
+});
 
 /** Holds the meter's footprint while a thread's activities are still loading. */
 export function ContextWindowMeterPlaceholder() {
