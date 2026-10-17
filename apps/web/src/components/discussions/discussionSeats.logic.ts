@@ -11,6 +11,30 @@ import type {
 export type DiscussionDraftSeat = DiscussionTemplate["seats"][number];
 
 /**
+ * Derives a seat's displayed position during a pending drag without committing draft data.
+ * @param index Original zero-based position of this seat.
+ * @param from Drag source, or -1 when no drag is active.
+ * @param to Collision target, or -1 when the pointer has no target.
+ * @param count Number of actual seats; the add button is not a drop target.
+ * @returns Preview position; invalid or inactive drags retain the original position.
+ */
+export function discussionSeatPreviewIndex(index: number, from: number, to: number, count: number) {
+  if (
+    !Number.isInteger(from) ||
+    !Number.isInteger(to) ||
+    from < 0 ||
+    to < 0 ||
+    from >= count ||
+    to >= count
+  )
+    return index;
+  if (index === from) return to;
+  if (from < to && index > from && index <= to) return index - 1;
+  if (from > to && index >= to && index < from) return index + 1;
+  return index;
+}
+
+/**
  * Appends a complete default seat without changing earlier seats.
  * @param seats Current speaking order.
  * @param seat Persona and user-default model to append.

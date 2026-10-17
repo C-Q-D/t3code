@@ -425,3 +425,74 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* DC5.1 · 新建讨论-8a v2: 1a seat cards and introduction, 2a selection, 2b drag. */
+@theme {
+  --text-discussion-draft-heading: 24px;
+  --text-discussion-draft-heading--line-height: 1.55;
+  --text-discussion-draft-number: 20px;
+  --text-discussion-draft-number--line-height: 1;
+  --radius-discussion-draft-add-icon: 14px;
+  --color-discussion-draft-hover: #303035;
+  --color-discussion-draft-drag: #34343a;
+  --color-discussion-draft-slot: rgba(0, 0, 0, 0.18);
+  --shadow-discussion-draft-card:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.095), 0 0 0 1px rgba(0, 0, 0, 0.5), 0 3px 0 #09090a,
+    10px 16px 22px -8px rgba(0, 0, 0, 0.7);
+  --shadow-discussion-draft-lifted:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.13), 0 0 0 1px rgba(0, 0, 0, 0.55), 0 6px 0 #060607,
+    14px 26px 30px -8px rgba(0, 0, 0, 0.85);
+  --shadow-discussion-draft-selected:
+    inset 0 0 0 1.5px #f2f2f3, 0 0 0 4px rgba(242, 242, 243, 0.16),
+    var(--shadow-discussion-draft-lifted);
+  --shadow-discussion-draft-drag:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.14), inset 0 0 0 1.5px #f2f2f3,
+    0 0 0 1px rgba(0, 0, 0, 0.6), 0 8px 0 #060607, 22px 34px 36px -8px rgba(0, 0, 0, 0.9);
+}
+
+/* Hover affects the card only. Sorting has no transition and leaves geometry to dnd-kit. */
+.discussion-draft-seat:not([data-sorting]):is(
+    :hover,
+    :focus-within,
+    [data-editing],
+    [data-preview]
+  ) {
+  transform: translateY(calc(var(--spacing) * -1));
+  background: var(--color-discussion-draft-hover);
+  box-shadow: var(--shadow-discussion-draft-lifted);
+}
+.discussion-draft-seat:not([data-sorting])[data-editing] {
+  box-shadow: var(--shadow-discussion-draft-selected);
+}
+.discussion-draft-seat[data-placeholder] {
+  border: 1.5px dashed var(--color-fg-control-disabled);
+  background: var(--color-discussion-draft-slot);
+  box-shadow: none;
+}
+.discussion-draft-add,
+.discussion-draft-add-icon {
+  border: 1.5px dashed var(--color-fg-icon-disabled);
+}
+.discussion-draft-add-icon {
+  border-radius: var(--radius-discussion-draft-add-icon);
+}
+.discussion-draft-add:hover:not(:disabled) {
+  border-color: var(--placeholder);
+}
+.discussion-draft-model-group + .discussion-draft-model-group {
+  border-top: 1px solid var(--color-stone-scrim);
+  margin-top: calc(var(--spacing) * 0.75);
+  padding-top: calc(var(--spacing) * 0.75);
+}
+.discussion-draft-preview-arrow {
+  width: calc(var(--spacing) * 3);
+  height: calc(var(--spacing) * 3);
+  background: inherit;
+  transform: rotate(45deg);
+}
+.discussion-draft-preview-arrow[data-side="bottom"] {
+  top: calc(var(--spacing) * -1.5);
+}
+.discussion-draft-preview-arrow[data-side="top"] {
+  bottom: calc(var(--spacing) * -1.5);
+}

@@ -8,6 +8,7 @@ import {
   changeDiscussionSeatPersona,
   changeDiscussionSeatModel,
   canSelectDiscussionModel,
+  discussionSeatPreviewIndex,
   type DiscussionDraftSeat,
 } from "./discussionSeats.logic";
 
@@ -29,6 +30,27 @@ const c: DiscussionDraftSeat = Object.freeze({
 const seats = Object.freeze([a, b, c]);
 
 describe("discussion seat editing", () => {
+  it("keeps continuous speaking positions when a drag crosses a wrapped row", () => {
+    expect(discussionSeatPreviewIndex(1, 1, 8, 9)).toBe(8);
+    expect(discussionSeatPreviewIndex(7, 1, 8, 9)).toBe(6);
+    expect(discussionSeatPreviewIndex(8, 1, 8, 9)).toBe(7);
+  });
+  it.each([
+    { index: 2, from: 2, to: 0, expected: 0 },
+    { index: 0, from: 2, to: 0, expected: 1 },
+    { index: 1, from: 0, to: 2, expected: 0 },
+    { index: 0, from: 0, to: 2, expected: 2 },
+    { index: 3, from: 0, to: 2, expected: 3 },
+    { index: 1, from: 0, to: -1, expected: 1 },
+    { index: 1, from: -1, to: 2, expected: 1 },
+    { index: 1, from: 0, to: 4, expected: 1 },
+    { index: 1, from: 0.5, to: 2, expected: 1 },
+  ])(
+    "previews position $index during $from -> $to as $expected",
+    ({ index, from, to, expected }) => {
+      expect(discussionSeatPreviewIndex(index, from, to, 4)).toBe(expected);
+    },
+  );
   it("appends the supplied persona and default model after existing seats", () => {
     expect(addDiscussionSeat(Object.freeze([a, b]), c)).toEqual([a, b, c]);
   });

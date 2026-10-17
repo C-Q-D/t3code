@@ -8,7 +8,6 @@ import {
 } from "@t3tools/client-runtime/state/runtime";
 import { useEffect, useId, useRef, useState } from "react";
 import { t } from "~/i18n";
-import { isElectron } from "~/env";
 import { useEnvironments } from "~/state/environments";
 import {
   useAllEnvironmentShellsBootstrapped,
@@ -32,7 +31,7 @@ import {
 } from "../ui/combobox";
 import { Select, SelectTrigger, SelectValue, SelectPopup, SelectItem } from "../ui/select";
 import { toastManager } from "../ui/toast";
-import { WorkspacePageHeader } from "../WorkspacePageHeader";
+import { useTitlebarSlot } from "../frame/titlebarSlot";
 import { DiscussionSeats } from "./DiscussionSeats";
 import { DiscussionTemplateEditor } from "./DiscussionTemplateEditor";
 import type { DiscussionDraftSeat } from "./discussionSeats.logic";
@@ -42,8 +41,17 @@ import {
   discussionCreatedRoute,
 } from "./discussionCreate.logic";
 
-/** Uses the same recent-project default as the new-thread landing page and keeps topic text across project changes. */
+/**
+ * Renders the 8a draft below the shared titlebar and keeps topic text across project changes.
+ * Uses the new-thread landing page's recent-project default; only explicit submission creates a discussion.
+ * @returns Project selection and the environment-scoped seat draft, or the existing unavailable state.
+ */
 export function DiscussionSeatDraftPage() {
+  const titlebar = useTitlebarSlot({
+    breadcrumb: (
+      <h1 className="truncate font-serif text-chat-title font-bold">{t.discussions.newTitle}</h1>
+    ),
+  });
   const projects = useProjects();
   const threads = useThreadShells();
   const bootstrapped = useAllEnvironmentShellsBootstrapped();
@@ -74,14 +82,12 @@ export function DiscussionSeatDraftPage() {
     environments.find((item) => item.environmentId === project?.environmentId)?.connection.phase ===
     "connected";
   return (
-    <SidebarInset>
-      <WorkspacePageHeader electron={isElectron} className="border-b">
-        <h1 className="truncate text-sm font-medium">{t.discussions.newTitle}</h1>
-      </WorkspacePageHeader>
-      <div className="scrollbar-gutter-both flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-10 pb-14">
-        <div className="flex w-full max-w-192 flex-col gap-7 py-6">
+    <SidebarInset className="h-full min-h-0">
+      {titlebar}
+      <div className="scrollbar-gutter-both flex min-h-0 flex-1 justify-center overflow-y-auto px-6 pt-10 pb-14">
+        <div className="flex w-full max-w-265 flex-col gap-8">
           <h2
-            className="text-center text-2xl font-normal leading-tight"
+            className="text-center text-discussion-draft-heading font-normal"
             aria-label={t.discussions.hero(project?.title ?? t.discussions.chooseProject)}
           >
             {t.discussions.heroPrefix}
@@ -109,7 +115,7 @@ export function DiscussionSeatDraftPage() {
                 render={
                   <button
                     type="button"
-                    className="inline cursor-pointer font-normal text-muted-foreground underline decoration-dotted underline-offset-6 outline-none hover:text-foreground focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                    className="inline cursor-pointer font-normal text-secondary-label underline decoration-dotted underline-offset-6 outline-none hover:text-foreground focus-visible:inset-shadow-focus"
                   />
                 }
               >
@@ -155,7 +161,7 @@ export function DiscussionSeatDraftPage() {
 }
 
 /**
- * Retains the B4 seat state and initializes it once from the environment's first template.
+ * Owns the ordered seat draft and initializes it once from the environment's first template.
  * @param props.environmentId Fixed catalog/command destination; changing environments remounts seats.
  * @param props.projectId Selected project in that environment.
  * @param props.topic Parent-owned text retained across project changes.
@@ -249,7 +255,7 @@ function SeatDraft({
   ];
   return (
     <>
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-7">
         {templates.error ? (
           <p role="alert" className="text-sm text-destructive">
             {templates.error}
@@ -283,7 +289,7 @@ function SeatDraft({
                       );
                     }}
                   >
-                    <SelectTrigger aria-labelledby={templateLabelId}>
+                    <SelectTrigger size="settings" aria-labelledby={templateLabelId}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectPopup>
@@ -300,13 +306,13 @@ function SeatDraft({
           />
         </fieldset>
         <form
-          className="rounded-3xl border bg-card shadow-sm dark:shadow-none"
+          className="surface-glass rounded-slab px-3.5 pt-4 pb-3 pl-4.5 shadow-raise-l"
           onSubmit={(event) => {
             event.preventDefault();
             void start();
           }}
         >
-          <div className="px-5 pt-4.5 pb-2.5">
+          <div>
             <textarea
               aria-label={t.discussions.topicLabel}
               value={topic}
@@ -314,22 +320,23 @@ function SeatDraft({
               onChange={(event) => onTopicChange(event.target.value)}
               placeholder={t.discussions.topicPlaceholder}
               rows={2}
-              className="field-sizing-content block max-h-52 min-h-11 w-full resize-none overflow-y-auto bg-transparent text-sm leading-relaxed text-foreground outline-none placeholder:text-muted-foreground focus-visible:rounded-md focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+              className="field-sizing-content block max-h-52 min-h-12 w-full resize-none overflow-y-auto rounded-compact-row bg-transparent text-body leading-relaxed text-foreground outline-none placeholder:text-placeholder focus-visible:inset-shadow-focus"
             />
           </div>
-          <div className="flex items-center gap-2 pt-2 pr-3 pb-3 pl-5">
-            <span className="min-w-0 flex-1 text-xs text-muted-foreground">
+          <div className="mt-3.5 flex flex-wrap items-center gap-2">
+            <span className="min-w-0 flex-1 text-secondary-copy text-secondary-label">
               {t.discussions.permissionsHint}
             </span>
             <Button
               type="button"
               variant="secondary"
+              size="toolbar"
               disabled={!canSaveTemplate || saving || !initialized}
               onClick={() => setTemplateEditorOpen(true)}
             >
               {t.discussions.saveAsTemplate}
             </Button>
-            <Button type="submit" disabled={!startEnabled}>
+            <Button type="submit" size="toolbar" disabled={!startEnabled}>
               {t.discussions.start}
             </Button>
           </div>
