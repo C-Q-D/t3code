@@ -12,6 +12,7 @@ import {
   respondToConfirmDialog,
 } from "./confirmDialog";
 
+/** Requires a mounted host so a test cannot silently skip a confirmation lifecycle. */
 function requireConfirmation(confirmation: Promise<boolean> | undefined): Promise<boolean> {
   if (!confirmation) {
     throw new Error("Expected a registered confirmation host.");
@@ -54,6 +55,26 @@ describe("confirm dialog coordinator", () => {
     completeConfirmDialogClose();
     expect(readConfirmDialogState()).toEqual({ status: "idle" });
     expect(isConfirmDialogActive()).toBe(false);
+    unregister();
+  });
+
+  it("keeps each action label through queue activation and closing", async () => {
+    const unregister = registerConfirmDialogHost();
+    const first = requireConfirmation(
+      requestConfirmDialog("Remove project?", { confirmLabel: "移除" }),
+    );
+    const second = requireConfirmation(
+      requestConfirmDialog("Delete worktree?", { confirmLabel: "删除" }),
+    );
+    expect(readConfirmDialogState()).toMatchObject({ status: "confirming", confirmLabel: "移除" });
+    respondToConfirmDialog(true);
+    expect(readConfirmDialogState()).toMatchObject({ status: "closing", confirmLabel: "移除" });
+    completeConfirmDialogClose();
+    expect(readConfirmDialogState()).toMatchObject({ status: "confirming", confirmLabel: "删除" });
+    respondToConfirmDialog(false);
+    expect(readConfirmDialogState()).toMatchObject({ status: "closing", confirmLabel: "删除" });
+    completeConfirmDialogClose();
+    await expect(Promise.all([first, second])).resolves.toEqual([true, false]);
     unregister();
   });
 

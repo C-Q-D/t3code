@@ -523,7 +523,7 @@ export function useThreadActions() {
               "",
               t.app.thread.deleteWorktreeQuestion,
             ].join("\n"),
-            { variant: "destructive" },
+            { variant: "destructive", confirmLabel: t.common.threadActions.delete },
           ),
         );
         if (confirmationResult._tag === "Failure") {

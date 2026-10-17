@@ -1,7 +1,8 @@
+/** Imports themes from search, JSON, or files while preserving batch and conflict handling. */
 import { t } from "~/i18n";
-import { DownloadIcon, PlusIcon } from "lucide-react";
-import type { ChangeEvent, DragEvent, UIEvent } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { DownloadIcon } from "lucide-react";
+import type { ChangeEvent, DragEvent } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "../../lib/utils";
 import {
   getCustomThemes,
@@ -21,21 +22,19 @@ import {
 } from "../../vscodeThemeImport";
 import { Alert } from "../ui/alert";
 import { Button } from "../ui/button";
+import { Toggle, ToggleGroup } from "../ui/toggle-group";
 import { Dialog, DialogHeader, DialogPanel, DialogPopup, DialogTitle } from "../ui/dialog";
 import { ThemeSearchSection } from "./ThemeSearchSection";
 
 /**
  * A full theme export is a few KB, so anything past this is not a theme file.
  * The guard runs on the size before the bytes are ever read: a large file
- * would otherwise be pulled into memory, highlighted, and rendered, which
+ * would otherwise be pulled into memory, parsed, and rendered, which
  * locks the UI for as long as that takes.
  */
 export const MAX_THEME_FILE_BYTES = 256 * 1024;
 
-/** Highlighting rebuilds the whole markup on every keystroke, so oversized
- *  pastes fall back to plain text instead of freezing the editor. */
-const MAX_HIGHLIGHTED_JSON_LENGTH = 20_000;
-
+/** Formats a byte count for file-size validation messages. */
 function formatByteSize(bytes: number): string {
   if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
@@ -51,46 +50,7 @@ export function describeOversizedThemeFile(bytes: number): string | null {
   );
 }
 
-function escapeJsonHtml(value: string): string {
-  return value.replace(
-    /[&<>"']/g,
-    (character) =>
-      ({
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#39;",
-      })[character] ?? character,
-  );
-}
-
-function highlightJson(value: string): string {
-  const tokenPattern =
-    /"(?:\\.|[^"\\])*"|-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?|true|false|null/g;
-  let highlighted = "";
-  let cursor = 0;
-
-  for (const match of value.matchAll(tokenPattern)) {
-    const token = match[0];
-    const index = match.index ?? 0;
-    highlighted += escapeJsonHtml(value.slice(cursor, index));
-
-    let tokenClass = "text-[var(--app-theme-secondary-foreground,var(--color-amber-600))]";
-    if (token.startsWith('"')) {
-      tokenClass = /^\s*:/.test(value.slice(index + token.length))
-        ? "text-[var(--app-theme-accent,var(--color-blue-600))]"
-        : "text-[var(--app-theme-message-action,var(--color-emerald-600))]";
-    } else if (token === "true" || token === "false" || token === "null") {
-      tokenClass = "text-[var(--app-theme-accent-surface-foreground,var(--color-violet-600))]";
-    }
-    highlighted += `<span class="${tokenClass}">${escapeJsonHtml(token)}</span>`;
-    cursor = index + token.length;
-  }
-
-  return highlighted + escapeJsonHtml(value.slice(cursor));
-}
-
+/** Edits raw JSON without transforming its content; the caller owns parsing and errors. */
 function ThemeJsonEditor({
   id,
   value,
@@ -100,40 +60,13 @@ function ThemeJsonEditor({
   value: string;
   onChange: (value: string) => void;
 }) {
-  const highlightRef = useRef<HTMLPreElement>(null);
-  const isPlainText = value.length > MAX_HIGHLIGHTED_JSON_LENGTH;
-  const highlightedJson = useMemo(
-    () => (value.length > MAX_HIGHLIGHTED_JSON_LENGTH ? "" : highlightJson(value)),
-    [value],
-  );
-
-  const syncScroll = useCallback((event: UIEvent<HTMLTextAreaElement>) => {
-    const highlightElement = highlightRef.current;
-    if (!highlightElement) return;
-    highlightElement.scrollTop = event.currentTarget.scrollTop;
-    highlightElement.scrollLeft = event.currentTarget.scrollLeft;
-  }, []);
-
   return (
-    <div className="relative overflow-hidden rounded-xl border border-input bg-background shadow-xs/5 focus-within:border-ring focus-within:ring-3 focus-within:ring-inset focus-within:ring-ring/24">
-      {isPlainText ? null : (
-        <pre
-          ref={highlightRef}
-          aria-hidden
-          className="pointer-events-none absolute inset-0 m-0 overflow-hidden whitespace-pre-wrap break-words p-3 font-mono text-xs leading-5 text-foreground"
-        >
-          <code dangerouslySetInnerHTML={{ __html: highlightedJson }} />
-        </pre>
-      )}
+    <div className="ov1-theme-json">
       <textarea
         aria-label={t.settings.themeImport.themeJson}
-        className={cn(
-          "relative z-10 block min-h-44 w-full resize-y overflow-auto bg-transparent p-3 font-mono text-xs leading-5 caret-foreground outline-none placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground",
-          isPlainText ? "text-foreground" : "text-transparent",
-        )}
+        className="block min-h-21 w-full resize-y overflow-auto bg-transparent px-3.5 py-2.5 font-mono text-secondary-copy leading-relaxed text-secondary-label caret-foreground outline-none placeholder:text-placeholder selection:bg-primary selection:text-primary-foreground"
         id={id}
         onChange={(event) => onChange(event.currentTarget.value)}
-        onScroll={syncScroll}
         placeholder={
           '{\n  "version": 1,\n  "name": "Aurora",\n  "appearance": "light",\n  "colors": { ... }\n}'
         }
@@ -147,6 +80,7 @@ function ThemeJsonEditor({
 /** What the import pipeline needs from a file; DOM File satisfies it. */
 type ImportableThemeFile = { name: string; size: number; text: () => Promise<string> };
 
+/** Coordinates controlled visibility, single-theme activation, batch imports, and conflict decisions. */
 export function ThemeImportDialog({
   open,
   onOpenChange,
@@ -161,6 +95,7 @@ export function ThemeImportDialog({
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [json, setJson] = useState("");
+  const [importMode, setImportMode] = useState<"json" | "file">("json");
   const [fileName, setFileName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isReading, setIsReading] = useState(false);
@@ -177,6 +112,7 @@ export function ThemeImportDialog({
     setIsDropTarget(false);
     if (!open) return;
     setJson("");
+    setImportMode("json");
     setFileName(null);
     setError(null);
     setIsReading(false);
@@ -443,9 +379,9 @@ export function ThemeImportDialog({
         onOpenChange(nextOpen);
       }}
     >
-      <DialogPopup className="max-w-3xl overflow-hidden">
+      <DialogPopup size="wide">
         <DialogHeader>
-          <DialogTitle>{t.settings.themeImport.addATheme}</DialogTitle>
+          <DialogTitle>{t.settings.themeImport.importTitle}</DialogTitle>
         </DialogHeader>
         <DialogPanel>
           <ThemeSearchSection
@@ -500,7 +436,7 @@ export function ThemeImportDialog({
             const editorSection = () => (
               <div className="space-y-2">
                 <div className="flex items-baseline justify-between gap-3">
-                  <label className="text-sm font-medium" htmlFor="theme-json-editor">
+                  <label className="sr-only" htmlFor="theme-json-editor">
                     {t.settings.themeImport.themeJson}
                   </label>
                 </div>
@@ -510,7 +446,7 @@ export function ThemeImportDialog({
             if (conflicts) {
               return (
                 <div className="space-y-3">
-                  <div className="rounded-xl border border-border/70 bg-muted/20 p-3">
+                  <div className="rounded-ov1-option bg-ov1-option-surface p-3">
                     <p className="text-sm font-medium">{t.settings.themeImport.alreadyInstalled}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {conflicts.map((theme) => theme.label).join(", ")}
@@ -534,35 +470,55 @@ export function ThemeImportDialog({
               );
             }
             return (
-              <div className="space-y-4">
-                <div
-                  className={cn(
-                    "flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed px-3 py-3 transition-colors",
-                    isDropTarget ? "border-ring bg-accent/20" : "border-border/80 bg-muted/20",
-                  )}
-                  {...dropHandlers}
+              <div className="space-y-3">
+                <ToggleGroup
+                  size="dialog"
+                  aria-label={t.settings.themeImport.importSource}
+                  value={[importMode]}
+                  onValueChange={(next) => {
+                    if (next[0] === "json" || next[0] === "file") setImportMode(next[0]);
+                  }}
                 >
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium">{t.settings.themeImport.themeFile}</p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {fileName ?? t.settings.themeImport.dropT3CodeOrVsCodeJsonFiles}
-                    </p>
+                  <Toggle value="json">{t.settings.themeImport.themeJson}</Toggle>
+                  <Toggle value="file">{t.settings.themeImport.themeFile}</Toggle>
+                </ToggleGroup>
+                <div hidden={importMode !== "file"}>
+                  <div
+                    className={cn(
+                      "ov1-theme-file",
+                      isDropTarget && "inset-shadow-selected-control",
+                    )}
+                    {...dropHandlers}
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">{t.settings.themeImport.themeFile}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {fileName ?? t.settings.themeImport.dropT3CodeOrVsCodeJsonFiles}
+                      </p>
+                    </div>
+                    {chooseButton()}
+                    {fileInput}
                   </div>
-                  {chooseButton()}
-                  {fileInput}
                 </div>
-                {editorSection()}
+                <div hidden={importMode !== "json"}>{editorSection()}</div>
                 {/* The actions live with the import section, not in a DialogFooter,
-                    because Add theme only applies to the file in this section. Pinning
+                    because Import only applies to the file in this section. Pinning
                     them at the modal bottom would read as a modal-scoped action when
                     the dialog also has the search and conflict views. */}
-                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                  <Button variant="ghost" onClick={() => onOpenChange(false)}>
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    size="dialog-action"
+                    onClick={() => onOpenChange(false)}
+                  >
                     {t.settings.actions.cancel}
                   </Button>
-                  <Button disabled={!json.trim() || isReading} onClick={handleSubmit}>
-                    <PlusIcon />
-                    {t.settings.themeImport.addTheme}
+                  <Button
+                    size="dialog-action-wide"
+                    disabled={!json.trim() || isReading}
+                    onClick={handleSubmit}
+                  >
+                    {t.settings.themeImport.importAction}
                   </Button>
                 </div>
               </div>

@@ -16,6 +16,7 @@ function createBrowserLocalApi(): LocalApi {
         if (!window.desktopBridge) return null;
         return window.desktopBridge.pickFolder(options);
       },
+      // Forward localized action copy unchanged to the web confirmation queue.
       confirm: async (message, options?: ConfirmDialogOptions) => {
         return requestConfirmDialog(message, options) ?? false;
       },

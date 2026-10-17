@@ -1,10 +1,11 @@
+/** Adds provider instances through the existing identity, configuration, and authentication wizard. */
 "use client";
 
 import { t } from "~/i18n";
+import { PixelIcon } from "../icons/PixelIcon";
 import { ProviderInstanceIcon } from "../chat/ProviderInstanceIcon";
 
 import { Radio as RadioPrimitive } from "@base-ui/react/radio";
-import { CheckIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import {
@@ -72,6 +73,7 @@ function slugifyLabel(value: string): string {
     .slice(0, 48);
 }
 
+/** Derives the driver-prefixed instance ID from a label; an empty slug stays invalid. */
 function deriveInstanceId(driver: ProviderDriverKind, label: string): string {
   const slug = slugifyLabel(label);
   return slug ? `${driver}_${slug}` : "";
@@ -97,6 +99,7 @@ function validateInstanceId(id: string, existing: ReadonlySet<string>): string |
   return null;
 }
 
+/** Target environment, controlled visibility, and optional callback for a created instance. */
 interface AddProviderInstanceDialogProps {
   readonly open: boolean;
   readonly environmentId: EnvironmentId;
@@ -105,6 +108,7 @@ interface AddProviderInstanceDialogProps {
   readonly onCreated?: (instanceId: ProviderInstanceId) => void;
 }
 
+/** Preserves wizard navigation and validation while presenting provider choices and identity controls. */
 export function AddProviderInstanceDialog({
   open,
   environmentId,
@@ -381,7 +385,7 @@ export function AddProviderInstanceDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <WizardPopup size="wide">
         <WizardHeader
-          title={t.settings.addProviderInstance.addProvider}
+          title={t.settings.addProviderInstance.addInstance}
           description={
             <>{t.settings.addProviderInstance.addAccountConfigureProviderHint(environmentLabel)}</>
           }
@@ -434,39 +438,44 @@ export function AddProviderInstanceDialog({
                     setHasAttemptedSubmit(false);
                   }}
                   aria-labelledby="add-instance-driver-label"
-                  className="grid grid-cols-1 sm:grid-cols-2"
                 >
-                  {providerClients.definitions
-                    .filter((option) => option.driverKind !== ACP_REGISTRY_DRIVER_KIND)
-                    .map((option) => {
-                      return (
-                        <RadioPrimitive.Root
-                          key={option.driverKind}
-                          value={option.driverKind}
-                          className="relative flex cursor-pointer items-center gap-3 rounded-lg bg-card px-3 py-3 text-left text-muted-foreground outline-none ring-1 ring-black/5 hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring data-checked:bg-primary/8 data-checked:text-foreground data-checked:ring-2 data-checked:ring-inset data-checked:ring-primary data-checked:hover:bg-primary/8 dark:bg-white/3 dark:ring-white/5 dark:hover:bg-white/5 dark:data-checked:bg-primary/15 dark:data-checked:ring-primary dark:data-checked:hover:bg-primary/15"
-                        >
-                          <ProviderInstanceIcon
-                            driverKind={option.driverKind}
-                            displayName={option.label}
-                            iconClassName="size-4"
-                          />
-                          <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
-                            {option.label}
-                          </span>
-                          <RadioPrimitive.Indicator
-                            className="grid size-5 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground"
-                            aria-hidden
+                  <div className="grid grid-cols-2 gap-2">
+                    {providerClients.definitions
+                      .filter((option) => option.driverKind !== ACP_REGISTRY_DRIVER_KIND)
+                      .map((option) => {
+                        return (
+                          <RadioPrimitive.Root
+                            key={option.driverKind}
+                            value={option.driverKind}
+                            className="ov1-provider-card"
                           >
-                            <CheckIcon className="size-3.5 shrink-0" />
-                          </RadioPrimitive.Indicator>
-                          {option.badgeLabel ? (
-                            <Badge variant="warning" size="sm">
-                              {option.badgeLabel}
-                            </Badge>
-                          ) : null}
-                        </RadioPrimitive.Root>
-                      );
-                    })}
+                            <span className="flex size-7 shrink-0 items-center justify-center">
+                              {option.driverKind === "codex" ||
+                              option.driverKind === "claudeAgent" ? (
+                                <PixelIcon
+                                  name={option.driverKind === "codex" ? "codex" : "claude"}
+                                  size={28}
+                                />
+                              ) : (
+                                <ProviderInstanceIcon
+                                  driverKind={option.driverKind}
+                                  displayName={option.label}
+                                  iconClassName="size-4"
+                                />
+                              )}
+                            </span>
+                            <span className="min-w-0 flex-1 truncate text-control font-semibold">
+                              {option.label}
+                            </span>
+                            {option.badgeLabel ? (
+                              <Badge variant="warning" size="sm">
+                                {option.badgeLabel}
+                              </Badge>
+                            ) : null}
+                          </RadioPrimitive.Root>
+                        );
+                      })}
+                  </div>
                 </RadioGroup>
               </div>
 
@@ -605,8 +614,8 @@ export function AddProviderInstanceDialog({
                     <Input
                       id="add-provider-label"
                       aria-describedby="add-provider-label-description"
-                      size="sm"
-                      className="w-full @min-[32rem]/settings-row:w-56"
+                      size="default"
+                      className="w-full"
                       placeholder={t.settings.addProviderInstance.eGWork}
                       value={label}
                       onChange={(event) => setIdentityDraft({ label: event.target.value })}
@@ -643,8 +652,8 @@ export function AddProviderInstanceDialog({
                           ? "add-provider-instance-id-description add-provider-instance-id-error"
                           : "add-provider-instance-id-description"
                       }
-                      size="sm"
-                      className="w-full @min-[32rem]/settings-row:w-56"
+                      size="default"
+                      className="w-full"
                       placeholder={`${driver}_work`}
                       value={instanceId}
                       onChange={(event) => {
@@ -689,8 +698,8 @@ export function AddProviderInstanceDialog({
 
             <WizardFooter>
               <Button
-                variant={wizardStep === 0 ? "ghost-muted" : "outline"}
-                size="sm"
+                variant="outline"
+                size="dialog-action"
                 disabled={isSaving || isPreparingRegistryAgent}
                 onClick={() => {
                   if (wizardStep === 0) {
@@ -704,7 +713,11 @@ export function AddProviderInstanceDialog({
               </Button>
               {wizardStep === 0 && driver === "codex" ? (
                 <>
-                  <Button variant="outline" size="sm" onClick={() => navigateToStep(1)}>
+                  <Button
+                    variant="outline"
+                    size="dialog-action-wide"
+                    onClick={() => navigateToStep(1)}
+                  >
                     {t.settings.addProviderInstance.configureManually}
                   </Button>
                   <ChatGptConnectionButton
@@ -714,7 +727,7 @@ export function AddProviderInstanceDialog({
                 </>
               ) : wizardStep < (isAcpRegistry ? 1 : 2) ? (
                 <Button
-                  size="sm"
+                  size="dialog-action-wide"
                   disabled={isPreparingRegistryAgent}
                   onClick={() => navigateToStep(wizardStep + 1)}
                 >
@@ -722,7 +735,7 @@ export function AddProviderInstanceDialog({
                 </Button>
               ) : (
                 <Button
-                  size="sm"
+                  size="dialog-action-wide"
                   disabled={isSaving || !canManageProviders}
                   onClick={() => void handleSave()}
                 >

@@ -16,14 +16,7 @@ import { Popover, PopoverTrigger, PopoverPopup } from "./ui/popover";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Toggle, ToggleGroup } from "./ui/toggle-group";
-import { Select, SelectTrigger, SelectValue, SelectPopup, SelectItem } from "./ui/select";
-import {
-  NumberField,
-  NumberFieldGroup,
-  NumberFieldInput,
-  NumberFieldDecrement,
-  NumberFieldIncrement,
-} from "./ui/number-field";
+import { NumberField, NumberFieldGroup, NumberFieldInput } from "./ui/number-field";
 import {
   Dialog,
   DialogPopup,
@@ -38,17 +31,20 @@ type SnoozeChoice = { readonly snoozedUntil: string };
 type Request = { readonly resolve: (choice: SnoozeChoice | null) => void };
 const useRequest = create<{ request: Request | null }>(() => ({ request: null }));
 
+/** Replaces any pending request; resolves with a chosen timestamp or null on cancellation. */
 export function requestCustomSnooze(): Promise<SnoozeChoice | null> {
   useRequest.getState().request?.resolve(null);
   return new Promise((resolve) => useRequest.setState({ request: { resolve } }));
 }
 
+/** Clears the current request before resolving it, preventing repeated responses. */
 function finish(choice: SnoozeChoice | null) {
   const request = useRequest.getState().request;
   useRequest.setState({ request: null });
   request?.resolve(choice);
 }
 
+/** Mounts the pending snooze editor and cancels its request when the host unmounts. */
 export function CustomSnoozeDialogHost() {
   const request = useRequest((state) => state.request);
   useEffect(() => () => finish(null), []);
@@ -75,7 +71,7 @@ function CustomSnoozeDialog() {
         if (!open) finish(null);
       }}
     >
-      <DialogPopup className="sm:max-w-sm">
+      <DialogPopup size="wide">
         <form
           className="flex min-h-0 flex-col"
           onSubmit={(event) => {
@@ -90,13 +86,13 @@ function CustomSnoozeDialog() {
         >
           <DialogHeader>
             <DialogTitle>{t.app.snooze.title}</DialogTitle>
-            <DialogDescription>{t.app.snooze.description}</DialogDescription>
+            <DialogDescription className="sr-only">{t.app.snooze.description}</DialogDescription>
           </DialogHeader>
           <DialogPanel>
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3.5">
               <ToggleGroup
                 aria-label={t.app.snooze.scheduleType}
-                className="w-full *:flex-1"
+                size="dialog"
                 value={[mode]}
                 onValueChange={(next) => {
                   const value = next[0];
@@ -107,7 +103,7 @@ function CustomSnoozeDialog() {
                 <Toggle value="date">{t.app.snooze.dateAndTime}</Toggle>
                 <Toggle value="duration">{t.app.snooze.duration}</Toggle>
               </ToggleGroup>
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-3.5">
                 {mode === "date" ? (
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div className="flex min-w-0 flex-col gap-1.5">
@@ -163,49 +159,42 @@ function CustomSnoozeDialog() {
                     </Label>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <NumberField
-                      id={`${id}-amount`}
-                      min={0}
-                      step="any"
-                      value={amount === "" ? null : Number(amount)}
-                      onValueChange={(value) => {
-                        setAmount(value === null ? "" : String(value));
-                        setError(null);
-                      }}
-                    >
-                      <Label htmlFor={`${id}-amount`}>{t.app.snooze.snoozeFor}</Label>
-                      <NumberFieldGroup>
-                        <NumberFieldDecrement aria-label={t.app.snooze.decreaseDuration} />
-                        <NumberFieldInput required />
-                        <NumberFieldIncrement aria-label={t.app.snooze.increaseDuration} />
-                      </NumberFieldGroup>
-                    </NumberField>
-                    <Label className="flex min-w-0 flex-col items-stretch" htmlFor={`${id}-unit`}>
-                      {t.app.snooze.unit}
-                      <Select
-                        value={unit}
-                        items={{
-                          minutes: t.app.snooze.minutes,
-                          hours: t.app.snooze.hours,
-                          days: t.app.snooze.days,
-                        }}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="w-29.5">
+                      <NumberField
+                        id={`${id}-amount`}
+                        min={0}
+                        step="any"
+                        value={amount === "" ? null : Number(amount)}
                         onValueChange={(value) => {
-                          if (value === "minutes" || value === "hours" || value === "days")
-                            setUnit(value);
+                          setAmount(value === null ? "" : String(value));
                           setError(null);
                         }}
                       >
-                        <SelectTrigger id={`${id}-unit`} className="min-w-0">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectPopup>
-                          <SelectItem value="minutes">{t.app.snooze.minutes}</SelectItem>
-                          <SelectItem value="hours">{t.app.snooze.hours}</SelectItem>
-                          <SelectItem value="days">{t.app.snooze.days}</SelectItem>
-                        </SelectPopup>
-                      </Select>
-                    </Label>
+                        <NumberFieldGroup variant="dialog">
+                          <NumberFieldInput
+                            aria-label={t.app.snooze.snoozeFor}
+                            variant="dialog"
+                            required
+                          />
+                        </NumberFieldGroup>
+                      </NumberField>
+                    </div>
+                    <ToggleGroup
+                      size="duration"
+                      aria-label={t.app.snooze.unit}
+                      value={[unit]}
+                      onValueChange={(next) => {
+                        const value = next[0];
+                        if (value === "minutes" || value === "hours" || value === "days")
+                          setUnit(value);
+                        setError(null);
+                      }}
+                    >
+                      <Toggle value="minutes">{t.app.snooze.minutes}</Toggle>
+                      <Toggle value="hours">{t.app.snooze.hours}</Toggle>
+                      <Toggle value="days">{t.app.snooze.days}</Toggle>
+                    </ToggleGroup>
                   </div>
                 )}
               </div>
@@ -217,10 +206,17 @@ function CustomSnoozeDialog() {
             )}
           </DialogPanel>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => finish(null)}>
+            <Button
+              type="button"
+              variant="outline"
+              size="dialog-action"
+              onClick={() => finish(null)}
+            >
               {t.common.confirm.cancel}
             </Button>
-            <Button type="submit">{t.common.threadActions.snooze}</Button>
+            <Button type="submit" size="dialog-action-wide">
+              {t.common.confirm.confirm}
+            </Button>
           </DialogFooter>
         </form>
       </DialogPopup>

@@ -434,6 +434,8 @@ const twMerge = extendTailwindMerge({
         "diagnostics-icon",
         "diagnostics-bar",
         "licenses-icon",
+        "ov1-option",
+        "ov1-checkbox",
       ],
       leading: [
         "code",

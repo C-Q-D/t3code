@@ -111,3 +111,62 @@ body:has([data-onboarding-route]) [data-titlebar-brand] {
   background: var(--code-foreground);
   border-radius: var(--radius-keycap);
 }
+
+/* OV1.1 — 其余屏-8.dc.html R1: option cards, 14px wells, and 5px checkbox corners. */
+@theme {
+  --color-ov1-option-surface: #26262a;
+  --color-ov1-option-selected: #38383e;
+  --radius-ov1-option: 14px;
+  --radius-ov1-checkbox: 5px;
+}
+
+/* Native script fields retain their input behavior; these styles belong only to R1. */
+.ov1-field-label {
+  @apply block text-secondary-copy-medium text-secondary-label;
+}
+.ov1-script-identity {
+  @apply grid grid-cols-1 gap-2.5;
+  @media (width >= 40rem) {
+    grid-template-columns: minmax(0, 1fr) --spacing(37.5);
+  }
+}
+.ov1-script-icon {
+  @apply flex h-13.5 min-w-0 cursor-pointer flex-col items-center justify-center gap-0.75 rounded-compact-row bg-ov1-option-surface text-meta-large text-code-foreground outline-none hover:bg-ov1-option-selected focus-visible:inset-shadow-focus disabled:cursor-default disabled:opacity-40;
+}
+.ov1-script-icon[aria-pressed="true"] {
+  @apply bg-ov1-option-selected font-bold text-foreground inset-shadow-selected-control;
+}
+.ov1-command-input {
+  @apply block min-h-9.5 max-h-64 w-full resize-y rounded-full bg-input px-3.5 py-2 font-mono text-secondary-copy-medium text-foreground shadow-well-track outline-none focus:inset-shadow-focus disabled:opacity-40;
+  field-sizing: content;
+}
+.ov1-script-option {
+  @apply flex cursor-pointer items-center gap-2.5 text-control text-foreground has-disabled:cursor-default has-disabled:opacity-60;
+}
+.ov1-checkbox {
+  @apply m-0 size-4 cursor-pointer appearance-none rounded-ov1-checkbox bg-transparent shadow-outline-control outline-none checked:bg-primary checked:shadow-none focus-visible:inset-shadow-focus disabled:cursor-default;
+}
+.ov1-checkbox-mark {
+  @apply pointer-events-none absolute inset-0.5 size-3 text-primary-foreground opacity-0 peer-checked:opacity-100;
+  --lucide-hue-override: currentColor;
+}
+.ov1-provider-card {
+  @apply relative flex h-13 cursor-pointer items-center gap-2.5 rounded-ov1-option bg-ov1-option-surface px-3 text-left text-foreground outline-none hover:bg-ov1-option-selected focus-visible:inset-shadow-focus data-disabled:cursor-default data-disabled:opacity-40;
+}
+.ov1-provider-card[data-checked] {
+  @apply bg-ov1-option-selected inset-shadow-selected-control;
+}
+.ov1-theme-json {
+  @apply relative overflow-hidden rounded-ov1-option bg-input shadow-well-track focus-within:inset-shadow-focus;
+}
+.ov1-theme-file {
+  @apply flex flex-wrap items-center justify-between gap-3 rounded-ov1-option bg-ov1-option-surface p-3;
+}
+
+/* R1 shortcut keycaps overlay the unchanged capture input; focus stays on the input. */
+.ov1-shortcut-input {
+  @apply relative rounded-full bg-input shadow-well-track focus-within:inset-shadow-focus has-disabled:opacity-40;
+}
+.ov1-shortcut-capture {
+  @apply h-9.5 w-full min-w-0 rounded-full bg-transparent px-2.5 text-control text-transparent caret-transparent outline-none placeholder:text-placeholder;
+}

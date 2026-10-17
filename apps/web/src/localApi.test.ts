@@ -1,3 +1,4 @@
+/** Verifies local host capabilities and confirmation options forwarded to the themed host. */
 import {
   DEFAULT_CLIENT_SETTINGS,
   type ConfirmDialogOptions,
@@ -27,6 +28,7 @@ vi.mock("./confirmDialog", () => ({
   requestConfirmDialog: requestConfirmDialogMock,
 }));
 
+/** Creates isolated in-memory storage for each local API test. */
 function createLocalStorageStub(): Storage {
   const values = new Map<string, string>();
   return {
@@ -45,6 +47,7 @@ function createLocalStorageStub(): Storage {
   };
 }
 
+/** Returns the browser global installed by this suite or its test-runner fallback. */
 function testWindow(): Window & typeof globalThis {
   return globalThis.window ?? (globalThis as unknown as Window & typeof globalThis);
 }
@@ -104,6 +107,18 @@ describe("LocalApi", () => {
       true,
     );
     expect(requestConfirmDialogMock).toHaveBeenCalledWith("Delete this thread?", options);
+  });
+
+  it("forwards a localized confirmation action label", async () => {
+    const { createLocalApi } = await import("./localApi");
+    await createLocalApi().dialogs.confirm("Remove this project?", {
+      variant: "destructive",
+      confirmLabel: "移除",
+    });
+    expect(requestConfirmDialogMock).toHaveBeenCalledWith("Remove this project?", {
+      variant: "destructive",
+      confirmLabel: "移除",
+    });
   });
 
   it("fails closed in a browser when no themed host is available", async () => {

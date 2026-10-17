@@ -3960,6 +3960,9 @@ ${address}`
       `Add ${activeAppearance} palette`,
   },
   themeImport: {
+    importTitle: "Import theme",
+    importAction: "Import",
+    importSource: "Theme source",
     bytes: (bytes: string | number | boolean | null | undefined) => `${bytes} bytes`,
     fileThemeFilesFewKbHint: (
       formatByteSizeBytes: string | number | boolean | null | undefined,
@@ -3988,7 +3991,6 @@ ${address}`
     ) => `${themeLabel}: ${causeInstanceofError ? causeMessage : "failed"}`,
     themeAddedButSelectedTryError: "Theme added, but it could not be selected. Try again.",
     thatThemeFileIsInvalid: "That theme file is invalid.",
-    addATheme: "Add a theme",
     orImportAFile: "or import a file",
     chooseFiles: "Choose files",
     reading: "Reading…",
@@ -3997,7 +3999,6 @@ ${address}`
     keepBoth: "Keep both",
     themeFile: "Theme file",
     dropT3CodeOrVsCodeJsonFiles: "Drop T3 Code or VS Code .json files",
-    addTheme: "Add theme",
   },
   themePreviewCircles: {
     applyMode: (

@@ -34,6 +34,9 @@ const toggleVariants = cva(
         // SettingsPage8a O2: 28px segments with 12px insets in the shared 34px dialog track.
         dialog:
           "h-7 min-w-0 rounded-segmented-item px-3 text-secondary-copy-medium before:rounded-segmented-item sm:text-secondary-copy-medium",
+        // 其余屏-8 R1: 32px duration-unit segments inside a 38px recessed track.
+        duration:
+          "h-8 min-w-0 rounded-card-row px-3 text-secondary-copy-medium before:rounded-card-row sm:text-secondary-copy-medium",
       },
       variant: {
         default: "border-transparent",

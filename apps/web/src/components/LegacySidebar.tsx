@@ -1634,7 +1634,7 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
                           t.sidebar.projects.removeArchivedHistoryHint,
                           t.sidebar.projects.removeEntryHint,
                         ].join("\n"),
-                    { variant: "destructive" },
+                    { variant: "destructive", confirmLabel: t.sidebar.actions.remove },
                   );
                   if (!confirmed) {
                     return;
@@ -1684,7 +1684,10 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
         t.sidebar.projects.removeArchivedHistoryHint,
         t.sidebar.projects.removeEntryHint,
       ].join("\n");
-      const confirmed = await api.dialogs.confirm(message, { variant: "destructive" });
+      const confirmed = await api.dialogs.confirm(message, {
+        variant: "destructive",
+        confirmLabel: t.sidebar.actions.remove,
+      });
       if (!confirmed) {
         return;
       }
@@ -2025,7 +2028,7 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
           [t.sidebar.confirm.deleteThreads(count), t.sidebar.thread.deleteSelectedHistoryHint].join(
             "\n",
           ),
-          { variant: "destructive" },
+          { variant: "destructive", confirmLabel: t.common.threadActions.delete },
         );
         if (!confirmed) return;
       }

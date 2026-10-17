@@ -46,6 +46,8 @@ function ToggleGroup({
         variant === "segmented" && size === "settings" && "h-8 rounded-card-row",
         // Panel8a K4: compact 28px track with 2px inset around the segments.
         variant === "segmented" && size === "panel" && "h-7 rounded-full p-0.5",
+        // 其余屏-8 R1: duration units align with the shared 38px input.
+        variant === "segmented" && size === "duration" && "h-9.5 rounded-full",
       )}
       data-size={size}
       data-slot="toggle-group"

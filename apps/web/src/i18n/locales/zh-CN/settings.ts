@@ -3761,6 +3761,9 @@ ${address}`
       `添加${activeAppearance === "light" ? "浅色" : activeAppearance === "dark" ? "深色" : activeAppearance}调色板`,
   },
   themeImport: {
+    importTitle: "导入主题",
+    importAction: "导入",
+    importSource: "主题来源",
     bytes: (bytes: string | number | boolean | null | undefined) => `${bytes} 字节`,
     fileThemeFilesFewKbHint: (
       formatByteSizeBytes: string | number | boolean | null | undefined,
@@ -3789,7 +3792,6 @@ ${address}`
     ) => `${themeLabel}：${causeInstanceofError ? causeMessage : "失败"}`,
     themeAddedButSelectedTryError: "主题已添加，但无法选中。请重试。",
     thatThemeFileIsInvalid: "此主题文件无效。",
-    addATheme: "添加主题",
     orImportAFile: "或导入文件",
     chooseFiles: "选择文件",
     reading: "正在读取…",
@@ -3798,7 +3800,6 @@ ${address}`
     keepBoth: "保留两者",
     themeFile: "主题文件",
     dropT3CodeOrVsCodeJsonFiles: "拖入T3 Code或VS Code .json文件",
-    addTheme: "添加主题",
   },
   themePreviewCircles: {
     applyMode: (

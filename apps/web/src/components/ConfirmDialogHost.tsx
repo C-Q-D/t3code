@@ -46,21 +46,21 @@ export function ConfirmDialogHost() {
         if (!open) completeConfirmDialogClose();
       }}
     >
-      <AlertDialogPopup>
+      <AlertDialogPopup size="wide">
         <AlertDialogHeader>
           <AlertDialogTitle>{copy.title}</AlertDialogTitle>
           {copy.description ? (
-            <AlertDialogDescription className="whitespace-pre-line">
+            <AlertDialogDescription variant="confirmation" className="whitespace-pre-line">
               {copy.description}
             </AlertDialogDescription>
           ) : null}
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogClose render={<Button variant="outline" />}>
+          <AlertDialogClose render={<Button variant="outline" size="dialog-action" />}>
             {t.common.confirm.cancel}
           </AlertDialogClose>
-          <Button variant={confirmVariant} onClick={onConfirm}>
-            {t.common.confirm.confirm}
+          <Button variant={confirmVariant} size="dialog-action-wide" onClick={onConfirm}>
+            {(state.status !== "idle" && state.confirmLabel) || t.common.confirm.confirm}
           </Button>
         </AlertDialogFooter>
       </AlertDialogPopup>

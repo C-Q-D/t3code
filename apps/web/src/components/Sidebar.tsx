@@ -4393,7 +4393,7 @@ export default function Sidebar() {
               t.sidebar.confirm.deleteThreads(count),
               t.sidebar.thread.deleteSelectedHistoryHint,
             ].join("\n"),
-            { variant: "destructive" },
+            { variant: "destructive", confirmLabel: t.common.threadActions.delete },
           ),
         );
         if (confirmed._tag === "Failure" || !confirmed.value) return;

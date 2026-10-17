@@ -1373,6 +1373,8 @@ export type ConfirmDialogVariant = "default" | "destructive";
 
 export interface ConfirmDialogOptions {
   readonly variant?: ConfirmDialogVariant;
+  /** Localized action label; omitted requests use the host's default confirmation label. */
+  readonly confirmLabel?: string;
 }
 
 /**

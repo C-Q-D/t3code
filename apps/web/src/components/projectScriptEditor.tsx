@@ -17,9 +17,10 @@ import {
   BugIcon,
   FlaskConicalIcon,
   HammerIcon,
-  ListChecksIcon,
+  ScanSearchIcon,
+  CheckIcon,
   PlayIcon,
-  WrenchIcon,
+  Settings2Icon,
 } from "lucide-react";
 import React, {
   type FormEvent,
@@ -58,10 +59,9 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 import { Input } from "./ui/input";
-import { Label } from "./ui/label";
-import { Popover, PopoverPopup, PopoverTrigger } from "./ui/popover";
-import { Switch } from "./ui/switch";
-import { Textarea } from "./ui/textarea";
+import { Kbd } from "./ui/kbd";
+import { formatShortcutKeyLabel } from "../keybindings";
+import { parseKeybindingShortcut } from "@t3tools/shared/keybindings";
 
 const SCRIPT_ICONS: Array<{ id: ProjectScriptIcon; label: string }> = [
   { id: "play", label: t.app.scripts.play },
@@ -72,6 +72,7 @@ const SCRIPT_ICONS: Array<{ id: ProjectScriptIcon; label: string }> = [
   { id: "debug", label: t.app.scripts.debug },
 ];
 
+/** Maps each project action icon to the shared Lucide icon system. */
 export function ScriptIcon({
   icon,
   className = "size-3.5",
@@ -80,13 +81,14 @@ export function ScriptIcon({
   className?: string;
 }) {
   if (icon === "test") return <FlaskConicalIcon className={className} />;
-  if (icon === "lint") return <ListChecksIcon className={className} />;
-  if (icon === "configure") return <WrenchIcon className={className} />;
+  if (icon === "lint") return <ScanSearchIcon className={className} />;
+  if (icon === "configure") return <Settings2Icon className={className} />;
   if (icon === "build") return <HammerIcon className={className} />;
   if (icon === "debug") return <BugIcon className={className} />;
   return <PlayIcon className={className} />;
 }
 
+/** Editable action configuration; omitted keybinding preserves the existing shortcut. */
 export interface NewProjectScriptInput {
   name: string;
   command: string;
@@ -103,6 +105,7 @@ export interface NewProjectScriptInput {
   autoOpenPreview: boolean;
 }
 
+/** Command result returned by the owner when an action is persisted. */
 export type ProjectScriptActionResult = AtomCommandResult<void, unknown>;
 
 export const EMPTY_PROJECT_SCRIPT_INPUT: NewProjectScriptInput = {
@@ -125,6 +128,7 @@ export interface ProjectScriptEditorRequest {
   error?: string;
 }
 
+/** Copies a persisted script and its resolved shortcut into an editor request. */
 export function editorRequestForScript(
   script: ProjectScript,
   keybindings: ResolvedKeybindingsConfig,
@@ -177,11 +181,11 @@ export function ProjectScriptEditorDialog({
   const [name, setName] = useState("");
   const [command, setCommand] = useState("");
   const [icon, setIcon] = useState<ProjectScriptIcon>("play");
-  const [iconPickerOpen, setIconPickerOpen] = useComposerMenuState(!canEditActions);
   const [runOnWorktreeCreate, setRunOnWorktreeCreate] = useState(false);
   const [waitForSetup, setWaitForSetup] = useState(false);
   const [runOnSettle, setRunOnSettle] = useState(false);
   const [keybinding, setKeybinding] = useState("");
+  const shortcut = parseKeybindingShortcut(keybinding);
   const [previewUrl, setPreviewUrl] = useState("");
   const [autoOpenPreview, setAutoOpenPreview] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -209,7 +213,6 @@ export function ProjectScriptEditorDialog({
     setName(request.initial.name);
     setCommand(request.initial.command);
     setIcon(request.initial.icon);
-    setIconPickerOpen(false);
     setRunOnWorktreeCreate(request.initial.runOnWorktreeCreate);
     setWaitForSetup(request.initial.waitForSetup);
     setRunOnSettle(request.initial.runOnSettle);
@@ -218,12 +221,11 @@ export function ProjectScriptEditorDialog({
     setAutoOpenPreview(request.initial.autoOpenPreview);
     setValidationError(request.error ?? null);
     setSavingRequest(null);
-  }, [request, setIconPickerOpen]);
+  }, [request]);
 
   const close = () => {
     pendingSubmissionRef.current = null;
     setSavingRequest(null);
-    setIconPickerOpen(false);
     onClose();
   };
 
@@ -301,7 +303,6 @@ export function ProjectScriptEditorDialog({
     const submission = { request };
     pendingSubmissionRef.current = submission;
     setSavingRequest(request);
-    setIconPickerOpen(false);
     try {
       const result = await onSubmit(request.scriptId, payload);
       if (pendingSubmissionRef.current === submission) {
@@ -335,58 +336,21 @@ export function ProjectScriptEditorDialog({
           }
         }}
       >
-        <DialogPopup>
+        <DialogPopup size="wide">
           <DialogHeader>
             <DialogTitle>
               {isEditing ? t.app.scripts.editTitle : t.app.scripts.addTitle}
             </DialogTitle>
-            <DialogDescription>{t.app.scripts.description}</DialogDescription>
+            <DialogDescription className="sr-only">{t.app.scripts.description}</DialogDescription>
           </DialogHeader>
           <DialogPanel>
             <form id={formId} onSubmit={submit}>
-              <fieldset className="space-y-4" disabled={isSaving || !canEditActions}>
-                <div className="space-y-1.5">
-                  <Label htmlFor="script-name">{t.app.scripts.name}</Label>
-                  <div className="flex items-center gap-2">
-                    <Popover onOpenChange={setIconPickerOpen} open={iconPickerOpen}>
-                      <PopoverTrigger
-                        render={
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="size-9 shrink-0"
-                            aria-label={t.app.scripts.chooseIcon}
-                          />
-                        }
-                      >
-                        <ScriptIcon icon={icon} className="size-4.5" />
-                      </PopoverTrigger>
-                      <PopoverPopup align="start">
-                        <div className="grid grid-cols-3 gap-2">
-                          {SCRIPT_ICONS.map((entry) => {
-                            const isSelected = entry.id === icon;
-                            return (
-                              <button
-                                key={entry.id}
-                                type="button"
-                                className={`relative flex flex-col items-center gap-2 rounded-md border px-2 py-2 text-xs dark:border-transparent ${
-                                  isSelected
-                                    ? "border-primary/70 bg-primary/10 ring-inset dark:ring-1 dark:ring-primary/30"
-                                    : "border-border/70 hover:bg-accent/60 dark:bg-white/[0.035]"
-                                }`}
-                                onClick={() => {
-                                  setIcon(entry.id);
-                                  setIconPickerOpen(false);
-                                }}
-                              >
-                                <ScriptIcon icon={entry.id} className="size-4" />
-                                <span>{entry.label}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </PopoverPopup>
-                    </Popover>
+              <fieldset className="space-y-3.5" disabled={isSaving || !canEditActions}>
+                <div className="ov1-script-identity">
+                  <div className="min-w-0 space-y-1.5">
+                    <label className="ov1-field-label" htmlFor="script-name">
+                      {t.app.scripts.name}
+                    </label>
                     <Input
                       id="script-name"
                       autoFocus
@@ -395,79 +359,165 @@ export function ProjectScriptEditorDialog({
                       onChange={(event) => setName(event.target.value)}
                     />
                   </div>
+                  <div className="min-w-0 space-y-1.5">
+                    <label className="ov1-field-label" htmlFor="script-keybinding">
+                      {t.app.scripts.keybinding}
+                    </label>
+                    <div className="ov1-shortcut-input">
+                      <input
+                        className="ov1-shortcut-capture"
+                        disabled={!canWriteSettings}
+                        id="script-keybinding"
+                        placeholder={t.app.scripts.pressShortcut}
+                        value={keybinding}
+                        readOnly
+                        onKeyDown={captureKeybinding}
+                        aria-describedby="script-keybinding-hint"
+                      />
+                      <span
+                        className="pointer-events-none absolute inset-0 flex items-center gap-1 overflow-hidden px-2.5"
+                        aria-hidden
+                      >
+                        {shortcut ? (
+                          <>
+                            {shortcut.modKey || shortcut.ctrlKey ? <Kbd>Ctrl</Kbd> : null}
+                            {shortcut.altKey ? <Kbd>Alt</Kbd> : null}
+                            {shortcut.shiftKey ? <Kbd>Shift</Kbd> : null}
+                            {shortcut.metaKey ? <Kbd>Meta</Kbd> : null}
+                            <Kbd>{formatShortcutKeyLabel(shortcut.key)}</Kbd>
+                          </>
+                        ) : keybinding ? (
+                          <Kbd>{keybinding}</Kbd>
+                        ) : null}
+                      </span>
+                    </div>
+                    <p id="script-keybinding-hint" className="sr-only">
+                      {t.app.scripts.shortcutHintLead}
+                      <code>Backspace</code> {t.app.scripts.shortcutHintTail}
+                    </p>
+                  </div>
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="script-keybinding">{t.app.scripts.keybinding}</Label>
-                  <Input
-                    disabled={!canWriteSettings}
-                    id="script-keybinding"
-                    placeholder={t.app.scripts.pressShortcut}
-                    value={keybinding}
-                    readOnly
-                    onKeyDown={captureKeybinding}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    {t.app.scripts.shortcutHintLead}
-                    <code>Backspace</code> {t.app.scripts.shortcutHintTail}
-                  </p>
+                  <span id="script-icon-label" className="ov1-field-label">
+                    {t.app.scripts.icon}
+                  </span>
+                  <div
+                    className="grid grid-cols-6 gap-1.5"
+                    role="group"
+                    aria-labelledby="script-icon-label"
+                  >
+                    {SCRIPT_ICONS.map((entry) => (
+                      <button
+                        key={entry.id}
+                        type="button"
+                        className="ov1-script-icon"
+                        aria-pressed={entry.id === icon}
+                        onClick={() => setIcon(entry.id)}
+                      >
+                        <ScriptIcon icon={entry.id} className="size-3.75" />
+                        <span>{entry.label}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="script-command">{t.app.scripts.command}</Label>
-                  <Textarea
+                  <label className="ov1-field-label" htmlFor="script-command">
+                    {t.app.scripts.command}
+                  </label>
+                  <textarea
+                    className="ov1-command-input"
+                    rows={1}
                     id="script-command"
-                    placeholder="bun test"
+                    placeholder={t.app.scripts.command}
                     value={command}
                     onChange={(event) => setCommand(event.target.value)}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="script-preview-url">{t.app.scripts.previewUrl}</Label>
+                  <label className="ov1-field-label" htmlFor="script-preview-url">
+                    {t.app.scripts.previewUrl}
+                  </label>
                   <Input
+                    font="mono"
                     id="script-preview-url"
                     placeholder="http://localhost:5173"
                     value={previewUrl}
                     onChange={(event) => setPreviewUrl(event.target.value)}
                   />
-                  <p className="text-xs text-muted-foreground">{t.app.scripts.previewHint}</p>
+                  <p className="sr-only">{t.app.scripts.previewHint}</p>
                 </div>
-                <label className="flex items-center justify-between gap-3 rounded-md border border-border/70 px-3 py-2 text-sm dark:border-transparent dark:bg-white/[0.035]">
-                  <span>{t.app.scripts.runOnCreate}</span>
-                  <Switch
-                    checked={runOnWorktreeCreate}
-                    onCheckedChange={(checked) => setRunOnWorktreeCreate(Boolean(checked))}
-                  />
-                </label>
-                <label
-                  className={`flex items-center justify-between gap-3 rounded-md border border-border/70 px-3 py-2 text-sm dark:border-transparent dark:bg-white/[0.035] ${
-                    runOnWorktreeCreate ? "" : "opacity-60"
-                  }`}
-                >
-                  <span>{t.app.scripts.waitBeforeAgent}</span>
-                  <Switch
-                    checked={waitForSetup}
-                    disabled={!runOnWorktreeCreate}
-                    onCheckedChange={(checked) => setWaitForSetup(Boolean(checked))}
-                  />
-                </label>
-                <label className="flex items-center justify-between gap-3 rounded-md border border-border/70 px-3 py-2 text-sm dark:border-transparent dark:bg-white/[0.035]">
-                  <span>{t.app.scripts.runOnSettle}</span>
-                  <Switch
-                    checked={runOnSettle}
-                    onCheckedChange={(checked) => setRunOnSettle(Boolean(checked))}
-                  />
-                </label>
-                <label
-                  className={`flex items-center justify-between gap-3 rounded-md border border-border/70 px-3 py-2 text-sm dark:border-transparent dark:bg-white/[0.035] ${
-                    previewUrl.trim().length === 0 ? "opacity-60" : ""
-                  }`}
-                >
-                  <span>{t.app.scripts.autoPreview}</span>
-                  <Switch
-                    checked={autoOpenPreview}
-                    disabled={previewUrl.trim().length === 0}
-                    onCheckedChange={(checked) => setAutoOpenPreview(Boolean(checked))}
-                  />
-                </label>
+                <div className="space-y-2">
+                  <label className="ov1-script-option">
+                    <span className="relative flex size-4 shrink-0">
+                      <input
+                        className="ov1-checkbox peer"
+                        type="checkbox"
+                        checked={runOnWorktreeCreate}
+                        onChange={(event) => setRunOnWorktreeCreate(event.target.checked)}
+                        onKeyDown={(event) => {
+                          if (event.key !== "Enter") return;
+                          event.preventDefault();
+                          setRunOnWorktreeCreate((checked) => !checked);
+                        }}
+                      />
+                      <CheckIcon className="ov1-checkbox-mark" aria-hidden />
+                    </span>
+                    <span>{t.app.scripts.runOnCreate}</span>
+                  </label>
+                  <label className="ov1-script-option">
+                    <span className="relative flex size-4 shrink-0">
+                      <input
+                        className="ov1-checkbox peer"
+                        type="checkbox"
+                        checked={waitForSetup}
+                        disabled={!runOnWorktreeCreate}
+                        onChange={(event) => setWaitForSetup(event.target.checked)}
+                        onKeyDown={(event) => {
+                          if (event.key !== "Enter") return;
+                          event.preventDefault();
+                          setWaitForSetup((checked) => !checked);
+                        }}
+                      />
+                      <CheckIcon className="ov1-checkbox-mark" aria-hidden />
+                    </span>
+                    <span>{t.app.scripts.waitBeforeAgent}</span>
+                  </label>
+                  <label className="ov1-script-option">
+                    <span className="relative flex size-4 shrink-0">
+                      <input
+                        className="ov1-checkbox peer"
+                        type="checkbox"
+                        checked={runOnSettle}
+                        onChange={(event) => setRunOnSettle(event.target.checked)}
+                        onKeyDown={(event) => {
+                          if (event.key !== "Enter") return;
+                          event.preventDefault();
+                          setRunOnSettle((checked) => !checked);
+                        }}
+                      />
+                      <CheckIcon className="ov1-checkbox-mark" aria-hidden />
+                    </span>
+                    <span>{t.app.scripts.runOnSettle}</span>
+                  </label>
+                  <label className="ov1-script-option">
+                    <span className="relative flex size-4 shrink-0">
+                      <input
+                        className="ov1-checkbox peer"
+                        type="checkbox"
+                        checked={autoOpenPreview}
+                        disabled={previewUrl.trim().length === 0}
+                        onChange={(event) => setAutoOpenPreview(event.target.checked)}
+                        onKeyDown={(event) => {
+                          if (event.key !== "Enter") return;
+                          event.preventDefault();
+                          setAutoOpenPreview((checked) => !checked);
+                        }}
+                      />
+                      <CheckIcon className="ov1-checkbox-mark" aria-hidden />
+                    </span>
+                    <span>{t.app.scripts.autoPreview}</span>
+                  </label>
+                </div>
                 {validationError && <p className="text-sm text-destructive">{validationError}</p>}
               </fieldset>
             </form>
@@ -484,15 +534,16 @@ export function ProjectScriptEditorDialog({
                 {t.common.threadActions.delete}
               </Button>
             )}
-            <Button type="button" variant="outline" onClick={close}>
+            <Button type="button" variant="outline" size="dialog-action" onClick={close}>
               {t.common.confirm.cancel}
             </Button>
-            <Button form={formId} type="submit" disabled={isSaving || !canEditActions}>
-              {isSaving
-                ? t.app.actions.saving
-                : isEditing
-                  ? t.app.actions.saveChanges
-                  : t.app.scripts.saveAction}
+            <Button
+              size="dialog-action-wide"
+              form={formId}
+              type="submit"
+              disabled={isSaving || !canEditActions}
+            >
+              {isSaving ? t.app.actions.saving : t.app.scripts.saveAction}
             </Button>
           </DialogFooter>
         </DialogPopup>
