@@ -7,7 +7,7 @@ import {
   htmlRenderFrameHeight,
   type HtmlRenderReference,
 } from "@t3tools/shared/htmlRender";
-import { Maximize2Icon } from "lucide-react";
+import { CodeXmlIcon, Maximize2Icon } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { useAssetUrlRefresh, useAssetUrlState } from "~/assets/assetUrls";
@@ -23,10 +23,10 @@ import { observeResize } from "~/lib/observeResize";
 const MIN_URL_LIFE_MS = 5 * 60_000;
 
 /**
- * An agent's HTML render inline in the thread: the page itself on the thread's
- * own background, at the server's measured height for this width until the
- * page reports its own. Loading and failure hold the same box so nothing below
- * it moves.
+ * Frames an agent's HTML page in the timeline at the server's measured height
+ * for the content width until the page reports its own. Loading and failure
+ * reserve the same content box. The surrounding chrome never changes the
+ * document's parent or frozen URL on updates.
  */
 export function HtmlRenderFrame(props: {
   readonly environmentId: EnvironmentId;
@@ -102,56 +102,77 @@ export function HtmlRenderFrame(props: {
   }, [cacheFailed, cachedExpiresAt, cachedUrl, refresh, src]);
 
   return (
-    <div ref={boxRef} className="group/html-render relative" style={{ height }}>
-      {src !== null ? (
-        <>
-          <HtmlRenderDocument
-            src={src}
-            title={title}
-            threadRef={props.threadRef}
-            className="block size-full"
-            onContentHeight={setContentHeight}
-          />
-          <div className="absolute end-2 top-2 flex gap-1 opacity-0 transition-opacity duration-150 focus-within:opacity-100 group-hover/html-render:opacity-100 pointer-coarse:opacity-100">
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    aria-label={t.chat.markdown.openFullScreen}
-                    size="icon-xs"
-                    variant="glass"
-                    onClick={async () => {
-                      const url = await refresh().catch(() => null);
-                      if (url !== null) setExpandedSrc(url);
-                      else
-                        toastManager.add({
-                          type: "error",
-                          title: "Page unavailable",
-                          description: "Reconnect to the environment and try again.",
-                        });
-                    }}
-                  />
-                }
-              >
-                <Maximize2Icon className="size-3.5" />
-              </TooltipTrigger>
-              <TooltipPopup side="left">{t.chat.markdown.openFullScreen}</TooltipPopup>
-            </Tooltip>
-          </div>
-          {expandedSrc !== null ? (
-            <HtmlRenderDialog
-              src={expandedSrc}
+    <div className="overflow-hidden rounded-card-row bg-timeline-embed pb-2 shadow-well-pressed">
+      <div className="flex h-8.5 items-center gap-2 px-3 text-secondary-copy text-secondary-label">
+        <CodeXmlIcon aria-hidden="true" className="size-3.25 shrink-0" strokeWidth={1.75} />
+        <span className="truncate">{t.chat.markdown.htmlPageFrameTitle}</span>
+      </div>
+      {/* Measure the real content width; the 8px shell gutters must not enter the page's size context. */}
+      <div
+        ref={boxRef}
+        className="group/html-render relative mx-2 overflow-hidden rounded-tag bg-timeline-embed-content text-shadow-none"
+        style={{ height }}
+      >
+        {src !== null ? (
+          <>
+            <HtmlRenderDocument
+              src={src}
               title={title}
               threadRef={props.threadRef}
-              onClose={() => setExpandedSrc(null)}
+              className="block size-full"
+              onContentHeight={setContentHeight}
             />
-          ) : null}
-        </>
-      ) : failed ? (
-        <p className="flex size-full items-center justify-center text-muted-foreground text-xs">
-          {t.chat.markdown.unableToLoad(title)}
-        </p>
-      ) : null}
+            <div className="absolute end-2 top-2 flex gap-1 opacity-0 transition-opacity duration-150 focus-within:opacity-100 group-hover/html-render:opacity-100 pointer-coarse:opacity-100">
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      aria-label={t.chat.markdown.openFullScreen}
+                      size="icon-xs"
+                      variant="glass"
+                      onClick={async () => {
+                        const url = await refresh().catch(() => null);
+                        if (url !== null) setExpandedSrc(url);
+                        else
+                          toastManager.add({
+                            type: "error",
+                            title: t.chat.markdown.pageUnavailable,
+                            description: t.chat.markdown.reconnectToRetryPage,
+                          });
+                      }}
+                    />
+                  }
+                >
+                  <Maximize2Icon className="size-3.5" />
+                </TooltipTrigger>
+                <TooltipPopup side="left">{t.chat.markdown.openFullScreen}</TooltipPopup>
+              </Tooltip>
+            </div>
+            {expandedSrc !== null ? (
+              <HtmlRenderDialog
+                src={expandedSrc}
+                title={title}
+                threadRef={props.threadRef}
+                onClose={() => setExpandedSrc(null)}
+              />
+            ) : null}
+          </>
+        ) : failed ? (
+          <p
+            role="alert"
+            className="m-0 flex size-full items-center justify-center p-3 text-secondary-copy text-error"
+          >
+            {t.chat.markdown.unableToLoad(title)}
+          </p>
+        ) : (
+          <p
+            role="status"
+            className="m-0 flex size-full items-center justify-center p-3 text-secondary-copy text-muted-foreground"
+          >
+            {t.chat.markdown.loadingPage}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

@@ -1,4 +1,7 @@
-// @vitest-environment jsdom
+/**
+ * Exercises inline HTML document lifetime and full-screen page interactions.
+ * @vitest-environment jsdom
+ */
 
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -10,7 +13,8 @@ import { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import { HtmlRenderDialog } from "./HtmlRenderDialog";
 import { HtmlRenderFrame } from "./HtmlRenderFrame";
 
-const { refresh, showError, openLink, openChangeRequestLink } = vi.hoisted(() => ({
+const { assetState, refresh, showError, openLink, openChangeRequestLink } = vi.hoisted(() => ({
+  assetState: vi.fn(),
   refresh: vi.fn(),
   showError: vi.fn(),
   openLink: vi.fn(),
@@ -21,11 +25,7 @@ vi.mock("~/lib/openPullRequestLink", () => ({
   useOpenChangeRequestLink: () => openChangeRequestLink,
 }));
 vi.mock("~/assets/assetUrls", () => ({
-  useAssetUrlState: () => ({
-    _tag: "Success",
-    url: "https://environment.test/original.html",
-    expiresAt: Date.now() + 60 * 60_000,
-  }),
+  useAssetUrlState: assetState,
   useAssetUrlRefresh: () => refresh,
 }));
 vi.mock("../ui/toast", () => ({ toastManager: { add: showError } }));
@@ -50,6 +50,11 @@ beforeEach(async () => {
     },
   );
   refresh.mockReset();
+  assetState.mockReturnValue({
+    _tag: "Success",
+    url: "https://environment.test/original.html",
+    expiresAt: Date.now() + 60 * 60_000,
+  });
   openLink.mockReset().mockResolvedValue(undefined);
   openChangeRequestLink.mockReset().mockReturnValue(false);
   showError.mockClear();
@@ -74,6 +79,7 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
+/** Activates an accessible page action and waits for its React updates. */
 async function click(label: string) {
   const button = document.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`);
   expect(button).not.toBeNull();
@@ -108,6 +114,7 @@ it("closes with the close button or Escape", async () => {
   expect(onClose).toHaveBeenCalledOnce();
 });
 
+/** Mounts the same inline page so updates can be checked without replacing its document. */
 async function renderInline() {
   await act(() =>
     root.render(
@@ -122,6 +129,40 @@ async function renderInline() {
     ),
   );
 }
+
+it.each([
+  { asset: { _tag: "Loading" }, role: "status", message: "Loading page…" },
+  { asset: { _tag: "Failure" }, role: "alert", message: "Unable to load Diagram" },
+])(
+  "announces the inline page's $asset._tag state without a blank iframe",
+  async ({ asset, role, message }) => {
+    assetState.mockReturnValue(asset);
+    await renderInline();
+    expect(container.querySelector(`[role="${role}"]`)?.textContent).toBe(message);
+    expect(container.querySelector("iframe")).toBeNull();
+  },
+);
+
+it("fits a page's reported height without replacing its iframe or URL on parent updates", async () => {
+  await renderInline();
+  const frame = container.querySelector("iframe")!;
+  const originalSrc = frame.src;
+  const originalWindow = frame.contentWindow;
+  await act(() => {
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        source: originalWindow,
+        data: { jsonrpc: "2.0", method: "ui/notifications/size-changed", params: { height: 300 } },
+      }),
+    );
+  });
+  expect(frame.parentElement?.style.height).toBe("300px");
+  await renderInline();
+  expect(container.querySelector("iframe")).toBe(frame);
+  expect(frame.contentWindow).toBe(originalWindow);
+  expect(frame.src).toBe(originalSrc);
+  expect(frame.parentElement?.style.height).toBe("300px");
+});
 
 it("offers only full screen and opens with a fresh URL while keeping the inline page loaded", async () => {
   await renderInline();

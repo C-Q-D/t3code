@@ -227,6 +227,8 @@ const twMerge = extendTailwindMerge({
         "browser-viewport",
         "browser-agent",
         "notice-sand",
+        "timeline-diagram-well",
+        "timeline-quote-toolbar",
       ],
       "inset-shadow": [
         "selected",
@@ -312,6 +314,7 @@ const twMerge = extendTailwindMerge({
         "panel-launcher",
         "browser-viewport",
         "notice",
+        "timeline-quote-key",
       ],
       leading: [
         "code",

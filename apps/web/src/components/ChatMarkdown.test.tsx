@@ -1129,6 +1129,47 @@ it("opens a disclosure only when find selects a match inside it", async () => {
   }
 });
 
+it("switches a timeline Mermaid between diagram and source while copying the original source", async () => {
+  await getSyntaxHighlighterPromise("mermaid");
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const writeText = vi.fn(async (_text: string) => {});
+  vi.stubGlobal("navigator", { clipboard: { writeText } });
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  const button = (label: string) => {
+    const result = Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find(
+      (element) => element.textContent === label || element.getAttribute("aria-label") === label,
+    );
+    if (!result) throw new Error(`Missing Mermaid action: ${label}`);
+    return result;
+  };
+  try {
+    await act(async () =>
+      root.render(
+        <ChatMarkdown
+          cwd={undefined}
+          presentation="timeline"
+          text={"```mermaid\ngraph TD; Alpha-->Beta\n```"}
+        />,
+      ),
+    );
+    expect(container.querySelector('svg[aria-label="Diagram"]')).not.toBeNull();
+    await act(async () => button("Show code").click());
+    expect(container.querySelector('svg[aria-label="Diagram"]')).toBeNull();
+    expect(container.querySelector("pre")?.textContent).toContain("graph TD; Alpha-->Beta");
+    await act(async () => button("Copy code").click());
+    // Fence copying preserves the authored trailing newline, as the existing code-copy tests require.
+    expect(writeText).toHaveBeenCalledExactlyOnceWith("graph TD; Alpha-->Beta\n");
+    await act(async () => button("Show diagram").click());
+    expect(container.querySelector('svg[aria-label="Diagram"]')).not.toBeNull();
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+    vi.unstubAllGlobals();
+  }
+});
+
 it("keeps Mermaid diagrams rendered until find selects a match in their source", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.stubGlobal(

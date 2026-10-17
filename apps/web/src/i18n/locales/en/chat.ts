@@ -63,6 +63,9 @@ export const chat = {
     },
   },
   mcpApp: {
+    /** Labels the frame with its actual server rather than the design's sample app. */
+    frameTitle: (server: string) => `MCP app · ${server}`,
+    loading: "Loading app…",
     show: "Show app",
     exitFullscreen: "Exit full screen",
     /** Formats allowTool with the supplied display values. */
@@ -647,6 +650,10 @@ export const chat = {
     resetZoom: "Reset zoom",
     expandedPreview: (title: string) => `Expanded ${title} preview`,
     openFullScreen: "Open full screen",
+    htmlPageFrameTitle: "HTML page · Auto height",
+    loadingPage: "Loading page…",
+    pageUnavailable: "Page unavailable",
+    reconnectToRetryPage: "Reconnect to the environment and try again.",
     openInPanel: "Open in panel",
     copyMessage: "Copy message",
     retry: "Retry",

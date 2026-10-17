@@ -36,6 +36,7 @@ import {
   InfoIcon,
   LightbulbIcon,
   MailIcon,
+  Maximize2Icon,
   MessageSquareIcon,
   MessageSquareWarningIcon,
   OctagonAlertIcon,
@@ -866,7 +867,7 @@ const THREAD_FIND_IGNORE_PROPS = {
  * Frame rendered and editable fences; only a timeline Markdown parent enables D1 chrome.
  * @param props Language/optional filename, theme, wrap state (defaults true), content and optional
  * header actions/title. as defaults to div and supports the composer's existing node-view wrapper.
- * @returns The code surface and header; Mermaid and composer frames keep their existing appearance.
+ * @returns The code surface and header; timeline Mermaid uses its own inset frame.
  */
 export function MarkdownCodeBlockFrame({
   as: Wrapper = "div",
@@ -890,13 +891,17 @@ export function MarkdownCodeBlockFrame({
   headerProps?: React.HTMLAttributes<HTMLDivElement>;
   children: React.ReactNode;
 }) {
-  const timeline = use(MarkdownTimelineContext) && language !== "mermaid";
+  const inTimeline = use(MarkdownTimelineContext);
+  const mermaidTimeline = inTimeline && language === "mermaid";
+  const timeline = inTimeline && !mermaidTimeline;
   return (
     <Wrapper
       className={
-        timeline
-          ? "chat-markdown-codeblock timeline-codeblock my-3.5 overflow-hidden rounded-card-surface bg-code text-code-foreground shadow-well-control"
-          : "chat-markdown-codeblock my-[0.65rem] overflow-hidden rounded-lg border border-border/70 bg-secondary leading-snug dark:border-transparent dark:bg-input/32"
+        mermaidTimeline
+          ? "chat-markdown-codeblock timeline-mermaid-frame mt-4.5 mb-3 overflow-hidden rounded-card-row bg-code text-code-foreground shadow-timeline-diagram-well"
+          : timeline
+            ? "chat-markdown-codeblock timeline-codeblock my-3.5 overflow-hidden rounded-card-surface bg-code text-code-foreground shadow-well-control"
+            : "chat-markdown-codeblock my-[0.65rem] overflow-hidden rounded-lg border border-border/70 bg-secondary leading-snug dark:border-transparent dark:bg-input/32"
       }
       data-language={language}
       data-wrap={wrapped ? "true" : "false"}
@@ -905,21 +910,29 @@ export function MarkdownCodeBlockFrame({
         {...headerProps}
         className={cn(
           "chat-markdown-codeblock-header flex items-center justify-between select-none",
-          timeline ? "h-10 gap-0.5 ps-4 pe-2" : "gap-2 pt-1.5 pr-1.5 pb-0 pl-3",
+          mermaidTimeline
+            ? "h-10 gap-1.5 ps-3.5 pe-2"
+            : timeline
+              ? "h-10 gap-0.5 ps-4 pe-2"
+              : "gap-2 pt-1.5 pr-1.5 pb-0 pl-3",
           headerProps?.className,
         )}
       >
         {title ?? (
           <span
             className={
-              timeline
+              inTimeline
                 ? "inline-flex h-5.5 min-w-0 items-center gap-1.5 rounded-full bg-timeline-log-hover px-2.5 text-secondary-copy font-semibold text-timeline-code-label"
                 : "inline-flex min-w-0 items-center gap-1.5 font-mono text-2xs"
             }
           >
-            {timeline && !fenceTitle ? (
+            {inTimeline && !fenceTitle ? (
               <span className="truncate">
-                {language === "typescript" ? "TypeScript" : language}
+                {language === "typescript"
+                  ? "TypeScript"
+                  : language === "mermaid"
+                    ? "Mermaid"
+                    : language}
               </span>
             ) : (
               <MarkdownCodeBlockTitleContent
@@ -1018,7 +1031,9 @@ function MarkdownCodeBlock({
   diagram?: boolean;
   children: ReactNode;
 }) {
-  const timeline = use(MarkdownTimelineContext) && language !== "mermaid";
+  const inTimeline = use(MarkdownTimelineContext);
+  const mermaidTimeline = inTimeline && language === "mermaid";
+  const timeline = inTimeline && !mermaidTimeline;
   const [copied, setCopied] = useState(false);
   const [wrapped, setWrapped] = useState(readInitialWordWrapSetting);
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1078,10 +1093,10 @@ function MarkdownCodeBlock({
     <Tooltip>
       <TooltipTrigger
         render={
-          timeline ? (
+          inTimeline ? (
             <button
               type="button"
-              className={TIMELINE_CODE_ACTION_CLASS}
+              className={cn(TIMELINE_CODE_ACTION_CLASS, mermaidTimeline && "size-7")}
               onClick={handleCopy}
               aria-label={copyLabel}
             />
@@ -1096,13 +1111,34 @@ function MarkdownCodeBlock({
           )
         }
       >
-        <MorphIcon className={timeline ? "size-3.75" : "size-3"} icon={copied ? Check : Copy} />
+        <MorphIcon
+          className={mermaidTimeline ? "size-3.5" : timeline ? "size-3.75" : "size-3"}
+          icon={copied ? Check : Copy}
+        />
       </TooltipTrigger>
       <TooltipPopup side="top">{copyLabel}</TooltipPopup>
     </Tooltip>
   );
 
   if (diagram) {
+    if (mermaidTimeline) {
+      return (
+        <MarkdownCodeBlockFrame
+          language={language}
+          fenceTitle={fenceTitle}
+          theme={theme}
+          headerProps={THREAD_FIND_IGNORE_PROPS}
+          actions={
+            <div className="flex items-center gap-1.5">
+              {leadingActions}
+              {copyButton}
+            </div>
+          }
+        >
+          {children}
+        </MarkdownCodeBlockFrame>
+      );
+    }
     return (
       <div className="my-[0.65rem]" data-language={language}>
         {children}
@@ -1129,7 +1165,7 @@ function MarkdownCodeBlock({
           aria-label={t.chat.markdown.codeBlockActions}
         >
           {leadingActions}
-          {timeline ? copyButton : null}
+          {inTimeline ? copyButton : null}
           {canWrap ? (
             <Tooltip>
               <TooltipTrigger
@@ -1186,7 +1222,7 @@ function MarkdownCodeBlock({
               <TooltipPopup side="top">{t.chat.markdown.runInTerminal}</TooltipPopup>
             </Tooltip>
           ) : null}
-          {timeline ? null : copyButton}
+          {inTimeline ? null : copyButton}
         </span>
       }
     >
@@ -1215,6 +1251,8 @@ function MarkdownMermaidCodeBlock({
   children: ReactNode;
 }) {
   const [showCode, setShowCode] = useState(false);
+  const timeline = use(MarkdownTimelineContext);
+  const diagramRef = useRef<HTMLDivElement>(null);
   const searching = use(MarkdownFindContext);
   const revealSource = useCallback(() => setShowCode(true), []);
   const sourceRevealRef = useFindRevealRef(revealSource);
@@ -1230,7 +1268,54 @@ function MarkdownMermaidCodeBlock({
       canWrap={!showDiagram}
       diagram={showDiagram}
       leadingActions={
-        isStreaming ? null : (
+        isStreaming ? null : timeline ? (
+          <>
+            <div
+              className="flex h-7 shrink-0 items-stretch rounded-full bg-timeline-diagram-toggle p-0.5 text-secondary-copy whitespace-nowrap"
+              role="group"
+              aria-label={t.chat.markdown.mermaidDiagram}
+            >
+              <button
+                type="button"
+                aria-pressed={!showCode}
+                onClick={() => setShowCode(false)}
+                className={cn(
+                  "cursor-pointer rounded-full px-2.25 focus-visible:outline-none focus-visible:inset-shadow-focus",
+                  !showCode
+                    ? "bg-segmented-selected font-bold text-foreground"
+                    : "text-secondary-label hover:text-foreground",
+                )}
+              >
+                {t.chat.markdown.showDiagram}
+              </button>
+              <button
+                type="button"
+                aria-pressed={showCode}
+                onClick={() => setShowCode(true)}
+                className={cn(
+                  "cursor-pointer rounded-full px-2.25 focus-visible:outline-none focus-visible:inset-shadow-focus",
+                  showCode
+                    ? "bg-segmented-selected font-bold text-foreground"
+                    : "text-secondary-label hover:text-foreground",
+                )}
+              >
+                {t.chat.markdown.showCode}
+              </button>
+            </div>
+            <button
+              type="button"
+              aria-label={t.chat.markdown.expandDiagram}
+              className={cn(TIMELINE_CODE_ACTION_CLASS, "timeline-mermaid-expand size-7")}
+              onClick={() =>
+                diagramRef.current
+                  ?.querySelector<HTMLButtonElement>("[data-mermaid-expand]")
+                  ?.click()
+              }
+            >
+              <Maximize2Icon className="size-3.5" strokeWidth={1.75} />
+            </button>
+          </>
+        ) : (
           <Tooltip>
             <TooltipTrigger
               render={
@@ -1250,27 +1335,46 @@ function MarkdownMermaidCodeBlock({
         )
       }
     >
-      {showDiagram ? (
-        <RenderErrorBoundary resetKeys={[code, theme]} fallback={children}>
-          <Suspense
-            fallback={
-              <div className="flex min-h-36 items-center justify-center text-xs text-muted-foreground">
-                {t.chat.markdown.renderingDiagram}
-              </div>
-            }
-          >
-            <MermaidDiagram source={code} theme={theme} onExpand={onExpand} />
-          </Suspense>
-          {/* Find counts the source; a selected match here switches to it. */}
-          {searching ? (
-            <pre ref={sourceRevealRef} hidden>
-              {code}
-            </pre>
-          ) : null}
-        </RenderErrorBoundary>
-      ) : (
-        children
-      )}
+      <div
+        ref={diagramRef}
+        className={
+          timeline
+            ? "min-h-30 p-3.5 text-secondary-copy-medium leading-callout text-fg-detail text-shadow-none"
+            : undefined
+        }
+      >
+        {showDiagram ? (
+          <RenderErrorBoundary resetKeys={[code, theme]} fallback={children}>
+            <Suspense
+              fallback={
+                <div
+                  className={cn(
+                    "flex items-center justify-center text-muted-foreground",
+                    timeline ? "min-h-23 text-secondary-copy" : "min-h-36 text-xs",
+                  )}
+                >
+                  {t.chat.markdown.renderingDiagram}
+                </div>
+              }
+            >
+              <MermaidDiagram
+                source={code}
+                theme={theme}
+                onExpand={onExpand}
+                presentation={timeline ? "timeline" : undefined}
+              />
+            </Suspense>
+            {/* Find counts the source; a selected match here switches to it. */}
+            {searching ? (
+              <pre ref={sourceRevealRef} hidden>
+                {code}
+              </pre>
+            ) : null}
+          </RenderErrorBoundary>
+        ) : (
+          children
+        )}
+      </div>
     </MarkdownCodeBlock>
   );
 }

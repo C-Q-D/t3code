@@ -20,7 +20,7 @@ import {
   mcpAppFileName,
   type McpAppReference,
 } from "@t3tools/shared/mcpApp";
-import { Minimize2Icon } from "lucide-react";
+import { Minimize2Icon, PlugIcon } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 
@@ -475,10 +475,10 @@ export function McpAppFrame(props: {
   // timeline does not jump, and says how to bring it back.
   if (closed) {
     return (
-      <div className="flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-muted-foreground text-xs">
+      <div className="flex items-center justify-between gap-2 rounded-card-row bg-timeline-embed px-3 py-2 text-secondary-copy text-secondary-label shadow-well-pressed">
         <span>{t.chat.mcpApp.closed(app.server)}</span>
         <Button
-          size="xs"
+          size="md"
           variant="ghost"
           onClick={() => {
             // The first URL's token may have expired: the new document
@@ -499,57 +499,72 @@ export function McpAppFrame(props: {
   return (
     // The row keeps its inline height while the app is full screen, so the
     // timeline does not jump; the box itself is what goes full screen.
-    <div style={{ height }}>
-      <div
-        ref={boxRef}
-        // Full screen is the same box shown in the browser's top layer: moving
-        // the frame to another parent would reload the app, and the timeline's
-        // rows contain fixed positioning, which the top layer escapes.
-        {...(fullscreenSupported ? { popover: "manual" as const } : {})}
-        data-mcp-app-fullscreen={fullscreen ? "" : undefined}
-        className={cn(
-          "relative size-full overflow-hidden",
-          app.prefersBorder === true && !fullscreen && "rounded-lg border border-border",
-          fullscreen
-            ? "fixed inset-0 m-0 flex h-dvh max-h-none w-dvw max-w-none flex-col border-0 bg-background p-0"
-            : // A closed popover is hidden; inline, the box is a plain block.
-              "block! static! m-0 border-0 bg-transparent p-0 text-inherit",
-        )}
-      >
-        {fullscreen ? (
-          <div className="flex h-10 shrink-0 items-center justify-between border-border border-b px-3 text-sm">
-            <span className="truncate">{app.server}</span>
-            <Button
-              aria-label={t.chat.mcpApp.exitFullscreen}
-              size="icon-sm"
-              variant="ghost"
-              onClick={() => setDisplayMode("inline")}
+    <div className="overflow-hidden rounded-card-row bg-timeline-embed pb-2 shadow-well-pressed">
+      <div className="flex h-8.5 items-center gap-2 px-3 text-secondary-copy text-secondary-label">
+        <PlugIcon aria-hidden="true" className="size-3.25 shrink-0" strokeWidth={1.75} />
+        <span className="truncate">{t.chat.mcpApp.frameTitle(app.server)}</span>
+      </div>
+      <div className="mx-2" style={{ height }}>
+        <div
+          ref={boxRef}
+          // Full screen is the same box shown in the browser's top layer: moving
+          // the frame to another parent would reload the app, and the timeline's
+          // rows contain fixed positioning, which the top layer escapes.
+          {...(fullscreenSupported ? { popover: "manual" as const } : {})}
+          data-mcp-app-fullscreen={fullscreen ? "" : undefined}
+          className={cn(
+            "relative size-full overflow-hidden",
+            fullscreen
+              ? "fixed inset-0 m-0 flex h-dvh max-h-none w-dvw max-w-none flex-col border-0 bg-background p-0"
+              : // A closed popover is hidden; inline, the box is a plain block.
+                "block! static! m-0 rounded-tag border-0 bg-timeline-embed-content p-0 text-inherit text-shadow-none",
+          )}
+        >
+          {fullscreen ? (
+            <div className="flex h-10 shrink-0 items-center justify-between border-border border-b px-3 text-sm">
+              <span className="truncate">{app.server}</span>
+              <Button
+                aria-label={t.chat.mcpApp.exitFullscreen}
+                size="icon-sm"
+                variant="ghost"
+                onClick={() => setDisplayMode("inline")}
+              >
+                <Minimize2Icon className="size-4" />
+              </Button>
+            </div>
+          ) : null}
+          {navigatedAway ? (
+            <p className="m-0 flex size-full items-center justify-center p-3 text-secondary-copy text-muted-foreground">
+              {t.chat.mcpApp.navigatedAway(app.server)}
+            </p>
+          ) : src !== null ? (
+            <iframe
+              ref={frameRef}
+              src={src}
+              title={t.chat.mcpApp.title(app.server)}
+              // Never allow-same-origin: the opaque origin keeps the app out of the session.
+              sandbox="allow-scripts allow-forms"
+              allow={mcpAppAllowAttribute(app.permissions)}
+              onLoad={onFrameLoad}
+              className={cn("block w-full border-0", fullscreen ? "min-h-0 flex-1" : "h-full")}
+              style={{ colorScheme: theme.appearance }}
+            />
+          ) : asset._tag === "Failure" || mintFailed ? (
+            <p
+              role="alert"
+              className="m-0 flex size-full items-center justify-center p-3 text-secondary-copy text-error"
             >
-              <Minimize2Icon className="size-4" />
-            </Button>
-          </div>
-        ) : null}
-        {navigatedAway ? (
-          <p className="flex size-full items-center justify-center text-muted-foreground text-xs">
-            {t.chat.mcpApp.navigatedAway(app.server)}
-          </p>
-        ) : src !== null ? (
-          <iframe
-            ref={frameRef}
-            src={src}
-            title={t.chat.mcpApp.title(app.server)}
-            // Never allow-same-origin: the opaque origin keeps the app out of the session.
-            sandbox="allow-scripts allow-forms"
-            allow={mcpAppAllowAttribute(app.permissions)}
-            onLoad={onFrameLoad}
-            className={cn("block w-full border-0", fullscreen ? "min-h-0 flex-1" : "h-full")}
-            style={{ colorScheme: theme.appearance }}
-          />
-        ) : asset._tag === "Failure" || mintFailed ? (
-          <p className="flex size-full items-center justify-center text-muted-foreground text-xs">
-            {t.chat.mcpApp.loadFailed(app.server)}
-          </p>
-        ) : null}
+              {t.chat.mcpApp.loadFailed(app.server)}
+            </p>
+          ) : (
+            <p
+              role="status"
+              className="m-0 flex size-full items-center justify-center p-3 text-secondary-copy text-muted-foreground"
+            >
+              {t.chat.mcpApp.loading}
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

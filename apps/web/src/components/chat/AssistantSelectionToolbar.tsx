@@ -18,7 +18,6 @@ import {
   resolveSelectionActionPosition,
   type SelectionActionPoint,
 } from "~/lib/selectionActions";
-import { Button } from "../ui/button";
 
 /**
  * Observes assistant text selection and offers a citation action above the selection.
@@ -42,10 +41,11 @@ export function AssistantSelectionToolbar({
     sourceAnchor: AssistantCitationSourceAnchor;
   } | null>(null);
   const toolbarRef = useRef<HTMLButtonElement>(null);
+  const shellRef = useRef<HTMLDivElement>(null);
   const actionsRef = useRef<ReturnType<typeof observeSelectionActions> | null>(null);
 
   useLayoutEffect(() => {
-    const toolbar = toolbarRef.current;
+    const toolbar = shellRef.current;
     if (!toolbar || !selection) return;
     const rect = toolbar.getBoundingClientRect();
     toolbar.style.left = `${Math.max(8, Math.min(selection.position.x, window.innerWidth - rect.width - 8))}px`;
@@ -87,17 +87,21 @@ export function AssistantSelectionToolbar({
           messageId: MessageId.make(messageId),
           ...captured.selector,
         },
-        position: resolveSelectionActionPosition({
-          bounds: viewportRect,
-          selectionRect: rects.item(rects.length - 1) ?? rect,
-          pointer: pointerOnText ? pointer : null,
-          viewport: { width: window.innerWidth, height: window.innerHeight },
-        }),
+        position: {
+          ...resolveSelectionActionPosition({
+            bounds: viewportRect,
+            selectionRect: rects.item(rects.length - 1) ?? rect,
+            pointer: pointerOnText ? pointer : null,
+            viewport: { width: window.innerWidth, height: window.innerHeight },
+          }),
+          // T3 places the 34px toolbar 10px above the selection; clamp after measuring.
+          y: rect.top - 44,
+        },
       });
     };
     const actions = observeSelectionActions({
       element: viewport,
-      getActionElement: () => toolbarRef.current,
+      getActionElement: () => shellRef.current,
       onSelection: update,
       onDismiss: clear,
     });
@@ -145,30 +149,35 @@ export function AssistantSelectionToolbar({
     return true;
   };
   return createPortal(
-    <Button
-      ref={toolbarRef}
-      type="button"
-      size="xs"
-      variant="glass"
-      disabled={tooLong}
-      aria-label={
-        tooLong ? t.chat.citation.selectionIsTooLongToCite : t.chat.citation.citeSelectionInComposer
-      }
-      className="fixed z-50 max-w-[calc(100vw-1rem)]"
+    <div
+      ref={shellRef}
+      className="timeline-selection-toolbar fixed z-50 max-w-full rounded-notice bg-primary p-0.75 text-shadow-none shadow-timeline-quote-toolbar"
       style={{ left: selection.position.x, top: selection.position.y }}
       onPointerDown={(event) => event.preventDefault()}
-      onClick={cite}
-      onKeyDown={(event) => {
-        event.stopPropagation();
-        if (event.key === "Escape" && !event.nativeEvent.isComposing) {
-          event.preventDefault();
-          dismiss();
-        }
-      }}
     >
-      <QuoteIcon aria-hidden="true" className="size-3.5" />
-      {tooLong ? t.chat.citation.shortenSelection : t.chat.citation.cite}
-    </Button>,
+      <button
+        ref={toolbarRef}
+        type="button"
+        disabled={tooLong}
+        aria-label={
+          tooLong
+            ? t.chat.citation.selectionIsTooLongToCite
+            : t.chat.citation.citeSelectionInComposer
+        }
+        className="flex h-7 cursor-pointer items-center gap-1.25 rounded-timeline-quote-key bg-primary-foreground px-2.5 text-secondary-copy-medium font-bold text-primary hover:opacity-90 focus-visible:outline-none focus-visible:inset-shadow-focus disabled:cursor-default disabled:opacity-50"
+        onClick={cite}
+        onKeyDown={(event) => {
+          event.stopPropagation();
+          if (event.key === "Escape" && !event.nativeEvent.isComposing) {
+            event.preventDefault();
+            dismiss();
+          }
+        }}
+      >
+        <QuoteIcon aria-hidden="true" className="size-3.25" />
+        {tooLong ? t.chat.citation.shortenSelection : t.chat.citation.cite}
+      </button>
+    </div>,
     document.body,
   );
 }

@@ -494,3 +494,24 @@
 .chat-markdown [data-markdown-callout] :is(ul, ol):last-child {
   @apply mb-0;
 }
+
+/* Supplemental screen 1 T3: diagram well, embedded app surfaces and white citation toolbar. */
+@theme {
+  --color-timeline-diagram-toggle: #0a0a0b;
+  --color-timeline-embed: #151517;
+  --color-timeline-embed-content: #0e0e10;
+  --radius-timeline-quote-key: 11px;
+  --shadow-timeline-diagram-well:
+    inset 2px 3px 6px rgba(0, 0, 0, 0.75), inset -1px -1px 0 rgba(255, 255, 255, 0.06);
+  --shadow-timeline-quote-toolbar: 0 2px 0 #8e8e96, 6px 10px 16px -4px rgba(0, 0, 0, 0.8);
+}
+
+/* The header action delegates to the rendered diagram; no render-state effect or cache key is added. */
+.timeline-mermaid-frame:not(:has([data-mermaid-expand])) .timeline-mermaid-expand {
+  display: none;
+}
+
+/* The white citation key needs the authored foreground, independent of automatic icon category hues. */
+.timeline-selection-toolbar {
+  --lucide-hue-override: currentColor;
+}

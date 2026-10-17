@@ -58,6 +58,9 @@ export const chat: Messages["chat"] = {
     },
   },
   mcpApp: {
+    /** Labels the frame with its actual server rather than the design's sample app. */
+    frameTitle: (server: string) => `MCP 应用 · ${server}`,
+    loading: "正在加载应用…",
     show: "显示应用",
     exitFullscreen: "退出全屏",
     /** Formats allowTool with the supplied display values. */
@@ -612,6 +615,10 @@ export const chat: Messages["chat"] = {
     resetZoom: "重置缩放",
     expandedPreview: (title: string) => `全屏预览 ${title}`,
     openFullScreen: "全屏打开",
+    htmlPageFrameTitle: "HTML 页面 · 自适应高度",
+    loadingPage: "正在加载页面…",
+    pageUnavailable: "页面不可用",
+    reconnectToRetryPage: "请重新连接环境后重试。",
     openInPanel: "在面板中打开",
     copyMessage: "复制消息",
     retry: "重试",

@@ -176,10 +176,13 @@ export function MermaidDiagram({
   source,
   theme,
   onExpand,
+  presentation,
 }: {
   source: string;
   theme: "light" | "dark";
   onExpand: (imageUrl: string) => void;
+  /** Timeline changes typography only; source/theme remain the render cache key. */
+  presentation?: "timeline" | undefined;
 }) {
   const [, setAttempt] = useState(0);
   const result = use(mermaidRenderPromise(source.trim(), theme));
@@ -188,7 +191,13 @@ export function MermaidDiagram({
     return (
       <div>
         <div className="flex items-center justify-between gap-2">
-          <p className="m-0 text-xs text-destructive">
+          <p
+            className={
+              presentation === "timeline"
+                ? "m-0 text-secondary-copy text-error"
+                : "m-0 text-xs text-destructive"
+            }
+          >
             {t.chat.markdown.renderError(result.message)}
           </p>
           {result.retryable ? (
@@ -208,7 +217,11 @@ export function MermaidDiagram({
         {/* Find matches the source through the hidden copy beside the diagram. */}
         <pre
           data-thread-find-ignore
-          className="mt-2 mb-0 overflow-auto font-mono text-xs whitespace-pre-wrap"
+          className={
+            presentation === "timeline"
+              ? "mt-2 mb-0 overflow-auto font-mono text-secondary-copy whitespace-pre-wrap"
+              : "mt-2 mb-0 overflow-auto font-mono text-xs whitespace-pre-wrap"
+          }
         >
           {source}
         </pre>
@@ -219,6 +232,7 @@ export function MermaidDiagram({
   return (
     <div className="overflow-x-auto">
       <button
+        data-mermaid-expand=""
         type="button"
         aria-label={t.chat.markdown.expandDiagram}
         className="flex w-full cursor-zoom-in justify-center rounded-md focus-visible:outline-2 focus-visible:outline-ring [&_svg]:h-auto [&_svg]:max-w-full"
