@@ -186,7 +186,7 @@
   width: calc(100% + var(--spacing) * 34.5);
 }
 
-:where(.device-panel:has(> .device-tools-drawer .device-tool-section[open]))
+:where(.device-panel:has(> .device-tools-drawer [data-device-tool-section]:is([open], [data-open])))
   .device-workspace-toolbar {
   width: calc(100% + var(--spacing) * 66.5);
 }
@@ -235,7 +235,8 @@
 }
 
 /* Real inputs need more room than the L3 category slot; closing restores its width. */
-.device-tools-drawer:has(.device-tool-section[open]) {
+/* Native details and Base UI Collapsible expose open state through different attributes. */
+.device-tools-drawer:has([data-device-tool-section]:is([open], [data-open])) {
   @apply w-64;
 }
 
@@ -296,7 +297,7 @@
   .device-tools-drawer {
     @apply absolute top-11.5 right-2.5 bottom-2.5 z-10 mt-0;
   }
-  .device-tools-drawer:not(:has(.device-tool-section[open])) {
+  .device-tools-drawer:not(:has([data-device-tool-section]:is([open], [data-open]))) {
     @apply w-27;
   }
 }

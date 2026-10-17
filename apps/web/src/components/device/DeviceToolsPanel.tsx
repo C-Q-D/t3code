@@ -351,7 +351,7 @@ export function DeviceToolsPanel(props: {
 /** Collapsible tool category; children retain their state while the category is closed. */
 function Section(props: { readonly title: string; readonly children: React.ReactNode }) {
   return (
-    <details className="device-tool-section">
+    <details className="device-tool-section" data-device-tool-section>
       <summary>{props.title}</summary>
       <div className="device-tool-content">{props.children}</div>
     </details>
@@ -671,7 +671,7 @@ function EventLogSection(props: {
   }, [open, props.access, props.device.id, props.device.platform]);
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen}>
+    <Collapsible data-device-tool-section open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger className="flex w-full items-center gap-1.5 border-b px-3 py-2.5 text-left text-xs font-medium text-muted-foreground">
         {t.tools.device.eventLog}
         <ChevronDown
