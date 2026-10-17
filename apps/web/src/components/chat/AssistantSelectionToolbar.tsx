@@ -16,6 +16,7 @@ import {
 import {
   observeSelectionActions,
   resolveSelectionActionPosition,
+  resolveSelectionToolbarPosition,
   type SelectionActionPoint,
 } from "~/lib/selectionActions";
 
@@ -38,6 +39,7 @@ export function AssistantSelectionToolbar({
   const [selection, setSelection] = useState<{
     citation: AssistantCitation;
     position: SelectionActionPoint;
+    selectionTop: number;
     sourceAnchor: AssistantCitationSourceAnchor;
   } | null>(null);
   const toolbarRef = useRef<HTMLButtonElement>(null);
@@ -47,9 +49,20 @@ export function AssistantSelectionToolbar({
   useLayoutEffect(() => {
     const toolbar = shellRef.current;
     if (!toolbar || !selection) return;
+    // A previous selection may have had no room; measure before paint without a hidden zero-size box.
+    toolbar.hidden = false;
     const rect = toolbar.getBoundingClientRect();
-    toolbar.style.left = `${Math.max(8, Math.min(selection.position.x, window.innerWidth - rect.width - 8))}px`;
-    toolbar.style.top = `${Math.max(8, Math.min(selection.position.y, window.innerHeight - rect.height - 8))}px`;
+    const position = resolveSelectionToolbarPosition({
+      anchorX: selection.position.x,
+      selectionTop: selection.selectionTop,
+      bounds: selection.sourceAnchor.viewport.getBoundingClientRect(),
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      size: rect,
+    });
+    toolbar.hidden = position === null;
+    if (position === null) return;
+    toolbar.style.left = `${position.x}px`;
+    toolbar.style.top = `${position.y}px`;
   }, [selection]);
 
   useEffect(() => {
@@ -87,16 +100,13 @@ export function AssistantSelectionToolbar({
           messageId: MessageId.make(messageId),
           ...captured.selector,
         },
-        position: {
-          ...resolveSelectionActionPosition({
-            bounds: viewportRect,
-            selectionRect: rects.item(rects.length - 1) ?? rect,
-            pointer: pointerOnText ? pointer : null,
-            viewport: { width: window.innerWidth, height: window.innerHeight },
-          }),
-          // T3 places the 34px toolbar 10px above the selection; clamp after measuring.
-          y: rect.top - 44,
-        },
+        selectionTop: rect.top,
+        position: resolveSelectionActionPosition({
+          bounds: viewportRect,
+          selectionRect: rects.item(rects.length - 1) ?? rect,
+          pointer: pointerOnText ? pointer : null,
+          viewport: { width: window.innerWidth, height: window.innerHeight },
+        }),
       });
     };
     const actions = observeSelectionActions({
@@ -121,7 +131,7 @@ export function AssistantSelectionToolbar({
       ) {
         return;
       }
-      if (toolbar.disabled) return;
+      if (toolbar.disabled || shellRef.current?.hidden) return;
       event.preventDefault();
       event.stopPropagation();
       toolbar.focus({ preventScroll: true });

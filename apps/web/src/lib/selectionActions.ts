@@ -1,7 +1,10 @@
+/** Selection gesture observation and viewport-relative action positioning. */
+/** A point in CSS pixels relative to the browser viewport. */
 export type SelectionActionPoint = { x: number; y: number };
 
 export const SELECTION_MULTI_CLICK_INTERVAL_MS = 500;
 
+/** Resolves a pointer or text-end anchor within the surface and the window's 8px inset. */
 export function resolveSelectionActionPosition(options: {
   bounds: { left: number; top: number; width: number; height: number };
   selectionRect: { right: number; bottom: number } | null;
@@ -22,6 +25,32 @@ export function resolveSelectionActionPosition(options: {
       8,
       Math.min(Math.max(bounds.top, preferred.y), bounds.top + bounds.height, viewport.height - 8),
     ),
+  };
+}
+
+/**
+ * Positions a measured citation toolbar above the selection using viewport CSS pixels.
+ * anchorX retains the gesture's horizontal anchor; selectionTop is the full range's top.
+ * bounds is the timeline rectangle, viewport the window size, and size the measured toolbar.
+ * The preferred top is 44px above the selection. Clamp to the visible intersection;
+ * when the toolbar cannot fit at all, return null so callers can hide it.
+ */
+export function resolveSelectionToolbarPosition(options: {
+  anchorX: number;
+  selectionTop: number;
+  bounds: { left: number; top: number; width: number; height: number };
+  viewport: { width: number; height: number };
+  size: { width: number; height: number };
+}): SelectionActionPoint | null {
+  const { anchorX, selectionTop, bounds, viewport, size } = options;
+  const left = Math.max(8, bounds.left);
+  const top = Math.max(8, bounds.top);
+  const right = Math.min(viewport.width - 8, bounds.left + bounds.width);
+  const bottom = Math.min(viewport.height - 8, bounds.top + bounds.height);
+  if (right - left < size.width || bottom - top < size.height) return null;
+  return {
+    x: Math.max(left, Math.min(anchorX, right - size.width)),
+    y: Math.max(top, Math.min(selectionTop - 44, bottom - size.height)),
   };
 }
 

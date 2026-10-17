@@ -1,11 +1,18 @@
+/** Tests selection gestures and action placement against explicit viewport geometry. */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
-import { observeSelectionActions, resolveSelectionActionPosition } from "./selectionActions";
+import {
+  observeSelectionActions,
+  resolveSelectionActionPosition,
+  resolveSelectionToolbarPosition,
+} from "./selectionActions";
 
+/** Creates a cancelable event with the fields consumed by the gesture observer. */
 function event(type: string, values: Record<string, unknown> = {}) {
   return Object.assign(new Event(type, { cancelable: true }), values);
 }
 
+/** Provides a controlled selection surface and explicit timer/frame advancement. */
 function createSelectionSurface({ interactiveActions = false } = {}) {
   const frames = new Map<number, FrameRequestCallback>();
   let frameId = 0;
@@ -384,6 +391,60 @@ describe("interactive selection actions", () => {
     surface.up({ x: 520, y: 320 });
     surface.flush();
     expect(surface.onSelection).toHaveBeenCalledWith({ x: 520, y: 320 });
+  });
+});
+
+describe("citation toolbar positioning", () => {
+  it("fits the whole toolbar inside the window when the timeline extends outside it", () => {
+    expect(
+      resolveSelectionToolbarPosition({
+        anchorX: 1100,
+        selectionTop: 900,
+        bounds: { left: -20, top: -100, width: 1200, height: 1000 },
+        viewport: { width: 1024, height: 768 },
+        size: { width: 90, height: 34 },
+      }),
+    ).toEqual({ x: 926, y: 726 });
+  });
+
+  it("reserves the measured width and height at the timeline's right and bottom edges", () => {
+    expect(
+      resolveSelectionToolbarPosition({
+        anchorX: 580,
+        selectionTop: 200,
+        bounds: { left: 100, top: 100, width: 500, height: 80 },
+        viewport: { width: 1024, height: 768 },
+        size: { width: 90, height: 34 },
+      }),
+    ).toEqual({ x: 510, y: 146 });
+  });
+
+  it("hides a toolbar that cannot fit in the visible timeline", () => {
+    expect(
+      resolveSelectionToolbarPosition({
+        anchorX: 300,
+        selectionTop: 110,
+        bounds: { left: 100, top: 100, width: 500, height: 20 },
+        viewport: { width: 1024, height: 768 },
+        size: { width: 90, height: 34 },
+      }),
+    ).toBeNull();
+  });
+
+  it.each([
+    { scenario: "near the timeline top", selectionTop: 110, expectedY: 100 },
+    { scenario: "range starts above the timeline", selectionTop: 60, expectedY: 100 },
+    { scenario: "normal position", selectionTop: 250, expectedY: 206 },
+  ])("keeps the toolbar inside the timeline: $scenario", ({ selectionTop, expectedY }) => {
+    expect(
+      resolveSelectionToolbarPosition({
+        anchorX: 300,
+        selectionTop,
+        bounds: { left: 100, top: 100, width: 500, height: 400 },
+        viewport: { width: 1024, height: 768 },
+        size: { width: 90, height: 34 },
+      }),
+    ).toEqual({ x: 300, y: expectedY });
   });
 });
 
