@@ -86,6 +86,7 @@ import { readEnvironmentScope } from "../state/session";
 import { terminalEnvironment } from "../state/terminal";
 import { useEnvironmentScope } from "../state/session";
 import { openTerminalLinkInPreview } from "./preview/openTerminalLinkInPreview";
+import { collapseThreadDetailsCard } from "./chat/ThreadDetailsCard";
 import { useAtomCommand } from "../state/use-atom-command";
 import { preventTerminalCloseShortcut } from "../lib/terminalCloseShortcut";
 import {
@@ -1246,6 +1247,16 @@ export default function ThreadTerminalDrawer({
   terminalLabelsById,
   terminalLaunchLocationsById,
 }: ThreadTerminalDrawerProps) {
+  useLayoutEffect(() => {
+    if (!visible || mode !== "drawer") return;
+    // Release on close, thread switch and unmount. Manual expansion is temporary:
+    // the final owner restores the opening snapshot, as the details-card API specifies.
+    // Depend on scoped identity so fresh ref objects do not collapse a manually reopened card.
+    return collapseThreadDetailsCard({
+      environmentId: threadRef.environmentId,
+      threadId: threadRef.threadId,
+    });
+  }, [visible, mode, threadRef.environmentId, threadRef.threadId]);
   const canOperateTerminal = useEnvironmentScope(threadRef.environmentId, AuthTerminalOperateScope);
   // Metadata provides process state without attaching another output stream for each tab.
   const knownTerminalSessions = useKnownTerminalSessions({
