@@ -133,3 +133,29 @@
     var(--discussion-connection-to)
   );
 }
+
+/* DC1.1 · 讨论页-8a v3 F1/F2：圆桌栏凹槽的底边高光。 */
+@theme {
+  --shadow-discussion-table-rail:
+    inset 2px 3px 10px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(0, 0, 0, 0.4),
+    0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* README-讨论模式 §2：按窗口宽度切换，不受侧栏宽度影响；DC2 另接面板展开状态。 */
+.discussion-page-round-table {
+  display: flex;
+}
+
+.discussion-page-long-table {
+  display: none;
+}
+
+@media (width < 1200px) {
+  .discussion-page-round-table {
+    display: none;
+  }
+
+  .discussion-page-long-table {
+    display: block;
+  }
+}

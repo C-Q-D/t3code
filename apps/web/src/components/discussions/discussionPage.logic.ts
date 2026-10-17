@@ -1,8 +1,61 @@
-/** Derives route eligibility and the discussion header/seat strip without starting subscriptions. */
+/** Derives route eligibility, header actions and physical table seats without starting subscriptions. */
 import type { Discussion, DiscussionId, EnvironmentId } from "@t3tools/contracts";
 import * as Option from "effect/Option";
 import type { discussions } from "~/i18n/locales/en/discussions";
 import type { AppRouter } from "~/router";
+import type { DiscussionSeatTag, DiscussionTableSeat } from "./discussionRoundTable.logic";
+
+/**
+ * Collapses turn occurrences into stable physical seats for both table shapes.
+ * @param discussion Server snapshot; cursor and closing plan retain their existing strip semantics.
+ * @param copy Localized seat annotations; identity names come from the snapshot.
+ * @returns One seat per persisted identity, in physical order, with zero-based color indices.
+ */
+export function discussionTableSeats(
+  discussion: Discussion,
+  copy: typeof discussions.page,
+): DiscussionTableSeat[] {
+  const occurrences = discussionSeatStrip(discussion).filter((item) => item.kind === "seat");
+  const tones = {
+    speaking: "info",
+    interrupted: "warning",
+    failed: "error",
+    next: "outline",
+    summarizer: "neutral",
+  } as const;
+  return discussion.seats.map((seat, seatIndex) => {
+    const turns = occurrences.filter((item) => item.index === seatIndex);
+    // The final/summary strip can repeat an identity; the physical table cannot.
+    const turn =
+      turns.find((item) => item.state === "current") ??
+      turns.find((item) => item.tags.includes("next")) ??
+      turns[0];
+    const summarizer = seat.id === discussion.closing?.summarizerSeatId;
+    const tags: DiscussionSeatTag[] = (turn?.tags ?? [])
+      .filter((tag) => tag !== "summarizer")
+      .map((tag) => ({ label: copy[tag], tone: tones[tag] }));
+    if (summarizer) tags.push({ label: copy.summarizer, tone: "neutral" });
+    return {
+      id: seat.id,
+      seatIndex,
+      role: seat.avatar,
+      label: seat.personaName,
+      // Completion colors an arc; only the ended summarizer receives a checkmark.
+      state:
+        discussion.status === "ended" && summarizer
+          ? "done"
+          : turn?.state === "current"
+            ? discussion.status === "paused"
+              ? "idle"
+              : "speaking"
+            : turn?.state === "next"
+              ? "next"
+              : "idle",
+      completed: turns.some((item) => item.state === "done"),
+      tags,
+    };
+  });
+}
 
 /**
  * Keeps a delayed deletion response from replacing a page the user has since opened.

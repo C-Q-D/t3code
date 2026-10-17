@@ -169,6 +169,7 @@ const twMerge = extendTailwindMerge({
         "usage-limit-track",
         "project-rail-divider",
         "thread-details-divider",
+        "discussion-table-rail",
       ],
       "inset-shadow": ["selected", "focus", "selected-control", "project-rail-hover"],
       "text-shadow": ["stone"],

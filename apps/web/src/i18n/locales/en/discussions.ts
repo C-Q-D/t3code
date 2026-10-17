@@ -136,6 +136,8 @@ export const discussions = {
     failed: "Speaking failed",
     speaking: "Speaking",
     seats: "Speaking order",
+    clockwise: "Speaking clockwise",
+    you: "You",
     runningCommand: "Running",
     viewProcess: "View process",
     noFiles: "No files changed",

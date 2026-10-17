@@ -122,6 +122,8 @@ export const discussions: Messages["discussions"] = {
     failed: "发言失败",
     speaking: "发言中",
     seats: "发言顺序",
+    clockwise: "顺时针发言",
+    you: "你",
     runningCommand: "正在运行",
     viewProcess: "查看过程",
     noFiles: "未改文件",

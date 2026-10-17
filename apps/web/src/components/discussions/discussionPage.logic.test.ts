@@ -7,6 +7,7 @@ import {
   discussionHeaderView,
   discussionRouteState,
   discussionSeatStrip,
+  discussionTableSeats,
 } from "./discussionPage.logic";
 
 const decodeEnvironmentId = Schema.decodeOption(EnvironmentId);
@@ -68,6 +69,159 @@ const closing = {
   remainingFinalSeatIds: [base.seats[1]!.id, base.seats[2]!.id],
   phase: "final_round" as const,
 };
+
+describe("physical discussion table seats", () => {
+  it("keeps physical identity, completion and upcoming seats separate from avatar badges", () => {
+    expect(discussionTableSeats(base, copy.page)).toEqual([
+      {
+        id: "a",
+        seatIndex: 0,
+        role: "architect",
+        label: "架构师",
+        state: "idle",
+        completed: true,
+        tags: [],
+      },
+      {
+        id: "b",
+        seatIndex: 1,
+        role: "opponent",
+        label: "反方",
+        state: "speaking",
+        completed: false,
+        tags: [{ label: "发言中", tone: "info" }],
+      },
+      {
+        id: "c",
+        seatIndex: 2,
+        role: "implementer",
+        label: "实现者",
+        state: "next",
+        completed: false,
+        tags: [{ label: "下一位", tone: "outline" }],
+      },
+    ]);
+  });
+
+  it("stops the failed seat's motion while keeping its retry and the future seat recessed", () => {
+    expect(
+      discussionTableSeats(
+        { ...base, status: "paused", pause: { reason: "seat_failed" } },
+        copy.page,
+      ),
+    ).toEqual([
+      {
+        id: "a",
+        seatIndex: 0,
+        role: "architect",
+        label: "架构师",
+        state: "idle",
+        completed: true,
+        tags: [],
+      },
+      {
+        id: "b",
+        seatIndex: 1,
+        role: "opponent",
+        label: "反方",
+        state: "idle",
+        completed: false,
+        tags: [
+          { label: "发言失败", tone: "error" },
+          { label: "下一位", tone: "outline" },
+        ],
+      },
+      {
+        id: "c",
+        seatIndex: 2,
+        role: "implementer",
+        label: "实现者",
+        state: "next",
+        completed: false,
+        tags: [],
+      },
+    ]);
+  });
+
+  it("shows the next-round first seat once and preserves its completed arc", () => {
+    expect(
+      discussionTableSeats({ ...base, cursor: { ...base.cursor, seatIndex: 2 } }, copy.page),
+    ).toEqual([
+      {
+        id: "a",
+        seatIndex: 0,
+        role: "architect",
+        label: "架构师",
+        state: "next",
+        completed: true,
+        tags: [{ label: "下一位", tone: "outline" }],
+      },
+      {
+        id: "b",
+        seatIndex: 1,
+        role: "opponent",
+        label: "反方",
+        state: "idle",
+        completed: true,
+        tags: [],
+      },
+      {
+        id: "c",
+        seatIndex: 2,
+        role: "implementer",
+        label: "实现者",
+        state: "speaking",
+        completed: false,
+        tags: [{ label: "发言中", tone: "info" }],
+      },
+    ]);
+  });
+
+  it("uses the active summary occurrence without duplicating the summarizer", () => {
+    expect(
+      discussionTableSeats(
+        {
+          ...base,
+          status: "closing",
+          cursor: { ...base.cursor, seatIndex: 0, phase: "summarizing" },
+          closing: { ...closing, phase: "summarizing", remainingFinalSeatIds: [] },
+        },
+        copy.page,
+      ),
+    ).toEqual([
+      {
+        id: "a",
+        seatIndex: 0,
+        role: "architect",
+        label: "架构师",
+        state: "speaking",
+        completed: true,
+        tags: [
+          { label: "发言中", tone: "info" },
+          { label: "梳理人", tone: "neutral" },
+        ],
+      },
+      {
+        id: "b",
+        seatIndex: 1,
+        role: "opponent",
+        label: "反方",
+        state: "idle",
+        completed: true,
+        tags: [],
+      },
+      {
+        id: "c",
+        seatIndex: 2,
+        role: "implementer",
+        label: "实现者",
+        state: "idle",
+        completed: true,
+        tags: [],
+      },
+    ]);
+  });
+});
 
 describe("discussion route eligibility", () => {
   it.each([
