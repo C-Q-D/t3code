@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { EnvironmentId, RuntimeRequestId, ThreadId } from "@t3tools/contracts";
 import { act, type ReactNode } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
@@ -21,11 +22,6 @@ const threadRef = { environmentId: EnvironmentId.make("env"), threadId: ThreadId
 it("cancels an answer's pending auto-submit on revocation and resumes after a new grant", async () => {
   vi.useFakeTimers();
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-  vi.stubGlobal("window", {
-    setTimeout: globalThis.setTimeout,
-    clearTimeout: globalThis.clearTimeout,
-  });
-  vi.stubGlobal("document", { addEventListener: vi.fn(), removeEventListener: vi.fn() });
   const onToggleOption = vi.fn();
   const onAdvance = vi.fn();
   const onDismiss = vi.fn();

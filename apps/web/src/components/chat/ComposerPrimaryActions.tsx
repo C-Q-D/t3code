@@ -1,7 +1,14 @@
 /** Renders composer actions; dispatch, permissions, and shortcuts remain caller-controlled. */
 import { t } from "~/i18n";
 import { memo, type MouseEventHandler, type PointerEventHandler } from "react";
-import { CheckIcon, ChevronDownIcon, ChevronLeftIcon, Minimize2Icon, PlayIcon } from "lucide-react";
+import {
+  CheckIcon,
+  ChevronDownIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  Minimize2Icon,
+  PlayIcon,
+} from "lucide-react";
 import { CornerDownRight, ListPlus } from "lucide";
 import { MorphIcon } from "~/components/MorphIcon";
 import { useEnvironmentIdentificationMode } from "~/hooks/useSettings";
@@ -9,7 +16,6 @@ import { formatContextWindowTokens } from "~/lib/contextWindow";
 import { cn } from "~/lib/utils";
 import { useShortcutModifierState } from "../../shortcutModifierState";
 import { StageBackdropButtonArt, useSidebarStageBackdropVariant } from "../SidebarStageBackdrop";
-import { Button } from "../ui/button";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "../ui/menu";
 import { Spinner } from "../ui/spinner";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
@@ -169,33 +175,25 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
     return (
       <div className={cn("flex items-center justify-end", compact ? "gap-1.5" : "gap-2")}>
         {canInterrupt ? renderStopGenerationButton(true) : null}
-        {pendingAction.questionIndex > 0 ? (
-          compact ? (
-            <Button
-              size="icon-sm"
-              variant="outline"
-              {...pointerFocusProps}
-              onClick={onPreviousPendingQuestion}
-              disabled={pendingAction.isResponding}
-              aria-label={t.composer.primaryActions.previousQuestion}
-            >
-              <ChevronLeftIcon className="size-3.5" />
-            </Button>
-          ) : (
-            <Button
-              size="sm"
-              variant="outline"
-              {...pointerFocusProps}
-              onClick={onPreviousPendingQuestion}
-              disabled={pendingAction.isResponding}
-            >
-              {t.composer.primaryActions.previous}
-            </Button>
-          )
-        ) : null}
+        <button
+          type="button"
+          className="inline-flex h-9.5 shrink-0 items-center justify-center gap-1 rounded-full border-0 bg-transparent px-3 text-secondary-copy-large text-secondary-label outline-none enabled:cursor-pointer enabled:hover:bg-secondary focus-visible:inset-shadow-focus disabled:pointer-events-none disabled:text-fg-control-disabled"
+          {...pointerFocusProps}
+          onClick={onPreviousPendingQuestion}
+          disabled={pendingAction.isResponding || pendingAction.questionIndex === 0}
+          aria-label={t.composer.primaryActions.previousQuestion}
+        >
+          <ChevronLeftIcon className="size-3.75" aria-hidden="true" />
+          {!compact ? t.composer.primaryActions.previousQuestion : null}
+        </button>
         <button
           type="submit"
-          className={cn(messageActionPillClassName, "h-8 sm:h-7", compact ? "px-3" : "px-4")}
+          className={cn(
+            "composer-approval-action px-4 font-semibold",
+            pendingAction.isLastQuestion
+              ? "composer-primary-key bg-primary font-extrabold text-primary-foreground text-shadow-none shadow-composer-panel-primary enabled:hover:bg-message-action-hover disabled:bg-accent"
+              : "bg-secondary text-foreground shadow-raise-xs enabled:hover:bg-accent",
+          )}
           {...pointerFocusProps}
           disabled={
             !canOperateThread ||
@@ -210,6 +208,9 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
             isResponding: pendingAction.isResponding,
             questionIndex: pendingAction.questionIndex,
           })}
+          {!pendingAction.isLastQuestion ? (
+            <ChevronRightIcon className="size-3.75" aria-hidden="true" />
+          ) : null}
         </button>
       </div>
     );

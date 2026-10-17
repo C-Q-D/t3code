@@ -17,6 +17,38 @@
   /* 对话页-8a.dc.html · E1：展开后的排队子行 14px、取消/收起控件 9px。 */
   --radius-composer-queue-row: 14px;
   --radius-composer-queue-toggle: 9px;
+  /* 对话页-8a.dc.html · E1：审批代码槽、提问选项行与分裂按钮内侧圆角。 */
+  --radius-composer-panel-row: 14px;
+  --radius-composer-split: 6px;
+  /* 对话页-8a.dc.html · E1：提问标题 15px，自定义回答井底。 */
+  --text-composer-question: 15px;
+  --text-composer-question--line-height: 1.55;
+  --color-composer-answer: #151517;
+  /* 对话页-8a.dc.html · E1：自定义回答入口向内 1.5px 虚线。 */
+  --spacing-composer-question-outline: 1.5px;
+  /* 对话页-8a.dc.html · E1：38px 审批/回答白键、选项底边与未选圆点。 */
+  --shadow-composer-panel-primary: 0 2px 0 #8e8e96, 4px 7px 12px -4px rgba(0, 0, 0, 0.8);
+  --shadow-composer-option-selected: 0 1.5px 0 #09090a;
+  --shadow-composer-choice: inset 1px 1.5px 2px rgba(0, 0, 0, 0.7), inset 0 0 0 1.5px var(--border);
+}
+
+@utility composer-custom-answer {
+  outline: var(--spacing-composer-question-outline) dashed var(--border);
+  outline-offset: calc(-1 * var(--spacing-composer-question-outline));
+}
+
+/* E1: the question spans both columns; its answer well and existing actions share the bottom row. */
+@utility composer-question-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: calc(var(--spacing) * 2.5) calc(var(--spacing) * 2);
+  padding: calc(var(--spacing) * 4) calc(var(--spacing) * 3.5) calc(var(--spacing) * 3);
+}
+
+/* E1's approval decisions have feature-specific split corners and a 38px height. */
+@utility composer-approval-action {
+  @apply inline-flex h-9.5 shrink-0 items-center justify-center gap-1.5 rounded-full border-0 text-control outline-none enabled:cursor-pointer focus-visible:inset-shadow-focus disabled:pointer-events-none disabled:text-fg-control-disabled disabled:shadow-none;
 }
 
 /* ContextStrip consumes these variables independently of the raised input surface. */

@@ -2921,6 +2921,9 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   const composerSuggestionsVisible = composerMenuOpen && !isComposerApprovalState;
   const composerSuggestionListVisible = composerSuggestionsVisible && composerMenuItems.length > 0;
   const activePendingUserInput = pendingUserInputs[0] ?? null;
+  // E1 replaces the desktop input surface; narrow layouts keep their existing attached controls.
+  const showDesktopQuestionPanel =
+    !isMobileViewport && activePendingUserInput !== null && !isComposerApprovalState;
   const isChoiceOnlyPendingQuestion =
     activePendingProgress?.activeQuestion?.allowCustomAnswer === false;
   const showComposerTopDrawer =
@@ -6880,7 +6883,9 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
               </ComposerBanner.Root>
             </ComposerBanner.Attachment>
           ) : null}
-          {showComposerTopDrawer && (!isTasksDrawerOpen || hasBlockingComposerTopDrawer) ? (
+          {showComposerTopDrawer &&
+          (isMobileViewport || !hasBlockingComposerTopDrawer) &&
+          (!isTasksDrawerOpen || hasBlockingComposerTopDrawer) ? (
             <ComposerBanner.Attachment>
               <ComposerBanner.Root
                 data-chat-composer-top-drawer="true"
@@ -7061,6 +7066,22 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
             isEditingQueuedMessage && "inset-shadow-selected-control",
           )}
         >
+          {!isMobileViewport && activePendingApproval ? (
+            <div className="flex flex-col gap-3 px-3.5 pt-4 pb-3.5">
+              <ComposerPendingApprovalPanel
+                approval={activePendingApproval}
+                pendingCount={pendingApprovals.length}
+              />
+              <ComposerPendingApprovalActions
+                requestId={activePendingApproval.requestId}
+                disabled={!canOperateThread}
+                isResponding={respondingRequestIds.includes(activePendingApproval.requestId)}
+                options={activePendingApproval.options}
+                canRespond={activePendingApproval.responseCapability === "live"}
+                onRespondToApproval={onRespondToApproval}
+              />
+            </div>
+          ) : null}
           <div
             ref={composerSurfaceRef}
             data-chat-composer-surface="true"
@@ -7071,9 +7092,32 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
               isDragOverComposer ? "bg-accent/45 ring-1 ring-inset ring-primary/70" : null,
               projectSelectionRequired ? "opacity-75" : null,
               composerProviderState.composerSurfaceClassName,
+              !isMobileViewport && isComposerApprovalState && "hidden",
+              showDesktopQuestionPanel && "composer-question-layout",
             )}
           >
-            {isEditingQueuedMessage ? (
+            {showDesktopQuestionPanel ? (
+              <div className="col-span-full min-w-0">
+                <ComposerPendingUserInputPanel
+                  pendingUserInputs={pendingUserInputs}
+                  cwd={gitCwd ?? undefined}
+                  threadRef={routeThreadRef}
+                  disabled={!canOperateThread}
+                  respondingRequestIds={
+                    activePendingIsResponding && activePendingUserInput
+                      ? [...respondingRequestIds, activePendingUserInput.requestId]
+                      : respondingRequestIds
+                  }
+                  answers={activePendingDraftAnswers}
+                  questionIndex={activePendingQuestionIndex}
+                  onToggleOption={onSelectActivePendingUserInputOption}
+                  onAdvance={onAdvanceActivePendingUserInput}
+                  onDismiss={onDismissActivePendingUserInput}
+                  onCustomAnswer={focusComposer}
+                />
+              </div>
+            ) : null}
+            {isEditingQueuedMessage && !showDesktopQuestionPanel ? (
               <div className="px-5.5 pt-3.5 text-secondary-copy font-semibold text-secondary-label">
                 {t.chat.queue.editingQueuedPrefix}
               </div>
@@ -7146,6 +7190,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                 isComposerApprovalState && "pb-3 sm:pb-4",
                 isComposerCollapsedMobile && "hidden",
                 isComposerResting && "py-2 sm:py-2",
+                showDesktopQuestionPanel &&
+                  "col-start-1 row-start-2 min-h-9.5 min-w-0 rounded-full bg-composer-answer px-3.5 py-0 shadow-well-track sm:px-3.5 sm:py-0",
               )}
             >
               {isStashMenuOpen && !composerMenuOpen && !isComposerApprovalState && (
@@ -7634,10 +7680,13 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                       isComposerResting &&
                         "my-0 max-h-8 min-h-8 overflow-hidden py-0 whitespace-pre! leading-8",
                       isComposerApprovalState && "min-h-10",
+                      showDesktopQuestionPanel &&
+                        "m-0 min-h-9.5 py-2 text-control leading-terminal",
                     )}
                     placeholderClassName={cn(
                       isComposerResting &&
                         "flex items-center overflow-hidden whitespace-nowrap leading-8",
+                      showDesktopQuestionPanel && "flex items-center text-control text-placeholder",
                     )}
                     onChange={onPromptChange}
                     onVisibleSelectionChange={expandComposerForEditorChange}
@@ -7708,9 +7757,13 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
               </div>
             </div>
 
-            <ComposerPromptLengthValidation
-              message={providerInputSubmissionError ?? composerSubmissionError}
-            />
+            {providerInputSubmissionError || composerSubmissionError ? (
+              <div className={showDesktopQuestionPanel ? "col-span-full" : undefined}>
+                <ComposerPromptLengthValidation
+                  message={providerInputSubmissionError ?? composerSubmissionError}
+                />
+              </div>
+            ) : null}
 
             {/* Bottom toolbar */}
             {isComposerCollapsedMobile || isComposerApprovalState ? null : (
@@ -7726,6 +7779,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     "absolute right-px z-10 h-12 w-auto gap-0 py-0 sm:gap-0 sm:py-0",
                   isComposerResting &&
                     (showInlineRestingControls ? "bottom-[calc(2rem+1px)]" : "bottom-px"),
+                  showDesktopQuestionPanel &&
+                    "col-start-2 row-start-2 self-end p-0 sm:gap-2 sm:p-0",
                 )}
               >
                 <div
@@ -7735,6 +7790,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                   className={cn(
                     "relative -m-1 -ms-3.5 flex min-w-0 flex-1 items-center gap-1 overflow-x-auto p-1 ps-3.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
                     isComposerResting && "hidden",
+                    showDesktopQuestionPanel && "hidden",
                   )}
                 >
                   {composerControlsCollapsed ? null : composerControls}
@@ -7788,12 +7844,19 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     </>
                   ) : null}
                   <ComposerFooterPrimaryActions
-                    compact={isComposerResting || isComposerPrimaryActionsCompact}
+                    compact={
+                      !showDesktopQuestionPanel &&
+                      (isComposerResting || isComposerPrimaryActionsCompact)
+                    }
                     canOperateThread={canOperateThread}
                     activeContextWindow={
-                      settings.contextWindowMeterEnabled ? activeContextWindow : null
+                      settings.contextWindowMeterEnabled && !showDesktopQuestionPanel
+                        ? activeContextWindow
+                        : null
                     }
-                    reserveContextWindowMeter={reserveContextWindowMeter}
+                    reserveContextWindowMeter={
+                      !showDesktopQuestionPanel && reserveContextWindowMeter
+                    }
                     activeThreadModelDisplayName={activeThreadModelDisplayName}
                     pendingAction={pendingPrimaryAction}
                     isRunning={phase === "running"}

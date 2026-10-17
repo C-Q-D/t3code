@@ -6,10 +6,10 @@ import {
   derivePendingUserInputProgress,
   type PendingUserInputDraftAnswer,
 } from "../../pendingUserInput";
-import { CheckIcon } from "lucide-react";
+import { CheckIcon, ChevronDownIcon, PencilIcon, XIcon } from "lucide-react";
 import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "../ui/collapsible";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { cn } from "~/lib/utils";
-import { ComposerBanner } from "./ComposerBanner";
 import ChatMarkdown from "../ChatMarkdown";
 
 interface PendingUserInputPanelProps {
@@ -24,8 +24,11 @@ interface PendingUserInputPanelProps {
   onToggleOption: (questionId: string, optionValue: string) => void;
   onAdvance: () => void;
   onDismiss: (requestId: RuntimeRequestId) => void;
+  /** Focuses the existing custom-answer editor when the provider allows free text. */
+  onCustomAnswer?: () => void;
 }
 
+/** Presents E1's option rows while retaining the request's answer and keyboard state. */
 export const ComposerPendingUserInputPanel = memo(function ComposerPendingUserInputPanel({
   pendingUserInputs,
   cwd,
@@ -37,6 +40,7 @@ export const ComposerPendingUserInputPanel = memo(function ComposerPendingUserIn
   onToggleOption,
   onAdvance,
   onDismiss,
+  onCustomAnswer,
 }: PendingUserInputPanelProps) {
   if (pendingUserInputs.length === 0) return null;
   const activePrompt = pendingUserInputs[0];
@@ -55,6 +59,7 @@ export const ComposerPendingUserInputPanel = memo(function ComposerPendingUserIn
       onToggleOption={onToggleOption}
       onAdvance={onAdvance}
       onDismiss={onDismiss}
+      onCustomAnswer={onCustomAnswer}
     />
   );
 });
@@ -70,6 +75,7 @@ const ComposerPendingUserInputCard = memo(function ComposerPendingUserInputCard(
   onToggleOption,
   onAdvance,
   onDismiss,
+  onCustomAnswer,
 }: {
   prompt: PendingUserInput;
   cwd: string | undefined;
@@ -81,6 +87,7 @@ const ComposerPendingUserInputCard = memo(function ComposerPendingUserInputCard(
   onToggleOption: (questionId: string, optionValue: string) => void;
   onAdvance: () => void;
   onDismiss: (requestId: RuntimeRequestId) => void;
+  onCustomAnswer?: (() => void) | undefined;
 }) {
   // Message-mode requests remain answerable after their provider turn ends.
   const canRespond = prompt.responseCapability !== "not_resumable";
@@ -203,123 +210,165 @@ const ComposerPendingUserInputCard = memo(function ComposerPendingUserInputCard(
         setCollapsedQuestionId(open ? null : activeQuestion.id);
       }}
     >
-      <CollapsibleTrigger
-        render={<ComposerBanner.Row render={<button type="button" />} />}
-        title={isCollapsed ? t.composer.userInput.showQuestion : t.composer.userInput.hideQuestion}
-        data-pending-user-input-toggle={isCollapsed ? "collapsed" : "expanded"}
-      >
-        <ComposerBanner.Icon />
-        <ComposerBanner.Content>
-          <span className="shrink-0 font-medium text-muted-foreground">
-            {activeQuestion.header}
+      <div className="flex items-start gap-2.5 px-2">
+        {prompt.questions.length > 1 ? (
+          <span className="shrink-0 pt-0.5 font-mono text-secondary-copy text-muted-foreground tabular-nums">
+            {questionIndex + 1} / {prompt.questions.length}
           </span>
+        ) : null}
+        <div className="min-w-0 flex-1">
+          <span className="sr-only">{activeQuestion.header}</span>
           {isCollapsed ? (
-            <span className="min-w-0 flex-1 truncate text-secondary-label">
+            <span className="block truncate text-composer-question font-bold text-foreground">
               {activeQuestion.question}
             </span>
-          ) : null}
-        </ComposerBanner.Content>
-        <ComposerBanner.Actions>
-          {prompt.questions.length > 1 ? (
-            <span className="text-3xs font-medium text-muted-foreground tabular-nums">
-              {questionIndex + 1}/{prompt.questions.length}
-            </span>
-          ) : null}
-          <ComposerBanner.ToggleIcon expanded={!isCollapsed} />
-          {prompt.dismissible ? (
-            // Sits inside the trigger button, so stop the click from toggling
-            // the disclosure. Dismiss closes the question without a reply.
-            <ComposerBanner.Dismiss
-              render={<span role="button" tabIndex={0} />}
-              aria-label={t.composer.userInput.dismiss}
-              title={t.composer.userInput.dismiss}
-              disabled={isResponding}
-              data-pending-user-input-dismiss
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                onDismiss(prompt.requestId);
-              }}
-              onKeyDown={(event) => {
-                if (event.key !== "Enter" && event.key !== " ") return;
-                event.preventDefault();
-                event.stopPropagation();
-                onDismiss(prompt.requestId);
-              }}
-            />
-          ) : null}
-        </ComposerBanner.Actions>
-      </CollapsibleTrigger>
-      <CollapsiblePanel>
-        <ComposerBanner.Scroll>
-          <ComposerBanner.Body className="pe-1 pb-1 wrap-anywhere">
-            <ChatMarkdown
-              text={activeQuestion.question}
-              cwd={cwd}
-              threadRef={threadRef}
-              className="text-foreground/85"
-            />
-            {activeQuestion.multiSelect ? (
-              <p className="mt-1 text-secondary-label text-xs">
-                {t.composer.userInput.selectMultipleHint}
-              </p>
-            ) : null}
-            <div className="mt-2 space-y-0.5">
-              {activeQuestion.options.map((option, index) => {
-                const optionValue = option.value ?? option.label;
-                const isOptimisticallySelected =
-                  optimisticSingleSelect?.questionId === activeQuestion.id &&
-                  optimisticSingleSelect.optionValue === optionValue;
-                const isSelected =
-                  isOptimisticallySelected ||
-                  (!customAnswerActive && progress.selectedOptionValues.includes(optionValue));
-                const shortcutKey = index < 9 ? index + 1 : null;
-                const className = cn(
-                  "group flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left outline-none transition-colors duration-150 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-primary/25",
-                  isSelected
-                    ? "bg-muted/55 text-foreground"
-                    : "bg-transparent text-foreground/85 hover:bg-muted/30",
-                  (disabled || isResponding) && "opacity-50 cursor-not-allowed",
-                  !disabled && !isResponding && "cursor-pointer",
-                );
-                const content = (
-                  <>
-                    <div className="min-w-0 flex-1 flex flex-col gap-0.5">
-                      <span className="text-sm font-medium">{option.label}</span>
-                      {option.description && option.description !== option.label ? (
-                        <span className="text-secondary-label text-2xs">{option.description}</span>
-                      ) : null}
-                    </div>
-                    {isSelected ? (
-                      <CheckIcon className="size-3.5 shrink-0 text-primary" />
-                    ) : shortcutKey !== null ? (
-                      <kbd
-                        className={cn(
-                          "flex size-5 shrink-0 items-center justify-center text-3xs font-medium text-muted-foreground tabular-nums",
-                        )}
-                      >
-                        {shortcutKey}
-                      </kbd>
-                    ) : null}
-                  </>
-                );
-                return (
-                  <button
-                    key={`${activeQuestion.id}:${optionValue}`}
-                    type="button"
-                    disabled={disabled || isResponding}
-                    onClick={() => {
-                      handleOptionSelection(activeQuestion.id, optionValue);
-                    }}
-                    className={className}
-                  >
-                    {content}
-                  </button>
-                );
-              })}
+          ) : (
+            <div className="max-h-32 overflow-y-auto overscroll-contain">
+              <ChatMarkdown
+                text={activeQuestion.question}
+                cwd={cwd}
+                threadRef={threadRef}
+                className="text-composer-question font-bold text-foreground"
+              />
             </div>
-          </ComposerBanner.Body>
-        </ComposerBanner.Scroll>
+          )}
+        </div>
+        <Tooltip>
+          <TooltipTrigger render={<span className="inline-flex shrink-0" />}>
+            <CollapsibleTrigger
+              render={
+                <button
+                  type="button"
+                  className="inline-flex size-7 shrink-0 items-center justify-center rounded-composer-queue-toggle border-0 bg-transparent p-0 text-secondary-label outline-none hover:bg-secondary focus-visible:inset-shadow-focus"
+                />
+              }
+              aria-label={
+                isCollapsed ? t.composer.userInput.showQuestion : t.composer.userInput.hideQuestion
+              }
+              data-pending-user-input-toggle={isCollapsed ? "collapsed" : "expanded"}
+            >
+              <ChevronDownIcon
+                className={cn("size-3.75", !isCollapsed && "rotate-180")}
+                aria-hidden="true"
+              />
+            </CollapsibleTrigger>
+          </TooltipTrigger>
+          <TooltipPopup>
+            {isCollapsed ? t.composer.userInput.showQuestion : t.composer.userInput.hideQuestion}
+          </TooltipPopup>
+        </Tooltip>
+        {prompt.dismissible ? (
+          <Tooltip>
+            <TooltipTrigger render={<span className="inline-flex shrink-0" />}>
+              <button
+                type="button"
+                className="inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-composer-queue-toggle border-0 bg-transparent p-0 text-secondary-label outline-none hover:bg-secondary focus-visible:inset-shadow-focus disabled:pointer-events-none disabled:text-fg-icon-disabled"
+                aria-label={t.composer.userInput.dismiss}
+                disabled={isResponding}
+                data-pending-user-input-dismiss
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onDismiss(prompt.requestId);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter" && event.key !== " ") return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onDismiss(prompt.requestId);
+                }}
+              >
+                <XIcon className="size-3.75" aria-hidden="true" />
+              </button>
+            </TooltipTrigger>
+            <TooltipPopup>{t.composer.userInput.dismiss}</TooltipPopup>
+          </Tooltip>
+        ) : null}
+      </div>
+      <CollapsiblePanel animate={false}>
+        <div className="mt-2.5 max-h-72 overflow-y-auto overscroll-contain wrap-anywhere">
+          {activeQuestion.multiSelect ? (
+            <p className="mb-1.5 px-2 text-secondary-copy text-secondary-label">
+              {t.composer.userInput.selectMultipleHint}
+            </p>
+          ) : null}
+          <div className="space-y-1.5">
+            {activeQuestion.options.map((option, index) => {
+              const optionValue = option.value ?? option.label;
+              const isOptimisticallySelected =
+                optimisticSingleSelect?.questionId === activeQuestion.id &&
+                optimisticSingleSelect.optionValue === optionValue;
+              const isSelected =
+                isOptimisticallySelected ||
+                (!customAnswerActive && progress.selectedOptionValues.includes(optionValue));
+              const shortcutKey = index < 9 ? index + 1 : null;
+              const className = cn(
+                "group flex min-h-10.5 w-full items-center gap-3 rounded-composer-panel-row border-0 px-3.5 py-2 text-left text-control outline-none focus-visible:inset-shadow-focus",
+                isSelected
+                  ? "bg-accent font-semibold text-foreground shadow-composer-option-selected inset-shadow-selected-control"
+                  : "bg-secondary text-foreground shadow-raise-xs hover:bg-accent",
+                (disabled || isResponding) && "opacity-50 cursor-not-allowed",
+                !disabled && !isResponding && "cursor-pointer",
+              );
+              const content = (
+                <>
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      "flex size-4 shrink-0 items-center justify-center",
+                      activeQuestion.multiSelect ? "rounded-composer-split" : "rounded-full",
+                      isSelected
+                        ? "composer-primary-key bg-primary text-primary-foreground"
+                        : "shadow-composer-choice",
+                    )}
+                  >
+                    {isSelected ? (
+                      activeQuestion.multiSelect ? (
+                        <CheckIcon className="size-3" />
+                      ) : (
+                        <span className="size-1.5 rounded-full bg-primary-foreground" />
+                      )
+                    ) : null}
+                  </span>
+                  <div className="min-w-0 flex-1 flex flex-col gap-0.5">
+                    <span>{option.label}</span>
+                    {option.description && option.description !== option.label ? (
+                      <span className="text-secondary-copy text-secondary-label">
+                        {option.description}
+                      </span>
+                    ) : null}
+                  </div>
+                  {shortcutKey !== null ? <kbd className="sr-only">{shortcutKey}</kbd> : null}
+                </>
+              );
+              return (
+                <button
+                  key={`${activeQuestion.id}:${optionValue}`}
+                  type="button"
+                  disabled={disabled || isResponding}
+                  aria-pressed={isSelected}
+                  onClick={() => {
+                    handleOptionSelection(activeQuestion.id, optionValue);
+                  }}
+                  className={className}
+                >
+                  {content}
+                </button>
+              );
+            })}
+            {activeQuestion.allowCustomAnswer !== false && onCustomAnswer ? (
+              <button
+                type="button"
+                disabled={responseDisabled}
+                onClick={onCustomAnswer}
+                className="composer-custom-answer flex h-10.5 w-full cursor-pointer items-center gap-2 rounded-composer-panel-row border-0 bg-transparent px-3.5 text-control text-secondary-label hover:bg-secondary focus-visible:inset-shadow-focus disabled:pointer-events-none disabled:text-fg-control-disabled"
+              >
+                <PencilIcon className="size-3.75" aria-hidden="true" />
+                {t.composer.placeholder.customAnswer}
+              </button>
+            ) : null}
+          </div>
+        </div>
       </CollapsiblePanel>
     </Collapsible>
   );

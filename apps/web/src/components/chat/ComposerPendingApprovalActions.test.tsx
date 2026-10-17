@@ -5,7 +5,7 @@ import { describe, expect, it } from "vite-plus/test";
 import { ComposerPendingApprovalActions } from "./ComposerPendingApprovalActions";
 
 describe("ComposerPendingApprovalActions", () => {
-  it("keeps the main decisions visible and secondary decisions in the menu", () => {
+  it("shows the E1 approval decisions with approval before session, decline, and cancel", () => {
     const markup = renderToStaticMarkup(
       <ComposerPendingApprovalActions
         requestId={RuntimeRequestId.make("approval-1")}
@@ -17,8 +17,11 @@ describe("ComposerPendingApprovalActions", () => {
 
     expect(markup).toContain(">Decline<");
     expect(markup).toContain(">Approve<");
-    expect(markup).not.toContain(">Cancel<");
-    expect(markup).not.toContain("Always allow this session");
+    expect(markup).toContain(">Cancel<");
+    expect(markup).toContain("Always allow this session");
+    expect(markup.indexOf(">Approve<")).toBeLessThan(markup.indexOf("Always allow this session"));
+    expect(markup.indexOf("Always allow this session")).toBeLessThan(markup.indexOf(">Decline<"));
+    expect(markup.indexOf(">Decline<")).toBeLessThan(markup.indexOf(">Cancel<"));
   });
 
   it("keeps secondary provider labels out of the compact action row", () => {

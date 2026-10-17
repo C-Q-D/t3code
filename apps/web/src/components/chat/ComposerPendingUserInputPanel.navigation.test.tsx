@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { EnvironmentId, RuntimeRequestId, ThreadId } from "@t3tools/contracts";
 import { act, useState, type ReactNode } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
@@ -76,11 +77,6 @@ let renderer: ReactTestRenderer | undefined;
 beforeEach(() => {
   vi.useFakeTimers();
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-  vi.stubGlobal("window", {
-    setTimeout: globalThis.setTimeout,
-    clearTimeout: globalThis.clearTimeout,
-  });
-  vi.stubGlobal("document", { addEventListener: vi.fn(), removeEventListener: vi.fn() });
 });
 afterEach(async () => {
   await act(async () => renderer?.unmount());

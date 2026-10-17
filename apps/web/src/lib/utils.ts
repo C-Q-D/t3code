@@ -88,6 +88,7 @@ const twMerge = extendTailwindMerge({
         "pr-detail-title",
         "pr-avatar",
         "pr-linked-heading",
+        "composer-question",
       ],
       shadow: [
         "slab",
@@ -192,6 +193,9 @@ const twMerge = extendTailwindMerge({
         "pr-description-well",
         "pr-review-card",
         "pr-linked-watching",
+        "composer-panel-primary",
+        "composer-option-selected",
+        "composer-choice",
       ],
       "inset-shadow": [
         "selected",
@@ -255,6 +259,8 @@ const twMerge = extendTailwindMerge({
         "pr-linked-row",
         "composer-queue-row",
         "composer-queue-toggle",
+        "composer-panel-row",
+        "composer-split",
       ],
       leading: [
         "code",
