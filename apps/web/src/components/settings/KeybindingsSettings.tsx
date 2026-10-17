@@ -285,6 +285,11 @@ function KeybindingConflictWarning({ labels }: { labels: ReadonlyArray<string> }
   );
 }
 
+/**
+ * Selects a condition identifier from variables while retaining the current value if it is unknown.
+ * unknownIdentifiers optionally supplies warning details; onChange receives nonempty selections
+ * and updates the caller's draft without persisting a binding.
+ */
 function WhenVariableSelect({
   value,
   variables,
@@ -565,6 +570,12 @@ function WhenExpressionNodeEditor({
   );
 }
 
+/**
+ * Edits a condition as text or a tree, using variables as the identifier choices.
+ * value is the current tree, or undefined for an unconditional binding; it seeds the text draft
+ * on mount. onChange receives valid trees only, including undefined when cleared.
+ * onValidityChange optionally reports edit validity so the caller can prevent saving invalid text.
+ */
 function WhenExpressionBuilder({
   value,
   variables,
@@ -1135,6 +1146,11 @@ interface NewKeybindingProps {
   onCancel: () => void;
 }
 
+/**
+ * Renders commandOptions with localized labels while keeping command identifiers as values.
+ * draft owns the selected command and its setter; selection updates the draft without saving.
+ * className optionally supplies layout classes for the trigger.
+ */
 function NewKeybindingCommandSelect({
   draft,
   commandOptions,
@@ -1326,6 +1342,12 @@ function BrowserKeybindingNotice() {
   );
 }
 
+/**
+ * Renders searchable bindings from the representative environment in the settings scope.
+ * Requires the settings scope and router contexts. Authorized edits target every connected
+ * selected environment; opening the JSON file targets only the representative environment.
+ * Mutation and editor failures are reported through toasts rather than thrown to the caller.
+ */
 export function KeybindingsSettingsPanel() {
   // The representative environment supplies the displayed bindings; edits
   // fan out to every connected environment in the selection, so one
