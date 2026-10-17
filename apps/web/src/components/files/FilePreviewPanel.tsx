@@ -1142,8 +1142,8 @@ export default function FilePreviewPanel({
   const canToggleRendered =
     previewPath !== null && attachment === undefined && renderedMode !== null;
   const updateClientSettings = useUpdateClientSettings();
-  // Word wrap only reaches the text bodies. A rendered Markdown document, a table and the
-  // browser frame all lay themselves out, so the toggle stays hidden rather than inert.
+  // Word wrap only reaches source text. K3 keeps the action visible in rendered
+  // documents, tables and browser frames, but disabled so it cannot change the source preference.
   const showsRawText =
     previewPath !== null &&
     file.data !== null &&
@@ -1312,8 +1312,11 @@ export default function FilePreviewPanel({
               {showsRawText || rendered ? (
                 <FileSurfaceAction
                   label={t.tools.files.wordWrap}
-                  pressed={wordWrap}
-                  onPress={() => updateClientSettings({ wordWrap: !wordWrap })}
+                  pressed={showsRawText && wordWrap}
+                  disabled={!showsRawText}
+                  {...(showsRawText
+                    ? { onPress: () => updateClientSettings({ wordWrap: !wordWrap }) }
+                    : {})}
                 >
                   <WrapTextIcon className="size-3.5" />
                 </FileSurfaceAction>
