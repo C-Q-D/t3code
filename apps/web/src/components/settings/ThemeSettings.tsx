@@ -56,7 +56,7 @@ import {
 } from "./ThemePreviewCircles";
 import { SettingsRow } from "./settingsLayout";
 import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group";
-import { Menu, MenuTrigger, MenuPopup, MenuItem } from "../ui/menu";
+import { Menu, MenuTrigger, MenuPopup, MenuItem, MenuRadioGroup, MenuRadioItem } from "../ui/menu";
 
 const MAINTAINER_THEMES: ReadonlyArray<ThemeDefinition> = [
   GRAPHITE_THEME,
@@ -158,19 +158,51 @@ function ThemeLibraryCard({
               <MoreHorizontalIcon />
             </MenuTrigger>
             <MenuPopup align="end">
-              {variantNavigation?.options.map((option) => (
-                <MenuItem
-                  density="compact"
-                  key={`${option.themeIndex}-${option.preview.mode}`}
-                  onClick={() =>
-                    variantNavigation.onSelectAndUse(option.themeIndex, option.preview.mode)
-                  }
-                >
-                  {option.preview.mode === "light" ? <SunIcon /> : <MoonIcon />}
-                  {option.label}
-                  {option.activeModes.includes(option.preview.mode) ? <CheckIcon /> : null}
-                </MenuItem>
-              ))}
+              {/* Each appearance has its own selection; one radio group would conflate the two halves. */}
+              {variantNavigation
+                ? (["light", "dark"] as const).map((mode) => (
+                    <MenuRadioGroup
+                      key={mode}
+                      aria-label={
+                        mode === "light"
+                          ? t.settings.rows.browserDefaultAppearance.options.light
+                          : t.settings.rows.browserDefaultAppearance.options.dark
+                      }
+                      value={
+                        variantNavigation.options.find(
+                          (option) =>
+                            option.preview.mode === mode && option.activeModes.includes(mode),
+                        )?.themeIndex ?? -1
+                      }
+                      onValueChange={(themeIndex) => {
+                        if (typeof themeIndex === "number")
+                          variantNavigation.onSelectAndUse(themeIndex, mode);
+                      }}
+                    >
+                      {variantNavigation.options
+                        .filter((option) => option.preview.mode === mode)
+                        .map((option) => (
+                          <MenuRadioItem
+                            closeOnClick
+                            density="compact"
+                            key={option.themeIndex}
+                            value={option.themeIndex}
+                            aria-label={t.settings.theme.variantAriaLabel(
+                              option.label,
+                              mode,
+                              option.activeModes.includes(mode),
+                            )}
+                          >
+                            <span className="flex items-center gap-2.5">
+                              {mode === "light" ? <SunIcon /> : <MoonIcon />}
+                              {option.label}
+                              {option.activeModes.includes(mode) ? <CheckIcon /> : null}
+                            </span>
+                          </MenuRadioItem>
+                        ))}
+                    </MenuRadioGroup>
+                  ))
+                : null}
               {onDuplicate ? (
                 <MenuItem density="compact" onClick={onDuplicate}>
                   <CopyIcon />

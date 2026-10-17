@@ -4003,20 +4003,6 @@ ${address}`
     updateTheme: "Update theme",
   },
   theme: {
-    lightAndDarkThemeVariants: "Light and dark theme variants",
-    chooseVariantOptionsCurrently: (
-      mode: string | number | boolean | null | undefined,
-      optionsLength: string | number | boolean | null | undefined,
-      selectedOptionLabel: string | number | boolean | null | undefined,
-    ) => `Choose ${mode} variant, ${optionsLength} options, currently ${selectedOptionLabel}`,
-    applyVariantAriaLabel: (
-      mode: string | number | boolean | null | undefined,
-      selectedOptionLabel: string | number | boolean | null | undefined,
-    ) => `Use ${mode} variant, currently ${selectedOptionLabel}`,
-    applyVariantTooltip: (
-      optionLabel: string | number | boolean | null | undefined,
-      mode: string | number | boolean | null | undefined,
-    ) => `Use ${optionLabel} for ${mode} mode`,
     variantAriaLabel: (
       optionLabel: string | number | boolean | null | undefined,
       mode: string | number | boolean | null | undefined,

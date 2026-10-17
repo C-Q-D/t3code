@@ -3806,23 +3806,6 @@ ${address}`
     updateTheme: "更新主题",
   },
   theme: {
-    lightAndDarkThemeVariants: "浅色和深色主题变体",
-    chooseVariantOptionsCurrently: (
-      mode: string | number | boolean | null | undefined,
-      optionsLength: string | number | boolean | null | undefined,
-      selectedOptionLabel: string | number | boolean | null | undefined,
-    ) =>
-      `选择${mode === "light" ? "浅色" : mode === "dark" ? "深色" : mode}变体，共 ${optionsLength} 个选项，当前为 ${selectedOptionLabel}`,
-    applyVariantAriaLabel: (
-      mode: string | number | boolean | null | undefined,
-      selectedOptionLabel: string | number | boolean | null | undefined,
-    ) =>
-      `使用${mode === "light" ? "浅色" : mode === "dark" ? "深色" : mode}变体，当前为 ${selectedOptionLabel}`,
-    applyVariantTooltip: (
-      optionLabel: string | number | boolean | null | undefined,
-      mode: string | number | boolean | null | undefined,
-    ) =>
-      `在${mode === "light" ? "浅色" : mode === "dark" ? "深色" : mode}模式中使用 ${optionLabel}`,
     variantAriaLabel: (
       optionLabel: string | number | boolean | null | undefined,
       mode: string | number | boolean | null | undefined,
