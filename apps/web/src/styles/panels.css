@@ -323,3 +323,19 @@
 @utility transition-panel-overlay {
   transition-property: translate, opacity;
 }
+
+/* PN1.2 · Panel8a.dc.html / 其余屏-1 K2: tab actions are 22px / r7,
+   and the add-panel launcher is 30px / r11. */
+@theme {
+  --radius-panel-tab-action: 7px;
+  --radius-panel-launcher: 11px;
+}
+
+/* StyleM-8a.dc.html · 整窗: the third slab uses the shared stone asset under
+   the panel veil. Slab owns the card color, 22px radius and frame elevation. */
+@utility stone-panel {
+  background-image:
+    linear-gradient(var(--color-stone-panel-veil), var(--color-stone-panel-veil)),
+    url("../assets/stone-8a.webp");
+  background-repeat: repeat;
+}

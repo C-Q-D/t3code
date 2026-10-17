@@ -37,6 +37,7 @@ import {
   Globe2,
   Plus,
   TerminalSquare,
+  X,
 } from "lucide-react";
 import { Volume2, VolumeOff } from "lucide";
 import {
@@ -76,7 +77,6 @@ import {
 } from "~/components/ui/menu";
 import { useBrowserDefaults } from "~/browser/browserDefaults";
 import { ScrollArea } from "~/components/ui/scroll-area";
-import { PanelTabCloseButton } from "~/components/ui/panel-tab-close-button";
 import { faviconUrlForOrigin } from "~/lib/favicon";
 import { useTheme } from "~/hooks/useTheme";
 import { useDeviceState } from "~/state/device";
@@ -643,13 +643,14 @@ function surfaceTitle(
   }
 }
 
+/** Keeps captured and fallback favicons at the same 14px size as the panel's surface glyphs. */
 function PreviewFavicon({ capturedUrl, url }: { capturedUrl: string | null; url: string | null }) {
   const publicProviderUrl = faviconUrlForOrigin(url, 32);
   return (
     <FaviconImage
       sources={[capturedUrl, publicProviderUrl]}
-      fallback={<Globe2 className="size-3 shrink-0" />}
-      className="size-3 shrink-0 rounded-sm object-contain"
+      fallback={<Globe2 className="size-3.5 shrink-0" strokeWidth={1.75} />}
+      className="size-3.5 shrink-0 rounded-sm object-contain"
     />
   );
 }
@@ -662,6 +663,7 @@ function sameOrigin(left: string, right: string): boolean {
   }
 }
 
+/** Uses panel-sized glyphs without changing surface identity or provider-specific artwork. */
 function SurfaceIcon({
   surface,
   sessions,
@@ -687,20 +689,20 @@ function SurfaceIcon({
       return <PreviewFavicon capturedUrl={capturedUrl} url={url} />;
     }
     case "diff":
-      return <FileDiff className="size-3 shrink-0" />;
+      return <FileDiff className="size-3.5 shrink-0" strokeWidth={1.75} />;
     case "files":
-      return <Files className="size-3 shrink-0" />;
+      return <Files className="size-3.5 shrink-0" strokeWidth={1.75} />;
     case "file":
       return (
         <PierreEntryIcon
           pathValue={surface.relativePath}
           kind="file"
           theme={theme}
-          className="size-3"
+          className="size-3.5"
         />
       );
     case "terminal":
-      return <TerminalSquare className="size-3 shrink-0" />;
+      return <TerminalSquare className="size-3.5 shrink-0" strokeWidth={1.75} />;
     case "pull-request":
       return (
         <PullRequestSurfaceIcon
@@ -710,14 +712,14 @@ function SurfaceIcon({
         />
       );
     case "pull-requests":
-      return <PullRequestGlyph.link className="size-3 shrink-0" />;
+      return <PullRequestGlyph.link className="size-3.5 shrink-0" strokeWidth={1.75} />;
     case "device":
       return surface.target?.platform === "ios" ? (
-        <AppleIcon className="size-3 shrink-0" />
+        <AppleIcon className="size-3.5 shrink-0" />
       ) : surface.target?.platform === "android" ? (
-        <AndroidIcon className="size-3 shrink-0" />
+        <AndroidIcon className="size-3.5 shrink-0" />
       ) : (
-        <Smartphone className="size-3 shrink-0" />
+        <Smartphone className="size-3.5 shrink-0" strokeWidth={1.75} />
       );
   }
 }
@@ -751,6 +753,7 @@ export function resolvePullRequestTabLink(
   return newest;
 }
 
+/** Preserves live PR lifecycle colors while matching the panel's 14px icon geometry. */
 function PullRequestSurfaceIcon({
   surface,
   environmentId,
@@ -811,13 +814,23 @@ function PullRequestSurfaceIcon({
   // detail data arrives.
   const status = linkedSnapshot ?? newestPullRequestSummary(detail, sharedSummary) ?? seed ?? null;
   if (status === null) {
-    return <PullRequestGlyph.pullRequest className="size-3 shrink-0 text-muted-foreground" />;
+    return (
+      <PullRequestGlyph.pullRequest
+        className="size-3.5 shrink-0 text-muted-foreground"
+        strokeWidth={1.75}
+      />
+    );
   }
   const presentation = resolvePullRequestState({
     state: status.state,
     isDraft: status.isDraft ?? detail?.isDraft ?? seed?.isDraft ?? false,
   });
-  return <presentation.Icon className={cn("size-3 shrink-0", presentation.toneClassName)} />;
+  return (
+    <presentation.Icon
+      className={cn("size-3.5 shrink-0", presentation.toneClassName)}
+      strokeWidth={1.75}
+    />
+  );
 }
 
 /**
@@ -1180,13 +1193,13 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
     >
       <div
         className={cn(
-          "flex shrink-0 items-center gap-1 pl-2",
+          "flex min-w-0 shrink-0 items-center gap-1 pl-2.5 font-sans text-secondary-copy-large leading-normal text-shadow-stone",
           // Standalone slabs start below the native titlebar. Keep native-control
           // space only for hosts that still place their tabs in that titlebar.
           props.standalone
             ? "h-12.5 min-h-12.5"
             : "h-(--workspace-topbar-height) min-h-(--workspace-topbar-height)",
-          props.mode === "inline" && !props.layoutControls && !props.standalone ? "pr-28" : "pr-3",
+          props.mode === "inline" && !props.layoutControls && !props.standalone ? "pr-28" : "pr-2",
           ownsDesktopTitleBar && "drag-region",
           ownsDesktopTitleBar && "wco:pr-(--workspace-native-controls-inset)",
           ownsDesktopTitleBar && props.maximized && COLLAPSED_SIDEBAR_TITLEBAR_INSET_CLASS,
@@ -1230,17 +1243,16 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
                     onAuxClick={(event) => handleTabAuxClick(event, surface)}
                     onContextMenu={(event) => void handleTabContextMenu(event, surface)}
                     className={cn(
-                      "cursor-pointer group/tab flex h-6 max-w-36 shrink-0 items-center gap-0.5 rounded-md pr-2 pl-1.5 text-xs",
+                      "group/tab relative flex h-8 max-w-36 shrink-0 cursor-pointer items-center gap-1.5 rounded-compact-row pl-2.5",
                       ownsDesktopTitleBar && "[-webkit-app-region:no-drag]",
                       active
-                        ? "bg-accent text-foreground"
-                        : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+                        ? "bg-secondary pr-1 font-semibold text-foreground shadow-raise-xs"
+                        : "font-normal text-secondary-label hover:bg-secondary hover:text-foreground focus-within:bg-secondary",
+                      // An audible inactive tab needs a separate hit area for mute and close.
+                      !active && (audio !== "none" && audioRuntimeTabId ? "pr-8" : "pr-2.5"),
                     )}
                   >
-                    <PanelTabCloseButton
-                      label={t.chat.rightPanel.closeTab(title)}
-                      onClick={() => props.onCloseSurface(surface)}
-                    >
+                    <span className="relative flex size-3.5 shrink-0 items-center justify-center">
                       <SurfaceIcon
                         surface={surface}
                         sessions={props.previewSessions}
@@ -1255,42 +1267,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
                           aria-hidden
                         />
                       ) : null}
-                    </PanelTabCloseButton>
-                    {audio === "none" || !audioRuntimeTabId ? null : (
-                      <Tooltip>
-                        <TooltipTrigger
-                          render={
-                            <button
-                              type="button"
-                              className="cursor-pointer flex size-4 shrink-0 items-center justify-center rounded-sm hover:bg-muted"
-                              aria-label={
-                                audio === "muted"
-                                  ? t.chat.rightPanel.unmuteNamedTab(title)
-                                  : t.chat.rightPanel.muteNamedTab(title)
-                              }
-                              onClick={(event) => {
-                                // Sibling of the close button, inside a tab that
-                                // activates on click: keep this to the toggle.
-                                event.stopPropagation();
-                                void previewBridge
-                                  ?.setAudioMuted(audioRuntimeTabId, audio !== "muted")
-                                  .catch(() => undefined);
-                              }}
-                            >
-                              <MorphIcon
-                                className="size-3"
-                                icon={audio === "muted" ? VolumeOff : Volume2}
-                              />
-                            </button>
-                          }
-                        />
-                        <TooltipPopup>
-                          {audio === "muted"
-                            ? t.chat.rightPanel.unmuteTab
-                            : t.chat.rightPanel.muteTab}
-                        </TooltipPopup>
-                      </Tooltip>
-                    )}
+                    </span>
                     {renamingDevice === surface.id ? (
                       <input
                         aria-label={t.chat.rightPanel.deviceTabName}
@@ -1323,7 +1300,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
                                 if (surface.kind === "device" && props.onRenameDevice)
                                   setRenamingDevice(surface.id);
                               }}
-                              className="cursor-pointer flex min-w-0 items-center"
+                              className="flex min-w-0 cursor-pointer items-center self-stretch rounded-panel-tab-action outline-none focus-visible:inset-shadow-focus"
                               onClick={() => props.onActivate(surface)}
                             >
                               <span className="truncate">{title}</span>
@@ -1343,6 +1320,54 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
                         </TooltipPopup>
                       </Tooltip>
                     )}
+                    {audio === "none" || !audioRuntimeTabId ? null : (
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <button
+                              type="button"
+                              className="flex size-5.5 shrink-0 cursor-pointer items-center justify-center rounded-panel-tab-action bg-transparent p-0 text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:inset-shadow-focus"
+                              aria-label={
+                                audio === "muted"
+                                  ? t.chat.rightPanel.unmuteNamedTab(title)
+                                  : t.chat.rightPanel.muteNamedTab(title)
+                              }
+                              onClick={(event) => {
+                                // Keep audio independent of activation and the trailing close action.
+                                event.stopPropagation();
+                                void previewBridge
+                                  ?.setAudioMuted(audioRuntimeTabId, audio !== "muted")
+                                  .catch(() => undefined);
+                              }}
+                            >
+                              <MorphIcon
+                                className="size-3"
+                                icon={audio === "muted" ? VolumeOff : Volume2}
+                              />
+                            </button>
+                          }
+                        />
+                        <TooltipPopup>
+                          {audio === "muted"
+                            ? t.chat.rightPanel.unmuteTab
+                            : t.chat.rightPanel.muteTab}
+                        </TooltipPopup>
+                      </Tooltip>
+                    )}
+                    {/* Inactive tabs keep K2's compact width; revealing close must not shift neighbours. */}
+                    <button
+                      type="button"
+                      aria-label={t.chat.rightPanel.closeTab(title)}
+                      onClick={() => props.onCloseSurface(surface)}
+                      className={cn(
+                        "flex size-5.5 shrink-0 cursor-pointer items-center justify-center rounded-panel-tab-action p-0 text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:inset-shadow-focus",
+                        active
+                          ? "bg-transparent"
+                          : "pointer-events-none absolute right-1 bg-secondary opacity-0 group-focus-within/tab:pointer-events-auto group-focus-within/tab:opacity-100 group-hover/tab:pointer-events-auto group-hover/tab:opacity-100",
+                      )}
+                    >
+                      <X className="size-3" />
+                    </button>
                   </SortableTab>
                 );
               })}
@@ -1352,15 +1377,15 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
                 <MenuTrigger
                   ref={addSurfaceTriggerRef}
                   render={
-                    <Button
+                    // The tab-strip launcher follows Panel8a's 30px / 11px geometry.
+                    <button
+                      type="button"
                       aria-label={t.chat.rightPanel.addSurface}
-                      className="shrink-0"
-                      size="icon-xs"
-                      variant="ghost-muted"
+                      className="flex size-7.5 shrink-0 cursor-pointer items-center justify-center rounded-panel-launcher bg-transparent p-0 text-secondary-label outline-none hover:bg-secondary hover:text-foreground focus-visible:inset-shadow-focus data-popup-open:bg-secondary data-popup-open:text-foreground"
                     />
                   }
                 >
-                  <Plus className="size-3.5" />
+                  <Plus className="size-4" />
                 </MenuTrigger>
                 <MenuPopup
                   align="start"

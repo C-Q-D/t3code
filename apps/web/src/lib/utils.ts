@@ -304,6 +304,8 @@ const twMerge = extendTailwindMerge({
         "pr-link-dialog",
         "timeline-empty-icon",
         "sidebar-provider-update",
+        "panel-tab-action",
+        "panel-launcher",
       ],
       leading: [
         "code",

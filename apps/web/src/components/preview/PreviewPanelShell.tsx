@@ -68,7 +68,7 @@ function ResizablePreviewPanelShell(props: PreviewPanelShellProps) {
   return <PreviewPanelShellFrame {...props} inlineSize={inlineSize} hostRef={hostRef} />;
 }
 
-/** Keeps the resize handle outside clipping while the slab clips its own content. */
+/** Keeps the resize handle outside clipping; the standalone slab owns its stone surface and content clip. */
 function PreviewPanelShellFrame(
   props: PreviewPanelShellProps & {
     inlineSize: PreviewPanelInlineSize;
@@ -179,6 +179,7 @@ function PreviewPanelShellFrame(
           radius="slab"
           elevation="slab-frame"
           className="h-full min-h-0 overflow-hidden"
+          render={<div className="stone-panel" />}
         >
           {content}
         </Slab>
