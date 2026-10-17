@@ -149,6 +149,7 @@ export const account = {
     agentSignIn: "Agent sign-in",
     pairingEnvironment: "Pairing with this environment",
     validatingPairing: "Validating the pairing link and preparing your session.",
+    pairingCredentialPlaceholder: "Paste a one-time token or pairing key",
     pairEnvironment: "Pair with this environment",
     pairingToken: "Pairing token",
     tokenPlaceholder: "Paste a one-time token or pairing secret",
@@ -312,6 +313,9 @@ export const account = {
     installingRelay: "Installing relay client",
     validatingExecutable: "Validating executable",
     activatingInstallation: "Activating installation",
+    relayDownload: "Download",
+    relayInstall: "Install",
+    relayStart: "Start",
     installRelay: "Install relay client?",
     preparingAccess: "T3 Code is preparing this environment for secure access through T3 Connect.",
     relayRequired:
@@ -368,6 +372,7 @@ export const account = {
     snapshotFailed: "Snapshot failed",
     retryCapture: "Try the capture again.",
     sshExpired: "This SSH password prompt expired. Try connecting again.",
+    connect: "Connect",
     sshPasswordRequired: "SSH Password Required",
     sshPasswordPrefix: "T3 needs your SSH password to connect to ",
     sshPasswordSuffix:

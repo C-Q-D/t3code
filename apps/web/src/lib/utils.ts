@@ -102,6 +102,7 @@ const twMerge = extendTailwindMerge({
         "discussion-error-heading",
         "ov5-title",
         "ov5-connect-title",
+        "ov5-prompt-title",
       ],
       shadow: [
         "slab",

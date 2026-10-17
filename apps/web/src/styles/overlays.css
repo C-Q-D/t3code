@@ -90,3 +90,24 @@ body:has([data-onboarding-route]) .window-titlebar-slot {
 body:has([data-onboarding-route]) [data-titlebar-brand] {
   margin-left: 0;
 }
+
+/* OV5.2: Onboarding8a Q3 SSH and relay prompt headings are 22px. */
+@theme {
+  --text-ov5-prompt-title: 22px;
+  --text-ov5-prompt-title--line-height: 1.55;
+}
+
+/* Q3 progress is backed by real installer stages, never the design's example percentage. */
+.ov5-install-progress {
+  appearance: none;
+}
+.ov5-install-progress::-webkit-progress-bar {
+  background: var(--input);
+  border-radius: var(--radius-keycap);
+  box-shadow: var(--shadow-well-progress);
+}
+.ov5-install-progress::-webkit-progress-value,
+.ov5-install-progress::-moz-progress-bar {
+  background: var(--code-foreground);
+  border-radius: var(--radius-keycap);
+}

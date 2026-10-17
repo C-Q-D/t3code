@@ -1,9 +1,48 @@
 /** Q1–Q3 onboarding surfaces; flow state and cloud mutations remain with their callers. */
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
-import { CheckIcon, CloudIcon } from "lucide-react";
+import { CheckIcon, CircleCheckIcon, CircleXIcon, CloudIcon, HourglassIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 import { t } from "~/i18n";
 import { cn } from "~/lib/utils";
+
+/** Gives standalone pairing and authorization routes the Q3 stone surface without introducing modal behavior. */
+export function OnboardingPage({ children }: { readonly children: ReactNode }) {
+  return (
+    <main className="flex h-full min-h-0 items-center justify-center overflow-y-auto scrollbar-gutter-both stone-base p-5 text-control text-foreground">
+      <section className="dialog-glass my-auto flex w-full max-w-110 flex-col gap-3.5 rounded-ov5-panel px-7 pt-6.5 pb-5.5">
+        {children}
+      </section>
+    </main>
+  );
+}
+
+/** Announces the supplied real pairing outcome with Q3's compact status row; it performs no requests. */
+export function OnboardingStatus({
+  tone,
+  children,
+}: {
+  readonly tone: "pending" | "success" | "error";
+  readonly children: ReactNode;
+}) {
+  const Icon =
+    tone === "success" ? CircleCheckIcon : tone === "error" ? CircleXIcon : HourglassIcon;
+  return (
+    <div
+      role={tone === "error" ? "alert" : "status"}
+      className={cn(
+        "flex min-h-10 items-center gap-2.5 rounded-ov5-row px-3.5 py-2 text-secondary-copy-large font-semibold",
+        tone === "success"
+          ? "bg-status-success text-success-foreground"
+          : tone === "error"
+            ? "bg-error-surface text-error-foreground"
+            : "bg-ov5-row text-code-foreground",
+      )}
+    >
+      <Icon className="size-3.75 shrink-0" />
+      <span>{children}</span>
+    </div>
+  );
+}
 
 /** Keeps modal focus handling while giving first-run setup an opaque, chrome-safe backdrop. */
 export function OnboardingPopup({

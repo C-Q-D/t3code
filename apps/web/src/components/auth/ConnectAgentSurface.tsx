@@ -24,7 +24,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { RadioGroup } from "../ui/radio-group";
 import { Spinner } from "../ui/spinner";
-import { AuthSurfaceShell } from "./AuthSurfaceShell";
+import { OnboardingPage } from "../onboarding/OnboardingSurface";
 
 const accessConfig: Record<
   AuthMcpClientAccess,
@@ -160,22 +160,22 @@ export function ConnectAgentSurface() {
 
   if (loaded.status === "loading") {
     return (
-      <AuthSurfaceShell>
+      <OnboardingPage>
         <ConnectAgentHeading
           title={t.account.auth.checkingRequest}
           description={t.account.auth.verifyingHint}
         />
         <Spinner className="mt-6" size="lg" tone="muted" />
-      </AuthSurfaceShell>
+      </OnboardingPage>
     );
   }
 
   if (loaded.status === "invalid") {
     return (
-      <AuthSurfaceShell>
+      <OnboardingPage>
         <ConnectAgentHeading title={t.account.auth.cannotContinue} description={loaded.message} />
-        <p className="mt-4 text-sm text-muted-foreground">{t.account.auth.restartSignIn}</p>
-      </AuthSurfaceShell>
+        <p className="mt-4 text-control text-muted-foreground">{t.account.auth.restartSignIn}</p>
+      </OnboardingPage>
     );
   }
 
@@ -184,7 +184,7 @@ export function ConnectAgentSurface() {
   const canApprove = pending === null && (oneClick || pairingCode.trim().length > 0);
 
   return (
-    <AuthSurfaceShell>
+    <OnboardingPage>
       <ConnectAgentHeading
         title={t.account.auth.connectClient(details.clientName)}
         description={
@@ -194,7 +194,7 @@ export function ConnectAgentSurface() {
           </>
         }
       />
-      <p className="mt-2 text-xs text-muted-foreground">
+      <p className="text-secondary-copy text-secondary-label">
         {redirectsToThisComputer(details.redirectHost) ? (
           <>
             {t.account.auth.localApprovalPrefix}
@@ -211,34 +211,23 @@ export function ConnectAgentSurface() {
       </p>
 
       <form
-        className="mt-6 space-y-5"
+        className="flex flex-col gap-3.5"
         onSubmit={(event) => {
           event.preventDefault();
           if (canApprove) void decide("approve");
         }}
       >
-        <div className="space-y-2">
-          <span id="connect-agent-access-label" className="text-sm font-medium">
-            {t.account.auth.permissions}
-          </span>
-          <RadioGroup
-            aria-labelledby="connect-agent-access-label"
-            value={access}
-            onValueChange={(value) => setAccess(value as AuthMcpClientAccess)}
-          >
-            {AuthMcpClientAccess.literals.map((option) => (
-              <AccessOption key={option} access={option} selected={option === access} />
-            ))}
-          </RadioGroup>
-          <p className="text-xs text-muted-foreground">{t.account.auth.permissionHint}</p>
-        </div>
-
         {oneClick ? null : (
           <div className="space-y-2">
-            <label className="text-sm font-medium" htmlFor="connect-agent-pairing-code">
+            <label
+              className="text-secondary-copy-medium text-secondary-label"
+              htmlFor="connect-agent-pairing-code"
+            >
               {t.account.auth.pairingCode}
             </label>
             <Input
+              size="lg"
+              font="mono"
               id="connect-agent-pairing-code"
               autoCapitalize="none"
               autoComplete="one-time-code"
@@ -250,7 +239,7 @@ export function ConnectAgentSurface() {
               spellCheck={false}
               value={pairingCode}
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-secondary-copy text-muted-foreground">
               {t.account.auth.createCodePrefix}
               <code>t3 auth pairing create</code>
               {t.account.auth.createCodeSuffix}
@@ -258,27 +247,46 @@ export function ConnectAgentSurface() {
           </div>
         )}
 
+        <div className="space-y-2">
+          <span id="connect-agent-access-label" className="sr-only">
+            {t.account.auth.permissions}
+          </span>
+          <RadioGroup
+            aria-labelledby="connect-agent-access-label"
+            value={access}
+            onValueChange={(value) => setAccess(value as AuthMcpClientAccess)}
+          >
+            {AuthMcpClientAccess.literals.map((option) => (
+              <AccessOption key={option} access={option} selected={option === access} />
+            ))}
+          </RadioGroup>
+          <p className="text-secondary-copy text-muted-foreground">
+            {t.account.auth.permissionHint}
+          </p>
+        </div>
+
         {errorMessage ? (
           <Alert variant="error">
             <AlertDescription>{errorMessage}</AlertDescription>
           </Alert>
         ) : null}
 
-        <div className="flex flex-wrap gap-2">
-          <Button disabled={!canApprove} type="submit">
+        <div className="flex flex-row-reverse flex-wrap gap-2">
+          <Button size="dialog-action" disabled={!canApprove} type="submit">
             {pending === "approve" ? t.account.auth.approving : t.account.auth.approve}
           </Button>
           <Button
+            size="dialog-action"
             disabled={pending !== null}
             onClick={() => void decide("deny")}
             type="button"
-            variant="outline"
+            variant="destructive-outline"
           >
             {pending === "deny" ? t.account.auth.denying : t.account.auth.deny}
           </Button>
         </div>
       </form>
-    </AuthSurfaceShell>
+    </OnboardingPage>
   );
 }
 
@@ -292,15 +300,14 @@ function ConnectAgentHeading({
 }) {
   return (
     <>
-      <p className="text-3xs font-semibold tracking-widest text-primary uppercase">
-        {t.account.auth.agentSignIn}
-      </p>
-      <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1>
-      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{description}</p>
+      <h1 className="font-serif text-ov5-connect-title font-bold">{t.account.auth.agentSignIn}</h1>
+      <p className="text-control font-semibold">{title}</p>
+      <p className="text-secondary-copy text-secondary-label">{description}</p>
     </>
   );
 }
 
+/** Displays the supplied access ceiling as a Q3 radio row; the parent retains the selected permission and approval checks. */
 function AccessOption({
   access,
   selected,
@@ -308,28 +315,30 @@ function AccessOption({
   readonly access: AuthMcpClientAccess;
   readonly selected: boolean;
 }) {
-  const { label, description, icon: Icon } = accessConfig[access];
+  const { label, description } = accessConfig[access];
   return (
     <RadioPrimitive.Root
       value={access}
+      aria-label={label}
       className={cn(
-        "flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2.5 text-left outline-none transition-[background-color,border-color,box-shadow]",
-        "focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background",
+        "flex min-h-10.5 cursor-pointer items-center gap-2.5 rounded-ov5-row px-3 py-2 text-left text-control outline-none focus-visible:inset-shadow-focus",
         selected
-          ? "border-primary bg-background ring-2 ring-inset ring-primary/25 dark:border-transparent dark:bg-primary/10 dark:ring-1 dark:ring-primary/30"
-          : "border-border bg-background hover:bg-muted/50 dark:border-transparent dark:bg-white/[0.035] dark:hover:bg-accent",
+          ? "bg-accent text-foreground inset-shadow-selected-control"
+          : "text-code-foreground hover:bg-secondary",
       )}
     >
-      <Icon
+      <span
         aria-hidden
         className={cn(
-          "mt-0.5 size-4 shrink-0",
-          selected ? "text-primary" : "text-muted-foreground",
+          "flex size-3.5 shrink-0 items-center justify-center rounded-full",
+          selected ? "bg-primary" : "shadow-outline-control",
         )}
-      />
-      <span className="min-w-0">
-        <span className="block text-sm font-medium text-foreground">{label}</span>
-        <span className="block text-xs text-muted-foreground">{description}</span>
+      >
+        {selected ? <span className="size-1.25 rounded-full bg-primary-foreground" /> : null}
+      </span>
+      <span>
+        {label}
+        <span className="sr-only"> — {description}</span>
       </span>
     </RadioPrimitive.Root>
   );

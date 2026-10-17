@@ -1,6 +1,10 @@
 /** Localized cloud presentation and existing interaction behavior. */
 import { t } from "~/i18n";
-import { DownloadIcon } from "lucide-react";
+import { CircleCheckIcon, CircleIcon, HourglassIcon } from "lucide-react";
+import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
+import { cn } from "~/lib/utils";
+import { relayInstallGroup } from "../onboarding/relayInstallPresentation.logic";
+import { OnboardingPopup, OnboardingFooter } from "../onboarding/OnboardingSurface";
 import { useSyncExternalStore } from "react";
 import type { RelayClientInstallProgressStage } from "@t3tools/contracts";
 
@@ -11,15 +15,7 @@ import {
   subscribeRelayClientInstallDialog,
 } from "../../cloud/relayClientInstallDialog";
 import { Button } from "../ui/button";
-import {
-  Dialog,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogPanel,
-  DialogPopup,
-  DialogTitle,
-} from "../ui/dialog";
+import { Dialog } from "../ui/dialog";
 const installSteps: ReadonlyArray<{
   readonly stage: RelayClientInstallProgressStage;
   readonly label: string;
@@ -47,6 +43,12 @@ export function RelayClientInstallDialog() {
     ? installSteps.findIndex(({ stage }) => stage === view.stage)
     : -1;
   const activeStep = installSteps[activeStepIndex];
+  const activeGroup = isInstalling ? relayInstallGroup(view.stage) : -1;
+  const groupLabels = [
+    t.account.cloud.relayDownload,
+    t.account.cloud.relayInstall,
+    t.account.cloud.relayStart,
+  ];
 
   return (
     <Dialog
@@ -62,62 +64,78 @@ export function RelayClientInstallDialog() {
         }
       }}
     >
-      <DialogPopup className="max-w-md" showCloseButton={isConfirming}>
-        <DialogHeader>
-          <div className="flex size-9 items-center justify-center rounded-lg border border-border/70 bg-muted/60">
-            <DownloadIcon aria-hidden className="size-4.5 text-muted-foreground" />
+      <OnboardingPopup>
+        <DialogPrimitive.Title className="font-serif text-ov5-prompt-title font-bold">
+          {t.account.cloud.installRelay}
+        </DialogPrimitive.Title>
+        <DialogPrimitive.Description className="sr-only">
+          {isInstalling ? t.account.cloud.preparingAccess : t.account.cloud.relayRequired}
+        </DialogPrimitive.Description>
+        {isInstalling ? (
+          <div className="space-y-2">
+            {groupLabels.map((label, index) => {
+              const active = index === activeGroup;
+              const complete = index < activeGroup;
+              const Icon = complete ? CircleCheckIcon : active ? HourglassIcon : CircleIcon;
+              return (
+                <div
+                  key={label}
+                  className={cn(
+                    "flex items-center gap-2.5 text-control",
+                    active
+                      ? "font-semibold text-foreground"
+                      : complete
+                        ? "text-foreground"
+                        : "text-placeholder",
+                  )}
+                >
+                  <Icon className="size-3.75 shrink-0" />
+                  <span>{label}</span>
+                  {active ? (
+                    <progress
+                      className="ov5-install-progress h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-input shadow-well-progress"
+                      aria-label={t.account.cloud.installProgress}
+                      aria-valuetext={activeStep?.label}
+                      max={installSteps.length}
+                      value={activeStepIndex + 1}
+                    />
+                  ) : null}
+                </div>
+              );
+            })}
+            <p aria-live="polite" className="text-secondary-copy text-secondary-label">
+              {activeStep?.label} ·{" "}
+              {t.account.cloud.stepProgress(activeStepIndex + 1, installSteps.length)}
+            </p>
+            <p className="text-secondary-copy text-secondary-label">{t.account.cloud.keepOpen}</p>
           </div>
-          <DialogTitle>
-            {isInstalling ? t.account.cloud.installingRelay : t.account.cloud.installRelay}
-          </DialogTitle>
-          <DialogDescription>
-            {isInstalling ? t.account.cloud.preparingAccess : t.account.cloud.relayRequired}
-          </DialogDescription>
-        </DialogHeader>
-        <DialogPanel scrollFade={false}>
-          {isInstalling ? (
-            <div className="space-y-2.5">
-              <div className="flex items-center justify-between gap-3 text-sm">
-                <p aria-live="polite" className="font-medium text-foreground">
-                  {activeStep?.label}
-                </p>
-                <p className="shrink-0 tabular-nums text-muted-foreground">
-                  {t.account.cloud.stepProgress(activeStepIndex + 1, installSteps.length)}
-                </p>
-              </div>
-              <progress
-                aria-label={t.account.cloud.installProgress}
-                className="h-2 w-full appearance-none overflow-hidden rounded-full bg-muted [&::-moz-progress-bar]:rounded-full [&::-moz-progress-bar]:bg-primary [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-bar]:bg-muted [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-primary"
-                max={installSteps.length}
-                value={activeStepIndex + 1}
-              />
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                {t.account.cloud.keepOpen}
-              </p>
-            </div>
-          ) : (
-            <div className="rounded-xl border border-border/70 bg-muted/35 p-3">
-              <p className="text-sm font-medium text-foreground">{t.account.cloud.managedRelay}</p>
-              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                {t.account.cloud.installVersion(view.status === "confirming" ? view.version : "")}
-              </p>
-            </div>
-          )}
-        </DialogPanel>
-        {isConfirming ? (
-          <DialogFooter>
+        ) : (
+          <div className="space-y-2 text-secondary-copy text-secondary-label">
+            <p>{t.account.cloud.managedRelay}</p>
+            <p>
+              {t.account.cloud.installVersion(view.status === "confirming" ? view.version : "")}
+            </p>
+          </div>
+        )}
+        <OnboardingFooter>
+          <Button
+            size="dialog-action"
+            variant="outline"
+            disabled={!isConfirming}
+            onClick={() => respondToRelayClientInstallConfirmation(false)}
+          >
+            {t.common.confirm.cancel}
+          </Button>
+          {isConfirming ? (
             <Button
-              variant="outline"
-              onClick={() => respondToRelayClientInstallConfirmation(false)}
+              size="dialog-action"
+              onClick={() => respondToRelayClientInstallConfirmation(true)}
             >
-              {t.common.confirm.cancel}
-            </Button>
-            <Button onClick={() => respondToRelayClientInstallConfirmation(true)}>
               {t.account.cloud.downloadInstall}
             </Button>
-          </DialogFooter>
-        ) : null}
-      </DialogPopup>
+          ) : null}
+        </OnboardingFooter>
+      </OnboardingPopup>
     </Dialog>
   );
 }

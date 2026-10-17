@@ -5,7 +5,6 @@ import type { AuthSessionState } from "@t3tools/contracts";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import React, { startTransition, useEffect, useRef, useState, useCallback } from "react";
 
-import { APP_DISPLAY_NAME } from "../../branding";
 import { connectPairing } from "../../connection/onboarding";
 import {
   peekPairingTokenFromUrl,
@@ -15,19 +14,19 @@ import {
 import { readHostedPairingRequest } from "../../hostedPairing";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import { StandalonePage, StandalonePageHeader } from "../ui/standalone-page";
+import { OnboardingPage, OnboardingStatus } from "../onboarding/OnboardingSurface";
 import { useAtomCommand } from "../../state/use-atom-command";
 
 /** Renders the pending pairing status while authentication prepares the session; performs no authentication itself. */
 export function PairingPendingSurface() {
   return (
-    <StandalonePage tone="pairing">
-      <StandalonePageHeader
-        eyebrow={APP_DISPLAY_NAME}
-        title={t.account.auth.pairingEnvironment}
-        description={t.account.auth.validatingPairing}
-      />
-    </StandalonePage>
+    <OnboardingPage>
+      <h1 className="font-serif text-ov5-connect-title font-bold">
+        {t.account.auth.pairEnvironment}
+      </h1>
+      <OnboardingStatus tone="pending">{t.account.auth.pairingBackend}</OnboardingStatus>
+      <p className="text-secondary-copy text-secondary-label">{t.account.auth.validatingPairing}</p>
+    </OnboardingPage>
   );
 }
 
@@ -91,46 +90,53 @@ export function PairingRouteSurface({
   }, [submitCredential]);
 
   return (
-    <StandalonePage tone="pairing">
-      <StandalonePageHeader
-        eyebrow={APP_DISPLAY_NAME}
-        title={t.account.auth.pairEnvironment}
-        description={describeAuthGate(auth.bootstrapMethods)}
-      />
+    <OnboardingPage>
+      <h1 className="font-serif text-ov5-connect-title font-bold">
+        {t.account.auth.pairEnvironment}
+      </h1>
+      <p className="text-secondary-copy text-secondary-label">
+        {describeAuthGate(auth.bootstrapMethods)}
+      </p>
 
-      <form className="mt-6 space-y-4" onSubmit={(event) => void handleSubmit(event)}>
+      <form className="space-y-3.5" onSubmit={(event) => void handleSubmit(event)}>
         <div className="space-y-2">
-          <label className="text-sm font-medium" htmlFor="pairing-token">
+          <label className="sr-only" htmlFor="pairing-token">
             {t.account.auth.pairingToken}
           </label>
           <Input
             id="pairing-token"
+            size="lg"
+            font="mono"
+            aria-invalid={errorMessage.length > 0}
             autoCapitalize="none"
             autoComplete="off"
             autoCorrect="off"
             disabled={isSubmitting}
             nativeInput
             onChange={(event) => setCredential(event.currentTarget.value)}
-            placeholder={t.account.auth.tokenPlaceholder}
+            placeholder={t.account.auth.pairingCredentialPlaceholder}
             spellCheck={false}
             value={credential}
           />
         </div>
 
-        {errorMessage ? (
-          <Alert variant="error">
-            <AlertDescription>{errorMessage}</AlertDescription>
-          </Alert>
+        {isSubmitting ? (
+          <OnboardingStatus tone="pending">{t.account.auth.pairingBackend}</OnboardingStatus>
+        ) : errorMessage ? (
+          <>
+            <OnboardingStatus tone="error">{t.account.auth.pairingFailed}</OnboardingStatus>
+            <p className="text-secondary-copy text-error-foreground">{errorMessage}</p>
+          </>
         ) : null}
 
-        <div className="flex flex-wrap gap-2">
-          <Button disabled={isSubmitting} size="sm" type="submit">
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button disabled={isSubmitting} size="dialog-action" type="submit">
             {isSubmitting ? t.account.auth.pairing : t.account.auth.continue}
           </Button>
           <Button
             disabled={isSubmitting}
             onClick={() => window.location.reload()}
-            size="sm"
+            size="dialog-action"
             variant="outline"
           >
             {t.account.auth.reloadApp}
@@ -138,10 +144,10 @@ export function PairingRouteSurface({
         </div>
       </form>
 
-      <div className="mt-6 rounded-lg border border-border/70 bg-background/55 px-3 py-3 text-xs leading-relaxed text-muted-foreground">
+      <div className="text-secondary-copy text-secondary-label">
         {describeSupportedMethods(auth.bootstrapMethods)}
       </div>
-    </StandalonePage>
+    </OnboardingPage>
   );
 }
 
@@ -216,49 +222,59 @@ export function HostedPairingRouteSurface() {
   const request = hostedPairingRequestRef.current;
 
   return (
-    <StandalonePage tone="pairing">
-      <StandalonePageHeader
-        eyebrow={APP_DISPLAY_NAME}
-        title={
-          status === "paired"
-            ? t.account.auth.backendPaired
-            : status === "error"
-              ? t.account.auth.pairingFailed
-              : t.account.auth.pairingBackend
-        }
-        description={message}
-      />
-
+    <OnboardingPage>
+      <h1 className="font-serif text-ov5-connect-title font-bold">
+        {t.account.auth.pairEnvironment}
+      </h1>
       {request ? (
-        <div className="mt-5 rounded-lg border border-border/70 bg-background/55 px-3 py-3 text-xs leading-relaxed text-muted-foreground">
-          {t.account.auth.hostPrefix}
-          <span className="font-mono text-foreground/80">{request.host}</span>
-        </div>
+        <Input
+          size="lg"
+          font="mono"
+          nativeInput
+          readOnly
+          value={request.host}
+          aria-label={t.account.auth.hostPrefix}
+          aria-invalid={status === "error"}
+        />
       ) : null}
+      <OnboardingStatus
+        tone={status === "paired" ? "success" : status === "error" ? "error" : "pending"}
+      >
+        {status === "paired"
+          ? t.account.auth.backendPaired
+          : status === "error"
+            ? t.account.auth.pairingFailed
+            : t.account.auth.pairingBackend}
+      </OnboardingStatus>
+      <p className="text-secondary-copy text-secondary-label">{message}</p>
 
       {status === "error" ? (
-        <Alert variant="error" className="mt-5">
+        <Alert variant="error" className="mt-0">
           <AlertDescription>{t.account.auth.verifyBackend}</AlertDescription>
         </Alert>
       ) : null}
 
-      <div className="mt-6 flex flex-wrap gap-2">
+      <div className="flex flex-wrap justify-end gap-2">
         {status === "pairing" ? (
-          <Button disabled size="sm">
+          <Button disabled size="dialog-action">
             {t.account.auth.pairing}
           </Button>
         ) : canRetry ? (
-          <Button size="sm" onClick={() => void submitHostedPairingRequest()}>
+          <Button size="dialog-action" onClick={() => void submitHostedPairingRequest()}>
             {t.account.auth.tryAgain}
           </Button>
         ) : null}
         {status === "paired" ? (
-          <Button size="sm" variant="outline" onClick={() => (window.location.href = "/")}>
+          <Button
+            size="dialog-action"
+            variant="outline"
+            onClick={() => (window.location.href = "/")}
+          >
             {t.account.auth.openApp}
           </Button>
         ) : null}
       </div>
-    </StandalonePage>
+    </OnboardingPage>
   );
 }
 

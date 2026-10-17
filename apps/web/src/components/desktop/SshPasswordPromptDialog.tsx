@@ -4,21 +4,17 @@ import type { DesktopSshPasswordPromptRequest } from "@t3tools/contracts";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { Button } from "../ui/button";
-import {
-  Dialog,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogPanel,
-  DialogPopup,
-  DialogTitle,
-} from "../ui/dialog";
+import { Dialog, DialogDescription } from "../ui/dialog";
+import { OnboardingPopup, OnboardingFooter } from "../onboarding/OnboardingSurface";
+import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { Input } from "../ui/input";
 
+/** Formats only the current request’s real user and destination for the password prompt. */
 function describeSshTarget(request: DesktopSshPasswordPromptRequest): string {
   return request.username ? `${request.username}@${request.destination}` : request.destination;
 }
 
+/** Formats the remaining whole seconds as minutes and two-digit seconds for the expiry indicator. */
 function formatRemainingSeconds(seconds: number): string {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
@@ -31,6 +27,7 @@ function getPromptErrorMessage(error: unknown): string {
     : message;
 }
 
+/** Queues desktop password requests and mounts only the active request; credentials stay in that prompt’s local state. */
 export function SshPasswordPromptDialog() {
   const [queue, setQueue] = useState<readonly DesktopSshPasswordPromptRequest[]>([]);
   const currentRequest = queue[0] ?? null;
@@ -158,16 +155,19 @@ function ActiveSshPasswordPrompt({
         }
       }}
     >
-      <DialogPopup className="max-w-md" showCloseButton={false}>
-        <DialogHeader>
-          <DialogTitle>{t.account.desktop.sshPasswordRequired}</DialogTitle>
-          <DialogDescription>
+      <OnboardingPopup>
+        <header className="flex flex-col gap-3.5">
+          <DialogPrimitive.Title className="font-serif text-ov5-prompt-title font-bold">
+            {t.account.desktop.sshPasswordRequired}
+          </DialogPrimitive.Title>
+          <p className="font-mono text-secondary-copy-medium text-secondary-label">{target}</p>
+          <DialogDescription className="sr-only">
             {t.account.desktop.sshPasswordPrefix}
             <code>{target}</code>
             {t.account.desktop.sshPasswordSuffix}
           </DialogDescription>
-        </DialogHeader>
-        <DialogPanel scrollFade={false}>
+        </header>
+        <div>
           <form
             className="space-y-3"
             id={formId}
@@ -178,13 +178,18 @@ function ActiveSshPasswordPrompt({
           >
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-medium text-foreground">{request.prompt}</p>
+                <label
+                  htmlFor={`${formId}-password`}
+                  className="text-secondary-copy text-secondary-label"
+                >
+                  {request.prompt}
+                </label>
                 {remainingLabel ? (
                   <span
                     className={
                       isExpired
-                        ? "shrink-0 text-xs font-medium text-destructive"
-                        : "shrink-0 text-xs text-muted-foreground"
+                        ? "shrink-0 text-secondary-copy font-medium text-destructive"
+                        : "shrink-0 text-secondary-copy text-muted-foreground"
                     }
                   >
                     {isExpired ? t.account.desktop.expired : remainingLabel}
@@ -192,6 +197,9 @@ function ActiveSshPasswordPrompt({
                 ) : null}
               </div>
               <Input
+                id={`${formId}-password`}
+                size="lg"
+                aria-invalid={visibleResponseError !== null}
                 ref={inputRef}
                 autoComplete="current-password"
                 disabled={isResponding || isExpired}
@@ -202,21 +210,32 @@ function ActiveSshPasswordPrompt({
               />
             </div>
             {visibleResponseError ? (
-              <p className="text-sm text-destructive">{visibleResponseError}</p>
+              <p className="text-control text-destructive">{visibleResponseError}</p>
             ) : (
-              <p className="text-sm text-muted-foreground">{t.account.desktop.sshKeysHint}</p>
+              <p className="text-control text-muted-foreground">{t.account.desktop.sshKeysHint}</p>
             )}
           </form>
-        </DialogPanel>
-        <DialogFooter>
-          <Button disabled={isResponding} type="button" variant="outline" onClick={cancelPrompt}>
+        </div>
+        <OnboardingFooter>
+          <Button
+            size="dialog-action"
+            disabled={isResponding}
+            type="button"
+            variant="outline"
+            onClick={cancelPrompt}
+          >
             {isExpired ? t.account.desktop.dismiss : t.common.confirm.cancel}
           </Button>
-          <Button disabled={isResponding || isExpired} form={formId} type="submit">
-            {t.account.desktop.continue}
+          <Button
+            size="dialog-action"
+            disabled={isResponding || isExpired}
+            form={formId}
+            type="submit"
+          >
+            {t.account.desktop.connect}
           </Button>
-        </DialogFooter>
-      </DialogPopup>
+        </OnboardingFooter>
+      </OnboardingPopup>
     </Dialog>
   );
 }
