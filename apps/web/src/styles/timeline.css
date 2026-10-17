@@ -458,3 +458,39 @@
   content: "";
   @apply absolute inset-x-0 top-0 h-px bg-timeline-recovery-rule shadow-timeline-rule;
 }
+
+/* Supplemental screen 1 T3 / W7: only values absent from the shared token contract. */
+@theme {
+  --color-timeline-callout-note: #151517;
+  --radius-notice: 14px;
+  --leading-callout: 1.65;
+  --shadow-notice-sand:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 2px 0 #a08f68, 4px 7px 12px -4px rgba(0, 0, 0, 0.7);
+}
+
+/* Authored alert semantics override category hues, including neutral note icons. */
+.timeline-markdown-callout {
+  --lucide-hue-override: currentColor;
+}
+
+/* Extend the graphite glass palette for the new shared variant without changing its opacity rule. */
+@layer utilities {
+  html[data-theme-id="graphite"] .alert-glass[data-variant="sand"] {
+    --stone-surface-color: var(--warning-surface);
+  }
+}
+
+/* Generated Markdown paragraphs must share the first line with the callout title. */
+.chat-markdown [data-markdown-callout] {
+  @apply my-3;
+}
+
+.chat-markdown [data-markdown-callout] .timeline-callout-body > span + p,
+.chat-markdown [data-markdown-callout] [data-slot="alert-description"] > span + p {
+  @apply m-0 inline;
+}
+
+.chat-markdown [data-markdown-callout] p:last-child,
+.chat-markdown [data-markdown-callout] :is(ul, ol):last-child {
+  @apply mb-0;
+}

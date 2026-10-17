@@ -226,6 +226,7 @@ const twMerge = extendTailwindMerge({
         "browser-address",
         "browser-viewport",
         "browser-agent",
+        "notice-sand",
       ],
       "inset-shadow": [
         "selected",
@@ -310,6 +311,7 @@ const twMerge = extendTailwindMerge({
         "panel-tab-action",
         "panel-launcher",
         "browser-viewport",
+        "notice",
       ],
       leading: [
         "code",
@@ -326,6 +328,7 @@ const twMerge = extendTailwindMerge({
         "timeline-plan",
         "pn5-copy",
         "sidebar-update",
+        "callout",
       ],
       tracking: ["brand", "chat-draft", "timeline-secret"],
     },

@@ -25,6 +25,8 @@ const alertVariants = cva("relative rounded-xl border px-3.5 py-3 text-card-fore
       success: "border-success/32 bg-success/4 [&_svg]:text-success",
       warning:
         "border-warning/32 bg-warning-surface text-warning-foreground [&_[data-slot=alert-description]]:text-warning-foreground/80 [&_svg]:text-warning",
+      // W7 solid sand notice, shared by Markdown callouts and status banners.
+      sand: "rounded-notice border-0 bg-warning-surface px-3.5 py-2.5 text-body leading-callout text-warning-foreground shadow-notice-sand text-shadow-none [--lucide-hue-override:currentColor] [&>div]:items-start [&>div]:gap-2.5 [&>div>div:has(>svg)]:mt-0.75 [&>div>div:has(>svg)]:size-4 [&>div>div:has(>[data-slot=alert-title])]:block [&_[data-slot=alert-title]]:inline [&_[data-slot=alert-title]]:font-bold [&_[data-slot=alert-title]]:text-status-warning-foreground [&_[data-slot=alert-description]]:inline [&_[data-slot=alert-description]]:text-inherit [&>div>div>svg]:text-warning",
     },
   },
 });

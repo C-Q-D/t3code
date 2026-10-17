@@ -1,4 +1,7 @@
-// @vitest-environment jsdom
+/**
+ * Exercises Markdown rendering, interactions, search, and presentation boundaries.
+ * @vitest-environment jsdom
+ */
 
 import { EnvironmentId, type AuthEnvironmentScope } from "@t3tools/contracts";
 import { createRoot } from "react-dom/client";
@@ -1344,6 +1347,46 @@ describe("ChatMarkdown in-page links", () => {
       } finally {
         await act(async () => root.unmount());
         container.remove();
+      }
+    },
+  );
+});
+
+describe("T3 timeline callouts", () => {
+  it.each([
+    ["NOTE", "Note"],
+    ["TIP", "Tip"],
+    ["IMPORTANT", "Important"],
+    ["WARNING", "Warning"],
+    ["CAUTION", "Caution"],
+  ])(
+    "renders %s as its callout and preserves rich body content across presentations",
+    async (type, label) => {
+      vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+      const container = document.createElement("div");
+      const root = createRoot(container);
+      const text = `> [!${type}]\n> Keep **stable** keys and [read more](https://example.com).\n>\n> - Preserve the list`;
+      try {
+        await act(async () =>
+          root.render(<ChatMarkdown cwd={undefined} presentation="timeline" text={text} />),
+        );
+        const callout = container.querySelector('[role="note"]');
+        expect(callout?.getAttribute("data-markdown-callout")).toBe(type.toLowerCase());
+        expect(callout?.querySelector("[data-thread-find-ignore]")?.textContent).toBe(label);
+        expect(callout?.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
+        expect(callout?.querySelector("strong")?.textContent).toBe("stable");
+        expect(callout?.querySelector("a")?.getAttribute("href")).toBe("https://example.com");
+        expect(callout?.querySelector("li")?.textContent).toBe("Preserve the list");
+        expect(callout?.textContent).not.toContain(`[!${type}]`);
+
+        await act(async () => root.render(<ChatMarkdown cwd={undefined} text={text} />));
+        const sharedCallout = container.querySelector('[role="note"]');
+        expect(sharedCallout?.hasAttribute("data-markdown-callout")).toBe(false);
+        expect(sharedCallout?.textContent).toContain(label);
+        expect(sharedCallout?.querySelector("strong")?.textContent).toBe("stable");
+      } finally {
+        await act(async () => root.unmount());
+        vi.unstubAllGlobals();
       }
     },
   );

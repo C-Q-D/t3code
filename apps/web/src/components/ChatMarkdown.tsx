@@ -138,6 +138,7 @@ import {
 import { hasSpecificPierreIconForFileName, syntheticFileNameForLanguageId } from "../pierre-icons";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 import { Button } from "./ui/button";
+import { Alert, AlertTitle, AlertDescription } from "./ui/alert";
 import { MorphIcon } from "~/components/MorphIcon";
 import { ContextChip } from "./ContextChip";
 import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "./ui/collapsible";
@@ -217,7 +218,7 @@ import { resolveLinkTarget } from "../browser/browserLinkTarget";
 import { PullRequestLinkPreview } from "./pullRequest/PullRequestLinkPreview";
 
 interface ChatMarkdownProps {
-  /** Opt into D1 code/table chrome; other surfaces and composer frames keep their existing look. */
+  /** Opt into timeline code/table/callout chrome; other surfaces keep their existing look. */
   presentation?: "timeline" | undefined;
   text: string;
   cwd: string | undefined;
@@ -421,37 +422,48 @@ function orderedListGutterStyle(
 
 const GITHUB_ALERT_PRESENTATIONS: Record<
   string,
-  { label: string; Icon: typeof InfoIcon; borderClassName: string; titleClassName: string }
+  {
+    label: string;
+    Icon: typeof InfoIcon;
+    borderClassName: string;
+    titleClassName: string;
+    timelineClassName: string;
+  }
 > = {
   note: {
     label: t.chat.markdown.note,
     Icon: InfoIcon,
     borderClassName: "border-blue-500/70",
     titleClassName: "text-blue-600 dark:text-blue-400",
+    timelineClassName: "bg-timeline-callout-note text-secondary-label shadow-well-pressed",
   },
   tip: {
     label: t.chat.markdown.tip,
     Icon: LightbulbIcon,
     borderClassName: "border-emerald-500/70",
     titleClassName: "text-emerald-600 dark:text-emerald-400",
+    timelineClassName: "bg-status-success text-success-foreground",
   },
   important: {
     label: t.chat.markdown.important,
     Icon: MessageSquareWarningIcon,
     borderClassName: "border-purple-500/70",
     titleClassName: "text-purple-600 dark:text-purple-400",
+    timelineClassName: "bg-status-emphasis text-status-emphasis-foreground",
   },
   warning: {
     label: t.chat.markdown.warning,
     Icon: TriangleAlertIcon,
     borderClassName: "border-amber-500/70",
     titleClassName: "text-amber-600 dark:text-amber-500",
+    timelineClassName: "",
   },
   caution: {
     label: t.chat.markdown.caution,
     Icon: OctagonAlertIcon,
     borderClassName: "border-red-500/70",
     titleClassName: "text-red-600 dark:text-red-400",
+    timelineClassName: "bg-error-surface text-error",
   },
 };
 
@@ -3054,10 +3066,56 @@ const CHAT_MARKDOWN_COMPONENTS = {
     return <p {...props}>{renderSkillInlineMarkdownChildren(children, skills)}</p>;
   },
   blockquote: function MarkdownBlockquote({ node: _node, children, ...props }) {
-    const alert =
-      GITHUB_ALERT_PRESENTATIONS[String((props as Record<string, unknown>)["data-alert"] ?? "")];
+    const isTimeline = use(MarkdownTimelineContext);
+    const alertType = String((props as Record<string, unknown>)["data-alert"] ?? "");
+    const alert = GITHUB_ALERT_PRESENTATIONS[alertType];
     if (!alert) {
       return <blockquote {...props}>{children}</blockquote>;
+    }
+    if (isTimeline) {
+      // W7 is also used by status banners; the other T3 colors belong to Markdown.
+      if (alertType === "warning") {
+        return (
+          <Alert variant="sand" role="note" data-markdown-callout={alertType}>
+            <alert.Icon aria-hidden />
+            <AlertTitle data-thread-find-ignore="true">{alert.label}</AlertTitle>
+            <AlertDescription>
+              <span aria-hidden data-thread-find-ignore="true">
+                {" "}
+                ·{" "}
+              </span>
+              {children}
+            </AlertDescription>
+          </Alert>
+        );
+      }
+      return (
+        <div
+          role="note"
+          data-markdown-callout={alertType}
+          className={cn(
+            "timeline-markdown-callout flex items-start gap-2.5 rounded-notice px-3.5 py-2.5 text-body leading-callout",
+            alert.timelineClassName,
+          )}
+        >
+          <alert.Icon aria-hidden className="mt-0.75 size-4 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <span
+              className={cn("font-bold", alertType === "note" && "text-foreground")}
+              data-thread-find-ignore="true"
+            >
+              {alert.label}
+            </span>
+            <div className="timeline-callout-body inline text-fg-detail">
+              <span aria-hidden data-thread-find-ignore="true">
+                {" "}
+                ·{" "}
+              </span>
+              {children}
+            </div>
+          </div>
+        </div>
+      );
     }
     // Not a <blockquote>: the stylesheet mutes those, and an alert's body is ordinary
     // text under a colored title — which is how the host renders it.
