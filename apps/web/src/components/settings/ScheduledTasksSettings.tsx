@@ -72,6 +72,8 @@ import {
   WEBHOOK_SIGNATURE_DEFAULTS,
   matchesScheduledTaskScope,
   scheduleFromDraft,
+  scheduledTaskRunRecords,
+  type ScheduledTaskRunRecord,
   scheduledTaskDefaultModel,
   taskToDraft,
   type DraftState,
@@ -243,14 +245,6 @@ function deliveryOutcomeVariant(outcome: ScheduledTaskWebhookDeliveryOutcome) {
   return "danger";
 }
 
-/** Map the latest task run state to a semantic badge without treating a running task as a successful run. */
-function statusVariant(status: ScheduledTask["lastRunStatus"]) {
-  if (status === "failed") return "danger";
-  if (status === "succeeded") return "success";
-  if (status === "running") return "info";
-  return "outline";
-}
-
 /** Render tasks in the active settings scope; optional environment/task IDs retain deep-link editor opening. Commands own persistence failures. */
 export function ScheduledTasksSettings(target: {
   readonly environmentId?: EnvironmentId;
@@ -347,6 +341,7 @@ function ScheduledTaskEnvironmentSection({
   const tasks = tasksQuery.data?.tasks.filter((task) =>
     matchesScheduledTaskScope(scope, environment.environmentId, task.projectId),
   );
+  const records = scheduledTaskRunRecords(tasks ?? []);
   const linkedTask = tasks?.find((task) => task.id === taskId);
   const openedLink = useRef(false);
   useEffect(() => {
@@ -421,16 +416,14 @@ function ScheduledTaskEnvironmentSection({
       {connected && tasks ? (
         <SettingsSection title={t.settings.scheduledTasks.deliveries.title}>
           <div className="space-y-0.5 px-3.5 py-2.5">
-            {tasks.every(
-              (task) => task.schedule.type !== "webhook" && task.lastRunStatus === "never",
-            ) ? (
+            {records.length === 0 ? (
               <TaskEmpty>{t.settings.scheduledTasks.deliveries.empty}</TaskEmpty>
             ) : (
-              tasks.map((task) => (
-                <ScheduledTaskRecords
-                  key={task.id}
+              records.map((record) => (
+                <ScheduledTaskRecordRow
+                  key={record.task.id}
                   environmentId={environment.environmentId}
-                  task={task}
+                  record={record}
                 />
               ))
             )}
@@ -491,7 +484,7 @@ function ScheduledTaskRow({
   return (
     <div
       className={cn(
-        "settings-task-list-row flex min-h-16 items-center gap-3 rounded-settings-row-surface py-2 pl-2.5 pr-1.5 hover:bg-secondary focus-within:bg-secondary",
+        "flex min-h-16 items-center gap-3 rounded-settings-row-surface py-2 pl-2.5 pr-1.5 hover:bg-secondary focus-within:bg-secondary",
         isEditing && "bg-secondary shadow-settings-connect-row",
       )}
     >
@@ -588,106 +581,77 @@ function TaskEmpty({ children }: { readonly children: ReactNode }) {
   );
 }
 
-/** Render real records for one task: the latest normal run or the existing bounded webhook query. No history is synthesized. */
-function ScheduledTaskRecords({
+/** Render one projected latest run; webhook rows open the existing delivery list only on demand. */
+function ScheduledTaskRecordRow({
   environmentId,
-  task,
+  record,
 }: {
   readonly environmentId: EnvironmentId;
-  readonly task: ScheduledTask;
+  readonly record: ScheduledTaskRunRecord;
 }) {
-  const isWebhook = task.schedule.type === "webhook";
-  const query = useEnvironmentQuery(
-    isWebhook
-      ? serverEnvironment.scheduledTaskWebhookDeliveries({ environmentId, input: { id: task.id } })
-      : null,
+  const [deliveriesOpen, setDeliveriesOpen] = useState(false);
+  const { task, status, runAt, error, variant } = record;
+  const content = (
+    <>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-control font-semibold">{task.title}</span>
+          <Badge size="settings" variant={variant}>
+            {t.settings.scheduledTasks.runStatuses[status]}
+          </Badge>
+        </div>
+        {error ? (
+          <p className="text-secondary-copy-medium text-error wrap-anywhere">{error}</p>
+        ) : null}
+      </div>
+      {runAt ? (
+        <span className="font-mono text-secondary-copy text-muted-foreground">
+          {relativeLabel(runAt)}
+        </span>
+      ) : null}
+    </>
   );
-  const [selectedDeliveryId, setSelectedDeliveryId] = useState<
-    ScheduledTaskWebhookDeliverySummary["id"] | null
-  >(null);
-  if (!isWebhook && task.lastRunStatus === "never") return null;
   return (
     <>
-      {isWebhook ? (
-        query.error ? (
-          <TaskEmpty>
-            {task.title}: {query.error}
-          </TaskEmpty>
-        ) : !query.data ? (
-          <p role="status" className="px-2.5 py-2 text-secondary-copy-medium text-secondary-label">
-            {task.title}: {t.settings.scheduledTasks.deliveries.loading}
-          </p>
-        ) : query.data.deliveries.length === 0 ? (
-          <TaskEmpty>
-            {task.title}: {t.settings.scheduledTasks.deliveries.empty}
-          </TaskEmpty>
-        ) : (
-          query.data.deliveries.map((delivery) => (
-            <button
-              key={delivery.id}
-              type="button"
-              onClick={() => setSelectedDeliveryId(delivery.id)}
-              className="settings-task-list-row flex min-h-16 w-full flex-wrap items-center gap-3 rounded-settings-row-surface py-2 pl-2.5 pr-1.5 text-left outline-none hover:bg-secondary focus-visible:inset-shadow-focus"
-            >
-              <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                <span className="text-control font-semibold">{task.title}</span>
-                <Badge size="settings" variant={deliveryOutcomeVariant(delivery.outcome)}>
-                  {DELIVERY_OUTCOME_LABELS[delivery.outcome]}
-                </Badge>
-              </span>
-              <span className="font-mono text-secondary-copy text-muted-foreground">
-                {relativeLabel(delivery.receivedAt)}
-              </span>
-            </button>
-          ))
-        )
+      {task.schedule.type === "webhook" ? (
+        <button
+          type="button"
+          onClick={() => setDeliveriesOpen(true)}
+          className="flex min-h-16 w-full flex-wrap items-center gap-3 rounded-settings-row-surface py-2 pl-2.5 pr-1.5 text-left outline-none hover:bg-secondary focus-visible:inset-shadow-focus"
+        >
+          {content}
+        </button>
       ) : (
-        <div className="settings-task-list-row flex min-h-16 flex-wrap items-center gap-3 rounded-settings-row-surface py-2 pl-2.5 pr-1.5">
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-control font-semibold">{task.title}</span>
-              <Badge size="settings" variant={statusVariant(task.lastRunStatus)}>
-                {t.settings.scheduledTasks.runStatuses[task.lastRunStatus]}
-              </Badge>
-            </div>
-            {task.lastRunError ? (
-              <p className="text-secondary-copy-medium text-error">{task.lastRunError}</p>
-            ) : null}
-          </div>
-          <span className="font-mono text-secondary-copy text-muted-foreground">
-            {relativeLabel(task.lastRunAt)}
-          </span>
+        <div className="flex min-h-16 flex-wrap items-center gap-3 rounded-settings-row-surface py-2 pl-2.5 pr-1.5">
+          {content}
         </div>
       )}
-      {selectedDeliveryId ? (
+      {deliveriesOpen ? (
         <WebhookDeliveriesDialog
           environmentId={environmentId}
           task={task}
-          initialDeliveryId={selectedDeliveryId}
-          onClose={() => setSelectedDeliveryId(null)}
+          onClose={() => setDeliveriesOpen(false)}
         />
       ) : null}
     </>
   );
 }
 
-/** Read a task’s webhook records in its environment; initialDeliveryId opens a clicked record, otherwise the list. onClose dismisses without writing records. */
+/** Query webhook deliveries only while this dialog is open; its list retains manual refresh and selecting a row loads detail. onClose dismisses without writes. */
 function WebhookDeliveriesDialog({
   environmentId,
   task,
   onClose,
-  initialDeliveryId = null,
 }: {
   readonly environmentId: EnvironmentId;
   readonly task: ScheduledTask;
   readonly onClose: () => void;
-  readonly initialDeliveryId?: ScheduledTaskWebhookDeliverySummary["id"] | null;
 }) {
   const deliveriesQuery = useEnvironmentQuery(
     serverEnvironment.scheduledTaskWebhookDeliveries({ environmentId, input: { id: task.id } }),
   );
   const [selectedId, setSelectedId] = useState<ScheduledTaskWebhookDeliverySummary["id"] | null>(
-    initialDeliveryId,
+    null,
   );
   const selectedQuery = useEnvironmentQuery(
     selectedId === null
@@ -780,7 +744,7 @@ function WebhookDeliveriesDialog({
                 <li key={delivery.id}>
                   <button
                     type="button"
-                    className="settings-task-list-row flex min-h-16 w-full flex-wrap items-center gap-3 rounded-settings-row-surface px-2.5 py-2 text-left text-control outline-none hover:bg-secondary focus-visible:inset-shadow-focus"
+                    className="flex min-h-16 w-full flex-wrap items-center gap-3 rounded-settings-row-surface px-2.5 py-2 text-left text-control outline-none hover:bg-secondary focus-visible:inset-shadow-focus"
                     onClick={() => setSelectedId(delivery.id)}
                   >
                     <Badge size="settings" variant={deliveryOutcomeVariant(delivery.outcome)}>

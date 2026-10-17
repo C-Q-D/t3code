@@ -266,9 +266,3 @@
   --color-settings-task-well: #151517;
   --shadow-settings-task-well: inset 1.5px 2px 3px rgba(0, 0, 0, 0.6);
 }
-
-/* O2 rows have a 64px minimum footprint; offscreen delivery rows need no paint. */
-@utility settings-task-list-row {
-  content-visibility: auto;
-  contain-intrinsic-size: auto calc(var(--spacing) * 16);
-}

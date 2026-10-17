@@ -1,3 +1,4 @@
+/** Pure scheduled-task scope, editor conversion and latest-run projection; no queries or mutations. */
 import {
   EnvironmentId,
   type ProjectId,
@@ -203,4 +204,43 @@ export function scheduledTaskDefaultModel(
   );
   const fallback = models.find(({ model }) => model.isDefault) ?? models[0];
   return fallback ? { instanceId: fallback.instanceId, model: fallback.model.slug } : null;
+}
+
+/** A task's latest run, retaining its task identity for the optional webhook history dialog. */
+export interface ScheduledTaskRunRecord {
+  readonly task: ScheduledTask;
+  readonly status: Exclude<ScheduledTask["lastRunStatus"], "never">;
+  readonly runAt: string | null;
+  readonly error: string | null;
+  readonly variant: "danger" | "success" | "info";
+}
+
+/**
+ * Project subscribed tasks into latest-run rows, newest first, without changing the input.
+ * Never-run tasks are omitted; running tasks remain visible even before a timestamp arrives.
+ * Missing timestamps sort last, equal timestamps retain subscription order, and only failed
+ * runs expose their error so a previous failure cannot leak into a running/successful row.
+ * @param tasks Tasks already filtered to the current environment and project scope.
+ * @returns One row per started task, including webhook tasks; no delivery query is needed.
+ */
+export function scheduledTaskRunRecords(tasks: readonly ScheduledTask[]): ScheduledTaskRunRecord[] {
+  return tasks
+    .flatMap((task): ScheduledTaskRunRecord[] => {
+      const status = task.lastRunStatus;
+      if (status === "never") return [];
+      return [
+        {
+          task,
+          status,
+          runAt: task.lastRunAt,
+          error: status === "failed" ? task.lastRunError : null,
+          variant: status === "failed" ? "danger" : status === "succeeded" ? "success" : "info",
+        },
+      ];
+    })
+    .toSorted((left, right) => {
+      if (left.runAt === null) return right.runAt === null ? 0 : 1;
+      if (right.runAt === null) return -1;
+      return Date.parse(right.runAt) - Date.parse(left.runAt);
+    });
 }

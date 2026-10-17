@@ -1558,7 +1558,6 @@ export const settings: Messages["settings"] = {
       inDays: (days: number) => `${days} 天后`,
     },
     runStatuses: {
-      never: "未安排",
       running: "运行中",
       succeeded: "已运行",
       failed: "运行失败",

@@ -1639,7 +1639,6 @@ export const settings = {
       inDays: (days: number) => `in ${days}d`,
     },
     runStatuses: {
-      never: "Unscheduled",
       running: "Running",
       succeeded: "Ran",
       failed: "Run failed",
