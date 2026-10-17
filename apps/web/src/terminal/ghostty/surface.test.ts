@@ -1,3 +1,4 @@
+/** Exercises real Ghostty WASM with controlled browser geometry, input and scheduling. */
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { GhosttyTerminalCore, type GhosttyCell, type GhosttyRow } from "./core";
@@ -32,12 +33,17 @@ import {
   type GhosttyTerminalSurfaceOptions,
 } from "./surface";
 
-vi.mock("./vendor/ghostty-vt.wasm?url", async () => ({
-  default: (await import("./vendor/ghostty-vt.wasm?inline")).default,
-}));
-vi.mock("./vendor/ghostty-write-pty.wasm?url&no-inline", async () => ({
-  default: (await import("./vendor/ghostty-write-pty.wasm?inline")).default,
-}));
+// Node loads the shipped bytes directly; Vite's inline asset transform is not available here.
+vi.mock("./vendor/ghostty-vt.wasm?url", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const bytes = await readFile(new URL("./vendor/ghostty-vt.wasm", import.meta.url));
+  return { default: `data:application/wasm;base64,${bytes.toString("base64")}` };
+});
+vi.mock("./vendor/ghostty-write-pty.wasm?url&no-inline", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const bytes = await readFile(new URL("./vendor/ghostty-write-pty.wasm", import.meta.url));
+  return { default: `data:application/wasm;base64,${bytes.toString("base64")}` };
+});
 
 describe("GhosttyTerminalSurface visibility", () => {
   const surfaces = new Set<GhosttyTerminalSurface>();
@@ -254,6 +260,8 @@ describe("GhosttyTerminalSurface visibility", () => {
           onSelectionChange() {},
           beforeKey: () => false,
           onLinkActivate() {},
+          // Input/visibility fixtures use a fixed 16px grid; K1 defaults are tested separately.
+          font: { size: 12, lineHeight: 4 / 3 },
           ...options,
           get visible() {
             return options.visible ?? true;
@@ -271,6 +279,47 @@ describe("GhosttyTerminalSurface visibility", () => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+  });
+
+  it("remeasures line spacing without recreating the core or losing terminal output", async () => {
+    const harness = createHarness();
+    const createCore = vi.spyOn(GhosttyTerminalCore, "create");
+    const surface = await harness.create({ font: { size: 12, lineHeight: 19 / 12 } });
+    surface.write("retained");
+    harness.flushFrame();
+    expect(surface.rows).toBe(5);
+
+    await surface.setFont({ size: 12, lineHeight: 1 });
+    harness.flushFrame();
+    expect(surface.rows).toBe(8);
+    expect(harness.renderedSnapshot.rowData[0]?.text).toContain("retained");
+    expect(createCore).toHaveBeenCalledOnce();
+  });
+
+  it("reports leaving and reaching the bottom from existing scroll events", async () => {
+    const harness = createHarness();
+    const onScrollStateChange = vi.fn<(atBottom: boolean) => void>();
+    const surface = await harness.create({ onScrollStateChange });
+    surface.write(Array.from({ length: 50 }, (_, i) => `row ${i}\r\n`).join(""));
+    harness.flushFrame();
+    expect(onScrollStateChange.mock.calls).toEqual([[true]]);
+
+    surface.canvas.dispatchEvent(
+      Object.assign(new Event("wheel", { cancelable: true }), {
+        deltaY: -48,
+        deltaMode: 0,
+        shiftKey: false,
+      }),
+    );
+    harness.flushFrame();
+    expect(onScrollStateChange.mock.calls).toEqual([[true], [false]]);
+    surface.write("additional output\r\n");
+    harness.flushFrame();
+    expect(onScrollStateChange.mock.calls).toEqual([[true], [false]]);
+
+    surface.scrollToBottom();
+    harness.flushFrame();
+    expect(onScrollStateChange.mock.calls).toEqual([[true], [false], [true]]);
   });
 
   it.each([
@@ -1332,6 +1381,10 @@ describe("application mouse reporting", () => {
 });
 
 describe("terminal font resolution", () => {
+  it("uses the bundled IBM Plex Mono before platform faces for an unset preference", () => {
+    expect(terminalFontFamily().startsWith('"IBM Plex Mono", ')).toBe(true);
+    expect(terminalFontFamily('"Fira Code"').startsWith('"Fira Code", ')).toBe(true);
+  });
   it("validates the requested face after its styles load", async () => {
     let loaded = false;
     const load = vi.fn(async () => {

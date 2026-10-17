@@ -12,7 +12,7 @@ import {
   type TerminalOutputUpdate,
   type TerminalSessionState,
 } from "@t3tools/client-runtime/state/terminal";
-import { Plus, SquareSplitHorizontal, SquareSplitVertical, X } from "lucide-react";
+import { ArrowDown, Plus, SquareSplitHorizontal, SquareSplitVertical, X } from "lucide-react";
 import {
   AuthPreviewOperateScope,
   AuthOrchestrationOperateScope,
@@ -53,6 +53,10 @@ import {
   type GhosttyTerminalSurfaceOptions,
 } from "~/terminal/ghostty/surface";
 import { type GhosttyColor, type GhosttyTheme } from "~/terminal/ghostty/core";
+import {
+  useTerminalContextMenu,
+  type TerminalContextMenuAction,
+} from "~/terminal/TerminalContextMenu";
 import { useOpenInPreferredEditor } from "../editorPreferences";
 import { resolvePathLinkTarget } from "@t3tools/shared/fileLinks";
 import { isTerminalUrl } from "../terminal-links";
@@ -304,23 +308,16 @@ export function terminalSelectionLineRange(position: {
   };
 }
 
-export type TerminalContextMenuAction =
-  | "add-to-chat"
-  | "copy"
-  | "paste"
-  | "select-all"
-  | "scroll-to-bottom";
-
-/** Post-selection popup: available selection actions, always enabled. */
+/** K1 keeps Add to chat visible but disabled when this viewport has no chat target. */
 export function terminalSelectionMenuItems(options?: {
   canAddToChat?: boolean;
 }): ContextMenuItem<"add-to-chat" | "copy">[] {
   return [
-    ...(options?.canAddToChat === false
-      ? []
-      : ([
-          { id: "add-to-chat", label: t.tools.terminal.addToChat },
-        ] satisfies ContextMenuItem<"add-to-chat">[])),
+    {
+      id: "add-to-chat",
+      label: t.tools.terminal.addToChat,
+      ...(options?.canAddToChat === false ? { disabled: true } : {}),
+    },
     { id: "copy", label: t.common.threadActions.copy },
   ];
 }
@@ -340,7 +337,7 @@ export function terminalContextMenuItems(options: {
   return [
     ...terminalSelectionMenuItems({ canAddToChat }).map((item) => ({
       ...item,
-      disabled: !hasSelection,
+      disabled: item.disabled || !hasSelection,
     })),
     { id: "paste", label: t.tools.terminal.paste, ...(options.readOnly ? { disabled: true } : {}) },
     { id: "select-all", label: t.tools.terminal.selectAll },
@@ -424,6 +421,20 @@ export function TerminalViewport({
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<GhosttyTerminalSurface | null>(null);
   const visibleRef = useRef(visible);
+  const [atBottom, setAtBottom] = useState(true);
+  const getMenuFocusTarget = useCallback(
+    () => (visibleRef.current ? (terminalRef.current?.input ?? null) : null),
+    [],
+  );
+  const {
+    present: presentTerminalMenu,
+    dismiss: dismissTerminalMenu,
+    actionElementRef,
+    menu,
+  } = useTerminalContextMenu(getMenuFocusTarget);
+  const jumpToLatest = useCallback(() => {
+    terminalRef.current?.scrollToBottom();
+  }, []);
   const environmentId = threadRef.environmentId;
   const canOperateTerminal = useEnvironmentScope(environmentId, AuthTerminalOperateScope);
   const hasTerminalWriteAccess = useEffectEvent(() =>
@@ -575,7 +586,8 @@ export function TerminalViewport({
   useLayoutEffect(() => {
     visibleRef.current = visible;
     terminalRef.current?.setVisible(visible);
-  }, [visible]);
+    if (!visible) dismissTerminalMenu();
+  }, [visible, dismissTerminalMenu]);
 
   useEffect(() => {
     const current = terminalFontRef.current;
@@ -606,6 +618,7 @@ export function TerminalViewport({
         onData: (data) => handleData(data),
         onResize: (cols, rows) => void resizeTerminal(cols, rows),
         onSelectionChange: () => handleSelectionChange(),
+        onScrollStateChange: setAtBottom,
         beforeKey: (event) => handleBeforeKey(event),
         onLinkActivate: (text, event) => handleLinkActivate(text, event),
         canActivateLink: (text) => canActivateTerminalLink(text),
@@ -666,13 +679,16 @@ export function TerminalViewport({
           openSelectionMenuRequestIdRef.current === selectionActionRequestIdRef.current;
         // Passive cancellation must not invalidate a newer right-click flow.
         if (supersede || ownsMenu) selectionActionRequestIdRef.current += 1;
-        if (ownsMenu) void localApi?.contextMenu.close();
+        if (ownsMenu) dismissTerminalMenu();
       };
       const clearSelectionAction = () => {
         selectionActions?.cancel();
         dismissSelectionAction(true);
       };
-      setupCleanups.push(clearSelectionAction);
+      setupCleanups.push(() => {
+        clearSelectionAction();
+        dismissTerminalMenu();
+      });
 
       const readSelectionAction = (
         pointer: SelectionActionPoint | null = null,
@@ -764,7 +780,7 @@ export function TerminalViewport({
       };
 
       const showTerminalContextMenu = async (event: MouseEvent) => {
-        if (!localApi || !terminalRef.current) return;
+        if (!terminalRef.current) return;
         // Own the gesture before anything async: leaving the default alive lets
         // the browser (or Electron's editing menu) answer with a Paste entry
         // that is permanently disabled over the terminal canvas.
@@ -773,21 +789,14 @@ export function TerminalViewport({
         clearSelectionAction();
         const selectionAction = readSelectionAction();
         const requestId = selectionActionRequestIdRef.current;
-        let clicked: TerminalContextMenuAction | null;
-        try {
-          clicked = await localApi.contextMenu.show(
-            terminalContextMenuItems({
-              hasSelection: selectionAction !== null,
-              canAddToChat: canAddSelectionToChat(),
-              readOnly: !hasTerminalWriteAccess(),
-            }),
-            { x: event.clientX, y: event.clientY },
-          );
-        } catch (error) {
-          reportIfCurrent(requestId, error, t.tools.terminal.contextMenuFailed);
-          focusIfCurrent(requestId);
-          return;
-        }
+        const clicked = await presentTerminalMenu(
+          terminalContextMenuItems({
+            hasSelection: selectionAction !== null,
+            canAddToChat: canAddSelectionToChat(),
+            readOnly: !hasTerminalWriteAccess(),
+          }),
+          { x: event.clientX, y: event.clientY },
+        );
         if (requestId !== selectionActionRequestIdRef.current || clicked === null) {
           return;
         }
@@ -808,17 +817,13 @@ export function TerminalViewport({
             focusIfCurrent(requestId);
             return;
           case "scroll-to-bottom":
-            terminalRef.current?.scrollToBottom();
+            jumpToLatest();
             focusIfCurrent(requestId);
             return;
         }
       };
 
       const showSelectionAction = async (pointer: SelectionActionPoint | null) => {
-        if (!localApi) {
-          clearSelectionAction();
-          return;
-        }
         if (openSelectionMenuRequestIdRef.current === selectionActionRequestIdRef.current) {
           return;
         }
@@ -829,16 +834,14 @@ export function TerminalViewport({
         }
         const requestId = ++selectionActionRequestIdRef.current;
         openSelectionMenuRequestIdRef.current = requestId;
-        const clicked = await localApi.contextMenu
-          .show(
-            terminalSelectionMenuItems({ canAddToChat: canAddSelectionToChat() }),
-            nextAction.position,
-          )
-          .finally(() => {
-            if (openSelectionMenuRequestIdRef.current === requestId) {
-              openSelectionMenuRequestIdRef.current = null;
-            }
-          });
+        const clicked = await presentTerminalMenu(
+          terminalSelectionMenuItems({ canAddToChat: canAddSelectionToChat() }),
+          nextAction.position,
+        ).finally(() => {
+          if (openSelectionMenuRequestIdRef.current === requestId) {
+            openSelectionMenuRequestIdRef.current = null;
+          }
+        });
         if (requestId !== selectionActionRequestIdRef.current || clicked === null) {
           return;
         }
@@ -985,6 +988,7 @@ export function TerminalViewport({
 
       selectionActions = observeSelectionActions({
         element: mount,
+        getActionElement: () => actionElementRef.current,
         onSelection: (pointer) => {
           void showSelectionAction(pointer);
         },
@@ -1051,7 +1055,18 @@ export function TerminalViewport({
         mount.focus({ preventScroll: true });
       }
     };
-  }, [cwd, environmentId, runtimeEnvKey, terminalId, threadId, worktreePath]);
+  }, [
+    cwd,
+    environmentId,
+    runtimeEnvKey,
+    terminalId,
+    threadId,
+    worktreePath,
+    presentTerminalMenu,
+    dismissTerminalMenu,
+    jumpToLatest,
+    actionElementRef,
+  ]);
 
   useEffect(() => {
     const terminal = terminalRef.current;
@@ -1106,11 +1121,27 @@ export function TerminalViewport({
     };
   }, [drawerHeight, environmentId, resizeEpoch, terminalId, threadId]);
   return (
-    <div
-      ref={containerRef}
-      tabIndex={-1}
-      className="relative h-full w-full overflow-hidden bg-(--terminal-background) font-mono text-terminal-copy text-fg-terminal"
-    />
+    <div className="relative h-full w-full">
+      <div
+        ref={containerRef}
+        tabIndex={-1}
+        className="relative h-full w-full overflow-hidden bg-(--terminal-background) font-mono text-terminal-copy text-fg-terminal"
+      />
+      {!atBottom ? (
+        <button
+          type="button"
+          className="absolute bottom-0 left-1/2 flex h-7 -translate-x-1/2 cursor-pointer items-center gap-1.25 rounded-full bg-secondary pr-3 pl-2.5 text-secondary-copy font-semibold whitespace-nowrap text-foreground shadow-terminal-jump outline-none hover:bg-accent focus-visible:inset-shadow-focus"
+          onClick={() => {
+            jumpToLatest();
+            terminalRef.current?.focus();
+          }}
+        >
+          <ArrowDown className="size-3.25" />
+          {t.tools.terminal.jumpToLatest}
+        </button>
+      ) : null}
+      {menu}
+    </div>
   );
 }
 

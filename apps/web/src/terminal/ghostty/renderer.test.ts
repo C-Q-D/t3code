@@ -1,3 +1,4 @@
+/** Verifies terminal cell geometry and canvas output independently of the surface lifecycle. */
 import { describe, expect, it } from "vite-plus/test";
 
 import { GHOSTTY_CELL_WIDE, type GhosttyCell, type GhosttySnapshot } from "./core";
@@ -39,7 +40,7 @@ describe("terminalGridSize", () => {
 });
 
 describe("measureGhosttyCell", () => {
-  it("uses descender-aware metrics and the mobile terminal line-height", () => {
+  it("uses K1 line spacing while keeping glyph descenders inside the cell", () => {
     const measureText = (text: string) =>
       text === "M"
         ? { width: 7.2, actualBoundingBoxAscent: 9, actualBoundingBoxDescent: 0 }
@@ -51,8 +52,8 @@ describe("measureGhosttyCell", () => {
 
     expect(measureGhosttyCell(context, 12, "monospace")).toEqual({
       width: 7.2,
-      height: 16,
-      baseline: 11,
+      height: 19,
+      baseline: 13,
     });
   });
 });

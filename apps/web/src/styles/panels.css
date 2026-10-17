@@ -393,3 +393,10 @@
   --terminal-cursor: var(--color-fg-terminal-cursor);
   --terminal-selection-background: var(--color-well-terminal-selection);
 }
+
+/* PN4.2 — Terminal8a.dc.html K1: the 28px floating jump-to-output key. */
+@theme {
+  --shadow-terminal-jump:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09), 0 0 0 1px rgba(0, 0, 0, 0.44), 0 1.5px 0 #09090a,
+    4px 6px 10px -3px rgba(0, 0, 0, 0.7);
+}

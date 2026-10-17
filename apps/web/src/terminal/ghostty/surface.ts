@@ -31,11 +31,12 @@ const TERMINAL_GLYPH_FALLBACKS =
   '"Symbols Nerd Font Mono", "Symbols Nerd Font", "JetBrainsMono Nerd Font", ' +
   '"JetBrainsMono NF", "FiraCode Nerd Font", "Hack Nerd Font", "MesloLGS NF", ' +
   '"CaskaydiaCove Nerd Font", "PowerlineSymbols", monospace';
-// The platform's own monospace faces; concrete names only, because an
+// The bundled text face precedes platform fallbacks; concrete names only, because an
 // unknown keyword (like ui-monospace) makes canvas font shorthand parsing
 // reject the whole string.
 export const DEFAULT_TERMINAL_FONT_FAMILY =
-  '"SF Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", ' + TERMINAL_GLYPH_FALLBACKS;
+  '"IBM Plex Mono", "SF Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", ' +
+  TERMINAL_GLYPH_FALLBACKS;
 const CONTENT_PADDING = 4;
 const MIN_SCROLLBAR_THUMB_HEIGHT = 18;
 /** Half a blink cycle: the visible and hidden phases are equally long. */
@@ -52,6 +53,8 @@ const TERMINAL_FONT_LOAD_VARIANTS = [
 export interface GhosttyTerminalFont {
   readonly family?: string;
   readonly size?: number;
+  /** Positive ratio of cell height to font size; defaults to K1's 19/12. */
+  readonly lineHeight?: number;
 }
 
 let symbolsFontLoad: Promise<void> | null = null;
@@ -548,6 +551,8 @@ export interface GhosttyTerminalSurfaceOptions {
   readonly onData: (data: string) => void;
   readonly onResize: (cols: number, rows: number) => void;
   readonly onSelectionChange: () => void;
+  /** Emits the initial bottom state and subsequent changes during existing scrollbar updates. */
+  readonly onScrollStateChange?: (atBottom: boolean) => void;
   readonly beforeKey: (event: KeyboardEvent) => boolean;
   readonly onLinkActivate: (text: string, event: MouseEvent) => void;
   readonly canActivateLink?: (text: string) => boolean;
@@ -576,6 +581,7 @@ export class GhosttyTerminalSurface {
   private fontFamily: string;
   private requestedFontFamily: string | undefined;
   private fontSize: number;
+  private lineHeight: number | undefined;
   private fontEpoch = 0;
   private pendingFontEpoch: number | null = null;
   private readonly stopObservingResize: () => void;
@@ -590,6 +596,7 @@ export class GhosttyTerminalSurface {
   private forceFullRender = true;
   private scrollbarDirty = true;
   private scrollbarState: GhosttyScrollbar | null = null;
+  private reportedAtBottom: boolean | null = null;
   private scrollbarPointerId: number | null = null;
   private scrollbarPointerOffset = 0;
   private disposed = false;
@@ -677,6 +684,7 @@ export class GhosttyTerminalSurface {
     this.fontFamily = fontFamily;
     this.requestedFontFamily = options.font?.family;
     this.fontSize = terminalFontSize(options.font?.size);
+    this.lineHeight = options.font?.lineHeight;
     this.installEvents();
     this.watchDevicePixelRatio();
     this.reducedMotionMedia?.addEventListener("change", this.onReducedMotionChange);
@@ -733,7 +741,7 @@ export class GhosttyTerminalSurface {
       // Metrics fall back to whichever faces are already available.
     }
     const fontFamily = await loadTerminalFontFamily(options.font?.family, fontSize);
-    const metrics = measureGhosttyCell(context, fontSize, fontFamily);
+    const metrics = measureGhosttyCell(context, fontSize, fontFamily, options.font?.lineHeight);
     const grid = terminalGridSize(mount.clientWidth, mount.clientHeight, metrics, CONTENT_PADDING);
     const core = await GhosttyTerminalCore.create(
       grid.cols,
@@ -812,6 +820,7 @@ export class GhosttyTerminalSurface {
     this.refreshHoveredLink();
   }
 
+  /** Re-measure family, CSS-pixel size and optional line-height ratio in place; newest async load wins without replacing the core. */
   async setFont(font: GhosttyTerminalFont): Promise<void> {
     if (this.disposed) return;
     const fontSize = terminalFontSize(font.size);
@@ -825,11 +834,18 @@ export class GhosttyTerminalSurface {
     this.fontFamily = fontFamily;
     this.requestedFontFamily = font.family;
     this.fontSize = fontSize;
+    this.lineHeight = font.lineHeight;
     this.applyFontMetrics();
   }
 
+  /** Apply the current font geometry to the existing core, input, grid and next paint. */
   private applyFontMetrics(): void {
-    this.metrics = measureGhosttyCell(this.context, this.fontSize, this.fontFamily);
+    this.metrics = measureGhosttyCell(
+      this.context,
+      this.fontSize,
+      this.fontFamily,
+      this.lineHeight,
+    );
     this.core.resize(this.cols, this.rows, this.metrics.width, this.metrics.height);
     // Cached IME textarea coordinates are stale in the new cell geometry.
     this.inputLeft = -1;
@@ -863,7 +879,12 @@ export class GhosttyTerminalSurface {
     }
     // A face that finished loading after the initial measurement changes glyph
     // advances; re-measure and refit so the grid matches what actually renders.
-    const metrics = measureGhosttyCell(this.context, this.fontSize, this.fontFamily);
+    const metrics = measureGhosttyCell(
+      this.context,
+      this.fontSize,
+      this.fontFamily,
+      this.lineHeight,
+    );
     if (
       metrics.width === this.metrics.width &&
       metrics.height === this.metrics.height &&
@@ -1902,7 +1923,13 @@ export class GhosttyTerminalSurface {
     this.scrollViewport(offset - state.offset);
   }
 
+  /** Publish bottom-state changes from normal render/scroll work, then update scrollbar geometry. */
   private updateScrollbar(): void {
+    const atBottom = this.isAtBottom();
+    if (atBottom !== this.reportedAtBottom) {
+      this.reportedAtBottom = atBottom;
+      this.options.onScrollStateChange?.(atBottom);
+    }
     const state = this.readScrollbarState();
     const geometry =
       state === null

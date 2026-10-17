@@ -1,3 +1,5 @@
+/** Measures and paints one shared cell grid for terminal output, cursor and selection. */
+import { terminalCellHeight } from "./renderer.logic";
 import {
   GHOSTTY_CELL_WIDE,
   ghosttyColorsEqual,
@@ -60,10 +62,12 @@ function fontForCell(cell: GhosttyCell, fontSize: number, fontFamily: string): s
   return `${style} ${weight} ${fontSize}px ${fontFamily}`;
 }
 
+/** Measure CSS-pixel cells for the selected family/size and optional line-height ratio; glyph bounds prevent clipping. */
 export function measureGhosttyCell(
   context: CanvasRenderingContext2D,
   fontSize: number,
   fontFamily: string,
+  lineHeight?: number,
 ): GhosttyCellMetrics {
   context.font = `normal 400 ${fontSize}px ${fontFamily}`;
   const widthMeasurement = context.measureText("M");
@@ -71,7 +75,7 @@ export function measureGhosttyCell(
   const ascent = verticalMeasurement.actualBoundingBoxAscent || fontSize;
   const descent = verticalMeasurement.actualBoundingBoxDescent;
   const glyphHeight = ascent + descent;
-  const height = Math.max(1, Math.round(fontSize * 1.35), Math.ceil(glyphHeight));
+  const height = terminalCellHeight(fontSize, glyphHeight, lineHeight);
   return {
     width: Math.max(1, widthMeasurement.width),
     height,

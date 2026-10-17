@@ -1,3 +1,4 @@
+/** Verifies terminal output synchronization, menu availability, theme and selection contracts. */
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import {
   applyTerminalAttachStreamEvent,
@@ -18,7 +19,7 @@ import {
 } from "./ThreadTerminalDrawer";
 
 describe("terminal selection menus", () => {
-  it("omits Add to chat when the terminal has no chat target", () => {
+  it("keeps Add to chat visible but disabled when the terminal has no chat target", () => {
     expect(terminalSelectionMenuItems().map(({ id }) => id)).toEqual(["add-to-chat", "copy"]);
     expect(terminalContextMenuItems({ hasSelection: true }).map(({ id }) => id)).toEqual([
       "add-to-chat",
@@ -28,12 +29,21 @@ describe("terminal selection menus", () => {
       "scroll-to-bottom",
     ]);
 
-    expect(terminalSelectionMenuItems({ canAddToChat: false }).map(({ id }) => id)).toEqual([
-      "copy",
+    expect(
+      terminalSelectionMenuItems({ canAddToChat: false }).map(({ id, disabled }) => ({
+        id,
+        disabled: !!disabled,
+      })),
+    ).toEqual([
+      { id: "add-to-chat", disabled: true },
+      { id: "copy", disabled: false },
     ]);
     expect(
       terminalContextMenuItems({ hasSelection: true, canAddToChat: false }).map(({ id }) => id),
-    ).toEqual(["copy", "paste", "select-all", "scroll-to-bottom"]);
+    ).toEqual(["add-to-chat", "copy", "paste", "select-all", "scroll-to-bottom"]);
+    expect(terminalContextMenuItems({ hasSelection: true, canAddToChat: false })[0]?.disabled).toBe(
+      true,
+    );
   });
 
   it("keeps local viewing actions available to a read-only observer", () => {

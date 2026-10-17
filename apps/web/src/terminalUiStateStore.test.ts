@@ -29,7 +29,7 @@ describe("terminalUiStateStore actions", () => {
     );
     expect(terminalUiState).toEqual({
       terminalOpen: false,
-      terminalHeight: 280,
+      terminalHeight: 300,
       terminalIds: [],
       activeTerminalId: "",
       terminalGroups: [],
@@ -84,7 +84,7 @@ describe("terminalUiStateStore actions", () => {
     );
     expect(terminalUiState).toEqual({
       terminalOpen: true,
-      terminalHeight: 280,
+      terminalHeight: 300,
       terminalIds: [DEFAULT_THREAD_TERMINAL_ID],
       activeTerminalId: DEFAULT_THREAD_TERMINAL_ID,
       terminalGroups: [

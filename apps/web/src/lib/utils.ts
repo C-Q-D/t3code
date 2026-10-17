@@ -232,6 +232,7 @@ const twMerge = extendTailwindMerge({
         "terminal-well",
         "terminal-divider-column",
         "terminal-divider-row",
+        "terminal-jump",
       ],
       "inset-shadow": [
         "selected",
