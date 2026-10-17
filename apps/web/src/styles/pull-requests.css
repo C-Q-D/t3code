@@ -20,6 +20,13 @@
   --shadow-pr-review-card:
     inset 0 1.5px 0 rgba(255, 255, 255, 0.095), 0 0 0 1px rgba(0, 0, 0, 0.484), 0 3px 0 #09090a,
     10px 16px 24px -8px rgba(0, 0, 0, 0.7);
+  /* Panel8a.dc.html · L2 linked PRs: 18px heading, 1.5 row leading, 14px rows and watched elevation. */
+  --text-pr-linked-heading: 18px;
+  --text-pr-linked-heading--line-height: 1.5;
+  --leading-pr-linked-copy: 1.5;
+  --radius-pr-linked-row: 14px;
+  --color-pr-linked-watching: #26262a;
+  --shadow-pr-linked-watching: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 1.5px 0 #09090a;
 }
 
 /* A folded track keeps its child's scrollHeight measurable for the scroll refund. */

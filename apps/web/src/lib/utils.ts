@@ -87,6 +87,7 @@ const twMerge = extendTailwindMerge({
         "chat-project-choice",
         "pr-detail-title",
         "pr-avatar",
+        "pr-linked-heading",
       ],
       shadow: [
         "slab",
@@ -190,6 +191,7 @@ const twMerge = extendTailwindMerge({
         "sidebar-bulk",
         "pr-description-well",
         "pr-review-card",
+        "pr-linked-watching",
       ],
       "inset-shadow": [
         "selected",
@@ -250,6 +252,7 @@ const twMerge = extendTailwindMerge({
         "badge-large",
         "split-join",
         "pr-description",
+        "pr-linked-row",
       ],
       leading: [
         "code",
@@ -261,6 +264,7 @@ const twMerge = extendTailwindMerge({
         "chat-project-menu",
         "pr-description",
         "pr-comment",
+        "pr-linked-copy",
       ],
       tracking: ["brand", "chat-draft"],
     },

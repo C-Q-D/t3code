@@ -4,6 +4,10 @@ import { cn, getLocalFileManagerName, isWindowsPlatform } from "./utils";
 
 describe("cn", () => {
   it.each([
+    ["text-body text-pr-linked-heading", "text-pr-linked-heading"],
+    ["shadow-raise-xs-control shadow-pr-linked-watching", "shadow-pr-linked-watching"],
+    ["rounded-card-row rounded-pr-linked-row", "rounded-pr-linked-row"],
+    ["leading-code leading-pr-linked-copy", "leading-pr-linked-copy"],
     ["text-body text-foreground", "text-body text-foreground"],
     ["text-fg-disabled text-reply", "text-fg-disabled text-reply"],
     ["text-heading text-status-warning-foreground", "text-heading text-status-warning-foreground"],

@@ -9,15 +9,8 @@ import {
   resolveThreadPullRequestChains,
   visibleThreadPullRequests,
 } from "@t3tools/shared/threadPullRequests";
-import {
-  ArrowUpRightIcon,
-  EyeIcon,
-  EyeOffIcon,
-  LinkIcon,
-  MoreHorizontalIcon,
-  PlusIcon,
-} from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { ArrowUpRightIcon, EyeIcon, EyeOffIcon, LinkIcon, MoreHorizontalIcon } from "lucide-react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 
 import { writeTextToClipboard } from "~/hooks/useCopyToClipboard";
 import { findProjectForChangeRequest, useOpenPrLink } from "~/lib/openPullRequestLink";
@@ -36,12 +29,9 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { openLinkPullRequestDialog } from "./LinkPullRequestDialog";
 import { pullRequestListLines, type PullRequestListLine } from "./pullRequestListLines";
 import {
-  PULL_REQUEST_ROW_CLASS,
-  PULL_REQUEST_ROW_NUMBER_CLASS,
   PullRequestRowAuthor,
   PullRequestRowBranches,
   PullRequestRowGlyph,
-  PullRequestRowLines,
 } from "./PullRequestListRow";
 import {
   PullRequestDiffStat,
@@ -60,6 +50,54 @@ const SOURCE_LABELS: Record<ThreadPullRequestLink["source"], string> = {
   "stack-dismissed": t.git.pullRequest.dismissed,
 };
 
+/**
+ * Keep the linked panel's source visible below the title, alongside existing host metadata.
+ * @param props Number/title, source, and optional host signals; missing host fields stay absent.
+ * @returns Two compact lines; metadata yields space before the source or title is obscured.
+ */
+function LinkedPullRequestLines({
+  number,
+  title,
+  source,
+  signals,
+  status,
+  meta,
+  updatedAt,
+}: {
+  number: ReactNode;
+  title: ReactNode;
+  source: string;
+  signals?: ReactNode;
+  status?: ReactNode;
+  meta?: ReactNode;
+  updatedAt?: string | null | undefined;
+}) {
+  return (
+    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+      <span className="flex min-w-0 items-center gap-1.25 font-semibold">
+        {number}
+        <span className="min-w-0 truncate">{title}</span>
+        {signals ? <span className="flex shrink-0 items-center gap-1">{signals}</span> : null}
+        {status ? <span className="ml-auto flex shrink-0 items-center gap-1">{status}</span> : null}
+      </span>
+      <span className="flex min-w-0 items-center gap-1.5 text-secondary-copy leading-pr-linked-copy text-muted-foreground">
+        <span className="shrink-0">{source}</span>
+        <span className="flex min-w-0 items-center gap-1.5 overflow-hidden">{meta}</span>
+        {updatedAt ? (
+          <span className="ml-auto shrink-0 tabular-nums">
+            {formatRelativeTimeLabel(updatedAt)}
+          </span>
+        ) : null}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * Render a check signal supplied by the host; callers omit this component for absent state.
+ * @param props Host check state and its existing semantic presentation.
+ * @returns The accessible signal with a localized tooltip.
+ */
 function ChecksGlyph({
   state,
 }: {
@@ -81,9 +119,10 @@ function ChecksGlyph({
 }
 
 /**
- * Renders link row from the supplied display data and callbacks.
- * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
- * @returns The rendered surface.
+ * Render one linked PR with its existing navigation, watch gates, context menu and quick actions.
+ * @param props Stack position, PR/thread identity and existing host command callbacks; a null
+ * watch callback means the environment does not support watching.
+ * @returns A source-labelled row; the host remains authoritative for its watch and lifecycle state.
  */
 function LinkRow({
   line,
@@ -137,7 +176,10 @@ function LinkRow({
     actionEntry !== null && pullRequestQuickActions(actionEntry, linkHostActions).length > 0;
   return (
     <div
-      className={cn(PULL_REQUEST_ROW_CLASS, "relative hover:bg-accent/60")}
+      className={cn(
+        "group/pr-row relative flex w-full items-center gap-2.5 rounded-pr-linked-row py-2.5 pr-2.5 text-left text-secondary-copy-large leading-pr-linked-copy hover:bg-secondary",
+        watching && "bg-pr-linked-watching shadow-pr-linked-watching",
+      )}
       onContextMenu={(event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -147,7 +189,7 @@ function LinkRow({
       // Each layer steps in under the one it targets. The step is capped: beyond a few layers
       // the indent only says "still in the stack", which the connector line already does, and
       // a sixteen-layer stack would otherwise stair-step off the right edge.
-      style={{ paddingLeft: `${0.5 + Math.min(depth, 3) * 1.25}rem` }}
+      style={{ paddingLeft: `${0.75 + Math.min(depth, 3) * 1.25}rem` }}
     >
       {depth > 0 ? <span aria-hidden className="-ml-2 h-6 w-px shrink-0 bg-border/70" /> : null}
       {snapshot === null ? (
@@ -168,10 +210,28 @@ function LinkRow({
         onClick={(event) => openPrLink(event, link.url, threadRef)}
         className="flex min-w-0 flex-1"
       >
-        <PullRequestRowLines
+        <LinkedPullRequestLines
+          source={SOURCE_LABELS[link.source]}
           number={
             <Tooltip>
-              <TooltipTrigger render={<span className={PULL_REQUEST_ROW_NUMBER_CLASS} />}>
+              <TooltipTrigger
+                render={
+                  <span
+                    className={cn(
+                      "shrink-0 font-mono font-medium tabular-nums",
+                      snapshot === null
+                        ? "text-muted-foreground"
+                        : snapshot.state === "merged"
+                          ? "text-status-emphasis-foreground"
+                          : snapshot.state === "closed"
+                            ? "text-error-foreground"
+                            : snapshot.isDraft
+                              ? "text-muted-foreground"
+                              : "text-success-foreground",
+                    )}
+                  />
+                }
+              >
                 #{link.number}
               </TooltipTrigger>
               <TooltipPopup>
@@ -207,9 +267,7 @@ function LinkRow({
               </>
             ) : null
           }
-          // Match the full PR list: diff counts up top, checks under the lifecycle glyph, the
-          // verdict by the author. Each is absent rather than neutral when the host said
-          // nothing, so a row without them reads as unknown, not as fine.
+          // Undrawn host metadata remains available beside the source, with no invented neutral state.
           status={
             <PullRequestDiffStat
               additions={snapshot?.additions ?? 0}
@@ -268,6 +326,23 @@ function LinkRow({
           updatedAt={snapshot?.updatedAt}
         />
       </a>
+      {onSetWatching !== null && open ? (
+        <span
+          className={cn("relative inline-flex shrink-0 rounded-full", watching && "bg-secondary")}
+        >
+          <Button variant="outline" size="compact" onClick={() => onSetWatching(link, !watching)}>
+            {watching ? <EyeOffIcon className="size-3.25" /> : <EyeIcon className="size-3.25" />}
+            {watching ? t.git.pullRequest.stopWatching : t.git.pullRequest.watchForChanges}
+          </Button>
+          {/* The feature's watched state adds the contract's selection ring without changing Button. */}
+          {watching ? (
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-0 rounded-full inset-shadow-selected-control"
+            />
+          ) : null}
+        </span>
+      ) : null}
       {actionEntry !== null ? (
         <PullRequestSpeedActions
           entry={actionEntry}
@@ -275,23 +350,19 @@ function LinkRow({
           visible={speedMode}
         />
       ) : null}
-      {/* Out of the row's flow, so no row reserves a column for a button only the hovered one
-          shows. It sits over the right end of the second line on the row's own hover color,
-          fading in from the left, so it covers the time and leaves the diff counts alone. */}
+      {/* Keep the existing menu reachable by hover or keyboard without covering the watch action. */}
       <span
         className={cn(
-          "absolute right-0 bottom-0.5 flex items-center rounded-r-md bg-background pr-1 pl-5",
-          "[mask-image:linear-gradient(to_right,transparent,black_1rem)]",
+          "absolute top-0 left-0 flex items-center",
           // Hidden means untouchable too: on a touch screen there is no hover, and an invisible
           // layer over the right of the row would otherwise swallow the tap meant for the link.
           "pointer-events-none opacity-0 group-hover/pr-row:pointer-events-auto group-hover/pr-row:opacity-100",
-          "has-[[data-popup-open]]:pointer-events-auto has-[[data-popup-open]]:opacity-100",
-          "has-[:focus-visible]:pointer-events-auto has-[:focus-visible]:opacity-100",
+          "group-focus-within/pr-row:pointer-events-auto group-focus-within/pr-row:opacity-100",
+          menuOpen && "pointer-events-auto opacity-100",
           "group-has-[[data-pull-request-action-pending=true]]/pr-row:hidden",
           speedMode && hasQuickActions && "hidden",
         )}
       >
-        <span aria-hidden className="absolute inset-0 bg-accent/60" />
         <Menu
           open={menuOpen}
           onOpenChange={(open) => {
@@ -430,30 +501,43 @@ function EnabledThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThread
     }
     return latest;
   }, [links]);
+  const header = (
+    <header className="flex h-9 shrink-0 items-center gap-2 px-1">
+      <h2 className="min-w-0 flex-1 truncate font-serif text-pr-linked-heading font-bold">
+        {t.chat.rightPanel.linkedPullRequests}
+      </h2>
+      <Button size="md" variant="secondary" onClick={openLinkDialog}>
+        <PullRequestGlyph.link className="size-3.25" />
+        {t.git.pullRequest.linkPullRequest}
+      </Button>
+    </header>
+  );
 
   if (links.length === 0) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
-        <PullRequestGlyph.link aria-hidden className="size-6 text-muted-foreground/60" />
-        <p className="text-sm font-medium">{t.git.pullRequest.noLinkedPullRequests}</p>
-        <p className="max-w-60 text-xs text-muted-foreground">
-          {
-            t.git.pullRequest
-              .pullRequestsTheAgentOpensFromThisThreadLandHereLinkOneYourselfFromAURLOrANumber
-          }
-        </p>
-        <Button size="sm" variant="outline" onClick={openLinkDialog}>
-          <PlusIcon className="size-3.5" />
-          {t.git.pullRequest.linkPullRequest}
-        </Button>
+      <div className="flex h-full min-h-0 flex-col gap-1.5 px-3 pb-3">
+        {header}
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2.5 text-center text-secondary-label">
+          <span className="flex size-10 items-center justify-center rounded-compact-row shadow-well-project">
+            <PullRequestGlyph.pullRequest aria-hidden className="size-4.5" />
+          </span>
+          <p className="text-secondary-copy-large">{t.git.pullRequest.noLinkedPullRequests}</p>
+          <p className="max-w-60 text-secondary-copy text-muted-foreground">
+            {
+              t.git.pullRequest
+                .pullRequestsTheAgentOpensFromThisThreadLandHereLinkOneYourselfFromAURLOrANumber
+            }
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex h-full min-h-0 flex-col gap-1.5 px-3 pb-3">
+      {header}
       <ScrollArea className="min-h-0 flex-1">
-        <div className="flex flex-col p-1.5">
+        <div className="flex flex-col gap-1.5">
           {lines.map((line) => (
             <LinkRow
               key={`${line.link.host}/${line.link.repository}#${line.link.number}`}
@@ -473,15 +557,11 @@ function EnabledThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThread
           ))}
         </div>
       </ScrollArea>
-      <footer className="flex items-center justify-between border-t border-border/60 px-2 py-1.5 text-2xs text-muted-foreground">
+      <footer className="px-1 text-meta text-muted-foreground">
         <span>
           {t.git.pullRequest.linkedRequestCounts(openCount, links.length)}
           {lastSynced ? t.git.pullRequest.syncedAt(formatRelativeTimeLabel(lastSynced)) : ""}
         </span>
-        <Button size="xs" variant="ghost" onClick={openLinkDialog}>
-          <PlusIcon className="size-3.5" />
-          {t.git.pullRequest.link}
-        </Button>
       </footer>
     </div>
   );
