@@ -1,17 +1,11 @@
-/** Allocates the shortened discussion titlebar without relying on title or translated label length. */
+/** Selects the discrete discussion layout; CSS owns continuous track sizing. */
 
 /**
- * Reserves clickable controls before assigning the title's clipping track.
+ * Switches to the menu when the full controls cannot retain a readable title.
  * @param width Measured titlebar content width, excluding its frame padding.
- * @returns Fixed control tracks and the remaining title space, in CSS pixels.
+ * @returns The discrete layout state; no pixel width enters React state.
  */
 export function resolveDiscussionTitlebarLayout(width: number) {
   // Full controls need 240 + 300px, two 8px gaps, and at least 160px for the title.
-  const compact = width < 716;
-  const leading = compact ? 70 : 240;
-  const actions = compact ? 44 : 300;
-  const spacer = compact ? 8 : 8 + Math.min(182, Math.max(0, width - 716));
-  const gap = 8;
-  const title = Math.max(0, width - leading - actions - spacer - gap);
-  return { compact, leading, actions, spacer, gap, title };
+  return { compact: width < 716 };
 }

@@ -1,6 +1,6 @@
 /** Owns window chrome geometry; routes supply content and Electron owns system buttons. */
 import { Link } from "@tanstack/react-router";
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useRef, type ReactNode } from "react";
 
 import { t } from "~/i18n";
 import { useEnvironmentIdentificationMode } from "~/hooks/useSettings";
@@ -12,7 +12,7 @@ import {
   useEnvironmentStageLabel,
 } from "../SidebarStageBackdrop";
 import { Badge } from "../ui/badge";
-import { TitlebarSlotOutlet, useTitlebarPanelActive } from "./titlebarSlot";
+import { TitlebarSlotOutlet, useTitlebarPanelLayout } from "./titlebarSlot";
 import { resolveDiscussionTitlebarLayout } from "./discussionTitlebar.logic";
 
 /**
@@ -21,8 +21,8 @@ import { resolveDiscussionTitlebarLayout } from "./discussionTitlebar.logic";
  * sidebarControl supplies the existing toggle and its keyboard bindings.
  * onLeadingWidthChange receives the live left cluster's right edge in CSS pixels;
  * the shell uses it to keep sidebar-width environment artwork behind that cluster.
- * A discussion panel budgets controls against the measured header content box;
- * other routes retain the original flex layout and spacers.
+ * A discussion panel observes only layout-region transitions; CSS sizes tracks
+ * continuously. Other routes retain the original flex layout and spacers.
  */
 export function WindowTitlebar({
   sidebarControl,
@@ -31,18 +31,22 @@ export function WindowTitlebar({
   sidebarControl: ReactNode;
   onLeadingWidthChange: (width: number) => void;
 }) {
-  const panelActive = useTitlebarPanelActive();
-  const [contentWidth, setContentWidth] = useState(0);
+  const { active: panelActive, compact, setCompact } = useTitlebarPanelLayout();
+  const lastCompact = useRef<boolean | undefined>(undefined);
   const observeHeader = useCallback(
     (element: HTMLElement) => {
       if (!panelActive) return;
       return observeResize(element, ([entry]) => {
-        if (entry) setContentWidth(entry.contentRect.width);
+        if (!entry) return;
+        const next = resolveDiscussionTitlebarLayout(entry.contentRect.width).compact;
+        // observeResize flushes synchronously; do not schedule React work within one layout region.
+        if (next === lastCompact.current) return;
+        lastCompact.current = next;
+        setCompact(next);
       });
     },
-    [panelActive],
+    [panelActive, setCompact],
   );
-  const layout = panelActive ? resolveDiscussionTitlebarLayout(contentWidth) : null;
   const stageLabel = useEnvironmentStageLabel();
   const identificationMode = useEnvironmentIdentificationMode();
   const backdropVariant = resolveSidebarStageBackdropVariant(
@@ -69,14 +73,7 @@ export function WindowTitlebar({
       ref={observeHeader}
       className="window-titlebar drag-region relative flex h-(--workspace-topbar-height) w-full shrink-0 items-center text-foreground text-shadow-stone"
       data-window-titlebar=""
-      data-discussion-layout={layout ? (layout.compact ? "compact" : "full") : undefined}
-      style={
-        layout
-          ? {
-              gridTemplateColumns: `${layout.leading}px ${layout.spacer}px minmax(0, ${layout.title}px) ${layout.gap}px ${layout.actions}px`,
-            }
-          : undefined
-      }
+      data-discussion-layout={panelActive ? (compact ? "compact" : "full") : undefined}
     >
       {backdropVariant ? (
         <div

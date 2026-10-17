@@ -26,6 +26,8 @@ type TitlebarContextValue = {
   owners: Record<SlotName, string[]>;
   setTarget: (name: SlotName, target: HTMLDivElement | null) => void;
   register: (name: SlotName, owner: string) => () => void;
+  compactPanel: boolean;
+  setCompactPanel: (compact: boolean) => void;
 };
 
 const TitlebarContext = createContext<TitlebarContextValue | null>(null);
@@ -37,14 +39,16 @@ function useTitlebarContext() {
   return context;
 }
 
-/** Restricts shortened-header geometry to a mounted panel with an actual frame destination. */
-export function useTitlebarPanelActive() {
-  const { targets, owners } = useTitlebarContext();
-  return targets.panel !== null && owners.panel.length > 0;
+/** Shares only the panel's discrete layout so portaled actions can replace their focusable controls. */
+export function useTitlebarPanelLayout() {
+  const { targets, owners, compactPanel, setCompactPanel } = useTitlebarContext();
+  const active = targets.panel !== null && owners.panel.length > 0;
+  return { active, compact: active && compactPanel, setCompact: setCompactPanel };
 }
 
 /** Scopes the titlebar destinations and their route owners to one app shell. */
 export function TitlebarSlotProvider({ children }: { children: ReactNode }) {
+  const [compactPanel, setCompactPanel] = useState(true);
   const [targets, setTargets] = useState<TitlebarContextValue["targets"]>({
     breadcrumb: null,
     actions: null,
@@ -65,8 +69,8 @@ export function TitlebarSlotProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ targets, owners, setTarget, register }),
-    [targets, owners, setTarget, register],
+    () => ({ targets, owners, setTarget, register, compactPanel, setCompactPanel }),
+    [targets, owners, setTarget, register, compactPanel],
   );
   return <TitlebarContext value={value}>{children}</TitlebarContext>;
 }

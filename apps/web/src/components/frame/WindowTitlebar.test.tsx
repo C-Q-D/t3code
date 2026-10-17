@@ -2,7 +2,7 @@
  * Exercises measured discussion-header budgets and release through real route portals.
  * @vitest-environment jsdom
  */
-import { act, type ReactNode } from "react";
+import { act, Profiler, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { expect, it, vi } from "vite-plus/test";
 import { WindowTitlebar } from "./WindowTitlebar";
@@ -65,14 +65,8 @@ it.each([false, true])(
       await act(() => measurements.deliver!(437));
       const header = container.querySelector("header")!;
       expect(header.dataset.discussionLayout).toBe("compact");
-      // These are the grid tracks delivered to layout, not measurements fabricated by jsdom.
-      // The intrinsic width of the long h1 cannot enlarge the bounded 307px title track.
-      expect(header.style.gridTemplateColumns).toBe("70px 8px minmax(0, 307px) 8px 44px");
-      const fixedTracks = [...header.style.gridTemplateColumns.matchAll(/(\d+)px/g)].reduce(
-        (total, match) => total + Number(match[1]),
-        0,
-      );
-      expect(fixedTracks + 16).toBeLessThanOrEqual(453);
+      // CSS now owns continuous widths; no measured pixel track is committed through React.
+      expect(header.style.gridTemplateColumns).toBe("");
       expect(header.querySelector("h1")!.textContent!.length).toBeGreaterThan(500);
       expect(header.querySelector('[data-titlebar-slot="actions"]')!.textContent).toBe(
         paused ? "继续结束讨论" : "停止结束讨论",
@@ -88,3 +82,42 @@ it.each([false, true])(
     }
   },
 );
+
+it("does not commit on same-region resize notifications and switches once at the threshold", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  const committed = vi.fn();
+  try {
+    await act(() =>
+      root.render(
+        <Profiler id="header" onRender={committed}>
+          <TitlebarSlotProvider>
+            <WindowTitlebar
+              sidebarControl={<button>sidebar</button>}
+              onLeadingWidthChange={() => {}}
+            />
+            <TitlebarSlotOutlet name="panel" />
+            <Route paused={false} panel />
+          </TitlebarSlotProvider>
+        </Profiler>,
+      ),
+    );
+    await act(() => measurements.deliver!(437));
+    committed.mockClear();
+    for (const width of [440, 500, 600, 715]) await act(() => measurements.deliver!(width));
+    expect(committed).not.toHaveBeenCalled();
+    await act(() => measurements.deliver!(716));
+    expect(container.querySelector("header")!.dataset.discussionLayout).toBe("full");
+    expect(committed).toHaveBeenCalledTimes(1);
+    committed.mockClear();
+    for (const width of [720, 900, 1000]) await act(() => measurements.deliver!(width));
+    expect(committed).not.toHaveBeenCalled();
+  } finally {
+    await act(() => root.unmount());
+    container.remove();
+    measurements.deliver = undefined;
+    vi.unstubAllGlobals();
+  }
+});

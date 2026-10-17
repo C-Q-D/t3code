@@ -306,6 +306,19 @@ html[data-theme-id="graphite"] [data-frame-main] {
 .window-titlebar[data-discussion-layout] {
   display: grid;
 }
+/* The header content box is 16px narrower than its border box. Percentages here
+   follow that content box on every resize without scheduling React renders. */
+.window-titlebar[data-discussion-layout="compact"] {
+  grid-template-columns:
+    calc(var(--spacing) * 17.5) calc(var(--spacing) * 2) minmax(0, 1fr)
+    calc(var(--spacing) * 2) calc(var(--spacing) * 11);
+}
+.window-titlebar[data-discussion-layout="full"] {
+  grid-template-columns:
+    calc(var(--spacing) * 60)
+    clamp(calc(var(--spacing) * 2), calc(100% - var(--spacing) * 177), calc(var(--spacing) * 47.5))
+    minmax(0, 1fr) calc(var(--spacing) * 2) calc(var(--spacing) * 75);
+}
 .window-titlebar[data-discussion-layout] > [data-titlebar-leading] {
   min-width: 0;
   overflow: hidden;
@@ -321,14 +334,5 @@ html[data-theme-id="graphite"] [data-frame-main] {
 .window-titlebar[data-discussion-layout="compact"] [data-titlebar-brand] > a > span:last-child,
 .window-titlebar[data-discussion-layout="compact"] [data-titlebar-brand] > div,
 .window-titlebar[data-discussion-layout="compact"] [data-discussion-project] {
-  display: none;
-}
-.discussion-titlebar-overflow {
-  display: none;
-}
-.window-titlebar[data-discussion-layout="compact"] .discussion-titlebar-overflow {
-  display: block;
-}
-.window-titlebar[data-discussion-layout="compact"] .discussion-titlebar-full {
   display: none;
 }
