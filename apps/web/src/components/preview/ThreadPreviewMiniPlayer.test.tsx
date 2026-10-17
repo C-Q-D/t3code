@@ -174,7 +174,11 @@ it.each([
     expect(renderer!.root.findByType(BrowserSurfaceSlot).props.layoutVersion).toBe(`${x}:${y}`);
     await act(async () => handle().props[finish]({ ...event, type: eventType }));
     if (direction === null)
-      expect(state.move).toHaveBeenCalledExactlyOnceWith(threadRef, "browser:tab", { x, y });
+      // The saved request is the starting position plus pointer delta, before layout fitting.
+      expect(state.move).toHaveBeenCalledExactlyOnceWith(threadRef, "browser:tab", {
+        x: 100 + dx,
+        y: 80 + dy,
+      });
     else
       expect(state.resize).toHaveBeenCalledExactlyOnceWith(threadRef, "browser:tab", width, {
         x,

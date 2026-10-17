@@ -82,7 +82,7 @@ function Harness({
         .frame,
     [bounds, composerHeight, detailsCard, findBar],
   );
-  const preview = { ...miniPlayer, key: "browser:tab", source, width: miniPlayer.width ?? 360 };
+  const preview = { ...miniPlayer, key: "browser:tab", source, width: miniPlayer.width };
   return (
     <ChatCanvasContext
       value={{
@@ -282,3 +282,153 @@ it.each([
     );
   },
 );
+
+/** Exercises persistence through real handlers; resize requests use the east edge and drag requests use canvas coordinates. */
+async function expectReleasePreservesFrame({
+  bounds,
+  composerHeight,
+  detailsCard,
+  findBar,
+  viewport,
+  width,
+  mode,
+  position,
+}: {
+  bounds: { width: number; height: number };
+  composerHeight: number;
+  detailsCard: PreviewMiniPlayerObstacles["detailsCard"];
+  findBar: PreviewMiniPlayerObstacles["detailsCard"];
+  viewport: { width: number; height: number };
+  width: number | null;
+  mode: "drag" | "resize";
+  position: { x: number; y: number };
+}) {
+  source = viewport;
+  const current = usePreviewMiniPlayerStore.getState().byThreadKey[threadKey]!;
+  usePreviewMiniPlayerStore.setState({ byThreadKey: { [threadKey]: { ...current, width } } });
+  await act(async () => {
+    renderer = create(
+      <Harness
+        bounds={bounds}
+        composerHeight={composerHeight}
+        detailsCard={detailsCard}
+        findBar={findBar}
+      />,
+    );
+  });
+  const start = displayedFrame();
+  const stored = usePreviewMiniPlayerStore.getState().byThreadKey[threadKey];
+  const renders = parentRenders;
+  const { handle, event } = await movePointer(
+    mode === "drag" ? null : "east",
+    position.x - start.x,
+    position.y - start.y,
+  );
+  const local = displayedFrame();
+  expect(parentRenders).toBe(renders);
+  expect(usePreviewMiniPlayerStore.getState().byThreadKey[threadKey]).toBe(stored);
+  await act(async () => handle.props.onPointerUp(event));
+  expect(displayedFrame()).toEqual(local);
+  return local;
+}
+
+const gestureGrid: Parameters<typeof expectReleasePreservesFrame>[0][] = [];
+for (const bounds of [
+  { width: 800, height: 500 },
+  { width: 1200, height: 900 },
+]) {
+  for (const composerHeight of [0, 180, 300]) {
+    for (const card of [false, true]) {
+      for (const find of [false, true]) {
+        for (const viewport of [
+          { width: 900, height: 600 },
+          { width: 390, height: 844 },
+        ]) {
+          for (const width of [360, null]) {
+            for (const mode of ["drag", "resize"] as const) {
+              for (const position of [
+                { x: 100, y: 100 },
+                { x: 1000, y: 100 },
+                { x: -300, y: 100 },
+                { x: 100, y: -300 },
+                { x: 100, y: 1200 },
+                { x: 100, y: 400 },
+                { x: 450, y: 100 },
+                { x: 700, y: 20 },
+              ]) {
+                gestureGrid.push({
+                  bounds,
+                  composerHeight,
+                  viewport,
+                  width,
+                  mode,
+                  position,
+                  detailsCard: card ? { left: 400, right: bounds.width - 12, bottom: 200 } : null,
+                  findBar: find ? { left: 0, right: bounds.width, bottom: 48 } : null,
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+it.each(gestureGrid.map((row, index) => ({ ...row, index })))(
+  "preserves the displayed frame through real store release in grid $index ($mode)",
+  async (row) => {
+    await expectReleasePreservesFrame(row);
+  },
+);
+
+it.each([
+  {
+    name: "portrait past right edge",
+    viewport: { width: 390, height: 844 },
+    width: 360,
+    composerHeight: 180,
+    detailsCard: null,
+    position: { x: 1000, y: 100 },
+  },
+  ...[360, null].map((width) => ({
+    name: `card and tall composer with width ${width}`,
+    viewport: { width: 900, height: 600 },
+    width,
+    composerHeight: 300,
+    detailsCard: { left: 400, right: 788, bottom: 200 },
+    position: { x: 100, y: 400 },
+  })),
+])("preserves the review reproduction: $name", async (row) => {
+  const frame = await expectReleasePreservesFrame({
+    ...row,
+    bounds: { width: 800, height: 500 },
+    findBar: null,
+    mode: "drag",
+  });
+  expect(frame.x).toBeGreaterThanOrEqual(0);
+  expect(frame.y).toBeGreaterThanOrEqual(0);
+  expect(frame.x + frame.width).toBeLessThanOrEqual(800);
+  expect(frame.y + frame.height).toBeLessThanOrEqual(500);
+  // With the card the composer ends at x=368; without it, it ends at x=752.
+  const composerRight = row.detailsCard ? 368 : 752;
+  expect(
+    frame.x >= composerRight ||
+      frame.x + frame.width <= 48 ||
+      frame.y + frame.height <= 500 - row.composerHeight,
+  ).toBe(true);
+  if (row.detailsCard) expect(frame.x + frame.width <= 400 || frame.y >= 200).toBe(true);
+});
+it("preserves the shared layout fallback when V4 chrome has no free space", async () => {
+  const frame = await expectReleasePreservesFrame({
+    bounds: { width: 800, height: 64 },
+    composerHeight: 0,
+    detailsCard: null,
+    findBar: { left: 0, right: 800, bottom: 48 },
+    viewport: { width: 900, height: 600 },
+    width: 360,
+    mode: "drag",
+    position: { x: 100, y: 100 },
+  });
+  // Existing shared output is intentionally retained, including zero content width.
+  expect(frame).toEqual({ x: 700, y: 12, width: 12, height: 40 });
+});

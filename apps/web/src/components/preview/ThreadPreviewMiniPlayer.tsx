@@ -72,6 +72,8 @@ interface PointerGesture {
   readonly direction: BrowserViewportResizeDirection | null;
   moved: boolean;
   latest: PreviewMiniPlayerFrame;
+  /** The exact request used for local layout; resolved frames must never become new intent. */
+  request: { x: number; y: number; width: number | null };
   readonly threadRef: ScopedThreadRef;
   readonly sourceKey: string;
   readonly source: PreviewMiniPlayerSize;
@@ -334,7 +336,8 @@ function DeviceMiniPlayer({
 
 /**
  * V4 frame and drag/resize gestures shared by floating sources. Gesture frames
- * stay local until release; native content remeasures through layoutVersion.
+ * stay local until release; the store receives the same request used to render
+ * them, never the fitted result. Native content remeasures through layoutVersion.
  * @param props View data, control flags, and callbacks defined by the component props type; optional fields retain their declared defaults.
  * @returns Rendered UI for the supplied props.
  */
@@ -398,9 +401,9 @@ function MiniPlayerShell({
     gestureRef.current = null;
     if (gesture.moved) {
       const store = usePreviewMiniPlayerStore.getState();
-      const { x, y, width } = gesture.latest;
+      const { x, y, width } = gesture.request;
       if (gesture.direction === null) store.move(gesture.threadRef, gesture.sourceKey, { x, y });
-      else store.resize(gesture.threadRef, gesture.sourceKey, width, { x, y });
+      else if (width !== null) store.resize(gesture.threadRef, gesture.sourceKey, width, { x, y });
     }
     if (gesture.target.hasPointerCapture(gesture.pointerId))
       gesture.target.releasePointerCapture(gesture.pointerId);
@@ -423,14 +426,6 @@ function MiniPlayerShell({
       gesture.source.height === sourceHeight
     )
       return;
-    gesture.latest =
-      resolvePreviewFrame({
-        key: gesture.sourceKey,
-        width: gesture.direction === null ? gesture.preferredWidth : gesture.latest.width,
-        position: gesture.latest,
-        source: { width: sourceWidth, height: sourceHeight },
-        lastInteraction: gesture.direction === null ? "drag" : "resize",
-      }) ?? gesture.latest;
     commitGesture();
     setGestureFrame(null);
   }, [resolvePreviewFrame, sourceWidth, sourceHeight, commitGesture]);
@@ -448,6 +443,7 @@ function MiniPlayerShell({
       direction,
       moved: false,
       latest: frame,
+      request: { x: frame.x, y: frame.y, width: miniPlayer.width },
       threadRef,
       sourceKey,
       source: sourceSize,
@@ -480,6 +476,7 @@ function MiniPlayerShell({
             source: sourceSize,
             container,
           });
+    gesture.request = { x: requested.x, y: requested.y, width: requested.width };
     gesture.latest =
       gesture.resolveFrame({
         key: gesture.sourceKey,
