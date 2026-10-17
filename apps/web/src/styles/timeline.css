@@ -364,3 +364,61 @@
 .timeline-scroll-button:disabled {
   @apply cursor-default text-fg-control-disabled shadow-none;
 }
+
+@theme {
+  /* 补充屏-1 T4：worktree / 密钥卡的凸起层，比日志壳少一条底部内阴影。 */
+  --shadow-timeline-request-card:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.44), 0 2px 0 #09090a,
+    6px 10px 16px -4px rgba(0, 0, 0, 0.66);
+  /* 补充屏-1 T4：进行中和已取消胶囊的专用底色。 */
+  --color-timeline-setup-running: #151517;
+  --color-timeline-setup-cancelled: #26262a;
+  /* 补充屏-1 T4：密钥输入的掩码字符间距。 */
+  --tracking-timeline-secret: 0.2em;
+}
+
+/* Phase selectors change presentation only; the host still owns action availability. */
+.timeline-setup[data-worktree-setup-phase="done"] {
+  @apply rounded-card-surface p-3.5 shadow-timeline-request-card;
+}
+
+.timeline-setup-heading {
+  @apply h-7 rounded-full px-2.5 text-secondary-copy text-code-foreground;
+}
+
+.timeline-setup-heading > svg {
+  display: none;
+}
+
+.timeline-setup[data-worktree-setup-phase="running"] .timeline-setup-heading {
+  @apply bg-timeline-setup-running;
+}
+
+.timeline-setup[data-worktree-setup-phase="failed"] .timeline-setup-heading {
+  @apply bg-error-surface text-error-foreground;
+}
+
+.timeline-setup[data-worktree-setup-phase="cancelled"] .timeline-setup-heading {
+  @apply bg-timeline-setup-cancelled text-secondary-label;
+}
+
+.timeline-setup[data-worktree-setup-phase="done"] .timeline-setup-heading {
+  @apply h-auto flex-1 gap-2 rounded-none px-0 text-secondary-copy-large font-bold text-foreground;
+}
+
+.timeline-setup[data-worktree-setup-phase="done"] .timeline-setup-ready-icon,
+.timeline-setup[data-worktree-setup-phase="running"] .timeline-setup-running-icon,
+.timeline-setup[data-worktree-setup-phase="failed"] .timeline-setup-failed-icon,
+.timeline-setup[data-worktree-setup-phase="cancelled"] .timeline-setup-cancelled-icon {
+  display: block;
+}
+
+.timeline-setup-details {
+  grid-template-columns: calc(var(--spacing) * 11) minmax(0, 1fr);
+}
+
+/* Native masking avoids password-manager prompts and never duplicates the entered value. */
+.timeline-secret input {
+  -webkit-text-security: disc;
+  @apply tracking-timeline-secret;
+}

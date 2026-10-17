@@ -1,3 +1,4 @@
+/** Renders secret requests while keeping entered values confined to state and the RPC payload. */
 import { t } from "~/i18n";
 import {
   SECRET_REQUEST_DEFAULT_PLACEHOLDER,
@@ -12,7 +13,7 @@ import {
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
 import type { EnvironmentId, OrchestrationV2ProjectedTurnItem } from "@t3tools/contracts";
-import { CheckIcon, LockIcon, MinusIcon, ShieldCheckIcon } from "lucide-react";
+import { CheckIcon, KeyRoundIcon, LockIcon, MinusIcon, ShieldCheckIcon } from "lucide-react";
 import { useId, useRef, useState, type FormEvent } from "react";
 
 import { serverEnvironment } from "../../state/server";
@@ -55,6 +56,7 @@ export function SecretRequestCard(props: {
   return <PendingSecretRequestForm environmentId={props.environmentId} item={item} />;
 }
 
+/** Collects or declines one request through the existing guarded command, without reporting secrets. */
 function PendingSecretRequestForm(props: {
   readonly environmentId: EnvironmentId;
   readonly item: SecretRequestItem;
@@ -107,7 +109,7 @@ function PendingSecretRequestForm(props: {
   return (
     <form
       data-v2-item-type={item.type}
-      className="flex min-w-0 flex-col gap-3 rounded-xl border border-border/60 bg-card p-4"
+      className="timeline-secret flex min-w-0 flex-col gap-2.5 rounded-card-surface surface-glass p-3.5 text-secondary-copy-large text-foreground shadow-timeline-request-card"
       onSubmit={onSubmit}
       autoComplete="off"
       // A click anywhere on the card targets its field, so a paste that
@@ -119,62 +121,63 @@ function PendingSecretRequestForm(props: {
       }}
     >
       <div className="flex min-w-0 flex-col gap-1">
-        <label htmlFor={inputId} className="text-sm font-medium text-foreground">
+        <label htmlFor={inputId} className="flex min-w-0 items-center gap-2 font-bold">
+          <KeyRoundIcon aria-hidden className="size-4 shrink-0" />
           {item.label}
         </label>
-        {item.reason.trim() ? <p className="text-sm text-muted-foreground">{item.reason}</p> : null}
+        {item.reason.trim() ? (
+          <p className="text-secondary-copy-medium text-secondary-label">{item.reason}</p>
+        ) : null}
       </div>
-      <div className="flex min-w-0 items-center gap-2">
-        <div className="min-w-0 flex-1">
-          <Input
-            id={inputId}
-            // Masked text rather than a password field: browsers offer to
-            // save any submitted password, and this is not a login.
-            type="text"
-            className="[-webkit-text-security:disc]"
-            autoComplete="off"
-            autoCorrect="off"
-            autoCapitalize="off"
-            spellCheck={false}
-            // Password managers otherwise offer to save or fill this field.
-            data-1p-ignore
-            data-lpignore="true"
-            data-bwignore
-            placeholder={item.placeholder ?? SECRET_REQUEST_DEFAULT_PLACEHOLDER}
-            value={secret}
-            disabled={submitting}
-            aria-invalid={error !== null || undefined}
-            aria-describedby={error !== null ? `${privacyId} ${errorId}` : privacyId}
-            onChange={(event) => setSecret(event.currentTarget.value)}
-          />
-        </div>
-        <Button type="submit" disabled={submitting || secret.trim().length === 0}>
-          {t.composer.secretRequest.save}
-        </Button>
+      <div className="min-w-0">
+        <Input
+          id={inputId}
+          // Masked text rather than a password field: browsers offer to
+          // save any submitted password, and this is not a login.
+          type="text"
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          // Password managers otherwise offer to save or fill this field.
+          data-1p-ignore
+          data-lpignore="true"
+          data-bwignore
+          placeholder={item.placeholder ?? SECRET_REQUEST_DEFAULT_PLACEHOLDER}
+          value={secret}
+          disabled={submitting}
+          aria-invalid={error !== null || undefined}
+          aria-describedby={error !== null ? `${privacyId} ${errorId}` : privacyId}
+          onChange={(event) => setSecret(event.currentTarget.value)}
+        />
       </div>
       {error !== null ? (
-        <p id={errorId} role="alert" className="text-xs text-destructive">
+        <p id={errorId} role="alert" className="text-secondary-copy text-error-foreground">
           {error}
         </p>
       ) : null}
-      <div className="flex min-w-0 items-center justify-between gap-2">
-        <p
-          id={privacyId}
-          className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground"
-        >
-          <ShieldCheckIcon className="size-3.5 shrink-0" aria-hidden />
-          {SECRET_REQUEST_PRIVACY_NOTE}
-        </p>
+      <div className="flex flex-wrap justify-end gap-1.5">
         <Button
           type="button"
-          size="xs"
-          variant="ghost-muted"
+          size="toolbar"
+          variant="destructive-outline"
           disabled={submitting}
           onClick={() => void send({ type: "decline" })}
         >
           {t.composer.secretRequest.decline}
         </Button>
+        <Button type="submit" size="toolbar" disabled={submitting || secret.trim().length === 0}>
+          <LockIcon aria-hidden className="size-3.25" />
+          {t.composer.secretRequest.save}
+        </Button>
       </div>
+      <p
+        id={privacyId}
+        className="flex min-w-0 items-center gap-1.5 text-secondary-copy text-secondary-label"
+      >
+        <ShieldCheckIcon className="size-3.5 shrink-0" aria-hidden />
+        {SECRET_REQUEST_PRIVACY_NOTE}
+      </p>
     </form>
   );
 }

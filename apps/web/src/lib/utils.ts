@@ -219,6 +219,7 @@ const twMerge = extendTailwindMerge({
         "pr-filter-idle",
         "pr-list-empty",
         "pr-list-empty-mark",
+        "timeline-request-card",
       ],
       "inset-shadow": [
         "selected",
@@ -314,7 +315,7 @@ const twMerge = extendTailwindMerge({
         "timeline-plan",
         "pn5-copy",
       ],
-      tracking: ["brand", "chat-draft"],
+      tracking: ["brand", "chat-draft", "timeline-secret"],
     },
     classGroups: {
       "bg-image": [
