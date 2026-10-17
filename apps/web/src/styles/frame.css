@@ -299,3 +299,36 @@ html[data-theme-id="graphite"] [data-frame-main] {
   .window-titlebar-system-controls {
   display: none;
 }
+
+/* DC2 review: only the populated discussion portal receives bounded header tracks.
+   The measured content box excludes frame padding; a zero-minimum title track lets a long
+   title truncate before controls can cross the adjacent panel's left edge. */
+.window-titlebar[data-discussion-layout] {
+  display: grid;
+}
+.window-titlebar[data-discussion-layout] > [data-titlebar-leading] {
+  min-width: 0;
+  overflow: hidden;
+}
+.window-titlebar[data-discussion-layout] > [data-titlebar-spacer],
+.window-titlebar[data-discussion-layout] > [data-titlebar-gap] {
+  width: auto;
+  min-width: 0;
+}
+.window-titlebar[data-discussion-layout] > [data-titlebar-slot="breadcrumb"] {
+  overflow: hidden;
+}
+.window-titlebar[data-discussion-layout="compact"] [data-titlebar-brand] > a > span:last-child,
+.window-titlebar[data-discussion-layout="compact"] [data-titlebar-brand] > div,
+.window-titlebar[data-discussion-layout="compact"] [data-discussion-project] {
+  display: none;
+}
+.discussion-titlebar-overflow {
+  display: none;
+}
+.window-titlebar[data-discussion-layout="compact"] .discussion-titlebar-overflow {
+  display: block;
+}
+.window-titlebar[data-discussion-layout="compact"] .discussion-titlebar-full {
+  display: none;
+}

@@ -1,6 +1,6 @@
 /** Owns window chrome geometry; routes supply content and Electron owns system buttons. */
 import { Link } from "@tanstack/react-router";
-import { useCallback, type ReactNode } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 
 import { t } from "~/i18n";
 import { useEnvironmentIdentificationMode } from "~/hooks/useSettings";
@@ -12,7 +12,8 @@ import {
   useEnvironmentStageLabel,
 } from "../SidebarStageBackdrop";
 import { Badge } from "../ui/badge";
-import { TitlebarSlotOutlet } from "./titlebarSlot";
+import { TitlebarSlotOutlet, useTitlebarPanelActive } from "./titlebarSlot";
+import { resolveDiscussionTitlebarLayout } from "./discussionTitlebar.logic";
 
 /**
  * Renders the persistent titlebar, independent of sidebar visibility.
@@ -20,6 +21,8 @@ import { TitlebarSlotOutlet } from "./titlebarSlot";
  * sidebarControl supplies the existing toggle and its keyboard bindings.
  * onLeadingWidthChange receives the live left cluster's right edge in CSS pixels;
  * the shell uses it to keep sidebar-width environment artwork behind that cluster.
+ * A discussion panel budgets controls against the measured header content box;
+ * other routes retain the original flex layout and spacers.
  */
 export function WindowTitlebar({
   sidebarControl,
@@ -28,6 +31,18 @@ export function WindowTitlebar({
   sidebarControl: ReactNode;
   onLeadingWidthChange: (width: number) => void;
 }) {
+  const panelActive = useTitlebarPanelActive();
+  const [contentWidth, setContentWidth] = useState(0);
+  const observeHeader = useCallback(
+    (element: HTMLElement) => {
+      if (!panelActive) return;
+      return observeResize(element, ([entry]) => {
+        if (entry) setContentWidth(entry.contentRect.width);
+      });
+    },
+    [panelActive],
+  );
+  const layout = panelActive ? resolveDiscussionTitlebarLayout(contentWidth) : null;
   const stageLabel = useEnvironmentStageLabel();
   const identificationMode = useEnvironmentIdentificationMode();
   const backdropVariant = resolveSidebarStageBackdropVariant(
@@ -51,8 +66,17 @@ export function WindowTitlebar({
 
   return (
     <header
+      ref={observeHeader}
       className="window-titlebar drag-region relative flex h-(--workspace-topbar-height) w-full shrink-0 items-center text-foreground text-shadow-stone"
       data-window-titlebar=""
+      data-discussion-layout={layout ? (layout.compact ? "compact" : "full") : undefined}
+      style={
+        layout
+          ? {
+              gridTemplateColumns: `${layout.leading}px ${layout.spacer}px minmax(0, ${layout.title}px) ${layout.gap}px ${layout.actions}px`,
+            }
+          : undefined
+      }
     >
       {backdropVariant ? (
         <div
@@ -62,7 +86,11 @@ export function WindowTitlebar({
           <SidebarStageBackdrop variant={backdropVariant} />
         </div>
       ) : null}
-      <div ref={observeLeadingWidth} className="relative z-10 flex shrink-0 items-center">
+      <div
+        ref={observeLeadingWidth}
+        className="relative z-10 flex shrink-0 items-center"
+        data-titlebar-leading=""
+      >
         <div className="no-drag flex size-8 shrink-0 items-center" data-titlebar-sidebar-control="">
           {sidebarControl}
         </div>
@@ -95,9 +123,9 @@ export function WindowTitlebar({
           ) : null}
         </div>
       </div>
-      <div className="w-47.5 shrink-0 self-stretch" aria-hidden="true" />
+      <div className="w-47.5 shrink-0 self-stretch" data-titlebar-spacer="" aria-hidden="true" />
       <TitlebarSlotOutlet name="breadcrumb" />
-      <div className="min-w-10 flex-1 self-stretch" aria-hidden="true" />
+      <div className="min-w-10 flex-1 self-stretch" data-titlebar-gap="" aria-hidden="true" />
       <TitlebarSlotOutlet name="actions" />
       <div className="window-titlebar-system-controls shrink-0 self-stretch" aria-hidden="true" />
     </header>

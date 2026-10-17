@@ -239,54 +239,101 @@ export function DiscussionPage({
         <h1 className="min-w-0 truncate font-serif text-chat-title font-bold">
           {discussion.title}
         </h1>
-        <span className="max-w-32 shrink-0 truncate text-secondary-copy text-secondary-label">
+        <span
+          data-discussion-project=""
+          className="max-w-32 shrink-0 truncate text-secondary-copy text-secondary-label"
+        >
           {project?.title ?? t.discussions.deletedProject}
         </span>
         <Badge variant={header.variant}>{header.label}</Badge>
       </div>
     ),
     actions: (
-      <div className="ml-auto flex shrink-0 items-center gap-2">
-        {header.actions.map((action) =>
-          action === "more" ? (
-            <Menu key={action}>
-              <MenuTrigger
-                render={
-                  <Button
-                    variant="secondary"
-                    size="icon-toolbar"
-                    disabled={!discussionHeaderActionEnabled(action, headerPending, canDelete)}
-                    aria-label={t.discussions.page.more}
-                  />
-                }
-              >
-                <EllipsisIcon />
-              </MenuTrigger>
-              <MenuPopup align="end" className="w-45">
-                <MenuItem
-                  variant="destructive"
-                  disabled={headerPending || !canDelete}
-                  onClick={() => setDeleteOpen(true)}
-                >
-                  <Trash2Icon />
-                  {t.discussions.page.deleteDiscussion}
-                </MenuItem>
-              </MenuPopup>
-            </Menu>
-          ) : (
-            <Button
-              key={action}
-              disabled={!discussionHeaderActionEnabled(action, headerPending, permitted(action))}
-              onClick={() => void act(action)}
-              variant={action === "resume" ? "default" : "secondary"}
-              size="toolbar"
-              aria-label={t.discussions.page[action]}
+      <div className="ml-auto flex min-w-0 items-center gap-2">
+        <div className="discussion-titlebar-overflow">
+          <Menu>
+            <MenuTrigger
+              render={
+                <Button
+                  variant="secondary"
+                  size="icon-toolbar"
+                  aria-label={t.discussions.page.more}
+                />
+              }
             >
-              {action === "stop" ? <PauseIcon /> : action === "resume" ? <PlayIcon /> : null}
-              {t.discussions.page[action]}
-            </Button>
-          ),
-        )}
+              <EllipsisIcon />
+            </MenuTrigger>
+            <MenuPopup align="end">
+              {header.actions.map((action) => (
+                <MenuItem
+                  key={action}
+                  disabled={
+                    !discussionHeaderActionEnabled(
+                      action,
+                      headerPending,
+                      action === "more" ? canDelete : permitted(action),
+                    )
+                  }
+                  variant={action === "more" ? "destructive" : "default"}
+                  onClick={() => (action === "more" ? setDeleteOpen(true) : void act(action))}
+                >
+                  {action === "stop" ? (
+                    <PauseIcon />
+                  ) : action === "resume" ? (
+                    <PlayIcon />
+                  ) : action === "more" ? (
+                    <Trash2Icon />
+                  ) : null}
+                  {action === "more"
+                    ? t.discussions.page.deleteDiscussion
+                    : t.discussions.page[action]}
+                </MenuItem>
+              ))}
+            </MenuPopup>
+          </Menu>
+        </div>
+        <div className="discussion-titlebar-full flex min-w-0 items-center gap-2">
+          {header.actions.map((action) =>
+            action === "more" ? (
+              <Menu key={action}>
+                <MenuTrigger
+                  render={
+                    <Button
+                      variant="secondary"
+                      size="icon-toolbar"
+                      disabled={!discussionHeaderActionEnabled(action, headerPending, canDelete)}
+                      aria-label={t.discussions.page.more}
+                    />
+                  }
+                >
+                  <EllipsisIcon />
+                </MenuTrigger>
+                <MenuPopup align="end" className="w-45">
+                  <MenuItem
+                    variant="destructive"
+                    disabled={headerPending || !canDelete}
+                    onClick={() => setDeleteOpen(true)}
+                  >
+                    <Trash2Icon />
+                    {t.discussions.page.deleteDiscussion}
+                  </MenuItem>
+                </MenuPopup>
+              </Menu>
+            ) : (
+              <Button
+                key={action}
+                disabled={!discussionHeaderActionEnabled(action, headerPending, permitted(action))}
+                onClick={() => void act(action)}
+                variant={action === "resume" ? "default" : "secondary"}
+                size="toolbar"
+                aria-label={t.discussions.page[action]}
+              >
+                {action === "stop" ? <PauseIcon /> : action === "resume" ? <PlayIcon /> : null}
+                {t.discussions.page[action]}
+              </Button>
+            ),
+          )}
+        </div>
       </div>
     ),
   });

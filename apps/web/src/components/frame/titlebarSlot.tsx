@@ -37,6 +37,12 @@ function useTitlebarContext() {
   return context;
 }
 
+/** Restricts shortened-header geometry to a mounted panel with an actual frame destination. */
+export function useTitlebarPanelActive() {
+  const { targets, owners } = useTitlebarContext();
+  return targets.panel !== null && owners.panel.length > 0;
+}
+
 /** Scopes the titlebar destinations and their route owners to one app shell. */
 export function TitlebarSlotProvider({ children }: { children: ReactNode }) {
   const [targets, setTargets] = useState<TitlebarContextValue["targets"]>({
