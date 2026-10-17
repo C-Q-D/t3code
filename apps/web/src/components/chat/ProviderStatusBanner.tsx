@@ -122,6 +122,7 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
     <div className="timeline-provider-lane">
       <div
         className="timeline-provider-banner alert-glass"
+        data-provider-status-banner
         data-variant={isWarning ? "warning" : "error"}
         data-severity={isWarning ? "warning" : "error"}
         role={incompatible && incompatible.status !== "broken" ? "status" : "alert"}

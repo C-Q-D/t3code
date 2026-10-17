@@ -504,7 +504,7 @@ const TIMELINE_MINIMAP_HIT_STRIP_MAX_WIDTH = 40;
 const TIMELINE_MINIMAP_EXPANDED_HIT_STRIP_WIDTH = "22rem";
 
 /**
- * The minimap overlays the viewport's left edge while the content column is
+ * The minimap overlays the viewport's right edge while the content column is
  * centered, so the side gutter between them shrinks under browser zoom, a
  * narrow pane, or a wider Chat width setting. A fixed-width hover strip would then sit on top of the message
  * text and swallow its pointer events. Cap the strip's width so it never
@@ -524,8 +524,8 @@ export function resolveTimelineMinimapHitStripWidth(
   );
 }
 
-// The prev/next buttons are centered 4px into the strip and 20px wide, so
-// their hitbox reaches 14px past the strip's left edge.
+// The 22px prev/next keys sit 1px from the strip's right edge. Retain the
+// existing 14px minimum-width gate for pointer availability.
 const TIMELINE_MINIMAP_NAVIGATION_REACH = 14;
 
 /**

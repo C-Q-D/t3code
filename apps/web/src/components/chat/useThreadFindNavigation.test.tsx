@@ -1,4 +1,7 @@
-// @vitest-environment jsdom
+/**
+ * Verifies search reveal geometry and virtual-history navigation without rendering timeline rows.
+ * @vitest-environment jsdom
+ */
 
 import type { LegendListRef } from "@legendapp/list/react";
 import { act, type ComponentProps } from "react";
@@ -7,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test"
 import { useThreadFindNavigation } from "./useThreadFindNavigation";
 
 const renders = vi.fn();
+/** Runs the navigation hook with the test's timeline and search state. */
 function Probe(props: Parameters<typeof useThreadFindNavigation>[0]) {
   renders();
   useThreadFindNavigation(props);
@@ -16,6 +20,7 @@ function Probe(props: Parameters<typeof useThreadFindNavigation>[0]) {
 let root: Root;
 let host: HTMLDivElement;
 let container: HTMLDivElement;
+let canvas: HTMLDivElement;
 let rect: DOMRect;
 const scrollToIndex = vi.fn<LegendListRef["scrollToIndex"]>();
 const scrollToOffset = vi.fn<LegendListRef["scrollToOffset"]>();
@@ -42,7 +47,10 @@ beforeEach(() => {
   container.innerHTML =
     '<div data-timeline-row-id="message"><p data-thread-find-text>COD4 and COD4</p></div>';
   container.getBoundingClientRect = () => new DOMRect(0, 0, 800, 600);
-  document.body.append(host, container);
+  canvas = document.createElement("div");
+  canvas.dataset.chatCanvas = "";
+  canvas.append(container);
+  document.body.append(host, canvas);
   root = createRoot(host);
   scrollToIndex.mockResolvedValue();
   props = {
@@ -68,12 +76,27 @@ afterEach(async () => {
   await act(async () => root.unmount());
   host.remove();
   container.remove();
+  canvas.remove();
   Reflect.deleteProperty(Range.prototype, "getBoundingClientRect");
   vi.clearAllMocks();
   vi.unstubAllGlobals();
 });
 
 describe("find result navigation", () => {
+  it.each([
+    { label: "single-line", height: 44, offset: 292 },
+    { label: "wrapped", height: 88, offset: 248 },
+  ])("reveals text below the actual $label Provider banner", async ({ height, offset }) => {
+    const banner = document.createElement("div");
+    banner.dataset.providerStatusBanner = "";
+    banner.getBoundingClientRect = () => new DOMRect(0, 64, 660, height);
+    canvas.prepend(banner);
+    // The old 96px boundary considers this match visible despite the banner covering it.
+    rect = new DOMRect(0, 100, 40, 20);
+    await act(async () => root.render(<Probe {...props} />));
+    expect(scrollToOffset).toHaveBeenCalledExactlyOnceWith({ offset, animated: false });
+  });
+
   it("retargets a pending first jump when progressive history moves the matching row", async () => {
     container.replaceChildren();
     let first!: () => void;

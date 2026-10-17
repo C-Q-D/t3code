@@ -1,7 +1,9 @@
+/** Reveals thread search matches while preserving virtual-history positioning and overlay clearance. */
 import type { LegendListRef } from "@legendapp/list/react";
 import { useCallback, useEffect, useLayoutEffect, useRef, type RefObject } from "react";
 import type { ThreadFindMatch } from "./threadFind";
 import { useThreadFindHighlights } from "./threadFindHighlights";
+import { resolveThreadFindRevealTop } from "./useThreadFindNavigation.logic";
 
 const FIND_MATCH_VIEW_MARGIN = 96;
 
@@ -148,6 +150,13 @@ export function useThreadFindNavigation({
       if (historyControls?.error) pagingPositionRef.current = null;
       if (revealedMatchRef.current === matchKey) return;
       if (!listReady || rowIndex < 0) return;
+      const viewport = container?.getBoundingClientRect();
+      // Read only this canvas's overlay when revealing, so wrapping is respected without polling rows.
+      const bannerBounds = container
+        ?.closest("[data-chat-canvas]")
+        ?.querySelector<HTMLElement>("[data-provider-status-banner]")
+        ?.getBoundingClientRect();
+      const bannerBottom = bannerBounds && bannerBounds.height > 0 ? bannerBounds.bottom : null;
       const materialize = () => {
         const list = listRef.current;
         const previous = positioningRef.current;
@@ -167,7 +176,12 @@ export function useThreadFindNavigation({
           .scrollToIndex({
             index: rowIndex,
             animated: false,
-            viewOffset: FIND_MATCH_VIEW_MARGIN,
+            viewOffset:
+              resolveThreadFindRevealTop({
+                viewportTop: viewport?.top ?? 0,
+                margin: FIND_MATCH_VIEW_MARGIN,
+                bannerBottom,
+              }) - (viewport?.top ?? 0),
           })
           .then(() => {
             if (positioningRef.current !== request || currentMatchKeyRef.current !== matchKey)
@@ -192,14 +206,13 @@ export function useThreadFindNavigation({
           codeScroller.scrollLeft += rect.right - viewport.right + 16;
       }
       const rect = range.getBoundingClientRect();
-      const viewport = container?.getBoundingClientRect();
       if (!viewport || rect.height === 0) return;
       // Shrink the margin when the band above the composer is short, so the match stays inside it.
       const margin = Math.min(
         FIND_MATCH_VIEW_MARGIN,
         Math.max(0, (viewport.height - contentInsetEndAdjustment - rect.height) / 2),
       );
-      const top = viewport.top + margin;
+      const top = resolveThreadFindRevealTop({ viewportTop: viewport.top, margin, bannerBottom });
       const bottom = viewport.bottom - margin - contentInsetEndAdjustment;
       const delta =
         rect.top < top ? rect.top - top : rect.bottom > bottom ? rect.bottom - bottom : 0;
