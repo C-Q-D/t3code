@@ -12207,26 +12207,27 @@ export default function ChatView(props: ChatViewProps) {
           if (!open) setPendingRevert(null);
         }}
       >
-        <AlertDialogPopup>
+        <AlertDialogPopup
+          size="wide"
+          initialFocus={
+            /** Keep focus on the non-file-reverting action after matching R1's visual order. */
+            () => document.getElementById("revert-keep-changes")
+          }
+        >
           <AlertDialogHeader>
             <AlertDialogTitle>{t.chat.view.editFromHere}</AlertDialogTitle>
-            <AlertDialogDescription>{t.chat.view.rewindDescription}</AlertDialogDescription>
+            <AlertDialogDescription variant="confirmation">
+              {t.chat.view.rewindDescription}
+            </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogClose render={<Button variant="outline" />}>
+          <AlertDialogFooter className="flex-wrap">
+            <AlertDialogClose render={<Button variant="ghost" size="dialog-action" />}>
               {t.chat.view.cancel}
             </AlertDialogClose>
             <Button
-              variant="destructive"
-              onClick={() => {
-                if (!pendingRevert || pendingRevert.routeThreadKey !== routeThreadKey) return;
-                setPendingRevert(null);
-                void onRevertToTurnCount(pendingRevert.turnCount, pendingRevert.messageId, true);
-              }}
-            >
-              {t.chat.view.revertFilesToo}
-            </Button>
-            <Button
+              id="revert-keep-changes"
+              variant="outline"
+              size="dialog-action"
               onClick={() => {
                 if (!pendingRevert || pendingRevert.routeThreadKey !== routeThreadKey) return;
                 setPendingRevert(null);
@@ -12234,6 +12235,16 @@ export default function ChatView(props: ChatViewProps) {
               }}
             >
               {t.chat.view.revertKeepChanges}
+            </Button>
+            <Button
+              size="dialog-action-wide"
+              onClick={() => {
+                if (!pendingRevert || pendingRevert.routeThreadKey !== routeThreadKey) return;
+                setPendingRevert(null);
+                void onRevertToTurnCount(pendingRevert.turnCount, pendingRevert.messageId, true);
+              }}
+            >
+              {t.chat.view.revertFilesToo}
             </Button>
           </AlertDialogFooter>
         </AlertDialogPopup>

@@ -167,7 +167,7 @@ import {
 import { Input } from "./ui/input";
 import { Popover, PopoverPopup, PopoverTrigger } from "./ui/popover";
 import { Select as SelectPrimitive } from "@base-ui/react/select";
-import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "./ui/select";
+import { Select, SelectItem, SelectPopup, SelectValue } from "./ui/select";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 import {
   SidebarContent,
@@ -2616,20 +2616,18 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
           }
         }}
       >
-        <DialogPopup className="max-w-lg">
+        <DialogPopup size="wide">
           <DialogHeader>
             <DialogTitle>{t.sidebar.projects.rename}</DialogTitle>
             <DialogDescription>
-              {projectRenameTarget
-                ? t.sidebar.projects.renamePathDescription(projectRenameTarget.workspaceRoot)
-                : t.sidebar.projects.renameDescription}
+              <span className="block text-control text-code-foreground">
+                {t.sidebar.projects.renameDescription}
+              </span>
             </DialogDescription>
           </DialogHeader>
           <DialogPanel>
             <div className="grid gap-1.5">
-              <span className="text-xs font-medium text-foreground">
-                {t.sidebar.projects.titleLabel}
-              </span>
+              <span className="ov1-field-label">{t.sidebar.projects.titleLabel}</span>
               <Input
                 aria-label={t.sidebar.projects.titleLabel}
                 disabled={!canRenameProject}
@@ -2655,10 +2653,14 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
             ) : null}
           </DialogPanel>
           <DialogFooter>
-            <Button variant="outline" onClick={closeProjectRenameDialog}>
+            <Button variant="outline" size="dialog-action" onClick={closeProjectRenameDialog}>
               {t.sidebar.actions.cancel}
             </Button>
-            <Button disabled={!canRenameProject} onClick={() => void submitProjectRename()}>
+            <Button
+              size="dialog-action-wide"
+              disabled={!canRenameProject}
+              onClick={() => void submitProjectRename()}
+            >
               {t.sidebar.actions.save}
             </Button>
           </DialogFooter>
@@ -2673,71 +2675,54 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
           }
         }}
       >
-        <DialogPopup className="max-w-lg">
+        <DialogPopup size="wide">
           <DialogHeader>
             <DialogTitle>{t.sidebar.grouping.title}</DialogTitle>
             <DialogDescription>
-              {projectGroupingTarget
-                ? t.sidebar.grouping.pathDescription(projectGroupingTarget.workspaceRoot)
-                : t.sidebar.grouping.description}
+              <span className="block text-control text-code-foreground">
+                {t.sidebar.grouping.description}
+              </span>
             </DialogDescription>
           </DialogHeader>
           <DialogPanel>
-            <div className="grid gap-1.5">
-              <span className="text-xs font-medium text-foreground">
-                {t.sidebar.grouping.ruleLabel}
-              </span>
-              <Select
-                value={projectGroupingSelection}
-                onValueChange={(value) => {
-                  if (
-                    value === "inherit" ||
-                    value === "repository" ||
-                    value === "repository_path" ||
-                    value === "separate"
-                  ) {
-                    setProjectGroupingSelection(value);
-                  }
-                }}
-              >
-                <SelectTrigger className="w-full" aria-label={t.sidebar.grouping.ruleAriaLabel}>
-                  <SelectValue>
-                    {projectGroupingSelection === "inherit"
-                      ? t.sidebar.grouping.globalDefaultLabel(
-                          PROJECT_GROUPING_MODE_LABELS[
-                            projectGroupingSettings.sidebarProjectGroupingMode
-                          ],
-                        )
-                      : PROJECT_GROUPING_MODE_LABELS[projectGroupingSelection]}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectPopup align="end" alignItemWithTrigger={false}>
-                  <SelectItem hideIndicator value="inherit">
-                    {t.sidebar.grouping.inheritDefault}
-                  </SelectItem>
-                  <SelectItem hideIndicator value="repository">
-                    {PROJECT_GROUPING_MODE_LABELS.repository}
-                  </SelectItem>
-                  <SelectItem hideIndicator value="repository_path">
-                    {PROJECT_GROUPING_MODE_LABELS.repository_path}
-                  </SelectItem>
-                  <SelectItem hideIndicator value="separate">
-                    {PROJECT_GROUPING_MODE_LABELS.separate}
-                  </SelectItem>
-                </SelectPopup>
-              </Select>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {projectGroupingSelection === "inherit"
-                ? projectGroupingModeDescription(projectGroupingSettings.sidebarProjectGroupingMode)
-                : projectGroupingModeDescription(projectGroupingSelection)}
-            </p>
+            <fieldset className="grid gap-2.5" aria-label={t.sidebar.grouping.ruleAriaLabel}>
+              {(["inherit", "repository", "repository_path", "separate"] as const).map((mode) => (
+                <label key={mode} className="ov1-grouping-option">
+                  <input
+                    type="radio"
+                    name="project-grouping"
+                    value={mode}
+                    checked={projectGroupingSelection === mode}
+                    onChange={() => setProjectGroupingSelection(mode)}
+                    className="ov1-grouping-radio"
+                  />
+                  <span className="min-w-0">
+                    <span className="block font-semibold">
+                      {mode === "inherit"
+                        ? t.sidebar.grouping.globalDefaultLabel(
+                            PROJECT_GROUPING_MODE_LABELS[
+                              projectGroupingSettings.sidebarProjectGroupingMode
+                            ],
+                          )
+                        : PROJECT_GROUPING_MODE_LABELS[mode]}
+                    </span>
+                    {mode !== "inherit" && (
+                      <span className="block text-secondary-copy text-secondary-label">
+                        {projectGroupingModeDescription(mode)}
+                      </span>
+                    )}
+                  </span>
+                </label>
+              ))}
+            </fieldset>
           </DialogPanel>
           <DialogFooter>
-            <Button variant="outline" onClick={closeProjectGroupingDialog}>
+            <Button variant="outline" size="dialog-action" onClick={closeProjectGroupingDialog}>
               {t.sidebar.actions.cancel}
             </Button>
-            <Button onClick={saveProjectGroupingPreference}>{t.sidebar.actions.save}</Button>
+            <Button size="dialog-action-wide" onClick={saveProjectGroupingPreference}>
+              {t.sidebar.actions.save}
+            </Button>
           </DialogFooter>
         </DialogPopup>
       </Dialog>

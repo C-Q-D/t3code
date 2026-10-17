@@ -834,6 +834,7 @@ export const git: Messages["git"] = {
     gitActionInProgress: "Git操作正在进行。",
     gitStatusIsUnavailable: "无法获取Git状态。",
     commitPush: "提交并推送",
+    publishRepositoryDialogTitle: "发布仓库…",
     publishRepository: "发布仓库",
     branchIsUpToDateNoActionNeeded: "分支已是最新，无需操作。",
     noLocalCommitsToPush: "没有可推送的本地提交。",
@@ -903,6 +904,8 @@ export const git: Messages["git"] = {
     edit: "编辑",
     none: "无",
     excluded: "已排除",
+    /** Formats the selected and total file counts with locale-specific punctuation. */
+    fileSelectionLabel: (selected: number, total: number) => `文件（${selected} / ${total}）`,
     commitMessageOptional: "提交消息（可选）",
     leaveEmptyToAutoGenerate: "留空以自动生成",
     commitOnNewBranch: "在新分支上提交",

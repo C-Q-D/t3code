@@ -32,6 +32,10 @@ import {
   CloudUploadIcon,
   FileDiffIcon,
   GitBranchPlusIcon,
+  GitBranchIcon,
+  MinusIcon,
+  CircleCheckIcon,
+  CircleXIcon,
   GitCommitIcon,
   InfoIcon,
   LockIcon,
@@ -40,7 +44,13 @@ import {
 import { Radio as RadioPrimitive } from "@base-ui/react/radio";
 import { RadioGroup } from "~/components/ui/radio-group";
 import { Spinner } from "~/components/ui/spinner";
-import { Toggle, ToggleGroup } from "~/components/ui/toggle-group";
+import {
+  Select,
+  SelectItem,
+  SelectPopup,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
 import { cn } from "~/lib/utils";
 import { useOpenPrLink } from "~/lib/openPullRequestLink";
 import {
@@ -61,10 +71,7 @@ import {
   resolveQuickAction,
   resolveThreadBranchUpdate,
 } from "./GitActionsControl.logic";
-import { WizardPopup, WizardHeader, WizardSteps, WizardPanel, WizardFooter } from "./ui/wizard";
-import { StartTruncatedPath } from "./StartTruncatedPath";
 import { Button } from "~/components/ui/button";
-import { Checkbox } from "~/components/ui/checkbox";
 import {
   Dialog,
   DialogDescription,
@@ -87,8 +94,6 @@ import {
   MenuTrigger,
 } from "~/components/ui/menu";
 import { Popover, PopoverPopup, PopoverTrigger } from "~/components/ui/popover";
-import { ScrollArea } from "~/components/ui/scroll-area";
-import { Textarea } from "~/components/ui/textarea";
 import { stackedThreadToast, toastManager } from "~/components/ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
 import { useOpenInPreferredEditor } from "~/editorPreferences";
@@ -681,28 +686,47 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
 
   return (
     <Dialog open={props.open} onOpenChange={handleOpenChange}>
-      <WizardPopup>
-        <WizardHeader
-          title={t.git.actions.publishRepository}
-          description={t.git.actions.pickWhereToHostItThenPointUsAtARepoToPushTo}
-        >
-          <WizardSteps
-            steps={publishWizardSteps}
-            currentStep={publishWizardStep}
-            summaries={publishWizardStepSummaries}
-            showSummaries
-            isStepDisabled={(index) =>
-              publishWizardStep === 2 ||
-              index >= publishWizardSteps.length - 1 ||
-              index > publishWizardStep
-            }
-            onStepChange={setPublishWizardStep}
-          />
-        </WizardHeader>
+      <DialogPopup size="wide">
+        <DialogHeader>
+          <DialogTitle>{t.git.actions.publishRepositoryDialogTitle}</DialogTitle>
+          <DialogDescription className="sr-only">
+            {t.git.actions.pickWhereToHostItThenPointUsAtARepoToPushTo}
+          </DialogDescription>
+          <ol className="ov1-publish-steps" aria-label={t.app.wizard.progress}>
+            {publishWizardSteps.map((step, index) => (
+              <li key={step} className="flex min-w-0 items-center gap-2">
+                {index > 0 && <span className="h-px w-5 shrink-0 bg-border" aria-hidden />}
+                <button
+                  type="button"
+                  className="ov1-publish-step"
+                  aria-current={index === publishWizardStep ? "step" : undefined}
+                  aria-label={t.app.wizard.step(
+                    step,
+                    index + 1,
+                    index < publishWizardStep && publishWizardStepSummaries[index]
+                      ? `, ${publishWizardStepSummaries[index]}`
+                      : "",
+                  )}
+                  disabled={
+                    publishWizardStep === 2 ||
+                    index >= publishWizardSteps.length - 1 ||
+                    index > publishWizardStep
+                  }
+                  onClick={() => setPublishWizardStep(index)}
+                >
+                  <span className="ov1-publish-step-number" aria-hidden>
+                    {index < publishWizardStep ? <CheckIcon className="size-3" /> : index + 1}
+                  </span>
+                  <span className="truncate">{step}</span>
+                </button>
+              </li>
+            ))}
+          </ol>
+        </DialogHeader>
 
-        <WizardPanel>
+        <DialogPanel>
           <div className={cn("space-y-2", publishWizardStep !== 0 && "hidden")}>
-            <span id="publish-provider-cards-label" className="text-xs font-medium text-foreground">
+            <span id="publish-provider-cards-label" className="ov1-field-label">
               {t.git.actions.provider}
             </span>
             <RadioGroup
@@ -716,15 +740,14 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
             >
               {sortedPublishProviderOptions.map((option) => {
                 const readiness = publishProviderReadiness(option.value);
-                const isSelected = publishProvider === option.value && readiness.ready;
                 if (!readiness.ready) {
                   return (
                     <div
                       key={option.value}
-                      className="relative flex cursor-not-allowed items-center gap-3 rounded-lg border border-border bg-background px-3 py-3 text-left opacity-64 dark:border-transparent dark:bg-white/[0.035]"
+                      className="ov1-provider-card cursor-not-allowed opacity-60"
                     >
-                      <option.Icon className="size-5 shrink-0 text-muted-foreground" aria-hidden />
-                      <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+                      <option.Icon className="size-5 shrink-0" aria-hidden />
+                      <span className="min-w-0 flex-1 truncate text-control font-semibold">
                         {option.label}
                       </span>
                       <Tooltip>
@@ -756,16 +779,10 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
                   <RadioPrimitive.Root
                     key={option.value}
                     value={option.value}
-                    className={cn(
-                      "relative flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-3 text-left outline-none transition-[background-color,border-color,box-shadow]",
-                      "focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background",
-                      isSelected
-                        ? "border-primary bg-background shadow-sm ring-2 ring-inset ring-primary/35 dark:border-transparent dark:bg-primary/10 dark:shadow-none dark:ring-1 dark:ring-primary/30"
-                        : "border-border bg-background hover:border-foreground/20 hover:bg-muted/50 dark:border-transparent dark:bg-white/[0.035] dark:hover:bg-accent",
-                    )}
+                    className="ov1-provider-card"
                   >
                     <option.Icon className="size-5 shrink-0" aria-hidden />
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+                    <span className="min-w-0 flex-1 truncate text-control font-semibold">
                       {option.label}
                     </span>
                   </RadioPrimitive.Root>
@@ -776,14 +793,11 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
 
           <div className={cn("space-y-5", publishWizardStep !== 1 && "hidden")}>
             <div className="space-y-2">
-              <label
-                htmlFor="publish-repository-path"
-                className="text-xs font-medium text-foreground"
-              >
+              <label htmlFor="publish-repository-path" className="ov1-field-label">
                 {t.git.actions.repository}
               </label>
-              <div className="flex items-stretch overflow-hidden rounded-md border border-input bg-background focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-ring">
-                <span className="flex shrink-0 items-center gap-1.5 border-r border-input bg-muted/50 px-2.5 font-mono text-xs text-muted-foreground">
+              <div className="ov1-publish-path">
+                <span className="flex shrink-0 items-center gap-1.5 pl-3.5 font-mono text-secondary-copy text-muted-foreground">
                   <currentPublishProvider.Icon className="size-3.5" />
                   {publishHost}/
                 </span>
@@ -802,16 +816,13 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
                   }}
                   placeholder={publishPathPlaceholder}
                   disabled={publishRepositoryAction.isPending}
-                  className="w-full bg-transparent px-3 py-2 font-mono text-sm placeholder:text-muted-foreground/60 focus:outline-none"
+                  className="h-9.5 min-w-0 flex-1 bg-transparent pr-3.5 font-mono text-secondary-copy-medium text-foreground outline-none placeholder:text-placeholder"
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <span
-                id="publish-visibility-cards-label"
-                className="text-xs font-medium text-foreground"
-              >
+              <span id="publish-visibility-cards-label" className="ov1-field-label">
                 {t.git.actions.visibility}
               </span>
               <RadioGroup
@@ -821,100 +832,92 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
                 }
                 aria-labelledby="publish-visibility-cards-label"
                 disabled={publishRepositoryAction.isPending}
-                className="grid grid-cols-2"
               >
-                {[
-                  {
-                    value: "private" as const,
-                    label: t.git.actions.private,
-                    description: t.git.actions.onlyInvitedPeople,
-                    Icon: LockIcon,
-                  },
-                  {
-                    value: "public" as const,
-                    label: t.git.actions.public,
-                    description: t.git.actions.anyoneOnTheWeb,
-                    Icon: GlobeIcon,
-                  },
-                ].map((option) => {
-                  const isSelected = publishVisibility === option.value;
-                  return (
-                    <RadioPrimitive.Root
-                      key={option.value}
-                      value={option.value}
-                      className={cn(
-                        "relative flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 text-left outline-none transition-[background-color,border-color,box-shadow]",
-                        "focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background",
-                        isSelected
-                          ? "border-primary bg-background shadow-sm ring-2 ring-inset ring-primary/35 dark:border-transparent dark:bg-primary/10 dark:shadow-none dark:ring-1 dark:ring-primary/30"
-                          : "border-border bg-background hover:border-foreground/20 hover:bg-muted/50 dark:border-transparent dark:bg-white/[0.035] dark:hover:bg-accent",
-                      )}
-                    >
-                      <option.Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-sm font-medium text-foreground">
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    {
+                      value: "private" as const,
+                      label: t.git.actions.private,
+                      description: t.git.actions.onlyInvitedPeople,
+                      Icon: LockIcon,
+                    },
+                    {
+                      value: "public" as const,
+                      label: t.git.actions.public,
+                      description: t.git.actions.anyoneOnTheWeb,
+                      Icon: GlobeIcon,
+                    },
+                  ].map((option) => {
+                    return (
+                      <RadioPrimitive.Root
+                        key={option.value}
+                        value={option.value}
+                        className="ov1-publish-visibility"
+                      >
+                        <span className="flex items-center gap-1.5 font-semibold">
+                          <option.Icon className="size-3.5 shrink-0" aria-hidden />
                           {option.label}
                         </span>
-                        <span className="block text-xs text-muted-foreground">
+                        <span className="text-secondary-copy text-secondary-label">
                           {option.description}
                         </span>
-                      </span>
-                    </RadioPrimitive.Root>
-                  );
-                })}
+                      </RadioPrimitive.Root>
+                    );
+                  })}
+                </div>
               </RadioGroup>
             </div>
 
             <div>
-              <button
-                type="button"
-                onClick={() => setPublishAdvancedOpen((prev) => !prev)}
-                aria-expanded={publishAdvancedOpen}
-                className="flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-              >
-                <ChevronDownIcon
-                  className={cn(
-                    "size-3.5 transition-transform",
-                    publishAdvancedOpen ? "" : "-rotate-90",
-                  )}
-                />
-                {t.git.actions.advanced}
-              </button>
+              <div className="flex items-center gap-2 text-secondary-copy-medium text-code-foreground">
+                <button
+                  type="button"
+                  onClick={() => setPublishAdvancedOpen((prev) => !prev)}
+                  aria-expanded={publishAdvancedOpen}
+                  className="flex items-center gap-2 rounded-tag outline-none focus-visible:inset-shadow-focus"
+                >
+                  <ChevronDownIcon
+                    className={cn(
+                      "size-3.25 transition-transform",
+                      !publishAdvancedOpen && "-rotate-90",
+                    )}
+                  />
+                  {t.git.actions.advanced}
+                </button>
+                <span id="publish-protocol-label" className="ml-auto">
+                  {t.git.actions.protocol}
+                </span>
+                <Select
+                  value={publishProtocol}
+                  onValueChange={(protocol) => {
+                    if (protocol === "ssh" || protocol === "https") setPublishProtocol(protocol);
+                  }}
+                  disabled={publishRepositoryAction.isPending}
+                >
+                  <SelectTrigger
+                    size="compact"
+                    className="w-auto min-w-0"
+                    aria-labelledby="publish-protocol-label"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectPopup>
+                    <SelectItem value="ssh">SSH</SelectItem>
+                    <SelectItem value="https">HTTPS</SelectItem>
+                  </SelectPopup>
+                </Select>
+              </div>
               {publishAdvancedOpen ? (
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <label className="space-y-1.5" htmlFor="publish-remote-name">
-                    <span className="text-xs font-medium text-foreground">{t.git.diff.remote}</span>
-                    <Input
-                      id="publish-remote-name"
-                      value={publishRemoteName}
-                      onChange={(event) => setPublishRemoteName(event.target.value)}
-                      placeholder="origin"
-                      disabled={publishRepositoryAction.isPending}
-                    />
-                  </label>
-                  <div className="space-y-1.5">
-                    <span
-                      id="publish-protocol-label"
-                      className="text-xs font-medium text-foreground"
-                    >
-                      {t.git.actions.protocol}
-                    </span>
-                    <ToggleGroup
-                      value={[publishProtocol]}
-                      onValueChange={(next) => {
-                        const protocol = next[0];
-                        if (protocol === "ssh" || protocol === "https") {
-                          setPublishProtocol(protocol);
-                        }
-                      }}
-                      aria-labelledby="publish-protocol-label"
-                      disabled={publishRepositoryAction.isPending}
-                    >
-                      <Toggle value="ssh">SSH</Toggle>
-                      <Toggle value="https">HTTPS</Toggle>
-                    </ToggleGroup>
-                  </div>
-                </div>
+                <label className="mt-3 grid gap-1.5" htmlFor="publish-remote-name">
+                  <span className="ov1-field-label">{t.git.diff.remote}</span>
+                  <Input
+                    id="publish-remote-name"
+                    value={publishRemoteName}
+                    onChange={(event) => setPublishRemoteName(event.target.value)}
+                    placeholder="origin"
+                    disabled={publishRepositoryAction.isPending}
+                  />
+                </label>
               ) : null}
             </div>
 
@@ -922,7 +925,7 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
               <div
                 role="status"
                 aria-live="polite"
-                className="flex items-center gap-2 rounded-md border border-input bg-muted/40 px-3 py-2 text-xs text-muted-foreground dark:border-transparent dark:bg-white/[0.035]"
+                className="flex min-h-11 items-center gap-2 rounded-ov1-option bg-ov1-option-surface px-3.5 py-2 text-secondary-copy text-secondary-label"
               >
                 <Spinner size="sm" aria-hidden />
                 {t.git.actions.publishingRepositoryTo}
@@ -930,12 +933,12 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
               </div>
             ) : null}
             {publishError && !publishRepositoryAction.isPending ? (
-              <div
-                role="alert"
-                className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
-              >
-                <p className="font-medium">{t.git.actions.publishFailed}</p>
-                <p className="mt-0.5 text-destructive/90">{publishError}</p>
+              <div role="alert" className="rounded-ov1-option bg-error-surface px-3.5 text-error">
+                <p className="flex min-h-11 items-center gap-2 text-control font-semibold">
+                  <CircleXIcon className="size-3.75 shrink-0" aria-hidden />
+                  {t.git.actions.publishFailed}
+                </p>
+                <p className="pb-3 text-secondary-copy break-words">{publishError}</p>
               </div>
             ) : null}
           </div>
@@ -943,30 +946,29 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
           <div className={cn("space-y-4", publishWizardStep !== 2 && "hidden")}>
             {publishResult ? (
               <>
-                <div className="flex flex-col items-center gap-2 py-1 text-center">
-                  <span className="grid size-8 place-items-center rounded-full bg-success/15 text-success">
-                    <CheckIcon className="size-4" aria-hidden />
-                  </span>
-                  <h3 className="text-sm font-semibold text-foreground">
-                    {publishResult.status === "pushed"
-                      ? t.git.actions.repositoryPublished
-                      : t.git.actions.repositoryCreated}
-                  </h3>
-                  <p className="max-w-xs text-pretty text-xs text-muted-foreground">
-                    {publishResult.status === "pushed"
-                      ? t.git.actions.publishedBranch(publishResult.branch, publishProviderLabel)
-                      : t.git.actions.remoteReady(publishResult.remoteName)}
-                  </p>
+                <div
+                  role="status"
+                  className="flex min-h-11 items-center gap-2 rounded-ov1-option bg-status-success px-3.5 py-2 text-control font-semibold text-success-foreground"
+                >
+                  <CircleCheckIcon className="size-3.75 shrink-0" aria-hidden />
+                  {publishResult.status === "pushed"
+                    ? t.git.actions.repositoryPublished
+                    : t.git.actions.repositoryCreated}
                 </div>
-                <div className="flex items-center gap-2 rounded-lg border border-input bg-muted/40 px-3 py-2 dark:border-transparent dark:bg-white/[0.035]">
-                  <currentPublishProvider.Icon className="size-3.5 shrink-0 text-muted-foreground" />
-                  <span className="min-w-0 flex-1 truncate font-mono text-xs text-foreground">
+                <p className="text-secondary-copy text-secondary-label">
+                  {publishResult.status === "pushed"
+                    ? t.git.actions.publishedBranch(publishResult.branch, publishProviderLabel)
+                    : t.git.actions.remoteReady(publishResult.remoteName)}
+                </p>
+                <div className="flex items-center gap-2 rounded-ov1-option bg-ov1-option-surface px-3.5 py-3">
+                  <currentPublishProvider.Icon className="size-3.5 shrink-0" />
+                  <span className="min-w-0 flex-1 truncate font-mono text-secondary-copy text-foreground">
                     {publishResult.repository.nameWithOwner}
                   </span>
                 </div>
                 <Button
                   variant="outline"
-                  size="sm"
+                  size="dialog-action"
                   className="w-full"
                   onClick={() => {
                     void openLink(publishResult.repository.url).catch(() => undefined);
@@ -977,20 +979,27 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
                 </Button>
               </>
             ) : (
-              <div className="rounded-md border border-input bg-background px-3 py-2 text-xs text-muted-foreground dark:border-transparent dark:bg-white/[0.035]">
+              <div className="rounded-ov1-option bg-ov1-option-surface px-3.5 py-3 text-secondary-copy text-secondary-label">
                 {t.git.actions.publishResultUnavailable}
               </div>
             )}
           </div>
-        </WizardPanel>
+        </DialogPanel>
 
-        <WizardFooter>
+        <DialogFooter variant="bare" className="justify-between">
           {publishWizardStep === 2 ? (
-            <Button onClick={() => handleOpenChange(false)}>{t.git.actions.done}</Button>
+            <Button
+              size="dialog-action-wide"
+              className="ml-auto"
+              onClick={() => handleOpenChange(false)}
+            >
+              {t.git.actions.done}
+            </Button>
           ) : (
             <>
               <Button
-                variant="outline"
+                variant="ghost"
+                size="dialog-action"
                 disabled={publishRepositoryAction.isPending}
                 onClick={() => {
                   if (publishWizardStep === 0) {
@@ -1004,13 +1013,18 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
               </Button>
               {publishWizardStep < 1 ? (
                 <Button
+                  size="dialog-action-wide"
                   disabled={!hasReadyPublishProvider || !selectedPublishProviderReadiness.ready}
                   onClick={() => setPublishWizardStep((step) => Math.min(1, step + 1))}
                 >
                   {t.git.actions.next}
                 </Button>
               ) : (
-                <Button disabled={!canSubmitPublishRepository} onClick={submitPublishRepository}>
+                <Button
+                  size="dialog-action-wide"
+                  disabled={!canSubmitPublishRepository}
+                  onClick={submitPublishRepository}
+                >
                   {publishRepositoryAction.isPending ? (
                     <>
                       <Spinner size="sm" aria-hidden />
@@ -1023,8 +1037,8 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
               )}
             </>
           )}
-        </WizardFooter>
-      </WizardPopup>
+        </DialogFooter>
+      </DialogPopup>
     </Dialog>
   );
 }
@@ -1087,7 +1101,7 @@ export default function GitActionsControl({
   const [isCommitDialogOpen, setIsCommitDialogOpen] = useState(false);
   const [dialogCommitMessage, setDialogCommitMessage] = useState("");
   const [excludedFiles, setExcludedFiles] = useState<ReadonlySet<string>>(new Set());
-  const [isEditingFiles, setIsEditingFiles] = useState(false);
+  const [commitOnNewBranch, setCommitOnNewBranch] = useState(false);
   const [isPublishDialogOpen, setIsPublishDialogOpen] = useState(false);
   const [inlineSuccess, setInlineSuccess] = useState<InlineGitActionSuccess | null>(null);
   const [pendingDefaultBranchAction, setPendingDefaultBranchAction] =
@@ -1495,6 +1509,7 @@ export default function GitActionsControl({
     });
   };
 
+  /** Submits the existing feature-branch action, then clears the dialog-only selection state. */
   const runDialogActionOnNewBranch = () => {
     if (!canChangeThreadBranch || !isCommitDialogOpen) return;
     const commitMessage = dialogCommitMessage.trim();
@@ -1502,7 +1517,7 @@ export default function GitActionsControl({
     setIsCommitDialogOpen(false);
     setDialogCommitMessage("");
     setExcludedFiles(new Set());
-    setIsEditingFiles(false);
+    setCommitOnNewBranch(false);
 
     void runGitActionWithToast({
       action: "commit",
@@ -1581,6 +1596,7 @@ export default function GitActionsControl({
     }
   };
 
+  /** Opens a fresh commit selection; push and PR commands keep their immediate execution path. */
   const openDialogForMenuItem = (item: GitActionMenuItem) => {
     if (item.disabled) return;
     if (item.dialogAction === "push") {
@@ -1592,17 +1608,18 @@ export default function GitActionsControl({
       return;
     }
     setExcludedFiles(new Set());
-    setIsEditingFiles(false);
+    setCommitOnNewBranch(false);
     setIsCommitDialogOpen(true);
   };
 
+  /** Submits selected files on the current branch through the existing default-branch guard. */
   const runDialogAction = () => {
     if (!isCommitDialogOpen) return;
     const commitMessage = dialogCommitMessage.trim();
     setIsCommitDialogOpen(false);
     setDialogCommitMessage("");
     setExcludedFiles(new Set());
-    setIsEditingFiles(false);
+    setCommitOnNewBranch(false);
     void runGitActionWithToast({
       action: "commit",
       ...(commitMessage ? { commitMessage } : {}),
@@ -2074,172 +2091,153 @@ export default function GitActionsControl({
             setIsCommitDialogOpen(false);
             setDialogCommitMessage("");
             setExcludedFiles(new Set());
-            setIsEditingFiles(false);
+            setCommitOnNewBranch(false);
           }
         }}
       >
-        <DialogPopup>
+        <DialogPopup size="wide">
           <DialogHeader>
             <DialogTitle>{COMMIT_DIALOG_TITLE}</DialogTitle>
-            <DialogDescription>{COMMIT_DIALOG_DESCRIPTION}</DialogDescription>
+            <DialogDescription>
+              <span className="block text-control text-code-foreground">
+                {COMMIT_DIALOG_DESCRIPTION}
+              </span>
+            </DialogDescription>
           </DialogHeader>
           <DialogPanel>
-            <div className="space-y-3 rounded-xl bg-zinc-25 p-3 text-sm ring-1 ring-black/5 dark:bg-white/[0.035] dark:ring-white/5">
-              <div className="grid grid-cols-[auto_1fr] items-center gap-x-2 gap-y-1">
-                <span className="text-muted-foreground">{t.common.threadActions.branch}</span>
-                <span className="flex items-center justify-between gap-2">
-                  <span className="font-medium">
-                    {gitStatusForActions?.refName ?? t.git.actions.detachedHead}
-                  </span>
-                  {isDefaultRef && (
-                    <span className="text-right text-warning">{t.git.actions.defaultBranch}</span>
+            <div className="ov1-commit-files">
+              <label className="flex h-8 items-center gap-2.5 px-2 text-secondary-copy-medium font-bold">
+                <span className="relative flex shrink-0">
+                  <input
+                    type="checkbox"
+                    className="ov1-checkbox peer"
+                    checked={allSelected}
+                    disabled={allFiles.length === 0}
+                    ref={(node) => {
+                      if (node) node.indeterminate = !allSelected && !noneSelected;
+                    }}
+                    onChange={() => {
+                      setExcludedFiles(
+                        allSelected ? new Set(allFiles.map((f) => f.path)) : new Set(),
+                      );
+                    }}
+                  />
+                  {allSelected ? (
+                    <CheckIcon className="ov1-checkbox-mark" aria-hidden />
+                  ) : (
+                    <MinusIcon className="ov1-checkbox-mark" aria-hidden />
                   )}
                 </span>
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    {isEditingFiles && allFiles.length > 0 && (
-                      <Checkbox
-                        checked={allSelected}
-                        indeterminate={!allSelected && !noneSelected}
-                        onCheckedChange={() => {
-                          setExcludedFiles(
-                            allSelected ? new Set(allFiles.map((f) => f.path)) : new Set(),
-                          );
-                        }}
-                      />
-                    )}
-                    <span className="text-muted-foreground">{t.git.actions.files}</span>
-                    {!allSelected && !isEditingFiles && (
-                      <span className="text-muted-foreground">
-                        {t.git.actions.selectedFileCounts(selectedFiles.length, allFiles.length)}
-                      </span>
-                    )}
-                  </div>
-                  {allFiles.length > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="xs"
-                      onClick={() => setIsEditingFiles((prev) => !prev)}
+                {t.git.actions.fileSelectionLabel(selectedFiles.length, allFiles.length)}
+              </label>
+              {!gitStatusForActions || allFiles.length === 0 ? (
+                <p className="px-2 text-secondary-copy text-secondary-label">
+                  {t.git.actions.none}
+                </p>
+              ) : (
+                <div className="max-h-44 overflow-y-auto">
+                  {allFiles.map((file) => (
+                    <div
+                      key={file.path}
+                      className="flex h-8 w-full items-center gap-2.5 px-2 font-mono text-secondary-copy"
                     >
-                      {isEditingFiles ? t.git.actions.done : t.git.actions.edit}
-                    </Button>
-                  )}
+                      <span className="relative flex shrink-0">
+                        <input
+                          type="checkbox"
+                          className="ov1-checkbox peer"
+                          aria-label={file.path}
+                          checked={!excludedFiles.has(file.path)}
+                          onChange={() => {
+                            setExcludedFiles((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(file.path)) next.delete(file.path);
+                              else next.add(file.path);
+                              return next;
+                            });
+                          }}
+                        />
+                        <CheckIcon className="ov1-checkbox-mark" aria-hidden />
+                      </span>
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={<button type="button" />}
+                          className="min-w-0 flex-1 overflow-hidden text-left outline-none focus-visible:inset-shadow-focus"
+                          disabled={!canOperateThread}
+                          aria-label={t.git.actions.openFile(file.path)}
+                          onClick={() => openChangedFileInEditor(file.path)}
+                        >
+                          <span className="flex min-w-0">
+                            <span className="truncate text-muted-foreground">
+                              {file.path.slice(0, file.path.lastIndexOf("/") + 1)}
+                            </span>
+                            <span
+                              className={cn(
+                                "shrink-0",
+                                excludedFiles.has(file.path) && "text-secondary-label",
+                              )}
+                            >
+                              {file.path.slice(file.path.lastIndexOf("/") + 1)}
+                            </span>
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipPopup side="top" variant="code">
+                          {file.path}
+                        </TooltipPopup>
+                      </Tooltip>
+                      <span className="shrink-0 text-success">
+                        +{formatDiffCount(file.insertions)}
+                      </span>
+                      <span className="shrink-0 text-error">
+                        −{formatDiffCount(file.deletions)}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-                {!gitStatusForActions || allFiles.length === 0 ? (
-                  <p className="font-medium">{t.git.actions.none}</p>
-                ) : (
-                  <div className="space-y-2">
-                    <div className="h-44 rounded-lg bg-card ring-1 ring-black/5 dark:bg-white/[0.025] dark:ring-white/5">
-                      <ScrollArea>
-                        <div className="space-y-1 p-1">
-                          {allFiles.map((file) => {
-                            const isExcluded = excludedFiles.has(file.path);
-                            return (
-                              <div
-                                key={file.path}
-                                className="flex w-full items-center gap-2 rounded-md px-2 py-1 font-mono hover:bg-accent/50"
-                              >
-                                {isEditingFiles && (
-                                  <Checkbox
-                                    checked={!excludedFiles.has(file.path)}
-                                    onCheckedChange={() => {
-                                      setExcludedFiles((prev) => {
-                                        const next = new Set(prev);
-                                        if (next.has(file.path)) {
-                                          next.delete(file.path);
-                                        } else {
-                                          next.add(file.path);
-                                        }
-                                        return next;
-                                      });
-                                    }}
-                                  />
-                                )}
-                                <button
-                                  type="button"
-                                  className="flex min-w-0 flex-1 items-center justify-between gap-3 text-left"
-                                  disabled={!canOperateThread}
-                                  aria-label={t.git.actions.openFile(file.path)}
-                                  onClick={() => openChangedFileInEditor(file.path)}
-                                >
-                                  <StartTruncatedPath
-                                    path={file.path}
-                                    className={`flex-1${isExcluded ? " text-muted-foreground" : ""}`}
-                                  />
-                                  <span className="shrink-0">
-                                    {isExcluded ? (
-                                      <span className="text-muted-foreground">
-                                        {t.git.actions.excluded}
-                                      </span>
-                                    ) : (
-                                      <>
-                                        <span className="text-diff-addition">
-                                          +{formatDiffCount(file.insertions)}
-                                        </span>
-                                        <span className="text-muted-foreground"> / </span>
-                                        <span className="text-diff-deletion">
-                                          -{formatDiffCount(file.deletions)}
-                                        </span>
-                                      </>
-                                    )}
-                                  </span>
-                                </button>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </ScrollArea>
-                    </div>
-                    <div className="flex justify-end font-mono">
-                      <span className="text-diff-addition">
-                        +{formatDiffCount(selectedFiles.reduce((sum, f) => sum + f.insertions, 0))}
-                      </span>
-                      <span className="text-muted-foreground"> / </span>
-                      <span className="text-diff-deletion">
-                        -{formatDiffCount(selectedFiles.reduce((sum, f) => sum + f.deletions, 0))}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
+              )}
             </div>
-            <div className="space-y-1">
-              <p className="text-sm font-medium">{t.git.actions.commitMessageOptional}</p>
-              <Textarea
+            <label className="grid gap-1.5">
+              <span className="ov1-field-label">{t.git.actions.commitMessageOptional}</span>
+              <textarea
+                className="ov1-commit-message"
                 value={dialogCommitMessage}
                 onChange={(event) => setDialogCommitMessage(event.target.value)}
                 placeholder={t.git.actions.leaveEmptyToAutoGenerate}
-                size="sm"
               />
-            </div>
+            </label>
+            <label className="ov1-script-option">
+              <span className="relative flex shrink-0">
+                <input
+                  type="checkbox"
+                  className="ov1-checkbox peer"
+                  checked={commitOnNewBranch}
+                  disabled={!canChangeThreadBranch}
+                  onChange={(event) => setCommitOnNewBranch(event.target.checked)}
+                />
+                <CheckIcon className="ov1-checkbox-mark" aria-hidden />
+              </span>
+              {t.git.actions.commitOnNewBranch}
+            </label>
           </DialogPanel>
           <DialogFooter variant="bare">
             <Button
               variant="outline"
-              size="sm"
+              size="dialog-action"
               onClick={() => {
                 setIsCommitDialogOpen(false);
                 setDialogCommitMessage("");
                 setExcludedFiles(new Set());
-                setIsEditingFiles(false);
+                setCommitOnNewBranch(false);
               }}
             >
               {t.common.confirm.cancel}
             </Button>
             <Button
-              variant="outline"
-              size="sm"
-              disabled={!canChangeThreadBranch || noneSelected}
-              onClick={runDialogActionOnNewBranch}
-            >
-              {t.git.actions.commitOnNewBranch}
-            </Button>
-            <Button
-              size="sm"
-              disabled={!canWriteSourceControl || noneSelected}
-              onClick={runDialogAction}
+              size="dialog-action-wide"
+              disabled={
+                noneSelected ||
+                (commitOnNewBranch ? !canChangeThreadBranch : !canWriteSourceControl)
+              }
+              onClick={commitOnNewBranch ? runDialogActionOnNewBranch : runDialogAction}
             >
               {t.git.actions.commit}
             </Button>
@@ -2263,34 +2261,36 @@ export default function GitActionsControl({
           }
         }}
       >
-        <DialogPopup className="max-w-xl">
+        <DialogPopup size="wide">
           <DialogHeader>
-            <DialogTitle>
-              {pendingDefaultBranchActionCopy?.title ?? t.git.actions.runActionOnDefaultBranch}
-            </DialogTitle>
-            <DialogDescription>{pendingDefaultBranchActionCopy?.description}</DialogDescription>
+            <div className="flex items-center gap-2.5">
+              <span className="ov1-default-branch-icon">
+                <GitBranchIcon className="size-3.75" aria-hidden />
+              </span>
+              <DialogTitle>{t.git.actions.runActionOnDefaultBranch}</DialogTitle>
+            </div>
+            <DialogDescription className="sr-only">
+              {pendingDefaultBranchActionCopy?.description}
+            </DialogDescription>
           </DialogHeader>
-          <DialogFooter variant="bare" className="sm:flex-wrap sm:items-center">
+          <DialogFooter variant="bare" className="flex-wrap">
             <Button
-              className="w-full sm:mr-auto sm:w-auto"
-              variant="outline"
-              size="sm"
+              variant="ghost"
+              size="dialog-action"
               onClick={() => setPendingDefaultBranchAction(null)}
             >
               {t.git.actions.abort}
             </Button>
             <Button
-              className="w-full max-w-full sm:w-auto"
               variant="outline"
-              size="sm-multiline"
+              size="dialog-action"
               onClick={continuePendingDefaultBranchAction}
               disabled={!canWriteSourceControl}
             >
-              {pendingDefaultBranchActionCopy?.continueLabel ?? t.git.actions.continue}
+              {t.git.actions.continue}
             </Button>
             <Button
-              className="w-full max-w-full sm:w-auto"
-              size="sm-multiline"
+              size="dialog-action-wide"
               onClick={checkoutFeatureBranchAndContinuePendingAction}
               disabled={!canChangeThreadBranch}
             >

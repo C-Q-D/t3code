@@ -170,3 +170,77 @@ body:has([data-onboarding-route]) [data-titlebar-brand] {
 .ov1-shortcut-capture {
   @apply h-9.5 w-full min-w-0 rounded-full bg-transparent px-2.5 text-control text-transparent caret-transparent outline-none placeholder:text-placeholder;
 }
+
+/* 其余屏-8 R1: commit-file well and completed publish-step counters. */
+@theme {
+  --color-ov1-commit-well: #151517;
+  --color-ov1-step-complete: #3a3a40;
+}
+
+/* R1 feature surfaces reuse OV1.1 option geometry and the shared focus/selection rings. */
+.ov1-grouping-option {
+  @apply flex cursor-pointer gap-2.5 rounded-ov1-option bg-ov1-option-surface px-3 py-2.5 text-control text-foreground;
+  &:has(input:checked) {
+    @apply bg-ov1-option-selected inset-shadow-selected-control;
+  }
+  &:has(input:checked) > span > span:first-child {
+    @apply font-bold;
+  }
+}
+.ov1-grouping-radio {
+  @apply mt-0.75 size-3.5 shrink-0 appearance-none rounded-full shadow-outline-control outline-none checked:bg-primary checked:shadow-none focus-visible:inset-shadow-focus;
+  &:checked {
+    @apply grid place-items-center;
+  }
+  &:checked::after {
+    @apply m-auto block size-1.25 rounded-full bg-primary-foreground;
+    content: "";
+  }
+}
+.ov1-commit-files {
+  @apply rounded-ov1-option bg-ov1-commit-well p-1.5 shadow-well-pressed;
+}
+.ov1-commit-message {
+  @apply min-h-14.5 w-full resize-y rounded-ov1-option bg-input px-3.5 py-2.5 text-control text-foreground shadow-well-track outline-none placeholder:text-placeholder focus-visible:inset-shadow-focus;
+}
+.ov1-commit-files .ov1-checkbox:indeterminate {
+  @apply bg-primary shadow-none;
+}
+.ov1-commit-files .ov1-checkbox:indeterminate + .ov1-checkbox-mark {
+  @apply opacity-100;
+}
+.ov1-default-branch-icon {
+  @apply flex size-7.5 shrink-0 items-center justify-center rounded-tag bg-warning-surface text-status-warning-foreground text-shadow-none;
+  --lucide-hue-override: currentColor;
+}
+.ov1-publish-steps {
+  @apply flex flex-wrap items-center gap-2 text-secondary-copy-medium;
+}
+.ov1-publish-step {
+  @apply flex min-w-0 items-center gap-1.5 rounded-full text-code-foreground outline-none focus-visible:inset-shadow-focus;
+  &[aria-current="step"] {
+    @apply font-bold text-foreground;
+  }
+}
+.ov1-publish-step-number {
+  @apply flex size-5.5 shrink-0 items-center justify-center rounded-full bg-ov1-step-complete text-meta;
+  --lucide-hue-override: currentColor;
+  .ov1-publish-step[aria-current="step"] & {
+    @apply bg-primary font-mono text-primary-foreground text-shadow-none;
+  }
+}
+.ov1-publish-path {
+  @apply flex items-stretch overflow-hidden rounded-full bg-input shadow-well-track focus-within:inset-shadow-focus;
+}
+.ov1-publish-visibility {
+  @apply flex cursor-pointer flex-col gap-0.5 rounded-ov1-option bg-ov1-option-surface px-3.5 py-3 text-left text-control text-foreground outline-none focus-visible:inset-shadow-focus;
+  &[data-checked] {
+    @apply bg-ov1-option-selected inset-shadow-selected-control;
+  }
+  &[data-checked] > span:first-child {
+    @apply font-bold;
+  }
+  &[data-disabled] {
+    @apply cursor-not-allowed opacity-60;
+  }
+}

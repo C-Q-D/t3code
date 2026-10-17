@@ -882,6 +882,7 @@ export const git = {
     gitActionInProgress: "Git action in progress.",
     gitStatusIsUnavailable: "Git status is unavailable.",
     commitPush: "Commit & push",
+    publishRepositoryDialogTitle: "Publish repository…",
     publishRepository: "Publish repository",
     branchIsUpToDateNoActionNeeded: "Branch is up to date. No action needed.",
     noLocalCommitsToPush: "No local commits to push.",
@@ -956,6 +957,8 @@ export const git = {
     edit: "Edit",
     none: "none",
     excluded: "Excluded",
+    /** Formats the selected and total file counts with locale-specific punctuation. */
+    fileSelectionLabel: (selected: number, total: number) => `Files (${selected} / ${total})`,
     commitMessageOptional: "Commit message (optional)",
     leaveEmptyToAutoGenerate: "Leave empty to auto-generate",
     commitOnNewBranch: "Commit on new branch",
