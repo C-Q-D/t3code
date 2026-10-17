@@ -1,5 +1,9 @@
 /* Sidebar header and row tokens and feature styles; shared controls keep their own appearance. */
 @theme {
+  /* 核心屏-8a.dc.html · B1：列表底部批量操作石板的短投影。 */
+  --shadow-sidebar-bulk:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.095), 0 0 0 1px rgba(0, 0, 0, 0.5), 0 3px 0 #09090a,
+    10px 18px 26px -8px rgba(0, 0, 0, 0.75);
   /* StyleM-8a.dc.html · 整窗头部：新建、快捷键帽和当前分段的石面。 */
   --color-sidebar-new-thread: #303035;
   --color-sidebar-shortcut: #2b2b30;
@@ -17,6 +21,15 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 0 0 1px rgba(0, 0, 0, 0.5), 0 3px 0 #09090a,
     18px 26px 30px -6px rgba(0, 0, 0, 0.85), 30px 46px 60px -20px rgba(0, 0, 0, 0.7);
   --shadow-sidebar-jump: 0 2px 0 #8e8e96, 3px 5px 8px -2px rgba(0, 0, 0, 0.7);
+}
+
+/* B1's feature buttons use compact rounded keys rather than the shared pill recipe. */
+.sidebar-bulk-action {
+  @apply flex h-8.5 cursor-pointer items-center justify-center gap-1.25 whitespace-nowrap rounded-compact-row border-0 bg-accent px-0 font-semibold text-secondary-copy-medium text-foreground shadow-raise-tab outline-none enabled:hover:bg-sidebar-tab-selected enabled:active:translate-y-0.25 enabled:active:shadow-well-pressed focus-visible:inset-shadow-focus disabled:cursor-not-allowed disabled:bg-control-secondary-disabled disabled:text-fg-control-disabled disabled:shadow-none;
+}
+
+.sidebar-bulk-more {
+  --lucide-hue-override: currentColor;
 }
 
 /* B1 supplies one clear action; hide WebKit's duplicate native search decoration. */

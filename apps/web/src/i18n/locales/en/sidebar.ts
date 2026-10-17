@@ -300,6 +300,7 @@ export const sidebar = {
     deleteThreads: (count: number) => `Delete ${count} thread${count === 1 ? "" : "s"}?`,
   },
   bulk: {
+    moreActions: "More bulk actions",
     markUnread: (count: number) => `Mark unread (${count})`,
     archive: (count: number) => `Archive (${count})`,
     delete: (count: number) => `Delete (${count})`,

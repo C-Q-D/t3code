@@ -185,6 +185,7 @@ const twMerge = extendTailwindMerge({
         "chat-draft-project-mark",
         "sidebar-row-drag",
         "sidebar-jump",
+        "sidebar-bulk",
       ],
       "inset-shadow": [
         "selected",

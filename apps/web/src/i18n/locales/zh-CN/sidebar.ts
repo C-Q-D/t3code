@@ -297,6 +297,7 @@ export const sidebar: Messages["sidebar"] = {
     deleteThreads: (count: number) => `要删除 ${count} 个对话吗？`,
   },
   bulk: {
+    moreActions: "更多批量操作",
     markUnread: (count: number) => `标记为未读（${count}）`,
     archive: (count: number) => `归档（${count}）`,
     delete: (count: number) => `删除（${count}）`,
