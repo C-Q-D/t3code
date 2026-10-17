@@ -2801,6 +2801,10 @@ ${address}`
     edit: (scriptName: string | number | boolean | null | undefined) => `编辑 ${scriptName}`,
   },
   projectActions: {
+    sectionTitle: "操作",
+    editLabel: "编辑",
+    deleteLabel: "删除",
+    deleteAction: (name: string) => `删除 ${name}`,
     failedToImportAction: "导入操作失败。",
     commandsRunProjectSCheckoutHint: "在此项目检出目录或 worktree 中运行的命令，可设置快捷键。",
     importScripts: "导入脚本",
@@ -2891,6 +2895,11 @@ ${address}`
     saveIcon: "保存图标",
   },
   projectSettings: {
+    overview: "项目概览",
+    overviewName: "项目名",
+    overviewPath: "路径",
+    overviewEnvironment: "环境",
+    identity: "项目信息",
     addProjectSidebarConfigureHint: "从侧边栏添加项目后，可在此配置。",
     thisProjectIsNoLongerAvailable: "此项目已不可用。",
     checkoutLongerAvailableSelectedProjectHint: "所选项目和环境中的此检出目录已不可用。",

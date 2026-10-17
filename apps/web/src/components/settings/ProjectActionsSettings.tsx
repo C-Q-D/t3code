@@ -1,3 +1,4 @@
+/** Project-specific action rows; persistence, inheritance and the shared editor remain unchanged. */
 import { t } from "~/i18n";
 import { useScopedSettingsWriteAllowed } from "./useScopedSettings";
 import { AuthSettingsWriteScope } from "@t3tools/contracts";
@@ -7,7 +8,7 @@ import {
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
 import { DEFAULT_RESOLVED_KEYBINDINGS } from "@t3tools/shared/keybindings";
-import { ChevronDownIcon, PlusIcon } from "lucide-react";
+import { ChevronDownIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { useT3ProjectFileState } from "../../hooks/useT3ProjectFileScripts";
 import { useEnvironments } from "../../state/environments";
@@ -20,6 +21,11 @@ import {
   type ProjectScriptEditorRequest,
 } from "../projectScriptEditor";
 import { Button } from "../ui/button";
+import { Badge } from "../ui/badge";
+import { Kbd } from "../ui/kbd";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { shortcutLabelForCommand } from "../../keybindings";
+import { commandForProjectScript } from "../../projectScripts";
 import {
   Menu,
   MenuGroup,
@@ -29,7 +35,6 @@ import {
   MenuSeparator,
   MenuTrigger,
 } from "../ui/menu";
-import { ProjectActionsList } from "./ProjectActionsList";
 import { useProjectScriptSettings } from "./useProjectScriptSettings";
 import { SettingsRow, SettingsSection } from "./settingsLayout";
 import { useSettingsScope } from "./SettingsScopeContext";
@@ -136,7 +141,129 @@ export function ProjectActionsSettings() {
   );
 
   return (
-    <SettingsSection id="project-actions" title={t.settings.rows.projectActions.title}>
+    <SettingsSection id="project-actions" title={t.settings.projectActions.sectionTitle}>
+      {!mixed ? (
+        <div className="flex flex-col gap-1.5 py-2.5 pr-3 pl-3.5">
+          {scripts.length === 0 ? (
+            <p className="rounded-settings-row-surface bg-settings-project-well px-3.5 py-2.5 text-secondary-copy-medium text-secondary-label shadow-settings-project-well">
+              {t.settings.projectActionsList.noActionsConfigured}
+            </p>
+          ) : (
+            scripts.map((script) => {
+              const shortcutLabel = shortcutLabelForCommand(
+                keybindings,
+                commandForProjectScript(script.id),
+              );
+              return (
+                <div
+                  key={script.id}
+                  className="flex min-h-11 flex-wrap items-center gap-2.5 rounded-settings-row-surface bg-settings-inheritance-surface py-1.75 pr-1.5 pl-3.5 text-control shadow-settings-connect-row"
+                >
+                  <ScriptIcon icon={script.icon} className="size-3.75 shrink-0" />
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <span
+                          tabIndex={0}
+                          className="w-16 shrink-0 truncate font-semibold outline-none focus-visible:inset-shadow-focus"
+                        />
+                      }
+                    >
+                      {script.name}
+                    </TooltipTrigger>
+                    <TooltipPopup>{script.name}</TooltipPopup>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <code
+                          tabIndex={0}
+                          className="min-w-0 flex-1 basis-20 truncate font-mono text-secondary-copy text-secondary-label outline-none focus-visible:inset-shadow-focus"
+                        />
+                      }
+                    >
+                      {script.command}
+                    </TooltipTrigger>
+                    <TooltipPopup>{script.command}</TooltipPopup>
+                  </Tooltip>
+                  {script.runOnWorktreeCreate ? (
+                    <Badge variant="neutral" size="sm">
+                      {t.settings.projectActionsList.setup}
+                    </Badge>
+                  ) : null}
+                  {script.runOnSettle ? (
+                    <Badge variant="neutral" size="sm">
+                      {t.settings.projectActionsList.onSettle}
+                    </Badge>
+                  ) : null}
+                  {script.previewUrl ? (
+                    <Badge variant="neutral" size="sm">
+                      {t.settings.projectActionsList.previewDesktopOnly}
+                    </Badge>
+                  ) : null}
+                  {shortcutLabel ? <Kbd>{shortcutLabel}</Kbd> : null}
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <Button
+                          size="icon-md"
+                          variant="ghost-muted"
+                          aria-label={t.settings.projectActionsList.edit(script.name)}
+                          disabled={saving || !canWriteSettings}
+                          onClick={() => setRequest(editorRequestForScript(script, keybindings))}
+                        />
+                      }
+                    >
+                      <PencilIcon className="size-3.5" />
+                    </TooltipTrigger>
+                    <TooltipPopup>{t.settings.projectActions.editLabel}</TooltipPopup>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <Button
+                          size="icon-md"
+                          variant="ghost-muted"
+                          aria-label={t.settings.projectActions.deleteAction(script.name)}
+                          disabled={saving || !canWriteSettings}
+                          onClick={(event) => {
+                            // The existing persistence path also removes unused shortcuts and reports failures.
+                            const addButton = event.currentTarget
+                              .closest("section")
+                              ?.querySelector<HTMLButtonElement>("[data-project-add-action]");
+                            void persist(
+                              (current) => current.filter((entry) => entry.id !== script.id),
+                              script.id,
+                              null,
+                            ).then((result) => {
+                              if (result._tag === "Success") addButton?.focus();
+                            });
+                          }}
+                        />
+                      }
+                    >
+                      <Trash2Icon className="size-3.5" />
+                    </TooltipTrigger>
+                    <TooltipPopup>{t.settings.projectActions.deleteLabel}</TooltipPopup>
+                  </Tooltip>
+                </div>
+              );
+            })
+          )}
+          <div className="self-start">
+            <Button
+              data-project-add-action
+              size="toolbar"
+              variant="outline"
+              disabled={saving || !canWriteSettings || targets.length === 0}
+              onClick={() => setRequest({ scriptId: null, initial: EMPTY_PROJECT_SCRIPT_INPUT })}
+            >
+              <PlusIcon className="size-3.25" />
+              {t.settings.projectActions.addAction}
+            </Button>
+          </div>
+        </div>
+      ) : null}
       <SettingsRow
         serverScoped
         settingKeys={["defaultProjectScripts"]}
@@ -152,7 +279,7 @@ export function ProjectActionsSettings() {
                   render={
                     <Button
                       id="import-scripts"
-                      size="xs"
+                      size="toolbar"
                       variant="ghost"
                       disabled={saving || !canWriteSettings}
                       type="button"
@@ -187,15 +314,17 @@ export function ProjectActionsSettings() {
                 </MenuPopup>
               </Menu>
             ) : null}
-            <Button
-              size="xs"
-              variant="outline"
-              disabled={saving || !canWriteSettings || targets.length === 0}
-              onClick={() => setRequest({ scriptId: null, initial: EMPTY_PROJECT_SCRIPT_INPUT })}
-            >
-              <PlusIcon className="size-3.5" />
-              {t.settings.projectActions.addAction}
-            </Button>
+            {mixed ? (
+              <Button
+                size="toolbar"
+                variant="outline"
+                disabled={saving || !canWriteSettings || targets.length === 0}
+                onClick={() => setRequest({ scriptId: null, initial: EMPTY_PROJECT_SCRIPT_INPUT })}
+              >
+                <PlusIcon className="size-3.5" />
+                {t.settings.projectActions.addAction}
+              </Button>
+            ) : null}
           </div>
         }
       />
@@ -204,14 +333,7 @@ export function ProjectActionsSettings() {
           title={t.settings.projectActions.differentActionsAcrossEnvironments}
           description={t.settings.projectActions.oneEnvironmentEditListAddingHint}
         />
-      ) : (
-        <ProjectActionsList
-          scripts={scripts}
-          keybindings={keybindings}
-          disabled={saving || !canWriteSettings}
-          onEdit={(script) => setRequest(editorRequestForScript(script, keybindings))}
-        />
-      )}
+      ) : null}
       {t3File.status === "invalid" ? (
         <SettingsRow
           title={t.settings.projectActions.t3JsonIsInvalid}

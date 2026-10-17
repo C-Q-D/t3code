@@ -2932,6 +2932,10 @@ ${address}`
     edit: (scriptName: string | number | boolean | null | undefined) => `Edit ${scriptName}`,
   },
   projectActions: {
+    sectionTitle: "Actions",
+    editLabel: "Edit",
+    deleteLabel: "Delete",
+    deleteAction: (name: string) => `Delete ${name}`,
     failedToImportAction: "Failed to import action.",
     commandsRunProjectSCheckoutHint:
       "Commands that run in this project's checkout or its worktree, with optional shortcuts.",
@@ -3032,6 +3036,11 @@ ${address}`
     saveIcon: "Save icon",
   },
   projectSettings: {
+    overview: "Project overview",
+    overviewName: "Project name",
+    overviewPath: "Path",
+    overviewEnvironment: "Environment",
+    identity: "Project identity",
     addProjectSidebarConfigureHint: "Add a project from the sidebar to configure it here.",
     thisProjectIsNoLongerAvailable: "This project is no longer available.",
     checkoutLongerAvailableSelectedProjectHint:

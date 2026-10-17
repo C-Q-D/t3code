@@ -1,3 +1,4 @@
+/** Routes project scopes to their settings and preserves the shared unavailable-scope notice. */
 import { t } from "~/i18n";
 import { EnvironmentId } from "@t3tools/contracts";
 

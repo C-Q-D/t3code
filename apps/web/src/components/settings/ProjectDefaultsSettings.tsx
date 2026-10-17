@@ -457,7 +457,7 @@ export function ProjectDefaultsSettings({
       {category === "project" ? (
         <>
           <DefaultModelSetting />
-          <DefaultWorkspaceSetting />
+          <DefaultWorkspaceSetting controlSize="settings" />
         </>
       ) : category === "source-control" ? (
         <>

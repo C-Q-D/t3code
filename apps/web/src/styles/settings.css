@@ -132,3 +132,10 @@
     @apply flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-keybindings-reset bg-transparent text-keybindings-reset outline-none hover:bg-secondary focus-visible:inset-shadow-focus disabled:cursor-default disabled:text-settings-target-surface disabled:hover:bg-transparent;
   }
 }
+
+/* ST3 N1 / SettingsPage8a project overview: inset fields, also used by the action empty state. */
+@theme {
+  --color-settings-project-well: #151517;
+  --shadow-settings-project-well:
+    inset 1.5px 2px 3px rgba(0, 0, 0, 0.6), inset -1px -1px 0 rgba(255, 255, 255, 0.05);
+}

@@ -252,6 +252,7 @@ const twMerge = extendTailwindMerge({
         "files-tree",
         "files-preview",
         "files-track",
+        "settings-project-well",
       ],
       "inset-shadow": [
         "selected",

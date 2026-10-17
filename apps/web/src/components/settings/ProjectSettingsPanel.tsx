@@ -1,3 +1,4 @@
+/** Project overview and identity controls; mutations and picker dialogs retain their existing scope. */
 import { t } from "~/i18n";
 import { useComposerMenuState } from "../chat/useComposerMenuState";
 import { useOrchestrationCommand } from "../../state/use-orchestration-command";
@@ -15,7 +16,7 @@ import { AsyncResult } from "effect/reactivity";
 import { type EnvironmentId, type ProjectIconOverride } from "@t3tools/contracts";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import * as Cause from "effect/Cause";
-import { InfoIcon, Trash2Icon } from "lucide-react";
+import { InfoIcon, MonitorIcon, Trash2Icon } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useComposerDraftStore } from "../../composerDraftStore";
@@ -32,6 +33,7 @@ import { ProjectFavicon } from "../ProjectFavicon";
 import { Alert, AlertDescription } from "../ui/alert";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { stackedThreadToast, toastManager } from "../ui/toast";
 import {
   SettingResetButton,
@@ -54,13 +56,34 @@ const ProjectIconPickerDialog = lazy(() =>
   })),
 );
 
+/** Identifies one physical project within its environment for removal bookkeeping. */
 function memberKey(member: { environmentId: string; id: string }): string {
   return `${member.environmentId}:${member.id}`;
+}
+
+/** Keeps long overview values readable with both keyboard focus and pointer hover. */
+function ProjectOverviewValue({ value }: { value: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <span
+            tabIndex={0}
+            className="block truncate rounded-settings-row-surface outline-none focus-visible:inset-shadow-focus"
+          />
+        }
+      >
+        {value}
+      </TooltipTrigger>
+      <TooltipPopup>{value}</TooltipPopup>
+    </Tooltip>
+  );
 }
 
 /** `project` is the Projects page shortcut: the new-thread defaults people change most. */
 export type ProjectSettingsCategory = "general" | "integrations" | "source-control" | "project";
 
+/** Resolves the selected project and optional checkout filters, retaining missing-project recovery. */
 export function ProjectSettingsPanel({
   projectKey,
   environmentId = null,
@@ -161,6 +184,7 @@ export function ProjectSettingsPanel({
   );
 }
 
+/** Presents the selected members; group edits fan out only to those members after permission checks. */
 function ProjectDetail({
   group,
   hasOtherMembers,
@@ -440,7 +464,7 @@ function ProjectDetail({
           description={member.workspaceRoot}
           control={
             <Button
-              size="sm"
+              size="toolbar"
               variant="outline"
               disabled={!editableIds.has(member.environmentId)}
               onClick={() => void removeMembers([member])}
@@ -456,14 +480,55 @@ function ProjectDetail({
 
   return (
     <>
-      <SettingsPageContainer className="gap-6">
+      <SettingsPageContainer>
+        <SettingsSection id="project-overview" title={t.settings.projectSettings.overview}>
+          <dl className="flex flex-wrap gap-2.5 py-2.5 pr-3 pl-3.5 text-control">
+            <div className="flex w-40 flex-col gap-0.5 rounded-settings-row-surface bg-settings-project-well px-3.5 py-2.5 shadow-settings-project-well">
+              <dt className="text-secondary-copy text-secondary-label">
+                {t.settings.projectSettings.overviewName}
+              </dt>
+              <dd className="flex min-w-0 items-center gap-2 font-semibold">
+                <ProjectFavicon project={representative} className="size-4.5 shrink-0" />
+                <ProjectOverviewValue value={group.displayName} />
+              </dd>
+            </div>
+            <div className="flex min-w-0 flex-1 basis-48 flex-col gap-0.5 rounded-settings-row-surface bg-settings-project-well px-3.5 py-2.5 shadow-settings-project-well">
+              <dt className="text-secondary-copy text-secondary-label">
+                {t.settings.projectSettings.overviewPath}
+              </dt>
+              <dd className="min-w-0 font-mono text-secondary-copy-medium">
+                <ProjectOverviewValue
+                  value={group.memberProjects.map((member) => member.workspaceRoot).join(" · ")}
+                />
+              </dd>
+            </div>
+            <div className="flex w-30 flex-col gap-0.5 rounded-settings-row-surface bg-settings-project-well px-3.5 py-2.5 shadow-settings-project-well">
+              <dt className="text-secondary-copy text-secondary-label">
+                {t.settings.projectSettings.overviewEnvironment}
+              </dt>
+              <dd className="flex min-w-0 items-center gap-1.5 font-semibold">
+                <MonitorIcon className="size-3.5 shrink-0" />
+                <ProjectOverviewValue
+                  value={Array.from(
+                    new Set(
+                      group.memberProjects.map(
+                        (member) => member.environmentLabel ?? t.settings.scopeNotice.environment,
+                      ),
+                    ),
+                  ).join(" · ")}
+                />
+              </dd>
+            </div>
+          </dl>
+        </SettingsSection>
+        <ProjectActionsSettings />
         <Alert variant="info">
           <InfoIcon aria-hidden />
           <AlertDescription>
             {t.settings.projectSettings.tFindSettingKeepProjectHint}
           </AlertDescription>
         </Alert>
-        <SettingsSection id="project-overview" title={t.settings.pages.projects} hideTitle>
+        <SettingsSection title={t.settings.projectSettings.identity}>
           {!canEditGroup ? (
             <p className="px-3 py-2 text-sm text-muted-foreground sm:px-4">
               {group.memberProjects.length > 1
@@ -477,7 +542,7 @@ function ProjectDetail({
             control={
               <Input
                 key={`${group.projectKey}:${group.displayName}`}
-                size="sm"
+                size="settings"
                 className="w-full sm:w-64"
                 aria-label={t.settings.projectSettings.projectName}
                 disabled={!canEditGroup}
@@ -522,7 +587,7 @@ function ProjectDetail({
               <div className="flex items-center gap-2">
                 <ProjectFavicon project={representative} className="size-6" />
                 <Button
-                  size="sm"
+                  size="toolbar"
                   variant="outline"
                   type="button"
                   aria-label={t.settings.projectSettings.chooseAProjectIcon}
@@ -532,7 +597,7 @@ function ProjectDetail({
                   {t.settings.projectSettings.chooseIcon}
                 </Button>
                 <Button
-                  size="sm"
+                  size="toolbar"
                   variant="outline"
                   type="button"
                   aria-label={t.settings.projectSettings.chooseAProjectIconFile}
@@ -546,7 +611,6 @@ function ProjectDetail({
           />
         </SettingsSection>
         <ProjectDefaultsSettings category="project" />
-        <ProjectActionsSettings />
         {hasMultipleCheckouts ? checkoutChoices : null}
         <SettingsSection title={t.settings.projectSettings.danger}>
           <SettingsRow
@@ -568,7 +632,7 @@ function ProjectDetail({
             }
             control={
               <Button
-                size="sm"
+                size="toolbar"
                 variant="destructive-outline"
                 disabled={!canEditGroup}
                 onClick={() => void removeMembers(group.memberProjects)}
