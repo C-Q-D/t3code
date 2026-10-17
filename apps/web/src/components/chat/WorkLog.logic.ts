@@ -59,6 +59,7 @@ export function workLogSummaryCounts(entries: ReadonlyArray<WorkLogEntry>) {
   const edits = new Set<string>();
   let readsKnown = true;
   let editsKnown = true;
+  let commandsKnown = true;
   let commands = 0;
   for (const entry of calls.values()) {
     if (
@@ -71,7 +72,8 @@ export function workLogSummaryCounts(entries: ReadonlyArray<WorkLogEntry>) {
     const item = entry.structuredPayload ?? entry.projectedItem?.item;
     const status = entry.toolLifecycleStatus ?? item?.status;
     if (action === "command") {
-      if (status !== "pending" && status !== "declined") commands += 1;
+      if (status === undefined) commandsKnown = false;
+      else if (status === "completed") commands += 1;
       continue;
     }
     if (action !== "read" && action !== "edit") continue;
@@ -99,7 +101,7 @@ export function workLogSummaryCounts(entries: ReadonlyArray<WorkLogEntry>) {
   }
   return {
     readFiles: readsKnown ? reads.size : null,
-    commands,
+    commands: commandsKnown ? commands : null,
     changedFiles: editsKnown ? edits.size : null,
   };
 }

@@ -136,6 +136,7 @@ import {
   DownloadIcon,
   EyeIcon,
   FileTextIcon,
+  FlagIcon,
   GitForkIcon,
   HandIcon,
   ShrinkIcon,
@@ -1651,6 +1652,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
               extraData={`${listIdentityKey}:${rows.length}`}
               keyExtractor={keyExtractor}
               getItemType={getItemType}
+              getFixedItemSize={getFixedItemSize}
               renderItem={renderItem}
               // Bootstrap for D1's 25.375px reply lines and 30px actions; measured type averages take over.
               estimatedItemSize={120}
@@ -1762,6 +1764,15 @@ function getItemType(item: MessagesTimelineRow) {
   // Recessed lifecycle tags must not share size estimates with tall event inspectors.
   if (item.kind === "event") return `event:${item.projectedItem.item.type}`;
   return item.kind === "message" ? `message:${item.message.role}` : item.kind;
+}
+
+/**
+ * Supply the checkpoint marker's known height to LegendList without measuring rows.
+ * @param item Display row; other row types continue to use LegendList's measured type averages.
+ * @returns 44px for a checkpoint: 28px tag, 8px vertical inset and 8px row spacing; otherwise undefined.
+ */
+function getFixedItemSize(item: MessagesTimelineRow) {
+  return item.kind === "checkpoint" ? 44 : undefined;
 }
 
 interface TimelinePositionState {
@@ -2133,6 +2144,7 @@ const TimelineRowContent = memo(function TimelineRowContent({ row }: { row: Time
                   !row.showAssistantMeta) ||
                 row.kind === "worktree-setup" ||
                 row.kind === "event" ||
+                row.kind === "checkpoint" ||
                 row.kind === "attempt-fold" ||
                 row.kind === "html-render" ||
                 row.kind === "mcp-app"
@@ -2177,6 +2189,9 @@ const TimelineRowContent = memo(function TimelineRowContent({ row }: { row: Time
       {row.kind === "turn-fold" ? <TurnFoldTimelineRow row={row} /> : null}
       {row.kind === "attempt-fold" ? <AttemptFoldTimelineRow row={row} /> : null}
       {row.kind === "context-compaction" ? <ContextCompactionTimelineRow row={row} /> : null}
+      {row.kind === "checkpoint" ? (
+        <TimelineSystemDivider label={t.chat.workLog.checkpointCaptured} icon={FlagIcon} />
+      ) : null}
       {row.kind === "message" && row.message.role === "user" ? <UserTimelineRow row={row} /> : null}
       {row.kind === "message" && row.message.role === "assistant" ? (
         <AssistantTimelineRow row={row} />
@@ -2840,7 +2855,11 @@ function TimelineRowTimestamp({
   );
 }
 
-/** Render an existing turn disclosure, using the D1 hand tag for an interrupted turn. */
+/**
+ * Render a turn disclosure, using the D1 hand tag for an interrupted turn.
+ * @param props Derived turn-fold row, with its current expansion state, label and optional summary.
+ * @returns A disclosure that calls TimelineRowCtx.onToggleTurnFold with the existing run ID.
+ */
 function TurnFoldTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "turn-fold" }> }) {
   const ctx = use(TimelineRowCtx);
 
@@ -3100,6 +3119,11 @@ function AssistantMessageMeta({
   );
 }
 
+/**
+ * Preserve the full-response copy entry when the existing copy-state policy permits it.
+ * @param props Message text, visibility policy and streaming state supplied by the derived row.
+ * @returns The D1-sized shared copy button, or null while copying is unavailable.
+ */
 function AssistantCopyButton({
   message,
   showCopyButton,
@@ -4285,6 +4309,11 @@ function LiveWorkEntryTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "
   );
 }
 
+/**
+ * Choose a compact tool-group icon from the shared semantic action.
+ * @param kind Shared summary action, including mixed groups and updates.
+ * @returns An icon name understood by WorkLogRow, without examining labels or provider prose.
+ */
 function toolGroupSummaryIconName(
   kind: Extract<TimelineRow, { kind: "work-toggle" }>["summaryKind"],
 ): WorkEntryIconName {
@@ -5592,6 +5621,11 @@ function buildToolCallExpandedBody(
 const toolCallExpandedBodyClassName =
   "max-h-64 cursor-text overflow-auto whitespace-pre-wrap break-words font-mono text-secondary-label text-(length:--font-size-code,var(--text-2xs)) leading-relaxed select-text";
 
+/**
+ * Choose the retained entry's icon, giving typed notification and tool metadata precedence.
+ * @param workEntry Work entry whose structured source, surface or action may identify its role.
+ * @returns A WorkLogRow icon name; entries without tool metadata fall back to their tone icon.
+ */
 function workEntryIconName(workEntry: TimelineWorkEntry): WorkEntryIconName {
   if (workEntry.structuredPayload?.type === "notification") {
     if (workEntry.structuredPayload.outcome === "failed") return "circle-alert";

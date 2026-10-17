@@ -24,7 +24,7 @@ export function TimelineSystemDivider(props: {
   const Icon = props.icon;
   const content = (
     <>
-      {Icon ? <Icon aria-hidden className="size-3.25 shrink-0" /> : null}
+      {Icon ? <Icon aria-hidden strokeWidth={1.75} className="size-3.25 shrink-0" /> : null}
       <span className="truncate">{props.label}</span>
       {props.detail ? (
         <span

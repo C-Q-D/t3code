@@ -581,6 +581,11 @@ export type MessagesTimelineRow = MessagesTimelineRowContent & {
 
 type MessagesTimelineRowContent =
   | {
+      kind: "checkpoint";
+      id: string;
+      createdAt: string;
+    }
+  | {
       kind: "worktree-setup";
       id: string;
       createdAt: string | null;
@@ -2143,14 +2148,64 @@ export function deriveMessagesTimelineRows(input: {
     }
   }
 
-  const result = attachTrailingToolGroupsToAssistant(
-    attachCreatedThreadSummaries(nextRows, timelineEntries),
+  const result = attachCheckpointRows(
+    attachTrailingToolGroupsToAssistant(attachCreatedThreadSummaries(nextRows, timelineEntries)),
+    timelineEntries,
+    input.turnDiffSummaries,
   );
   return result.map((row, index) =>
     timelineRowIsWorkLog(row) && timelineRowIsWorkLog(result[index + 1])
       ? { ...row, continuesWorkLog: true }
       : row,
   );
+}
+
+/**
+ * Add captured-checkpoint markers only to rendered rows, leaving shared entries and work counts intact.
+ * @param rows Existing display rows after folding and trailing-action placement; never mutated.
+ * @param entries Shared entries used to resolve row run IDs without changing their projection.
+ * @param checkpoints Existing client summaries. Only ready checkpoints for loaded runs are shown.
+ * @returns Rows with each marker after its run's last visible row. A linear scan avoids rescanning
+ * long conversations per checkpoint; stable checkpoint IDs also preserve virtual-list identity.
+ */
+function attachCheckpointRows(
+  rows: MessagesTimelineRow[],
+  entries: ReadonlyArray<TimelineEntry>,
+  checkpoints: ReadonlyArray<TurnDiffSummary>,
+): MessagesTimelineRow[] {
+  if (checkpoints.length === 0) return rows;
+  const runByEntryId = new Map(
+    entries.map((entry) => [
+      entry.id,
+      entry.kind === "event" ? entry.projectedItem.item.runId : timelineEntryRunId(entry),
+    ]),
+  );
+  const lastRowByRun = new Map<RunId, number>();
+  for (const [index, row] of rows.entries()) {
+    let runId = runByEntryId.get(row.id);
+    if (row.kind === "message" || row.kind === "assistant-meta") runId = row.message.runId;
+    else if (row.kind === "turn-fold" || row.kind === "attempt-fold" || row.kind === "work-toggle")
+      runId = row.runId;
+    else if (row.kind === "work-live") runId = row.entry.runId;
+    else if (row.kind === "work") runId = row.groupedEntries.at(-1)?.runId;
+    if (runId) lastRowByRun.set(runId, index);
+  }
+  const markersByIndex = new Map<number, MessagesTimelineRow[]>();
+  const seen = new Set<string>();
+  for (const checkpoint of checkpoints) {
+    if (checkpoint.status !== "ready") continue;
+    const index = lastRowByRun.get(checkpoint.runId);
+    if (index === undefined) continue;
+    const id = `checkpoint:${checkpoint.checkpointId ?? checkpoint.checkpointRef}`;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const markers = markersByIndex.get(index) ?? [];
+    markers.push({ kind: "checkpoint", id, createdAt: checkpoint.completedAt });
+    markersByIndex.set(index, markers);
+  }
+  return markersByIndex.size === 0
+    ? rows
+    : rows.flatMap((row, index) => [row, ...(markersByIndex.get(index) ?? [])]);
 }
 
 /** Adjacent work stays one visual list even when virtualization splits its groups. */
@@ -2379,6 +2434,7 @@ function isRowUnchanged(a: MessagesTimelineRow, b: MessagesTimelineRow): boolean
   if (a.kind !== b.kind || a.id !== b.id) return false;
 
   switch (a.kind) {
+    case "checkpoint":
     case "working":
       return a.createdAt === (b as typeof a).createdAt;
     case "thinking": {

@@ -3628,6 +3628,12 @@ const CHAT_MARKDOWN_COMPONENTS = {
   },
 } satisfies Components;
 
+/**
+ * Render Markdown with the host's existing interactions and an optional timeline presentation.
+ * @param props Required text and optional cwd/context. presentation defaults to the shared look;
+ * timeline enables D1 typography and code/table chrome without changing Markdown actions.
+ * @returns Markdown plus the existing local media preview, when opened.
+ */
 function ChatMarkdown({
   text,
   className,

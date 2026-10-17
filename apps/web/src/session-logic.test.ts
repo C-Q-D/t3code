@@ -1047,42 +1047,69 @@ describe("native provider presentation in the v2 timeline", () => {
     ).toBe("message");
   });
 
-  it("excludes checkpoint-only work from the timeline", () => {
-    const message: OrchestrationV2TurnItem = {
-      ...base,
-      type: "assistant_message",
-      messageId: MessageId.make("done"),
-      text: "Done",
-      streaming: false,
-    };
-    const checkpoint: OrchestrationV2TurnItem = {
-      ...base,
-      id: TurnItemId.make("checkpoint"),
-      type: "checkpoint",
-      checkpointId: CheckpointId.make("checkpoint"),
-      scopeId: CheckpointScopeId.make("scope"),
-      files: [],
-    };
-    const entries = deriveTimelineEntriesFromVisibleTurnItems({
-      visibleTurnItems: [visible(message), visible(checkpoint)],
-      optimisticMessages: [],
-    });
-    expect(entries.map((entry) => entry.kind)).toEqual(["message"]);
-    const rows = deriveMessagesTimelineRows({
-      timelineEntries: entries,
-      latestRun: {
-        runId: base.runId,
-        status: "completed",
-        startedAt: DateTime.formatIso(timestamp),
-        completedAt: DateTime.formatIso(timestamp),
-      },
-      isWorking: false,
-      activeTurnStartedAt: null,
-      turnDiffSummaries: [],
-      supportsConversationRollback: false,
-    });
-    expect(rows.map((row) => row.kind)).toEqual(["message"]);
-  });
+  it.each([
+    { status: "ready", kinds: ["message", "checkpoint"] },
+    { status: "missing", kinds: ["message"] },
+    { status: "error", kinds: ["message"] },
+    { status: "stale", kinds: ["message"] },
+  ] as const)(
+    "keeps shared entries unchanged with a $status captured checkpoint",
+    ({ status, kinds }) => {
+      const message: OrchestrationV2TurnItem = {
+        ...base,
+        type: "assistant_message",
+        messageId: MessageId.make("done"),
+        text: "Done",
+        streaming: false,
+      };
+      const checkpoint: OrchestrationV2TurnItem = {
+        ...base,
+        id: TurnItemId.make("checkpoint"),
+        type: "checkpoint",
+        checkpointId: CheckpointId.make("checkpoint"),
+        scopeId: CheckpointScopeId.make("scope"),
+        files: [],
+      };
+      const entries = deriveTimelineEntriesFromVisibleTurnItems({
+        visibleTurnItems: [visible(message), visible(checkpoint)],
+        optimisticMessages: [],
+      });
+      expect(entries.map((entry) => entry.kind)).toEqual(["message"]);
+      const rows = deriveMessagesTimelineRows({
+        timelineEntries: entries,
+        latestRun: {
+          runId: base.runId,
+          status: "completed",
+          startedAt: DateTime.formatIso(timestamp),
+          completedAt: DateTime.formatIso(timestamp),
+        },
+        isWorking: false,
+        activeTurnStartedAt: null,
+        turnDiffSummaries: [
+          {
+            checkpointId: CheckpointId.make("checkpoint"),
+            scopeId: CheckpointScopeId.make("scope"),
+            runId: base.runId!,
+            checkpointTurnCount: 1,
+            checkpointRef: "refs/checkpoint" as never,
+            status,
+            files: [],
+            assistantMessageId: MessageId.make("done"),
+            completedAt: DateTime.formatIso(timestamp),
+          },
+        ],
+        supportsConversationRollback: false,
+      });
+      expect(rows.map((row) => row.kind)).toEqual(kinds);
+      expect(entries.map((entry) => entry.kind)).toEqual(["message"]);
+      expect(
+        deriveTimelineEntriesFromVisibleTurnItemsWithState({
+          visibleTurnItems: [visible(message), visible(checkpoint)],
+          optimisticMessages: [],
+        }).entries,
+      ).toEqual(entries);
+    },
+  );
 
   it.each([
     { outputIndicatesFailure: true },

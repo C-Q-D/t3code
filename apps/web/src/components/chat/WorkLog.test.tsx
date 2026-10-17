@@ -1,4 +1,7 @@
-// @vitest-environment jsdom
+/**
+ * Verifies live log following and its pause while the reader scrolls up.
+ * @vitest-environment jsdom
+ */
 
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";

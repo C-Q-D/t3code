@@ -52,6 +52,68 @@ import {
 } from "./MessagesTimeline.logic";
 import type { WorkLogEntry } from "../../session-logic";
 
+it("places each checkpoint after its own loaded turn and keeps marker identity on replay", () => {
+  const first: TimelineEntry = {
+    kind: "message",
+    id: "first",
+    createdAt: "2026-01-01T00:00:01Z",
+    message: {
+      id: MessageId.make("first"),
+      role: "assistant",
+      runId: RunId.make("run-first"),
+      text: "First done",
+      createdAt: "2026-01-01T00:00:01Z",
+      updatedAt: "2026-01-01T00:00:02Z",
+      streaming: false,
+    },
+  };
+  const second: TimelineEntry = {
+    ...first,
+    id: "second",
+    createdAt: "2026-01-01T00:00:03Z",
+    message: { ...first.message, id: MessageId.make("second"), runId: RunId.make("run-second") },
+  };
+  const checkpoint: TurnDiffSummary = {
+    runId: RunId.make("run-first"),
+    checkpointTurnCount: 1,
+    checkpointRef: CheckpointRef.make("first"),
+    status: "ready",
+    files: [],
+    assistantMessageId: MessageId.make("first"),
+    completedAt: "2026-01-01T00:00:02Z",
+  };
+  const input = {
+    timelineEntries: [first, second],
+    isWorking: false,
+    supportsConversationRollback: false,
+    turnDiffSummaries: [
+      checkpoint,
+      checkpoint,
+      {
+        ...checkpoint,
+        runId: RunId.make("run-second"),
+        checkpointRef: CheckpointRef.make("second"),
+      },
+      {
+        ...checkpoint,
+        runId: RunId.make("not-loaded"),
+        checkpointRef: CheckpointRef.make("unloaded"),
+      },
+    ],
+  };
+  const initial = deriveMessagesTimelineRowsWithState(input);
+  expect(initial.rows.map((row) => row.id)).toEqual([
+    "first",
+    "checkpoint:first",
+    "second",
+    "checkpoint:second",
+  ]);
+  const stable = computeStableMessagesTimelineRows(initial.rows, { byId: new Map(), result: [] });
+  const replay = deriveMessagesTimelineRowsWithState({ ...input, isWorking: true }, initial);
+  const stableReplay = computeStableMessagesTimelineRows(replay.rows, stable);
+  expect(stableReplay.result.find((row) => row.id === "checkpoint:first")).toBe(initial.rows[1]);
+});
+
 describe("expanded tool group scrolling", () => {
   const entries = [{ id: "first" }, { id: "second" }];
 

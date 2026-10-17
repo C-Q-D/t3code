@@ -5,14 +5,18 @@ import { workLogSummaryCounts } from "./WorkLog.logic";
 import { ThreadId, TurnItemId } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
 
-/** Build a settled tool; overrides supply only the facts relevant to each counting rule. */
-function entry(id: string, overrides: Partial<WorkLogEntry> = {}): WorkLogEntry {
+/** Build a settled tool; null lifecycle omits the status so tests can model missing metadata. */
+function entry(
+  id: string,
+  overrides: Partial<WorkLogEntry> = {},
+  lifecycle: NonNullable<WorkLogEntry["toolLifecycleStatus"]> | null = "completed",
+): WorkLogEntry {
   return {
     id,
     createdAt: "2026-01-01T00:00:00Z",
     label: "Tool",
     tone: "tool",
-    toolLifecycleStatus: "completed",
+    ...(lifecycle === null ? {} : { toolLifecycleStatus: lifecycle }),
     ...overrides,
   };
 }
@@ -31,7 +35,7 @@ describe("workLogSummaryCounts", () => {
     expect(workLogSummaryCounts(entries)).toEqual({ readFiles: 2, commands: 2, changedFiles: 2 });
   });
 
-  it("counts a command lifecycle once, using the latest update for its call ID", () => {
+  it("does not count a failed latest update as a completed command", () => {
     expect(
       workLogSummaryCounts([
         entry("started", {
@@ -44,6 +48,81 @@ describe("workLogSummaryCounts", () => {
           itemType: "command_execution",
           toolLifecycleStatus: "failed",
         }),
+      ]),
+    ).toEqual({ readFiles: 0, commands: 0, changedFiles: 0 });
+  });
+
+  it.each(["idle", "declined", "inProgress", "stopped", "failed"] as const)(
+    "does not count a command with status %s as completed",
+    (status) => {
+      expect(
+        workLogSummaryCounts([
+          entry("command", { itemType: "command_execution", toolLifecycleStatus: status }),
+        ]),
+      ).toEqual({ readFiles: 0, commands: 0, changedFiles: 0 });
+    },
+  );
+
+  it.each(["pending", "running"] as const)("does not count retained item status %s", (status) => {
+    expect(
+      workLogSummaryCounts([
+        entry(
+          "retained-command",
+          {
+            itemType: "command_execution",
+            structuredPayload: {
+              id: TurnItemId.make("command"),
+              threadId: ThreadId.make("thread-1"),
+              runId: null,
+              nodeId: null,
+              providerThreadId: null,
+              providerTurnId: null,
+              nativeItemRef: null,
+              parentItemId: null,
+              ordinal: 0,
+              status,
+              title: null,
+              startedAt: null,
+              completedAt: null,
+              updatedAt: DateTime.makeUnsafe("2026-01-01T00:00:00Z"),
+              type: "command_execution",
+              input: "vp test run",
+            },
+          },
+          null,
+        ),
+      ]),
+    ).toEqual({ readFiles: 0, commands: 0, changedFiles: 0 });
+  });
+
+  it.each([
+    ["alone", []],
+    ["with a completed command", [entry("completed-command", { itemType: "command_execution" })]],
+  ] as const)("hides an unknown command category %s", (_label, knownCommands) => {
+    const entries = [
+      entry("unknown-command", { itemType: "command_execution" }, null),
+      entry("read", { requestKind: "file-read", changedFiles: ["src/a.ts"] }),
+      entry("edit", { itemType: "file_change", changedFiles: ["src/a.ts"] }),
+    ];
+    expect(workLogSummaryCounts([...entries, ...knownCommands])).toEqual({
+      readFiles: 1,
+      commands: null,
+      changedFiles: 1,
+    });
+  });
+
+  it("counts the completed latest update once after an unknown command update", () => {
+    expect(
+      workLogSummaryCounts([
+        entry(
+          "unknown",
+          {
+            toolCallId: "call-1",
+            itemType: "command_execution",
+          },
+          null,
+        ),
+        entry("completed", { toolCallId: "call-1", itemType: "command_execution" }),
       ]),
     ).toEqual({ readFiles: 0, commands: 1, changedFiles: 0 });
   });

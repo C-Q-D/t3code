@@ -492,6 +492,43 @@ function buildSnapShotTimelineEntry(previewUrl?: string) {
 }
 
 describe("MessagesTimeline", () => {
+  it("shows a captured checkpoint without requiring changed files", async () => {
+    vi.unstubAllGlobals();
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    const runId = RunId.make("checkpoint-run");
+    const entry = buildAssistantTimelineEntry("Done without file changes.");
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    try {
+      await act(async () =>
+        root.render(
+          <MessagesTimeline
+            {...buildProps()}
+            timelineEntries={[{ ...entry, message: { ...entry.message, runId } }]}
+            turnDiffSummaries={[
+              {
+                runId,
+                checkpointTurnCount: 1,
+                checkpointRef: CheckpointRef.make("checkpoint-empty"),
+                status: "ready",
+                files: [],
+                assistantMessageId: entry.message.id,
+                completedAt: MESSAGE_CREATED_AT,
+              },
+            ]}
+          />,
+        ),
+      );
+      expect(container.textContent).toContain("Done without file changes.");
+      expect(container.textContent?.match(/Checkpoint captured/g)).toHaveLength(1);
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("shows dynamic tool input without cached output when the row is expanded", async () => {
     activityTestState.expanded = true;
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);

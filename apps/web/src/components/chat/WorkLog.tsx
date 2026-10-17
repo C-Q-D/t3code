@@ -154,6 +154,13 @@ export function WorkLogRow({
 /** Distance from the end, in px, that still counts as reading the newest text. */
 const LIVE_EDGE_PX = 4;
 
+/**
+ * Render expanded log content without letting pointer actions toggle its parent disclosure.
+ * @param props Children and content kind (text by default); panel/media keep their existing shells.
+ * followLive defaults false. When true, text updates follow the end before paint while the reader
+ * is within 4px of it. Scrolling up pauses following until the reader scrolls back to the end.
+ * @returns The detail container; updates use its existing scroll geometry without timers or polling.
+ */
 export function WorkLogDetails({
   children,
   kind = "text",

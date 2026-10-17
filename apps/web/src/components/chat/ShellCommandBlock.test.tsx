@@ -1,5 +1,7 @@
-// @vitest-environment jsdom
-/** Verifies that the compact command exposes its complete text through real tooltip interaction. */
+/**
+ * Verifies that the compact command exposes its complete text through real tooltip interaction.
+ * @vitest-environment jsdom
+ */
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { expect, it, vi } from "vite-plus/test";
