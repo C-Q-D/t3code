@@ -38,6 +38,25 @@ describe("8a round-table geometry", () => {
     ]);
   });
 
+  it("keeps four seats on the 120-degree normal orbit", () => {
+    const layout = roundTableLayout([
+      ...THREE_SEATS,
+      { id: "d", seatIndex: 3, label: "产品", state: "next" },
+    ]);
+    expect(layout.map(({ angle }) => angle)).toEqual([-150, -110, -70, -30]);
+    expect(layout[3]!.angle - layout[0]!.angle).toBe(120);
+  });
+
+  it("expands five seats to the 160-degree dense orbit", () => {
+    const layout = roundTableLayout([
+      ...THREE_SEATS,
+      { id: "d", seatIndex: 3, label: "产品", state: "next" },
+      { id: "e", seatIndex: 4, label: "安全", state: "next" },
+    ]);
+    expect(layout.map(({ angle }) => angle)).toEqual([-170, -130, -90, -50, -10]);
+    expect(layout[4]!.angle - layout[0]!.angle).toBe(160);
+  });
+
   it("spreads six seats across 160 degrees, shrinking only nonspeakers", () => {
     const layout = roundTableLayout([
       ...THREE_SEATS,

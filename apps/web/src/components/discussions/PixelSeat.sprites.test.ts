@@ -1,5 +1,7 @@
-// @vitest-environment jsdom
-/** Guards shared-sheet lifetime and the fixed palette needed by SVG presentation attributes. */
+/**
+ * Guards shared-sheet lifetime and the fixed palette needed by SVG presentation attributes.
+ * @vitest-environment jsdom
+ */
 import * as NodeURL from "node:url";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import { it } from "@effect/vitest";

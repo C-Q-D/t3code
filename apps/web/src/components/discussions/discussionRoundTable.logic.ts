@@ -52,12 +52,15 @@ export function roundTablePoint(degrees: number) {
  * @returns Positioned seats with outside-label direction and one animated speaker at most.
  * @throws RangeError when ids repeat; turn references would otherwise be ambiguous.
  */
-export function roundTableLayout(seats: readonly DiscussionTableSeat[]) {
+export function roundTableLayout(
+  seats: readonly DiscussionTableSeat[],
+): RoundTablePositionedSeat[] {
   if (new Set(seats.map((seat) => seat.id)).size !== seats.length) {
     throw new RangeError("Round-table seat ids must be unique");
   }
   const count = seats.length;
-  // The handoff groups up to four seats at normal size and larger tables at dense size.
+  // 讨论页-8a v3 状态.dc.html:87,105 ties the 160° dense orbit to k > 4 (38px seats).
+  // 讨论列表与新建-8a.dc.html:263 independently names >4 as the threshold for a longer arc.
   const span = count < 2 ? 0 : count === 2 ? 90 : count <= 4 ? 120 : 160;
   const step = count > 1 ? span / (count - 1) : 0;
   const speaker = seats.findIndex((seat) => seat.state === "speaking");
@@ -66,19 +69,26 @@ export function roundTableLayout(seats: readonly DiscussionTableSeat[]) {
     // A transient duplicate speaker must not start another continuous animation.
     const state = seat.state === "speaking" && index !== speaker ? "idle" : seat.state;
     const size = state === "speaking" ? 48 : count > 4 ? 38 : 44;
+    const labelsAbove = Math.sin((angle * Math.PI) / 180) < -0.9;
     return {
       ...seat,
       state,
       angle,
       ...roundTablePoint(angle),
       size,
-      labelsAbove: Math.sin((angle * Math.PI) / 180) < -0.9,
+      labelsAbove,
     };
   });
 }
 
-/** Geometry returned by roundTableLayout, shared by the SVG and arc calculation. */
-export type RoundTablePositionedSeat = ReturnType<typeof roundTableLayout>[number];
+/** Physical orbit position in CSS pixels, with outside-label direction for the SVG renderer. */
+export interface RoundTablePositionedSeat extends DiscussionTableSeat {
+  readonly angle: number;
+  readonly x: number;
+  readonly y: number;
+  readonly size: number;
+  readonly labelsAbove: boolean;
+}
 
 /**
  * Trims the orbit around both seats and draws clockwise, including the long arc behind the user.
