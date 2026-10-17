@@ -353,6 +353,7 @@ export const chat = {
   },
 
   rightPanel: {
+    panelTitle: "Right panel",
     /** Formats a generated terminal fallback label; caller-supplied session labels bypass it. */
     browserDisabled: "Browser previews are only available in the T3 Code desktop app.",
     terminalDisabled: "Terminal surfaces are only available from a project thread.",

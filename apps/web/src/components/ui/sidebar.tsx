@@ -40,6 +40,8 @@ type SidebarContextProps = {
   state: ResponsiveSidebarState;
   open: boolean;
   setOpen: (open: boolean) => void;
+  /** Updates desktop visibility for temporary layouts without changing the saved preference. */
+  setOpenTemporarily: (open: boolean) => void;
   openMobile: boolean;
   mobileSheetMounted: boolean;
   setMobileSheetElement: (element: HTMLDivElement | null) => void;
@@ -107,7 +109,7 @@ function useSidebarVisibility() {
 /**
  * Owns desktop and drawer visibility, toggle actions, and an in-memory panel snapshot.
  * defaultOpen seeds uncontrolled desktop visibility; open/onOpenChange allow control.
- * Desktop changes retain the existing cookie behavior; snapshots do not persist.
+ * Manual desktop changes retain cookie persistence; temporary layouts and snapshot restores do not.
  * Native div props, children, and CSS geometry pass through to the shared wrapper.
  */
 function SidebarProvider({
@@ -134,14 +136,21 @@ function SidebarProvider({
   // We use openProp and setOpenProp for control from outside the component.
   const [_open, _setOpen] = React.useState(defaultOpen);
   const open = openProp ?? _open;
-  const setOpen = React.useCallback(
-    async (value: boolean | ((value: boolean) => boolean)) => {
+  const setOpenTemporarily = React.useCallback(
+    (value: boolean | ((value: boolean) => boolean)) => {
       const openState = typeof value === "function" ? value(open) : value;
       if (setOpenProp) {
         setOpenProp(openState);
       } else {
         _setOpen(openState);
       }
+    },
+    [setOpenProp, open],
+  );
+  const setOpen = React.useCallback(
+    async (value: boolean | ((value: boolean) => boolean)) => {
+      const openState = typeof value === "function" ? value(open) : value;
+      setOpenTemporarily(openState);
 
       // This sets the cookie to keep the sidebar state.
       await cookieStore.set({
@@ -151,7 +160,7 @@ function SidebarProvider({
         value: String(openState),
       });
     },
-    [setOpenProp, open],
+    [setOpenTemporarily, open],
   );
 
   // Helper to toggle the sidebar.
@@ -172,6 +181,7 @@ function SidebarProvider({
       mobileSheetMounted,
       setMobileSheetElement,
       setOpen,
+      setOpenTemporarily,
       setOpenMobile,
       state,
       toggleSidebar,
@@ -183,7 +193,7 @@ function SidebarProvider({
         const saved = savedVisibility.current;
         if (!saved) return;
         savedVisibility.current = null;
-        if (saved.open !== open) void setOpen(saved.open);
+        if (saved.open !== open) setOpenTemporarily(saved.open);
         setOpenMobile(saved.openMobile);
       },
     }),
@@ -191,6 +201,7 @@ function SidebarProvider({
       state,
       open,
       setOpen,
+      setOpenTemporarily,
       isMobile,
       openMobile,
       mobileSheetMounted,

@@ -322,6 +322,7 @@ export const chat: Messages["chat"] = {
   },
 
   rightPanel: {
+    panelTitle: "右侧面板",
     /** Formats a generated terminal fallback label; caller-supplied session labels bypass it. */
     browserDisabled: "浏览器预览仅在T3 Code桌面应用中可用。",
     terminalDisabled: "终端面板仅在项目对话中可用。",

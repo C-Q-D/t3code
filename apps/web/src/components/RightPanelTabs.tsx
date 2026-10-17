@@ -1,3 +1,4 @@
+/** Hosts sortable right-panel tabs and launch actions; surface content and layout ownership remain with the caller. */
 import { t } from "~/i18n";
 import { pullRequestHostOf, type SourceControlProviderKind } from "@t3tools/contracts";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
@@ -96,8 +97,11 @@ import { resolvePullRequestState } from "./pullRequest/pullRequestPresentation";
 import { PullRequestGlyph } from "~/components/pullRequest/pullRequestIcons";
 import { observeResize } from "~/lib/observeResize";
 
+/** Controlled panel surfaces, actions and host geometry; tab identity and ordering are supplied by the owner. */
 interface RightPanelTabsProps {
   mode: PreviewPanelMode;
+  /** Chat owns sibling slabs below the shared titlebar; other hosts retain their existing layout. */
+  standalone?: boolean;
   maximized?: boolean;
   open?: boolean;
   keybindings: ResolvedKeybindingsConfig;
@@ -871,8 +875,9 @@ function SortableTab({
   );
 }
 
+/** Renders the host's tabs and layout controls without changing surface activation, ordering or close semantics. */
 export function RightPanelTabs(props: RightPanelTabsProps) {
-  const ownsDesktopTitleBar = isElectron && props.mode === "inline";
+  const ownsDesktopTitleBar = isElectron && props.mode === "inline" && !props.standalone;
   const browserProfiles = useBrowserDefaults().profiles;
   const { resolvedTheme } = useTheme();
   const tabListRef = useRef<HTMLDivElement>(null);
@@ -1166,6 +1171,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
   return (
     <PreviewPanelShell
       mode={props.mode}
+      {...(props.standalone !== undefined ? { standalone: props.standalone } : {})}
       {...(props.maximized !== undefined ? { maximized: props.maximized } : {})}
       {...(props.open !== undefined ? { open: props.open } : {})}
       {...(props.widthStorageKey !== undefined ? { widthStorageKey: props.widthStorageKey } : {})}
@@ -1174,14 +1180,16 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
     >
       <div
         className={cn(
-          "flex h-[var(--workspace-topbar-height)] min-h-[var(--workspace-topbar-height)] shrink-0 items-center gap-1 pl-2",
-          // The sheet overlays from the viewport top, so its tab bar keeps
-          // the titlebar's height: a compact row re-centers the layout
-          // controls a few pixels higher and the cluster jumps on open.
-          props.mode === "inline" && !props.layoutControls ? "pr-28" : "pr-3",
+          "flex shrink-0 items-center gap-1 pl-2",
+          // Standalone slabs start below the native titlebar. Keep native-control
+          // space only for hosts that still place their tabs in that titlebar.
+          props.standalone
+            ? "h-12.5 min-h-12.5"
+            : "h-(--workspace-topbar-height) min-h-(--workspace-topbar-height)",
+          props.mode === "inline" && !props.layoutControls && !props.standalone ? "pr-28" : "pr-3",
           ownsDesktopTitleBar && "drag-region",
           ownsDesktopTitleBar && "wco:pr-(--workspace-native-controls-inset)",
-          props.mode === "inline" && props.maximized && COLLAPSED_SIDEBAR_TITLEBAR_INSET_CLASS,
+          ownsDesktopTitleBar && props.maximized && COLLAPSED_SIDEBAR_TITLEBAR_INSET_CLASS,
         )}
         data-right-panel-tabbar
       >

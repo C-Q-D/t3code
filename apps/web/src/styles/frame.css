@@ -257,3 +257,17 @@ html[data-theme-id="graphite"] [data-frame-main] {
     transform: none;
   }
 }
+
+/* PN1.1 · ChatView owns two sibling slabs. Its route wrapper must expose their
+   exterior shadows and leave the frame's stone base visible in the gutter.
+   Other routes keep AppSidebarLayout's original enclosing slab. */
+[data-frame-main="chat"] > [data-slot="sidebar-inset"] {
+  overflow: visible;
+  background: transparent;
+}
+
+/* ThreadRouteView can be waiting for a thread before ChatView mounts.
+   Preserve its existing empty main slab until chat takes ownership. */
+[data-frame-main="chat"]:not(:has([data-chat-workspace])) {
+  @apply stone-frame-card rounded-slab bg-card shadow-slab-frame;
+}

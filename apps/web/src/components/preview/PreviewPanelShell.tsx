@@ -1,3 +1,4 @@
+/** Hosts panel sizing and resize handles; standalone chat panels own a separate slab below the titlebar. */
 import {
   type CSSProperties,
   type ReactNode,
@@ -7,7 +8,6 @@ import {
   useState,
 } from "react";
 
-import { isElectron } from "~/env";
 import {
   getPreviewPanelMaxWidth,
   type PreviewPanelInlineSize,
@@ -17,9 +17,11 @@ import { RESIZABLE_WIDTH_PROPERTY } from "~/hooks/useResizableWidth";
 
 export { getPreviewPanelMaxWidth };
 import { cn } from "~/lib/utils";
+import { Slab } from "~/components/ui/slab";
 
 import { RightPanelResizeHandle } from "./RightPanelResizeHandle";
 
+/** Chooses whether sizing belongs to this shell, a sheet/sidebar host, or an embedded surface. */
 export type PreviewPanelMode = "inline" | "sheet" | "sidebar" | "embedded";
 
 /**
@@ -29,6 +31,8 @@ export type PreviewPanelMode = "inline" | "sheet" | "sidebar" | "embedded";
  */
 interface PreviewPanelShellProps {
   mode: PreviewPanelMode;
+  /** Use a sibling slab in chat; false preserves embedded and PR-page layouts. */
+  standalone?: boolean;
   maximized?: boolean;
   inlineSize?: PreviewPanelInlineSize;
   open?: boolean;
@@ -44,6 +48,7 @@ interface PreviewPanelShellProps {
   children: ReactNode;
 }
 
+/** Selects externally owned sizing or a local resizable width; children supply panel content. */
 export function PreviewPanelShell(props: PreviewPanelShellProps) {
   if (props.inlineSize) {
     return <PreviewPanelShellFrame {...props} inlineSize={props.inlineSize} />;
@@ -52,6 +57,7 @@ export function PreviewPanelShell(props: PreviewPanelShellProps) {
   return <ResizablePreviewPanelShell {...props} />;
 }
 
+/** Resolves local width only when the host has not supplied its shared resize state. */
 function ResizablePreviewPanelShell(props: PreviewPanelShellProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const inlineSize = usePreviewPanelInlineSize(hostRef, {
@@ -62,13 +68,13 @@ function ResizablePreviewPanelShell(props: PreviewPanelShellProps) {
   return <PreviewPanelShellFrame {...props} inlineSize={inlineSize} hostRef={hostRef} />;
 }
 
+/** Keeps the resize handle outside clipping while the slab clips its own content. */
 function PreviewPanelShellFrame(
   props: PreviewPanelShellProps & {
     inlineSize: PreviewPanelInlineSize;
     hostRef?: RefObject<HTMLDivElement | null>;
   },
 ) {
-  const useDragRegion = isElectron && props.mode !== "sheet" && props.mode !== "embedded";
   const isInline = props.mode === "inline";
   const collapsible = isInline && props.open !== undefined;
   const open = props.open ?? true;
@@ -113,20 +119,42 @@ function PreviewPanelShellFrame(
       window.cancelAnimationFrame(restoreFrame);
     };
   }, [suppressWidthTransition]);
+  const content = (
+    <div className={cn("h-full min-h-0 w-full", collapsible && "overflow-clip")}>
+      <div
+        className="flex h-full min-h-0 min-w-0 flex-col"
+        style={
+          collapsible && !maximized
+            ? {
+                width: props.standalone
+                  ? `var(${RESIZABLE_WIDTH_PROPERTY})`
+                  : `calc(var(${RESIZABLE_WIDTH_PROPERTY}) - 1px)`,
+              }
+            : undefined
+        }
+      >
+        {props.children}
+      </div>
+    </div>
+  );
   return (
     <div
       ref={hostRef}
       className={cn(
-        "relative flex h-full min-h-0 min-w-0 max-w-full flex-col self-stretch bg-background",
-        isInline
-          ? maximized
-            ? "flex-1 border-l border-border"
-            : "shrink-0 border-l border-border"
-          : "w-full",
+        "relative flex h-full min-h-0 min-w-0 max-w-full flex-col self-stretch",
+        !props.standalone && "bg-background",
+        isInline ? (maximized ? "flex-1" : "shrink-0") : "w-full",
+        isInline && !props.standalone && "border-l border-border",
+        isInline && props.standalone && open && !maximized && "ms-(--frame-slab-gap)",
         collapsible &&
+          !props.standalone &&
           "[[data-panel-animations=true]_&]:transition-[width] [[data-panel-animations=true]_&]:duration-(--panel-animation-duration) [[data-panel-animations=true]_&]:ease-out",
-        collapsible && open && "[[data-panel-animations=true]_&]:starting:w-0!",
+        collapsible &&
+          !props.standalone &&
+          open &&
+          "[[data-panel-animations=true]_&]:starting:w-0!",
         collapsible && !open && "pointer-events-none",
+        collapsible && !open && props.standalone && "invisible",
       )}
       style={
         isInline
@@ -145,18 +173,18 @@ function PreviewPanelShellFrame(
       data-preview-panel-maximized={maximized ? "true" : "false"}
     >
       {isInline && !maximized ? <RightPanelResizeHandle handlers={handlers} /> : null}
-      <div className={cn("h-full min-h-0 w-full", collapsible && "overflow-clip")}>
-        <div
-          className="flex h-full min-h-0 min-w-0 flex-col"
-          style={
-            collapsible && !maximized
-              ? { width: `calc(var(${RESIZABLE_WIDTH_PROPERTY}) - 1px)` }
-              : undefined
-          }
+      {props.standalone ? (
+        <Slab
+          tone="card"
+          radius="slab"
+          elevation="slab-frame"
+          className="h-full min-h-0 overflow-hidden"
         >
-          {props.children}
-        </div>
-      </div>
+          {content}
+        </Slab>
+      ) : (
+        content
+      )}
     </div>
   );
 }

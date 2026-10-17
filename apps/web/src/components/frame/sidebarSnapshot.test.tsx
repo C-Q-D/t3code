@@ -11,10 +11,18 @@ import { SidebarProvider, useSidebar } from "../ui/sidebar";
 let container: HTMLDivElement;
 let root: Root;
 
-/** Exposes visibility and the future panel actions through ordinary user events. */
+/** Exposes snapshots, temporary collapse and manual toggles through ordinary user events. */
 function Controls() {
-  const { open, openMobile, setOpen, setOpenMobile, saveSidebarState, restoreSidebarState } =
-    useSidebar();
+  const {
+    open,
+    openMobile,
+    setOpen,
+    setOpenTemporarily,
+    setOpenMobile,
+    toggleSidebar,
+    saveSidebarState,
+    restoreSidebarState,
+  } = useSidebar();
   return (
     <>
       <output>{`${open}/${openMobile}`}</output>
@@ -22,6 +30,8 @@ function Controls() {
       <button onClick={restoreSidebarState}>restore</button>
       <button onClick={() => void setOpen(!open)}>desktop</button>
       <button onClick={() => setOpenMobile(!openMobile)}>drawer</button>
+      <button onClick={() => setOpenTemporarily(false)}>temporary close</button>
+      <button onClick={toggleSidebar}>toggle</button>
     </>
   );
 }
@@ -55,6 +65,53 @@ afterEach(async () => {
 });
 
 describe("sidebar visibility before a right panel opens", () => {
+  it("collapses and restores temporarily without persisting either change", async () => {
+    await act(() =>
+      root.render(
+        <SidebarProvider>
+          <Controls />
+        </SidebarProvider>,
+      ),
+    );
+    await click("save");
+    await click("temporary close");
+    expect(container.querySelector("output")?.textContent).toBe("false/false");
+    expect(cookieStore.set).not.toHaveBeenCalled();
+    await click("restore");
+    expect(container.querySelector("output")?.textContent).toBe("true/false");
+    expect(cookieStore.set).not.toHaveBeenCalled();
+  });
+
+  it("persists manual toggles while restoring the original in-memory snapshot", async () => {
+    await act(() =>
+      root.render(
+        <SidebarProvider defaultOpen={false}>
+          <Controls />
+        </SidebarProvider>,
+      ),
+    );
+    await click("save");
+    await click("toggle");
+    expect(container.querySelector("output")?.textContent).toBe("true/false");
+    expect(cookieStore.set).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        name: "sidebar_state",
+        value: "true",
+      }),
+    );
+    await click("restore");
+    expect(container.querySelector("output")?.textContent).toBe("false/false");
+    expect(cookieStore.set).toHaveBeenCalledTimes(1);
+    await click("toggle");
+    await click("toggle");
+    expect(cookieStore.set).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        name: "sidebar_state",
+        value: "false",
+      }),
+    );
+  });
+
   it("restores the first snapshot of both modes and consumes it after restoring", async () => {
     await act(() =>
       root.render(

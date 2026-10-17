@@ -301,3 +301,25 @@
     @apply w-27;
   }
 }
+
+/* PN1.1 · StyleM-8a / 核心屏-8a A4: portaled overlays start below the
+   shared titlebar, leave the project rail exposed, and retain frame gutters.
+   The viewport owns placement; the popup's sibling slab owns its surface. */
+.right-panel-overlay-region {
+  position: fixed;
+  z-index: var(--z-sheet);
+  top: var(--workspace-topbar-height, var(--frame-titlebar-height));
+  right: 0;
+  bottom: 0;
+  left: calc(var(--frame-padding-inline) + var(--frame-projectbar-width));
+}
+
+.right-panel-overlay-viewport {
+  padding-right: var(--frame-padding-inline);
+  padding-bottom: var(--frame-padding-bottom);
+}
+
+/* Tailwind's translate utilities use the independent translate property. */
+@utility transition-panel-overlay {
+  transition-property: translate, opacity;
+}

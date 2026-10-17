@@ -4,6 +4,8 @@ import { useAtomValue } from "@effect/atom-react";
 import * as Schema from "effect/Schema";
 import {
   useEffect,
+  useLayoutEffect,
+  useRef,
   useState,
   useSyncExternalStore,
   type CSSProperties,
@@ -22,9 +24,16 @@ import { isEditableFocused } from "../lib/editableFocus";
 import { isPreviewFocused } from "../lib/previewFocus";
 import { isTerminalFocused } from "../lib/terminalFocus";
 import { isModelPickerOpen } from "../modelPickerVisibility";
-import { selectActiveRightPanel, useRightPanelStore } from "../rightPanelStore";
+import {
+  selectActiveRightPanel,
+  selectThreadRightPanelState,
+  useRightPanelStore,
+} from "../rightPanelStore";
+import { scopeThreadRef } from "@t3tools/client-runtime/environment";
+import { useComposerDraftStore } from "../composerDraftStore";
+import { resolveRightPanelSidebarAction, shouldUseRightPanelSheet } from "../rightPanelLayout";
 import { selectThreadTerminalUiState, useTerminalUiStateStore } from "../terminalUiStateStore";
-import { resolveThreadRouteRef } from "../threadRoutes";
+import { resolveThreadRouteRef, resolveThreadRouteTarget } from "../threadRoutes";
 import { isMacPlatform } from "../lib/utils";
 import { primaryServerKeybindingsAtom } from "../state/server";
 import { useEnvironmentIdentificationMode, useLegacySidebarEnabled } from "../hooks/useSettings";
@@ -58,6 +67,46 @@ import {
 } from "./frame/frameGeometry";
 
 const MACOS_TRAFFIC_LIGHTS_LEFT_INSET = "var(--desktop-window-controls-inset, 90px)";
+
+/**
+ * Owns the temporary sidebar session above keyed ChatViews so switching an open
+ * panel between conversations does not capture its already-collapsed state.
+ * The original visibility wins on close, even after manual changes while open.
+ */
+function RightPanelSidebarVisibility({ sheet }: { sheet: boolean }) {
+  const target = useParams({ strict: false, select: (params) => resolveThreadRouteTarget(params) });
+  const draft = useComposerDraftStore((state) =>
+    target?.kind === "draft" ? state.getDraftSession(target.draftId) : null,
+  );
+  const threadRef =
+    target?.kind === "server"
+      ? target.threadRef
+      : draft
+        ? (draft.promotedTo ?? scopeThreadRef(draft.environmentId, draft.threadId))
+        : null;
+  const panelOpen = useRightPanelStore(
+    (state) => selectThreadRightPanelState(state.byThreadKey, threadRef).isOpen,
+  );
+  const sidebar = useSidebar();
+  const snapshotActive = useRef(false);
+
+  useLayoutEffect(() => {
+    const action = resolveRightPanelSidebarAction({
+      snapshotActive: snapshotActive.current,
+      panelOpen,
+      sheet,
+    });
+    if (action === "capture-and-collapse") {
+      snapshotActive.current = true;
+      sidebar.saveSidebarState();
+      sidebar.setOpenTemporarily(false);
+    } else if (action === "restore") {
+      snapshotActive.current = false;
+      sidebar.restoreSidebarState();
+    }
+  }, [panelOpen, sheet, sidebar]);
+  return null;
+}
 
 function subscribeToViewportWidth(onChange: () => void): () => void {
   window.addEventListener("resize", onChange);
@@ -238,6 +287,7 @@ function ProjectProjectionRetention() {
  * the parent workspace, which receives the space below the titlebar.
  * Mount within the app router and environment providers for navigation and shortcuts.
  */
+/** Frames routed children with the shared titlebar and sidebar; chat routes own their sibling slabs. */
 export function AppSidebarLayout({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const legacySidebarEnabled = useLegacySidebarEnabled();
@@ -248,6 +298,10 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
   // Seeds server-side visited tracking from this browser's localStorage the
   useThreadVisitedMigration();
   const pathname = useLocation({ select: (location) => location.pathname });
+  const chatOwnsSlabs = useParams({
+    strict: false,
+    select: (params) => resolveThreadRouteTarget(params) !== null,
+  });
   const panelAnimationsSuppressed = usePanelNavigationSuppression(pathname);
   const routePanelAnimationsActive = panelAnimationsActive && !panelAnimationsSuppressed;
   const isOnSettings = pathname === "/settings" || pathname.startsWith("/settings/");
@@ -338,6 +392,7 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
             defaultOpen
             style={sidebarProviderStyle}
           >
+            <RightPanelSidebarVisibility sheet={shouldUseRightPanelSheet(viewportWidth)} />
             <WindowTitlebar
               sidebarControl={<SidebarControl />}
               onLeadingWidthChange={setTitlebarLeadingWidth}
@@ -382,16 +437,25 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
                 <SidebarRail onDoubleClick={resetSidebarWidth} />
               </Sidebar>
               <div className="window-frame-main flex min-h-0 min-w-0 flex-col">
-                <Slab
-                  tone="card"
-                  radius="slab"
-                  elevation="slab-frame"
-                  className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
-                  render={<div className="stone-frame-card" />}
-                  data-frame-main=""
-                >
-                  {children}
-                </Slab>
+                {chatOwnsSlabs ? (
+                  <div
+                    className="relative flex min-h-0 min-w-0 flex-1 flex-col"
+                    data-frame-main="chat"
+                  >
+                    {children}
+                  </div>
+                ) : (
+                  <Slab
+                    tone="card"
+                    radius="slab"
+                    elevation="slab-frame"
+                    className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+                    render={<div className="stone-frame-card" />}
+                    data-frame-main=""
+                  >
+                    {children}
+                  </Slab>
+                )}
               </div>
               <NavigationHistoryShortcuts />
               <MainAppLocationTracker />

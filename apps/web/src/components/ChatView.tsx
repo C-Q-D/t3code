@@ -257,6 +257,7 @@ import {
   type ThreadPanelPresentation,
 } from "../rightPanelLayout";
 import { PopoverCreateHandle } from "./ui/popover";
+import { Slab } from "./ui/slab";
 import {
   pullRequestSurface,
   selectActiveRightPanel,
@@ -2281,6 +2282,7 @@ export default function ChatView(props: ChatViewProps) {
   const browserAvailable = isPreviewSupportedInRuntime() || activeEnvironmentServerBrowser;
   const previewPanelInlineSize = usePreviewPanelInlineSize(undefined, {
     container: workspaceLayoutElement,
+    defaultWidth: 560,
     widthStorageKey: `t3code:preview-panel-width:${activeThreadKey}`,
   });
   const activeThreadShell = useThreadShell(isServerThread ? activeThreadRef : null);
@@ -2405,8 +2407,7 @@ export default function ChatView(props: ChatViewProps) {
     panelAnimationDurationMs,
   );
   const rightPanelPresent = rightPanelPresence.present;
-  const rightPanelControlsInPanel =
-    shouldUsePlanSidebarSheet && rightPanelPresent && rightPanelOpen;
+  const rightPanelControlsInPanel = rightPanelPresent && rightPanelOpen;
   const renderedRightPanelSurface = rightPanelPresence.value?.activeSurface ?? null;
   const renderedRightPanelSurfaces = rightPanelPresence.value?.surfaces ?? [];
   const previewMiniPlayerVisible = shouldRenderPreviewMiniPlayer(
@@ -11399,7 +11400,8 @@ export default function ChatView(props: ChatViewProps) {
   const content = (
     <div
       ref={setWorkspaceLayoutElement}
-      className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background"
+      className="relative flex min-h-0 min-w-0 flex-1"
+      data-chat-workspace=""
     >
       <Dialog
         open={
@@ -11424,10 +11426,14 @@ export default function ChatView(props: ChatViewProps) {
           ) : null}
         </WizardPopup>
       </Dialog>
-      <div
+      <Slab
+        tone="card"
+        radius="slab"
+        elevation="slab-frame"
+        render={<div className="stone-frame-card" />}
         className={cn(
-          "flex min-h-0 min-w-0 flex-col overflow-x-hidden",
-          rightPanelMaximized ? "w-0 flex-none" : "flex-1",
+          "relative flex min-h-0 min-w-0 flex-col overflow-hidden",
+          rightPanelMaximized ? "invisible w-0 flex-none" : "flex-1",
         )}
         data-chat-column-maximized-away={rightPanelMaximized ? "true" : "false"}
       >
@@ -12052,16 +12058,18 @@ export default function ChatView(props: ChatViewProps) {
             onAddTerminalContext={addTerminalContextToDraft}
           />
         ))}
-      </div>
+      </Slab>
 
       {rightPanelPresent && !shouldUsePlanSidebarSheet && activeThreadRef ? (
         <RightPanelTabs
           mode="inline"
+          standalone
           open={rightPanelOpen}
           keybindings={keybindings}
           getShortcutContext={getShortcutContext}
           maximized={rightPanelMaximized}
           inlineSize={previewPanelInlineSize}
+          layoutControls={rightPanelOpen ? panelLayoutControls : null}
           surfaces={renderedRightPanelSurfaces}
           environmentId={activeThreadRef.environmentId}
           activeSurfaceId={renderedRightPanelSurface?.id ?? null}
@@ -12102,25 +12110,19 @@ export default function ChatView(props: ChatViewProps) {
       ) : null}
       {rightPanelPresent && shouldUsePlanSidebarSheet && activeThreadRef ? (
         <RightPanelSheet
+          standalone
           animationDurationMs={panelAnimationsActive ? panelAnimationDurationMs : 0}
           open={rightPanelOpen}
           onClose={closePreviewPanel}
         >
           <RightPanelTabs
             mode="sheet"
+            standalone
             open={rightPanelOpen}
             keybindings={keybindings}
             getShortcutContext={getShortcutContext}
             inlineSize={previewPanelInlineSize}
-            // Same effective inset as the closed-state titlebar controls
-            // (pr-3 in the tab bar plus this pixel equals the absolute
-            // right inset plus mr-px), so the cluster does not creep when
-            // the sheet opens.
-            layoutControls={
-              rightPanelOpen ? (
-                <div className="mr-px flex items-center">{panelToggleControls}</div>
-              ) : null
-            }
+            layoutControls={rightPanelOpen ? panelLayoutControls : null}
             surfaces={renderedRightPanelSurfaces}
             environmentId={activeThreadRef.environmentId}
             activeSurfaceId={renderedRightPanelSurface?.id ?? null}
