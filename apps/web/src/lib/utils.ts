@@ -242,6 +242,9 @@ const twMerge = extendTailwindMerge({
         "composer-model-check",
         "composer-trait-switch",
         "composer-usage-divider",
+        "keybindings-recording-row",
+        "keybindings-capture",
+        "keybindings-keycap",
       ],
       "inset-shadow": [
         "selected",
@@ -332,6 +335,7 @@ const twMerge = extendTailwindMerge({
         "composer-notice",
         "composer-segment",
         "composer-model-check",
+        "keybindings-reset",
       ],
       leading: [
         "code",

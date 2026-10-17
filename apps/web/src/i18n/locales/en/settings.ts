@@ -2828,7 +2828,7 @@ ${address}`
     ) => `Edit shortcut for ${commandLabelRowCommand}: ${value}`,
     keybindingFor: (commandLabelRowCommand: string | number | boolean | null | undefined) =>
       `Keybinding for ${commandLabelRowCommand}`,
-    pressShortcut: "Press shortcut",
+    pressShortcut: "Press a new shortcut",
     unassigned: "Unassigned",
     editWhenClauseFor: (label: string | number | boolean | null | undefined) =>
       `Edit when clause for ${label}`,

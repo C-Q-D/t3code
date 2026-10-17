@@ -2707,7 +2707,7 @@ ${address}`
     ) => `编辑 ${commandLabelRowCommand} 的快捷键：${value}`,
     keybindingFor: (commandLabelRowCommand: string | number | boolean | null | undefined) =>
       `${commandLabelRowCommand} 的快捷键`,
-    pressShortcut: "按下快捷键",
+    pressShortcut: "按下新的快捷键",
     unassigned: "未分配",
     editWhenClauseFor: (label: string | number | boolean | null | undefined) =>
       `编辑 ${label} 的生效条件`,

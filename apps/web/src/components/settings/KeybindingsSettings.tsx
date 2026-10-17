@@ -1,3 +1,4 @@
+/** Graphite shortcut settings presentation; existing scoped commands own persistence and validation. */
 import { t } from "~/i18n";
 import { useEnvironmentScope } from "../../state/session";
 import { useEnvironmentsWithScope, readEnvironmentScope } from "../../state/session";
@@ -10,6 +11,7 @@ import {
   PlusIcon,
   SearchIcon,
   TriangleAlertIcon,
+  Undo2Icon,
   XIcon,
 } from "lucide-react";
 import { useLocation } from "@tanstack/react-router";
@@ -43,7 +45,6 @@ import { formatShortcutLabel } from "../../keybindings";
 import { cn } from "../../lib/utils";
 import { serverEnvironment } from "../../state/server";
 import { useSettingsScope } from "./SettingsScopeContext";
-import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "../ui/input-group";
@@ -73,11 +74,17 @@ import {
   whenNodeRemoveLabel,
 } from "./KeybindingsSettings.logic";
 import { SettingsGroup } from "./SettingsGroup";
-import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settingsLayout";
+import {
+  SettingsPageContainer,
+  SettingsRow,
+  SettingsSection,
+  SettingsSearchTarget,
+} from "./settingsLayout";
 import { keybindingSearchAnchorId, searchableSetting } from "./settingsSearch";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { useAtomCommand } from "../../state/use-atom-command";
 
+/** Displays the platform-specific parts of a shortcut without changing its stored value. */
 function KeybindingPill({ value }: { value: string }) {
   // Keys dedupe repeated parts; a literal "+" in a shortcut splits into empty strings.
   const seenParts = new Map<string, number>();
@@ -89,7 +96,7 @@ function KeybindingPill({ value }: { value: string }) {
   return (
     <KbdGroup>
       {parts.map(({ part, key }) => (
-        <Kbd key={key}>
+        <Kbd key={key} size="settings">
           {part === "mod"
             ? navigator.platform.toLowerCase().includes("mac")
               ? "⌘"
@@ -122,11 +129,9 @@ function KeybindingsSearchInput({
   inputRef: RefObject<HTMLInputElement | null>;
 }) {
   return (
-    <InputGroup className="min-w-0 basis-full **:[input]:h-9 sm:basis-0 sm:flex-1 sm:**:[input]:h-8">
-      <InputGroupAddon>
-        <SearchIcon aria-hidden className="size-3.5" />
-      </InputGroupAddon>
-      <InputGroupInput
+    <div className="keybindings-search min-w-0 basis-full sm:basis-0 sm:flex-1">
+      <SearchIcon aria-hidden className="size-3.5 shrink-0" />
+      <input
         ref={inputRef}
         type="search"
         value={query}
@@ -141,9 +146,9 @@ function KeybindingsSearchInput({
         }}
         placeholder={t.settings.keybindings.searchKeybindings}
         aria-label={t.settings.keybindings.searchKeybindings}
-        size="sm"
+        className="h-9 min-w-0 flex-1 bg-transparent text-secondary-copy-medium outline-none placeholder:text-placeholder"
       />
-    </InputGroup>
+    </div>
   );
 }
 
@@ -297,7 +302,7 @@ function WhenVariableSelect({
 
   return (
     <Select value={value} onValueChange={(nextValue) => nextValue && onChange(nextValue)}>
-      <SelectTrigger size="compact" className="min-w-0 flex-1">
+      <SelectTrigger size="settings" variant="keycap" className="min-w-0 flex-1">
         <SelectValue placeholder={t.settings.keybindings.condition} />
         {unknownIdentifiers && unknownIdentifiers.length > 0 ? (
           <UnknownWhenVariableWarning identifiers={unknownIdentifiers} focusable={false} />
@@ -675,7 +680,7 @@ function WhenExpressionBuilder({
           </div>
         )}
         {parseError ? (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg border border-destructive/30 bg-background/75 p-4 text-center text-xs text-destructive backdrop-blur-xs">
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg border border-destructive/30 bg-background/75 p-4 text-center text-xs text-destructive">
             {t.settings.keybindings.fixExpressionAboveContinueEditingHint}
           </div>
         ) : null}
@@ -823,29 +828,30 @@ function KeybindingKeyControl({
             formatShortcutLabel(row.binding.shortcut),
           )}
           className={cn(
-            "inline-flex h-8 cursor-pointer items-center rounded-md border border-transparent px-1.5 sm:h-7 outline-none transition-colors hover:border-border/70 hover:bg-accent focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-ring/24",
+            "inline-flex h-7.5 cursor-pointer items-center rounded-keycap outline-none hover:bg-accent focus-visible:inset-shadow-focus",
             pillClassName,
           )}
         >
           <KeybindingPill value={row.key} />
         </button>
       ) : (
-        <Input
-          data-keybinding-capture=""
-          autoFocus={isRecording}
-          aria-label={t.settings.keybindings.keybindingFor(commandLabel(row.command))}
-          value={isRecording ? "" : keyDraft}
-          placeholder={
-            isRecording ? t.settings.keybindings.pressShortcut : t.settings.keybindings.unassigned
-          }
-          size="sm"
-          font="mono"
-          className="w-44"
-          onFocus={() => setDraft({ isRecording: true })}
-          onBlur={() => setDraft({ isRecording: false })}
-          onChange={(event) => setDraft({ keyDraft: event.currentTarget.value })}
-          onKeyDown={captureKeybinding}
-        />
+        <span className="keybindings-capture" data-recording={isRecording || undefined}>
+          {isRecording ? <span aria-hidden className="keybindings-record-dot" /> : null}
+          <input
+            data-keybinding-capture=""
+            autoFocus={isRecording}
+            aria-label={t.settings.keybindings.keybindingFor(commandLabel(row.command))}
+            value={isRecording ? "" : keyDraft}
+            placeholder={
+              isRecording ? t.settings.keybindings.pressShortcut : t.settings.keybindings.unassigned
+            }
+            className="h-7.5 min-w-0 w-44 bg-transparent px-3 text-secondary-copy-medium outline-none placeholder:text-foreground"
+            onFocus={() => setDraft({ isRecording: true })}
+            onBlur={() => setDraft({ isRecording: false })}
+            onChange={(event) => setDraft({ keyDraft: event.currentTarget.value })}
+            onKeyDown={captureKeybinding}
+          />
+        </span>
       )}
     </>
   );
@@ -940,21 +946,39 @@ function KeybindingRowMenu({
   );
 }
 
+/** Shows every source, including defaults, in the N2 source column. */
 function KeybindingSourceBadge({ source }: { source: KeybindingRow["source"] }) {
-  if (source === "Default") return null;
   return (
-    <Badge variant="outline" size="sm">
-      {t.settings.keybindings.sourceLabels[source]}
-    </Badge>
+    <span className="flex w-14.5 shrink-0 justify-end">
+      <span
+        className={cn(
+          "inline-flex h-5 items-center rounded-full px-2 text-meta font-semibold",
+          source === "Default"
+            ? "bg-settings-inheritance-surface text-secondary-label"
+            : source === "Custom"
+              ? "bg-update-surface text-update-foreground"
+              : "bg-status-emphasis text-status-emphasis-foreground",
+        )}
+      >
+        {t.settings.keybindings.sourceLabels[source]}
+      </span>
+    </span>
   );
 }
 
+/** Keeps the command identifier available without replacing the localized command name. */
 function KeybindingRowTitle({ row }: { row: KeybindingRow }) {
   return (
     <Tooltip>
-      <TooltipTrigger render={<span className="flex items-center gap-2" />}>
+      <TooltipTrigger
+        render={
+          <span
+            tabIndex={0}
+            className="rounded-keycap outline-none focus-visible:inset-shadow-focus"
+          />
+        }
+      >
         {commandLabel(row.command)}
-        <KeybindingSourceBadge source={row.source} />
       </TooltipTrigger>
       <TooltipPopup side="top">{row.command}</TooltipPopup>
     </Tooltip>
@@ -987,49 +1011,51 @@ function KeybindingRowWhen({
   );
 }
 
-/** Row actions that stay hidden until the row is hovered or holds focus. */
-function KeybindingHoverRowMenu(props: {
-  row: KeybindingRow;
-  isSaving: boolean;
-  onReset: (row: KeybindingRow) => void;
-  onRemove: (row: KeybindingRow) => void;
-}) {
-  return (
-    <span className="flex items-center opacity-0 transition-opacity group-focus-within/row:opacity-100 group-hover/row:opacity-100 has-data-popup-open:opacity-100 pointer-coarse:opacity-100">
-      <KeybindingRowMenu {...props} />
-    </span>
-  );
-}
-
-/** One binding as a settings row: pills flush right, actions fading in beside them on hover. */
+/** Compact N2 command row; conditions and removal stay available as existing capabilities. */
 function KeybindingSettingsRow(props: KeybindingRowProps) {
   const { row, isSaving, anchorId, allRows, variables, onSave, onReset, onRemove } = props;
   const editor = useKeybindingRowEditor({ row, allRows, onSave });
+  const canReset = row.source === "Custom" && row.defaultKey !== null;
 
   return (
-    <SettingsRow
+    <SettingsSearchTarget
       id={anchorId}
-      className="group/row rounded-none"
-      title={<KeybindingRowTitle row={row} />}
-      description={<KeybindingRowWhen row={row} editor={editor} variables={variables} />}
-      control={
-        <div className="flex flex-wrap items-center justify-end gap-1.5">
-          <KeybindingConflictWarning labels={editor.conflictLabels} />
-          <KeybindingHoverRowMenu
-            row={row}
-            isSaving={isSaving}
-            onReset={onReset}
-            onRemove={onRemove}
-          />
-          <KeybindingKeyControl
-            row={row}
-            editor={editor}
-            isSaving={isSaving}
-            pillClassName="-mr-1.5"
-          />
+      className="keybindings-command-row group/row"
+      data-recording={editor.isRecording || undefined}
+    >
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-x-3">
+          <span className="text-control font-normal">
+            <KeybindingRowTitle row={row} />
+          </span>
+          <KeybindingRowWhen row={row} editor={editor} variables={variables} />
         </div>
-      }
-    />
+      </div>
+      <div className="flex flex-wrap items-center justify-end gap-2.5">
+        <KeybindingConflictWarning labels={editor.conflictLabels} />
+        <KeybindingKeyControl row={row} editor={editor} isSaving={isSaving} />
+        <KeybindingSourceBadge source={row.source} />
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <button
+                type="button"
+                className="keybindings-reset"
+                disabled={isSaving || !canReset}
+                onClick={() => onReset(row)}
+                aria-label={t.settings.keybindings.resetToDefault}
+              />
+            }
+          >
+            <Undo2Icon aria-hidden className="size-3.25" />
+          </TooltipTrigger>
+          <TooltipPopup>{t.settings.keybindings.resetToDefault}</TooltipPopup>
+        </Tooltip>
+        {row.source !== "Default" ? (
+          <KeybindingRowMenu row={row} isSaving={isSaving} onReset={onReset} onRemove={onRemove} />
+        ) : null}
+      </div>
+    </SettingsSearchTarget>
   );
 }
 
@@ -1123,7 +1149,7 @@ function NewKeybindingCommandSelect({
       value={draft.commandDraft}
       onValueChange={(value) => draft.setCommandDraft(value as KeybindingCommand)}
     >
-      <SelectTrigger size="sm" className={className}>
+      <SelectTrigger size="settings" variant="keycap" className={className}>
         <SelectValue placeholder={t.settings.diagnostics.columns.command} />
       </SelectTrigger>
       <SelectContent alignItemWithTrigger={false} matchTriggerWidth={false} className="max-h-72">
@@ -1259,7 +1285,12 @@ interface KeybindingsGroupsProps extends KeybindingRowActions {
 function KeybindingsGroups(props: KeybindingsGroupsProps) {
   const { groups, anchorIds, savingCommand, ...rowActions } = props;
   return groups.map((group) => (
-    <SettingsSection key={group.id} id={`keybindings-${group.id}`} title={group.title}>
+    <SettingsSection
+      key={group.id}
+      id={`keybindings-${group.id}`}
+      title={group.title}
+      variant="plain"
+    >
       {group.rows.map((row) => (
         <KeybindingSettingsRow
           key={row.id}
@@ -1493,11 +1524,12 @@ export function KeybindingsSettingsPanel() {
         {...searchableSetting("keybindings")}
         headerAction={!isElectron ? <BrowserKeybindingNotice /> : null}
       >
-        <div className="flex flex-wrap items-center gap-2 px-3 py-3 sm:px-4">
+        <div className="flex flex-wrap items-center gap-2 px-3 py-3">
           <KeybindingsSearchInput query={query} onChange={setQuery} inputRef={searchInputRef} />
           <Button
             type="button"
             variant="outline"
+            size="toolbar"
             disabled={isAddingBinding || !canWriteSettings}
             onClick={() => setIsAddingBinding(true)}
           >
@@ -1510,7 +1542,7 @@ export function KeybindingsSettingsPanel() {
                 <Button
                   type="button"
                   variant="outline"
-                  size="icon"
+                  size="icon-toolbar"
                   disabled={!keybindingsConfigPath || !canOpenKeybindingsFile}
                   onClick={openKeybindingsFile}
                   aria-label={t.settings.keybindings.openKeybindingsJson}
@@ -1522,42 +1554,42 @@ export function KeybindingsSettingsPanel() {
             <TooltipPopup side="top">{t.settings.keybindings.openKeybindingsJson}</TooltipPopup>
           </Tooltip>
         </div>
-      </SettingsSection>
 
-      {!canWriteSettings ? (
-        <p className="text-xs text-muted-foreground">
-          {t.settings.keybindings.connectionViewKeybindingsButChangeError}
-        </p>
-      ) : null}
-      <div inert={!canWriteSettings} className="flex flex-col gap-8">
-        {isAddingBinding ? (
-          <SettingsGroup>
-            <NewKeybindingSettingsRow
-              commandOptions={commandOptions}
-              allRows={rows}
-              variables={whenVariables}
-              isSaving={savingCommand !== null}
-              onSave={saveKeybinding}
-              onCancel={cancelAdd}
-            />
-          </SettingsGroup>
+        {!canWriteSettings ? (
+          <p className="text-xs text-muted-foreground">
+            {t.settings.keybindings.connectionViewKeybindingsButChangeError}
+          </p>
         ) : null}
+        <div inert={!canWriteSettings} className="flex flex-col gap-4 px-3 pb-3">
+          {isAddingBinding ? (
+            <SettingsGroup variant="plain">
+              <NewKeybindingSettingsRow
+                commandOptions={commandOptions}
+                allRows={rows}
+                variables={whenVariables}
+                isSaving={savingCommand !== null}
+                onSave={saveKeybinding}
+                onCancel={cancelAdd}
+              />
+            </SettingsGroup>
+          ) : null}
 
-        {groups.length > 0 ? (
-          <KeybindingsGroups
-            groups={groups}
-            anchorIds={anchorIds}
-            savingCommand={savingCommand}
-            {...rowActions}
-          />
-        ) : (
-          <SettingsGroup>
-            <div className="px-4 py-12 text-center text-sm text-muted-foreground">
-              {t.settings.keybindings.noKeybindingsMatchYourSearch}
-            </div>
-          </SettingsGroup>
-        )}
-      </div>
+          {groups.length > 0 ? (
+            <KeybindingsGroups
+              groups={groups}
+              anchorIds={anchorIds}
+              savingCommand={savingCommand}
+              {...rowActions}
+            />
+          ) : (
+            <SettingsGroup variant="plain">
+              <div className="px-4 py-12 text-center text-secondary-copy-large text-muted-foreground">
+                {t.settings.keybindings.noKeybindingsMatchYourSearch}
+              </div>
+            </SettingsGroup>
+          )}
+        </div>
+      </SettingsSection>
     </SettingsPageContainer>
   );
 }

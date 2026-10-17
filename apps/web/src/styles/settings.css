@@ -88,3 +88,47 @@
     }
   }
 }
+
+/* N2 shortcut-only surfaces from SettingsPage8a.dc.html; no global control overrides. */
+@theme {
+  --color-keybindings-recording-dot: #ff6b35;
+  --color-keybindings-reset: #c4c4ca;
+  --radius-keybindings-reset: 9px;
+  --shadow-keybindings-recording-row: inset 0 0 0 1.5px #46464d;
+  --shadow-keybindings-capture: inset 1.5px 2px 3px rgba(0, 0, 0, 0.6);
+  --shadow-keybindings-keycap: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 1.5px 0 #09090a;
+}
+
+@layer components {
+  .keybindings-search {
+    @apply flex h-9 items-center gap-2 rounded-full bg-input px-3.5 text-secondary-label shadow-well-track focus-within:inset-shadow-focus;
+  }
+
+  .keybindings-command-row {
+    @apply flex min-h-11 flex-wrap items-center gap-2.5 rounded-compact-row py-1.75 pr-1.5 pl-3 outline-none focus-visible:inset-shadow-focus;
+  }
+
+  .keybindings-command-row[data-recording] {
+    @apply bg-accent shadow-keybindings-recording-row;
+  }
+
+  .keybindings-capture {
+    @apply relative inline-flex items-center rounded-full bg-input text-foreground shadow-keybindings-capture focus-within:inset-shadow-focus;
+  }
+
+  .keybindings-capture[data-recording] {
+    @apply inset-shadow-focus;
+  }
+
+  .keybindings-capture[data-recording] input {
+    @apply pl-6.25;
+  }
+
+  .keybindings-record-dot {
+    @apply pointer-events-none absolute left-3 size-1.75 rounded-full bg-keybindings-recording-dot;
+  }
+
+  .keybindings-reset {
+    @apply flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-keybindings-reset bg-transparent text-keybindings-reset outline-none hover:bg-secondary focus-visible:inset-shadow-focus disabled:cursor-default disabled:text-settings-target-surface disabled:hover:bg-transparent;
+  }
+}
