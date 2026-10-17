@@ -39,6 +39,10 @@ const buttonVariants = cva(
           "min-h-8 gap-1.5 px-[calc(--spacing(2.5)-1px)] py-[calc(--spacing(1)-1px)] whitespace-normal sm:min-h-7",
         xl: "h-11 px-[calc(--spacing(4)-1px)] text-card-title sm:h-10 sm:text-body [&_svg:not([class*='size-'])]:size-5 sm:[&_svg:not([class*='size-'])]:size-4.5",
         xs: "h-7 gap-1 px-[calc(--spacing(2)-1px)] text-body sm:h-6 sm:text-secondary-copy [&_svg:not([class*='size-'])]:size-4 sm:[&_svg:not([class*='size-'])]:size-3.5",
+        // 讨论页-8a v3 F1/F2: titlebar actions use 32px capsules with 12px inline padding.
+        toolbar: "h-8 px-3",
+        // 讨论页-8a v3 F1/F2: More and Send use 32×32px circular icon buttons.
+        "icon-toolbar": "size-8 p-0 [&_svg:not([class*='size-'])]:size-4",
       },
       variant: {
         default:

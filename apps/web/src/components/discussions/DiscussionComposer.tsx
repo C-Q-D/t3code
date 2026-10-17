@@ -12,6 +12,7 @@ import { cn } from "~/lib/utils";
 import { serverEnvironment } from "~/state/server";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { toastManager } from "../ui/toast";
+import { Button } from "../ui/button";
 import { DiscussionAlert } from "./DiscussionAlert";
 import {
   discussionComposerView,
@@ -23,7 +24,7 @@ import {
  * Submits user material without starting or interrupting a seat's provider turn.
  * @param props.discussion Live snapshot determines the next reader and closing availability.
  * @param props.environmentId Destination for guarded, discussion-scoped commands.
- * @returns Aligned, growing input; ended discussions have no composer.
+ * @returns One growing table-side draft; responsive layout moves it without remounting, and ended discussions hide it.
  */
 export function DiscussionComposer({
   discussion,
@@ -63,16 +64,16 @@ export function DiscussionComposer({
   };
   if (!view) return null;
   return (
-    <div className="shrink-0 px-6 pb-4">
-      <div className="mx-auto flex w-full max-w-192 flex-col gap-2 pl-10.5">
+    <div className="mx-auto w-full max-w-170 shrink-0">
+      <div className="flex flex-col gap-2.5">
         <DiscussionAlert discussion={discussion} environmentId={environmentId} />
         <div
           className={cn(
-            "rounded-3xl border shadow-sm focus-within:ring-2 focus-within:ring-inset focus-within:ring-ring dark:shadow-none",
-            view.disabled ? "bg-muted/30" : "bg-card",
+            "surface-glass rounded-card-large pt-3 pr-2.5 pb-2.5 pl-4 shadow-raise-l focus-within:inset-shadow-focus",
+            view.disabled && "discussion-composer-disabled",
           )}
         >
-          <div className="px-5 pt-3.5 pb-1">
+          <div className="mb-1.5">
             <textarea
               aria-label={t.discussions.page.interjection}
               placeholder={view.placeholder}
@@ -80,7 +81,7 @@ export function DiscussionComposer({
               disabled={view.disabled}
               readOnly={pending}
               rows={1}
-              className="field-sizing-content block max-h-52 min-h-5.5 w-full resize-none overflow-y-auto bg-transparent text-sm leading-5.5 outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
+              className="field-sizing-content block max-h-52 min-h-11 w-full resize-none overflow-y-auto bg-transparent text-body leading-discussion-composer text-foreground text-shadow-none outline-none placeholder:text-placeholder disabled:cursor-not-allowed disabled:placeholder:text-fg-disabled"
               onChange={(event) => setText(event.target.value)}
               onKeyDown={(event) => {
                 if (
@@ -97,21 +98,16 @@ export function DiscussionComposer({
               }}
             />
           </div>
-          <div className="flex justify-end px-2.5 pt-1 pb-2.5">
-            <button
-              type="button"
-              className={cn(
-                "relative isolate flex size-8 items-center justify-center overflow-hidden rounded-full shadow-xs transition-all duration-150 enabled:cursor-pointer enabled:inset-shadow-control-highlight hover:scale-105 active:inset-shadow-control-pressed active:shadow-none disabled:pointer-events-none disabled:shadow-none disabled:hover:scale-100 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&_svg]:pointer-events-none",
-                view.disabled
-                  ? "bg-foreground/10 text-muted-foreground"
-                  : "bg-message-action text-message-action-foreground enabled:shadow-message-action/24 hover:bg-message-action-hover disabled:opacity-64",
-              )}
+          <div className="flex justify-end">
+            <Button
+              variant="default"
+              size="icon-toolbar"
               disabled={sendable === null}
               aria-label={t.discussions.page.sendInterjection}
               onClick={() => void send()}
             >
-              <ArrowUpIcon className="size-4" />
-            </button>
+              <ArrowUpIcon />
+            </Button>
           </div>
         </div>
       </div>

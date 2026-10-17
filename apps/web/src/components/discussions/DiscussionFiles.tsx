@@ -25,15 +25,15 @@ export function DiscussionFiles({
   const summary = discussionFilesView(files, hideEmpty, t.discussions);
   if (!summary) return null;
   if (summary.kind !== "files")
-    return <p className="text-xs text-muted-foreground">{summary.label}</p>;
+    return <p className="text-secondary-copy text-muted-foreground">{summary.label}</p>;
   return (
-    <div className="overflow-hidden rounded-lg border bg-card">
-      <div className="flex h-7.5 items-center gap-1.5 border-b px-3 text-xs">
-        <span className="font-medium">{summary.label}</span>
-        <span className="text-success-foreground">+{summary.additions}</span>
-        <span className="text-destructive-foreground">−{summary.deletions}</span>
+    <div className="overflow-hidden rounded-menu-row bg-well-raised shadow-discussion-inset">
+      <div className="flex h-7.5 items-center gap-2 px-3 text-secondary-copy-medium">
+        <span className="font-bold">{summary.label}</span>
+        <span className="text-diff-addition-foreground">+{summary.additions}</span>
+        <span className="text-diff-deletion-foreground">−{summary.deletions}</span>
       </div>
-      <ul className="divide-y">
+      <ul>
         {files?.map((file) => (
           <li key={file.path}>
             {onOpenFile ? (
@@ -42,19 +42,27 @@ export function DiscussionFiles({
                 aria-pressed={selectedPath === file.path}
                 onClick={() => onOpenFile(file.path)}
                 className={cn(
-                  "flex min-h-7 w-full items-center gap-2 px-3 py-1 text-left text-xs outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+                  "flex min-h-7 w-full items-center gap-2.5 px-3 py-1 text-left text-secondary-copy text-fg-detail shadow-discussion-file-rule outline-none hover:bg-accent focus-visible:inset-shadow-focus",
                   selectedPath === file.path && "bg-accent",
                 )}
               >
                 <span className="min-w-0 flex-1 break-all font-mono">{file.path}</span>
-                <span className="shrink-0 text-success-foreground">+{file.additions}</span>
-                <span className="shrink-0 text-destructive-foreground">−{file.deletions}</span>
+                <span className="shrink-0 font-mono text-diff-addition-foreground">
+                  +{file.additions}
+                </span>
+                <span className="shrink-0 font-mono text-diff-deletion-foreground">
+                  −{file.deletions}
+                </span>
               </button>
             ) : (
-              <div className="flex min-h-7 items-center gap-2 px-3 py-1 text-xs">
+              <div className="flex min-h-7 items-center gap-2.5 px-3 py-1 text-secondary-copy text-fg-detail shadow-discussion-file-rule">
                 <span className="min-w-0 flex-1 break-all font-mono">{file.path}</span>
-                <span className="shrink-0 text-success-foreground">+{file.additions}</span>
-                <span className="shrink-0 text-destructive-foreground">−{file.deletions}</span>
+                <span className="shrink-0 font-mono text-diff-addition-foreground">
+                  +{file.additions}
+                </span>
+                <span className="shrink-0 font-mono text-diff-deletion-foreground">
+                  −{file.deletions}
+                </span>
               </div>
             )}
           </li>

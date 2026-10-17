@@ -227,7 +227,7 @@ export function DiscussionPage({
                 render={
                   <Button
                     variant="secondary"
-                    size="icon-sm"
+                    size="icon-toolbar"
                     disabled={!discussionHeaderActionEnabled(action, headerPending, canDelete)}
                     aria-label={t.discussions.page.more}
                   />
@@ -252,7 +252,7 @@ export function DiscussionPage({
               disabled={!discussionHeaderActionEnabled(action, headerPending, permitted(action))}
               onClick={() => void act(action)}
               variant={action === "resume" ? "default" : "secondary"}
-              size="sm"
+              size="toolbar"
               aria-label={t.discussions.page[action]}
             >
               {action === "stop" ? <PauseIcon /> : action === "resume" ? <PlayIcon /> : null}
@@ -275,7 +275,7 @@ export function DiscussionPage({
               centerLabel={t.discussions.round(discussion.cursor.round)}
             />
           </div>
-          <div className="flex min-h-0 min-w-0 flex-1">
+          <div className="discussion-page-content flex min-h-0 min-w-0 flex-1">
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">
               <DiscussionTranscript
                 key={`${environmentId}:${discussion.id}`}
@@ -285,17 +285,9 @@ export function DiscussionPage({
                 selectedDiff={selectedDiff}
                 onOpenDiff={openDiff}
               />
-              <DiscussionComposer
-                key={`composer:${environmentId}:${discussion.id}`}
-                discussion={discussion}
-                environmentId={environmentId}
-              />
             </div>
-            <aside
-              className="discussion-page-round-table mr-3 mb-3 w-100 shrink-0 flex-col rounded-composer bg-well-surface px-5 pt-4 pb-5 shadow-discussion-table-rail"
-              aria-label={t.discussions.page.seats}
-            >
-              <div className="flex min-h-0 flex-1 items-center justify-center">
+            <aside className="discussion-page-table-rail" aria-label={t.discussions.page.seats}>
+              <div className="discussion-page-round-table min-h-0 flex-1 items-center justify-center">
                 <DiscussionRoundTable
                   seats={seats}
                   label={t.discussions.page.seats}
@@ -304,6 +296,11 @@ export function DiscussionPage({
                   userLabel={t.discussions.page.you}
                 />
               </div>
+              <DiscussionComposer
+                key={`composer:${environmentId}:${discussion.id}`}
+                discussion={discussion}
+                environmentId={environmentId}
+              />
             </aside>
           </div>
         </div>

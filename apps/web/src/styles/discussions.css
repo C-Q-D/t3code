@@ -146,11 +146,37 @@
   display: flex;
 }
 
+/* One table-side composer remains mounted across the viewport breakpoint, preserving its draft. */
+.discussion-page-table-rail {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  width: calc(var(--spacing) * 100);
+  margin: 0 calc(var(--spacing) * 3) calc(var(--spacing) * 3) 0;
+  padding: calc(var(--spacing) * 4) calc(var(--spacing) * 5) calc(var(--spacing) * 5);
+  border-radius: var(--radius-composer);
+  background: var(--color-well-surface);
+  box-shadow: var(--shadow-discussion-table-rail);
+}
+
 .discussion-page-long-table {
   display: none;
 }
 
 @media (width < 1200px) {
+  .discussion-page-content {
+    flex-direction: column;
+  }
+
+  .discussion-page-table-rail {
+    width: 100%;
+    margin: 0;
+    padding: 0 calc(var(--spacing) * 8) calc(var(--spacing) * 6);
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
   .discussion-page-round-table {
     display: none;
   }
@@ -158,4 +184,85 @@
   .discussion-page-long-table {
     display: block;
   }
+}
+
+/* DC1.2 · 讨论页-8a v3 F1/F2：群聊气泡、轮次胶囊与实时命令槽。 */
+@theme {
+  --color-discussion-user-bubble: #38383e;
+  --color-discussion-unread-border: #5a5a62;
+  --color-discussion-summary: #2c2c31;
+  --color-discussion-live: #2b2833;
+  --color-discussion-round: #1b1b1e;
+  --color-discussion-command: rgba(0, 0, 0, 0.22);
+  --radius-discussion-bubble: 6px 18px 18px 18px;
+  --radius-discussion-user-bubble: 18px 6px 18px 18px;
+  --radius-discussion-command: 8px;
+  --shadow-discussion-user-bubble:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.5), 0 2px 0 #09090a;
+  --shadow-discussion-summary:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.11), 0 0 0 1px rgba(0, 0, 0, 0.5), 0 4px 0 #060607,
+    12px 20px 28px -8px rgba(0, 0, 0, 0.7);
+  --shadow-discussion-inset: inset 1px 1.5px 3px rgba(0, 0, 0, 0.55);
+  --shadow-discussion-command: inset 1px 1.5px 3px rgba(0, 0, 0, 0.45);
+  --shadow-discussion-file-rule: inset 0 1px 0 rgba(0, 0, 0, 0.4);
+  --leading-discussion-composer: 1.6;
+  /* F1/F2 body rhythm explicitly replaces ChatMarkdown's default leading-relaxed. */
+  --leading-discussion-record: 1.55;
+  --shadow-discussion-next-tag: inset 0 0 0 1px #46464d;
+  --text-discussion-summary-heading: 15px;
+  --text-discussion-summary-heading--line-height: 1.55;
+}
+
+/* F1：座位色在实例上求值；38% 描边只属于当前发言气泡。 */
+@theme inline {
+  --shadow-discussion-live:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.11),
+    inset 0 0 0 1px color-mix(in srgb, var(--discussion-seat-color) 38%, transparent),
+    0 0 0 1px rgba(0, 0, 0, 0.5), 0 5px 0 #060607, 16px 26px 34px -10px rgba(0, 0, 0, 0.85);
+}
+
+.discussion-user-unread {
+  border: 1.5px dashed var(--color-discussion-unread-border);
+}
+
+.discussion-next-bubble {
+  border: 1.5px dashed color-mix(in srgb, var(--discussion-seat-color) 35%, transparent);
+}
+
+.discussion-next-tag {
+  box-shadow: var(--shadow-discussion-next-tag);
+}
+
+.discussion-record-summary .chat-markdown :is(h1, h2, h3, h4) {
+  font-size: var(--text-discussion-summary-heading);
+  line-height: var(--text-discussion-summary-heading--line-height);
+  font-weight: 700;
+}
+
+.surface-glass.discussion-composer-disabled {
+  background: var(--color-well-raised);
+  box-shadow: var(--shadow-input-well);
+}
+
+/* F1: static 2×16px cursor; paragraph endings stay inline, other endings get a new line. */
+[data-discussion-live] .chat-markdown::after,
+[data-discussion-live] .chat-markdown > p:last-child::after {
+  content: "";
+  width: calc(var(--spacing) * 0.5);
+  height: calc(var(--spacing) * 4);
+  background: var(--discussion-seat-color);
+  vertical-align: -2px;
+}
+
+[data-discussion-live] .chat-markdown::after {
+  display: block;
+}
+
+[data-discussion-live] .chat-markdown > p:last-child::after {
+  display: inline-block;
+  margin-left: var(--spacing);
+}
+
+[data-discussion-live] .chat-markdown:has(> p:last-child)::after {
+  display: none;
 }

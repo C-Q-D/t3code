@@ -13,7 +13,9 @@ import { MemoizedDiscussionLiveRow } from "./DiscussionLiveRow";
 import { orderDiscussionEntries } from "./discussionLive.logic";
 import { discussionLiveWave } from "./discussionMotion.logic";
 import { Link } from "@tanstack/react-router";
-import { memo, useLayoutEffect, useMemo, useRef } from "react";
+import { memo, useLayoutEffect, useMemo, useRef, type CSSProperties } from "react";
+import { CheckCheckIcon, ClockIcon, PauseIcon } from "lucide-react";
+import { cn } from "~/lib/utils";
 import { t } from "~/i18n";
 import { observeResize } from "~/lib/observeResize";
 import { useEnvironmentSettings } from "~/hooks/useSettings";
@@ -23,7 +25,7 @@ import { useEnvironmentQuery } from "~/state/query";
 import { EMPTY_SERVER_PROVIDERS, serverEnvironment } from "~/state/server";
 import ChatMarkdown from "../ChatMarkdown";
 import { Badge } from "../ui/badge";
-import { PixelAvatar } from "./PixelAvatar";
+import { PixelSeat } from "./PixelSeat";
 import { discussionModelLabel } from "./discussionModelLabel";
 import { discussionSeatColor } from "./discussionSeatColors";
 import {
@@ -48,6 +50,7 @@ type DiscussionEntryRowProps = DiscussionStatementHeading & {
   receiptSeatNumber: number;
   receiptAvatarState: "idle" | "next";
   userRead: boolean;
+  receiptPaused: boolean;
   selectedPath: string | undefined;
   onOpenDiff: (selection: DiscussionDiffSelection) => void;
 };
@@ -68,67 +71,84 @@ type DiscussionEntryRowProps = DiscussionStatementHeading & {
  * @param props.receiptAvatar Frozen seat sprite shown with the receipt.
  * @param props.receiptSeatNumber One-based receipt color, zero when no avatar is available.
  * @param props.receiptAvatarState Idle when read, next when pending for a known seat.
- * @param props.userRead Whether the bubble uses a solid border; the topic counts as read.
+ * @param props.userRead Whether the user bubble is raised; unread interjections use a dashed outline.
+ * @param props.receiptPaused Whether a pending receipt uses the paused icon instead of the clock.
  * @param props.threadId Entry-specific thread, seat fallback, or null when unavailable.
  * @param props.statusLabel Interrupted/failed text, null for completed entries.
  * @param props.badgeVariant Warning/error presentation, null for completed entries.
  * @param props.selectedPath Selected file within this entry, undefined when unselected.
  * @param props.onOpenDiff Opens a persisted statement patch at the activated file.
- * @returns A 28px avatar column and text/file presentation with persisted diff actions.
+ * @returns A 32px avatar beside a chat bubble; AI is left-aligned and user material is right-aligned.
  */
 function DiscussionEntryRow(props: DiscussionEntryRowProps) {
   const { entry } = props;
   if (entry.kind === "user")
     return (
-      <div className="grid grid-cols-[28px_minmax(0,1fr)] gap-x-3.5">
-        <PixelAvatar role="user" seat={0} size={28} />
-        <div className="flex min-w-0 flex-col gap-1.5">
+      <div className="flex items-start gap-3">
+        <div className="flex min-w-0 flex-1 flex-col items-end gap-1.25">
+          <div
+            className={cn(
+              "max-w-4/5 rounded-discussion-user-bubble px-3.5 py-2.5 whitespace-pre-wrap break-words text-body",
+              props.userRead
+                ? "bg-discussion-user-bubble shadow-discussion-user-bubble"
+                : "discussion-user-unread",
+            )}
+          >
+            {entry.text}
+          </div>
           {props.receiptLabel ? (
-            <div className="flex min-h-7 items-center gap-2">
-              <span
-                aria-hidden="true"
-                className="min-w-4 flex-1 border-t border-dashed border-foreground/15"
-              />
-              <span className="text-xs text-muted-foreground">{props.receiptLabel}</span>
+            <div className="flex max-w-full flex-wrap items-center justify-end gap-1.5 text-secondary-copy text-secondary-label">
+              {props.receiptSeatNumber <= 0 ? null : props.userRead ? (
+                <CheckCheckIcon className="size-3.25" />
+              ) : props.receiptPaused ? (
+                <PauseIcon className="size-3.25" />
+              ) : (
+                <ClockIcon className="size-3.25" />
+              )}
+              <span>{props.receiptLabel}</span>
               {props.receiptSeatNumber > 0 ? (
-                <PixelAvatar
+                <PixelSeat
                   role={props.receiptAvatar}
-                  seat={props.receiptSeatNumber}
+                  seatIndex={props.receiptSeatNumber - 1}
                   size={18}
                   state={props.receiptAvatarState}
+                  label={props.receiptLabel}
                 />
               ) : null}
             </div>
           ) : null}
-          <div className="flex justify-end">
-            <div
-              className={`max-w-[80%] whitespace-pre-wrap break-words rounded-2xl border border-border px-3.5 py-2.5 text-sm leading-relaxed ${props.userRead ? "" : "border-dashed"}`}
-              style={{ background: "color-mix(in srgb, var(--foreground) 6%, var(--card))" }}
-            >
-              {entry.text}
-            </div>
-          </div>
         </div>
+        <PixelSeat
+          role="user"
+          seatIndex={0}
+          size={32}
+          state="idle"
+          label={t.discussions.page.you}
+        />
       </div>
     );
   return (
-    <div className="grid grid-cols-[28px_minmax(0,1fr)] gap-x-3.5">
-      <PixelAvatar
+    <div className="flex items-start gap-3">
+      <PixelSeat
         role={props.avatar}
-        seat={props.seatNumber}
-        size={28}
+        seatIndex={props.seatNumber - 1}
+        size={32}
         state={props.avatarState}
+        label={props.personaName}
       />
-      <div
-        className={`flex min-w-0 flex-col gap-2 ${entry.kind === "summary" ? "rounded-xl border bg-card p-3.5" : ""}`}
-      >
-        <div className="flex min-h-7 items-center gap-2 text-sm">
-          <span className="max-w-32 shrink-0 truncate font-medium">{props.personaName}</span>
-          <span className="min-w-0 truncate text-xs text-muted-foreground">{props.modelLabel}</span>
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+        <div className="flex min-w-0 items-center gap-2 text-secondary-copy text-secondary-label">
+          <span
+            className={cn(
+              "max-w-32 shrink-0 truncate text-body font-bold",
+              discussionSeatColor(props.seatNumber).textClassName,
+            )}
+          >
+            {props.personaName}
+          </span>
+          <span className="min-w-0 truncate">{props.modelLabel}</span>
           {props.roundLabel ? (
-            <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">
-              {props.roundLabel}
-            </span>
+            <span className="shrink-0 whitespace-nowrap">{props.roundLabel}</span>
           ) : null}
           {props.turnBadge ? <Badge variant="secondary">{props.turnBadge}</Badge> : null}
           {props.statusLabel && props.badgeVariant ? (
@@ -138,35 +158,45 @@ function DiscussionEntryRow(props: DiscussionEntryRowProps) {
             <Link
               to="/$environmentId/$threadId"
               params={{ environmentId: props.environmentId, threadId: props.threadId }}
-              className="ml-auto shrink-0 rounded-sm text-xs text-muted-foreground underline decoration-muted-foreground/50 underline-offset-3 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+              className="ml-auto shrink-0 rounded-sm underline underline-offset-3 outline-none hover:text-foreground focus-visible:inset-shadow-focus"
             >
               {t.discussions.page.viewProcess}
             </Link>
           ) : null}
         </div>
-        {entry.text ? (
-          <ChatMarkdown
-            text={entry.text}
-            lineBreaks={shouldPreserveAssistantLineBreaks(entry.text)}
-            cwd={props.cwd}
-            environmentId={props.environmentId}
-            threadRef={
-              props.threadId
-                ? { environmentId: props.environmentId, threadId: props.threadId }
+        <div
+          className={cn(
+            "flex min-w-0 flex-col gap-2 rounded-discussion-bubble",
+            entry.kind === "summary"
+              ? "discussion-record-summary bg-discussion-summary px-4.5 py-4 shadow-discussion-summary"
+              : "bg-surface-raised px-3.5 py-3 shadow-raise-l",
+          )}
+        >
+          {entry.text ? (
+            <ChatMarkdown
+              text={entry.text}
+              className="text-body leading-discussion-record text-foreground"
+              lineBreaks={shouldPreserveAssistantLineBreaks(entry.text)}
+              cwd={props.cwd}
+              environmentId={props.environmentId}
+              threadRef={
+                props.threadId
+                  ? { environmentId: props.environmentId, threadId: props.threadId }
+                  : undefined
+              }
+            />
+          ) : null}
+          <DiscussionFiles
+            files={entry.files}
+            hideEmpty={entry.kind === "summary"}
+            selectedPath={props.selectedPath}
+            onOpenFile={
+              discussionFilesCanOpen(entry.id, entry.files)
+                ? (filePath) => props.onOpenDiff({ entryId: entry.id, filePath })
                 : undefined
             }
           />
-        ) : null}
-        <DiscussionFiles
-          files={entry.files}
-          hideEmpty={entry.kind === "summary"}
-          selectedPath={props.selectedPath}
-          onOpenFile={
-            discussionFilesCanOpen(entry.id, entry.files)
-              ? (filePath) => props.onOpenDiff({ entryId: entry.id, filePath })
-              : undefined
-          }
-        />
+        </div>
       </div>
     </div>
   );
@@ -189,14 +219,25 @@ function DiscussionNextRow(props: {
   label: string | null;
 }) {
   return (
-    <div className="grid grid-cols-[28px_minmax(0,1fr)] items-center gap-x-3.5">
-      <PixelAvatar role={props.avatar} seat={props.seatNumber} size={28} state="next" />
-      <div className="flex min-w-0 flex-wrap items-center gap-2 text-muted-foreground">
-        <span className="text-sm font-medium">{props.personaName}</span>
-        <span className="text-muted-foreground">
-          <Badge variant="outline">{t.discussions.page.next}</Badge>
+    <div
+      className="flex items-center gap-3"
+      style={
+        { "--discussion-seat-color": discussionSeatColor(props.seatNumber).color } as CSSProperties
+      }
+    >
+      <PixelSeat
+        role={props.avatar}
+        seatIndex={props.seatNumber - 1}
+        size={32}
+        state="next"
+        label={props.personaName}
+      />
+      <div className="discussion-next-bubble flex min-w-0 flex-wrap items-center gap-2 rounded-discussion-bubble px-3.5 py-2 text-secondary-label">
+        <span className="text-body font-bold">{props.personaName}</span>
+        <span className="discussion-next-tag flex h-5 items-center rounded-discussion-table-outline px-1.75 text-secondary-copy font-semibold">
+          {t.discussions.page.next}
         </span>
-        {props.label ? <span className="text-xs">{props.label}</span> : null}
+        {props.label ? <span className="text-secondary-copy">{props.label}</span> : null}
       </div>
     </div>
   );
@@ -211,19 +252,17 @@ const MemoizedDiscussionNextRow = memo(DiscussionNextRow);
  */
 function DiscussionTopicRow({ text }: { text: string }) {
   return (
-    <div className="grid grid-cols-[28px_minmax(0,1fr)] gap-x-3.5">
-      <PixelAvatar role="user" seat={0} size={28} />
-      <div className="flex justify-end">
-        <div
-          className="max-w-[80%] whitespace-pre-wrap break-words rounded-2xl border border-border px-3.5 py-2.5 text-sm leading-relaxed"
-          style={{ background: "color-mix(in srgb, var(--foreground) 6%, var(--card))" }}
-        >
+    <div className="flex items-start gap-3">
+      <div className="flex min-w-0 flex-1 justify-end">
+        <div className="max-w-4/5 rounded-discussion-user-bubble bg-discussion-user-bubble px-3.5 py-2.5 whitespace-pre-wrap break-words text-body shadow-discussion-user-bubble">
           {text}
         </div>
       </div>
+      <PixelSeat role="user" seatIndex={0} size={32} state="idle" label={t.discussions.page.you} />
     </div>
   );
 }
+
 const MemoizedDiscussionTopicRow = memo(DiscussionTopicRow);
 
 /**
@@ -233,7 +272,7 @@ const MemoizedDiscussionTopicRow = memo(DiscussionTopicRow);
  * @param props.cwd Project directory used by Markdown links and media.
  * @param props.selectedDiff Open persisted entry/file selection, null when the panel is closed.
  * @param props.onOpenDiff Activates the statement diff independently of the thread process link.
- * @returns A centered 768px record column. Remount per discussion to reset initial-scroll ownership.
+ * @returns A centered 680px record column with 20px between items. Remount per discussion to reset initial-scroll ownership.
  */
 export function DiscussionTranscript({
   discussion,
@@ -311,7 +350,7 @@ export function DiscussionTranscript({
       ref={viewportRef}
       role="region"
       aria-label={t.discussions.page.transcript}
-      className="scrollbar-gutter-both min-h-0 flex-1 overflow-y-auto px-6 pt-6 pb-5"
+      className="scrollbar-gutter-both min-h-0 flex-1 overflow-y-auto px-8 pb-6"
       onScroll={(event) => {
         const viewport = event.currentTarget;
         followsBottom.current =
@@ -319,33 +358,30 @@ export function DiscussionTranscript({
           FOLLOW_BOTTOM_DISTANCE_PX;
       }}
     >
-      <div ref={contentRef} className="mx-auto flex w-full max-w-192 flex-col gap-6">
+      <div
+        ref={contentRef}
+        className="mx-auto flex min-h-full w-full max-w-170 flex-col justify-end gap-5"
+      >
         {items.map((item, position) => {
           if (item.kind === "round") {
             const following = items[position + 1];
             const boundaryId = following?.kind === "entry" ? following.entry.id : "initial";
             return (
-              <div key={`round-${item.round}-${boundaryId}`} className="flex items-center gap-2.5">
-                <span className="-ml-3 inline-flex h-5 shrink-0 items-center rounded-full border bg-background px-2 text-xs text-muted-foreground">
+              <div
+                key={`round-${item.round}-${boundaryId}`}
+                className="flex items-center gap-3 text-secondary-copy text-secondary-label"
+              >
+                <span aria-hidden="true" className="h-px min-w-0 flex-1 bg-foreground/8" />
+                <span className="flex h-5.5 shrink-0 items-center rounded-full bg-discussion-round px-3 shadow-discussion-inset">
                   {t.discussions.round(item.round)}
                 </span>
-                <span aria-hidden="true" className="h-px min-w-0 flex-1 bg-foreground/6" />
+                <span aria-hidden="true" className="h-px min-w-0 flex-1 bg-foreground/8" />
               </div>
             );
           }
           if (item.kind === "topic")
             return (
-              <article key="discussion-topic" className="relative">
-                {position < items.length - 1 ? (
-                  <span
-                    aria-hidden="true"
-                    className="pointer-events-none absolute top-8.5 -bottom-5 left-3.5"
-                    style={{
-                      borderLeft:
-                        "1px solid color-mix(in srgb, var(--foreground) 18%, transparent)",
-                    }}
-                  />
-                ) : null}
+              <article key="discussion-topic">
                 <MemoizedDiscussionTopicRow text={item.text} />
               </article>
             );
@@ -353,7 +389,7 @@ export function DiscussionTranscript({
             return (
               <div
                 key={`closing-${item.id}`}
-                className="flex items-center gap-3 text-xs text-muted-foreground"
+                className="flex items-center gap-3 text-secondary-copy text-secondary-label"
               >
                 <span aria-hidden="true" className="h-px min-w-0 flex-1 bg-foreground/12" />
                 <span>{item.label}</span>
@@ -362,7 +398,10 @@ export function DiscussionTranscript({
             );
           if (item.kind === "footer")
             return (
-              <p key="ended-footer" className="text-center text-xs text-muted-foreground">
+              <p
+                key="ended-footer"
+                className="text-center text-secondary-copy text-secondary-label"
+              >
                 {item.label}
               </p>
             );
@@ -380,16 +419,8 @@ export function DiscussionTranscript({
           }
           if (item.kind === "live") {
             const seat = discussion.seats[item.seatIndex]!;
-            const color = discussionSeatColor(item.seatIndex + 1).color;
             return (
-              <article key={item.runId} className="relative">
-                <span
-                  aria-hidden="true"
-                  className="pointer-events-none absolute top-12 -bottom-5 left-3.25 w-0.5 rounded-full"
-                  style={{
-                    background: `linear-gradient(to bottom, color-mix(in srgb, ${color} 70%, transparent), color-mix(in srgb, ${color} 25%, transparent))`,
-                  }}
-                />
+              <article key={item.runId}>
                 <MemoizedDiscussionLiveRow
                   environmentId={environmentId}
                   threadId={seat.threadId}
@@ -421,23 +452,7 @@ export function DiscussionTranscript({
             t.settings.discussions.deletedPersona,
           );
           return (
-            <article key={entry.runId ?? entry.id} className="relative">
-              {position < items.length - 1 ? (
-                <span
-                  aria-hidden="true"
-                  className="pointer-events-none absolute top-8.5 -bottom-5 left-3.5"
-                  style={
-                    entry.kind === "user"
-                      ? {
-                          borderLeft: `1px ${userView?.read ? "solid" : "dashed"} color-mix(in srgb, var(--foreground) 18%, transparent)`,
-                        }
-                      : {
-                          width: 1,
-                          background: `color-mix(in srgb, ${discussionSeatColor(seatIndex + 1).color} 45%, transparent)`,
-                        }
-                  }
-                />
-              ) : null}
+            <article key={entry.runId ?? entry.id}>
               <MemoizedDiscussionEntryRow
                 entry={entry}
                 environmentId={environmentId}
@@ -449,6 +464,7 @@ export function DiscussionTranscript({
                 receiptSeatNumber={userView?.seatIndex == null ? 0 : userView.seatIndex + 1}
                 receiptAvatarState={userView?.avatarState ?? "idle"}
                 userRead={userView?.read ?? true}
+                receiptPaused={discussion.status === "paused"}
                 selectedPath={
                   selectedDiff?.entryId === entry.id ? selectedDiff.filePath : undefined
                 }
