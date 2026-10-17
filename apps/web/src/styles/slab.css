@@ -1,1 +1,91 @@
-/* F1 石纹与玻璃：本线新增的令牌（@theme）与全局样式写在这里。 */
+/*
+ * F1：石纹资源与石墨石面；组件继续使用玻璃类，其他主题保留 index.css 的玻璃行为。
+ * README.md · 设计令牌：640×640 石纹平铺，底座 #0b0b0c 上叠 rgba(0,0,0,.2)。
+ * 工具类由窗口/侧边栏任务应用，本文件不改变布局，也不在石纹层上添加模糊。
+ */
+/* 框架任务尚未引用这些类时也要打包石纹；此登记只生成 CSS，不应用到界面。 */
+@source inline("stone-base stone-sidebar");
+
+@utility stone-base {
+  background-color: var(--background);
+  background-image:
+    linear-gradient(var(--color-stone-dim), var(--color-stone-dim)), url("../assets/stone-8a.webp");
+  background-repeat: repeat;
+}
+
+/* StyleM-8a.dc.html · 整窗：侧边栏同样平铺石纹，上覆 rgba(28,28,31,.82)。 */
+@utility stone-sidebar {
+  background-color: var(--sidebar);
+  background-image:
+    linear-gradient(var(--color-stone-sidebar-veil), var(--color-stone-sidebar-veil)),
+    url("../assets/stone-8a.webp");
+  background-repeat: repeat;
+}
+
+@layer utilities {
+  html[data-theme-id="graphite"]
+    :is(.surface-glass, .alert-glass, .dialog-glass, .dialog-backdrop, .dropdown-glass) {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    border: 0;
+  }
+
+  html[data-theme-id="graphite"] :is(.surface-glass, .alert-glass, .dialog-glass, .dropdown-glass) {
+    /* __root.tsx 写入百分数；80% 以上混黑为零，0% 时混黑 50%，始终保持不透明。
+     * 同层且更具体的 important 背景覆盖原 alert-glass 和无 backdrop-filter 时的兜底。 */
+    --stone-black-mix: clamp(0%, calc((80% - var(--glass-opacity, 80%)) * 0.625), 50%);
+    background: color-mix(
+      in srgb,
+      var(--stone-surface-color, var(--surface-raised)),
+      var(--color-black) var(--stone-black-mix)
+    ) !important;
+  }
+
+  /* 规范-8a.dc.html · G1：实心凸起面 #28282c；页面按画板选择自己的层级阴影。 */
+  html[data-theme-id="graphite"] .surface-glass {
+    --stone-surface-color: var(--surface-raised);
+  }
+
+  /* 规范-8a.dc.html · H2：#2a2a2e + 弹层阴影；保留 Tailwind 独立圈的合成槽。 */
+  html[data-theme-id="graphite"] .dropdown-glass {
+    @apply shadow-overlay;
+    --stone-surface-color: var(--popover);
+    /* 现有调用方的 shadow-black/25 不能把设计中的高光与投影统一染黑。 */
+    --tw-shadow: var(--shadow-overlay);
+  }
+
+  /* 规范-8a.dc.html · H4：#2a2a2e + 对话框阴影，不复用菜单较短的投影。 */
+  html[data-theme-id="graphite"] .dialog-glass {
+    @apply shadow-dialog;
+    --stone-surface-color: var(--popover);
+    --tw-shadow: var(--shadow-dialog);
+  }
+
+  /* 规范-8a.dc.html · H4 / StyleM-8a.dc.html · 整窗 R1：55% 黑幕，不随石面深浅变化。 */
+  html[data-theme-id="graphite"] .dialog-backdrop {
+    background: var(--color-stone-scrim);
+  }
+
+  /* README.md · 设计令牌（W7 定稿）：info #16233f，warning #e8dcc0，error #f0cfc9。
+   * W7 没有规定 success 横幅底色，保留现有 4% 成功色着色，底层改为不透明石面。
+   * 文字和图标继续由 Alert 变体负责；浅沙文字另用合同中的深色文字令牌。 */
+  html[data-theme-id="graphite"] .alert-glass {
+    --stone-surface-color: var(--surface-raised);
+  }
+
+  html[data-theme-id="graphite"] .alert-glass[data-variant="info"] {
+    --stone-surface-color: var(--color-status-info);
+  }
+
+  html[data-theme-id="graphite"] .alert-glass[data-variant="warning"] {
+    --stone-surface-color: var(--warning-surface);
+  }
+
+  html[data-theme-id="graphite"] .alert-glass[data-variant="error"] {
+    --stone-surface-color: var(--color-status-error);
+  }
+
+  html[data-theme-id="graphite"] .alert-glass[data-variant="success"] {
+    --stone-surface-color: color-mix(in srgb, var(--success) 4%, var(--surface-raised));
+  }
+}
