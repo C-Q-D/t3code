@@ -136,6 +136,8 @@ const twMerge = extendTailwindMerge({
         "switch-thumb",
         "switch-thumb-on",
         "send-disabled",
+        "input-disabled-edge",
+        "input-focus-depth",
       ],
       "inset-shadow": ["selected", "focus", "selected-control"],
       "text-shadow": ["stone"],

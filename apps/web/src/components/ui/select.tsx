@@ -1,3 +1,4 @@
+/** Shares select trigger styling with button-based pickers; popups own their own surface. */
 "use client";
 import { mergeProps } from "@base-ui/react/merge-props";
 import { Select as SelectPrimitive } from "@base-ui/react/select";
@@ -11,7 +12,7 @@ import { cn } from "~/lib/utils";
 const Select = SelectPrimitive.Root;
 
 const selectTriggerVariants = cva(
-  "relative inline-flex cursor-pointer select-none items-center justify-between gap-2 border rounded-lg text-left text-base outline-none transition-[color,box-shadow,background-color] data-disabled:pointer-events-none data-disabled:opacity-64 sm:text-sm [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4",
+  "group/select-trigger relative inline-flex cursor-pointer select-none items-center justify-between gap-1.5 rounded-full border-0 text-left text-secondary-copy-large outline-none transition-[color,box-shadow,background-color] focus-visible:inset-shadow-focus disabled:pointer-events-none data-disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
   {
     defaultVariants: {
       size: "default",
@@ -20,22 +21,22 @@ const selectTriggerVariants = cva(
     variants: {
       variant: {
         default:
-          "w-full min-w-36 border-input bg-background not-dark:bg-clip-padding text-foreground shadow-xs/5 ring-ring/24 before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)] not-data-disabled:not-focus-visible:not-aria-invalid:not-data-pressed:before:shadow-[0_1px_--theme(--color-black/4%)] pointer-coarse:after:absolute pointer-coarse:after:size-full pointer-coarse:after:min-h-11 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-inset aria-invalid:border-destructive/36 focus-visible:aria-invalid:border-destructive/64 focus-visible:aria-invalid:ring-destructive/16 dark:bg-input/32 dark:aria-invalid:ring-destructive/24 dark:not-data-disabled:not-focus-visible:not-aria-invalid:not-data-pressed:before:shadow-[0_-1px_--theme(--color-white/6%)] [&_svg:not([class*='opacity-'])]:opacity-80 [&_svg:not([class*='text-'])]:text-icon-muted [[data-disabled],:focus-visible,[aria-invalid],[data-pressed]]:shadow-none",
+          "w-full min-w-36 bg-select-control text-fg-detail shadow-raise-xs-control not-disabled:not-data-disabled:hover:bg-accent not-disabled:not-data-disabled:hover:text-message-action-hover not-disabled:not-data-disabled:hover:shadow-raise-xs-hover focus-visible:shadow-raise-tab not-disabled:not-data-disabled:[&:is(:active,[data-pressed],[aria-expanded=true])]:translate-y-[1.5px] not-disabled:not-data-disabled:[&:is(:active,[data-pressed],[aria-expanded=true])]:bg-select-pressed not-disabled:not-data-disabled:[&:is(:active,[data-pressed],[aria-expanded=true])]:text-foreground not-disabled:not-data-disabled:[&:is(:active,[data-pressed],[aria-expanded=true])]:shadow-raise-xs-pressed aria-invalid:shadow-outline-danger [&:is(:disabled,[data-disabled])]:bg-select-disabled [&:is(:disabled,[data-disabled])]:text-fg-control-disabled [&:is(:disabled,[data-disabled])]:shadow-none",
         ghost:
-          "border-transparent text-secondary-label focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring data-pressed:bg-accent [:hover,[data-pressed]]:bg-accent [:hover,[data-pressed]]:text-foreground",
+          "bg-transparent text-secondary-label not-disabled:not-data-disabled:hover:bg-accent not-disabled:not-data-disabled:hover:text-foreground not-disabled:not-data-disabled:[&:is(:active,[data-pressed],[aria-expanded=true])]:bg-accent not-disabled:not-data-disabled:[&:is(:active,[data-pressed],[aria-expanded=true])]:text-foreground [&:is(:disabled,[data-disabled])]:text-fg-control-disabled",
       },
       size: {
-        compact:
-          "h-7 gap-1 rounded-md px-[calc(--spacing(2)-1px)] text-xs before:rounded-[calc(var(--radius-md)-1px)] [&_svg:not([class*='size-'])]:size-3.5",
-        default: "min-h-9 px-[calc(--spacing(3)-1px)] sm:min-h-8",
-        lg: "min-h-10 px-[calc(--spacing(3)-1px)] sm:min-h-9",
-        sm: "min-h-8 gap-1.5 px-[calc(--spacing(2.5)-1px)] sm:min-h-7",
-        xs: "h-7 gap-1 rounded-md px-[calc(--spacing(2)-1px)] text-sm before:rounded-[calc(var(--radius-md)-1px)] sm:h-6 sm:text-xs [&_svg:not([class*='size-'])]:size-4 sm:[&_svg:not([class*='size-'])]:size-3.5",
+        compact: "h-7 gap-1 px-2 text-secondary-copy",
+        default: "h-8.5 ps-3 pe-2.5",
+        lg: "h-10 ps-3 pe-2.5",
+        sm: "h-7.5 px-2.5",
+        xs: "h-7 gap-1 px-2 text-secondary-copy",
       },
     },
   },
 );
 
+/** Keeps Base UI selection and focus behavior while applying the shared capsule variants. */
 function SelectTrigger({
   className,
   size = "default",
@@ -53,7 +54,9 @@ function SelectTrigger({
     >
       {children}
       <SelectPrimitive.Icon data-slot="select-icon">
-        {icon ?? <ChevronDownIcon className="-me-1 size-3 opacity-50" />}
+        {icon ?? (
+          <ChevronDownIcon className="size-3.5 group-aria-expanded/select-trigger:rotate-180" />
+        )}
       </SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>
   );
@@ -82,7 +85,10 @@ function SelectButton({
       children: (
         <>
           <span className="min-w-0 flex-1 truncate text-left">{children}</span>
-          <ChevronDownIcon aria-hidden className="-me-1 size-3 shrink-0 opacity-50" />
+          <ChevronDownIcon
+            aria-hidden
+            className="size-3.5 shrink-0 group-aria-expanded/select-trigger:rotate-180"
+          />
         </>
       ),
     },

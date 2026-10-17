@@ -1,1 +1,14 @@
 /* F3 交互控件：本线新增的令牌（@theme）与全局样式写在这里。 */
+
+/* F3.2 — 规范-8a.dc.html H1：输入、Select 和 Switch 五态缺失的精确值。 */
+@theme {
+  --color-input-disabled: #18181a;
+  --color-select-control: #2b2b30;
+  --color-select-pressed: #232327;
+  --color-select-disabled: #26262a;
+  --color-switch-on-pressed: #dedee2;
+
+  /* H1 输入禁用仅留暗描边；焦点深度不含白圈，交给 inset-shadow-focus 叠加。 */
+  --shadow-input-disabled-edge: inset 0 0 0 1px rgba(0, 0, 0, 0.4);
+  --shadow-input-focus-depth: inset 2px 3px 5px rgba(0, 0, 0, 0.66);
+}

@@ -1,3 +1,4 @@
+/** Owns the shared input well; native and Base UI inputs use the same presentation. */
 "use client";
 
 import { Input as InputPrimitive } from "@base-ui/react/input";
@@ -5,6 +6,7 @@ import type * as React from "react";
 
 import { cn } from "~/lib/utils";
 
+/** Preserves native sizing and the unstyled composition path used by InputGroup. */
 type InputProps = Omit<InputPrimitive.Props & React.RefAttributes<HTMLInputElement>, "size"> & {
   size?: "sm" | "compact" | "default" | "lg" | number;
   /** Monospace with tabular digits, for paths, commands, colors and numbers. */
@@ -13,6 +15,7 @@ type InputProps = Omit<InputPrimitive.Props & React.RefAttributes<HTMLInputEleme
   nativeInput?: boolean;
 };
 
+/** Renders a pill input; numeric size values still set the native character width. */
 function Input({
   className,
   size = "default",
@@ -22,10 +25,12 @@ function Input({
   ...props
 }: InputProps) {
   const inputClassName = cn(
-    "h-8.5 w-full min-w-0 rounded-[inherit] px-[calc(--spacing(3)-1px)] leading-8.5 outline-none placeholder:text-placeholder sm:h-7.5 sm:leading-7.5 [transition:background-color_5000000s_ease-in-out_0s]",
-    size === "compact" && "h-7 px-[calc(--spacing(2.5)-1px)] text-xs leading-7 sm:h-7 sm:leading-7",
-    size === "sm" && "h-7.5 px-[calc(--spacing(2.5)-1px)] leading-7.5 sm:h-6.5 sm:leading-6.5",
-    size === "lg" && "h-9.5 leading-9.5 sm:h-8.5 sm:leading-8.5",
+    "h-9.5 w-full min-w-0 rounded-[inherit] bg-transparent px-3.5 text-control outline-none caret-message-action placeholder:text-placeholder [transition:background-color_5000000s_ease-in-out_0s]",
+    !unstyled &&
+      "enabled:not-focus:hover:placeholder:text-muted-foreground disabled:placeholder:text-fg-icon-disabled",
+    size === "compact" && "h-7 px-2.5 text-secondary-copy",
+    size === "sm" && "h-7.5 px-2.5",
+    size === "lg" && "h-10",
     props.type === "search" &&
       "[&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-decoration]:appearance-none [&::-webkit-search-results-button]:appearance-none [&::-webkit-search-results-decoration]:appearance-none",
     // Number fields are typed into; browser spin buttons crowd narrow fields and step by 1.
@@ -65,10 +70,7 @@ function Input({
       className={
         cn(
           !unstyled &&
-            "relative inline-flex w-full rounded-lg border border-input bg-background not-dark:bg-clip-padding text-base text-foreground shadow-xs/5 ring-ring/24 transition-shadow before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)] not-has-disabled:not-has-focus-visible:not-has-aria-invalid:before:shadow-[0_1px_--theme(--color-black/4%)] has-focus-visible:has-aria-invalid:border-destructive/64 has-focus-visible:has-aria-invalid:ring-destructive/16 has-aria-invalid:border-destructive/36 has-focus-visible:border-ring has-autofill:bg-foreground/4 has-disabled:opacity-64 has-[:disabled,:focus-visible,[aria-invalid]]:shadow-none has-focus-visible:ring-[3px] has-focus-visible:ring-inset sm:text-sm dark:bg-input/32 dark:has-autofill:bg-foreground/8 dark:has-aria-invalid:ring-destructive/24 dark:not-has-disabled:not-has-focus-visible:not-has-aria-invalid:before:shadow-[0_-1px_--theme(--color-white/6%)]",
-          !unstyled &&
-            size === "compact" &&
-            "rounded-md before:rounded-[calc(var(--radius-md)-1px)]",
+            "relative inline-flex w-full rounded-full border-0 bg-input text-foreground shadow-well-control transition-shadow not-has-disabled:not-focus-within:hover:bg-well-surface not-has-disabled:not-focus-within:hover:shadow-well-hover focus-within:bg-input focus-within:shadow-input-focus-depth focus-within:inset-shadow-focus has-[input:active]:bg-input has-[input:active]:shadow-well-editing has-aria-invalid:shadow-outline-danger has-disabled:bg-input-disabled has-disabled:text-fg-icon-disabled has-disabled:shadow-input-disabled-edge",
           font === "mono" && "font-mono tabular-nums",
           className,
         ) || undefined
