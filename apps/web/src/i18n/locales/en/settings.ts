@@ -3198,6 +3198,7 @@ ${address}`
     pasteApiKey: "Paste API key",
   },
   providerInstanceCard: {
+    addInstance: "Add instance",
     storedSecretEnterValueReplace: "Stored secret - enter a new value to replace",
     clear: (propsFieldLabel: string | number | boolean | null | undefined) =>
       `Clear ${propsFieldLabel}`,
@@ -4067,6 +4068,8 @@ ${address}`
     ) => `Remove selected${themeIdsToRemoveLength0 ? ` (${themeIdsToRemoveLength})` : ""}`,
   },
   usageProvider: {
+    usageGroup: "Usage",
+    providerRow: "Usage providers",
     updateCursorAccountUsage: "update Cursor account usage",
     addHub: "Add hub",
     readExistingCursorCliLoginHint:

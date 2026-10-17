@@ -1,4 +1,7 @@
+/** Verifies provider mutations, access and search targets stay bound to the selected environment. */
 import type { ReactElement } from "react";
+import type * as ReactModule from "react";
+import type * as SettingsLayoutModule from "./settingsLayout";
 import {
   DEFAULT_UNIFIED_SETTINGS,
   EnvironmentId,
@@ -46,7 +49,7 @@ const settingsSearchState = vi.hoisted(() => ({
 }));
 
 vi.mock("react", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("react")>();
+  const actual = await importOriginal<typeof ReactModule>();
   const { reactHookHarness } = await import("../../test/reactHookHarness");
   return {
     ...actual,
@@ -59,7 +62,7 @@ vi.mock("react", async (importOriginal) => {
 });
 
 vi.mock("./settingsLayout", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./settingsLayout")>();
+  const actual = await importOriginal<typeof SettingsLayoutModule>();
   return {
     ...actual,
     useSettingsSearchTargetId: () => settingsSearchState.targetId,
@@ -145,6 +148,7 @@ vi.mock("../../state/entities", () => ({
 
 import { EnvironmentProviderSettings } from "./ProviderSettingsPanel";
 import { AddProviderInstanceDialog } from "./AddProviderInstanceDialog";
+import { UsageProviderSettings } from "./UsageProviderSettings";
 
 const environmentId = EnvironmentId.make("remote-device");
 const codexId = ProviderInstanceId.make("codex");
@@ -448,18 +452,32 @@ describe("EnvironmentProviderSettings routing", () => {
     expect(settingsState.updateSettings).not.toHaveBeenCalled();
   });
 
-  it("keeps Advanced visible when search targets the provider health interval", () => {
+  it("keeps the health interval reachable in Usage before and after a search jump", () => {
     let panel = renderPanel();
-    expect(visitElements(panel, (element) => element.props.title === "Advanced")).not.toBeNull();
+    const usageBeforeSearch = visitElements(
+      panel,
+      (element) => element.type === UsageProviderSettings,
+    );
+    expect(usageBeforeSearch).not.toBeNull();
     expect(
-      visitElements(panel, (element) => element.props.id === "provider-health-check-interval"),
+      visitElements(
+        usageBeforeSearch!,
+        (element) => element.props.id === "provider-health-check-interval",
+      ),
     ).not.toBeNull();
 
     settingsSearchState.targetId = "provider-health-check-interval";
     panel = renderPanel();
-    expect(visitElements(panel, (element) => element.props.title === "Advanced")).not.toBeNull();
+    const usageAfterSearch = visitElements(
+      panel,
+      (element) => element.type === UsageProviderSettings,
+    );
+    expect(usageAfterSearch).not.toBeNull();
     expect(
-      visitElements(panel, (element) => element.props.id === "provider-health-check-interval"),
+      visitElements(
+        usageAfterSearch!,
+        (element) => element.props.id === "provider-health-check-interval",
+      ),
     ).not.toBeNull();
   });
 

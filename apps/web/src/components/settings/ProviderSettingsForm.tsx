@@ -1,3 +1,4 @@
+/** Renders schema-defined provider fields; config defaults and secret handling remain schema-owned. */
 "use client";
 
 import { t } from "~/i18n";
@@ -333,7 +334,7 @@ function ProviderSettingsSelect({
   readonly field: ProviderSettingsFieldModel;
   readonly value: unknown;
   readonly inputId: string;
-  readonly size: "sm" | "xs";
+  readonly size: "sm" | "xs" | "settings";
   readonly className?: string | undefined;
   readonly onChange: ProviderSettingsFormProps["onChange"];
 }) {
@@ -381,6 +382,11 @@ interface ProviderSettingsFieldRowProps {
   readonly onChange: ProviderSettingsFormProps["onChange"];
 }
 
+/**
+ * Renders a schema field in the requested form layout and preserves default-value omission.
+ * @param props Field schema, current config, input ID prefix, layout and parent config-change callback.
+ * @returns The appropriate control; persistence errors remain the parent's responsibility.
+ */
 function ProviderSettingsFieldRow({
   field,
   value,
@@ -415,7 +421,7 @@ function ProviderSettingsFieldRow({
           field={field}
           value={value}
           inputId={inputId}
-          size="sm"
+          size="settings"
           className="w-full max-w-full @min-[32rem]/settings-row:w-56"
           onChange={onChange}
         />
@@ -435,7 +441,7 @@ function ProviderSettingsFieldRow({
         <SecretInput
           id={inputId}
           aria-describedby={descriptionId}
-          size="sm"
+          size="settings"
           className="w-full max-w-full @min-[32rem]/settings-row:w-56"
           configured={readProviderConfigString(value, field.key).length > 0}
           value=""
@@ -445,7 +451,7 @@ function ProviderSettingsFieldRow({
         <DraftInput
           id={inputId}
           aria-describedby={descriptionId}
-          size="sm"
+          size="settings"
           className="w-full max-w-full @min-[32rem]/settings-row:w-56"
           type={field.control === "password" ? "password" : undefined}
           autoComplete={field.control === "password" ? "off" : undefined}

@@ -172,6 +172,8 @@ const twMerge = extendTailwindMerge({
         "settings-avatar-edge",
         "settings-group-elevation",
         "settings-toolbar-key-elevation",
+        "provider-card",
+        "provider-model",
         "usage-chart",
         "usage-total",
         "usage-bar",

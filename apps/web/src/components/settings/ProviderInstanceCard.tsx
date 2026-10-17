@@ -1,3 +1,4 @@
+/** Renders provider overview cards and instance configuration; persistence stays with the caller. */
 "use client";
 
 import { t } from "~/i18n";
@@ -265,6 +266,11 @@ export function nextProviderEnvironmentWithFieldValue(
   return next;
 }
 
+/**
+ * Edits one driver-declared environment field without revealing stored secrets.
+ * @param props Field metadata, optional saved value, stable input prefix and parent commit/remove handlers.
+ * @returns A settings row; the parent owns validation and persistence errors.
+ */
 function ProviderEnvironmentFieldRow(props: {
   readonly field: ProviderEnvironmentField;
   readonly variable: ProviderInstanceEnvironmentVariable | undefined;
@@ -284,7 +290,7 @@ function ProviderEnvironmentFieldRow(props: {
           {props.field.sensitive === false ? (
             <DraftInput
               id={inputId}
-              size="sm"
+              size="settings"
               className="min-w-0 flex-1"
               autoComplete="off"
               value={value}
@@ -295,7 +301,7 @@ function ProviderEnvironmentFieldRow(props: {
           ) : (
             <SecretInput
               id={inputId}
-              size="sm"
+              size="settings"
               className="min-w-0 flex-1"
               value={value}
               onCommit={(next) => props.onCommit(props.field, next)}
@@ -321,6 +327,11 @@ function ProviderEnvironmentFieldRow(props: {
   );
 }
 
+/**
+ * Maintains editable environment-variable drafts and publishes valid rows to the parent.
+ * @param props Persisted environment variables and the callback receiving each validated replacement list.
+ * @returns Variable controls that preserve redacted secrets and discard blank draft rows from writes.
+ */
 export function ProviderEnvironmentSection(props: {
   readonly environment: ReadonlyArray<ProviderInstanceEnvironmentVariable>;
   readonly onChange: (environment: ReadonlyArray<ProviderInstanceEnvironmentVariable>) => void;
@@ -418,7 +429,7 @@ export function ProviderEnvironmentSection(props: {
           {rows.map((variable, index) => (
             <div key={variable.id} className="flex min-w-0 flex-wrap items-center gap-1.5">
               <DraftInput
-                size="sm"
+                size="settings"
                 font="mono"
                 className="w-full min-w-0 sm:w-44 sm:shrink-0"
                 value={variable.name}
@@ -432,7 +443,7 @@ export function ProviderEnvironmentSection(props: {
               </span>
               {variable.sensitive ? (
                 <SecretInput
-                  size="sm"
+                  size="settings"
                   font="mono"
                   className="min-w-0 flex-1"
                   value={variable.valueRedacted ? "" : variable.value}
@@ -444,7 +455,7 @@ export function ProviderEnvironmentSection(props: {
                 />
               ) : (
                 <DraftInput
-                  size="sm"
+                  size="settings"
                   font="mono"
                   className="min-w-0 flex-1"
                   value={variable.valueRedacted ? "" : variable.value}
@@ -606,6 +617,8 @@ interface ProviderInstanceCardProps {
   readonly mode: "list" | "editor";
   readonly selected?: boolean | undefined;
   readonly onSelect?: (() => void) | undefined;
+  /** Opens the existing instance wizard; omitted when provider management is unavailable. */
+  readonly onAddInstance?: (() => void) | undefined;
   readonly readOnly?: boolean | undefined;
   readonly canWriteSettings?: boolean;
   readonly onUpdate: (nextInstance: ProviderInstanceConfig) => void;
@@ -655,8 +668,8 @@ interface ProviderInstanceCardProps {
 const EMPTY_ACP_PROJECTS: NonNullable<ProviderInstanceCardProps["acpProjects"]> = [];
 
 /**
- * Renders one provider instance as either a compact selectable list row or
- * the full editor shown beside that list. Both modes use the same enabled
+ * Renders one provider instance as either a selectable overview card or
+ * the full editor shown below the card grid. Both modes use the same enabled
  * state and provider metadata.
  *
  * Behavior notes:
@@ -684,6 +697,7 @@ export function ProviderInstanceCard({
   mode,
   selected = false,
   onSelect,
+  onAddInstance,
   readOnly = false,
   canWriteSettings = true,
   onUpdate,
@@ -887,8 +901,8 @@ export function ProviderInstanceCard({
           : (readConfigString(instance.config, "registryIconUrl") ?? undefined)
       }
       showBadge={Boolean(accentColor)}
-      className="size-5"
-      iconClassName="size-4 text-foreground/80"
+      className={mode === "list" ? "size-7.5" : "size-5"}
+      iconClassName={mode === "list" ? "size-7.5" : "size-4 text-foreground/80"}
       badgeClassName="right-[-0.125rem] bottom-[-0.125rem] h-3 min-w-3 px-0.5 text-5xs"
     />
   );
@@ -1059,80 +1073,106 @@ export function ProviderInstanceCard({
       <div
         data-slot="settings-row"
         className={cn(
-          "group flex min-h-18 items-center gap-3 px-3 py-3 transition-colors sm:px-4",
-          selected ? "bg-muted/45" : "hover:bg-muted/25",
+          "relative flex min-w-0 flex-col gap-3 rounded-card-row bg-provider-card p-3.5 shadow-provider-card",
+          selected && "inset-shadow-selected",
         )}
       >
-        <div
-          className={cn(
-            "pointer-events-none relative flex min-w-0 flex-1 items-start gap-3 rounded-md text-left transition-opacity",
-            !enabled && !selected && "opacity-60 group-hover:opacity-100",
-          )}
-        >
-          <button
-            type="button"
-            className="pointer-events-auto absolute inset-0 cursor-pointer rounded-md outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-            onClick={onSelect}
-            aria-label={t.settings.providerInstanceCard.select(displayName)}
-            aria-pressed={selected}
-          />
+        <button
+          type="button"
+          className="absolute inset-0 cursor-pointer rounded-card-row outline-none focus-visible:inset-shadow-focus"
+          onClick={onSelect}
+          aria-label={t.settings.providerInstanceCard.select(displayName)}
+          aria-pressed={selected}
+        />
+        <div className="pointer-events-none relative flex min-w-0 items-center gap-2.5">
           {titleIconNode}
-          <span className="min-w-0 flex-1">
-            <span className="flex min-w-0 items-center gap-2">
-              <span className="truncate text-sm font-medium text-foreground">{displayName}</span>
-              {versionLabel ? (
-                <code className="max-w-24 shrink-0 truncate text-xs text-muted-foreground">
-                  {versionLabel}
-                </code>
-              ) : null}
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <span className="truncate text-heading font-bold text-foreground">{displayName}</span>
               {versionAdvisoryNode}
+            </div>
+            <div className="pointer-events-auto w-fit max-w-full font-mono text-xs text-secondary-label">
+              {isAuthenticated && authEmail ? (
+                <ProviderAuthEmail email={authEmail} />
+              ) : (
+                (authLabel ?? versionCodeNode)
+              )}
+            </div>
+          </div>
+          <ProviderStatusDiagnostic detail={statusDiagnostic}>
+            <span
+              tabIndex={statusDiagnostic ? 0 : undefined}
+              aria-live="polite"
+              className={cn(
+                "pointer-events-auto flex min-h-5 max-w-32 items-center rounded-tag px-2 text-meta-large font-semibold",
+                statusKey === "ready"
+                  ? "bg-status-success text-success-foreground"
+                  : statusKey === "warning"
+                    ? "bg-status-restricted text-status-restricted-foreground"
+                    : statusKey === "error"
+                      ? "bg-error-surface text-error-foreground"
+                      : "bg-secondary text-secondary-label",
+              )}
+            >
+              {updateProgress
+                ? t.settings.merge.updatingProgress(updateProgress)
+                : summary.headline}
             </span>
-            <span className="mt-0.5 flex items-start gap-1.5 text-xs leading-normal text-muted-foreground/80">
-              {/* The dot describes provider health, not the update in progress. */}
-              {statusDotNode && !updateProgress ? (
-                <span className="flex h-[1.45em] shrink-0 items-center">{statusDotNode}</span>
-              ) : null}
-              <ProviderStatusDiagnostic detail={statusDiagnostic}>
-                <span
-                  tabIndex={statusDiagnostic ? 0 : undefined}
-                  aria-live="polite"
-                  className="pointer-events-auto line-clamp-2 [overflow-wrap:anywhere]"
-                >
-                  {updateProgress ? (
-                    t.settings.merge.updatingProgress(updateProgress)
-                  ) : (
-                    <>
-                      {summary.headline}
-                      {needsAttention && inlineStatusDetail ? ` · ${inlineStatusDetail}` : null}
-                    </>
-                  )}
+          </ProviderStatusDiagnostic>
+          <div className="pointer-events-auto">
+            <span className="flex h-5 shrink-0 items-center gap-1">
+              {projectOverride?.value !== undefined ? (
+                <span className="flex items-center">
+                  <ProjectOverrideInheritance
+                    projectEnabled={projectOverride.value}
+                    deviceEnabled={resolveProviderInstanceEnabled(instance)}
+                  />
+                  <SettingResetButton
+                    label={`${displayName} enablement`}
+                    tooltip="Reset to the device setting"
+                    disabled={readOnly || !canWriteSettings}
+                    onClick={projectOverride.onReset}
+                  />
                 </span>
-              </ProviderStatusDiagnostic>
+              ) : null}
+              <Switch
+                checked={enabled}
+                disabled={readOnly || (projectOverride !== undefined && !canWriteSettings)}
+                onCheckedChange={(checked) => updateEnabled(Boolean(checked))}
+                aria-label={t.settings.providerInstanceCard.enable(displayName)}
+              />
             </span>
-          </span>
+          </div>
         </div>
-        <span className="flex h-5 shrink-0 items-center gap-1">
-          {projectOverride?.value !== undefined ? (
-            <span className="flex items-center">
-              <ProjectOverrideInheritance
-                projectEnabled={projectOverride.value}
-                deviceEnabled={resolveProviderInstanceEnabled(instance)}
-              />
-              <SettingResetButton
-                label={`${displayName} enablement`}
-                tooltip="Reset to the device setting"
-                disabled={readOnly || !canWriteSettings}
-                onClick={projectOverride.onReset}
-              />
-            </span>
-          ) : null}
-          <Switch
-            checked={enabled}
-            disabled={readOnly || (projectOverride !== undefined && !canWriteSettings)}
-            onCheckedChange={(checked) => updateEnabled(Boolean(checked))}
-            aria-label={t.settings.providerInstanceCard.enable(displayName)}
-          />
-        </span>
+        {needsAttention && inlineStatusDetail ? (
+          <p className="pointer-events-none relative text-xs text-secondary-label">
+            {inlineStatusDetail}
+          </p>
+        ) : null}
+        <div className="relative flex max-h-32 flex-wrap gap-1.5 overflow-y-auto">
+          {modelsForDisplay.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              {t.settings.providerModels.modelsReportedProviderYetHint}
+            </p>
+          ) : (
+            modelsForDisplay.map((model) => (
+              <span
+                key={model.slug}
+                className="inline-flex min-h-6 max-w-full items-center rounded-compact-row bg-provider-model px-2.5 text-xs shadow-provider-model"
+              >
+                <span className="truncate">{model.name}</span>
+              </span>
+            ))
+          )}
+        </div>
+        {onAddInstance ? (
+          <div className="relative mt-auto self-start">
+            <Button size="md" variant="outline" onClick={onAddInstance}>
+              <PlusIcon aria-hidden />
+              {t.settings.providerInstanceCard.addInstance}
+            </Button>
+          </div>
+        ) : null}
       </div>
     );
   }
@@ -1247,7 +1287,7 @@ export function ProviderInstanceCard({
               />
               <DraftInput
                 id={`provider-instance-${instanceId}-display-name`}
-                size="sm"
+                size="settings"
                 className="min-w-0 flex-1 @min-[32rem]/settings-row:w-56"
                 value={instance.displayName ?? ""}
                 onCommit={updateDisplayName}

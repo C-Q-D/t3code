@@ -1,8 +1,9 @@
+/** Manages usage hubs and Cursor usage for the selected environment; never substitutes example providers. */
 import { t } from "~/i18n";
 import type { EnvironmentId, UnifiedSettings } from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
 import { PlusIcon } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { useUpdateEnvironmentSettings } from "../../hooks/useSettings";
 import { serverEnvironment } from "../../state/server";
@@ -29,12 +30,15 @@ export function UsageProviderSettings({
   sources,
   cursorKeychainUsageEnabled,
   readOnly,
+  children,
 }: {
   readonly environmentId: EnvironmentId;
   readonly environmentLabel: string;
   readonly sources: UnifiedSettings["usageLimitSources"];
   readonly cursorKeychainUsageEnabled: boolean;
   readonly readOnly: boolean;
+  /** Related usage rows, including the health interval, share this settings group. */
+  readonly children?: ReactNode;
 }) {
   const updateSettings = useUpdateEnvironmentSettings(environmentId);
   const updateCursorSettings = useAtomCommand(serverEnvironment.updateSettings, {
@@ -66,17 +70,50 @@ export function UsageProviderSettings({
 
   return (
     <>
-      <SettingsSection
-        {...searchableSetting("usage-providers")}
-        headerAction={
-          !readOnly ? (
-            <Button size="xs" variant="outline" onClick={() => setAdding(true)}>
-              <PlusIcon className="size-3" aria-hidden />
-              {t.settings.usageProvider.addHub}
-            </Button>
-          ) : null
-        }
-      >
+      <SettingsSection title={t.settings.usageProvider.usageGroup}>
+        <SettingsRow
+          {...searchableSetting("usage-providers")}
+          title={t.settings.usageProvider.providerRow}
+          description={t.settings.usageProvider.cliProxy}
+          control={
+            !readOnly ? (
+              <Button size="md" variant="outline" onClick={() => setAdding(true)}>
+                <PlusIcon aria-hidden />
+                {t.settings.usageProvider.addHub}
+              </Button>
+            ) : null
+          }
+        >
+          <div className="mt-3 divide-y divide-border">
+            {entries.length === 0 ? (
+              <p className="py-2 text-secondary-copy text-muted-foreground">
+                {t.settings.usageProvider.noHubsConfigured}
+              </p>
+            ) : (
+              entries.map(([id, source]) => {
+                const label = source.label?.trim() || source.url;
+                return (
+                  <div key={id} className="flex min-w-0 items-center justify-between gap-3 py-3">
+                    <div className="min-w-0">
+                      <p className="break-all text-body text-foreground">{label}</p>
+                      <p className="break-all text-secondary-copy text-muted-foreground">
+                        {t.settings.usageProvider.cliProxy}
+                        {source.enabled ? "" : t.settings.usageProvider.disabled}
+                        {label !== source.url ? ` · ${source.url}` : ""}
+                      </p>
+                    </div>
+                    {!readOnly ? (
+                      <RemoveUsageProviderButton
+                        label={label}
+                        onConfirm={() => updateSettings({ usageLimitSources: { [id]: null } })}
+                      />
+                    ) : null}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </SettingsRow>
         {platform?.os === "darwin" ? (
           <SettingsRow
             id="cursor-keychain-usage"
@@ -92,34 +129,7 @@ export function UsageProviderSettings({
             }
           />
         ) : null}
-        {entries.length === 0 ? (
-          <SettingsRow title={t.settings.usageProvider.noHubsConfigured} />
-        ) : (
-          entries.map(([id, source]) => {
-            const label = source.label?.trim() || source.url;
-            return (
-              <SettingsRow
-                key={id}
-                title={label}
-                description={
-                  <span className="break-all">
-                    {t.settings.usageProvider.cliProxy}
-                    {source.enabled ? "" : t.settings.usageProvider.disabled}
-                    {label !== source.url ? ` · ${source.url}` : ""}
-                  </span>
-                }
-                control={
-                  !readOnly ? (
-                    <RemoveUsageProviderButton
-                      label={label}
-                      onConfirm={() => updateSettings({ usageLimitSources: { [id]: null } })}
-                    />
-                  ) : null
-                }
-              />
-            );
-          })
-        )}
+        {children}
       </SettingsSection>
       {adding && !readOnly ? (
         <AddUsageLimitSourceDialog
@@ -144,7 +154,7 @@ function RemoveUsageProviderButton({
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Button size="xs" variant="ghost" onClick={() => setOpen(true)}>
+      <Button size="md" variant="ghost" onClick={() => setOpen(true)}>
         {t.settings.usageProvider.remove}
       </Button>
       <AlertDialog open={open} onOpenChange={setOpen}>

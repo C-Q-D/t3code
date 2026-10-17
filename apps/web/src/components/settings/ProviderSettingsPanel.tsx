@@ -1,3 +1,4 @@
+/** Presents environment provider cards and their selected editor without changing scoped writes. */
 import { t } from "~/i18n";
 import { SettingsGroup } from "./SettingsGroup";
 import { RefreshIcon } from "~/components/ui/refresh-icon";
@@ -34,9 +35,8 @@ import {
 } from "@t3tools/shared/backgroundActivitySettings";
 import * as Arr from "effect/Array";
 import * as Duration from "effect/Duration";
-import * as Equal from "effect/Equal";
 import * as Result from "effect/Result";
-import { PlusIcon } from "lucide-react";
+import { MinusIcon, PlusIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { isDesktopLocalConnectionTarget } from "../../connection/desktopLocal";
@@ -72,6 +72,7 @@ import {
 } from "../ProviderUpdateLaunchNotification.logic";
 import { ProviderUpdatesAction } from "../ProviderUpdatesAction";
 import { Button } from "../ui/button";
+import { Input } from "../ui/input";
 import {
   Empty,
   EmptyContent,
@@ -80,13 +81,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "../ui/empty";
-import {
-  NumberField,
-  NumberFieldDecrement,
-  NumberFieldGroup,
-  NumberFieldIncrement,
-  NumberFieldInput,
-} from "../ui/number-field";
+import { NumberField, NumberFieldPrimitive } from "../ui/number-field";
 import { ScrollArea } from "../ui/scroll-area";
 import { Toggle, ToggleGroup } from "../ui/toggle-group";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
@@ -189,14 +184,13 @@ function providerEnvironmentDetail(environment: EnvironmentPresentation): string
   return environment.displayUrl ?? t.settings.providerSettings.remoteDevice;
 }
 
-// Shared by the editor grid and the placeholder states so switching devices
-// never changes the card's footprint.
+// Unavailable devices keep a substantial empty-state area without fixing the live editor height.
 const providerCardHeightClassName =
   "@min-[48rem]/providers:h-[min(44rem,calc(100dvh-11rem))] @min-[48rem]/providers:min-h-[32rem]";
 
 /**
- * Same chrome as the provider editor (section heading, floating device tabs,
- * tall card) for states that cannot render provider settings yet.
+ * Keeps unavailable devices in the shared provider shell with a tall empty state
+ * until their settings can be read.
  */
 function ProviderSettingsPlaceholder({
   deviceTabs,
@@ -294,9 +288,14 @@ interface ProviderSettingsTarget {
   readonly projectIds?: readonly ProjectId[];
 }
 
+/**
+ * Renders the scoped provider page in the shared settings shell.
+ * @param target Optional environment, instance and project scope used by selection and access checks.
+ * @returns The provider page; the environment content gates writes using destination grants.
+ */
 export function ProviderSettingsPanel(target: ProviderSettingsTarget) {
   return (
-    <SettingsPageContainer className="@container/providers gap-8">
+    <SettingsPageContainer className="@container/providers">
       <ProviderSettingsPanelContent
         key={`${target.environmentId ?? ""}:${target.instanceId ?? ""}`}
         {...target}
@@ -566,6 +565,13 @@ function AccessGatedProviderSettings({
   );
 }
 
+/**
+ * Shows cards, the selected editor and usage controls for one environment.
+ * @param props Environment identity, permission state, optional device tabs and search target;
+ * projectIds selects the project overrides while an absent list edits environment defaults.
+ * @returns Readable settings with writes gated by the destination environment grants.
+ * Persistence and provider command failures are reported by the existing command hooks.
+ */
 export function EnvironmentProviderSettings({
   environmentId,
   environmentLabel,
@@ -1002,6 +1008,7 @@ export function EnvironmentProviderSettings({
         mode={mode}
         selected={mode === "list" && selectedRow?.instanceId === row.instanceId}
         onSelect={mode === "list" ? () => setSelectedInstanceId(row.instanceId) : undefined}
+        onAddInstance={!readOnly ? () => setIsAddInstanceDialogOpen(true) : undefined}
         readOnly={readOnly}
         runtime={
           mode === "editor" &&
@@ -1231,49 +1238,25 @@ export function EnvironmentProviderSettings({
             />
           </SettingsGroup>
         ) : null}
-        <SettingsGroup
-          divided={false}
-          className={cn(
-            providerCardHeightClassName,
-            "overflow-hidden @min-[48rem]/providers:grid @min-[48rem]/providers:grid-cols-[17rem_minmax(0,1fr)]",
-          )}
-        >
-          <div className="border-b border-border/60 bg-muted/10 @min-[48rem]/providers:flex @min-[48rem]/providers:min-h-0 @min-[48rem]/providers:flex-col @min-[48rem]/providers:border-r @min-[48rem]/providers:border-b-0">
-            <ScrollArea
-              scrollFade
-              chainVerticalScroll
-              className="@min-[48rem]/providers:min-h-0 @min-[48rem]/providers:flex-1"
-            >
-              <div className="divide-y divide-border/50">
-                {rows.map((row) => renderProviderInstance(row, "list"))}
-                {!readOnly ? (
-                  <button
-                    type="button"
-                    className="flex w-full cursor-pointer items-center gap-3 px-3 py-3 text-left text-sm text-muted-foreground transition-colors outline-none hover:bg-muted/25 hover:text-foreground focus-visible:bg-muted/25 focus-visible:text-foreground sm:px-4"
-                    onClick={() => setIsAddInstanceDialogOpen(true)}
-                  >
-                    <PlusIcon className="size-4 shrink-0" />
-                    Add provider
-                  </button>
-                ) : null}
-              </div>
-            </ScrollArea>
+        <SettingsGroup>
+          <div className="grid grid-cols-1 gap-3 py-2.5 pr-3 pl-3.5 @min-2xl/providers:grid-cols-2">
+            {rows.map((row) => renderProviderInstance(row, "list"))}
           </div>
-
-          <div className="min-w-0 @min-[48rem]/providers:min-h-0">
-            {selectedRow ? (
-              <ScrollArea scrollFade chainVerticalScroll className="@min-[48rem]/providers:h-full">
-                <div className="space-y-6 p-4">{renderProviderInstance(selectedRow, "editor")}</div>
-              </ScrollArea>
-            ) : (
-              <div className="p-6 text-sm text-muted-foreground">
-                {targetInstanceMissing
-                  ? t.settings.providerSettings.providerInstanceLongerAvailableDeviceHint
-                  : t.settings.providerSettings.noProvidersConfigured}
-              </div>
-            )}
-          </div>
+          {rows.length === 0 ? (
+            <SettingsRow title={t.settings.providerSettings.noProvidersConfigured} />
+          ) : null}
         </SettingsGroup>
+        <div className="min-w-0 space-y-6 pt-4">
+          {selectedRow ? (
+            renderProviderInstance(selectedRow, "editor")
+          ) : targetInstanceMissing ? (
+            <SettingsGroup>
+              <SettingsRow
+                title={t.settings.providerSettings.providerInstanceLongerAvailableDeviceHint}
+              />
+            </SettingsGroup>
+          ) : null}
+        </div>
       </SettingsSection>
 
       <UsageProviderSettings
@@ -1283,9 +1266,7 @@ export function EnvironmentProviderSettings({
         sources={settings.usageLimitSources}
         cursorKeychainUsageEnabled={settings.cursorKeychainUsageEnabled}
         readOnly={readOnly}
-      />
-
-      <SettingsSection title={t.settings.rows.backgroundActivity.options.advanced}>
+      >
         <SettingsRow
           id={searchableSetting("provider-health-check-interval").id}
           title={
@@ -1347,17 +1328,30 @@ export function EnvironmentProviderSettings({
                   )
                 }
               >
-                <NumberFieldGroup>
-                  <NumberFieldDecrement
+                <NumberFieldPrimitive.Group
+                  render={
+                    <div className="flex h-8 items-center rounded-card-row bg-input p-0.75 shadow-well-track" />
+                  }
+                >
+                  <NumberFieldPrimitive.Decrement
+                    render={<Button size="icon-stepper" variant="secondary" />}
                     aria-label={t.settings.providerSettings.decreaseProviderHealthCheckInterval}
-                  />
-                  <NumberFieldInput
-                    aria-label={t.settings.providerSettings.providerHealthCheckIntervalSeconds}
-                  />
-                  <NumberFieldIncrement
+                  >
+                    <MinusIcon aria-hidden />
+                  </NumberFieldPrimitive.Decrement>
+                  <div className="w-16 min-w-0 rounded-keycap focus-within:inset-shadow-focus">
+                    <NumberFieldPrimitive.Input
+                      render={<Input unstyled nativeInput size="stepper" font="mono" />}
+                      aria-label={t.settings.providerSettings.providerHealthCheckIntervalSeconds}
+                    />
+                  </div>
+                  <NumberFieldPrimitive.Increment
+                    render={<Button size="icon-stepper" variant="secondary" />}
                     aria-label={t.settings.providerSettings.increaseProviderHealthCheckInterval}
-                  />
-                </NumberFieldGroup>
+                  >
+                    <PlusIcon aria-hidden />
+                  </NumberFieldPrimitive.Increment>
+                </NumberFieldPrimitive.Group>
               </NumberField>
               <span className="text-xs text-muted-foreground">
                 {t.settings.backgroundActivity.seconds}
@@ -1365,7 +1359,7 @@ export function EnvironmentProviderSettings({
             </div>
           }
         />
-      </SettingsSection>
+      </UsageProviderSettings>
 
       {isAddInstanceDialogOpen && !readOnly ? (
         <AddProviderInstanceDialog

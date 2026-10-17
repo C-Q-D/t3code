@@ -139,3 +139,13 @@
   --shadow-settings-project-well:
     inset 1.5px 2px 3px rgba(0, 0, 0, 0.6), inset -1px -1px 0 rgba(255, 255, 255, 0.05);
 }
+
+/* ST6: N4 imports SettingsPage8a.dc.html; provider cards and model wells use these exact surfaces. */
+@theme {
+  --color-provider-card: #26262a;
+  --color-provider-model: #151517;
+  --shadow-provider-card:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.44), 0 2px 0 #09090a,
+    6px 10px 16px -4px rgba(0, 0, 0, 0.6);
+  --shadow-provider-model: inset 1px 1.5px 2px rgba(0, 0, 0, 0.6);
+}

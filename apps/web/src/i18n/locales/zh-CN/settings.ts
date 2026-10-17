@@ -3039,6 +3039,7 @@ ${address}`
     pasteApiKey: "粘贴API密钥",
   },
   providerInstanceCard: {
+    addInstance: "添加实例",
     storedSecretEnterValueReplace: "已存储密钥，输入新值可替换",
     clear: (propsFieldLabel: string | number | boolean | null | undefined) =>
       `清除 ${propsFieldLabel}`,
@@ -3873,6 +3874,8 @@ ${address}`
     ) => `移除所选主题${themeIdsToRemoveLength0 ? ` (${themeIdsToRemoveLength})` : ""}`,
   },
   usageProvider: {
+    usageGroup: "用量",
+    providerRow: "用量Provider",
     updateCursorAccountUsage: "更新Cursor账号用量",
     addHub: "添加中心",
     readExistingCursorCliLoginHint:
