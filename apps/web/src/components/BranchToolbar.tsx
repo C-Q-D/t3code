@@ -47,10 +47,7 @@ import { BranchToolbarEnvironmentSelector } from "./BranchToolbarEnvironmentSele
 import { BranchToolbarEnvModeSelector } from "./BranchToolbarEnvModeSelector";
 import { PreviousWorktreeItemContent } from "./PreviousWorktreeItemContent";
 import { ThreadDetailsControl } from "./chat/ThreadDetailsControl";
-import {
-  THREAD_DETAILS_PANEL_ICON_CLASS,
-  THREAD_DETAILS_PANEL_LOCKED_ROW_CLASS,
-} from "./chat/threadDetailsPanelStyles";
+import { THREAD_DETAILS_PANEL_ICON_CLASS } from "./chat/threadDetailsPanelStyles";
 import { ComposerControl } from "./chat/ComposerControl";
 import {
   Menu,
@@ -200,7 +197,7 @@ const RunContextSelector = memo(function RunContextSelector({
         ? resolveEnvModeLabel("worktree")
         : resolveCurrentWorkspaceLabel(activeWorktreePath);
   const isPanel = displayMode === "panel";
-  const isLocked = envLocked || (envModeLocked && (!isPanel || !showEnvironmentPicker));
+  const isLocked = envLocked || envModeLocked;
   const workspacePath =
     forceNewWorktree || (effectiveEnvMode === "worktree" && !activeWorktreePath)
       ? null
@@ -269,16 +266,138 @@ const RunContextSelector = memo(function RunContextSelector({
     </>
   );
 
+  // Share the choices and callbacks with the composer while giving F1 each field its own well.
+  const environmentChoices =
+    showEnvironmentPicker && availableEnvironments && onEnvironmentChange ? (
+      <MenuGroup>
+        <MenuGroupLabel>{t.chat.branchToolbar.runOn}</MenuGroupLabel>
+        <MenuRadioGroup
+          value={autoEnvironmentLabel ? "auto" : environmentId}
+          onValueChange={(value) =>
+            value === "auto" ? onAutoEnvironment?.() : onEnvironmentChange(value as EnvironmentId)
+          }
+        >
+          {onAutoEnvironment && (
+            <MenuRadioItem
+              value="auto"
+              disabled={envLocked}
+              closeOnClick
+              onClick={() => {
+                if (autoEnvironmentLabel) onAutoEnvironment?.();
+              }}
+            >
+              <span className="flex min-w-0 items-center gap-1.5">
+                <ScaleIcon className="size-3" aria-hidden="true" />
+                <span className="min-w-0 truncate">
+                  {autoEnvironmentLabel ?? t.chat.branchToolbar.autoBalance}
+                </span>
+              </span>
+            </MenuRadioItem>
+          )}
+          {availableEnvironments.map((env) => (
+            <MenuRadioItem
+              key={env.environmentId}
+              disabled={envLocked}
+              value={env.environmentId}
+              closeOnClick
+            >
+              <span className="flex min-w-0 items-center gap-1.5">
+                <EnvironmentMachineIcon kind={env.machine} className="size-3" />
+                <span className="min-w-0 truncate">{env.label}</span>
+              </span>
+            </MenuRadioItem>
+          ))}
+        </MenuRadioGroup>
+      </MenuGroup>
+    ) : null;
+  const workspaceChoices = (
+    <MenuGroup>
+      <MenuGroupLabel>{t.chat.branchToolbar.workspace}</MenuGroupLabel>
+      <MenuRadioGroup
+        value={effectiveEnvMode}
+        onValueChange={(value) => {
+          if (value === "previous-worktree") {
+            onUsePreviousWorktree();
+            return;
+          }
+          onEnvModeChange(value as EnvMode);
+        }}
+      >
+        <MenuRadioItem disabled={envModeLocked || forceNewWorktree} value="local" closeOnClick>
+          <span className="flex min-w-0 items-center gap-1.5">
+            {activeWorktreePath ? (
+              <FolderGitIcon className="size-3" />
+            ) : (
+              <FolderIcon className="size-3" />
+            )}
+            <MiddleTruncate value={resolveCurrentWorkspaceLabel(activeWorktreePath)} />
+          </span>
+        </MenuRadioItem>
+        <MenuRadioItem disabled={envModeLocked} value="worktree" closeOnClick>
+          <span className="flex min-w-0 items-center gap-1.5">
+            <FolderGit2Icon className="size-3" />
+            <span className="min-w-0 truncate">{resolveEnvModeLabel("worktree")}</span>
+          </span>
+        </MenuRadioItem>
+        {previousWorktreeLabel ? (
+          <MenuRadioItem disabled={envModeLocked} value="previous-worktree" closeOnClick>
+            <PreviousWorktreeItemContent branch={previousWorktreeBranch} />
+          </MenuRadioItem>
+        ) : null}
+      </MenuRadioGroup>
+    </MenuGroup>
+  );
+  if (isPanel) {
+    return (
+      <>
+        {[
+          {
+            label: t.chat.branchToolbar.runOn,
+            value:
+              autoEnvironmentLabel ?? activeEnvironment?.label ?? t.chat.branchToolbar.thisDevice,
+            locked: envLocked || !showEnvironmentPicker,
+            choices: environmentChoices,
+            shortcut: "composer.host",
+            onContextMenu: undefined,
+          },
+          {
+            label: t.chat.branchToolbar.workspace,
+            value: workspaceLabel,
+            locked: envModeLocked,
+            choices: workspaceChoices,
+            shortcut: "composer.workspace",
+            onContextMenu: handleContextMenu,
+          },
+        ].map((field) => (
+          <Menu key={field.label}>
+            <MenuTrigger
+              render={<ThreadDetailsControl part="context" />}
+              aria-label={field.label}
+              disabled={field.locked}
+              onContextMenu={field.onContextMenu}
+              onMouseDownCapture={(event) => {
+                if (event.button !== 0 || event.ctrlKey) event.stopPropagation();
+              }}
+              data-composer-shortcut={field.locked ? undefined : field.shortcut}
+            >
+              <span className="text-secondary-copy text-secondary-label font-normal">
+                {field.label}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-right">{field.value}</span>
+            </MenuTrigger>
+            <MenuPopup align="start" side="bottom" className="w-(--anchor-width)">
+              {field.choices}
+            </MenuPopup>
+          </Menu>
+        ))}
+      </>
+    );
+  }
+
   if (isLocked) {
     return (
       <span
-        className={cn(
-          "inline-flex h-7 min-w-0 max-w-[48%] flex-initial items-center justify-start gap-1 rounded-md border border-transparent px-1.75 font-normal text-muted-foreground/70 text-xs sm:h-6",
-          isPanel && "max-w-full",
-          isPanel && THREAD_DETAILS_PANEL_LOCKED_ROW_CLASS,
-        )}
-        onContextMenu={handleContextMenu}
-        aria-label={isPanel ? t.git.pullRequest.runContext : undefined}
+        className="inline-flex h-7 min-w-0 max-w-[48%] flex-initial items-center justify-start gap-1 rounded-md border border-transparent px-1.75 font-normal text-muted-foreground/70 text-xs sm:h-6"
         data-composer-context-control
       >
         {triggerContent}
@@ -289,17 +408,8 @@ const RunContextSelector = memo(function RunContextSelector({
   return (
     <Menu>
       <MenuTrigger
-        render={isPanel ? <ThreadDetailsControl part="select" /> : <ComposerControl size="xs" />}
-        className={isPanel ? undefined : "min-w-0 max-w-[48%] flex-initial justify-start"}
-        onContextMenu={handleContextMenu}
-        onMouseDownCapture={
-          isPanel
-            ? (event) => {
-                if (event.button !== 0 || event.ctrlKey) event.stopPropagation();
-              }
-            : undefined
-        }
-        aria-label={isPanel ? t.git.pullRequest.runContext : undefined}
+        render={<ComposerControl size="xs" />}
+        className="min-w-0 max-w-[48%] flex-initial justify-start"
         data-composer-context-control
         data-composer-shortcut={[
           showEnvironmentPicker && !envLocked ? "composer.host" : "",
@@ -307,102 +417,17 @@ const RunContextSelector = memo(function RunContextSelector({
         ].join(" ")}
       >
         {triggerContent}
-        {!isPanel ? <ChevronDownIcon className="size-3 shrink-0 opacity-50" /> : null}
+        <ChevronDownIcon className="size-3 shrink-0 opacity-50" />
       </MenuTrigger>
       <MenuPopup
         align="start"
-        side={isPanel ? "bottom" : "top"}
-        className={
-          isPanel
-            ? "w-(--anchor-width)"
-            : previousWorktreeLabel
-              ? "w-[min(21rem,calc(100vw-2rem))]"
-              : undefined
-        }
-        {...(!isPanel ? composerFloatingLayerProps : {})}
+        side="top"
+        className={previousWorktreeLabel ? "w-[min(21rem,calc(100vw-2rem))]" : undefined}
+        {...composerFloatingLayerProps}
       >
-        {showEnvironmentPicker && availableEnvironments && onEnvironmentChange ? (
-          <>
-            <MenuGroup>
-              <MenuGroupLabel>{t.chat.branchToolbar.runOn}</MenuGroupLabel>
-              <MenuRadioGroup
-                value={autoEnvironmentLabel ? "auto" : environmentId}
-                onValueChange={(value) =>
-                  value === "auto"
-                    ? onAutoEnvironment?.()
-                    : onEnvironmentChange(value as EnvironmentId)
-                }
-              >
-                {onAutoEnvironment && (
-                  <MenuRadioItem
-                    value="auto"
-                    disabled={envLocked}
-                    closeOnClick
-                    onClick={() => {
-                      if (autoEnvironmentLabel) onAutoEnvironment?.();
-                    }}
-                  >
-                    <span className="flex min-w-0 items-center gap-1.5">
-                      <ScaleIcon className="size-3" aria-hidden="true" />
-                      <span className="min-w-0 truncate">
-                        {autoEnvironmentLabel ?? t.chat.branchToolbar.autoBalance}
-                      </span>
-                    </span>
-                  </MenuRadioItem>
-                )}
-                {availableEnvironments.map((env) => (
-                  <MenuRadioItem
-                    key={env.environmentId}
-                    disabled={envLocked}
-                    value={env.environmentId}
-                    closeOnClick
-                  >
-                    <span className="flex min-w-0 items-center gap-1.5">
-                      <EnvironmentMachineIcon kind={env.machine} className="size-3" />
-                      <span className="min-w-0 truncate">{env.label}</span>
-                    </span>
-                  </MenuRadioItem>
-                ))}
-              </MenuRadioGroup>
-            </MenuGroup>
-            <MenuSeparator />
-          </>
-        ) : null}
-        <MenuGroup>
-          <MenuGroupLabel>{t.chat.branchToolbar.workspace}</MenuGroupLabel>
-          <MenuRadioGroup
-            value={effectiveEnvMode}
-            onValueChange={(value) => {
-              if (value === "previous-worktree") {
-                onUsePreviousWorktree();
-                return;
-              }
-              onEnvModeChange(value as EnvMode);
-            }}
-          >
-            <MenuRadioItem disabled={envModeLocked || forceNewWorktree} value="local" closeOnClick>
-              <span className="flex min-w-0 items-center gap-1.5">
-                {activeWorktreePath ? (
-                  <FolderGitIcon className="size-3" />
-                ) : (
-                  <FolderIcon className="size-3" />
-                )}
-                <MiddleTruncate value={resolveCurrentWorkspaceLabel(activeWorktreePath)} />
-              </span>
-            </MenuRadioItem>
-            <MenuRadioItem disabled={envModeLocked} value="worktree" closeOnClick>
-              <span className="flex min-w-0 items-center gap-1.5">
-                <FolderGit2Icon className="size-3" />
-                <span className="min-w-0 truncate">{resolveEnvModeLabel("worktree")}</span>
-              </span>
-            </MenuRadioItem>
-            {previousWorktreeLabel ? (
-              <MenuRadioItem disabled={envModeLocked} value="previous-worktree" closeOnClick>
-                <PreviousWorktreeItemContent branch={previousWorktreeBranch} />
-              </MenuRadioItem>
-            ) : null}
-          </MenuRadioGroup>
-        </MenuGroup>
+        {environmentChoices}
+        {showEnvironmentPicker ? <MenuSeparator /> : null}
+        {workspaceChoices}
       </MenuPopup>
     </Menu>
   );

@@ -2,13 +2,19 @@ import { EnvironmentId, ThreadId, ScheduledTaskId, type ScheduledTask } from "@t
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
 
-const state = vi.hoisted(() => ({ allowed: true, toggle: vi.fn(), run: vi.fn() }));
+const state = vi.hoisted(() => ({
+  allowed: true,
+  enabled: true,
+  toggle: vi.fn(),
+  run: vi.fn(),
+  navigate: vi.fn(),
+}));
 vi.mock("../../state/session", () => ({
   useEnvironmentScope: () => state.allowed,
   readEnvironmentScope: () => state.allowed,
 }));
 vi.mock("@effect/atom-react", () => ({ useAtomValue: () => state.allowed }));
-vi.mock("@tanstack/react-router", () => ({ useNavigate: () => vi.fn() }));
+vi.mock("@tanstack/react-router", () => ({ useNavigate: () => state.navigate }));
 vi.mock("../settings/ScheduledTasksSettings", () => ({
   relativeLabel: () => "later",
   scheduleLabel: () => "daily",
@@ -24,7 +30,10 @@ vi.mock("../../state/use-atom-command", () => ({
   useAtomCommand: (command: string) => (command === "toggle" ? state.toggle : state.run),
 }));
 vi.mock("../../state/query", () => ({
-  useEnvironmentQuery: () => ({ data: { tasks: [task] }, error: null }),
+  useEnvironmentQuery: () => ({
+    data: { tasks: [{ ...task, enabled: state.enabled }] },
+    error: null,
+  }),
 }));
 vi.mock("../ui/tooltip", () => ({
   Tooltip: ({ children }: { children: React.ReactNode }) => children,
@@ -50,6 +59,8 @@ const task = {
 let renderer: ReactTestRenderer;
 beforeEach(() => {
   state.allowed = true;
+  state.enabled = true;
+  state.navigate.mockReset();
   state.toggle.mockReset().mockResolvedValue({ _tag: "Success" });
   state.run.mockReset().mockResolvedValue({ _tag: "Success" });
 });
@@ -75,10 +86,48 @@ it("rejects a retained toggle after task permission is revoked", async () => {
   });
   const toggle = renderer.root
     .findAllByProps({ "aria-label": "Pause Daily review" })
-    .find((node) => node.props.onCheckedChange)!;
+    .find((node) => node.type === "button")!;
   state.allowed = false;
   await act(async () => {
-    await toggle.props.onCheckedChange(false);
+    await toggle.props.onClick();
   });
   expect(state.toggle).not.toHaveBeenCalled();
+});
+
+it.each([true, false])(
+  "pauses or resumes the task without changing its other fields (%s)",
+  async (enabled) => {
+    state.enabled = enabled;
+    await act(async () => {
+      renderer = create(
+        <ThreadAutomationsPanel environmentId={environmentId} threadId={threadId} />,
+      );
+    });
+    const label = enabled ? "Pause Daily review" : "Resume Daily review";
+    const toggle = renderer.root
+      .findAllByProps({ "aria-label": label })
+      .find((node) => node.type === "button")!;
+    await act(async () => {
+      await toggle.props.onClick();
+    });
+    expect(state.toggle).toHaveBeenCalledWith({
+      environmentId,
+      input: { id: task.id, enabled: !enabled },
+    });
+  },
+);
+
+it("keeps all enabled-task actions visible but disabled without permission", async () => {
+  state.allowed = false;
+  await act(async () => {
+    renderer = create(<ThreadAutomationsPanel environmentId={environmentId} threadId={threadId} />);
+  });
+  const labels = ["Run Daily review now", "Pause Daily review", "Edit Daily review"];
+  for (const label of labels) {
+    const button = renderer.root
+      .findAllByProps({ "aria-label": label })
+      .find((node) => node.type === "button");
+    expect(button, label).toBeDefined();
+    expect(button!.props.disabled, label).toBe(true);
+  }
 });

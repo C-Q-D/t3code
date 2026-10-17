@@ -34,7 +34,7 @@ vi.mock("../state/entities", () => ({
 
 import { BranchToolbar } from "./BranchToolbar";
 
-it("keeps machine choices usable when the combined row's workspace is locked", async () => {
+it("keeps machine choices usable when the workspace row is locked", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   const container = document.createElement("div");
   document.body.append(container);
@@ -65,18 +65,16 @@ it("keeps machine choices usable when the combined row's workspace is locked", a
         />,
       );
     });
-    const trigger = container.querySelector("button")!;
-    expect(trigger.textContent).toBe("local");
-    expect(container.querySelectorAll("button")).toHaveLength(1);
+    const trigger = container.querySelector<HTMLButtonElement>('[aria-label="Run on"]')!;
+    expect(trigger.textContent).toContain("local");
+    expect(container.querySelector('[aria-label="Workspace"]')?.textContent).toContain("Worktree");
     await act(async () => {
       trigger.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, ctrlKey: true }));
     });
     expect(document.querySelector('[role="menu"]')).toBeNull();
     await act(async () => trigger.click());
     const items = [...document.querySelectorAll<HTMLElement>('[role="menuitemradio"]')];
-    expect(
-      items.find((item) => item.textContent === "New worktree")?.getAttribute("aria-disabled"),
-    ).toBe("true");
+    expect(items.some((item) => item.textContent === "New worktree")).toBe(false);
     await act(async () => items.find((item) => item.textContent === "remote")!.click());
     expect(onEnvironmentChange).toHaveBeenCalledWith("remote");
   } finally {
@@ -119,7 +117,7 @@ it.each([
       });
       const event = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
       await act(async () => {
-        container.querySelector('[aria-label="Run context"]')!.dispatchEvent(event);
+        container.querySelector('[aria-label="Workspace"]')!.dispatchEvent(event);
       });
       expect(event.defaultPrevented).toBe(copiedPath !== null);
       if (copiedPath === null) {

@@ -3,7 +3,7 @@ import { t } from "~/i18n";
 import { useAtomValue } from "@effect/atom-react";
 import { ThreadDetailsControl } from "./ThreadDetailsControl";
 import { useNavigate } from "@tanstack/react-router";
-import { CalendarClockIcon, PencilIcon, PlayIcon, Settings2Icon } from "lucide-react";
+import { PauseIcon, PencilIcon, PlayIcon } from "lucide-react";
 import { useState } from "react";
 import {
   AuthOrchestrationOperateScope,
@@ -17,28 +17,14 @@ import {
 } from "@t3tools/client-runtime/state/runtime";
 
 import { ThreadDetailsSection } from "./ThreadDetailsSection";
-import { cn } from "../../lib/utils";
 import { relativeLabel, scheduleLabel } from "../settings/ScheduledTasksSettings";
 import { useEnvironmentQuery } from "../../state/query";
 import { serverEnvironment } from "../../state/server";
 import { useAtomCommand } from "../../state/use-atom-command";
 
 import { readEnvironmentScope } from "../../state/session";
-import { Switch } from "../ui/switch";
 import { stackedThreadToast, toastManager } from "../ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
-import {
-  THREAD_DETAILS_PANEL_ICON_CLASS,
-  THREAD_DETAILS_PANEL_ROW_CONTENT_CLASS,
-} from "./threadDetailsPanelStyles";
-
-const STATUS_DOT_CLASS: Record<ScheduledTask["lastRunStatus"], string> = {
-  never: "bg-muted-foreground/40",
-  running: "bg-sky-500",
-  succeeded: "bg-emerald-500",
-  failed: "bg-destructive",
-};
-
 /**
  * Thread details panel section listing the automations (scheduled tasks) bound
  * to this thread. Fed by the live scheduled-task subscription, so run status
@@ -123,29 +109,6 @@ export function ThreadAutomationsPanel(props: {
       headingId="thread-details-automations-heading"
       title={t.chat.details.automations}
       data-thread-automations-panel
-      actions={
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <ThreadDetailsControl
-                size="icon-xs"
-                variant="ghost"
-                part="icon"
-                aria-label={t.chat.details.manageScheduledTasks}
-                onClick={() =>
-                  void navigate({
-                    to: "/settings/scheduled-tasks",
-                    search: { environmentId: props.environmentId },
-                  })
-                }
-              >
-                <Settings2Icon className="size-3.5" />
-              </ThreadDetailsControl>
-            }
-          />
-          <TooltipPopup>{t.chat.details.manageScheduledTasks}</TooltipPopup>
-        </Tooltip>
-      }
     >
       {tasksQuery.error !== null ? (
         <p className="px-2.5 py-1.5 text-2xs text-destructive">
@@ -153,67 +116,32 @@ export function ThreadAutomationsPanel(props: {
         </p>
       ) : null}
 
-      <ul className="m-0 list-none p-0">
+      <ul className="m-0 -mt-1 flex list-none flex-col gap-1.5 p-0">
         {boundTasks.map((task) => (
-          <li
-            key={task.id}
-            className={cn(
-              "group flex items-center rounded-lg py-1.5",
-              THREAD_DETAILS_PANEL_ROW_CONTENT_CLASS,
-            )}
-          >
-            <span className="relative inline-flex size-4 shrink-0 items-center justify-center">
-              <CalendarClockIcon className={THREAD_DETAILS_PANEL_ICON_CLASS} />
-              <span
-                className={cn(
-                  "absolute -right-1 -top-1 size-1.5 rounded-full",
-                  STATUS_DOT_CLASS[task.lastRunStatus],
-                )}
-                aria-hidden
-              />
-            </span>
-            <div className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium text-foreground/80">
-                {task.title}
-              </span>
-              <p className="truncate text-2xs text-muted-foreground">
-                {scheduleLabel(task.schedule)}
-                {task.enabled && task.nextRunAt !== null
-                  ? t.chat.details.nextRunSuffix(relativeLabel(task.nextRunAt))
-                  : task.enabled
-                    ? ""
-                    : t.chat.details.pausedSuffix}
-              </p>
-            </div>
+          <li key={task.id} className="flex min-w-0 items-center gap-0.5">
             <Tooltip>
               <TooltipTrigger
-                render={
-                  <ThreadDetailsControl
-                    size="icon-xs"
-                    variant="ghost"
-                    part="icon"
-                    aria-label={t.chat.details.editTask(task.title)}
-                    onClick={() =>
-                      void navigate({
-                        to: "/settings/scheduled-tasks",
-                        search: { environmentId: props.environmentId, taskId: task.id },
-                      })
-                    }
-                  >
-                    <PencilIcon className="size-3.5" />
-                  </ThreadDetailsControl>
-                }
-              />
-              <TooltipPopup>{t.chat.details.editAutomation}</TooltipPopup>
+                render={<span className="min-w-0 flex-1 truncate text-secondary-copy-large" />}
+              >
+                <span className={task.enabled ? "text-foreground" : "text-secondary-label"}>
+                  {task.title}
+                </span>
+                <span className="text-secondary-copy text-secondary-label">
+                  {task.enabled && task.nextRunAt != null
+                    ? t.chat.details.nextRunSuffix(relativeLabel(task.nextRunAt))
+                    : task.enabled
+                      ? ""
+                      : t.chat.details.pausedSuffix}
+                </span>
+              </TooltipTrigger>
+              <TooltipPopup>{scheduleLabel(task.schedule)}</TooltipPopup>
             </Tooltip>
-            {/* A webhook task runs from its URL; there is no request to run it with. */}
-            {task.schedule.type === "webhook" ? null : (
+            {/* Webhooks still require a payload; paused tasks resume through the enabled flag. */}
+            {task.enabled && task.schedule.type !== "webhook" ? (
               <Tooltip>
                 <TooltipTrigger
                   render={
                     <ThreadDetailsControl
-                      size="icon-xs"
-                      variant="ghost"
                       part="icon"
                       aria-label={t.chat.details.runTask(task.title)}
                       disabled={
@@ -227,20 +155,70 @@ export function ThreadAutomationsPanel(props: {
                 />
                 <TooltipPopup>{t.chat.details.runNow}</TooltipPopup>
               </Tooltip>
-            )}
-            <Switch
-              checked={task.enabled}
-              disabled={!canOperate || busyTaskId !== null}
-              aria-label={
-                task.enabled
+            ) : null}
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <ThreadDetailsControl
+                    part="icon"
+                    aria-label={
+                      task.enabled
+                        ? t.chat.details.pauseTask(task.title)
+                        : t.chat.details.resumeTask(task.title)
+                    }
+                    disabled={!canOperate || busyTaskId !== null}
+                    onClick={() => void toggleEnabled(task, !task.enabled)}
+                  >
+                    {task.enabled ? (
+                      <PauseIcon className="size-3.5" />
+                    ) : (
+                      <PlayIcon className="size-3.5" />
+                    )}
+                  </ThreadDetailsControl>
+                }
+              />
+              <TooltipPopup>
+                {task.enabled
                   ? t.chat.details.pauseTask(task.title)
-                  : t.chat.details.resumeTask(task.title)
-              }
-              onCheckedChange={(enabled) => void toggleEnabled(task, enabled)}
-            />
+                  : t.chat.details.resumeTask(task.title)}
+              </TooltipPopup>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <ThreadDetailsControl
+                    part="icon"
+                    aria-label={t.chat.details.editTask(task.title)}
+                    disabled={!canOperate || busyTaskId !== null}
+                    onClick={() => {
+                      if (!readEnvironmentScope(props.environmentId, AuthOrchestrationOperateScope))
+                        return;
+                      void navigate({
+                        to: "/settings/scheduled-tasks",
+                        search: { environmentId: props.environmentId, taskId: task.id },
+                      });
+                    }}
+                  >
+                    <PencilIcon className="size-3.25" />
+                  </ThreadDetailsControl>
+                }
+              />
+              <TooltipPopup>{t.chat.details.editAutomation}</TooltipPopup>
+            </Tooltip>
           </li>
         ))}
       </ul>
+      <ThreadDetailsControl
+        part="link"
+        onClick={() =>
+          void navigate({
+            to: "/settings/scheduled-tasks",
+            search: { environmentId: props.environmentId },
+          })
+        }
+      >
+        {t.chat.details.manageScheduledTasks}
+      </ThreadDetailsControl>
     </ThreadDetailsSection>
   );
 }
