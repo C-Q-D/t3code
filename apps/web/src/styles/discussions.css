@@ -496,3 +496,32 @@
 .discussion-draft-preview-arrow[data-side="top"] {
   bottom: calc(var(--spacing) * -1.5);
 }
+
+/* DC5.2 · 讨论设置-8a L3 title and L6 static loading placeholder. */
+@theme {
+  --text-discussion-template-heading: 24px;
+  --text-discussion-template-heading--line-height: 1.2;
+  --color-discussion-loading-label: #6e6e76;
+  --color-discussion-loading-border: #3a3a40;
+  --shadow-discussion-loading: inset 2px 3px 8px rgba(0, 0, 0, 0.6);
+}
+
+/* L6's search well stays local to the project picker; no shared Combobox recipe changes. */
+.surface-glass.discussion-project-search {
+  background: var(--input);
+  box-shadow: var(--shadow-input-well);
+}
+
+.discussion-loading-seat {
+  border: 1.5px dashed var(--color-discussion-loading-border);
+}
+
+/* Only the new-discussion entry supplies this scope; settings keeps its existing editor layout. */
+.discussion-template-draft .discussion-seats-well {
+  border-radius: var(--radius-dialog);
+}
+
+.discussion-template-draft fieldset > section {
+  margin-top: var(--spacing);
+  gap: calc(var(--spacing) * 4);
+}

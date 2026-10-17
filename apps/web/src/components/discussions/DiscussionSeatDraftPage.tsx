@@ -1,5 +1,7 @@
 /** Owns the project, topic and controlled seats for discussion creation; templates never start providers. */
 import { useAtomValue } from "@effect/atom-react";
+import { Combobox as ComboboxPrimitive } from "@base-ui/react/combobox";
+import { CheckIcon, SearchIcon, UnplugIcon } from "lucide-react";
 import type { EnvironmentId, ProjectId } from "@t3tools/contracts";
 import { useNavigate } from "@tanstack/react-router";
 import {
@@ -20,15 +22,7 @@ import { useAtomCommand } from "~/state/use-atom-command";
 import { sortScopedProjectsForSidebar } from "../Sidebar.logic";
 import { SidebarInset } from "../ui/sidebar";
 import { Button } from "../ui/button";
-import {
-  Combobox,
-  ComboboxTrigger,
-  ComboboxPopup,
-  ComboboxSearchInput,
-  ComboboxList,
-  ComboboxItem,
-  ComboboxEmpty,
-} from "../ui/combobox";
+import { Combobox, ComboboxTrigger } from "../ui/combobox";
 import { Select, SelectTrigger, SelectValue, SelectPopup, SelectItem } from "../ui/select";
 import { toastManager } from "../ui/toast";
 import { useTitlebarSlot } from "../frame/titlebarSlot";
@@ -115,28 +109,49 @@ export function DiscussionSeatDraftPage() {
                 render={
                   <button
                     type="button"
-                    className="inline cursor-pointer font-normal text-secondary-label underline decoration-dotted underline-offset-6 outline-none hover:text-foreground focus-visible:inset-shadow-focus"
+                    className="inline cursor-pointer font-normal text-secondary-label underline decoration-dotted underline-offset-6 outline-none hover:text-foreground focus-visible:inset-shadow-focus disabled:cursor-default disabled:text-fg-disabled"
                   />
                 }
               >
                 {project?.title ?? t.discussions.chooseProject}
               </ComboboxTrigger>
-              <ComboboxPopup>
-                <ComboboxSearchInput
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  aria-label={t.discussions.chooseProject}
-                  placeholder={t.discussions.chooseProject}
-                />
-                <ComboboxEmpty>{t.discussions.noProjects}</ComboboxEmpty>
-                <ComboboxList>
-                  {(item) => (
-                    <ComboboxItem key={item.value} value={item}>
-                      {item.label}
-                    </ComboboxItem>
-                  )}
-                </ComboboxList>
-              </ComboboxPopup>
+              <ComboboxPrimitive.Portal>
+                <ComboboxPrimitive.Positioner
+                  sideOffset={4}
+                  align="start"
+                  className="z-50 max-w-full"
+                >
+                  <ComboboxPrimitive.Popup className="dropdown-glass flex w-70 max-w-full flex-col gap-0.5 rounded-overlay-large p-2 text-body text-foreground outline-none">
+                    <div className="surface-glass discussion-project-search mb-1 flex h-8.5 items-center gap-2 rounded-full px-3 focus-within:inset-shadow-focus">
+                      <SearchIcon aria-hidden="true" className="size-3.5 shrink-0" />
+                      <ComboboxPrimitive.Input
+                        className="min-w-0 flex-1 bg-transparent text-body outline-none placeholder:text-placeholder"
+                        value={query}
+                        onChange={(event) => setQuery(event.target.value)}
+                        aria-label={t.discussions.chooseProject}
+                        placeholder={t.discussions.chooseProject}
+                      />
+                    </div>
+                    <ComboboxPrimitive.Empty className="text-secondary-label not-empty:p-2">
+                      {t.discussions.noProjects}
+                    </ComboboxPrimitive.Empty>
+                    <ComboboxPrimitive.List className="flex max-h-80 flex-col gap-0.5 overflow-y-auto">
+                      {(item) => (
+                        <ComboboxPrimitive.Item
+                          key={item.value}
+                          value={item}
+                          className="flex h-8.5 shrink-0 items-center gap-2 rounded-tag px-2.5 outline-none data-selected:bg-accent data-highlighted:bg-accent"
+                        >
+                          <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                          <ComboboxPrimitive.ItemIndicator>
+                            <CheckIcon className="size-3.5" />
+                          </ComboboxPrimitive.ItemIndicator>
+                        </ComboboxPrimitive.Item>
+                      )}
+                    </ComboboxPrimitive.List>
+                  </ComboboxPrimitive.Popup>
+                </ComboboxPrimitive.Positioner>
+              </ComboboxPrimitive.Portal>
             </Combobox>
             {t.discussions.heroSuffix}
           </h2>
@@ -150,8 +165,9 @@ export function DiscussionSeatDraftPage() {
               onSavingChange={setSaving}
             />
           ) : (
-            <p className="text-center text-sm text-muted-foreground">
-              {!project ? t.discussions.noProjects : t.settings.scheduledTasks.disconnected}
+            <p className="flex items-center justify-center gap-2 text-body text-secondary-label">
+              {project ? <UnplugIcon aria-hidden="true" className="size-3.75" /> : null}
+              {!project ? t.discussions.noProjects : t.discussions.environmentDisconnected}
             </p>
           )}
         </div>
@@ -262,49 +278,64 @@ function SeatDraft({
           </p>
         ) : null}
         {!initialized ? (
-          <p role="status" className="text-sm text-muted-foreground">
-            {t.discussions.loadingTemplates}
-          </p>
-        ) : null}
-        <fieldset disabled={saving || !initialized} className="min-w-0">
-          <DiscussionSeats
-            projectId={projectId}
-            environmentId={environmentId}
-            seats={seats}
-            onChange={setSeats}
-            headerAction={
-              <div className="flex items-center gap-2">
-                <span id={templateLabelId} className="text-xs text-muted-foreground">
-                  {t.discussions.template}
-                </span>
-                <div className="min-w-33">
-                  <Select
-                    items={templateItems}
-                    value={templateId}
-                    onValueChange={(value) => {
-                      if (!value) return;
-                      setTemplateId(value);
-                      setSeats(
-                        templates.data?.templates.find((item) => item.id === value)?.seats ?? [],
-                      );
-                    }}
-                  >
-                    <SelectTrigger size="settings" aria-labelledby={templateLabelId}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectPopup>
-                      {templateItems.map((item) => (
-                        <SelectItem key={item.value} value={item.value}>
-                          {item.label}
-                        </SelectItem>
-                      ))}
-                    </SelectPopup>
-                  </Select>
+          <div role="status" className="flex flex-col gap-2.5">
+            <div className="flex items-center gap-2">
+              <span className="min-w-0 flex-1 text-secondary-copy-large font-semibold">
+                {t.discussions.seatsHeading}
+              </span>
+              <span className="flex h-7.5 items-center rounded-full bg-well-raised px-3 text-secondary-copy-medium text-discussion-loading-label">
+                {t.discussions.loadingTemplates}
+              </span>
+            </div>
+            <div
+              aria-hidden="true"
+              className="flex h-30 items-center justify-center gap-2.5 rounded-card-row bg-well-surface px-3.5 opacity-60 shadow-discussion-loading"
+            >
+              <span className="discussion-loading-seat h-12.5 w-37.5 min-w-0 rounded-discussion-draft-add-icon" />
+              <span className="discussion-loading-seat h-12.5 w-37.5 min-w-0 rounded-discussion-draft-add-icon" />
+            </div>
+          </div>
+        ) : (
+          <fieldset disabled={saving || !initialized} className="min-w-0">
+            <DiscussionSeats
+              projectId={projectId}
+              environmentId={environmentId}
+              seats={seats}
+              onChange={setSeats}
+              headerAction={
+                <div className="flex items-center gap-2">
+                  <span id={templateLabelId} className="text-xs text-muted-foreground">
+                    {t.discussions.template}
+                  </span>
+                  <div className="min-w-33">
+                    <Select
+                      items={templateItems}
+                      value={templateId}
+                      onValueChange={(value) => {
+                        if (!value) return;
+                        setTemplateId(value);
+                        setSeats(
+                          templates.data?.templates.find((item) => item.id === value)?.seats ?? [],
+                        );
+                      }}
+                    >
+                      <SelectTrigger size="settings" aria-labelledby={templateLabelId}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectPopup>
+                        {templateItems.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectPopup>
+                    </Select>
+                  </div>
                 </div>
-              </div>
-            }
-          />
-        </fieldset>
+              }
+            />
+          </fieldset>
+        )}
         <form
           className="surface-glass rounded-slab px-3.5 pt-4 pb-3 pl-4.5 shadow-raise-l"
           onSubmit={(event) => {

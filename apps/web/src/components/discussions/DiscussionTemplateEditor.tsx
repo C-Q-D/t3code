@@ -22,12 +22,13 @@ import { Label } from "../ui/label";
 import { toastManager } from "../ui/toast";
 import { DiscussionSeats } from "./DiscussionSeats";
 import type { DiscussionDraftSeat } from "./discussionSeats.logic";
+import { isDiscussionDraftTemplate } from "./DiscussionTemplateEditor.logic";
 
 /**
  * Mounts an open editor; the owner unmounts it on close and remounts for a different draft.
  * @param props.environmentId Fixed destination for catalogs, permission and the write.
  * @param props.template Saved snapshot for editing; omitted/null creates a template.
- * @param props.initialSeats Speaking order prefilled by an external creation flow, ignored when editing.
+ * @param props.initialSeats New-discussion snapshot and L3 presentation marker; ignored when editing a saved template.
  * @param props.onClose Called after cancellation or a successful write; remove the component here.
  * @returns A 760px template form. Failed writes retain the draft and are never automatically retried.
  */
@@ -43,6 +44,7 @@ export function DiscussionTemplateEditor({
   readonly onClose: () => void;
 }) {
   const fieldId = useId();
+  const fromDiscussion = isDiscussionDraftTemplate(template?.id, initialSeats);
   const [draft, setDraft] = useState<{
     name: string;
     seats: readonly DiscussionDraftSeat[];
@@ -100,7 +102,11 @@ export function DiscussionTemplateEditor({
           {/* This feature's wide seat row cannot fit the shared popup's 512px maximum. */}
           <DialogPrimitive.Popup
             aria-describedby={`${fieldId}-hint`}
-            className="relative row-start-2 flex max-h-full w-full max-w-190 flex-col overflow-hidden rounded-xl border bg-card text-card-foreground shadow-xl outline-none"
+            className={
+              fromDiscussion
+                ? "discussion-template-draft dialog-glass relative row-start-2 flex max-h-full w-full max-w-190 flex-col overflow-hidden rounded-dialog text-foreground outline-none"
+                : "relative row-start-2 flex max-h-full w-full max-w-190 flex-col overflow-hidden rounded-xl border bg-card text-card-foreground shadow-xl outline-none"
+            }
             render={
               <form
                 onSubmit={(event) => {
@@ -110,18 +116,33 @@ export function DiscussionTemplateEditor({
               />
             }
           >
-            <div className="overflow-y-auto p-5">
+            <div className={fromDiscussion ? "overflow-y-auto p-6 pb-4" : "overflow-y-auto p-5"}>
               <fieldset disabled={saving} className="flex min-w-0 flex-col gap-4">
-                <DialogPrimitive.Title className="text-base font-semibold">
+                <DialogPrimitive.Title
+                  className={
+                    fromDiscussion
+                      ? "font-serif text-discussion-template-heading font-bold"
+                      : "text-base font-semibold"
+                  }
+                >
                   {template
                     ? t.settings.discussions.editTemplate
                     : t.settings.discussions.newTemplate}
                 </DialogPrimitive.Title>
                 <div className="space-y-1.5">
-                  <Label htmlFor={`${fieldId}-name`}>{t.settings.discussions.name}</Label>
+                  {fromDiscussion ? (
+                    <label
+                      htmlFor={`${fieldId}-name`}
+                      className="block text-secondary-copy-large font-semibold text-code-foreground"
+                    >
+                      {t.settings.discussions.name}
+                    </label>
+                  ) : (
+                    <Label htmlFor={`${fieldId}-name`}>{t.settings.discussions.name}</Label>
+                  )}
                   <Input
                     id={`${fieldId}-name`}
-                    size="lg"
+                    size={fromDiscussion ? "default" : "lg"}
                     value={draft.name}
                     autoFocus
                     onChange={(event) =>
@@ -137,14 +158,40 @@ export function DiscussionTemplateEditor({
                 />
               </fieldset>
             </div>
-            <div className="flex shrink-0 items-center gap-2 border-t bg-muted/20 px-5 py-3.5">
-              <p id={`${fieldId}-hint`} className="min-w-0 flex-1 text-xs text-muted-foreground">
+            <div
+              className={
+                fromDiscussion
+                  ? "flex shrink-0 items-center gap-2 px-6 pt-0.5 pb-6"
+                  : "flex shrink-0 items-center gap-2 border-t bg-muted/20 px-5 py-3.5"
+              }
+            >
+              <p
+                id={`${fieldId}-hint`}
+                className={
+                  fromDiscussion
+                    ? "min-w-0 flex-1 text-secondary-copy text-secondary-label"
+                    : "min-w-0 flex-1 text-xs text-muted-foreground"
+                }
+              >
                 {t.settings.discussions.futureOnly}
               </p>
-              <DialogClose disabled={saving} render={<Button type="button" variant="outline" />}>
+              <DialogClose
+                disabled={saving}
+                render={
+                  <Button
+                    type="button"
+                    variant={fromDiscussion ? "secondary" : "outline"}
+                    size={fromDiscussion ? "dialog-action" : "default"}
+                  />
+                }
+              >
                 {t.common.confirm.cancel}
               </DialogClose>
-              <Button type="submit" disabled={!saveEnabled}>
+              <Button
+                type="submit"
+                size={fromDiscussion ? "dialog-action-wide" : "default"}
+                disabled={!saveEnabled}
+              >
                 {t.settings.discussions.save}
               </Button>
             </div>

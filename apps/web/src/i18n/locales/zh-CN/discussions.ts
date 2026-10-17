@@ -9,6 +9,7 @@ export const discussions: Messages["discussions"] = {
   heroSuffix: " 中讨论什么？",
   chooseProject: "选择项目",
   noProjects: "添加项目后即可开始讨论。",
+  environmentDisconnected: "环境已断开",
   template: "模板",
   noTemplate: "不用模板",
   loadingTemplates: "正在加载模板…",

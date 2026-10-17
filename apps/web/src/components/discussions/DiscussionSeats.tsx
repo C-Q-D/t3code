@@ -182,7 +182,7 @@ export function DiscussionSeats({
         }}
       >
         <SortableContext items={identity.ids} strategy={rectSortingStrategy}>
-          <div className="flex flex-wrap justify-center gap-y-5 rounded-composer bg-well-surface px-3.5 pt-4.5 pb-5 shadow-well">
+          <div className="discussion-seats-well flex flex-wrap justify-center gap-y-5 rounded-composer bg-well-surface px-3.5 pt-4.5 pb-5 shadow-well">
             {seats.map((seat, index) => {
               const id = identity.ids[index] ?? `${prefix}:${identity.revision}:${index}`;
               const options = getCustomModelOptionsByInstance(

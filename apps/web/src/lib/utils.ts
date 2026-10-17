@@ -107,6 +107,7 @@ const twMerge = extendTailwindMerge({
         "discussion-list-empty-title",
         "discussion-draft-heading",
         "discussion-draft-number",
+        "discussion-template-heading",
       ],
       shadow: [
         "slab",
@@ -302,6 +303,7 @@ const twMerge = extendTailwindMerge({
         "discussion-draft-lifted",
         "discussion-draft-selected",
         "discussion-draft-drag",
+        "discussion-loading",
       ],
       "inset-shadow": [
         "selected",

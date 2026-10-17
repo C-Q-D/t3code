@@ -7,6 +7,7 @@ export const discussions = {
   heroSuffix: "?",
   chooseProject: "Choose a project",
   noProjects: "Add a project to start a discussion.",
+  environmentDisconnected: "Environment disconnected",
   template: "Template",
   noTemplate: "No template",
   loadingTemplates: "Loading templates…",
