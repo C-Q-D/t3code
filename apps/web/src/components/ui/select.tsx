@@ -188,7 +188,7 @@ function SelectItem({
   return (
     <SelectPrimitive.Item
       className={cn(
-        "flex h-8.5 shrink-0 in-data-[side=none]:min-w-[calc(var(--anchor-width)+1.25rem)] cursor-pointer items-center gap-2.5 rounded-menu-row px-2.5 py-0 text-control text-foreground outline-none not-data-disabled:not-active:data-selected:bg-accent not-data-disabled:not-active:data-highlighted:bg-accent not-data-disabled:focus-visible:inset-shadow-focus not-data-disabled:active:bg-sidebar not-data-disabled:active:shadow-well-pressed data-disabled:pointer-events-none data-disabled:cursor-not-allowed data-disabled:text-fg-icon-disabled [&_svg:not([class*='size-'])]:size-3.5 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+        "flex min-h-8.5 shrink-0 in-data-[side=none]:min-w-[calc(var(--anchor-width)+1.25rem)] cursor-pointer items-center gap-2.5 rounded-menu-row px-2.5 py-1 text-control text-foreground outline-none not-data-disabled:not-active:data-selected:bg-accent not-data-disabled:not-active:data-highlighted:bg-accent not-data-disabled:focus-visible:inset-shadow-focus not-data-disabled:active:bg-sidebar not-data-disabled:active:shadow-well-pressed data-disabled:pointer-events-none data-disabled:cursor-not-allowed data-disabled:text-fg-icon-disabled [&_svg:not([class*='size-'])]:size-3.5 [&_svg]:pointer-events-none [&_svg]:shrink-0",
         className,
       )}
       data-slot="select-item"

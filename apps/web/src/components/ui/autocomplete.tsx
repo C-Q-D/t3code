@@ -141,7 +141,7 @@ function AutocompleteItem({
   return (
     <AutocompletePrimitive.Item
       className={cn(
-        "flex h-8.5 shrink-0 cursor-default select-none items-center gap-2.5 rounded-menu-row px-2.5 py-0 text-control text-foreground outline-none not-data-disabled:active:bg-sidebar not-data-disabled:active:shadow-well-pressed data-disabled:pointer-events-none data-disabled:text-fg-icon-disabled [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
+        "flex min-h-8.5 shrink-0 cursor-default select-none items-center gap-2.5 rounded-menu-row px-2.5 py-1 text-control text-foreground outline-none not-data-disabled:active:bg-sidebar not-data-disabled:active:shadow-well-pressed data-disabled:pointer-events-none data-disabled:text-fg-icon-disabled [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
         highlighted === undefined &&
           "not-data-disabled:not-active:data-selected:bg-accent not-data-disabled:not-active:hover:bg-accent not-data-disabled:not-active:data-highlighted:bg-accent",
         highlighted && "not-data-disabled:not-active:bg-accent",
