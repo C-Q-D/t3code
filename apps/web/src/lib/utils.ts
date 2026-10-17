@@ -222,6 +222,7 @@ const twMerge = extendTailwindMerge({
         "timeline-request-card",
         "timeline-empty-well",
         "timeline-empty-icon",
+        "sidebar-provider-update",
       ],
       "inset-shadow": [
         "selected",
@@ -302,6 +303,7 @@ const twMerge = extendTailwindMerge({
         "pr-list-popup",
         "pr-link-dialog",
         "timeline-empty-icon",
+        "sidebar-provider-update",
       ],
       leading: [
         "code",
@@ -317,6 +319,7 @@ const twMerge = extendTailwindMerge({
         "timeline-user",
         "timeline-plan",
         "pn5-copy",
+        "sidebar-update",
       ],
       tracking: ["brand", "chat-draft", "timeline-secret"],
     },

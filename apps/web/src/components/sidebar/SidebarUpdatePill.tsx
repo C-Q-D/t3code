@@ -1,8 +1,9 @@
+/** Sidebar app and remote update actions; existing update services own download and installation. */
 import { t } from "~/i18n";
 import { useAtomValue } from "@effect/atom-react";
 import type { DesktopBridge, DesktopUpdateState } from "@t3tools/contracts";
 import { Atom } from "effect/reactivity";
-import { TriangleAlertIcon } from "lucide-react";
+import { CircleArrowUpIcon, HourglassIcon, TriangleAlertIcon } from "lucide-react";
 import {
   type ComponentProps,
   useCallback,
@@ -14,8 +15,6 @@ import {
 } from "react";
 import { flushSync } from "react-dom";
 import { isElectron } from "../../env";
-import { useMediaQuery } from "../../hooks/useMediaQuery";
-import { cn } from "../../lib/utils";
 import { ensureLocalApi } from "../../localApi";
 import { useDesktopUpdateState } from "../../state/desktopUpdate";
 import { serverEnvironment } from "../../state/server";
@@ -40,8 +39,6 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import {
   DesktopUpdateStatusIcon,
   type DesktopUpdateStatusIconState,
-  shouldContinueDesktopUpdateCheckAnimation,
-  shouldShowDesktopUpdateCheckIcon,
 } from "./DesktopUpdateStatusIcon";
 import { SidebarUpdateReleaseNotes } from "./SidebarUpdateReleaseNotes";
 import { UpdateEverythingDialog } from "./UpdateEverythingDialog";
@@ -58,6 +55,7 @@ type SidebarUpdatePopoverChangeDetails = Parameters<
 >[1];
 type SidebarUpdatePopoverHandle = ReturnType<typeof PopoverCreateHandle>;
 
+/** Show previews only when update details include nonempty nightly release notes. */
 export function shouldUseSidebarUpdateReleaseNotesPopover(
   showUpdateDetails: boolean,
   state: DesktopUpdateState | null,
@@ -65,6 +63,7 @@ export function shouldUseSidebarUpdateReleaseNotesPopover(
   return showUpdateDetails && state?.channel === "nightly" && state.releaseNotes.length > 0;
 }
 
+/** Cancel trigger presses so the same press runs the update action without toggling notes. */
 export function handleSidebarUpdateReleaseNotesPopoverOpenChange(
   _open: boolean,
   details: Pick<SidebarUpdatePopoverChangeDetails, "reason" | "cancel">,
@@ -73,6 +72,7 @@ export function handleSidebarUpdateReleaseNotesPopoverOpenChange(
   if (details.reason === "trigger-press") details.cancel();
 }
 
+/** Promote forward Tab to a focus-managed popup without preventing native navigation. */
 export function openSidebarUpdateReleaseNotesPopoverOnForwardTab(
   event: { readonly key: string; readonly shiftKey: boolean },
   handle: Pick<SidebarUpdatePopoverHandle, "open">,
@@ -83,6 +83,7 @@ export function openSidebarUpdateReleaseNotesPopoverOnForwardTab(
   flushSync(() => handle.open(triggerId));
 }
 
+/** Resolve the icon and detail visibility from local progress and the remote update run. */
 function resolveSidebarUpdatePresentation({
   action,
   showsEverything,
@@ -118,14 +119,15 @@ function resolveSidebarUpdatePresentation({
   return {
     iconStatus,
     showUpdateDetails,
-    showUpdateIconState: showUpdateDetails && !showCheckIcon,
   } as const;
 }
 
+/** Render the architecture notice only in the local desktop app. */
 export function SidebarUpdateArchitectureWarning() {
   return isElectron ? <SidebarUpdateArchitectureWarningContent /> : null;
 }
 
+/** Explain an Intel app running on an ARM host; hide when architecture matches. */
 function SidebarUpdateArchitectureWarningContent() {
   const state = useDesktopUpdateState();
   const visible = shouldShowArm64IntelBuildWarning(state);
@@ -250,26 +252,15 @@ export function SidebarUpdatePill() {
   return <SidebarUpdateControl />;
 }
 
+/** Render update status and dispatch existing local or multi-machine update actions. */
 function SidebarUpdateControl() {
   const state = useDesktopUpdateState();
   const [isActionPending, setIsActionPending] = useState(false);
   const [isConfirmingEverything, setIsConfirmingEverything] = useState(false);
-  const [checkAnimationKey, setCheckAnimationKey] = useState(0);
-  const [isCheckAnimationLatched, setIsCheckAnimationLatched] = useState(false);
   const [releaseNotesPopoverHandle] = useState(() => PopoverCreateHandle());
   const suppressReleaseNotesFocusOpen = useRef(false);
   const releaseNotesPopupRef = useRef<HTMLDivElement>(null);
   const releaseNotesTriggerId = useId();
-  const prefersReducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
-
-  useEffect(() => {
-    if (prefersReducedMotion) {
-      setIsCheckAnimationLatched(false);
-    } else if (state?.status === "checking") {
-      setIsCheckAnimationLatched(true);
-    }
-  }, [prefersReducedMotion, state?.status]);
-
   const action = state ? resolveDesktopUpdateButtonAction(state) : "none";
   const isDownloading = state?.status === "downloading";
   // Remote servers follow this app to the version it is about to install.
@@ -281,12 +272,9 @@ function SidebarUpdateControl() {
   const run = useUpdateEverythingRun();
   const isRunningEverything = run !== null;
   const runTooltip = useUpdateRunTooltip(run, state, action === "install");
-  const showCheckIcon = shouldShowDesktopUpdateCheckIcon({
-    isAnimationLatched: isCheckAnimationLatched,
-    isChecking: state?.status === "checking",
-    prefersReducedMotion,
-  });
-  const { iconStatus, showUpdateDetails, showUpdateIconState } = resolveSidebarUpdatePresentation({
+  // V1 uses a static hourglass; no trailing spin cycle should hold the action disabled.
+  const showCheckIcon = state?.status === "checking";
+  const { iconStatus, showUpdateDetails } = resolveSidebarUpdatePresentation({
     action,
     showsEverything: runsEverything,
     run,
@@ -374,10 +362,6 @@ function SidebarUpdateControl() {
       return;
     }
 
-    if (!prefersReducedMotion) {
-      setIsCheckAnimationLatched(true);
-      setCheckAnimationKey((key) => key + 1);
-    }
     void bridge
       .checkForUpdate()
       .then((result) => {
@@ -400,7 +384,7 @@ function SidebarUpdateControl() {
         );
       })
       .finally(() => setIsActionPending(false));
-  }, [action, isInteractionDisabled, prefersReducedMotion, runsEverything, state]);
+  }, [action, isInteractionDisabled, runsEverything, state]);
 
   const runEverything = useCallback(async () => {
     const bridge = window.desktopBridge;
@@ -431,15 +415,6 @@ function SidebarUpdateControl() {
     }
   }, [action, everything]);
 
-  const handleCheckAnimationIteration = useCallback(() => {
-    setIsCheckAnimationLatched(
-      shouldContinueDesktopUpdateCheckAnimation({
-        isChecking: state?.status === "checking",
-        prefersReducedMotion,
-      }),
-    );
-  }, [prefersReducedMotion, state?.status]);
-
   // Web has no local app to check, so it only shows the button for remote work.
   if (!isElectron && !runsEverything && !isRunningEverything) return null;
 
@@ -448,20 +423,11 @@ function SidebarUpdateControl() {
       type="button"
       aria-label={tooltip}
       aria-disabled={isInteractionDisabled || undefined}
-      className={cn(
-        "inline-flex size-8 items-center justify-center rounded-full outline-hidden ring-ring transition-colors focus-visible:ring-2 focus-visible:ring-inset",
-        isInteractionDisabled ? "cursor-not-allowed" : "cursor-pointer",
-        showUpdateIconState
-          ? cn(
-              "bg-sidebar-control-surface text-sidebar-foreground",
-              !isInteractionDisabled && "hover:bg-sidebar-row-hover",
-            )
-          : cn(
-              "text-(--sidebar-icon-color)",
-              !isInteractionDisabled && "hover:bg-sidebar-row-hover hover:text-sidebar-foreground",
-            ),
-        disabled && !showUpdateIconState && "opacity-60",
-      )}
+      className="sidebar-update-pill"
+      data-prominent={
+        showUpdateDetails && !showCheckIcon && !isDownloading && state?.status !== "error"
+      }
+      data-status={showCheckIcon ? "checking" : state?.status}
       onClick={handleAction}
       onBlur={() => {
         suppressReleaseNotesFocusOpen.current = false;
@@ -483,18 +449,34 @@ function SidebarUpdateControl() {
         );
       }}
     >
-      <DesktopUpdateStatusIcon
-        key={showCheckIcon ? checkAnimationKey : iconStatus}
-        downloadPercent={state?.downloadPercent ?? null}
-        isCheckAnimating={showCheckIcon && !prefersReducedMotion}
-        onCheckAnimationIteration={handleCheckAnimationIteration}
-        status={iconStatus}
-      />
+      <span className="sidebar-update-pill-icon" aria-hidden="true">
+        {showCheckIcon ? (
+          <HourglassIcon />
+        ) : iconStatus === "available" || iconStatus === "everything" ? (
+          <CircleArrowUpIcon />
+        ) : (
+          <DesktopUpdateStatusIcon
+            downloadPercent={state?.downloadPercent ?? null}
+            status={iconStatus}
+          />
+        )}
+      </span>
+      <span className="sidebar-update-pill-label">
+        {state?.status === "disabled"
+          ? t.sidebar.updates.unavailableHint
+          : showCheckIcon
+            ? t.sidebar.updates.checking
+            : state?.status === "available" && !runsEverything && !isRunningEverything
+              ? t.sidebar.updates.available
+              : state?.status === "error" && !runsEverything && !isRunningEverything
+                ? getDesktopUpdateButtonTooltip(state)
+                : tooltip}
+      </span>
     </button>
   );
 
   return (
-    <SidebarMenuItem className="ml-auto shrink-0">
+    <SidebarMenuItem className="w-full shrink-0">
       <Popover
         handle={releaseNotesPopoverHandle}
         onOpenChange={(open, details) => {
@@ -537,7 +519,9 @@ function SidebarUpdateControl() {
         </Tooltip>
         {showReleaseNotesPopover && state ? (
           <PopoverPopup
-            align="center"
+            align="start"
+            padding="none"
+            variant="panel"
             aria-label={t.sidebar.updates.releaseNotesAriaLabel}
             initialFocus={false}
             onKeyDownCapture={(event) => {
@@ -550,7 +534,6 @@ function SidebarUpdateControl() {
             }}
             ref={releaseNotesPopupRef}
             side="top"
-            tooltipStyle
           >
             <SidebarUpdateReleaseNotes
               shell={window.desktopBridge}

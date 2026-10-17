@@ -9,11 +9,13 @@ export const SidebarChromeFooter = memo(function SidebarChromeFooter() {
   return (
     <SidebarFooter>
       <SidebarThreadUndoNotice />
-      <SidebarProviderUpdatePill />
-      <SidebarUpdateArchitectureWarning />
-      <SidebarMenu className="flex-row items-center">
-        <SidebarUpdatePill />
-      </SidebarMenu>
+      <div className="sidebar-update-stack">
+        <SidebarProviderUpdatePill />
+        <SidebarUpdateArchitectureWarning />
+        <SidebarMenu>
+          <SidebarUpdatePill />
+        </SidebarMenu>
+      </div>
     </SidebarFooter>
   );
 });

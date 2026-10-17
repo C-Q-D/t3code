@@ -1,3 +1,4 @@
+/** Nightly release previews and external links; release selection stays in desktop update state. */
 import { t } from "~/i18n";
 import type { DesktopBridge, DesktopUpdateState } from "@t3tools/contracts";
 import { ExternalLinkIcon } from "lucide-react";
@@ -7,10 +8,10 @@ import {
   getDesktopUpdateReleaseUrl,
 } from "../desktopUpdate.logic";
 import { openDesktopUpdateReleaseNotes } from "../desktopUpdate.toast";
-import { Separator } from "../ui/separator";
 
 type DesktopUpdateShell = Pick<DesktopBridge, "openExternal">;
 
+/** Give repeated note text stable occurrence keys without changing item order. */
 function keyReleaseNoteItems(items: ReadonlyArray<string>) {
   const occurrences = new Map<string, number>();
   return items.map((item) => {
@@ -20,6 +21,7 @@ function keyReleaseNoteItems(items: ReadonlyArray<string>) {
   });
 }
 
+/** Open an exact release URL through the desktop shell; the shared opener reports failures. */
 function ReleaseLink({
   children,
   releaseUrl,
@@ -31,7 +33,7 @@ function ReleaseLink({
 }) {
   return (
     <a
-      className="mt-2 inline-flex items-center gap-1 rounded-sm text-xs leading-5 text-muted-foreground underline decoration-dotted underline-offset-4 outline-none transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+      className="sidebar-update-release-link"
       href={releaseUrl}
       onClick={(event) => {
         event.preventDefault();
@@ -44,6 +46,7 @@ function ReleaseLink({
   );
 }
 
+/** Render nightly previews and omitted-change links; other states fall back to the tooltip text. */
 export function SidebarUpdateReleaseNotes({
   shell,
   state,
@@ -58,25 +61,13 @@ export function SidebarUpdateReleaseNotes({
   }
 
   return (
-    <div className="flex max-h-[calc(var(--available-height)-0.5rem)] min-h-0 w-fit max-w-[min(24rem,calc(100vw-2rem))] flex-col text-left">
-      <div className="shrink-0 px-1">
-        {state.status === "available" ? (
-          <div>
-            <div className="whitespace-nowrap text-sm leading-5 font-medium">
-              {t.sidebar.updates.readyToDownload}
-            </div>
-            {state.availableVersion ? (
-              <div className="mt-0.5 text-xs leading-4 text-muted-foreground">
-                {state.availableVersion}
-              </div>
-            ) : null}
-          </div>
-        ) : (
-          <div className="text-sm leading-5 font-medium">{tooltip}</div>
-        )}
-      </div>
-      <div className="min-h-0 max-h-[min(28rem,calc(100vh-6rem))] overflow-y-auto px-1 pt-4 pb-1">
-        {state.releaseNotes.map((releaseNote, index) => {
+    <div className="sidebar-update-release-notes dropdown-glass">
+      <h2 className="sidebar-update-release-title">{t.sidebar.updates.changesTitle}</h2>
+      {state.status !== "available" ? (
+        <div className="sidebar-update-release-status">{tooltip}</div>
+      ) : null}
+      <div className="sidebar-update-release-scroll">
+        {state.releaseNotes.map((releaseNote) => {
           const releaseUrl = getDesktopUpdateReleaseUrl(releaseNote.version);
           const omittedItemCount = Math.max(0, releaseNote.totalItems - releaseNote.items.length);
           const linkLabel =
@@ -85,33 +76,27 @@ export function SidebarUpdateReleaseNotes({
               : t.sidebar.updates.moreChanges(omittedItemCount);
 
           return (
-            <div key={releaseNote.version}>
-              {index > 0 && <Separator className="my-3" />}
-              <section>
-                <h3 className="text-foreground text-xs leading-4 font-semibold">
-                  {index === 0
-                    ? t.sidebar.updates.changesTitle
-                    : t.sidebar.updates.versionChanges(releaseNote.version)}
-                </h3>
-                <ul className="mt-2 space-y-1.5 pl-4 text-xs leading-5 text-popover-foreground/90">
-                  {keyReleaseNoteItems(releaseNote.items).map(({ item, key }) => (
-                    <li className="list-disc break-words" key={key}>
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-                {releaseUrl ? (
-                  <ReleaseLink releaseUrl={releaseUrl} shell={shell}>
-                    {linkLabel}
-                  </ReleaseLink>
-                ) : null}
-              </section>
-            </div>
+            <section className="sidebar-update-release-section" key={releaseNote.version}>
+              <h3 className="sidebar-update-release-version">
+                {t.sidebar.updates.versionChanges(releaseNote.version)}
+              </h3>
+              <ul className="sidebar-update-release-items">
+                {keyReleaseNoteItems(releaseNote.items).map(({ item, key }) => (
+                  <li className="list-disc break-words" key={key}>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              {releaseUrl ? (
+                <ReleaseLink releaseUrl={releaseUrl} shell={shell}>
+                  {linkLabel}
+                </ReleaseLink>
+              ) : null}
+            </section>
           );
         })}
         {state.omittedReleaseCount > 0 ? (
-          <div>
-            <Separator className="my-3" />
+          <div className="sidebar-update-release-history">
             <ReleaseLink releaseUrl={getDesktopUpdateReleaseHistoryUrl()} shell={shell}>
               {t.sidebar.updates.olderReleases(state.omittedReleaseCount)}
             </ReleaseLink>

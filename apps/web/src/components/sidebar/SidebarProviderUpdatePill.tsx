@@ -1,9 +1,9 @@
+/** Provider update notices retain their status, settings action, and dismissal lifecycle. */
 import { t } from "~/i18n";
-import { Spinner } from "~/components/ui/spinner";
 import { useNavigate } from "@tanstack/react-router";
 import { useAtomValue } from "@effect/atom-react";
 import type { ServerProvider } from "@t3tools/contracts";
-import { CircleCheckIcon, DownloadIcon, TriangleAlertIcon, XIcon } from "lucide-react";
+import { BotIcon, CircleCheckIcon, HourglassIcon, TriangleAlertIcon, XIcon } from "lucide-react";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 
 import { primaryServerProvidersAtom } from "../../state/server";
@@ -13,23 +13,7 @@ import {
 } from "../ProviderUpdateLaunchNotification.logic";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
-const PROVIDER_UPDATE_PILL_STYLES = {
-  loading:
-    "bg-sidebar-control-surface text-sidebar-foreground group-has-[button[data-provider-update-main]:hover]/provider-update:bg-sidebar-row-hover",
-  success:
-    "bg-sidebar-control-surface text-sidebar-foreground group-has-[button[data-provider-update-main]:hover]/provider-update:bg-sidebar-row-hover",
-  warning:
-    "bg-warning/12 text-warning group-has-[button[data-provider-update-main]:hover]/provider-update:bg-warning/18",
-  error:
-    "bg-destructive/12 text-destructive group-has-[button[data-provider-update-main]:hover]/provider-update:bg-destructive/18",
-} as const;
-
-const PROVIDER_UPDATE_PILL_PROGRESS_STYLES = {
-  success: "bg-foreground/8",
-  warning: "bg-warning/14",
-  error: "bg-destructive/14",
-} as const;
-
+/** Return the latest ISO check timestamp, or undefined when there are no providers. */
 function latestProviderCheckedAt(
   providers: ReadonlyArray<Pick<ServerProvider, "checkedAt">>,
 ): string | undefined {
@@ -40,6 +24,7 @@ function latestProviderCheckedAt(
   );
 }
 
+/** Show provider update status; pressing the notice opens settings and closing dismisses its key. */
 export function SidebarProviderUpdatePill() {
   const navigate = useNavigate();
   const providers = useAtomValue(primaryServerProvidersAtom);
@@ -126,13 +111,10 @@ export function SidebarProviderUpdatePill() {
 
   return (
     <div
-      className={`group/provider-update relative flex min-h-7 w-full shrink-0 items-center overflow-hidden rounded-lg text-2xs leading-4 font-medium transform-gpu transition-all duration-180 ease-drawer will-change-transform ${
-        PROVIDER_UPDATE_PILL_STYLES[displayedView.tone]
-      } ${
-        exitingKey === displayedView.key
-          ? "pointer-events-none translate-y-1.5 opacity-0"
-          : "translate-y-0 opacity-100"
+      className={`sidebar-provider-update ${
+        exitingKey === displayedView.key ? "sidebar-provider-update-exiting" : ""
       }`}
+      data-tone={displayedView.tone}
       onTransitionEnd={(event) => {
         if (event.target !== event.currentTarget) {
           return;
@@ -153,9 +135,7 @@ export function SidebarProviderUpdatePill() {
         <div
           key={displayedView.key}
           aria-hidden="true"
-          className={`pointer-events-none absolute inset-y-0 left-0 w-full origin-left scale-x-0 transition-transform duration-(--provider-update-pill-dismiss-ms) ease-linear starting:scale-x-100 border-r border-current/15 inset-shadow-2xs inset-shadow-white/8 ${
-            PROVIDER_UPDATE_PILL_PROGRESS_STYLES[displayedView.tone]
-          }`}
+          className="sidebar-provider-update-progress"
           style={
             {
               "--provider-update-pill-dismiss-ms": `${dismissAfterVisibleMs}ms`,
@@ -163,7 +143,6 @@ export function SidebarProviderUpdatePill() {
           }
         />
       ) : null}
-      <div className="pointer-events-none absolute inset-0 rounded-lg transition-colors" />
       <Tooltip>
         <TooltipTrigger
           render={
@@ -171,17 +150,17 @@ export function SidebarProviderUpdatePill() {
               type="button"
               aria-label={displayedView.description}
               data-provider-update-main
-              className="relative z-[1] flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left"
+              className="sidebar-provider-update-main"
               onClick={openProviderSettings}
             >
               {displayedView.tone === "loading" ? (
-                <Spinner size="sm" className="shrink-0" />
+                <HourglassIcon className="size-3.5 shrink-0" aria-label={t.app.actions.loading} />
               ) : displayedView.tone === "success" ? (
                 <CircleCheckIcon className="size-3.5 shrink-0" />
               ) : displayedView.tone === "error" ? (
                 <TriangleAlertIcon className="size-3.5 shrink-0" />
               ) : (
-                <DownloadIcon className="size-3.5 shrink-0" />
+                <BotIcon className="size-3.5 shrink-0" />
               )}
               <span className="min-w-0 wrap-break-word">{displayedView.title}</span>
             </button>
@@ -196,10 +175,10 @@ export function SidebarProviderUpdatePill() {
               <button
                 type="button"
                 aria-label={t.sidebar.providerUpdates.dismissAriaLabel}
-                className="relative z-[1] mr-1 flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-md opacity-70 outline-none hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                className="sidebar-provider-update-dismiss"
                 onClick={() => startExit(displayedView.key, null, displayedView.key)}
               >
-                <XIcon className="size-3.5 shrink-0" />
+                <XIcon className="size-3.25 shrink-0" />
               </button>
             }
           />

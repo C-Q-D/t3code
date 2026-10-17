@@ -62,3 +62,159 @@
 .sidebar-drop-badge {
   --lucide-hue-override: currentColor;
 }
+
+/* 补充屏-3.dc.html · V1：只补合同表缺少的提示条石面、文字、微凸阴影和 14px 圆角。 */
+@theme {
+  --color-sidebar-provider-update: #26262a;
+  --color-sidebar-update-label: #c4c4ca;
+  --radius-sidebar-provider-update: 14px;
+  --shadow-sidebar-provider-update: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 1.5px 0 #09090a;
+  --leading-sidebar-update: 1.5;
+}
+
+/* V1's tray owns only update notices; undo remains outside it. */
+.sidebar-update-stack:has(.sidebar-update-pill, .sidebar-provider-update) {
+  @apply flex flex-col gap-2 rounded-slab bg-sidebar p-2.5 shadow-slab;
+}
+
+/* V1's 38px white key and 32px rounded status rows are feature-specific shapes.
+   Shared Button sizes use capsules or different icon geometry, so these stay native. */
+.sidebar-update-pill {
+  @apply flex min-h-8 w-full min-w-0 cursor-pointer items-center gap-2 rounded-menu-row border-0 px-3 text-left font-normal text-secondary-copy-medium leading-sidebar-update text-sidebar-update-label outline-none focus-visible:inset-shadow-focus;
+}
+
+.sidebar-update-pill[data-prominent="true"] {
+  --lucide-hue-override: currentColor;
+  @apply min-h-9.5 rounded-compact-row bg-primary font-extrabold text-secondary-copy-large leading-sidebar-update text-primary-foreground text-shadow-none shadow-primary-edge-control;
+}
+
+.sidebar-update-pill[aria-disabled="true"] {
+  @apply cursor-not-allowed;
+}
+
+.sidebar-update-pill[data-status="checking"] {
+  @apply text-secondary-label;
+}
+
+.sidebar-update-pill[data-status="error"] {
+  @apply py-1.5 text-secondary-copy leading-sidebar-update text-error;
+}
+
+.sidebar-update-pill[data-status="disabled"] {
+  @apply text-secondary-copy leading-sidebar-update text-muted-foreground;
+}
+
+.sidebar-update-pill:not([aria-disabled="true"]):hover {
+  @apply bg-sidebar-row-hover;
+}
+
+.sidebar-update-pill[data-prominent="true"]:not([aria-disabled="true"]):hover {
+  @apply bg-message-action-hover;
+}
+
+.sidebar-update-pill-icon {
+  @apply grid size-3.75 shrink-0 place-items-center;
+}
+
+.sidebar-update-pill-icon > svg {
+  @apply size-3.25;
+}
+
+.sidebar-update-pill[data-prominent="true"] .sidebar-update-pill-icon > svg {
+  @apply size-3.75;
+}
+
+/* The retained download ring owns a 32px box. */
+.sidebar-update-pill[data-status="downloading"] .sidebar-update-pill-icon {
+  @apply size-8;
+}
+
+.sidebar-update-pill-label {
+  @apply min-w-0 whitespace-pre-line wrap-anywhere;
+}
+
+.sidebar-provider-update {
+  @apply relative flex min-w-0 shrink-0 items-center gap-2 overflow-hidden rounded-sidebar-provider-update bg-sidebar-provider-update py-2.5 pr-1.5 pl-3 text-secondary-copy-medium leading-sidebar-update text-sidebar-foreground shadow-sidebar-provider-update duration-180 ease-out;
+  transition-property: transform, opacity;
+}
+
+.sidebar-provider-update-exiting {
+  @apply pointer-events-none translate-y-1.5 opacity-0;
+}
+
+.sidebar-provider-update-main {
+  @apply relative flex min-h-6.5 min-w-0 flex-1 cursor-pointer items-center gap-2 text-left outline-none focus-visible:inset-shadow-focus;
+}
+
+.sidebar-provider-update[data-tone="error"] {
+  @apply text-error;
+}
+
+/* V1's 26px close target is not one of the shared icon-button sizes. */
+.sidebar-provider-update-dismiss {
+  @apply relative flex size-6.5 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent p-0 text-muted-foreground outline-none hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-visible:inset-shadow-focus;
+}
+
+.sidebar-provider-update-progress {
+  @apply pointer-events-none absolute inset-0 origin-left scale-x-0 bg-foreground/4 transition-transform ease-linear;
+  transition-duration: var(--provider-update-pill-dismiss-ms);
+}
+
+@starting-style {
+  .sidebar-provider-update-progress {
+    @apply scale-x-100;
+  }
+}
+
+/* The shared panel variant is frameless; this feature-owned surface uses the
+   graphite dropdown contract, including its opacity setting and solid fill. */
+.sidebar-update-release-notes {
+  @apply flex w-75 max-w-full flex-col gap-2.5 rounded-overlay-large p-3.5 text-left leading-sidebar-update text-popover-foreground;
+  max-height: calc(var(--available-height) - --spacing(4));
+}
+
+/* dropdown-glass already owns elevation. Select V1's existing toast shadow
+   locally so its shared graphite recipe resolves the illustrated short throw. */
+.sidebar-update-release-notes.dropdown-glass {
+  --shadow-overlay: var(--shadow-toast);
+}
+
+.sidebar-update-release-title {
+  @apply shrink-0 font-serif font-bold text-plan-title leading-sidebar-update;
+}
+
+.sidebar-update-release-status,
+.sidebar-update-release-version {
+  @apply font-semibold text-secondary-copy leading-sidebar-update text-secondary-label;
+}
+
+.sidebar-update-release-scroll {
+  @apply flex min-h-0 flex-col gap-2.5 overflow-y-auto;
+}
+
+.sidebar-update-release-section {
+  @apply flex flex-col items-start gap-2.5;
+}
+
+.sidebar-update-release-items {
+  @apply flex flex-col gap-1 pl-3.5 text-secondary-copy-medium leading-sidebar-update text-fg-detail;
+}
+
+.sidebar-update-release-link {
+  @apply inline-flex items-center gap-1 text-secondary-copy-medium leading-sidebar-update text-foreground underline decoration-fg-control-disabled underline-offset-3 outline-none hover:text-message-action-hover focus-visible:inset-shadow-focus;
+}
+
+.sidebar-update-release-history {
+  @apply text-secondary-copy leading-sidebar-update text-muted-foreground;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-provider-update {
+    /* Retain transition-end dismissal without visible movement. */
+    @apply translate-y-0 transition-opacity duration-1;
+  }
+
+  .sidebar-provider-update-progress {
+    @apply transition-none;
+  }
+}
