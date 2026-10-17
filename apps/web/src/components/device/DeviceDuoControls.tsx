@@ -81,10 +81,9 @@ export function DeviceDuoControls(props: {
       <TooltipPopup side="left">{label}</TooltipPopup>
     </Tooltip>
   );
-  const group =
-    "pointer-events-auto flex shrink-0 flex-col items-center gap-1 rounded-full border border-border/50 bg-background/80 p-1 shadow-sm";
+  const group = "device-controls-bar";
   return (
-    <div aria-label={t.tools.device.duoStands} className="flex flex-col items-center gap-2">
+    <div aria-label={t.tools.device.duoStands} className="device-fold-controls">
       <div role="group" aria-label={t.tools.device.foldShape} className={group}>
         {FOLDS.map(({ id, angle: value }) =>
           button(

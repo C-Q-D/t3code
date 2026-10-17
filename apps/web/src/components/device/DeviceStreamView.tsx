@@ -27,7 +27,6 @@ import {
 import { observeResize } from "~/lib/observeResize";
 
 const AX_POLL_INTERVAL_MS = 2_000;
-const CONTROLS_RAIL_WIDTH = 56;
 
 export interface DeviceViewControls {
   readonly phone: boolean;
@@ -215,7 +214,6 @@ export function DeviceStreamView(props: {
     const timeout = window.setTimeout(() => setShowRestartNotice(true), 2_000);
     return () => window.clearTimeout(timeout);
   }, [retainingFrame, showPhone]);
-  const controlsInset = props.renderControls && !showPhone ? CONTROLS_RAIL_WIDTH : 0;
 
   // The frame is the largest box at `aspect` that fits the container, so a
   // narrow panel shows a shorter phone rather than a squeezed one. CSS
@@ -238,8 +236,8 @@ export function DeviceStreamView(props: {
     return observeResize(element, update);
   }, []);
   const frame = useMemo(() => {
-    return fitDeviceFrame(aspect, host.width, host.height, controlsInset);
-  }, [aspect, controlsInset, host]);
+    return fitDeviceFrame(aspect, host.width, host.height);
+  }, [aspect, host]);
 
   // serve-sim streams the raw framebuffer; rotate the display for a device
   // that reports landscape while its frames stay portrait.
@@ -338,8 +336,10 @@ export function DeviceStreamView(props: {
 
   return (
     <div
+      data-presentation={props.renderControls ? (showPhone ? "phone" : "flat") : undefined}
       className={cn(
         "relative flex size-full min-h-0 min-w-0",
+        props.renderControls && "device-stream-workspace",
         props.allowPhoneView ? "bg-background" : "bg-black/90",
       )}
     >
@@ -395,7 +395,7 @@ export function DeviceStreamView(props: {
         ref={hostRef}
         className={cn(
           "relative flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden outline-none",
-          controlsInset && "pr-14",
+          props.renderControls && "device-stream-viewport",
         )}
         tabIndex={0}
         role="application"
@@ -414,7 +414,11 @@ export function DeviceStreamView(props: {
         }}
       >
         <div
-          className={cn("relative select-none", showPhone && "invisible pointer-events-none")}
+          className={cn(
+            "relative select-none",
+            showPhone && "invisible pointer-events-none",
+            props.renderControls && !showPhone && "device-flat-frame",
+          )}
           style={{ width: frame.width, height: frame.height }}
           onPointerDown={(event) => {
             event.currentTarget.setPointerCapture(event.pointerId);

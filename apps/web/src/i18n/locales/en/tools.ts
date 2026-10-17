@@ -371,6 +371,11 @@ export const tools = {
     available: "available",
     unavailable: "unavailable",
     view3d: "3D view",
+    screenshotAction: "Screenshot",
+    androidOnlyAction: "Available on Android only",
+    rotateInControls: "Use Rotate in the control bar.",
+    pushHeading: "Push",
+    launchAppHeading: "Launch app",
   },
   preview: {
     fileNotShown: "This file can’t be shown here",

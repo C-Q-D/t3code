@@ -50,6 +50,9 @@ const buttonVariants = cva(
         // 对话页-8a D1：建议计划头部的 32×32px 图标操作，11px 圆角。
         "icon-toolbar-key":
           "size-8 rounded-toolbar-icon p-0 [&_svg:not([class*='size-'])]:size-3.75",
+        // 其余屏-2 L3 / Panel8a: compact toolbar keys are 28px with 9px corners.
+        "icon-compact-key":
+          "size-7 rounded-device-control p-0 [&_svg:not([class*='size-'])]:size-3.5",
       },
       variant: {
         default:

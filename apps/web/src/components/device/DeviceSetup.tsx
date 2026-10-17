@@ -90,7 +90,7 @@ export function DeviceSetup(props: {
   };
 
   return (
-    <>
+    <div className="device-setup">
       <WizardHeader title={t.tools.device.setup} description={t.tools.device.setupHint}>
         <WizardSteps
           steps={[t.tools.device.hub, t.tools.device.simulators, t.tools.device.agentAccess]}
@@ -196,7 +196,7 @@ export function DeviceSetup(props: {
           </Button>
         )}
       </WizardFooter>
-    </>
+    </div>
   );
 }
 

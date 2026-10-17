@@ -206,6 +206,10 @@ const twMerge = extendTailwindMerge({
         "pn5-selected",
         "pn5-empty",
         "pn5-footer",
+        "device-viewport",
+        "device-tools",
+        "device-controls",
+        "device-frame",
       ],
       "inset-shadow": [
         "selected",
@@ -278,6 +282,10 @@ const twMerge = extendTailwindMerge({
         "toolbar-icon",
         "pn5-result",
         "pn5-hint",
+        "device-stage",
+        "device-tool",
+        "device-control",
+        "device-frame",
       ],
       leading: [
         "code",

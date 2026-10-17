@@ -101,9 +101,7 @@ export function DeviceToolsPanel(props: {
   const isIos = device.platform === "ios";
 
   return (
-    <div
-      className={cn("flex min-h-0 flex-col border-border bg-background text-sm", props.className)}
-    >
+    <div className={cn("device-tools flex min-h-0 flex-col text-sm", props.className)}>
       <div className="flex h-9 shrink-0 items-center gap-2 border-b px-3">
         <span className="font-medium">{t.tools.device.toolsHeading}</span>
         {pending ? <Spinner size="sm" /> : null}
@@ -135,47 +133,7 @@ export function DeviceToolsPanel(props: {
           </Section>
         ) : null}
 
-        <Section title={t.tools.device.app}>
-          <Row label={t.tools.device.foreground}>
-            <span className="truncate font-mono text-xs">{foregroundApp?.id ?? "—"}</span>
-          </Row>
-          {foregroundApp ? (
-            <div className="flex gap-1.5">
-              <Button
-                size="xs"
-                variant="outline"
-                disabled={disabled}
-                onClick={() => void act({ type: "terminateApp", appId: foregroundApp.id })}
-              >
-                {t.tools.device.terminate}
-              </Button>
-              <Button
-                size="xs"
-                variant="outline"
-                disabled={disabled}
-                onClick={() => void act({ type: "launchApp", appId: foregroundApp.id })}
-              >
-                {t.tools.device.relaunch}
-              </Button>
-            </div>
-          ) : null}
-          <SubmitRow
-            placeholder={t.tools.device.urlPlaceholder}
-            action={t.tools.device.open}
-            disabled={disabled}
-            onSubmit={(url) => act({ type: "openUrl", url })}
-          />
-          <SubmitRow
-            placeholder={
-              isIos ? t.tools.device.bundlePlaceholder : t.tools.device.packagePlaceholder
-            }
-            action={t.tools.device.launch}
-            disabled={disabled}
-            onSubmit={(appId) => act({ type: "launchApp", appId })}
-          />
-        </Section>
-
-        <Section title={isIos ? t.tools.device.simulator : t.tools.device.emulator}>
+        <Section title={t.tools.device.appearance}>
           <Row label={t.tools.device.appearance}>
             <ToggleGroup
               aria-label={t.tools.device.appearance}
@@ -191,6 +149,26 @@ export function DeviceToolsPanel(props: {
               <Toggle value="dark">{t.tools.device.dark}</Toggle>
             </ToggleGroup>
           </Row>
+          {isIos ? (
+            <Row label="Liquid Glass">
+              <ToggleGroup
+                aria-label="Liquid Glass"
+                value={settings?.liquidGlass ? [settings.liquidGlass] : []}
+                disabled={disabled || settings?.liquidGlass === undefined}
+                onValueChange={(value) => {
+                  const next = value[0];
+                  if (next === "clear" || next === "tinted") {
+                    void act({ type: "setLiquidGlass", value: next });
+                  }
+                }}
+              >
+                <Toggle value="clear">{t.tools.device.clearGlass}</Toggle>
+                <Toggle value="tinted">{t.tools.device.tinted}</Toggle>
+              </ToggleGroup>
+            </Row>
+          ) : null}
+        </Section>
+        <Section title={t.tools.device.textSizeHeading}>
           <Row label={t.tools.device.textSizeHeading}>
             <ChoiceSelect
               ariaLabel={t.tools.device.textSizeHeading}
@@ -200,35 +178,28 @@ export function DeviceToolsPanel(props: {
               onChange={(value) => act({ type: "setTextSize", value })}
             />
           </Row>
-          {isIos ? (
-            <>
-              <Row label="Liquid Glass">
-                <ToggleGroup
-                  aria-label="Liquid Glass"
-                  value={settings?.liquidGlass ? [settings.liquidGlass] : []}
-                  disabled={disabled || settings?.liquidGlass === undefined}
-                  onValueChange={(value) => {
-                    const next = value[0];
-                    if (next === "clear" || next === "tinted") {
-                      void act({ type: "setLiquidGlass", value: next });
-                    }
-                  }}
-                >
-                  <Toggle value="clear">{t.tools.device.clearGlass}</Toggle>
-                  <Toggle value="tinted">{t.tools.device.tinted}</Toggle>
-                </ToggleGroup>
-              </Row>
-              <Row label={t.tools.device.colorFilter}>
-                <ChoiceSelect
-                  ariaLabel={t.tools.device.colorFilter}
-                  value={settings?.colorFilter ?? null}
-                  options={COLOR_FILTERS}
-                  disabled={disabled}
-                  onChange={(value) => act({ type: "setColorFilter", value })}
-                />
-              </Row>
-            </>
-          ) : (
+        </Section>
+        {isIos ? (
+          <Section title={t.tools.device.colorFilter}>
+            <Row label={t.tools.device.colorFilter}>
+              <ChoiceSelect
+                ariaLabel={t.tools.device.colorFilter}
+                value={settings?.colorFilter ?? null}
+                options={COLOR_FILTERS}
+                disabled={disabled}
+                onChange={(value) => act({ type: "setColorFilter", value })}
+              />
+            </Row>
+          </Section>
+        ) : null}
+        {isIos ? (
+          <Section title={t.tools.device.orientation}>
+            <p className="text-secondary-copy text-secondary-label">
+              {t.tools.device.rotateInControls}
+            </p>
+          </Section>
+        ) : (
+          <Section title={t.tools.device.orientation}>
             <Row label={t.tools.device.orientation}>
               <ChoiceSelect
                 ariaLabel={t.tools.device.orientation}
@@ -239,7 +210,9 @@ export function DeviceToolsPanel(props: {
                 onChange={(value) => act({ type: "setOrientation", value })}
               />
             </Row>
-          )}
+          </Section>
+        )}
+        <Section title={t.tools.device.accessibility}>
           <SwitchRow
             label={t.tools.device.reduceMotion}
             checked={settings?.reduceMotion}
@@ -283,9 +256,6 @@ export function DeviceToolsPanel(props: {
               onChange={(value) => act({ type: "setToggle", setting: "networkEnabled", value })}
             />
           )}
-        </Section>
-
-        <Section title={t.tools.device.accessibility}>
           <SwitchRow
             label={t.tools.device.elementFrames}
             checked={props.axOverlay}
@@ -296,6 +266,24 @@ export function DeviceToolsPanel(props: {
             }}
           />
         </Section>
+
+        {isIos ? (
+          <Section title={t.tools.device.pushHeading}>
+            <SubmitRow
+              placeholder={t.tools.device.alertText}
+              action={t.tools.device.send}
+              disabled={disabled || !foregroundApp}
+              onSubmit={(payload) =>
+                foregroundApp
+                  ? act({ type: "sendPush", appId: foregroundApp.id, payload })
+                  : Promise.resolve()
+              }
+            />
+            {!foregroundApp ? (
+              <p className="text-xs text-muted-foreground">{t.tools.device.openAppFirst}</p>
+            ) : null}
+          </Section>
+        ) : null}
 
         <LocationSection
           disabled={disabled}
@@ -314,36 +302,59 @@ export function DeviceToolsPanel(props: {
           }
         />
 
-        {isIos ? (
-          <Section title={t.tools.device.pushNotification}>
-            <SubmitRow
-              placeholder={t.tools.device.alertText}
-              action={t.tools.device.send}
-              disabled={disabled || !foregroundApp}
-              onSubmit={(payload) =>
-                foregroundApp
-                  ? act({ type: "sendPush", appId: foregroundApp.id, payload })
-                  : Promise.resolve()
-              }
-            />
-            {!foregroundApp ? (
-              <p className="text-xs text-muted-foreground">{t.tools.device.openAppFirst}</p>
-            ) : null}
-          </Section>
-        ) : null}
-
         {isIos && props.access ? <EventLogSection access={props.access} device={device} /> : null}
+
+        <Section title={t.tools.device.launchAppHeading}>
+          <Row label={t.tools.device.foreground}>
+            <span className="truncate font-mono text-xs">{foregroundApp?.id ?? "—"}</span>
+          </Row>
+          {foregroundApp ? (
+            <div className="flex gap-1.5">
+              <Button
+                size="xs"
+                variant="outline"
+                disabled={disabled}
+                onClick={() => void act({ type: "terminateApp", appId: foregroundApp.id })}
+              >
+                {t.tools.device.terminate}
+              </Button>
+              <Button
+                size="xs"
+                variant="outline"
+                disabled={disabled}
+                onClick={() => void act({ type: "launchApp", appId: foregroundApp.id })}
+              >
+                {t.tools.device.relaunch}
+              </Button>
+            </div>
+          ) : null}
+          <SubmitRow
+            placeholder={t.tools.device.urlPlaceholder}
+            action={t.tools.device.open}
+            disabled={disabled}
+            onSubmit={(url) => act({ type: "openUrl", url })}
+          />
+          <SubmitRow
+            placeholder={
+              isIos ? t.tools.device.bundlePlaceholder : t.tools.device.packagePlaceholder
+            }
+            action={t.tools.device.launch}
+            disabled={disabled}
+            onSubmit={(appId) => act({ type: "launchApp", appId })}
+          />
+        </Section>
       </div>
     </div>
   );
 }
 
+/** Collapsible tool category; children retain their state while the category is closed. */
 function Section(props: { readonly title: string; readonly children: React.ReactNode }) {
   return (
-    <section className="flex flex-col gap-2 border-b px-3 py-2.5 last:border-b-0">
-      <h3 className="text-xs font-medium text-muted-foreground">{props.title}</h3>
-      {props.children}
-    </section>
+    <details className="device-tool-section">
+      <summary>{props.title}</summary>
+      <div className="device-tool-content">{props.children}</div>
+    </details>
   );
 }
 

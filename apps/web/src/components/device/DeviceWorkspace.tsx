@@ -2,6 +2,7 @@
 import { t } from "~/i18n";
 import type { DeviceSummary, EnvironmentId } from "@t3tools/contracts";
 import { useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import {
   captureDeviceScreenshot,
   DeviceScreenshotError,
@@ -25,9 +26,10 @@ export function DeviceWorkspace(props: {
   onFloat: () => void;
   onClose: () => void;
   onPowerOff: () => void;
+  devicePicker: ReactNode;
 }) {
   const [handle, setHandle] = useState<DeviceStreamHandle | null>(null);
-  const [toolsOpen, setToolsOpen] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(true);
   const [axOverlay, setAxOverlay] = useState(false);
   const [screenshotPending, setScreenshotPending] = useState(false);
   const [screenshotError, setScreenshotError] = useState<string | null>(null);
@@ -83,7 +85,7 @@ export function DeviceWorkspace(props: {
   };
   return (
     <>
-      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="device-workspace relative flex min-h-0 min-w-0 flex-1 flex-col">
         {screenshotError || (controls.error && !toolsOpen) ? (
           <p role="alert" className="px-3 py-2 text-xs text-destructive">
             {screenshotError ?? controls.error}
@@ -114,6 +116,7 @@ export function DeviceWorkspace(props: {
                 onFloat={props.onFloat}
                 onClose={props.onClose}
                 onPowerOff={props.onPowerOff}
+                devicePicker={props.devicePicker}
               />
             )}
           />
@@ -128,7 +131,7 @@ export function DeviceWorkspace(props: {
           axOverlay={axOverlay}
           onAxOverlayChange={setAxOverlay}
           onClose={() => setToolsOpen(false)}
-          className="absolute inset-y-0 right-0 z-10 w-full max-w-72 border-l shadow-lg @[700px]:static @[700px]:w-72 @[700px]:shrink-0 @[700px]:shadow-none"
+          className="device-tools-drawer"
         />
       ) : null}
     </>

@@ -21,10 +21,10 @@ export function DeviceLoadingView(props: {
   return (
     <div
       role={props.error ? "alert" : "status"}
-      className="flex size-full items-center justify-center bg-background px-6 py-10"
+      className="device-loading flex size-full items-center justify-center px-6 py-10"
     >
       <div className="flex max-w-sm flex-col items-center gap-3 text-center">
-        <div className="grid size-12 place-items-center rounded-xl border bg-muted/30">
+        <div className="device-loading-icon grid size-12 place-items-center rounded-xl">
           <Smartphone className="size-6 text-muted-foreground" />
         </div>
         <div className="space-y-1">

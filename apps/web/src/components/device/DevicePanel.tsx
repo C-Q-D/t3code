@@ -13,7 +13,6 @@ import { useEffect, useMemo, useState } from "react";
 import { usePreviewMiniPlayerStore } from "~/previewMiniPlayerStore";
 import { useRightPanelStore, type RightPanelSurface } from "~/rightPanelStore";
 import { Button } from "~/components/ui/button";
-import { DiscoveryList, DiscoveryListRow } from "~/components/ui/discovery-list";
 import { Dialog } from "~/components/ui/dialog";
 import { WizardPopup } from "~/components/ui/wizard";
 import { Spinner } from "~/components/ui/spinner";
@@ -25,6 +24,15 @@ import { DeviceLoadingView } from "./DeviceLoadingView";
 import { DeviceSetup } from "./DeviceSetup";
 import { DeviceWorkspace } from "./DeviceWorkspace";
 import { PreviewPanelShell, type PreviewPanelMode } from "../preview/PreviewPanelShell";
+import {
+  Menu,
+  MenuTrigger,
+  MenuPopup,
+  MenuRadioGroup,
+  MenuRadioItem,
+  MenuRadioItemIndicator,
+} from "~/components/ui/menu";
+import { ChevronDown } from "lucide-react";
 
 /**
  * @param platform Device group's iOS or Android platform discriminator.
@@ -207,7 +215,7 @@ export function DevicePanel(props: {
           </Button>
         </div>
       ) : null}
-      <div className="@container relative flex min-h-0 flex-1">
+      <div className="device-panel @container relative flex min-h-0 flex-1">
         {activeDevice && activeSession ? (
           <DeviceWorkspace
             key={`${environmentId}\u0000${deviceKey(activeDevice)}`}
@@ -222,6 +230,44 @@ export function DevicePanel(props: {
             onFloat={floatActive}
             onClose={() => closeActive(false)}
             onPowerOff={() => closeActive(true)}
+            devicePicker={
+              <Menu>
+                <MenuTrigger
+                  render={
+                    <Button size="md" variant="secondary" disabled={pendingDeviceKey !== null} />
+                  }
+                >
+                  <span className="truncate">
+                    {activeDevice.name} · {activeDevice.version}
+                  </span>
+                  <ChevronDown className="size-3 shrink-0" />
+                </MenuTrigger>
+                <MenuPopup align="start">
+                  <MenuRadioGroup
+                    value={deviceKey(activeDevice)}
+                    onValueChange={(value) => {
+                      if (value !== deviceKey(activeDevice)) void selectDevice(value);
+                    }}
+                  >
+                    {grouped.flatMap((group) =>
+                      group.devices.map((device) => (
+                        <MenuRadioItem key={deviceKey(device)} value={deviceKey(device)}>
+                          <span className="flex min-w-0 flex-1 flex-col">
+                            <span>{device.name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {state.hosts.find((host) => host.id === device.hostId)?.label} ·{" "}
+                              {device.version} ·{" "}
+                              {device.booted ? t.tools.device.running : t.tools.device.stopped}
+                            </span>
+                          </span>
+                          <MenuRadioItemIndicator />
+                        </MenuRadioItem>
+                      )),
+                    )}
+                  </MenuRadioGroup>
+                </MenuPopup>
+              </Menu>
+            }
           />
         ) : pendingDevice || hostBusy || !loaded ? (
           <DeviceLoadingView
@@ -243,7 +289,7 @@ export function DevicePanel(props: {
             }
           />
         ) : (
-          <div className="scrollbar-gutter-both flex size-full flex-col overflow-y-auto px-5 py-8 text-sm text-muted-foreground">
+          <div className="device-picker scrollbar-gutter-both flex size-full flex-col overflow-y-auto px-5 py-8 text-sm text-muted-foreground">
             <div
               className={cn(
                 "mx-auto flex w-full max-w-xl flex-col gap-6",
@@ -268,32 +314,37 @@ export function DevicePanel(props: {
                         <Smartphone className="size-4 shrink-0" />
                         <h3 className="font-medium">{platformLabel(group.platform)}</h3>
                       </div>
-                      <DiscoveryList>
+                      <div className="flex flex-col gap-1.5">
                         {group.devices.map((device) => (
-                          <DiscoveryListRow
+                          <button
+                            type="button"
                             key={deviceKey(device)}
-                            icon={
-                              <span className="grid size-8 shrink-0 place-items-center rounded-md border border-border/60">
-                                <Smartphone className="size-4" />
-                              </span>
-                            }
-                            title={device.name}
-                            description={`${state.hosts.find((host) => host.id === device.hostId)?.label} · ${device.version} · ${device.booted ? t.tools.device.running : t.tools.device.stopped}`}
+                            className="device-picker-row"
                             disabled={pendingDeviceKey !== null}
                             aria-label={`${device.booted ? t.tools.device.open : t.tools.device.start} ${device.name}`}
                             onClick={() => void selectDevice(deviceKey(device))}
-                            action={
-                              pendingDeviceKey === deviceKey(device) ? (
-                                <Spinner size="xs" />
-                              ) : (
-                                <span className="text-xs text-muted-foreground">
-                                  {device.booted ? t.tools.device.open : t.tools.device.start}
-                                </span>
-                              )
-                            }
-                          />
+                          >
+                            <Smartphone className="size-4.25 shrink-0" />
+                            <span className="flex min-w-0 flex-1 flex-col">
+                              <span className="truncate font-semibold text-foreground">
+                                {device.name}
+                              </span>
+                              <span className="truncate text-secondary-copy text-secondary-label">
+                                {state.hosts.find((host) => host.id === device.hostId)?.label} ·{" "}
+                                {device.version} ·{" "}
+                                {device.booted ? t.tools.device.running : t.tools.device.stopped}
+                              </span>
+                            </span>
+                            {pendingDeviceKey === deviceKey(device) ? (
+                              <Spinner size="xs" />
+                            ) : (
+                              <span className="text-secondary-copy text-secondary-label">
+                                {device.booted ? t.tools.device.open : t.tools.device.start}
+                              </span>
+                            )}
+                          </button>
                         ))}
-                      </DiscoveryList>
+                      </div>
                     </section>
                   ))}
                 </div>

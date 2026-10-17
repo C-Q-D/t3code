@@ -101,8 +101,8 @@ export function DeviceAndroidFoldControls(props: {
   };
 
   return (
-    <div aria-label={t.tools.device.foldControls} className="flex flex-col items-center gap-2">
-      <div className="pointer-events-auto flex shrink-0 flex-col items-center gap-1 rounded-full border border-border/50 bg-background/80 p-1 shadow-sm">
+    <div aria-label={t.tools.device.foldControls} className="device-fold-controls">
+      <div className="device-controls-bar">
         <Tooltip>
           <TooltipTrigger
             render={

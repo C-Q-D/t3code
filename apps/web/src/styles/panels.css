@@ -111,3 +111,192 @@
 .pn5-palette .pn5-footer kbd svg {
   @apply size-2.75;
 }
+
+/* PN7 — 其余屏-2 L3 imports Panel8a: only device content, never the PN1 shell. */
+@theme {
+  /* Panel8a device stage, tool slot and control bar; G1 roles reuse code/input/secondary. */
+  --color-device-tools: #1a1a1d;
+  --color-device-controls: #26262a;
+  --shadow-device-viewport:
+    inset 2px 3px 6px rgba(0, 0, 0, 0.75), inset -1px -1px 0 rgba(255, 255, 255, 0.06);
+  --shadow-device-tools: inset 1.5px 2px 3px rgba(0, 0, 0, 0.6);
+  --shadow-device-controls: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 1.5px 0 #09090a;
+  /* Panel8a phone frame and shadow, without transforming the live input surface. */
+  --shadow-device-frame:
+    0 0 0 5px #070708, 0 0 0 6px #3a3a40, 14px 20px 30px -8px rgba(0, 0, 0, 0.85);
+  --radius-device-stage: 14px;
+  --radius-device-tool: 8px;
+  --radius-device-control: 9px;
+  --radius-device-frame: 30px;
+}
+
+.device-panel {
+  @apply min-w-0 gap-2.5 px-3 pb-3;
+  container-type: inline-size;
+}
+
+.device-stream-workspace {
+  @apply isolate flex-col gap-3 bg-transparent;
+}
+
+/* A single recessed stage stays behind both the viewport and bottom controls. */
+.device-stream-workspace::before {
+  content: "";
+  @apply absolute -z-10 inset-x-0 top-11 bottom-0 rounded-device-stage bg-code shadow-device-viewport;
+}
+
+.device-workspace-toolbar {
+  @apply order-first flex min-h-8.5 flex-none flex-wrap items-center justify-between gap-2;
+}
+
+.device-workspace-picker {
+  @apply flex min-w-0 flex-1;
+}
+
+.device-workspace-picker > * {
+  @apply max-w-full;
+}
+
+/* The selector uses Button size=md; no feature CSS repaints its primitive. */
+.device-view-selector {
+  @apply m-0 flex h-7.5 flex-none items-stretch rounded-full border-0 bg-input p-0.75 text-secondary-copy shadow-device-tools;
+}
+
+.device-view-selector label {
+  @apply relative flex cursor-pointer;
+}
+
+.device-view-selector label > span {
+  @apply flex items-center rounded-compact-row px-2.5 text-secondary-label;
+}
+
+.device-view-selector input:checked + span {
+  @apply bg-segmented-selected font-bold text-foreground;
+}
+
+.device-view-selector input:focus-visible + span {
+  @apply inset-shadow-focus;
+}
+
+.device-view-selector input:disabled + span {
+  @apply cursor-default opacity-50;
+}
+
+:where(.device-panel:has(> .device-tools-drawer)) .device-workspace-toolbar {
+  width: calc(100% + var(--spacing) * 34.5);
+}
+
+:where(.device-panel:has(> .device-tools-drawer .device-tool-section[open]))
+  .device-workspace-toolbar {
+  width: calc(100% + var(--spacing) * 66.5);
+}
+
+.device-stream-viewport {
+  @apply mx-3 mt-0.5 rounded-device-stage focus-visible:inset-shadow-focus;
+}
+
+.device-flat-frame {
+  @apply rounded-device-frame shadow-device-frame;
+}
+
+/* The L3 3D phone is at most 330px tall; centering does not recreate its viewer. */
+.device-stream-workspace[data-presentation="phone"] .device-stream-viewport {
+  @apply mt-auto max-h-82.5 basis-82.5 grow-0;
+}
+
+.device-stream-workspace[data-presentation="phone"] .device-controls {
+  @apply mb-auto;
+}
+
+.device-controls {
+  @apply order-last flex flex-none flex-wrap items-center justify-center gap-1.5 px-2 pb-3.5;
+}
+
+.device-controls-bar {
+  @apply flex max-w-full flex-none flex-wrap items-center justify-center gap-0.5 rounded-device-stage bg-device-controls p-0.75 shadow-device-controls;
+}
+
+/* This power key is a device-only control: the board has no generic danger outline. */
+.device-power-key {
+  --lucide-hue-override: currentColor;
+  @apply flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-device-control border-0 bg-transparent p-0 text-error-foreground hover:bg-error-surface focus-visible:inset-shadow-focus disabled:pointer-events-none disabled:opacity-50;
+}
+
+.device-fold-controls {
+  @apply flex flex-wrap items-center justify-center gap-1.5;
+}
+
+.device-tools {
+  @apply rounded-device-stage bg-device-tools p-1.25 text-secondary-copy-medium shadow-device-tools;
+}
+
+.device-tools-drawer {
+  @apply mt-11.5 w-32 max-w-full flex-none;
+}
+
+/* Real inputs need more room than the L3 category slot; closing restores its width. */
+.device-tools-drawer:has(.device-tool-section[open]) {
+  @apply w-64;
+}
+
+.device-tool-section {
+  @apply my-0.25;
+}
+
+.device-tool-section > summary {
+  @apply flex min-h-7.5 cursor-pointer list-none items-center rounded-device-tool px-2 text-code-foreground;
+}
+
+.device-tool-section > summary::-webkit-details-marker {
+  display: none;
+}
+
+.device-tool-section > summary:hover,
+.device-tool-section[open] > summary {
+  @apply bg-secondary text-foreground;
+}
+
+.device-tool-section > summary:focus-visible {
+  @apply inset-shadow-focus;
+}
+
+.device-tool-content {
+  @apply flex flex-col gap-2 px-2 pt-2.5 pb-3;
+}
+
+.device-tool-content > div {
+  @apply flex-wrap;
+}
+
+.device-loading {
+  @apply rounded-device-stage bg-code shadow-device-viewport;
+}
+
+.device-loading-icon {
+  @apply bg-device-tools shadow-device-tools;
+}
+
+.device-picker {
+  @apply px-1.5 py-2;
+}
+
+.device-picker-row {
+  @apply flex min-h-12 w-full cursor-pointer items-center gap-3 rounded-device-stage border-0 bg-secondary px-3.5 py-2 text-left text-control shadow-device-controls hover:bg-raise-toolbar-hover focus-visible:inset-shadow-focus disabled:pointer-events-none disabled:opacity-50;
+}
+
+.device-setup {
+  @apply min-w-0 text-foreground;
+}
+
+/* Docked/floating narrow panels retain the mounted stream underneath the tool overlay. */
+@container (max-width: 440px) {
+  .device-workspace .device-workspace-toolbar {
+    @apply w-full;
+  }
+  .device-tools-drawer {
+    @apply absolute top-11.5 right-2.5 bottom-2.5 z-10 mt-0;
+  }
+  .device-tools-drawer:not(:has(.device-tool-section[open])) {
+    @apply w-27;
+  }
+}

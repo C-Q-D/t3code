@@ -366,6 +366,11 @@ export const tools: Messages["tools"] = {
     available: "可用",
     unavailable: "不可用",
     view3d: "3D 视图",
+    screenshotAction: "截图",
+    androidOnlyAction: "仅 Android 支持",
+    rotateInControls: "请使用控制条中的旋转操作。",
+    pushHeading: "推送",
+    launchAppHeading: "启动应用",
   },
   preview: {
     fileNotShown: "无法在此处显示该文件",
