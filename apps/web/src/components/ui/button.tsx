@@ -70,6 +70,11 @@ const buttonVariants = cva(
         "onboarding-row": "h-11 gap-2.5 rounded-card-row px-3.5 text-control",
         // SettingsPage8a O1–O4: shared list actions are 28px capsules with 11px padding.
         "settings-list": "h-7 px-2.75 text-secondary-copy",
+        // 讨论页-8a v3 H3: the shared compact capsule with 12px inline padding.
+        "compact-padded": "h-7 gap-1.25 px-3 text-secondary-copy-medium font-semibold",
+        // 讨论页-8a v3 H1/H2: a 26px compact key, complementing the circular stepper.
+        "icon-stepper-key":
+          "size-6.5 rounded-compact-stepper-key p-0 [&_svg:not([class*='size-'])]:size-3.75",
       },
       variant: {
         default:

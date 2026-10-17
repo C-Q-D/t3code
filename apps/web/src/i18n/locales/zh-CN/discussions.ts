@@ -48,6 +48,8 @@ export const discussions: Messages["discussions"] = {
   loading: "正在加载讨论…",
   loadFailed: "加载讨论失败",
   diff: {
+    panelTitle: "发言改动",
+    raw: "补丁格式无法按文件拆开，下面是原始内容。",
     close: "关闭",
     loading: "正在读取这次发言的改动…",
     failed: (message: string) =>

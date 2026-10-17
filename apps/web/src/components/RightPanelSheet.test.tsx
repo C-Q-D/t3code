@@ -11,8 +11,8 @@ let container: HTMLDivElement;
 let root: Root;
 const originalGetAnimations = Object.getOwnPropertyDescriptor(Element.prototype, "getAnimations");
 
-/** Uses controlled open state so dismissal must actually close the panel. */
-function OverlayHost() {
+/** Uses controlled open state; discussion selects H2, while the default preserves A4 coverage. */
+function OverlayHost({ discussion = false }: { discussion?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -20,6 +20,7 @@ function OverlayHost() {
       <output>{open ? "open" : "closed"}</output>
       <RightPanelSheet
         standalone
+        discussion={discussion}
         open={open}
         animationDurationMs={0}
         onClose={() => setOpen(false)}
@@ -30,9 +31,10 @@ function OverlayHost() {
   );
 }
 
-/** Flushes the primitive's scheduled opening and focus work without wall-clock waits. */
-async function openOverlay() {
-  await act(() => root.render(<OverlayHost />));
+/** Opens H2 when discussion is true, otherwise A4; flushes scheduled focus without wall-clock waits. */
+async function openOverlay(discussion = false) {
+  await act(() => root.render(<OverlayHost discussion={discussion} />));
+  container.querySelector("button")?.focus();
   await act(() => container.querySelector("button")?.click());
   await act(() => vi.advanceTimersByTimeAsync(0));
   await act(() => vi.advanceTimersToNextFrame());
@@ -82,6 +84,38 @@ describe("standalone right panel overlay", () => {
       '.right-panel-overlay-region[role="presentation"]',
     );
     if (!backdrop) throw new Error("Missing panel backdrop");
+    await act(() => {
+      backdrop.dispatchEvent(new MouseEvent("mousedown", { button: 0, bubbles: true }));
+      backdrop.dispatchEvent(new MouseEvent("mouseup", { button: 0, bubbles: true }));
+      backdrop.click();
+    });
+    expect(container.querySelector("output")?.textContent).toBe("closed");
+  });
+});
+
+describe("discussion H2 overlay", () => {
+  it("closes on Escape and returns focus to the file opener", async () => {
+    await openOverlay(true);
+    expect(document.activeElement?.textContent).toBe("panel action");
+    await act(() =>
+      document.activeElement?.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+      ),
+    );
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    // Base UI finishes even a zero-animation close on its next animation frame.
+    await act(() => vi.advanceTimersToNextFrame());
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(container.querySelector("output")?.textContent).toBe("closed");
+    expect(document.activeElement).toBe(container.querySelector("button"));
+  });
+
+  it("closes when the H2 backdrop is clicked", async () => {
+    await openOverlay(true);
+    const backdrop = document.querySelector<HTMLElement>(
+      '.discussion-diff-backdrop[role="presentation"]',
+    );
+    if (!backdrop) throw new Error("Missing discussion backdrop");
     await act(() => {
       backdrop.dispatchEvent(new MouseEvent("mousedown", { button: 0, bubbles: true }));
       backdrop.dispatchEvent(new MouseEvent("mouseup", { button: 0, bubbles: true }));

@@ -306,6 +306,10 @@ const twMerge = extendTailwindMerge({
         "discussion-loading",
         "source-control-inset",
         "settings-task-well",
+        "discussion-file-selected",
+        "discussion-diff-well",
+        "discussion-diff-header",
+        "discussion-diff-overlay",
       ],
       "inset-shadow": [
         "selected",
@@ -412,6 +416,8 @@ const twMerge = extendTailwindMerge({
         "discussion-list-seat",
         "discussion-draft-add-icon",
         "source-control-icon",
+        "discussion-diff-skeleton",
+        "compact-stepper-key",
       ],
       leading: [
         "code",

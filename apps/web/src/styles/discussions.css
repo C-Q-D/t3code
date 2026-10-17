@@ -525,3 +525,82 @@
   margin-top: var(--spacing);
   gap: calc(var(--spacing) * 4);
 }
+
+/* DC2 · 讨论页-8a v3 H1–H3: selected files, recessed diff and static loading bars. */
+@theme {
+  --color-discussion-diff-header: #232326;
+  --color-discussion-diff-scrim: rgba(0, 0, 0, 0.42);
+  --radius-discussion-diff-skeleton: 5px;
+  --radius-compact-stepper-key: 8px;
+  --shadow-discussion-file-selected: inset 3px 0 0 var(--primary);
+  --shadow-discussion-diff-well:
+    inset 2px 3px 8px rgba(0, 0, 0, 0.65), inset 0 0 0 1px rgba(0, 0, 0, 0.4);
+  --shadow-discussion-diff-header:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 2px 6px rgba(0, 0, 0, 0.5);
+  --shadow-discussion-diff-overlay:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.6),
+    0 5px 0 var(--color-stone-edge), -24px 0 48px -12px rgba(0, 0, 0, 0.85);
+}
+
+.discussion-diff-backdrop {
+  z-index: var(--z-sheet);
+  background: var(--color-discussion-diff-scrim);
+}
+
+.discussion-diff-viewport {
+  z-index: var(--z-sheet);
+}
+
+/* Configure the glass utility's existing surface input; retain its opacity preference. */
+html[data-theme-id="graphite"] .discussion-diff-panel.surface-glass {
+  --stone-surface-color: var(--sidebar);
+}
+
+.discussion-diff-skeleton > span {
+  @apply h-2.5 rounded-discussion-diff-skeleton bg-discussion-diff-header;
+  width: 80%;
+}
+.discussion-diff-skeleton > span:nth-child(2) {
+  width: 62%;
+}
+.discussion-diff-skeleton > span:nth-child(3) {
+  width: 72%;
+}
+
+.discussion-diff-view {
+  --code-background: inherit;
+  scrollbar-gutter: stable;
+}
+
+/* The shared filename slot is light DOM. H1 truncates the whole path from its start. */
+.discussion-diff-view [data-title] {
+  display: block;
+  direction: rtl;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.discussion-diff-view [data-title] > span {
+  display: contents;
+  color: inherit;
+}
+
+/* H1 uses the compact table even on wide windows; keep the composer mounted and its draft intact. */
+[data-discussion-diff-open="true"] .discussion-page-content {
+  flex-direction: column;
+}
+[data-discussion-diff-open="true"] .discussion-page-table-rail {
+  width: 100%;
+  margin: 0;
+  padding: 0 calc(var(--spacing) * 4) calc(var(--spacing) * 4);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+[data-discussion-diff-open="true"] .discussion-page-round-table {
+  display: none;
+}
+[data-discussion-diff-open="true"] .discussion-page-long-table {
+  display: block;
+}

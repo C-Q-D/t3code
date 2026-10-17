@@ -11,8 +11,12 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
-/** Content owned by one mounted route or nested route. */
-export type TitlebarSlotContent = { breadcrumb?: ReactNode; actions?: ReactNode };
+/** Route-owned content; optional panel mounts beside the main slab only where the frame exposes it. */
+export type TitlebarSlotContent = {
+  breadcrumb?: ReactNode;
+  actions?: ReactNode;
+  panel?: ReactNode;
+};
 
 type SlotName = keyof TitlebarSlotContent;
 
@@ -38,10 +42,12 @@ export function TitlebarSlotProvider({ children }: { children: ReactNode }) {
   const [targets, setTargets] = useState<TitlebarContextValue["targets"]>({
     breadcrumb: null,
     actions: null,
+    panel: null,
   });
   const [owners, setOwners] = useState<TitlebarContextValue["owners"]>({
     breadcrumb: [],
     actions: [],
+    panel: [],
   });
   const setTarget = useCallback((name: SlotName, target: HTMLDivElement | null) => {
     setTargets((current) => (current[name] === target ? current : { ...current, [name]: target }));
@@ -70,7 +76,7 @@ export function TitlebarSlotOutlet({ name }: { name: keyof TitlebarSlotContent }
 }
 
 /**
- * Returns portals for the supplied breadcrumb/actions; include the result in route JSX.
+ * Returns portals for breadcrumb/actions and an optional frame-owned panel; include them in route JSX.
  * Null, undefined and false release a slot. The last registered owner wins independently
  * per slot; cleanup restores the previous mounted owner. Content updates keep priority.
  * Registration follows layout-effect order (child before parent on a shared commit).
@@ -82,6 +88,7 @@ export function useTitlebarSlot(content: TitlebarSlotContent): ReactNode {
   const owner = useId();
   const hasBreadcrumb = content.breadcrumb != null && content.breadcrumb !== false;
   const hasActions = content.actions != null && content.actions !== false;
+  const hasPanel = content.panel != null && content.panel !== false;
 
   useLayoutEffect(
     () => (hasBreadcrumb ? register("breadcrumb", owner) : undefined),
@@ -91,6 +98,10 @@ export function useTitlebarSlot(content: TitlebarSlotContent): ReactNode {
     () => (hasActions ? register("actions", owner) : undefined),
     [hasActions, owner, register],
   );
+  useLayoutEffect(
+    () => (hasPanel ? register("panel", owner) : undefined),
+    [hasPanel, owner, register],
+  );
 
   return (
     <>
@@ -99,6 +110,9 @@ export function useTitlebarSlot(content: TitlebarSlotContent): ReactNode {
         : null}
       {targets.actions && owners.actions.at(-1) === owner
         ? createPortal(content.actions, targets.actions, `${owner}-actions`)
+        : null}
+      {targets.panel && owners.panel.at(-1) === owner
+        ? createPortal(content.panel, targets.panel, `${owner}-panel`)
         : null}
     </>
   );

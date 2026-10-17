@@ -5,13 +5,14 @@ import { t } from "~/i18n";
 
 import { Sheet, SheetPopup, SheetPortal } from "./ui/sheet";
 
-/** Keeps backdrop, Escape and focus management in Base UI; standalone selects the A4 chat geometry. */
+/** Keeps dismissal and focus in Base UI; discussion selects H2 without changing A4 or legacy hosts. */
 export function RightPanelSheet(props: {
   animationDurationMs: number;
   children: ReactNode;
   open: boolean;
   onClose: () => void;
   standalone?: boolean;
+  discussion?: boolean;
 }) {
   const transitionStyle = { transitionDuration: `${props.animationDurationMs}ms` };
   return (
@@ -23,7 +24,19 @@ export function RightPanelSheet(props: {
         }
       }}
     >
-      {props.standalone ? (
+      {props.discussion ? (
+        <SheetPortal keepMounted>
+          <SheetPrimitive.Backdrop className="discussion-diff-backdrop fixed inset-0" />
+          <SheetPrimitive.Viewport className="discussion-diff-viewport pointer-events-none fixed inset-0 flex justify-end p-2.5">
+            <SheetPrimitive.Popup
+              aria-label={t.discussions.diff.panelTitle}
+              className="pointer-events-auto flex min-h-0 w-140 max-w-full flex-col outline-none"
+            >
+              {props.children}
+            </SheetPrimitive.Popup>
+          </SheetPrimitive.Viewport>
+        </SheetPortal>
+      ) : props.standalone ? (
         <SheetPortal keepMounted>
           <SheetPrimitive.Backdrop
             className="right-panel-overlay-region dialog-backdrop motion-safe:transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0"

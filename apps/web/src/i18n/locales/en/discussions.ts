@@ -46,6 +46,8 @@ export const discussions = {
   loading: "Loading discussions…",
   loadFailed: "Could not load discussions",
   diff: {
+    panelTitle: "Statement changes",
+    raw: "The patch could not be split into files. The original content is shown below.",
     close: "Close",
     loading: "Loading this statement’s changes…",
     failed: (message: string) =>

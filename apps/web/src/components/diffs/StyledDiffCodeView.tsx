@@ -278,6 +278,8 @@ type StyledDiffCodeViewProps<LAnnotation> = (
    * to restyle chrome the viewer owns — such as replacing its per-file line counts.
    */
   readonly unsafeCSSExtra?: string;
+  /** H1 discussion chrome has taller headers; opt in without changing other diff surfaces. */
+  readonly discussion?: boolean;
 };
 
 /** The shared web CodeView surface: app styling and virtualized geometry stay paired here. */
@@ -286,9 +288,23 @@ export function StyledDiffCodeView<LAnnotation = undefined>({
   viewerRef,
   className,
   unsafeCSSExtra,
+  discussion = false,
   renderHeaderFilenameSuffix,
   ...props
 }: StyledDiffCodeViewProps<LAnnotation>) {
+  const diffHeaderHeight = discussion ? 40 : 38;
+  const hunkSeparatorHeight = discussion ? 26 : 24;
+  // Derive the painted heights from the virtual metrics so file reveal cannot drift.
+  const geometryCSS = discussion
+    ? `
+[data-diffs-header] {
+  height: calc(var(--spacing) * ${diffHeaderHeight / 4}) !important;
+  min-height: calc(var(--spacing) * ${diffHeaderHeight / 4}) !important;
+}
+:is([data-separator="line-info"], [data-separator="line-info-basic"]) {
+  height: calc(var(--spacing) * ${hunkSeparatorHeight / 4}) !important;
+}`
+    : "";
   return (
     <DiffWorkerPoolProvider>
       <CodeView<LAnnotation>
@@ -322,12 +338,12 @@ export function StyledDiffCodeView<LAnnotation = undefined>({
           ...options,
           searchMessages: t.git.diffSearch,
           unsafeCSS: unsafeCSSExtra
-            ? `${DIFF_VIEW_UNSAFE_CSS}\n${CODE_VIEW_FILENAME_CSS}\n${unsafeCSSExtra}`
-            : `${DIFF_VIEW_UNSAFE_CSS}\n${CODE_VIEW_FILENAME_CSS}`,
+            ? `${DIFF_VIEW_UNSAFE_CSS}\n${CODE_VIEW_FILENAME_CSS}\n${unsafeCSSExtra}${geometryCSS}`
+            : `${DIFF_VIEW_UNSAFE_CSS}\n${CODE_VIEW_FILENAME_CSS}${geometryCSS}`,
           itemMetrics: {
-            diffHeaderHeight: 38,
+            diffHeaderHeight,
             lineHeight: 22,
-            hunkSeparatorHeight: 24,
+            hunkSeparatorHeight,
             // Pierre uses its general file spacing as a fallback in expanded-file layout paths.
             // Keep it zero alongside the explicit paddingTop or expanding the first file can
             // reintroduce the library's default 8px gap above its header.

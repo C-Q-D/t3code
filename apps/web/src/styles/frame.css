@@ -271,3 +271,31 @@ html[data-theme-id="graphite"] [data-frame-main] {
 [data-frame-main="chat"]:not(:has([data-chat-workspace])) {
   @apply stone-frame-card rounded-slab bg-card shadow-slab-frame;
 }
+
+/* DC2 H1: the optional route portal is a sibling of the main slab, as in PN1.
+   Only a populated discussion outlet reserves space; closing restores the frame.
+   Native buttons stay at the OS-owned top-right coordinates while this slab rises behind them. */
+.window-frame-main > [data-titlebar-slot="panel"]:empty {
+  display: none;
+}
+
+.window-frame-main:has(> [data-titlebar-slot="panel"] > *) {
+  flex-direction: row;
+  gap: var(--frame-slab-gap);
+}
+
+.window-frame-main > [data-titlebar-slot="panel"]:not(:empty) {
+  @apply relative z-10 w-135 shrink-0;
+  margin-top: calc(-1 * var(--workspace-topbar-height));
+  align-items: stretch;
+}
+
+[data-app-shell]:has(.window-frame-main > [data-titlebar-slot="panel"] > *) > .window-titlebar {
+  width: calc(100% - var(--spacing) * 135 - var(--frame-padding-inline) - var(--frame-slab-gap));
+}
+
+[data-app-shell]:has(.window-frame-main > [data-titlebar-slot="panel"] > *)
+  > .window-titlebar
+  .window-titlebar-system-controls {
+  display: none;
+}

@@ -42,8 +42,9 @@ export function DiscussionFiles({
                 aria-pressed={selectedPath === file.path}
                 onClick={() => onOpenFile(file.path)}
                 className={cn(
-                  "flex min-h-7 w-full items-center gap-2.5 px-3 py-1 text-left text-secondary-copy text-fg-detail shadow-discussion-file-rule outline-none hover:bg-accent focus-visible:inset-shadow-focus",
-                  selectedPath === file.path && "bg-accent",
+                  "flex min-h-7.5 w-full items-center gap-2.5 px-3 py-1 text-left text-secondary-copy text-fg-detail shadow-discussion-file-rule outline-none hover:bg-accent focus-visible:inset-shadow-focus",
+                  selectedPath === file.path &&
+                    "bg-discussion-user-bubble text-message-action-hover shadow-discussion-file-selected",
                 )}
               >
                 <span className="min-w-0 flex-1 break-all font-mono">{file.path}</span>
@@ -55,7 +56,7 @@ export function DiscussionFiles({
                 </span>
               </button>
             ) : (
-              <div className="flex min-h-7 items-center gap-2.5 px-3 py-1 text-secondary-copy text-fg-detail shadow-discussion-file-rule">
+              <div className="flex min-h-7.5 items-center gap-2.5 px-3 py-1 text-secondary-copy text-fg-detail shadow-discussion-file-rule">
                 <span className="min-w-0 flex-1 break-all font-mono">{file.path}</span>
                 <span className="shrink-0 font-mono text-diff-addition-foreground">
                   +{file.additions}

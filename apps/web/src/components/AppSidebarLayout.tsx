@@ -31,7 +31,11 @@ import {
 } from "../rightPanelStore";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { useComposerDraftStore } from "../composerDraftStore";
-import { resolveRightPanelSidebarAction, shouldUseRightPanelSheet } from "../rightPanelLayout";
+import {
+  resolveRightPanelSidebarAction,
+  shouldUseRightPanelSheet,
+  shouldUseDiscussionPanelSheet,
+} from "../rightPanelLayout";
 import { selectThreadTerminalUiState, useTerminalUiStateStore } from "../terminalUiStateStore";
 import { resolveThreadRouteRef, resolveThreadRouteTarget } from "../threadRoutes";
 import { isMacPlatform } from "../lib/utils";
@@ -58,7 +62,7 @@ import {
 import { Sidebar, SidebarProvider, SidebarRail, SidebarTrigger, useSidebar } from "./ui/sidebar";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 import { WindowTitlebar } from "./frame/WindowTitlebar";
-import { TitlebarSlotProvider } from "./frame/titlebarSlot";
+import { TitlebarSlotProvider, TitlebarSlotOutlet } from "./frame/titlebarSlot";
 import { Slab } from "./ui/slab";
 import {
   resolveFrameGeometry,
@@ -287,7 +291,7 @@ function ProjectProjectionRetention() {
  * the parent workspace, which receives the space below the titlebar.
  * Mount within the app router and environment providers for navigation and shortcuts.
  */
-/** Frames routed children with the shared titlebar and sidebar; chat routes own their sibling slabs. */
+/** Frames routes with shared chrome; chat owns its slabs and discussion can portal a sibling panel. */
 export function AppSidebarLayout({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const legacySidebarEnabled = useLegacySidebarEnabled();
@@ -456,6 +460,10 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
                     {children}
                   </Slab>
                 )}
+                {pathname.startsWith("/discussions/") &&
+                !shouldUseDiscussionPanelSheet(viewportWidth) ? (
+                  <TitlebarSlotOutlet name="panel" />
+                ) : null}
               </div>
               <NavigationHistoryShortcuts />
               <MainAppLocationTracker />

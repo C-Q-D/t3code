@@ -1,4 +1,4 @@
-/** Displays one persisted discussion statement patch in the shared responsive diff shell. */
+/** Displays one persisted statement in the H1/H2 slab, retaining the shared virtualized diff viewer. */
 import type { CodeViewDiffItem } from "@pierre/diffs";
 import type { CodeViewHandle } from "@pierre/diffs/react";
 import type { Discussion, EnvironmentId } from "@t3tools/contracts";
@@ -11,7 +11,9 @@ import { getRenderablePatch, resolveDiffThemeName } from "~/lib/diffRendering";
 import { PREFERRED_HIGHLIGHTER } from "~/lib/syntaxHighlighting";
 import { serverEnvironment } from "~/state/server";
 import { useEnvironmentQuery } from "~/state/query";
-import { DiffPanelShell, DiffPanelLoadingState, type DiffPanelMode } from "../DiffPanelShell";
+import { isElectron } from "~/env";
+import { cn } from "~/lib/utils";
+import { PixelSeat } from "./PixelSeat";
 import { StyledDiffCodeView, type StyledDiffCodeViewOptions } from "../diffs/StyledDiffCodeView";
 import { useCodeViewFileReveal } from "../diffs/useCodeViewFileReveal";
 import { Button } from "../ui/button";
@@ -22,12 +24,30 @@ import {
   type DiscussionDiffSelection,
 } from "./discussionDiff.logic";
 
+// H1 styles live inside Pierre's shadow root; the shared viewer still owns scrolling and search.
+const DISCUSSION_DIFF_CSS = `
+:host { --diffs-font-size: var(--text-secondary-copy); }
+[data-diffs-header] {
+  background-color: var(--color-discussion-diff-header) !important;
+  border-radius: 0;
+  box-shadow: var(--shadow-discussion-diff-header);
+  padding-inline: calc(var(--spacing) * 1.5) calc(var(--spacing) * 2.5) !important;
+}
+[data-change-icon] { display: none; }
+:is([data-diff], [data-file], [data-virtualizer-buffer]) {
+  --diffs-grid-number-column-width: calc(var(--spacing) * 9);
+}
+[data-column-number] { padding-inline-end: calc(var(--spacing) * 1.5); }
+[data-indicators="classic"] [data-line] { padding-inline-start: calc(var(--spacing) * 4.5); }
+[data-indicators="classic"] [data-line]::before { width: calc(var(--spacing) * 4.5); }
+`;
+
 /**
  * Reads only the selected statement; the parent keys this component by environment/discussion/entry.
  * @param props.discussion Frozen seats resolve heading identity.
  * @param props.environmentId Destination environment for the read-only checkpoint diff query.
  * @param props.selection Persisted entry and requested current/previous file path.
- * @param props.mode Inline shell starts at the window top; sheet shell has no drag region.
+ * @param props.mode Inline mounts in the frame slot; sheet uses the H2 modal host.
  * @param props.onClose Unmounts this query and viewer; no automatic request retries are added.
  * @returns A diff shell with distinct loading, error/retry, empty, raw and file presentations.
  */
@@ -41,7 +61,7 @@ export function DiscussionDiffPanel({
   discussion: Discussion;
   environmentId: EnvironmentId;
   selection: DiscussionDiffSelection;
-  mode: DiffPanelMode;
+  mode: "inline" | "sheet";
   onClose: () => void;
 }) {
   const query = useEnvironmentQuery(
@@ -115,89 +135,144 @@ export function DiscussionDiffPanel({
     reveal(id);
   }, [selectedIndex, reveal]);
   return (
-    <DiffPanelShell
-      mode={mode}
-      header={
-        <>
-          <span className="min-w-0 flex-1 truncate text-sm font-medium">{title}</span>
-          <div className="shrink-0 [-webkit-app-region:no-drag]">
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={t.discussions.diff.close}
-                    onClick={onClose}
-                  />
-                }
-              >
-                <XIcon />
-              </TooltipTrigger>
-              <TooltipPopup>{t.discussions.diff.close}</TooltipPopup>
-            </Tooltip>
-          </div>
-        </>
-      }
-    >
-      {view.kind === "loading" ? (
-        <DiffPanelLoadingState label={view.label} />
-      ) : view.kind === "error" ? (
-        <div className="space-y-3 px-4 py-5">
-          <p className="text-sm text-muted-foreground">{view.label}</p>
-          <Button variant="outline" size="sm" onClick={query.refresh}>
-            {t.discussions.diff.retry}
-          </Button>
-        </div>
-      ) : view.kind === "empty" ? (
-        <p className="px-4 py-5 text-sm text-muted-foreground">{view.label}</p>
-      ) : view.kind === "raw" ? (
-        <div className="min-h-0 flex-1 space-y-2 overflow-auto px-4 py-5">
-          <p className="text-xs text-muted-foreground">{view.reason}</p>
-          <pre className="whitespace-pre-wrap break-words font-mono text-xs">{view.text}</pre>
-        </div>
-      ) : (
-        <div className="flex min-h-0 flex-1 flex-col">
-          {view.notice ? (
-            <p className="shrink-0 px-4 py-3 text-xs text-muted-foreground">{view.notice}</p>
-          ) : null}
-          <div className="min-h-0 flex-1">
-            <StyledDiffCodeView
-              className="@container h-full overflow-auto [scrollbar-gutter:stable]"
-              viewerRef={setViewer}
-              items={items}
-              options={options}
-              renderHeaderPrefix={(item) => (
-                <Button
-                  size="icon-micro"
-                  variant="ghost-muted"
-                  aria-expanded={!item.collapsed}
-                  aria-label={item.collapsed ? t.git.diff.expandDiff : t.git.diff.collapseDiff}
-                  onClick={() =>
-                    setFoldState((current) => {
-                      const next = new Set(current.ids);
-                      if (current.selection !== selection) next.delete(String(selectedIndex));
-                      if (item.collapsed) next.delete(item.id);
-                      else next.add(item.id);
-                      return { selection, ids: next };
-                    })
-                  }
-                >
-                  {item.collapsed ? <ChevronRightIcon /> : <ChevronDownIcon />}
-                </Button>
-              )}
-              onRevealSearchMatch={(item) =>
-                setFoldState((current) => {
-                  const next = new Set(current.ids);
-                  if (current.selection !== selection) next.delete(String(selectedIndex));
-                  next.delete(item.id);
-                  return { selection, ids: next };
-                })
-              }
-            />
-          </div>
-        </div>
+    <aside
+      aria-label={t.discussions.diff.panelTitle}
+      className={cn(
+        "discussion-diff-panel flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden rounded-slab",
+        mode === "sheet"
+          ? "surface-glass shadow-discussion-diff-overlay"
+          : "bg-sidebar shadow-slab-frame",
       )}
-    </DiffPanelShell>
+    >
+      <div
+        className={cn(
+          "flex h-13 min-h-(--workspace-topbar-height) shrink-0 items-center gap-2.5 pl-4.5 text-body",
+          isElectron && mode !== "sheet" && "drag-region",
+        )}
+      >
+        {seat ? (
+          <PixelSeat
+            role={seat.avatar}
+            seatIndex={discussion.seats.indexOf(seat)}
+            size={22}
+            state="idle"
+            label={seat.personaName}
+          />
+        ) : null}
+        <span className="min-w-0 flex-1 truncate font-bold">{title}</span>
+        <div className="no-drag shrink-0">
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="secondary"
+                  size="icon-toolbar"
+                  aria-label={t.discussions.diff.close}
+                  onClick={onClose}
+                />
+              }
+            >
+              <XIcon className="size-3.75" />
+            </TooltipTrigger>
+            <TooltipPopup>{t.discussions.diff.close}</TooltipPopup>
+          </Tooltip>
+        </div>
+        <span
+          aria-hidden="true"
+          className={
+            isElectron
+              ? "ml-1.5 w-35 shrink-0 self-stretch wco:w-(--workspace-native-controls-inset)"
+              : "w-2"
+          }
+        />
+      </div>
+      <div className="mx-2.5 mb-2.5 flex min-h-0 flex-1 flex-col overflow-hidden rounded-card-row bg-code shadow-discussion-diff-well text-secondary-copy-large text-shadow-none">
+        {view.kind === "loading" ? (
+          <div className="flex flex-col gap-2.5 p-4 text-muted-foreground" role="status">
+            <span>{view.label}</span>
+            <div aria-hidden="true" className="discussion-diff-skeleton flex flex-col gap-2.5">
+              <span />
+              <span />
+              <span />
+            </div>
+          </div>
+        ) : view.kind === "error" ? (
+          <div className="space-y-3 p-4">
+            <p role="alert" className="break-words">
+              {view.label}
+            </p>
+            <Button variant="secondary" size="compact-padded" onClick={query.refresh}>
+              {t.discussions.diff.retry}
+            </Button>
+          </div>
+        ) : view.kind === "empty" ? (
+          <p
+            role="status"
+            className="flex flex-1 items-center justify-center p-4 text-center text-muted-foreground"
+          >
+            {view.label}
+          </p>
+        ) : view.kind === "raw" ? (
+          <div className="min-h-0 flex-1 space-y-2.5 overflow-auto p-3.5">
+            <p className="text-muted-foreground">{t.discussions.diff.raw}</p>
+            <pre className="whitespace-pre-wrap break-words font-mono text-meta-large text-code-foreground">
+              {view.text}
+            </pre>
+          </div>
+        ) : (
+          <div className="flex min-h-0 flex-1 flex-col">
+            {view.notice ? (
+              <p
+                role="status"
+                className="shrink-0 break-words px-3.5 py-2.5 text-secondary-copy text-muted-foreground"
+              >
+                {view.notice}
+              </p>
+            ) : null}
+            <div className="min-h-0 flex-1">
+              <StyledDiffCodeView
+                discussion
+                className="discussion-diff-view @container h-full overflow-auto"
+                viewerRef={setViewer}
+                items={items}
+                options={options}
+                unsafeCSSExtra={DISCUSSION_DIFF_CSS}
+                renderHeaderPrefix={(item) => (
+                  <Button
+                    size="icon-stepper-key"
+                    variant="ghost-muted"
+                    aria-expanded={!item.collapsed}
+                    aria-label={item.collapsed ? t.git.diff.expandDiff : t.git.diff.collapseDiff}
+                    onClick={() =>
+                      setFoldState((current) => {
+                        const next = new Set(current.ids);
+                        if (current.selection !== selection) next.delete(String(selectedIndex));
+                        if (item.collapsed) next.delete(item.id);
+                        else next.add(item.id);
+                        return { selection, ids: next };
+                      })
+                    }
+                  >
+                    {item.collapsed ? (
+                      <ChevronRightIcon className="size-3.75" />
+                    ) : (
+                      <ChevronDownIcon className="size-3.75" />
+                    )}
+                  </Button>
+                )}
+                onRevealSearchMatch={(item) =>
+                  setFoldState((current) => {
+                    const next = new Set(current.ids);
+                    if (current.selection !== selection) next.delete(String(selectedIndex));
+                    next.delete(item.id);
+                    return { selection, ids: next };
+                  })
+                }
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    </aside>
   );
 }

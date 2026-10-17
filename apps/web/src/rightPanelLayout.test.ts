@@ -1,6 +1,21 @@
 /** Protects the approved 1024px overlay boundary and the original sidebar snapshot across a panel session. */
 import { describe, expect, it } from "vite-plus/test";
-import { resolveRightPanelSidebarAction, shouldUseRightPanelSheet } from "./rightPanelLayout";
+import {
+  DISCUSSION_PANEL_OVERLAY_MEDIA_QUERY,
+  resolveRightPanelSidebarAction,
+  shouldUseRightPanelSheet,
+  shouldUseDiscussionPanelSheet,
+} from "./rightPanelLayout";
+
+describe("discussion panel placement", () => {
+  it.each([
+    [1024, true],
+    [1025, false],
+  ])("uses the H2 overlay at %spx: %s", (width, sheet) => {
+    expect(DISCUSSION_PANEL_OVERLAY_MEDIA_QUERY).toBe("(max-width: 1024px)");
+    expect(shouldUseDiscussionPanelSheet(width)).toBe(sheet);
+  });
+});
 
 describe("right panel placement", () => {
   it.each([

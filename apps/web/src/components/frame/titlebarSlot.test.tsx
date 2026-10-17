@@ -1,5 +1,6 @@
-// @vitest-environment jsdom
-/** Exercises real route portals and ownership transitions, without styling assertions. */
+/** Exercises real route portals and ownership transitions, without styling assertions.
+ * @vitest-environment jsdom
+ */
 import { act, createContext, StrictMode, useContext, useState, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
@@ -16,7 +17,15 @@ function BreadcrumbTitle() {
 }
 
 /** Supplies live route state so a portal that only copies the initial content fails. */
-function Route({ title, actions }: { title: string; actions?: ReactNode }) {
+function Route({
+  title,
+  actions,
+  panel,
+}: {
+  title: string;
+  actions?: ReactNode;
+  panel?: ReactNode;
+}) {
   const [count, setCount] = useState(0);
   const titlebar = useTitlebarSlot({
     breadcrumb: (
@@ -25,6 +34,7 @@ function Route({ title, actions }: { title: string; actions?: ReactNode }) {
       </button>
     ),
     actions,
+    panel,
   });
   return <RouteTitle value={title}>{titlebar}</RouteTitle>;
 }
@@ -47,6 +57,7 @@ function Shell({ children }: { children?: ReactNode }) {
       <TitlebarSlotProvider>
         <TitlebarSlotOutlet name="breadcrumb" />
         <TitlebarSlotOutlet name="actions" />
+        <TitlebarSlotOutlet name="panel" />
         <main>{children}</main>
       </TitlebarSlotProvider>
     </StrictMode>
@@ -67,6 +78,28 @@ afterEach(async () => {
 });
 
 describe("titlebar route slots", () => {
+  it("mounts the discussion panel outside the route slab and releases it on close", async () => {
+    await act(() =>
+      root.render(
+        <Shell>
+          <Route title="Discussion" panel={<BreadcrumbTitle />} />
+        </Shell>,
+      ),
+    );
+    expect(container.querySelector('[data-titlebar-slot="panel"]')?.textContent).toBe("Discussion");
+    expect(container.querySelector("main")?.textContent).toBe("");
+    await act(() =>
+      root.render(
+        <Shell>
+          <Route title="Discussion" panel={null} />
+        </Shell>,
+      ),
+    );
+    expect(container.querySelector('[data-titlebar-slot="panel"]')?.textContent).toBe("");
+    expect(container.querySelector('[data-titlebar-slot="breadcrumb"]')?.textContent).toBe(
+      "Discussion: 0",
+    );
+  });
   it("renders live route content into both destinations", async () => {
     await act(() =>
       root.render(

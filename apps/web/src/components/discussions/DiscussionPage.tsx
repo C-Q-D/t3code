@@ -29,7 +29,7 @@ import { Button } from "../ui/button";
 import { SidebarInset } from "../ui/sidebar";
 import { toastManager } from "../ui/toast";
 import { useMediaQuery } from "~/hooks/useMediaQuery";
-import { RIGHT_PANEL_INLINE_LAYOUT_MEDIA_QUERY } from "~/rightPanelLayout";
+import { DISCUSSION_PANEL_OVERLAY_MEDIA_QUERY } from "~/rightPanelLayout";
 import { RightPanelSheet } from "../RightPanelSheet";
 import { DiscussionDiffPanel } from "./DiscussionDiffPanel";
 import { discussionDiffKey, type DiscussionDiffSelection } from "./discussionDiff.logic";
@@ -115,7 +115,20 @@ export function DiscussionPage({
     (selection: DiscussionDiffSelection) => setSelectedDiff(selection),
     [],
   );
-  const useSheet = useMediaQuery(RIGHT_PANEL_INLINE_LAYOUT_MEDIA_QUERY);
+  const useSheet = useMediaQuery(DISCUSSION_PANEL_OVERLAY_MEDIA_QUERY);
+  const diffPanel = useTitlebarSlot({
+    panel:
+      selectedDiff && !useSheet ? (
+        <DiscussionDiffPanel
+          key={discussionDiffKey(environmentId, discussion.id, selectedDiff.entryId)}
+          discussion={discussion}
+          environmentId={environmentId}
+          selection={selectedDiff}
+          mode="inline"
+          onClose={() => setSelectedDiff(null)}
+        />
+      ) : null,
+  });
   const [headerPending, setHeaderPending] = useState(false);
   const [endOpen, setEndOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -278,8 +291,12 @@ export function DiscussionPage({
     ),
   });
   return (
-    <SidebarInset className="h-full min-h-0">
+    <SidebarInset
+      className="h-full min-h-0"
+      data-discussion-diff-open={selectedDiff ? "true" : undefined}
+    >
       {titlebar}
+      {diffPanel}
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <div className="discussion-page-long-table mx-3 mt-4 mb-3 min-w-0">
@@ -329,28 +346,22 @@ export function DiscussionPage({
             </aside>
           </div>
         </div>
-        {selectedDiff ? (
-          useSheet ? (
-            <RightPanelSheet open animationDurationMs={0} onClose={() => setSelectedDiff(null)}>
-              <DiscussionDiffPanel
-                key={discussionDiffKey(environmentId, discussion.id, selectedDiff.entryId)}
-                discussion={discussion}
-                environmentId={environmentId}
-                selection={selectedDiff}
-                mode="sheet"
-                onClose={() => setSelectedDiff(null)}
-              />
-            </RightPanelSheet>
-          ) : (
+        {selectedDiff && useSheet ? (
+          <RightPanelSheet
+            discussion
+            open
+            animationDurationMs={0}
+            onClose={() => setSelectedDiff(null)}
+          >
             <DiscussionDiffPanel
               key={discussionDiffKey(environmentId, discussion.id, selectedDiff.entryId)}
               discussion={discussion}
               environmentId={environmentId}
               selection={selectedDiff}
-              mode="inline"
+              mode="sheet"
               onClose={() => setSelectedDiff(null)}
             />
-          )
+          </RightPanelSheet>
         ) : null}
       </div>
       {endOpen ? (
