@@ -4,12 +4,12 @@
  */
 import * as NodeURL from "node:url";
 import * as NodeModule from "node:module";
-import * as NodePath from "node:path";
-import * as NodeFSP from "node:fs/promises";
+import * as NodePath from "@effect/platform-node/NodePath";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import { it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
 import { compile } from "tailwindcss";
 import { expect } from "vite-plus/test";
 import { acquirePixelSeatSprites, pixelSeatSymbolId } from "./PixelSeat.sprites";
@@ -18,21 +18,25 @@ it.effect("retains the handoff pixel palette even when no color utility referenc
   Effect.gen(function* () {
     const cssPath = NodeURL.fileURLToPath(new NodeURL.URL("../../index.css", import.meta.url));
     const fs = yield* FileSystem.FileSystem;
+    const pathService = yield* Path.Path;
     const css = yield* fs.readFileString(cssPath);
+    const services = yield* Effect.context();
     // The production entry supplies the theme and utilities required by discussions.css.
     // Build no candidates: sprite colors must survive without a matching color utility.
     const compiler = yield* Effect.promise(() =>
       compile(css, {
-        base: NodePath.dirname(cssPath),
+        base: pathService.dirname(cssPath),
         loadStylesheet: async (id, base) => {
           // Node's default package condition selects JS; explicitly select Tailwind's CSS entry.
-          const path = NodeModule.createRequire(NodePath.join(base, "index.css")).resolve(
+          const path = NodeModule.createRequire(pathService.join(base, "index.css")).resolve(
             id === "tailwindcss" ? "tailwindcss/index.css" : id,
           );
           return {
             path,
-            base: NodePath.dirname(path),
-            content: await NodeFSP.readFile(path, "utf8"),
+            base: pathService.dirname(path),
+            // Tailwind requires a Promise callback; this I/O bridge reuses the test services.
+            // oxlint-disable-next-line t3code/no-manual-effect-runtime-in-tests
+            content: await Effect.runPromiseWith(services)(fs.readFileString(path)),
           };
         },
       }),
@@ -55,7 +59,7 @@ it.effect("retains the handoff pixel palette even when no color utility referenc
       neutral: "#71717a",
       black: "#000000",
     });
-  }).pipe(Effect.provide(NodeFileSystem.layer)),
+  }).pipe(Effect.provide([NodeFileSystem.layer, NodePath.layer])),
 );
 
 it("shares six rect-grid symbols across seats and releases them after the last seat", () => {
