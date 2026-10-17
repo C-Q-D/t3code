@@ -1,3 +1,4 @@
+/** Search access and destination regressions; the presentation shell is replaced without mocking result actions. */
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { AuthFilesystemReadScope, EnvironmentId, ThreadId } from "@t3tools/contracts";
 import type { ReactNode } from "react";
@@ -51,7 +52,7 @@ vi.mock("~/state/queries", () => ({
         : [],
   }),
 }));
-vi.mock("../CommandPaletteContent", () => ({ CommandPaletteContent: "section" }));
+vi.mock("./ProjectContentSearchShell", () => ({ ProjectContentSearchShell: "section" }));
 vi.mock("../chat/PierreEntryIcon", () => ({ PierreEntryIcon: () => null }));
 vi.mock("./HighlightedSearchLine", () => ({ HighlightedSearchLine: () => null }));
 vi.mock("../ui/scroll-area", () => ({ ScrollArea: "div" }));
@@ -83,6 +84,7 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
+/** Mounts the real search controller with only its external state and presentation dependencies replaced. */
 async function openSearch() {
   await act(() => {
     renderer = create(<ProjectContentSearchDialog onOpenChange={onOpenChange} />);

@@ -1,3 +1,4 @@
+/** Preview launch content regressions with discovery isolated; no legacy card dependencies are mocked. */
 import { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vite-plus/test";
@@ -17,9 +18,6 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("./useDiscoveredLocalServers", () => ({
   useDiscoveredLocalServers: () => mocks.servers,
-}));
-vi.mock("./PreviewFaviconIcon", () => ({
-  PreviewFaviconIcon: () => <span data-favicon-icon />,
 }));
 
 import { PreviewEmptyState } from "./PreviewEmptyState";

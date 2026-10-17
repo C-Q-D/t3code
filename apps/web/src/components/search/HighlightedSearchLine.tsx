@@ -1,3 +1,4 @@
+/** Search snippets with syntax fallback and K6 match emphasis; range handling stays independent of styling. */
 import { getFiletypeFromFileName } from "@pierre/diffs";
 import type { ProjectContentMatch } from "@t3tools/contracts";
 import { memo, Suspense, use, useMemo, type CSSProperties } from "react";
@@ -7,11 +8,13 @@ import { getSyntaxHighlighterPromise } from "~/lib/syntaxHighlighting";
 
 import { RenderErrorBoundary } from "../RenderErrorBoundary";
 
+/** Half-open character offsets into a result line. */
 interface Range {
   readonly start: number;
   readonly end: number;
 }
 
+/** Highlighter token and its source offset; optional attributes come from the syntax theme. */
 interface CodeToken {
   readonly content: string;
   readonly offset: number;
@@ -19,6 +22,7 @@ interface CodeToken {
   readonly fontStyle?: number;
 }
 
+/** Token fragment split at search-match boundaries. */
 interface Segment {
   readonly content: string;
   readonly isMatch: boolean;
@@ -27,6 +31,7 @@ interface Segment {
   readonly token: CodeToken;
 }
 
+/** Clamps server ranges to the line and merges overlapping or adjacent matches in source order. */
 function normalizeRanges(match: ProjectContentMatch): Range[] {
   const ranges = match.matchRanges
     .map((range) => ({
@@ -48,6 +53,7 @@ function normalizeRanges(match: ProjectContentMatch): Range[] {
   return merged;
 }
 
+/** Splits one syntax token against normalized ranges without dropping unmatched characters. */
 function splitToken(line: string, token: CodeToken, ranges: ReadonlyArray<Range>): Segment[] {
   const segments: Segment[] = [];
   const tokenEnd = token.offset + token.content.length;
@@ -91,6 +97,7 @@ function splitToken(line: string, token: CodeToken, ranges: ReadonlyArray<Range>
   return segments;
 }
 
+/** Converts optional syntax-theme attributes to React styles for non-match text. */
 function tokenStyle(token: CodeToken): CSSProperties {
   const fontStyle = token.fontStyle ?? 0;
   return {
@@ -101,6 +108,7 @@ function tokenStyle(token: CodeToken): CSSProperties {
   };
 }
 
+/** Renders fragments with the search highlight taking precedence over syntax colors for matches. */
 function HighlightedTokens(props: {
   readonly line: string;
   readonly ranges: ReadonlyArray<Range>;
@@ -111,9 +119,8 @@ function HighlightedTokens(props: {
     .map((segment) =>
       segment.isMatch ? (
         <mark
-          className="rounded-xs bg-primary/25 text-inherit"
+          className="rounded-pn6-match bg-well-search-match text-pn6-match"
           key={`${segment.start}:${segment.end}:match`}
-          style={tokenStyle(segment.token)}
         >
           {segment.content}
         </mark>
@@ -125,6 +132,7 @@ function HighlightedTokens(props: {
     );
 }
 
+/** Suspends while the language loads and falls back to plain tokens when the grammar rejects a line. */
 function SyntaxHighlightedTokens(props: {
   readonly line: string;
   readonly language: string;
@@ -154,6 +162,7 @@ function SyntaxHighlightedTokens(props: {
   );
 }
 
+/** Displays one result line; loading or highlighter errors retain plain text and match emphasis. */
 export const HighlightedSearchLine = memo(function HighlightedSearchLine(props: {
   readonly match: ProjectContentMatch;
   readonly path: string;

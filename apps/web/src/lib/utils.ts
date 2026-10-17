@@ -93,6 +93,7 @@ const twMerge = extendTailwindMerge({
         "pn5-hint",
         "pr-list-meta",
         "pr-link-title",
+        "pn6-empty-title",
       ],
       shadow: [
         "slab",
@@ -245,6 +246,8 @@ const twMerge = extendTailwindMerge({
         "keybindings-recording-row",
         "keybindings-capture",
         "keybindings-keycap",
+        "pn6-empty-icon",
+        "pn6-search-option",
       ],
       "inset-shadow": [
         "selected",
@@ -336,6 +339,9 @@ const twMerge = extendTailwindMerge({
         "composer-segment",
         "composer-model-check",
         "keybindings-reset",
+        "pn6-error-icon",
+        "pn6-search-option",
+        "pn6-match",
       ],
       leading: [
         "code",

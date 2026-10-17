@@ -1,11 +1,13 @@
 /** Localized preview UI and interactions; preserves user data, commands, and protocol values. */
 import { t } from "~/i18n";
 import { useState } from "react";
+import { GlobeLock } from "lucide-react";
 
 import { Button } from "~/components/ui/button";
 
 import { describePreviewError } from "./errorCodeMessages";
 
+/** Failed navigation details and the existing retry or environment-switch actions. */
 interface Props {
   url: string;
   /** Chromium net error code, e.g. -105. */
@@ -61,7 +63,7 @@ export function PreviewFileNotShown({
   );
 }
 
-/** Theme-aware tailwind port of Chromium's "This site can't be reached" page.
+/** K6 unreachable state with existing diagnostics and recovery controls.
  * @param props View data, control flags, and callbacks defined by the component props type; optional fields retain their declared defaults.
  * @returns Rendered UI for the supplied props.
  */
@@ -72,18 +74,20 @@ export function PreviewUnreachable({ url, code, description, onReload, move }: P
   const errorLabel = description.length > 0 ? description : `ERR_${Math.abs(code) || "FAILED"}`;
 
   return (
-    <div className="scrollbar-gutter-both relative flex h-full min-h-0 w-full overflow-y-auto bg-background">
-      <div className="mx-auto flex w-full max-w-xl flex-1 flex-col px-8 py-12 sm:py-16">
-        <ErrorIcon className="mb-6 size-12 text-muted-foreground/70" />
-        <h1 className="mb-3 text-2xl font-semibold leading-tight text-foreground">
+    <div className="scrollbar-gutter-both relative flex h-full min-h-0 w-full flex-col overflow-y-auto bg-code p-4">
+      <div className="m-auto flex w-full max-w-95 flex-col items-center gap-2.5 text-center text-secondary-label">
+        <span className="flex size-11 items-center justify-center rounded-pn6-error-icon shadow-pn6-empty-icon">
+          <GlobeLock className="size-5" />
+        </span>
+        <h1 className="font-serif text-pn6-empty-title font-bold text-foreground">
           {t.tools.preview.unreachable}
         </h1>
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          <span className="font-semibold text-foreground">{host}</span>: {friendly}.
-        </p>
+        <p className="max-w-full truncate font-mono text-secondary-copy">{host}</p>
 
         {showDetails ? (
-          <div className="mt-6 rounded-lg border border-border bg-muted/40 p-4 text-sm">
+          <div className="w-full rounded-compact-row bg-well-surface p-4 text-left text-secondary-copy">
+            <p className="mb-2">{friendly}</p>
+            <p className="mb-2 break-all font-mono text-muted-foreground">{errorLabel}</p>
             <p className="mb-2 font-medium text-foreground">{t.tools.preview.try}</p>
             <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
               <li>{t.tools.preview.checkConnection}</li>
@@ -94,11 +98,7 @@ export function PreviewUnreachable({ url, code, description, onReload, move }: P
           </div>
         ) : null}
 
-        <div className="mt-8 text-xs uppercase tracking-wide text-muted-foreground/70">
-          {errorLabel}
-        </div>
-
-        <div className="mt-auto flex items-center gap-2 pt-8">
+        <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
           <Button
             type="button"
             variant="outline"
@@ -107,7 +107,6 @@ export function PreviewUnreachable({ url, code, description, onReload, move }: P
           >
             {showDetails ? t.tools.preview.hideDetails : t.tools.preview.details}
           </Button>
-          <div className="flex-1" />
           {move ? (
             <Button type="button" variant="outline" size="sm" onClick={move.onMove}>
               {move.label}
@@ -122,6 +121,7 @@ export function PreviewUnreachable({ url, code, description, onReload, move }: P
   );
 }
 
+/** Decorative document icon retained for downloaded files, which K6 does not redesign. */
 function ErrorIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -138,6 +138,7 @@ function ErrorIcon({ className }: { className?: string }) {
   );
 }
 
+/** Returns a host for a valid URL, or null so the caller can display the original address. */
 function safeHost(url: string): string | null {
   try {
     return new URL(url).host;

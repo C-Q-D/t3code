@@ -12,7 +12,14 @@ import {
   type TerminalOutputUpdate,
   type TerminalSessionState,
 } from "@t3tools/client-runtime/state/terminal";
-import { ArrowDown, Plus, SquareSplitHorizontal, SquareSplitVertical, X } from "lucide-react";
+import {
+  ArrowDown,
+  Plus,
+  SquareSplitHorizontal,
+  SquareSplitVertical,
+  SquareTerminal,
+  X,
+} from "lucide-react";
 import {
   AuthPreviewOperateScope,
   AuthOrchestrationOperateScope,
@@ -1627,15 +1634,20 @@ export default function ThreadTerminalDrawer({
             onLostPointerCapture={handleResizePointerEnd}
           />
         ) : null}
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-4 py-6 text-center text-sm text-muted-foreground">
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-4 py-6 text-center text-secondary-copy-large text-secondary-label">
+          <span className="flex size-10 items-center justify-center rounded-compact-row shadow-pn6-empty-icon">
+            <SquareTerminal className="size-4.5" />
+          </span>
           <p>{t.tools.terminal.noSessions}</p>
           <Button
-            size="xs"
-            variant="outline"
+            size="toolbar"
+            variant="secondary"
             onClick={onNewTerminalAction}
             disabled={!canOperateTerminal}
+            aria-label={newTerminalActionLabel}
           >
-            {newTerminalActionLabel}
+            <Plus />
+            {t.tools.terminal.newTerminal}
           </Button>
         </div>
       </aside>

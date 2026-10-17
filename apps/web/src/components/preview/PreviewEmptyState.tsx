@@ -1,16 +1,11 @@
-/** Localized preview UI and interactions; preserves user data, commands, and protocol values. */
+/** K6 preview launch states; discovery and navigation remain owned by the existing hook and callbacks. */
 import { t } from "~/i18n";
 import type { EnvironmentId, ScopedThreadRef } from "@t3tools/contracts";
-import { Globe, History, RadioTower } from "lucide-react";
-
+import { History, Radio, X } from "lucide-react";
 import type { BrowserHistoryEntry } from "~/browserHistoryStore";
-import { Empty, EmptyDescription, EmptyMedia, EmptyTitle } from "~/components/ui/empty";
-import { DiscoveryList } from "../ui/discovery-list";
-
-import { PreviewLocalServerCard } from "./PreviewLocalServerCard";
-import { PreviewRecentUrlCard } from "./PreviewRecentUrlCard";
 import { useDiscoveredLocalServers } from "./useDiscoveredLocalServers";
 
+/** Preview launch inputs; callbacks own navigation and history mutations. */
 interface Props {
   threadRef: ScopedThreadRef;
   environmentId: EnvironmentId;
@@ -21,76 +16,87 @@ interface Props {
 }
 
 /**
- * Renders valid recent URLs and discovered local servers, or the localized empty guidance.
- * @param props View data, control flags, and callbacks defined by the component props type; optional fields retain their declared defaults.
- * @returns Rendered UI for the supplied props.
+ * Displays the eight latest valid history entries and discovered services without merging the groups.
+ * @param props Discovery scope, history and existing open/remove actions; configured URLs are optional.
+ * @returns The K6 launch view, with guidance when both sources are empty.
  */
 export function PreviewEmptyState({
-  threadRef,
   environmentId,
   configuredUrls,
   recentEntries,
   onRemoveRecent,
   onOpenUrl,
 }: Props) {
-  const servers = useDiscoveredLocalServers({
-    environmentId,
-    configuredUrls,
-  });
+  const servers = useDiscoveredLocalServers({ environmentId, configuredUrls });
   const recents = recentEntries.filter((entry) => URL.canParse(entry.url)).slice(0, 8);
-
-  if (servers.length === 0 && recents.length === 0) {
-    return (
-      <Empty>
-        <EmptyMedia variant="icon">
-          <Globe className="size-4.5 text-muted-foreground" />
-        </EmptyMedia>
-        <EmptyTitle>{t.tools.preview.emptyTitle}</EmptyTitle>
-        <EmptyDescription>{t.tools.preview.emptyHint}</EmptyDescription>
-      </Empty>
-    );
-  }
-
   return (
-    <div className="scrollbar-gutter-both flex h-full min-h-0 overflow-y-auto px-5 py-8">
-      <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
+    <div className="scrollbar-gutter-both flex h-full min-h-0 w-full overflow-y-auto bg-code py-6">
+      <div className="pn6-preview-empty m-auto flex max-w-95 flex-col gap-3.5">
+        <h1 className="text-center font-serif text-pn6-empty-title font-bold text-foreground">
+          {t.tools.preview.emptyTitle}
+        </h1>
+        {servers.length === 0 && recents.length === 0 ? (
+          <p className="text-center text-secondary-copy text-muted-foreground">
+            {t.tools.preview.emptyHint}
+          </p>
+        ) : null}
         {recents.length > 0 ? (
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <History className="size-4 shrink-0" />
-              <h2 className="font-medium">{t.tools.preview.recentlyUsed}</h2>
+          <section className="flex flex-col gap-1.5">
+            <h2 className="px-1 text-meta-large text-muted-foreground">
+              {t.tools.preview.recentlyUsed}
+            </h2>
+            <div className="flex flex-col gap-0.5">
+              {recents.map((entry) => {
+                const parsed = new URL(entry.url);
+                const label = `${parsed.host}${parsed.pathname === "/" ? "" : parsed.pathname}${parsed.search}${parsed.hash}`;
+                return (
+                  <div key={entry.url} className="group relative">
+                    <button
+                      type="button"
+                      onClick={() => onOpenUrl(entry.url)}
+                      aria-label={entry.title ? `${entry.title}: ${label}` : label}
+                      className="flex h-9 w-full items-center gap-2.5 rounded-compact-row px-2.5 pr-9 text-left font-mono text-secondary-copy text-foreground outline-none hover:bg-pn6-recent-hover focus-visible:inset-shadow-focus"
+                    >
+                      <History className="size-3.5 shrink-0" />
+                      <span className="truncate">{label}</span>
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={t.tools.preview.removeHistory(label)}
+                      onClick={() => onRemoveRecent(entry.url)}
+                      className="absolute top-1.5 right-1.5 flex size-6 items-center justify-center rounded-full text-muted-foreground opacity-0 outline-none group-hover:opacity-100 group-focus-within:opacity-100 hover:bg-secondary focus-visible:inset-shadow-focus"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
-            <DiscoveryList>
-              {recents.map((entry) => (
-                <PreviewRecentUrlCard
-                  key={entry.url}
-                  threadRef={threadRef}
-                  entry={entry}
-                  onOpen={() => onOpenUrl(entry.url)}
-                  onRemove={() => onRemoveRecent(entry.url)}
-                />
-              ))}
-            </DiscoveryList>
-          </div>
+          </section>
         ) : null}
         {servers.length > 0 ? (
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <RadioTower className="size-4 shrink-0" />
-              <h2 className="font-medium">{t.tools.preview.localServers}</h2>
-            </div>
-            <DiscoveryList>
+          <section className="flex flex-col gap-1.5">
+            <h2 className="px-1 text-meta-large text-muted-foreground">
+              {t.tools.preview.localServers}
+            </h2>
+            <div className="flex flex-col gap-0.5">
               {servers.map((server) => (
-                <PreviewLocalServerCard
+                <button
+                  type="button"
                   key={`${server.host}:${server.port}`}
-                  threadRef={threadRef}
-                  server={server}
-                  onOpen={() => onOpenUrl(server.requestedUrl)}
-                />
+                  aria-label={`${server.host}:${server.port}${server.processName ? ` (${server.processName})` : ""} — ${t.tools.preview.listening}`}
+                  onClick={() => onOpenUrl(server.requestedUrl)}
+                  className="flex h-9 w-full items-center gap-2.5 rounded-compact-row px-2.5 font-mono text-secondary-copy text-foreground outline-none hover:bg-pn6-recent-hover focus-visible:inset-shadow-focus"
+                >
+                  <Radio className="size-3.5 shrink-0" />
+                  <span>:{server.port}</span>
+                  <span className="ml-auto font-sans text-success-foreground">
+                    {t.tools.preview.listening}
+                  </span>
+                </button>
               ))}
-            </DiscoveryList>
-            <p className="px-1 text-xs text-muted-foreground">{t.tools.preview.localServersHint}</p>
-          </div>
+            </div>
+          </section>
         ) : null}
       </div>
     </div>

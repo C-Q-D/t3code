@@ -4,6 +4,7 @@ import { Spinner } from "~/components/ui/spinner";
 import { AuthFilesystemReadScope, type ProjectContentMatch } from "@t3tools/contracts";
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { CaseSensitive, ChevronDown, Regex, WholeWord } from "lucide-react";
 
 import { useActiveProjectTarget, type ActiveProjectTarget } from "~/hooks/useActiveProjectTarget";
 import { useTheme } from "~/hooks/useTheme";
@@ -12,13 +13,12 @@ import { useRightPanelStore } from "~/rightPanelStore";
 import { useProjectContentSearch } from "~/state/queries";
 import { readEnvironmentScope } from "~/state/session";
 
-import { PierreEntryIcon } from "../chat/PierreEntryIcon";
-import { CommandPaletteContent } from "../CommandPaletteContent";
+import { ProjectContentSearchShell } from "./ProjectContentSearchShell";
 import { ScrollArea } from "../ui/scroll-area";
-import { Toggle } from "../ui/toggle";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { HighlightedSearchLine } from "./HighlightedSearchLine";
 
+/** Dialog dismissal belongs to the shared palette owner. */
 interface ProjectContentSearchDialogProps {
   readonly onOpenChange: (open: boolean) => void;
 }
@@ -31,11 +31,13 @@ interface ProjectContentSearchDialogProps {
  */
 const VISIBLE_MATCH_WINDOW = 100;
 
+/** File group retaining original result indices for keyboard navigation across windows. */
 interface MatchGroup {
   readonly path: string;
   readonly matches: ReadonlyArray<ProjectContentMatch & { readonly resultIndex: number }>;
 }
 
+/** Splits the server's slash-separated relative path for filename and directory labels. */
 function splitPath(path: string): { readonly name: string; readonly directory: string } {
   const separator = path.lastIndexOf("/");
   return separator === -1
@@ -43,6 +45,7 @@ function splitPath(path: string): { readonly name: string; readonly directory: s
     : { name: path.slice(separator + 1), directory: path.slice(0, separator) };
 }
 
+/** Groups visible matches in first-seen file order while preserving their search-result indices. */
 function groupMatches(matches: ReadonlyArray<ProjectContentMatch>): MatchGroup[] {
   const groups = new Map<string, Array<ProjectContentMatch & { readonly resultIndex: number }>>();
   matches.forEach((match, resultIndex) => {
@@ -57,6 +60,7 @@ function groupMatches(matches: ReadonlyArray<ProjectContentMatch>): MatchGroup[]
   return [...groups].map(([path, groupedMatches]) => ({ path, matches: groupedMatches }));
 }
 
+/** K6 compact toggle; native button semantics preserve Space/Enter and permission disabling. */
 function SearchOptionButton(props: {
   readonly active: boolean;
   readonly disabled: boolean;
@@ -68,17 +72,17 @@ function SearchOptionButton(props: {
     <Tooltip>
       <TooltipTrigger
         render={
-          <Toggle
+          <button
+            type="button"
             aria-label={props.label}
             disabled={props.disabled}
-            pressed={props.active}
-            size="segmented"
-            variant="segmented"
+            aria-pressed={props.active}
+            className="pn6-search-option flex size-6.5 shrink-0 items-center justify-center rounded-pn6-search-option text-muted-foreground outline-none hover:bg-secondary focus-visible:inset-shadow-focus disabled:pointer-events-none disabled:text-fg-control-disabled"
             onClick={props.onClick}
           />
         }
       >
-        <span className="font-mono">{props.children}</span>
+        {props.children}
       </TooltipTrigger>
       <TooltipPopup side="top">{props.label}</TooltipPopup>
     </Tooltip>
@@ -88,20 +92,15 @@ function SearchOptionButton(props: {
 /** Renders the project-search shell with guidance to open a project before searching. */
 function EmptyContentSearchDialog() {
   return (
-    <CommandPaletteContent
+    <ProjectContentSearchShell
       aria-label={t.tools.search.projectContents}
-      escapeLabel={t.tools.search.back}
-      footerActionLabel={t.tools.search.openFile}
       inputProps={{ disabled: true, placeholder: t.tools.search.placeholder }}
-      mode="none"
-      panelSize="fill"
-      testId="project-content-search"
       value=""
     >
       <p className="m-auto px-6 text-center text-muted-foreground text-sm">
         {t.tools.search.openProjectHint}
       </p>
-    </CommandPaletteContent>
+    </ProjectContentSearchShell>
   );
 }
 
@@ -172,19 +171,17 @@ function OpenContentSearchDialog(props: {
     (search.hasQuery || search.isPending || search.error !== null || search.invalidRegex);
 
   return (
-    <CommandPaletteContent
+    <ProjectContentSearchShell
       aria-label={t.tools.search.fileContents(target.projectName)}
-      escapeLabel={t.tools.search.back}
-      footerActionLabel={t.tools.search.openFile}
       inputAccessory={
-        <div className="absolute inset-e-2.5 top-1/2 flex shrink-0 -translate-y-1/2 items-center gap-0.5 rounded-lg border bg-muted/30 p-0.5">
+        <div className="flex shrink-0 items-center gap-1">
           <SearchOptionButton
             active={caseSensitive}
             disabled={!search.canReadFiles}
             label={t.tools.search.matchCase}
             onClick={() => setCaseSensitive((current) => !current)}
           >
-            Aa
+            <CaseSensitive className="size-3.75" />
           </SearchOptionButton>
           <SearchOptionButton
             active={wholeWord}
@@ -192,7 +189,7 @@ function OpenContentSearchDialog(props: {
             label={t.tools.search.wholeWord}
             onClick={() => setWholeWord((current) => !current)}
           >
-            <span className="underline decoration-2 underline-offset-2">ab</span>
+            <WholeWord className="size-3.75" />
           </SearchOptionButton>
           <SearchOptionButton
             active={useRegex}
@@ -200,14 +197,13 @@ function OpenContentSearchDialog(props: {
             label={t.tools.search.regularExpression}
             onClick={() => setUseRegex((current) => !current)}
           >
-            .*
+            <Regex className="size-3.75" />
           </SearchOptionButton>
         </div>
       }
       inputProps={{
-        className: "pe-30",
         disabled: !search.canReadFiles,
-        placeholder: t.tools.search.searchIn(target.projectName),
+        placeholder: t.tools.search.placeholder,
         onKeyDown: (event) => {
           if (event.key === "ArrowDown" && matches.length > 0) {
             event.preventDefault();
@@ -231,14 +227,14 @@ function OpenContentSearchDialog(props: {
           }
         },
       }}
-      mode="none"
       onValueChange={setQuery}
-      panelSize="fill"
-      testId="project-content-search"
       value={query}
     >
       {showSearchStatus ? (
-        <div className="flex h-9 shrink-0 items-center border-b px-3 text-xs text-muted-foreground">
+        <div
+          role="status"
+          className="flex shrink-0 items-center px-1.5 text-secondary-copy text-muted-foreground"
+        >
           {search.isPending ? (
             <span className="flex items-center gap-2">
               <Spinner size="sm" />
@@ -270,27 +266,16 @@ function OpenContentSearchDialog(props: {
         </div>
       ) : (
         <ScrollArea className="min-h-0 flex-1" scrollFade>
-          <div className="py-2">
+          <div className="flex flex-col gap-0.5">
             {groups.map((group) => {
               const path = splitPath(group.path);
               return (
-                <section className="pb-2" key={group.path}>
-                  <div className="sticky top-0 z-10 flex h-8 items-center gap-2 bg-popover/95 px-3 text-xs backdrop-blur-sm">
-                    <PierreEntryIcon
-                      pathValue={group.path}
-                      kind="file"
-                      theme={resolvedTheme}
-                      className="size-3.5"
-                    />
-                    <span className="font-medium text-foreground">{path.name}</span>
-                    {path.directory ? (
-                      <span className="min-w-0 truncate text-muted-foreground">
-                        {path.directory}
-                      </span>
-                    ) : null}
-                    <span className="ml-auto rounded-full bg-muted px-1.5 py-0.5 tabular-nums text-3xs text-muted-foreground">
-                      {group.matches.length}
-                    </span>
+                <section className="flex flex-col gap-0.5" key={group.path}>
+                  <div className="flex h-7 items-center gap-1.5 px-2 font-mono text-secondary-copy">
+                    <ChevronDown className="size-3 shrink-0" />
+                    {path.directory ? <span className="sr-only">{path.directory}/</span> : null}
+                    <span className="truncate text-foreground">{path.name}</span>
+                    <span className="ml-auto text-muted-foreground">{group.matches.length}</span>
                   </div>
                   {group.matches.map((match) => (
                     <button
@@ -298,16 +283,14 @@ function OpenContentSearchDialog(props: {
                       key={`${match.path}:${match.lineNumber}:${match.resultIndex}`}
                       data-content-search-result={match.resultIndex}
                       className={cn(
-                        "flex h-7 w-full min-w-0 items-center gap-3 px-3 text-left font-mono text-xs hover:bg-accent/60 disabled:pointer-events-none",
-                        match.resultIndex === selectedIndex && "bg-accent text-accent-foreground",
+                        "flex h-6.5 w-full min-w-0 items-center rounded-keycap pr-2 pl-6.5 text-left font-mono text-secondary-copy text-secondary-label outline-none hover:bg-secondary focus-visible:inset-shadow-focus disabled:pointer-events-none",
+                        match.resultIndex === selectedIndex && "bg-secondary text-code-foreground",
                       )}
                       disabled={!canOpenMatches}
                       onMouseEnter={() => setSelectedIndex(match.resultIndex)}
                       onClick={() => openMatch(match)}
                     >
-                      <span className="w-10 shrink-0 text-right tabular-nums text-muted-foreground/70">
-                        {match.lineNumber}
-                      </span>
+                      <span className="sr-only">{match.lineNumber}</span>
                       <span className="min-w-0 flex-1 truncate whitespace-pre">
                         <HighlightedSearchLine
                           match={match}
@@ -326,10 +309,11 @@ function OpenContentSearchDialog(props: {
           </div>
         </ScrollArea>
       )}
-    </CommandPaletteContent>
+    </ProjectContentSearchShell>
   );
 }
 
+/** Resolves the active workspace and resets search state when its environment or directory changes. */
 export function ProjectContentSearchDialog(props: ProjectContentSearchDialogProps) {
   const target = useActiveProjectTarget();
 

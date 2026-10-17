@@ -400,3 +400,26 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.09), 0 0 0 1px rgba(0, 0, 0, 0.44), 0 1.5px 0 #09090a,
     4px 6px 10px -3px rgba(0, 0, 0, 0.7);
 }
+
+/* PN6 — 其余屏-1 K6, Panel8a / Terminal8a: launch states and content-search controls. */
+@theme {
+  --text-pn6-empty-title: 22px;
+  --text-pn6-empty-title--line-height: 1.5;
+  --radius-pn6-error-icon: 13px;
+  --radius-pn6-search-option: 8px;
+  --radius-pn6-match: 3px;
+  --color-pn6-recent-hover: #26262a;
+  --color-pn6-search-option: #3a3a40;
+  --color-pn6-match: #f3c55e;
+  --shadow-pn6-empty-icon:
+    inset 1.5px 2px 3px rgba(0, 0, 0, 0.62), inset -1px -1px 0 rgba(255, 255, 255, 0.055);
+  --shadow-pn6-search-option: 0 1px 0 var(--color-raise-edge);
+}
+
+/* Panel8a specifies a proportional inner width, capped by max-w-95 in the component. */
+.pn6-preview-empty {
+  width: 86%;
+}
+.pn6-search-option[aria-pressed="true"] {
+  @apply bg-pn6-search-option text-foreground shadow-pn6-search-option;
+}
