@@ -365,3 +365,63 @@
 .discussion-end-template:is(:disabled, [data-disabled]) {
   @apply bg-discussion-select-disabled text-discussion-select-disabled-label shadow-discussion-select-disabled;
 }
+
+/* DC4 · 讨论列表与新建-8a K2/K3: miniature tables and archive well. */
+@theme {
+  --text-discussion-list-unit: 10.5px;
+  --text-discussion-list-empty-title: 26px;
+  --radius-discussion-list-row: 14px;
+  --radius-discussion-list-seat: 9px;
+  --background-image-discussion-list-table: radial-gradient(
+    circle at 40% 32%,
+    #34343a,
+    #26262a 62%,
+    #1f1f22
+  );
+  --background-image-discussion-list-empty-table: radial-gradient(
+    circle at 40% 32%,
+    #2e2e33,
+    #232326 62%,
+    #1d1d20
+  );
+  --shadow-discussion-list-well:
+    inset 2px 3px 8px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(0, 0, 0, 0.4);
+  --shadow-discussion-list-archive:
+    inset 1.5px 2px 5px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(0, 0, 0, 0.4);
+  --shadow-discussion-list-table:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.1), inset 0 -4px 8px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(0, 0, 0, 0.6), 0 4px 0 #060607, 10px 16px 22px -8px rgba(0, 0, 0, 0.8);
+  --shadow-discussion-list-empty-table:
+    inset 0 2px 0 rgba(255, 255, 255, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.6), 0 4px 0 #060607;
+  --shadow-discussion-list-divider: 0 -1px 0 rgba(255, 255, 255, 0.04);
+  --shadow-discussion-list-hover: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+.discussion-list-archive > li + li:not(:hover) {
+  box-shadow: var(--shadow-discussion-list-divider);
+}
+
+/* This list can contain many tables: retain seat states without running DC0's continuous sprite motion. */
+.discussion-list [data-discussion-motion] {
+  animation: none;
+}
+.discussion-list-empty-seat {
+  border: 1.5px dashed color-mix(in srgb, var(--foreground) 20%, transparent);
+}
+.discussion-list-empty-action {
+  --lucide-hue-override: currentColor;
+}
+/* The board fixes three columns; narrow desktop panes collapse them before the metadata is squeezed out. */
+.discussion-list {
+  container-type: inline-size;
+}
+@container (max-width: 700px) {
+  .discussion-list-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@container (max-width: 480px) {
+  .discussion-list-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -11,6 +11,7 @@ import { describe, expect, it } from "vite-plus/test";
 import { discussions as copy } from "~/i18n/locales/zh-CN/discussions";
 import {
   discussionListRow,
+  discussionListSeats,
   groupDiscussions,
   type ScopedDiscussionListItem,
 } from "./discussionList.logic";
@@ -146,5 +147,51 @@ describe("discussion list presentation", () => {
     expect(
       groupDiscussions(items, copy).map(({ kind, label, count }) => ({ kind, label, count })),
     ).toEqual(expected);
+  });
+});
+
+// K2 independently specifies the 64px orbit and the 150-degree arc for four or more seats.
+describe("discussionListSeats", () => {
+  it("places three ordered seats around the 96px table and highlights only the cursor", () => {
+    const seats = discussionListSeats({
+      ...base,
+      seats: [...base.seats, { ...base.seats[0]!, id: DiscussionSeatId.make("seat-c") }],
+    });
+    expect(seats.map(({ seat }) => seat.id)).toEqual(["seat-a", "seat-b", "seat-c"]);
+    expect(seats[0]?.x).toBeCloseTo(-55.425626);
+    expect(seats[0]?.y).toBeCloseTo(60);
+    expect(seats[1]?.x).toBeCloseTo(0);
+    expect(seats[1]?.y).toBeCloseTo(28);
+    expect(seats[2]?.x).toBeCloseTo(55.425626);
+    expect(seats[2]?.y).toBeCloseTo(60);
+    expect(seats.map(({ state, size }) => ({ state, size }))).toEqual([
+      { state: "idle", size: 26 },
+      { state: "speaking", size: 32 },
+      { state: "next", size: 26 },
+    ]);
+  });
+
+  it.each([
+    { status: "paused", pause: { reason: "seat_failed" }, expected: ["idle", "next"] },
+    { status: "paused", pause: { reason: "stopped" }, expected: ["idle", "idle"] },
+    { status: "closing", pause: null, expected: ["idle", "speaking"] },
+    { status: "ended", pause: null, expected: ["idle", "idle"] },
+  ] as const)(
+    "shows $status / $pause without inventing an active speaker",
+    ({ status, pause, expected }) => {
+      expect(discussionListSeats({ ...base, status, pause }).map(({ state }) => state)).toEqual(
+        expected,
+      );
+    },
+  );
+
+  it("widens four seats to 150 degrees while retaining every supplied seat", () => {
+    const seats = discussionListSeats({ ...base, seats: [...base.seats, ...base.seats] });
+    expect(seats).toHaveLength(4);
+    expect(seats[0]?.x).toBeCloseTo(-61.819253);
+    expect(seats[0]?.y).toBeCloseTo(75.435581);
+    expect(seats[3]?.x).toBeCloseTo(61.819253);
+    expect(seats[3]?.y).toBeCloseTo(75.435581);
+    expect(discussionListSeats({ ...base, seats: [] })).toEqual([]);
   });
 });

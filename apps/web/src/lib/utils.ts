@@ -103,6 +103,8 @@ const twMerge = extendTailwindMerge({
         "ov5-title",
         "ov5-connect-title",
         "ov5-prompt-title",
+        "discussion-list-unit",
+        "discussion-list-empty-title",
       ],
       shadow: [
         "slab",
@@ -288,6 +290,12 @@ const twMerge = extendTailwindMerge({
         "ov5-row",
         "ov5-step",
         "ov5-terminal",
+        "discussion-list-well",
+        "discussion-list-archive",
+        "discussion-list-table",
+        "discussion-list-empty-table",
+        "discussion-list-divider",
+        "discussion-list-hover",
       ],
       "inset-shadow": [
         "selected",
@@ -390,6 +398,8 @@ const twMerge = extendTailwindMerge({
         "ov5-panel",
         "ov5-row",
         "ov5-cloud",
+        "discussion-list-row",
+        "discussion-list-seat",
       ],
       leading: [
         "code",

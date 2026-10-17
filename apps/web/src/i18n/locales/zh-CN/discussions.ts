@@ -39,6 +39,7 @@ export const discussions: Messages["discussions"] = {
   ended: "已结束",
   deletedProject: "已删除的项目",
   empty: "还没有讨论",
+  listRoundUnit: "轮",
   loading: "正在加载讨论…",
   loadFailed: "加载讨论失败",
   diff: {

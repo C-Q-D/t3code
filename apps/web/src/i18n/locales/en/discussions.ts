@@ -37,6 +37,7 @@ export const discussions = {
   ended: "Ended",
   deletedProject: "Deleted project",
   empty: "No discussions yet",
+  listRoundUnit: "round",
   loading: "Loading discussions…",
   loadFailed: "Could not load discussions",
   diff: {
