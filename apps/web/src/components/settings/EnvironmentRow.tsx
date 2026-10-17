@@ -88,11 +88,7 @@ export function EnvironmentRow({
 }) {
   return (
     <div
-      className={cn(
-        "connections-environment-row grid min-h-12 items-center gap-x-3 rounded-settings-row-surface py-2 pr-1.5 pl-2.5",
-        dimmed && "opacity-60",
-        className,
-      )}
+      className={cn("connections-environment-row grid min-h-12", dimmed && "opacity-60", className)}
     >
       <span className="flex size-8 items-center justify-center rounded-connections-icon bg-connections-well shadow-connections-icon">
         <EnvironmentMachineIcon aria-hidden kind={kind} className="size-3.75" />

@@ -75,6 +75,8 @@ const buttonVariants = cva(
         // 讨论页-8a v3 H1/H2: a 26px compact key, complementing the circular stepper.
         "icon-stepper-key":
           "size-6.5 rounded-compact-stepper-key p-0 [&_svg:not([class*='size-'])]:size-3.75",
+        // SettingsPage8a M2: 22px inline text actions sit beside setting labels across categories.
+        "inline-label": "h-5.5 gap-1 px-2 text-meta-large [&_svg:not([class*='size-'])]:size-2.75",
       },
       variant: {
         default:

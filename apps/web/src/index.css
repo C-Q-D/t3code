@@ -1414,23 +1414,6 @@ html[data-theme-token-probe] *::after {
   top: calc(100% + 0.35rem);
 }
 
-/* Workspace actions use a small, separate chrome hierarchy. Keeping these
-   roles explicit prevents the thread toolbar from falling back to the default
-   dark-mode whites while preserving the same theme file across clients. */
-html[data-theme-id] [data-chat-header] {
-  background-color: var(--toolbar-background);
-  color: var(--contrast-toolbar-foreground);
-}
-
-html[data-theme-id] [data-chat-header] [data-slot="button"],
-html[data-theme-id] [data-chat-header] [data-slot="menu-trigger"],
-html[data-theme-id] [data-chat-header] [data-toolbar-control] {
-  --control-icon-color: var(--contrast-toolbar-control-foreground);
-  background-color: var(--toolbar-control);
-  border-color: var(--contrast-toolbar-border);
-  color: var(--contrast-toolbar-control-foreground);
-}
-
 /* The panel layout toggles stay ghost: they render both inside the header and
    in the titlebar strip, so filling them would make them change appearance as
    the panel opens. They only take the themed foreground; hover and pressed
@@ -1454,19 +1437,6 @@ html[data-theme-id] [data-workspace-titlebar-controls] [data-slot="tooltip-trigg
     var(--toolbar-background)
   );
   color: color-mix(in oklab, var(--contrast-toolbar-foreground) 55%, var(--toolbar-background));
-}
-
-html[data-theme-id] [data-chat-header] [data-slot="button"]:hover,
-html[data-theme-id] [data-chat-header] [data-slot="button"][data-pressed],
-html[data-theme-id] [data-chat-header] [data-slot="menu-trigger"]:hover,
-html[data-theme-id] [data-chat-header] [data-slot="menu-trigger"][data-pressed],
-html[data-theme-id] [data-chat-header] [data-toolbar-control]:hover,
-html[data-theme-id] [data-chat-header] [data-toolbar-control][data-pressed] {
-  background-color: var(--toolbar-control-hover);
-}
-
-html[data-theme-id] [data-chat-header] [data-slot="separator"] {
-  background-color: var(--contrast-toolbar-border);
 }
 
 /* Chat code blocks join the other code surfaces on the code tokens. The
@@ -2199,41 +2169,6 @@ code {
 
 .ultrathink-chroma {
   filter: saturate(1.2);
-}
-
-@keyframes preview-loading-progress {
-  from {
-    transform: scaleX(0.04);
-  }
-
-  to {
-    transform: scaleX(0.9);
-  }
-}
-
-.preview-loading-progress {
-  opacity: 0;
-  transform: scaleX(1);
-  transition:
-    transform 150ms ease-out,
-    opacity 150ms ease-out 220ms;
-}
-
-.preview-loading-progress[data-loading="true"] {
-  opacity: 1;
-  animation: preview-loading-progress 5.3s cubic-bezier(0.1, 0.5, 0.2, 1) forwards;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .preview-loading-progress,
-  .preview-loading-progress[data-loading="true"] {
-    transition: none;
-    animation: none;
-  }
-
-  .preview-loading-progress[data-loading="true"] {
-    transform: scaleX(0.9);
-  }
 }
 
 /* Let the sortable rows open label clearance before painting the dividers.

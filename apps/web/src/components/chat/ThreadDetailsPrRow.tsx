@@ -307,7 +307,7 @@ export function ThreadDetailsPrRow({
                 />
               }
             >
-              <Badge variant={badgeVariant}>
+              <Badge variant={badgeVariant} size="lg">
                 <PrIcon aria-hidden />
                 {t.chat.details.prLabel(number)}
               </Badge>

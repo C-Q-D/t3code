@@ -484,7 +484,7 @@ function ScheduledTaskRow({
   return (
     <div
       className={cn(
-        "flex min-h-16 items-center gap-3 rounded-settings-row-surface py-2 pl-2.5 pr-1.5 hover:bg-secondary focus-within:bg-secondary",
+        "settings-list-row flex min-h-16 gap-y-3 hover:bg-secondary focus-within:bg-secondary",
         isEditing && "bg-secondary shadow-settings-connect-row",
       )}
     >
@@ -617,14 +617,12 @@ function ScheduledTaskRecordRow({
         <button
           type="button"
           onClick={() => setDeliveriesOpen(true)}
-          className="flex min-h-16 w-full flex-wrap items-center gap-3 rounded-settings-row-surface py-2 pl-2.5 pr-1.5 text-left outline-none hover:bg-secondary focus-visible:inset-shadow-focus"
+          className="settings-list-row flex min-h-16 w-full flex-wrap gap-y-3 text-left outline-none hover:bg-secondary focus-visible:inset-shadow-focus"
         >
           {content}
         </button>
       ) : (
-        <div className="flex min-h-16 flex-wrap items-center gap-3 rounded-settings-row-surface py-2 pl-2.5 pr-1.5">
-          {content}
-        </div>
+        <div className="settings-list-row flex min-h-16 flex-wrap gap-y-3">{content}</div>
       )}
       {deliveriesOpen ? (
         <WebhookDeliveriesDialog

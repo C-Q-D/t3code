@@ -3,8 +3,12 @@ import type * as React from "react";
 
 import { cn } from "~/lib/utils";
 
-/** Renders the H5 standalone keycap and forwards native kbd props, including children. */
-function Kbd({ className, size, ...props }: React.ComponentProps<"kbd"> & { size?: "settings" }) {
+/** Renders shortcut keycaps; size selects the default H5, settings control, or compact page-header density. Native kbd props pass through. */
+function Kbd({
+  className,
+  size,
+  ...props
+}: React.ComponentProps<"kbd"> & { size?: "settings" | "compact" }) {
   return (
     <kbd
       className={cn(
@@ -12,6 +16,8 @@ function Kbd({ className, size, ...props }: React.ComponentProps<"kbd"> & { size
         // SettingsPage8a N2 uses the same keycap language at 24px for settings controls.
         size === "settings" &&
           "h-6 min-w-6 px-1.75 text-meta-large text-foreground shadow-keybindings-keycap",
+        // SettingsPage8a M2–P4: page-header shortcut hints use the shared keycap at 20px.
+        size === "compact" && "h-5",
         className,
       )}
       data-slot="kbd"

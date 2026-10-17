@@ -259,7 +259,7 @@ export function SettingsUnavailableGroup({
  * Control sizing across settings follows three tiers so rows share a baseline:
  * - `control` slot: `size="sm"` (Button, Select, Input, NumberField) or `icon-sm`.
  * - Section `headerAction`s and buttons inside list items, cards, toolbars: `xs` / `icon-xs`.
- * - Inline affordances: `icon-micro`, or `micro` for the labelled project inheritance reset.
+ * - Inline affordances: `icon-micro`, or `inline-label` for the labelled project inheritance reset.
  * Dialog footers keep the app-wide default button size.
  */
 export function SettingsRow({
@@ -537,7 +537,7 @@ export function SettingResetButton({
       <TooltipTrigger
         render={
           <Button
-            size={showLabel ? "micro" : "icon-micro"}
+            size={showLabel ? "inline-label" : "icon-micro"}
             variant={showLabel ? "outline" : "ghost-muted"}
             aria-label={t.common.resetLabelToDefault(label)}
             disabled={disabled}

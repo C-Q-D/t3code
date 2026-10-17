@@ -40,7 +40,7 @@ function RestoreDeviceDefaultsButton({ onRestored }: { onRestored: () => void })
   const { changedSettingLabels, restoreDefaults } = useSettingsRestore(onRestored);
   return (
     <Button
-      size="default"
+      size="toolbar"
       variant="outline"
       disabled={changedSettingLabels.length === 0}
       onClick={() => void restoreDefaults()}
@@ -191,7 +191,7 @@ function SettingsContentLayout() {
               onClick={() => void navigateToMainApp()}
               className="flex cursor-pointer items-center gap-1.5 rounded-menu-row text-secondary-copy leading-normal text-muted-foreground outline-none hover:text-foreground focus-visible:inset-shadow-focus"
             >
-              <Kbd>Esc</Kbd>
+              <Kbd size="compact">Esc</Kbd>
               {t.settings.pageShell.returnToConversation}
             </button>
           </div>

@@ -1,5 +1,7 @@
-// @vitest-environment jsdom
-/** Exercises real header drop registration and the sidebar pointer sensor without a browser server. */
+/**
+ * @vitest-environment jsdom
+ * Exercises real header drop registration and the sidebar pointer sensor without a browser server.
+ */
 import { act, createRef } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import {

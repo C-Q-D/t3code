@@ -1,3 +1,4 @@
+/** Exercises PR merge confirmation and check counts; popup bodies are isolated from the row's actions. */
 import { EnvironmentId, type PullRequestCheck } from "@t3tools/contracts";
 import { act, cloneElement, type ReactElement, type ReactNode } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
@@ -9,6 +10,11 @@ const state = vi.hoisted(() => ({
   perform: vi.fn(),
   mergeability: "mergeable",
   startHandoff: vi.fn(),
+}));
+
+// Checks now mount a Base UI portal directly; keep that body isolated with the mocked popover root.
+vi.mock("@base-ui/react/popover", () => ({
+  Popover: { Portal: () => null },
 }));
 
 vi.mock("~/state/entities", () => ({ useServerConfigs: () => new Map() }));
