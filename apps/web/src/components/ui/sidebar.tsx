@@ -475,7 +475,7 @@ function clampSidebarWidth(width: number, options: SidebarResolvedResizableOptio
   return Math.max(options.minWidth, Math.min(width, options.maxWidth));
 }
 
-/** Renders the sidebar edge control, forwarding the supplied pointer handlers and click action; enables resizing only when the sidebar context allows it. */
+/** Renders the sidebar edge control and drag-only pixel readout, forwarding supplied pointer handlers and click action; enables resizing only when the sidebar context allows it. */
 function SidebarRail({
   className,
   onClick,
@@ -489,6 +489,8 @@ function SidebarRail({
   const { open, toggleSidebar } = useSidebar();
   const sidebarInstance = React.use(SidebarInstanceContext);
   const railRef = React.useRef<HTMLButtonElement | null>(null);
+  const widthReadoutRef = React.useRef<HTMLSpanElement | null>(null);
+  const [isResizing, setIsResizing] = React.useState(false);
   const suppressClickRef = React.useRef(false);
   const resolvedResizable = sidebarInstance?.resizable ?? null;
   const latestResizable = React.useRef(resolvedResizable);
@@ -521,11 +523,15 @@ function SidebarRail({
       widthTargets.forEach((element) => {
         element.style.setProperty("width", `${value}px`);
       });
+      // Keep pointer-frame feedback local to the rail, without rendering the list.
+      if (widthReadoutRef.current) widthReadoutRef.current.textContent = `${Math.round(value)} px`;
     };
     widthTargets.forEach((element) => {
       element.style.setProperty("transition-duration", "0ms");
     });
     setTargetWidth(width);
+    rail.setAttribute("data-resizing", "true");
+    setIsResizing(true);
 
     return {
       width,
@@ -563,6 +569,8 @@ function SidebarRail({
         options?.onResize?.(finalWidth);
       },
       cleanup() {
+        rail.removeAttribute("data-resizing");
+        setIsResizing(false);
         widthTargets.forEach((element) => {
           element.style.removeProperty("width");
           element.style.removeProperty("transition-duration");
@@ -619,7 +627,7 @@ function SidebarRail({
   }, [resolvedResizable]);
 
   return (
-    <Tooltip>
+    <Tooltip disabled={isResizing}>
       <TooltipTrigger
         render={
           <button
@@ -637,6 +645,7 @@ function SidebarRail({
             )}
             data-sidebar="rail"
             data-slot="sidebar-rail"
+            data-resizable={canResize || undefined}
             onClick={handleClick}
             onLostPointerCapture={(event) => {
               onLostPointerCapture?.(event);
@@ -662,7 +671,14 @@ function SidebarRail({
             tabIndex={-1}
             type="button"
             {...props}
-          />
+          >
+            {canResize ? (
+              <>
+                <span aria-hidden="true" className="sidebar-resize-grip" />
+                <span aria-hidden="true" className="sidebar-resize-readout" ref={widthReadoutRef} />
+              </>
+            ) : null}
+          </button>
         }
       />
       <TooltipPopup side="right">{railTitle}</TooltipPopup>

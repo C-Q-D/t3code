@@ -4964,9 +4964,14 @@ export default function Sidebar() {
     shortcutLabelForCommand(keybindings, "chat.new") ??
     (projectGroups.length <= 1 ? shortcutLabelForCommand(keybindings, "chat.newLocal") : undefined);
   const newThreadInProjectShortcutLabel = shortcutLabelForCommand(keybindings, "chat.newLocal");
+  const contextDragThread = dragState ? threadByKey.get(dragState.activeKey) : undefined;
+  const contextDragProject = contextDragThread
+    ? (projectByKey.get(`${contextDragThread.environmentId}:${contextDragThread.projectId}`) ??
+      null)
+    : null;
   return (
     <>
-      <ThreadContextDragGhost />
+      <ThreadContextDragGhost project={contextDragProject} />
       {threadContextMenuPopup}
       <SidebarThreadDndContext
         sensors={dndSensors}

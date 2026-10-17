@@ -1099,6 +1099,7 @@ import { toastManager } from "../ui/toast";
 import {
   FileIcon,
   FileXIcon,
+  Link2Icon,
   CircleAlertIcon,
   PlusIcon,
   PencilRulerIcon,
@@ -7109,6 +7110,15 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
             isEditingQueuedMessage && "inset-shadow-selected-control",
           )}
         >
+          <div
+            aria-hidden="true"
+            className="sidebar-context-drop-hint pointer-events-none absolute inset-0 hidden items-start rounded-composer"
+          >
+            <div className="flex items-center gap-2 px-5.5 py-4 text-secondary-copy-large leading-sidebar-context-drag text-code-foreground">
+              <Link2Icon className="size-3.75 shrink-0" strokeWidth={2} />
+              <span>{t.sidebar.thread.dropContextHint}</span>
+            </div>
+          </div>
           {!isMobileViewport && activePendingApproval ? (
             <div className="flex flex-col gap-3 px-3.5 pt-4 pb-3.5">
               <ComposerPendingApprovalPanel
@@ -7131,7 +7141,6 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
             data-chat-composer-mobile-collapsed={isComposerCollapsedMobile ? "true" : "false"}
             className={cn(
               "rounded-composer transition-[background-color] duration-200",
-              "in-data-[thread-context-over]:bg-accent/45 in-data-[thread-context-over]:ring-1 in-data-[thread-context-over]:ring-inset in-data-[thread-context-over]:ring-primary/70",
               isDragOverComposer ? "bg-accent/45 ring-1 ring-inset ring-primary/70" : null,
               projectSelectionRequired ? "opacity-75" : null,
               composerProviderState.composerSurfaceClassName,

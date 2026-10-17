@@ -218,3 +218,73 @@
     @apply transition-none;
   }
 }
+
+@theme {
+  /* 补充屏-4.dc.html · X1: 8px white rail with its halo and hard lower edge. */
+  --radius-sidebar-resize-grip: 4px;
+  --shadow-sidebar-resize-grip: 0 0 0 3px rgba(242, 242, 243, 0.15), 0 2px 0 #8e8e96;
+  /* 补充屏-4.dc.html · X2: lifted context card, without B1's second long shadow. */
+  --shadow-sidebar-context-drag:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 0 0 1px rgba(0, 0, 0, 0.5), 0 3px 0 #09090a,
+    18px 26px 30px -6px rgba(0, 0, 0, 0.85);
+  --leading-sidebar-context-drag: 1.5;
+}
+
+/* X1 is scoped to the desktop frame; collapsed and non-resizable rails retain their behavior. */
+[data-variant="frame"] [data-slot="sidebar-rail"][data-resizable] {
+  @apply translate-x-0 cursor-col-resize bg-transparent transition-none;
+}
+
+[data-variant="frame"][data-side="left"] [data-slot="sidebar-rail"][data-resizable] {
+  @apply -right-4;
+}
+
+[data-variant="frame"][data-side="right"] [data-slot="sidebar-rail"][data-resizable] {
+  @apply -left-4;
+}
+
+[data-variant="frame"] [data-slot="sidebar-rail"][data-resizable]::after {
+  @apply hidden;
+}
+
+.sidebar-resize-grip {
+  @apply pointer-events-none absolute top-1/2 left-1/2 h-30 w-2 -translate-x-1/2 -translate-y-1/2 rounded-sidebar-resize-grip bg-primary opacity-0 shadow-sidebar-resize-grip;
+}
+
+[data-slot="sidebar-rail"]:is(:hover, :focus-visible, [data-resizing]) .sidebar-resize-grip {
+  @apply opacity-100;
+}
+
+.sidebar-resize-readout {
+  @apply pointer-events-none absolute top-1/2 left-6 flex h-6.5 -translate-y-1/2 items-center whitespace-nowrap rounded-full bg-primary px-2.25 font-mono text-meta-large text-primary-foreground text-shadow-none opacity-0 shadow-primary-edge;
+}
+
+[data-side="right"] .sidebar-resize-readout {
+  @apply right-6 left-auto;
+}
+
+[data-slot="sidebar-rail"][data-resizing] .sidebar-resize-readout {
+  @apply opacity-100;
+}
+
+.sidebar-context-attach {
+  --lucide-hue-override: currentColor;
+}
+
+/* 补充屏-4.dc.html · X2: decorate CP1's existing shell only for thread context drops.
+   Keep its glass fill and elevation; the selected inset ring composes with that shadow. */
+[data-composer-drop-target][data-thread-context-over] [data-chat-composer-main-surface] {
+  @apply inset-shadow-selected outline-2 outline-dashed outline-primary/50 outline-offset-6;
+}
+
+/* Preserve layout and hit-test bounds while replacing the editor's visual content.
+   File drags never set this attribute and retain their existing feedback. */
+[data-composer-drop-target][data-thread-context-over]
+  [data-chat-composer-main-surface]
+  > :not(.sidebar-context-drop-hint) {
+  @apply opacity-0;
+}
+
+[data-composer-drop-target][data-thread-context-over] .sidebar-context-drop-hint {
+  @apply flex;
+}

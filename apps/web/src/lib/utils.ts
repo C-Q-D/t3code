@@ -279,6 +279,8 @@ const twMerge = extendTailwindMerge({
         "discussion-primary-key",
         "discussion-select",
         "discussion-select-disabled",
+        "sidebar-resize-grip",
+        "sidebar-context-drag",
       ],
       "inset-shadow": [
         "selected",
@@ -377,6 +379,7 @@ const twMerge = extendTailwindMerge({
         "pn3-comment",
         "settings-motion-panel",
         "ov3-report",
+        "sidebar-resize-grip",
       ],
       leading: [
         "code",
@@ -398,6 +401,7 @@ const twMerge = extendTailwindMerge({
         "files-prose",
         "ov3-hint",
         "ov3-report",
+        "sidebar-context-drag",
       ],
       tracking: ["brand", "chat-draft", "timeline-secret"],
     },

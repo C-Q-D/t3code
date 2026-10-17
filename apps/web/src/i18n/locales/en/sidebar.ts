@@ -60,6 +60,8 @@ export const sidebar = {
     remoteDescription: (labels: string) => `Remote environment: ${labels}`,
   },
   thread: {
+    attachContext: "Attach",
+    dropContextHint: "Release to attach this conversation as context",
     exportTranscriptSuccess: "Conversation exported",
     exportTranscriptError: "Failed to export conversation",
     titleAriaLabel: "Thread title",
