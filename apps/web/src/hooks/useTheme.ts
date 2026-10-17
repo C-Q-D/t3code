@@ -1,3 +1,4 @@
+/** Owns client theme preferences, one-time migration, and synchronous initial theme application. */
 import type { DesktopBridge } from "@t3tools/contracts";
 import { safeErrorLogAttributes } from "@t3tools/client-runtime/errors";
 import * as Schema from "effect/Schema";
@@ -36,10 +37,11 @@ type ThemeSnapshot = {
 type DesktopThemeBridge = Pick<DesktopBridge, "setTheme">;
 
 const STORAGE_KEY = "t3code:theme";
+const GRAPHITE_MIGRATION_STORAGE_KEY = "t3code:theme-migrated-graphite";
 const MEDIA_QUERY = "(prefers-color-scheme: dark)";
 const DEFAULT_THEME_SNAPSHOT: ThemeSnapshot = {
-  theme: "system",
-  resolvedTheme: "light",
+  theme: "graphite",
+  resolvedTheme: "dark",
   systemDark: false,
   followSystem: true,
   appearanceMode: "system",
@@ -199,6 +201,32 @@ function writeAppearanceModePreference(appearanceMode: ThemePreferenceMode): voi
   }
 }
 
+/**
+ * Replaces the previous selection once before the first palette is applied.
+ * Returns whether migration ran; throws ThemeStorageError with the failing key.
+ * The marker is written last so an incomplete write is retried on the next load.
+ */
+function migrateGraphiteTheme(): boolean {
+  if (typeof window === "undefined") return false;
+  let storageKey = GRAPHITE_MIGRATION_STORAGE_KEY;
+  let operation: "read" | "write" = "read";
+  try {
+    if (window.localStorage.getItem(storageKey) !== null) return false;
+    operation = "write";
+    // A saved light half overrides a dark-only base, so replace the whole mix.
+    storageKey = THEME_HALVES_STORAGE_KEY;
+    window.localStorage.removeItem(storageKey);
+    writeThemePreference("graphite");
+    storageKey = GRAPHITE_MIGRATION_STORAGE_KEY;
+    window.localStorage.setItem(storageKey, "true");
+    return true;
+  } catch (cause) {
+    if (isThemeStorageError(cause)) throw cause;
+    throw new ThemeStorageError({ operation, storageKey, cause });
+  }
+}
+
+/** Reads the canonical selection after one-time Graphite adoption; throws ThemeStorageError on storage failure. */
 export function readThemePreference(): Theme {
   if (typeof window === "undefined") return DEFAULT_THEME_SNAPSHOT.theme;
   let raw: string | null;
@@ -211,6 +239,7 @@ export function readThemePreference(): Theme {
       cause,
     });
   }
+  if (migrateGraphiteTheme()) return "graphite";
   if (raw !== null && isKnownThemePreference(raw)) {
     return canonicalThemePreference(raw);
   }

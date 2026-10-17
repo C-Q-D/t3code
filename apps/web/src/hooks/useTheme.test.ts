@@ -1,3 +1,4 @@
+/** Tests theme migration, initial application, and storage or desktop failure handling. */
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 function createStorage(overrides: Partial<Storage> = {}): Storage {
@@ -24,6 +25,59 @@ afterEach(() => {
   vi.resetModules();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+});
+
+describe("Graphite theme migration", () => {
+  it("initializes empty storage with Graphite and records the migration before first application", async () => {
+    const storage = createStorage();
+    vi.stubGlobal("window", { localStorage: storage });
+    const toggle = vi.fn(() => ({
+      theme: storage.getItem("t3code:theme"),
+      migrated: storage.getItem("t3code:theme-migrated-graphite"),
+    }));
+    vi.stubGlobal("document", { documentElement: { classList: { toggle } } });
+
+    const { readThemePreference } = await import("./useTheme");
+
+    expect(readThemePreference()).toBe("graphite");
+    expect(storage.getItem("t3code:theme")).toBe("graphite");
+    expect(storage.getItem("t3code:theme-migrated-graphite")).not.toBeNull();
+    expect(toggle).toHaveBeenCalledWith("dark", true);
+    expect(toggle.mock.results[0]?.value).toEqual({ theme: "graphite", migrated: "true" });
+  });
+
+  it("replaces an old preference and light mix with Graphite once", async () => {
+    const storage = createStorage();
+    storage.setItem("t3code:theme", "system");
+    storage.setItem("t3code:theme-appearance-mode", "light");
+    storage.setItem("t3code:theme-halves:v1", JSON.stringify({ light: "t3-chat" }));
+    vi.stubGlobal("window", { localStorage: storage });
+    const toggle = vi.fn();
+    vi.stubGlobal("document", { documentElement: { classList: { toggle } } });
+
+    const { readThemePreference } = await import("./useTheme");
+
+    expect(readThemePreference()).toBe("graphite");
+    expect(storage.getItem("t3code:theme")).toBe("graphite");
+    expect(storage.getItem("t3code:theme-migrated-graphite")).not.toBeNull();
+    expect(storage.getItem("t3code:theme-halves:v1")).toBeNull();
+    expect(toggle).toHaveBeenCalledWith("dark", true);
+  });
+
+  it("preserves a later theme choice when the migration key exists", async () => {
+    const storage = createStorage();
+    storage.setItem("t3code:theme", "ocean");
+    storage.setItem("t3code:theme-migrated-graphite", "");
+    vi.stubGlobal("window", { localStorage: storage });
+
+    const { readThemePreference, writeThemePreference } = await import("./useTheme");
+
+    expect(readThemePreference()).toBe("ocean");
+    writeThemePreference("system");
+    expect(readThemePreference()).toBe("system");
+    expect(storage.getItem("t3code:theme")).toBe("system");
+    expect(storage.getItem("t3code:theme-migrated-graphite")).toBe("");
+  });
 });
 
 describe("theme failure handling", () => {
