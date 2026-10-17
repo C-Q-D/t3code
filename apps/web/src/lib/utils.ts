@@ -80,6 +80,7 @@ const twMerge = extendTailwindMerge({
         "terminal-copy",
         "window-brand",
         "discussion-table-title",
+        "discussion-long-note",
       ],
       shadow: [
         "slab",
@@ -146,6 +147,9 @@ const twMerge = extendTailwindMerge({
         "discussion-seat-user",
         "discussion-seat",
         "discussion-seat-halo",
+        "discussion-long-well",
+        "discussion-long-capsule",
+        "discussion-long-speaker",
       ],
       "inset-shadow": ["selected", "focus", "selected-control"],
       "text-shadow": ["stone"],
@@ -172,12 +176,16 @@ const twMerge = extendTailwindMerge({
         "discussion-table-note",
         "discussion-table-tag",
         "discussion-table-outline",
+        "discussion-long-note",
+        "discussion-long-line",
       ],
       leading: ["code", "terminal"],
       tracking: ["brand"],
     },
     classGroups: {
-      "bg-image": [{ bg: ["discussion-seat-plate"] }],
+      "bg-image": [
+        { bg: ["discussion-seat-plate", "discussion-long-capsule", "discussion-long-connection"] },
+      ],
     },
   },
 });

@@ -1,4 +1,4 @@
-/** Maps presentation seats to the 8a circular geometry; no discussion lifecycle decisions live here. */
+/** Shares table presentation semantics and maps seats to the 8a orbit; lifecycle stays with the page. */
 import type { DiscussionPersonaAvatar } from "@t3tools/contracts";
 import type { PixelSeatState } from "./PixelSeat.logic";
 
@@ -19,6 +19,82 @@ export interface DiscussionTableSeat {
   readonly completed?: boolean;
   readonly tags?: readonly DiscussionSeatTag[];
   readonly interjection?: { readonly count: number; readonly label: string };
+}
+
+/** Sequence controls shared by the circular orbit and the compact horizontal table. */
+export interface DiscussionTableSequenceOptions {
+  readonly order?: readonly string[];
+  readonly closeLoop?: boolean;
+  readonly quiet?: boolean;
+}
+
+/**
+ * Keeps the first physical speaker authoritative before applying an optional statement order.
+ * @param seats Physical seats with unique ids, independent of table geometry.
+ * @param order Optional unique existing ids; a subset or empty sequence is allowed.
+ * @returns Seats in display order, with at most one speaking occurrence and stable color indices.
+ * @throws RangeError for ambiguous seat ids or invalid explicit order references.
+ */
+export function discussionTableOrder(
+  seats: readonly DiscussionTableSeat[],
+  order?: readonly string[],
+): DiscussionTableSeat[] {
+  if (new Set(seats.map((seat) => seat.id)).size !== seats.length) {
+    throw new RangeError("Round-table seat ids must be unique");
+  }
+  const speaker = seats.findIndex((seat) => seat.state === "speaking");
+  // Normalize before reordering so changing table shape cannot change the animated identity.
+  const normalized = seats.map((seat, index) => ({
+    ...seat,
+    state: seat.state === "speaking" && index !== speaker ? "idle" : seat.state,
+  }));
+  if (order === undefined) return normalized;
+  const byId = new Map(normalized.map((seat) => [seat.id, seat]));
+  if (new Set(order).size !== order.length || order.some((id) => !byId.has(id))) {
+    throw new RangeError("Round-table order must reference unique existing seat ids");
+  }
+  return order.map((id) => byId.get(id)!);
+}
+
+/**
+ * Assigns the same completed/next/pending/quiet appearance without depending on orbit geometry.
+ * @param seats Physical seats; only the first speaking identity remains active.
+ * @param options Actual order, optional open end, and faint solid summary/ended treatment.
+ * @returns Directed connections, including a pending return when closeLoop is not false.
+ * @throws RangeError for ambiguous ids or invalid explicit order references.
+ */
+export function discussionTableConnections(
+  seats: readonly DiscussionTableSeat[],
+  options: DiscussionTableSequenceOptions = {},
+) {
+  const ordered = discussionTableOrder(seats, options.order);
+  return ordered.flatMap((from, index) => {
+    const closing = index === ordered.length - 1;
+    if (closing && (options.closeLoop === false || ordered.length < 2)) return [];
+    const to = ordered[(index + 1) % ordered.length]!;
+    const kind = options.quiet
+      ? "quiet"
+      : closing
+        ? "pending"
+        : (from.completed ?? from.state === "done")
+          ? "completed"
+          : from.state === "speaking" && to.state === "next"
+            ? "next"
+            : "pending";
+    return [
+      {
+        fromId: from.id,
+        toId: to.id,
+        fromSeatIndex: from.seatIndex,
+        toSeatIndex: to.seatIndex,
+        closing,
+        kind,
+        width: closing || kind === "next" || kind === "pending" ? 1.5 : 2.5,
+        opacity: kind === "completed" ? 0.7 : kind === "next" ? 0.3 : 0.13,
+        dash: kind === "next" || kind === "pending" ? "4 5" : undefined,
+      },
+    ];
+  });
 }
 
 /** G1–G7 use the 360×410 state canvas, including the user at the bottom of the orbit. */
@@ -55,19 +131,14 @@ export function roundTablePoint(degrees: number) {
 export function roundTableLayout(
   seats: readonly DiscussionTableSeat[],
 ): RoundTablePositionedSeat[] {
-  if (new Set(seats.map((seat) => seat.id)).size !== seats.length) {
-    throw new RangeError("Round-table seat ids must be unique");
-  }
   const count = seats.length;
   // 讨论页-8a v3 状态.dc.html:87,105 ties the 160° dense orbit to k > 4 (38px seats).
   // 讨论列表与新建-8a.dc.html:263 independently names >4 as the threshold for a longer arc.
   const span = count < 2 ? 0 : count === 2 ? 90 : count <= 4 ? 120 : 160;
   const step = count > 1 ? span / (count - 1) : 0;
-  const speaker = seats.findIndex((seat) => seat.state === "speaking");
-  return seats.map((seat, index) => {
+  return discussionTableOrder(seats).map((seat, index) => {
     const angle = -90 - span / 2 + index * step;
-    // A transient duplicate speaker must not start another continuous animation.
-    const state = seat.state === "speaking" && index !== speaker ? "idle" : seat.state;
+    const state = seat.state;
     const size = state === "speaking" ? 48 : count > 4 ? 38 : 44;
     const labelsAbove = Math.sin((angle * Math.PI) / 180) < -0.9;
     return {
@@ -120,46 +191,15 @@ export function roundTableArc(fromDegrees: number, toDegrees: number) {
  */
 export function roundTableSegments(
   seats: readonly RoundTablePositionedSeat[],
-  options: {
-    readonly order?: readonly string[];
-    readonly closeLoop?: boolean;
-    readonly quiet?: boolean;
-  } = {},
+  options: DiscussionTableSequenceOptions = {},
 ) {
   const byId = new Map(seats.map((seat) => [seat.id, seat]));
-  const ids = options.order ?? seats.map((seat) => seat.id);
-  if (new Set(ids).size !== ids.length || ids.some((id) => !byId.has(id))) {
-    throw new RangeError("Round-table order must reference unique existing seat ids");
-  }
-  const ordered = ids.map((id) => byId.get(id)!);
-  return ordered.flatMap((from, index) => {
-    const closing = index === ordered.length - 1;
-    if (closing && (options.closeLoop === false || ordered.length < 2)) return [];
-    const to = ordered[(index + 1) % ordered.length]!;
+  return discussionTableConnections(seats, options).flatMap((connection) => {
+    const from = byId.get(connection.fromId)!;
+    const to = byId.get(connection.toId)!;
     const geometry = roundTableArc(from.angle, to.angle);
     if (!geometry) return [];
-    const kind = options.quiet
-      ? "quiet"
-      : closing
-        ? "pending"
-        : (from.completed ?? from.state === "done")
-          ? "completed"
-          : from.state === "speaking" && to.state === "next"
-            ? "next"
-            : "pending";
-    return [
-      {
-        ...geometry,
-        fromId: from.id,
-        toId: to.id,
-        fromSeatIndex: from.seatIndex,
-        toSeatIndex: to.seatIndex,
-        kind,
-        width: closing || kind === "next" || kind === "pending" ? 1.5 : 2.5,
-        opacity: kind === "completed" ? 0.7 : kind === "next" ? 0.3 : 0.13,
-        dash: kind === "next" || kind === "pending" ? "4 5" : undefined,
-      },
-    ];
+    return [{ ...geometry, ...connection }];
   });
 }
 

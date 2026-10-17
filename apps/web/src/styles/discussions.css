@@ -105,3 +105,31 @@
 .discussion-svg-seat-halo {
   stroke: color-mix(in srgb, var(--discussion-seat-color) 90%, transparent);
 }
+
+/* DC0.3 · 组件规范 S3 / 讨论页-8a v3 面板与对话框 H1：66px 长桌凹槽、轮次胶囊与便签。 */
+@theme {
+  --shadow-discussion-long-well:
+    inset 2px 3px 8px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(0, 0, 0, 0.4);
+  --shadow-discussion-long-capsule:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.6), 0 3px 0 #060607;
+  /* H1's speaker drop shadow is isolated on a static sibling; no animated ancestor uses a filter. */
+  --shadow-discussion-long-speaker: 0 6px 8px rgba(0, 0, 0, 0.6);
+  --radius-discussion-long-note: 4px;
+  --radius-discussion-long-line: 2px;
+  --text-discussion-long-note: 10px;
+  --text-discussion-long-note--line-height: 1;
+}
+
+/* Resolve identity colors at each connector instance, as with the shared PixelSeat plate. */
+@theme inline {
+  --background-image-discussion-long-capsule: radial-gradient(
+    circle at 40% 30%,
+    var(--color-discussion-table-top),
+    var(--color-discussion-seat-gradient-top) 70%
+  );
+  --background-image-discussion-long-connection: linear-gradient(
+    90deg,
+    var(--discussion-connection-from),
+    var(--discussion-connection-to)
+  );
+}
