@@ -1,15 +1,18 @@
+/** Checks process visibility and chart geometry against independent telemetry examples. */
 import { describe, expect, it } from "vite-plus/test";
 
 import type { ResourceTelemetryProcess } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
 
 import {
+  resourceSummaryBarHeights,
   resourceHistoryBarHeight,
   resourceHistoryCpuScaleMax,
   shouldShowResourceMonitorRetry,
   visibleResourceTelemetryProcesses,
 } from "./ResourceTelemetryDiagnostics.logic";
 
+/** Builds a stopped-time process fixture; pid, parent pid and depth define the tested tree. */
 const process = (pid: number, ppid: number, depth: number): ResourceTelemetryProcess => ({
   identity: { pid, startTimeMs: pid * 1_000 },
   ppid,
@@ -86,5 +89,21 @@ describe("visibleResourceTelemetryProcesses", () => {
       processes[1],
       processes[3],
     ]);
+  });
+});
+
+describe("resourceSummaryBarHeights", () => {
+  it("plots CPU averages and peak resident memory on independent scales", () => {
+    expect(
+      resourceSummaryBarHeights([
+        { avgCpuPercent: 2, maxRssBytes: 800 },
+        { avgCpuPercent: 8, maxRssBytes: 200 },
+        { avgCpuPercent: 0, maxRssBytes: 0 },
+      ]),
+    ).toEqual({ cpu: [25, 100, 0], memory: [100, 25, 0] });
+  });
+
+  it("keeps an empty history empty instead of inventing chart samples", () => {
+    expect(resourceSummaryBarHeights([])).toEqual({ cpu: [], memory: [] });
   });
 });

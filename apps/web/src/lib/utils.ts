@@ -108,6 +108,7 @@ const twMerge = extendTailwindMerge({
         "discussion-draft-heading",
         "discussion-draft-number",
         "discussion-template-heading",
+        "diagnostics-metric",
       ],
       shadow: [
         "slab",
@@ -313,6 +314,7 @@ const twMerge = extendTailwindMerge({
         "archive-thread-inset",
         "connections-icon",
         "connections-qr",
+        "diagnostics-well",
       ],
       "inset-shadow": [
         "selected",
@@ -423,6 +425,8 @@ const twMerge = extendTailwindMerge({
         "compact-stepper-key",
         "archive-thread-icon",
         "connections-icon",
+        "diagnostics-icon",
+        "diagnostics-bar",
       ],
       leading: [
         "code",

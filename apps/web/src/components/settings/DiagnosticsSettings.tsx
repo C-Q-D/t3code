@@ -1,3 +1,4 @@
+/** Presents diagnostics without changing environment access, process signals or trace queries. */
 import { t } from "~/i18n";
 import { ProcessSignalActions } from "./ProcessSignalActions";
 import { resolveUsageAccess } from "@t3tools/client-runtime/state/usage-access";
@@ -36,22 +37,30 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { toastManager } from "../ui/toast";
 import { ExpandableText } from "./ExpandableText";
 import { ResourceTelemetryDiagnostics } from "./ResourceTelemetryDiagnostics";
-import { SettingsPageContainer, SettingsSection, useRelativeTimeTick } from "./settingsLayout";
+import {
+  SettingsPageContainer,
+  SettingsRow,
+  SettingsSection,
+  useRelativeTimeTick,
+} from "./settingsLayout";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { useSettingsScope } from "./SettingsScopeContext";
 import { TelemetryExportSettings } from "./TelemetryExportSettings";
 
 const NUMBER_FORMAT = new Intl.NumberFormat();
 
+/** Formats a diagnostic count with the active runtime locale. */
 function formatCount(value: number): string {
   return NUMBER_FORMAT.format(value);
 }
 
+/** Formats milliseconds for diagnostic tables without changing the recorded duration. */
 function formatDuration(value: number): string {
   if (value < 1_000) return `${Math.round(value)} ms`;
   return `${(value / 1_000).toFixed(value >= 10_000 ? 1 : 2)} s`;
 }
 
+/** Formats a byte count using binary units for diagnostic measurements. */
 function formatBytes(value: number): string {
   if (value < 1024) return `${value} B`;
   const units = ["KB", "MB", "GB"] as const;
@@ -64,24 +73,29 @@ function formatBytes(value: number): string {
   return `${next.toFixed(next >= 10 ? 1 : 2)} ${units[unitIndex]}`;
 }
 
+/** Formats a UTC observation time, returning the localized empty label when absent. */
 function formatRelative(value: DateTime.Utc | null): string {
   if (!value) return t.settings.diagnostics.traces.empty;
   return formatRelativeTimeLabel(DateTime.formatIso(value));
 }
 
+/** Formats an optional UTC observation time without line breaks inside its label. */
 function formatRelativeNoWrap(value: DateTime.Utc | null): string {
   return formatRelative(value).replaceAll(" ", "\u00a0");
 }
 
+/** Abbreviates long trace identifiers for display; copying still uses the complete identifier. */
 function shortenTraceId(traceId: string): string {
   if (traceId.length <= 32) return traceId;
   return `${traceId.slice(0, 18)}...${traceId.slice(-10)}`;
 }
 
+/** Recognizes the server response for a process that exited before a signal could be sent. */
 function isStaleProcessSignalMessage(message: string | undefined): boolean {
   return message?.includes("not a live descendant") ?? false;
 }
 
+/** Displays one labeled diagnostic value, with an optional explanation and severity. */
 function StatBlock({
   label,
   value,
@@ -94,8 +108,8 @@ function StatBlock({
   tone?: "default" | "warning" | "danger";
 }) {
   return (
-    <div className="min-w-0 border-border/60 px-4 py-3 sm:px-5">
-      <div className="flex min-w-0 items-center gap-1.5 text-2xs font-medium uppercase tracking-widest text-muted-foreground/70">
+    <div className="min-w-0 border-settings-divider px-4 py-3 sm:px-5">
+      <div className="flex min-w-0 items-center gap-1.5 text-meta-large font-medium tracking-normal text-muted-foreground">
         <span className="min-w-0 truncate">{label}</span>
         {tooltip ? (
           <Tooltip>
@@ -116,7 +130,7 @@ function StatBlock({
       </div>
       <div
         className={cn(
-          "mt-1 truncate font-mono text-lg font-semibold tabular-nums text-foreground",
+          "mt-1 truncate font-mono text-card-title font-semibold tabular-nums text-foreground",
           tone === "warning" && "text-warning-foreground",
           tone === "danger" && "text-destructive",
         )}
@@ -127,6 +141,7 @@ function StatBlock({
   );
 }
 
+/** Groups diagnostic values with dividers while preserving their reading order. */
 function StatsGrid({ children }: { children: ReactNode }) {
   return (
     <div className="relative grid grid-cols-2 sm:grid-cols-4">
@@ -151,10 +166,12 @@ function StatsGrid({ children }: { children: ReactNode }) {
   );
 }
 
+/** Displays the supplied empty-state explanation in place of table rows. */
 function EmptyRows({ label }: { label: string }) {
-  return <div className="px-4 py-4 text-xs text-muted-foreground sm:px-5">{label}</div>;
+  return <div className="px-4 py-4 text-secondary-copy text-muted-foreground sm:px-5">{label}</div>;
 }
 
+/** Renders labeled diagnostic columns with optional widths and horizontal overflow. */
 function DiagnosticsTable({
   headers,
   children,
@@ -175,7 +192,11 @@ function DiagnosticsTable({
       className="w-full max-w-full"
     >
       <table
-        className={cn("w-full text-left text-xs", minTableWidth, columnWidths && "table-fixed")}
+        className={cn(
+          "w-full text-left text-secondary-copy",
+          minTableWidth,
+          columnWidths && "table-fixed",
+        )}
       >
         {columnWidths ? (
           <colgroup>
@@ -184,7 +205,7 @@ function DiagnosticsTable({
             ))}
           </colgroup>
         ) : null}
-        <thead className="border-b border-border/60 text-2xs uppercase tracking-widest text-muted-foreground/70">
+        <thead className="border-b border-settings-divider text-meta-large tracking-normal text-muted-foreground">
           <tr>
             {headers.map((header, index) => (
               <th
@@ -199,12 +220,13 @@ function DiagnosticsTable({
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-border/60">{children}</tbody>
+        <tbody className="divide-y divide-settings-divider">{children}</tbody>
       </table>
     </ScrollArea>
   );
 }
 
+/** Displays an abbreviated trace ID and copies its complete value through the clipboard hook. */
 function TraceIdCell({ traceId }: { traceId: string }) {
   const { copyToClipboard, isCopied: copied } = useCopyToClipboard({
     target: "trace ID",
@@ -216,7 +238,7 @@ function TraceIdCell({ traceId }: { traceId: string }) {
       <Tooltip>
         <TooltipTrigger
           render={
-            <span className="min-w-0 flex-1 truncate font-mono text-2xs">
+            <span className="min-w-0 flex-1 truncate font-mono text-meta-large">
               {shortenTraceId(traceId)}
             </span>
           }
@@ -250,6 +272,7 @@ function TraceIdCell({ traceId }: { traceId: string }) {
   );
 }
 
+/** Derives the displayed executable name while retaining the complete command for inspection. */
 function formatProcessName(command: string): string {
   const firstToken = command.trim().split(/\s+/)[0];
   if (!firstToken) return command;
@@ -258,6 +281,7 @@ function formatProcessName(command: string): string {
   return segments.at(-1) ?? normalized;
 }
 
+/** Labels a process by depth and recognized agent command without changing its identity. */
 function formatProcessType(process: ServerProcessDiagnosticsEntry): string {
   if (process.depth > 0) return t.settings.diagnostics.processCategories.subprocess;
   if (/\b(codex|claude|opencode|cursor)\b/i.test(process.command))
@@ -265,6 +289,7 @@ function formatProcessType(process: ServerProcessDiagnosticsEntry): string {
   return t.settings.diagnostics.processCategories.process;
 }
 
+/** Displays a process command and invokes onToggle with its PID when its child list is expanded. */
 function ProcessNameCell({
   process,
   isExpanded,
@@ -311,6 +336,7 @@ function ProcessNameCell({
   );
 }
 
+/** Renders the process tree and existing permission-gated signal actions; emptyLabel overrides the default empty state. */
 function ProcessDiagnosticsTable({
   processes,
   canMaintainEnvironment,
@@ -357,7 +383,7 @@ function ProcessDiagnosticsTable({
   }, []);
 
   return (
-    <div className="border-t border-border/60">
+    <div className="border-t border-settings-divider">
       <ScrollArea
         radius="none"
         chainVerticalScroll
@@ -365,7 +391,7 @@ function ProcessDiagnosticsTable({
         hideScrollbars
         className="max-h-[min(64vh,44rem)] w-full max-w-full"
       >
-        <table className="w-full min-w-[1040px] table-fixed text-left text-xs">
+        <table className="w-full min-w-[1040px] table-fixed text-left text-secondary-copy">
           <colgroup>
             <col className="w-[24%]" />
             <col className="w-[8%]" />
@@ -375,7 +401,7 @@ function ProcessDiagnosticsTable({
             <col className="w-[11%]" />
             <col className="w-[6%]" />
           </colgroup>
-          <thead className="sticky top-0 z-10 border-b border-border/60 bg-card text-2xs uppercase tracking-widest text-muted-foreground/70">
+          <thead className="sticky top-0 z-10 border-b border-settings-divider bg-card text-meta-large tracking-normal text-muted-foreground">
             <tr>
               <th className="px-4 py-2 font-semibold sm:pl-5">
                 {t.settings.diagnostics.columns.name}
@@ -396,10 +422,13 @@ function ProcessDiagnosticsTable({
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-border/50">
+          <tbody className="divide-y divide-settings-divider">
             {visibleProcesses.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-4 text-xs text-muted-foreground sm:px-5">
+                <td
+                  colSpan={7}
+                  className="px-4 py-4 text-secondary-copy text-muted-foreground sm:px-5"
+                >
                   {emptyLabel ?? t.settings.diagnostics.processes.empty}
                 </td>
               </tr>
@@ -473,6 +502,7 @@ const RESOURCE_HISTORY_WINDOWS = [
   },
 ] satisfies readonly [unknown, ...unknown[]];
 
+/** Formats accumulated CPU time using the units supplied by the diagnostic source. */
 function formatCpuTime(seconds: number): string {
   if (seconds < 60)
     return t.settings.diagnostics.cpuTime.seconds(seconds.toFixed(seconds >= 10 ? 1 : 2));
@@ -482,11 +512,13 @@ function formatCpuTime(seconds: number): string {
   return t.settings.diagnostics.cpuTime.hours((minutes / 60).toFixed(2));
 }
 
+/** Extracts a short executable label from a complete command for historical rows. */
 function formatShortProcessName(command: string): string {
   const name = formatProcessName(command);
   return name.length > 42 ? `${name.slice(0, 39)}...` : name;
 }
 
+/** Displays a historical process name while keeping its full command available for inspection. */
 function ResourceHistoryProcessNameCell({
   process,
   visualDepth,
@@ -521,6 +553,7 @@ function ResourceHistoryProcessNameCell({
   );
 }
 
+/** Plots the supplied server CPU history buckets without animated interpolation. */
 function ProcessResourceHistoryChart({
   buckets,
 }: {
@@ -533,7 +566,7 @@ function ProcessResourceHistoryChart({
   const maxCpuPercent = Math.max(1, ...buckets.map((bucket) => bucket.maxCpuPercent));
 
   return (
-    <div className="border-t border-border/60 px-4 py-3 sm:px-5">
+    <div className="border-t border-settings-divider px-4 py-3 sm:px-5">
       <div className="flex h-28 items-end gap-1 overflow-hidden rounded-sm bg-muted/10 p-2">
         {buckets.map((bucket) => {
           const peakHeight = Math.max(2, (bucket.maxCpuPercent / maxCpuPercent) * 100);
@@ -576,6 +609,7 @@ function ProcessResourceHistoryChart({
   );
 }
 
+/** Selects an existing history window in milliseconds; invokes onSelect only for supported windows. */
 function ResourceHistoryWindowSelector({
   selectedWindowMs,
   onSelect,
@@ -587,6 +621,7 @@ function ResourceHistoryWindowSelector({
     <ToggleGroup
       aria-label={t.settings.diagnostics.history.periodAriaLabel}
       variant="segmented"
+      size="settings"
       value={[String(selectedWindowMs)]}
       onValueChange={(next) => {
         const selected = RESOURCE_HISTORY_WINDOWS.find(
@@ -596,7 +631,7 @@ function ResourceHistoryWindowSelector({
       }}
     >
       {RESOURCE_HISTORY_WINDOWS.map((option) => (
-        <Toggle key={option.windowMs} value={String(option.windowMs)}>
+        <Toggle size="settings" key={option.windowMs} value={String(option.windowMs)}>
           {option.label}
         </Toggle>
       ))}
@@ -604,6 +639,7 @@ function ResourceHistoryWindowSelector({
   );
 }
 
+/** Displays historical resource summaries and the supplied loading or empty explanation. */
 function ProcessResourceHistoryTable({
   processes,
   emptyLabel,
@@ -617,14 +653,14 @@ function ProcessResourceHistoryTable({
   }, null);
 
   return (
-    <div className="border-t border-border/60">
+    <div className="border-t border-settings-divider">
       <ScrollArea
         chainVerticalScroll
         scrollFade
         hideScrollbars
         className="max-h-[min(64vh,44rem)] w-full max-w-full"
       >
-        <table className="w-full min-w-[980px] table-fixed text-left text-xs">
+        <table className="w-full min-w-[980px] table-fixed text-left text-secondary-copy">
           <colgroup>
             <col className="w-[24%]" />
             <col className="w-[10%]" />
@@ -635,7 +671,7 @@ function ProcessResourceHistoryTable({
             <col className="w-[16%]" />
             <col className="w-[10%]" />
           </colgroup>
-          <thead className="sticky top-0 z-10 border-b border-border/60 bg-card text-2xs uppercase tracking-widest text-muted-foreground/70">
+          <thead className="sticky top-0 z-10 border-b border-settings-divider bg-card text-meta-large tracking-normal text-muted-foreground">
             <tr>
               <th className="px-4 py-2 font-semibold sm:pl-5">
                 {t.settings.diagnostics.processCategories.process}
@@ -661,10 +697,13 @@ function ProcessResourceHistoryTable({
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-border/50">
+          <tbody className="divide-y divide-settings-divider">
             {processes.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-4 text-xs text-muted-foreground sm:px-5">
+                <td
+                  colSpan={8}
+                  className="px-4 py-4 text-secondary-copy text-muted-foreground sm:px-5"
+                >
                   {emptyLabel}
                 </td>
               </tr>
@@ -718,13 +757,14 @@ function ProcessResourceHistoryTable({
   );
 }
 
+/** Updates only the relative label for the supplied UTC observation time. */
 function DiagnosticsLastChecked({ checkedAt }: { checkedAt: DateTime.Utc | null }) {
   useRelativeTimeTick();
   const relative = getRelativeTimeState(checkedAt ? DateTime.formatIso(checkedAt) : null);
 
   if (relative.status === "missing") {
     return (
-      <span className="text-2xs text-muted-foreground/50">
+      <span className="text-meta-large text-muted-foreground/50">
         {t.settings.diagnostics.status.checking}
       </span>
     );
@@ -732,14 +772,14 @@ function DiagnosticsLastChecked({ checkedAt }: { checkedAt: DateTime.Utc | null 
 
   if (relative.status === "invalid") {
     return (
-      <span className="text-2xs text-muted-foreground/50">
+      <span className="text-meta-large text-muted-foreground/50">
         {t.settings.diagnostics.status.unavailable}
       </span>
     );
   }
 
   return (
-    <span className="text-2xs text-muted-foreground/60">
+    <span className="text-meta-large text-muted-foreground/60">
       {relative.suffix ? (
         <>
           {t.settings.diagnostics.status.checked}{" "}
@@ -754,6 +794,7 @@ function DiagnosticsLastChecked({ checkedAt }: { checkedAt: DateTime.Utc | null 
   );
 }
 
+/** Refreshes the owning diagnostic query and reflects its pending state. */
 function DiagnosticsRefreshButton({
   isPending,
   label,
@@ -783,6 +824,7 @@ function DiagnosticsRefreshButton({
   );
 }
 
+/** Loads diagnostics for the selected environment while retaining access checks, export drafts and signal confirmations. */
 export function DiagnosticsSettingsPanel() {
   const { environment } = useSettingsScope();
   // The boundary only mounts this page when the selection resolves to one
@@ -1011,7 +1053,7 @@ export function DiagnosticsSettingsPanel() {
   if (!canReadDiagnostics) {
     return (
       <SettingsPageContainer>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-secondary-copy-large text-muted-foreground">
           {environmentId === null
             ? t.settings.diagnostics.connectHint
             : diagnosticsAccess.isPending
@@ -1023,8 +1065,32 @@ export function DiagnosticsSettingsPanel() {
   }
 
   return (
-    <SettingsPageContainer width="expanded" className="gap-10">
-      <ResourceTelemetryDiagnostics environmentId={environmentId} />
+    <SettingsPageContainer>
+      <ResourceTelemetryDiagnostics environmentId={environmentId}>
+        <SettingsSection title={t.settings.diagnostics.graphite.tracing}>
+          <SettingsRow
+            title={t.settings.diagnostics.graphite.exportTrace}
+            control={
+              <Button size="md" variant="secondary" disabled>
+                {t.settings.diagnostics.graphite.export}
+              </Button>
+            }
+          />
+          <SettingsRow
+            title={t.settings.diagnostics.graphite.signals}
+            control={
+              <Button
+                size="icon-md"
+                variant="ghost"
+                disabled
+                aria-label={t.settings.diagnostics.graphite.signals}
+              >
+                <MorphIcon icon={ChevronRight} />
+              </Button>
+            }
+          />
+        </SettingsSection>
+      </ResourceTelemetryDiagnostics>
 
       <SettingsSection
         title={t.settings.diagnostics.processes.title}
@@ -1060,7 +1126,7 @@ export function DiagnosticsSettingsPanel() {
           />
         </StatsGrid>
         {processDiagnosticsError || processError ? (
-          <div className="space-y-2 border-t border-border/60 px-4 py-3 text-xs text-muted-foreground sm:px-5">
+          <div className="space-y-2 border-t border-settings-divider px-4 py-3 text-secondary-copy text-muted-foreground sm:px-5">
             {processDiagnosticsError ? (
               <div className="flex items-start gap-2 text-destructive">
                 <AlertTriangleIcon className="mt-0.5 size-3.5 shrink-0" />
@@ -1126,7 +1192,7 @@ export function DiagnosticsSettingsPanel() {
           />
         </StatsGrid>
         {processResourceError || resourceError ? (
-          <div className="space-y-2 border-t border-border/60 px-4 py-3 text-xs text-muted-foreground sm:px-5">
+          <div className="space-y-2 border-t border-settings-divider px-4 py-3 text-secondary-copy text-muted-foreground sm:px-5">
             {processResourceError ? (
               <div className="flex items-start gap-2 text-destructive">
                 <AlertTriangleIcon className="mt-0.5 size-3.5 shrink-0" />
@@ -1214,7 +1280,7 @@ export function DiagnosticsSettingsPanel() {
           />
         </StatsGrid>
         {openLogsDirectoryError || traceDiagnosticsError || error ? (
-          <div className="space-y-2 border-t border-border/60 px-4 py-3 text-xs text-muted-foreground sm:px-5">
+          <div className="space-y-2 border-t border-settings-divider px-4 py-3 text-secondary-copy text-muted-foreground sm:px-5">
             {openLogsDirectoryError ? (
               <div className="flex items-start gap-2 text-destructive">
                 <AlertTriangleIcon className="mt-0.5 size-3.5 shrink-0" />
@@ -1258,7 +1324,7 @@ export function DiagnosticsSettingsPanel() {
           >
             {data.latestFailures.map((failure) => (
               <tr key={`${failure.traceId}:${failure.spanId}`}>
-                <td className="px-4 py-3 align-top text-xs font-medium text-foreground first:sm:pl-5">
+                <td className="px-4 py-3 align-top text-secondary-copy font-medium text-foreground first:sm:pl-5">
                   {failure.name}
                 </td>
                 <td className="max-w-[360px] px-4 py-3 align-top text-muted-foreground">
@@ -1297,7 +1363,7 @@ export function DiagnosticsSettingsPanel() {
           >
             {data.commonFailures.map((failure) => (
               <tr key={`${failure.name}:${failure.cause}`}>
-                <td className="px-4 py-3 align-top text-xs font-medium text-foreground first:sm:pl-5">
+                <td className="px-4 py-3 align-top text-secondary-copy font-medium text-foreground first:sm:pl-5">
                   {failure.name}
                 </td>
                 <td className="px-4 py-3 align-top font-mono tabular-nums">
@@ -1337,7 +1403,7 @@ export function DiagnosticsSettingsPanel() {
           >
             {data.slowestSpans.map((span) => (
               <tr key={`${span.traceId}:${span.spanId}`}>
-                <td className="px-4 py-3 align-top text-xs font-medium text-foreground first:sm:pl-5">
+                <td className="px-4 py-3 align-top text-secondary-copy font-medium text-foreground first:sm:pl-5">
                   {span.name}
                 </td>
                 <td className="px-4 py-3 align-top font-mono tabular-nums">
@@ -1372,7 +1438,7 @@ export function DiagnosticsSettingsPanel() {
             hideScrollbars
             className="w-full max-w-full"
           >
-            <table className="w-full min-w-[920px] table-fixed text-left text-xs">
+            <table className="w-full min-w-[920px] table-fixed text-left text-secondary-copy">
               <colgroup>
                 <col className="w-[11%]" />
                 <col className="w-[9%]" />
@@ -1380,7 +1446,7 @@ export function DiagnosticsSettingsPanel() {
                 <col className="w-[26%]" />
                 <col className="w-[30%]" />
               </colgroup>
-              <thead className="border-b border-border/60 text-2xs uppercase tracking-widest text-muted-foreground/70">
+              <thead className="border-b border-settings-divider text-meta-large tracking-normal text-muted-foreground">
                 <tr>
                   <th className="whitespace-nowrap px-4 py-2.5 font-semibold sm:pl-5">
                     {t.settings.diagnostics.columns.time}
@@ -1399,7 +1465,7 @@ export function DiagnosticsSettingsPanel() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border/60">
+              <tbody className="divide-y divide-settings-divider">
                 {data.latestWarningAndErrorLogs.map((event) => (
                   <tr
                     key={`${event.traceId}:${event.spanId}:${DateTime.formatIso(event.seenAt)}:${event.message}`}
@@ -1409,7 +1475,7 @@ export function DiagnosticsSettingsPanel() {
                       {formatRelativeNoWrap(event.seenAt)}
                     </td>
                     <td className="px-4 py-3 align-top">
-                      <span className="inline-flex rounded bg-muted px-1.5 py-0.5 font-mono text-2xs font-medium uppercase text-foreground/80">
+                      <span className="inline-flex rounded bg-muted px-1.5 py-0.5 font-mono text-meta-large font-medium text-foreground/80">
                         {event.level}
                       </span>
                     </td>
@@ -1457,7 +1523,7 @@ export function DiagnosticsSettingsPanel() {
           >
             {data.topSpansByCount.map((span) => (
               <tr key={span.name}>
-                <td className="px-4 py-3 align-top text-xs font-medium text-foreground first:sm:pl-5">
+                <td className="px-4 py-3 align-top text-secondary-copy font-medium text-foreground first:sm:pl-5">
                   {span.name}
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 align-top font-mono tabular-nums">

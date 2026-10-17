@@ -308,3 +308,45 @@
 @utility connections-environment-row {
   grid-template-columns: auto minmax(0, 1fr) auto;
 }
+
+/* ST13: 其余屏-6 P4 imports SettingsPage8a charts/list. These wells use its exact inset geometry. */
+@theme {
+  --color-diagnostics-well: #151517;
+  --radius-diagnostics-icon: 9px;
+  --radius-diagnostics-bar: 2px;
+  --text-diagnostics-metric: 15px;
+  --shadow-diagnostics-well: inset 1.5px 2px 3px rgba(0, 0, 0, 0.6);
+}
+
+@layer components {
+  .diagnostics-chart-well {
+    @apply flex min-w-0 flex-col gap-2.5 rounded-settings-row-surface bg-diagnostics-well px-3.5 py-3 shadow-diagnostics-well;
+  }
+  .diagnostics-history-bar {
+    @apply rounded-t-diagnostics-bar;
+  }
+  .diagnostics-process-list {
+    @apply flex max-h-96 flex-col gap-0.5 overflow-y-auto rounded-settings-row-surface py-2.5 pr-3 pl-3.5;
+  }
+  .diagnostics-process-row {
+    @apply flex min-h-12 items-center gap-3 rounded-settings-row-surface py-2 pr-1.5 pl-2.5;
+    content-visibility: auto;
+    contain-intrinsic-size: auto 56px;
+  }
+  .diagnostics-icon-well {
+    @apply flex size-8 shrink-0 items-center justify-center rounded-diagnostics-icon bg-diagnostics-well shadow-diagnostics-well;
+  }
+  .diagnostics-empty {
+    @apply rounded-settings-row-surface bg-diagnostics-well px-4 py-4.5 text-center text-secondary-copy-medium text-secondary-label shadow-diagnostics-well;
+  }
+  .diagnostics-export-form {
+    @apply grid gap-0 px-3.5 py-1;
+  }
+  .diagnostics-export-row {
+    @apply grid gap-2 border-b border-settings-divider py-3;
+  }
+  .diagnostics-export-form > p,
+  .diagnostics-export-form > div:last-child {
+    @apply py-3;
+  }
+}

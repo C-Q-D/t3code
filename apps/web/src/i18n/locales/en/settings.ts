@@ -1033,6 +1033,13 @@ export const settings = {
     historyHint: (archived: string, created: string) => `Archived ${archived} · Created ${created}`,
   },
   diagnostics: {
+    graphite: {
+      resources: "Resource telemetry",
+      tracing: "Tracing",
+      exportTrace: "Trace export",
+      export: "Export",
+      signals: "Signals",
+    },
     traceMode: {
       local: "Local trace file",
       terminal: "Terminal logs only",

@@ -1,3 +1,4 @@
+/** Presents environment resource telemetry; history subscriptions stay inside their own panel. */
 import { t } from "~/i18n";
 import { ProcessSignalActions } from "./ProcessSignalActions";
 import { AuthEnvironmentMaintainScope } from "@t3tools/contracts";
@@ -29,7 +30,7 @@ import type {
 } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
@@ -53,6 +54,7 @@ import { Toggle, ToggleGroup } from "../ui/toggle-group";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { toastManager } from "../ui/toast";
 import {
+  resourceSummaryBarHeights,
   resourceHistoryBarHeight,
   resourceHistoryCpuScaleMax,
   shouldShowResourceMonitorRetry,
@@ -83,10 +85,12 @@ const HISTORY_WINDOWS = [
   },
 ] satisfies readonly [unknown, ...unknown[]];
 
+/** Formats a byte-per-second measurement for the process I/O columns. */
 function formatRate(value: number): string {
   return `${formatBytes(value)}/s`;
 }
 
+/** Formats accumulated CPU time using the units supplied by the diagnostic source. */
 function formatCpuTime(valueMs: number): string {
   const seconds = valueMs / 1_000;
   if (seconds < 60)
@@ -97,26 +101,31 @@ function formatCpuTime(valueMs: number): string {
   return t.settings.resourceTelemetry.cpuTime.hours((minutes / 60).toFixed(2));
 }
 
+/** Formats collector duration from microseconds for the health display. */
 function formatDurationMicros(value: number): string {
   if (value < 1_000) return `${Math.round(value)} µs`;
   if (value < 1_000_000) return `${(value / 1_000).toFixed(2)} ms`;
   return `${(value / 1_000_000).toFixed(2)} s`;
 }
 
+/** Formats the collector sampling interval supplied in milliseconds. */
 function formatSampleInterval(valueMs: number): string {
   if (valueMs < 1_000) return `${Math.max(0, Math.round(valueMs))} ms`;
   const seconds = valueMs / 1_000;
   return t.settings.resourceTelemetry.sampleIntervalSeconds(seconds);
 }
 
+/** Combines PID and start time to keep reused operating-system PIDs distinct. */
 function processIdentityKey(process: ResourceTelemetryProcess): string {
   return `${process.identity.pid}:${process.identity.startTimeMs}`;
 }
 
+/** Builds a stable historical row key from process identity rather than its command name. */
 function processSummaryIdentityKey(process: ResourceTelemetryProcessSummary): string {
   return `${process.identity.pid}:${process.identity.startTimeMs}`;
 }
 
+/** Derives the displayed executable name while retaining the complete command for inspection. */
 function formatProcessName(process: Pick<ResourceTelemetryProcess, "command" | "name">): string {
   if (process.name.trim()) return process.name;
   const firstToken = process.command.trim().split(/\s+/)[0] ?? process.command;
@@ -124,6 +133,7 @@ function formatProcessName(process: Pick<ResourceTelemetryProcess, "command" | "
   return normalized.split(/[\\/]/).findLast((segment) => segment.length > 0) ?? normalized;
 }
 
+/** Maps the telemetry process category to its localized display name. */
 function categoryLabel(category: ResourceTelemetryProcessCategory): string {
   switch (category) {
     case "server":
@@ -149,6 +159,7 @@ function categoryLabel(category: ResourceTelemetryProcessCategory): string {
   }
 }
 
+/** Selects the existing semantic status color for a process category. */
 function categoryDotClass(category: ResourceTelemetryProcessCategory): string {
   if (category === "resource-monitor") return "bg-warning";
   if (category.startsWith("electron-")) return "bg-info";
@@ -156,6 +167,7 @@ function categoryDotClass(category: ResourceTelemetryProcessCategory): string {
   return "bg-success";
 }
 
+/** Explains the platform meaning of the recorded I/O counters. */
 function ioSemanticsLabel(semantics: ResourceTelemetryIoSemantics): string {
   switch (semantics) {
     case "storage":
@@ -169,6 +181,7 @@ function ioSemanticsLabel(semantics: ResourceTelemetryIoSemantics): string {
   }
 }
 
+/** Formats a known or unknown host boolean signal using the supplied true and false labels. */
 function booleanStateLabel(
   value: BackgroundBooleanState,
   labels: { readonly true: string; readonly false: string },
@@ -178,12 +191,14 @@ function booleanStateLabel(
   return t.settings.resourceTelemetry.unknown;
 }
 
+/** Maps collector health to the existing diagnostic severity states. */
 function sourceStatusTone(status: ResourceTelemetrySourceStatus): "default" | "warning" | "danger" {
   if (status === "healthy") return "default";
   if (status === "starting" || status === "degraded") return "warning";
   return "danger";
 }
 
+/** Displays collector source health and an optional diagnostic explanation. */
 function SourceStatusBadge({
   label,
   status,
@@ -202,7 +217,7 @@ function SourceStatusBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-3xs font-semibold uppercase tracking-widest",
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-meta font-semibold tracking-normal",
         tone === "neutral" && "border-border/70 bg-muted/45 text-muted-foreground",
         tone === "default" && "border-success/25 bg-success/10 text-success-foreground",
         tone === "warning" && "border-warning/30 bg-warning/10 text-warning-foreground",
@@ -223,11 +238,12 @@ function SourceStatusBadge({
   );
 }
 
+/** Updates the relative age of a UTC sample locally without ticking the whole resource panel. */
 function LastSampleLabel({ sampledAt }: { sampledAt: DateTime.Utc | null }) {
   useRelativeTimeTick();
   if (!sampledAt) {
     return (
-      <span className="text-2xs text-muted-foreground/55">
+      <span className="text-meta-large text-muted-foreground">
         {t.settings.resourceTelemetry.waitingSample}
       </span>
     );
@@ -235,13 +251,13 @@ function LastSampleLabel({ sampledAt }: { sampledAt: DateTime.Utc | null }) {
   const relative = formatRelativeTime(DateTime.formatIso(sampledAt));
   if (!relative) {
     return (
-      <span className="text-2xs text-muted-foreground/55">
+      <span className="text-meta-large text-muted-foreground">
         {t.settings.resourceTelemetry.waitingSample}
       </span>
     );
   }
   return (
-    <span className="text-2xs text-muted-foreground/60">
+    <span className="text-meta-large text-muted-foreground/60">
       {t.settings.resourceTelemetry.updated}{" "}
       <span className="font-mono tabular-nums">{relative.value}</span>
       {relative.suffix ? ` ${relative.suffix}` : ""}
@@ -249,6 +265,7 @@ function LastSampleLabel({ sampledAt }: { sampledAt: DateTime.Utc | null }) {
   );
 }
 
+/** Displays a labeled resource measurement with its identifying icon. */
 function IconStat({
   icon,
   label,
@@ -264,8 +281,8 @@ function IconStat({
 }) {
   return (
     <div className="group min-w-0 px-4 py-4 sm:px-5">
-      <div className="flex items-center gap-2 text-3xs font-semibold uppercase tracking-widest text-muted-foreground/70">
-        <span className="text-muted-foreground/55 transition-colors group-hover:text-foreground/65">
+      <div className="flex items-center gap-2 text-meta font-semibold tracking-normal text-muted-foreground">
+        <span className="text-muted-foreground transition-colors group-hover:text-foreground/65">
           {icon}
         </span>
         <span className="truncate">{label}</span>
@@ -280,12 +297,13 @@ function IconStat({
         {value}
       </div>
       {detail ? (
-        <div className="mt-1.5 truncate text-3xs text-muted-foreground/60">{detail}</div>
+        <div className="mt-1.5 truncate text-meta text-muted-foreground/60">{detail}</div>
       ) : null}
     </div>
   );
 }
 
+/** Displays the supplied resource aggregate without changing its attribution or sampling. */
 function AggregateCard({
   label,
   accentClass,
@@ -296,13 +314,13 @@ function AggregateCard({
   aggregate: ResourceTelemetryAggregate;
 }) {
   return (
-    <div className="relative overflow-hidden border-t border-border/60 px-4 py-4 first:border-t-0 md:border-t-0 md:border-l md:first:border-l-0 sm:px-5">
+    <div className="relative overflow-hidden border-t border-settings-divider px-4 py-4 first:border-t-0 md:border-t-0 md:border-l md:first:border-l-0 sm:px-5">
       <span className={cn("absolute inset-x-5 top-0 h-0.5 rounded-full opacity-75", accentClass)} />
       <div className="flex items-center justify-between gap-3">
-        <div className="text-3xs font-semibold uppercase tracking-widest text-muted-foreground/75">
+        <div className="text-meta font-semibold tracking-normal text-muted-foreground/75">
           {label}
         </div>
-        <div className="rounded-md bg-muted/55 px-1.5 py-0.5 font-mono text-3xs tabular-nums text-muted-foreground/70">
+        <div className="rounded-md bg-muted/55 px-1.5 py-0.5 font-mono text-meta tabular-nums text-muted-foreground">
           {t.settings.resourceTelemetry.footprint.processCountLabel(aggregate.processCount)}
         </div>
       </div>
@@ -328,28 +346,30 @@ function AggregateCard({
   );
 }
 
+/** Pairs a metric label with its formatted value inside resource aggregates. */
 function MetricPair({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <div className="text-3xs font-semibold uppercase tracking-widest text-muted-foreground/45">
+      <div className="text-meta font-semibold tracking-normal text-muted-foreground/45">
         {label}
       </div>
-      <div className="truncate font-mono text-xs font-medium tabular-nums text-foreground/90">
+      <div className="truncate font-mono text-secondary-copy font-medium tabular-nums text-foreground/90">
         {value}
       </div>
     </div>
   );
 }
 
+/** Displays source status and collector error details from a telemetry health record. */
 function HealthSource({ label, health }: { label: string; health: ResourceTelemetrySourceHealth }) {
   const expectedInBrowser =
     health.status === "unavailable" &&
     Option.exists(health.lastError, (error) => error.includes("'web' mode"));
   return (
-    <div className="flex items-start justify-between gap-4 border-t border-border/50 py-3 first:border-t-0">
+    <div className="flex items-start justify-between gap-4 border-t border-settings-divider py-3 first:border-t-0">
       <div className="min-w-0">
-        <div className="text-sm font-medium text-foreground">{label}</div>
-        <div className="mt-1 text-2xs leading-relaxed text-muted-foreground/65">
+        <div className="text-secondary-copy-large font-medium text-foreground">{label}</div>
+        <div className="mt-1 text-meta-large leading-relaxed text-muted-foreground">
           {expectedInBrowser
             ? t.settings.resourceTelemetry.desktopOnlyHint
             : Option.match(health.lastError, {
@@ -374,6 +394,7 @@ function HealthSource({ label, health }: { label: string; health: ResourceTeleme
   );
 }
 
+/** Displays a host or collector detail; valueClassName conveys an existing semantic severity. */
 function DetailRow({
   label,
   value,
@@ -384,11 +405,11 @@ function DetailRow({
   valueClassName?: string | undefined;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 border-t border-border/50 py-2.5 first:border-t-0">
-      <span className="text-2xs text-muted-foreground/75">{label}</span>
+    <div className="flex items-center justify-between gap-4 border-t border-settings-divider py-2.5 first:border-t-0">
+      <span className="text-meta-large text-muted-foreground/75">{label}</span>
       <span
         className={cn(
-          "min-w-0 truncate text-right font-mono text-2xs tabular-nums text-foreground/85",
+          "min-w-0 truncate text-right font-mono text-meta-large tabular-nums text-foreground/85",
           valueClassName,
         )}
       >
@@ -398,6 +419,7 @@ function DetailRow({
   );
 }
 
+/** Selects a supported resource history window in milliseconds through onSelect. */
 function HistoryWindowSelector({
   selectedWindowMs,
   onSelect,
@@ -409,6 +431,7 @@ function HistoryWindowSelector({
     <ToggleGroup
       aria-label={t.settings.resourceTelemetry.historyPeriodAriaLabel}
       variant="segmented"
+      size="settings"
       value={[String(selectedWindowMs)]}
       onValueChange={(next) => {
         const selected = HISTORY_WINDOWS.find((option) => String(option.windowMs) === next[0]);
@@ -416,7 +439,7 @@ function HistoryWindowSelector({
       }}
     >
       {HISTORY_WINDOWS.map((option) => (
-        <Toggle key={option.windowMs} value={String(option.windowMs)}>
+        <Toggle size="settings" key={option.windowMs} value={String(option.windowMs)}>
           {option.label}
         </Toggle>
       ))}
@@ -424,6 +447,7 @@ function HistoryWindowSelector({
   );
 }
 
+/** Preserves the detailed CPU and I/O bucket chart alongside the P4 CPU and memory overview. */
 function ResourceHistoryChart({
   buckets,
 }: {
@@ -433,8 +457,8 @@ function ResourceHistoryChart({
   const maxIo = Math.max(1, ...buckets.map((bucket) => bucket.ioReadBytes + bucket.ioWriteBytes));
 
   return (
-    <div className="border-t border-border/60 px-4 py-4 sm:px-5">
-      <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-3xs text-muted-foreground/65">
+    <div className="border-t border-settings-divider px-4 py-4 sm:px-5">
+      <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-meta text-muted-foreground">
         <span className="inline-flex items-center gap-1.5">
           <span className="h-1.5 w-3 rounded-full bg-foreground/70" />{" "}
           {t.settings.resourceTelemetry.labels.cpuAverage}
@@ -509,6 +533,7 @@ function ResourceHistoryChart({
   );
 }
 
+/** Displays process identity and invokes onToggle to expand or collapse its descendants. */
 function ProcessTreeName({
   process,
   collapsed,
@@ -554,6 +579,7 @@ function ProcessTreeName({
   );
 }
 
+/** Restricts process actions to the existing signal-capable telemetry categories. */
 function canSignalProcess(process: ResourceTelemetryProcess): boolean {
   return (
     process.category === "server-child" ||
@@ -562,6 +588,7 @@ function canSignalProcess(process: ResourceTelemetryProcess): boolean {
   );
 }
 
+/** Delegates signal choices with the existing environment permission and in-flight identity guards. */
 function ProcessActions({
   process,
   canMaintainEnvironment,
@@ -574,7 +601,7 @@ function ProcessActions({
   onSignal: (process: ResourceTelemetryProcess, signal: ServerProcessSignal) => void;
 }) {
   if (!canSignalProcess(process)) {
-    return <span className="text-3xs text-muted-foreground/35">—</span>;
+    return <span className="text-meta text-muted-foreground/35">—</span>;
   }
   const isSignaling = signalingKeys.has(processIdentityKey(process));
   return (
@@ -585,6 +612,7 @@ function ProcessActions({
   );
 }
 
+/** Preserves the full process tree, I/O counters, identities and guarded signal actions. */
 function ProcessTable({
   processes,
   canMaintainEnvironment,
@@ -615,14 +643,14 @@ function ProcessTable({
   }, []);
 
   return (
-    <div className="border-t border-border/60">
+    <div className="border-t border-settings-divider">
       <ScrollArea
         chainVerticalScroll
         scrollFade
         hideScrollbars
         className="max-h-[min(68vh,48rem)] w-full max-w-full"
       >
-        <table className="w-full min-w-[1320px] table-fixed text-left text-xs">
+        <table className="w-full min-w-[1320px] table-fixed text-left text-secondary-copy">
           <colgroup>
             <col className="w-[20%]" />
             <col className="w-[10%]" />
@@ -636,7 +664,7 @@ function ProcessTable({
             <col className="w-[6%]" />
             <col className="w-[4%]" />
           </colgroup>
-          <thead className="sticky top-0 z-10 border-b border-border/60 bg-card text-3xs uppercase tracking-widest text-muted-foreground/65">
+          <thead className="sticky top-0 z-10 border-b border-settings-divider bg-card text-meta tracking-normal text-muted-foreground">
             <tr>
               <th className="px-4 py-2 font-semibold sm:pl-5">
                 {t.settings.resourceTelemetry.columns.process}
@@ -673,10 +701,13 @@ function ProcessTable({
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-border/50">
+          <tbody className="divide-y divide-settings-divider">
             {visible.length === 0 ? (
               <tr>
-                <td colSpan={11} className="px-4 py-5 text-xs text-muted-foreground sm:px-5">
+                <td
+                  colSpan={11}
+                  className="px-4 py-5 text-secondary-copy text-muted-foreground sm:px-5"
+                >
                   {t.settings.resourceTelemetry.processes.waiting}
                 </td>
               </tr>
@@ -690,7 +721,7 @@ function ProcessTable({
                     onToggle={toggle}
                   />
                 </td>
-                <td className="truncate px-3 py-2 text-2xs text-muted-foreground">
+                <td className="truncate px-3 py-2 text-meta-large text-muted-foreground">
                   {categoryLabel(process.category)}
                 </td>
                 <td className="px-3 py-2 text-right font-mono tabular-nums">
@@ -737,20 +768,21 @@ function ProcessTable({
   );
 }
 
+/** Renders historical per-process counters using stable process identities. */
 function HistoryProcessTable({
   processes,
 }: {
   processes: ReadonlyArray<ResourceTelemetryProcessSummary>;
 }) {
   return (
-    <div className="border-t border-border/60">
+    <div className="border-t border-settings-divider">
       <ScrollArea
         chainVerticalScroll
         scrollFade
         hideScrollbars
         className="max-h-[28rem] w-full max-w-full"
       >
-        <table className="w-full min-w-[1020px] table-fixed text-left text-xs">
+        <table className="w-full min-w-[1020px] table-fixed text-left text-secondary-copy">
           <colgroup>
             <col className="w-[24%]" />
             <col className="w-[11%]" />
@@ -762,7 +794,7 @@ function HistoryProcessTable({
             <col className="w-[7%]" />
             <col className="w-[5%]" />
           </colgroup>
-          <thead className="sticky top-0 z-10 border-b border-border/60 bg-card text-3xs uppercase tracking-widest text-muted-foreground/65">
+          <thead className="sticky top-0 z-10 border-b border-settings-divider bg-card text-meta tracking-normal text-muted-foreground">
             <tr>
               <th className="px-4 py-2 font-semibold sm:pl-5">
                 {t.settings.resourceTelemetry.columns.process}
@@ -793,10 +825,13 @@ function HistoryProcessTable({
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-border/50">
+          <tbody className="divide-y divide-settings-divider">
             {processes.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-5 text-xs text-muted-foreground sm:px-5">
+                <td
+                  colSpan={9}
+                  className="px-4 py-5 text-secondary-copy text-muted-foreground sm:px-5"
+                >
                   {t.settings.resourceTelemetry.processes.emptyHistory}
                 </td>
               </tr>
@@ -817,7 +852,7 @@ function HistoryProcessTable({
                     </TooltipPopup>
                   </Tooltip>
                 </td>
-                <td className="truncate px-3 py-2 text-2xs text-muted-foreground">
+                <td className="truncate px-3 py-2 text-meta-large text-muted-foreground">
                   {categoryLabel(process.category)}
                 </td>
                 <td className="px-3 py-2 text-right font-mono tabular-nums">
@@ -850,10 +885,11 @@ function HistoryProcessTable({
   );
 }
 
+/** Displays persisted resource attribution entries without changing their grouping. */
 function AttributionTable({ entries }: { entries: ReadonlyArray<ResourceAttributionEntry> }) {
   return (
-    <div className="overflow-x-auto border-t border-border/60">
-      <table className="w-full min-w-[720px] table-fixed text-left text-xs">
+    <div className="overflow-x-auto border-t border-settings-divider">
+      <table className="w-full min-w-[720px] table-fixed text-left text-secondary-copy">
         <colgroup>
           <col className="w-[22%]" />
           <col className="w-[28%]" />
@@ -862,7 +898,7 @@ function AttributionTable({ entries }: { entries: ReadonlyArray<ResourceAttribut
           <col className="w-[10%]" />
           <col className="w-[12%]" />
         </colgroup>
-        <thead className="border-b border-border/60 text-3xs uppercase tracking-widest text-muted-foreground/65">
+        <thead className="border-b border-settings-divider text-meta tracking-normal text-muted-foreground">
           <tr>
             <th className="px-4 py-2 font-semibold sm:pl-5">
               {t.settings.resourceTelemetry.columns.component}
@@ -884,10 +920,13 @@ function AttributionTable({ entries }: { entries: ReadonlyArray<ResourceAttribut
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-border/50">
+        <tbody className="divide-y divide-settings-divider">
           {entries.length === 0 ? (
             <tr>
-              <td colSpan={6} className="px-4 py-5 text-xs text-muted-foreground sm:px-5">
+              <td
+                colSpan={6}
+                className="px-4 py-5 text-secondary-copy text-muted-foreground sm:px-5"
+              >
                 {t.settings.resourceTelemetry.attribution.empty}
               </td>
             </tr>
@@ -916,17 +955,19 @@ function AttributionTable({ entries }: { entries: ReadonlyArray<ResourceAttribut
   );
 }
 
-export function ResourceTelemetryDiagnostics({
+/** Owns the history query for one environment so bucket updates cannot render the page or process list. */
+const ResourceHistoryPanel = memo(function ResourceHistoryPanel({
   environmentId,
+  overview,
+  children,
 }: {
+  overview: ReactNode;
+  children?: ReactNode;
   environmentId: EnvironmentId | null;
 }) {
   const [windowMs, setWindowMs] = useState(15 * 60_000);
   const selectedWindow =
     HISTORY_WINDOWS.find((option) => option.windowMs === windowMs) ?? HISTORY_WINDOWS[1];
-  const canMaintainEnvironment = useEnvironmentScope(environmentId, AuthEnvironmentMaintainScope);
-  const telemetry = useResourceTelemetry(environmentId);
-  const retryTelemetry = telemetry.retry;
   const history = useResourceTelemetryHistory(
     {
       windowMs: selectedWindow.windowMs,
@@ -934,6 +975,157 @@ export function ResourceTelemetryDiagnostics({
     },
     environmentId,
   );
+  return (
+    <>
+      <SettingsSection title={t.settings.diagnostics.graphite.resources}>
+        {history.error ? (
+          <p role="status" className="px-3.5 text-secondary-copy text-error">
+            {history.error}
+          </p>
+        ) : null}
+        <ResourceSummaryCharts buckets={history.data?.buckets ?? []} />
+        {overview}
+      </SettingsSection>
+      {children}
+      <SettingsSection
+        title={t.settings.resourceTelemetry.history.title}
+        headerAction={
+          <div className="flex items-center gap-2">
+            <HistoryWindowSelector selectedWindowMs={windowMs} onSelect={setWindowMs} />
+            <Button
+              size="icon-toolbar"
+              variant="ghost"
+              disabled={history.isPending}
+              onClick={history.refresh}
+              aria-label={t.settings.resourceTelemetry.history.refreshAriaLabel}
+            >
+              <RefreshIcon size="xs" refreshing={history.isPending} />
+            </Button>
+          </div>
+        }
+      >
+        <ResourceHistoryChart buckets={history.data?.buckets ?? []} />
+        <HistoryProcessTable processes={history.data?.topProcesses ?? []} />
+      </SettingsSection>
+    </>
+  );
+});
+
+/** Draws CPU averages and peak resident memory from real buckets; an empty history never invents samples. */
+function ResourceSummaryCharts({
+  buckets,
+}: {
+  buckets: ReadonlyArray<ResourceTelemetryHistoryBucket>;
+}) {
+  const latest = buckets.at(-1);
+  const heights = resourceSummaryBarHeights(buckets);
+  const metrics = [
+    {
+      key: "cpu",
+      label: t.settings.resourceTelemetry.labels.cpu,
+      value: latest
+        ? `${latest.avgCpuPercent.toFixed(1)}%`
+        : t.settings.resourceTelemetry.unavailable,
+      color: "bg-code-foreground",
+    },
+    {
+      key: "memory",
+      label: t.settings.resourceTelemetry.labels.memory,
+      value: latest ? formatBytes(latest.maxRssBytes) : t.settings.resourceTelemetry.unavailable,
+      color: "bg-info",
+    },
+  ] as const;
+  return (
+    <div className="grid grid-cols-2 gap-3 px-3.5 py-3">
+      {metrics.map((metric) => (
+        <div key={metric.key} className="diagnostics-chart-well">
+          <div className="flex items-baseline gap-2">
+            <span className="flex-1 text-secondary-copy-medium text-secondary-label">
+              {metric.label}
+            </span>
+            <span className="font-mono text-diagnostics-metric tabular-nums">{metric.value}</span>
+          </div>
+          <div
+            className="flex h-16 items-end gap-0.5"
+            role="img"
+            aria-label={`${metric.label}: ${metric.value}`}
+          >
+            {buckets.length === 0 ? (
+              <span className="self-center text-secondary-copy text-muted-foreground">
+                {t.settings.resourceTelemetry.health.waiting}
+              </span>
+            ) : (
+              buckets.map((bucket, index) => (
+                <Tooltip key={DateTime.formatIso(bucket.startedAt)}>
+                  <TooltipTrigger
+                    render={
+                      <span
+                        className={cn("diagnostics-history-bar min-w-0 flex-1", metric.color)}
+                        style={{ height: `${heights[metric.key][index]}%` }}
+                      />
+                    }
+                  />
+                  <TooltipPopup side="top">
+                    {DateTime.formatIso(bucket.startedAt)} ·{" "}
+                    {metric.key === "cpu"
+                      ? `${bucket.avgCpuPercent.toFixed(1)}%`
+                      : formatBytes(bucket.maxRssBytes)}
+                  </TooltipPopup>
+                </Tooltip>
+              ))
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Shows the P4 process overview; detailed identities, I/O and signal actions remain in the process table. */
+function ResourceProcessOverview({
+  processes,
+}: {
+  processes: ReadonlyArray<ResourceTelemetryProcess>;
+}) {
+  return (
+    <ul className="diagnostics-process-list">
+      {processes.length === 0 ? (
+        <li className="diagnostics-empty">{t.settings.resourceTelemetry.processes.waiting}</li>
+      ) : (
+        processes.map((process) => (
+          <li key={processIdentityKey(process)} className="diagnostics-process-row">
+            <span className="diagnostics-icon-well">
+              <CpuIcon className="size-3.75" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-control font-semibold">
+                {formatProcessName(process)}
+              </div>
+              <div className="truncate text-secondary-copy-medium text-secondary-label">
+                {categoryLabel(process.category)} · {process.command}
+              </div>
+            </div>
+            <span className="shrink-0 whitespace-nowrap font-mono text-secondary-copy text-muted-foreground tabular-nums">
+              {process.cpuPercent.toFixed(1)}% · {formatBytes(process.residentBytes)}
+            </span>
+          </li>
+        ))
+      )}
+    </ul>
+  );
+}
+
+/** Renders live resources and retained diagnostics for environmentId; children supplies the trace action group. */
+export function ResourceTelemetryDiagnostics({
+  environmentId,
+  children,
+}: {
+  environmentId: EnvironmentId | null;
+  children?: ReactNode;
+}) {
+  const canMaintainEnvironment = useEnvironmentScope(environmentId, AuthEnvironmentMaintainScope);
+  const telemetry = useResourceTelemetry(environmentId);
+  const retryTelemetry = telemetry.retry;
   const signalServerProcess = useAtomCommand(serverEnvironment.signalProcess, {
     reportFailure: false,
   });
@@ -1082,6 +1274,12 @@ export function ResourceTelemetryDiagnostics({
 
   return (
     <>
+      <ResourceHistoryPanel
+        environmentId={environmentId}
+        overview={<ResourceProcessOverview processes={snapshot?.processes ?? []} />}
+      >
+        {children}
+      </ResourceHistoryPanel>
       <SettingsSection
         title={t.settings.resourceTelemetry.monitor.title}
         icon={<ActivityIcon className="size-4 text-muted-foreground" />}
@@ -1113,17 +1311,17 @@ export function ResourceTelemetryDiagnostics({
           </div>
         }
       >
-        <div className="overflow-hidden rounded-2xl border border-border/70 bg-card shadow-sm/5">
-          <div className="flex flex-col gap-3 border-b border-border/60 bg-linear-to-r from-muted/45 via-muted/20 to-transparent px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+        <div className="overflow-hidden">
+          <div className="flex flex-col gap-3 border-b border-settings-divider px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
             <div>
-              <div className="text-3xs font-semibold uppercase tracking-widest text-muted-foreground/70">
+              <div className="text-meta font-semibold tracking-normal text-muted-foreground">
                 {t.settings.resourceTelemetry.footprint.title}
               </div>
-              <p className="mt-1 max-w-xl text-xs leading-relaxed text-muted-foreground">
+              <p className="mt-1 max-w-xl text-secondary-copy leading-relaxed text-muted-foreground">
                 {t.settings.resourceTelemetry.footprint.description}
               </p>
             </div>
-            <div className="flex items-center gap-2 text-3xs text-muted-foreground/65">
+            <div className="flex items-center gap-2 text-meta text-muted-foreground">
               <span className="size-1.5 rounded-full bg-success" />
               {t.settings.resourceTelemetry.footprint.sampleInterval}{" "}
               {snapshot ? formatSampleInterval(snapshot.sampleIntervalMs) : "..."}
@@ -1213,13 +1411,13 @@ export function ResourceTelemetryDiagnostics({
             />
           </div>
           {telemetry.error ? (
-            <div className="flex items-start gap-2 border-t border-destructive/20 bg-destructive/5 px-4 py-3 text-xs text-destructive sm:px-5">
+            <div className="flex items-start gap-2 border-t border-destructive/20 bg-destructive/5 px-4 py-3 text-secondary-copy text-destructive sm:px-5">
               <AlertTriangleIcon className="mt-0.5 size-3.5 shrink-0" />
               <span>{telemetry.error}</span>
             </div>
           ) : null}
           {snapshot ? (
-            <div className="grid border-t border-border/60 bg-muted/10 md:grid-cols-3">
+            <div className="grid border-t border-settings-divider bg-muted/10 md:grid-cols-3">
               <AggregateCard
                 label={t.settings.resourceTelemetry.footprint.backend}
                 accentClass="bg-success/80"
@@ -1252,9 +1450,9 @@ export function ResourceTelemetryDiagnostics({
           ) : null
         }
       >
-        <div className="grid overflow-hidden rounded-2xl border border-border/70 bg-card shadow-xs/5 md:grid-cols-2 md:divide-x md:divide-border/60">
+        <div className="grid overflow-hidden md:grid-cols-2 md:divide-x md:divide-settings-divider">
           <div className="px-4 py-4 sm:px-5">
-            <div className="mb-3 flex items-center gap-2 text-3xs font-semibold uppercase tracking-widest text-muted-foreground/70">
+            <div className="mb-3 flex items-center gap-2 text-meta font-semibold tracking-normal text-muted-foreground">
               <span className="flex size-6 items-center justify-center rounded-md bg-muted/60">
                 <BatteryIcon className="size-3.5" />
               </span>
@@ -1309,18 +1507,18 @@ export function ResourceTelemetryDiagnostics({
                 />
               </>
             ) : (
-              <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-4 py-5">
-                <div className="text-sm font-medium text-foreground">
+              <div className="rounded-settings-row-surface border border-dashed border-border/70 bg-muted/20 px-4 py-5">
+                <div className="text-secondary-copy-large font-medium text-foreground">
                   {t.settings.resourceTelemetry.host.disconnected}
                 </div>
-                <p className="mt-1.5 max-w-sm text-2xs leading-relaxed text-muted-foreground/70">
+                <p className="mt-1.5 max-w-sm text-meta-large leading-relaxed text-muted-foreground">
                   {t.settings.resourceTelemetry.host.disconnectedHint}
                 </p>
               </div>
             )}
           </div>
-          <div className="border-t border-border/60 px-4 py-4 md:border-t-0 sm:px-5">
-            <div className="mb-3 flex items-center gap-2 text-3xs font-semibold uppercase tracking-widest text-muted-foreground/70">
+          <div className="border-t border-settings-divider px-4 py-4 md:border-t-0 sm:px-5">
+            <div className="mb-3 flex items-center gap-2 text-meta font-semibold tracking-normal text-muted-foreground">
               <span className="flex size-6 items-center justify-center rounded-md bg-muted/60">
                 <GaugeIcon className="size-3.5" />
               </span>
@@ -1373,7 +1571,7 @@ export function ResourceTelemetryDiagnostics({
                 />
               </>
             ) : (
-              <div className="py-4 text-xs text-muted-foreground">
+              <div className="py-4 text-secondary-copy text-muted-foreground">
                 {t.settings.resourceTelemetry.health.waiting}
               </div>
             )}
@@ -1382,41 +1580,11 @@ export function ResourceTelemetryDiagnostics({
       </SettingsSection>
 
       <SettingsSection
-        title={t.settings.resourceTelemetry.history.title}
-        icon={<HardDriveIcon className="size-4 text-muted-foreground" />}
-        headerAction={
-          <div className="flex items-center gap-2">
-            <HistoryWindowSelector selectedWindowMs={windowMs} onSelect={setWindowMs} />
-            <Button
-              size="icon-micro"
-              variant="ghost"
-              disabled={history.isPending}
-              onClick={history.refresh}
-              aria-label={t.settings.resourceTelemetry.history.refreshAriaLabel}
-            >
-              <RefreshIcon size="xs" refreshing={history.isPending} />
-            </Button>
-          </div>
-        }
-      >
-        <div className="overflow-hidden rounded-2xl border border-border/70 bg-card shadow-xs/5">
-          {history.error ? (
-            <div className="flex items-start gap-2 border-b border-destructive/20 bg-destructive/5 px-4 py-3 text-xs text-destructive sm:px-5">
-              <AlertTriangleIcon className="mt-0.5 size-3.5 shrink-0" />
-              <span>{history.error}</span>
-            </div>
-          ) : null}
-          <ResourceHistoryChart buckets={history.data?.buckets ?? []} />
-          <HistoryProcessTable processes={history.data?.topProcesses ?? []} />
-        </div>
-      </SettingsSection>
-
-      <SettingsSection
         title={t.settings.resourceTelemetry.processes.title}
         icon={<CpuIcon className="size-4 text-muted-foreground" />}
         headerAction={
           snapshot ? (
-            <span className="text-3xs text-muted-foreground/55">
+            <span className="text-meta text-muted-foreground">
               {t.settings.resourceTelemetry.processes.identityLabel}{" "}
               <span className="font-mono">
                 {t.settings.resourceTelemetry.processes.identityHint}
@@ -1425,7 +1593,7 @@ export function ResourceTelemetryDiagnostics({
           ) : null
         }
       >
-        <div className="overflow-hidden rounded-2xl border border-border/70 bg-card shadow-xs/5">
+        <div className="overflow-hidden">
           <ProcessTable
             processes={snapshot?.processes ?? []}
             canMaintainEnvironment={canMaintainEnvironment}
@@ -1439,13 +1607,13 @@ export function ResourceTelemetryDiagnostics({
         title={t.settings.resourceTelemetry.attribution.title}
         icon={<DatabaseIcon className="size-4 text-muted-foreground" />}
         headerAction={
-          <span className="text-3xs text-muted-foreground/55">
+          <span className="text-meta text-muted-foreground">
             {t.settings.resourceTelemetry.attribution.subtitle}
           </span>
         }
       >
-        <div className="overflow-hidden rounded-2xl border border-border/70 bg-card shadow-xs/5">
-          <div className="bg-muted/15 px-4 py-3 text-2xs leading-relaxed text-muted-foreground sm:px-5">
+        <div className="overflow-hidden">
+          <div className="bg-muted/15 px-4 py-3 text-meta-large leading-relaxed text-muted-foreground sm:px-5">
             {t.settings.resourceTelemetry.attribution.description}
           </div>
           <AttributionTable entries={snapshot?.attribution.entries ?? []} />

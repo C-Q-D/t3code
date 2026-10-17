@@ -980,6 +980,13 @@ export const settings: Messages["settings"] = {
     historyHint: (archived: string, created: string) => `已归档 ${archived}·创建于 ${created}`,
   },
   diagnostics: {
+    graphite: {
+      resources: "资源遥测",
+      tracing: "追踪",
+      exportTrace: "追踪导出",
+      export: "导出",
+      signals: "信号",
+    },
     traceMode: {
       local: "本地追踪文件",
       terminal: "仅终端日志",

@@ -26,6 +26,7 @@ type SignalKey = (typeof SIGNALS)[number]["key"];
 /** The latest check for a signal; it describes the field only while `url` is still its value. */
 type EndpointCheck = { readonly url: string; readonly result: OtlpEndpointCheckResult | null };
 
+/** Checks the existing HTTP endpoint eligibility rule before sending a connectivity request. */
 const isHttpUrl = (url: string) => /^https?:\/\/./i.test(url);
 
 /** Returns the current endpoint check label and indicator color. */
@@ -134,7 +135,7 @@ function TelemetryExportForm() {
   return (
     <SettingsSection title={t.settings.merge.telemetryTitle} id="telemetry-export">
       <form
-        className="grid gap-4 px-4 py-4 sm:px-5"
+        className="diagnostics-export-form"
         onSubmit={async (event) => {
           event.preventDefault();
           if (!environment || saving) return;
@@ -160,9 +161,11 @@ function TelemetryExportForm() {
           }
         }}
       >
-        <p className="text-xs text-muted-foreground">{t.settings.merge.telemetryDescription}</p>
+        <p className="text-secondary-copy text-muted-foreground">
+          {t.settings.merge.telemetryDescription}
+        </p>
         {!canEdit && (
-          <p className="text-xs text-muted-foreground">
+          <p className="text-secondary-copy text-muted-foreground">
             {t.settings.merge.telemetryNoPermission(
               environment?.label ?? t.settings.merge.telemetrySelectedEnvironment,
             )}
@@ -172,7 +175,7 @@ function TelemetryExportForm() {
           const url = values[key].trim();
           const status = canCheck ? endpointStatus(url, checks[key]) : null;
           return (
-            <div key={key} className="grid gap-1.5">
+            <div key={key} className="diagnostics-export-row">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-1.5">
                   {status && <ConnectionStatusDot dotClassName={status.dot} />}
@@ -186,12 +189,14 @@ function TelemetryExportForm() {
                     )}
                   </Label>
                 </div>
-                {status && <span className="text-xs text-muted-foreground">{status.label}</span>}
+                {status && (
+                  <span className="text-secondary-copy text-muted-foreground">{status.label}</span>
+                )}
               </div>
               <div className="flex gap-2">
                 <Input
                   id={key}
-                  size="sm"
+                  size="settings"
                   type="url"
                   pattern="[Hh][Tt][Tt][Pp][Ss]?://.*"
                   title={t.settings.merge.telemetryEndpointHint}
@@ -213,7 +218,7 @@ function TelemetryExportForm() {
                 {canCheck && (
                   <Button
                     type="button"
-                    size="sm"
+                    size="md"
                     variant="outline"
                     disabled={!isHttpUrl(url) || checks[key]?.result === null}
                     onClick={() => void checkEndpoint(key, signal, url)}
@@ -223,7 +228,7 @@ function TelemetryExportForm() {
                 )}
               </div>
               {saved[key] !== (running?.[key] ?? "") && (
-                <p className="break-all text-xs text-muted-foreground">
+                <p className="break-all text-secondary-copy text-muted-foreground">
                   {t.settings.merge.telemetryRunning(
                     running?.[key] || t.settings.merge.telemetryDisabled,
                   )}
@@ -233,13 +238,13 @@ function TelemetryExportForm() {
           );
         })}
         <div className="flex items-center justify-between gap-3">
-          <p role="status" className="text-xs text-muted-foreground">
+          <p role="status" className="text-secondary-copy text-muted-foreground">
             {message}
           </p>
           <div className="flex shrink-0 gap-2">
             <Button
               type="button"
-              size="xs"
+              size="md"
               variant="outline"
               disabled={!changed || saving || !canEdit}
               onClick={() => {
@@ -254,7 +259,7 @@ function TelemetryExportForm() {
             >
               {t.settings.merge.telemetryDiscard}
             </Button>
-            <Button type="submit" size="xs" disabled={!changed || saving || !canEdit}>
+            <Button type="submit" size="md" disabled={!changed || saving || !canEdit}>
               {saving ? t.settings.merge.telemetrySaving : t.settings.merge.telemetrySave}
             </Button>
           </div>
