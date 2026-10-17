@@ -1,5 +1,7 @@
-// @vitest-environment jsdom
-/** Verifies scoped card visibility, overlapping collapse ownership, and overlay dismissal. */
+/**
+ * Verifies scoped card visibility, overlapping collapse ownership, and overlay dismissal.
+ * @vitest-environment jsdom
+ */
 
 import { EnvironmentId, ThreadId, type ScopedThreadRef } from "@t3tools/contracts";
 import { act } from "react";

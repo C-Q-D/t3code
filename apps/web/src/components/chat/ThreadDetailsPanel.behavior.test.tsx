@@ -1,5 +1,7 @@
-// @vitest-environment jsdom
-/** Exercises detail-panel branch selection and change navigation through the real child controls. */
+/**
+ * Exercises detail-panel branch selection and change navigation through the real child controls.
+ * @vitest-environment jsdom
+ */
 import { EnvironmentId, ThreadId, type VcsRef } from "@t3tools/contracts";
 import { act, type ComponentProps, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
