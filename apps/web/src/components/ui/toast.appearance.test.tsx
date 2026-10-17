@@ -10,6 +10,105 @@ import { ToastProvider, toastManager } from "./toast";
 
 vi.mock("@tanstack/react-router", () => ({ useParams: () => null }));
 
+/** Exercises real Base UI expansion; inert is the native focus/accessibility boundary, which jsdom does not itself enforce. */
+it("restores the fourth and fifth stone notifications on expansion with limit=5", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  try {
+    await act(async () =>
+      root.render(<ToastProvider timeout={0} stack="stone" position="bottom-right" limit={5} />),
+    );
+    await act(async () => {
+      toastManager.add({ title: "First", actionProps: { children: "Open first" } });
+      toastManager.add({ title: "Second", actionProps: { children: "Open second" } });
+      toastManager.add({ title: "Third" });
+      toastManager.add({ title: "Fourth" });
+      toastManager.add({ title: "Fifth" });
+    });
+    const viewport = document.querySelector<HTMLElement>('[data-slot="toast-viewport"]')!;
+    const fourth = viewport.querySelector<HTMLElement>('[data-stack-layer="3"]')!;
+    const fifth = viewport.querySelector<HTMLElement>('[data-stack-layer="4"]')!;
+    expect(fourth.hasAttribute("data-stack-hidden")).toBe(true);
+    expect(fifth.hasAttribute("data-stack-hidden")).toBe(true);
+    expect(fourth.hasAttribute("inert")).toBe(true);
+    expect(fifth.hasAttribute("inert")).toBe(true);
+    expect(fourth.getAttribute("aria-hidden")).toBe("true");
+    expect(fifth.getAttribute("aria-hidden")).toBe("true");
+    expect(viewport.querySelector(".ov2-toast-count")?.textContent).toBe("+4");
+
+    await act(async () => viewport.dispatchEvent(new MouseEvent("mouseover", { bubbles: true })));
+    expect(fourth.hasAttribute("data-expanded")).toBe(true);
+    expect(fourth.hasAttribute("data-stack-hidden")).toBe(false);
+    expect(fifth.hasAttribute("data-stack-hidden")).toBe(false);
+    expect(fourth.hasAttribute("inert")).toBe(false);
+    expect(fifth.hasAttribute("inert")).toBe(false);
+    expect(fourth.hasAttribute("aria-hidden")).toBe(false);
+    expect(fifth.hasAttribute("aria-hidden")).toBe(false);
+    expect(viewport.querySelector(".ov2-toast-count")).toBeNull();
+    await act(async () =>
+      viewport.dispatchEvent(
+        new MouseEvent("mouseout", { bubbles: true, relatedTarget: document.body }),
+      ),
+    );
+    expect(fourth.hasAttribute("data-stack-hidden")).toBe(true);
+    expect(fifth.hasAttribute("inert")).toBe(true);
+    expect(viewport.querySelector(".ov2-toast-count")?.textContent).toBe("+4");
+    await act(async () => viewport.focus());
+    expect(fourth.hasAttribute("data-stack-hidden")).toBe(false);
+    expect(fifth.hasAttribute("inert")).toBe(false);
+    const action = fifth.querySelector<HTMLButtonElement>('[data-slot="toast-action"]')!;
+    await act(async () => action.focus());
+    expect(document.activeElement).toBe(action);
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+    vi.unstubAllGlobals();
+  }
+});
+
+/** Provider-limited cards must stay inaccessible even when the stone stack is expanded by keyboard focus. */
+it("retains the default provider limit when the stone viewport receives focus", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  try {
+    await act(async () =>
+      root.render(<ToastProvider timeout={0} stack="stone" position="bottom-right" />),
+    );
+    await act(async () => {
+      toastManager.add({ title: "First" });
+      toastManager.add({ title: "Second" });
+      toastManager.add({ title: "Third" });
+      toastManager.add({ title: "Fourth" });
+      toastManager.add({ title: "Fifth" });
+    });
+    const viewport = document.querySelector<HTMLElement>('[data-slot="toast-viewport"]')!;
+    expect(viewport.querySelector(".ov2-toast-count")?.textContent).toBe("+4");
+    await act(async () => viewport.focus());
+    const fourth = viewport.querySelector<HTMLElement>('[data-stack-layer="3"]')!;
+    const fifth = viewport.querySelector<HTMLElement>('[data-stack-layer="4"]')!;
+    expect(fourth.hasAttribute("data-expanded")).toBe(true);
+    expect(fourth.hasAttribute("data-limited")).toBe(true);
+    expect(fifth.hasAttribute("data-limited")).toBe(true);
+    expect(fourth.hasAttribute("inert")).toBe(true);
+    expect(fifth.hasAttribute("inert")).toBe(true);
+    expect(fourth.hasAttribute("data-stack-hidden")).toBe(true);
+    expect(fifth.hasAttribute("data-stack-hidden")).toBe(true);
+    expect(viewport.querySelector(".ov2-toast-count")).toBeNull();
+    expect(
+      viewport.querySelector('[data-stack-layer="2"]')?.hasAttribute("data-stack-hidden"),
+    ).toBe(false);
+    expect(viewport.querySelector('[data-stack-layer="2"]')?.hasAttribute("inert")).toBe(false);
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+    vi.unstubAllGlobals();
+  }
+});
+
 it.each([
   { data: {}, copyAvailable: true },
   { data: { appearance: "error-stripe" as const }, copyAvailable: false },

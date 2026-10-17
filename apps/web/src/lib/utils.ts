@@ -325,6 +325,7 @@ const twMerge = extendTailwindMerge({
         "ov2-stack-back",
         "ov2-stack-far",
         "ov2-count",
+        "ov2-error-stripe",
       ],
       "inset-shadow": [
         "selected",

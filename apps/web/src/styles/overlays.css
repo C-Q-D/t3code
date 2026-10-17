@@ -315,10 +315,6 @@ body:has([data-onboarding-route]) [data-titlebar-brand] {
   visibility: hidden;
 }
 
-[data-slot="toast-viewport"][data-stack="stone"]:has([data-expanded]) .ov2-toast-count {
-  opacity: 0;
-}
-
 [data-slot="toast-icon"][data-tone="neutral"] {
   background: var(--color-toast-loading-tile);
   box-shadow: none;
@@ -341,4 +337,21 @@ body:has([data-onboarding-route]) [data-titlebar-brand] {
   [data-stack="stone"][data-position]:not([data-slot="toast-viewport"]) {
     transition: none;
   }
+}
+
+/* OV2 review: compose DC6 L4's 3px stripe with S1 elevation; settings.css remains authoritative when expanded. */
+@theme {
+  --shadow-ov2-error-stripe: inset 3px 0 0 var(--color-error);
+}
+
+[data-stack="stone"][data-appearance="error-stripe"][data-stack-layer="0"]:not([data-expanded]) {
+  box-shadow: var(--shadow-ov2-error-stripe), var(--shadow-ov2-stack-front);
+}
+
+[data-stack="stone"][data-appearance="error-stripe"][data-stack-behind]:not([data-expanded]) {
+  box-shadow: var(--shadow-ov2-error-stripe), var(--shadow-ov2-stack-back);
+}
+
+[data-stack="stone"][data-appearance="error-stripe"][data-stack-layer="2"]:not([data-expanded]) {
+  box-shadow: var(--shadow-ov2-error-stripe), var(--shadow-ov2-stack-far);
 }

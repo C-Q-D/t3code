@@ -1,13 +1,44 @@
 /** Pure presentation decisions for toast visibility, stacking, actions, and determinate progress. */
 import type { ScopedThreadRef, ThreadId } from "@t3tools/contracts";
 
-/** Returns S1's pixel insets and visibility for a zero-based visible layer; only the first three layers are shown. */
-export function getStoneToastLayer(visibleIndex: number) {
+/**
+ * Derives S1 geometry, visibility, and badge membership from a zero-based visible index
+ * and Base UI state. Collapsed stacks show three stone layers; expanded stacks honor
+ * the provider limit. Pending cards, including limited ones, remain in the collapsed
+ * badge count until they close, preserving the existing count semantics.
+ */
+export function getStoneToastLayer(
+  visibleIndex: number,
+  {
+    expanded = false,
+    limited = false,
+    transitionStatus,
+  }: {
+    expanded?: boolean;
+    limited?: boolean | undefined;
+    transitionStatus?: "starting" | "ending" | "idle" | undefined;
+  } = {},
+) {
   return {
     inset: visibleIndex * 12,
     offset: visibleIndex === 0 ? 0 : visibleIndex * -10,
-    hidden: visibleIndex >= 3,
+    hidden: limited || (!expanded && visibleIndex >= 3),
+    countsAsRemaining: !expanded && visibleIndex > 0 && transitionStatus !== "ending",
   };
+}
+
+/** Counts pending back cards using the same S1 state decision as visibility and inert; expanded stacks have no badge. */
+export function countStoneToastRemaining(
+  items: readonly {
+    visibleIndex: number;
+    toast: { limited?: boolean | undefined; transitionStatus?: "starting" | "ending" | undefined };
+  }[],
+  expanded: boolean,
+) {
+  return items.filter(
+    ({ visibleIndex, toast }) =>
+      getStoneToastLayer(visibleIndex, { ...toast, expanded }).countsAsRemaining,
+  ).length;
 }
 
 /**

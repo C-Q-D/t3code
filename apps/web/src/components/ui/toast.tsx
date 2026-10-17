@@ -34,6 +34,7 @@ import { useCopyToClipboard } from "~/hooks/useCopyToClipboard";
 import { resolveThreadRouteTarget } from "~/threadRoutes";
 import {
   buildVisibleToastLayout,
+  countStoneToastRemaining,
   getStoneToastLayer,
   hasVisibleToastAction,
   resolveToastProgressPercent,
@@ -583,8 +584,6 @@ function Toasts({ position, stack }: { position: ToastPosition; stack?: "stone" 
     shouldRenderThreadScopedToast(toast.data, activeThreadRef),
   );
   const visibleToastLayout = buildVisibleToastLayout(visibleToasts);
-  const remainingCount =
-    visibleToasts.filter((toast) => toast.transitionStatus !== "ending").length - 1;
 
   useEffect(() => {
     const activeToastIds = new Set(toasts.map((toast) => toast.id));
@@ -611,20 +610,32 @@ function Toasts({ position, stack }: { position: ToastPosition; stack?: "stone" 
         data-position={position}
         data-stack={stack}
         data-slot="toast-viewport"
+        render={
+          stack === "stone"
+            ? (viewportProps, { expanded }) => {
+                const remainingCount = countStoneToastRemaining(visibleToastLayout.items, expanded);
+                return (
+                  <div {...viewportProps}>
+                    {remainingCount > 0 ? (
+                      <span
+                        aria-hidden
+                        className="ov2-toast-count pointer-events-none absolute right-2.5 z-10000 flex h-5.5 items-center rounded-full bg-accent px-2.25 font-mono text-meta text-code-foreground shadow-ov2-count"
+                      >
+                        +{remainingCount}
+                      </span>
+                    ) : null}
+                    {viewportProps.children}
+                  </div>
+                );
+              }
+            : undefined
+        }
         style={
           {
             "--toast-frontmost-height": `${visibleToastLayout.frontmostHeight}px`,
           } as CSSProperties
         }
       >
-        {stack === "stone" && remainingCount > 0 ? (
-          <span
-            aria-hidden
-            className="ov2-toast-count pointer-events-none absolute right-2.5 z-10000 flex h-5.5 items-center rounded-full bg-accent px-2.25 font-mono text-meta text-code-foreground shadow-ov2-count"
-          >
-            +{remainingCount}
-          </span>
-        ) : null}
         {visibleToastLayout.items.map(({ toast, visibleIndex, offsetY }) => {
           const stoneLayer = stack === "stone" ? getStoneToastLayer(visibleIndex) : undefined;
           const hideCollapsedContent = shouldHideCollapsedToastContent(
@@ -640,7 +651,21 @@ function Toasts({ position, stack }: { position: ToastPosition; stack?: "stone" 
               data-stack={stack}
               data-stack-layer={stoneLayer ? visibleIndex : undefined}
               data-stack-behind={stack === "stone" && visibleIndex > 0 ? "" : undefined}
-              data-stack-hidden={stoneLayer?.hidden ? "" : undefined}
+              render={
+                stack === "stone"
+                  ? (rootProps, state) => {
+                      const { hidden } = getStoneToastLayer(visibleIndex, state);
+                      return (
+                        <div
+                          {...rootProps}
+                          data-stack-hidden={hidden ? "" : undefined}
+                          inert={hidden}
+                          aria-hidden={hidden || undefined}
+                        />
+                      );
+                    }
+                  : undefined
+              }
               className={cn(
                 "dropdown-glass absolute z-[calc(9999-var(--toast-index))] w-full overflow-visible select-none rounded-overlay text-foreground text-shadow-stone [transition:transform_.5s_cubic-bezier(.22,1,.36,1),opacity_.5s,height_.15s]",
                 // Base positioning using data-position
