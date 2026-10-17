@@ -165,6 +165,11 @@ export function CommandPaletteVirtualizedResults(props: CommandPaletteVirtualize
   );
 }
 
+/**
+ * Displays an unavailable result without registering a selectable command or execution handler.
+ * @param props.item Action or submenu data whose title, icon, and optional metadata are displayed.
+ * @returns A presentation-only row; it never invokes the item's action or opens its submenu.
+ */
 function DisabledCommandPaletteResultRow(props: {
   item: CommandPaletteActionItem | CommandPaletteSubmenuItem;
 }) {
@@ -200,6 +205,15 @@ function DisabledCommandPaletteResultRow(props: {
   );
 }
 
+/**
+ * Displays an available result while leaving command execution and submenu navigation to its owner.
+ * @param props.index Optional item index supplied by the virtualized list for keyboard navigation.
+ * @param props.item Action or submenu data to display and pass unchanged to the execution callback.
+ * @param props.isActive Whether the owner currently highlights this result.
+ * @param props.keybindings Resolved bindings used to display the item's shortcut, when configured.
+ * @param props.onExecuteItem Called with the item on click; the owner handles execution and errors.
+ * @returns A selectable row that preserves input focus on mouse down; keyboard execution stays with the parent.
+ */
 function CommandPaletteResultRow(props: {
   index?: number;
   item: CommandPaletteActionItem | CommandPaletteSubmenuItem;
