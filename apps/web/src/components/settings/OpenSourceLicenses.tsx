@@ -58,7 +58,10 @@ function loadLicenseManifest(): Promise<ThirdPartyLicenseManifest> {
   return licenseManifestPromise;
 }
 
-/** Renders a real manifest entry; open and onOpenChange keep expansion controlled by the parent. */
+/**
+ * Renders a real manifest entry; open and onOpenChange keep expansion controlled by the parent.
+ * Package names and versions can shrink and wrap unbroken text to preserve the trailing controls.
+ */
 function LicenseNoticeRow({
   entry,
   open,
@@ -78,11 +81,13 @@ function LicenseNoticeRow({
             </span>
             <span className="flex min-w-0 flex-1 flex-col gap-0.25">
               <span className="flex min-w-0 flex-wrap items-baseline gap-2">
-                <span className="break-words text-control leading-normal font-semibold text-foreground">
+                <span className="min-w-0 text-control leading-normal font-semibold wrap-anywhere text-foreground">
                   {entry.name}
                 </span>
                 {entry.version ? (
-                  <code className="text-secondary-copy text-muted-foreground">{entry.version}</code>
+                  <code className="min-w-0 text-secondary-copy wrap-anywhere text-muted-foreground">
+                    {entry.version}
+                  </code>
                 ) : null}
               </span>
               <span className="text-secondary-copy-medium leading-normal text-secondary-label">
