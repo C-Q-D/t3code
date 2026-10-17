@@ -127,8 +127,15 @@ export function DiscussionListPage() {
                             : "flex flex-col gap-2.5 rounded-slab bg-surface-raised p-2 shadow-raise-l outline-none hover:bg-secondary focus-visible:inset-shadow-focus"
                         }
                       >
+                        {/* Name participants once; decorative seats must not add individual image names to the link. */}
+                        <span className="sr-only">
+                          {item.seats.map((seat) => seat.personaName).join("、")}
+                        </span>
                         {ended ? (
-                          <span className="flex min-w-15.5 shrink-0 items-center -space-x-1.5">
+                          <span
+                            aria-hidden="true"
+                            className="flex min-w-15.5 shrink-0 items-center -space-x-1.5"
+                          >
                             {item.seats.map((seat, index) => (
                               <span
                                 key={seat.id}
@@ -146,7 +153,10 @@ export function DiscussionListPage() {
                             ))}
                           </span>
                         ) : (
-                          <div className="relative h-37.5 overflow-hidden rounded-card-row bg-well-surface shadow-discussion-list-well">
+                          <div
+                            aria-hidden="true"
+                            className="relative h-37.5 overflow-hidden rounded-card-row bg-well-surface shadow-discussion-list-well"
+                          >
                             <div className="absolute top-11 left-1/2 flex size-24 -translate-x-1/2 flex-col items-center justify-center rounded-full bg-discussion-list-table shadow-discussion-list-table">
                               <span className="font-serif text-discussion-table-title font-bold">
                                 {item.cursor.round}
