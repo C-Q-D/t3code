@@ -1,6 +1,6 @@
 /** Renders web conversation items, activity folds and attachment previews. */
 import { PixelSubagentIcon, PixelThinkIcon } from "../icons/PixelLucideIcon";
-import { getSubagentPixelIconName } from "../icons/subagentPixelIcon";
+import { PixelIcon } from "../icons/PixelIcon";
 import { t } from "~/i18n";
 import { ThreadFindTimelineContext } from "./ThreadFindProvider";
 import { shouldPreserveAssistantLineBreaks } from "@t3tools/shared/markdownPipeline";
@@ -127,6 +127,7 @@ import { T3Wordmark } from "../T3Wordmark";
 import { ThreadContextChip } from "../ThreadContextChip";
 import {
   CheckIcon,
+  SparklesIcon,
   CalendarClockIcon,
   ChevronDownIcon,
   ChevronRightIcon,
@@ -134,6 +135,7 @@ import {
   CircleAlertIcon,
   DownloadIcon,
   EyeIcon,
+  FileTextIcon,
   GitForkIcon,
   GlobeIcon,
   type LucideIcon,
@@ -289,7 +291,6 @@ import { useV2ItemSupport } from "../../state/v2ItemSupport";
 import { Collapsible, CollapsibleTrigger, CollapsiblePanel } from "../ui/collapsible";
 import {
   isV2LifecycleItem,
-  SubagentAvatar,
   SubagentElapsed,
   SubagentNotificationLink,
   V2LifecycleRow,
@@ -2686,7 +2687,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
                     }
                   : {})}
                 variant="ghost"
-                size="icon-xs"
+                size="icon-md"
               />
             )}
             {promptLink !== null && (
@@ -2695,7 +2696,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
                 label="Copy prompt link"
                 icon={LinkIconNode}
                 variant="ghost"
-                size="icon-xs"
+                size="icon-md"
               />
             )}
           </div>
@@ -2799,8 +2800,8 @@ function RevertUserMessageButton({
         render={
           <Button
             type="button"
-            size="icon-xs"
-            variant="ghost"
+            size="icon-md"
+            variant="ghost-muted"
             disabled={activity.isRevertingCheckpoint || activity.isWorking}
             onClick={() => ctx.onRevertToTurnCount(turnCount, messageId)}
             aria-label={t.chat.timeline.editFromHere}
@@ -2858,23 +2859,23 @@ function TurnFoldTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "turn-
   const ctx = use(TimelineRowCtx);
 
   return (
-    <div className="group/timeline-row relative flex items-center gap-1 border-b border-border/60 pb-2 pe-0.5 pt-1">
-      <button
-        type="button"
-        aria-expanded={row.expanded}
-        data-scroll-anchor-ignore
-        onClick={() => ctx.onToggleTurnFold(row.runId)}
-        className="flex cursor-pointer select-none items-center gap-1 rounded-md px-1 text-sm leading-relaxed text-muted-foreground tabular-nums transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70"
-      >
-        <span>{row.label}</span>
-        <MorphIcon className="size-3.5" icon={row.expanded ? ChevronDown : ChevronRight} />
-      </button>
-      <TimelineRowTimestamp
-        createdAt={row.createdAt}
-        timestampFormat={ctx.timestampFormat}
-        className="ms-auto"
-      />
-    </div>
+    <WorkLogButton
+      presentation="summary"
+      aria-expanded={row.expanded}
+      data-scroll-anchor-ignore
+      onClick={() => ctx.onToggleTurnFold(row.runId)}
+      icon={<SparklesIcon aria-hidden className="size-3.75 text-secondary-label" />}
+      label={<span className="font-semibold text-foreground tabular-nums">{row.label}</span>}
+      trailing={
+        <>
+          <TimelineRowTimestamp createdAt={row.createdAt} timestampFormat={ctx.timestampFormat} />
+          <MorphIcon
+            className="size-3.5 text-muted-foreground"
+            icon={row.expanded ? ChevronDown : ChevronRight}
+          />
+        </>
+      }
+    />
   );
 }
 
@@ -3536,57 +3537,46 @@ const V2SubagentGroup = memo(function V2SubagentGroup({
         <CollapsibleTrigger
           aria-label={label}
           aria-description={statusSummary}
-          className={cn(
-            "flex w-full min-w-0 items-center gap-3 py-2 text-left transition-opacity hover:opacity-100",
-            expanded || summary.active
-              ? "text-foreground opacity-100"
-              : "text-muted-foreground opacity-55",
-          )}
-        >
-          <span className="flex shrink-0 items-center -space-x-1.5" aria-hidden>
-            {agents.slice(0, 3).map(({ item, status }) => (
-              <SubagentAvatar
-                key={item.id}
-                pixelIconName={getSubagentPixelIconName(item.driver, item.subagentId, liveAgents)}
-                driver={item.driver}
-                provider={ctx.providerStatuses.find(
-                  (provider) => provider.instanceId === item.providerInstanceId,
-                )}
-                status={agents.length === 1 ? status : undefined}
-              />
-            ))}
-            {agents.length > 3 ? (
-              <span className="inline-flex size-6 items-center justify-center rounded-full bg-muted text-3xs font-medium text-muted-foreground ring-2 ring-background">
-                +{agents.length - 3}
-              </span>
-            ) : null}
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-xs font-semibold">{label}</span>
-            <span
-              className={cn(
-                "block truncate text-3xs text-muted-foreground",
-                summary.active ? "text-info" : summary.failed && "text-destructive",
-              )}
-            >
-              {statusSummary}
-            </span>
-          </span>
-          <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-            <SubagentElapsed agent={subagentGroupTiming(agents)} />
-          </span>
-          <ChevronDownIcon
-            aria-hidden
-            className={cn(
-              "size-3.5 shrink-0 text-muted-foreground transition-transform",
-              expanded && "rotate-180",
-            )}
-          />
-        </CollapsibleTrigger>
+          render={
+            <WorkLogButton
+              disclosure={
+                <ChevronRightIcon
+                  aria-hidden
+                  className={cn(
+                    "size-3.25 shrink-0 text-muted-foreground",
+                    expanded && "rotate-90",
+                  )}
+                />
+              }
+              icon={<PixelIcon name="subagent" size={14} />}
+              label={
+                <span className="flex min-w-0 items-center gap-2">
+                  <span className="truncate">{label}</span>
+                  <span aria-hidden className="text-placeholder">
+                    ·
+                  </span>
+                  <span
+                    className={cn(
+                      "min-w-0 flex-1 truncate text-muted-foreground",
+                      summary.failed && "text-error",
+                    )}
+                  >
+                    {statusSummary}
+                  </span>
+                </span>
+              }
+              trailing={
+                <span className="shrink-0 text-secondary-copy text-muted-foreground tabular-nums">
+                  <SubagentElapsed agent={subagentGroupTiming(agents)} />
+                </span>
+              }
+            />
+          }
+        />
         {/* Virtualized rows must settle before disclosure scroll anchoring resumes. */}
         <CollapsiblePanel animate={false}>
           {expanded ? (
-            <div className="mt-1 mb-1 rounded-lg border border-border/60 bg-card/30 p-1">
+            <div className="ms-8.5 me-1.5 flex flex-col gap-0.5">
               {members.map((item) => (
                 <V2LifecycleRow
                   environmentId={ctx.activeThreadEnvironmentId}
@@ -3708,8 +3698,8 @@ function WorkingTimer({ createdAt }: { createdAt: string }) {
   );
 }
 
-// Matches the grouped WorkLog row's min-h-6.
-const compactWorkEntryHeight = 24;
+// D1 labels occupy 32px plus a 2px row gap; include both in the virtualizer's initial estimate.
+const compactWorkEntryHeight = 34;
 
 /**
  * Renders an expanded work group while preserving its scroll and disclosure anchors.
@@ -4004,14 +3994,19 @@ function ThinkingTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "think
   // Reserve the activity row during setup so the handoff keeps the same height.
   if (isPreparingWorktree || isCompacting) return <WorkLogRow label="" />;
   const activity = (
-    <LiveActivityRow label={t.chat.timeline.thinking} iconName="brain" active shimmer />
+    <LiveActivityRow
+      label={t.chat.timeline.thinking}
+      iconName="brain"
+      active
+      expanded={row.groupId === undefined ? undefined : row.expanded === true}
+    />
   );
   const { groupId } = row;
   if (groupId === undefined) return activity;
   return (
     <button
       type="button"
-      className="group/live-work flex min-h-6 w-full max-w-full cursor-pointer items-center rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70"
+      className="group/live-work flex w-full max-w-full cursor-pointer items-center rounded-compact-row text-left focus-visible:outline-none focus-visible:inset-shadow-focus"
       aria-expanded={row.expanded === true}
       onClick={() => ctx.onToggleWorkGroup(groupId, row.id)}
     >
@@ -4020,49 +4015,39 @@ function ThinkingTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "think
   );
 }
 
+/** Use static status color for live work so long conversations do not continuously repaint. */
 function LiveActivityRow({
   label,
   iconName,
   toolIcon,
   failed = false,
   active = false,
-  shimmer = false,
+  expanded,
 }: {
   label: ReactNode;
   iconName?: WorkEntryIconName;
   toolIcon?: ToolActivityIcon | undefined;
   failed?: boolean;
   active?: boolean;
-  shimmer?: boolean;
+  expanded?: boolean | undefined;
 }) {
-  const animated = active && !failed;
-  const showShimmer = animated && shimmer;
   return (
-    <div
-      ref={animated ? observeVisibleAnimation : undefined}
-      className="relative min-h-6 w-fit max-w-full min-w-0 overflow-hidden rounded-md text-sm leading-relaxed"
-    >
-      <LiveActivityContent
-        label={label}
-        iconName={iconName}
-        toolIcon={toolIcon}
-        failed={failed}
-        announceFailure={failed}
-        active={animated && !shimmer}
-      />
-      {showShimmer ? (
-        <ActivityShimmerOverlay>
-          <LiveActivityContent label={label} iconName={iconName} toolIcon={toolIcon} highlighted />
-        </ActivityShimmerOverlay>
-      ) : null}
-    </div>
+    <LiveActivityContent
+      label={label}
+      iconName={iconName}
+      toolIcon={toolIcon}
+      failed={failed}
+      announceFailure={failed}
+      active={active && !failed}
+      expanded={expanded}
+    />
   );
 }
 
 /**
  * Renders an activity label with tool status and optional failure announcement.
  * @param props - label may be null or empty; iconName may be undefined and toolIcon is optional.
- * failed, announceFailure, active, and highlighted default to false.
+ * failed, announceFailure and active default to false. Undefined expanded means no group disclosure.
  * @returns The activity content element; never null.
  */
 function LiveActivityContent({
@@ -4072,7 +4057,7 @@ function LiveActivityContent({
   failed = false,
   announceFailure = false,
   active = false,
-  highlighted = false,
+  expanded,
 }: {
   label: ReactNode;
   iconName: WorkEntryIconName | undefined;
@@ -4080,23 +4065,23 @@ function LiveActivityContent({
   failed?: boolean;
   announceFailure?: boolean;
   active?: boolean;
-  highlighted?: boolean;
+  expanded?: boolean | undefined;
 }) {
   const showTrailingFailureMark =
     failed && iconName !== undefined && !toolIconAcceptsTint(toolIcon);
 
   return (
     <WorkLogRow
+      presentation={expanded === undefined ? "entry" : expanded ? "header" : "summary"}
+      disclosure={
+        expanded ? <ChevronDownIcon aria-hidden className="size-3.5 shrink-0" /> : undefined
+      }
       icon={
         iconName ? (
           <span
             className={cn(
-              "flex size-4 items-center justify-center",
-              failed
-                ? failedToolIconClassName
-                : highlighted
-                  ? "text-foreground"
-                  : "text-icon-muted",
+              "flex size-3.5 items-center justify-center",
+              failed ? failedToolIconClassName : "text-secondary-label",
             )}
             role={announceFailure ? "img" : undefined}
             aria-label={announceFailure ? t.chat.timeline.toolCallFailed : undefined}
@@ -4104,27 +4089,26 @@ function LiveActivityContent({
             <ToolActivityIconView
               icon={toolIcon}
               fallbackName={iconName}
-              className="block size-4 shrink-0 stroke-2"
-              muted={!highlighted}
+              className="block size-3.5 shrink-0 stroke-2"
+              muted
             />
           </span>
         ) : null
       }
       label={
-        <span
-          className={cn(
-            "block truncate",
-            highlighted && "text-foreground",
-            active && "live-tool-shine",
-          )}
-        >
-          {label}
+        <span className={cn("block truncate", active && "font-bold text-update")}>
+          {expanded && active ? t.chat.timeline.working : label}
         </span>
       }
       trailing={
-        showTrailingFailureMark ? (
-          <XIcon aria-hidden className={cn("size-3 shrink-0", failedToolIconClassName)} />
-        ) : null
+        <>
+          {showTrailingFailureMark ? (
+            <XIcon aria-hidden className={cn("size-3 shrink-0", failedToolIconClassName)} />
+          ) : null}
+          {expanded === false ? (
+            <ChevronRightIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+          ) : null}
+        </>
       }
     />
   );
@@ -4205,8 +4189,8 @@ function LiveWorkEntryTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "
     <button
       type="button"
       className={cn(
-        "group/live-work flex w-full max-w-full cursor-pointer rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70",
-        thoughtLine ? "flex-col items-start" : "min-h-6 items-center",
+        "group/live-work flex w-full max-w-full cursor-pointer rounded-compact-row text-left focus-visible:outline-none focus-visible:inset-shadow-focus",
+        thoughtLine ? "flex-col items-start" : "items-center",
       )}
       aria-label={
         failed
@@ -4277,6 +4261,7 @@ function LiveWorkEntryTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "
         toolIcon={row.entry.toolIcon ?? row.entry.toolSource?.icon}
         failed={failed}
         active={row.active}
+        expanded={row.expanded}
       />
     </button>
   );
@@ -4294,7 +4279,7 @@ function toolGroupSummaryIconName(
     case "unwatch-pr":
       return "pull-request";
     case "read":
-      return "eye";
+      return "file-text";
     case "edit":
       return "square-pen";
     case "command":
@@ -4364,7 +4349,10 @@ function WorkGroupHeader(props: {
 }) {
   return (
     <WorkLogButton
-      ref={props.active && !props.failed ? observeVisibleAnimation : undefined}
+      presentation={props.expanded ? "header" : "summary"}
+      disclosure={
+        props.expanded ? <ChevronDownIcon aria-hidden className="size-3.5 shrink-0" /> : undefined
+      }
       aria-label={props.failed ? t.chat.timeline.toolFailure(props.label) : props.label}
       aria-expanded={props.expanded}
       onClick={props.onToggle}
@@ -4372,17 +4360,30 @@ function WorkGroupHeader(props: {
         <ToolActivityIconView
           icon={props.toolIcon}
           fallbackName={props.iconName}
-          className="size-4 shrink-0 stroke-2 text-icon-muted"
+          className="size-3.5 shrink-0 stroke-2 text-secondary-label"
           muted
         />
       }
       label={
-        <span className={cn("block truncate", props.active && !props.failed && "live-tool-shine")}>
+        <span
+          className={cn(
+            "block truncate font-semibold",
+            props.active && !props.failed ? "text-update" : "text-foreground",
+          )}
+        >
           {props.label}
         </span>
       }
       trailing={
-        <TimelineRowTimestamp createdAt={props.createdAt} timestampFormat={props.timestampFormat} />
+        <>
+          <TimelineRowTimestamp
+            createdAt={props.createdAt}
+            timestampFormat={props.timestampFormat}
+          />
+          {!props.expanded ? (
+            <ChevronRightIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+          ) : null}
+        </>
       }
     />
   );
@@ -5239,6 +5240,7 @@ type WorkEntryIconName =
   | "code"
   | "device"
   | "eye"
+  | "file-text"
   | "globe"
   | "hammer"
   | "message-circle"
@@ -5452,6 +5454,8 @@ function WorkEntryIcon({ name, className }: { name: WorkEntryIconName; className
       return <CircleAlertIcon className={className} aria-hidden />;
     case "eye":
       return <EyeIcon className={className} aria-hidden />;
+    case "file-text":
+      return <FileTextIcon className={className} aria-hidden />;
     case "globe":
       return <GlobeIcon className={className} aria-hidden />;
     case "hammer":
@@ -5595,6 +5599,7 @@ function workEntryIconName(workEntry: TimelineWorkEntry): WorkEntryIconName {
     return "message-circle";
   }
   if (workEntry.toolSurface) return workEntry.toolSurface;
+  if (toolGroupAction(workEntry) === "read") return "file-text";
   if (
     workEntry.structuredPayload?.type === "dynamic_tool" &&
     isJavaScriptReplTool(workEntry.structuredPayload.toolName)
@@ -5899,7 +5904,7 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
     : showDestructiveRowStyle
       ? "font-medium text-destructive"
       : workLogEntryIsToolLike(workEntry)
-        ? "text-secondary-label"
+        ? "text-code-foreground"
         : "text-foreground/80";
   const threadLabel = isReasoning ? null : threadReadLabel(workEntry, threadTarget);
   const accessiblePreview = [threadLabel?.text ?? previewText, answerPreview]
@@ -5929,6 +5934,16 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
       data-v2-item-type={workEntry.projectedItem?.item.type}
       data-v2-item-visibility={workEntry.projectedItem?.visibility}
       {...rowToggleProps}
+      disclosure={
+        <ChevronRightIcon
+          aria-hidden
+          className={cn(
+            "size-3.25 shrink-0 text-muted-foreground",
+            !canExpandProjectedItem && "invisible",
+            expanded && "rotate-90",
+          )}
+        />
+      }
       icon={
         <span
           className={iconWrapperClass}
@@ -5938,14 +5953,14 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
           <ToolActivityIconView
             icon={entryToolIcon}
             fallbackName={entryIconName}
-            className="block size-4 shrink-0 stroke-2"
+            className="block size-3.5 shrink-0 stroke-2"
             muted
           />
         </span>
       }
       label={
         <div className="min-w-0 flex-1 overflow-hidden">
-          <p className="flex min-w-0 w-full items-baseline gap-1.5 text-sm leading-relaxed">
+          <p className="flex min-w-0 w-full items-baseline gap-1.5 text-secondary-copy-large">
             <span
               className={cn(answerPreview ? "min-w-0" : "min-w-0 flex-1", "truncate", headingClass)}
             >
@@ -6026,20 +6041,6 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
             <XIcon aria-hidden className={cn("size-3 shrink-0", failedToolIconClassName)} />
           ) : null}
           <TimelineRowTimestamp createdAt={workEntry.createdAt} timestampFormat={timestampFormat} />
-          <span
-            className={cn(
-              "flex size-4 shrink-0 items-center justify-center",
-              !canExpandProjectedItem && "invisible",
-            )}
-            aria-hidden
-          >
-            <ChevronRightIcon
-              className={cn(
-                "size-3 shrink-0 text-icon-muted opacity-70 transition-transform duration-200",
-                expanded && "rotate-90",
-              )}
-            />
-          </span>
         </>
       }
     >

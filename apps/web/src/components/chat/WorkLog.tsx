@@ -1,16 +1,8 @@
-import {
-  createContext,
-  use,
-  useLayoutEffect,
-  useRef,
-  type ComponentProps,
-  type ReactNode,
-} from "react";
+/** Shared work-log geometry joins separately virtualized headers and entries without measuring them. */
+import { useLayoutEffect, useRef, type ComponentProps, type ReactNode } from "react";
 import { cn } from "../../lib/utils";
 
-const GroupedRows = createContext(false);
-
-/** Groups may span virtualized timeline items. Each part owns its trailing space. */
+/** Split the stone surface at virtual-list boundaries; each part owns its trailing space. */
 export function WorkLogBlock({
   layout = "standalone",
   continues = false,
@@ -30,48 +22,54 @@ export function WorkLogBlock({
             : "pb-2"
       }
     >
-      {children}
+      <div
+        className={cn(
+          layout === "group-header" &&
+            "timeline-worklog-header rounded-t-card-surface bg-sidebar-row-hover px-1.5 pt-1.5 shadow-raise-m",
+          layout === "group-content" &&
+            "timeline-worklog-content rounded-b-card-surface bg-sidebar-row-hover px-1.5 pb-2 shadow-timeline-log-content",
+        )}
+      >
+        {children}
+      </div>
     </div>
   );
 }
 
 /** Expanded members align with the header and use the same compact row geometry. */
 export function WorkLogList({ children }: { children: ReactNode }) {
-  return (
-    <GroupedRows value>
-      <div className="flex min-w-0 flex-col">{children}</div>
-    </GroupedRows>
-  );
+  return <div className="flex min-w-0 flex-col">{children}</div>;
 }
 
 type RowContent = {
+  disclosure?: ReactNode;
   icon?: ReactNode;
   label: ReactNode;
   trailing?: ReactNode;
   wrapLabel?: boolean;
+  presentation?: "entry" | "summary" | "header";
 };
 
-function WorkLogLine({ icon, label, trailing, wrapLabel }: RowContent) {
+/** Keep the label line fixed-height; expanded detail lives outside it for stable size estimates. */
+function WorkLogLine({ disclosure, icon, label, trailing, wrapLabel, presentation }: RowContent) {
   return (
     <div
       className={cn(
-        "flex min-h-6 min-w-0 gap-1.5 text-sm leading-relaxed select-none [&_*]:select-none",
+        "flex min-w-0 gap-2 text-secondary-copy-large select-none [&_*]:select-none",
+        presentation === "header" ? "min-h-9.5" : "min-h-8",
+        presentation !== "summary" &&
+          "rounded-compact-row px-3 group-hover/log-control:bg-timeline-log-hover",
         wrapLabel ? "items-start" : "items-center",
       )}
     >
-      <div className="flex min-w-0 flex-1 items-baseline gap-1.5">
+      {disclosure}
+      <div className="flex min-w-0 flex-1 items-center gap-2">
         {icon ? (
-          // Align with the first line's capital letters. Centering line boxes drifts
-          // when font ascent/descent rounding changes at fractional browser zoom.
-          <span className="relative w-6 shrink-0 leading-0">
-            <span className="inline-block size-6 overflow-hidden align-[calc(0.5cap_-_0.75rem)]">
-              <span className="flex size-full items-center justify-center">{icon}</span>
-            </span>
-          </span>
+          <span className="flex size-3.5 shrink-0 items-center justify-center">{icon}</span>
         ) : null}
         <div
           className={cn(
-            "min-w-0 flex-1 text-secondary-label",
+            "min-w-0 flex-1 text-code-foreground",
             !wrapLabel && "truncate [&_*]:whitespace-nowrap",
           )}
         >
@@ -84,46 +82,70 @@ function WorkLogLine({ icon, label, trailing, wrapLabel }: RowContent) {
 }
 
 const interactionClassName =
-  "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70";
+  "cursor-pointer focus-visible:outline-none focus-visible:inset-shadow-focus";
 
-function useRowClassName(interactive: boolean) {
-  const grouped = use(GroupedRows);
+/** Callers select a D1 presentation instead of overriding shared row geometry. */
+function rowClassName(interactive: boolean, presentation: RowContent["presentation"]) {
   return cn(
-    "group/timeline-row relative w-full min-w-0 rounded-md px-0.5 text-left transition-colors",
-    grouped ? "py-0" : "py-0.5",
+    "group/timeline-row relative min-w-0 text-left",
+    presentation === "summary"
+      ? "w-fit max-w-full rounded-card-row bg-popover ps-2.5 pe-3.5 shadow-raise-xs-control"
+      : presentation === "entry"
+        ? "w-full pb-0.5"
+        : "w-full",
+    presentation !== "summary" && "rounded-compact-row",
+    interactive && "group/log-control",
     interactive && interactionClassName,
   );
 }
 
-// No className/style escape hatch: consumers supply content and behavior, not geometry.
+/** Keep disclosure behavior native while owning D1 row geometry instead of accepting style overrides. */
 export function WorkLogButton({
+  disclosure,
   icon,
   label,
   trailing,
   wrapLabel = false,
+  presentation = "entry",
   ...buttonProps
 }: RowContent & Omit<ComponentProps<"button">, "className" | "style" | "children">) {
-  const className = useRowClassName(true);
+  const className = rowClassName(true, presentation);
   return (
     <button {...buttonProps} type="button" className={className}>
-      <WorkLogLine icon={icon} label={label} trailing={trailing} wrapLabel={wrapLabel} />
+      <WorkLogLine
+        disclosure={disclosure}
+        icon={icon}
+        label={label}
+        trailing={trailing}
+        wrapLabel={wrapLabel}
+        presentation={presentation}
+      />
     </button>
   );
 }
 
 /** Div-based disclosure supports selectable detail and nested actions in an entry. */
 export function WorkLogRow({
+  disclosure,
   icon,
   label,
   trailing,
   wrapLabel = false,
+  presentation = "entry",
   children,
   ...rowProps
 }: RowContent & Omit<ComponentProps<"div">, "className" | "style">) {
-  const className = useRowClassName(rowProps.onClick !== undefined);
+  const className = rowClassName(rowProps.onClick !== undefined, presentation);
   return (
     <div {...rowProps} className={className}>
-      <WorkLogLine icon={icon} label={label} trailing={trailing} wrapLabel={wrapLabel} />
+      <WorkLogLine
+        disclosure={disclosure}
+        icon={icon}
+        label={label}
+        trailing={trailing}
+        wrapLabel={wrapLabel}
+        presentation={presentation}
+      />
       {children}
     </div>
   );
@@ -162,9 +184,9 @@ export function WorkLogDetails({
       className={cn(
         "cursor-auto",
         kind === "text"
-          ? "ms-7 flex max-h-96 flex-col gap-3 overflow-auto px-0.5 py-1 select-text"
+          ? "ms-8.5 me-1.5 flex max-h-96 flex-col gap-3 overflow-auto py-1 select-text"
           : kind === "panel"
-            ? "mt-0.5 mb-1.5 pb-2"
+            ? "ms-8.5 me-1.5 mt-0.5 mb-1 rounded-timeline-command bg-code px-3.5 py-2.5 text-terminal-copy leading-terminal text-secondary-label shadow-well-control"
             : "mt-1",
       )}
       onClick={(event) => event.stopPropagation()}

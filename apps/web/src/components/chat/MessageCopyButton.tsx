@@ -28,7 +28,7 @@ export const MessageCopyButton = memo(function MessageCopyButton({
   icon?: typeof Copy;
   /** Additional clipboard types written beside `text/plain` when the platform allows it. */
   extraFlavors?: Readonly<Record<string, string>>;
-  size?: "xs" | "icon-xs";
+  size?: "xs" | "icon-xs" | "icon-md";
   variant?: "outline" | "ghost";
   className?: string;
 }) {
@@ -57,7 +57,7 @@ export const MessageCopyButton = memo(function MessageCopyButton({
         }
       >
         <MorphIcon
-          className={cn("size-3", isCopied && "text-primary")}
+          className={cn(size === "icon-md" ? "size-3.75" : "size-3", isCopied && "text-primary")}
           icon={isCopied ? Check : icon}
         />
       </TooltipTrigger>

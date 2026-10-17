@@ -33,7 +33,6 @@ import {
 } from "@t3tools/contracts";
 import type { TimestampFormat } from "@t3tools/contracts/settings";
 import {
-  ChevronRightIcon,
   ArrowRightLeftIcon,
   ArrowRightIcon,
   GitForkIcon,
@@ -447,56 +446,49 @@ function SubagentTimelineLink(props: {
   };
   const content = (
     <>
-      <SubagentAvatar
-        pixelIconName={pixelIconName}
-        driver={props.driver}
-        provider={props.provider}
-        status={status ?? undefined}
-      />
       <span className="min-w-0 flex-1">
         <span className="flex items-baseline gap-2">
-          <span className="min-w-0 truncate text-xs font-medium text-foreground">
+          <span className="min-w-0 truncate text-secondary-copy-large text-fg-detail">
             {props.title}
           </span>
-          {detail !== null && (props.event !== undefined || status !== "completed") ? (
-            <span
-              className={cn(
-                "shrink-0 text-3xs",
-                failed ? "text-destructive" : "text-muted-foreground",
-              )}
-            >
-              {statusLabel}
-            </span>
-          ) : null}
         </span>
-        <span
-          className={cn(
-            "block text-2xs leading-relaxed",
-            failed ? "text-destructive" : "text-muted-foreground",
-          )}
-        >
-          {detail === null ? (
-            statusLabel
-          ) : detail.includes("/") && !detail.includes(" ") ? (
-            <MiddleTruncate value={detail} showTitle={false} className="flex" />
-          ) : (
-            <span className="block truncate">{detail}</span>
-          )}
-        </span>
+        {/* Progress/result previews are existing content; D1's empty-preview state stays one line. */}
+        {detail !== null ? (
+          <span
+            className={cn(
+              "block truncate text-meta-large",
+              failed ? "text-error" : "text-muted-foreground",
+            )}
+          >
+            {detail.includes("/") && !detail.includes(" ") ? (
+              <MiddleTruncate value={detail} showTitle={false} className="flex" />
+            ) : (
+              <span className="block truncate">{detail}</span>
+            )}
+          </span>
+        ) : null}
       </span>
-      <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+      <span className="shrink-0 text-secondary-copy text-muted-foreground tabular-nums">
         {props.event ? props.event.timestamp : <SubagentElapsed agent={timing} />}
       </span>
-      {threadId !== null ? (
-        <ChevronRightIcon
-          aria-hidden
-          className="size-3.5 shrink-0 text-muted-foreground/60 transition-colors group-hover/subagent:text-foreground"
-        />
-      ) : null}
+      <span
+        className={cn(
+          "flex h-5 shrink-0 items-center rounded-tag px-2.25 text-meta-large font-semibold shadow-tag",
+          status === "failed"
+            ? "bg-error-surface text-error-foreground"
+            : status === "completed"
+              ? "bg-secondary text-success-foreground"
+              : settled
+                ? "bg-secondary text-secondary-label"
+                : "bg-update-surface text-update-foreground",
+        )}
+      >
+        {statusLabel}
+      </span>
     </>
   );
   const className =
-    "group/subagent flex w-full min-w-0 items-center gap-2.5 rounded-md px-2 py-1.5 text-left";
+    "group/subagent flex h-9.5 w-full min-w-0 items-center gap-2 rounded-compact-row bg-timeline-agent-well ps-3 pe-1.5 text-left shadow-timeline-file";
   return (
     <Tooltip>
       <TooltipTrigger
@@ -515,7 +507,7 @@ function SubagentTimelineLink(props: {
               onClick={() => props.onOpenThread(threadId)}
               className={cn(
                 className,
-                "cursor-pointer transition-colors hover:bg-accent/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70",
+                "cursor-pointer hover:bg-timeline-log-hover focus-visible:outline-none focus-visible:inset-shadow-focus",
               )}
             >
               {content}

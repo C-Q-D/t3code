@@ -13,4 +13,22 @@
   --color-timeline-file: #1a1a1d;
   --shadow-timeline-file:
     inset 1.5px 2px 3px rgba(0, 0, 0, 0.6), inset -1px -1px 0 rgba(255, 255, 255, 0.05);
+
+  /* 对话页-8a D1 / StyleM-8a：工作日志命令井、子 Agent 井与日志行悬停。 */
+  --radius-timeline-command: 14px;
+  --color-timeline-agent-well: #151517;
+  --color-timeline-log-hover: #2c2c31;
+  /* StyleM-8a 展开日志的 shadow-raise-m 下半段；省去顶端高光以免虚拟行接缝重复。 */
+  --shadow-timeline-log-content:
+    inset 0 -1px 0 rgba(0, 0, 0, 0.66), 0 0 0 1px rgba(0, 0, 0, 0.44), 0 2px 0 #09090a,
+    6px 10px 16px -4px rgba(0, 0, 0, 0.66);
+}
+
+/* Keep the side shadows while clipping the edge shared with the adjacent virtual item. */
+.timeline-worklog-header {
+  clip-path: inset(calc(var(--spacing) * -8) calc(var(--spacing) * -12) 0);
+}
+
+.timeline-worklog-content {
+  clip-path: inset(0 calc(var(--spacing) * -12) calc(var(--spacing) * -12));
 }
