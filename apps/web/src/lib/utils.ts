@@ -8,6 +8,7 @@ import { DraftId } from "../composerDraftStore";
 
 // tailwind-merge cannot read CSS theme declarations. Keep these scales aligned with
 // index.css and styles/tokens.css so sizes and shadows remain distinct from colors.
+// Size names must not reuse color names; state circles use the separate inset-shadow slot.
 const twMerge = extendTailwindMerge({
   extend: {
     theme: {
@@ -83,13 +84,10 @@ const twMerge = extendTailwindMerge({
         "raise-l",
         "raise-xs",
         "well",
-        "input",
-        "selected",
-        "focus",
-        "selected-control",
+        "input-well",
         "primary-edge",
         "primary-edge-control",
-        "primary",
+        "primary-button",
         "primary-send",
         "primary-pressed",
         "primary-toast",
@@ -139,10 +137,11 @@ const twMerge = extendTailwindMerge({
         "switch-thumb-on",
         "send-disabled",
       ],
+      "inset-shadow": ["selected", "focus", "selected-control"],
       "text-shadow": ["stone"],
       radius: [
         "slab",
-        "card",
+        "card-surface",
         "card-large",
         "card-row",
         "compact-row",

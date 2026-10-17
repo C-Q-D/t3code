@@ -18,12 +18,45 @@ describe("cn", () => {
     ["shadow-slab shadow-black/50", "shadow-slab shadow-black/50"],
     ["text-shadow-stone text-shadow-fg-disabled", "text-shadow-stone text-shadow-fg-disabled"],
     ["text-shadow-stone text-shadow-none", "text-shadow-none"],
-    ["rounded-card rounded-lg", "rounded-lg"],
-    ["rounded-lg rounded-card", "rounded-card"],
+    ["rounded-card-surface rounded-lg", "rounded-lg"],
+    ["rounded-lg rounded-card-surface", "rounded-card-surface"],
     ["leading-code leading-terminal", "leading-terminal"],
     ["leading-code leading-6", "leading-6"],
     ["tracking-brand tracking-wide", "tracking-wide"],
   ])("merges %s according to its utility group", (classes, expected) => {
+    assert.strictEqual(cn(classes), expected);
+  });
+
+  // Existing buttons use a theme color and a shadow size together, in either order.
+  it.each([
+    ["shadow-primary/24 shadow-xs", "shadow-primary/24 shadow-xs"],
+    ["shadow-xs shadow-primary/24", "shadow-xs shadow-primary/24"],
+    ["shadow-input/24 shadow-xs", "shadow-input/24 shadow-xs"],
+    ["shadow-primary/24 shadow-primary-button", "shadow-primary/24 shadow-primary-button"],
+    ["shadow-primary-button shadow-primary/24", "shadow-primary-button shadow-primary/24"],
+    ["shadow-input/24 shadow-input-well", "shadow-input/24 shadow-input-well"],
+    ["shadow-card/24 shadow-primary-button", "shadow-card/24 shadow-primary-button"],
+  ])("preserves theme shadow color and size in %s", (classes, expected) => {
+    assert.strictEqual(cn(classes), expected);
+  });
+
+  it.each([
+    ["shadow-raise-xs-control inset-shadow-focus", "shadow-raise-xs-control inset-shadow-focus"],
+    ["shadow-raise-l inset-shadow-selected", "shadow-raise-l inset-shadow-selected"],
+    [
+      "shadow-raise-xs-control inset-shadow-selected-control",
+      "shadow-raise-xs-control inset-shadow-selected-control",
+    ],
+    [
+      "shadow-outline-control focus-visible:inset-shadow-focus",
+      "shadow-outline-control focus-visible:inset-shadow-focus",
+    ],
+    ["inset-shadow-focus inset-shadow-none", "inset-shadow-none"],
+    [
+      "shadow-raise-l inset-shadow-selected focus-visible:inset-shadow-focus",
+      "shadow-raise-l inset-shadow-selected focus-visible:inset-shadow-focus",
+    ],
+  ])("keeps state circles independent of layer shadows in %s", (classes, expected) => {
     assert.strictEqual(cn(classes), expected);
   });
 });

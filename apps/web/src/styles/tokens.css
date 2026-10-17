@@ -2,11 +2,17 @@
  * F1：8a 深色石墨的令牌合同与结构尺寸；不应用到组件，不替代 F0 配色或 F2 字体族。
  * 合同表：按用途选下列唯一入口；同值不同用途分行。现有主题类的设计值由 F0 实现，
  * 本文件不覆盖其定义。这里的固定颜色只补没有对应主题工具类的用途。
- * cn() 已登记：lib/utils.ts 已登记本文件的 color、text、shadow、text-shadow、radius、
+ * cn() 已登记：lib/utils.ts 已登记本文件的 color、text、shadow、inset-shadow、text-shadow、radius、
  * leading、tracking 名称，可按工具类分组安全合并；后续新增这些令牌时须同步登记，
  * 以区分字号、阴影与颜色，并让圆角、行高、字距按最后一个互斥类覆盖。
  * 尺寸用 Tailwind 间距刻度：1 单位 = 4px，可用 0.25 的倍数；
  * 例如 34px → h-8.5，276px → w-69，48px → h-12，16px → gap-4。
+ * 阴影、字号、圆角的名称避开全部现有 --color-* 名称，保留主题色作阴影颜色的行为。
+ * 焦点圈与选中圈使用独立的向内 inset-shadow 槽，不覆盖 shadow-* 的层级阴影。
+ * 焦点组合：shadow-raise-xs-control focus-visible:inset-shadow-focus。
+ * 选中组合：shadow-raise-l inset-shadow-selected；1.5px 例外用 inset-shadow-selected-control。
+ * 同时选中与聚焦：shadow-raise-l inset-shadow-selected focus-visible:inset-shadow-focus；
+ * 焦点态只将圈从 2px 切为 1.5px，底边、投影和原描边保留。
  *
  * | 用途 | 设计值 | 类名 | 来源（文件 · 画板或章节） |
  * | --- | --- | --- | --- |
@@ -116,13 +122,13 @@
  * | 通用凸起卡片 | inset 0 1.5px 0 rgba(255,255,255,.095), 0 0 0 1px rgba(0,0,0,.484), 0 3px 0 #09090a, 10px 16px 24px -8px rgba(0,0,0,.6) | shadow-raise-l | README.md · 设计令牌 |
  * | 通用小按钮 | inset 0 1px 0 rgba(255,255,255,.09), 0 0 0 1px rgba(0,0,0,.44), 0 1.5px 0 #09090a | shadow-raise-xs | README.md · 设计令牌 |
  * | 通用凹槽 | inset 2px 3px 10px rgba(0,0,0,.6), inset 0 0 0 1px rgba(0,0,0,.4) | shadow-well | README.md · 设计令牌 |
- * | 通用输入区 | inset 1.5px 2px 4px rgba(0,0,0,.65) | shadow-input | README.md · 设计令牌 |
- * | 通用选中白圈 | inset 0 0 0 2px #F2F2F3 | shadow-selected | README.md · 设计令牌 |
- * | 键盘焦点圈；H2 向内 outline 的等效几何 | inset 0 0 0 1.5px #F2F2F3 | shadow-focus | 规范-8a.dc.html · G1 / H1 / H2 |
- * | 具体控件与侧边栏多选白圈 | inset 0 0 0 1.5px #F2F2F3 | shadow-selected-control | 规范-8a.dc.html · G1 / StyleM-8a.dc.html · 整窗 |
+ * | 通用输入区 | inset 1.5px 2px 4px rgba(0,0,0,.65) | shadow-input-well | README.md · 设计令牌 |
+ * | 通用选中白圈；与层级阴影叠加 | inset 0 0 0 2px #F2F2F3 | inset-shadow-selected | README.md · 设计令牌 |
+ * | 键盘焦点圈；H2 向内 outline 的等效几何；与层级阴影叠加 | inset 0 0 0 1.5px #F2F2F3 | inset-shadow-focus | 规范-8a.dc.html · G1 / H1 / H2 |
+ * | 具体控件与侧边栏多选白圈；与层级阴影叠加 | inset 0 0 0 1.5px #F2F2F3 | inset-shadow-selected-control | 规范-8a.dc.html · G1 / StyleM-8a.dc.html · 整窗 |
  * | 通用白键底边 | 0 1.5px 0 #8E8E96 | shadow-primary-edge | README.md · 设计令牌 |
  * | 控件白键底边 | 0 2px 0 #8E8E96 | shadow-primary-edge-control | 规范-8a.dc.html · H1 / H5 |
- * | 主按钮 | 0 2px 0 #8E8E96, 3px 5px 9px -3px rgba(0,0,0,.8) | shadow-primary | 规范-8a.dc.html · H1 / StyleM-8a.dc.html · 整窗 |
+ * | 主按钮 | 0 2px 0 #8E8E96, 3px 5px 9px -3px rgba(0,0,0,.8) | shadow-primary-button | 规范-8a.dc.html · H1 / StyleM-8a.dc.html · 整窗 |
  * | 发送与引导消息白键 | inset 0 1px 0 rgba(255,255,255,0.018), 0 2px 0 #8E8E96, 0 3px 2px rgba(0,0,0,0.66), 5px 9px 14px -4px rgba(0,0,0,0.9) | shadow-primary-send | StyleM-8a.dc.html · 整窗 |
  * | 白键按下 | inset 0 1px 2px rgba(0,0,0,.3) | shadow-primary-pressed | 规范-8a.dc.html · H1 |
  * | 白键退出提示 | 0 2px 0 #8E8E96, 8px 14px 22px -6px rgba(0,0,0,.8) | shadow-primary-toast | 规范-8a.dc.html · H3 |
@@ -172,7 +178,7 @@
  * | 开启开关滑块 | 0 1px 1px rgba(0,0,0,.4) | shadow-switch-thumb-on | 规范-8a.dc.html · H1 |
  * | 发送按钮禁用 | inset 0 1px 0 rgba(255,255,255,0.06), 0 1px 0 #09090a | shadow-send-disabled | StyleM-8a.dc.html · 整窗 |
  * | 石板 | 22px | rounded-slab | 规范-8a.dc.html · H6 |
- * | 卡片下限 | 18px | rounded-card | 规范-8a.dc.html · H6 |
+ * | 卡片下限 | 18px | rounded-card-surface | 规范-8a.dc.html · H6 |
  * | 卡片上限 | 20px | rounded-card-large | 规范-8a.dc.html · H6 |
  * | 卡片行 | 16px | rounded-card-row | 规范-8a.dc.html · H6 |
  * | 紧凑行 | 12px | rounded-compact-row | 规范-8a.dc.html · H6 |
@@ -246,9 +252,9 @@
  * 纹理覆色只登记颜色，不能拿 bg-stone-*-veil 代替完整材质；层叠和玻璃行为由 F1.2 实现。
  * G1 受限、离线文字 #a8461a 与 H5/StyleM 侧边栏标签 #8a3510 分用途保留；
  * 通用 warning 采用 README W7 的 #e8dcc0 / #7a5000，通用 error 采用 #f0cfc9 / #6e1d14。
- * 选中用 2px；具体控件的 1.5px 选中例外用 shadow-selected-control，焦点用 shadow-focus。
+ * 选中用 2px；具体控件的 1.5px 选中例外用 inset-shadow-selected-control，焦点用 inset-shadow-focus。
  * H1 画有向外偏移的 outline；当前 lint 要求状态指示器向内绘制。
- * 此处登记 1.5px 的向内 shadow-focus（H2 同样向内），不新增向外指示器工具类。
+ * 此处登记 1.5px 的向内 inset-shadow-focus（H2 同样向内），独立于层级阴影，不新增向外指示器。
  * README 五条通用阴影原值保留；G1、H1–H5、StyleM 的不同投影按场景另列。
  * README 卡片圆角范围与 H6 不同：卡片用 H6 的 18–20px，16px 专用于 H6 卡片行。
  * 不包含字体族（F2）、图标色相（F8）、设计稿展台装饰或画板标注色。
@@ -395,16 +401,16 @@
   --shadow-well: inset 2px 3px 10px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(0, 0, 0, 0.4);
 
   /* README.md · 设计令牌；通用输入区：inset 1.5px 2px 4px rgba(0,0,0,.65)。 */
-  --shadow-input: inset 1.5px 2px 4px rgba(0, 0, 0, 0.65);
+  --shadow-input-well: inset 1.5px 2px 4px rgba(0, 0, 0, 0.65);
 
   /* README.md · 设计令牌；通用选中白圈：inset 0 0 0 2px #F2F2F3。 */
-  --shadow-selected: inset 0 0 0 2px #f2f2f3;
+  --inset-shadow-selected: inset 0 0 0 2px #f2f2f3;
 
   /* 规范-8a.dc.html · G1 / H1 / H2；键盘焦点圈；H2 向内 outline 的等效几何：inset 0 0 0 1.5px #F2F2F3。 */
-  --shadow-focus: inset 0 0 0 1.5px #f2f2f3;
+  --inset-shadow-focus: inset 0 0 0 1.5px #f2f2f3;
 
   /* 规范-8a.dc.html · G1 / StyleM-8a.dc.html · 整窗；具体控件与侧边栏多选白圈：inset 0 0 0 1.5px #F2F2F3。 */
-  --shadow-selected-control: inset 0 0 0 1.5px #f2f2f3;
+  --inset-shadow-selected-control: inset 0 0 0 1.5px #f2f2f3;
 
   /* README.md · 设计令牌；通用白键底边：0 1.5px 0 #8E8E96。 */
   --shadow-primary-edge: 0 1.5px 0 #8e8e96;
@@ -413,7 +419,7 @@
   --shadow-primary-edge-control: 0 2px 0 #8e8e96;
 
   /* 规范-8a.dc.html · H1 / StyleM-8a.dc.html · 整窗；主按钮：0 2px 0 #8E8E96, 3px 5px 9px -3px rgba(0,0,0,.8)。 */
-  --shadow-primary: 0 2px 0 #8e8e96, 3px 5px 9px -3px rgba(0, 0, 0, 0.8);
+  --shadow-primary-button: 0 2px 0 #8e8e96, 3px 5px 9px -3px rgba(0, 0, 0, 0.8);
 
   /* StyleM-8a.dc.html · 整窗；发送与引导消息白键：inset 0 1px 0 rgba(255,255,255,0.018), 0 2px 0 #8E8E96, 0 3px 2px rgba(0,0,0,0.66), 5px 9px 14px -4px rgba(0,0,0,0.9)。 */
   --shadow-primary-send:
@@ -608,7 +614,7 @@
   --radius-slab: 22px;
 
   /* 规范-8a.dc.html · H6；卡片下限：18px。 */
-  --radius-card: 18px;
+  --radius-card-surface: 18px;
 
   /* 规范-8a.dc.html · H6；卡片上限：20px。 */
   --radius-card-large: 20px;
