@@ -1,3 +1,4 @@
+/** Shared button recipes; feature callers choose variants and sizes instead of restyling controls. */
 "use client";
 
 import { mergeProps } from "@base-ui/react/merge-props";
@@ -7,8 +8,10 @@ import type * as React from "react";
 
 import { cn } from "~/lib/utils";
 
+// H1 uses explicit disabled colors, not opacity; enabled-only interaction states keep them intact.
+// The white key alone overrides F8's icon hues so its icons retain the dark foreground.
 const buttonVariants = cva(
-  "[--control-icon-color:currentColor] [&_svg]:-mx-0.5 relative inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-[var(--control-radius)] border font-medium text-base outline-none transition-[box-shadow,scale] [&:not([aria-haspopup]):not(:disabled):not([aria-disabled=true])]:will-change-[scale] [&:active:not([aria-haspopup])]:scale-[0.97] before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--control-radius)-1px)] pointer-coarse:after:absolute pointer-coarse:after:size-full pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-64 aria-disabled:cursor-not-allowed aria-disabled:opacity-64 sm:text-sm [&_svg:not([class*='text-'])]:text-[var(--control-icon-color)] [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  "relative inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full border-0 font-semibold text-secondary-copy-large outline-none focus-visible:inset-shadow-focus disabled:pointer-events-none aria-disabled:cursor-not-allowed pointer-coarse:after:absolute pointer-coarse:after:size-full pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11 [&_svg:not([class*='size-'])]:size-3.5 [&_svg]:pointer-events-none [&_svg]:shrink-0",
   {
     defaultVariants: {
       size: "default",
@@ -17,12 +20,11 @@ const buttonVariants = cva(
     variants: {
       size: {
         compact:
-          "h-7 gap-1 rounded-md px-[calc(--spacing(2)-1px)] text-xs before:rounded-[calc(var(--radius-md)-1px)] [&_svg:not([class*='size-'])]:size-3.5",
-        default: "h-9 px-[calc(--spacing(3)-1px)] sm:h-8",
-        icon: "size-9 sm:size-8",
+          "h-7 gap-1 px-[calc(--spacing(2)-1px)] text-secondary-copy [&_svg:not([class*='size-'])]:size-3.5",
+        default: "h-8.5 px-4",
+        icon: "size-8.5 p-0 [&_svg:not([class*='size-'])]:size-3.75",
         "icon-lg": "size-10 sm:size-9",
-        "icon-micro":
-          "size-5 rounded-sm p-0 before:rounded-[calc(var(--radius-sm)-1px)] [&_svg:not([class*='size-'])]:size-3",
+        "icon-micro": "size-5 p-0 [&_svg:not([class*='size-'])]:size-3",
         "icon-tiny": "size-4 p-0 [&_svg:not([class*='size-'])]:size-3",
         "icon-sm": "size-8 sm:size-7",
         "icon-xl":
@@ -31,53 +33,73 @@ const buttonVariants = cva(
           "size-7 sm:size-6 not-in-data-[slot=input-group]:[&_svg:not([class*='size-'])]:size-4 sm:not-in-data-[slot=input-group]:[&_svg:not([class*='size-'])]:size-3.5",
         lg: "h-10 px-[calc(--spacing(3.5)-1px)] sm:h-9",
         micro:
-          "h-5 gap-1 rounded-sm px-[calc(--spacing(1.5)-1px)] text-[11px] before:rounded-[calc(var(--radius-sm)-1px)] sm:text-[11px] [&_svg:not([class*='size-'])]:size-3 sm:[&_svg:not([class*='size-'])]:size-3",
+          "h-5 gap-1 px-[calc(--spacing(1.5)-1px)] text-meta [&_svg:not([class*='size-'])]:size-3",
         sm: "h-8 gap-1.5 px-[calc(--spacing(2.5)-1px)] sm:h-7",
         "sm-multiline":
           "min-h-8 gap-1.5 px-[calc(--spacing(2.5)-1px)] py-[calc(--spacing(1)-1px)] whitespace-normal sm:min-h-7",
-        xl: "h-11 px-[calc(--spacing(4)-1px)] text-lg sm:h-10 sm:text-base [&_svg:not([class*='size-'])]:size-5 sm:[&_svg:not([class*='size-'])]:size-4.5",
-        xs: "h-7 gap-1 px-[calc(--spacing(2)-1px)] text-sm sm:h-6 sm:text-xs [&_svg:not([class*='size-'])]:size-4 sm:[&_svg:not([class*='size-'])]:size-3.5",
+        xl: "h-11 px-[calc(--spacing(4)-1px)] text-card-title sm:h-10 sm:text-body [&_svg:not([class*='size-'])]:size-5 sm:[&_svg:not([class*='size-'])]:size-4.5",
+        xs: "h-7 gap-1 px-[calc(--spacing(2)-1px)] text-body sm:h-6 sm:text-secondary-copy [&_svg:not([class*='size-'])]:size-4 sm:[&_svg:not([class*='size-'])]:size-3.5",
       },
       variant: {
         default:
-          "not-disabled:inset-shadow-[0_1px_--theme(--color-white/16%)] border-primary bg-primary text-primary-foreground shadow-primary/24 shadow-xs [:active,[data-pressed]]:inset-shadow-[0_1px_--theme(--color-black/8%)] [:disabled,:active,[data-pressed]]:shadow-none [:hover,[data-pressed]]:bg-primary/90",
+          "[--lucide-hue-override:currentColor] bg-primary text-primary-foreground font-bold text-shadow-none shadow-primary-button not-disabled:not-aria-disabled:hover:bg-message-action-hover not-disabled:not-aria-disabled:[:active,[data-pressed]]:bg-control-primary-pressed not-disabled:not-aria-disabled:[:active,[data-pressed]]:translate-y-0.5 not-disabled:not-aria-disabled:[:active,[data-pressed]]:shadow-primary-pressed [:disabled,[aria-disabled=true]]:bg-accent [:disabled,[aria-disabled=true]]:text-fg-control-disabled [:disabled,[aria-disabled=true]]:shadow-none focus-visible:shadow-primary-edge-control",
         destructive:
-          "not-disabled:inset-shadow-[0_1px_--theme(--color-white/16%)] border-destructive bg-destructive text-white shadow-destructive/24 shadow-xs [:active,[data-pressed]]:inset-shadow-[0_1px_--theme(--color-black/8%)] [:disabled,:active,[data-pressed]]:shadow-none [:hover,[data-pressed]]:bg-destructive/90",
+          "bg-control-danger text-message-action-hover font-bold text-shadow-(--text-shadow-control-danger) shadow-danger not-disabled:not-aria-disabled:hover:bg-control-danger-hover not-disabled:not-aria-disabled:[:active,[data-pressed]]:bg-control-danger-pressed not-disabled:not-aria-disabled:[:active,[data-pressed]]:translate-y-0.5 not-disabled:not-aria-disabled:[:active,[data-pressed]]:shadow-danger-pressed [:disabled,[aria-disabled=true]]:bg-error-surface [:disabled,[aria-disabled=true]]:text-control-danger-disabled [:disabled,[aria-disabled=true]]:text-shadow-none [:disabled,[aria-disabled=true]]:shadow-none focus-visible:shadow-danger-edge focus-visible:text-shadow-none",
         "destructive-outline":
-          "border-input bg-popover not-dark:bg-clip-padding text-destructive-foreground shadow-xs/5 not-disabled:not-active:not-data-pressed:before:shadow-[0_1px_--theme(--color-black/4%)] dark:bg-input/32 dark:not-disabled:before:shadow-[0_-1px_--theme(--color-white/2%)] dark:not-disabled:not-active:not-data-pressed:before:shadow-[0_-1px_--theme(--color-white/6%)] [:disabled,:active,[data-pressed]]:shadow-none [:hover,[data-pressed]]:border-destructive/32 [:hover,[data-pressed]]:bg-destructive/4",
+          "bg-transparent text-error-foreground shadow-outline-danger not-disabled:not-aria-disabled:hover:bg-error-surface not-disabled:not-aria-disabled:hover:text-control-danger-label-hover not-disabled:not-aria-disabled:hover:shadow-outline-danger-hover not-disabled:not-aria-disabled:[:active,[data-pressed]]:bg-control-danger-outline-pressed not-disabled:not-aria-disabled:[:active,[data-pressed]]:text-error-foreground not-disabled:not-aria-disabled:[:active,[data-pressed]]:shadow-outline-danger-pressed [:disabled,[aria-disabled=true]]:text-control-danger-disabled [:disabled,[aria-disabled=true]]:shadow-outline-danger-disabled",
         ghost:
-          "[--control-icon-color:var(--contrast-muted-foreground)] border-transparent text-foreground data-pressed:bg-accent [:hover,[data-pressed]]:bg-accent",
+          "bg-transparent text-fg-detail font-normal not-disabled:not-aria-disabled:hover:bg-secondary not-disabled:not-aria-disabled:hover:text-foreground not-disabled:not-aria-disabled:[:active,[data-pressed]]:bg-control-ghost-pressed not-disabled:not-aria-disabled:[:active,[data-pressed]]:text-foreground not-disabled:not-aria-disabled:[:active,[data-pressed]]:shadow-well-pressed [:disabled,[aria-disabled=true]]:text-fg-control-disabled",
         "ghost-muted":
-          "[--control-icon-color:currentColor] border-transparent text-muted-foreground data-pressed:bg-accent [:hover,[data-pressed]]:bg-accent [:hover,[data-pressed]]:text-foreground",
+          "bg-transparent text-secondary-label font-normal not-disabled:not-aria-disabled:hover:bg-secondary not-disabled:not-aria-disabled:hover:text-foreground not-disabled:not-aria-disabled:[:active,[data-pressed]]:bg-control-ghost-pressed not-disabled:not-aria-disabled:[:active,[data-pressed]]:text-foreground not-disabled:not-aria-disabled:[:active,[data-pressed]]:shadow-well-pressed [:disabled,[aria-disabled=true]]:text-fg-icon-disabled",
         "ghost-destructive":
-          "[--control-icon-color:currentColor] border-transparent text-muted-foreground data-pressed:bg-accent [:hover,[data-pressed]]:bg-accent [:hover,[data-pressed]]:text-destructive",
+          "bg-transparent text-secondary-label not-disabled:not-aria-disabled:hover:bg-error-surface not-disabled:not-aria-disabled:hover:text-error-foreground not-disabled:not-aria-disabled:[:active,[data-pressed]]:bg-control-danger-outline-pressed not-disabled:not-aria-disabled:[:active,[data-pressed]]:text-error-foreground not-disabled:not-aria-disabled:[:active,[data-pressed]]:shadow-well-pressed [:disabled,[aria-disabled=true]]:text-control-danger-disabled",
+        // The public surface owns the fill; this button variant supplies elevation and state shadows.
         glass:
-          "surface-glass [--control-icon-color:var(--contrast-muted-foreground)] rounded-full border-border/60 text-foreground shadow-sm before:rounded-full [:hover,[data-pressed]]:border-border",
-        link: "border-transparent underline-offset-4 [:hover,[data-pressed]]:underline",
+          "surface-glass text-foreground shadow-raise-xs-control not-disabled:not-aria-disabled:hover:text-message-action-hover not-disabled:not-aria-disabled:hover:shadow-raise-xs-hover not-disabled:not-aria-disabled:[:active,[data-pressed]]:text-foreground not-disabled:not-aria-disabled:[:active,[data-pressed]]:shadow-raise-xs-pressed [:disabled,[aria-disabled=true]]:text-fg-control-disabled [:disabled,[aria-disabled=true]]:shadow-none focus-visible:shadow-raise-tab",
+        link: "bg-transparent text-foreground rounded-(--radius-control-link) underline decoration-fg-control-disabled underline-offset-4 not-disabled:not-aria-disabled:hover:text-message-action-hover not-disabled:not-aria-disabled:hover:decoration-foreground not-disabled:not-aria-disabled:[:active,[data-pressed]]:text-secondary-label not-disabled:not-aria-disabled:[:active,[data-pressed]]:decoration-secondary-label [:disabled,[aria-disabled=true]]:text-fg-control-disabled [:disabled,[aria-disabled=true]]:no-underline",
         "media-close":
-          "[--control-icon-color:currentColor] border-transparent bg-black/65 text-white shadow-sm ring-1 ring-white/20 [:hover,[data-pressed]]:bg-black/80 focus-visible:ring-white",
+          "bg-stone-scrim text-message-action-hover shadow-raise-xs-control not-disabled:not-aria-disabled:[:hover,[data-pressed]]:bg-background [:disabled,[aria-disabled=true]]:text-fg-control-disabled",
         "media-navigation":
-          "[--control-icon-color:currentColor] absolute top-1/2 z-20 -translate-y-1/2 border-transparent text-white/90 [:hover,[data-pressed]]:bg-white/10 [:hover,[data-pressed]]:text-white focus-visible:ring-white focus-visible:ring-offset-transparent",
+          "absolute top-1/2 z-20 -translate-y-1/2 bg-transparent text-fg-detail not-disabled:not-aria-disabled:[:hover,[data-pressed]]:bg-secondary not-disabled:not-aria-disabled:[:hover,[data-pressed]]:text-message-action-hover [:disabled,[aria-disabled=true]]:text-fg-control-disabled",
         outline:
-          "[--control-icon-color:var(--contrast-muted-foreground)] border-input bg-popover not-dark:bg-clip-padding text-foreground shadow-xs/5 not-disabled:not-active:not-data-pressed:before:shadow-[0_1px_--theme(--color-black/4%)] dark:bg-input/32 dark:not-disabled:before:shadow-[0_-1px_--theme(--color-white/2%)] dark:not-disabled:not-active:not-data-pressed:before:shadow-[0_-1px_--theme(--color-white/6%)] [:disabled,:active,[data-pressed]]:shadow-none [:hover,[data-pressed]]:bg-accent/50 dark:[:hover,[data-pressed]]:bg-input/64",
-        overlay: "border-transparent bg-black/70 text-white/65 [:hover,[data-pressed]]:bg-black/90",
+          "bg-transparent text-foreground shadow-outline-control not-disabled:not-aria-disabled:hover:bg-popover not-disabled:not-aria-disabled:hover:text-message-action-hover not-disabled:not-aria-disabled:hover:shadow-outline-control-hover not-disabled:not-aria-disabled:[:active,[data-pressed]]:bg-well-surface not-disabled:not-aria-disabled:[:active,[data-pressed]]:text-foreground not-disabled:not-aria-disabled:[:active,[data-pressed]]:shadow-outline-control-pressed [:disabled,[aria-disabled=true]]:text-fg-control-disabled [:disabled,[aria-disabled=true]]:shadow-outline-control-disabled",
+        overlay:
+          "bg-stone-scrim text-fg-detail not-disabled:not-aria-disabled:[:hover,[data-pressed]]:bg-background [:disabled,[aria-disabled=true]]:text-fg-control-disabled",
         secondary:
-          "border-transparent bg-secondary text-secondary-foreground [:active,[data-pressed]]:bg-secondary/80 [:hover,[data-pressed]]:bg-secondary/90",
+          "bg-secondary text-foreground shadow-raise-xs-control not-disabled:not-aria-disabled:hover:bg-accent not-disabled:not-aria-disabled:hover:text-message-action-hover not-disabled:not-aria-disabled:hover:shadow-raise-xs-hover not-disabled:not-aria-disabled:[:active,[data-pressed]]:bg-control-secondary-pressed not-disabled:not-aria-disabled:[:active,[data-pressed]]:text-foreground not-disabled:not-aria-disabled:[:active,[data-pressed]]:translate-y-[1.5px] not-disabled:not-aria-disabled:[:active,[data-pressed]]:shadow-raise-xs-pressed [:disabled,[aria-disabled=true]]:bg-control-secondary-disabled [:disabled,[aria-disabled=true]]:text-fg-control-disabled [:disabled,[aria-disabled=true]]:shadow-none focus-visible:shadow-raise-tab",
         "warning-outline":
-          "border-warning/32 bg-warning-surface text-warning-foreground shadow-xs/5 [:disabled,:active,[data-pressed]]:shadow-none [:hover,[data-pressed]]:border-warning/40 [:hover,[data-pressed]]:bg-warning/16 dark:[:hover,[data-pressed]]:bg-warning/24",
+          "border-[1.5px] border-warning/32 bg-warning-surface text-warning-foreground shadow-raise-xs-control not-disabled:not-aria-disabled:[:active,[data-pressed]]:shadow-none not-disabled:not-aria-disabled:[:hover,[data-pressed]]:border-warning/40 not-disabled:not-aria-disabled:[:hover,[data-pressed]]:bg-warning/16 [:disabled,[aria-disabled=true]]:text-fg-control-disabled [:disabled,[aria-disabled=true]]:shadow-none",
       },
     },
+    compoundVariants: [
+      {
+        variant: ["destructive", "destructive-outline", "ghost"],
+        size: "default",
+        className: "px-3.5",
+      },
+      { variant: "outline", size: "default", className: "pl-3 pr-3.5" },
+      { variant: "link", size: "default", className: "h-auto px-0" },
+      {
+        variant: "ghost",
+        size: ["icon", "icon-lg", "icon-micro", "icon-tiny", "icon-sm", "icon-xl", "icon-xs"],
+        className: "text-secondary-label [:disabled,[aria-disabled=true]]:text-fg-icon-disabled",
+      },
+    ],
   },
 );
 
+/** Semantic button appearances shared by controls and existing feature callers. */
 type ButtonVariant = NonNullable<VariantProps<typeof buttonVariants>["variant"]>;
+/** Existing density and icon sizes; default and icon match the 34px H1 controls. */
 type ButtonSize = NonNullable<VariantProps<typeof buttonVariants>["size"]>;
 
+/** Native or rendered button props, with appearance owned by the shared recipe. */
 interface ButtonProps extends useRender.ComponentProps<"button"> {
   variant?: ButtonVariant;
   size?: ButtonSize;
 }
 
+/** Render an action; native buttons default to type=button, while render owns element semantics. */
 function Button({ className, variant, size, render, ...props }: ButtonProps) {
   const typeValue: React.ButtonHTMLAttributes<HTMLButtonElement>["type"] = render
     ? undefined

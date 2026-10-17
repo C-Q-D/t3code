@@ -1,5 +1,26 @@
 /* F3 交互控件：本线新增的令牌（@theme）与全局样式写在这里。 */
 
+/* H1 button states missing from tokens.css; shared theme roles remain owned by F0. */
+@theme {
+  /* 规范-8a.dc.html · H1: pressed white key, pressed/disabled raised stone, pressed ghost. */
+  --color-control-primary-pressed: #dedee2;
+  --color-control-secondary-pressed: #232327;
+  --color-control-secondary-disabled: #26262a;
+  --color-control-ghost-pressed: #1a1a1d;
+
+  /* 规范-8a.dc.html · H1: filled danger default/hover/pressed and outline label/pressed/disabled. */
+  --color-control-danger: #e2483c;
+  --color-control-danger-hover: #ec5a4e;
+  --color-control-danger-pressed: #c93d32;
+  --color-control-danger-label-hover: #ff8f80;
+  --color-control-danger-outline-pressed: #2a1513;
+  --color-control-danger-disabled: #7a4a45;
+
+  /* 规范-8a.dc.html · H1: links use a small focus corner; filled danger text lifts off its red face. */
+  --radius-control-link: 4px;
+  --text-shadow-control-danger: 0 -1px 0 rgba(0, 0, 0, 0.3);
+}
+
 /* F3.2 — 规范-8a.dc.html H1：输入、Select 和 Switch 五态缺失的精确值。 */
 @theme {
   --color-input-disabled: #18181a;
