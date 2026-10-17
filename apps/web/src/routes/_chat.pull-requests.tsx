@@ -1919,6 +1919,7 @@ function PullRequestsRouteView() {
         <PullRequestListGhost rows={7} />
       ) : !pullRequestsSupported ? (
         <PullRequestsUnavailableState
+          variant="list"
           title={t.git.pullRequest.pullRequestsUnavailable}
           error={t.git.pullRequest.updateYourT3CodeServersToBrowsePullRequests}
         />
@@ -1926,6 +1927,7 @@ function PullRequestsRouteView() {
         <PullRequestListGhost rows={7} />
       ) : listQuery.error && shownCount === 0 ? (
         <PullRequestsUnavailableState
+          variant="list"
           error={listQuery.error}
           refreshing={listQuery.isPending}
           onRetry={() => listQuery.refresh()}

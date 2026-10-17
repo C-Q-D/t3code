@@ -89,3 +89,20 @@
     appearance: none;
   }
 }
+
+/* 其余屏-2.dc.html L6: 150px empty cards/40px inset marks and 14px filter/check popups.
+   Panel8a.dc.html linked dialog: 22px shell and 20px serif title. */
+@theme {
+  --shadow-pr-list-empty: 0 0 0 1px rgba(0, 0, 0, 0.55), 0 3px 0 #060607;
+  --shadow-pr-list-empty-mark:
+    inset 1.5px 2px 3px rgba(0, 0, 0, 0.62), inset -1px -1px 0 rgba(255, 255, 255, 0.055);
+  --radius-pr-list-popup: 14px;
+  --radius-pr-link-dialog: 22px;
+  --text-pr-link-title: 20px;
+  --text-pr-link-title--line-height: 1.5;
+}
+
+/* Feature popups can overlap Electron's draggable titlebar, where pointer input must still work. */
+@utility pr-popup {
+  -webkit-app-region: no-drag;
+}

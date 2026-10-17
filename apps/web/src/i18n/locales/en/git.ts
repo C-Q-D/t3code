@@ -545,20 +545,12 @@ export const git = {
     applied: "Applied",
     opened: "opened ",
     noProjectsInThisWorkspace: "No projects in this workspace",
-    addAProjectAndThePullRequestsFromItsRepositoryAppearHere:
-      "Add a project, and the pull requests from its repository appear here.",
     addProject: "Add project",
-    theHostsWereSearchedForItTryFewerWordsOrSearchByNumberAuthorOrBranch:
-      "The hosts were searched for it. Try fewer words, or search by number, author or branch.",
     clearSearch: "Clear search",
     checking: "Checking...",
     checkAgain: "Check again",
     nothingUnderTheseFilters: "Nothing under these filters",
     noPullRequests: "No pull requests",
-    widenTheStateInvolvementOrProjectFilterToSeeMore:
-      "Widen the state, involvement or project filter to see more.",
-    pullRequestsFromEveryProjectInThisWorkspaceAppearHere:
-      "Pull requests from every project in this workspace appear here.",
     loading: "Loading...",
     loadMorePullRequests: "Load more pull requests",
     searchPullRequestsOrLabelBug: "Search pull requests, or label:bug",

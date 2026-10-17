@@ -3,6 +3,7 @@ import { t } from "~/i18n";
 import { pullRequestHostOf, type ScopedThreadRef } from "@t3tools/contracts";
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import { useAtomValue } from "@effect/atom-react";
+import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { parseChangeRequestUrl } from "~/lib/openPullRequestLink";
@@ -14,12 +15,10 @@ import { Atom } from "effect/reactivity";
 import { Button } from "../ui/button";
 import {
   Dialog,
+  DialogBackdrop,
   DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogPanel,
-  DialogPopup,
-  DialogTitle,
+  DialogPortal,
+  DialogViewport,
 } from "../ui/dialog";
 import { Input } from "../ui/input";
 
@@ -207,55 +206,67 @@ function LinkPullRequestDialog({
 
   return (
     <Dialog open={open} onOpenChange={(next) => (pending ? undefined : onOpenChange(next))}>
-      <DialogPopup className="max-w-xl">
-        <DialogHeader>
-          <DialogTitle>{t.git.pullRequest.linkPullRequest}</DialogTitle>
-          <DialogDescription>{t.git.pullRequest.attachByUrlOrNumber}</DialogDescription>
-        </DialogHeader>
-        <DialogPanel>
-          <Input
-            ref={inputRef}
-            placeholder={t.git.pullRequest.pullRequestURLOr42}
-            value={reference}
-            onChange={(event) => {
-              setDirty(true);
-              setReference(event.target.value);
-            }}
-            onKeyDown={(event) => {
-              if (event.key !== "Enter") return;
-              event.preventDefault();
-              void submit();
-            }}
-          />
-          {resolved !== null && "link" in resolved ? (
-            <p className="truncate text-muted-foreground text-xs">
-              {resolved.link.host}/{resolved.link.repository} #{resolved.link.number}
-            </p>
-          ) : null}
-          {(validation ?? submitError) ? (
-            <p className="text-destructive text-xs">{validation ?? submitError}</p>
-          ) : null}
-        </DialogPanel>
-        <DialogFooter>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => onOpenChange(false)}
-            disabled={pending}
-          >
-            {t.common.confirm.cancel}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            onClick={() => void submit()}
-            disabled={pending || resolved === null || "error" in resolved}
-          >
-            {pending ? t.git.pullRequest.linking : t.git.pullRequest.link}
-          </Button>
-        </DialogFooter>
-      </DialogPopup>
+      <DialogPortal>
+        <DialogBackdrop />
+        <DialogViewport>
+          {/* L6's compact shell belongs to linking; Base UI retains the existing modal/focus behavior. */}
+          <DialogPrimitive.Popup className="dialog-glass pr-popup relative row-start-2 flex min-h-0 max-h-full w-43/50 max-w-95 flex-col gap-3 rounded-pr-link-dialog p-4.5 outline-none">
+            <DialogPrimitive.Title className="shrink-0 font-serif text-pr-link-title font-bold">
+              {t.git.pullRequest.linkPullRequest}
+            </DialogPrimitive.Title>
+            <DialogDescription className="sr-only">
+              {t.git.pullRequest.attachByUrlOrNumber}
+            </DialogDescription>
+            <div className="flex min-h-0 min-w-0 flex-col gap-3 overflow-y-auto">
+              <Input
+                ref={inputRef}
+                aria-label={t.git.pullRequest.pullRequestURLOr42}
+                aria-invalid={validation !== null || submitError !== null}
+                placeholder={t.git.pullRequest.pullRequestURLOr42}
+                value={reference}
+                onChange={(event) => {
+                  setDirty(true);
+                  setReference(event.target.value);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter") return;
+                  event.preventDefault();
+                  void submit();
+                }}
+              />
+              {resolved !== null && "link" in resolved ? (
+                <p className="truncate text-muted-foreground text-secondary-copy">
+                  {resolved.link.host}/{resolved.link.repository} #{resolved.link.number}
+                </p>
+              ) : null}
+              {(validation ?? submitError) ? (
+                <p role="alert" className="break-words text-error-foreground text-secondary-copy">
+                  {validation ?? submitError}
+                </p>
+              ) : null}
+            </div>
+            <div className="flex shrink-0 justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="default"
+                onClick={() => onOpenChange(false)}
+                disabled={pending}
+              >
+                {t.common.confirm.cancel}
+              </Button>
+              <Button
+                type="button"
+                size="default"
+                onClick={() => void submit()}
+                disabled={pending || resolved === null || "error" in resolved}
+              >
+                {pending ? t.git.pullRequest.linking : t.git.pullRequest.linkPullRequest}
+              </Button>
+            </div>
+          </DialogPrimitive.Popup>
+        </DialogViewport>
+      </DialogPortal>
     </Dialog>
   );
 }

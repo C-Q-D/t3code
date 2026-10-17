@@ -513,18 +513,12 @@ export const git: Messages["git"] = {
     applied: "已应用",
     opened: "发起于 ",
     noProjectsInThisWorkspace: "此工作区没有项目",
-    addAProjectAndThePullRequestsFromItsRepositoryAppearHere:
-      "添加项目后，其仓库的 PR 会显示在这里。",
     addProject: "添加项目",
-    theHostsWereSearchedForItTryFewerWordsOrSearchByNumberAuthorOrBranch:
-      "已搜索托管平台。请减少关键词，或按编号、作者或分支搜索。",
     clearSearch: "清除搜索",
     checking: "正在检查…",
     checkAgain: "再次检查",
     nothingUnderTheseFilters: "这些筛选条件下没有结果",
     noPullRequests: "没有 PR",
-    widenTheStateInvolvementOrProjectFilterToSeeMore: "放宽状态、参与或项目筛选以查看更多。",
-    pullRequestsFromEveryProjectInThisWorkspaceAppearHere: "此工作区所有项目的 PR 会显示在这里。",
     loading: "正在加载…",
     loadMorePullRequests: "加载更多 PR",
     searchPullRequestsOrLabelBug: "搜索 PR，或输入 label:bug",

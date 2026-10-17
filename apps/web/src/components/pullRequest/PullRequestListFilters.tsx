@@ -1,5 +1,6 @@
 /** Owns pull request list filters on the web pull-request surface; host data and agent context remain unchanged. */
 import { t } from "~/i18n";
+import { Menu as MenuPrimitive } from "@base-ui/react/menu";
 import { Spinner } from "~/components/ui/spinner";
 import type {
   EnvironmentId,
@@ -171,6 +172,10 @@ const CHECKS_OPTIONS = [
   { value: "failing", label: t.git.pullRequest.failing, Icon: CircleXIcon },
 ] as const satisfies ReadonlyArray<PullRequestFilterOption<string>>;
 
+/** L6 gives these three feature popups narrower surfaces and 30px rows. */
+const SUPPLEMENT_POPUP_WIDTHS = { draft: "w-30", review: "w-32.5", checks: "w-27.5" };
+type SupplementPopup = keyof typeof SUPPLEMENT_POPUP_WIDTHS;
+
 /**
  * Renders pull request filter radio group from the supplied display data and callbacks.
  * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
@@ -181,11 +186,13 @@ function PullRequestFilterRadioGroup<Value extends string>({
   value,
   options,
   onChange,
+  supplement,
 }: {
   label: string;
   value: Value;
   options: ReadonlyArray<PullRequestFilterOption<Value>>;
   onChange: (value: Value) => void;
+  supplement?: SupplementPopup | undefined;
 }) {
   return (
     <MenuRadioGroup
@@ -195,35 +202,51 @@ function PullRequestFilterRadioGroup<Value extends string>({
         if (next !== value) onChange(next as Value);
       }}
     >
-      {options.map((option) => {
-        // A host the server has already said it cannot read is not a choice here: offering
-        // it would answer the press by replacing a working list with that failure.
-        const item = (
-          <MenuRadioItem
-            density="compact"
-            key={option.value}
-            value={option.value}
-            className={option.unavailable ? "data-disabled:pointer-events-auto" : undefined}
-            disabled={option.unavailable !== undefined}
-          >
-            <span className="flex min-w-0 items-center gap-2">
-              {option.project ? <PullRequestFilterOptionIcon option={option} /> : null}
-              <span className="min-w-0 flex-1 truncate">{option.label}</span>
-              {option.unavailable ? (
-                <span className="shrink-0">{t.git.pullRequest.unavailable}</span>
-              ) : null}
-              <MenuRadioItemIndicator />
-            </span>
-          </MenuRadioItem>
-        );
-        if (!option.unavailable) return item;
-        return (
-          <Tooltip key={option.value}>
-            <TooltipTrigger render={item} />
-            <TooltipPopup side="top">{option.unavailable}</TooltipPopup>
-          </Tooltip>
-        );
-      })}
+      <div className={supplement ? "flex flex-col gap-px" : undefined}>
+        {options.map((option) => {
+          if (supplement) {
+            return (
+              <MenuPrimitive.RadioItem
+                key={option.value}
+                value={option.value}
+                className="flex h-7.5 shrink-0 cursor-pointer items-center gap-1.5 rounded-menu-row px-2.25 text-secondary-copy-large text-foreground outline-none data-checked:bg-accent data-highlighted:bg-accent focus-visible:inset-shadow-focus"
+              >
+                {supplement === "checks" && option.value !== UNFILTERED_VALUE ? (
+                  <option.Icon aria-hidden className="size-3.25 shrink-0" />
+                ) : null}
+                <span className="truncate">{option.label}</span>
+              </MenuPrimitive.RadioItem>
+            );
+          }
+          // A host the server has already said it cannot read is not a choice here: offering
+          // it would answer the press by replacing a working list with that failure.
+          const item = (
+            <MenuRadioItem
+              density="compact"
+              key={option.value}
+              value={option.value}
+              className={option.unavailable ? "data-disabled:pointer-events-auto" : undefined}
+              disabled={option.unavailable !== undefined}
+            >
+              <span className="flex min-w-0 items-center gap-2">
+                {option.project ? <PullRequestFilterOptionIcon option={option} /> : null}
+                <span className="min-w-0 flex-1 truncate">{option.label}</span>
+                {option.unavailable ? (
+                  <span className="shrink-0">{t.git.pullRequest.unavailable}</span>
+                ) : null}
+                <MenuRadioItemIndicator />
+              </span>
+            </MenuRadioItem>
+          );
+          if (!option.unavailable) return item;
+          return (
+            <Tooltip key={option.value}>
+              <TooltipTrigger render={item} />
+              <TooltipPopup side="top">{option.unavailable}</TooltipPopup>
+            </Tooltip>
+          );
+        })}
+      </div>
     </MenuRadioGroup>
   );
 }
@@ -277,6 +300,7 @@ export function PullRequestFilterSelect<Value extends string>({
   onOpenChange,
   valueOnly = false,
   supplementaryOptions = EMPTY_SUPPLEMENTARY_OPTIONS,
+  supplement,
 }: {
   label: string;
   value: Value;
@@ -286,9 +310,20 @@ export function PullRequestFilterSelect<Value extends string>({
   valueOnly?: boolean;
   /** Board choices absent from the filter contract remain visible but cannot issue a request. */
   supplementaryOptions?: ReadonlyArray<string>;
+  /** L6 supplementary filters have their own feature geometry. */
+  supplement?: SupplementPopup;
 }) {
   const current = options.find((option) => option.value === value) ?? options[0];
   if (!current) return null;
+  const choices = (
+    <PullRequestFilterRadioGroup
+      label={label}
+      value={value}
+      options={options}
+      onChange={onChange}
+      supplement={supplement}
+    />
+  );
   return (
     <Menu onOpenChange={onOpenChange}>
       <PullRequestFilterTrigger
@@ -307,19 +342,29 @@ export function PullRequestFilterSelect<Value extends string>({
           label
         )}
       </PullRequestFilterTrigger>
-      <MenuPopup align="start" side="bottom" className={valueOnly ? "w-40" : "w-42.5"}>
-        <PullRequestFilterRadioGroup
-          label={label}
-          value={value}
-          options={options}
-          onChange={onChange}
-        />
-        {supplementaryOptions.map((option) => (
-          <MenuItem key={option} density="compact" disabled>
-            {option}
-          </MenuItem>
-        ))}
-      </MenuPopup>
+      {supplement ? (
+        <MenuPrimitive.Portal>
+          <MenuPrimitive.Positioner align="start" side="bottom" sideOffset={4} className="z-130">
+            <MenuPrimitive.Popup
+              className={cn(
+                "dropdown-glass pr-popup flex max-h-96 max-w-full flex-col gap-px overflow-y-auto rounded-pr-list-popup p-1.5 outline-none",
+                SUPPLEMENT_POPUP_WIDTHS[supplement],
+              )}
+            >
+              {choices}
+            </MenuPrimitive.Popup>
+          </MenuPrimitive.Positioner>
+        </MenuPrimitive.Portal>
+      ) : (
+        <MenuPopup align="start" side="bottom" className={valueOnly ? "w-40" : "w-42.5"}>
+          {choices}
+          {supplementaryOptions.map((option) => (
+            <MenuItem key={option} density="compact" disabled>
+              {option}
+            </MenuItem>
+          ))}
+        </MenuPopup>
+      )}
     </Menu>
   );
 }
@@ -677,6 +722,7 @@ export function PullRequestFiltersMenu({
         label={t.git.pullRequest.draft}
         value={filters.draft ?? UNFILTERED_VALUE}
         options={DRAFT_OPTIONS}
+        supplement="draft"
         onChange={(draft) => updateFilter("draft", draft)}
       />
       <PullRequestFilterSelect
@@ -684,6 +730,7 @@ export function PullRequestFiltersMenu({
         label={t.git.pullRequest.review}
         value={filters.review ?? UNFILTERED_VALUE}
         options={REVIEW_OPTIONS}
+        supplement="review"
         onChange={(review) => updateFilter("review", review)}
       />
       <PullRequestFilterSelect
@@ -691,6 +738,7 @@ export function PullRequestFiltersMenu({
         label={t.git.pullRequest.checks}
         value={filters.checks ?? UNFILTERED_VALUE}
         options={CHECKS_OPTIONS}
+        supplement="checks"
         onChange={(checks) => updateFilter("checks", checks)}
       />
     </div>

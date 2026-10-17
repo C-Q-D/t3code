@@ -2301,8 +2301,9 @@ export function PullRequestDetailPanel({
                       <MoreHorizontalIcon aria-hidden className="size-4" />
                     )}
                   </MenuTrigger>
-                  <MenuPopup align="end">
+                  <MenuPopup align="end" className="w-42.5">
                     <MenuItem
+                      density="compact"
                       closeOnClick={
                         headerActions.disableAutoMerge || inlineConfirm.isArmed("enable-auto-merge")
                       }
@@ -2334,6 +2335,7 @@ export function PullRequestDetailPanel({
                             : t.git.pullRequest.autoMerge}
                     </MenuItem>
                     <MenuItem
+                      density="compact"
                       disabled={actionPending || !headerActions.ready}
                       onClick={() => void perform("ready")}
                     >
@@ -2341,6 +2343,7 @@ export function PullRequestDetailPanel({
                       {t.git.pullRequest.readyForReview}
                     </MenuItem>
                     <MenuItem
+                      density="compact"
                       disabled={actionPending || !headerActions.draft}
                       onClick={() => void perform("draft")}
                     >
@@ -2348,6 +2351,7 @@ export function PullRequestDetailPanel({
                       {t.git.pullRequest.convertToDraft}
                     </MenuItem>
                     <MenuItem
+                      density="compact"
                       closeOnClick={inlineConfirm.isArmed("revert")}
                       disabled={actionPending || detail.state !== "merged" || !can("revert")}
                       variant={inlineConfirm.isArmed("revert") ? "destructive" : "default"}
@@ -2360,6 +2364,7 @@ export function PullRequestDetailPanel({
                     </MenuItem>
                     <MenuSeparator />
                     <MenuItem
+                      density="compact"
                       disabled={actionPending || detail.state !== "closed" || !can("reopen")}
                       onClick={() => void perform("reopen")}
                     >
@@ -2367,6 +2372,7 @@ export function PullRequestDetailPanel({
                       {t.git.pullRequest.reopen}
                     </MenuItem>
                     <MenuItem
+                      density="compact"
                       closeOnClick={inlineConfirm.isArmed("close")}
                       variant="destructive"
                       disabled={actionPending || detail.state !== "open" || !can("close")}
@@ -2380,6 +2386,7 @@ export function PullRequestDetailPanel({
                     <MenuSeparator />
                     {conflicting ? (
                       <MenuItem
+                        density="compact"
                         disabled={
                           handoff !== null || (attachTarget === null && checkoutRoot === null)
                         }
@@ -2402,11 +2409,16 @@ export function PullRequestDetailPanel({
                       }
                       onPickerOpenChange={setThreadPickerOpen}
                     />
-                    <MenuItem disabled={refreshing} onClick={() => void refreshFromHost()}>
+                    <MenuItem
+                      density="compact"
+                      disabled={refreshing}
+                      onClick={() => void refreshFromHost()}
+                    >
                       <RefreshIcon size="sm" refreshing={refreshing} />
                       {t.git.pullRequest.refresh}
                     </MenuItem>
                     <MenuItem
+                      density="compact"
                       disabled={handoff !== null || !canFixFindings}
                       onClick={startFixFindings}
                     >
@@ -2416,7 +2428,11 @@ export function PullRequestDetailPanel({
                         : handoffLabels.fixFindings}
                     </MenuItem>
                     {reviewGuidesEnabled && guideWriter.canWrite ? (
-                      <MenuItem disabled={guideWriter.running} onClick={writeGuide}>
+                      <MenuItem
+                        density="compact"
+                        disabled={guideWriter.running}
+                        onClick={writeGuide}
+                      >
                         <PixelSparkIcon aria-hidden className="size-3.5" />
                         {guideWriter.running
                           ? "Writing guide..."
@@ -2434,12 +2450,16 @@ export function PullRequestDetailPanel({
                       />
                     ) : null}
                     <MenuSeparator />
-                    <MenuItem onClick={() => void readLocalApi()?.shell.openExternal(detail.url)}>
+                    <MenuItem
+                      density="compact"
+                      onClick={() => void readLocalApi()?.shell.openExternal(detail.url)}
+                    >
                       <ArrowUpRightIcon aria-hidden className="size-3.5" />
                       {openOnHostLabel(hostClient)}
                     </MenuItem>
                     {repositoryUrl ? (
                       <MenuItem
+                        density="compact"
                         onClick={() => void readLocalApi()?.shell.openExternal(repositoryUrl)}
                       >
                         <FolderGit2Icon aria-hidden className="size-3.5" />

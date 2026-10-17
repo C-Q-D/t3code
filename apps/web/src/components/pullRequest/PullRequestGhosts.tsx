@@ -1,11 +1,11 @@
 /**
  * Loading states specific to the pull request surface — the first list, a search under way,
- * and a detail panel opening — use bars in the geometry of the content they stand for, pulsing
- * on one composited layer. Diff loading uses the shared diff-panel skeleton instead.
+ * and a detail panel opening — use bars in the geometry of the content they stand for.
+ * The list is static; detail loading retains its existing composited pulse.
+ * Diff loading uses the shared diff-panel skeleton instead.
  *
- * The bars share the app-wide `Skeleton` tone (`muted-foreground` at low alpha, which reads on
- * both themes) and the single `animate-skeleton` pulse, applied once on the container so any
- * number of bars costs one opacity animation.
+ * Detail bars keep the app-wide `Skeleton` tone and one container-level opacity pulse;
+ * list placeholders follow the loaded rows without continuously animating.
  */
 import { t } from "~/i18n";
 import type { PullRequestListEntry, PullRequestSummary } from "@t3tools/contracts";
@@ -55,7 +55,7 @@ const DEFAULT_DETAIL_TABS = [
   { value: "code", label: t.git.pullRequest.code },
 ] as const;
 
-/** Rows in the list's own grid — glyph, title over meta, time over diffstat.
+/** Static rows reserve the same three-line 86px geometry as the loaded L4 list.
  * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
  * @returns The rendered surface.
  */
@@ -71,25 +71,26 @@ export function PullRequestListGhost({
     <div
       role="status"
       aria-label={caption ?? t.git.pullRequest.loadingPullRequests}
-      className="motion-safe:animate-skeleton space-y-0.5"
+      className="space-y-0.75"
     >
       {caption ? (
-        <p className="px-3 pb-1 text-xs font-medium text-muted-foreground/70">{caption}</p>
+        <p className="px-3 pb-1 text-secondary-copy text-muted-foreground">{caption}</p>
       ) : null}
       {Array.from({ length: rows }, (_, index) => (
         <div
           key={index}
-          className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-md px-3 py-2.5"
+          className="flex min-h-21.5 flex-col justify-center gap-2 rounded-card-row px-3 py-2.5"
         >
-          <GhostBar className="size-4 rounded-full" />
-          <div className="min-w-0 space-y-1.5">
-            <GhostBar className={cn("h-4", TITLE_WIDTHS[index % TITLE_WIDTHS.length])} />
-            <GhostBar className={cn("h-3.5", META_WIDTHS[index % META_WIDTHS.length])} />
-          </div>
-          <div className="flex flex-col items-end gap-1.5">
-            <GhostBar className="w-12" />
-            <GhostBar className="w-16" />
-          </div>
+          <GhostBar
+            className={cn(
+              "h-3.5 rounded-full bg-accent",
+              TITLE_WIDTHS[index % TITLE_WIDTHS.length],
+            )}
+          />
+          <GhostBar
+            className={cn("h-3 rounded-full bg-secondary", META_WIDTHS[index % META_WIDTHS.length])}
+          />
+          <GhostBar className="h-3 w-1/2 rounded-full bg-secondary" />
         </div>
       ))}
     </div>

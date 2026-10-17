@@ -1,77 +1,18 @@
-/** Owns pull request list empty state on the web pull-request surface; host data and agent context remain unchanged. */
+/** Maps existing list empty/search states onto the L6 cards without changing recovery conditions. */
+import { FolderXIcon, ListFilterIcon, PlusIcon, SearchIcon } from "lucide-react";
+
 import { t } from "~/i18n";
 import { RefreshIcon } from "~/components/ui/refresh-icon";
-/**
- * What the list shows when it has no rows to show.
- *
- * The drawing is the page's own subject rather than a stock empty box: two branch lines and the
- * node where a change would land, in the stroke language the row icons already use. Nothing
- * found leaves the branch unjoined — the gap is the whole picture, so it is drawn once and the
- * variants only decide whether the seam closes.
- *
- * An empty page and an unread one look the same, so the states that are showing a host's answer
- * offer to ask for it again. The two that are not — a search still in flight, and a workspace
- * with no project to read from — leave the button out, since pressing it could only repeat what
- * is already happening or ask nobody.
- */
-import { PlusIcon, SearchIcon } from "lucide-react";
-
 import { openCommandPalette } from "../../commandPaletteBus";
 import { Button } from "../ui/button";
 import { PullRequestListGhost } from "./PullRequestGhosts";
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "../ui/empty";
+import { PullRequestListStatus } from "./PullRequestListStatus";
+import { PullRequestGlyph } from "./pullRequestIcons";
 
 /**
- * Drawn at the weight of the icons beside it rather than as an illustration with its own
- * palette, so an empty page reads as the same surface with nothing on it.
- */
-function BranchMark({ joined }: { joined: boolean }) {
-  return (
-    <svg
-      aria-hidden
-      viewBox="0 0 120 72"
-      className="h-20 w-32 text-muted-foreground/60"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      {/* The base line the change would land on, always whole. */}
-      <path d="M10 58h100" className="text-muted-foreground/30" stroke="currentColor" />
-      <circle cx="10" cy="58" r="5" fill="currentColor" fillOpacity={0.25} />
-      <circle cx="110" cy="58" r="5" fill="currentColor" fillOpacity={0.25} />
-      {joined ? (
-        // A branch that leaves the base and comes back: the shape of a change that landed.
-        <path d="M30 58c0-18 8-26 24-26h12c16 0 24 8 24 26" />
-      ) : (
-        <>
-          {/* The same branch, stopped short. What is missing is the join, so that is what the
-              drawing withholds. */}
-          <path d="M30 58c0-18 8-26 24-26h4" />
-          <path
-            d="M90 58c0-18-8-26-24-26h-4"
-            strokeDasharray="2 7"
-            className="text-muted-foreground/50"
-          />
-        </>
-      )}
-      <circle
-        cx="60"
-        cy="32"
-        r={joined ? 5 : 4}
-        fill={joined ? "currentColor" : "none"}
-        fillOpacity={0.25}
-        className={joined ? undefined : "text-muted-foreground/45"}
-      />
-    </svg>
-  );
-}
-
-/**
- * Renders pull request list empty state from the supplied display data and callbacks.
- * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
- * @returns The rendered surface.
+ * Keep no-project, searching, query-empty and filter-empty precedence and their existing actions.
+ * @param props Current list state and callbacks; no-project and searching do not offer refresh.
+ * @returns The matching L6 status card or the list loading placeholder.
  */
 export function PullRequestListEmptyState({
   query,
@@ -85,49 +26,28 @@ export function PullRequestListEmptyState({
   onLoadMore,
   onRefresh,
 }: {
-  /** The text being searched for, so the reader is told what was searched rather than guessing. */
   query: string;
-  /** True when a state, involvement or project filter is narrowing the list. */
   filtered: boolean;
-  /** A search is in flight; the rows on screen are the previous answer. */
   searching: boolean;
-  /**
-   * Whether this environment holds a project at all. The list is assembled from the projects'
-   * remotes, so without one there is no host to ask and no filter or search that could help.
-   */
   hasProjects: boolean;
   canLoadMore: boolean;
   loadingMore: boolean;
-  /** A re-read of the hosts is already running, from here or from the header. */
   refreshing: boolean;
   onClearQuery: () => void;
   onLoadMore: () => void;
   onRefresh: () => void;
 }) {
-  // Ahead of the search and the filters, because neither can produce a row until a project does.
   if (!hasProjects) {
     return (
-      <Empty>
-        <BranchMark joined={false} />
-        <EmptyHeader>
-          <EmptyTitle>{t.git.pullRequest.noProjectsInThisWorkspace}</EmptyTitle>
-          <EmptyDescription>
-            {t.git.pullRequest.addAProjectAndThePullRequestsFromItsRepositoryAppearHere}
-          </EmptyDescription>
-        </EmptyHeader>
-        <EmptyContent>
-          <Button size="sm" onClick={() => openCommandPalette({ open: "add-project" })}>
-            <PlusIcon className="size-3.5" />
-            {t.git.pullRequest.addProject}
-          </Button>
-        </EmptyContent>
-      </Empty>
+      <PullRequestListStatus Icon={FolderXIcon} title={t.git.pullRequest.noProjectsInThisWorkspace}>
+        <Button size="md" onClick={() => openCommandPalette({ open: "add-project" })}>
+          <PlusIcon aria-hidden className="size-3.5" />
+          {t.git.pullRequest.addProject}
+        </Button>
+      </PullRequestListStatus>
     );
   }
-
   if (searching) {
-    // The same ghost the first load wears, so a search on its way and a list on its way are
-    // one state to the eye — with the question named where the group headers usually speak.
     return (
       <PullRequestListGhost
         rows={5}
@@ -137,60 +57,41 @@ export function PullRequestListEmptyState({
       />
     );
   }
-
   if (query.length > 0) {
     return (
-      <Empty>
-        <BranchMark joined={false} />
-        <EmptyHeader>
-          {/* A pasted paragraph is still a search, but it is not a title. */}
-          <EmptyTitle>
-            {t.git.pullRequest.nothingMatches(query.length > 48 ? `${query.slice(0, 48)}…` : query)}
-          </EmptyTitle>
-          <EmptyDescription>
-            {t.git.pullRequest.theHostsWereSearchedForItTryFewerWordsOrSearchByNumberAuthorOrBranch}
-          </EmptyDescription>
-        </EmptyHeader>
-        <div className="flex flex-wrap justify-center gap-2">
-          <Button size="sm" variant="outline" onClick={onClearQuery}>
-            <SearchIcon className="size-3.5" />
-            {t.git.pullRequest.clearSearch}
-          </Button>
-          {/* The hosts answered this query once; a pull request opened since then would answer
-              differently, and nothing on screen says which of the two the reader is looking at. */}
-          <Button size="sm" variant="outline" disabled={refreshing} onClick={onRefresh}>
-            <RefreshIcon size="sm" refreshing={refreshing} />
-            {refreshing ? t.git.pullRequest.checking : t.git.pullRequest.checkAgain}
-          </Button>
-        </div>
-      </Empty>
-    );
-  }
-
-  return (
-    <Empty>
-      <BranchMark joined={false} />
-      <EmptyHeader>
-        <EmptyTitle>
-          {filtered ? t.git.pullRequest.nothingUnderTheseFilters : t.git.pullRequest.noPullRequests}
-        </EmptyTitle>
-        <EmptyDescription>
-          {filtered
-            ? t.git.pullRequest.widenTheStateInvolvementOrProjectFilterToSeeMore
-            : t.git.pullRequest.pullRequestsFromEveryProjectInThisWorkspaceAppearHere}
-        </EmptyDescription>
-      </EmptyHeader>
-      <div className="flex flex-wrap justify-center gap-2">
-        {canLoadMore ? (
-          <Button size="sm" variant="outline" disabled={loadingMore} onClick={onLoadMore}>
-            {loadingMore ? t.git.pullRequest.loading : t.git.pullRequest.loadMorePullRequests}
-          </Button>
-        ) : null}
-        <Button size="sm" variant="outline" disabled={refreshing} onClick={onRefresh}>
+      <PullRequestListStatus
+        Icon={SearchIcon}
+        title={t.git.pullRequest.nothingMatches(
+          query.length > 48 ? `${query.slice(0, 48)}…` : query,
+        )}
+      >
+        <Button size="md" variant="outline" onClick={onClearQuery}>
+          <SearchIcon aria-hidden className="size-3.5" />
+          {t.git.pullRequest.clearSearch}
+        </Button>
+        <Button size="md" variant="outline" disabled={refreshing} onClick={onRefresh}>
           <RefreshIcon size="sm" refreshing={refreshing} />
           {refreshing ? t.git.pullRequest.checking : t.git.pullRequest.checkAgain}
         </Button>
-      </div>
-    </Empty>
+      </PullRequestListStatus>
+    );
+  }
+  return (
+    <PullRequestListStatus
+      Icon={filtered ? ListFilterIcon : PullRequestGlyph.pullRequest}
+      title={
+        filtered ? t.git.pullRequest.nothingUnderTheseFilters : t.git.pullRequest.noPullRequests
+      }
+    >
+      {canLoadMore ? (
+        <Button size="md" variant="outline" disabled={loadingMore} onClick={onLoadMore}>
+          {loadingMore ? t.git.pullRequest.loading : t.git.pullRequest.loadMorePullRequests}
+        </Button>
+      ) : null}
+      <Button size="md" variant="outline" disabled={refreshing} onClick={onRefresh}>
+        <RefreshIcon size="sm" refreshing={refreshing} />
+        {refreshing ? t.git.pullRequest.checking : t.git.pullRequest.checkAgain}
+      </Button>
+    </PullRequestListStatus>
   );
 }

@@ -92,6 +92,7 @@ const twMerge = extendTailwindMerge({
         "pn5-search",
         "pn5-hint",
         "pr-list-meta",
+        "pr-link-title",
       ],
       shadow: [
         "slab",
@@ -216,6 +217,8 @@ const twMerge = extendTailwindMerge({
         "timeline-setup-key",
         "timeline-scroll",
         "pr-filter-idle",
+        "pr-list-empty",
+        "pr-list-empty-mark",
       ],
       "inset-shadow": [
         "selected",
@@ -293,6 +296,8 @@ const twMerge = extendTailwindMerge({
         "device-control",
         "device-frame",
         "timeline-minimap-strip",
+        "pr-list-popup",
+        "pr-link-dialog",
       ],
       leading: [
         "code",

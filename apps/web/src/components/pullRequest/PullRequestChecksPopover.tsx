@@ -9,13 +9,14 @@ import type {
   ScopedThreadRef,
 } from "@t3tools/contracts";
 import { useState } from "react";
+import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
 
 import { useOpenLink } from "~/browser/useOpenLink";
 import { cn } from "~/lib/utils";
 import { pullRequestEnvironment } from "~/state/pullRequests";
 import { useEnvironmentQuery } from "~/state/query";
 
-import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
+import { Popover, PopoverTrigger } from "../ui/popover";
 import { Button } from "../ui/button";
 import { ScrollArea } from "../ui/scroll-area";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
@@ -48,11 +49,11 @@ function LazyChecksBody({
     pullRequestEnvironment.detail({ environmentId, input: reference }),
   );
   if (detailQuery.error !== null) {
-    return <p className="text-muted-foreground text-xs">{detailQuery.error}</p>;
+    return <p className="text-muted-foreground text-secondary-copy-medium">{detailQuery.error}</p>;
   }
   if (detailQuery.data === null) {
     return (
-      <p className="text-muted-foreground text-xs">
+      <p className="text-muted-foreground text-secondary-copy-medium">
         {detailQuery.isPending
           ? t.git.pullRequest.loadingChecks
           : t.git.pullRequest.noChecksReported}
@@ -80,44 +81,55 @@ function ChecksBody({
   const canCollapse = attention.length + running.length > 0 && completed.length > 0;
   const visibleChecks = [...attention, ...running, ...(showAll || !canCollapse ? completed : [])];
   if (checks.length === 0) {
-    return <p className="text-muted-foreground text-xs">{t.git.pullRequest.noChecksReported}</p>;
+    return (
+      <p className="text-muted-foreground text-secondary-copy-medium">
+        {t.git.pullRequest.noChecksReported}
+      </p>
+    );
   }
   return (
     <>
       <ScrollArea className="max-h-64">
-        <ul className="flex flex-col gap-1">
+        <ul className="flex flex-col gap-0.5">
           {/* Keyed by position as well as by name: the host is the one that decides how many runs
           share a name, and a repeated key is a rendering fault rather than a wrong list. */}
           {visibleChecks.map((check, index) => (
-            <li key={`${index}:${check.name}`} className="flex items-center gap-2 text-xs">
+            <li
+              key={`${index}:${check.name}`}
+              className="flex min-h-7.5 items-center gap-2 px-2 text-secondary-copy-medium"
+            >
               <PullRequestCheckStatusIcon status={check.status} />
               <Tooltip>
                 <TooltipTrigger
-                  render={<span className="min-w-0 flex-1 truncate">{check.name}</span>}
+                  render={
+                    check.url === null ? (
+                      <span className="min-w-0 flex-1 truncate">{check.name}</span>
+                    ) : (
+                      <button
+                        type="button"
+                        aria-label={`${t.git.pullRequest.details}: ${check.name}`}
+                        className="min-w-0 flex-1 cursor-pointer truncate rounded-menu-row text-left outline-none hover:underline focus-visible:inset-shadow-focus"
+                        onClick={() => {
+                          if (!check.url) return;
+                          void openLink(check.url).catch((error: unknown) => {
+                            console.error(error);
+                            toastManager.add({
+                              type: "error",
+                              title: t.git.pullRequest.unableToOpenCheckDetails,
+                            });
+                          });
+                        }}
+                      >
+                        {check.name}
+                      </button>
+                    )
+                  }
                 />
                 <TooltipPopup side="top">{check.description ?? check.name}</TooltipPopup>
               </Tooltip>
-              <span className="shrink-0 text-muted-foreground">
+              <span className="shrink-0 font-mono text-meta text-muted-foreground">
                 {pullRequestCheckStatusLabel(check)}
               </span>
-              {check.url === null ? null : (
-                <button
-                  type="button"
-                  className="shrink-0 text-primary hover:underline"
-                  onClick={() => {
-                    if (!check.url) return;
-                    void openLink(check.url).catch((error: unknown) => {
-                      console.error(error);
-                      toastManager.add({
-                        type: "error",
-                        title: t.git.pullRequest.unableToOpenCheckDetails,
-                      });
-                    });
-                  }}
-                >
-                  {t.git.pullRequest.details}
-                </button>
-              )}
             </li>
           ))}
         </ul>
@@ -125,7 +137,7 @@ function ChecksBody({
       {canCollapse ? (
         <Button
           variant="ghost"
-          size="xs"
+          size="md"
           aria-expanded={showAll}
           onClick={() => setShowAll(!showAll)}
         >
@@ -216,23 +228,33 @@ export function PullRequestChecksPopover({
           </>
         ) : null}
       </PopoverTrigger>
-      <PopoverPopup align="start" width="md" side="bottom">
-        <p className="mb-2 font-medium text-sm">{presentation.label}</p>
-        {summary === null ? null : <p className="mb-2 text-muted-foreground text-xs">{summary}</p>}
-        {stale ? (
-          <p className="text-muted-foreground text-xs">
-            {t.git.pullRequest.checkDetailsAreOutOfDateRefreshThePullRequestToUpdateThem}
-          </p>
-        ) : checks !== undefined ? (
-          <ChecksBody checks={checks} threadRef={threadRef} />
-        ) : environmentId !== undefined && reference !== undefined ? (
-          <LazyChecksBody
-            environmentId={environmentId}
-            reference={reference}
-            threadRef={threadRef}
-          />
-        ) : null}
-      </PopoverPopup>
+      <PopoverPrimitive.Portal>
+        <PopoverPrimitive.Positioner
+          align="start"
+          side="bottom"
+          sideOffset={4}
+          collisionPadding={16}
+          className="z-130 max-w-full"
+        >
+          <PopoverPrimitive.Popup className="dropdown-glass pr-popup flex w-62.5 max-w-full flex-col rounded-pr-list-popup p-2 outline-none">
+            <p className="sr-only">{presentation.label}</p>
+            {summary === null ? null : <p className="sr-only">{summary}</p>}
+            {stale ? (
+              <p className="text-muted-foreground text-secondary-copy-medium">
+                {t.git.pullRequest.checkDetailsAreOutOfDateRefreshThePullRequestToUpdateThem}
+              </p>
+            ) : checks !== undefined ? (
+              <ChecksBody checks={checks} threadRef={threadRef} />
+            ) : environmentId !== undefined && reference !== undefined ? (
+              <LazyChecksBody
+                environmentId={environmentId}
+                reference={reference}
+                threadRef={threadRef}
+              />
+            ) : null}
+          </PopoverPrimitive.Popup>
+        </PopoverPrimitive.Positioner>
+      </PopoverPrimitive.Portal>
     </Popover>
   );
 }
