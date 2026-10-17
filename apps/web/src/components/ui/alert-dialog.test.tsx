@@ -1,5 +1,9 @@
+// @vitest-environment jsdom
+/** Protects confirmation focus behavior and the existing long-description layout contract. */
+import { act, createRef } from "react";
+import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
 
 import {
   AlertDialog,
@@ -7,7 +11,185 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogPopup,
 } from "./alert-dialog";
+import { Dialog, DialogTitle } from "./dialog";
+
+describe.each([
+  { name: "dialog", Root: Dialog, Title: DialogTitle },
+  { name: "alert dialog", Root: AlertDialog, Title: AlertDialogTitle },
+])("$name title hover", ({ Root, Title }) => {
+  it.each([
+    { name: "full rich text", title: undefined, expected: "Archive important conversation?" },
+    { name: "explicit hint", title: "Custom hint", expected: "Custom hint" },
+    { name: "caller handler", title: undefined, expected: "Archive important conversation?" },
+  ])("preserves $name", async ({ title, expected, name }) => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    const onMouseEnter = vi.fn();
+    try {
+      await act(async () => {
+        root.render(
+          <Root>
+            <Title title={title} onMouseEnter={onMouseEnter}>
+              Archive <strong>important</strong> conversation?
+            </Title>
+          </Root>,
+        );
+      });
+      const heading = container.querySelector("h2");
+      expect(heading).not.toBeNull();
+      await act(async () => {
+        heading?.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+      });
+      if (name === "caller handler") expect(onMouseEnter).toHaveBeenCalledTimes(1);
+      else expect(heading?.title).toBe(expected);
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
+describe("alert dialog initial focus", () => {
+  it.each([
+    {
+      scenario: "primary action and callback ref",
+      disabled: false,
+      explicit: false,
+      callbackRef: true,
+      expected: "Confirm",
+    },
+    { scenario: "disabled action", disabled: true, explicit: false, expected: "Cancel" },
+    { scenario: "explicit ref", disabled: false, explicit: true, expected: "Details" },
+    { scenario: "hidden action", hidden: true, expected: "Cancel" },
+    { scenario: "missing footer", footer: false, expected: "Details" },
+    { scenario: "inert ancestor", inert: true, expected: "Cancel" },
+    { scenario: "aria-disabled action", ariaDisabled: true, expected: "Cancel" },
+    { scenario: "nested alertdialog", nestedRole: "alertdialog", expected: "Confirm" },
+    { scenario: "nested dialog", nestedRole: "dialog", expected: "Confirm" },
+    { scenario: "explicit false", preventFocus: true, expected: "Outside" },
+    { scenario: "display none ancestor", displayNone: true, expected: "Cancel" },
+    { scenario: "visibility hidden ancestor", visibilityHidden: true, expected: "Cancel" },
+    { scenario: "negative tab index", tabIndex: -1, expected: "Cancel" },
+    { scenario: "function initial focus", functionFocus: true, expected: "Details" },
+    {
+      scenario: "callback ref without cleanup",
+      callbackRef: true,
+      noCleanup: true,
+      expected: "Confirm",
+    },
+  ])(
+    "$scenario focuses $expected",
+    async ({
+      disabled,
+      explicit,
+      callbackRef,
+      hidden,
+      footer,
+      inert,
+      ariaDisabled,
+      nestedRole,
+      preventFocus,
+      displayNone,
+      visibilityHidden,
+      tabIndex,
+      functionFocus,
+      noCleanup,
+      expected,
+    }) => {
+      vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+      vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
+      const container = document.createElement("div");
+      const outside = document.createElement("button");
+      outside.textContent = "Outside";
+      document.body.append(outside);
+      outside.focus();
+      document.body.append(container);
+      const root = createRoot(container);
+      const detailsRef = createRef<HTMLButtonElement>();
+      const popupRef = createRef<HTMLDivElement>();
+      const onPopupRef = vi.fn((element: HTMLDivElement | null) => {
+        popupRef.current = element;
+        if (!noCleanup)
+          return () => {
+            popupRef.current = null;
+          };
+      });
+      try {
+        await act(async () => {
+          root.render(
+            <AlertDialog open>
+              <AlertDialogPopup
+                ref={callbackRef ? onPopupRef : popupRef}
+                initialFocus={
+                  preventFocus
+                    ? false
+                    : functionFocus
+                      ? () => detailsRef.current
+                      : explicit
+                        ? detailsRef
+                        : undefined
+                }
+              >
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Archive conversation?</AlertDialogTitle>
+                </AlertDialogHeader>
+                <button ref={detailsRef}>Details</button>
+                {footer !== false && (
+                  <AlertDialogFooter>
+                    <button>Cancel</button>
+                    <div
+                      inert={inert}
+                      style={{
+                        display: displayNone ? "none" : undefined,
+                        visibility: visibilityHidden ? "hidden" : undefined,
+                      }}
+                    >
+                      <button
+                        disabled={disabled}
+                        hidden={hidden}
+                        aria-disabled={ariaDisabled}
+                        tabIndex={tabIndex}
+                      >
+                        Confirm
+                      </button>
+                    </div>
+                    {nestedRole && (
+                      <div
+                        role={nestedRole}
+                        data-slot={nestedRole === "dialog" ? "dialog-popup" : "alert-dialog-popup"}
+                      >
+                        <AlertDialogFooter>
+                          <button>Nested</button>
+                        </AlertDialogFooter>
+                      </div>
+                    )}
+                  </AlertDialogFooter>
+                )}
+              </AlertDialogPopup>
+            </AlertDialog>,
+          );
+        });
+        // Base UI schedules the initial focus on the next animation frame.
+        await act(async () => vi.advanceTimersToNextFrame());
+        expect(document.activeElement?.textContent).toBe(expected);
+        expect(popupRef.current?.contains(document.activeElement)).toBe(!preventFocus);
+      } finally {
+        await act(async () => root.unmount());
+        container.remove();
+        outside.remove();
+        vi.useRealTimers();
+        vi.unstubAllGlobals();
+      }
+      if (noCleanup) expect(onPopupRef).toHaveBeenLastCalledWith(null);
+      expect(popupRef.current).toBeNull();
+    },
+  );
+});
 
 describe("alert dialog description", () => {
   it("keeps a long payload in a bounded scroll region so the actions stay put", () => {

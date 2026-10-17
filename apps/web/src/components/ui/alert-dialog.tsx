@@ -1,6 +1,8 @@
+/** Confirmation dialog shell; shares material with dialogs and defaults focus to the trailing action. */
 "use client";
 
 import { AlertDialog as AlertDialogPrimitive } from "@base-ui/react/alert-dialog";
+import { useCallback, useRef } from "react";
 
 import { cn } from "~/lib/utils";
 import {
@@ -37,15 +39,60 @@ function AlertDialogViewport({ className, ...props }: AlertDialogPrimitive.Viewp
   );
 }
 
+/** Uses the last available footer button as the primary action unless initialFocus is supplied; forwards popup refs and all primitive props. */
 function AlertDialogPopup({
   className,
   bottomStickOnMobile = true,
   portalContainer,
+  initialFocus,
+  ref,
   ...props
 }: AlertDialogPrimitive.Popup.Props & {
   bottomStickOnMobile?: boolean;
   portalContainer?: AlertDialogPrimitive.Portal.Props["container"];
 }) {
+  const popupRef = useRef<HTMLDivElement | null>(null);
+  const setPopupRef = useCallback(
+    (element: HTMLDivElement | null) => {
+      popupRef.current = element;
+      const cleanup = typeof ref === "function" ? ref(element) : undefined;
+      if (ref && typeof ref !== "function") ref.current = element;
+      return () => {
+        popupRef.current = null;
+        if (typeof cleanup === "function") cleanup();
+        else if (typeof ref === "function") ref(null);
+        else if (ref) ref.current = null;
+      };
+    },
+    [ref],
+  );
+
+  /** Returns the trailing available action, or true to delegate an empty footer to Base UI. */
+  const focusPrimaryAction = () => {
+    // The shell's action order is secondary first, primary last. Ignore unavailable actions
+    // and descendants of another dialog/alertdialog, including ordinary dialog popups.
+    const buttons = popupRef.current?.querySelectorAll<HTMLButtonElement>(
+      '[data-slot="alert-dialog-footer"] button:not(:disabled):not([aria-disabled="true"]):not([tabindex="-1"])',
+    );
+    return (
+      Array.from(buttons ?? []).findLast((button) => {
+        if (button.closest('[role="dialog"], [role="alertdialog"]') !== popupRef.current)
+          return false;
+        for (let element: HTMLElement | null = button; element; element = element.parentElement) {
+          const style = element.ownerDocument.defaultView?.getComputedStyle(element);
+          if (
+            element.matches("[hidden], [inert]") ||
+            style?.display === "none" ||
+            style?.visibility === "hidden" ||
+            style?.visibility === "collapse"
+          )
+            return false;
+        }
+        return true;
+      }) ?? true
+    );
+  };
+
   return (
     <AlertDialogPortal container={portalContainer}>
       <AlertDialogBackdrop />
@@ -55,11 +102,13 @@ function AlertDialogPopup({
         <AlertDialogPrimitive.Popup
           className={cn(
             DIALOG_POPUP_CLASS,
-            "row-start-2 max-h-full max-w-lg text-popover-foreground",
+            "row-start-2 max-h-full text-popover-foreground",
             bottomStickOnMobile && DIALOG_MOBILE_SHEET_CLASS,
             className,
           )}
           data-slot="alert-dialog-popup"
+          ref={setPopupRef}
+          initialFocus={initialFocus === undefined ? focusPrimaryAction : initialFocus}
           {...props}
         />
       </AlertDialogViewport>
@@ -67,19 +116,18 @@ function AlertDialogPopup({
   );
 }
 
+/** Insets title and description using H4 spacing; permits long descriptions to shrink and scroll. */
 function AlertDialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
-      className={cn(
-        "flex min-h-0 flex-col gap-2 p-6 text-center max-sm:pb-4 sm:text-left",
-        className,
-      )}
+      className={cn("flex min-h-0 min-w-0 flex-col gap-2.5 px-5.5 pt-5.5 text-left", className)}
       data-slot="alert-dialog-header"
       {...props}
     />
   );
 }
 
+/** Aligns caller-ordered secondary and primary actions to the right; bare keeps a compact top gap. */
 function AlertDialogFooter({
   className,
   variant = "default",
@@ -90,9 +138,9 @@ function AlertDialogFooter({
   return (
     <div
       className={cn(
-        "flex flex-col-reverse gap-2 px-6 sm:flex-row sm:justify-end sm:rounded-b-[calc(var(--radius-2xl)-1px)]",
-        variant === "default" && "border-t bg-muted/72 py-4",
-        variant === "bare" && "pb-6",
+        "flex flex-row justify-end gap-2 px-5.5 pb-4.5",
+        variant === "default" && "pt-4.5",
+        variant === "bare" && "pt-2",
         className,
       )}
       data-slot="alert-dialog-footer"
@@ -101,11 +149,22 @@ function AlertDialogFooter({
   );
 }
 
-function AlertDialogTitle({ className, ...props }: AlertDialogPrimitive.Title.Props) {
+/** Preserves the full accessible title while exposing truncated rich text in the native hover hint. */
+function AlertDialogTitle({
+  className,
+  title,
+  onMouseEnter,
+  ...props
+}: AlertDialogPrimitive.Title.Props) {
   return (
     <AlertDialogPrimitive.Title
-      className={cn("wrap-anywhere shrink-0 font-semibold text-xl leading-none", className)}
+      className={cn("min-w-0 shrink-0 truncate font-serif text-dialog-title font-bold", className)}
       data-slot="alert-dialog-title"
+      title={title}
+      onMouseEnter={(event) => {
+        if (title === undefined) event.currentTarget.title = event.currentTarget.textContent ?? "";
+        onMouseEnter?.(event);
+      }}
       {...props}
     />
   );

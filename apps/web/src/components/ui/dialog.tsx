@@ -87,7 +87,7 @@ function DialogPopup({
           className={cn(
             variant === "media" ? DIALOG_MEDIA_POPUP_CLASS : DIALOG_POPUP_CLASS,
             "row-start-2 text-popover-foreground",
-            variant === "default" && "max-h-full max-w-lg",
+            variant === "default" && "max-h-full",
             bottomStickOnMobile && DIALOG_MOBILE_SHEET_CLASS,
             className,
           )}
@@ -110,19 +110,18 @@ function DialogPopup({
   );
 }
 
+/** Insets the title and optional description using the H4 shell spacing. */
 function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
-      className={cn(
-        "flex flex-col gap-2 p-6 in-[[data-slot=dialog-popup]:has([data-slot=dialog-panel])]:pb-3 max-sm:pb-4",
-        className,
-      )}
+      className={cn("flex min-w-0 flex-col gap-2.5 px-5.5 pt-5.5", className)}
       data-slot="dialog-header"
       {...props}
     />
   );
 }
 
+/** Aligns caller-ordered secondary and primary actions to the right; bare keeps a compact top gap. */
 function DialogFooter({
   className,
   variant = "default",
@@ -133,9 +132,9 @@ function DialogFooter({
   return (
     <div
       className={cn(
-        "flex flex-col-reverse gap-2 px-6 sm:flex-row sm:justify-end sm:rounded-b-[calc(var(--radius-2xl)-1px)]",
-        variant === "default" && "border-t bg-muted/72 py-4",
-        variant === "bare" && "py-4",
+        "flex flex-row justify-end gap-2 px-5.5 pb-4.5",
+        variant === "default" && "pt-4.5",
+        variant === "bare" && "pt-2",
         className,
       )}
       data-slot="dialog-footer"
@@ -144,11 +143,17 @@ function DialogFooter({
   );
 }
 
-function DialogTitle({ className, ...props }: DialogPrimitive.Title.Props) {
+/** Keeps the accessible title intact and exposes rich title text through the native hover hint. */
+function DialogTitle({ className, title, onMouseEnter, ...props }: DialogPrimitive.Title.Props) {
   return (
     <DialogPrimitive.Title
-      className={cn("wrap-anywhere font-semibold text-xl leading-none", className)}
+      className={cn("min-w-0 truncate font-serif text-dialog-title font-bold", className)}
       data-slot="dialog-title"
+      title={title}
+      onMouseEnter={(event) => {
+        if (title === undefined) event.currentTarget.title = event.currentTarget.textContent ?? "";
+        onMouseEnter?.(event);
+      }}
       {...props}
     />
   );
@@ -164,6 +169,7 @@ function DialogDescription({ className, ...props }: DialogPrimitive.Description.
   );
 }
 
+/** Provides scrolling content with H4 horizontal insets; scrollFade defaults to true. */
 function DialogPanel({
   className,
   scrollFade = true,
@@ -173,7 +179,7 @@ function DialogPanel({
     <ScrollArea scrollFade={scrollFade}>
       <div
         className={cn(
-          "space-y-4 p-6 in-[[data-slot=dialog-popup]:has([data-slot=dialog-header])]:pt-1 in-[[data-slot=dialog-popup]:has([data-slot=dialog-footer]:not(.border-t))]:pb-1",
+          "space-y-4 p-5.5 in-[[data-slot=dialog-popup]:has([data-slot=dialog-header])]:pt-1 in-[[data-slot=dialog-popup]:has([data-slot=dialog-footer])]:pb-1",
           className,
         )}
         data-slot="dialog-panel"
