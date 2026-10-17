@@ -657,6 +657,21 @@ export class GhosttyTerminalSurface {
   private inputLeft = -1;
   private inputTop = -1;
 
+  /**
+   * Takes ownership of the initialized core and view elements created by create().
+   * Installs input, font, display-scale and resize observers; dispose() releases these
+   * subscriptions, the core and the view elements, but leaves the caller's mount intact.
+   * @param mount Caller-owned host whose dimensions determine the terminal grid.
+   * @param canvas Owned drawing element for terminal output and pointer selection.
+   * @param input Owned textarea for keyboard input, IME and clipboard events.
+   * @param scrollbar Owned scrollback track.
+   * @param scrollbarThumb Owned draggable viewport indicator within the track.
+   * @param context Canvas drawing context, borrowed for the lifetime of canvas.
+   * @param core Initialized WASM terminal transferred to this surface for disposal.
+   * @param metrics Initial cell width, height and baseline in CSS pixels.
+   * @param fontFamily Validated canvas font stack used to obtain metrics.
+   * @param options Initial presentation preferences and caller-owned host callbacks.
+   */
   private constructor(
     mount: HTMLElement,
     canvas: HTMLCanvasElement,

@@ -9,10 +9,13 @@ import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
 import { selectThreadPanelVisibility, useRightPanelStore } from "../rightPanelStore";
 import ThreadTerminalDrawer from "./ThreadTerminalDrawer";
 
+/** Full session module shape retained while replacing only the server-backed grant hook. */
+type SessionModule = typeof import("../state/session");
+
 // Session discovery and grants require a server; collapse ownership and the drawer remain real.
 vi.mock("../state/terminalSessions", () => ({ useKnownTerminalSessions: () => [] }));
 vi.mock("../state/session", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../state/session")>()),
+  ...(await importOriginal<SessionModule>()),
   useEnvironmentScope: () => true,
 }));
 
