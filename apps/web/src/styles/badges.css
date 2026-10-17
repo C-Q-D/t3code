@@ -1,1 +1,6 @@
 /* F7 徽标、提示气泡、快捷键：本线新增的令牌（@theme）与全局样式写在这里。 */
+
+@theme {
+  /* 规范-8a.dc.html · H5：PR 与版本徽标高 18px，圆角 9px。 */
+  --radius-badge-compact: 9px;
+}

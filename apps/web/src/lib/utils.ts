@@ -154,6 +154,7 @@ const twMerge = extendTailwindMerge({
         "tag",
         "composer",
         "keycap",
+        "badge-compact",
       ],
       leading: ["code", "terminal"],
       tracking: ["brand"],

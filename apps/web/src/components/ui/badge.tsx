@@ -1,3 +1,4 @@
+/** Shared, static H5 status badges; callers supply labels and optional icons. */
 "use client";
 
 import { mergeProps } from "@base-ui/react/merge-props";
@@ -7,46 +8,59 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "~/lib/utils";
 
 const badgeVariants = cva(
-  "relative inline-flex shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-sm border border-transparent font-medium outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-64 [&_svg:not([class*='opacity-'])]:opacity-80 [&_svg:not([class*='size-'])]:size-3.5 sm:[&_svg:not([class*='size-'])]:size-3 [&_svg]:pointer-events-none [&_svg]:shrink-0 [button&,a&]:cursor-pointer [button&,a&]:pointer-coarse:after:absolute [button&,a&]:pointer-coarse:after:size-full [button&,a&]:pointer-coarse:after:min-h-11 [button&,a&]:pointer-coarse:after:min-w-11",
+  "relative inline-flex h-5 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-tag px-2.25 font-sans text-meta-large font-semibold text-shadow-stone [&_svg:not([class*='size-'])]:size-2.75 [&_svg]:pointer-events-none [&_svg]:shrink-0",
   {
     defaultVariants: {
       size: "default",
       variant: "default",
     },
+    compoundVariants: [
+      // H5 version labels have one extra pixel of padding per side compared with PR labels.
+      { size: "sm", variant: "secondary", className: "px-1.75" },
+    ],
     variants: {
       size: {
-        control:
-          "h-7 min-w-7 rounded-[var(--control-radius)] px-[calc(--spacing(2)-1px)] text-sm sm:h-6 sm:min-w-6 sm:text-xs",
-        default:
-          "h-5.5 min-w-5.5 px-[calc(--spacing(1)-1px)] text-sm sm:h-4.5 sm:min-w-4.5 sm:text-xs",
-        lg: "h-6.5 min-w-6.5 px-[calc(--spacing(1.5)-1px)] text-base sm:h-5.5 sm:min-w-5.5 sm:text-sm",
-        // leading-none: with the inherited fractional leading the rounded font metrics
-        // leave the label sitting high in the fixed-height box, worse under renderer zoom.
-        sm: "h-5 min-w-5 rounded-[.25rem] px-[calc(--spacing(1)-1px)] text-xs leading-none sm:h-4 sm:min-w-4 sm:text-[.625rem]",
+        // Retain size names; only sm uses H5's compact PR/version geometry and typography.
+        control: "",
+        default: "",
+        lg: "",
+        sm: "h-4.5 gap-0.75 rounded-badge-compact px-1.5 font-mono text-meta font-normal",
       },
       variant: {
-        default: "bg-primary text-primary-foreground [button&,a&]:hover:bg-primary/90",
-        destructive: "bg-destructive text-white [button&,a&]:hover:bg-destructive/90",
-        error: "bg-destructive/8 text-destructive-foreground dark:bg-destructive/16",
-        info: "bg-info/8 text-info-foreground dark:bg-info/16",
-        outline:
-          "border-input bg-background text-foreground dark:bg-input/32 [button&,a&]:hover:bg-accent/50 dark:[button&,a&]:hover:bg-input/48",
-        secondary: "bg-secondary text-secondary-foreground [button&,a&]:hover:bg-secondary/90",
-        success: "bg-success/8 text-success-foreground dark:bg-success/16",
-        warning: "bg-warning/8 text-warning-foreground dark:bg-warning/16",
-        // A code-host label tinted from the --label color the consumer sets in style.
-        label:
-          "bg-[color-mix(in_srgb,var(--label)_8%,transparent)] text-[color-mix(in_srgb,var(--label)_30%,var(--color-foreground))] dark:bg-[color-mix(in_srgb,var(--label)_12%,transparent)] dark:text-[color-mix(in_srgb,var(--label)_45%,var(--color-foreground))]",
+        // Light surfaces keep F8 semantic icons dark instead of recoloring their strokes.
+        default:
+          "bg-primary text-primary-foreground font-bold text-shadow-none [--lucide-hue-override:currentColor]",
+        action:
+          "bg-primary text-primary-foreground font-bold text-shadow-none [--lucide-hue-override:currentColor]",
+        destructive: "bg-error-surface text-error-foreground",
+        danger: "bg-error-surface text-error-foreground",
+        error:
+          "bg-status-error text-status-error-foreground text-shadow-none [--lucide-hue-override:currentColor]",
+        info: "bg-status-info text-info",
+        outline: "bg-secondary text-secondary-label",
+        neutral: "bg-secondary text-secondary-label",
+        secondary: "bg-secondary text-status-neutral-foreground",
+        success: "bg-status-success text-success-foreground",
+        warning:
+          "bg-warning-surface text-status-warning-foreground text-shadow-none [--lucide-hue-override:currentColor]",
+        restricted:
+          "bg-status-restricted text-status-restricted-foreground text-shadow-none [--lucide-hue-override:currentColor]",
+        target: "bg-status-target text-status-target-foreground",
+        accent: "bg-status-emphasis text-status-emphasis-foreground",
+        // External labels use H5's neutral palette rather than consumer-defined colors.
+        label: "bg-secondary text-secondary-label",
       },
     },
   },
 );
 
+/** Span/render props and semantic palette; sm selects H5's compact PR/version badges. */
 interface BadgeProps extends useRender.ComponentProps<"span"> {
   variant?: VariantProps<typeof badgeVariants>["variant"];
   size?: VariantProps<typeof badgeVariants>["size"];
 }
 
+/** Render a status label without adding interaction states; defaults to the white action palette. */
 function Badge({ className, variant, size, render, ...props }: BadgeProps) {
   const defaultProps = {
     className: cn(badgeVariants({ className, size, variant })),
