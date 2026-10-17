@@ -1,3 +1,4 @@
+/** Shared menu appearance; Base UI owns focus, selection, portals, and dismissal. */
 "use client";
 
 import { Menu as MenuPrimitive } from "@base-ui/react/menu";
@@ -5,9 +6,14 @@ import { CheckIcon, ChevronRightIcon } from "lucide-react";
 import type * as React from "react";
 
 import { cn } from "~/lib/utils";
-import { buttonVariants } from "./button";
 
 const Menu = MenuPrimitive.Root;
+
+// H2 shares one row treatment across commands, choices, and submenu triggers.
+// Highlight fill follows Base UI even when pointer focus stays focus-visible.
+// Destructive icons keep currentColor; the inset focus ring layers over the fill.
+const menuRowClassName =
+  "h-8.5 in-data-[slot=menu-sub-content]:h-8 shrink-0 cursor-pointer select-none items-center gap-2.5 rounded-menu-row px-2.5 py-0 text-control in-data-[slot=menu-sub-content]:text-secondary-copy-large text-foreground outline-none [--menu-icon-color:var(--color-secondary-label)] not-data-disabled:data-highlighted:not-active:bg-accent not-data-disabled:not-data-[variant=destructive]:data-highlighted:not-active:[--menu-icon-color:var(--color-foreground)] not-data-disabled:data-popup-open:not-active:bg-accent focus-visible:inset-shadow-focus not-data-disabled:active:bg-sidebar not-data-disabled:active:shadow-well-pressed not-data-disabled:not-data-[variant=destructive]:active:[--menu-icon-color:var(--color-secondary-label)] data-disabled:pointer-events-none data-disabled:cursor-not-allowed data-disabled:text-fg-icon-disabled data-disabled:[--menu-icon-color:currentColor] data-disabled:[&_*]:text-current [&_svg:not([class*='size-'])]:size-3.5 [&_svg:not([class*='text-'])]:text-(--menu-icon-color) [&_svg]:pointer-events-none [&_svg]:shrink-0";
 
 function MenuTrigger({ className, children, ...props }: MenuPrimitive.Trigger.Props) {
   return (
@@ -17,6 +23,7 @@ function MenuTrigger({ className, children, ...props }: MenuPrimitive.Trigger.Pr
   );
 }
 
+/** Render a viewport-bounded menu; dropdown-glass alone owns the surface elevation. */
 function MenuPopup({
   children,
   className,
@@ -48,7 +55,7 @@ function MenuPopup({
       >
         <MenuPrimitive.Popup
           className={cn(
-            "dropdown-glass relative flex origin-(--transform-origin) rounded-lg shadow-[0_16px_40px_-18px_rgb(0_0_0/55%)] outline-none focus:outline-none dark:shadow-[0_18px_44px_-18px_rgb(0_0_0/80%)]",
+            "dropdown-glass relative flex origin-(--transform-origin) rounded-overlay outline-none focus:outline-none text-shadow-stone",
             // Portaled menus can overlap an Electron window drag region (e.g.
             // the Review panel header). Drag hit-testing ignores z-index, so
             // the topmost row would stay unhoverable without this opt-out.
@@ -60,17 +67,27 @@ function MenuPopup({
           data-slot="menu-popup"
           {...props}
         >
-          <div className="max-h-(--available-height) w-full overflow-y-auto p-1">{children}</div>
+          <div className="flex max-h-(--available-height) w-full flex-col gap-px overflow-y-auto p-1.5">
+            {children}
+          </div>
         </MenuPrimitive.Popup>
       </MenuPrimitive.Positioner>
     </MenuPrimitive.Portal>
   );
 }
 
-function MenuGroup(props: MenuPrimitive.Group.Props) {
-  return <MenuPrimitive.Group data-slot="menu-group" {...props} />;
+/** Keep grouped rows on H2's 1px rhythm without shrinking rows in long menus. */
+function MenuGroup({ className, ...props }: MenuPrimitive.Group.Props) {
+  return (
+    <MenuPrimitive.Group
+      className={cn("flex shrink-0 flex-col gap-px", className)}
+      data-slot="menu-group"
+      {...props}
+    />
+  );
 }
 
+/** Render a command; existing ghost and destructive variants retain their public names. */
 function MenuItem({
   className,
   inset,
@@ -85,14 +102,9 @@ function MenuItem({
   return (
     <MenuPrimitive.Item
       className={cn(
-        "[&>svg]:-mx-0.5 flex min-h-8 cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1 text-base text-foreground outline-none data-disabled:pointer-events-none data-disabled:cursor-not-allowed data-highlighted:bg-accent data-inset:ps-8 data-[variant=destructive]:text-destructive-foreground data-highlighted:text-accent-foreground data-disabled:opacity-64 sm:min-h-7 sm:text-sm [&>svg:not([class*='opacity-'])]:opacity-80 [&>svg:not([class*='size-'])]:size-4.5 sm:[&>svg:not([class*='size-'])]:size-4 [&>svg:not([class*='text-'])]:text-muted-foreground data-[variant=destructive]:[&>svg:not([class*='text-'])]:text-current [&>svg]:pointer-events-none [&>svg]:shrink-0",
-        variant === "ghost" &&
-          buttonVariants({
-            variant: "ghost",
-            size: "compact",
-            className: "h-auto min-h-7 w-full sm:text-xs",
-          }),
-        density === "touch" && "min-h-10 sm:min-h-10",
+        menuRowClassName,
+        "flex data-inset:ps-8 data-[variant=destructive]:not-data-disabled:text-error data-[variant=destructive]:not-data-disabled:[--menu-icon-color:currentColor]",
+        density === "touch" && "min-h-10",
         className,
       )}
       data-density={density}
@@ -119,6 +131,7 @@ function MenuItemLabel({ className, ...props }: React.ComponentProps<"span">) {
   );
 }
 
+/** Apply menu row states while preserving checkbox and switch indicator behavior. */
 function MenuCheckboxItem({
   className,
   children,
@@ -132,10 +145,11 @@ function MenuCheckboxItem({
     <MenuPrimitive.CheckboxItem
       checked={checked}
       className={cn(
-        "grid min-h-8 in-data-[side=none]:min-w-[calc(var(--anchor-width)+1.25rem)] cursor-pointer items-center gap-2 rounded-sm py-1 ps-2 text-base text-foreground outline-none data-disabled:pointer-events-none data-disabled:cursor-not-allowed data-highlighted:bg-accent data-highlighted:text-accent-foreground data-disabled:opacity-64 sm:min-h-7 sm:text-sm [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+        menuRowClassName,
+        "grid in-data-[side=none]:min-w-[calc(var(--anchor-width)+1.25rem)]",
         variant === "switch"
           ? "grid-cols-[1fr_auto] gap-4 pe-1.5"
-          : "grid-cols-[1rem_minmax(0,1fr)] pe-4",
+          : "grid-cols-[0.875rem_minmax(0,1fr)]",
         className,
       )}
       data-slot="menu-checkbox-item"
@@ -179,6 +193,7 @@ function MenuRadioGroup(props: MenuPrimitive.RadioGroup.Props) {
   return <MenuPrimitive.RadioGroup data-slot="menu-radio-group" {...props} />;
 }
 
+/** Apply menu row states while retaining the existing checked-choice fill. */
 function MenuRadioItem({
   className,
   children,
@@ -190,7 +205,8 @@ function MenuRadioItem({
   return (
     <MenuPrimitive.RadioItem
       className={cn(
-        "[&_svg]:-mx-0.5 flex min-h-8 in-data-[side=none]:min-w-[calc(var(--anchor-width)+1.25rem)] cursor-pointer items-center rounded-sm px-2 py-1 text-base text-foreground outline-none data-checked:bg-foreground/[0.08] data-disabled:pointer-events-none data-disabled:cursor-not-allowed data-highlighted:bg-accent data-highlighted:text-accent-foreground data-disabled:opacity-64 sm:min-h-7 sm:text-sm [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+        menuRowClassName,
+        "flex in-data-[side=none]:min-w-[calc(var(--anchor-width)+1.25rem)] not-data-disabled:data-checked:not-active:bg-accent",
         className,
       )}
       data-slot="menu-radio-item"
@@ -218,6 +234,7 @@ function MenuRadioItemIndicator({
   );
 }
 
+/** Align noninteractive group headings with the menu's text inset. */
 function MenuGroupLabel({
   className,
   inset,
@@ -228,7 +245,7 @@ function MenuGroupLabel({
   return (
     <MenuPrimitive.GroupLabel
       className={cn(
-        "px-2 py-1.5 font-medium text-muted-foreground text-xs data-inset:ps-9 sm:data-inset:ps-8",
+        "px-2.5 py-1.5 font-medium text-muted-foreground text-secondary-copy data-inset:ps-8",
         className,
       )}
       data-inset={inset}
@@ -238,21 +255,26 @@ function MenuGroupLabel({
   );
 }
 
+/** Draw H2's engraved cut rather than a flat border-colored divider. */
 function MenuSeparator({ className, ...props }: MenuPrimitive.Separator.Props) {
   return (
     <MenuPrimitive.Separator
-      className={cn("mx-2 my-1 h-px bg-border", className)}
+      className={cn(
+        "mx-2 my-1 h-px shrink-0 bg-menu-engraving shadow-(--shadow-menu-engraving)",
+        className,
+      )}
       data-slot="menu-separator"
       {...props}
     />
   );
 }
 
+/** Keep shortcut hints secondary and let disabled rows dim every label together. */
 function MenuShortcut({ className, ...props }: React.ComponentProps<"kbd">) {
   return (
     <kbd
       className={cn(
-        "ms-auto font-medium font-sans text-secondary-label text-xs tracking-widest",
+        "ms-auto font-mono text-placeholder text-meta in-data-highlighted:text-secondary-label in-data-disabled:text-current",
         className,
       )}
       data-slot="menu-shortcut"
@@ -265,6 +287,7 @@ function MenuSub(props: MenuPrimitive.SubmenuRoot.Props) {
   return <MenuPrimitive.SubmenuRoot data-slot="menu-sub" {...props} />;
 }
 
+/** Match command row states and keep the submenu chevron at the trailing edge. */
 function MenuSubTrigger({
   className,
   inset,
@@ -278,13 +301,9 @@ function MenuSubTrigger({
   return (
     <MenuPrimitive.SubmenuTrigger
       className={cn(
-        // Leading-icon treatment matches `MenuItem`: a sub-trigger sits in the
-        // same column as the items around it, so its icon has to align and dim
-        // with theirs. Scoped away from the last child because the chevron is
-        // also a direct svg — on a sub-trigger with no leading icon it is the
-        // only one, and these rules would take away its `ms-auto` alignment.
-        "[&>svg:not(:last-child)]:-mx-0.5 flex min-h-8 cursor-pointer items-center gap-2 rounded-sm px-2 py-1 text-base text-foreground outline-none data-disabled:cursor-not-allowed data-disabled:pointer-events-none data-highlighted:bg-accent data-popup-open:bg-accent data-inset:ps-8 data-highlighted:text-accent-foreground data-popup-open:text-accent-foreground data-disabled:opacity-64 sm:min-h-7 sm:text-sm [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground [&>svg:not(:last-child):not([class*='opacity-'])]:opacity-80 [&_svg]:pointer-events-none [&>svg]:shrink-0",
-        density === "touch" && "min-h-10 sm:min-h-10",
+        menuRowClassName,
+        "flex data-inset:ps-8",
+        density === "touch" && "min-h-10",
         className,
       )}
       data-density={density}
@@ -293,7 +312,7 @@ function MenuSubTrigger({
       {...props}
     >
       {children}
-      <ChevronRightIcon className="-me-0.5 ms-auto opacity-80" />
+      <ChevronRightIcon className="ms-auto text-secondary-label in-data-disabled:text-current" />
     </MenuPrimitive.SubmenuTrigger>
   );
 }

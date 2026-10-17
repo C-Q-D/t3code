@@ -1,1 +1,6 @@
-/* F4 菜单与弹层：本线新增的令牌（@theme）与全局样式写在这里。 */
+/* H2 menu engraving only; dropdown-glass owns popup color and elevation. */
+@theme {
+  /* 规范-8a.dc.html · H2: a dark 1px cut with a light lower edge. */
+  --color-menu-engraving: rgba(0, 0, 0, 0.6);
+  --shadow-menu-engraving: 0 1px 0 rgba(255, 255, 255, 0.05);
+}
