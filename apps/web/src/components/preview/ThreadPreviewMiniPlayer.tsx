@@ -54,6 +54,8 @@ import type { PreviewStreamViewport } from "@t3tools/client-runtime/preview/serv
 import { previewBridge } from "./previewBridge";
 import { showPreviewPopup } from "./showPreviewPopup";
 import {
+  clampPreviewMiniPlayerPosition,
+  NO_PREVIEW_MINI_PLAYER_OBSTACLES,
   PREVIEW_MINI_PLAYER_CORNER_RADIUS,
   PREVIEW_MINI_PLAYER_WEBVIEW_Z_INDEX,
   type PreviewMiniPlayerFrame,
@@ -466,8 +468,14 @@ function MiniPlayerShell({
         ? {
             ...gesture.frame,
             width: gesture.preferredWidth,
-            x: gesture.frame.x + delta.x,
-            y: gesture.frame.y + delta.y,
+            // Match the baseline request: contain the drag before canvas avoidance.
+            // Save this same request so enlarging the canvas cannot reveal pointer overshoot.
+            ...clampPreviewMiniPlayerPosition(
+              { x: gesture.frame.x + delta.x, y: gesture.frame.y + delta.y },
+              container,
+              gesture.frame,
+              NO_PREVIEW_MINI_PLAYER_OBSTACLES,
+            ),
           }
         : resizePreviewMiniPlayer({
             start: gesture.frame,

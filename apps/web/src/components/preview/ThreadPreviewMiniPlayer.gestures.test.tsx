@@ -432,3 +432,22 @@ it("preserves the shared layout fallback when V4 chrome has no free space", asyn
   // Existing shared output is intentionally retained, including zero content width.
   expect(frame).toEqual({ x: 700, y: 12, width: 12, height: 40 });
 });
+
+it("keeps the baseline position after dragging past the right edge and growing the canvas", async () => {
+  await act(async () => {
+    renderer = create(<Harness bounds={{ width: 800, height: 500 }} />);
+  });
+  const start = displayedFrame();
+  const { handle, event } = await movePointer(null, 1000 - start.x, 100 - start.y);
+  const local = displayedFrame();
+  await act(async () => handle.props.onPointerUp(event));
+  expect(displayedFrame()).toEqual(local);
+  await act(async () => renderer!.update(<Harness bounds={{ width: 1000, height: 700 }} />));
+  // Baseline clamps the request to 800 - 360 - 12 = 428 before saving it.
+  // The V4 height is 272, so y=100 fits both containers without adjustment.
+  expect(displayedFrame()).toMatchObject({ x: 428, y: 100, width: 360 });
+  expect(usePreviewMiniPlayerStore.getState().byThreadKey[threadKey]!.position).toEqual({
+    x: 428,
+    y: 100,
+  });
+});

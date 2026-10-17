@@ -174,10 +174,10 @@ it.each([
     expect(renderer!.root.findByType(BrowserSurfaceSlot).props.layoutVersion).toBe(`${x}:${y}`);
     await act(async () => handle().props[finish]({ ...event, type: eventType }));
     if (direction === null)
-      // The saved request is the starting position plus pointer delta, before layout fitting.
+      // Baseline saves the container-clamped request; the edge gap is 12px.
       expect(state.move).toHaveBeenCalledExactlyOnceWith(threadRef, "browser:tab", {
-        x: 100 + dx,
-        y: 80 + dy,
+        x,
+        y,
       });
     else
       expect(state.resize).toHaveBeenCalledExactlyOnceWith(threadRef, "browser:tab", width, {
