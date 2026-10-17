@@ -259,15 +259,17 @@ import {
 } from "../providerInstances";
 import { useThreadRunningTerminalIds } from "../state/terminalSessions";
 import { stackedThreadToast, toastManager } from "./ui/toast";
-import { Button, InlineButton } from "./ui/button";
+import { InlineButton } from "./ui/button";
 import { Badge } from "./ui/badge";
-import { SidebarContent, SidebarGroup, useSidebar } from "./ui/sidebar";
+import { SidebarContent, useSidebar } from "./ui/sidebar";
 import { SidebarChromeFooter } from "./sidebar/SidebarChrome";
 import { SidebarThreadHeader } from "./sidebar/SidebarThreadHeader";
 import {
   buildSidebarTabs,
   nextSidebarSettledVisibleCount,
   readSidebarTab,
+  writeSidebarTab,
+  type SidebarTab,
   resolveSidebarTabView,
   sidebarTabJumpNumbers,
   SIDEBAR_SETTLED_INITIAL_COUNT,
@@ -2780,8 +2782,7 @@ export default function Sidebar() {
   // page state.
   const [settledVisibleCount, setSettledVisibleCount] = useState(SIDEBAR_SETTLED_INITIAL_COUNT);
   // The raw preference codec deliberately accepts no JSON or translated labels.
-  // Tab controls are connected in SB1.3; this step restores the selected list on mount.
-  const [currentTab] = useState(() => {
+  const [currentTab, setCurrentTab] = useState(() => {
     try {
       return readSidebarTab(window.localStorage.getItem(SIDEBAR_TAB_STORAGE_KEY));
     } catch (error) {
@@ -2789,6 +2790,22 @@ export default function Sidebar() {
       return readSidebarTab(null);
     }
   });
+  /** Select a shelf and persist its raw identifier; failed storage must not block navigation. */
+  const handleSidebarTabChange = useCallback(
+    (tab: SidebarTab) => {
+      if (tab === currentTab) return;
+      // Selected rows in another shelf must not remain targets of hidden bulk actions.
+      clearSelection();
+      setCurrentTab(tab);
+      const entry = writeSidebarTab(tab);
+      try {
+        window.localStorage.setItem(entry.key, entry.value);
+      } catch (error) {
+        console.error("[SIDEBAR] Could not save the selected tab.", error);
+      }
+    },
+    [clearSelection, currentTab],
+  );
   const settledResetKey = projectScopeKey ?? "all";
   const lastSettledResetKeyRef = useRef(settledResetKey);
   if (lastSettledResetKeyRef.current !== settledResetKey) {
@@ -4787,30 +4804,29 @@ export default function Sidebar() {
       <SidebarContent
         className="min-h-full"
         fixedHeader={
-          // Lifted above the stage backdrop, whose fade bleeds below the
-          // header and would otherwise paint across the search row's outline.
-          <SidebarGroup className="z-[1]">
-            <SidebarThreadHeader
-              hasProjects={projectGroups.length > 0}
-              onOpenDiscussions={() => void router.navigate({ to: "/discussions" })}
-              onNewThread={handleNewThreadClick}
-              newThreadDisabled={projects.length === 0}
-              newThreadShortcutLabel={newThreadShortcutLabel}
-              newThreadInProjectShortcutLabel={newThreadInProjectShortcutLabel}
-              showNewThreadInProjectHint={projectGroups.length > 1}
-              searchInputRef={threadSearchInputRef}
-              searchQuery={threadSearchQuery}
-              onSearchQueryChange={(value) => {
-                setThreadSearchQuery(value);
-                setActiveSearchResultIndex(0);
-              }}
-              onSearchKeyDown={handleThreadSearchKeyDown}
-              isSearching={isSearchingThreads}
-              searchResultCount={threadSearchResults.length}
-              activeSearchResultIndex={activeSearchResultIndex}
-              onClearSearch={clearThreadSearch}
-            />
-          </SidebarGroup>
+          <SidebarThreadHeader
+            currentTab={currentTab}
+            tabCounts={sidebarTabs.counts}
+            onTabChange={handleSidebarTabChange}
+            hasProjects={projectGroups.length > 0}
+            onOpenDiscussions={() => void router.navigate({ to: "/discussions" })}
+            onNewThread={handleNewThreadClick}
+            newThreadDisabled={projects.length === 0}
+            newThreadShortcutLabel={newThreadShortcutLabel}
+            newThreadInProjectShortcutLabel={newThreadInProjectShortcutLabel}
+            showNewThreadInProjectHint={projectGroups.length > 1}
+            searchInputRef={threadSearchInputRef}
+            searchQuery={threadSearchQuery}
+            onSearchQueryChange={(value) => {
+              setThreadSearchQuery(value);
+              setActiveSearchResultIndex(0);
+            }}
+            onSearchKeyDown={handleThreadSearchKeyDown}
+            isSearching={isSearchingThreads}
+            searchResultCount={threadSearchResults.length}
+            activeSearchResultIndex={activeSearchResultIndex}
+            onClearSearch={clearThreadSearch}
+          />
         }
       >
         <div className="flex min-w-0 flex-1 flex-col pb-2.5 pt-0.5" role="presentation">

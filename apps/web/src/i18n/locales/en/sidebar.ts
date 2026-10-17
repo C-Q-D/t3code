@@ -24,6 +24,7 @@ export const sidebar = {
     discussions: "Discussions",
     addProject: "Add project",
     newThread: "New thread",
+    newThreadLabel: "New",
     searchPlaceholder: "Search",
     searchAriaLabel: "Search threads",
     clearSearchAriaLabel: "Clear thread search",
@@ -202,9 +203,16 @@ export const sidebar = {
     increaseVisibleThreadCountAriaLabel: "Increase visible thread count",
   },
   search: {
+    matches: (count: number) => `${count} matches`,
     resultsAriaLabel: "Thread search results",
     searchingHint: "Searching thread messages…",
     empty: "No threads found",
+  },
+  tabs: {
+    ariaLabel: "Thread status",
+    active: "Active",
+    later: "Later",
+    settled: "Settled",
   },
   sections: {
     empty: "No threads yet",

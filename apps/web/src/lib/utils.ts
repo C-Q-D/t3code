@@ -186,7 +186,13 @@ const twMerge = extendTailwindMerge({
         "sidebar-row-drag",
         "sidebar-jump",
       ],
-      "inset-shadow": ["selected", "focus", "selected-control", "project-rail-hover"],
+      "inset-shadow": [
+        "selected",
+        "focus",
+        "selected-control",
+        "project-rail-hover",
+        "sidebar-search-focus",
+      ],
       "text-shadow": ["stone"],
       radius: [
         "slab",

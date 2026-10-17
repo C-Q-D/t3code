@@ -26,6 +26,7 @@ export const sidebar: Messages["sidebar"] = {
     discussions: "讨论",
     addProject: "添加项目",
     newThread: "新建对话",
+    newThreadLabel: "新建",
     searchPlaceholder: "搜索",
     searchAriaLabel: "搜索对话",
     clearSearchAriaLabel: "清除对话搜索",
@@ -200,9 +201,16 @@ export const sidebar: Messages["sidebar"] = {
     increaseVisibleThreadCountAriaLabel: "增加显示的对话数量",
   },
   search: {
+    matches: (count: number) => `匹配 ${count}`,
     resultsAriaLabel: "对话搜索结果",
     searchingHint: "正在搜索对话消息…",
     empty: "未找到对话",
+  },
+  tabs: {
+    ariaLabel: "对话状态",
+    active: "活跃",
+    later: "稍后处理",
+    settled: "已完结",
   },
   sections: {
     empty: "还没有对话",
