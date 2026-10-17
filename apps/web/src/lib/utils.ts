@@ -89,6 +89,8 @@ const twMerge = extendTailwindMerge({
         "pr-avatar",
         "pr-linked-heading",
         "composer-question",
+        "pn5-search",
+        "pn5-hint",
       ],
       shadow: [
         "slab",
@@ -201,6 +203,9 @@ const twMerge = extendTailwindMerge({
         "timeline-log-content",
         "timeline-rule",
         "timeline-table",
+        "pn5-selected",
+        "pn5-empty",
+        "pn5-footer",
       ],
       "inset-shadow": [
         "selected",
@@ -271,6 +276,8 @@ const twMerge = extendTailwindMerge({
         "timeline-inline",
         "timeline-table-copy",
         "toolbar-icon",
+        "pn5-result",
+        "pn5-hint",
       ],
       leading: [
         "code",
@@ -285,6 +292,7 @@ const twMerge = extendTailwindMerge({
         "pr-linked-copy",
         "timeline-user",
         "timeline-plan",
+        "pn5-copy",
       ],
       tracking: ["brand", "chat-draft"],
     },

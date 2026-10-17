@@ -1,11 +1,22 @@
 /** Localized palette UI and interactions; preserves user data, commands, and protocol values. */
 import { t } from "~/i18n";
-import { ArrowDownIcon, ArrowUpIcon } from "lucide-react";
+import { Autocomplete as AutocompletePrimitive } from "@base-ui/react/autocomplete";
+import {
+  ArrowDownIcon,
+  ArrowUpIcon,
+  ArrowUpDownIcon,
+  CornerDownLeftIcon,
+  DeleteIcon,
+  SearchIcon,
+  XIcon,
+} from "lucide-react";
 import { type ComponentProps, type ReactNode, useLayoutEffect, useRef } from "react";
 
 import { Command, CommandFooter, CommandInput, CommandPanel } from "./ui/command";
 import { Kbd, KbdGroup } from "./ui/kbd";
+import { cn } from "~/lib/utils";
 
+/** Query and chrome inputs; result ownership and navigation remain with the caller. */
 type CommandPaletteContentProps = Omit<ComponentProps<typeof Command>, "children"> & {
   readonly children: ReactNode;
   readonly escapeLabel?: ReactNode;
@@ -20,6 +31,11 @@ type CommandPaletteContentProps = Omit<ComponentProps<typeof Command>, "children
   readonly panelSize?: "list" | "tall-list" | "fill";
   readonly showBackHint?: boolean;
   readonly testId?: string;
+  /** K5 chrome is exclusive to command mode; file and content search keep their own shells. */
+  readonly graphite?: boolean;
+  readonly shortcutLabel?: string | null;
+  /** Existing add-project navigation, displayed as the removable Palette8a breadcrumb. */
+  readonly inputBreadcrumb?: { readonly label: string; readonly onBack: () => void };
 };
 
 /**
@@ -39,6 +55,9 @@ export function CommandPaletteContent({
   panelSize = "list",
   showBackHint,
   testId,
+  graphite = false,
+  shortcutLabel,
+  inputBreadcrumb,
   ...commandProps
 }: CommandPaletteContentProps) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -51,53 +70,121 @@ export function CommandPaletteContent({
   }, []);
 
   return (
-    <div className="contents" data-testid={testId}>
+    <div
+      className={graphite ? "pn5-palette contents" : "contents"}
+      data-pn5-submenu={showBackHint}
+      data-testid={testId}
+    >
       <Command {...commandProps}>
-        <div className="relative">
-          <CommandInput {...inputProps} ref={inputRef} />
+        <div className={graphite ? "pn5-search relative" : "relative"}>
+          {graphite ? (
+            <div className={cn("pn5-search-well", inputProps.className)}>
+              <span className="pn5-search-icon">
+                {inputBreadcrumb ? <SearchIcon /> : (inputProps.startAddon ?? <SearchIcon />)}
+              </span>
+              {inputBreadcrumb ? (
+                <span className="pn5-breadcrumb">
+                  {inputBreadcrumb.label}
+                  <button
+                    type="button"
+                    aria-label={t.tools.palette.back}
+                    onClick={inputBreadcrumb.onBack}
+                    className="flex size-6 items-center justify-center rounded-full focus-visible:outline-ring"
+                  >
+                    <XIcon className="size-3" />
+                  </button>
+                </span>
+              ) : null}
+              <AutocompletePrimitive.Input
+                autoFocus
+                ref={inputRef}
+                placeholder={inputProps.placeholder}
+                onKeyDown={inputProps.onKeyDown}
+                data-slot="autocomplete-input"
+                className="pn5-search-input"
+              />
+              {!inputAccessory && shortcutLabel ? <Kbd>{shortcutLabel}</Kbd> : null}
+            </div>
+          ) : (
+            <CommandInput {...inputProps} ref={inputRef} />
+          )}
           {inputAccessory}
         </div>
-        <CommandPanel
-          className={
-            panelSize === "fill"
-              ? "flex min-h-0 flex-1 flex-col"
-              : panelSize === "tall-list"
-                ? "max-h-[min(34rem,76vh)]"
-                : "max-h-[min(28rem,70vh)]"
-          }
-        >
-          {children}
-        </CommandPanel>
-        <CommandFooter className="max-sm:flex-col max-sm:items-start">
-          <div className="flex items-center gap-3">
-            <KbdGroup>
-              <Kbd>
-                <ArrowUpIcon />
-              </Kbd>
-              <Kbd>
-                <ArrowDownIcon />
-              </Kbd>
-              <span>{t.tools.palette.navigate}</span>
-            </KbdGroup>
+        {graphite ? (
+          <div className="pn5-results relative min-h-0 overflow-hidden">{children}</div>
+        ) : (
+          <CommandPanel
+            className={
+              panelSize === "fill"
+                ? "flex min-h-0 flex-1 flex-col"
+                : panelSize === "tall-list"
+                  ? "max-h-[min(34rem,76vh)]"
+                  : "max-h-[min(28rem,70vh)]"
+            }
+          >
+            {children}
+          </CommandPanel>
+        )}
+        {graphite ? (
+          <div className="pn5-footer">
+            <span>
+              <kbd>
+                <ArrowUpDownIcon />
+              </kbd>
+              {t.tools.palette.navigate}
+            </span>
             {footerActionLabel !== undefined ? (
-              <KbdGroup>
-                <Kbd>Enter</Kbd>
-                <span>{footerActionLabel}</span>
-              </KbdGroup>
+              <span>
+                <kbd>
+                  <CornerDownLeftIcon />
+                </kbd>
+                {footerActionLabel}
+              </span>
             ) : null}
-            {showBackHint ? (
-              <KbdGroup>
-                <Kbd>Backspace</Kbd>
-                <span>{t.tools.palette.back}</span>
-              </KbdGroup>
-            ) : null}
-            <KbdGroup>
-              <Kbd>Esc</Kbd>
-              <span>{escapeLabel}</span>
-            </KbdGroup>
+            <span>
+              <kbd>Esc</kbd>
+              {escapeLabel}
+            </span>
+            <span>
+              <kbd>
+                <DeleteIcon />
+              </kbd>
+              {t.tools.palette.back}
+            </span>
+            {footerTrailing}
           </div>
-          {footerTrailing}
-        </CommandFooter>
+        ) : (
+          <CommandFooter className="max-sm:flex-col max-sm:items-start">
+            <div className="flex items-center gap-3">
+              <KbdGroup>
+                <Kbd>
+                  <ArrowUpIcon />
+                </Kbd>
+                <Kbd>
+                  <ArrowDownIcon />
+                </Kbd>
+                <span>{t.tools.palette.navigate}</span>
+              </KbdGroup>
+              {footerActionLabel !== undefined ? (
+                <KbdGroup>
+                  <Kbd>Enter</Kbd>
+                  <span>{footerActionLabel}</span>
+                </KbdGroup>
+              ) : null}
+              {showBackHint ? (
+                <KbdGroup>
+                  <Kbd>Backspace</Kbd>
+                  <span>{t.tools.palette.back}</span>
+                </KbdGroup>
+              ) : null}
+              <KbdGroup>
+                <Kbd>Esc</Kbd>
+                <span>{escapeLabel}</span>
+              </KbdGroup>
+            </div>
+            {footerTrailing}
+          </CommandFooter>
+        )}
       </Command>
     </div>
   );

@@ -230,7 +230,11 @@ import {
   deriveProviderInstanceEntries,
   type ProviderInstanceEntry,
 } from "../providerInstances";
-import { resolveShortcutCommand, threadJumpIndexFromCommand } from "../keybindings";
+import {
+  resolveShortcutCommand,
+  shortcutLabelForCommand,
+  threadJumpIndexFromCommand,
+} from "../keybindings";
 import { CommandDialog, CommandDialogPopup, CommandFooterAction } from "./ui/command";
 import { Button } from "./ui/button";
 import { Kbd, KbdGroup } from "./ui/kbd";
@@ -3587,6 +3591,11 @@ function OpenCommandPaletteDialog(props: {
 
   return (
     <CommandPaletteContent
+      graphite
+      {...(addProjectEnvironmentId !== null && isSubmenu
+        ? { inputBreadcrumb: { label: t.tools.palette.addProject, onBack: popView } }
+        : {})}
+      shortcutLabel={shortcutLabelForCommand(keybindings, "commandPalette.toggle")}
       key={`${viewStack.length}-${browseGeneration}-${isBrowsing}-${newProjectFlow ? "new-project" : (addProjectCloneFlow?.step ?? "none")}`}
       aria-label={t.tools.palette.commandPalette}
       autoHighlight={autoHighlightsFirstRow ? "always" : false}

@@ -1,1 +1,113 @@
 /* PN1–PN6 右侧面板、终端、命令面板：本线新增的令牌（@theme）与全局样式写在这里。 */
+
+/* PN5: Palette8a search, result and hint geometry. K5/StyleM owns the 660px shell at y=84px. */
+@theme {
+  --text-pn5-search: 15px;
+  --text-pn5-search--line-height: 1.45;
+  --text-pn5-hint: 10.5px;
+  --text-pn5-hint--line-height: 1.45;
+  --leading-pn5-copy: 1.45;
+  --radius-pn5-result: 14px;
+  --radius-pn5-hint: 6px;
+  --color-pn5-footer: rgba(0, 0, 0, 0.25);
+  --color-pn5-breadcrumb: #3a3a40;
+  --shadow-pn5-selected: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 1.5px 0 var(--color-raise-edge);
+  --shadow-pn5-empty:
+    inset 1.5px 2px 3px rgba(0, 0, 0, 0.62), inset -1px -1px 0 rgba(255, 255, 255, 0.055);
+  --shadow-pn5-footer: inset 0 1px 0 rgba(0, 0, 0, 0.5);
+}
+
+/* Base UI portals the viewport outside the feature subtree; scope its geometry to command mode. */
+[data-slot="command-dialog-viewport"]:has([data-palette-mode="command"]) {
+  @apply pt-21 pb-4;
+}
+[data-command-palette][data-palette-mode="command"] {
+  @apply max-w-165 max-h-full rounded-slab text-control leading-pn5-copy text-shadow-stone;
+}
+.pn5-palette .pn5-search {
+  @apply px-3 pt-3 pb-2;
+}
+.pn5-palette .pn5-search-well {
+  @apply flex h-11.5 items-center gap-2.5 rounded-full bg-input px-3.5 shadow-well-control;
+}
+.pn5-palette .pn5-search-icon {
+  @apply flex shrink-0 items-center;
+}
+.pn5-palette .pn5-search-icon svg {
+  @apply size-4.25;
+}
+.pn5-palette .pn5-breadcrumb {
+  @apply flex h-6.5 shrink-0 items-center gap-1 rounded-full bg-pn5-breadcrumb ps-2.5 pe-1.5 text-secondary-copy-medium font-semibold;
+}
+.pn5-palette .pn5-search-input {
+  @apply h-full min-w-0 flex-1 bg-transparent text-pn5-search text-foreground outline-none caret-message-action placeholder:text-placeholder;
+}
+.pn5-palette .pn5-search-well:focus-within {
+  @apply outline-none;
+}
+.pn5-palette .pn5-results {
+  max-height: min(38rem, calc(100dvh - 11.5rem));
+  @apply rounded-none;
+}
+.pn5-palette .pn5-virtual-list {
+  @apply pt-0 pb-2;
+}
+.pn5-palette [data-slot="command-list"] {
+  @apply p-0;
+}
+.pn5-palette [data-slot="command-group-label"] {
+  @apply px-3 pt-2 pb-1 text-meta-large font-normal text-muted-foreground leading-pn5-copy;
+}
+.pn5-palette .pn5-group-gap {
+  @apply pt-0.5;
+}
+.pn5-palette [data-slot="command-item"],
+.pn5-palette .pn5-result {
+  @apply min-h-10 gap-3 rounded-pn5-result px-3 py-0 text-control leading-pn5-copy;
+  margin-bottom: --spacing(0.25);
+}
+.pn5-palette [data-pn5-details="true"] {
+  @apply min-h-11.5;
+}
+.pn5-palette[data-pn5-submenu="true"] [data-pn5-details="false"] {
+  @apply min-h-11;
+}
+.pn5-palette [data-slot="command-item"][data-active] {
+  @apply shadow-pn5-selected;
+}
+.pn5-palette [data-slot="command-item"][data-active] .text-sm {
+  @apply font-semibold;
+}
+.pn5-palette [data-pn5-details] .text-sm {
+  @apply text-control leading-pn5-copy;
+}
+.pn5-palette [data-pn5-details] .text-xs {
+  @apply text-secondary-copy text-secondary-label leading-pn5-copy;
+}
+.pn5-palette [data-pn5-project="true"] .text-xs {
+  @apply font-mono;
+}
+.pn5-palette [data-slot="command-shortcut"] {
+  @apply font-mono text-meta font-normal tracking-normal text-muted-foreground;
+}
+.pn5-palette [data-pn5-details="true"] [data-slot="command-shortcut"] {
+  @apply flex h-5.5 items-center rounded-keycap bg-secondary px-1.75 text-code-foreground shadow-keycap;
+}
+.pn5-palette .pn5-empty {
+  @apply flex h-37.5 flex-col items-center justify-center gap-2.5 py-0 text-control text-secondary-label;
+}
+.pn5-palette .pn5-empty-icon {
+  @apply flex size-10 items-center justify-center rounded-compact-row shadow-pn5-empty;
+}
+.pn5-palette .pn5-footer {
+  @apply flex min-h-10 shrink-0 flex-wrap items-center gap-x-4.5 gap-y-2 bg-pn5-footer px-5 py-2 text-secondary-copy text-secondary-label shadow-pn5-footer;
+}
+.pn5-palette .pn5-footer > span {
+  @apply inline-flex items-center gap-1.5;
+}
+.pn5-palette .pn5-footer kbd {
+  @apply inline-flex h-5 min-w-5 items-center justify-center rounded-pn5-hint bg-secondary px-1 font-mono text-pn5-hint text-fg-detail shadow-keycap;
+}
+.pn5-palette .pn5-footer kbd svg {
+  @apply size-2.75;
+}

@@ -2,7 +2,7 @@
 import { t } from "~/i18n";
 import { type ResolvedKeybindingsConfig } from "@t3tools/contracts";
 import { LegendList, type LegendListRef } from "@legendapp/list/react";
-import { ChevronRightIcon } from "lucide-react";
+import { ChevronRightIcon, SearchXIcon } from "lucide-react";
 import { type RefObject, useCallback, useState } from "react";
 import { cn } from "~/lib/utils";
 import { shortcutLabelForCommand } from "../keybindings";
@@ -41,9 +41,14 @@ interface CommandPaletteResultsProps {
  */
 function CommandPaletteEmptyState(props: { emptyStateMessage?: string; isActionsOnly: boolean }) {
   return (
-    <div className="py-10 text-center text-sm text-muted-foreground">
-      {props.emptyStateMessage ??
-        (props.isActionsOnly ? t.tools.palette.noActions : t.tools.palette.noCommands)}
+    <div className="pn5-empty py-10 text-center text-sm text-muted-foreground">
+      <span aria-hidden="true" className="pn5-empty-icon hidden">
+        <SearchXIcon className="size-4.5" />
+      </span>
+      <span>
+        {props.emptyStateMessage ??
+          (props.isActionsOnly ? t.tools.palette.noActions : t.tools.palette.noCommands)}
+      </span>
     </div>
   );
 }
@@ -131,7 +136,7 @@ export function CommandPaletteVirtualizedResults(props: CommandPaletteVirtualize
         extraData={props.highlightedItemValue}
         renderItem={({ item: row }) =>
           row.kind === "label" ? (
-            <div className={row.first ? undefined : "pt-1.5"}>
+            <div className={row.first ? undefined : "pn5-group-gap pt-1.5"}>
               <CommandListHeading>{row.label}</CommandListHeading>
             </div>
           ) : row.itemIndex === null ? (
@@ -146,13 +151,13 @@ export function CommandPaletteVirtualizedResults(props: CommandPaletteVirtualize
             />
           )
         }
-        estimatedItemSize={40}
+        estimatedItemSize={46}
         drawDistance={400}
         onLayout={updateScrollFade}
         onScroll={updateScrollFade}
         contentContainerClassName="px-2"
         className={cn(
-          "min-h-0 scroll-py-6 overflow-x-hidden overscroll-y-contain py-2 [&::-webkit-scrollbar-track]:my-2",
+          "pn5-virtual-list min-h-0 scroll-py-6 overflow-x-hidden overscroll-y-contain py-2 [&::-webkit-scrollbar-track]:my-2",
           getVirtualizedScrollFadeClassName(scrollFade),
         )}
       />
@@ -164,7 +169,10 @@ function DisabledCommandPaletteResultRow(props: {
   item: CommandPaletteActionItem | CommandPaletteSubmenuItem;
 }) {
   return (
-    <div className="flex min-h-8 select-none items-center gap-2 rounded-sm px-2 py-1.5 text-base opacity-64 sm:min-h-7 sm:text-sm">
+    <div
+      data-pn5-details={Boolean(props.item.description || props.item.threadContentMatch)}
+      className="pn5-result flex min-h-8 select-none items-center gap-2 rounded-sm px-2 py-1.5 text-base opacity-64 sm:min-h-7 sm:text-sm"
+    >
       {props.item.icon}
       {props.item.description || props.item.threadContentMatch ? (
         <span className="flex min-w-0 flex-1 flex-col">
@@ -205,6 +213,8 @@ function CommandPaletteResultRow(props: {
 
   return (
     <CommandItem
+      data-pn5-details={Boolean(props.item.description || props.item.threadContentMatch)}
+      data-pn5-project={props.item.value.startsWith("project:")}
       {...(props.index === undefined ? {} : { index: props.index })}
       value={props.item.value}
       active={props.isActive}
