@@ -339,15 +339,20 @@ export function SourceControlWritingSettingsSection() {
           ) : (
             <div className="flex flex-wrap items-center justify-end gap-2">
               {!usesDedicatedModel ? (
-                <SelectButton
-                  size="settings"
-                  aria-disabled="true"
-                  aria-label={t.settings.rows.sourceControlWriterModel.title}
-                >
-                  {mixedWriterModel
-                    ? t.settings.general.mixed
-                    : defaultModelSelection.model || t.settings.rows.textGenerationModel.empty}
-                </SelectButton>
+                <div className="flex flex-col items-end gap-1">
+                  <SelectButton
+                    size="settings"
+                    disabled
+                    aria-label={t.settings.rows.sourceControlWriterModel.title}
+                  >
+                    {mixedWriterModel
+                      ? t.settings.general.mixed
+                      : defaultModelSelection.model || t.settings.rows.textGenerationModel.empty}
+                  </SelectButton>
+                  <p className="text-secondary-copy-medium text-secondary-label">
+                    {t.settings.sourceControlWriting.followsScopedTextGenerationModel}
+                  </p>
+                </div>
               ) : null}
               {usesDedicatedModel && !canEnableDedicatedModel ? (
                 <span className="text-sm text-muted-foreground">

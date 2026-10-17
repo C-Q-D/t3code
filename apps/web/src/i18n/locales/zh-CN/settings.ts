@@ -3437,6 +3437,7 @@ ${address}`
     animateSnapshots: "快照动画",
   },
   sourceControl: {
+    detectedToolsOnly: "仅显示检测到的工具，暂不支持切换。",
     syncAndMerge: "同步与合并",
     writing: "文案",
     hostCredentials: "托管平台凭据",
@@ -3488,6 +3489,7 @@ ${address}`
     verificationError: (label: string) => `无法验证${label}。`,
   },
   sourceControlWriting: {
+    followsScopedTextGenerationModel: "跟随当前设置作用域的文本生成模型。",
     sourceControlWritingStyle: "版本控制文案风格",
     customSourceControlInstructionsAll: "所有所选环境的自定义版本控制指令",
     writeInstructionsEachSelectedEnvironmentHint: "填写每个所选环境应使用的指令。",

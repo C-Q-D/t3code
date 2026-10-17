@@ -3621,6 +3621,7 @@ ${address}`
     animateSnapshots: "Animate snapshots",
   },
   sourceControl: {
+    detectedToolsOnly: "Only detected tools are shown. Switching is not supported yet.",
     syncAndMerge: "Sync and merge",
     writing: "Writing",
     hostCredentials: "Hosting credentials",
@@ -3675,6 +3676,8 @@ ${address}`
     verificationError: (label: string) => `Could not verify ${label}.`,
   },
   sourceControlWriting: {
+    followsScopedTextGenerationModel:
+      "Follows the text generation model for the current settings scope.",
     sourceControlWritingStyle: "source control writing style",
     customSourceControlInstructionsAll:
       "Custom source control instructions for all selected environments",

@@ -571,7 +571,7 @@ export function SourceControlSettingsPanel() {
                   control={
                     <div className="flex items-center gap-2">
                       {/* Discovery reports installed drivers; the design's selector has no write API. */}
-                      <SelectButton size="settings" aria-disabled="true">
+                      <SelectButton size="settings" disabled>
                         {result.versionControlSystems
                           .filter((item) => item.status === "available" && item.implemented)
                           .map((item) => item.label)
@@ -581,6 +581,9 @@ export function SourceControlSettingsPanel() {
                     </div>
                   }
                 >
+                  <p className="text-secondary-copy-medium text-secondary-label">
+                    {t.settings.sourceControl.detectedToolsOnly}
+                  </p>
                   {result.versionControlSystems.map((item) => (
                     <div
                       key={item.kind}
