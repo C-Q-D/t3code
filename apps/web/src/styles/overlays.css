@@ -277,17 +277,20 @@ body:has([data-onboarding-route]) [data-titlebar-brand] {
 }
 
 /* A collapsed back card is a 60px stone edge; it never scales text or animates layout.
-   Feed slab's surface variable because its important background owns opacity mixing. */
+   Both back layers keep background for non-graphite themes and feed the surface
+   variable to graphite's slab, whose important background owns opacity mixing. */
 [data-stack="stone"][data-stack-behind]:not([data-expanded]) {
   width: calc(100% - var(--ov2-inset-x) * 2);
   right: var(--ov2-inset-x);
   height: --spacing(15);
   --stone-surface-color: var(--color-ov2-stack-middle);
+  background: var(--color-ov2-stack-middle);
   box-shadow: var(--shadow-ov2-stack-back);
 }
 
 [data-stack="stone"][data-stack-layer="2"]:not([data-expanded]) {
   --stone-surface-color: var(--color-well-raised);
+  background: var(--color-well-raised);
   box-shadow: var(--shadow-ov2-stack-far);
 }
 

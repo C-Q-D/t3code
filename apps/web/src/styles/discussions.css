@@ -239,9 +239,11 @@
   font-weight: 700;
 }
 
-/* The disabled well supplies slab's color input so its important background retains opacity mixing. */
+/* Keep background for non-graphite themes; the surface variable supplies graphite's
+   slab color while its important background retains opacity mixing. */
 .surface-glass.discussion-composer-disabled {
   --stone-surface-color: var(--color-well-raised);
+  background: var(--color-well-raised);
   box-shadow: var(--shadow-input-well);
 }
 
@@ -507,9 +509,11 @@
   --shadow-discussion-loading: inset 2px 3px 8px rgba(0, 0, 0, 0.6);
 }
 
-/* L6's search well supplies slab's color input, retaining opacity mixing without changing shared Comboboxes. */
+/* L6 keeps background for non-graphite themes and supplies the surface variable to
+   graphite's slab for opacity mixing, without changing shared Comboboxes. */
 .surface-glass.discussion-project-search {
   --stone-surface-color: var(--input);
+  background: var(--input);
   box-shadow: var(--shadow-input-well);
 }
 
