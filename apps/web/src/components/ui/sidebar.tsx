@@ -284,7 +284,9 @@ function Sidebar({
       return (
         <SidebarInstanceContext value={instanceContextValue}>
           <Sheet onOpenChange={setOpenMobile} open={openMobile}>
-            <SheetPortal>
+            {/* Sidebar children own global navigation shortcuts. Keep their listeners
+                alive while closed, but exclude the retained subtree from input and AT. */}
+            <SheetPortal keepMounted inert={!openMobile} aria-hidden={!openMobile || undefined}>
               <SheetPrimitive.Backdrop
                 className="frame-sidebar-drawer-backdrop bg-stone-scrim"
                 style={FRAME_SIDEBAR_DRAWER_GEOMETRY.backdrop}
