@@ -15,6 +15,21 @@ catalogs:
     '@effect/tsgo':
       specifier: 0.51.1
       version: 0.51.1
+    '@fontsource-variable/cormorant-garamond':
+      specifier: 5.3.0
+      version: 5.3.0
+    '@fontsource-variable/instrument-sans':
+      specifier: 5.3.0
+      version: 5.3.0
+    '@fontsource-variable/noto-sans-sc':
+      specifier: 5.3.1
+      version: 5.3.1
+    '@fontsource-variable/noto-serif-sc':
+      specifier: 5.3.1
+      version: 5.3.1
+    '@fontsource/ibm-plex-mono':
+      specifier: 5.3.0
+      version: 5.3.0
     '@legendapp/list':
       specifier: 3.3.5
       version: 3.3.5
@@ -778,6 +793,21 @@ importers:
       '@effect/atom-react':
         specifier: 4.0.4
         version: 4.0.4(effect@4.0.4)(react@19.2.6)(scheduler@0.28.0)
+      '@fontsource-variable/cormorant-garamond':
+        specifier: 'catalog:'
+        version: 5.3.0
+      '@fontsource-variable/instrument-sans':
+        specifier: 'catalog:'
+        version: 5.3.0
+      '@fontsource-variable/noto-sans-sc':
+        specifier: 'catalog:'
+        version: 5.3.1
+      '@fontsource-variable/noto-serif-sc':
+        specifier: 'catalog:'
+        version: 5.3.1
+      '@fontsource/ibm-plex-mono':
+        specifier: 'catalog:'
+        version: 5.3.0
       '@formkit/auto-animate':
         specifier: ^0.9.0
         version: 0.9.0
@@ -3893,6 +3923,21 @@ packages:
 
   '@floating-ui/utils@0.2.11':
     resolution: {integrity: sha512-RiB/yIh78pcIxl6lLMG0CgBXAZ2Y0eVHqMPYugu+9U0AeT6YBeiJpf7lbdJNIugFP5SIjwNRgo4DhR1Qxi26Gg==}
+
+  '@fontsource-variable/cormorant-garamond@5.3.0':
+    resolution: {integrity: sha512-rgZJ/5w3hi60swAPnrOXpZf5wEH6NTrvm4H8D9Y4b1QIFUqlX14eM3QTMU/eAznjfh0eXpO1QUqsFhiy58aoMg==}
+
+  '@fontsource-variable/instrument-sans@5.3.0':
+    resolution: {integrity: sha512-u4gKbDBTNFGkg997tfQn3eHOhHuquWUFTRT/rwzuKtrxX5P2ekfs2x+LgBPP4P32+cC+vUwF1Cr+IdRoPQbrGw==}
+
+  '@fontsource-variable/noto-sans-sc@5.3.1':
+    resolution: {integrity: sha512-UB96JJ17HyD5ehEU7Em0hDdh7fvTMB4B4Hzmq5c4QaNwwSLqTrdM2S+coySeBqCkXwh0DxqXT0b0wMrmzorFpQ==}
+
+  '@fontsource-variable/noto-serif-sc@5.3.1':
+    resolution: {integrity: sha512-aIHcBaL13QctVaJFeT6wqfgO9Rq/cNtD5g2ob4ze59fYPYwacGthnIrHBe83kDpMEB/k6VGtGc6fS99RImcoSQ==}
+
+  '@fontsource/ibm-plex-mono@5.3.0':
+    resolution: {integrity: sha512-eTgnZjZEGk1QtD3ZstF+Vclo2HLAni8YMy34/DxllwZvyz1lR/1RF/xTiAquOBO7MvqBx8D2Ig2WCPMVfdZu7Q==}
 
   '@formkit/auto-animate@0.9.0':
     resolution: {integrity: sha512-VhP4zEAacXS3dfTpJpJ88QdLqMTcabMg0jwpOSxZ/VzfQVfl3GkZSCZThhGC5uhq/TxPHPzW0dzr4H9Bb1OgKA==}
@@ -14816,6 +14861,16 @@ snapshots:
       react-dom: 19.2.6(react@19.2.6)
 
   '@floating-ui/utils@0.2.11': {}
+
+  '@fontsource-variable/cormorant-garamond@5.3.0': {}
+
+  '@fontsource-variable/instrument-sans@5.3.0': {}
+
+  '@fontsource-variable/noto-sans-sc@5.3.1': {}
+
+  '@fontsource-variable/noto-serif-sc@5.3.1': {}
+
+  '@fontsource/ibm-plex-mono@5.3.0': {}
 
   '@formkit/auto-animate@0.9.0': {}
 
