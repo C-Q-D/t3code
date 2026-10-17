@@ -183,6 +183,8 @@ const twMerge = extendTailwindMerge({
         "chat-control-icon",
         "chat-project-choice",
         "chat-draft-project-mark",
+        "sidebar-row-drag",
+        "sidebar-jump",
       ],
       "inset-shadow": ["selected", "focus", "selected-control", "project-rail-hover"],
       "text-shadow": ["stone"],
@@ -232,6 +234,8 @@ const twMerge = extendTailwindMerge({
         "chat-controls-well",
         "chat-control",
         "chat-draft-project-mark",
+        "sidebar-quick-action",
+        "sidebar-search-hit",
       ],
       leading: [
         "code",

@@ -46,6 +46,7 @@ import {
   resolveWorkingStartedAt,
   pullRequestMatchesSearchQuery,
   searchSidebarThreads,
+  sidebarSearchTextSegments,
   shouldClearThreadSelectionOnMouseDown,
   shouldShowSidebarV2Duration,
   shouldRecedeSidebarThread,
@@ -86,6 +87,33 @@ import {
 import { makeThreadFixture, type ThreadFixtureOverrides } from "../test-fixtures";
 
 const localEnvironmentId = EnvironmentId.make("environment-local");
+
+describe("sidebarSearchTextSegments", () => {
+  it("marks repeated literal hits with ASCII case folding while preserving Chinese text and offsets", () => {
+    expect(sidebarSearchTextSegments("修复 A+B，再查 a+b。", " a+b ")).toEqual([
+      { text: "修复 ", start: 0, matched: false },
+      { text: "A+B", start: 3, matched: true },
+      { text: "，再查 ", start: 6, matched: false },
+      { text: "a+b", start: 10, matched: true },
+      { text: "。", start: 13, matched: false },
+    ]);
+    expect(sidebarSearchTextSegments("闪烁与闪烁", "闪烁")).toEqual([
+      { text: "闪烁", start: 0, matched: true },
+      { text: "与", start: 2, matched: false },
+      { text: "闪烁", start: 3, matched: true },
+    ]);
+  });
+
+  it("leaves unmatched and blank queries intact and emits no segment for empty text", () => {
+    expect(sidebarSearchTextSegments("保留原文", "absent")).toEqual([
+      { text: "保留原文", start: 0, matched: false },
+    ]);
+    expect(sidebarSearchTextSegments("保留原文", " \t ")).toEqual([
+      { text: "保留原文", start: 0, matched: false },
+    ]);
+    expect(sidebarSearchTextSegments("", "闪烁")).toEqual([]);
+  });
+});
 
 describe("resolveSidebarRowAccessibility", () => {
   it.each([

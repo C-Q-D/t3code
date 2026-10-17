@@ -1,1 +1,39 @@
-/* SB1–SB3 侧边栏：本线新增的令牌（@theme）与全局样式写在这里。 */
+/* Sidebar row tokens and feature styles; shared controls keep their own appearance. */
+@theme {
+  /* 核心屏-8a.dc.html · B1：拖起的行、Ctrl 跳转键和 28px 快捷操作。 */
+  --color-sidebar-row-drag: #34343a;
+  /* 核心屏-8a.dc.html · B1 搜索：标题和两行摘录中的琥珀色命中。 */
+  --color-sidebar-search-hit: rgba(240, 184, 74, 0.22);
+  --color-sidebar-search-hit-foreground: #f3c55e;
+  --radius-sidebar-search-hit: 3px;
+  --radius-sidebar-quick-action: 9px;
+  --shadow-sidebar-row-drag:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 0 0 1px rgba(0, 0, 0, 0.5), 0 3px 0 #09090a,
+    18px 26px 30px -6px rgba(0, 0, 0, 0.85), 30px 46px 60px -20px rgba(0, 0, 0, 0.7);
+  --shadow-sidebar-jump: 0 2px 0 #8e8e96, 3px 5px 8px -2px rgba(0, 0, 0, 0.7);
+}
+
+/* B1's tilt belongs to the lifted surface; dnd-kit owns the outer translation. */
+.sidebar-row-drag {
+  transform: rotate(-1.8deg);
+}
+
+.sidebar-drag-source::before {
+  content: "";
+  @apply absolute inset-x-0 top-0 bottom-0.75 rounded-card-row bg-sidebar-control-surface shadow-well-track outline-1 outline-dashed outline-border -outline-offset-1;
+}
+
+.sidebar-drag-source:has([data-sidebar-thread-row="slim"])::before {
+  @apply bottom-0.25 rounded-compact-row;
+}
+
+.sidebar-thread-list[data-dragging="true"]
+  > li:not([data-dragging="true"])
+  [data-sidebar-thread-row] {
+  opacity: 0.55;
+}
+
+/* Light action badges retain the native dark icon, including F8 hue overrides. */
+.sidebar-drop-badge {
+  --lucide-hue-override: currentColor;
+}

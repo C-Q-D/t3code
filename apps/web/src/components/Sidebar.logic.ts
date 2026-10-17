@@ -29,6 +29,44 @@ import { cn, normalizeSearchText } from "../lib/utils";
 import { isLatestRunSettled } from "../session-logic";
 import { resolveServerBackedAppStageLabel } from "../branding.logic";
 
+/**
+ * Splits a title or excerpt into ordered literal hits for B1's search marks.
+ * `text` stays verbatim; `query` is trimmed and folds ASCII case like the existing search.
+ * Returned starts are UTF-16 offsets into `text`; an empty text returns no segments,
+ * while a blank/unmatched query returns the entire nonempty text unmarked.
+ */
+export function sidebarSearchTextSegments(
+  text: string,
+  query: string,
+): readonly {
+  text: string;
+  start: number;
+  matched: boolean;
+}[] {
+  // Match the incumbent thread search's ASCII folding. Full Unicode lowercasing
+  // can change string length, which would move highlights away from their text.
+  const fold = (value: string) => value.replace(/[A-Z]/g, (character) => character.toLowerCase());
+  const needle = fold(query.trim());
+  if (text.length === 0) return [];
+  if (needle.length === 0) return [{ text, start: 0, matched: false }];
+  const normalized = fold(text);
+  const segments: { text: string; start: number; matched: boolean }[] = [];
+  let cursor = 0;
+  while (cursor < text.length) {
+    const hit = normalized.indexOf(needle, cursor);
+    if (hit === -1) {
+      segments.push({ text: text.slice(cursor), start: cursor, matched: false });
+      break;
+    }
+    if (hit > cursor)
+      segments.push({ text: text.slice(cursor, hit), start: cursor, matched: false });
+    const end = hit + needle.length;
+    segments.push({ text: text.slice(hit, end), start: hit, matched: true });
+    cursor = end;
+  }
+  return segments;
+}
+
 export function shouldNavigateAfterThreadPark(input: {
   readonly threadKey: string;
   readonly currentThreadKey: string | null;
