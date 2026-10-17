@@ -1,3 +1,4 @@
+/** Environment-local GitHub account choices; account disclosure stays explicitly opt-in. */
 import { t } from "~/i18n";
 import type { EnvironmentId, SourceControlProviderAuth } from "@t3tools/contracts";
 import { EyeIcon, EyeOffIcon } from "lucide-react";
@@ -82,7 +83,7 @@ export function GitHubAccountSettings({
 
   if (groups.length === 0) {
     return (
-      <p className="text-xs text-muted-foreground">
+      <p className="text-secondary-copy-medium text-secondary-label">
         {t.settings.gitHubAccount.signInWith}
         <code className="rounded bg-muted px-1 py-px text-2xs">gh auth login</code>{" "}
         {t.settings.gitHubAccount.serverHostRescanAccountsHint}
@@ -93,7 +94,7 @@ export function GitHubAccountSettings({
   return (
     <div className="grid gap-4">
       <div className="flex items-center justify-between gap-3">
-        <p className="max-w-2xl text-xs leading-relaxed text-muted-foreground">
+        <p className="max-w-2xl text-secondary-copy-medium leading-relaxed text-secondary-label">
           {t.settings.gitHubAccount.chooseWhich}
           <code className="rounded bg-muted px-1 py-px text-2xs">gh</code>{" "}
           {t.settings.gitHubAccount.loginEachGitHubHostUsesHint}
@@ -119,12 +120,14 @@ export function GitHubAccountSettings({
           choice?.account !== undefined && !group.selectable.includes(choice.account);
         const pinned = choice?.account !== undefined && !stalePin ? choice.account : ACTIVE_ACCOUNT;
         return (
-          <div key={group.host} className="grid gap-2">
+          <div key={group.host} className="grid gap-2 rounded-settings-row-surface px-2.5 py-2">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0 space-y-0.5">
-                <span className="text-xs font-medium text-foreground">{group.host}</span>
+                <span className="text-secondary-copy-medium font-medium text-foreground">
+                  {group.host}
+                </span>
                 {group.selectable.length === 1 && group.selectable[0] !== undefined ? (
-                  <p className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+                  <p className="flex min-w-0 items-center gap-1 text-secondary-copy-medium text-secondary-label">
                     <span>{t.settings.codexSetup.account.signedInPrefix}</span>
                     <RedactedLogin revealed={revealed} account={group.selectable[0]} />
                   </p>
@@ -139,7 +142,7 @@ export function GitHubAccountSettings({
             </div>
             {group.selectable.length > 1 ? (
               <div className="flex items-center justify-between gap-3">
-                <span className="text-xs text-muted-foreground">
+                <span className="text-secondary-copy-medium text-secondary-label">
                   {t.settings.gitHubAccount.account}
                 </span>
                 <div className="w-64 max-w-full">
@@ -154,7 +157,7 @@ export function GitHubAccountSettings({
                     }}
                   >
                     <SelectTrigger
-                      size="sm"
+                      size="settings"
                       aria-label={t.settings.gitHubAccount.gitHubAccountFor(group.host)}
                     >
                       <SelectValue>
@@ -206,11 +209,11 @@ export function GitHubAccountSettings({
             ) : null}
             {stalePin ? (
               <div className="flex items-center justify-between gap-3">
-                <p className="text-xs text-warning">
+                <p className="text-secondary-copy-medium text-warning">
                   {t.settings.gitHubAccount.chosenLoginLongerSignedActiveHint}
                 </p>
                 <Button
-                  size="xs"
+                  size="settings-list"
                   variant="outline"
                   disabled={saving}
                   onClick={() => void save(group.host, { account: null })}
@@ -222,7 +225,7 @@ export function GitHubAccountSettings({
             {group.broken.map((entry) => (
               <p
                 key={entry.account}
-                className="flex min-w-0 flex-wrap items-center gap-1 text-xs text-muted-foreground/70"
+                className="flex min-w-0 flex-wrap items-center gap-1 text-secondary-copy-medium text-secondary-label"
               >
                 <RedactedLogin revealed={revealed} account={entry.account} />
                 <span>
@@ -232,7 +235,7 @@ export function GitHubAccountSettings({
               </p>
             ))}
             {group.environmentVariable ? (
-              <p className="text-xs text-warning">
+              <p className="text-secondary-copy-medium text-warning">
                 {t.settings.gitHubAccount.serverOverridesAccountChosenUntilHint(
                   group.environmentVariable,
                 )}

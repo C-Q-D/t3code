@@ -1,3 +1,4 @@
+/** GitHub token replacement form; saved credentials remain write-only. */
 import { t } from "~/i18n";
 import type { EnvironmentId } from "@t3tools/contracts";
 import { ExternalLinkIcon } from "lucide-react";
@@ -73,7 +74,7 @@ export function GitHubTokenSettings({
     >
       {/* Locked while saving: a successful save clears the draft, which would drop edits made mid-request. */}
       <fieldset disabled={saving} className="contents">
-        <p className="max-w-2xl text-xs leading-relaxed text-muted-foreground">
+        <p className="max-w-2xl text-secondary-copy-medium leading-relaxed text-secondary-label">
           {t.settings.gitHubToken.aTokenSavedHereIsUsedBefore}{" "}
           <code className="rounded bg-muted px-1 py-px text-2xs">GH_TOKEN</code>{" "}
           {t.settings.gitHubToken.andThe}{" "}
@@ -92,25 +93,25 @@ export function GitHubTokenSettings({
             <ExternalLinkIcon aria-hidden className="size-3" />
           </InlineButton>
         </p>
-        <div className="grid gap-3 sm:grid-cols-[12rem_1fr]">
-          <div className="grid gap-1.5">
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="grid gap-1.5 sm:w-48 sm:shrink-0">
             <Label htmlFor={`github-token-host-${environmentId}`}>
               {t.settings.connections.pairing.hostLabel}
             </Label>
             <Input
               id={`github-token-host-${environmentId}`}
               autoComplete="off"
-              size="sm"
+              size="settings"
               placeholder={DEFAULT_HOST}
               value={host}
               onChange={(event) => setHost(event.target.value)}
             />
           </div>
-          <div className="grid gap-1.5">
+          <div className="grid min-w-0 flex-1 gap-1.5">
             <Label htmlFor={`github-token-${environmentId}`}>{t.settings.gitHubToken.token}</Label>
             <SecretInput
               id={`github-token-${environmentId}`}
-              size="sm"
+              size="settings"
               configured={isSaved}
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
@@ -118,7 +119,7 @@ export function GitHubTokenSettings({
           </div>
         </div>
         <div className="flex items-center justify-between gap-3">
-          <p className="text-xs text-muted-foreground">
+          <p className="text-secondary-copy-medium text-secondary-label">
             {savedHosts.length === 0
               ? t.settings.gitHubToken.tokenSavedServerUsesGhHint
               : t.settings.gitHubToken.savedFor(savedHosts.join(", "))}
@@ -126,7 +127,7 @@ export function GitHubTokenSettings({
           <div className="flex shrink-0 gap-2">
             {isSaved ? (
               <Button
-                size="xs"
+                size="settings-list"
                 variant="outline"
                 disabled={saving}
                 onClick={() => void save(normalizedHost, "")}
@@ -134,7 +135,11 @@ export function GitHubTokenSettings({
                 {t.settings.gitHubToken.remove}
               </Button>
             ) : null}
-            <Button type="submit" size="xs" disabled={!normalizedHost || !draft.trim() || saving}>
+            <Button
+              type="submit"
+              size="settings-list"
+              disabled={!normalizedHost || !draft.trim() || saving}
+            >
               {t.settings.gitHubToken.save}
             </Button>
           </div>

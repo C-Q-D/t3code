@@ -1,3 +1,4 @@
+/** Scoped source-control writing and review-guide preferences, independent of branch naming. */
 import { t } from "~/i18n";
 import { useNavigate } from "@tanstack/react-router";
 import { useRef, useState } from "react";
@@ -33,22 +34,27 @@ import {
 import { EMPTY_SERVER_PROVIDERS } from "../../state/server";
 import { ProviderModelPicker } from "../chat/ProviderModelPicker";
 import { TraitsPicker } from "../chat/TraitsPicker";
-import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
+import {
+  Select,
+  SelectButton,
+  SelectItem,
+  SelectPopup,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
 import { Switch } from "../ui/switch";
 import { Textarea } from "../ui/textarea";
 import { toastManager } from "../ui/toast";
 import { Button } from "../ui/button";
-import {
-  SETTINGS_PICKER_TRIGGER_CLASSNAME,
-  SettingResetButton,
-  SettingsRow,
-  SettingsSection,
-} from "./settingsLayout";
-import { BranchNamingSettings } from "./BranchNamingSettings";
+import { SettingResetButton, SettingsRow, SettingsSection } from "./settingsLayout";
 import { searchableSetting } from "./settingsSearch";
 
 const MODE_OPTIONS = t.settings.sourceControlWriting.modeOptions;
+// O4 gives model and trait pickers the same 32px capsule as settings selects.
+const SOURCE_CONTROL_MODEL_TRIGGER_CLASSNAME =
+  "h-8 min-w-30 max-w-full shrink-0 rounded-full border-0 bg-select-control px-3 text-secondary-copy-large text-fg-detail shadow-raise-xs-control hover:bg-accent sm:text-secondary-copy-large";
 
+/** Keeps mixed-target editing and model availability checks inside the O4 writing group. */
 export function SourceControlWritingSettingsSection() {
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
@@ -164,14 +170,13 @@ export function SourceControlWritingSettingsSection() {
   );
 
   return (
-    <SettingsSection id="source-control-text-generation" title={t.settings.sections.textGeneration}>
-      <BranchNamingSettings />
+    <SettingsSection id="source-control-text-generation" title={t.settings.sourceControl.writing}>
       <SettingsRow
         serverScoped
         settingKeys={["sourceControlWritingStyle"]}
         mixed={writingStyleMixed}
         {...searchableSetting("source-control-writing-style")}
-        description={MODE_OPTIONS[style.mode].description}
+        aria-description={MODE_OPTIONS[style.mode].description}
         resetAction={
           isSourceControlWritingStyleDirty ? (
             <SettingResetButton
@@ -201,8 +206,7 @@ export function SourceControlWritingSettingsSection() {
             }}
           >
             <SelectTrigger
-              size="sm"
-              className="w-full sm:w-56"
+              size="settings"
               aria-label={t.settings.rows.sourceControlWritingStyle.title}
             >
               <SelectValue>
@@ -290,7 +294,7 @@ export function SourceControlWritingSettingsSection() {
         settingKeys={["sourceControlWritingStyle"]}
         mixed={templatesMixed}
         {...searchableSetting("follow-change-request-templates")}
-        description={t.settings.sourceControlWriting.repositorySTemplateChangeRequestHint}
+        aria-description={t.settings.sourceControlWriting.repositorySTemplateChangeRequestHint}
         resetAction={
           templatesMixed ||
           style.followChangeRequestTemplates !== defaults.followChangeRequestTemplates ? (
@@ -326,7 +330,7 @@ export function SourceControlWritingSettingsSection() {
         serverScoped
         settingKeys={["sourceControlWriterModelSelection"]}
         {...searchableSetting("source-control-writer-model")}
-        description={t.settings.sourceControlWriting.modelSourceControlTextBranchHint}
+        aria-description={t.settings.sourceControlWriting.modelSourceControlTextBranchHint}
         control={
           !hasServerTargets ? (
             <span className="text-sm text-muted-foreground">
@@ -334,6 +338,17 @@ export function SourceControlWritingSettingsSection() {
             </span>
           ) : (
             <div className="flex flex-wrap items-center justify-end gap-2">
+              {!usesDedicatedModel ? (
+                <SelectButton
+                  size="settings"
+                  aria-disabled="true"
+                  aria-label={t.settings.rows.sourceControlWriterModel.title}
+                >
+                  {mixedWriterModel
+                    ? t.settings.general.mixed
+                    : defaultModelSelection.model || t.settings.rows.textGenerationModel.empty}
+                </SelectButton>
+              ) : null}
               {usesDedicatedModel && !canEnableDedicatedModel ? (
                 <span className="text-sm text-muted-foreground">
                   {t.settings.rows.textGenerationModel.empty}
@@ -347,7 +362,7 @@ export function SourceControlWritingSettingsSection() {
                   lockedProvider={null}
                   instanceEntries={instanceEntries}
                   modelOptionsByInstance={modelOptionsByInstance}
-                  triggerClassName={SETTINGS_PICKER_TRIGGER_CLASSNAME}
+                  triggerClassName={SOURCE_CONTROL_MODEL_TRIGGER_CLASSNAME}
                   triggerAriaLabel={t.settings.rows.sourceControlWriterModel.title}
                   {...(mixedWriterModel ? { triggerLabel: t.settings.general.mixed } : {})}
                   {...(environmentId
@@ -392,7 +407,7 @@ export function SourceControlWritingSettingsSection() {
                   planModeEnabled={
                     settings.planModeEnabled || selectsPlanAgent(activeSelection.options)
                   }
-                  triggerClassName={SETTINGS_PICKER_TRIGGER_CLASSNAME}
+                  triggerClassName={SOURCE_CONTROL_MODEL_TRIGGER_CLASSNAME}
                   onModelOptionsChange={(options) =>
                     updateSettings({
                       sourceControlWriterModelSelection: createModelSelection(
@@ -464,7 +479,7 @@ export function SourceControlWritingSettingsSection() {
                       lockedProvider={null}
                       instanceEntries={instanceEntries}
                       modelOptionsByInstance={reviewGuideModelOptionsByInstance}
-                      triggerClassName={SETTINGS_PICKER_TRIGGER_CLASSNAME}
+                      triggerClassName={SOURCE_CONTROL_MODEL_TRIGGER_CLASSNAME}
                       triggerAriaLabel="Review guide model"
                       {...(mixedReviewGuideModel ? { triggerLabel: "Mixed" } : {})}
                       getModelDisabledReason={writerModelDisabledReason}
@@ -499,7 +514,7 @@ export function SourceControlWritingSettingsSection() {
                       planModeEnabled={
                         settings.planModeEnabled || selectsPlanAgent(reviewGuideSelection.options)
                       }
-                      triggerClassName={SETTINGS_PICKER_TRIGGER_CLASSNAME}
+                      triggerClassName={SOURCE_CONTROL_MODEL_TRIGGER_CLASSNAME}
                       onModelOptionsChange={(options) =>
                         updateSettings({
                           reviewGuideModelSelection: createModelSelection(

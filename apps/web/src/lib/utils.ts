@@ -304,6 +304,7 @@ const twMerge = extendTailwindMerge({
         "discussion-draft-selected",
         "discussion-draft-drag",
         "discussion-loading",
+        "source-control-inset",
       ],
       "inset-shadow": [
         "selected",
@@ -409,6 +410,7 @@ const twMerge = extendTailwindMerge({
         "discussion-list-row",
         "discussion-list-seat",
         "discussion-draft-add-icon",
+        "source-control-icon",
       ],
       leading: [
         "code",

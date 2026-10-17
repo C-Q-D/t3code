@@ -235,3 +235,28 @@
 .settings-integrations #agent-browser-access > div > div > p {
   display: none;
 }
+
+/* ST9 — O4 imports SettingsPage8a: list marks/empty wells are #151517 with a 9px icon radius. */
+@theme {
+  --color-source-control-well: #151517;
+  --radius-source-control-icon: 9px;
+  --shadow-source-control-inset: inset 1.5px 2px 3px rgba(0, 0, 0, 0.6);
+}
+
+@layer components {
+  .source-control-host-list {
+    @apply flex flex-col gap-0.5 rounded-settings-row-surface py-2.5 pr-3 pl-3.5;
+  }
+  .source-control-host-row {
+    @apply flex min-h-12 items-center gap-3 rounded-settings-row-surface py-2 pr-1.5 pl-2.5;
+  }
+  .source-control-icon-well {
+    @apply flex size-8 shrink-0 items-center justify-center rounded-source-control-icon bg-source-control-well shadow-source-control-inset;
+  }
+  .source-control-connected {
+    @apply inline-flex h-5 shrink-0 items-center rounded-full bg-status-success px-2 text-meta-large font-semibold text-success-foreground text-shadow-none;
+  }
+  .source-control-empty {
+    @apply m-2.5 rounded-settings-row-surface bg-source-control-well px-4 py-4.5 text-center text-secondary-copy-large text-secondary-label shadow-source-control-inset;
+  }
+}

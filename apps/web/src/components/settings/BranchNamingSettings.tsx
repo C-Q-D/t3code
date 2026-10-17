@@ -1,9 +1,10 @@
+/** Scoped branch naming controls; drafts keep their existing blur-to-save behavior. */
 import { t } from "~/i18n";
 import { useRef } from "react";
 import { BranchNamingMode, DEFAULT_SERVER_SETTINGS } from "@t3tools/contracts";
 
 import { Input } from "../ui/input";
-import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
+import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group";
 import { Textarea } from "../ui/textarea";
 import { SettingsRow, SettingResetButton } from "./settingsLayout";
 import { useSettingsScope } from "./SettingsScopeContext";
@@ -16,6 +17,7 @@ import {
 
 const MODES = t.settings.rows.worktreeBranchNaming.options;
 
+/** Renders O4's three naming modes and the fields required by the selected mode. */
 export function BranchNamingSettings() {
   const settings = useScopedSettings();
   const { targets } = useSettingsScope();
@@ -33,12 +35,7 @@ export function BranchNamingSettings() {
         serverScoped
         settingKeys={["branchNamingMode"]}
         {...searchableSetting("worktree-branch-naming")}
-        description={t.settings.branchNaming.worktreeBranchesNamedFirstMessageHint}
-        status={
-          !modeMixed && settings.branchNamingMode === "semantic"
-            ? t.settings.branchNaming.modelChoosesPrefixDescribesWorkHint
-            : undefined
-        }
+        aria-description={t.settings.branchNaming.worktreeBranchesNamedFirstMessageHint}
         resetAction={
           settings.branchNamingMode !== DEFAULT_SERVER_SETTINGS.branchNamingMode || modeMixed ? (
             <SettingResetButton
@@ -50,29 +47,23 @@ export function BranchNamingSettings() {
           ) : null
         }
         control={
-          <Select
-            value={modeMixed ? null : settings.branchNamingMode}
-            onValueChange={(value) => {
-              if (BranchNamingMode.literals.includes(value as BranchNamingMode)) {
-                updateSettings({ branchNamingMode: value as BranchNamingMode });
+          <ToggleGroup
+            size="settings"
+            value={modeMixed ? [] : [settings.branchNamingMode]}
+            aria-label={t.settings.rows.worktreeBranchNaming.title}
+            onValueChange={(values) => {
+              const value = values[0];
+              if (value === "static" || value === "semantic" || value === "custom") {
+                updateSettings({ branchNamingMode: value });
               }
             }}
           >
-            <SelectTrigger size="sm" aria-label={t.settings.rows.worktreeBranchNaming.title}>
-              <SelectValue>
-                {(value: BranchNamingMode | null) =>
-                  value === null ? t.settings.general.mixed : MODES[value]
-                }
-              </SelectValue>
-            </SelectTrigger>
-            <SelectPopup align="end" alignItemWithTrigger={false}>
-              {BranchNamingMode.literals.map((mode) => (
-                <SelectItem key={mode} value={mode}>
-                  {MODES[mode]}
-                </SelectItem>
-              ))}
-            </SelectPopup>
-          </Select>
+            {BranchNamingMode.literals.map((mode) => (
+              <ToggleGroupItem key={mode} value={mode}>
+                {MODES[mode]}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
         }
       />
       {!modeMixed && settings.branchNamingMode === "static" ? (
@@ -94,6 +85,7 @@ export function BranchNamingSettings() {
           }
           control={
             <Input
+              size="settings"
               key={`${scopeKey}:${prefixMixed}:${settings.branchNamePrefix}`}
               aria-label={t.settings.branchNaming.branchPrefix}
               autoCapitalize="none"

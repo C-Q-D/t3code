@@ -2261,8 +2261,6 @@ export const settings: Messages["settings"] = {
     exampleTTProducesTHint: "例如，t3或t3/ 会生成t3/add-search。留空则不使用前缀。",
     prefixResetLabel: "分支前缀",
     noPrefix: "无前缀",
-    modelChoosesPrefixDescribesWorkHint:
-      "模型选择能描述任务的前缀，例如feat/add-search、fix/login-timeout或refactor/auth。",
     branchNamingInstructions: "分支命名指令",
     appendedNamingPromptModelReturnsHint:
       "追加到命名提示词。模型返回完整分支名称，不再添加前缀或后缀。",
@@ -2846,7 +2844,6 @@ ${address}`
     threadsStartProjectsTheirTHint: "新对话的启动位置。项目及其t3.json可覆盖此设置。",
     defaultWorkspace: "默认工作区",
     workspaceAriaLabel: "默认工作区",
-    repositories: "仓库",
     permissionsThreadsProjectHint: "此项目中新对话的权限。",
     defaultPermissionsThreadsProjectsOverrideHint: "新对话的默认权限。项目可覆盖此设置。",
     defaultPermissions: "默认权限",
@@ -3440,9 +3437,18 @@ ${address}`
     animateSnapshots: "快照动画",
   },
   sourceControl: {
+    syncAndMerge: "同步与合并",
+    writing: "文案",
+    hostCredentials: "托管平台凭据",
+    githubAccountAndToken: "GitHub 账号与 token",
+    connected: "已连接",
+    edit: "编辑",
+    connect: "连接",
+    collapse: "收起",
+    /** Formats whole-minute fetch intervals; non-minute values retain their seconds editor. */
+    intervalMinutes: (minutes: number) => `${minutes} 分钟`,
+
     authenticated: "已认证",
-    notAuthenticated: "未认证",
-    statusUnknown: "状态未知",
     toggleSourceControlAccountVisibility: "切换版本控制账号可见性",
     clickToRevealAccount: "点击显示账号",
     clickToHideAccount: "点击隐藏账号",
@@ -3460,11 +3466,8 @@ ${address}`
     ) => `${itemLabel}尚未在此服务器上认证。请登录或配置凭据，使用`,
     toolServerHostEnableChangeHint: " 服务端主机上的工具，以启用变更请求功能。",
     availableStatus: "可用",
-    comingSoon: "即将推出",
     toggleDetails: (itemLabel: string | number | boolean | null | undefined) =>
       `切换 ${itemLabel} 详情`,
-    availability: (itemLabel: string | number | boolean | null | undefined) =>
-      `${itemLabel} 可用性`,
     intervalConfiguredGitSharedBackgroundHint:
       "此间隔仅用于Git。到时仍由共享“后台活动”策略决定是否允许运行Git刷新。自定义间隔在常规设置中显示为“高级”。",
     fetchInterval: "fetch间隔",
@@ -3472,7 +3475,6 @@ ${address}`
     decreaseFetchInterval: "缩短fetch间隔",
     automaticGitFetchIntervalInSeconds: "自动Git fetch间隔（秒）",
     increaseFetchInterval: "延长fetch间隔",
-    serverEnvironment: "服务端环境",
     couldNotScanTheServerEnvironment: "无法扫描服务端环境",
     nothingDetectedYet: "尚未检测到内容",
     installGitServerAddOptionalError:
@@ -3483,10 +3485,6 @@ ${address}`
     connectEnvironmentInspectVersionControlHint: "连接环境以检查其版本控制工具和托管集成。",
     versionControl: (environmentSuffix: string | number | boolean | null | undefined) =>
       `版本控制${environmentSuffix}`,
-    sourceControlProviders: "版本控制 Provider",
-    providersSectionTitle: (environmentSuffix: string | number | boolean | null | undefined) =>
-      `版本控制 Provider${environmentSuffix}`,
-
     verificationError: (label: string) => `无法验证${label}。`,
   },
   sourceControlWriting: {

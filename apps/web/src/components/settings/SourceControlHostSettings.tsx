@@ -76,7 +76,7 @@ export function SourceControlHostSettings({
       {hasSaved ? (
         <div className="flex justify-end pt-2">
           <Button
-            size="xs"
+            size="settings-list"
             variant="outline"
             onClick={() =>
               void save(Object.fromEntries(Object.keys(saved ?? {}).map((key) => [key, ""])))

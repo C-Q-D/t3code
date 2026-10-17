@@ -2361,8 +2361,6 @@ export const settings = {
       "For example, t3 or t3/ produces t3/add-search. Leave empty for no prefix.",
     prefixResetLabel: "branch prefix",
     noPrefix: "No prefix",
-    modelChoosesPrefixDescribesWorkHint:
-      "The model chooses a prefix that describes the work, such as feat/add-search, fix/login-timeout, or refactor/auth.",
     branchNamingInstructions: "Branch naming instructions",
     appendedNamingPromptModelReturnsHint:
       "Appended to the naming prompt. The model returns the complete branch name; no prefix or suffix is added.",
@@ -2982,7 +2980,6 @@ ${address}`
       "Where new threads start. Projects and their t3.json can override it.",
     defaultWorkspace: "default workspace",
     workspaceAriaLabel: "Default workspace",
-    repositories: "Repositories",
     permissionsThreadsProjectHint: "Permissions for new threads in this project.",
     defaultPermissionsThreadsProjectsOverrideHint:
       "Default permissions for new threads. Projects can override them.",
@@ -3624,9 +3621,18 @@ ${address}`
     animateSnapshots: "Animate snapshots",
   },
   sourceControl: {
+    syncAndMerge: "Sync and merge",
+    writing: "Writing",
+    hostCredentials: "Hosting credentials",
+    githubAccountAndToken: "GitHub account and token",
+    connected: "Connected",
+    edit: "Edit",
+    connect: "Connect",
+    collapse: "Collapse",
+    /** Formats whole-minute fetch intervals; non-minute values retain their seconds editor. */
+    intervalMinutes: (minutes: number) => `${minutes} min`,
+
     authenticated: "Authenticated",
-    notAuthenticated: "Not authenticated",
-    statusUnknown: "Status unknown",
     toggleSourceControlAccountVisibility: "Toggle source control account visibility",
     clickToRevealAccount: "Click to reveal account",
     clickToHideAccount: "Click to hide account",
@@ -3645,11 +3651,8 @@ ${address}`
       `${itemLabel} is not authenticated on this server. Sign in or configure credentials using the`,
     toolServerHostEnableChangeHint: " tool on the server host to enable change request features.",
     availableStatus: "Available",
-    comingSoon: "Coming Soon",
     toggleDetails: (itemLabel: string | number | boolean | null | undefined) =>
       `Toggle ${itemLabel} details`,
-    availability: (itemLabel: string | number | boolean | null | undefined) =>
-      `${itemLabel} availability`,
     intervalConfiguredGitSharedBackgroundHint:
       "This interval is configured for Git only. The shared Background activity policy still decides whether Git refreshes may run when the timer fires. Custom intervals appear as Advanced in General settings.",
     fetchInterval: "fetch interval",
@@ -3658,7 +3661,6 @@ ${address}`
     decreaseFetchInterval: "Decrease fetch interval",
     automaticGitFetchIntervalInSeconds: "Automatic Git fetch interval in seconds",
     increaseFetchInterval: "Increase fetch interval",
-    serverEnvironment: "Server environment",
     couldNotScanTheServerEnvironment: "Could not scan the server environment",
     nothingDetectedYet: "Nothing detected yet",
     installGitServerAddOptionalError:
@@ -3670,10 +3672,6 @@ ${address}`
       "Connect an environment to inspect its version control tools and hosting integrations.",
     versionControl: (environmentSuffix: string | number | boolean | null | undefined) =>
       `Version Control${environmentSuffix}`,
-    sourceControlProviders: "Source Control Providers",
-    providersSectionTitle: (environmentSuffix: string | number | boolean | null | undefined) =>
-      `Source Control Providers${environmentSuffix}`,
-
     verificationError: (label: string) => `Could not verify ${label}.`,
   },
   sourceControlWriting: {

@@ -9,6 +9,7 @@ import {
 import { createModelSelection } from "@t3tools/shared/model";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import { useNavigate } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 
 import { mergeEnvironmentSettings } from "../../hooks/useSettings";
 import { getCustomModelOptionsByInstance } from "../../modelSelection";
@@ -426,8 +427,11 @@ export function DefaultSubmodulesSetting({
 /** Keeps the existing grouped defaults for project, source-control and integration settings callers. */
 export function ProjectDefaultsSettings({
   category,
+  sourceControlRows,
 }: {
   category: Exclude<ProjectSettingsCategory, "general">;
+  /** Discovery and fetch rows join the O4 group without duplicating the scoped defaults. */
+  sourceControlRows?: ReactNode;
 }) {
   const { scope } = useSettingsScope();
   const settings = useScopedSettings();
@@ -451,7 +455,7 @@ export function ProjectDefaultsSettings({
           ? t.settings.rows.newThreads.title
           : category === "integrations"
             ? t.settings.sections.browser
-            : t.settings.projectDefaults.repositories
+            : t.settings.sourceControl.syncAndMerge
       }
     >
       {category === "project" ? (
@@ -467,7 +471,7 @@ export function ProjectDefaultsSettings({
             mixed={mixedAutoPull}
             id="automatic-pull"
             title={t.settings.rows.automaticPull.title}
-            description={
+            aria-description={
               isProjectScope
                 ? t.settings.projectDefaults.keepsProjectSDefaultBranchHint
                 : t.settings.projectDefaults.keepsDefaultBranchCurrentCheckoutHint
@@ -495,7 +499,7 @@ export function ProjectDefaultsSettings({
             settingKeys={["removeAgentCreditsOnMerge"]}
             mixed={mixedAgentCredits}
             {...searchableSetting("remove-agent-credits-on-merge")}
-            description={t.settings.projectDefaults.removeRecognizedAgentCreditLinesHint}
+            aria-description={t.settings.projectDefaults.removeRecognizedAgentCreditLinesHint}
             resetAction={
               settings.removeAgentCreditsOnMerge ? (
                 <SettingResetButton
@@ -521,7 +525,7 @@ export function ProjectDefaultsSettings({
             settingKeys={["pullRequestMergeMethod"]}
             mixed={mixedMergeMethod}
             {...searchableSetting("pull-request-merge-method")}
-            description={
+            aria-description={
               isProjectScope
                 ? t.settings.projectDefaults.pullRequestsProjectStartMethodHint
                 : t.settings.projectDefaults.pullRequestsStartMethodLastHint
@@ -545,7 +549,7 @@ export function ProjectDefaultsSettings({
                 }}
               >
                 <SelectTrigger
-                  size="sm"
+                  size="settings"
                   aria-label={t.settings.projectDefaults.defaultPullRequestMergeMethod}
                 >
                   <SelectValue>
@@ -567,6 +571,7 @@ export function ProjectDefaultsSettings({
               </Select>
             }
           />
+          {sourceControlRows}
         </>
       ) : (
         <>
