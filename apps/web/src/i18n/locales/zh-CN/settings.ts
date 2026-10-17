@@ -833,6 +833,7 @@ export const settings: Messages["settings"] = {
   },
   general: {
     browseFolder: "浏览文件夹",
+    folderPickerError: "无法打开文件夹选择器",
     mixed: "多个值",
     appVersionDescription: "应用当前版本。",
   },

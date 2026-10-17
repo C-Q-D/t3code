@@ -128,6 +128,7 @@ import {
   DialogTitle,
 } from "../ui/dialog";
 import { DraftInput } from "../ui/draft-input";
+import { resolvePickedFolderPath } from "./GeneralPathInput.logic";
 import { Input } from "../ui/input";
 import {
   DEFAULT_CODE_FONT_STACK,
@@ -2270,10 +2271,10 @@ function LegacyFeaturesSection() {
 /**
  * Composes M2's path well around the existing commit-on-blur input.
  * @param props.value Persisted path, or an empty draft for mixed targets.
- * @param props.onCommit Existing scoped path writer, invoked by DraftInput on commit.
+ * @param props.onCommit Existing scoped path writer, shared by manual commits and folder selection.
  * @param props.placeholder Existing empty/mixed hint; no path is inferred locally.
  * @param props.label Accessible setting name for the input.
- * @returns An editable path with a disabled browse affordance: this flow has no folder picker yet.
+ * @returns An editable path with native browsing when the desktop bridge supports it; cancellation does not commit.
  */
 function GeneralPathInput({
   value,
@@ -2286,6 +2287,29 @@ function GeneralPathInput({
   placeholder: string;
   label: string;
 }) {
+  const [isPickingFolder, setIsPickingFolder] = useState(false);
+  const canPickFolder =
+    typeof window !== "undefined" && typeof window.desktopBridge?.pickFolder === "function";
+
+  /** Waits for the user's native dialog without timeout or retry; failures leave the saved path intact. */
+  async function pickFolder() {
+    const api = readLocalApi();
+    if (!canPickFolder || isPickingFolder || !api) return;
+
+    setIsPickingFolder(true);
+    let pickedPath: string | null;
+    try {
+      pickedPath = await api.dialogs.pickFolder({ initialPath: value });
+    } catch {
+      toastManager.add({ type: "error", title: t.settings.general.folderPickerError });
+      return;
+    } finally {
+      setIsPickingFolder(false);
+    }
+    const path = resolvePickedFolderPath(pickedPath);
+    if (path !== null) onCommit(path);
+  }
+
   return (
     <div className="flex h-8 w-65 max-w-full items-center gap-2 rounded-card-row bg-input pr-1.5 shadow-well-track focus-within:inset-shadow-focus">
       <DraftInput
@@ -2302,7 +2326,9 @@ function GeneralPathInput({
       <Button
         size="icon-xs"
         variant="secondary"
-        disabled
+        disabled={!canPickFolder || isPickingFolder}
+        aria-busy={isPickingFolder}
+        onClick={() => void pickFolder()}
         aria-label={t.settings.general.browseFolder}
       >
         <FolderOpenIcon aria-hidden />

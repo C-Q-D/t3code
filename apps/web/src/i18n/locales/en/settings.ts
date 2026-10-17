@@ -884,6 +884,7 @@ export const settings = {
   },
   general: {
     browseFolder: "Browse folder",
+    folderPickerError: "Could not open the folder picker",
     mixed: "Mixed",
     appVersionDescription: "Current version of the application.",
   },
