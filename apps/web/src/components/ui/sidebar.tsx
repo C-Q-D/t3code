@@ -1,5 +1,6 @@
 /** Provides responsive sidebar layout, collapse state, and pointer resizing controls. */
 import { t } from "~/i18n";
+import { Dialog as SheetPrimitive } from "@base-ui/react/dialog";
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
 import { cva, type VariantProps } from "class-variance-authority";
@@ -16,11 +17,13 @@ import {
   SheetDescription,
   SheetHeader,
   SheetPopup,
+  SheetPortal,
   SheetTitle,
 } from "~/components/ui/sheet";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
 import { useResizeDrag } from "~/hooks/useResizeDrag";
-import { useIsMobile } from "~/hooks/useMediaQuery";
+import { useMediaQuery } from "~/hooks/useMediaQuery";
+import { FRAME_SIDEBAR_DRAWER_GEOMETRY } from "~/components/frame/sidebarDrawerGeometry";
 import { getLocalStorageItem, setLocalStorageItem } from "~/hooks/useLocalStorage";
 import { resolveSidebarState, type ResponsiveSidebarState } from "./sidebarState";
 import * as Schema from "effect/Schema";
@@ -120,7 +123,7 @@ function SidebarProvider({
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }) {
-  const isMobile = useIsMobile();
+  const isMobile = useMediaQuery({ max: 1024 });
   const [openMobile, setOpenMobile] = React.useState(false);
   const [mobileSheetMounted, setMobileSheetMounted] = React.useState(false);
   const setMobileSheetElement = React.useCallback((element: HTMLDivElement | null) => {
@@ -277,6 +280,49 @@ function Sidebar({
   }
 
   if (isMobile) {
+    if (variant === "frame") {
+      return (
+        <SidebarInstanceContext value={instanceContextValue}>
+          <Sheet onOpenChange={setOpenMobile} open={openMobile}>
+            <SheetPortal>
+              <SheetPrimitive.Backdrop
+                className="frame-sidebar-drawer-backdrop bg-stone-scrim"
+                style={FRAME_SIDEBAR_DRAWER_GEOMETRY.backdrop}
+              />
+              {/* Keep dismissal and focus ownership in the same primitive as SheetPopup.
+                  The viewport excludes the project rail and titlebar, like the scrim. */}
+              <SheetPrimitive.Viewport
+                className="frame-sidebar-drawer-viewport"
+                style={FRAME_SIDEBAR_DRAWER_GEOMETRY.backdrop}
+              >
+                <SheetPrimitive.Popup
+                  ref={setMobileSheetElement}
+                  render={
+                    <Slab tone="sidebar" radius="slab" elevation="slab-frame" render={<aside />} />
+                  }
+                  className={cn(
+                    "frame-sidebar-drawer stone-sidebar text-sidebar-foreground",
+                    className,
+                  )}
+                  style={FRAME_SIDEBAR_DRAWER_GEOMETRY.drawer}
+                  data-mobile="true"
+                  data-sidebar="sidebar"
+                  data-slot="sidebar"
+                >
+                  <SheetHeader className="sr-only">
+                    <SheetTitle>{t.app.sidebar.title}</SheetTitle>
+                    <SheetDescription>{t.app.sidebar.description}</SheetDescription>
+                  </SheetHeader>
+                  <div className="flex h-full min-h-0 w-full flex-col" {...props}>
+                    {children}
+                  </div>
+                </SheetPrimitive.Popup>
+              </SheetPrimitive.Viewport>
+            </SheetPortal>
+          </Sheet>
+        </SidebarInstanceContext>
+      );
+    }
     return (
       <SidebarInstanceContext value={instanceContextValue}>
         <Sheet onOpenChange={setOpenMobile} open={openMobile}>

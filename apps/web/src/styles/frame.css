@@ -220,3 +220,40 @@ html[data-theme-id="graphite"] [data-frame-main] {
 .project-rail-scroll {
   scrollbar-width: none;
 }
+
+/* FR3.1 · StyleM A3. Only frame drawers use this surface; other sheet variants keep theirs. */
+.frame-sidebar-drawer-backdrop {
+  z-index: var(--z-sheet);
+  transition: opacity 200ms ease-in-out;
+}
+
+.frame-sidebar-drawer-viewport {
+  z-index: var(--z-sheet);
+}
+
+.frame-sidebar-drawer {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  transition:
+    opacity 200ms ease-in-out,
+    transform 200ms ease-in-out;
+}
+
+.frame-sidebar-drawer-backdrop:is([data-starting-style], [data-ending-style]),
+.frame-sidebar-drawer:is([data-starting-style], [data-ending-style]) {
+  opacity: 0;
+}
+
+.frame-sidebar-drawer:is([data-starting-style], [data-ending-style]) {
+  transform: translateX(calc(var(--spacing) * -8));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .frame-sidebar-drawer-backdrop,
+  .frame-sidebar-drawer {
+    transition: none;
+    transform: none;
+  }
+}
