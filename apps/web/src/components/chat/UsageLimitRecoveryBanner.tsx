@@ -5,11 +5,12 @@ import {
   type OrchestrationV2LimitRecoveryUpdate,
   type RunId,
 } from "@t3tools/contracts";
-import { GaugeIcon } from "lucide-react";
+import { CalendarClockIcon, GaugeIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "../ui/button";
-import type { ComposerBannerStackItem } from "./ComposerBannerStack";
+import type { ComposerBannerStackContent } from "./ComposerBannerStack";
 
+/** Existing run-bound schedule and snooze settings; the caller owns persistence and grants. */
 type RecoveryProps = {
   runId: RunId;
   resetAt: string | null;
@@ -23,22 +24,33 @@ type RecoveryProps = {
  * Builds the composer warning for a run stopped by a usage limit.
  * @param props - Required runId, stoppedAt timestamp, and asynchronous recovery-update callback.
  * resetAt, snoozedUntil, and recovery may be null when unavailable or unset.
- * @returns A warning banner descriptor; actions are null unless resetAt is later than stoppedAt.
+ * @returns A warning card in the composer stack; actions are absent unless resetAt follows stoppedAt.
  * Never returns null.
  */
-export function usageLimitRecoveryBannerItem(props: RecoveryProps): ComposerBannerStackItem {
+export function usageLimitRecoveryBannerItem(props: RecoveryProps): ComposerBannerStackContent {
   const { runId, resetAt, stoppedAt } = props;
   const canSchedule = resetAt !== null && Date.parse(resetAt) > Date.parse(stoppedAt);
   return {
     id: `usage-limit-recovery:${runId}`,
     variant: "warning",
     priority: "urgent",
-    icon: <GaugeIcon />,
-    title: t.chat.limitRecovery.usageLimitReached,
-    description: resetAt
-      ? t.chat.limitRecovery.resets(new Date(resetAt).toLocaleString())
-      : t.chat.limitRecovery.resetTimeUnavailableRetryManually,
-    actions: canSchedule ? <RecoveryActions key={`${runId}:${resetAt}`} {...props} /> : null,
+    content: (
+      <section
+        role="alert"
+        className="timeline-limit-recovery surface-glass flex min-w-0 flex-col gap-2.5 rounded-card-surface p-3.5 text-secondary-copy-large text-foreground shadow-timeline-request-card"
+      >
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <GaugeIcon className="size-4 shrink-0" aria-hidden />
+          <b className="min-w-0 flex-1">{t.chat.limitRecovery.usageLimitReached}</b>
+          <span className="text-secondary-copy text-secondary-label">
+            {resetAt
+              ? t.chat.limitRecovery.resets(new Date(resetAt).toLocaleString())
+              : t.chat.limitRecovery.resetTimeUnavailableRetryManually}
+          </span>
+        </div>
+        {canSchedule ? <RecoveryActions key={`${runId}:${resetAt}`} {...props} /> : null}
+      </section>
+    ),
   };
 }
 
@@ -93,26 +105,40 @@ function RecoveryActions({ runId, resetAt, recovery, snoozedUntil, onChange }: R
     setPending(false);
   }
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <Button size="xs" variant="ghost" disabled={pending} onClick={() => void toggle("resume")}>
-        {pending
-          ? t.chat.limitRecovery.saving
-          : scheduled
-            ? t.chat.limitRecovery.cancelAutoResume
-            : t.chat.limitRecovery.resumeAtReset}
-      </Button>
-      {!snoozed ? (
+    <div
+      className="timeline-limit-actions flex flex-wrap items-center gap-1.5"
+      data-scheduled={scheduled}
+    >
+      <div className="timeline-limit-resume flex min-w-0 items-center gap-2">
+        {scheduled ? <CalendarClockIcon className="size-3.25 shrink-0" aria-hidden /> : null}
+        {scheduled ? <span className="flex-1" aria-hidden /> : null}
         <Button
-          size="xs"
-          variant="ghost"
-          disabled={pending || Date.parse(resetAt!) <= nowMs}
-          onClick={() => void toggle("snooze")}
+          size={scheduled ? "compact" : "toolbar"}
+          variant={scheduled ? "outline" : "default"}
+          disabled={pending}
+          onClick={() => void toggle("resume")}
         >
-          {pending ? t.chat.limitRecovery.saving : t.chat.limitRecovery.snoozeUntilReset}
+          {pending
+            ? t.chat.limitRecovery.saving
+            : scheduled
+              ? t.chat.limitRecovery.cancelAutoResume
+              : t.chat.limitRecovery.resumeAtReset}
         </Button>
+      </div>
+      {!snoozed ? (
+        <div className="flex min-w-0 items-center">
+          <Button
+            size="toolbar"
+            variant="secondary"
+            disabled={pending || Date.parse(resetAt!) <= nowMs}
+            onClick={() => void toggle("snooze")}
+          >
+            {pending ? t.chat.limitRecovery.saving : t.chat.limitRecovery.snoozeUntilReset}
+          </Button>
+        </div>
       ) : null}
       {error ? (
-        <p role="alert" className="basis-full text-xs text-destructive">
+        <p role="alert" className="order-3 basis-full text-secondary-copy text-error-foreground">
           {error}
         </p>
       ) : null}

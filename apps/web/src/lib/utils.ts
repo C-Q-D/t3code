@@ -220,6 +220,8 @@ const twMerge = extendTailwindMerge({
         "pr-list-empty",
         "pr-list-empty-mark",
         "timeline-request-card",
+        "timeline-empty-well",
+        "timeline-empty-icon",
       ],
       "inset-shadow": [
         "selected",
@@ -299,6 +301,7 @@ const twMerge = extendTailwindMerge({
         "timeline-minimap-strip",
         "pr-list-popup",
         "pr-link-dialog",
+        "timeline-empty-icon",
       ],
       leading: [
         "code",

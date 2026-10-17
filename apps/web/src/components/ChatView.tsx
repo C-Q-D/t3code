@@ -311,7 +311,7 @@ import {
   AlarmClockIcon,
   CheckCircle2Icon,
   MessageCircleIcon,
-  PaperclipIcon,
+  FileUpIcon,
   DownloadIcon,
   GitBranchIcon,
   TargetIcon,
@@ -495,7 +495,10 @@ import {
   type EditQueuedRunRequest,
 } from "./chat/QueuedRunsControl";
 import { useLinkedThreadPullRequest } from "./ThreadStatusIndicators";
-import type { ComposerBannerStackItem } from "./chat/ComposerBannerStack";
+import type {
+  ComposerBannerStackContent,
+  ComposerBannerStackItem,
+} from "./chat/ComposerBannerStack";
 import { ThreadStatusLine } from "./chat/ThreadStatusLine";
 import { formatRelativeTimeLabel, formatRelativeTimeUntilLabel } from "../timestampFormat";
 import { ComposerSurface } from "./chat/ComposerSurface";
@@ -7894,7 +7897,9 @@ export default function ChatView(props: ChatViewProps) {
       ? { environmentId, ...activeThreadShell.discussion }
       : null,
   );
-  const composerBannerItems = useMemo<ComposerBannerStackItem[]>(() => {
+  const composerBannerItems = useMemo<
+    (ComposerBannerStackItem | ComposerBannerStackContent)[]
+  >(() => {
     const discussionSeatItems = discussionSeatBanner === null ? [] : [discussionSeatBanner];
     const limitRecoveryItems = limitRecoveryBanner === null ? [] : [limitRecoveryBanner];
     const backgroundWorkItems = [
@@ -11467,14 +11472,14 @@ export default function ChatView(props: ChatViewProps) {
             <ThreadFind onClose={focusComposer} />
             {isWorkspaceFileDragActive ? (
               <div
-                className="pointer-events-none absolute inset-2 z-40 flex items-center justify-center rounded-2xl border-2 border-dashed border-primary/60 bg-primary/[0.035]"
+                className="pointer-events-none absolute inset-2 z-40 flex items-center justify-center"
                 data-chat-workspace-drop-overlay="true"
               >
                 <div
                   role="status"
-                  className="flex items-center gap-2 rounded-full border border-primary/25 bg-background/95 px-4 py-2.5 text-sm font-medium text-foreground shadow-lg"
+                  className="flex h-50 w-full flex-col items-center justify-center gap-2.5 rounded-card-surface bg-timeline-drop-scrim text-secondary-copy-large font-bold text-foreground outline-2 -outline-offset-8 outline-dashed outline-ring"
                 >
-                  <PaperclipIcon className="size-4 text-primary" aria-hidden="true" />
+                  <FileUpIcon className="size-6.5" strokeWidth={1.5} aria-hidden="true" />
                   {t.chat.view.dropFiles}
                 </div>
               </div>

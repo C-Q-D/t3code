@@ -422,3 +422,39 @@
   -webkit-text-security: disc;
   @apply tracking-timeline-secret;
 }
+
+@theme {
+  /* 补充屏-1 T4：拖放文件提示的半透明黑底；只在拖放状态挂载。 */
+  --color-timeline-drop-scrim: rgba(0, 0, 0, 0.35);
+}
+
+@theme {
+  /* 补充屏-1 T4：空对话的 170px 凹槽、44px 图标井及 13px 图标圆角。 */
+  --color-timeline-empty-surface: #151517;
+  --shadow-timeline-empty-well: inset 1.5px 2px 3px rgba(0, 0, 0, 0.6);
+  --shadow-timeline-empty-icon:
+    inset 1.5px 2px 3px rgba(0, 0, 0, 0.62), inset -1px -1px 0 rgba(255, 255, 255, 0.055);
+  --radius-timeline-empty-icon: 13px;
+  /* 补充屏-1 T4：已安排操作行上方的分隔线；高光复用 timeline-rule。 */
+  --color-timeline-recovery-rule: rgba(0, 0, 0, 0.6);
+}
+
+/* The content slot retains stacking/attachment behavior; its T4 card owns the visible shell. */
+[data-slot="composer-banner"]:has(> .timeline-limit-recovery) {
+  @apply p-0;
+}
+
+[data-slot="composer-banner"]:has(> .timeline-limit-recovery)::before,
+[data-slot="composer-banner"]:has(> .timeline-limit-recovery)::after {
+  display: none;
+}
+
+/* Keep the same focused resume button mounted when it becomes the scheduled cancel action. */
+.timeline-limit-actions[data-scheduled="true"] > .timeline-limit-resume {
+  @apply relative order-2 mt-1 basis-full pt-2.5;
+}
+
+.timeline-limit-actions[data-scheduled="true"] > .timeline-limit-resume::before {
+  content: "";
+  @apply absolute inset-x-0 top-0 h-px bg-timeline-recovery-rule shadow-timeline-rule;
+}
