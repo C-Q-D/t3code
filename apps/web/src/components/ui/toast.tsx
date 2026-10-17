@@ -3,8 +3,6 @@
 
 import { t } from "~/i18n";
 
-import { Spinner } from "~/components/ui/spinner";
-
 import { Toast } from "@base-ui/react/toast";
 import {
   useEffect,
@@ -20,6 +18,7 @@ import { type ScopedThreadRef, type ThreadId } from "@t3tools/contracts";
 import {
   CircleXIcon,
   CircleCheckIcon,
+  HourglassIcon,
   MessageCircleQuestionIcon,
   ShieldAlertIcon,
   XIcon,
@@ -35,6 +34,7 @@ import { resolveThreadRouteTarget } from "~/threadRoutes";
 import {
   buildVisibleToastLayout,
   hasVisibleToastAction,
+  resolveToastProgressPercent,
   shouldHideCollapsedToastContent,
   shouldRenderThreadScopedToast,
 } from "./toast.logic";
@@ -44,6 +44,8 @@ export type ThreadToastData = {
   threadRef?: ScopedThreadRef | null;
   threadId?: ThreadId | null;
   leadingIcon?: ReactNode;
+  /** Loading progress in percent; finite values are rounded and clamped to 0–100. Omit or use null when unknown. */
+  progressPercent?: number | null;
   tooltipStyle?: boolean;
   onClose?: (() => void) | undefined;
   dismissAfterVisibleMs?: number;
@@ -85,7 +87,7 @@ const threadToastVisibleTimeoutRemainingMs = new Map<ToastId, number>();
 const TOAST_ICONS = {
   error: CircleXIcon,
   info: MessageCircleQuestionIcon,
-  loading: Spinner,
+  loading: HourglassIcon,
   success: CircleCheckIcon,
   warning: ShieldAlertIcon,
 } as const;
@@ -323,6 +325,7 @@ function ToastBodyContent({
   const additionalActions = toastData?.additionalActions ?? [];
   const secondaryActionProps = toastData?.secondaryActionProps;
   const leadingIcon = toastData?.leadingIcon;
+  const progressPercent = resolveToastProgressPercent(toastType, toastData?.progressPercent);
   const { className: secondaryActionClassName, ...secondaryActionRest } =
     secondaryActionProps ?? {};
 
@@ -347,9 +350,49 @@ function ToastBodyContent({
             {leadingIcon || (Icon ? <Icon className="size-3.75" /> : null)}
           </div>
         ) : null}
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <Toast.Title className="min-w-0 wrap-break-word font-bold" data-slot="toast-title" />
+        <div
+          className={cn(
+            "flex min-w-0 flex-1 flex-col",
+            progressPercent !== null ? "gap-2" : "gap-0.5",
+          )}
+        >
+          <div
+            className={cn(
+              "flex min-w-0 items-center gap-2.5",
+              toastType === "loading" && "min-h-7",
+            )}
+          >
+            <Toast.Title
+              className="min-w-0 flex-1 wrap-break-word font-bold"
+              data-slot="toast-title"
+            />
+            {progressPercent !== null ? (
+              <span
+                aria-hidden
+                className="shrink-0 font-mono text-secondary-copy text-secondary-label"
+                data-slot="toast-progress-label"
+              >
+                {progressPercent}%
+              </span>
+            ) : null}
+          </div>
           <ToastDescriptionAndExpandable toastData={toastData} />
+          {progressPercent !== null ? (
+            <div
+              aria-label={t.app.actions.loading}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={progressPercent}
+              className="-mr-0.5 h-1.5 overflow-hidden rounded-full bg-input shadow-well-progress"
+              data-slot="toast-progress"
+              role="progressbar"
+            >
+              <div
+                className="h-full w-full origin-left rounded-full bg-code-foreground transition-transform duration-200 motion-reduce:transition-none"
+                style={{ transform: `scaleX(${progressPercent / 100})` }}
+              />
+            </div>
+          ) : null}
         </div>
       </div>
       {hasTrailingControls ? (

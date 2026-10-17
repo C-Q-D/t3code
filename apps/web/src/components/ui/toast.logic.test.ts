@@ -1,11 +1,36 @@
+/** Verifies toast presentation decisions independently of DOM styling and notification transports. */
 import type { ScopedThreadRef } from "@t3tools/contracts";
 import { assert, describe, it } from "vite-plus/test";
 import {
   buildVisibleToastLayout,
   hasVisibleToastAction,
+  resolveToastProgressPercent,
   shouldHideCollapsedToastContent,
   shouldRenderThreadScopedToast,
 } from "./toast.logic";
+
+describe("resolveToastProgressPercent", () => {
+  it.each([
+    ["loading", 40, 40],
+    ["loading", 0, 0],
+    ["loading", 100, 100],
+    ["loading", -5, 0],
+    ["loading", 120, 100],
+    ["loading", 40.6, 41],
+    ["loading", undefined, null],
+    ["loading", null, null],
+    ["loading", NaN, null],
+    ["loading", Infinity, null],
+    ["loading", -Infinity, null],
+    ["success", 40, null],
+    ["error", 40, null],
+    ["info", 40, null],
+    ["warning", 40, null],
+    [undefined, 40, null],
+  ] as const)("normalizes %s progress %s to %s", (type, progress, expected) => {
+    assert.equal(resolveToastProgressPercent(type, progress), expected);
+  });
+});
 
 describe("hasVisibleToastAction", () => {
   it("treats a labeled action as visible", () => {

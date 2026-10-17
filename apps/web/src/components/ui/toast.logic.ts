@@ -1,4 +1,20 @@
+/** Pure presentation decisions for toast visibility, stacking, actions, and determinate progress. */
 import type { ScopedThreadRef, ThreadId } from "@t3tools/contracts";
+
+/**
+ * Returns a whole percentage in [0, 100] for loading toasts only.
+ * Missing or non-finite progressPercent means unknown progress and returns null,
+ * so callers render neither a percentage nor a determinate progress bar.
+ */
+export function resolveToastProgressPercent(
+  toastType: unknown,
+  progressPercent: number | null | undefined,
+): number | null {
+  if (toastType !== "loading" || progressPercent == null || !Number.isFinite(progressPercent)) {
+    return null;
+  }
+  return Math.round(Math.min(100, Math.max(0, progressPercent)));
+}
 
 /**
  * Base UI toast updates omit `undefined` fields, so callers that need to remove
