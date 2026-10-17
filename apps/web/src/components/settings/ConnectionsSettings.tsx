@@ -1995,7 +1995,7 @@ function ConfiguredCloudLinkRow({ canManageRelay }: { readonly canManageRelay: b
     <>
       {window.desktopBridge ? (
         <SettingsRow
-          title={searchableSetting("t3-connect").title}
+          {...searchableSetting("t3-connect")}
           status={operationError ?? primaryCloudLinkState.error}
           control={
             <Tooltip>
@@ -2030,7 +2030,7 @@ function ConfiguredCloudLinkRow({ canManageRelay }: { readonly canManageRelay: b
       ) : null}
       {managedTunnelActive ? (
         <SettingsRow
-          title={searchableSetting("hold-webhooks-while-offline").title}
+          {...searchableSetting("hold-webhooks-while-offline")}
           description={t.settings.connections.cloud.webhooksDescription}
           control={
             <CloudLinkSwitch
@@ -2044,7 +2044,7 @@ function ConfiguredCloudLinkRow({ canManageRelay }: { readonly canManageRelay: b
         />
       ) : null}
       <SettingsRow
-        title={searchableSetting("publish-agent-activity").title}
+        {...searchableSetting("publish-agent-activity")}
         description={t.settings.connections.cloud.activityDescription}
         control={
           <CloudLinkSwitch
@@ -2066,6 +2066,7 @@ function ConfiguredCloudLinkRow({ canManageRelay }: { readonly canManageRelay: b
   );
 }
 
+/** Preserves the T3 Connect search anchor when relay permissions show an explanation instead of controls. */
 function CloudLinkRow({
   canReadRelay,
   canManageRelay,
@@ -2077,7 +2078,7 @@ function CloudLinkRow({
   if (!canReadRelay) {
     return (
       <SettingsRow
-        title={t.settings.rows.t3Connect.title}
+        {...searchableSetting("t3-connect")}
         description={t.settings.connections.cloud.permissionsHint}
       />
     );
@@ -4180,6 +4181,7 @@ export function ConnectionsSettings() {
           <>
             <SettingsRow
               title={t.settings.connections.groups.thisMachine}
+              description={t.settings.connections.groups.thisMachineHint}
               control={
                 <SelectButton size="settings" disabled>
                   {primaryEnvironment.label}

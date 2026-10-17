@@ -1,3 +1,4 @@
+/** Verifies settings search results, availability, localization and navigation destinations. */
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { EnvironmentId } from "@t3tools/contracts";
 import { en } from "~/i18n/locales/en";
@@ -98,6 +99,19 @@ describe("translated settings catalog", () => {
 });
 
 describe("searchSettings", () => {
+  it.each(["t3-connect", "hold-webhooks-while-offline", "publish-agent-activity"] as const)(
+    "targets the independent T3 Connect row for %s",
+    (id) => {
+      const item: SettingsSearchItem | undefined = SETTINGS_SEARCH_ITEMS.find(
+        (entry) => entry.id === id,
+      );
+
+      expect(item).toMatchObject({ id, to: "/settings/connections", targetId: id });
+      expect(item?.targetId ?? item?.id).toBe(id);
+      expect(searchableSetting(id).id).toBe(id);
+    },
+  );
+
   it.each(["OTel", "OTLP", "telemetry export", "Grafana"])(
     "finds environment telemetry settings for %s",
     (query) => {

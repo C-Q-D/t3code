@@ -1123,6 +1123,7 @@ export const settings: Messages["settings"] = {
       environments: "环境",
       pairing: "配对",
       thisMachine: "此机器",
+      thisMachineHint: "只显示当前环境，不支持在此切换。",
       thisDevice: "此设备",
     },
     scopes: {

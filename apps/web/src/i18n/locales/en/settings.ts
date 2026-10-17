@@ -1179,6 +1179,7 @@ export const settings = {
       environments: "Environments",
       pairing: "Pairing",
       thisMachine: "This machine",
+      thisMachineHint: "Shows the current environment only. You cannot switch environments here.",
       thisDevice: "This device",
     },
     scopes: {
