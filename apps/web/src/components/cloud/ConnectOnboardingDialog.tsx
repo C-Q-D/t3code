@@ -5,6 +5,7 @@ import { useAtomValue } from "@effect/atom-react";
 import { AuthRelayReadScope, AuthRelayWriteScope, type AuthSessionState } from "@t3tools/contracts";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { useEffect, useRef, useState } from "react";
+import { CheckIcon } from "lucide-react";
 
 import {
   CONNECT_ONBOARDING_OPT_OUT_STORAGE_KEY,
@@ -302,6 +303,7 @@ function ConfiguredConnectOnboardingDialog() {
               aria-pressed={dontShowAgain}
               onClick={() => setDontShowAgain((value) => !value)}
             >
+              {dontShowAgain ? <CheckIcon aria-hidden className="size-4" /> : null}
               {t.account.onboarding.dontShowAgain}
             </Button>
           }

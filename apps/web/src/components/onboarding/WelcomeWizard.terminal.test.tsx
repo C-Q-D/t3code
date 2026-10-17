@@ -1,4 +1,7 @@
-/** Verifies onboarding permissions and asynchronous setup behavior through the user flow. */
+/**
+ * Verifies onboarding permissions and asynchronous setup behavior through the user flow.
+ * @vitest-environment jsdom
+ */
 import { RegistryContext } from "@effect/atom-react";
 import {
   BearerConnectionTarget,
@@ -23,6 +26,7 @@ import { DEFAULT_RESOLVED_KEYBINDINGS } from "@t3tools/shared/keybindings";
 import * as Cause from "effect/Cause";
 import { AsyncResult, Atom, AtomRegistry } from "effect/reactivity";
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from "react-test-renderer";
+import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 type SessionResult = AsyncResult.AsyncResult<AuthSessionState, Error>;
@@ -99,7 +103,7 @@ vi.mock("./OnboardingSurface", () => ({
   OnboardingPopup: "div",
   OnboardingHeader: "div",
   OnboardingSteps: ({ onStepChange }: { onStepChange: (step: number) => void }) => (
-    <button onClick={() => onStepChange(0)}>Back</button>
+    <button onClick={() => onStepChange(0)}>Step navigation back</button>
   ),
 }));
 vi.mock("../ui/scroll-area", () => ({ ScrollArea: "div" }));
@@ -221,6 +225,9 @@ function text(node: ReactTestInstance | string): string {
   return typeof node === "string" ? node : node.children.map(text).join("");
 }
 let renderer: ReactTestRenderer | undefined;
+const browserDocument = document;
+let domRoot: Root | undefined;
+let domContainer: HTMLDivElement | undefined;
 function button(label: string) {
   return renderer!.root.findAllByType("button").find((node) => text(node) === label)!;
 }
@@ -291,6 +298,10 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+  await act(async () => domRoot?.unmount());
+  domRoot = undefined;
+  domContainer?.remove();
+  domContainer = undefined;
   await act(async () => renderer?.unmount());
   renderer = undefined;
   state.registry?.dispose();
@@ -301,6 +312,52 @@ afterEach(async () => {
 });
 
 describe("welcome agent terminal setup", () => {
+  it("returns through the footer and advances again without resending the install command", async () => {
+    vi.stubGlobal("document", browserDocument);
+    setAccess(primaryId, false);
+    domContainer = document.createElement("div");
+    document.body.append(domContainer);
+    domRoot = createRoot(domContainer);
+    await act(async () =>
+      domRoot!.render(
+        <RegistryContext.Provider value={state.registry!}>
+          <WelcomeWizard localAvailable onDone={state.done} />
+        </RegistryContext.Provider>,
+      ),
+    );
+    /** Uses DOM clicks on the production footer; the mock step navigation has a distinct label. */
+    async function clickAction(label: string) {
+      const action = Array.from(domContainer!.querySelectorAll("button")).find(
+        (node) => node.textContent === label,
+      );
+      expect(action, `Missing action: ${label}`).toBeDefined();
+      expect(action!.disabled).toBe(false);
+      await act(async () => action!.click());
+    }
+    await clickAction("Next");
+    await clickAction("Install");
+    expect(state.write).toHaveBeenCalledExactlyOnceWith({
+      environmentId: remoteId,
+      input: {
+        threadId: "onboarding-agent-setup",
+        terminalId: expect.any(String),
+        data: "curl -fsSL https://claude.ai/install.sh | bash",
+      },
+    });
+    await clickAction("Back");
+    expect(domContainer.textContent).toContain("Connect your computer");
+    await clickAction("Next");
+    expect(domContainer.textContent).toContain("Connect your agents");
+    await clickAction("Next");
+    expect(domContainer.textContent).toContain("Import your projects");
+    await clickAction("Back");
+    expect(domContainer.textContent).toContain("Connect your agents");
+    await clickAction("Next");
+    expect(domContainer.textContent).toContain("Import your projects");
+    expect(state.open).toHaveBeenCalledOnce();
+    expect(state.write).toHaveBeenCalledOnce();
+  });
+
   it("disables both setup actions for the paired read-only connection and preserves local completion", async () => {
     setAccess(remoteId, false);
     await enterRemoteAgents();
