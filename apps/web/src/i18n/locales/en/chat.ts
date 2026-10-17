@@ -985,6 +985,7 @@ export const chat = {
   draftHero: {
     noProject: "No project",
     chooseAProject: "Choose a project",
+    chooseProject: "Choose project",
     addAProject: "Add a project",
     whatShouldWeWorkOn: "What should we work on?",
     addAProjectToStart: "Add a project to start",

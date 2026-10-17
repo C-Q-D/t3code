@@ -2,7 +2,7 @@
 /** Tests rename rules and observable titlebar interactions; ignores visual class implementation. */
 import { act, createElement, createRef } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { EnvironmentId, ThreadId } from "@t3tools/contracts";
+import { EnvironmentId, ProjectId, ThreadId } from "@t3tools/contracts";
 import { afterEach, beforeEach, vi } from "vite-plus/test";
 import type { useThreadActionMenu } from "~/hooks/useThreadActionMenu";
 import { TitlebarSlotOutlet, TitlebarSlotProvider } from "../frame/titlebarSlot";
@@ -78,7 +78,7 @@ describe("chat titlebar interactions", () => {
   });
 
   /** Mounts the real slot provider and outlets so assertions exercise route-to-chrome ownership. */
-  async function renderRoute(showChat = true) {
+  async function renderRoute(showChat = true, isServerThread = true) {
     await act(async () =>
       root.render(
         createElement(
@@ -99,8 +99,20 @@ describe("chat titlebar interactions", () => {
                   activeThreadEnvironmentId: EnvironmentId.make("local"),
                   activeThreadId: ThreadId.make("thread-1"),
                   activeThreadTitle: "Original title",
-                  isServerThread: true,
-                  activeProject: null,
+                  isServerThread,
+                  activeProject: isServerThread
+                    ? null
+                    : {
+                        id: ProjectId.make("project-1"),
+                        environmentId: EnvironmentId.make("local"),
+                        title: "Project",
+                        workspaceRoot: "F:/project",
+                        repositoryIdentity: null,
+                        defaultModelSelection: null,
+                        scripts: [],
+                        createdAt: "2026-01-01T00:00:00Z",
+                        updatedAt: "2026-01-01T00:00:00Z",
+                      },
                   parentThreadLink: null,
                   onOpenThread: vi.fn(),
                   onNewThreadInProject: vi.fn(),
@@ -126,6 +138,21 @@ describe("chat titlebar interactions", () => {
     await renderRoute(false);
     expect(container.querySelector('[data-titlebar-slot="breadcrumb"]')?.textContent).toBe("");
     expect(container.querySelector('[data-titlebar-slot="actions"]')?.textContent).toBe("");
+  });
+
+  it("shows only the project on a draft route and restores thread chrome when opening a thread", async () => {
+    await renderRoute(true, false);
+    expect(container.querySelector('[data-titlebar-slot="breadcrumb"]')?.textContent).toBe(
+      "Project",
+    );
+    expect(container.querySelector('[data-titlebar-slot="actions"]')?.textContent).toBe("");
+    await renderRoute();
+    expect(container.querySelector('[data-titlebar-slot="breadcrumb"]')?.textContent).toBe(
+      "Original title",
+    );
+    expect(container.querySelector('[data-titlebar-slot="actions"]')?.textContent).toBe(
+      "Existing panel control",
+    );
   });
 
   it("opens a DOM menu on a single click and commits a trimmed rename on double click", async () => {

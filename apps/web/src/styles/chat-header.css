@@ -51,6 +51,17 @@
   --radius-chat-control: 11px;
   /* StyleM-8a topGroup lc-icon filter: the same engraved edge on all three glyphs. */
   --shadow-chat-control-icon: 0 1px 0 rgba(0, 0, 0, 0.55);
+  /* StyleM-8a C1/C2: 38px project choice inside the 42px serif heading. */
+  --text-chat-project-choice: 38px;
+  --text-chat-project-choice--line-height: 1.25;
+  --tracking-chat-draft: 0.01em;
+  --leading-chat-project-menu: 1.4;
+  --radius-chat-draft-project-mark: 8px;
+  --shadow-chat-project-choice:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1), inset 0 -1px 0 rgba(0, 0, 0, 0.66),
+    0 0 0 1px rgba(0, 0, 0, 0.44), 0 2px 0 #09090a, 6px 10px 16px -4px rgba(0, 0, 0, 0.66);
+  --shadow-chat-draft-project-mark:
+    inset 1.5px 2px 3px rgba(0, 0, 0, 0.6), inset -1px -1px 0 rgba(255, 255, 255, 0.06);
 }
 
 /* The whole well remains clickable inside Electron's draggable titlebar. */

@@ -89,26 +89,6 @@ export const PanelLayoutControls = memo(function PanelLayoutControls({
             )
           : threadPanelTooltip(threadPanelToggle)
         : null}
-      {showRightPanelControl ? (
-        <Tooltip>
-          <TooltipTrigger render={<span className="flex shrink-0" />}>
-            <TogglePrimitive
-              className={panelToggleClassName}
-              pressed={rightPanelOpen}
-              onPressedChange={onToggleRightPanel}
-              aria-label={t.chat.panelLayout.toggleRightPanel}
-              disabled={!rightPanelAvailable}
-            >
-              <Columns3Icon className="size-4" strokeWidth={1.75} />
-            </TogglePrimitive>
-          </TooltipTrigger>
-          <TooltipPopup side="bottom">
-            {rightPanelAvailable
-              ? t.chat.panelLayout.rightShortcut(rightPanelShortcutLabel ?? null)
-              : rightPanelUnavailableLabel}
-          </TooltipPopup>
-        </Tooltip>
-      ) : null}
       {showTerminalControl ? (
         <Tooltip>
           <TooltipTrigger render={<span className="flex shrink-0" />}>
@@ -126,6 +106,26 @@ export const PanelLayoutControls = memo(function PanelLayoutControls({
             {terminalAvailable
               ? t.chat.panelLayout.terminalShortcut(terminalShortcutLabel ?? null)
               : t.chat.panelLayout.terminalDrawerIsUnavailable}
+          </TooltipPopup>
+        </Tooltip>
+      ) : null}
+      {showRightPanelControl ? (
+        <Tooltip>
+          <TooltipTrigger render={<span className="flex shrink-0" />}>
+            <TogglePrimitive
+              className={panelToggleClassName}
+              pressed={rightPanelOpen}
+              onPressedChange={onToggleRightPanel}
+              aria-label={t.chat.panelLayout.toggleRightPanel}
+              disabled={!rightPanelAvailable}
+            >
+              <Columns3Icon className="size-4" strokeWidth={1.75} />
+            </TogglePrimitive>
+          </TooltipTrigger>
+          <TooltipPopup side="bottom">
+            {rightPanelAvailable
+              ? t.chat.panelLayout.rightShortcut(rightPanelShortcutLabel ?? null)
+              : rightPanelUnavailableLabel}
           </TooltipPopup>
         </Tooltip>
       ) : null}

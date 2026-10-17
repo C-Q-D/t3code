@@ -936,6 +936,7 @@ export const chat: Messages["chat"] = {
   draftHero: {
     noProject: "无项目",
     chooseAProject: "选择项目",
+    chooseProject: "选择项目",
     addAProject: "添加项目",
     whatShouldWeWorkOn: "我们要做什么？",
     addAProjectToStart: "添加项目以开始",

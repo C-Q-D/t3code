@@ -1,13 +1,14 @@
 /** Renders the draft heading and inline project selection controls. */
 import { t } from "~/i18n";
+import { Combobox as ComboboxPrimitive } from "@base-ui/react/combobox";
 import type { DraftId } from "~/composerDraftStore";
 import { composerDraftHasUserContent, useComposerDraftStore } from "~/composerDraftStore";
 import { resolveEnvironmentMachineKind, type ScopedProjectRef } from "@t3tools/contracts";
 import { scopedProjectKey, scopeProjectRef } from "@t3tools/client-runtime/environment";
 import { isScratchProject } from "@t3tools/client-runtime/state/projects";
-import { FolderPlusIcon } from "lucide-react";
+import { CheckIcon, ChevronDownIcon, FolderPlusIcon, FolderXIcon } from "lucide-react";
 import { useAtomValue } from "@effect/atom-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { openCommandPalette } from "~/commandPaletteBus";
 import { shortcutLabelForCommand } from "~/keybindings";
@@ -16,6 +17,7 @@ import { useNewThreadHandler } from "~/hooks/useHandleNewThread";
 import { useScratchProject } from "~/hooks/useScratchProject";
 import { useClientSettings } from "~/hooks/useSettings";
 import { hasExplicitComposerModelSelection } from "~/lib/chatThreadActions";
+import { cn } from "~/lib/utils";
 import {
   deriveLogicalProjectKeyFromSettings,
   selectProjectGroupingSettings,
@@ -33,26 +35,29 @@ import { sortLogicalProjectsForSidebar } from "../Sidebar.logic";
 import {
   Combobox,
   ComboboxEmpty,
-  ComboboxItem,
   ComboboxList,
-  ComboboxPopup,
   ComboboxSearchInput,
   ComboboxTrigger,
   useComboboxFilter,
 } from "../ui/combobox";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
-import { InlineButton } from "../ui/button";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 
-// Picker value for the "Add project" row; real entries are keyed by logical
-// project key.
+// Action values stay distinct from the logical project keys used by real project rows.
 const ADD_PROJECT_VALUE = "add-project";
+const NO_PROJECT_VALUE = "no-project";
 
+// C1's raised 50px project choice is specific to the serif hero, rather than a shared button size.
+const projectTriggerClassName =
+  "pointer-events-auto inline-flex h-12.5 max-w-full shrink-0 cursor-pointer items-center gap-2.5 rounded-card-row border-0 bg-secondary pr-3.5 pl-2.5 align-middle font-serif text-chat-project-choice font-semibold text-foreground shadow-chat-project-choice outline-none hover:bg-accent focus-visible:inset-shadow-focus";
+
+/** Project choices and the two existing actions share the combobox's labeled-value contract. */
 interface PickerItem {
   readonly value: string;
   readonly label: string;
 }
 
+/** Nullable route context supports both project-backed and no-project drafts. */
 interface DraftHeroHeadlineProps {
   readonly draftId: DraftId | null;
   readonly activeProjectRef: ScopedProjectRef | null;
@@ -161,8 +166,7 @@ export function DraftHeroHeadline({
   const hasResolvedProject = activeProjectTitle !== null;
   const canChooseProject = projectPickerEntries.length > 0;
   const shouldShowProjectMenu = canChooseProject;
-  // The project that hosts threads without a project is not a row: the line
-  // under the headline is the way into it.
+  // Scratch projects appear as the no-project action rather than physical project rows.
   const menuEntries = useMemo(
     () =>
       projectPickerEntries.filter(
@@ -185,16 +189,20 @@ export function DraftHeroHeadline({
   const scratchWorkspaceRoot = scratchWorkspaceRootFor(scratchTargetEnvironmentId);
   const isScratchDraft =
     activeProject !== null && isScratchProject(activeProject, scratchWorkspaceRoot);
+  const canStartWithoutProject =
+    scratchTargetEnvironmentId !== null && scratchWorkspaceRoot !== null;
 
   // {value, label} items let Base UI drive the combobox selection while the
-  // popup search filters the same collection. "Add project" is an action, not
-  // a project, so it only trails the unfiltered list.
+  // popup search filters the same collection. Non-project actions only trail the unfiltered list.
   const pickerItems = useMemo<readonly PickerItem[]>(
     () => [
       ...menuEntries.map(({ group }) => ({ value: group.projectKey, label: group.displayName })),
+      ...(canStartWithoutProject
+        ? [{ value: NO_PROJECT_VALUE, label: t.chat.draftHero.noProject }]
+        : []),
       { value: ADD_PROJECT_VALUE, label: t.chat.draftHero.addProject },
     ],
-    [menuEntries],
+    [canStartWithoutProject, menuEntries],
   );
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerQuery, setPickerQuery] = useState("");
@@ -205,10 +213,14 @@ export function DraftHeroHeadline({
     return pickerItems.filter(
       (item) =>
         item.value !== ADD_PROJECT_VALUE &&
+        item.value !== NO_PROJECT_VALUE &&
         pickerFilter.contains(item, query, (candidate) => candidate.label),
     );
   }, [pickerFilter, pickerItems, pickerQuery]);
-  const selectedPickerItem = pickerItems.find((item) => item.value === activeProjectKey) ?? null;
+  const selectedPickerItem =
+    pickerItems.find(
+      (item) => item.value === (isScratchDraft ? NO_PROJECT_VALUE : activeProjectKey),
+    ) ?? null;
 
   // The picker can change the draft's target while the no-project home is
   // still being opened; a stale continuation must not retarget it again.
@@ -295,6 +307,10 @@ export function DraftHeroHeadline({
           openAddProject();
           return;
         }
+        if (item.value === NO_PROJECT_VALUE) {
+          void startScratch();
+          return;
+        }
         const entry = projectEntryByKey.get(item.value);
         if (!entry || item.value === activeProjectKey) {
           return;
@@ -310,65 +326,100 @@ export function DraftHeroHeadline({
             // aria-label here would replace the title with an action phrase
             // mid-sentence and baffle screen-reader users.
             <ComboboxTrigger
-              render={<InlineButton tone="picker" />}
+              render={<button type="button" />}
               data-draft-project-trigger=""
-              className="pointer-events-auto max-w-64 align-baseline"
+              className={projectTriggerClassName}
             />
           }
         >
-          <span className="min-w-0 truncate">
+          <span className="inline-flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-chat-draft-project-mark shadow-chat-draft-project-mark">
+            {activeProject && !isScratchDraft ? (
+              <ProjectFavicon project={activeProjectGroup ?? activeProject} className="size-full" />
+            ) : (
+              <FolderXIcon className="size-5" />
+            )}
+          </span>
+          <span className="min-w-0 max-w-64 truncate">
             {isScratchDraft
               ? t.chat.draftHero.noProject
               : (activeProjectDisplayName ?? t.chat.draftHero.chooseAProject)}
           </span>
+          <ChevronDownIcon className="size-5 shrink-0" />
         </TooltipTrigger>
-        {activeProjectDisplayName && !isScratchDraft ? (
-          <TooltipPopup side="top">{activeProjectDisplayName}</TooltipPopup>
-        ) : null}
+        <TooltipPopup side="top">{t.chat.draftHero.chooseProject}</TooltipPopup>
       </Tooltip>
-      <ComboboxPopup align="center" className="w-72 overflow-hidden">
-        <ComboboxSearchInput
-          aria-label={t.sidebar.projects.searchAriaLabel}
-          placeholder={t.sidebar.projects.searchPlaceholder}
-          value={pickerQuery}
-          onChange={(event) => setPickerQuery(event.target.value)}
-        />
-        <ComboboxEmpty>{t.sidebar.projects.noMatchingProjects}</ComboboxEmpty>
-        <ComboboxList>
-          {(item: PickerItem) => {
-            const entry = projectEntryByKey.get(item.value);
-            return (
-              <ComboboxItem key={item.value} hideIndicator value={item}>
-                {item.value === ADD_PROJECT_VALUE ? (
-                  <FolderPlusIcon className="size-4 shrink-0" />
-                ) : entry ? (
-                  <ProjectFavicon project={entry.group} className="size-4 shrink-0" />
-                ) : null}
-                <Tooltip>
-                  <TooltipTrigger render={<span className="min-w-0 flex-1 truncate text-sm" />}>
-                    {item.label}
-                  </TooltipTrigger>
-                  <TooltipPopup side="top">{item.label}</TooltipPopup>
-                </Tooltip>
-                {entry && showProjectEnvironments ? (
-                  <ProjectEnvironmentBadge
-                    group={entry.group}
-                    primaryEnvironmentId={primaryEnvironmentId}
-                    machineByEnvironmentId={environmentMachineById}
-                  />
-                ) : null}
-              </ComboboxItem>
-            );
-          }}
-        </ComboboxList>
-      </ComboboxPopup>
+      <ComboboxPrimitive.Portal>
+        <ComboboxPrimitive.Positioner align="start" sideOffset={10} className="z-130">
+          <ComboboxPrimitive.Popup className="dropdown-glass flex max-h-(--available-height) w-65 max-w-(--available-width) flex-col overflow-hidden rounded-overlay-large font-sans text-control font-medium text-foreground leading-chat-project-menu tracking-normal">
+            <ComboboxSearchInput
+              aria-label={t.sidebar.projects.searchAriaLabel}
+              placeholder={t.sidebar.projects.searchPlaceholder}
+              value={pickerQuery}
+              onChange={(event) => setPickerQuery(event.target.value)}
+            />
+            <ComboboxEmpty>{t.sidebar.projects.noMatchingProjects}</ComboboxEmpty>
+            <ComboboxList>
+              {(item: PickerItem) => {
+                const entry = projectEntryByKey.get(item.value);
+                return (
+                  <Fragment key={item.value}>
+                    {item.value === NO_PROJECT_VALUE ||
+                    (item.value === ADD_PROJECT_VALUE && !canStartWithoutProject) ? (
+                      <div
+                        role="presentation"
+                        className="mx-2 mt-1 mb-1.5 h-px shrink-0 bg-menu-engraving shadow-menu-engraving"
+                      />
+                    ) : null}
+                    <ComboboxPrimitive.Item
+                      value={item}
+                      className="mb-0.5 flex h-9.5 shrink-0 cursor-pointer items-center gap-2.5 rounded-compact-row px-2.5 outline-none last:mb-0 data-selected:bg-accent not-data-selected:hover:bg-secondary not-data-selected:data-highlighted:bg-secondary focus-visible:inset-shadow-focus"
+                    >
+                      {item.value === ADD_PROJECT_VALUE ? (
+                        <FolderPlusIcon className="size-4 shrink-0" />
+                      ) : item.value === NO_PROJECT_VALUE ? (
+                        <FolderXIcon className="size-4 shrink-0" />
+                      ) : entry ? (
+                        <ProjectFavicon
+                          project={entry.group}
+                          className="size-5 shrink-0 rounded-project-mark shadow-chat-project-mark"
+                        />
+                      ) : null}
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <span
+                              className={cn(
+                                "min-w-0 flex-1 truncate",
+                                !entry && "text-chat-project-label",
+                              )}
+                            />
+                          }
+                        >
+                          {item.label}
+                        </TooltipTrigger>
+                        <TooltipPopup side="top">{item.label}</TooltipPopup>
+                      </Tooltip>
+                      {entry && showProjectEnvironments ? (
+                        <ProjectEnvironmentBadge
+                          group={entry.group}
+                          primaryEnvironmentId={primaryEnvironmentId}
+                          machineByEnvironmentId={environmentMachineById}
+                        />
+                      ) : null}
+                      <ComboboxPrimitive.ItemIndicator>
+                        <CheckIcon className="size-3.75 shrink-0" />
+                      </ComboboxPrimitive.ItemIndicator>
+                    </ComboboxPrimitive.Item>
+                  </Fragment>
+                );
+              }}
+            </ComboboxList>
+          </ComboboxPrimitive.Popup>
+        </ComboboxPrimitive.Positioner>
+      </ComboboxPrimitive.Portal>
     </Combobox>
   ) : (
-    <button
-      type="button"
-      onClick={openAddProject}
-      className="pointer-events-auto inline cursor-pointer border-muted-foreground/35 border-b border-dotted text-muted-foreground/60 transition-colors hover:border-muted-foreground/60 hover:text-muted-foreground/80 focus-visible:rounded-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-    >
+    <button type="button" onClick={openAddProject} className={projectTriggerClassName}>
       {activeProjectTitle ?? t.chat.draftHero.addAProject}
     </button>
   );
@@ -393,9 +444,9 @@ export function DraftHeroHeadline({
       <Tooltip>
         <TooltipTrigger
           render={
-            <InlineButton
-              tone="muted"
-              className="pointer-events-auto"
+            <button
+              type="button"
+              className="pointer-events-auto cursor-pointer rounded-sm text-secondary-label underline decoration-border underline-offset-4 outline-none hover:text-foreground focus-visible:inset-shadow-focus"
               onClick={() =>
                 void startScratch().then((started) => {
                   if (started) {
@@ -413,10 +464,10 @@ export function DraftHeroHeadline({
     ) : null;
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col items-center">
+    <div className="mx-auto flex w-full max-w-5xl flex-col items-center gap-3.5">
       <h1
         aria-label={headingLabel}
-        className="w-full text-center font-normal text-2xl text-foreground tracking-tight sm:text-3xl"
+        className="flex w-full flex-wrap items-center justify-center gap-3 text-center font-serif text-new-chat-title font-semibold text-balance text-foreground tracking-chat-draft"
       >
         {isScratchDraft ? (
           <>{t.chat.draftHero.whatShouldWeWorkOn}</>
@@ -438,7 +489,7 @@ export function DraftHeroHeadline({
       {/* Reserved whenever threads can skip a project, so the heading does not
           move. Without a project, the picker moves here to choose one. */}
       {scratchWorkspaceRoot === null ? null : (
-        <p className="mt-2 flex h-6 items-center text-sm">
+        <p className="flex min-h-6 items-center justify-center font-sans text-control">
           {isScratchDraft ? projectSelector : orStartWithoutProject}
         </p>
       )}

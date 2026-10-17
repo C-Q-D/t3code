@@ -84,6 +84,7 @@ const twMerge = extendTailwindMerge({
         "usage-total",
         "usage-limit-number",
         "discussion-summary-heading",
+        "chat-project-choice",
       ],
       shadow: [
         "slab",
@@ -180,6 +181,8 @@ const twMerge = extendTailwindMerge({
         "discussion-file-rule",
         "chat-project-mark",
         "chat-control-icon",
+        "chat-project-choice",
+        "chat-draft-project-mark",
       ],
       "inset-shadow": ["selected", "focus", "selected-control", "project-rail-hover"],
       "text-shadow": ["stone"],
@@ -228,6 +231,7 @@ const twMerge = extendTailwindMerge({
         "project-mark",
         "chat-controls-well",
         "chat-control",
+        "chat-draft-project-mark",
       ],
       leading: [
         "code",
@@ -236,8 +240,9 @@ const twMerge = extendTailwindMerge({
         "usage-limit-note",
         "discussion-composer",
         "discussion-record",
+        "chat-project-menu",
       ],
-      tracking: ["brand"],
+      tracking: ["brand", "chat-draft"],
     },
     classGroups: {
       "bg-image": [

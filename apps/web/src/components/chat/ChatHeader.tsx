@@ -81,7 +81,7 @@ interface ChatHeaderProps {
   activeThreadEnvironmentId: EnvironmentId;
   activeThreadId: ThreadId;
   activeThreadTitle: string;
-  /** Drafts have no server thread yet, so the title carries no action menu. */
+  /** Draft titlebars publish only the project capsule, without thread chrome. */
   isServerThread: boolean;
   activeProject: EnvironmentProject | null;
   parentThreadLink: { threadId: ThreadId; title: string } | null;
@@ -460,12 +460,14 @@ export const ChatHeader = memo(function ChatHeader({
                 <TooltipPopup side="top">{t.chat.header.newThread(activeProjectName)}</TooltipPopup>
               </Tooltip>
             </WorkspaceBreadcrumbItem>
-            <WorkspaceBreadcrumbSeparator className="text-chat-crumb-separator">
-              <ChevronRightIcon className="size-4" />
-            </WorkspaceBreadcrumbSeparator>
+            {isServerThread ? (
+              <WorkspaceBreadcrumbSeparator className="text-chat-crumb-separator">
+                <ChevronRightIcon className="size-4" />
+              </WorkspaceBreadcrumbSeparator>
+            ) : null}
           </>
         ) : null}
-        {parentThreadLink ? (
+        {isServerThread && parentThreadLink ? (
           <>
             <WorkspaceBreadcrumbItem>
               <Tooltip>
@@ -499,86 +501,74 @@ export const ChatHeader = memo(function ChatHeader({
             </WorkspaceBreadcrumbSeparator>
           </>
         ) : null}
-        <WorkspaceBreadcrumbItem current className="min-w-10 flex-1">
-          {renamingTitle !== null ? (
-            <input
-              autoFocus
-              aria-label={t.chat.header.threadTitle}
-              className="h-8 min-w-0 flex-1 rounded-full bg-input px-3 font-serif text-chat-title font-bold text-foreground shadow-well-control outline-none focus:inset-shadow-focus"
-              defaultValue={renamingTitle}
-              onBlur={(event) => {
-                if (renameCommittedRef.current) return;
-                // Focus landing on a navigation button means the rename was
-                // abandoned — discard it rather than persisting a half-draft.
-                if (
-                  event.relatedTarget instanceof HTMLElement &&
-                  event.relatedTarget.closest("button")
-                ) {
-                  setRenaming(null);
-                  return;
-                }
-                commitRename(event.currentTarget.value);
-              }}
-              onFocus={(event) => event.currentTarget.select()}
-              onKeyDown={handleRenameKeyDown}
-            />
-          ) : isServerThread ? (
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <button
-                    ref={(button) => {
-                      titleButtonRef.current = button;
-                      if (button && restoreTitleFocusRef.current) {
-                        restoreTitleFocusRef.current = false;
-                        button.focus();
-                      }
-                    }}
-                    type="button"
-                    aria-label={t.chat.header.threadActions(activeThreadTitle)}
-                    aria-haspopup="menu"
-                    aria-expanded={menu !== null}
-                    onClick={openMenuFromTitle}
-                    onDoubleClick={canOperateThread ? handleTitleDoubleClick : undefined}
-                    className="group/thread-title inline-flex h-8 min-w-0 max-w-full cursor-pointer items-center gap-1.5 rounded-full px-3 text-left font-serif text-chat-title font-bold text-foreground outline-none hover:bg-chat-title-hover focus-visible:inset-shadow-focus"
-                  />
-                }
-              >
-                <span className="min-w-0">
-                  <WorkspaceBreadcrumbText>{activeThreadTitle}</WorkspaceBreadcrumbText>
-                </span>
-                <span
-                  aria-hidden
-                  data-thread-title-chevron
-                  className="shrink-0 text-secondary-label"
+        {isServerThread ? (
+          <WorkspaceBreadcrumbItem current className="min-w-10 flex-1">
+            {renamingTitle !== null ? (
+              <input
+                autoFocus
+                aria-label={t.chat.header.threadTitle}
+                className="h-8 min-w-0 flex-1 rounded-full bg-input px-3 font-serif text-chat-title font-bold text-foreground shadow-well-control outline-none focus:inset-shadow-focus"
+                defaultValue={renamingTitle}
+                onBlur={(event) => {
+                  if (renameCommittedRef.current) return;
+                  // Focus landing on a navigation button means the rename was
+                  // abandoned — discard it rather than persisting a half-draft.
+                  if (
+                    event.relatedTarget instanceof HTMLElement &&
+                    event.relatedTarget.closest("button")
+                  ) {
+                    setRenaming(null);
+                    return;
+                  }
+                  commitRename(event.currentTarget.value);
+                }}
+                onFocus={(event) => event.currentTarget.select()}
+                onKeyDown={handleRenameKeyDown}
+              />
+            ) : (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <button
+                      ref={(button) => {
+                        titleButtonRef.current = button;
+                        if (button && restoreTitleFocusRef.current) {
+                          restoreTitleFocusRef.current = false;
+                          button.focus();
+                        }
+                      }}
+                      type="button"
+                      aria-label={t.chat.header.threadActions(activeThreadTitle)}
+                      aria-haspopup="menu"
+                      aria-expanded={menu !== null}
+                      onClick={openMenuFromTitle}
+                      onDoubleClick={canOperateThread ? handleTitleDoubleClick : undefined}
+                      className="group/thread-title inline-flex h-8 min-w-0 max-w-full cursor-pointer items-center gap-1.5 rounded-full px-3 text-left font-serif text-chat-title font-bold text-foreground outline-none hover:bg-chat-title-hover focus-visible:inset-shadow-focus"
+                    />
+                  }
                 >
-                  <ChevronDownIcon className="size-3.75" />
-                </span>
-              </TooltipTrigger>
-              <TooltipPopup side="top">{activeThreadTitle}</TooltipPopup>
-            </Tooltip>
-          ) : (
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <h2
-                    aria-label={activeThreadTitle}
-                    className="min-w-0 flex-1 font-serif text-chat-title font-bold"
-                  />
-                }
-              >
-                <WorkspaceBreadcrumbText>{activeThreadTitle}</WorkspaceBreadcrumbText>
-              </TooltipTrigger>
-              <TooltipPopup side="top">{activeThreadTitle}</TooltipPopup>
-            </Tooltip>
-          )}
-        </WorkspaceBreadcrumbItem>
+                  <span className="min-w-0">
+                    <WorkspaceBreadcrumbText>{activeThreadTitle}</WorkspaceBreadcrumbText>
+                  </span>
+                  <span
+                    aria-hidden
+                    data-thread-title-chevron
+                    className="shrink-0 text-secondary-label"
+                  >
+                    <ChevronDownIcon className="size-3.75" />
+                  </span>
+                </TooltipTrigger>
+                <TooltipPopup side="top">{activeThreadTitle}</TooltipPopup>
+              </Tooltip>
+            )}
+          </WorkspaceBreadcrumbItem>
+        ) : null}
       </WorkspaceBreadcrumb>
     </div>
   );
   const slots = useTitlebarSlot({
     breadcrumb,
-    actions: (
+    actions: isServerThread ? (
       <div
         ref={(element) => {
           popoverAnchorRef.current = element;
@@ -587,7 +577,7 @@ export const ChatHeader = memo(function ChatHeader({
       >
         {actions}
       </div>
-    ),
+    ) : null,
   });
   return (
     <>
