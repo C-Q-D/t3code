@@ -5,7 +5,6 @@ import { parseChangeRequestUrl } from "@t3tools/shared/changeRequestUrl";
 import { useAtomValue } from "@effect/atom-react";
 import { usePullRequestStack } from "~/state/usePullRequestStack";
 import { RefreshIcon } from "~/components/ui/refresh-icon";
-import { AnimatedWidth } from "~/components/AnimatedWidth";
 import {
   scopedThreadKey,
   scopeProjectRef,
@@ -29,12 +28,10 @@ import {
   ArrowDownUpIcon,
   ArrowLeftIcon,
   ArrowUpRightIcon,
-  BookOpenIcon,
-  CheckIcon,
   CircleDotIcon,
+  EyeIcon,
   CopyIcon,
   ChevronDownIcon,
-  ExternalLinkIcon,
   FileDiffIcon,
   FolderGit2Icon,
   GitBranchIcon,
@@ -44,10 +41,13 @@ import {
   MessageSquareIcon,
   LinkIcon,
   MoreHorizontalIcon,
+  HashIcon,
   PanelRightIcon,
+  PencilIcon,
   PlayIcon,
-  RotateCcwIcon,
+  Undo2Icon,
   TriangleAlertIcon,
+  TerminalIcon,
 } from "lucide-react";
 import {
   lazy,
@@ -104,7 +104,7 @@ import { useUiStateStore } from "~/uiStateStore";
 import { EnvironmentMachineIcon } from "../EnvironmentMachineIcon";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
-import { PullRequestEditButton } from "./PullRequestEditButton";
+import { Group } from "../ui/group";
 import { Input } from "../ui/input";
 import {
   Menu,
@@ -151,7 +151,6 @@ import {
   loadingPullRequestCheckoutCommand,
   isPullRequestNotFound,
   isStackedPullRequestBase,
-  pullRequestActionMenuHasGroup,
   pullRequestActionNeedsHostRefresh,
   pullRequestCheckoutCommand,
   pullRequestFindingKey,
@@ -161,7 +160,7 @@ import {
   readPullRequestDetailSnapshot,
   resolvePullRequestReferenceHost,
   resolveDisplayedPullRequestDetail,
-  resolvePullRequestPrimaryControl,
+  resolvePullRequestActionGroups,
   allowsSinglePullRequestMerge,
   resolveBaseFreshness,
   resolvePullRequestMergeMethod,
@@ -1556,10 +1555,6 @@ export function PullRequestDetailPanel({
     projectDefaultMergeMethod,
     lastSelectedMergeMethod,
   );
-  const selectedMergeMethodLabel = PULL_REQUEST_MERGE_METHOD_LABELS[selectedMergeMethod];
-  const pendingAutoMergeLabel = t.git.pullRequest.autoMergeMethod(
-    selectedMergeMethodLabel.toLowerCase(),
-  );
   const conflicting = detail?.state === "open" && detail.mergeability === "conflicting";
   // Only an outright yes arms it. A host that reports nothing has not said the merge is already
   // spoken for, and an off switch for something that may not be on says the wrong thing twice.
@@ -1611,53 +1606,21 @@ export function PullRequestDetailPanel({
       : latestChecksState;
   // A newer rollup cannot tell us which runs changed or how many passed.
   const checksStale = checksState !== detailChecksState;
-  // The merge state remains in one stable slot from waiting through completion. Conflicts take
-  // the slot while they need a person; the armed badge remains beside them so that state is not lost.
-  const primaryAction = detail
-    ? resolvePullRequestPrimaryControl({
-        state: detail.state,
-        isDraft: detail.isDraft,
-        mergeability: detail.mergeability,
-        checksState,
-        autoMergeEnabled: detail.autoMergeEnabled,
-        hasMergeMethod: allowedMergeMethods.length > 0,
-        canMerge: canMergeSinglePullRequest && can("merge"),
-        canMarkReady: can("ready"),
-        canEnableAutoMerge: canMergeSinglePullRequest && can("enable-auto-merge"),
-      })
-    : null;
-  // What the menu's action group holds. Named once so the separators around it are drawn from
-  // the same answer as its contents, rather than on the assumption that it has any.
-  const showsDraftToggle =
-    detail?.state === "open" &&
-    can(detail.isDraft ? "ready" : "draft") &&
-    !(detail.isDraft && primaryAction === "ready");
-  const showsAutoMerge =
-    canMergeSinglePullRequest &&
-    detail?.state === "open" &&
-    ((autoMergeArmed && can("disable-auto-merge")) ||
-      (!autoMergeArmed &&
-        primaryAction !== "enable-auto-merge" &&
-        !detail.isDraft &&
-        !conflicting &&
-        can("enable-auto-merge") &&
-        allowedMergeMethods.length > 0));
-  const showsMergeNow =
-    canMergeSinglePullRequest &&
-    detail?.state === "open" &&
-    (primaryAction === "enable-auto-merge" || primaryAction === "auto-merge-armed") &&
-    can("merge") &&
-    !detail.isDraft &&
-    !conflicting &&
-    allowedMergeMethods.length > 0;
-  const showsMergeMethods =
-    detail?.state === "open" &&
-    can("merge") &&
-    !detail.isDraft &&
-    !conflicting &&
-    allowedMergeMethods.length > 1;
-  // The pull request number carries this state in the overview and the right-panel tab mirrors
-  // it. Conflicts take the action slot while they need a person, but do not change the PR state.
+  const headerActions = resolvePullRequestActionGroups({
+    state: detail?.state ?? "closed",
+    isDraft: detail?.isDraft ?? false,
+    mergeability: detail?.mergeability ?? "unknown",
+    checksState,
+    autoMergeEnabled: detail?.autoMergeEnabled,
+    mergeMethodCount: allowedMergeMethods.length,
+    canMergeSinglePullRequest,
+    canMerge: can("merge"),
+    canMarkReady: can("ready"),
+    canConvertToDraft: can("draft"),
+    canEnableAutoMerge: can("enable-auto-merge"),
+    canDisableAutoMerge: can("disable-auto-merge"),
+  });
+  // Conflicts do not change the host's PR state; the identity badge keeps that distinction.
   const statePresentation = detail
     ? resolvePullRequestState({ state: detail.state, isDraft: detail.isDraft })
     : null;
@@ -1687,35 +1650,39 @@ export function PullRequestDetailPanel({
   const checkoutControl =
     context === "page" ? (
       <Menu>
-        <Tooltip>
-          <TooltipTrigger
+        <Group variant="split" aria-label={t.git.pullRequest.checkOutThisPullRequest}>
+          <MenuTrigger
+            disabled={handoff !== null || checkoutRoot === null}
             render={
-              <MenuTrigger
-                disabled={handoff !== null || checkoutRoot === null}
-                render={
-                  <Button
-                    size="xs"
-                    variant="outline"
-                    aria-label={
-                      handoff?.startsWith("checkout")
-                        ? t.git.pullRequest.checkingOut
-                        : t.git.pullRequest.checkOut
-                    }
-                  >
-                    <GitBranchIcon aria-hidden className="size-3.5" />
-                    <span className="@max-[35rem]/pr-header:hidden">
-                      {handoff?.startsWith("checkout")
-                        ? t.git.pullRequest.checkingOut
-                        : t.git.pullRequest.checkOut}
-                    </span>
-                    <ChevronDownIcon aria-hidden className="size-3.5 text-muted-foreground" />
-                  </Button>
+              <Button
+                size="default"
+                variant="secondary"
+                aria-label={
+                  handoff?.startsWith("checkout")
+                    ? t.git.pullRequest.checkingOut
+                    : t.git.pullRequest.checkOut
                 }
               />
             }
-          />
-          <TooltipPopup>{t.git.pullRequest.checkOutThisPullRequest}</TooltipPopup>
-        </Tooltip>
+          >
+            <GitBranchIcon aria-hidden className="size-3.5" />
+            {handoff?.startsWith("checkout")
+              ? t.git.pullRequest.checkingOut
+              : t.git.pullRequest.checkOutThisPullRequest}
+          </MenuTrigger>
+          <MenuTrigger
+            disabled={handoff !== null || checkoutRoot === null}
+            render={
+              <Button
+                size="icon"
+                variant="secondary"
+                aria-label={t.git.pullRequest.checkoutMethod}
+              />
+            }
+          >
+            <ChevronDownIcon aria-hidden className="size-3.5" />
+          </MenuTrigger>
+        </Group>
         <MenuPopup align="end" side="bottom">
           <MenuItem disabled={!canPrepareWorktree} onClick={() => startCheckout("worktree")}>
             <GitBranchIcon className="mt-1 size-3.5 shrink-0 self-start" />
@@ -1820,739 +1787,355 @@ export function PullRequestDetailPanel({
           onPickerOpenChange={setThreadPickerOpen}
         />
       ) : null}
-      <div
-        className={cn(
-          "@container/pr-header grid min-w-0 shrink-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2",
-          detail && "border-b border-border/60",
-          !detail && !onClose && "hidden",
-        )}
-      >
-        <div className="pl-4 grid h-7 min-w-0 items-center overflow-hidden">
-          <div
-            aria-hidden={condensed}
-            inert={condensed}
-            className={cn(
-              "col-start-1 row-start-1 flex min-w-0 items-center gap-1 text-sm text-muted-foreground transition-[opacity,transform] ease-out motion-reduce:transform-none motion-reduce:transition-none sm:text-xs",
-              condensed
-                ? "pointer-events-none -translate-y-1 opacity-0 duration-100"
-                : "translate-y-0 opacity-100 delay-50 duration-150",
-            )}
-          >
+      <div className={cn("min-w-0 shrink-0", !detail && !onClose && "hidden")}>
+        <TooltipProvider delay={150} closeDelay={150} timeout={400}>
+          <div className="flex min-h-7 min-w-0 flex-wrap items-center gap-2 px-4 pt-1 pb-2.5">
+            {onBack ? (
+              <Button
+                size="icon-sm"
+                variant="ghost-muted"
+                onClick={onBack}
+                aria-label={t.git.pullRequest.backToThisThreadSPullRequests}
+              >
+                <ArrowLeftIcon aria-hidden className="size-3.5" />
+              </Button>
+            ) : null}
             {detail && statePresentation ? (
               <>
-                {onBack ? (
-                  <Tooltip>
-                    <TooltipTrigger
-                      render={
-                        <Button
-                          size="icon-micro"
-                          variant="ghost-muted"
-                          onClick={onBack}
-                          className="-ml-1.5"
-                          aria-label={t.git.pullRequest.backToThisThreadSPullRequests}
-                        >
-                          <ArrowLeftIcon aria-hidden className="size-3.5" />
-                        </Button>
-                      }
-                    />
-                    <TooltipPopup side="top">{t.git.pullRequest.backToPullRequests}</TooltipPopup>
-                  </Tooltip>
-                ) : null}
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      repositoryUrl ? (
-                        <button
-                          type="button"
-                          onClick={() => void readLocalApi()?.shell.openExternal(repositoryUrl)}
-                          className="min-w-0 cursor-pointer truncate text-left font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-                        >
-                          {detail.repository}
-                        </button>
-                      ) : (
-                        <span className="min-w-0 truncate font-medium text-muted-foreground">
-                          {detail.repository}
-                        </span>
-                      )
-                    }
-                  />
-                  <TooltipPopup side="top">
-                    {repositoryUrl
-                      ? t.git.pullRequest.openRepository(detail.repository)
-                      : detail.repository}
-                  </TooltipPopup>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <button
-                        type="button"
-                        onClick={() => void readLocalApi()?.shell.openExternal(detail.url)}
-                        onContextMenu={(event) => openNumberContextMenu(event, detail)}
-                        className={cn(
-                          "inline-flex shrink-0 cursor-pointer items-center gap-0.5 font-medium underline-offset-2 hover:underline",
-                          statePresentation.toneClassName,
-                        )}
-                        aria-label={t.git.pullRequest.openRequestOnHost(detail.number)}
-                      >
-                        #{detail.number}
-                        <ExternalLinkIcon aria-hidden className="size-2.5" />
-                      </button>
-                    }
-                  />
-                  <TooltipPopup side="top">{openOnHostLabel(hostClient)}</TooltipPopup>
-                </Tooltip>
+                <Badge
+                  size="lg"
+                  variant={
+                    detail.state === "open" && detail.isDraft
+                      ? "neutral"
+                      : detail.state === "open"
+                        ? "success"
+                        : detail.state === "merged"
+                          ? "accent"
+                          : "danger"
+                  }
+                >
+                  <statePresentation.Icon aria-hidden className="size-3" />
+                  {statePresentation.label}
+                </Badge>
+                <button
+                  type="button"
+                  onClick={() => void readLocalApi()?.shell.openExternal(detail.url)}
+                  onContextMenu={(event) => openNumberContextMenu(event, detail)}
+                  className="shrink-0 cursor-pointer rounded-keycap font-mono text-secondary-copy-medium text-muted-foreground underline-offset-2 hover:underline focus-visible:inset-shadow-focus"
+                  aria-label={t.git.pullRequest.openRequestOnHost(detail.number)}
+                >
+                  #{detail.number}
+                </button>
               </>
             ) : null}
-          </div>
-          <div
-            aria-hidden={!condensed}
-            inert={!condensed}
-            className={cn(
-              "col-start-1 row-start-1 flex min-w-0 items-center gap-1 text-sm text-muted-foreground transition-[opacity,transform] ease-out motion-reduce:transform-none motion-reduce:transition-none sm:text-xs",
-              condensed
-                ? "translate-y-0 opacity-100 delay-50 duration-150"
-                : "pointer-events-none translate-y-1 opacity-0 duration-100",
-            )}
-          >
-            {detail && statePresentation ? (
-              <>
-                {onBack ? (
-                  <Tooltip>
-                    <TooltipTrigger
+            <div className="ml-auto flex min-w-0 items-center gap-1">
+              {detail ? (
+                <>
+                  <Button
+                    size="compact"
+                    variant="ghost"
+                    disabled={handoff !== null}
+                    onClick={askAboutPullRequest}
+                  >
+                    <MessageCircleQuestionIcon aria-hidden className="size-3.5" />
+                    {handoff === "ask" ? t.git.pullRequest.opening : t.git.pullRequest.askAQuestion}
+                  </Button>
+                  <Button
+                    size="compact"
+                    variant="secondary"
+                    disabled={handoff !== null}
+                    onClick={explainPullRequest}
+                  >
+                    <PixelSparkIcon aria-hidden className="size-3.5" />
+                    {handoff === "explain"
+                      ? t.git.pullRequest.opening
+                      : t.git.pullRequest.explainThisPR}
+                  </Button>
+                  <Menu>
+                    <MenuTrigger
                       render={
                         <Button
-                          size="icon-micro"
+                          size="compact"
                           variant="ghost-muted"
-                          tabIndex={condensed ? 0 : -1}
-                          onClick={onBack}
-                          className="-ml-1.5"
-                          aria-label={t.git.pullRequest.backToThisThreadSPullRequests}
-                        >
-                          <ArrowLeftIcon aria-hidden className="size-3.5" />
-                        </Button>
+                          aria-label={t.git.pullRequest.copyMenu}
+                        />
                       }
-                    />
-                    <TooltipPopup side="top">{t.git.pullRequest.backToPullRequests}</TooltipPopup>
-                  </Tooltip>
-                ) : null}
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <button
-                        type="button"
-                        tabIndex={condensed ? 0 : -1}
-                        onClick={() => void readLocalApi()?.shell.openExternal(detail.url)}
-                        onContextMenu={(event) => openNumberContextMenu(event, detail)}
-                        className={cn(
-                          "inline-flex shrink-0 cursor-pointer items-center gap-0.5 font-medium underline-offset-2 hover:underline",
-                          statePresentation.toneClassName,
-                        )}
-                        aria-label={t.git.pullRequest.openRequestOnHost(detail.number)}
+                    >
+                      <CopyIcon aria-hidden className="size-3.5" />
+                      <ChevronDownIcon aria-hidden className="size-3" />
+                    </MenuTrigger>
+                    <MenuPopup align="end">
+                      <MenuItem onClick={() => copyReference(detail.url, t.git.pullRequest.pRLink)}>
+                        <LinkIcon aria-hidden className="size-3.5" />
+                        {t.git.pullRequest.copyLinkLabel}
+                        <MenuShortcut>
+                          {shortcutLabelForCommand(keybindings, "thread.copyReference")}
+                        </MenuShortcut>
+                      </MenuItem>
+                      <MenuItem
+                        onClick={() =>
+                          copyReference(`#${reference.number}`, t.git.pullRequest.pRNumber)
+                        }
                       >
-                        #{detail.number}
-                        <ExternalLinkIcon aria-hidden className="size-2.5" />
-                      </button>
-                    }
-                  />
-                  <TooltipPopup side="top">{openOnHostLabel(hostClient)}</TooltipPopup>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <span className="min-w-0 truncate font-medium text-foreground">
-                        {detail.title}
-                      </span>
-                    }
-                  />
-                  <TooltipPopup side="top">{detail.title}</TooltipPopup>
-                </Tooltip>
-              </>
-            ) : null}
-          </div>
-        </div>
-        <div className="mr-4 flex h-7 shrink-0 items-center justify-end gap-1">
-          {detail ? (
-            <TooltipProvider delay={150} closeDelay={150} timeout={400}>
-              {!nativeStack && supportsStackActions && nativeStackQuery.error ? (
-                <Button variant="ghost" size="xs" onClick={nativeStackQuery.refresh}>
-                  {t.git.pullRequest.retryStackLookup}
+                        <HashIcon aria-hidden className="size-3.5" />
+                        {t.git.pullRequest.copyNumberLabel}
+                        <MenuShortcut>
+                          {shortcutLabelForCommand(keybindings, "pullRequest.copyNumber")}
+                        </MenuShortcut>
+                      </MenuItem>
+                      <MenuItem
+                        onClick={() =>
+                          copyReference(detail.headBranch, t.git.pullRequest.branchName)
+                        }
+                      >
+                        <GitBranchIcon aria-hidden className="size-3.5" />
+                        {t.git.pullRequest.copyBranchLabel}
+                      </MenuItem>
+                      {checkoutCommand ? (
+                        <MenuItem
+                          onClick={() =>
+                            copyReference(
+                              checkoutCommand,
+                              t.git.pullRequest.pullRequestCheckoutCommand,
+                            )
+                          }
+                        >
+                          <TerminalIcon aria-hidden className="size-3.5" />
+                          {t.git.pullRequest.copyCheckoutLabel}
+                        </MenuItem>
+                      ) : null}
+                    </MenuPopup>
+                  </Menu>
+                </>
+              ) : null}
+              {onClose ? (
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  aria-label={t.git.pullRequest.collapsePullRequestPanel}
+                  onClick={onClose}
+                >
+                  <PanelRightIcon aria-hidden className="size-3.5" />
                 </Button>
               ) : null}
-              {nativeStack ? (
-                <PullRequestStackMenu
-                  hostLabel={hostClient.label}
-                  stack={nativeStack}
-                  notice={nativeStackQuery.notice}
-                  onRetry={nativeStackQuery.error ? nativeStackQuery.refresh : undefined}
-                  reference={reference}
-                  environmentId={environmentId}
-                  onSelect={onSelectPullRequest}
-                  mergeMethod={selectedMergeMethod}
-                  canMerge={
-                    nativeStackQuery.isFresh &&
-                    supportsStackActions &&
-                    can("merge") &&
-                    allowedMergeMethods.length > 0
-                  }
-                  canRebase={
-                    nativeStackQuery.isFresh &&
-                    supportsStackActions &&
-                    detail.viewerPermissions.stackRebase === true
-                  }
-                  onActed={() => {
-                    refreshDetail();
-                    onActed?.();
-                  }}
-                />
+            </div>
+          </div>
+          <div className={cn("grid", condensed ? "pr-detail-expanded" : "pr-detail-folded")}>
+            <div
+              ref={condensedRowRef}
+              inert={!condensed}
+              className={cn(
+                "min-h-0 overflow-hidden px-4 transition-opacity motion-reduce:transition-none",
+                !condensed && "opacity-0",
+              )}
+            >
+              {detail ? (
+                <p className="truncate pb-2.5 font-serif text-card-title font-bold">
+                  {detail.title}
+                </p>
               ) : null}
-              {context === "page" ? (
-                <PullRequestThreadLinks
-                  display="count"
-                  environmentId={environmentId}
-                  reference={reference}
-                  url={detail.url}
-                  threadRef={null}
-                />
-              ) : null}
-              {/* Said where the Merge button is, because it is the answer to why nobody has
-                  pressed it: the merge is already asked for, and the host is holding it. */}
-              {autoMergeArmed && primaryAction !== "auto-merge-armed" ? (
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <Badge
-                        size="control"
-                        variant="info"
-                        role="img"
-                        aria-label={armedAutoMergeLabel}
-                      >
-                        <PullRequestGlyph.merged aria-hidden className="size-3.5" />
-                        <span className="@max-[30rem]/pr-header:hidden">{armedAutoMergeLabel}</span>
-                      </Badge>
-                    }
-                  />
-                  <TooltipPopup side="top">
-                    {armedAutoMergeLabel}
-                    {t.git.pullRequest.theHostWillMergeThisOnItsOwnOnceItsRequirementsAreMet}
-                  </TooltipPopup>
-                </Tooltip>
-              ) : null}
-              {primaryAction === "resolve" ? (
-                resolveConflictsControl
-              ) : primaryAction === "ready" ? (
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <span className="inline-flex shrink-0">
-                        <Button
-                          size="xs"
-                          variant="default"
-                          disabled={actionPending}
-                          onClick={() => void perform("ready")}
-                          aria-label={t.git.pullRequest.readyForReview}
+              {detail ? (
+                <div className="min-w-0 pb-2.5">
+                  <div className="flex min-w-0 items-center gap-2 text-secondary-copy text-muted-foreground">
+                    <span className="flex min-w-0 shrink items-center gap-1.5 overflow-hidden text-secondary-copy text-muted-foreground">
+                      <PullRequestActorLabel
+                        actor={detail.author}
+                        profileUrl={authorProfileUrl}
+                        variant="avatar"
+                        className="shrink-0"
+                      />
+                      <span className="shrink-0">{formatRelativeTimeLabel(detail.updatedAt)}</span>
+                    </span>
+                    <span aria-hidden className="h-3 w-px shrink-0 bg-border/70" />
+                    <span className="flex min-w-0 flex-1 items-center gap-1.5 font-mono text-meta text-muted-foreground/65">
+                      {/* An out-of-date base wears the warning on the branch name itself, so the
+                        name is amber and pointing at either the name or the mark opens the way
+                        out. Up to date, the name keeps its plain tooltip. */}
+                      {freshness ? (
+                        <PullRequestBaseFreshnessWarning
+                          baseBranch={detail.baseBranch}
+                          freshness={freshness}
+                          pending={actionPending}
+                          onUpdate={(method) => void perform("update-branch", undefined, method)}
+                          iconClassName="size-3"
+                          className="max-w-36"
                         >
-                          <PullRequestGlyph.pullRequest aria-hidden className="size-3.5" />
-                          <span className="@max-[30rem]/pr-header:hidden">
-                            {t.git.pullRequest.readyForReview}
-                          </span>
-                        </Button>
-                      </span>
-                    }
-                  />
-                  <TooltipPopup side="top">{t.git.pullRequest.readyForReview}</TooltipPopup>
-                </Tooltip>
-              ) : primaryAction === "enable-auto-merge" ? (
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <span className="inline-flex shrink-0">
-                        <Button
-                          size="xs"
-                          variant="default"
-                          disabled={actionPending}
-                          {...inlineConfirm.props(
-                            "enable-auto-merge",
-                            () => void perform("enable-auto-merge", selectedMergeMethod),
-                          )}
-                          aria-label={
-                            pendingAction === "enable-auto-merge"
-                              ? t.git.pullRequest.enabling
-                              : inlineConfirm.isArmed("enable-auto-merge")
-                                ? t.git.pullRequest.confirmAutoMerge
-                                : pendingAutoMergeLabel
-                          }
-                        >
-                          {inlineConfirm.isArmed("enable-auto-merge") ? (
-                            <CheckIcon aria-hidden className="size-3.5" />
-                          ) : (
-                            <PullRequestGlyph.merged aria-hidden className="size-3.5" />
-                          )}
-                          <AnimatedWidth className="@max-[30rem]/pr-header:hidden">
-                            <span className="grid">
-                              <span aria-hidden className="invisible col-start-1 row-start-1">
-                                {pendingAutoMergeLabel}
+                          {isStackedPullRequest ? (
+                            <PullRequestGlyph.stack
+                              aria-label={t.git.pullRequest.stackedPullRequest}
+                              className="size-3 shrink-0"
+                            />
+                          ) : null}
+                          <code className="flex min-w-0">
+                            <MiddleTruncate value={detail.baseBranch} showTitle={false} />
+                          </code>
+                        </PullRequestBaseFreshnessWarning>
+                      ) : (
+                        <Tooltip>
+                          <TooltipTrigger
+                            render={
+                              <span className="inline-flex min-w-0 max-w-36 shrink-0 items-center gap-1">
+                                {isStackedPullRequest ? (
+                                  <PullRequestGlyph.stack
+                                    aria-label={t.git.pullRequest.stackedPullRequest}
+                                    className="size-3 shrink-0"
+                                  />
+                                ) : null}
+                                <code className="flex min-w-0">
+                                  <MiddleTruncate value={detail.baseBranch} showTitle={false} />
+                                </code>
                               </span>
-                              <span className="col-start-1 row-start-1">
-                                {pendingAction === "enable-auto-merge"
-                                  ? t.git.pullRequest.enabling
-                                  : inlineConfirm.isArmed("enable-auto-merge")
-                                    ? t.git.pullRequest.confirmAutoMerge
-                                    : pendingAutoMergeLabel}
-                              </span>
-                            </span>
-                          </AnimatedWidth>
-                        </Button>
-                      </span>
-                    }
-                  />
-                  <TooltipPopup side="top">
-                    {pendingAction === "enable-auto-merge"
-                      ? t.git.pullRequest.enabling
-                      : inlineConfirm.isArmed("enable-auto-merge")
-                        ? t.git.pullRequest.confirmAutoMerge
-                        : pendingAutoMergeLabel}
-                  </TooltipPopup>
-                </Tooltip>
-              ) : primaryAction === "auto-merge-armed" ? (
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <Badge
-                        size="control"
-                        variant="info"
-                        role="img"
-                        aria-label={armedAutoMergeLabel}
-                      >
-                        <PullRequestGlyph.merged aria-hidden className="size-3.5" />
-                        <span className="@max-[30rem]/pr-header:hidden">{armedAutoMergeLabel}</span>
-                      </Badge>
-                    }
-                  />
-                  <TooltipPopup side="top">
-                    {armedAutoMergeLabel}
-                    {t.git.pullRequest.theHostWillMergeThisOnItsOwnOnceItsRequirementsAreMet}
-                  </TooltipPopup>
-                </Tooltip>
-              ) : primaryAction === "merge" ? (
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <span className="inline-flex shrink-0">
-                        <Button
-                          size="xs"
-                          variant="default"
-                          disabled={actionPending}
-                          {...inlineConfirm.props(
-                            "merge",
-                            () => void perform("merge", selectedMergeMethod),
-                          )}
-                          aria-label={
-                            pendingAction === "merge"
-                              ? t.git.pullRequest.merging
-                              : inlineConfirm.isArmed("merge")
-                                ? t.git.pullRequest.confirmMerge
-                                : selectedMergeMethodLabel
-                          }
-                        >
-                          {inlineConfirm.isArmed("merge") ? (
-                            <CheckIcon aria-hidden className="size-3.5" />
-                          ) : (
-                            <PullRequestGlyph.merged aria-hidden className="size-3.5" />
-                          )}
-                          <AnimatedWidth className="@max-[30rem]/pr-header:hidden">
-                            <span className="grid">
-                              <span aria-hidden className="invisible col-start-1 row-start-1">
-                                {selectedMergeMethodLabel}
-                              </span>
-                              <span className="col-start-1 row-start-1">
-                                {pendingAction === "merge"
-                                  ? t.git.pullRequest.merging
-                                  : inlineConfirm.isArmed("merge")
-                                    ? t.git.pullRequest.confirmMerge
-                                    : selectedMergeMethodLabel}
-                              </span>
-                            </span>
-                          </AnimatedWidth>
-                        </Button>
-                      </span>
-                    }
-                  />
-                  <TooltipPopup side="top">
-                    {pendingAction === "merge"
-                      ? t.git.pullRequest.merging
-                      : inlineConfirm.isArmed("merge")
-                        ? t.git.pullRequest.confirmMerge
-                        : selectedMergeMethodLabel}
-                  </TooltipPopup>
-                </Tooltip>
-              ) : (primaryAction === "merged" || primaryAction === "closed") &&
-                statePresentation !== null ? (
-                <Badge size="control" variant="outline">
-                  <span className={cn("flex items-center gap-1", statePresentation.toneClassName)}>
-                    <statePresentation.Icon className="size-3.5" />
-                    {statePresentation.label}
-                  </span>
-                </Badge>
-              ) : null}
-              {/* Keep checkout beside the menu so host actions arriving on its left cannot
-                  move a different action under the reader's pointer. */}
-              {checkoutControl}
-              <Menu>
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <MenuTrigger
-                        render={
-                          <Button
-                            aria-label={
-                              refreshing
-                                ? t.git.pullRequest.refreshingPullRequest
-                                : t.git.pullRequest.morePullRequestActions
                             }
+                          />
+                          <TooltipPopup side="top">
+                            {isStackedPullRequest
+                              ? t.git.pullRequest.stackedOn(detail.baseBranch)
+                              : detail.baseBranch}
+                          </TooltipPopup>
+                        </Tooltip>
+                      )}
+                      <ArrowLeftIcon
+                        aria-label={t.git.pullRequest.receivesChangesFrom}
+                        className="size-3 shrink-0 opacity-60"
+                      />
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <code className="flex min-w-0 flex-1">
+                              <MiddleTruncate value={detail.headBranch} showTitle={false} />
+                            </code>
+                          }
+                        />
+                        <TooltipPopup side="top">{detail.headBranch}</TooltipPopup>
+                      </Tooltip>
+                    </span>
+                    <span className="ml-auto inline-flex shrink-0 items-center justify-end gap-2 text-meta">
+                      <span
+                        className="inline-flex items-center gap-1 tabular-nums"
+                        aria-label={t.git.pullRequest.changedFileCount(detail.changedFiles)}
+                      >
+                        <FileDiffIcon aria-hidden className="size-3" />
+                        {detail.changedFiles.toLocaleString()}
+                      </span>
+                      <PullRequestDiffStat
+                        additions={detail.additions}
+                        deletions={detail.deletions}
+                        className="shrink-0 font-mono text-meta"
+                      />
+                    </span>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </div>
+          <div className={cn("grid", condensed ? "pr-detail-folded" : "pr-detail-expanded")}>
+            <div
+              ref={foldRef}
+              inert={condensed}
+              className={cn(
+                "min-h-0 overflow-hidden transition-opacity motion-reduce:transition-none",
+                condensed && "opacity-0",
+              )}
+            >
+              {detail ? (
+                <PullRequestDetailHeaderBody
+                  title={
+                    titleDraft === null ? (
+                      <PullRequestDetailTitleRow className="group gap-2">
+                        <Tooltip>
+                          <TooltipTrigger
+                            render={
+                              <h1 className="min-w-0 truncate font-serif text-pr-detail-title font-bold">
+                                {detail.title}
+                              </h1>
+                            }
+                          />
+                          <TooltipPopup side="top">{detail.title}</TooltipPopup>
+                        </Tooltip>
+                        {canEditPullRequestChangeRequest(detail) ? (
+                          <Button
                             size="icon-xs"
                             variant="ghost-muted"
-                          />
-                        }
-                      >
-                        {/* The refresh lives in this menu, so while one runs the trigger wears
-                            the spinning glyph in place of the dots: the reader sees the panel
-                            is fetching without a control appearing or the row shifting. */}
-                        {refreshing ? (
-                          <RefreshIcon refreshing size="md" />
-                        ) : (
-                          <MoreHorizontalIcon className="size-4" />
-                        )}
-                      </MenuTrigger>
-                    }
-                  />
-                  <TooltipPopup>
-                    {refreshing
-                      ? t.git.pullRequest.refreshingPullRequest
-                      : t.git.pullRequest.morePullRequestActions}
-                  </TooltipPopup>
-                </Tooltip>
-                <MenuPopup align="end" side="bottom">
-                  <PullRequestThreadLinks
-                    display="menu-item"
-                    environmentId={environmentId}
-                    reference={reference}
-                    url={detail.url}
-                    threadRef={
-                      threadRef ??
-                      (typeof composerDraftTarget === "object" ? composerDraftTarget : null)
-                    }
-                    onPickerOpenChange={setThreadPickerOpen}
-                  />
-                  <MenuItem disabled={refreshing} onClick={() => void refreshFromHost()}>
-                    <RefreshIcon size="sm" refreshing={refreshing} />
-                    {t.git.pullRequest.refresh}
-                  </MenuItem>
-                  <MenuItem disabled={handoff !== null} onClick={askAboutPullRequest}>
-                    <MessageCircleQuestionIcon className="mt-1 size-3.5 shrink-0 self-start" />
-                    <span className="flex min-w-0 flex-col">
-                      <span>
-                        {handoff === "ask"
-                          ? t.git.pullRequest.opening
-                          : t.git.pullRequest.askAQuestion}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {attachTarget !== null
-                          ? t.git.pullRequest.addsThePullRequestToThisThreadSComposer
-                          : t.git.pullRequest.opensAThreadThatKnowsWhichPullRequestYouMean}
-                      </span>
-                    </span>
-                  </MenuItem>
-                  <MenuItem disabled={handoff !== null} onClick={explainPullRequest}>
-                    <BookOpenIcon className="mt-1 size-3.5 shrink-0 self-start" />
-                    <span className="flex min-w-0 flex-col">
-                      <span>
-                        {handoff === "explain"
-                          ? t.git.pullRequest.opening
-                          : t.git.pullRequest.explainThisPR}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {t.git.pullRequest.aWalkThroughTheDiffAndWhatToReadClosely}
-                      </span>
-                    </span>
-                  </MenuItem>
-                  <MenuItem
-                    disabled={handoff !== null || !canFixFindings}
-                    onClick={startFixFindings}
-                  >
-                    <HammerIcon className="size-3.5" />
-                    {handoff === "findings"
-                      ? t.git.pullRequest.preparing
-                      : handoffLabels.fixFindings}
-                  </MenuItem>
-                  {reviewGuidesEnabled && guideWriter.canWrite ? (
-                    <MenuItem disabled={guideWriter.running} onClick={writeGuide}>
-                      <PixelSparkIcon className="size-3.5" />
-                      {guideWriter.running
-                        ? "Writing guide..."
-                        : guideWriter.data?.guide == null
-                          ? "Write guide"
-                          : "Rewrite guide"}
-                    </MenuItem>
-                  ) : null}
-                  {pickableEnvironments.length > 0 ? (
-                    <ActOnEnvironmentPicker
-                      environments={pickableEnvironments}
-                      value={actingEnvironmentId}
-                      onChange={(next) => setActingScope({ pullRequestKey, environmentId: next })}
-                      disabled={handoff !== null}
-                    />
-                  ) : null}
-                  <MenuSeparator />
-                  {detail.state === "open" ? (
-                    <>
-                      {/* Only where the button row could not take it: "Ready for review" on a
-                          draft is the primary header button, so offering it here as well would
-                          show the same action twice. */}
-                      {showsDraftToggle ? (
-                        <MenuItem
-                          disabled={actionPending}
-                          onClick={() => void perform(detail.isDraft ? "ready" : "draft")}
-                        >
-                          {detail.isDraft ? (
-                            <PullRequestGlyph.pullRequest className="size-3.5" />
-                          ) : (
-                            <PullRequestGlyph.draft className="size-3.5" />
-                          )}
-                          {detail.isDraft
-                            ? t.git.pullRequest.readyForReview
-                            : t.git.pullRequest.convertToDraft}
-                        </MenuItem>
-                      ) : null}
-                      {showsMergeNow ? (
-                        <MenuItem
-                          closeOnClick={inlineConfirm.isArmed("merge")}
-                          aria-label={
-                            inlineConfirm.isArmed("merge")
-                              ? t.git.pullRequest.confirmMerge
-                              : t.git.pullRequest.mergeNow
-                          }
-                          disabled={actionPending}
-                          {...inlineConfirm.props(
-                            "merge",
-                            () => void perform("merge", selectedMergeMethod),
-                          )}
-                        >
-                          <PullRequestGlyph.merged className="size-3.5" />
-                          {inlineConfirm.isArmed("merge")
-                            ? t.git.pullRequest.confirmMerge
-                            : t.git.pullRequest.mergeNow}
-                        </MenuItem>
-                      ) : null}
-                      {/* The same merge, left with the host to carry out once its requirements
-                          pass. A conflicting branch cannot be armed because nothing the host
-                          waits for will clear the conflict. */}
-                      {autoMergeArmed && can("disable-auto-merge") ? (
-                        <MenuItem
-                          disabled={actionPending}
-                          onClick={() => void perform("disable-auto-merge")}
-                        >
-                          <PullRequestGlyph.merged className="size-3.5" />
-                          {t.git.pullRequest.disableAutoMerge}
-                        </MenuItem>
-                      ) : showsAutoMerge ? (
-                        <MenuItem
-                          closeOnClick={inlineConfirm.isArmed("enable-auto-merge")}
-                          aria-label={
-                            inlineConfirm.isArmed("enable-auto-merge")
-                              ? t.git.pullRequest.confirmAutoMerge
-                              : t.git.pullRequest.enableAutoMerge
-                          }
-                          disabled={actionPending}
-                          {...inlineConfirm.props(
-                            "enable-auto-merge",
-                            () => void perform("enable-auto-merge", selectedMergeMethod),
-                          )}
-                        >
-                          <PullRequestGlyph.merged className="size-3.5" />
-                          {inlineConfirm.isArmed("enable-auto-merge")
-                            ? t.git.pullRequest.confirmAutoMerge
-                            : t.git.pullRequest.enableAutoMerge}
-                        </MenuItem>
-                      ) : null}
-                      {/* A preference for the merge action rather than a second action, so it
-                          is a radio group here instead of a chevron welded to the Merge pill.
-                          Hidden while conflicting: every method would fail. */}
-                      {/* Only where merging is on offer at all: a strategy to merge with is not
-                          a choice for someone who may not merge. */}
-                      {showsMergeMethods ? (
-                        <>
-                          {/* Only below the draft control. A host with no draft of its own, or
-                              a draft whose control is already the header button, would leave
-                              this against the separator that opened the group. */}
-                          {showsDraftToggle || showsMergeNow || showsAutoMerge ? (
-                            <MenuSeparator />
-                          ) : null}
-                          <MenuRadioGroup
-                            value={selectedMergeMethod}
-                            onValueChange={(method) => {
-                              const selectedMethod = method as PullRequestMergeMethod;
-                              setMergeMethod(selectedMethod);
-                              setLastSelectedMergeMethod(selectedMethod);
-                            }}
+                            aria-label={t.git.pullRequest.editTitle}
+                            onClick={() => setTitleScope({ pullRequestKey, text: detail.title })}
                           >
-                            {allowedMergeMethods.map((method) => (
-                              <MenuRadioItem
-                                key={method}
-                                value={method}
-                                disabled={actionPending}
-                                closeOnClick
-                              >
-                                {/* The radio item lays its children out as one block, so the
-                                    icon and the label need their own row to share a line. */}
-                                <span className="flex min-w-0 items-center gap-2">
-                                  <PullRequestGlyph.merged className="size-3.5" />
-                                  <span>{PULL_REQUEST_MERGE_METHOD_LABELS[method]}</span>
-                                </span>
-                              </MenuRadioItem>
-                            ))}
-                          </MenuRadioGroup>
-                        </>
-                      ) : null}
-                      {pullRequestActionMenuHasGroup(
-                        showsDraftToggle,
-                        showsAutoMerge || showsMergeNow,
-                        showsMergeMethods,
-                      ) ? (
-                        <MenuSeparator />
-                      ) : null}
-                    </>
-                  ) : null}
-                  <MenuItem onClick={() => void readLocalApi()?.shell.openExternal(detail.url)}>
-                    <ArrowUpRightIcon className="size-3.5" />
-                    {openOnHostLabel(hostClient)}
-                  </MenuItem>
-                  <MenuItem onClick={() => copyReference(detail.url, t.git.pullRequest.pRLink)}>
-                    <LinkIcon className="size-3.5" />
-                    {t.git.pullRequest.copyLink}
-                    <MenuShortcut>
-                      {shortcutLabelForCommand(keybindings, "thread.copyReference")}
-                    </MenuShortcut>
-                  </MenuItem>
-                  <MenuItem
-                    onClick={() =>
-                      copyReference(`#${reference.number}`, t.git.pullRequest.pRNumber)
-                    }
-                  >
-                    <CopyIcon className="size-3.5" />
-                    {t.git.pullRequest.copyPRNumber}
-                    <MenuShortcut>
-                      {shortcutLabelForCommand(keybindings, "pullRequest.copyNumber")}
-                    </MenuShortcut>
-                  </MenuItem>
-                  {detail.state === "open" && can("close") ? (
-                    <>
-                      <MenuSeparator />
-                      <MenuItem
-                        closeOnClick={inlineConfirm.isArmed("close")}
-                        aria-label={
-                          inlineConfirm.isArmed("close")
-                            ? t.git.pullRequest.confirmClose
-                            : t.git.pullRequest.closePullRequest
-                        }
-                        variant="destructive"
-                        disabled={actionPending}
-                        {...inlineConfirm.props("close", () => void perform("close"))}
-                      >
-                        <PullRequestGlyph.closed className="size-3.5" />
-                        {inlineConfirm.isArmed("close")
-                          ? t.git.pullRequest.confirmClose
-                          : t.git.pullRequest.closePullRequest}
-                      </MenuItem>
-                    </>
-                  ) : detail.state === "closed" && can("reopen") ? (
-                    <>
-                      <MenuSeparator />
-                      <MenuItem disabled={actionPending} onClick={() => void perform("reopen")}>
-                        <PullRequestGlyph.reopen className="size-3.5" />
-                        {t.git.pullRequest.reopenPullRequest}
-                      </MenuItem>
-                    </>
-                  ) : detail.state === "merged" && can("revert") ? (
-                    <>
-                      <MenuSeparator />
-                      <MenuItem
-                        closeOnClick={inlineConfirm.isArmed("revert")}
-                        aria-label={
-                          inlineConfirm.isArmed("revert")
-                            ? t.git.pullRequest.confirmRevert
-                            : t.git.pullRequest.revertChanges
-                        }
-                        variant={inlineConfirm.isArmed("revert") ? "destructive" : "default"}
-                        disabled={actionPending}
-                        {...inlineConfirm.props("revert", () => void perform("revert"))}
-                      >
-                        <RotateCcwIcon className="size-3.5" />
-                        {inlineConfirm.isArmed("revert")
-                          ? t.git.pullRequest.confirmRevert
-                          : t.git.pullRequest.revertChanges}
-                      </MenuItem>
-                    </>
-                  ) : null}
-                </MenuPopup>
-              </Menu>
-            </TooltipProvider>
-          ) : null}
-          {onClose ? (
-            <Button
-              size="icon-xs"
-              variant="ghost"
-              aria-label={t.git.pullRequest.collapsePullRequestPanel}
-              onClick={onClose}
-            >
-              <PanelRightIcon className="size-3.5" />
-            </Button>
-          ) : null}
-        </div>
-
-        <div
-          className={cn(
-            "col-span-2 grid",
-            condensed
-              ? "grid-rows-[1fr]"
-              : "grid-rows-[0fr] transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none",
-          )}
-        >
-          <div
-            ref={condensedRowRef}
-            className={cn(
-              "min-h-0 overflow-hidden transition-[opacity,transform] duration-150 ease-out motion-reduce:transform-none motion-reduce:transition-none",
-              condensed
-                ? "translate-y-0 opacity-100 delay-50"
-                : "translate-y-1 opacity-0 duration-100",
-            )}
-            inert={!condensed}
-          >
-            {detail ? (
-              <div className="col-span-2 min-w-0 px-4 pb-2 pt-1">
-                <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-                  <span className="flex min-w-0 shrink items-center gap-1.5 overflow-hidden text-xs text-muted-foreground">
+                            <PencilIcon aria-hidden className="size-3.5" />
+                          </Button>
+                        ) : null}
+                      </PullRequestDetailTitleRow>
+                    ) : (
+                      // A title is one line of text, not markdown, so it takes an input rather than
+                      // the editor the description and the remarks share.
+                      <div className="space-y-2">
+                        <Input
+                          autoFocus
+                          size="sm"
+                          disabled={titleSaving}
+                          value={titleDraft}
+                          aria-label={t.git.pullRequest.pullRequestTitle}
+                          onChange={(event) =>
+                            setTitleScope({ pullRequestKey, text: event.target.value })
+                          }
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              void saveTitle(titleDraft);
+                            } else if (event.key === "Escape") {
+                              event.preventDefault();
+                              setTitleScope(null);
+                            }
+                          }}
+                        />
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            size="xs"
+                            variant="ghost"
+                            disabled={titleSaving}
+                            onClick={() => setTitleScope(null)}
+                          >
+                            {t.common.confirm.cancel}
+                          </Button>
+                          <Button
+                            size="xs"
+                            variant="outline"
+                            disabled={
+                              !canWriteSourceControl ||
+                              titleSaving ||
+                              titleDraft.trim().length === 0
+                            }
+                            onClick={() => void saveTitle(titleDraft)}
+                          >
+                            {titleSaving ? t.git.pullRequest.saving : t.git.pullRequest.save}
+                          </Button>
+                        </div>
+                      </div>
+                    )
+                  }
+                  author={
                     <PullRequestActorLabel
                       actor={detail.author}
                       profileUrl={authorProfileUrl}
                       variant="avatar"
-                      className="shrink-0"
+                      avatarSize="lg"
                     />
-                    <span className="shrink-0">{formatRelativeTimeLabel(detail.updatedAt)}</span>
-                  </span>
-                  <span aria-hidden className="h-3 w-px shrink-0 bg-border/70" />
-                  <span className="flex min-w-0 flex-1 items-center gap-1.5 font-mono text-2xs text-muted-foreground/65">
-                    {/* An out-of-date base wears the warning on the branch name itself, so the
+                  }
+                  updated={
+                    <span>
+                      {t.git.pullRequest.updated}
+                      {formatRelativeTimeLabel(detail.updatedAt)}
+                    </span>
+                  }
+                  base={
+                    /* An out-of-date base wears the warning on the branch name itself, so the
                         name is amber and pointing at either the name or the mark opens the way
-                        out. Up to date, the name keeps its plain tooltip. */}
-                    {freshness ? (
+                        out. Up to date, the name keeps its plain tooltip. */
+                    freshness ? (
                       <PullRequestBaseFreshnessWarning
                         baseBranch={detail.baseBranch}
                         freshness={freshness}
                         pending={actionPending}
                         onUpdate={(method) => void perform("update-branch", undefined, method)}
-                        iconClassName="size-3"
-                        className="max-w-[40%]"
+                        className="max-w-36"
                       >
                         {isStackedPullRequest ? (
                           <PullRequestGlyph.stack
@@ -2568,7 +2151,7 @@ export function PullRequestDetailPanel({
                       <Tooltip>
                         <TooltipTrigger
                           render={
-                            <span className="inline-flex min-w-0 max-w-[40%] shrink-0 items-center gap-1">
+                            <span className="inline-flex min-w-0 max-w-36 shrink-0 items-center gap-1">
                               {isStackedPullRequest ? (
                                 <PullRequestGlyph.stack
                                   aria-label={t.git.pullRequest.stackedPullRequest}
@@ -2587,222 +2170,345 @@ export function PullRequestDetailPanel({
                             : detail.baseBranch}
                         </TooltipPopup>
                       </Tooltip>
-                    )}
-                    <ArrowLeftIcon
-                      aria-label={t.git.pullRequest.receivesChangesFrom}
-                      className="size-3 shrink-0 opacity-60"
+                    )
+                  }
+                  head={
+                    <PullRequestCopyableCode
+                      key={detail.headBranch}
+                      value={detail.headBranch}
+                      target={t.git.pullRequest.branchName}
+                      copyLabel={t.git.pullRequest.copyPullRequestBranch}
+                      copiedLabel={t.git.pullRequest.branchNameCopied}
+                      className="p-0"
                     />
-                    <Tooltip>
-                      <TooltipTrigger
-                        render={
-                          <code className="flex min-w-0 flex-1">
-                            <MiddleTruncate value={detail.headBranch} showTitle={false} />
-                          </code>
-                        }
-                      />
-                      <TooltipPopup side="top">{detail.headBranch}</TooltipPopup>
-                    </Tooltip>
-                  </span>
-                  <span className="ml-auto inline-flex shrink-0 items-center justify-end gap-2 text-2xs">
-                    <span
-                      className="inline-flex items-center gap-1 tabular-nums"
-                      aria-label={t.git.pullRequest.changedFileCount(detail.changedFiles)}
-                    >
-                      <FileDiffIcon aria-hidden className="size-3" />
-                      {detail.changedFiles.toLocaleString()}
-                    </span>
+                  }
+                  files={t.git.pullRequest.fileCount(detail.changedFiles)}
+                  diffStat={
                     <PullRequestDiffStat
                       additions={detail.additions}
                       deletions={detail.deletions}
-                      className="shrink-0 font-mono text-2xs"
+                      className="shrink-0 font-mono text-secondary-copy"
                     />
-                  </span>
-                </div>
-              </div>
-            ) : null}
+                  }
+                />
+              ) : null}
+            </div>
           </div>
-        </div>
-
-        <div
-          className={cn(
-            "col-span-2 grid",
-            // Collapse before the scroll refund paints; only reopening eases back in. Animating
-            // both directions makes the shrinking track fight the scrollTop correction.
-            condensed
-              ? "grid-rows-[0fr]"
-              : "grid-rows-[1fr] transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none",
-          )}
-        >
-          <div
-            ref={foldRef}
-            className={cn(
-              "min-h-0 overflow-hidden transition-[opacity,transform] duration-150 ease-out motion-reduce:transform-none motion-reduce:transition-none",
-              condensed
-                ? "-translate-y-1 opacity-0 duration-100"
-                : "translate-y-0 opacity-100 delay-50",
-            )}
-            inert={condensed}
-          >
-            {detail ? (
-              <PullRequestDetailHeaderBody
-                title={
-                  titleDraft === null ? (
-                    <PullRequestDetailTitleRow className="group gap-1">
-                      <Tooltip>
-                        <TooltipTrigger
-                          render={
-                            <h1 className="min-w-0 flex-1 truncate text-base font-semibold leading-snug">
-                              {detail.title}
-                            </h1>
-                          }
-                        />
-                        <TooltipPopup side="top">{detail.title}</TooltipPopup>
-                      </Tooltip>
-                      {canEditPullRequestChangeRequest(detail) ? (
-                        <PullRequestEditButton
-                          aria-label={t.git.pullRequest.editTitle}
-                          onClick={() => setTitleScope({ pullRequestKey, text: detail.title })}
-                        />
-                      ) : null}
-                    </PullRequestDetailTitleRow>
-                  ) : (
-                    // A title is one line of text, not markdown, so it takes an input rather than
-                    // the editor the description and the remarks share.
-                    <div className="space-y-2">
-                      <Input
-                        autoFocus
-                        size="sm"
-                        disabled={titleSaving}
-                        value={titleDraft}
-                        aria-label={t.git.pullRequest.pullRequestTitle}
-                        onChange={(event) =>
-                          setTitleScope({ pullRequestKey, text: event.target.value })
-                        }
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter") {
-                            event.preventDefault();
-                            void saveTitle(titleDraft);
-                          } else if (event.key === "Escape") {
-                            event.preventDefault();
-                            setTitleScope(null);
-                          }
-                        }}
-                      />
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          disabled={titleSaving}
-                          onClick={() => setTitleScope(null)}
-                        >
-                          {t.common.confirm.cancel}
-                        </Button>
-                        <Button
-                          size="xs"
-                          variant="outline"
-                          disabled={
-                            !canWriteSourceControl || titleSaving || titleDraft.trim().length === 0
-                          }
-                          onClick={() => void saveTitle(titleDraft)}
-                        >
-                          {titleSaving ? t.git.pullRequest.saving : t.git.pullRequest.save}
-                        </Button>
-                      </div>
-                    </div>
-                  )
-                }
-                author={
-                  <PullRequestActorLabel actor={detail.author} profileUrl={authorProfileUrl} />
-                }
-                updated={
-                  <span>
-                    {t.git.pullRequest.updated}
-                    {formatRelativeTimeLabel(detail.updatedAt)}
-                  </span>
-                }
-                checkout={
-                  checkoutCommand ? (
-                    <PullRequestCopyableCode
-                      key={checkoutCommand}
-                      value={checkoutCommand}
-                      target={t.git.pullRequest.pullRequestCheckoutCommand}
-                      copyLabel={t.git.pullRequest.copyCheckoutCommand}
-                      copiedLabel={t.git.pullRequest.checkoutCommandCopied}
-                      className="ml-auto font-mono"
-                      tooltipSide="bottom"
-                      onError={onCheckoutCommandError}
-                    />
-                  ) : null
-                }
-                base={
-                  /* An out-of-date base wears the warning on the branch name itself, so the
-                        name is amber and pointing at either the name or the mark opens the way
-                        out. Up to date, the name keeps its plain tooltip. */
-                  freshness ? (
-                    <PullRequestBaseFreshnessWarning
-                      baseBranch={detail.baseBranch}
-                      freshness={freshness}
-                      pending={actionPending}
-                      onUpdate={(method) => void perform("update-branch", undefined, method)}
-                      className="max-w-[40%]"
+          {detail ? (
+            <div className="flex flex-col gap-2.5 px-4 pb-2.5">
+              {conflicting ? (
+                <p className="flex items-center gap-1.5 text-secondary-copy text-attention">
+                  <TriangleAlertIcon aria-hidden className="size-3.25" />
+                  {t.git.pullRequest.mergeConflictsWith(detail.baseBranch)}
+                </p>
+              ) : null}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Menu>
+                  <Group variant="split" aria-label={t.git.pullRequest.merge}>
+                    <Button
+                      variant="default"
+                      disabled={actionPending || !headerActions.merge}
+                      {...inlineConfirm.props(
+                        "merge",
+                        () => void perform("merge", selectedMergeMethod),
+                      )}
+                      aria-label={
+                        pendingAction === "merge"
+                          ? t.git.pullRequest.merging
+                          : inlineConfirm.isArmed("merge")
+                            ? t.git.pullRequest.confirmMerge
+                            : t.git.pullRequest.merge
+                      }
                     >
-                      {isStackedPullRequest ? (
-                        <PullRequestGlyph.stack
-                          aria-label={t.git.pullRequest.stackedPullRequest}
-                          className="size-3 shrink-0"
+                      {pendingAction === "merge"
+                        ? t.git.pullRequest.merging
+                        : inlineConfirm.isArmed("merge")
+                          ? t.git.pullRequest.confirmMerge
+                          : t.git.pullRequest.merge}
+                    </Button>
+                    <MenuTrigger
+                      disabled={actionPending || !headerActions.mergeMethods}
+                      render={
+                        <Button
+                          size="icon"
+                          variant="default"
+                          aria-label={t.git.pullRequest.mergeMethod}
                         />
-                      ) : null}
-                      <code className="flex min-w-0">
-                        <MiddleTruncate value={detail.baseBranch} showTitle={false} />
-                      </code>
-                    </PullRequestBaseFreshnessWarning>
-                  ) : (
-                    <Tooltip>
-                      <TooltipTrigger
-                        render={
-                          <span className="inline-flex min-w-0 max-w-[40%] shrink-0 items-center gap-1">
-                            {isStackedPullRequest ? (
-                              <PullRequestGlyph.stack
-                                aria-label={t.git.pullRequest.stackedPullRequest}
-                                className="size-3 shrink-0"
-                              />
-                            ) : null}
-                            <code className="flex min-w-0">
-                              <MiddleTruncate value={detail.baseBranch} showTitle={false} />
-                            </code>
-                          </span>
-                        }
+                      }
+                    >
+                      <ChevronDownIcon aria-hidden className="size-3.5" />
+                    </MenuTrigger>
+                  </Group>
+                  <MenuPopup align="start">
+                    <MenuRadioGroup
+                      value={selectedMergeMethod}
+                      onValueChange={(method) => {
+                        const selectedMethod = method as PullRequestMergeMethod;
+                        setMergeMethod(selectedMethod);
+                        setLastSelectedMergeMethod(selectedMethod);
+                      }}
+                    >
+                      {allowedMergeMethods.map((method) => (
+                        <MenuRadioItem
+                          key={method}
+                          value={method}
+                          disabled={actionPending}
+                          closeOnClick
+                        >
+                          {PULL_REQUEST_MERGE_METHOD_LABELS[method]}
+                        </MenuRadioItem>
+                      ))}
+                    </MenuRadioGroup>
+                  </MenuPopup>
+                </Menu>
+                <Menu>
+                  <MenuTrigger
+                    disabled={actionPending || !freshness?.methods.length}
+                    render={
+                      <Button variant={freshness?.methods.length ? "default" : "secondary"} />
+                    }
+                  >
+                    {t.git.pullRequest.updateBranch}
+                  </MenuTrigger>
+                  <MenuPopup align="start">
+                    {freshness?.methods.map((method) => (
+                      <MenuItem
+                        key={method}
+                        disabled={actionPending}
+                        onClick={() => void perform("update-branch", undefined, method)}
+                      >
+                        {method === "rebase"
+                          ? t.git.pullRequest.updateWithRebase
+                          : t.git.pullRequest.updateBranch}
+                      </MenuItem>
+                    ))}
+                  </MenuPopup>
+                </Menu>
+                {checkoutControl}
+                <Menu>
+                  <MenuTrigger
+                    render={
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        aria-label={t.git.pullRequest.morePullRequestActions}
                       />
-                      <TooltipPopup side="top">
-                        {isStackedPullRequest
-                          ? t.git.pullRequest.stackedOn(detail.baseBranch)
-                          : detail.baseBranch}
-                      </TooltipPopup>
-                    </Tooltip>
-                  )
-                }
-                head={
-                  <PullRequestCopyableCode
-                    key={detail.headBranch}
-                    value={detail.headBranch}
-                    target={t.git.pullRequest.branchName}
-                    copyLabel={t.git.pullRequest.copyPullRequestBranch}
-                    copiedLabel={t.git.pullRequest.branchNameCopied}
+                    }
+                  >
+                    {refreshing ? (
+                      <RefreshIcon refreshing size="md" />
+                    ) : (
+                      <MoreHorizontalIcon aria-hidden className="size-4" />
+                    )}
+                  </MenuTrigger>
+                  <MenuPopup align="end">
+                    <MenuItem
+                      closeOnClick={
+                        headerActions.disableAutoMerge || inlineConfirm.isArmed("enable-auto-merge")
+                      }
+                      disabled={
+                        actionPending ||
+                        !(headerActions.enableAutoMerge || headerActions.disableAutoMerge)
+                      }
+                      aria-label={
+                        headerActions.disableAutoMerge
+                          ? t.git.pullRequest.disableAutoMerge
+                          : inlineConfirm.isArmed("enable-auto-merge")
+                            ? t.git.pullRequest.confirmAutoMerge
+                            : t.git.pullRequest.enableAutoMerge
+                      }
+                      {...(headerActions.disableAutoMerge
+                        ? { onClick: () => void perform("disable-auto-merge") }
+                        : inlineConfirm.props(
+                            "enable-auto-merge",
+                            () => void perform("enable-auto-merge", selectedMergeMethod),
+                          ))}
+                    >
+                      <PullRequestGlyph.merged aria-hidden className="size-3.5" />
+                      {headerActions.disableAutoMerge
+                        ? t.git.pullRequest.disableAutoMerge
+                        : pendingAction === "enable-auto-merge"
+                          ? t.git.pullRequest.enabling
+                          : inlineConfirm.isArmed("enable-auto-merge")
+                            ? t.git.pullRequest.confirmAutoMerge
+                            : t.git.pullRequest.autoMerge}
+                    </MenuItem>
+                    <MenuItem
+                      disabled={actionPending || !headerActions.ready}
+                      onClick={() => void perform("ready")}
+                    >
+                      <EyeIcon aria-hidden className="size-3.5" />
+                      {t.git.pullRequest.readyForReview}
+                    </MenuItem>
+                    <MenuItem
+                      disabled={actionPending || !headerActions.draft}
+                      onClick={() => void perform("draft")}
+                    >
+                      <PullRequestGlyph.draft aria-hidden className="size-3.5" />
+                      {t.git.pullRequest.convertToDraft}
+                    </MenuItem>
+                    <MenuItem
+                      closeOnClick={inlineConfirm.isArmed("revert")}
+                      disabled={actionPending || detail.state !== "merged" || !can("revert")}
+                      variant={inlineConfirm.isArmed("revert") ? "destructive" : "default"}
+                      {...inlineConfirm.props("revert", () => void perform("revert"))}
+                    >
+                      <Undo2Icon aria-hidden className="size-3.5" />
+                      {inlineConfirm.isArmed("revert")
+                        ? t.git.pullRequest.confirmRevert
+                        : t.git.pullRequest.revertChanges}
+                    </MenuItem>
+                    <MenuSeparator />
+                    <MenuItem
+                      disabled={actionPending || detail.state !== "closed" || !can("reopen")}
+                      onClick={() => void perform("reopen")}
+                    >
+                      <PullRequestGlyph.reopen aria-hidden className="size-3.5" />
+                      {t.git.pullRequest.reopen}
+                    </MenuItem>
+                    <MenuItem
+                      closeOnClick={inlineConfirm.isArmed("close")}
+                      variant="destructive"
+                      disabled={actionPending || detail.state !== "open" || !can("close")}
+                      {...inlineConfirm.props("close", () => void perform("close"))}
+                    >
+                      <PullRequestGlyph.closed aria-hidden className="size-3.5" />
+                      {inlineConfirm.isArmed("close")
+                        ? t.git.pullRequest.confirmClose
+                        : t.git.pullRequest.close}
+                    </MenuItem>
+                    <MenuSeparator />
+                    {conflicting ? (
+                      <MenuItem
+                        disabled={
+                          handoff !== null || (attachTarget === null && checkoutRoot === null)
+                        }
+                        onClick={startResolveConflicts}
+                      >
+                        <PullRequestGlyph.conflicting aria-hidden className="size-3.5" />
+                        {handoff === "conflicts"
+                          ? t.git.pullRequest.preparing
+                          : t.git.pullRequest.resolveConflicts}
+                      </MenuItem>
+                    ) : null}
+                    <PullRequestThreadLinks
+                      display="menu-item"
+                      environmentId={environmentId}
+                      reference={reference}
+                      url={detail.url}
+                      threadRef={
+                        threadRef ??
+                        (typeof composerDraftTarget === "object" ? composerDraftTarget : null)
+                      }
+                      onPickerOpenChange={setThreadPickerOpen}
+                    />
+                    <MenuItem disabled={refreshing} onClick={() => void refreshFromHost()}>
+                      <RefreshIcon size="sm" refreshing={refreshing} />
+                      {t.git.pullRequest.refresh}
+                    </MenuItem>
+                    <MenuItem
+                      disabled={handoff !== null || !canFixFindings}
+                      onClick={startFixFindings}
+                    >
+                      <HammerIcon aria-hidden className="size-3.5" />
+                      {handoff === "findings"
+                        ? t.git.pullRequest.preparing
+                        : handoffLabels.fixFindings}
+                    </MenuItem>
+                    {reviewGuidesEnabled && guideWriter.canWrite ? (
+                      <MenuItem disabled={guideWriter.running} onClick={writeGuide}>
+                        <PixelSparkIcon aria-hidden className="size-3.5" />
+                        {guideWriter.running
+                          ? "Writing guide..."
+                          : guideWriter.data?.guide == null
+                            ? "Write guide"
+                            : "Rewrite guide"}
+                      </MenuItem>
+                    ) : null}
+                    {pickableEnvironments.length > 0 ? (
+                      <ActOnEnvironmentPicker
+                        environments={pickableEnvironments}
+                        value={actingEnvironmentId}
+                        onChange={(next) => setActingScope({ pullRequestKey, environmentId: next })}
+                        disabled={handoff !== null}
+                      />
+                    ) : null}
+                    <MenuSeparator />
+                    <MenuItem onClick={() => void readLocalApi()?.shell.openExternal(detail.url)}>
+                      <ArrowUpRightIcon aria-hidden className="size-3.5" />
+                      {openOnHostLabel(hostClient)}
+                    </MenuItem>
+                    {repositoryUrl ? (
+                      <MenuItem
+                        onClick={() => void readLocalApi()?.shell.openExternal(repositoryUrl)}
+                      >
+                        <FolderGit2Icon aria-hidden className="size-3.5" />
+                        {t.git.pullRequest.openRepository(detail.repository)}
+                      </MenuItem>
+                    ) : null}
+                  </MenuPopup>
+                </Menu>
+                {!nativeStack && supportsStackActions && nativeStackQuery.error ? (
+                  <Button variant="ghost" size="xs" onClick={nativeStackQuery.refresh}>
+                    {t.git.pullRequest.retryStackLookup}
+                  </Button>
+                ) : null}
+                {nativeStack ? (
+                  <PullRequestStackMenu
+                    hostLabel={hostClient.label}
+                    stack={nativeStack}
+                    notice={nativeStackQuery.notice}
+                    onRetry={nativeStackQuery.error ? nativeStackQuery.refresh : undefined}
+                    reference={reference}
+                    environmentId={environmentId}
+                    onSelect={onSelectPullRequest}
+                    mergeMethod={selectedMergeMethod}
+                    canMerge={
+                      nativeStackQuery.isFresh &&
+                      supportsStackActions &&
+                      can("merge") &&
+                      allowedMergeMethods.length > 0
+                    }
+                    canRebase={
+                      nativeStackQuery.isFresh &&
+                      supportsStackActions &&
+                      detail.viewerPermissions.stackRebase === true
+                    }
+                    onActed={() => {
+                      refreshDetail();
+                      onActed?.();
+                    }}
                   />
-                }
-                files={t.git.pullRequest.fileCount(detail.changedFiles)}
-                diffStat={
-                  <PullRequestDiffStat
-                    additions={detail.additions}
-                    deletions={detail.deletions}
-                    className="shrink-0 font-mono text-xs"
+                ) : null}
+                {context === "page" ? (
+                  <PullRequestThreadLinks
+                    display="count"
+                    environmentId={environmentId}
+                    reference={reference}
+                    url={detail.url}
+                    threadRef={null}
                   />
-                }
-              />
-            ) : null}
-          </div>
-        </div>
+                ) : null}
 
+                {autoMergeArmed ? (
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <Badge variant="info" role="img" aria-label={armedAutoMergeLabel}>
+                          {armedAutoMergeLabel}
+                        </Badge>
+                      }
+                    />
+                    <TooltipPopup>
+                      {armedAutoMergeLabel}
+                      {t.git.pullRequest.theHostWillMergeThisOnItsOwnOnceItsRequirementsAreMet}
+                    </TooltipPopup>
+                  </Tooltip>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+        </TooltipProvider>
         {detail ? (
           <PullRequestDetailTabBar
             tabs={visibleTabs}

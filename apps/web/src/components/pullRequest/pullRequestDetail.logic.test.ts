@@ -42,7 +42,6 @@ import {
   newestPullRequestCommitAt,
   mergePullRequestThreadComments,
   orderPullRequestComments,
-  pullRequestActionMenuHasGroup,
   pullRequestActionNeedsHostRefresh,
   pullRequestCheckoutCommand,
   pullRequestFindingKey,
@@ -52,6 +51,7 @@ import {
   resolveDisplayedPullRequestDetail,
   resolvePullRequestReferenceHost,
   resolvePullRequestPrimaryControl,
+  resolvePullRequestActionGroups,
   allowsSinglePullRequestMerge,
   shouldRefreshPullRequestActivity,
   resolveBaseFreshness,
@@ -271,12 +271,6 @@ describe("review thread comment pages", () => {
   });
 });
 
-describe("pull request action menu", () => {
-  it("keeps the group divider when auto-merge is the only action", () => {
-    expect(pullRequestActionMenuHasGroup(false, true, false)).toBe(true);
-  });
-});
-
 describe("pull request primary control", () => {
   const open = {
     state: "open" as const,
@@ -322,6 +316,82 @@ describe("pull request primary control", () => {
       "resolve",
     );
     expect(resolvePullRequestPrimaryControl({ ...open, isDraft: true })).toBe("ready");
+  });
+});
+
+describe("pull request header and overflow actions", () => {
+  const open = {
+    state: "open" as const,
+    isDraft: false,
+    mergeability: "mergeable" as const,
+    checksState: "passing" as const,
+    autoMergeEnabled: false,
+    mergeMethodCount: 2,
+    canMergeSinglePullRequest: true,
+    canMerge: true,
+    canMarkReady: true,
+    canConvertToDraft: true,
+    canEnableAutoMerge: true,
+    canDisableAutoMerge: true,
+  };
+
+  it("keeps immediate merge available beside deferred merge and moves auto-merge into overflow", () => {
+    expect(resolvePullRequestActionGroups({ ...open, checksState: "pending" })).toEqual({
+      merge: true,
+      ready: false,
+      draft: true,
+      enableAutoMerge: true,
+      disableAutoMerge: false,
+      mergeMethods: true,
+    });
+    expect(resolvePullRequestActionGroups({ ...open, autoMergeEnabled: true })).toMatchObject({
+      merge: true,
+      enableAutoMerge: false,
+      disableAutoMerge: true,
+    });
+  });
+
+  it("retains ready-for-review on drafts, including conflicting drafts, without enabling merge", () => {
+    expect(
+      resolvePullRequestActionGroups({ ...open, isDraft: true, mergeability: "conflicting" }),
+    ).toEqual({
+      merge: false,
+      ready: true,
+      draft: false,
+      enableAutoMerge: false,
+      disableAutoMerge: false,
+      mergeMethods: false,
+    });
+  });
+
+  it.each([
+    { mergeability: "conflicting" as const },
+    { mergeMethodCount: 0 },
+    { canMergeSinglePullRequest: false },
+    { state: "closed" as const },
+    { state: "merged" as const },
+  ])("does not enable an unavailable merge for %j", (changes) => {
+    expect(resolvePullRequestActionGroups({ ...open, ...changes }).merge).toBe(false);
+  });
+
+  it("keeps host and viewer permissions authoritative after regrouping", () => {
+    expect(
+      resolvePullRequestActionGroups({
+        ...open,
+        canMerge: false,
+        canMarkReady: false,
+        canConvertToDraft: false,
+        canEnableAutoMerge: false,
+        canDisableAutoMerge: false,
+      }),
+    ).toEqual({
+      merge: false,
+      ready: false,
+      draft: false,
+      enableAutoMerge: false,
+      disableAutoMerge: false,
+      mergeMethods: false,
+    });
   });
 });
 

@@ -1,1 +1,21 @@
 /* PR1–PR2：本线新增的令牌（@theme）与全局样式写在这里。 */
+
+@theme {
+  /* PRDetail8a.dc.html · L1：详情标题为 25px / 1.25，使用现有衬线字体族。 */
+  --text-pr-detail-title: 25px;
+  --text-pr-detail-title--line-height: 1.25;
+  /* PRDetail8a.dc.html · L1：头像内的缩写为 9px。 */
+  --text-pr-avatar: 9px;
+  --text-pr-avatar--line-height: 1.5;
+  /* PRDetail8a.dc.html · L1：通用分体按钮接缝两侧圆角为 5px。 */
+  --radius-split-join: 5px;
+}
+
+/* A folded track keeps its child's scrollHeight measurable for the scroll refund. */
+@utility pr-detail-folded {
+  grid-template-rows: 0fr;
+}
+
+@utility pr-detail-expanded {
+  grid-template-rows: 1fr;
+}

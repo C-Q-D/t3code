@@ -85,6 +85,8 @@ const twMerge = extendTailwindMerge({
         "usage-limit-number",
         "discussion-summary-heading",
         "chat-project-choice",
+        "pr-detail-title",
+        "pr-avatar",
       ],
       shadow: [
         "slab",
@@ -243,6 +245,8 @@ const twMerge = extendTailwindMerge({
         "chat-draft-project-mark",
         "sidebar-quick-action",
         "sidebar-search-hit",
+        "badge-large",
+        "split-join",
       ],
       leading: [
         "code",

@@ -493,19 +493,27 @@ export function PullRequestActorLabel({
   actor,
   className,
   variant = "label",
+  avatarSize = "default",
   tooltip = true,
   profileUrl,
 }: {
   actor: PullRequestActor | null;
   className?: string;
   variant?: "label" | "avatar";
+  /** lg is the 20px avatar used beside the detail header's branch names. */
+  avatarSize?: "default" | "lg";
   tooltip?: boolean;
   profileUrl?: string | null;
 }) {
   const login = actor?.login ?? "ghost";
   const label = (
     <span className={cn("flex min-w-0 items-center", variant === "label" && "gap-1.5")}>
-      <PullRequestActorAvatar actor={actor} />
+      <PullRequestActorAvatar
+        actor={actor}
+        {...(avatarSize === "lg"
+          ? { className: "size-5 bg-well-raised text-pr-avatar font-bold text-foreground" }
+          : {})}
+      />
       <span className={variant === "label" ? "truncate font-medium text-foreground" : "sr-only"}>
         {login}
       </span>

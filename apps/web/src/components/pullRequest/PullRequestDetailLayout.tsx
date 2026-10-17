@@ -1,14 +1,17 @@
 /** Shared layout for live and loading pull-request details. */
 import { t } from "~/i18n";
-import { ArrowLeftIcon, FileDiffIcon } from "lucide-react";
+import { ArrowRightIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 
 import { cn } from "~/lib/utils";
 
 import { Toggle, ToggleGroup } from "../ui/toggle-group";
-import { PullRequestMetaLine } from "./pullRequestPresentation";
 
-/** Renders shared header slots for both loaded details and loading placeholders. */
+/**
+ * Renders title and head-to-base metadata for loaded and loading details.
+ * @param props Header slots; updated and files remain accessible metadata, and checkout is an optional loading-state control.
+ * @returns Expanded header rows; the caller owns actions, collapse behavior, and tabs.
+ */
 export function PullRequestDetailHeaderBody({
   title,
   author,
@@ -29,41 +32,31 @@ export function PullRequestDetailHeaderBody({
   diffStat: ReactNode;
 }) {
   return (
-    <div className="col-span-2 mt-1 min-w-0 px-4 pb-4">
+    <div className="flex min-w-0 flex-col gap-2.5 px-4 pb-2.5">
       {title}
-      <div className="mt-2 flex min-h-5 min-w-0 items-center gap-2 text-xs text-muted-foreground">
-        <PullRequestMetaLine className="min-w-0 whitespace-nowrap">
-          {author}
-          {updated}
-        </PullRequestMetaLine>
-        {checkout}
-      </div>
-      <div className="mt-4 flex min-h-5 min-w-0 items-center gap-2 text-xs text-muted-foreground">
-        <span className="flex min-w-0 flex-1 items-center gap-1.5 font-mono text-xs text-muted-foreground/70">
-          {base}
-          <ArrowLeftIcon
-            aria-label={t.git.pullRequest.receivesChangesFrom}
-            className="size-3.5 shrink-0 opacity-60"
-          />
+      <div className="flex min-h-5 min-w-0 items-center gap-2 font-mono text-secondary-copy text-secondary-label">
+        {author}
+        <span className="flex min-w-0 flex-1 items-center gap-2">
           {head}
+          <ArrowRightIcon
+            aria-label={t.git.pullRequest.receivesChangesFrom}
+            className="size-3 shrink-0"
+          />
+          {base}
         </span>
-        <span className="ml-auto inline-flex shrink-0 items-center justify-end gap-2">
-          <span className="inline-flex min-w-16 items-center justify-end gap-1.5 tabular-nums">
-            <FileDiffIcon aria-hidden className="size-3.5" />
-            {files}
-          </span>
-          {diffStat}
-        </span>
+        <span className="ml-auto shrink-0">{diffStat}</span>
       </div>
+      <span className="sr-only">
+        {updated} · {files}
+      </span>
+      {checkout}
     </div>
   );
 }
 
 /** Keeps the title row height consistent while details load. */
 export function PullRequestDetailTitleRow({ className, ...props }: ComponentProps<"div">) {
-  return (
-    <div className={cn("flex min-h-7 min-w-0 items-center sm:min-h-6", className)} {...props} />
-  );
+  return <div className={cn("flex min-h-8 min-w-0 items-center", className)} {...props} />;
 }
 
 /** Renders accessible detail tabs and optional intent preloading. */

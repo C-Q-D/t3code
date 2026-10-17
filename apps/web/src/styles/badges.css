@@ -3,4 +3,6 @@
 @theme {
   /* 规范-8a.dc.html · H5：PR 与版本徽标高 18px，圆角 9px。 */
   --radius-badge-compact: 9px;
+  /* PRDetail8a.dc.html · L1：22px 状态徽标使用半高圆角。 */
+  --radius-badge-large: 11px;
 }

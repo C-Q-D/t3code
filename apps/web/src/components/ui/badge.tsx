@@ -1,4 +1,4 @@
-/** Shared, static H5 status badges; callers supply labels and optional icons. */
+/** Shared status badges; H5 densities and 22px detail statuses accept labels and optional icons. */
 "use client";
 
 import { mergeProps } from "@base-ui/react/merge-props";
@@ -20,10 +20,10 @@ const badgeVariants = cva(
     ],
     variants: {
       size: {
-        // Retain size names; only sm uses H5's compact PR/version geometry and typography.
+        // Keep existing densities; lg had no callers before adopting the 22px status geometry.
         control: "",
         default: "",
-        lg: "",
+        lg: "h-5.5 rounded-badge-large pl-1.75 pr-2.25 text-secondary-copy font-bold shadow-tag [&_svg:not([class*='size-'])]:size-3",
         sm: "h-4.5 gap-0.75 rounded-badge-compact px-1.5 font-mono text-meta font-normal",
       },
       variant: {
@@ -54,7 +54,7 @@ const badgeVariants = cva(
   },
 );
 
-/** Span/render props and semantic palette; sm selects H5's compact PR/version badges. */
+/** Span/render props and semantic palette; sm is an 18px tag and lg is a 22px status badge. */
 interface BadgeProps extends useRender.ComponentProps<"span"> {
   variant?: VariantProps<typeof badgeVariants>["variant"];
   size?: VariantProps<typeof badgeVariants>["size"];

@@ -1,4 +1,5 @@
-import { SourceControlProviderKind } from "@t3tools/contracts";
+/** Exercise detail-panel handoffs, confirmation boundaries, and active-scroller behavior. */
+import { SourceControlProviderKind, type PullRequestAction } from "@t3tools/contracts";
 import {
   EnvironmentId,
   ProjectId,
@@ -13,10 +14,11 @@ import { create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { DraftId, useComposerDraftStore } from "~/composerDraftStore";
 
-const { newThread, prepareThread, refresh, Wrapper, Trigger } = vi.hoisted(() => ({
+const { newThread, prepareThread, refresh, runAction, Wrapper, Trigger } = vi.hoisted(() => ({
   newThread: vi.fn(),
   prepareThread: vi.fn(),
   refresh: vi.fn(),
+  runAction: vi.fn(),
   Wrapper: ({ children }: { children?: ReactNode }) => children,
   Trigger: ({ children, render }: { children?: ReactNode; render?: ReactElement }) => (
     <>
@@ -47,7 +49,7 @@ vi.mock("~/hooks/useHandleNewThread", () => ({ useNewThreadHandler: () => newThr
 vi.mock("~/lib/sourceControlActions", () => ({
   usePreparePullRequestThreadAction: () => ({ run: prepareThread, isAllowed: true, error: null }),
 }));
-vi.mock("~/state/use-atom-command", () => ({ useAtomCommand: () => vi.fn() }));
+vi.mock("~/state/use-atom-command", () => ({ useAtomCommand: () => runAction }));
 vi.mock("~/state/pullRequests", async (importOriginal) => ({
   ...(await importOriginal<typeof import("~/state/pullRequests")>()),
   pullRequestEnvironment: {
@@ -63,7 +65,7 @@ vi.mock("~/state/pullRequests", async (importOriginal) => ({
 vi.mock("~/state/vcs", () => ({ vcsEnvironment: { listRefs: () => null } }));
 vi.mock("~/state/query", () => ({
   useEnvironmentQuery: (query: string) => ({
-    data: query === "detail" ? detail : null,
+    data: query === "detail" ? queriedDetail : null,
     isPending: false,
     isSuccess: true,
     error: null,
@@ -216,6 +218,7 @@ const detail: PullRequestDetailView = {
     requestReviewers: false,
   },
 };
+let queriedDetail = detail;
 
 const threadRef: ScopedThreadRef = {
   environmentId: EnvironmentId.make("env-1"),
@@ -226,6 +229,8 @@ const newDraftId = DraftId.make("new-draft");
 let renderer: ReactTestRenderer;
 
 beforeEach(() => {
+  queriedDetail = detail;
+  runAction.mockReset().mockResolvedValue({ _tag: "Success", value: undefined });
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.stubGlobal("window", { addEventListener: vi.fn(), removeEventListener: vi.fn() });
   useComposerDraftStore.setState({ draftsByThreadKey: {} });
@@ -237,11 +242,75 @@ beforeEach(() => {
     value: { branch: "feature", worktreePath: "/workspace/pr" },
   });
 });
+
+describe("regrouped host action confirmations", () => {
+  it.each([
+    ["merge", "open", "Merge", "Confirm merge?"],
+    ["enable-auto-merge", "open", "Enable auto-merge", "Confirm auto-merge?"],
+    ["close", "open", "Close", "Confirm close?"],
+    ["revert", "merged", "Revert changes", "Confirm revert?"],
+  ] as const)("still requires two clicks for %s", async (action, state, label, confirmation) => {
+    const actions: PullRequestAction[] = ["merge", "enable-auto-merge", "close", "revert"];
+    queriedDetail = {
+      ...detail,
+      state,
+      mergeability: "mergeable",
+      autoMergeEnabled: false,
+      mergeCapabilities: { merge: false, squash: true, rebase: false },
+      capabilities: { ...detail.capabilities, actions, mergeMethods: ["squash"] },
+      viewerPermissions: { ...detail.viewerPermissions, actions },
+    };
+    // The timer only disarms idle controls. These cases exercise consecutive user clicks.
+    vi.stubGlobal("window", {
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      setTimeout: vi.fn(() => 1),
+      clearTimeout: vi.fn(),
+    });
+    vi.stubGlobal("document", { addEventListener: vi.fn(), removeEventListener: vi.fn() });
+    await act(async () => {
+      renderer = create(
+        <PullRequestDetailPanel
+          environmentId={threadRef.environmentId}
+          reference={detail}
+          context="page"
+          shortcutsEnabled={false}
+          getShortcutContext={() => ({
+            terminalFocus: false,
+            terminalOpen: false,
+            previewFocus: false,
+            previewOpen: false,
+            isWeb: true,
+            isDesktop: false,
+          })}
+        />,
+      );
+    });
+    await click(label);
+    expect(runAction).not.toHaveBeenCalled();
+    await click(confirmation);
+    expect(runAction).toHaveBeenCalledExactlyOnceWith({
+      environmentId: threadRef.environmentId,
+      input: {
+        projectId: detail.projectId,
+        repository: detail.repository,
+        number: 1,
+        action,
+        ...(action === "merge" || action === "enable-auto-merge" ? { mergeMethod: "squash" } : {}),
+      },
+    });
+  });
+});
 afterEach(() => {
   act(() => renderer?.unmount());
   vi.unstubAllGlobals();
 });
 
+/**
+ * Click a rendered control and flush its effects, keeping a stable currentTarget for confirmations.
+ * @param label Accessible name or visible button text from the UI contract.
+ * @returns Completion after React applies the click; fails when the control cannot be found.
+ */
 async function click(label: string) {
   const button = renderer.root
     .findAllByType("button")
@@ -253,6 +322,7 @@ async function click(label: string) {
   expect(button, label).toBeDefined();
   await act(async () =>
     button!.props.onClick({
+      currentTarget: button,
       nativeEvent: new Event("click"),
       preventDefault() {},
       stopPropagation() {},

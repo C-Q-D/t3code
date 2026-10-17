@@ -110,6 +110,55 @@ export function resolvePullRequestPrimaryControl(input: {
   return input.canMerge ? "merge" : null;
 }
 
+/**
+ * Place existing host actions in the fixed header or overflow menu without widening permissions.
+ * @param input Host state, allowed strategy count, and permissions already intersected with the viewer's grants.
+ * @returns Availability for the merge button, overflow commands, and strategy picker; pending state is applied by the UI.
+ */
+export function resolvePullRequestActionGroups(input: {
+  readonly state: PullRequestState;
+  readonly isDraft: boolean;
+  readonly mergeability: PullRequestMergeability;
+  readonly checksState: ContractPullRequestChecksState | null;
+  readonly autoMergeEnabled: boolean | undefined;
+  readonly mergeMethodCount: number;
+  readonly canMergeSinglePullRequest: boolean;
+  readonly canMerge: boolean;
+  readonly canMarkReady: boolean;
+  readonly canConvertToDraft: boolean;
+  readonly canEnableAutoMerge: boolean;
+  readonly canDisableAutoMerge: boolean;
+}) {
+  const open = input.state === "open";
+  const mergeable = open && !input.isDraft && input.mergeability !== "conflicting";
+  const primary = resolvePullRequestPrimaryControl({
+    ...input,
+    hasMergeMethod: input.mergeMethodCount > 0,
+    canMerge: input.canMergeSinglePullRequest && input.canMerge,
+    canEnableAutoMerge: input.canMergeSinglePullRequest && input.canEnableAutoMerge,
+  });
+  return {
+    // Previously offered in overflow when auto-merge occupied the primary slot.
+    merge:
+      primary === "merge" ||
+      (mergeable &&
+        input.canMergeSinglePullRequest &&
+        input.canMerge &&
+        input.mergeMethodCount > 0 &&
+        (primary === "enable-auto-merge" || primary === "auto-merge-armed")),
+    ready: open && input.isDraft && input.canMarkReady,
+    draft: open && !input.isDraft && input.canConvertToDraft,
+    enableAutoMerge:
+      mergeable &&
+      input.autoMergeEnabled !== true &&
+      input.canMergeSinglePullRequest &&
+      input.canEnableAutoMerge &&
+      input.mergeMethodCount > 0,
+    disableAutoMerge: open && input.autoMergeEnabled === true && input.canDisableAutoMerge,
+    mergeMethods: mergeable && input.canMerge && input.mergeMethodCount > 1,
+  };
+}
+
 export function pullRequestCheckoutCommand(
   provider: SourceControlProviderKind,
   number: number,
@@ -270,15 +319,6 @@ export function pullRequestHandoffLabels(inThisThread: boolean) {
         fixCheck: t.git.pullRequest.fix,
         fixFindings: t.git.pullRequest.fixFindingsInAThread,
       };
-}
-
-/** Whether the open pull-request action group contains at least one action. */
-export function pullRequestActionMenuHasGroup(
-  showsDraftToggle: boolean,
-  showsAutoMerge: boolean,
-  showsMergeMethods: boolean,
-): boolean {
-  return showsDraftToggle || showsAutoMerge || showsMergeMethods;
 }
 
 export function isStackedPullRequestBase(
