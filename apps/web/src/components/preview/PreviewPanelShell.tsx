@@ -33,6 +33,8 @@ interface PreviewPanelShellProps {
   mode: PreviewPanelMode;
   /** Use a sibling slab in chat; false preserves embedded and PR-page layouts. */
   standalone?: boolean;
+  /** Let the surrounding slab supply the browser gutters' stone background; defaults to false. */
+  transparent?: boolean;
   maximized?: boolean;
   inlineSize?: PreviewPanelInlineSize;
   open?: boolean;
@@ -142,7 +144,7 @@ function PreviewPanelShellFrame(
       ref={hostRef}
       className={cn(
         "relative flex h-full min-h-0 min-w-0 max-w-full flex-col self-stretch",
-        !props.standalone && "bg-background",
+        !props.standalone && !props.transparent && "bg-background",
         isInline ? (maximized ? "flex-1" : "shrink-0") : "w-full",
         isInline && !props.standalone && "border-l border-border",
         isInline && props.standalone && open && !maximized && "ms-(--frame-slab-gap)",

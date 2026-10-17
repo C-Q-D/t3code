@@ -1,3 +1,4 @@
+/** Paints the agent pointer over its existing browser surface; page coordinates stay store-owned. */
 "use client";
 
 import type { DesktopPreviewPointerEvent } from "@t3tools/contracts";
@@ -6,11 +7,13 @@ import { useEffect, useState } from "react";
 
 import { useBrowserPointerStore } from "~/browser/browserPointerStore";
 import { useBrowserSurfaceStore } from "~/browser/browserSurfaceStore";
+import { t } from "~/i18n";
 
 import { agentBrowserCursorOpacity, type BrowserController } from "./agentBrowserCursorLogic";
 
 const CURSOR_ACTIVE_MS = 700;
 
+/** Observes one runtime tab's latest pointer event and page-content geometry. */
 export function AgentBrowserCursor(props: {
   readonly tabId: string;
   readonly zoomFactor: number;
@@ -32,6 +35,7 @@ export function AgentBrowserCursor(props: {
   );
 }
 
+/** Applies the existing zoom, content scale and scroll offsets to the agent's page coordinates. */
 function AgentBrowserCursorEvent(props: {
   readonly event: DesktopPreviewPointerEvent;
   readonly content: {
@@ -57,7 +61,7 @@ function AgentBrowserCursorEvent(props: {
   );
 }
 
-/** The agent's pointer at a surface position; it fades once the agent stops acting. */
+/** Labels the agent's surface position; only movement transitions, while the existing idle dimming stays intact. */
 export function AgentCursorMark(props: {
   readonly phase: "move" | "click";
   readonly sequence: number;
@@ -76,7 +80,7 @@ export function AgentCursorMark(props: {
 
   return (
     <div
-      className="pointer-events-none absolute left-0 top-0 z-40 transition-[opacity,transform] duration-150 ease-out motion-reduce:transition-none"
+      className="browser-agent-shadow pointer-events-none absolute left-0 top-0 z-40 flex items-start gap-0.5 text-attention transition-transform duration-150 ease-out motion-reduce:transition-none"
       style={{
         opacity: agentBrowserCursorOpacity(active, controller),
         transform: `translate3d(${left}px, ${top}px, 0)`,
@@ -85,15 +89,15 @@ export function AgentCursorMark(props: {
       data-agent-browser-cursor
     >
       {phase === "click" ? (
-        <span
-          key={sequence}
-          className="absolute left-0.5 top-0.5 size-4 animate-status-ping rounded-full bg-primary/25 motion-reduce:animate-none"
-        />
+        <span className="absolute left-0.5 top-0.5 size-4 rounded-full bg-attention/25" />
       ) : null}
       <MousePointer2
-        className="relative size-5 -translate-x-0.5 -translate-y-0.5 fill-background text-primary drop-shadow-sm"
+        className="relative size-5.5 -translate-x-0.5 -translate-y-0.5 fill-current"
         strokeWidth={2}
       />
+      <span className="mt-4 flex h-5 items-center rounded-tag bg-attention px-2 font-sans text-meta font-bold text-browser-agent-foreground text-shadow-none">
+        {t.tools.preview.agentCursorLabel}
+      </span>
     </div>
   );
 }

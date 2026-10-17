@@ -223,6 +223,9 @@ const twMerge = extendTailwindMerge({
         "timeline-empty-well",
         "timeline-empty-icon",
         "sidebar-provider-update",
+        "browser-address",
+        "browser-viewport",
+        "browser-agent",
       ],
       "inset-shadow": [
         "selected",
@@ -306,6 +309,7 @@ const twMerge = extendTailwindMerge({
         "sidebar-provider-update",
         "panel-tab-action",
         "panel-launcher",
+        "browser-viewport",
       ],
       leading: [
         "code",

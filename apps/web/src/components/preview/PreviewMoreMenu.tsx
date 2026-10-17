@@ -4,7 +4,22 @@
 import { t } from "~/i18n";
 
 import type { DesktopPreviewColorScheme } from "@t3tools/contracts";
-import { Minus, MoreVertical, Plus as PlusIcon, RotateCcw } from "lucide-react";
+import {
+  ArrowRightLeft,
+  Bug,
+  Cookie,
+  Ellipsis,
+  Eraser,
+  ExternalLink,
+  Minus,
+  Plus as PlusIcon,
+  RefreshCcw,
+  RotateCcw,
+  Settings2,
+  Smartphone,
+  SunMoon,
+  ZoomIn,
+} from "lucide-react";
 
 import { Button } from "~/components/ui/button";
 import {
@@ -51,6 +66,7 @@ export interface PreviewMoreMenuActions {
   readonly toggleNativePictureInPicture?: () => void;
 }
 
+/** Active-tab menu state; absent actions keep their existing hidden-item behavior. */
 interface Props {
   /** False until the tab can take these actions, such as before its page attaches. */
   enabled: boolean;
@@ -82,17 +98,16 @@ const MenuTriggerButton = () => (
       render={
         <MenuTrigger
           render={
-            <Button
-              variant="ghost"
-              size="icon-xs"
+            <button
               type="button"
               aria-label={t.tools.preview.menu}
+              className="flex size-7.5 shrink-0 cursor-pointer items-center justify-center rounded-tag bg-transparent p-0 text-foreground outline-none hover:bg-secondary focus-visible:inset-shadow-focus data-popup-open:bg-secondary"
             />
           }
         />
       }
     >
-      <MoreVertical />
+      <Ellipsis className="size-3.75" />
     </TooltipTrigger>
     <TooltipPopup>{t.tools.preview.more}</TooltipPopup>
   </Tooltip>
@@ -118,28 +133,41 @@ export function PreviewMoreMenu({
   return (
     <Menu>
       <MenuTriggerButton />
-      <MenuPopup align="end" sideOffset={6}>
+      <MenuPopup align="end" sideOffset={10} className="w-47.5">
         <MenuItem onClick={actions.hardReload} disabled={disabled}>
+          <RefreshCcw strokeWidth={1.75} />
           {t.tools.preview.hardReload}
         </MenuItem>
         {actions.openDevTools ? (
           <MenuItem onClick={actions.openDevTools} disabled={disabled}>
+            <Bug strokeWidth={1.75} />
             {t.tools.preview.devTools}
           </MenuItem>
         ) : null}
         {actions.toggleNativePictureInPicture ? (
           <MenuItem onClick={actions.toggleNativePictureInPicture} disabled={disabled}>
+            <ExternalLink strokeWidth={1.75} />
             {nativePictureInPicture
               ? t.tools.preview.closeSeparateWindow
               : t.tools.preview.openSeparateWindow}
           </MenuItem>
         ) : null}
-        {move ? <MenuItem onClick={move.onMove}>{move.label}</MenuItem> : null}
+        {move ? (
+          <MenuItem onClick={move.onMove}>
+            <ArrowRightLeft strokeWidth={1.75} />
+            {move.label}
+          </MenuItem>
+        ) : null}
         <MenuItem onClick={onToggleDeviceToolbar} disabled={disabled}>
+          <Smartphone strokeWidth={1.75} />
           {deviceToolbarVisible ? t.tools.preview.hideToolbar : t.tools.preview.showToolbar}
         </MenuItem>
+        <MenuSeparator />
         <MenuSub>
-          <MenuSubTrigger disabled={disabled}>{t.tools.preview.appearance}</MenuSubTrigger>
+          <MenuSubTrigger disabled={disabled}>
+            <SunMoon strokeWidth={1.75} />
+            {t.tools.preview.appearance}
+          </MenuSubTrigger>
           <MenuSubPopup>
             <MenuRadioGroup
               value={colorScheme}
@@ -153,18 +181,21 @@ export function PreviewMoreMenu({
             </MenuRadioGroup>
           </MenuSubPopup>
         </MenuSub>
-        <MenuSeparator />
         {/*
           Zoom row: label + inline control cluster. `closeOnClick=false`
-          keeps the menu open while the user clicks the +/− buttons.
+          keeps the menu open while the user clicks the +/− buttons. The
+          existing controls wrap to retain K2's 190px popup without losing actions.
         */}
         <MenuItem
           closeOnClick={false}
           onClick={(event: React.MouseEvent) => event.preventDefault()}
-          className="justify-between"
+          className="flex-wrap justify-between"
           disabled={disabled}
         >
-          <span>{t.tools.preview.zoom}</span>
+          <span className="flex items-center gap-2.5">
+            <ZoomIn className="size-3.5" strokeWidth={1.75} />
+            {t.tools.preview.zoom}
+          </span>
           <span className="flex items-center gap-1">
             <Button
               variant="outline"
@@ -216,8 +247,19 @@ export function PreviewMoreMenu({
               <span className="block truncate">{t.tools.preview.profileLabel(profileName)}</span>
             </MenuGroupLabel>
           ) : null}
-          <MenuItem onClick={actions.clearCookies}>{t.tools.preview.clearCookies}</MenuItem>
-          <MenuItem onClick={actions.clearCache}>{t.tools.preview.clearCache}</MenuItem>
+          <MenuItem onClick={actions.clearCookies}>
+            <Cookie strokeWidth={1.75} />
+            {t.tools.preview.clearCookies}
+          </MenuItem>
+          <MenuItem onClick={actions.clearCache}>
+            <Eraser strokeWidth={1.75} />
+            {t.tools.preview.clearCache}
+          </MenuItem>
+          {/* The board shows configuration, but this menu has no configuration action yet. */}
+          <MenuItem disabled>
+            <Settings2 strokeWidth={1.75} />
+            {t.tools.preview.configuration}
+          </MenuItem>
         </MenuGroup>
       </MenuPopup>
     </Menu>

@@ -339,3 +339,36 @@
     url("../assets/stone-8a.webp");
   background-repeat: repeat;
 }
+
+/* PN1.3 · Panel8a.dc.html / 其余屏-1 K2: browser viewport, address well,
+   and the Agent cursor label. Movement remains the only cursor transition. */
+@theme {
+  --color-browser-viewport: #121214;
+  --color-browser-agent-foreground: #1a0c05;
+  --radius-browser-viewport: 14px;
+  --shadow-browser-address:
+    inset 2px 3px 5px rgba(0, 0, 0, 0.66), inset -1px -1px 0 rgba(255, 255, 255, 0.07);
+  --shadow-browser-viewport:
+    inset 2px 3px 6px rgba(0, 0, 0, 0.75), inset -1px -1px 0 rgba(255, 255, 255, 0.06);
+  --shadow-browser-agent: 2px 3px 3px rgba(0, 0, 0, 0.6);
+}
+
+/* A drop shadow follows the pointer and badge silhouettes instead of their enclosing rectangle. */
+@utility browser-agent-shadow {
+  --lucide-hue-override: currentColor;
+  filter: drop-shadow(var(--shadow-browser-agent));
+}
+
+/* Paint above iframe content and the hosted Webview's default z-index 30,
+   below the agent cursor at 40; the inset frame must not intercept browser input. */
+@utility browser-viewport-frame {
+  &::after {
+    content: "";
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    z-index: 31;
+    border-radius: inherit;
+    box-shadow: var(--shadow-browser-viewport);
+  }
+}

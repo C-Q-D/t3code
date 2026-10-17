@@ -1,4 +1,4 @@
-/** Localized preview UI and interactions; preserves user data, commands, and protocol values. */
+/** Browser address chrome; navigation and URL drafts stay independent of the mounted page surface. */
 import { t } from "~/i18n";
 import { RefreshIcon } from "~/components/ui/refresh-icon";
 import {
@@ -6,7 +6,9 @@ import {
   ArrowRight,
   Camera,
   ExternalLink,
-  MousePointerClick,
+  Globe,
+  Square,
+  SquareDashedMousePointer,
   PictureInPicture2,
 } from "lucide-react";
 import {
@@ -19,10 +21,9 @@ import {
 } from "react";
 
 import { Button } from "~/components/ui/button";
-import { InputGroup, InputGroupAddon, InputGroupInput } from "~/components/ui/input-group";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
-import { cn } from "~/lib/utils";
 
+/** Navigation state and existing browser actions; optional actions retain their availability rules. */
 interface Props {
   url: string;
   loading: boolean;
@@ -119,10 +120,11 @@ export function PreviewChromeRow({
   };
 
   return (
-    <div className="relative">
+    <div className="relative shrink-0">
       <form
         onSubmit={submit}
-        className="flex h-10 min-h-10 shrink-0 items-center gap-1 border-b border-border/60 bg-background px-2 in-data-[preview-panel-mode=inline]:mb-3 in-data-[preview-panel-mode=inline]:h-7 in-data-[preview-panel-mode=inline]:min-h-7 in-data-[preview-panel-mode=inline]:border-b-transparent"
+        className="flex h-9.5 min-h-9.5 min-w-0 items-center gap-0.5"
+        aria-busy={loading}
         data-surface-subheader
       >
         <div
@@ -135,7 +137,7 @@ export function PreviewChromeRow({
               render={
                 <Button
                   variant="ghost"
-                  size="icon-xs"
+                  size="icon-md"
                   onClick={canGoBack ? onBack : NOOP}
                   disabled={!canGoBack}
                   aria-label={t.tools.preview.back}
@@ -143,7 +145,7 @@ export function PreviewChromeRow({
                 />
               }
             >
-              <ArrowLeft />
+              <ArrowLeft className="size-3.75" />
             </TooltipTrigger>
             <TooltipPopup>{t.tools.preview.back}</TooltipPopup>
           </Tooltip>
@@ -152,7 +154,7 @@ export function PreviewChromeRow({
               render={
                 <Button
                   variant="ghost"
-                  size="icon-xs"
+                  size="icon-md"
                   onClick={canGoForward ? onForward : NOOP}
                   disabled={!canGoForward}
                   aria-label={t.tools.preview.forward}
@@ -160,7 +162,7 @@ export function PreviewChromeRow({
                 />
               }
             >
-              <ArrowRight />
+              <ArrowRight className="size-3.75" />
             </TooltipTrigger>
             <TooltipPopup>{t.tools.preview.forward}</TooltipPopup>
           </Tooltip>
@@ -169,7 +171,7 @@ export function PreviewChromeRow({
               render={
                 <Button
                   variant="ghost"
-                  size="icon-xs"
+                  size="icon-md"
                   onClick={refreshDisabled ? NOOP : onRefresh}
                   disabled={refreshDisabled}
                   aria-label={loading ? t.tools.preview.stop : t.tools.preview.refresh}
@@ -177,7 +179,7 @@ export function PreviewChromeRow({
                 />
               }
             >
-              <RefreshIcon refreshing={loading} />
+              {loading ? <Square className="size-3.5" /> : <RefreshIcon size="sm" />}
             </TooltipTrigger>
             <TooltipPopup>
               {loading ? t.tools.preview.loading : t.tools.preview.refresh}
@@ -187,11 +189,16 @@ export function PreviewChromeRow({
 
         {leadingActions}
 
-        <InputGroup variant="ghost" className="group/address h-7 flex-1">
+        {/* This browser-specific well keeps the address and its adornments in one 34px pill. */}
+        <div
+          role="group"
+          className="group/address mx-1 flex h-8.5 min-w-0 flex-1 items-center gap-2 rounded-full bg-input px-3 shadow-browser-address focus-within:inset-shadow-focus"
+        >
+          <Globe className="size-3.25 shrink-0" strokeWidth={1.75} />
           <Tooltip>
             <TooltipTrigger
               render={
-                <InputGroupInput
+                <input
                   ref={inputRef}
                   value={inputFocused ? draft : url}
                   onChange={(event) => setDraft(event.target.value)}
@@ -212,16 +219,17 @@ export function PreviewChromeRow({
                     }
                   }}
                   placeholder={t.tools.preview.urlPlaceholder}
+                  aria-label={t.tools.preview.urlPlaceholder}
                   spellCheck={false}
                   disabled={inputDisabled}
                   data-preview-url-input
-                  size="sm"
+                  className="h-full min-w-0 flex-1 bg-transparent font-mono text-secondary-copy text-fg-detail outline-none caret-message-action placeholder:text-placeholder disabled:text-fg-control-disabled"
                 />
               }
             />
           </Tooltip>
           {onOpenInBrowser && !inputFocused ? (
-            <InputGroupAddon align="inline-end">
+            <div className="flex shrink-0 items-center">
               {/* Revealed on hover so a resting address bar reads as plain text. */}
               <span className="pointer-events-none flex opacity-0 transition-opacity focus-within:pointer-events-auto focus-within:opacity-100 group-hover/address:pointer-events-auto group-hover/address:opacity-100">
                 <Tooltip>
@@ -229,21 +237,21 @@ export function PreviewChromeRow({
                     render={
                       <Button
                         variant="ghost"
-                        size="icon-xs"
+                        size="icon-micro"
                         onClick={onOpenInBrowser}
                         aria-label={t.tools.preview.openSystemBrowser}
                         type="button"
                       />
                     }
                   >
-                    <ExternalLink />
+                    <ExternalLink className="size-3.25" />
                   </TooltipTrigger>
                   <TooltipPopup>{t.tools.preview.openSystemBrowser}</TooltipPopup>
                 </Tooltip>
               </span>
-            </InputGroupAddon>
+            </div>
           ) : null}
-        </InputGroup>
+        </div>
 
         {onPickElement ? (
           <Tooltip>
@@ -251,7 +259,7 @@ export function PreviewChromeRow({
               render={
                 <Button
                   variant={pickActive ? "secondary" : "ghost"}
-                  size="icon-xs"
+                  size="icon-md"
                   onClick={onPickElement}
                   disabled={pickDisabled}
                   aria-label={
@@ -262,7 +270,7 @@ export function PreviewChromeRow({
                 />
               }
             >
-              <MousePointerClick className={cn(pickActive && "text-primary")} />
+              <SquareDashedMousePointer className="size-3.75" strokeWidth={1.75} />
             </TooltipTrigger>
             <TooltipPopup>
               {pickDisabled && pickDisabledReason
@@ -279,7 +287,7 @@ export function PreviewChromeRow({
               render={
                 <Button
                   variant={recording ? "secondary" : "ghost"}
-                  size="icon-xs"
+                  size="icon-md"
                   onClick={(event) => onCapture(event.shiftKey)}
                   aria-label={
                     recording ? t.tools.preview.stopRecording : t.tools.preview.captureScreenshot
@@ -290,9 +298,9 @@ export function PreviewChromeRow({
                 />
               }
             >
-              <Camera className={cn(recording && "text-destructive")} />
+              <Camera className="size-3.75" strokeWidth={1.75} />
               {recording ? (
-                <span className="absolute right-0.5 top-0.5 size-1.5 animate-status-pulse rounded-full bg-destructive" />
+                <span className="absolute right-0.5 top-0.5 size-1.5 rounded-full bg-attention" />
               ) : null}
             </TooltipTrigger>
             <TooltipPopup>
@@ -306,7 +314,7 @@ export function PreviewChromeRow({
               render={
                 <Button
                   variant={pictureInPicture ? "secondary" : "ghost"}
-                  size="icon-xs"
+                  size="icon-md"
                   onClick={onPictureInPicture}
                   aria-label={
                     pictureInPicture ? t.tools.preview.closeFloating : t.tools.preview.floatOverChat
@@ -317,7 +325,7 @@ export function PreviewChromeRow({
                 />
               }
             >
-              <PictureInPicture2 className={cn(pictureInPicture && "text-primary")} />
+              <PictureInPicture2 className="size-3.75" strokeWidth={1.75} />
             </TooltipTrigger>
             <TooltipPopup>
               {pictureInPicture ? t.tools.preview.closeFloating : t.tools.preview.floatOverChat}
@@ -326,12 +334,6 @@ export function PreviewChromeRow({
         ) : null}
         {trailingActions}
       </form>
-      <div
-        aria-hidden
-        data-loading={loading}
-        className="preview-loading-progress pointer-events-none absolute bottom-0 left-0 z-10 h-0.5 w-full origin-left rounded-r-full bg-primary"
-        style={{ boxShadow: "0 0 6px 1px var(--color-ring)" }}
-      />
     </div>
   );
 }

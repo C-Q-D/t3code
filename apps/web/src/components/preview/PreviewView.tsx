@@ -979,7 +979,7 @@ export function PreviewView({
 
   return (
     <div
-      className="flex min-h-0 flex-1 flex-col bg-background"
+      className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 px-3 pb-3"
       data-thread-key={scopedThreadKey(threadRef)}
     >
       <PreviewChromeRow
@@ -1062,7 +1062,12 @@ export function PreviewView({
         }
       />
 
-      <div ref={serverBodyRef} className="relative min-h-0 flex-1 overflow-hidden">
+      {/* The hosted Webview lives outside this DOM subtree. Its slot receives the
+          same radius below; this clip and inset frame also cover streamed pages. */}
+      <div
+        ref={serverBodyRef}
+        className="browser-viewport-frame relative min-h-0 flex-1 overflow-hidden rounded-browser-viewport bg-browser-viewport"
+      >
         {runtimeTabId && snapshot && isServerTab ? (
           <>
             {viewport._tag !== "fill" && !showEmptyState && !isUnreachable ? (
@@ -1106,6 +1111,7 @@ export function PreviewView({
               key={runtimeTabId}
               tabId={runtimeTabId}
               visible={visible && !isUnreachable}
+              cornerRadius={14}
               className="absolute inset-0 h-full w-full"
             />
           ) : (
