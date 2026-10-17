@@ -1,3 +1,4 @@
+/** Owns scoped default-setting rows; General composes individual rows while other pages retain their groups. */
 import { t } from "~/i18n";
 import {
   DEFAULT_SERVER_SETTINGS,
@@ -49,11 +50,15 @@ import {
  * project or checkout scope; the scoped hooks route the write.
  */
 const WORKTREE_SUBMODULES_OPTIONS = ["recursive", "top-level", "none"] as const;
+/** Accepts only supported submodule choices before they reach the scoped settings command. */
 function isWorktreeSubmodules(value: string | null): value is WorktreeSubmodules {
   return value !== null && (WORKTREE_SUBMODULES_OPTIONS as readonly string[]).includes(value);
 }
 
-export function ProjectDefaultsSettings({ category }: { category: ProjectSettingsCategory }) {
+/** Edits the default model; title only changes its presentation, including in the existing project group. */
+export function DefaultModelSetting({
+  title = t.settings.scheduledTasks.editor.modelLabel,
+}: { title?: string } = {}) {
   const { scope, target, targets, connectedEnvironments } = useSettingsScope();
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
@@ -79,26 +84,10 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
   );
   const activeEntry = entries.find((entry) => entry.instanceId === selection?.instanceId);
   const mixedModel = useScopedSettingsMixed(["defaultModelSelection"]);
-  const mixedPermissions = useScopedSettingsMixed(["defaultRuntimeMode"]);
-  const PermissionIcon = runtimeModeConfig[settings.defaultRuntimeMode].icon;
-  const mixedWorkspace = useScopedSettingsMixed(["defaultThreadEnvMode"]);
-  const mixedSubmodules = useScopedSettingsMixed(["worktreeSubmodules"]);
-  const mixedBrowser = useScopedSettingsMixed(["enableAgentBrowserAccess"]);
-  const mixedAutoPull = useScopedSettingsMixed(["defaultAutoPull"]);
-  const mixedAgentCredits = useScopedSettingsMixed(["removeAgentCreditsOnMerge"]);
-  const mixedMergeMethod = useScopedSettingsMixed(["pullRequestMergeMethod"]);
   const modelSource = useScopedSettingSource(["defaultModelSelection"]);
   const isProjectScope = scope.kind === "project" || scope.kind === "checkout";
   const unavailable = connectedEnvironments.length === 0;
-  // File-backed keys show their effective value; the target already carries
-  // the checkout's t3.json, and a null file here only fills the built-in.
-  // The reset arrow beside the title clears the tier (SettingsRow handles a
-  // project override, the environment value is cleared here), so the picker
-  // has no "inherit" item.
-  const effective = target
-    ? resolveProjectSettings(target.settings, null, null, null).settings
-    : null;
-
+  /** Rejects a model unavailable on any selected target before requesting a scoped write. */
   function modelDisabledReason(instanceId: ProviderInstanceId, model: string): string | null {
     const sourceEntry = entries.find((entry) => entry.instanceId === instanceId);
     for (const candidate of targets) {
@@ -130,6 +119,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
     return null;
   }
 
+  /** Persists a valid model selection, or clears it so the resolver supplies the default. */
   const setModel = (value: ModelSelection | null) => {
     const reason = value ? modelDisabledReason(value.instanceId, value.model) : null;
     if (reason) {
@@ -143,13 +133,13 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
     updateSettings({ defaultModelSelection: value });
   };
 
-  const modelRow = (
+  return (
     <SettingsRow
       serverScoped
       settingKeys={["defaultModelSelection"]}
       mixed={mixedModel}
       id="default-model"
-      title={t.settings.scheduledTasks.editor.modelLabel}
+      title={title}
       description={
         isProjectScope
           ? t.settings.projectDefaults.modelForNewThreadsInThisProject
@@ -219,13 +209,108 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
       }
     />
   );
-  const workspaceRow = (
+}
+
+/** Edits default approval permissions through the existing scope, preserving mixed and reset states. */
+export function DefaultPermissionsSetting({
+  controlSize = "sm",
+}: { controlSize?: "sm" | "settings" } = {}) {
+  const { scope } = useSettingsScope();
+  const settings = useScopedSettings();
+  const updateSettings = useUpdateScopedSettings();
+  const isProjectScope = scope.kind === "project" || scope.kind === "checkout";
+  const mixedPermissions = useScopedSettingsMixed(["defaultRuntimeMode"]);
+  const PermissionIcon = runtimeModeConfig[settings.defaultRuntimeMode].icon;
+  return (
+    <SettingsRow
+      serverScoped
+      settingKeys={["defaultRuntimeMode"]}
+      mixed={mixedPermissions}
+      {...searchableSetting("default-permissions")}
+      description={
+        isProjectScope
+          ? t.settings.projectDefaults.permissionsThreadsProjectHint
+          : t.settings.projectDefaults.defaultPermissionsThreadsProjectsOverrideHint
+      }
+      resetAction={
+        settings.defaultRuntimeMode !== DEFAULT_SERVER_SETTINGS.defaultRuntimeMode ? (
+          <SettingResetButton
+            label={t.settings.projectDefaults.defaultPermissions}
+            onClick={() =>
+              updateSettings({
+                defaultRuntimeMode: DEFAULT_SERVER_SETTINGS.defaultRuntimeMode,
+              })
+            }
+          />
+        ) : null
+      }
+      control={
+        <Select
+          value={mixedPermissions ? null : settings.defaultRuntimeMode}
+          onValueChange={(value) => {
+            if (value) updateSettings({ defaultRuntimeMode: value });
+          }}
+        >
+          <SelectTrigger
+            size={controlSize}
+            aria-label={t.settings.projectDefaults.permissionsAriaLabel}
+          >
+            {!mixedPermissions && (
+              <PermissionIcon className="size-3.5 shrink-0 text-muted-foreground" />
+            )}
+            <SelectValue>
+              {mixedPermissions
+                ? t.settings.general.mixed
+                : runtimeModeConfig[settings.defaultRuntimeMode].label}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectPopup align="end" alignItemWithTrigger={false}>
+            {runtimeModeOptions.map((mode) => {
+              const option = runtimeModeConfig[mode];
+              const Icon = option.icon;
+              return (
+                <SelectItem key={mode} value={mode} className="min-w-64">
+                  <div className="grid gap-0.5">
+                    <span className="inline-flex items-center gap-1.5 font-medium">
+                      <Icon className="size-3.5 shrink-0 text-muted-foreground" />
+                      {option.label}
+                    </span>
+                    <span className="text-xs leading-4 text-muted-foreground">
+                      {option.description}
+                    </span>
+                  </div>
+                </SelectItem>
+              );
+            })}
+          </SelectPopup>
+        </Select>
+      }
+    />
+  );
+}
+
+/** Edits new-thread workspace mode; the optional title lets General use M2 without changing the project group. */
+export function DefaultWorkspaceSetting({
+  title = t.settings.scheduledTasks.editor.workspaceLabel,
+  controlSize = "sm",
+}: { title?: string; controlSize?: "sm" | "settings" } = {}) {
+  const { scope, target, connectedEnvironments } = useSettingsScope();
+  const settings = useScopedSettings();
+  const updateSettings = useUpdateScopedSettings();
+  const isProjectScope = scope.kind === "project" || scope.kind === "checkout";
+  const unavailable = connectedEnvironments.length === 0;
+  // Resolve file-backed defaults at the selected checkout; resets still clear the original tier.
+  const effective = target
+    ? resolveProjectSettings(target.settings, null, null, null).settings
+    : null;
+  const mixedWorkspace = useScopedSettingsMixed(["defaultThreadEnvMode"]);
+  return (
     <SettingsRow
       serverScoped
       settingKeys={["defaultThreadEnvMode"]}
       mixed={mixedWorkspace}
       id={searchableSetting("new-threads").id}
-      title={t.settings.scheduledTasks.editor.workspaceLabel}
+      title={title}
       description={
         isProjectScope
           ? t.settings.projectDefaults.threadsProjectStartHint
@@ -247,7 +332,10 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
               updateSettings({ defaultThreadEnvMode: value });
           }}
         >
-          <SelectTrigger size="sm" aria-label={t.settings.projectDefaults.workspaceAriaLabel}>
+          <SelectTrigger
+            size={controlSize}
+            aria-label={t.settings.projectDefaults.workspaceAriaLabel}
+          >
             <SelectValue>
               {(value: string | null) =>
                 value === "local" || value === "worktree"
@@ -266,18 +354,100 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
       }
     />
   );
+}
 
+/** Edits checkout submodule population, retaining t3.json resolution and tier-specific resets. */
+export function DefaultSubmodulesSetting({
+  controlSize = "sm",
+}: { controlSize?: "sm" | "settings" } = {}) {
+  const { scope, target, connectedEnvironments } = useSettingsScope();
+  const settings = useScopedSettings();
+  const updateSettings = useUpdateScopedSettings();
+  const isProjectScope = scope.kind === "project" || scope.kind === "checkout";
+  const unavailable = connectedEnvironments.length === 0;
+  // Resolve file-backed defaults at the selected checkout; resets still clear the original tier.
+  const effective = target
+    ? resolveProjectSettings(target.settings, null, null, null).settings
+    : null;
+  const mixedSubmodules = useScopedSettingsMixed(["worktreeSubmodules"]);
+  return (
+    <SettingsRow
+      serverScoped
+      settingKeys={["worktreeSubmodules"]}
+      mixed={mixedSubmodules}
+      {...searchableSetting("worktree-submodules")}
+      description={
+        isProjectScope
+          ? t.settings.projectDefaults.worktreesProjectPopulateGitSubmodulesHint
+          : t.settings.projectDefaults.worktreesPopulateGitSubmodulesProjectsHint
+      }
+      resetAction={
+        !isProjectScope && settings.worktreeSubmodules !== null ? (
+          <SettingResetButton
+            label={t.settings.projectDefaults.worktreeSubmodules}
+            onClick={() => updateSettings({ worktreeSubmodules: null })}
+          />
+        ) : null
+      }
+      control={
+        <Select
+          value={mixedSubmodules ? null : (effective?.worktreeSubmodules ?? null)}
+          onValueChange={(value) => {
+            if (isWorktreeSubmodules(value)) updateSettings({ worktreeSubmodules: value });
+          }}
+        >
+          <SelectTrigger
+            size={controlSize}
+            aria-label={t.settings.projectDefaults.submodulesAriaLabel}
+          >
+            <SelectValue>
+              {(value: string | null) =>
+                isWorktreeSubmodules(value)
+                  ? WORKTREE_SUBMODULES_LABELS[value]
+                  : unavailable
+                    ? t.settings.resourceTelemetry.unavailable
+                    : t.settings.general.mixed
+              }
+            </SelectValue>
+          </SelectTrigger>
+          <SelectPopup align="end" alignItemWithTrigger={false}>
+            {WORKTREE_SUBMODULES_OPTIONS.map((option) => (
+              <SelectItem key={option} value={option}>
+                {WORKTREE_SUBMODULES_LABELS[option]}
+              </SelectItem>
+            ))}
+          </SelectPopup>
+        </Select>
+      }
+    />
+  );
+}
+
+/** Keeps the existing grouped defaults for project, source-control and integration settings callers. */
+export function ProjectDefaultsSettings({
+  category,
+}: {
+  category: Exclude<ProjectSettingsCategory, "general">;
+}) {
+  const { scope } = useSettingsScope();
+  const settings = useScopedSettings();
+  const updateSettings = useUpdateScopedSettings();
+  const isProjectScope = scope.kind === "project" || scope.kind === "checkout";
+  const mixedBrowser = useScopedSettingsMixed(["enableAgentBrowserAccess"]);
+  const mixedAutoPull = useScopedSettingsMixed(["defaultAutoPull"]);
+  const mixedAgentCredits = useScopedSettingsMixed(["removeAgentCreditsOnMerge"]);
+  const mixedMergeMethod = useScopedSettingsMixed(["pullRequestMergeMethod"]);
   return (
     <SettingsSection
       id={
-        category === "general" || category === "project"
+        category === "project"
           ? "project-defaults"
           : category === "integrations"
             ? "browser-access"
             : "source-control-defaults"
       }
       title={
-        category === "general" || category === "project"
+        category === "project"
           ? t.settings.rows.newThreads.title
           : category === "integrations"
             ? t.settings.sections.browser
@@ -286,126 +456,8 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
     >
       {category === "project" ? (
         <>
-          {modelRow}
-          {workspaceRow}
-        </>
-      ) : category === "general" ? (
-        <>
-          {modelRow}
-          <SettingsRow
-            serverScoped
-            settingKeys={["defaultRuntimeMode"]}
-            mixed={mixedPermissions}
-            {...searchableSetting("default-permissions")}
-            description={
-              isProjectScope
-                ? t.settings.projectDefaults.permissionsThreadsProjectHint
-                : t.settings.projectDefaults.defaultPermissionsThreadsProjectsOverrideHint
-            }
-            resetAction={
-              settings.defaultRuntimeMode !== DEFAULT_SERVER_SETTINGS.defaultRuntimeMode ? (
-                <SettingResetButton
-                  label={t.settings.projectDefaults.defaultPermissions}
-                  onClick={() =>
-                    updateSettings({
-                      defaultRuntimeMode: DEFAULT_SERVER_SETTINGS.defaultRuntimeMode,
-                    })
-                  }
-                />
-              ) : null
-            }
-            control={
-              <Select
-                value={mixedPermissions ? null : settings.defaultRuntimeMode}
-                onValueChange={(value) => {
-                  if (value) updateSettings({ defaultRuntimeMode: value });
-                }}
-              >
-                <SelectTrigger
-                  size="sm"
-                  aria-label={t.settings.projectDefaults.permissionsAriaLabel}
-                >
-                  {!mixedPermissions && (
-                    <PermissionIcon className="size-3.5 shrink-0 text-muted-foreground" />
-                  )}
-                  <SelectValue>
-                    {mixedPermissions
-                      ? t.settings.general.mixed
-                      : runtimeModeConfig[settings.defaultRuntimeMode].label}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectPopup align="end" alignItemWithTrigger={false}>
-                  {runtimeModeOptions.map((mode) => {
-                    const option = runtimeModeConfig[mode];
-                    const Icon = option.icon;
-                    return (
-                      <SelectItem key={mode} value={mode} className="min-w-64">
-                        <div className="grid gap-0.5">
-                          <span className="inline-flex items-center gap-1.5 font-medium">
-                            <Icon className="size-3.5 shrink-0 text-muted-foreground" />
-                            {option.label}
-                          </span>
-                          <span className="text-xs leading-4 text-muted-foreground">
-                            {option.description}
-                          </span>
-                        </div>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectPopup>
-              </Select>
-            }
-          />
-          {workspaceRow}
-          <SettingsRow
-            serverScoped
-            settingKeys={["worktreeSubmodules"]}
-            mixed={mixedSubmodules}
-            {...searchableSetting("worktree-submodules")}
-            description={
-              isProjectScope
-                ? t.settings.projectDefaults.worktreesProjectPopulateGitSubmodulesHint
-                : t.settings.projectDefaults.worktreesPopulateGitSubmodulesProjectsHint
-            }
-            resetAction={
-              !isProjectScope && settings.worktreeSubmodules !== null ? (
-                <SettingResetButton
-                  label={t.settings.projectDefaults.worktreeSubmodules}
-                  onClick={() => updateSettings({ worktreeSubmodules: null })}
-                />
-              ) : null
-            }
-            control={
-              <Select
-                value={mixedSubmodules ? null : (effective?.worktreeSubmodules ?? null)}
-                onValueChange={(value) => {
-                  if (isWorktreeSubmodules(value)) updateSettings({ worktreeSubmodules: value });
-                }}
-              >
-                <SelectTrigger
-                  size="sm"
-                  aria-label={t.settings.projectDefaults.submodulesAriaLabel}
-                >
-                  <SelectValue>
-                    {(value: string | null) =>
-                      isWorktreeSubmodules(value)
-                        ? WORKTREE_SUBMODULES_LABELS[value]
-                        : unavailable
-                          ? t.settings.resourceTelemetry.unavailable
-                          : t.settings.general.mixed
-                    }
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectPopup align="end" alignItemWithTrigger={false}>
-                  {WORKTREE_SUBMODULES_OPTIONS.map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {WORKTREE_SUBMODULES_LABELS[option]}
-                    </SelectItem>
-                  ))}
-                </SelectPopup>
-              </Select>
-            }
-          />
+          <DefaultModelSetting />
+          <DefaultWorkspaceSetting />
         </>
       ) : category === "source-control" ? (
         <>

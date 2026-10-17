@@ -6,7 +6,16 @@ import { useScopedSettingsWriteAllowed } from "./useScopedSettings";
 import { Spinner } from "~/components/ui/spinner";
 import { NotificationSettings } from "./NotificationSettings";
 import { PRIVACY_POLICY_URL } from "../../legalLinks";
-import { ArchiveIcon, ArchiveX, CheckIcon, ChevronRightIcon, SettingsIcon } from "lucide-react";
+import {
+  ArchiveIcon,
+  ArchiveX,
+  CheckIcon,
+  ChevronRightIcon,
+  FolderOpenIcon,
+  MinusIcon,
+  PlusIcon,
+  SettingsIcon,
+} from "lucide-react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { CSSProperties, ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -16,7 +25,6 @@ import {
   ProviderDriverKind,
   type ProviderInstanceId,
   type ScopedThreadRef,
-  type SidebarProjectGroupingMode,
 } from "@t3tools/contracts";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { presentThreadShell } from "@t3tools/client-runtime/state/shell";
@@ -85,7 +93,12 @@ import {
 } from "./useScopedSettings";
 import { useScopedModelDisabledReason } from "./useScopedModelAvailability";
 import { useSettingsScope } from "./SettingsScopeContext";
-import { ProjectDefaultsSettings } from "./ProjectDefaultsSettings";
+import {
+  DefaultModelSetting,
+  DefaultPermissionsSetting,
+  DefaultWorkspaceSetting,
+  DefaultSubmodulesSetting,
+} from "./ProjectDefaultsSettings";
 import { useThreadActions } from "../../hooks/useThreadActions";
 import { useDesktopUpdateState } from "../../state/desktopUpdate";
 import {
@@ -137,6 +150,8 @@ import {
 } from "../ui/number-field";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { Switch } from "../ui/switch";
+import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group";
+import { Kbd } from "../ui/kbd";
 import { ScopedSwitch } from "./ScopedSwitch";
 import { stackedThreadToast, toastManager } from "../ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
@@ -150,9 +165,6 @@ import {
   normalizeIntervalSeconds,
   PROVIDER_HEALTH_INTERVAL_STEP_SECONDS,
   hasChangedBackgroundActivitySettings,
-  isProjectGroupingEnabled,
-  projectGroupingModeFromToggle,
-  readLastEnabledProjectGroupingMode,
   rememberEnabledProjectGroupingMode,
   resolveBackgroundActivityProfileOption,
 } from "./SettingsPanels.logic";
@@ -161,6 +173,7 @@ import {
   SETTINGS_PICKER_TRIGGER_CLASSNAME,
   SettingResetButton,
   SettingsPageContainer,
+  SettingsSearchTarget,
   SettingsRow,
   SettingsSection,
   useSettingsSearchTarget,
@@ -243,6 +256,7 @@ function AboutVersionTitle() {
   );
 }
 
+/** Shows version/update actions; desktop channel selection preserves the bridge's save/error lifecycle. */
 function AboutVersionSection() {
   const updateState = useDesktopUpdateState();
   const [isChangingUpdateChannel, setIsChangingUpdateChannel] = useState(false);
@@ -412,7 +426,7 @@ function AboutVersionSection() {
             <TooltipTrigger
               render={
                 <Button
-                  size="sm"
+                  size="md"
                   variant="outline"
                   disabled={buttonDisabled || isUpdateActionPending}
                   onClick={handleButtonClick}
@@ -430,33 +444,23 @@ function AboutVersionSection() {
           {...searchableSetting("update-track")}
           description={t.settings.about.updateTrack.description}
           control={
-            <Select
-              value={selectedUpdateChannel}
-              onValueChange={(value) => {
-                handleUpdateChannelChange(value as DesktopUpdateChannel);
+            <ToggleGroup
+              size="settings"
+              value={[selectedUpdateChannel]}
+              onValueChange={(values) => {
+                const value = values[0];
+                if (value === "latest" || value === "nightly") handleUpdateChannelChange(value);
               }}
+              aria-label={t.settings.about.updateTrack.title}
+              disabled={isChangingUpdateChannel}
             >
-              <SelectTrigger
-                size="sm"
-                className="w-full sm:w-40"
-                aria-label={t.settings.about.updateTrack.title}
-                disabled={isChangingUpdateChannel}
-              >
-                <SelectValue>
-                  {selectedUpdateChannel === "nightly"
-                    ? t.settings.about.updateTrack.options.nightly
-                    : t.settings.about.updateTrack.options.stable}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectPopup align="end" alignItemWithTrigger={false}>
-                <SelectItem hideIndicator value="latest">
-                  {t.settings.about.updateTrack.options.stable}
-                </SelectItem>
-                <SelectItem hideIndicator value="nightly">
-                  {t.settings.about.updateTrack.options.nightly}
-                </SelectItem>
-              </SelectPopup>
-            </Select>
+              <ToggleGroupItem value="latest">
+                {t.settings.about.updateTrack.options.stable}
+              </ToggleGroupItem>
+              <ToggleGroupItem value="nightly">
+                {t.settings.about.updateTrack.options.nightly}
+              </ToggleGroupItem>
+            </ToggleGroup>
           }
         />
       ) : selectedHostedAppChannel ? (
@@ -473,11 +477,7 @@ function AboutVersionSection() {
                 );
               }}
             >
-              <SelectTrigger
-                size="sm"
-                className="w-full sm:w-40"
-                aria-label={t.settings.about.updateTrack.title}
-              >
+              <SelectTrigger size="settings" aria-label={t.settings.about.updateTrack.title}>
                 <SelectValue>{HOSTED_APP_CHANNEL_LABEL}</SelectValue>
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
@@ -2104,6 +2104,12 @@ function FontFamilySettingsRow({
 
 const AUTO_SETTLE_DEFAULT_DAYS = DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleAfterDays ?? 3;
 
+/**
+ * Edits inactivity days; invalid drafts revert on blur and steppers commit immediately.
+ * @param props.value Persisted whole days within the contract's minimum and maximum.
+ * @param props.onCommit Requests a scoped write of a valid day count; the caller handles persistence errors.
+ * @returns The M2 stepper with the existing draft validation and boundary-disabled buttons.
+ */
 function AutoSettleDaysInput({
   value,
   onCommit,
@@ -2119,30 +2125,53 @@ function AutoSettleDaysInput({
   }, [value]);
 
   return (
-    <Input
-      size="sm"
-      type="number"
-      min={MIN_SIDEBAR_AUTO_SETTLE_AFTER_DAYS}
-      max={MAX_SIDEBAR_AUTO_SETTLE_AFTER_DAYS}
-      className="w-full sm:w-24"
-      value={draft}
-      onChange={(event) => {
-        setDraft(event.target.value);
-        // Number(), not parseInt: "3.5" must be rejected (not truncated to a
-        // committed 3 while the field shows 3.5) — commit only when the
-        // persisted value matches the displayed one.
-        const parsed = Number(event.target.value);
-        if (
-          Number.isInteger(parsed) &&
-          parsed >= MIN_SIDEBAR_AUTO_SETTLE_AFTER_DAYS &&
-          parsed <= MAX_SIDEBAR_AUTO_SETTLE_AFTER_DAYS
-        ) {
-          onCommit(parsed);
-        }
-      }}
-      onBlur={() => setDraft(String(value))}
-      aria-label={t.settings.rows.daysBeforeAutoSettle.title}
-    />
+    <div className="flex h-8 items-center rounded-card-row bg-input p-0.75 shadow-well-track">
+      <Button
+        size="icon-stepper"
+        variant="secondary"
+        aria-label={t.settings.rows.daysBeforeAutoSettle.decreaseAriaLabel}
+        disabled={value <= MIN_SIDEBAR_AUTO_SETTLE_AFTER_DAYS}
+        onClick={() => onCommit(value - 1)}
+      >
+        <MinusIcon aria-hidden />
+      </Button>
+      <div className="w-11 min-w-0 rounded-keycap focus-within:inset-shadow-focus">
+        <Input
+          unstyled
+          size="stepper"
+          font="mono"
+          type="number"
+          min={MIN_SIDEBAR_AUTO_SETTLE_AFTER_DAYS}
+          max={MAX_SIDEBAR_AUTO_SETTLE_AFTER_DAYS}
+          value={draft}
+          onChange={(event) => {
+            setDraft(event.target.value);
+            // Number(), not parseInt: "3.5" must be rejected (not truncated to a
+            // committed 3 while the field shows 3.5) — commit only when the
+            // persisted value matches the displayed one.
+            const parsed = Number(event.target.value);
+            if (
+              Number.isInteger(parsed) &&
+              parsed >= MIN_SIDEBAR_AUTO_SETTLE_AFTER_DAYS &&
+              parsed <= MAX_SIDEBAR_AUTO_SETTLE_AFTER_DAYS
+            ) {
+              onCommit(parsed);
+            }
+          }}
+          onBlur={() => setDraft(String(value))}
+          aria-label={t.settings.rows.daysBeforeAutoSettle.title}
+        />
+      </div>
+      <Button
+        size="icon-stepper"
+        variant="secondary"
+        aria-label={t.settings.rows.daysBeforeAutoSettle.increaseAriaLabel}
+        disabled={value >= MAX_SIDEBAR_AUTO_SETTLE_AFTER_DAYS}
+        onClick={() => onCommit(value + 1)}
+      >
+        <PlusIcon aria-hidden />
+      </Button>
+    </div>
   );
 }
 
@@ -2155,14 +2184,14 @@ const LEGACY_FEATURE_TARGET_IDS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Retired features kept only for users who still depend on them. Collapsed by
- * default so they stay out of the everyday settings path; a settings-search
- * jump to one of the rows unfolds the section.
+ * Retired features kept only for users who still depend on them. Collapsible
+ * on demand; initially expanded to match M2. A settings-search jump to one
+ * of the rows unfolds a section the user has collapsed.
  */
 function LegacyFeaturesSection() {
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   const searchTargetId = useSettingsSearchTargetId();
   const targetRef = useSettingsSearchTarget<HTMLElement>("legacy-features");
   // Unfold once per search jump; tracking the handled id lets the user fold
@@ -2182,10 +2211,10 @@ function LegacyFeaturesSection() {
   }, [searchTargetId]);
 
   return (
-    <section id="legacy-features" ref={targetRef} tabIndex={-1} className="space-y-2.5">
+    <section id="legacy-features" ref={targetRef} tabIndex={-1} className="space-y-2">
       <Collapsible open={open} onOpenChange={setOpen}>
-        <CollapsibleTrigger className="group flex min-h-8 w-full items-center gap-2 px-3 sm:px-4">
-          <h2 className="text-sm font-normal text-foreground/70 transition-colors group-hover:text-foreground">
+        <CollapsibleTrigger className="group flex min-h-7 w-full items-center gap-2 px-1">
+          <h2 className="font-serif text-plan-title leading-normal font-bold text-foreground">
             {t.settings.sections.legacyFeatures}
           </h2>
           <ChevronRightIcon className="size-4 text-muted-foreground transition-transform duration-200 group-data-panel-open:rotate-90" />
@@ -2239,6 +2268,50 @@ function LegacyFeaturesSection() {
 }
 
 /**
+ * Composes M2's path well around the existing commit-on-blur input.
+ * @param props.value Persisted path, or an empty draft for mixed targets.
+ * @param props.onCommit Existing scoped path writer, invoked by DraftInput on commit.
+ * @param props.placeholder Existing empty/mixed hint; no path is inferred locally.
+ * @param props.label Accessible setting name for the input.
+ * @returns An editable path with a disabled browse affordance: this flow has no folder picker yet.
+ */
+function GeneralPathInput({
+  value,
+  onCommit,
+  placeholder,
+  label,
+}: {
+  value: string;
+  onCommit: (next: string) => void;
+  placeholder: string;
+  label: string;
+}) {
+  return (
+    <div className="flex h-8 w-65 max-w-full items-center gap-2 rounded-card-row bg-input pr-1.5 shadow-well-track focus-within:inset-shadow-focus">
+      <DraftInput
+        unstyled
+        size="settings"
+        font="mono"
+        className="min-w-0 flex-1"
+        value={value}
+        onCommit={onCommit}
+        placeholder={placeholder}
+        spellCheck={false}
+        aria-label={label}
+      />
+      <Button
+        size="icon-xs"
+        variant="secondary"
+        disabled
+        aria-label={t.settings.general.browseFolder}
+      >
+        <FolderOpenIcon aria-hidden />
+      </Button>
+    </div>
+  );
+}
+
+/**
  * Renders general settings for targets selected by the enclosing settings scope, with no props.
  * Server rows persist via the scoped settings command; mixed targets show an empty draft.
  * Export location is an environment setting: empty means stateDir/exports on the destination server.
@@ -2270,9 +2343,6 @@ export function GeneralSettingsPanel() {
   const hasServerTargets = connectedEnvironments.length > 0;
   const [backgroundActivityDialogOpen, setBackgroundActivityDialogOpen] = useState(false);
   const mixedResponseStreamingMode = useScopedSettingsMixed(["responseStreamingMode"]);
-  const lastEnabledProjectGroupingMode = useRef<SidebarProjectGroupingMode>(
-    readLastEnabledProjectGroupingMode(),
-  );
   const serverProviders = environment?.serverConfig?.providers ?? EMPTY_SERVER_PROVIDERS;
   const supportsAutoSettlement =
     connectedEnvironments.length > 0 &&
@@ -2344,7 +2414,7 @@ export function GeneralSettingsPanel() {
 
   return (
     <SettingsPageContainer>
-      <ProjectDefaultsSettings category="general" />
+      <LanguageSetting size="settings" />
       <SettingsSection id="organization" title={t.settings.sections.organization}>
         <SettingsRow
           {...searchableSetting("project-grouping")}
@@ -2363,22 +2433,40 @@ export function GeneralSettingsPanel() {
             ) : null
           }
           control={
-            <Switch
-              checked={isProjectGroupingEnabled(settings.sidebarProjectGroupingMode)}
-              onCheckedChange={(checked) => {
-                if (!checked && settings.sidebarProjectGroupingMode !== "separate") {
-                  lastEnabledProjectGroupingMode.current = settings.sidebarProjectGroupingMode;
+            <Select
+              value={settings.sidebarProjectGroupingMode}
+              onValueChange={(value) => {
+                if (value !== "repository" && value !== "repository_path" && value !== "separate")
+                  return;
+                if (value === "separate") {
                   rememberEnabledProjectGroupingMode(settings.sidebarProjectGroupingMode);
+                } else {
+                  rememberEnabledProjectGroupingMode(value);
                 }
-                updateSettings({
-                  sidebarProjectGroupingMode: projectGroupingModeFromToggle(
-                    checked,
-                    lastEnabledProjectGroupingMode.current,
-                  ),
-                });
+                updateSettings({ sidebarProjectGroupingMode: value });
               }}
-              aria-label={t.settings.rows.projectGrouping.ariaLabel}
-            />
+            >
+              <SelectTrigger size="settings" aria-label={t.settings.rows.projectGrouping.ariaLabel}>
+                <SelectValue>
+                  {settings.sidebarProjectGroupingMode === "repository"
+                    ? t.sidebar.grouping.repository
+                    : settings.sidebarProjectGroupingMode === "repository_path"
+                      ? t.sidebar.grouping.repositoryPath
+                      : t.sidebar.grouping.separate}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectPopup align="end" alignItemWithTrigger={false}>
+                <SelectItem hideIndicator value="repository">
+                  {t.sidebar.grouping.repository}
+                </SelectItem>
+                <SelectItem hideIndicator value="repository_path">
+                  {t.sidebar.grouping.repositoryPath}
+                </SelectItem>
+                <SelectItem hideIndicator value="separate">
+                  {t.sidebar.grouping.separate}
+                </SelectItem>
+              </SelectPopup>
+            </Select>
           }
         />
         <SettingsRow
@@ -2406,11 +2494,7 @@ export function GeneralSettingsPanel() {
                 }
               }}
             >
-              <SelectTrigger
-                size="sm"
-                className="w-full sm:w-44"
-                aria-label={t.settings.rows.projectOrder.ariaLabel}
-              >
+              <SelectTrigger size="settings" aria-label={t.settings.rows.projectOrder.ariaLabel}>
                 <SelectValue>
                   {SIDEBAR_PROJECT_SORT_ORDER_LABELS[settings.sidebarProjectSortOrder]}
                 </SelectValue>
@@ -2423,6 +2507,29 @@ export function GeneralSettingsPanel() {
                 ))}
               </SelectPopup>
             </Select>
+          }
+        />
+      </SettingsSection>
+
+      <SettingsSection id="behavior" title={t.settings.sections.behavior}>
+        <SettingsSearchTarget id="project-defaults">
+          <DefaultModelSetting title={t.settings.rows.defaultModel.title} />
+          <DefaultPermissionsSetting controlSize="settings" />
+        </SettingsSearchTarget>
+        <SettingsRow
+          serverScoped
+          {...searchableSetting("snooze-limited-threads")}
+          description={t.settings.rows.snoozeLimitedThreads.description}
+          settingKeys={["snoozeLimitedThreads"]}
+          control={
+            <ScopedSwitch
+              settingKeys={["snoozeLimitedThreads"]}
+              checked={settings.snoozeLimitedThreads}
+              onCheckedChange={(checked) =>
+                updateSettings({ snoozeLimitedThreads: Boolean(checked) })
+              }
+              aria-label={t.settings.rows.snoozeLimitedThreads.ariaLabel}
+            />
           }
         />
 
@@ -2442,23 +2549,6 @@ export function GeneralSettingsPanel() {
             />
           }
         />
-        <SettingsRow
-          serverScoped
-          {...searchableSetting("snooze-limited-threads")}
-          description={t.settings.rows.snoozeLimitedThreads.description}
-          settingKeys={["snoozeLimitedThreads"]}
-          control={
-            <ScopedSwitch
-              settingKeys={["snoozeLimitedThreads"]}
-              checked={settings.snoozeLimitedThreads}
-              onCheckedChange={(checked) =>
-                updateSettings({ snoozeLimitedThreads: Boolean(checked) })
-              }
-              aria-label={t.settings.rows.snoozeLimitedThreads.ariaLabel}
-            />
-          }
-        />
-
         <SettingsRow
           {...searchableSetting("working-shelf")}
           description={t.settings.rows.workingShelf.description}
@@ -2488,36 +2578,6 @@ export function GeneralSettingsPanel() {
 
         {supportsAutoSettlement ? (
           <>
-            <SettingsRow
-              serverScoped
-              settingKeys={["sidebarAutoSettleOnMerge"]}
-              {...searchableSetting("auto-settle-merged-threads")}
-              description={t.settings.rows.autoSettleMergedThreads.description}
-              resetAction={
-                settings.sidebarAutoSettleOnMerge !==
-                DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleOnMerge ? (
-                  <SettingResetButton
-                    label={t.settings.rows.autoSettleMergedThreads.resetLabel}
-                    onClick={() =>
-                      updateSettings({
-                        sidebarAutoSettleOnMerge: DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleOnMerge,
-                      })
-                    }
-                  />
-                ) : null
-              }
-              control={
-                <ScopedSwitch
-                  settingKeys={["sidebarAutoSettleOnMerge"]}
-                  checked={settings.sidebarAutoSettleOnMerge}
-                  onCheckedChange={(checked) =>
-                    updateSettings({ sidebarAutoSettleOnMerge: Boolean(checked) })
-                  }
-                  aria-label={t.settings.rows.autoSettleMergedThreads.ariaLabel}
-                />
-              }
-            />
-
             <SettingsRow
               serverScoped
               settingKeys={["sidebarAutoSettleAfterDays"]}
@@ -2554,7 +2614,7 @@ export function GeneralSettingsPanel() {
               <SettingsRow
                 serverScoped
                 settingKeys={["sidebarAutoSettleAfterDays"]}
-                title={searchableSetting("days-before-auto-settle").title}
+                {...searchableSetting("days-before-auto-settle")}
                 description={t.settings.rows.daysBeforeAutoSettle.description}
                 control={
                   <AutoSettleDaysInput
@@ -2564,11 +2624,37 @@ export function GeneralSettingsPanel() {
                 }
               />
             ) : null}
+            <SettingsRow
+              serverScoped
+              settingKeys={["sidebarAutoSettleOnMerge"]}
+              {...searchableSetting("auto-settle-merged-threads")}
+              description={t.settings.rows.autoSettleMergedThreads.description}
+              resetAction={
+                settings.sidebarAutoSettleOnMerge !==
+                DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleOnMerge ? (
+                  <SettingResetButton
+                    label={t.settings.rows.autoSettleMergedThreads.resetLabel}
+                    onClick={() =>
+                      updateSettings({
+                        sidebarAutoSettleOnMerge: DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleOnMerge,
+                      })
+                    }
+                  />
+                ) : null
+              }
+              control={
+                <ScopedSwitch
+                  settingKeys={["sidebarAutoSettleOnMerge"]}
+                  checked={settings.sidebarAutoSettleOnMerge}
+                  onCheckedChange={(checked) =>
+                    updateSettings({ sidebarAutoSettleOnMerge: Boolean(checked) })
+                  }
+                  aria-label={t.settings.rows.autoSettleMergedThreads.ariaLabel}
+                />
+              }
+            />
           </>
         ) : null}
-      </SettingsSection>
-
-      <SettingsSection id="behavior" title={t.settings.sections.behavior}>
         <NotificationSettings />
         <SettingsRow
           {...searchableSetting("in-app-notifications")}
@@ -2597,33 +2683,23 @@ export function GeneralSettingsPanel() {
             ) : null
           }
           control={
-            <Select
-              value={settings.timestampFormat}
-              onValueChange={(value) => {
+            <ToggleGroup
+              size="settings"
+              value={[settings.timestampFormat]}
+              onValueChange={(values) => {
+                const value = values[0];
                 if (value === "locale" || value === "12-hour" || value === "24-hour") {
                   updateSettings({ timestampFormat: value });
                 }
               }}
+              aria-label={t.settings.rows.timeFormat.ariaLabel}
             >
-              <SelectTrigger
-                size="sm"
-                className="w-full sm:w-40"
-                aria-label={t.settings.rows.timeFormat.ariaLabel}
-              >
-                <SelectValue>{TIMESTAMP_FORMAT_LABELS[settings.timestampFormat]}</SelectValue>
-              </SelectTrigger>
-              <SelectPopup align="end" alignItemWithTrigger={false}>
-                <SelectItem hideIndicator value="locale">
-                  {TIMESTAMP_FORMAT_LABELS.locale}
-                </SelectItem>
-                <SelectItem hideIndicator value="12-hour">
-                  {TIMESTAMP_FORMAT_LABELS["12-hour"]}
-                </SelectItem>
-                <SelectItem hideIndicator value="24-hour">
-                  {TIMESTAMP_FORMAT_LABELS["24-hour"]}
-                </SelectItem>
-              </SelectPopup>
-            </Select>
+              {(["locale", "12-hour", "24-hour"] as const).map((value) => (
+                <ToggleGroupItem key={value} value={value}>
+                  {TIMESTAMP_FORMAT_LABELS[value]}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
           }
         />
         <SettingsRow
@@ -2657,8 +2733,7 @@ export function GeneralSettingsPanel() {
               }}
             >
               <SelectTrigger
-                size="sm"
-                className="w-full sm:w-56"
+                size="settings"
                 aria-label={t.settings.rows.responseStreaming.ariaLabel}
               >
                 <SelectValue>
@@ -2730,8 +2805,7 @@ export function GeneralSettingsPanel() {
               }}
             >
               <SelectTrigger
-                size="sm"
-                className="w-full sm:w-40"
+                size="settings"
                 aria-label={t.settings.rows.defaultDiffFileState.ariaLabel}
               >
                 <SelectValue>
@@ -2763,30 +2837,23 @@ export function GeneralSettingsPanel() {
             ) : null
           }
           control={
-            <Select
-              value={settings.diffLayout}
-              onValueChange={(value) => {
+            <ToggleGroup
+              size="settings"
+              value={[settings.diffLayout]}
+              onValueChange={(values) => {
+                const value = values[0];
                 if (value === "stacked" || value === "split") {
                   updateSettings({ diffLayout: value });
                 }
               }}
+              aria-label={t.settings.rows.diffLayout.ariaLabel}
             >
-              <SelectTrigger
-                size="sm"
-                className="w-full sm:w-40"
-                aria-label={t.settings.rows.diffLayout.ariaLabel}
-              >
-                <SelectValue>{DIFF_LAYOUT_LABELS[settings.diffLayout]}</SelectValue>
-              </SelectTrigger>
-              <SelectPopup align="end" alignItemWithTrigger={false}>
-                <SelectItem hideIndicator value="stacked">
-                  {DIFF_LAYOUT_LABELS.stacked}
-                </SelectItem>
-                <SelectItem hideIndicator value="split">
-                  {DIFF_LAYOUT_LABELS.split}
-                </SelectItem>
-              </SelectPopup>
-            </Select>
+              {(["stacked", "split"] as const).map((value) => (
+                <ToggleGroupItem key={value} value={value}>
+                  {DIFF_LAYOUT_LABELS[value]}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
           }
         />
 
@@ -2918,15 +2985,18 @@ export function GeneralSettingsPanel() {
               }}
             >
               <SelectTrigger
-                size="sm"
-                className="w-auto min-w-0 max-w-full"
+                variant="keycap"
+                size="shortcut"
+                icon={false}
                 aria-label={t.settings.rows.sendShortcut.ariaLabel}
               >
                 <SelectValue>
-                  {
-                    sendShortcutOptions.find((option) => option.value === settings.sendShortcut)
-                      ?.label
-                  }
+                  <Kbd>
+                    {
+                      sendShortcutOptions.find((option) => option.value === settings.sendShortcut)
+                        ?.label
+                    }
+                  </Kbd>
                 </SelectValue>
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
@@ -2971,8 +3041,7 @@ export function GeneralSettingsPanel() {
               }}
             >
               <SelectTrigger
-                size="sm"
-                className="w-auto min-w-0"
+                size="settings"
                 aria-label={t.settings.rows.followUpBehavior.ariaLabel}
               >
                 <SelectValue>
@@ -3099,8 +3168,7 @@ export function GeneralSettingsPanel() {
                 }}
               >
                 <SelectTrigger
-                  size="sm"
-                  className="w-full sm:w-40"
+                  size="settings"
                   aria-label={t.settings.rows.backgroundActivity.ariaLabel}
                 >
                   <SelectValue>
@@ -3159,6 +3227,8 @@ export function GeneralSettingsPanel() {
       </SettingsSection>
 
       <SettingsSection id="projects-and-threads" title={t.settings.sections.projectsAndThreads}>
+        <DefaultWorkspaceSetting title={t.settings.rows.newThreads.title} controlSize="settings" />
+        <DefaultSubmodulesSetting controlSize="settings" />
         <SettingsRow
           serverScoped
           settingKeys={["newWorktreesStartFromOrigin"]}
@@ -3208,14 +3278,11 @@ export function GeneralSettingsPanel() {
             ) : null
           }
           control={
-            <DraftInput
-              size="sm"
-              className="w-full sm:w-72"
+            <GeneralPathInput
               value={mixedAddProjectBaseDirectory ? "" : settings.addProjectBaseDirectory}
               onCommit={(next) => updateSettings({ addProjectBaseDirectory: next })}
               placeholder={mixedAddProjectBaseDirectory ? t.settings.general.mixed : "~/"}
-              spellCheck={false}
-              aria-label={t.settings.rows.addProjectStartsIn.ariaLabel}
+              label={t.settings.rows.addProjectStartsIn.ariaLabel}
             />
           }
         />
@@ -3237,14 +3304,11 @@ export function GeneralSettingsPanel() {
             ) : null
           }
           control={
-            <DraftInput
-              size="sm"
-              className="w-full sm:w-72"
+            <GeneralPathInput
               value={mixedThreadExportDirectory ? "" : settings.threadExportDirectory}
               onCommit={(next) => updateSettings({ threadExportDirectory: next })}
               placeholder={mixedThreadExportDirectory ? t.settings.general.mixed : ""}
-              spellCheck={false}
-              aria-label={t.settings.rows.threadExportDirectory.ariaLabel}
+              label={t.settings.rows.threadExportDirectory.ariaLabel}
             />
           }
         />
@@ -3353,8 +3417,7 @@ export function GeneralSettingsPanel() {
                 }}
               >
                 <SelectTrigger
-                  size="sm"
-                  className="w-full sm:w-40"
+                  size="settings"
                   aria-label={t.settings.rows.quitConfirmation.ariaLabel}
                 >
                   <SelectValue>{QUIT_CONFIRMATION_MODE_LABELS[settings.confirmQuit]}</SelectValue>
@@ -3504,10 +3567,25 @@ export function GeneralSettingsPanel() {
           control={
             <Button
               render={<a href={PRIVACY_POLICY_URL} target="_blank" rel="noreferrer noopener" />}
-              size="sm"
-              variant="outline"
+              size="icon-toolbar"
+              variant="ghost-muted"
+              aria-label={t.settings.rows.privacyPolicy.viewPolicy}
             >
-              {t.settings.rows.privacyPolicy.viewPolicy}
+              <ChevronRightIcon aria-hidden />
+            </Button>
+          }
+        />
+        <SettingsRow
+          {...searchableSetting("open-source-licenses")}
+          description={t.settings.rows.openSourceLicenses.description}
+          control={
+            <Button
+              render={<Link to="/settings/open-source-licenses" />}
+              size="icon-toolbar"
+              variant="ghost-muted"
+              aria-label={t.settings.rows.openSourceLicenses.viewLicenses}
+            >
+              <ChevronRightIcon aria-hidden />
             </Button>
           }
         />
@@ -3525,23 +3603,11 @@ export function GeneralSettingsPanel() {
               render={
                 <Link to="/settings/diagnostics" search={{ machine: environmentId ?? undefined }} />
               }
-              size="sm"
-              variant="outline"
+              size="icon-toolbar"
+              variant="ghost-muted"
+              aria-label={t.settings.rows.diagnostics.viewDiagnostics}
             >
-              {t.settings.rows.diagnostics.viewDiagnostics}
-            </Button>
-          }
-        />
-        <SettingsRow
-          {...searchableSetting("open-source-licenses")}
-          description={t.settings.rows.openSourceLicenses.description}
-          control={
-            <Button
-              render={<Link to="/settings/open-source-licenses" />}
-              size="sm"
-              variant="outline"
-            >
-              {t.settings.rows.openSourceLicenses.viewLicenses}
+              <ChevronRightIcon aria-hidden />
             </Button>
           }
         />

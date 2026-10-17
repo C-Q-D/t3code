@@ -1,3 +1,4 @@
+/** Edits notification mode; permission prompts and audio unlock remain prerequisites for saving. */
 import { t } from "~/i18n";
 import { useState } from "react";
 
@@ -12,6 +13,7 @@ import { SettingsRow } from "./settingsLayout";
 import { searchableSetting } from "./settingsSearch";
 import { useScopedSettings, useUpdateScopedSettings } from "./useScopedSettings";
 
+/** Preserves all notification modes and permission feedback in the General settings capsule. */
 export function NotificationSettings() {
   const mode = useScopedSettings((settings) => settings.notificationMode);
   const updateSettings = useUpdateScopedSettings();
@@ -58,11 +60,7 @@ export function NotificationSettings() {
             updateSettings({ notificationMode: value });
           }}
         >
-          <SelectTrigger
-            size="sm"
-            className="w-full sm:w-56"
-            aria-label={t.settings.rows.threadNotifications.title}
-          >
+          <SelectTrigger size="settings" aria-label={t.settings.rows.threadNotifications.title}>
             <SelectValue>{NOTIFICATION_MODE_LABELS[mode]}</SelectValue>
           </SelectTrigger>
           <SelectPopup align="end" alignItemWithTrigger={false}>

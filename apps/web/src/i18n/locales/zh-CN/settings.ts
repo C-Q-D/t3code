@@ -332,6 +332,8 @@ export const settings: Messages["settings"] = {
     daysBeforeAutoSettle: {
       title: "自动完结前的不活跃天数",
       description: "任何新活动都会自动恢复对话。",
+      decreaseAriaLabel: "减少自动完结前的不活跃天数",
+      increaseAriaLabel: "增加自动完结前的不活跃天数",
     },
     threadNotifications: {
       title: "对话通知",
@@ -830,6 +832,7 @@ export const settings: Messages["settings"] = {
     environmentLabel: (label: string, address: string) => `${label}·${address}`,
   },
   general: {
+    browseFolder: "浏览文件夹",
     mixed: "多个值",
     appVersionDescription: "应用当前版本。",
   },

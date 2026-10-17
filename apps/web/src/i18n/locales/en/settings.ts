@@ -359,6 +359,8 @@ export const settings = {
     daysBeforeAutoSettle: {
       title: "Days of inactivity before auto-settle",
       description: "Any new activity un-settles a thread automatically.",
+      decreaseAriaLabel: "Decrease days of inactivity before auto-settle",
+      increaseAriaLabel: "Increase days of inactivity before auto-settle",
     },
     threadNotifications: {
       title: "Thread notifications",
@@ -881,6 +883,7 @@ export const settings = {
     environmentLabel: (label: string, address: string) => `${label} · ${address}`,
   },
   general: {
+    browseFolder: "Browse folder",
     mixed: "Mixed",
     appVersionDescription: "Current version of the application.",
   },

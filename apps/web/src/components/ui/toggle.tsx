@@ -23,6 +23,9 @@ const toggleVariants = cva(
           "h-7 min-w-0 rounded-segmented-item px-2.5 text-secondary-copy-medium before:rounded-segmented-item sm:text-secondary-copy-medium",
         sm: "h-8 min-w-8 px-[calc(--spacing(1.5)-1px)] sm:h-7 sm:min-w-7",
         xs: "h-7 min-w-7 px-[calc(--spacing(1)-1px)] sm:h-6 sm:min-w-6 rounded-md",
+        // SettingsPage8a M2/M3: 26px segments inside the 32px settings track.
+        settings:
+          "h-6.5 min-w-0 rounded-segmented-item px-2.75 text-secondary-copy-medium before:rounded-segmented-item sm:text-secondary-copy-medium",
       },
       variant: {
         default: "border-transparent",

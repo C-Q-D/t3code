@@ -25,6 +25,9 @@ const selectTriggerVariants = cva(
           "w-full min-w-36 bg-select-control text-fg-detail shadow-raise-xs-control not-disabled:not-data-disabled:hover:bg-accent not-disabled:not-data-disabled:hover:text-message-action-hover not-disabled:not-data-disabled:hover:shadow-raise-xs-hover focus-visible:shadow-raise-tab not-disabled:not-data-disabled:[&:is(:active,[data-pressed],[aria-expanded=true])]:translate-y-[1.5px] not-disabled:not-data-disabled:[&:is(:active,[data-pressed],[aria-expanded=true])]:bg-select-pressed not-disabled:not-data-disabled:[&:is(:active,[data-pressed],[aria-expanded=true])]:text-foreground not-disabled:not-data-disabled:[&:is(:active,[data-pressed],[aria-expanded=true])]:shadow-raise-xs-pressed aria-invalid:shadow-outline-danger [&:is(:disabled,[data-disabled])]:bg-select-disabled [&:is(:disabled,[data-disabled])]:text-fg-control-disabled [&:is(:disabled,[data-disabled])]:shadow-none",
         ghost:
           "bg-transparent text-secondary-label not-disabled:not-data-disabled:hover:bg-accent not-disabled:not-data-disabled:hover:text-foreground not-disabled:not-data-disabled:[&:is(:active,[data-pressed],[aria-expanded=true])]:bg-accent not-disabled:not-data-disabled:[&:is(:active,[data-pressed],[aria-expanded=true])]:text-foreground [&:is(:disabled,[data-disabled])]:text-fg-control-disabled",
+        // SettingsPage8a M2: shortcut pickers place a keycap inside the shared recessed well.
+        keycap:
+          "justify-center bg-input text-foreground shadow-well-track [&:is(:disabled,[data-disabled])]:text-fg-control-disabled",
       },
       size: {
         compact: "h-7 gap-1 px-2 text-secondary-copy",
@@ -32,6 +35,10 @@ const selectTriggerVariants = cva(
         lg: "h-10 ps-3 pe-2.5",
         sm: "h-7.5 px-2.5",
         xs: "h-7 gap-1 px-2 text-secondary-copy",
+        // SettingsPage8a M2/M3: shared 32px capsule with a 120px minimum width.
+        settings: "h-8 w-auto min-w-30 ps-3 pe-2.5",
+        // SettingsPage8a M2: 32px shortcut well, at least 90px wide.
+        shortcut: "h-8 w-auto min-w-22.5 px-3",
       },
     },
   },

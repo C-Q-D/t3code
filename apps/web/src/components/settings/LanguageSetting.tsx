@@ -12,8 +12,8 @@ import { toastManager } from "../ui/toast";
 import { SettingResetButton, SettingsRow, SettingsSection } from "./settingsLayout";
 import { searchableSetting } from "./settingsSearch";
 
-/** Renders a device-local setting; selection and reset persist before reloading the page. */
-export function LanguageSetting() {
+/** Edits device-local language; size selects the General capsule or the existing appearance-page control. Saving and resetting still reload after persistence. */
+export function LanguageSetting({ size = "sm" }: { size?: "sm" | "settings" } = {}) {
   const preference = readLocalePreference();
 
   /**
@@ -48,9 +48,9 @@ export function LanguageSetting() {
           ) : null
         }
         control={
-          <div className="w-full sm:w-40">
+          <div className={size === "settings" ? "max-w-full" : "w-full sm:w-40"}>
             <Select value={preference} onValueChange={changeLanguage}>
-              <SelectTrigger size="sm" aria-label={t.settings.rows.language.ariaLabel}>
+              <SelectTrigger size={size} aria-label={t.settings.rows.language.ariaLabel}>
                 <SelectValue>
                   {preference === "system"
                     ? t.settings.rows.language.options.system

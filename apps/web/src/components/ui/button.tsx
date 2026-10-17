@@ -53,6 +53,8 @@ const buttonVariants = cva(
         // 其余屏-2 L3 / Panel8a: compact toolbar keys are 28px with 9px corners.
         "icon-compact-key":
           "size-7 rounded-device-control p-0 [&_svg:not([class*='size-'])]:size-3.5",
+        // SettingsPage8a M2 day stepper: 26px circular controls inside a 32px well.
+        "icon-stepper": "size-6.5 p-0 [&_svg:not([class*='size-'])]:size-3.25",
       },
       variant: {
         default:
