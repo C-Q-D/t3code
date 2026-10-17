@@ -3,6 +3,8 @@ import { converter } from "culori/fn";
 import { BUILT_IN_THEMES } from "@t3tools/shared/themePalettes";
 
 import {
+  BUILT_IN_THEME_DEFINITIONS,
+  THEME_COLOR_ROLES,
   applyThemeColorPreview,
   applyThemePalette,
   getThemeColorsForMode,
@@ -82,6 +84,82 @@ function contrastRatio(first: string, second: string): number {
 }
 
 describe("theme files", () => {
+  it("provides Graphite as a complete dark-only web built-in without sidebar artwork", () => {
+    const graphite = getThemeDefinition("graphite");
+    expect(graphite).not.toBeNull();
+    expect(BUILT_IN_THEME_DEFINITIONS).toContain(graphite);
+    expect(singleAppearanceOf(graphite!)).toBe("dark");
+    expect(getThemeColorsForMode(graphite!, "light")).toBeNull();
+    expect(themeAllowsSidebarArtwork("graphite")).toBe(false);
+    expect(Object.keys(graphite!.colors).sort()).toEqual([...THEME_COLOR_ROLES].sort());
+    expectThemeColors(graphite!.colors, {
+      canvas: "#0b0b0c",
+      chrome: "#0b0b0c",
+      toolbar: "#0b0b0c",
+      toolbarForeground: "#ececee",
+      toolbarBorder: "#1c1c1f",
+      toolbarControl: "#2e2e33",
+      toolbarControlForeground: "#ececee",
+      toolbarControlHover: "#38383e",
+      surface: "#202023",
+      surfaceRaised: "#28282c",
+      surfaceOverlay: "#2a2a2e",
+      text: "#ececee",
+      textMuted: "#94949c",
+      border: "#46464d",
+      input: "#131315",
+      focus: "#f2f2f3",
+      accent: "#f2f2f3",
+      accentForeground: "#111113",
+      secondary: "#2e2e33",
+      secondaryForeground: "#ececee",
+      muted: "#2e2e33",
+      mutedForeground: "#a9a9b1",
+      placeholder: "#76767e",
+      secondaryLabel: "#94949c",
+      iconMuted: "#94949c",
+      error: "#ff7b6b",
+      errorForeground: "#ff7b6b",
+      errorSurface: "#3a1c1a",
+      warning: "#9a6400",
+      warningForeground: "#2e2617",
+      warningSurface: "#e8dcc0",
+      update: "#82abff",
+      updateForeground: "#8fb4ff",
+      updateSurface: "#17263f",
+      accentSurface: "#38383e",
+      accentSurfaceForeground: "#ececee",
+      messageSurface: "#323237",
+      messageForeground: "#f5f5f6",
+      messageAction: "#f2f2f3",
+      messageActionForeground: "#111113",
+      messageActionHover: "#ffffff",
+      codeBackground: "#121214",
+      codeForeground: "#c4c4ca",
+      searchMatchBackground: "#4a3a17",
+      searchMatchForeground: "#ececee",
+      searchMatchActiveBackground: "#eea52b",
+      searchMatchActiveForeground: "#111113",
+      sidebar: "#1c1c1f",
+      sidebarForeground: "#ececee",
+      sidebarMutedForeground: "#a9a9b1",
+      sidebarControlSurface: "#131315",
+      sidebarRowHover: "#27272b",
+      sidebarRowActive: "#2e2e33",
+      sidebarRowSelected: "#202023",
+      sidebarBorder: "#1c1c1f",
+      terminalBackground: "#121214",
+      terminalForeground: "#ececee",
+      terminalCursor: "#f2f2f3",
+      terminalSelection: "#3a3a40",
+      terminalScrollbar: "#46464d",
+      terminalScrollbarHover: "#5e5e66",
+    });
+    expect(
+      Object.values(graphite!.colors).every((color) => toCanonicalThemeColor(color) === color),
+    ).toBe(true);
+  });
+
   it("keeps every built-in palette value in canonical OKLCH form", () => {
     for (const theme of BUILT_IN_THEMES) {
       for (const colors of [theme.colors, ...Object.values(theme.variants ?? {})]) {

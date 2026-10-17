@@ -1088,7 +1088,81 @@ export function updateThemeColorFamily(
   }
 }
 
-const BUILT_IN_THEME_DEFINITIONS: ReadonlyArray<ThemeDefinition> = BUILT_IN_THEMES;
+/** Graphite uses the 8a G1 dark palette; canonical OKLCH keeps editor and export values stable. */
+export const GRAPHITE_THEME: ThemeDefinition = {
+  id: "graphite",
+  label: "Graphite",
+  appearance: "dark",
+  colors: {
+    canvas: "oklch(0.150035 0.00212 286.141)", // #0b0b0c
+    chrome: "oklch(0.150035 0.00212 286.141)", // #0b0b0c
+    toolbar: "oklch(0.150035 0.00212 286.141)", // #0b0b0c
+    toolbarForeground: "oklch(0.943656 0.002669 286.348)", // #ececee
+    toolbarBorder: "oklch(0.227713 0.005742 285.935)", // #1c1c1f
+    toolbarControl: "oklch(0.303159 0.008917 285.856)", // #2e2e33
+    toolbarControlForeground: "oklch(0.943656 0.002669 286.348)", // #ececee
+    toolbarControlHover: "oklch(0.342998 0.010376 285.84)", // #38383e
+    surface: "oklch(0.244771 0.005637 285.976)", // #202023
+    surfaceRaised: "oklch(0.278453 0.007282 285.917)", // #28282c
+    surfaceOverlay: "oklch(0.286608 0.007229 285.935)", // #2a2a2e
+    text: "oklch(0.943656 0.002669 286.348)", // #ececee
+    textMuted: "oklch(0.669086 0.011677 286.08)", // #94949c
+    border: "oklch(0.396763 0.011671 285.856)", // #46464d
+    input: "oklch(0.187619 0.004015 286.006)", // #131315
+    focus: "oklch(0.961433 0.001328 286.375)", // #f2f2f3
+    accent: "oklch(0.961433 0.001328 286.375)", // #f2f2f3
+    accentForeground: "oklch(0.178529 0.004066 285.981)", // #111113
+    secondary: "oklch(0.303159 0.008917 285.856)", // #2e2e33
+    secondaryForeground: "oklch(0.943656 0.002669 286.348)", // #ececee
+    muted: "oklch(0.303159 0.008917 285.856)", // #2e2e33
+    mutedForeground: "oklch(0.737277 0.011392 286.117)", // #a9a9b1
+    placeholder: "oklch(0.568499 0.012173 286.006)", // #76767e
+    secondaryLabel: "oklch(0.669086 0.011677 286.08)", // #94949c
+    iconMuted: "oklch(0.669086 0.011677 286.08)", // #94949c
+    error: "oklch(0.733244 0.163958 28.725)", // #ff7b6b
+    errorForeground: "oklch(0.733244 0.163958 28.725)", // #ff7b6b
+    errorSurface: "oklch(0.267813 0.047615 24.75)", // #3a1c1a
+    warning: "oklch(0.54827 0.11708 72.508)", // #9a6400
+    warningForeground: "oklch(0.273167 0.028176 82.674)", // #2e2617
+    warningSurface: "oklch(0.896803 0.039453 87.567)", // #e8dcc0
+    update: "oklch(0.746145 0.130033 263.722)", // #82abff
+    updateForeground: "oklch(0.772297 0.115436 263.774)", // #8fb4ff
+    updateSurface: "oklch(0.268859 0.051211 260.163)", // #17263f
+    accentSurface: "oklch(0.342998 0.010376 285.84)", // #38383e
+    accentSurfaceForeground: "oklch(0.943656 0.002669 286.348)", // #ececee
+    messageSurface: "oklch(0.31908 0.0088 285.89)", // #323237
+    messageForeground: "oklch(0.970432 0.001325 286.375)", // #f5f5f6
+    messageAction: "oklch(0.961433 0.001328 286.375)", // #f2f2f3
+    messageActionForeground: "oklch(0.178529 0.004066 285.981)", // #111113
+    messageActionHover: "oklch(1 0 0)", // #ffffff
+    codeBackground: "oklch(0.183088 0.00404 285.994)", // #121214
+    codeForeground: "oklch(0.822103 0.008304 286.216)", // #c4c4ca
+    searchMatchBackground: "oklch(0.357733 0.055518 84.636)", // #4a3a17
+    searchMatchForeground: "oklch(0.943656 0.002669 286.348)", // #ececee
+    searchMatchActiveBackground: "oklch(0.774202 0.151946 74.331)", // #eea52b
+    searchMatchActiveForeground: "oklch(0.178529 0.004066 285.981)", // #111113
+    sidebar: "oklch(0.227713 0.005742 285.935)", // #1c1c1f
+    sidebarForeground: "oklch(0.943656 0.002669 286.348)", // #ececee
+    sidebarMutedForeground: "oklch(0.737277 0.011392 286.117)", // #a9a9b1
+    sidebarControlSurface: "oklch(0.187619 0.004015 286.006)", // #131315
+    sidebarRowHover: "oklch(0.274353 0.00731 285.908)", // #27272b
+    sidebarRowActive: "oklch(0.303159 0.008917 285.856)", // #2e2e33
+    sidebarRowSelected: "oklch(0.244771 0.005637 285.976)", // #202023
+    sidebarBorder: "oklch(0.227713 0.005742 285.935)", // #1c1c1f; fallback for G1's borderless sidebar, matching its surface.
+    terminalBackground: "oklch(0.183088 0.00404 285.994)", // #121214
+    terminalForeground: "oklch(0.943656 0.002669 286.348)", // #ececee
+    terminalCursor: "oklch(0.961433 0.001328 286.375)", // #f2f2f3
+    terminalSelection: "oklch(0.350745 0.010317 285.856)", // #3a3a40
+    terminalScrollbar: "oklch(0.396763 0.011671 285.856)", // #46464d
+    terminalScrollbarHover: "oklch(0.484726 0.01268 285.917)", // #5e5e66
+  },
+};
+
+/** Web built-ins include desktop-only palettes without extending the mobile theme library. */
+export const BUILT_IN_THEME_DEFINITIONS: ReadonlyArray<ThemeDefinition> = [
+  GRAPHITE_THEME,
+  ...BUILT_IN_THEMES,
+];
 
 export function getThemeDefinition(theme: ThemePreference): ThemeDefinition | null {
   const themeId = themeIdFromPreference(theme);
