@@ -34,6 +34,13 @@ Style with Tailwind classes in the component that renders the element.
 - No `style={{ ... }}` or inline `<style>` for static values a class covers. Values computed at
   runtime are fine.
 - Theme-only rules use `@variant dark` and `@variant light`, not `.dark` selectors.
+- Design tokens start from the contract table at the top of
+  [`styles/tokens.css`](../../apps/web/src/styles/tokens.css), one class per purpose. A value only
+  one feature needs goes in that feature's stylesheet under `styles/` with `@theme`. Register every
+  new shadow, inset-shadow, text size, radius, leading, or tracking token in the matching group of
+  `extendTailwindMerge` in [`lib/utils.ts`](../../apps/web/src/lib/utils.ts). Unregistered names are
+  misclassified, with shadows and text sizes read as colors, so `cn` keeps or drops the wrong
+  class. Color tokens need no entry.
 
 ## Composition
 
