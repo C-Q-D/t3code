@@ -21,7 +21,6 @@ import { resolveThreadCurrentPullRequestLink } from "@t3tools/shared/threadPullR
 import { useAtomValue } from "@effect/atom-react";
 import { replaceComposerContextReferences } from "@t3tools/shared/composerContextReferences";
 import {
-  DndContext,
   useSensor,
   useSensors,
   type DragEndEvent,
@@ -262,6 +261,10 @@ import { Badge } from "./ui/badge";
 import { SidebarContent, useSidebar } from "./ui/sidebar";
 import { SidebarChromeFooter } from "./sidebar/SidebarChrome";
 import { SidebarThreadHeader } from "./sidebar/SidebarThreadHeader";
+import {
+  SidebarThreadDndContext,
+  type SidebarTabDropActions,
+} from "./sidebar/SidebarThreadDndContext";
 import { SidebarBulkActions } from "./sidebar/SidebarBulkActions";
 import {
   buildSidebarBulkActionModel,
@@ -4038,6 +4041,75 @@ export default function Sidebar() {
     [performSnooze],
   );
 
+  // Header targets read live source membership and destination grants on hover and release.
+  const tabDropActions = useMemo<SidebarTabDropActions>(
+    () => ({
+      getSource: (key) => {
+        const thread = threadByKeyRef.current.get(key);
+        const section = sectionByThreadKeyRef.current.get(key);
+        if (!thread || !section) return null;
+        const capabilities = serverConfigs.get(thread.environmentId)?.environment.capabilities;
+        return {
+          section,
+          canOperate: canOperateThreads([thread]),
+          supportsSettlement: capabilities?.threadSettlement === true,
+          supportsSnooze: capabilities?.threadSnooze === true,
+          canSnooze: canSnooze(thread, { now: new Date().toISOString() }),
+        };
+      },
+      onDrop: (key, intent, position) => {
+        const thread = threadByKeyRef.current.get(key);
+        if (!thread || !checkThreadOperations([thread])) return;
+        const threadRef = scopeThreadRef(thread.environmentId, thread.id);
+        if (intent === "settle") {
+          settleThreads([key]);
+          return;
+        }
+        if (intent === "unsnooze") {
+          attemptUnsnooze(threadRef);
+          return;
+        }
+        if (intent === "unsettle") {
+          attemptUnsettle(threadRef);
+          return;
+        }
+        void (async () => {
+          const api = readLocalApi();
+          if (!api) return;
+          const presets = resolveSnoozePresets(new Date(), timestampFormat);
+          const clicked = await settlePromise(() =>
+            api.contextMenu.show(
+              [
+                ...presets.map((preset) => ({
+                  id: preset.id,
+                  label: t.sidebar.snooze.presetLabel(preset.label, preset.whenLabel),
+                })),
+                { id: "custom", label: t.sidebar.snooze.custom, separatorBefore: true },
+              ],
+              position,
+            ),
+          );
+          if (clicked._tag === "Failure" || clicked.value === null) return;
+          const preset =
+            clicked.value === "custom"
+              ? await requestCustomSnooze()
+              : presets.find((candidate) => candidate.id === clicked.value);
+          const current = threadByKeyRef.current.get(key);
+          if (preset && current && checkThreadOperations([current]))
+            attemptSnooze(threadRef, preset);
+        })();
+      },
+    }),
+    [
+      attemptSnooze,
+      attemptUnsettle,
+      attemptUnsnooze,
+      serverConfigs,
+      settleThreads,
+      timestampFormat,
+    ],
+  );
+
   const removeFromSelection = useThreadSelectionStore((s) => s.removeFromSelection);
   const supportsBulkAction = useCallback(
     (environmentId: EnvironmentId, capability: SidebarBulkCapability) =>
@@ -4755,143 +4827,140 @@ export default function Sidebar() {
   return (
     <>
       <ThreadContextDragGhost />
-      <SidebarContent
-        className="min-h-full"
-        fixedHeader={
-          <SidebarThreadHeader
-            currentTab={currentTab}
-            tabCounts={sidebarTabs.counts}
-            onTabChange={handleSidebarTabChange}
-            hasProjects={projectGroups.length > 0}
-            onOpenDiscussions={() => void router.navigate({ to: "/discussions" })}
-            onNewThread={handleNewThreadClick}
-            newThreadDisabled={projects.length === 0}
-            newThreadShortcutLabel={newThreadShortcutLabel}
-            newThreadInProjectShortcutLabel={newThreadInProjectShortcutLabel}
-            showNewThreadInProjectHint={projectGroups.length > 1}
-            searchInputRef={threadSearchInputRef}
-            searchQuery={threadSearchQuery}
-            onSearchQueryChange={(value) => {
-              setThreadSearchQuery(value);
-              setActiveSearchResultIndex(0);
-            }}
-            onSearchKeyDown={handleThreadSearchKeyDown}
-            isSearching={isSearchingThreads}
-            searchResultCount={threadSearchResults.length}
-            activeSearchResultIndex={activeSearchResultIndex}
-            onClearSearch={clearThreadSearch}
-          />
-        }
+      <SidebarThreadDndContext
+        sensors={dndSensors}
+        autoScroll={!isContextDrag}
+        collisionDetection={dndCollisionDetection}
+        modifiers={[restrictToVerticalAxis, restrictBelowPins, restrictToFirstScrollableAncestor]}
+        onDragStart={handleThreadDragStart}
+        onDragOver={handleThreadDragOver}
+        onDragEnd={handleThreadDragEnd}
+        tabDrop={tabDropActions}
       >
-        <div className="flex min-w-0 flex-1 flex-col pb-2.5 pt-0.5" role="presentation">
-          {isSearchingThreads ? (
-            threadSearchResults.length > 0 ? (
+        <SidebarContent
+          className="min-h-full"
+          fixedHeader={
+            <SidebarThreadHeader
+              currentTab={currentTab}
+              tabCounts={sidebarTabs.counts}
+              onTabChange={handleSidebarTabChange}
+              hasProjects={projectGroups.length > 0}
+              onOpenDiscussions={() => void router.navigate({ to: "/discussions" })}
+              onNewThread={handleNewThreadClick}
+              newThreadDisabled={projects.length === 0}
+              newThreadShortcutLabel={newThreadShortcutLabel}
+              newThreadInProjectShortcutLabel={newThreadInProjectShortcutLabel}
+              showNewThreadInProjectHint={projectGroups.length > 1}
+              searchInputRef={threadSearchInputRef}
+              searchQuery={threadSearchQuery}
+              onSearchQueryChange={(value) => {
+                setThreadSearchQuery(value);
+                setActiveSearchResultIndex(0);
+              }}
+              onSearchKeyDown={handleThreadSearchKeyDown}
+              isSearching={isSearchingThreads}
+              searchResultCount={threadSearchResults.length}
+              activeSearchResultIndex={activeSearchResultIndex}
+              onClearSearch={clearThreadSearch}
+            />
+          }
+        >
+          <div className="flex min-w-0 flex-1 flex-col pb-2.5 pt-0.5" role="presentation">
+            {isSearchingThreads ? (
+              threadSearchResults.length > 0 ? (
+                <TooltipProvider
+                  key="sidebar-thread-search-tooltips-150"
+                  delay={150}
+                  closeDelay={0}
+                  timeout={400}
+                >
+                  <ul
+                    id="sidebar-thread-search-results"
+                    role="listbox"
+                    aria-label={t.sidebar.search.resultsAriaLabel}
+                    className="flex flex-col gap-1"
+                  >
+                    {threadSearchResults.map((thread, index) => {
+                      const threadKey = scopedThreadKey(
+                        scopeThreadRef(thread.environmentId, thread.id),
+                      );
+                      return (
+                        <SidebarSearchResultRow
+                          isSettled={settledThreadKeys.has(threadKey)}
+                          key={threadKey}
+                          thread={thread}
+                          project={
+                            projectByKey.get(`${thread.environmentId}:${thread.projectId}`) ?? null
+                          }
+                          projectDisplayName={
+                            projectDisplayNameByKey.get(
+                              `${thread.environmentId}:${thread.projectId}`,
+                            ) ?? null
+                          }
+                          environmentLabel={environmentLabelById.get(thread.environmentId) ?? null}
+                          environmentMachine={
+                            environmentMachineById.get(thread.environmentId) ?? "server"
+                          }
+                          providerEntryByInstanceId={
+                            providerEntriesByEnvironment.get(thread.environmentId) ??
+                            EMPTY_PROVIDER_ENTRIES
+                          }
+                          isHighlighted={activeSearchResultIndex === index}
+                          isRouteActive={routeThreadKey === threadKey}
+                          resultId={`sidebar-thread-search-result-${index}`}
+                          searchMatch={
+                            threadSearchMatchByKey.get(
+                              threadSearchMatchKey({
+                                environmentId: thread.environmentId,
+                                threadId: thread.id,
+                              }),
+                            ) ?? null
+                          }
+                          searchQuery={threadSearchQuery}
+                          onHighlight={() => setActiveSearchResultIndex(index)}
+                          onSelect={() => selectThreadSearchResult(thread)}
+                          onFileDropThreads={handleThreadFileDrop}
+                        />
+                      );
+                    })}
+                  </ul>
+                  {threadSearch.isPending ? (
+                    <div
+                      role="status"
+                      className="flex h-9 items-center gap-2 px-3 text-secondary-copy-medium text-muted-foreground"
+                    >
+                      <TextSearchIcon aria-hidden className="size-3.5" />
+                      {t.sidebar.search.searchingHint}
+                    </div>
+                  ) : null}
+                </TooltipProvider>
+              ) : (
+                <div
+                  role="status"
+                  className={cn(
+                    "flex items-center gap-2.5 px-3 text-secondary-copy-large text-muted-foreground",
+                    threadSearch.isPending
+                      ? "h-9 gap-2 text-secondary-copy-medium"
+                      : "h-24 flex-col justify-center text-center",
+                  )}
+                >
+                  {threadSearch.isPending ? (
+                    <TextSearchIcon aria-hidden className="size-3.5" />
+                  ) : (
+                    <span className="flex size-10 items-center justify-center rounded-compact-row shadow-well-control">
+                      <SearchXIcon aria-hidden className="size-4.5" />
+                    </span>
+                  )}
+                  {threadSearch.isPending ? t.sidebar.search.searchingHint : t.sidebar.search.empty}
+                </div>
+              )
+            ) : null}
+            {!isSearchingThreads ? (
               <TooltipProvider
-                key="sidebar-thread-search-tooltips-150"
+                key="sidebar-thread-tooltips-150"
                 delay={150}
                 closeDelay={0}
                 timeout={400}
-              >
-                <ul
-                  id="sidebar-thread-search-results"
-                  role="listbox"
-                  aria-label={t.sidebar.search.resultsAriaLabel}
-                  className="flex flex-col gap-1"
-                >
-                  {threadSearchResults.map((thread, index) => {
-                    const threadKey = scopedThreadKey(
-                      scopeThreadRef(thread.environmentId, thread.id),
-                    );
-                    return (
-                      <SidebarSearchResultRow
-                        isSettled={settledThreadKeys.has(threadKey)}
-                        key={threadKey}
-                        thread={thread}
-                        project={
-                          projectByKey.get(`${thread.environmentId}:${thread.projectId}`) ?? null
-                        }
-                        projectDisplayName={
-                          projectDisplayNameByKey.get(
-                            `${thread.environmentId}:${thread.projectId}`,
-                          ) ?? null
-                        }
-                        environmentLabel={environmentLabelById.get(thread.environmentId) ?? null}
-                        environmentMachine={
-                          environmentMachineById.get(thread.environmentId) ?? "server"
-                        }
-                        providerEntryByInstanceId={
-                          providerEntriesByEnvironment.get(thread.environmentId) ??
-                          EMPTY_PROVIDER_ENTRIES
-                        }
-                        isHighlighted={activeSearchResultIndex === index}
-                        isRouteActive={routeThreadKey === threadKey}
-                        resultId={`sidebar-thread-search-result-${index}`}
-                        searchMatch={
-                          threadSearchMatchByKey.get(
-                            threadSearchMatchKey({
-                              environmentId: thread.environmentId,
-                              threadId: thread.id,
-                            }),
-                          ) ?? null
-                        }
-                        searchQuery={threadSearchQuery}
-                        onHighlight={() => setActiveSearchResultIndex(index)}
-                        onSelect={() => selectThreadSearchResult(thread)}
-                        onFileDropThreads={handleThreadFileDrop}
-                      />
-                    );
-                  })}
-                </ul>
-                {threadSearch.isPending ? (
-                  <div
-                    role="status"
-                    className="flex h-9 items-center gap-2 px-3 text-secondary-copy-medium text-muted-foreground"
-                  >
-                    <TextSearchIcon aria-hidden className="size-3.5" />
-                    {t.sidebar.search.searchingHint}
-                  </div>
-                ) : null}
-              </TooltipProvider>
-            ) : (
-              <div
-                role="status"
-                className={cn(
-                  "flex items-center gap-2.5 px-3 text-secondary-copy-large text-muted-foreground",
-                  threadSearch.isPending
-                    ? "h-9 gap-2 text-secondary-copy-medium"
-                    : "h-24 flex-col justify-center text-center",
-                )}
-              >
-                {threadSearch.isPending ? (
-                  <TextSearchIcon aria-hidden className="size-3.5" />
-                ) : (
-                  <span className="flex size-10 items-center justify-center rounded-compact-row shadow-well-control">
-                    <SearchXIcon aria-hidden className="size-4.5" />
-                  </span>
-                )}
-                {threadSearch.isPending ? t.sidebar.search.searchingHint : t.sidebar.search.empty}
-              </div>
-            )
-          ) : null}
-          {!isSearchingThreads ? (
-            <TooltipProvider
-              key="sidebar-thread-tooltips-150"
-              delay={150}
-              closeDelay={0}
-              timeout={400}
-            >
-              <DndContext
-                sensors={dndSensors}
-                autoScroll={!isContextDrag}
-                collisionDetection={dndCollisionDetection}
-                modifiers={[
-                  restrictToVerticalAxis,
-                  restrictBelowPins,
-                  restrictToFirstScrollableAncestor,
-                ]}
-                onDragStart={handleThreadDragStart}
-                onDragOver={handleThreadDragOver}
-                onDragEnd={handleThreadDragEnd}
               >
                 <SidebarDragLifecycle onUnmount={cancelThreadDrag} />
                 <SortableContext items={sortableIds} strategy={sidebarSortingStrategy}>
@@ -5149,37 +5218,37 @@ export default function Sidebar() {
                     ) : null}
                   </ul>
                 </SortableContext>
-              </DndContext>
-            </TooltipProvider>
-          ) : null}
-          {!isSearchingThreads &&
-          (currentTab !== "active" || visibleDraftSessionCount === 0) &&
-          sidebarTabs.counts[currentTab] === 0 ? (
-            <div className="flex flex-col items-center gap-2.5 px-3 py-5 text-center text-secondary-copy-large text-secondary-label">
-              <span className="flex size-10 items-center justify-center rounded-compact-row shadow-well-control">
-                <MessagesSquareIcon aria-hidden className="size-4.5" />
-              </span>
-              {projects.length === 0 ? (
-                <>
-                  <span>{t.sidebar.projects.empty}</span>
-                  <button
-                    type="button"
-                    onClick={openAddProjectCommandPalette}
-                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-sidebar-border px-2.5 py-1 text-2xs font-medium text-sidebar-muted-foreground transition-colors hover:bg-sidebar-row-hover hover:text-sidebar-foreground"
-                  >
-                    <PlusIcon className="-mx-0.5 size-3" />
-                    {t.sidebar.header.addProject}
-                  </button>
-                </>
-              ) : scopedProjectGroup ? (
-                t.sidebar.sections.projectEmpty(scopedProjectGroup.displayName)
-              ) : (
-                t.sidebar.sections.empty
-              )}
-            </div>
-          ) : null}
-        </div>
-      </SidebarContent>
+              </TooltipProvider>
+            ) : null}
+            {!isSearchingThreads &&
+            (currentTab !== "active" || visibleDraftSessionCount === 0) &&
+            sidebarTabs.counts[currentTab] === 0 ? (
+              <div className="flex flex-col items-center gap-2.5 px-3 py-5 text-center text-secondary-copy-large text-secondary-label">
+                <span className="flex size-10 items-center justify-center rounded-compact-row shadow-well-control">
+                  <MessagesSquareIcon aria-hidden className="size-4.5" />
+                </span>
+                {projects.length === 0 ? (
+                  <>
+                    <span>{t.sidebar.projects.empty}</span>
+                    <button
+                      type="button"
+                      onClick={openAddProjectCommandPalette}
+                      className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-sidebar-border px-2.5 py-1 text-2xs font-medium text-sidebar-muted-foreground transition-colors hover:bg-sidebar-row-hover hover:text-sidebar-foreground"
+                    >
+                      <PlusIcon className="-mx-0.5 size-3" />
+                      {t.sidebar.header.addProject}
+                    </button>
+                  </>
+                ) : scopedProjectGroup ? (
+                  t.sidebar.sections.projectEmpty(scopedProjectGroup.displayName)
+                ) : (
+                  t.sidebar.sections.empty
+                )}
+              </div>
+            ) : null}
+          </div>
+        </SidebarContent>
+      </SidebarThreadDndContext>
       <SidebarBulkActions
         threadByKey={threadByKey}
         supports={supportsBulkAction}

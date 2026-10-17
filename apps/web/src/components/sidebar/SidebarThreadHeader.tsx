@@ -1,6 +1,7 @@
 /** Sidebar search, discussion entry, creation and shelf tabs; list projections and persistence belong to Sidebar. */
 import { Toggle } from "@base-ui/react/toggle";
 import { ToggleGroup } from "@base-ui/react/toggle-group";
+import { useDroppable } from "@dnd-kit/core";
 import { useLocation } from "@tanstack/react-router";
 import { MessagesSquareIcon, PlusIcon, SearchIcon, XIcon } from "lucide-react";
 import {
@@ -14,6 +15,25 @@ import { cn } from "~/lib/utils";
 import { discussionNavigationState } from "../discussions/discussionNavigation.logic";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import type { SidebarTab } from "./sidebarTabs.logic";
+import { sidebarTabDropId } from "./SidebarThreadDndContext";
+
+/** Register a real header target; eligible pointer hits use the same appearance as hover. */
+function SidebarDropTab({ tab, count }: { tab: SidebarTab; count: number }) {
+  const { setNodeRef, isOver } = useDroppable({ id: sidebarTabDropId(tab) });
+  return (
+    <Toggle
+      ref={setNodeRef}
+      value={tab}
+      className={cn(
+        "flex h-7.5 min-w-0 flex-1 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full text-secondary-label hover:bg-secondary hover:text-foreground data-pressed:bg-sidebar-tab-selected data-pressed:font-bold data-pressed:text-foreground data-pressed:shadow-raise-xs-control focus-visible:inset-shadow-focus focus-visible:outline-none",
+        isOver && "bg-secondary text-foreground",
+      )}
+    >
+      {t.sidebar.tabs[tab]}
+      <span className="font-mono text-meta">{count}</span>
+    </Toggle>
+  );
+}
 
 /** Controlled header inputs; counts include every row in each shelf, including paginated history. */
 export interface SidebarThreadHeaderProps {
@@ -191,14 +211,7 @@ export function SidebarThreadHeader({
           className="mb-1.5 flex h-9 rounded-full bg-sidebar-control-surface p-0.75 text-secondary-copy-medium shadow-well-control"
         >
           {(["active", "later", "settled"] as const).map((tab) => (
-            <Toggle
-              key={tab}
-              value={tab}
-              className="flex h-7.5 min-w-0 flex-1 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full text-secondary-label data-pressed:bg-sidebar-tab-selected data-pressed:font-bold data-pressed:text-foreground data-pressed:shadow-raise-xs-control focus-visible:inset-shadow-focus focus-visible:outline-none"
-            >
-              {t.sidebar.tabs[tab]}
-              <span className="font-mono text-meta">{tabCounts[tab]}</span>
-            </Toggle>
+            <SidebarDropTab key={tab} tab={tab} count={tabCounts[tab]} />
           ))}
         </ToggleGroup>
       )}

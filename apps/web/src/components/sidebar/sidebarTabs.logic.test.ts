@@ -25,6 +25,7 @@ function shelves(overrides: Partial<SidebarTabShelves<string>> = {}): SidebarTab
   };
 }
 
+/** Return each string fixture's existing key unchanged for tab and shortcut projections. */
 const getThreadKey = (key: string) => key;
 const settledThreads = Array.from({ length: 37 }, (_, index) => `settled-${index + 1}`);
 

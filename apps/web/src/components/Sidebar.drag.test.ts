@@ -56,13 +56,15 @@ function layout(
   } satisfies Parameters<SortingStrategy>[0];
 }
 
+/** Project input's ordered items for the active/over IDs at the requested measured scale (default 1).
+ * Fixtures supply 82/36px reference heights unless input overrides them; layout scales actual rects,
+ * which take precedence over those references. Returns sortable IDs mapped to projected transforms. */
 function preview(
   input: Parameters<typeof createSidebarSortingStrategy>[0],
   active: string,
   over: string,
   scale = 1,
 ) {
-  // Existing fixtures use 82/36px reference nodes; measured sizes below still own the projection.
   const strategy = createSidebarSortingStrategy({ cardHeight: 82, slimHeight: 36, ...input });
   const args = layout(input.items, active, over, scale);
   return new Map(
