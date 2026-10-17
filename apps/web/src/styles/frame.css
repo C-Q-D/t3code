@@ -1,1 +1,41 @@
 /* FR1–FR3 窗口框架：本线新增的令牌（@theme）与全局样式写在这里。 */
+
+/* StyleM-8a: the titlebar shares the stone base; texture belongs to FR1 grid. */
+.window-titlebar {
+  padding-left: var(--frame-padding-inline);
+}
+
+.window-titlebar-slot {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+}
+
+.window-titlebar-slot[data-titlebar-slot="breadcrumb"] {
+  flex: 0 1 auto;
+}
+
+.window-titlebar-slot[data-titlebar-slot="actions"] {
+  flex: none;
+  margin-right: 12px;
+}
+
+/* Geometry is maintained by windowControlsOverlay.ts and index.css, including zoom.
+   The existing inset includes a 12px gutter; actions already own that gutter here. */
+.window-titlebar-system-controls {
+  width: max(0px, calc(var(--workspace-native-controls-inset) - 0.75rem));
+}
+
+/* Portal descendants must not inherit an explicit drag region from page content. */
+.window-titlebar .no-drag,
+.window-titlebar .no-drag * {
+  -webkit-app-region: no-drag;
+}
+
+/* The existing sidebar is viewport-fixed. Keep it below the new shell row until
+   FR1 grid takes ownership of the slab layout; no changes to the shared UI primitive. */
+.window-frame-workspace [data-slot="sidebar-container"] {
+  top: var(--frame-titlebar-height);
+  height: calc(100svh - var(--frame-titlebar-height));
+}

@@ -57,6 +57,8 @@ import {
   useSidebarVisibility,
 } from "./ui/sidebar";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
+import { WindowTitlebar } from "./frame/WindowTitlebar";
+import { TitlebarSlotProvider } from "./frame/titlebarSlot";
 
 const MACOS_TRAFFIC_LIGHTS_LEFT_INSET = "var(--desktop-window-controls-inset, 90px)";
 
@@ -314,49 +316,54 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
 
   return (
     <PanelAnimationSuppressionProvider value={panelAnimationsSuppressed}>
-      <SidebarProvider
-        className="h-dvh! min-h-0!"
-        data-panel-animations={routePanelAnimationsActive ? "true" : "false"}
-        defaultOpen
-        style={sidebarProviderStyle}
-      >
-        <SidebarBrandWidthProbe onWidthChange={setBrandWidth} />
-        <ProjectProjectionRetention />
-        <Sidebar
-          side="left"
-          collapsible="offcanvas"
-          data-app-sidebar=""
-          role="navigation"
-          aria-label={isOnSettings ? t.sidebar.chrome.settings : t.sidebar.chrome.threads}
-          resizable={{
-            maxWidth: sidebarMaximumWidth,
-            minWidth: sidebarMinimumWidth,
-            shouldAcceptWidth: ({ currentWidth, nextWidth, wrapper }) =>
-              nextWidth <= currentWidth ||
-              wrapper.clientWidth - nextWidth >= THREAD_MAIN_CONTENT_MIN_WIDTH,
-            storageKey: THREAD_SIDEBAR_WIDTH_STORAGE_KEY,
-            onResize: setSidebarWidth,
-          }}
-          // The narrow-window sidebar is a sheet, portaled outside the provider's styles.
-          style={windowControlsInsetStyle}
+      <TitlebarSlotProvider>
+        <SidebarProvider
+          className="h-dvh! min-h-0! flex-col"
+          data-panel-animations={routePanelAnimationsActive ? "true" : "false"}
+          defaultOpen
+          style={sidebarProviderStyle}
         >
-          {isOnSettings ? (
-            <>
-              <SidebarChromeHeader isElectron={isElectron} />
-              <SettingsSidebarNav pathname={pathname} />
-            </>
-          ) : legacySidebarEnabled ? (
-            <LegacyThreadSidebar />
-          ) : (
-            <ThreadSidebar />
-          )}
-          <SidebarRail onDoubleClick={resetSidebarWidth} />
-        </Sidebar>
-        {children}
-        <SidebarControl />
-        <NavigationHistoryShortcuts />
-        <MainAppLocationTracker />
-      </SidebarProvider>
+          <WindowTitlebar />
+          <div className="window-frame-workspace flex min-h-0 w-full flex-1">
+            <SidebarBrandWidthProbe onWidthChange={setBrandWidth} />
+            <ProjectProjectionRetention />
+            <Sidebar
+              side="left"
+              collapsible="offcanvas"
+              data-app-sidebar=""
+              role="navigation"
+              aria-label={isOnSettings ? t.sidebar.chrome.settings : t.sidebar.chrome.threads}
+              resizable={{
+                maxWidth: sidebarMaximumWidth,
+                minWidth: sidebarMinimumWidth,
+                shouldAcceptWidth: ({ currentWidth, nextWidth, wrapper }) =>
+                  nextWidth <= currentWidth ||
+                  wrapper.clientWidth - nextWidth >= THREAD_MAIN_CONTENT_MIN_WIDTH,
+                storageKey: THREAD_SIDEBAR_WIDTH_STORAGE_KEY,
+                onResize: setSidebarWidth,
+              }}
+              // The narrow-window sidebar is a sheet, portaled outside the provider's styles.
+              style={windowControlsInsetStyle}
+            >
+              {isOnSettings ? (
+                <>
+                  <SidebarChromeHeader isElectron={isElectron} />
+                  <SettingsSidebarNav pathname={pathname} />
+                </>
+              ) : legacySidebarEnabled ? (
+                <LegacyThreadSidebar />
+              ) : (
+                <ThreadSidebar />
+              )}
+              <SidebarRail onDoubleClick={resetSidebarWidth} />
+            </Sidebar>
+            {children}
+            <SidebarControl />
+            <NavigationHistoryShortcuts />
+            <MainAppLocationTracker />
+          </div>
+        </SidebarProvider>
+      </TitlebarSlotProvider>
     </PanelAnimationSuppressionProvider>
   );
 }
