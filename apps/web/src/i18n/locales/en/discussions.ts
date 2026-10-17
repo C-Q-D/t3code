@@ -137,6 +137,8 @@ export const discussions = {
     speaking: "Speaking",
     seats: "Speaking order",
     clockwise: "Speaking clockwise",
+    summaryAfter: (name: string) => `${name} will summarize afterwards`,
+    finalStatementsComplete: "Final statements complete",
     you: "You",
     runningCommand: "Running",
     viewProcess: "View process",

@@ -61,6 +61,7 @@ function DiscussionRoute() {
     <DiscussionPage
       key={`${state.environmentId}:${state.discussionId}`}
       discussion={query.data.discussion}
+      entries={query.data.entries}
       environmentId={state.environmentId}
     />
   ) : (

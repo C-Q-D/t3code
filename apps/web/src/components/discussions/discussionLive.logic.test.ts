@@ -152,7 +152,6 @@ it("places opening statements before later interjections and End while preservin
     "closing",
     "e5",
     "e6",
-    "footer",
   ]);
   expect(
     discussionStatementHeading(ordinary, discussion.seats[0], "model", copy, "missing").roundLabel,

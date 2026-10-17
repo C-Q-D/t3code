@@ -15,7 +15,6 @@ export type DiscussionTranscriptItem =
   | { kind: "entry"; entry: DiscussionEntry }
   | ({ kind: "live" } & DiscussionLiveAssignment)
   | { kind: "closing"; id: DiscussionEntry["id"]; label: string }
-  | { kind: "footer"; label: string }
   | { kind: "next"; seatIndex: number; label: string | null; round: number | null };
 /** Primitive heading fields remain stable when unrelated entries or the cursor change. */
 export type DiscussionStatementHeading = {
@@ -38,7 +37,7 @@ export type DiscussionFilesSummary =
  * @param entries Subscription entries sorted once by their opening anchors; input objects are retained.
  * @param discussion Persisted topic, current closing plan and shared next-seat assignment.
  * @param copy Localized boundaries and placeholder text.
- * @returns Initial round and topic, ordered records, closing boundaries and a final next-seat or ended footer item.
+ * @returns Initial round and topic, ordered records, closing boundaries and an optional next-seat item.
  */
 export function discussionTranscriptItems(
   entries: readonly DiscussionEntry[],
@@ -96,10 +95,7 @@ export function discussionTranscriptItems(
     }
     items.push(record);
   }
-  if (discussion.status === "ended") {
-    items.push({ kind: "footer", label: copy.page.endedFooter });
-    return items;
-  }
+  if (discussion.status === "ended") return items;
   const strip = discussionSeatStrip(discussion);
   const nextPosition = strip.findIndex(
     (item) => item.kind === "seat" && item.tags.includes("next"),

@@ -443,7 +443,7 @@ describe("C3 receipt and closing presentation", () => {
         : null,
     );
   });
-  it("ended footer follows the summary without a next placeholder", () => {
+  it("ended records stop at the summary; the page owns the table-side footer", () => {
     const summary = { ...base, kind: "summary" as const, id: decodeEntryId("summary") };
     expect(
       discussionTranscriptItems(
@@ -456,7 +456,6 @@ describe("C3 receipt and closing presentation", () => {
       "topic:独立议题\n第二行",
       "closing:讨论到此 · 梳理人：架构师",
       "summary",
-      "footer:讨论已结束，记录保留。要接着讨论，请新建一场。",
     ]);
   });
 });

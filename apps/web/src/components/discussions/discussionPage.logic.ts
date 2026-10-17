@@ -1,9 +1,92 @@
 /** Derives route eligibility, header actions and physical table seats without starting subscriptions. */
-import type { Discussion, DiscussionId, EnvironmentId } from "@t3tools/contracts";
+import type { Discussion, DiscussionEntry, DiscussionId, EnvironmentId } from "@t3tools/contracts";
 import * as Option from "effect/Option";
 import type { discussions } from "~/i18n/locales/en/discussions";
 import type { AppRouter } from "~/router";
 import type { DiscussionSeatTag, DiscussionTableSeat } from "./discussionRoundTable.logic";
+
+/** Shared table presentation; physical seats stay fixed while connections follow the turn sequence. */
+export type DiscussionTableView = {
+  seats: DiscussionTableSeat[];
+  order: string[];
+  centerLabel: string;
+  subtitle: string;
+  closeLoop: boolean;
+  quiet: boolean;
+  footer: string | null;
+};
+
+/**
+ * Maps the persisted lifecycle to both table shapes without advancing the discussion.
+ * @param discussion Server snapshot, including the remaining final-statement suffix.
+ * @param entries Existing route snapshot, used only for unread interjection notes.
+ * @param copy Localized table labels and annotations.
+ * @param endedTime Already formatted environment-local end time; empty when unavailable.
+ * @returns Table text, physical seats, connection sequence and the table-side ended footnote.
+ */
+export function discussionTableView(
+  discussion: Discussion,
+  entries: readonly DiscussionEntry[],
+  copy: typeof discussions,
+  endedTime: string,
+): DiscussionTableView {
+  const ended = discussion.status === "ended";
+  const paused = discussion.status === "paused";
+  const plan = discussion.closing;
+  const summarizing = plan?.phase === "summarizing";
+  const closing = plan !== null || discussion.status === "closing";
+  const final = closing && !summarizing && !ended;
+  const physicalOrder = discussion.seats.map((seat) => seat.id);
+  // The service creates one clockwise lap, then removes only its completed prefix.
+  // Its last remaining identity therefore still identifies the original lap's end.
+  const lastFinal = plan?.remainingFinalSeatIds.at(-1);
+  const finalStart =
+    final && lastFinal ? (physicalOrder.indexOf(lastFinal) + 1) % physicalOrder.length : 0;
+  const summarizer = discussion.seats.find((seat) => seat.id === plan?.summarizerSeatId);
+  const next = discussionSeatStrip(discussion).find(
+    (item) => item.kind === "seat" && item.tags.includes("next"),
+  );
+  const unread =
+    !ended && !closing
+      ? entries.filter((entry) => entry.kind === "user" && !entry.readBySeatId).length
+      : 0;
+  const seats = discussionTableSeats(discussion, copy.page).map((seat) =>
+    unread > 0 && next?.kind === "seat" && seat.seatIndex === next.index
+      ? {
+          ...seat,
+          interjection: {
+            count: unread,
+            label: paused ? copy.page.nextUnreadPaused(unread) : copy.page.nextUnread(unread),
+          },
+        }
+      : seat,
+  );
+  return {
+    seats,
+    order: [...physicalOrder.slice(finalStart), ...physicalOrder.slice(0, finalStart)],
+    centerLabel: ended
+      ? copy.totalRounds(discussion.cursor.round)
+      : summarizing
+        ? copy.page.summary
+        : final
+          ? copy.page.final
+          : copy.round(discussion.cursor.round),
+    subtitle: ended
+      ? endedTime
+      : paused
+        ? copy.paused
+        : summarizing
+          ? copy.page.finalStatementsComplete
+          : final
+            ? summarizer
+              ? copy.page.summaryAfter(summarizer.personaName)
+              : ""
+            : copy.page.clockwise,
+    closeLoop: !final,
+    quiet: ended || summarizing,
+    footer: ended ? copy.page.endedFooter : null,
+  };
+}
 
 /**
  * Collapses turn occurrences into stable physical seats for both table shapes.
@@ -31,10 +114,19 @@ export function discussionTableSeats(
       turns.find((item) => item.tags.includes("next")) ??
       turns[0];
     const summarizer = seat.id === discussion.closing?.summarizerSeatId;
-    const tags: DiscussionSeatTag[] = (turn?.tags ?? [])
-      .filter((tag) => tag !== "summarizer")
-      .map((tag) => ({ label: copy[tag], tone: tones[tag] }));
-    if (summarizer) tags.push({ label: copy.summarizer, tone: "neutral" });
+    const tags: DiscussionSeatTag[] = summarizer
+      ? [{ label: copy.summarizer, tone: "neutral" }]
+      : [];
+    tags.push(
+      ...(turn?.tags ?? [])
+        // G5 identifies the final-speaking summarizer by role alone; G6 adds the speaking tag.
+        .filter(
+          (tag) =>
+            tag !== "summarizer" &&
+            !(summarizer && discussion.closing?.phase === "final_round" && tag === "speaking"),
+        )
+        .map((tag) => ({ label: copy[tag], tone: tones[tag] })),
+    );
     return {
       id: seat.id,
       seatIndex,

@@ -123,6 +123,8 @@ export const discussions: Messages["discussions"] = {
     speaking: "发言中",
     seats: "发言顺序",
     clockwise: "顺时针发言",
+    summaryAfter: (name: string) => `之后由${name}梳理`,
+    finalStatementsComplete: "最后陈述已完成",
     you: "你",
     runningCommand: "正在运行",
     viewProcess: "查看过程",

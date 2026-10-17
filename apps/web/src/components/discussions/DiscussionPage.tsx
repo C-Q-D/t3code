@@ -1,6 +1,11 @@
 /** Composes the discussion record and responsive tables, publishing guarded actions to the app titlebar. */
 import { useAtomValue } from "@effect/atom-react";
-import type { Discussion, EnvironmentId, DiscussionEndInput } from "@t3tools/contracts";
+import type {
+  Discussion,
+  DiscussionEntry,
+  EnvironmentId,
+  DiscussionEndInput,
+} from "@t3tools/contracts";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
@@ -37,7 +42,7 @@ import {
   discussionHeaderView,
   discussionHeaderActionEnabled,
   discussionDeleteShouldNavigate,
-  discussionTableSeats,
+  discussionTableView,
 } from "./discussionPage.logic";
 
 /**
@@ -85,14 +90,17 @@ export function DiscussionPageMessage({
 /**
  * Displays the live snapshot's title, project and lifecycle actions.
  * @param props.discussion Subscription snapshot scoped to this environment.
+ * @param props.entries The same route snapshot supplies unread interjection notes without another subscription.
  * @param props.environmentId Destination used to disambiguate project IDs and timestamp settings.
  * @returns Responsive workspace and titlebar portals with independent lifecycle and interjection locks.
  */
 export function DiscussionPage({
   discussion,
+  entries,
   environmentId,
 }: {
   discussion: Discussion;
+  entries: readonly DiscussionEntry[];
   environmentId: EnvironmentId;
 }) {
   const [selectedDiff, setSelectedDiff] = useState<DiscussionDiffSelection | null>(null);
@@ -200,12 +208,11 @@ export function DiscussionPage({
       candidate.environmentId === environmentId && candidate.id === discussion.projectId,
   );
   const settings = useEnvironmentSettings(environmentId);
-  const header = discussionHeaderView(
-    discussion,
-    t.discussions,
-    discussion.endedAt ? formatDayAwareTimestamp(discussion.endedAt, settings.timestampFormat) : "",
-  );
-  const seats = discussionTableSeats(discussion, t.discussions.page);
+  const endedTime = discussion.endedAt
+    ? formatDayAwareTimestamp(discussion.endedAt, settings.timestampFormat)
+    : "";
+  const header = discussionHeaderView(discussion, t.discussions, endedTime);
+  const table = discussionTableView(discussion, entries, t.discussions, endedTime);
   const titlebar = useTitlebarSlot({
     breadcrumb: (
       <div className="flex min-w-0 flex-1 items-center gap-2.5">
@@ -270,9 +277,12 @@ export function DiscussionPage({
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <div className="discussion-page-long-table mx-3 mt-4 mb-3 min-w-0">
             <DiscussionLongTable
-              seats={seats}
+              seats={table.seats}
               label={t.discussions.page.seats}
-              centerLabel={t.discussions.round(discussion.cursor.round)}
+              centerLabel={table.centerLabel}
+              order={table.order}
+              closeLoop={table.closeLoop}
+              quiet={table.quiet}
             />
           </div>
           <div className="discussion-page-content flex min-h-0 min-w-0 flex-1">
@@ -289,13 +299,21 @@ export function DiscussionPage({
             <aside className="discussion-page-table-rail" aria-label={t.discussions.page.seats}>
               <div className="discussion-page-round-table min-h-0 flex-1 items-center justify-center">
                 <DiscussionRoundTable
-                  seats={seats}
+                  seats={table.seats}
                   label={t.discussions.page.seats}
-                  centerLabel={t.discussions.round(discussion.cursor.round)}
-                  subtitle={t.discussions.page.clockwise}
+                  centerLabel={table.centerLabel}
+                  subtitle={table.subtitle}
                   userLabel={t.discussions.page.you}
+                  order={table.order}
+                  closeLoop={table.closeLoop}
+                  quiet={table.quiet}
                 />
               </div>
+              {table.footer ? (
+                <p className="px-2.5 pt-3.5 pb-1 text-center text-secondary-copy text-secondary-label">
+                  {table.footer}
+                </p>
+              ) : null}
               <DiscussionComposer
                 key={`composer:${environmentId}:${discussion.id}`}
                 discussion={discussion}

@@ -396,15 +396,6 @@ export function DiscussionTranscript({
                 <span aria-hidden="true" className="h-px min-w-0 flex-1 bg-foreground/12" />
               </div>
             );
-          if (item.kind === "footer")
-            return (
-              <p
-                key="ended-footer"
-                className="text-center text-secondary-copy text-secondary-label"
-              >
-                {item.label}
-              </p>
-            );
           if (item.kind === "next") {
             const seat = discussion.seats[item.seatIndex]!;
             return (
