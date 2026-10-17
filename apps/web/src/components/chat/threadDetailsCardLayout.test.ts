@@ -2,6 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   resolveThreadDetailsCardDensity,
   resolveThreadDetailsCardLayout,
+  resolveThreadDetailsPopoverLayout,
 } from "./threadDetailsCardLayout";
 
 const lane = { padding: 48, minChatWidth: 640 };
@@ -97,5 +98,27 @@ describe("card content fitting", () => {
   it("measures unseen content before deciding to fold it", () => {
     expect(resolveThreadDetailsCardDensity(300, { full: 0, compact: 0 })).toBe("full");
     expect(resolveThreadDetailsCardDensity(300, { full: 570, compact: 0 })).toBe("compact");
+  });
+});
+
+describe("A5 overlay card", () => {
+  it("keeps a full-width card fourteen pixels inside a narrow canvas", () => {
+    expect(resolveThreadDetailsPopoverLayout({ width: 924, height: 700 })).toEqual({
+      width: 280,
+      height: 672,
+      gap: 14,
+    });
+  });
+  it("keeps the card inside very small canvases and below the find bar", () => {
+    expect(resolveThreadDetailsPopoverLayout({ width: 260, height: 400 }, 48)).toEqual({
+      width: 232,
+      height: 324,
+      gap: 14,
+    });
+    expect(resolveThreadDetailsPopoverLayout({ width: 20, height: 20 }, 48)).toEqual({
+      width: 0,
+      height: 0,
+      gap: 14,
+    });
   });
 });

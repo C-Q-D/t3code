@@ -5,17 +5,41 @@ import type { ScopedThreadRef } from "@t3tools/contracts";
 import { ScrollArea } from "../ui/scroll-area";
 import { cn } from "../../lib/utils";
 import { Popover, PopoverPopup, PopoverCreateHandle } from "../ui/popover";
-import { selectThreadPanelOpen, useRightPanelStore } from "../../rightPanelStore";
+import {
+  selectThreadPanelOpen,
+  selectThreadPanelVisibility,
+  useRightPanelStore,
+} from "../../rightPanelStore";
 import type { ThreadPanelPresentation } from "../../rightPanelLayout";
 import { useChatCanvas } from "./ChatCanvasContext";
 import {
-  THREAD_DETAILS_CARD_GAP,
   resolveThreadDetailsCardDensity,
   resolveThreadDetailsCardLayout,
+  resolveThreadDetailsPopoverLayout,
 } from "./threadDetailsCardLayout";
 import { observeResize } from "../../lib/observeResize";
 
-/** One card owns its placement and folds content only when that content cannot fit. */
+/**
+ * Temporarily hide both card presentations for this thread, e.g. while a terminal drawer is open.
+ * @param threadRef - The environment and thread whose card should be hidden.
+ * @returns An idempotent cleanup that restores the visibility captured before collapse.
+ */
+export function collapseThreadDetailsCard(threadRef: ScopedThreadRef): () => void {
+  const store = useRightPanelStore.getState();
+  const previous = selectThreadPanelVisibility(store.threadPanelVisibilityByThreadKey, threadRef);
+  store.setThreadPanelOpen(threadRef, "inline", false);
+  store.setThreadPanelOpen(threadRef, "popover", false);
+  let restored = false;
+  return () => {
+    if (restored) return;
+    restored = true;
+    const current = useRightPanelStore.getState();
+    current.setThreadPanelOpen(threadRef, "inline", previous.inlineOpen);
+    current.setThreadPanelOpen(threadRef, "popover", previous.popoverOpen);
+  };
+}
+
+/** Owns card placement; overlays scroll full content while inline cards fold only to fit. */
 export function ThreadDetailsCard({
   threadRef,
   anchor,
@@ -49,6 +73,10 @@ export function ThreadDetailsCard({
     : null;
   const mode = placement ? "inline" : "popover";
   const topInset = canvas?.detailsCardTopInset ?? 0;
+  const overlay = resolveThreadDetailsPopoverLayout(
+    canvas?.container ?? { width: 0, height: 0 },
+    topInset,
+  );
   const inlineOpen = useRightPanelStore((state) =>
     selectThreadPanelOpen(state.threadPanelVisibilityByThreadKey, threadRef, "inline"),
   );
@@ -64,8 +92,9 @@ export function ThreadDetailsCard({
   });
   const contentHeights =
     measurements.key === measurementKey ? measurements.heights : { full: 0, compact: 0 };
-  const height = placement?.height ?? Math.max(0, (canvas?.container.height ?? 0) - 52);
-  const density = resolveThreadDetailsCardDensity(height, contentHeights);
+  const height = placement?.height ?? overlay.height;
+  const density =
+    mode === "popover" ? "full" : resolveThreadDetailsCardDensity(height, contentHeights);
   const reportDetailsCard = canvas?.reportDetailsCard;
   const cardLeft = preferredPlacement?.x;
   const cardRight = preferredPlacement
@@ -124,12 +153,11 @@ export function ThreadDetailsCard({
   }, [contentElement, density, measurementKey]);
   const card = (
     <div
-      className={cn(
-        "surface-glass isolate grid max-h-full grid-rows-[minmax(0,1fr)] overflow-hidden rounded-slab shadow-raise-detail",
-        mode === "popover" &&
-          "max-h-[min(calc(100dvh-6.5rem),calc(var(--available-height,100dvh)-1rem))]",
-      )}
-      style={placement ? { maxHeight: height } : undefined}
+      className="surface-glass isolate grid max-h-full grid-rows-1 overflow-hidden rounded-slab shadow-raise-detail"
+      style={{
+        maxHeight: canvas ? height : undefined,
+        width: mode === "popover" && canvas ? overlay.width : undefined,
+      }}
       data-thread-details-card
     >
       <ScrollArea scrollFade className="min-h-0">
@@ -159,6 +187,13 @@ export function ThreadDetailsCard({
         useRightPanelStore.getState().setThreadPanelOpen(threadRef, "popover", open);
       }}
     >
+      {mode === "popover" && popoverOpen && canvas ? (
+        <div
+          className="absolute inset-0 z-20 rounded-slab bg-thread-details-scrim"
+          aria-hidden="true"
+          data-thread-details-scrim
+        />
+      ) : null}
       {placement ? (
         inlineOpen ? (
           <aside
@@ -189,15 +224,19 @@ export function ThreadDetailsCard({
         <PopoverPopup
           anchor={anchor}
           align="end"
-          // Lines the card up with the find bar: the panel pads its card by 8px.
-          alignOffset={THREAD_DETAILS_CARD_GAP - 8}
+          // The shared panel viewport adds eight pixels around the A5 card.
+          alignOffset={overlay.gap - 8}
           collisionAvoidance={{ side: "shift", align: "shift", fallbackAxisSide: "none" }}
           side="bottom"
-          sideOffset={topInset}
+          sideOffset={topInset + overlay.gap - 8}
           variant="panel"
           padding="none"
         >
-          <div data-density={density} data-thread-details-panel="popover">
+          <div
+            aria-label={t.chat.details.threadDetails}
+            data-density={density}
+            data-thread-details-panel="popover"
+          >
             {card}
           </div>
         </PopoverPopup>

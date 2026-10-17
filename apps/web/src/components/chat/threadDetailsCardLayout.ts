@@ -53,3 +53,21 @@ export function resolveThreadDetailsCardLayout({
     height,
   } as const;
 }
+
+/**
+ * A5 keeps the full card inside the canvas, with room for an open find bar.
+ * @param container - Available canvas width and height in CSS pixels.
+ * @param topInset - Pixels reserved above the card; defaults to zero.
+ * @returns Card width capped at 280px, nonnegative scroll height, and the 14px edge gap.
+ */
+export function resolveThreadDetailsPopoverLayout(
+  container: { width: number; height: number },
+  topInset = 0,
+) {
+  const gap = 14;
+  return {
+    width: Math.max(0, Math.min(THREAD_DETAILS_CARD_WIDTH, container.width - gap * 2)),
+    height: Math.max(0, container.height - gap * 2 - topInset),
+    gap,
+  };
+}

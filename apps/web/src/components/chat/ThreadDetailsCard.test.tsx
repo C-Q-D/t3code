@@ -1,0 +1,154 @@
+// @vitest-environment jsdom
+
+import { EnvironmentId, ThreadId, type ScopedThreadRef } from "@t3tools/contracts";
+import { act } from "react";
+import { createRoot } from "react-dom/client";
+import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
+import { useRightPanelStore, selectThreadPanelVisibility } from "../../rightPanelStore";
+import { PopoverCreateHandle } from "../ui/popover";
+import { ChatCanvasContext } from "./ChatCanvasContext";
+import { ThreadDetailsCard, collapseThreadDetailsCard } from "./ThreadDetailsCard";
+
+vi.mock("../ui/scroll-area", () => ({
+  ScrollArea: ({ children }: { children: React.ReactNode }) => children,
+}));
+
+const threadRef = {
+  environmentId: EnvironmentId.make("details-test"),
+  threadId: ThreadId.make("thread"),
+} satisfies ScopedThreadRef;
+const otherThreadRef = { ...threadRef, threadId: ThreadId.make("other") };
+const visibility = (ref = threadRef) =>
+  selectThreadPanelVisibility(useRightPanelStore.getState().threadPanelVisibilityByThreadKey, ref);
+let container: HTMLDivElement;
+let root: ReturnType<typeof createRoot>;
+
+beforeEach(() => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  useRightPanelStore.setState({ threadPanelVisibilityByThreadKey: {} });
+  container = document.createElement("div");
+  document.body.append(container);
+  root = createRoot(container);
+});
+afterEach(async () => {
+  await act(async () => root.unmount());
+  container.remove();
+  vi.unstubAllGlobals();
+});
+
+it.each([true, false])(
+  "collapses both presentations and restores their previous visibility (%s)",
+  async (popoverOpen) => {
+    useRightPanelStore.getState().setThreadPanelOpen(threadRef, "popover", popoverOpen);
+    const before = visibility();
+    const otherBefore = visibility(otherThreadRef);
+    const restore = collapseThreadDetailsCard(threadRef);
+    expect(visibility()).toEqual({ inlineOpen: false, popoverOpen: false });
+    expect(visibility(otherThreadRef)).toEqual(otherBefore);
+    restore();
+    expect(visibility()).toEqual(before);
+    useRightPanelStore.getState().setThreadPanelOpen(threadRef, "inline", false);
+    restore();
+    expect(visibility().inlineOpen).toBe(false);
+  },
+);
+
+it("removes the visible card while collapsed and renders it again on restore", async () => {
+  await act(async () => {
+    root.render(
+      <ChatCanvasContext
+        value={{
+          container: { width: 1600, height: 900 },
+          lane: { padding: 48, minChatWidth: 640 },
+          layout: { frame: null, overlapsDetailsCard: false } as NonNullable<
+            React.ContextType<typeof ChatCanvasContext>
+          >["layout"],
+          previewKey: null,
+          reportPreview: vi.fn(),
+          clearPreview: vi.fn(),
+          registerTimeline: vi.fn(),
+          reportDetailsCard: vi.fn(),
+          detailsCardTopInset: 0,
+        }}
+      >
+        <ThreadDetailsCard
+          threadRef={threadRef}
+          anchor={{ current: null }}
+          handle={PopoverCreateHandle()}
+          onPresentationChange={vi.fn()}
+        >
+          {() => <p>Workspace controls</p>}
+        </ThreadDetailsCard>
+      </ChatCanvasContext>,
+    );
+  });
+  expect(container.textContent).toContain("Workspace controls");
+  let restore!: () => void;
+  await act(async () => {
+    restore = collapseThreadDetailsCard(threadRef);
+  });
+  expect(container.textContent).not.toContain("Workspace controls");
+  await act(async () => restore());
+  expect(container.textContent).toContain("Workspace controls");
+});
+
+it.each(["Escape", "outside press"])(
+  "opens a full-content overlay on demand and dismisses it with %s",
+  async (dismissal) => {
+    const anchor = document.createElement("header");
+    document.body.append(anchor);
+    try {
+      await act(async () => {
+        root.render(
+          <ChatCanvasContext
+            value={{
+              container: { width: 924, height: 700 },
+              lane: { padding: 48, minChatWidth: 640 },
+              layout: { frame: null, overlapsDetailsCard: false } as NonNullable<
+                React.ContextType<typeof ChatCanvasContext>
+              >["layout"],
+              previewKey: null,
+              reportPreview: vi.fn(),
+              clearPreview: vi.fn(),
+              registerTimeline: vi.fn(),
+              reportDetailsCard: vi.fn(),
+              detailsCardTopInset: 0,
+            }}
+          >
+            <ThreadDetailsCard
+              threadRef={threadRef}
+              anchor={{ current: anchor }}
+              handle={PopoverCreateHandle()}
+              onPresentationChange={vi.fn()}
+            >
+              {(density) => <p>Workspace controls: {density}</p>}
+            </ThreadDetailsCard>
+          </ChatCanvasContext>,
+        );
+      });
+      expect(document.body.textContent).not.toContain("Workspace controls");
+      expect(container.querySelector("[data-thread-details-scrim]")).toBeNull();
+      await act(async () =>
+        useRightPanelStore.getState().setThreadPanelOpen(threadRef, "popover", true),
+      );
+      expect(document.body.textContent).toContain("Workspace controls: full");
+      expect(container.querySelector("[data-thread-details-scrim]")).not.toBeNull();
+      await act(async () => {
+        if (dismissal === "Escape") {
+          document
+            .querySelector<HTMLElement>('[data-slot="popover-popup"]')!
+            .dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+        } else {
+          const scrim = container.querySelector<HTMLElement>("[data-thread-details-scrim]")!;
+          scrim.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+          scrim.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+          scrim.click();
+        }
+      });
+      expect(visibility().popoverOpen).toBe(false);
+      expect(container.querySelector("[data-thread-details-scrim]")).toBeNull();
+    } finally {
+      anchor.remove();
+    }
+  },
+);

@@ -1,6 +1,8 @@
 /* DT1–DT2 对话页顶栏与详情卡：本线新增的令牌（@theme）与全局样式写在这里。 */
 
 @theme {
+  /* 核心屏-8a A5 / StyleM-8a details：仅压暗对话区的半透明暗幕。 */
+  --color-thread-details-scrim: rgba(0, 0, 0, 0.5);
   /* 对话页-8a.dc.html · F1：工作区、分支与 PR 的凹槽。 */
   --color-thread-details-well: #151517;
   /* 对话页-8a.dc.html · F1：冲突说明。 */
@@ -23,4 +25,12 @@
 /* F1 keeps twelve pixels between controls even when their owner adds a wrapper. */
 [data-thread-details-card] [data-thread-panel-run-context] {
   gap: --spacing(3);
+}
+
+/* A5 leaves fourteen pixels per side; the shared panel viewport supplies eight of them. */
+[data-slot="popover-positioner"]:has([data-thread-details-panel="popover"]) {
+  width: min(
+    calc(var(--thread-details-panel-width) + --spacing(4)),
+    calc(var(--anchor-width) - --spacing(3))
+  );
 }
