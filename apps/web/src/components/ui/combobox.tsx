@@ -1,5 +1,7 @@
 "use client";
 
+/** Combobox composition with H2 list surfaces; Base UI owns selection and virtual highlights. */
+
 import { Combobox as ComboboxPrimitive } from "@base-ui/react/combobox";
 import { ChevronsUpDownIcon, SearchIcon, XIcon } from "lucide-react";
 import * as React from "react";
@@ -16,6 +18,7 @@ const ComboboxContext = React.createContext<{
   multiple: false,
 });
 
+/** Share the multi-select chip anchor across portals and forward root props and events to Base UI. */
 function Combobox<Value, Multiple extends boolean | undefined = false>(
   props: ComboboxPrimitive.Root.Props<Value, Multiple>,
 ) {
@@ -28,6 +31,7 @@ function Combobox<Value, Multiple extends boolean | undefined = false>(
   );
 }
 
+/** Compose the input and optional addons; forward Base UI input props and caller events unchanged. */
 function ComboboxInput({
   className,
   showTrigger = true,
@@ -134,6 +138,10 @@ function ComboboxTrigger({ className, children, ...props }: ComboboxPrimitive.Tr
   );
 }
 
+/**
+ * Portal a glass list surface at an explicit anchor or the multi-select chip anchor.
+ * Default to bottom/start with a 4px side offset; forward remaining props to Base UI's popup.
+ */
 function ComboboxPopup({
   className,
   children,
@@ -166,12 +174,12 @@ function ComboboxPopup({
       >
         <span
           className={cn(
-            "dropdown-glass relative flex max-h-full min-w-(--anchor-width) max-w-(--available-width) origin-(--transform-origin) rounded-lg shadow-[0_16px_40px_-18px_rgb(0_0_0/55%)] transition-[scale,opacity] dark:shadow-[0_18px_44px_-18px_rgb(0_0_0/80%)]",
+            "dropdown-glass relative flex max-h-full min-w-(--anchor-width) max-w-(--available-width) origin-(--transform-origin) rounded-overlay transition-[scale,opacity]",
             className,
           )}
         >
           <ComboboxPrimitive.Popup
-            className="flex min-w-0 max-h-[min(var(--available-height),23rem)] flex-1 flex-col overflow-hidden text-foreground"
+            className="flex min-w-0 max-h-[min(var(--available-height),23rem)] flex-1 flex-col overflow-hidden rounded-overlay text-foreground"
             data-slot="combobox-popup"
             {...props}
           >
@@ -183,6 +191,7 @@ function ComboboxPopup({
   );
 }
 
+/** Render an H2 option with a shared highlight background; forward selection props and events unchanged. */
 function ComboboxItem({
   className,
   children,
@@ -194,17 +203,14 @@ function ComboboxItem({
   return (
     <ComboboxPrimitive.Item
       className={cn(
-        "flex min-h-8 in-data-[side=none]:min-w-[calc(var(--anchor-width)+1.25rem)] cursor-pointer items-center rounded-sm px-2 py-1 text-base outline-none not-data-disabled:hover:bg-accent data-disabled:pointer-events-none data-disabled:cursor-not-allowed data-selected:bg-foreground/[0.08] data-selected:text-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground [&[data-highlighted][data-selected]]:bg-accent [&[data-highlighted][data-selected]]:text-accent-foreground data-disabled:opacity-64 sm:min-h-7 sm:text-sm [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+        "flex h-8.5 shrink-0 in-data-[side=none]:min-w-[calc(var(--anchor-width)+1.25rem)] cursor-pointer items-center rounded-menu-row px-2.5 py-0 text-control text-foreground outline-none not-data-disabled:not-active:data-selected:bg-accent not-data-disabled:not-active:hover:bg-accent not-data-disabled:not-active:data-highlighted:bg-accent not-data-disabled:active:bg-sidebar not-data-disabled:active:shadow-well-pressed data-disabled:pointer-events-none data-disabled:cursor-not-allowed data-disabled:text-fg-icon-disabled [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
         className,
       )}
       data-slot="combobox-item"
       {...props}
     >
       {/* Children lay out as one row: a label that truncates, then any trailing meta. */}
-      <div
-        className="flex min-w-0 flex-1 items-center gap-2 [&_svg:not([class*='text-'])]:text-muted-foreground"
-        data-slot="combobox-item-content"
-      >
+      <div className="flex min-w-0 flex-1 items-center gap-2.5" data-slot="combobox-item-content">
         {children}
       </div>
     </ComboboxPrimitive.Item>
@@ -224,11 +230,15 @@ function ComboboxEmpty({ className, ...props }: ComboboxPrimitive.Empty.Props) {
   );
 }
 
+/**
+ * Wrap a padded Base UI list in ScrollArea with a reserved scrollbar gutter and edge fades.
+ * Forward list props and className to the inner list; virtualizers should use ComboboxListVirtualized.
+ */
 function ComboboxList({ className, ...props }: ComboboxPrimitive.List.Props) {
   return (
     <ScrollArea scrollbarGutter scrollFade>
       <ComboboxPrimitive.List
-        className={cn("not-empty:scroll-py-1 not-empty:px-1 not-empty:py-1", className)}
+        className={cn("not-empty:scroll-py-1.5 not-empty:p-1.5", className)}
         data-slot="combobox-list"
         {...props}
       />
@@ -243,7 +253,7 @@ function ComboboxList({ className, ...props }: ComboboxPrimitive.List.Props) {
 function ComboboxListVirtualized({ className, ...props }: ComboboxPrimitive.List.Props) {
   return (
     <ComboboxPrimitive.List
-      className={cn("size-full min-w-0 not-empty:px-1 not-empty:py-1", className)}
+      className={cn("size-full min-w-0 not-empty:p-1.5", className)}
       data-slot="combobox-list"
       {...props}
     />

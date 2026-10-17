@@ -1,5 +1,7 @@
 "use client";
 
+/** Autocomplete primitives with H2 list surfaces; Base UI owns selection and virtual highlights. */
+
 import { Autocomplete as AutocompletePrimitive } from "@base-ui/react/autocomplete";
 import { ChevronsUpDownIcon, XIcon } from "lucide-react";
 
@@ -9,6 +11,7 @@ import { ScrollArea } from "~/components/ui/scroll-area";
 
 const Autocomplete = AutocompletePrimitive.Root;
 
+/** Compose the input and optional addons; forward Base UI input props and caller events unchanged. */
 function AutocompleteInput({
   className,
   showTrigger = false,
@@ -75,6 +78,10 @@ function AutocompleteInput({
   );
 }
 
+/**
+ * Portal a list surface at the supplied anchor; glass owns material and elevation.
+ * Position defaults to bottom/start with a 4px side offset. Forward remaining props to Base UI's popup.
+ */
 function AutocompletePopup({
   className,
   children,
@@ -104,12 +111,12 @@ function AutocompletePopup({
       >
         <span
           className={cn(
-            "relative flex max-h-full min-w-(--anchor-width) max-w-(--available-width) origin-(--transform-origin) rounded-lg border bg-popover not-dark:bg-clip-padding shadow-lg/5 transition-[scale,opacity] before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)] before:shadow-[0_1px_--theme(--color-black/4%)] dark:before:shadow-[0_-1px_--theme(--color-white/6%)]",
+            "dropdown-glass relative flex max-h-full min-w-(--anchor-width) max-w-(--available-width) origin-(--transform-origin) rounded-overlay transition-[scale,opacity]",
             className,
           )}
         >
           <AutocompletePrimitive.Popup
-            className="flex max-h-[min(var(--available-height),23rem)] flex-1 flex-col text-foreground"
+            className="flex max-h-[min(var(--available-height),23rem)] flex-1 flex-col rounded-overlay text-foreground"
             data-slot="autocomplete-popup"
             {...props}
           >
@@ -121,11 +128,23 @@ function AutocompletePopup({
   );
 }
 
-function AutocompleteItem({ className, children, ...props }: AutocompletePrimitive.Item.Props) {
+/**
+ * Render an H2 option. `highlighted` overrides only its active background for palette-owned navigation;
+ * undefined uses Base UI's highlight, while false suppresses it. Selection and events remain with Base UI.
+ */
+function AutocompleteItem({
+  className,
+  children,
+  highlighted,
+  ...props
+}: AutocompletePrimitive.Item.Props & { highlighted?: boolean | undefined }) {
   return (
     <AutocompletePrimitive.Item
       className={cn(
-        "flex min-h-8 cursor-default select-none items-center gap-2 rounded-sm px-2 py-1 text-base outline-none hover:bg-accent data-disabled:pointer-events-none data-selected:bg-accent/50 data-selected:text-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground [&[data-highlighted][data-selected]]:bg-accent [&[data-highlighted][data-selected]]:text-accent-foreground data-disabled:opacity-64 sm:min-h-7 sm:text-sm [&_svg:not([class*='text-'])]:text-muted-foreground",
+        "flex h-8.5 shrink-0 cursor-default select-none items-center gap-2.5 rounded-menu-row px-2.5 py-0 text-control text-foreground outline-none not-data-disabled:active:bg-sidebar not-data-disabled:active:shadow-well-pressed data-disabled:pointer-events-none data-disabled:text-fg-icon-disabled [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
+        highlighted === undefined &&
+          "not-data-disabled:not-active:data-selected:bg-accent not-data-disabled:not-active:hover:bg-accent not-data-disabled:not-active:data-highlighted:bg-accent",
+        highlighted && "not-data-disabled:not-active:bg-accent",
         className,
       )}
       data-slot="autocomplete-item"
@@ -170,10 +189,14 @@ function AutocompleteListHeading({ className, ...props }: React.ComponentProps<"
   );
 }
 
+/**
+ * Render a padded Base UI list without a ScrollArea; the child virtualizer must own scrolling.
+ * Forward list props and merge className so callers can constrain the virtualized viewport.
+ */
 function AutocompleteListVirtualized({ className, ...props }: AutocompletePrimitive.List.Props) {
   return (
     <AutocompletePrimitive.List
-      className={cn("size-full min-w-0", className)}
+      className={cn("size-full min-w-0 not-empty:p-1.5", className)}
       data-slot="autocomplete-list"
       {...props}
     />
@@ -193,11 +216,15 @@ function AutocompleteEmpty({ className, ...props }: AutocompletePrimitive.Empty.
   );
 }
 
+/**
+ * Wrap a padded Base UI list in ScrollArea with a reserved scrollbar gutter and edge fades.
+ * Forward list props and className to the inner list; use the virtualized variant for external scrolling.
+ */
 function AutocompleteList({ className, ...props }: AutocompletePrimitive.List.Props) {
   return (
     <ScrollArea scrollbarGutter scrollFade>
       <AutocompletePrimitive.List
-        className={cn("not-empty:scroll-py-1 not-empty:p-1", className)}
+        className={cn("not-empty:scroll-py-1.5 not-empty:p-1.5", className)}
         data-slot="autocomplete-list"
         {...props}
       />

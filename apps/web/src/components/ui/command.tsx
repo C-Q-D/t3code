@@ -1,5 +1,7 @@
 "use client";
 
+/** Command list composition; H2 row states are shared with autocomplete, including controlled navigation. */
+
 import { Dialog as CommandDialogPrimitive } from "@base-ui/react/dialog";
 import { SearchIcon } from "lucide-react";
 import type * as React from "react";
@@ -49,6 +51,7 @@ function CommandDialogViewport({ className, ...props }: CommandDialogPrimitive.V
   );
 }
 
+/** Keep dialog positioning and dismissal while using H2 corners and the shared glass material. */
 function CommandDialogPopup({
   className,
   children,
@@ -64,7 +67,7 @@ function CommandDialogPopup({
         <CommandDialogPrimitive.Popup
           className={cn(
             DIALOG_POPUP_CLASS,
-            "pointer-events-auto max-h-105 max-w-xl text-foreground",
+            "pointer-events-auto max-h-105 max-w-xl rounded-overlay text-foreground",
             className,
           )}
           data-slot="command-dialog-popup"
@@ -115,10 +118,14 @@ function CommandInput({
   );
 }
 
+/**
+ * Render the standard autocomplete scroll list with H2 padding and the command-list slot.
+ * Forward list props and className; use CommandListVirtualized when a child owns scrolling.
+ */
 function CommandList({ className, ...props }: React.ComponentProps<typeof AutocompleteList>) {
   return (
     <AutocompleteList
-      className={cn("not-empty:scroll-py-2 not-empty:p-2", className)}
+      className={cn("not-empty:scroll-py-1.5 not-empty:p-1.5", className)}
       data-slot="command-list"
       {...props}
     />
@@ -148,11 +155,15 @@ function CommandListHeading({
   );
 }
 
+/**
+ * Clip command results to H2 corners; round the bottom only when no command footer follows.
+ * Forward div props and className. This container does not own navigation or scrolling.
+ */
 function CommandPanel({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       className={cn(
-        "relative min-h-0 overflow-hidden rounded-t-xl not-has-[+[data-slot=command-footer]]:rounded-b-2xl bg-transparent **:data-[slot=scroll-area-scrollbar]:mt-2 [touch-action:pan-y]",
+        "relative min-h-0 overflow-hidden rounded-t-overlay not-has-[+[data-slot=command-footer]]:rounded-b-overlay **:data-[slot=scroll-area-scrollbar]:mt-2 [touch-action:pan-y]",
         className,
       )}
       {...props}
@@ -177,9 +188,7 @@ function CommandCollection({ ...props }: React.ComponentProps<typeof Autocomplet
   return <AutocompleteCollection data-slot="command-collection" {...props} />;
 }
 
-// Pass `active` when the palette tracks the highlighted row itself; the
-// primitive's hover and keyboard highlight are then ignored so the two never
-// disagree, and the row shows the active surface instead.
+/** `active` overrides only the highlighted background for palette-owned navigation; forward other item props. */
 function CommandItem({
   className,
   active,
@@ -187,13 +196,8 @@ function CommandItem({
 }: React.ComponentProps<typeof AutocompleteItem> & { active?: boolean }) {
   return (
     <AutocompleteItem
-      className={cn(
-        "py-1.5 data-selected:bg-foreground/[0.06] data-highlighted:bg-foreground/[0.09] data-highlighted:text-foreground [&[data-highlighted][data-selected]]:bg-foreground/[0.09] [&[data-highlighted][data-selected]]:text-foreground",
-        active !== undefined &&
-          "cursor-pointer hover:bg-transparent hover:text-inherit data-highlighted:bg-transparent data-highlighted:text-inherit data-selected:bg-transparent data-selected:text-inherit [&[data-highlighted][data-selected]]:bg-transparent [&[data-highlighted][data-selected]]:text-inherit",
-        active && "bg-accent! text-accent-foreground!",
-        className,
-      )}
+      className={cn("cursor-pointer", className)}
+      highlighted={active}
       data-active={active || undefined}
       data-slot="command-item"
       {...props}
@@ -214,11 +218,15 @@ function CommandShortcut({ className, ...props }: React.ComponentProps<"kbd">) {
   );
 }
 
+/**
+ * Render the footer slot with H2 bottom corners and compact shortcut hints.
+ * Forward div props and className; footer actions and their handlers are supplied by callers.
+ */
 function CommandFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       className={cn(
-        "relative flex items-center justify-between gap-2 rounded-b-[calc(var(--radius-2xl)-1px)] bg-foreground/[0.025] px-[var(--command-content-inset)] py-2.5 font-medium text-sm text-muted-foreground [&_[data-slot=kbd-group]]:font-sans [&_[data-slot=kbd]]:bg-foreground/[0.08] [&_[data-slot=kbd]]:text-foreground [&_[data-slot=kbd]]:ring-0",
+        "relative flex items-center justify-between gap-2 rounded-b-overlay bg-foreground/[0.025] px-[var(--command-content-inset)] py-2.5 font-medium text-sm text-muted-foreground [&_[data-slot=kbd-group]]:font-sans [&_[data-slot=kbd]]:bg-foreground/[0.08] [&_[data-slot=kbd]]:text-foreground [&_[data-slot=kbd]]:ring-0",
         className,
       )}
       data-slot="command-footer"

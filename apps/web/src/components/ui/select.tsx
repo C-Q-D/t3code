@@ -1,5 +1,6 @@
 /** Shares select trigger styling with button-based pickers; popups own their own surface. */
 "use client";
+/** Select primitives; trigger styling is independent of the H2 popup and option states. */
 import { mergeProps } from "@base-ui/react/merge-props";
 import { Select as SelectPrimitive } from "@base-ui/react/select";
 import { useRender } from "@base-ui/react/use-render";
@@ -106,6 +107,7 @@ function SelectValue({ className, ...props }: SelectPrimitive.Value.Props) {
   );
 }
 
+/** Position the H2 list surface; dropdown-glass owns its material and elevation. */
 function SelectPopup({
   className,
   children,
@@ -139,31 +141,31 @@ function SelectPopup({
         sideOffset={sideOffset}
       >
         <SelectPrimitive.Popup
-          className="origin-(--transform-origin) rounded-lg text-foreground outline-none"
+          className="origin-(--transform-origin) rounded-overlay text-foreground outline-none"
           data-slot="select-popup"
           {...props}
         >
           <SelectPrimitive.ScrollUpArrow
-            className="top-0 z-50 flex h-6 w-full cursor-default items-center justify-center before:pointer-events-none before:absolute before:inset-x-px before:top-px before:h-[200%] before:rounded-t-[calc(var(--radius-lg)-1px)] before:bg-linear-to-b before:from-50% before:from-popover"
+            className="top-0 z-50 flex h-6 w-full cursor-default items-center justify-center"
             data-slot="select-scroll-up-arrow"
           >
             <ChevronUpIcon className="relative size-4.5 sm:size-4" />
           </SelectPrimitive.ScrollUpArrow>
           <div
             className={cn(
-              "dropdown-glass relative h-full rounded-lg shadow-[0_16px_40px_-18px_rgb(0_0_0/55%)] dark:shadow-[0_18px_44px_-18px_rgb(0_0_0/80%)]",
+              "dropdown-glass relative h-full rounded-overlay",
               matchTriggerWidth && "min-w-(--anchor-width)",
             )}
           >
             <SelectPrimitive.List
-              className={cn("max-h-(--available-height) overflow-y-auto p-1", className)}
+              className={cn("max-h-(--available-height) overflow-y-auto p-1.5", className)}
               data-slot="select-list"
             >
               {children}
             </SelectPrimitive.List>
           </div>
           <SelectPrimitive.ScrollDownArrow
-            className="bottom-0 z-50 flex h-6 w-full cursor-default items-center justify-center before:pointer-events-none before:absolute before:inset-x-px before:bottom-px before:h-[200%] before:rounded-b-[calc(var(--radius-lg)-1px)] before:bg-linear-to-t before:from-50% before:from-popover"
+            className="bottom-0 z-50 flex h-6 w-full cursor-default items-center justify-center"
             data-slot="select-scroll-down-arrow"
           >
             <ChevronDownIcon className="relative size-4.5 sm:size-4" />
@@ -174,6 +176,7 @@ function SelectPopup({
   );
 }
 
+/** Render an H2 option using native focus-visible because Select moves actual focus onto its items. */
 function SelectItem({
   className,
   children,
@@ -185,16 +188,13 @@ function SelectItem({
   return (
     <SelectPrimitive.Item
       className={cn(
-        "flex min-h-8 in-data-[side=none]:min-w-[calc(var(--anchor-width)+1.25rem)] cursor-pointer items-center rounded-sm px-2 py-1 text-base outline-none data-selected:bg-foreground/[0.08] data-disabled:pointer-events-none data-disabled:cursor-not-allowed data-highlighted:bg-accent data-highlighted:text-accent-foreground data-disabled:opacity-64 sm:min-h-7 sm:text-sm [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+        "flex h-8.5 shrink-0 in-data-[side=none]:min-w-[calc(var(--anchor-width)+1.25rem)] cursor-pointer items-center gap-2.5 rounded-menu-row px-2.5 py-0 text-control text-foreground outline-none not-data-disabled:not-active:data-selected:bg-accent not-data-disabled:not-active:data-highlighted:bg-accent not-data-disabled:focus-visible:inset-shadow-focus not-data-disabled:active:bg-sidebar not-data-disabled:active:shadow-well-pressed data-disabled:pointer-events-none data-disabled:cursor-not-allowed data-disabled:text-fg-icon-disabled [&_svg:not([class*='size-'])]:size-3.5 [&_svg]:pointer-events-none [&_svg]:shrink-0",
         className,
       )}
       data-slot="select-item"
       {...props}
     >
-      <SelectPrimitive.ItemText
-        className="min-w-0 flex-1 [&_svg:not([class*='text-'])]:text-muted-foreground"
-        data-slot="select-item-text"
-      >
+      <SelectPrimitive.ItemText className="min-w-0 flex-1" data-slot="select-item-text">
         {children}
       </SelectPrimitive.ItemText>
     </SelectPrimitive.Item>
