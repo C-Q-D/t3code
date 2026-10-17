@@ -9,7 +9,7 @@ import {
 } from "@t3tools/client-runtime/state/runtime";
 import { DEFAULT_RESOLVED_KEYBINDINGS } from "@t3tools/shared/keybindings";
 import { ChevronDownIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useT3ProjectFileState } from "../../hooks/useT3ProjectFileScripts";
 import { useEnvironments } from "../../state/environments";
 import {
@@ -62,6 +62,13 @@ export function ProjectActionsSettings() {
   );
   const canWriteSettings = useScopedSettingsWriteAllowed();
   const [request, setRequest] = useState<ProjectScriptEditorRequest | null>(null);
+  const addActionRef = useRef<HTMLButtonElement>(null);
+  const [deleteFocusRequest, setDeleteFocusRequest] = useState(0);
+  useEffect(() => {
+    // Persistence resolves before React commits the enabled button. Focus only after that commit;
+    // a new request also handles deleting a script with the same ID after it is added again.
+    if (deleteFocusRequest > 0) addActionRef.current?.focus();
+  }, [deleteFocusRequest]);
   const memberById = new Map(
     isProjectScope ? scope.members.map((member) => [member.id, member]) : [],
   );
@@ -226,17 +233,15 @@ export function ProjectActionsSettings() {
                           variant="ghost-muted"
                           aria-label={t.settings.projectActions.deleteAction(script.name)}
                           disabled={saving || !canWriteSettings}
-                          onClick={(event) => {
+                          onClick={() => {
                             // The existing persistence path also removes unused shortcuts and reports failures.
-                            const addButton = event.currentTarget
-                              .closest("section")
-                              ?.querySelector<HTMLButtonElement>("[data-project-add-action]");
                             void persist(
                               (current) => current.filter((entry) => entry.id !== script.id),
                               script.id,
                               null,
                             ).then((result) => {
-                              if (result._tag === "Success") addButton?.focus();
+                              if (result._tag === "Success")
+                                setDeleteFocusRequest((count) => count + 1);
                             });
                           }}
                         />
@@ -252,7 +257,7 @@ export function ProjectActionsSettings() {
           )}
           <div className="self-start">
             <Button
-              data-project-add-action
+              ref={addActionRef}
               size="toolbar"
               variant="outline"
               disabled={saving || !canWriteSettings || targets.length === 0}

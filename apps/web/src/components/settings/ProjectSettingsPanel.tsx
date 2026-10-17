@@ -481,7 +481,7 @@ function ProjectDetail({
   return (
     <>
       <SettingsPageContainer>
-        <SettingsSection id="project-overview" title={t.settings.projectSettings.overview}>
+        <SettingsSection id="project-summary" title={t.settings.projectSettings.overview}>
           <dl className="flex flex-wrap gap-2.5 py-2.5 pr-3 pl-3.5 text-control">
             <div className="flex w-40 flex-col gap-0.5 rounded-settings-row-surface bg-settings-project-well px-3.5 py-2.5 shadow-settings-project-well">
               <dt className="text-secondary-copy text-secondary-label">
@@ -528,7 +528,7 @@ function ProjectDetail({
             {t.settings.projectSettings.tFindSettingKeepProjectHint}
           </AlertDescription>
         </Alert>
-        <SettingsSection title={t.settings.projectSettings.identity}>
+        <SettingsSection id="project-overview" title={t.settings.projectSettings.identity}>
           {!canEditGroup ? (
             <p className="px-3 py-2 text-sm text-muted-foreground sm:px-4">
               {group.memberProjects.length > 1

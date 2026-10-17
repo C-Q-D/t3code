@@ -1,3 +1,4 @@
+/** Exercises project editing permissions and search destinations against mutable project records. */
 import { RegistryContext } from "@effect/atom-react";
 import type {
   DeleteProjectInput,
@@ -160,13 +161,15 @@ vi.mock("./settingsLayout", () => ({
   SETTINGS_PICKER_TRIGGER_CLASSNAME: "",
   SettingsPageContainer: "div",
   SettingsSection: ({
+    id,
     children,
     headerAction,
   }: {
+    id?: string;
     children: ReactNode;
     headerAction?: ReactNode;
   }) => (
-    <section>
+    <section id={id}>
       {headerAction}
       {children}
     </section>
@@ -196,14 +199,17 @@ vi.mock("./ProjectFaviconPickerDialog", () => ({
   ProjectFaviconPickerDialog: "favicon-picker",
 }));
 vi.mock("./ProjectIconPickerDialog", () => ({ ProjectIconPickerDialog: "icon-picker" }));
+/** Names the editor module without a nested import type in the TSX generic call. */
+type ScriptEditorModule = typeof import("../projectScriptEditor");
 vi.mock("../projectScriptEditor", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../projectScriptEditor")>()),
+  ...(await importOriginal<ScriptEditorModule>()),
   ProjectScriptEditorDialog: "script-editor",
 }));
 
 import { buildSidebarProjectSnapshots } from "../../sidebarProjectGrouping";
 import { ProjectFaviconPickerDialog } from "./ProjectFaviconPickerDialog";
 import { ProjectSettingsPanel } from "./ProjectSettingsPanel";
+import { searchSettings } from "./settingsSearch";
 
 const primaryId = EnvironmentId.make("primary");
 const remoteId = EnvironmentId.make("remote");
@@ -330,6 +336,26 @@ async function grant(id: EnvironmentId, result: SessionResult) {
 }
 
 describe("project settings permissions", () => {
+  it("routes a project name search to the editable name and icon group", async () => {
+    const root = await mountPanel();
+    const match = searchSettings("name").find((item) => item.to === "/settings/projects");
+    expect(match).toBeDefined();
+    const section = root
+      .findAllByType("section")
+      .find((node) => node.props.id === (match?.targetId ?? match?.id));
+    expect(section).toBeDefined();
+    const name = section!.findByProps({ "aria-label": "Project name" });
+    expect(section!.findByProps({ "aria-label": "Choose a project icon" })).toBeDefined();
+    await act(async () => {
+      name.props.onChange();
+      name.props.onBlur({ currentTarget: { value: "Found through search" } });
+    });
+    expect(state.projects.map((project) => project.title)).toEqual([
+      "Found through search",
+      "Found through search",
+    ]);
+  });
+
   it("preflights every member before any shared field update", async () => {
     await grant(remoteId, AsyncResult.success(session([AuthSettingsWriteScope])));
     const root = await mountPanel();
