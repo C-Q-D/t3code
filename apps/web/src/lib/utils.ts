@@ -229,6 +229,9 @@ const twMerge = extendTailwindMerge({
         "notice-sand",
         "timeline-diagram-well",
         "timeline-quote-toolbar",
+        "terminal-well",
+        "terminal-divider-column",
+        "terminal-divider-row",
       ],
       "inset-shadow": [
         "selected",
@@ -315,6 +318,7 @@ const twMerge = extendTailwindMerge({
         "browser-viewport",
         "notice",
         "timeline-quote-key",
+        "terminal-tool",
       ],
       leading: [
         "code",

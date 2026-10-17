@@ -1037,6 +1037,7 @@ export const tools = {
     paste: "Paste",
     closed: "Terminal closed",
     exited: "Process exited",
+    tabExited: "Exited",
     copyFailed: "Unable to copy terminal selection",
     clipboardFailed: "Unable to read the clipboard",
     contextMenuFailed: "Unable to open the terminal context menu",

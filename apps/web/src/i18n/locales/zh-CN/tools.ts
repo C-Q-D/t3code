@@ -995,6 +995,7 @@ export const tools: Messages["tools"] = {
     paste: "粘贴",
     closed: "终端已关闭",
     exited: "进程已退出",
+    tabExited: "已退出",
     copyFailed: "无法复制终端选中内容",
     clipboardFailed: "无法读取剪贴板",
     contextMenuFailed: "无法打开终端右键菜单",

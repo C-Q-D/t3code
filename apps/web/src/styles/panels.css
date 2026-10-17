@@ -372,3 +372,24 @@
     box-shadow: var(--shadow-browser-viewport);
   }
 }
+
+/* PN4.1 — Terminal8a.dc.html: recessed terminal, 9px tool corners and split rules. */
+@theme {
+  --color-terminal-layout: #070708;
+  --radius-terminal-tool: 9px;
+  --shadow-terminal-well:
+    inset 2px 3px 6px rgba(0, 0, 0, 0.75), inset -1px -1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+  --shadow-terminal-divider-column:
+    -1px 0 0 rgba(0, 0, 0, 0.7), inset 1px 0 0 rgba(255, 255, 255, 0.05);
+  --shadow-terminal-divider-row:
+    0 -1px 0 rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Ghostty reads these inherited values when creating or updating its canvas theme. */
+.thread-terminal-well {
+  --terminal-background: var(--color-well-terminal);
+  --terminal-foreground: var(--color-fg-terminal);
+  --terminal-cursor: var(--color-fg-terminal-cursor);
+  --terminal-selection-background: var(--color-well-terminal-selection);
+}
