@@ -149,3 +149,83 @@
     6px 10px 16px -4px rgba(0, 0, 0, 0.6);
   --shadow-provider-model: inset 1px 1.5px 2px rgba(0, 0, 0, 0.6);
 }
+
+/* ST2 — SettingsPage8a.dc.html, imported by 其余屏-3 M3: palette cards, sliders and motion preview. */
+@theme {
+  --radius-settings-motion-panel: 9px;
+  --shadow-settings-theme-card:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09), 0 0 0 1px rgba(0, 0, 0, 0.44), 0 2px 0 #09090a;
+  --shadow-settings-theme-dot: 0 0 0 1px rgba(255, 255, 255, 0.12);
+  --shadow-settings-motion-panel:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09), 0 2px 0 #09090a, -6px 6px 12px -4px rgba(0, 0, 0, 0.7);
+  --shadow-settings-slider-thumb: 0 2px 0 #8e8e96, 2px 3px 5px rgba(0, 0, 0, 0.6);
+}
+
+@layer utilities {
+  /* These theme actions are full-height palette grid cells, not generic buttons. */
+  .settings-theme-action {
+    outline: 1.5px dashed var(--border);
+    outline-offset: -1.5px;
+  }
+  .settings-motion-panel {
+    width: 38%;
+  }
+  .settings-motion-travel {
+    right: calc(38% + 14px);
+    background: repeating-linear-gradient(90deg, var(--placeholder) 0 4px, transparent 4px 8px);
+  }
+  /* Native range pseudo-elements need scoped CSS; other settings sliders keep their existing skin. */
+  .settings-appearance-slider::-webkit-slider-runnable-track {
+    background: linear-gradient(
+      to right,
+      var(--code-foreground) 0 var(--settings-slider-fill-position),
+      var(--input) var(--settings-slider-fill-position) 100%
+    );
+    box-shadow: var(--shadow-well-progress);
+  }
+  .settings-appearance-slider::-moz-range-track {
+    background: var(--input);
+    box-shadow: var(--shadow-well-progress);
+  }
+  .settings-appearance-slider::-moz-range-progress {
+    background: var(--code-foreground);
+  }
+  .settings-appearance-slider::-webkit-slider-thumb,
+  .settings-appearance-slider:hover::-webkit-slider-thumb {
+    border: 0;
+    background: var(--primary);
+    box-shadow: var(--shadow-settings-slider-thumb);
+    transition: transform 120ms ease;
+  }
+  .settings-appearance-slider::-moz-range-thumb,
+  .settings-appearance-slider:hover::-moz-range-thumb {
+    border: 0;
+    background: var(--primary);
+    box-shadow: var(--shadow-settings-slider-thumb);
+    transition: transform 120ms ease;
+  }
+  .settings-appearance-slider:focus-visible::-webkit-slider-thumb {
+    box-shadow: var(--shadow-settings-slider-thumb), var(--inset-shadow-focus);
+  }
+  .settings-appearance-slider:focus-visible::-moz-range-thumb {
+    box-shadow: var(--shadow-settings-slider-thumb), var(--inset-shadow-focus);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .settings-appearance-slider::-webkit-slider-thumb,
+    .settings-appearance-slider::-moz-range-thumb {
+      transition: none;
+    }
+  }
+}
+
+/* M3's five equal columns fit the 680px+ row; narrower settings windows keep usable swatches. */
+@container settings-row (min-width: 480px) {
+  .settings-theme-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@container settings-row (min-width: 680px) {
+  .settings-theme-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}

@@ -948,6 +948,15 @@ export const settings: Messages["settings"] = {
     continue: "继续",
   },
   appearance: {
+    motionPresetsPreview: "档位仅预览；请用下方滑块调整时长。",
+    motionOff: "关闭",
+    motionFast: "快",
+    motionStandard: "标准",
+    motionSlow: "慢",
+    preview: "预览",
+    importTheme: "导入",
+    newTheme: "新建",
+    themeActions: "主题操作",
     monospaceFont: {
       title: "等宽字体",
       description: "代码块、差异、文件预览和终端。",

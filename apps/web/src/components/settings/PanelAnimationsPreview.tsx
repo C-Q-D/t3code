@@ -1,51 +1,30 @@
+/** Interactive M3 panel preview; only a user click changes its transform. */
 import { t } from "~/i18n";
 import { type CSSProperties, useState } from "react";
 
 import { cn } from "~/lib/utils";
 
+/** Shows panel travel using the configured duration in milliseconds, including zero and reduced motion. */
 export function PanelAnimationsPreview({ durationMs }: { durationMs: number }) {
   const [panelsOpen, setPanelsOpen] = useState(true);
-  const transitionClass =
-    "transition-[width,height,border-width] duration-(--preview-duration) ease-out motion-reduce:transition-none";
-
   return (
     <button
       type="button"
-      className="flex h-10 w-full cursor-pointer overflow-hidden rounded-lg border border-border bg-background p-1 shadow-xs/5 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
+      className="relative block h-16 w-full cursor-pointer overflow-hidden rounded-compact-row bg-input shadow-well-track outline-none focus-visible:inset-shadow-focus"
       aria-label={t.settings.panelAnimationsPreview.replayPanelAnimationPreview}
+      aria-pressed={panelsOpen}
       onClick={() => setPanelsOpen((open) => !open)}
       style={{ "--preview-duration": `${durationMs}ms` } as CSSProperties}
     >
-      <span
-        aria-hidden
-        className={cn(
-          "h-full shrink-0 overflow-hidden rounded-md bg-sidebar",
-          transitionClass,
-          panelsOpen ? "w-4" : "w-0",
-        )}
-      />
-      <span aria-hidden className="flex min-w-0 flex-1 flex-col px-1">
-        <span className="flex min-h-0 flex-1 flex-col gap-1 pt-1">
-          <span className="h-0.5 w-full rounded-full bg-muted-foreground/25" />
-          <span className="h-0.5 w-4/5 rounded-full bg-muted-foreground/20" />
-          <span className="h-0.5 w-3/5 rounded-full bg-muted-foreground/15" />
-        </span>
-        <span
-          className={cn(
-            "flex shrink-0 items-center overflow-hidden bg-foreground/5 px-2",
-            transitionClass,
-            panelsOpen ? "h-2 border-t border-border/70" : "h-0 border-t-0",
-          )}
-        >
-          <span className="h-px w-2/3 rounded-full bg-muted-foreground/25" />
-        </span>
+      <span aria-hidden className="absolute top-2 left-3 font-mono text-meta text-placeholder">
+        {t.settings.appearance.preview}
       </span>
+      <span aria-hidden className="settings-motion-travel absolute top-1/2 h-0.5 w-10" />
       <span
         aria-hidden
         className={cn(
-          "h-full shrink-0 overflow-hidden rounded-md bg-muted",
-          transitionClass,
-          panelsOpen ? "w-5" : "w-0",
+          "settings-motion-panel absolute top-2 right-2.5 bottom-2 rounded-settings-motion-panel bg-secondary shadow-settings-motion-panel transition-transform duration-(--preview-duration) ease-out motion-reduce:transition-none",
+          panelsOpen ? "translate-x-0" : "translate-x-full",
         )}
       />
     </button>

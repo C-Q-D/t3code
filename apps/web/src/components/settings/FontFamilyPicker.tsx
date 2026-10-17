@@ -1,3 +1,4 @@
+/** Installed-font picker with virtualized results; selection keeps the existing monospace validation. */
 import { t } from "~/i18n";
 import { LegendList, type LegendListRef } from "@legendapp/list/react";
 import { CheckIcon } from "lucide-react";
@@ -218,7 +219,7 @@ export function FontFamilyPicker({
         void listRef.current?.scrollIndexIntoView?.({ index: eventDetails.index, animated: false });
       }}
     >
-      <ComboboxTrigger aria-label={ariaLabel} render={<SelectButton size="sm" />}>
+      <ComboboxTrigger aria-label={ariaLabel} render={<SelectButton size="settings" />}>
         {selectedFamily.length === 0 ? defaultFamily : selectedFamily}
       </ComboboxTrigger>
       <ComboboxPopup align="end" className="flex w-72 flex-col">

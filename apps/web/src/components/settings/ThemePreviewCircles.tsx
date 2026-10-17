@@ -1,5 +1,5 @@
+/** Shared theme preview data and command-palette orb, plus compact appearance-card swatches. */
 import { t } from "~/i18n";
-import { MoonIcon, SunIcon } from "lucide-react";
 import type { CSSProperties } from "react";
 import {
   STANDARD_THEME_PREVIEW_COLORS as SHARED_STANDARD_THEME_PREVIEW_COLORS,
@@ -66,13 +66,6 @@ export const STANDARD_THEME_CARDS: ReadonlyArray<ThemeCardDefinition> = [
     })),
   },
 ];
-
-export function previewColorsOf(
-  card: ThemeCardDefinition,
-  mode: ThemeAppearance,
-): ThemeCardPreviewColors | null {
-  return card.previews.find((preview) => preview.mode === mode)?.colors ?? null;
-}
 
 export function getThemeCardDefinition(theme: ThemeDefinition): ThemeCardDefinition {
   return {
@@ -160,9 +153,8 @@ export function ThemePreviewCircle({
 }
 
 /**
- * A theme card's light and dark balls. Clicking a ball assigns that theme to
- * that half of the appearance mix; assigned balls carry a ring and a sun or
- * moon badge.
+ * M3 palette dots retain the existing per-appearance assignment action.
+ * Runtime colors come from the installed theme, never from design sample palettes.
  */
 export function ThemePreviewCircles({
   label,
@@ -176,58 +168,55 @@ export function ThemePreviewCircles({
   previews: ThemeCardDefinition["previews"];
 }) {
   return (
-    <div className="flex min-h-16 items-center justify-center gap-2.5 px-3 pt-3">
-      {previews.map((preview) => {
-        const mode = preview.mode;
-        const isPicked = activeModes.includes(mode);
-        return (
-          <Tooltip key={mode}>
-            <TooltipTrigger
-              render={
-                <button
-                  aria-label={t.settings.themePreviewCircles.applyMode(label, mode)}
-                  aria-pressed={isPicked}
-                  className={cn(
-                    "relative flex size-[68px] shrink-0 transform-gpu cursor-pointer items-center justify-center rounded-full p-1 outline-none transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card",
-                    isPicked && "hover:scale-100",
-                  )}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onSelectMode(mode);
-                  }}
-                  type="button"
-                >
-                  <ThemePreviewCircle colors={preview.colors} mode={mode} />
-                  {isPicked ? (
-                    <>
-                      <span
-                        aria-hidden
-                        className="pointer-events-none absolute inset-0 rounded-full"
-                        style={{ boxShadow: "inset 0 0 0 2px var(--ring)" }}
-                      />
-                      <span
-                        aria-hidden
-                        className="pointer-events-none absolute bottom-0.5 right-0.5 flex size-5 items-center justify-center rounded-full border border-border/70 bg-background text-foreground shadow-sm"
-                      >
-                        {mode === "light" ? (
-                          <SunIcon className="size-3" />
-                        ) : (
-                          <MoonIcon className="size-3" />
-                        )}
-                      </span>
-                    </>
-                  ) : null}
-                </button>
-              }
-            />
-            <TooltipPopup>
-              {mode === "light"
-                ? t.settings.themePreviewCircles.applyLightModeOnly
-                : t.settings.themePreviewCircles.applyDarkModeOnly}
-            </TooltipPopup>
-          </Tooltip>
-        );
-      })}
+    <div className="flex min-w-0 items-center gap-1">
+      {previews.map((preview) => (
+        <Tooltip key={preview.mode}>
+          <TooltipTrigger
+            render={
+              <button
+                type="button"
+                aria-label={t.settings.themePreviewCircles.applyMode(label, preview.mode)}
+                aria-pressed={activeModes.includes(preview.mode)}
+                className={cn(
+                  "flex h-6 cursor-pointer items-center gap-1 rounded-full outline-none focus-visible:inset-shadow-focus",
+                  activeModes.includes(preview.mode) && "inset-shadow-selected-control",
+                )}
+                onClick={() => onSelectMode(preview.mode)}
+              >
+                <span
+                  aria-hidden
+                  className="size-3 rounded-full shadow-settings-theme-dot"
+                  style={{ backgroundColor: preview.colors.canvas }}
+                />
+                {previews.length === 1 ? (
+                  <span
+                    aria-hidden
+                    className="size-3 rounded-full shadow-settings-theme-dot"
+                    style={{ backgroundColor: preview.colors.messageSurface }}
+                  />
+                ) : null}
+                <span
+                  aria-hidden
+                  className="size-3 rounded-full shadow-settings-theme-dot"
+                  style={{ backgroundColor: preview.colors.accent }}
+                />
+                {previews.length === 1 ? (
+                  <span
+                    aria-hidden
+                    className="size-3 rounded-full shadow-settings-theme-dot"
+                    style={{ backgroundColor: preview.colors.messageAction }}
+                  />
+                ) : null}
+              </button>
+            }
+          />
+          <TooltipPopup>
+            {preview.mode === "light"
+              ? t.settings.themePreviewCircles.applyLightModeOnly
+              : t.settings.themePreviewCircles.applyDarkModeOnly}
+          </TooltipPopup>
+        </Tooltip>
+      ))}
     </div>
   );
 }

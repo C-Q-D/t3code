@@ -1000,6 +1000,15 @@ export const settings = {
     continue: "Continue",
   },
   appearance: {
+    motionPresetsPreview: "Preset preview only; adjust the duration below.",
+    motionOff: "Off",
+    motionFast: "Fast",
+    motionStandard: "Standard",
+    motionSlow: "Slow",
+    preview: "Preview",
+    importTheme: "Import",
+    newTheme: "New",
+    themeActions: "Theme actions",
     monospaceFont: {
       title: "Monospace font",
       description: "Code blocks, diffs, file previews, and the terminal.",
