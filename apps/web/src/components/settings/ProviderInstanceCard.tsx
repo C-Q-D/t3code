@@ -1145,15 +1145,21 @@ export function ProviderInstanceCard({
           </div>
         </div>
         {needsAttention && inlineStatusDetail ? (
-          <p className="pointer-events-none relative text-xs text-secondary-label">
+          <p className="pointer-events-none relative text-xs wrap-anywhere text-secondary-label">
             {inlineStatusDetail}
           </p>
         ) : null}
-        <div className="relative flex max-h-32 flex-wrap gap-1.5 overflow-y-auto">
+        <button
+          type="button"
+          onClick={onSelect}
+          aria-label={t.settings.providerInstanceCard.select(displayName)}
+          aria-pressed={selected}
+          className="relative flex max-h-32 cursor-pointer flex-wrap gap-1.5 overflow-y-auto rounded-compact-row text-left outline-none focus-visible:inset-shadow-focus"
+        >
           {modelsForDisplay.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
+            <span className="text-xs text-muted-foreground">
               {t.settings.providerModels.modelsReportedProviderYetHint}
-            </p>
+            </span>
           ) : (
             modelsForDisplay.map((model) => (
               <span
@@ -1164,7 +1170,7 @@ export function ProviderInstanceCard({
               </span>
             ))
           )}
-        </div>
+        </button>
         {onAddInstance ? (
           <div className="relative mt-auto self-start">
             <Button size="md" variant="outline" onClick={onAddInstance}>
