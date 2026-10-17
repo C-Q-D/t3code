@@ -16,6 +16,12 @@ import { DiffWorkerPoolProvider } from "../DiffWorkerPoolProvider";
 
 /** The app's diff stylesheet, shared by single-file renderers so their separators match. */
 export const DIFF_VIEW_UNSAFE_CSS = `${DIFF_SURFACE_THEME_UNSAFE_CSS}
+/* Pierre computes typography on the host, including standalone PR guide FileDiffs.
+   Descendant variables cannot change the font size or line height inherited from it. */
+:host {
+  --diffs-font-size: var(--text-code-copy);
+  --diffs-line-height: var(--text-code-copy--line-height);
+}
 :is(
   [data-line],
   [data-line-annotation],
@@ -101,8 +107,6 @@ export const DIFF_VIEW_UNSAFE_CSS = `${DIFF_SURFACE_THEME_UNSAFE_CSS}
 
 /* Keep the selected blue/orange or red/green palette; K4 changes tint strength only. */
 :is([data-diff], [data-file], [data-virtualizer-buffer]) {
-  --diffs-font-size: var(--text-code-copy);
-  --diffs-line-height: var(--text-code-copy--line-height);
   --diffs-grid-number-column-width: calc(var(--spacing) * 11);
   --diffs-bg-context-override: var(--code-background);
   --diffs-addition-color-override: var(--diff-addition);
@@ -244,6 +248,13 @@ const CODE_VIEW_FILENAME_CSS = `
   display: none;
 }
 [data-diffs-header] slot[name="header-filename-suffix"] {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+/* renderDiffChildren wraps the React suffix in a light-DOM div assigned to this slot.
+   That wrapper is the flex item; it must shrink before the inner directory can truncate. */
+[data-diffs-header] slot[name="header-filename-suffix"]::slotted(div) {
   display: flex;
   flex: 1;
   min-width: 0;
