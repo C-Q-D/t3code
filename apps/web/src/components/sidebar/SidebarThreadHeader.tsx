@@ -1,18 +1,7 @@
-/**
- * The sidebar header: one row holding search, project scope, discussions and new thread.
- *
- * Search owns the row's text and spans it. Project scope collapses to an icon
- * that sits with new-project, discussions and new-thread as a segmented group at the end.
- * The scope icon swaps to the project favicon while a project is selected,
- * so the header still names the scope after the row that showed it is gone.
- *
- * The scope picker itself is passed in: its combobox state lives with the rest
- * of the sidebar's scope logic. `searchFieldRef` lands on the search field so
- * the picker's popup can anchor to that width rather than to its 28px trigger.
- */
+/** The sidebar header holds thread search, discussions and new-thread actions. */
 import { t } from "~/i18n";
 import { useLocation } from "@tanstack/react-router";
-import { FolderPlusIcon, MessagesSquareIcon, SearchIcon, SquarePenIcon, XIcon } from "lucide-react";
+import { MessagesSquareIcon, SearchIcon, SquarePenIcon, XIcon } from "lucide-react";
 import {
   type ComponentProps,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -28,13 +17,8 @@ import { SidebarInput, SidebarMenuButton } from "../ui/sidebar";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
 export interface SidebarThreadHeaderProps {
-  /** Lands on the search field so a popup can anchor to its width. */
-  searchFieldRef?: RefObject<HTMLDivElement | null>;
-  /** Without projects there is nothing to scope, so those controls stay out. */
+  /** Discussions are available when at least one project exists. */
   hasProjects: boolean;
-  /** The project scope combobox, rendered as the first icon of the group. */
-  projectScope: ReactNode;
-  onNewProject: () => void;
   onOpenDiscussions: () => void;
   /** Receives the click so Shift+click can skip the project picker. */
   onNewThread: (event: ReactMouseEvent) => void;
@@ -55,10 +39,7 @@ export interface SidebarThreadHeaderProps {
 
 /** Owns route selection so pathname updates stay in the header instead of subscribing the full sidebar. */
 export function SidebarThreadHeader({
-  searchFieldRef,
   hasProjects,
-  projectScope,
-  onNewProject,
   onOpenDiscussions,
   onNewThread,
   newThreadDisabled,
@@ -87,10 +68,7 @@ export function SidebarThreadHeader({
 
   return (
     <div className="flex items-center gap-1">
-      <div
-        ref={searchFieldRef}
-        className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground"
-      >
+      <div className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground">
         <SearchIcon className="size-4 shrink-0 text-(--sidebar-icon-color)" />
         <SidebarInput
           ref={searchInputRef}
@@ -132,14 +110,6 @@ export function SidebarThreadHeader({
           hover states, and a background well reads far louder on themed
           palettes than on the base light and dark ones. */}
       <div className="flex shrink-0 items-center">
-        {hasProjects ? (
-          <>
-            {projectScope}
-            <SidebarHeaderIconButton label={t.sidebar.header.addProject} onClick={onNewProject}>
-              <FolderPlusIcon />
-            </SidebarHeaderIconButton>
-          </>
-        ) : null}
         {discussions.visible ? (
           <SidebarHeaderIconButton
             label={t.sidebar.header.discussions}
