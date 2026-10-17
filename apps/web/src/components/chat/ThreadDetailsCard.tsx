@@ -2,6 +2,7 @@
 import { t } from "~/i18n";
 import { useLayoutEffect, useState, type ReactNode, type RefObject } from "react";
 import type { ScopedThreadRef } from "@t3tools/contracts";
+import { scopedThreadKey } from "@t3tools/client-runtime/environment";
 import { ScrollArea } from "../ui/scroll-area";
 import { cn } from "../../lib/utils";
 import { Popover, PopoverPopup, PopoverCreateHandle } from "../ui/popover";
@@ -19,23 +20,47 @@ import {
 } from "./threadDetailsCardLayout";
 import { observeResize } from "../../lib/observeResize";
 
+// Collapse ownership outlives card mounts; each caller must release its own request.
+const collapsedThreads = new Map<
+  string,
+  {
+    count: number;
+    previous: ReturnType<typeof selectThreadPanelVisibility>;
+  }
+>();
+
 /**
  * Temporarily hide both card presentations for this thread, e.g. while a terminal drawer is open.
+ * The first owner captures visibility; only the final release restores it, in either release order.
+ * Component unmount does not release requests: callers such as PN4 must invoke cleanup themselves.
  * @param threadRef - The environment and thread whose card should be hidden.
- * @returns An idempotent cleanup that restores the visibility captured before collapse.
+ * @returns An idempotent cleanup that releases this request and restores the original visibility
+ * once no collapse owners remain. Keep and call it when the caller closes or unmounts.
  */
 export function collapseThreadDetailsCard(threadRef: ScopedThreadRef): () => void {
+  const key = scopedThreadKey(threadRef);
   const store = useRightPanelStore.getState();
-  const previous = selectThreadPanelVisibility(store.threadPanelVisibilityByThreadKey, threadRef);
+  let ownership = collapsedThreads.get(key);
+  if (!ownership) {
+    ownership = {
+      count: 0,
+      previous: selectThreadPanelVisibility(store.threadPanelVisibilityByThreadKey, threadRef),
+    };
+    collapsedThreads.set(key, ownership);
+  }
+  ownership.count += 1;
   store.setThreadPanelOpen(threadRef, "inline", false);
   store.setThreadPanelOpen(threadRef, "popover", false);
-  let restored = false;
+  let released = false;
   return () => {
-    if (restored) return;
-    restored = true;
+    if (released) return;
+    released = true;
+    ownership.count -= 1;
+    if (ownership.count !== 0) return;
+    collapsedThreads.delete(key);
     const current = useRightPanelStore.getState();
-    current.setThreadPanelOpen(threadRef, "inline", previous.inlineOpen);
-    current.setThreadPanelOpen(threadRef, "popover", previous.popoverOpen);
+    current.setThreadPanelOpen(threadRef, "inline", ownership.previous.inlineOpen);
+    current.setThreadPanelOpen(threadRef, "popover", ownership.previous.popoverOpen);
   };
 }
 

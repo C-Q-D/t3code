@@ -1,10 +1,24 @@
+/** Verifies PR disclosure and thread lifecycle/permission guards for starting and stopping watches. */
 import { EnvironmentId, ThreadId, type ThreadPullRequestLink } from "@t3tools/contracts";
 import { act } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, expect, it, vi } from "vite-plus/test";
 
 const watchCommand = vi.hoisted(() => vi.fn());
-const watchState = vi.hoisted(() => ({ supported: true, permitted: true }));
+const watchState = vi.hoisted(() => ({
+  supported: true,
+  permitted: true,
+  thread: {
+    settledOverride: null as "settled" | "active" | null,
+    settledAt: null as string | null,
+    archivedAt: null as string | null,
+    lineage: { relationshipToParent: null as "subagent" | null },
+    source: {
+      creationSource: "user" as "user" | "provider" | "mcp",
+      lineage: { relationshipToParent: null as "subagent" | null },
+    },
+  },
+}));
 vi.mock("~/state/session", async (importOriginal) => ({
   ...(await importOriginal<typeof import("~/state/session")>()),
   useEnvironmentScope: () => watchState.permitted,
@@ -31,6 +45,7 @@ vi.mock("./ThreadDetailsPrRow", () => ({
 }));
 vi.mock("~/state/entities", () => ({
   useProjects: () => [],
+  useThreadShell: () => watchState.thread,
   useServerConfigs: () =>
     new Map([
       [
@@ -86,6 +101,12 @@ afterEach(() => {
   vi.unstubAllGlobals();
   watchState.supported = true;
   watchState.permitted = true;
+  watchState.thread.settledOverride = null;
+  watchState.thread.settledAt = null;
+  watchState.thread.archivedAt = null;
+  watchState.thread.lineage.relationshipToParent = null;
+  watchState.thread.source.lineage.relationshipToParent = null;
+  watchState.thread.source.creationSource = "user";
   watchCommand.mockClear();
 });
 
@@ -213,4 +234,44 @@ it.each([
   const row = renderer.root.findByProps({ "data-row": "1" });
   expect(row.props.onDoubleClick).toBeUndefined();
   expect(row.props.onClick).toBeUndefined();
+});
+
+it.each([
+  "settled override",
+  "settled timestamp",
+  "archived",
+  "native subagent",
+  "delegated subagent",
+] as const)("prevents starting a watch for a %s thread but preserves stopping", (scenario) => {
+  if (scenario === "settled override") watchState.thread.settledOverride = "settled";
+  if (scenario === "settled timestamp") watchState.thread.settledAt = "2026-01-01T00:00:00Z";
+  if (scenario === "archived") watchState.thread.archivedAt = "2026-01-01T00:00:00Z";
+  if (scenario === "native subagent" || scenario === "delegated subagent") {
+    watchState.thread.lineage.relationshipToParent = "subagent";
+    watchState.thread.source.lineage.relationshipToParent = "subagent";
+    watchState.thread.source.creationSource = scenario === "native subagent" ? "provider" : "mcp";
+  }
+  render([bottom], bottom);
+  const start = renderer.root.findByProps({ "data-row": "1" });
+  expect(start.props.onDoubleClick).toBeUndefined();
+  act(() => renderer.unmount());
+  const watched: ThreadPullRequestLink = {
+    ...bottom,
+    watch: {
+      startedAt: "2026-01-01T00:00:30.000Z",
+      headSha: null,
+      failedChecks: [],
+      passed: false,
+      passedChecks: [],
+      remarksThrough: "2026-01-01T00:00:30.000Z",
+      remarkIds: [],
+      conflicting: false,
+      wakes: 0,
+    },
+  };
+  render([watched], watched);
+  act(() => renderer.root.findByProps({ "data-row": "1" }).props.onClick());
+  expect(watchCommand).toHaveBeenCalledWith(
+    expect.objectContaining({ input: expect.objectContaining({ watching: false }) }),
+  );
 });

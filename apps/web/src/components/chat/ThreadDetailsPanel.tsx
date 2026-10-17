@@ -202,13 +202,13 @@ export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
                   <BranchToolbarBranchSelector
                     displayMode="panel"
                     {...branchToolbarProps}
-                    effectiveEnvModeOverride={props.envMode}
+                    effectiveEnvModeOverride={props.forceNewWorktree ? "worktree" : props.envMode}
                     panelActions={
                       props.activeProjectName ? (
                         <GitActionsControl
                           displayMode="panel"
                           compact={density !== "full"}
-                          showChangesRow={false}
+                          showChangesRow={density !== "full"}
                           gitCwd={props.gitCwd}
                           activeThreadRef={activeThreadRef}
                           {...(props.draftId ? { draftId: props.draftId } : {})}
@@ -221,7 +221,7 @@ export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
                   <GitActionsControl
                     displayMode="panel"
                     compact={density !== "full"}
-                    showChangesRow={false}
+                    showChangesRow={density !== "full"}
                     gitCwd={props.gitCwd}
                     activeThreadRef={activeThreadRef}
                     {...(props.draftId ? { draftId: props.draftId } : {})}

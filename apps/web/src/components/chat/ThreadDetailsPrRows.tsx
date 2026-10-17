@@ -13,7 +13,7 @@ import { useState, type ComponentProps, type MouseEvent as ReactMouseEvent } fro
 
 import { findProjectOnChangeRequestHost, parseChangeRequestUrl } from "~/lib/openPullRequestLink";
 
-import { useProjects, useServerConfigs } from "~/state/entities";
+import { useProjects, useServerConfigs, useThreadShell } from "~/state/entities";
 import { threadEnvironment } from "~/state/threads";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { readEnvironmentScope, useEnvironmentScope } from "~/state/session";
@@ -23,6 +23,7 @@ import { MorphIcon } from "~/components/MorphIcon";
 import { linkedPullRequestSnapshotStatus, prStatusIndicator } from "../ThreadStatusIndicators";
 
 import { ThreadDetailsPrRow } from "./ThreadDetailsPrRow";
+import { canStartThreadPullRequestWatch } from "./ThreadDetailsPrRows.logic";
 
 /**
  * Resolves a linked PR's project and snapshot without changing its watch state or navigation.
@@ -96,18 +97,21 @@ export function ThreadDetailsPrRows({
   onOpenLink: (event: ReactMouseEvent<HTMLElement>, url: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const thread = useThreadShell(threadRef);
   const watch = useAtomCommand(threadEnvironment.watchPullRequest, { reportFailure: true });
   const permitted = useEnvironmentScope(threadRef.environmentId, AuthOrchestrationOperateScope);
   const supported =
     useServerConfigs().get(threadRef.environmentId)?.environment.capabilities
       .threadPullRequestWatch === true;
-  // Both mutations target this thread's environment; an unsupported server gets no command.
+  // Lifecycle restrictions apply only to starting; an existing watch must remain stoppable.
   const setWatching = (link: ThreadPullRequestLink | null, watching: boolean) =>
     !link ||
     !supported ||
     !permitted ||
-    link.snapshot?.state === "closed" ||
-    link.snapshot?.state === "merged"
+    (watching &&
+      (!canStartThreadPullRequestWatch(thread) ||
+        link.snapshot?.state === "closed" ||
+        link.snapshot?.state === "merged"))
       ? undefined
       : () => {
           if (!readEnvironmentScope(threadRef.environmentId, AuthOrchestrationOperateScope)) return;

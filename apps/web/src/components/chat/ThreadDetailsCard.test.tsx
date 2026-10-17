@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+/** Verifies scoped card visibility, overlapping collapse ownership, and overlay dismissal. */
 
 import { EnvironmentId, ThreadId, type ScopedThreadRef } from "@t3tools/contracts";
 import { act } from "react";
@@ -18,6 +19,7 @@ const threadRef = {
   threadId: ThreadId.make("thread"),
 } satisfies ScopedThreadRef;
 const otherThreadRef = { ...threadRef, threadId: ThreadId.make("other") };
+/** Reads the effective visibility for a scoped test thread, including store defaults. */
 const visibility = (ref = threadRef) =>
   selectThreadPanelVisibility(useRightPanelStore.getState().threadPanelVisibilityByThreadKey, ref);
 let container: HTMLDivElement;
@@ -149,6 +151,30 @@ it.each(["Escape", "outside press"])(
       expect(container.querySelector("[data-thread-details-scrim]")).toBeNull();
     } finally {
       anchor.remove();
+    }
+  },
+);
+
+it.each([false, true])(
+  "restores the original state only after both collapse owners release (reverse=%s)",
+  (reverse) => {
+    useRightPanelStore.getState().setThreadPanelOpen(threadRef, "popover", true);
+    const original = visibility();
+    const releases = [
+      collapseThreadDetailsCard(threadRef),
+      collapseThreadDetailsCard({ ...threadRef }),
+    ];
+    if (reverse) releases.reverse();
+    const [first, last] = releases;
+    try {
+      first!();
+      expect(visibility()).toEqual({ inlineOpen: false, popoverOpen: false });
+      first!();
+      expect(visibility()).toEqual({ inlineOpen: false, popoverOpen: false });
+      last!();
+      expect(visibility()).toEqual(original);
+    } finally {
+      releases.forEach((release) => release());
     }
   },
 );
