@@ -7,7 +7,10 @@ import { resolveThreadCurrentPullRequestLink } from "@t3tools/shared/threadPullR
 import { Spinner } from "~/components/ui/spinner";
 import {
   ArchiveIcon,
-  ArrowUpDownIcon,
+  SlidersHorizontalIcon,
+  ChevronDownIcon,
+  MinusIcon,
+  PlusIcon,
   ChevronRightIcon,
   FolderPlusIcon,
   Globe2Icon,
@@ -162,23 +165,15 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 import { Input } from "./ui/input";
-import { Menu, MenuGroup, MenuPopup, MenuRadioGroup, MenuRadioItem, MenuTrigger } from "./ui/menu";
-import {
-  NumberField,
-  NumberFieldDecrement,
-  NumberFieldGroup,
-  NumberFieldIncrement,
-  NumberFieldInput,
-} from "./ui/number-field";
+import { Popover, PopoverPopup, PopoverTrigger } from "./ui/popover";
+import { Select as SelectPrimitive } from "@base-ui/react/select";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "./ui/select";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 import {
   SidebarContent,
   SidebarGroup,
   SidebarMenu,
-  SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
   useSidebar,
@@ -747,12 +742,12 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
         data-size="sm"
         data-testid={`thread-row-${thread.id}`}
         className={cn(
-          "relative isolate flex h-8 w-full min-w-0 cursor-pointer select-none items-center gap-2 overflow-hidden rounded-md px-2 text-left text-xs outline-hidden focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring group-data-[collapsible=icon]:hidden [&>span:last-child]:truncate [&>svg:not([class*='size-'])]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-muted-foreground",
+          "relative isolate flex h-8 w-full min-w-0 cursor-pointer select-none items-center gap-2 overflow-hidden rounded-menu-row pr-2.5 pl-9.5 text-left text-secondary-copy-large outline-none focus-visible:inset-shadow-focus group-data-[collapsible=icon]:hidden",
           isActive
-            ? "bg-sidebar-row-active font-medium text-sidebar-foreground hover:bg-sidebar-row-active"
+            ? "bg-sidebar-row-active text-sidebar-foreground hover:bg-sidebar-row-active"
             : isSelected
               ? "bg-sidebar-row-selected text-sidebar-foreground hover:bg-sidebar-row-active"
-              : "text-sidebar-muted-foreground/80 hover:bg-sidebar-row-hover hover:text-sidebar-foreground",
+              : "text-code-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground",
           isFileDragOver && "ring-1 ring-inset ring-primary/70",
         )}
         onClick={handleRowClick}
@@ -808,7 +803,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
           {canOperateThread && renamingThreadKey === threadKey ? (
             <input
               ref={handleRenameInputRef}
-              className="min-w-0 flex-1 truncate rounded border border-ring bg-transparent px-0.5 text-sm outline-none"
+              className="min-w-0 flex-1 truncate rounded-menu-row border border-ring bg-transparent px-0.5 text-secondary-copy-large outline-none"
               value={renamingTitle}
               onChange={handleRenameInputChange}
               onKeyDown={handleRenameInputKeyDown}
@@ -821,7 +816,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
               <TooltipTrigger
                 render={
                   <span
-                    className="min-w-0 flex-1 truncate text-sm"
+                    className="min-w-0 flex-1 truncate text-secondary-copy-large"
                     data-testid={`thread-title-${thread.id}`}
                   >
                     {thread.title}
@@ -1068,9 +1063,9 @@ const SidebarProjectThreadList = memo(function SidebarProjectThreadList(
   const showLessButtonRender = useMemo(() => <button type="button" />, []);
 
   return (
-    <SidebarMenuSub
+    <ul
       ref={attachThreadListAutoAnimateRef}
-      className="mx-0.5 my-0 w-full translate-x-0 overflow-hidden sm:mx-1"
+      className="flex w-full min-w-0 flex-col gap-0.5 overflow-hidden"
     >
       {shouldShowThreadPanel && showEmptyThreadState ? (
         <SidebarMenuSubItem className="w-full" data-thread-selection-safe>
@@ -1156,7 +1151,7 @@ const SidebarProjectThreadList = memo(function SidebarProjectThreadList(
           </SidebarMenuSubButton>
         </SidebarMenuSubItem>
       )}
-    </SidebarMenuSub>
+    </ul>
   );
 });
 
@@ -2457,9 +2452,13 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
   return (
     <>
       <div className="group/project-header relative">
-        <SidebarMenuButton
+        <button
+          type="button"
           ref={isManualProjectSorting ? dragHandleProps?.setActivatorNodeRef : undefined}
-          className={isManualProjectSorting ? "cursor-grab active:cursor-grabbing" : undefined}
+          className={cn(
+            "legacy-sidebar-project-row",
+            isManualProjectSorting && "cursor-grab active:cursor-grabbing",
+          )}
           {...(isManualProjectSorting && dragHandleProps ? dragHandleProps.attributes : {})}
           {...(isManualProjectSorting && dragHandleProps ? dragHandleProps.listeners : {})}
           onPointerDownCapture={handleProjectButtonPointerDownCapture}
@@ -2479,7 +2478,7 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
               >
                 <span className="absolute inset-0 flex items-center justify-center transition-opacity duration-150 group-hover/project-header:opacity-0">
                   <span
-                    className={`size-[9px] rounded-full ${projectStatus.dotClass} ${
+                    className={`size-2.25 rounded-full ${projectStatus.dotClass} ${
                       projectStatus.pulse ? "animate-status-pulse" : ""
                     }`}
                   />
@@ -2492,16 +2491,16 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
             </Tooltip>
           ) : (
             <ChevronRightIcon
-              className={`-ml-0.5 size-3.5 shrink-0 text-muted-foreground/70 transition-transform duration-150 ${
+              className={`size-3.25 shrink-0 transition-transform duration-150 ${
                 projectExpanded ? "rotate-90" : ""
               }`}
             />
           )}
           <span className="flex shrink-0">
-            <ProjectFavicon project={project} />
+            <ProjectFavicon project={project} className="size-4" />
           </span>
           <span className="flex min-w-0 flex-1 items-center gap-2">
-            <span className="truncate text-sm font-medium text-sidebar-foreground/90">
+            <span className="truncate text-secondary-copy-large font-bold text-sidebar-foreground">
               {project.displayName}
             </span>
             {project.groupedProjectCount > 1 ? (
@@ -2513,7 +2512,7 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
           {/* Keeps the name clear of the environment badge and new-thread button overlaid on
               the row's end (two slots on touch, where both stay visible). */}
           <span aria-hidden className="w-4 shrink-0 max-sm:w-10" />
-        </SidebarMenuButton>
+        </button>
         {/* Environment badge – visible by default, crossfades with the
             "new thread" button on hover using the same pointer-events +
             opacity pattern as the thread row archive/timestamp swap. */}
@@ -2832,7 +2831,8 @@ type SortableProjectHandleProps = Pick<
   "attributes" | "listeners" | "setActivatorNodeRef"
 >;
 
-function ProjectSortMenu({
+/** Owns X3 option controls; supplied values stay authoritative and changes use the existing settings handlers. */
+function LegacySidebarOptions({
   projectSortOrder,
   threadSortOrder,
   threadPreviewCount,
@@ -2861,98 +2861,123 @@ function ProjectSortMenu({
     [onThreadPreviewCountChange, threadPreviewCount],
   );
 
+  const radioName = React.useId();
   return (
-    <Menu>
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <MenuTrigger
-              render={
-                <Button size="icon-xs" variant="ghost-muted" aria-label={t.sidebar.options.title} />
-              }
-            />
-          }
-        >
-          <ArrowUpDownIcon className="size-3.5" />
-        </TooltipTrigger>
-        <TooltipPopup side="right">{t.sidebar.options.title}</TooltipPopup>
-      </Tooltip>
-      <MenuPopup align="end" side="bottom">
-        <MenuGroup>
-          <div className="px-2 py-1 sm:text-xs font-medium text-muted-foreground">
-            {t.sidebar.options.sortProjects}
-          </div>
-          <MenuRadioGroup
-            value={projectSortOrder}
-            onValueChange={(value) => {
-              onProjectSortOrderChange(value as SidebarProjectSortOrder);
-            }}
-          >
-            {(Object.entries(SIDEBAR_SORT_LABELS) as Array<[SidebarProjectSortOrder, string]>).map(
-              ([value, label]) => (
-                <MenuRadioItem key={value} value={value}>
-                  {label}
-                </MenuRadioItem>
-              ),
-            )}
-          </MenuRadioGroup>
-        </MenuGroup>
-        <MenuGroup>
-          <div className="px-2 pt-2 pb-1 sm:text-xs font-medium text-muted-foreground">
-            {t.sidebar.options.sortThreads}
-          </div>
-          <MenuRadioGroup
-            value={threadSortOrder}
-            onValueChange={(value) => {
-              onThreadSortOrderChange(value as SidebarThreadSortOrder);
-            }}
-          >
-            {(
-              Object.entries(SIDEBAR_THREAD_SORT_LABELS) as Array<[SidebarThreadSortOrder, string]>
-            ).map(([value, label]) => (
-              <MenuRadioItem key={value} value={value}>
-                {label}
-              </MenuRadioItem>
-            ))}
-          </MenuRadioGroup>
-        </MenuGroup>
-        <MenuGroup>
-          <div className="px-2 pt-2 pb-1 text-muted-foreground sm:text-xs font-medium">
-            {t.sidebar.options.visibleThreads}
-          </div>
-          <div className="px-2 py-1">
-            <NumberField
-              aria-label={t.sidebar.options.visibleThreadCount}
-              className="w-28"
-              max={MAX_SIDEBAR_THREAD_PREVIEW_COUNT}
-              min={MIN_SIDEBAR_THREAD_PREVIEW_COUNT}
-              onValueChange={handleThreadPreviewCountChange}
-              size="sm"
-              step={1}
-              value={threadPreviewCount}
+    <Popover>
+      <PopoverTrigger
+        render={
+          <button
+            type="button"
+            className="legacy-sidebar-round-key"
+            aria-label={t.sidebar.options.title}
+          />
+        }
+      >
+        <SlidersHorizontalIcon className="size-3.75" />
+      </PopoverTrigger>
+      <PopoverPopup
+        align="end"
+        side="bottom"
+        padding="none"
+        className="w-62.5"
+        aria-label={t.sidebar.options.title}
+      >
+        <div className="flex flex-col gap-2.5 p-3 text-secondary-copy-large leading-sidebar-context-drag">
+          <div className="flex items-center gap-2">
+            <span className="flex-1 text-code-foreground">{t.sidebar.options.sortProjects}</span>
+            <Select
+              value={projectSortOrder}
+              onValueChange={(value) => {
+                if (value !== null) onProjectSortOrderChange(value);
+              }}
             >
-              <NumberFieldGroup>
-                <NumberFieldDecrement
-                  aria-label={t.sidebar.options.decreaseVisibleThreadCountAriaLabel}
-                  className="[&_svg]:size-3.5"
-                />
-                <NumberFieldInput
-                  aria-label={t.sidebar.options.visibleThreadCount}
-                  inputMode="numeric"
-                  onKeyDownCapture={(event) => {
-                    event.stopPropagation();
-                  }}
-                />
-                <NumberFieldIncrement
-                  aria-label={t.sidebar.options.increaseVisibleThreadCountAriaLabel}
-                  className="[&_svg]:size-3.5"
-                />
-              </NumberFieldGroup>
-            </NumberField>
+              <SelectPrimitive.Trigger
+                className="legacy-sidebar-project-sort"
+                aria-label={t.sidebar.options.sortProjects}
+              >
+                <SelectValue>{SIDEBAR_SORT_LABELS[projectSortOrder]}</SelectValue>
+                <SelectPrimitive.Icon>
+                  <ChevronDownIcon className="size-3" />
+                </SelectPrimitive.Icon>
+              </SelectPrimitive.Trigger>
+              <SelectPopup alignItemWithTrigger={false} matchTriggerWidth={false}>
+                {(
+                  Object.entries(SIDEBAR_SORT_LABELS) as Array<[SidebarProjectSortOrder, string]>
+                ).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectPopup>
+            </Select>
           </div>
-        </MenuGroup>
-      </MenuPopup>
-    </Menu>
+          <fieldset className="min-w-0">
+            <legend className="mb-1.5 text-code-foreground">{t.sidebar.options.sortThreads}</legend>
+            <div className="flex flex-col gap-0.5 rounded-compact-row bg-sidebar-control-surface p-0.75 shadow-well-pressed">
+              {(
+                Object.entries(SIDEBAR_THREAD_SORT_LABELS) as Array<
+                  [SidebarThreadSortOrder, string]
+                >
+              ).map(([value, label]) => (
+                <label key={value} className="legacy-sidebar-sort-option">
+                  <input
+                    type="radio"
+                    name={radioName}
+                    value={value}
+                    checked={threadSortOrder === value}
+                    onChange={() => onThreadSortOrderChange(value)}
+                    className="peer sr-only"
+                  />
+                  <span className="legacy-sidebar-sort-label">{label}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          <div className="flex items-center gap-2">
+            <span className="flex-1 text-code-foreground">{t.sidebar.options.visibleThreads}</span>
+            <div className="flex h-7 items-center rounded-full bg-sidebar-control-surface px-0.75 font-mono text-secondary-copy">
+              <button
+                type="button"
+                className="legacy-sidebar-count-step"
+                aria-label={t.sidebar.options.decreaseVisibleThreadCountAriaLabel}
+                disabled={threadPreviewCount <= MIN_SIDEBAR_THREAD_PREVIEW_COUNT}
+                onClick={() => handleThreadPreviewCountChange(threadPreviewCount - 1)}
+              >
+                <MinusIcon className="size-2.75" />
+              </button>
+              <input
+                type="number"
+                className="legacy-sidebar-count-input"
+                aria-label={t.sidebar.options.visibleThreadCount}
+                min={MIN_SIDEBAR_THREAD_PREVIEW_COUNT}
+                max={MAX_SIDEBAR_THREAD_PREVIEW_COUNT}
+                step={1}
+                value={threadPreviewCount}
+                onChange={(event) =>
+                  handleThreadPreviewCountChange(
+                    Number.isFinite(event.currentTarget.valueAsNumber)
+                      ? event.currentTarget.valueAsNumber
+                      : null,
+                  )
+                }
+                onKeyDownCapture={(event) => {
+                  if (event.key !== "Escape") event.stopPropagation();
+                }}
+              />
+              <button
+                type="button"
+                className="legacy-sidebar-count-step"
+                aria-label={t.sidebar.options.increaseVisibleThreadCountAriaLabel}
+                disabled={threadPreviewCount >= MAX_SIDEBAR_THREAD_PREVIEW_COUNT}
+                onClick={() => handleThreadPreviewCountChange(threadPreviewCount + 1)}
+              >
+                <PlusIcon className="size-2.75" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </PopoverPopup>
+    </Popover>
   );
 }
 
@@ -3100,19 +3125,47 @@ const SidebarProjectsContent = memo(function SidebarProjectsContent(
       fixedHeader={
         // Lifted above the stage backdrop, whose fade bleeds below the
         // header and would otherwise paint across the search row's outline.
-        <SidebarGroup className="z-[1]">
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <CommandDialogTrigger
-                render={<SidebarMenuButton data-testid="command-palette-trigger" />}
-              >
-                <SearchIcon />
-                <span className="flex-1 truncate">{t.sidebar.header.searchPlaceholder}</span>
-                {commandPaletteShortcutLabel ? <Kbd>{commandPaletteShortcutLabel}</Kbd> : null}
-              </CommandDialogTrigger>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarGroup>
+        <div className="relative z-1 flex items-center gap-1.5 px-3 pt-3 pb-2">
+          <CommandDialogTrigger
+            render={
+              <button
+                type="button"
+                data-testid="command-palette-trigger"
+                className="legacy-sidebar-search"
+              />
+            }
+          >
+            <SearchIcon className="size-3.5 shrink-0" strokeWidth={1.75} />
+            <span className="min-w-0 flex-1 truncate text-left">
+              {t.sidebar.header.searchPlaceholder}
+            </span>
+            {commandPaletteShortcutLabel ? <Kbd>{commandPaletteShortcutLabel}</Kbd> : null}
+          </CommandDialogTrigger>
+          <LegacySidebarOptions
+            projectSortOrder={projectSortOrder}
+            threadSortOrder={threadSortOrder}
+            threadPreviewCount={threadPreviewCount}
+            onProjectSortOrderChange={handleProjectSortOrderChange}
+            onThreadSortOrderChange={handleThreadSortOrderChange}
+            onThreadPreviewCountChange={handleThreadPreviewCountChange}
+          />
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <button
+                  type="button"
+                  className="legacy-sidebar-round-key"
+                  aria-label={t.sidebar.header.addProject}
+                  data-testid="sidebar-add-project-trigger"
+                  onClick={openAddProject}
+                />
+              }
+            >
+              <FolderPlusIcon className="size-3.75" />
+            </TooltipTrigger>
+            <TooltipPopup side="right">{t.sidebar.header.addProject}</TooltipPopup>
+          </Tooltip>
+        </div>
       }
     >
       {showArm64IntelBuildWarning && arm64IntelBuildWarningDescription ? (
@@ -3139,39 +3192,7 @@ const SidebarProjectsContent = memo(function SidebarProjectsContent(
         </SidebarGroup>
       ) : null}
       <LocalSecondaryStatus />
-      <SidebarGroup>
-        <div className="mb-1 flex items-center justify-between pl-2 pr-1.5">
-          <span className="text-xs font-medium text-sidebar-muted-foreground/80">
-            {t.sidebar.projects.title}
-          </span>
-          <div className="flex items-center gap-1">
-            <ProjectSortMenu
-              projectSortOrder={projectSortOrder}
-              threadSortOrder={threadSortOrder}
-              threadPreviewCount={threadPreviewCount}
-              onProjectSortOrderChange={handleProjectSortOrderChange}
-              onThreadSortOrderChange={handleThreadSortOrderChange}
-              onThreadPreviewCountChange={handleThreadPreviewCountChange}
-            />
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    size="icon-xs"
-                    variant="ghost-muted"
-                    aria-label={t.sidebar.header.addProject}
-                    data-testid="sidebar-add-project-trigger"
-                    onClick={openAddProject}
-                  />
-                }
-              >
-                <FolderPlusIcon className="size-3.5" />
-              </TooltipTrigger>
-              <TooltipPopup side="right">{t.sidebar.header.addProject}</TooltipPopup>
-            </Tooltip>
-          </div>
-        </div>
-
+      <div className="px-2">
         {isManualProjectSorting ? (
           <DndContext
             sensors={projectDnDSensors}
@@ -3254,7 +3275,7 @@ const SidebarProjectsContent = memo(function SidebarProjectsContent(
             {t.sidebar.projects.empty}
           </div>
         )}
-      </SidebarGroup>
+      </div>
     </SidebarContent>
   );
 });

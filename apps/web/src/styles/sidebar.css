@@ -288,3 +288,50 @@
 [data-composer-drop-target][data-thread-context-over] .sidebar-context-drop-hint {
   @apply flex;
 }
+
+/* 补充屏-4.dc.html · X3: feature-owned search launcher and option controls.
+   The search remains a command-palette trigger, not an editable search field. */
+@theme {
+  /* X3's project-sort capsule has only a 1.5px lower edge. */
+  --shadow-legacy-sidebar-sort: 0 1.5px 0 #09090a;
+}
+
+.legacy-sidebar-search {
+  @apply flex h-8.5 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-full bg-sidebar-control-surface px-3 text-secondary-copy-large text-placeholder text-shadow-none shadow-well-pressed outline-none focus-visible:inset-shadow-focus;
+}
+
+.legacy-sidebar-round-key {
+  @apply flex size-8.5 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent p-0 text-foreground outline-none hover:bg-sidebar-row-hover focus-visible:inset-shadow-focus aria-expanded:bg-accent aria-expanded:inset-shadow-selected-control;
+}
+
+.legacy-sidebar-project-row {
+  @apply flex h-8 w-full min-w-0 cursor-pointer items-center gap-2 rounded-menu-row px-2.5 text-left text-secondary-copy-large font-bold text-sidebar-foreground outline-none hover:bg-sidebar-row-hover focus-visible:inset-shadow-focus;
+}
+
+.legacy-sidebar-project-sort {
+  @apply flex h-7 min-w-0 max-w-38 cursor-pointer items-center gap-1 rounded-full bg-sidebar-shortcut pr-2 pl-2.5 text-secondary-copy text-foreground shadow-legacy-sidebar-sort outline-none hover:bg-accent focus-visible:inset-shadow-focus;
+}
+
+.legacy-sidebar-sort-option {
+  @apply relative cursor-pointer;
+}
+
+.legacy-sidebar-sort-label {
+  @apply flex h-7 items-center rounded-sidebar-quick-action px-2.5 text-secondary-copy-medium text-secondary-label peer-checked:bg-sidebar-tab-selected peer-checked:font-bold peer-checked:text-foreground peer-focus-visible:inset-shadow-focus;
+}
+
+.legacy-sidebar-count-step {
+  @apply flex size-5.5 shrink-0 cursor-pointer items-center justify-center rounded-full bg-secondary p-0 text-foreground outline-none hover:bg-accent focus-visible:inset-shadow-focus disabled:cursor-default disabled:text-fg-control-disabled;
+}
+
+/* X3 supplies separate step buttons; suppress the browser's duplicate spinner. */
+.legacy-sidebar-count-input {
+  @apply w-7.5 min-w-0 bg-transparent text-center outline-none focus-visible:inset-shadow-focus;
+  appearance: textfield;
+}
+
+.legacy-sidebar-count-input::-webkit-inner-spin-button,
+.legacy-sidebar-count-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}

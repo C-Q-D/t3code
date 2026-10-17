@@ -281,6 +281,7 @@ const twMerge = extendTailwindMerge({
         "discussion-select-disabled",
         "sidebar-resize-grip",
         "sidebar-context-drag",
+        "legacy-sidebar-sort",
       ],
       "inset-shadow": [
         "selected",
