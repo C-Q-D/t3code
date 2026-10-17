@@ -1,4 +1,25 @@
 @import "tailwindcss";
+@import "./styles/tokens.css";
+@import "./styles/fonts.css";
+@import "./styles/graphite.css";
+@import "./styles/slab.css";
+@import "./styles/icon-hues.css";
+@import "./styles/controls.css";
+@import "./styles/menus.css";
+@import "./styles/toast.css";
+@import "./styles/dialogs.css";
+@import "./styles/badges.css";
+@import "./styles/frame.css";
+@import "./styles/sidebar.css";
+@import "./styles/timeline.css";
+@import "./styles/composer.css";
+@import "./styles/chat-header.css";
+@import "./styles/panels.css";
+@import "./styles/pull-requests.css";
+@import "./styles/usage.css";
+@import "./styles/settings.css";
+@import "./styles/overlays.css";
+@import "./styles/discussions.css";
 
 @custom-variant dark (&:is(.dark, .dark *));
 @custom-variant light (&:not(.dark, .dark *));

@@ -1,0 +1,759 @@
+/*
+ * F1：8a 深色石墨的令牌合同与结构尺寸；不应用到组件，不替代 F0 配色或 F2 字体族。
+ * 合同表：按用途选下列唯一入口；同值不同用途分行。现有主题类的设计值由 F0 实现，
+ * 本文件不覆盖其定义。这里的固定颜色只补没有对应主题工具类的用途。
+ * cn() 已登记：lib/utils.ts 已登记本文件的 color、text、shadow、text-shadow、radius、
+ * leading、tracking 名称，可按工具类分组安全合并；后续新增这些令牌时须同步登记，
+ * 以区分字号、阴影与颜色，并让圆角、行高、字距按最后一个互斥类覆盖。
+ * 尺寸用 Tailwind 间距刻度：1 单位 = 4px，可用 0.25 的倍数；
+ * 例如 34px → h-8.5，276px → w-69，48px → h-12，16px → gap-4。
+ *
+ * | 用途 | 设计值 | 类名 | 来源（文件 · 画板或章节） |
+ * | --- | --- | --- | --- |
+ * | 窗口底座 | #0b0b0c | bg-background | README.md · 设计令牌 / 规范-8a.dc.html · G1 |
+ * | 侧边栏石板 | #1c1c1f | bg-sidebar | README.md · 设计令牌 / 规范-8a.dc.html · G1 |
+ * | 对话区石板 | #202023 | bg-card | README.md · 设计令牌 / 规范-8a.dc.html · G1 |
+ * | 凸起卡片与输入框外壳 | #28282c | bg-surface-raised | README.md · 设计令牌 / 规范-8a.dc.html · G1 |
+ * | 浮层与消息外壳 | #2a2a2e | bg-popover | README.md · 设计令牌 / 规范-8a.dc.html · G1 |
+ * | 通用悬停 | #2e2e33 | bg-secondary | README.md · 设计令牌 / 规范-8a.dc.html · G1 |
+ * | 通用选中行 | #38383e | bg-accent | README.md · 设计令牌 / 规范-8a.dc.html · G1 |
+ * | 正文 | #ececee | text-foreground | README.md · 设计令牌 / 规范-8a.dc.html · G1 |
+ * | 次要文字 | #a9a9b1 | text-secondary-label | README.md · 设计令牌 / 规范-8a.dc.html · G1 |
+ * | 三级文字 | #94949c | text-muted-foreground | README.md · 设计令牌 / 规范-8a.dc.html · G1 |
+ * | 占位文字 | #76767e | text-placeholder | README.md · 设计令牌 / 规范-8a.dc.html · G1 |
+ * | 次要图标 | #94949c | text-icon-muted | 规范-8a.dc.html · G1 |
+ * | 描边 | #46464d | border-border | 规范-8a.dc.html · G1 |
+ * | 输入区底色 | #131315 | bg-input | README.md · 设计令牌 / 规范-8a.dc.html · G1 |
+ * | 主按钮底色 | #F2F2F3 | bg-primary | README.md · 设计令牌 / 规范-8a.dc.html · G1 |
+ * | 主按钮文字 | #111113 | text-primary-foreground | README.md · 设计令牌 / 规范-8a.dc.html · G1 |
+ * | 焦点颜色 | #F2F2F3 | outline-ring | 规范-8a.dc.html · G1 |
+ * | 次要按钮底色 | #2e2e33 | bg-secondary | 规范-8a.dc.html · G1 |
+ * | 弱化容器底色 | #2e2e33 | bg-muted | 规范-8a.dc.html · G1 |
+ * | 悬停与选中文字 | #ececee | text-accent-foreground | 规范-8a.dc.html · G1 |
+ * | 用户消息底色 | #323237 | bg-message | 规范-8a.dc.html · G1 |
+ * | 用户消息文字 | #f5f5f6 | text-message-foreground | 规范-8a.dc.html · G1 |
+ * | 发送、开关、滑块底色 | #F2F2F3 | bg-message-action | 规范-8a.dc.html · G1 |
+ * | 发送、开关、滑块文字 | #111113 | text-message-action-foreground | 规范-8a.dc.html · G1 |
+ * | 白键悬停 | #FFFFFF | bg-message-action-hover | 规范-8a.dc.html · G1 |
+ * | 代码底色 | #121214 | bg-code | 规范-8a.dc.html · G1 |
+ * | 代码文字 | #c4c4ca | text-code-foreground | 规范-8a.dc.html · G1 |
+ * | 错误语义色 | #ff7b6b | text-error | 规范-8a.dc.html · G1 |
+ * | 错误语义文字 / danger | #ff7b6b | text-error-foreground | README.md · 设计令牌 / 规范-8a.dc.html · G1 |
+ * | 暗底错误状态 | #3a1c1a | bg-error-surface | 规范-8a.dc.html · G1 / H5 |
+ * | 警告语义色 | #9a6400 | text-warning | 规范-8a.dc.html · G1 |
+ * | 警告语义文字 | #2e2617 | text-warning-foreground | 规范-8a.dc.html · G1 |
+ * | W7 浅沙警告底色 | #e8dcc0 | bg-warning-surface | README.md · 设计令牌 / 规范-8a.dc.html · G1 / H5 |
+ * | 更新语义色 | #82abff | text-update | 规范-8a.dc.html · G1 |
+ * | 处理中标签文字 | #8fb4ff | text-update-foreground | 规范-8a.dc.html · G1 / H5 |
+ * | 处理中标签底色 | #17263f | bg-update-surface | 规范-8a.dc.html · G1 / H5 |
+ * | 侧边栏正文 | #ececee | text-sidebar-foreground | 规范-8a.dc.html · G1 |
+ * | 侧边栏次要文字 | #a9a9b1 | text-sidebar-muted-foreground | 规范-8a.dc.html · G1 |
+ * | 侧边栏搜索与分段底色 | #131315 | bg-sidebar-control-surface | 规范-8a.dc.html · G1 |
+ * | 侧边栏行悬停 | #27272b | bg-sidebar-row-hover | 规范-8a.dc.html · G1 |
+ * | 侧边栏当前行 | #2e2e33 | bg-sidebar-row-active | 规范-8a.dc.html · G1 |
+ * | 侧边栏多选底色 | #202023 | bg-sidebar-row-selected | 规范-8a.dc.html · G1 |
+ * | 侧边栏无边框 | 无 | border-0 | 规范-8a.dc.html · G1 |
+ * | 成功、Diff 新增语义色 | #5fd08a | text-success | 规范-8a.dc.html · G1 |
+ * | 成功文字 | #6fd896 | text-success-foreground | README.md · 设计令牌 / 规范-8a.dc.html · G1 / H5 |
+ * | Diff 新增统计 | #6fd896 | text-diff-addition-foreground | 规范-8a.dc.html · G1 |
+ * | Diff 删除统计 | #ff7b6b | text-diff-deletion-foreground | 规范-8a.dc.html · G1 |
+ * | 信息文字 | #82abff | text-info | README.md · 设计令牌 / 规范-8a.dc.html · G1 |
+ * | 强调标签底色 / 批准 / 输入框 | #F2F2F3 | bg-primary | 规范-8a.dc.html · H5 |
+ * | 强调标签文字 / 批准 / 输入框 | #111113 | text-primary-foreground | 规范-8a.dc.html · H5 |
+ * | 中性标签底色 | #2e2e33 | bg-secondary | 规范-8a.dc.html · H5 |
+ * | 中性草稿文字 | #a9a9b1 | text-secondary-label | 规范-8a.dc.html · H5 |
+ * | 受限警告（W7 通用变体）底色 | #e8dcc0 | bg-warning-surface | README.md · 设计令牌（W7 定稿） |
+ * | 界面标题字重 | 700 | font-bold | 规范-8a.dc.html · H6 |
+ * | 按钮胶囊圆角 | 高度的一半 | rounded-full | README.md · 设计令牌 / 规范-8a.dc.html · H6 |
+ * | 通用间距一 | 4px | gap-1 | 规范-8a.dc.html · H6 |
+ * | 通用间距二 | 6px | gap-1.5 | 规范-8a.dc.html · H6 |
+ * | 通用间距三 | 8px | gap-2 | 规范-8a.dc.html · H6 |
+ * | 通用间距四 | 12px | gap-3 | 规范-8a.dc.html · H6 |
+ * | 通用间距五 | 16px | gap-4 | 规范-8a.dc.html · H6 |
+ * | 通用间距六 | 24px | gap-6 | 规范-8a.dc.html · H6 |
+ * | 标题栏 chrome | #0b0b0c | bg-stone-chrome | 规范-8a.dc.html · G1 |
+ * | 工具栏底色 | #0b0b0c | bg-stone-toolbar | 规范-8a.dc.html · G1 |
+ * | 工具栏文字 | #ececee | text-fg-toolbar | 规范-8a.dc.html · G1 |
+ * | 工具栏描边兜底（通常无分隔线） | #1c1c1f | border-stone-toolbar-border | 规范-8a.dc.html · G1 |
+ * | 工具栏凸起控件 | #2e2e33 | bg-raise-toolbar | 规范-8a.dc.html · G1 |
+ * | 工具栏控件悬停 | #38383e | bg-raise-toolbar-hover | 规范-8a.dc.html · G1 |
+ * | 凹槽 | #18181b | bg-well-surface | README.md · 设计令牌 |
+ * | 较浅凹槽 | #1e1e21 | bg-well-raised | README.md · 设计令牌 |
+ * | 不可用文字 | #5e5e66 | text-fg-disabled | README.md · 设计令牌 |
+ * | 中性版本标签与控件文字 | #d8d8dc | text-fg-detail | 规范-8a.dc.html · H1 / H5 |
+ * | 按钮禁用文字 | #5a5a62 | text-fg-control-disabled | 规范-8a.dc.html · H1 |
+ * | 图标与菜单禁用文字 | #4a4a52 | text-fg-icon-disabled | 规范-8a.dc.html · H1 / H2 |
+ * | 石板侧面 | #060607 | bg-stone-edge | 规范-8a.dc.html · G1 |
+ * | 凸起件侧面 | #09090a | bg-raise-edge | 规范-8a.dc.html · G1 |
+ * | 白键侧面 | #8E8E96 | bg-raise-primary-edge | 规范-8a.dc.html · G1 |
+ * | 搜索命中 | #4a3a17 | bg-well-search-match | 规范-8a.dc.html · G1 |
+ * | 当前搜索命中 | #eea52b | bg-well-search-match-active | 规范-8a.dc.html · G1 |
+ * | 终端底色 | #121214 | bg-well-terminal | 规范-8a.dc.html · G1 |
+ * | 终端文字 | #ececee | text-fg-terminal | 规范-8a.dc.html · G1 |
+ * | 终端光标 | #F2F2F3 | bg-fg-terminal-cursor | 规范-8a.dc.html · G1 |
+ * | 终端选区 | #3a3a40 | bg-well-terminal-selection | 规范-8a.dc.html · G1 |
+ * | 信息标签底色 | #16233f | bg-status-info | README.md · 设计令牌（W7 定稿） |
+ * | 浅沙警告文字（含等待、唤醒、通用受限） | #7a5000 | text-status-warning-foreground | README.md · 设计令牌（W7 定稿） / 规范-8a.dc.html · H5 |
+ * | 浅粉沙错误底色 | #f0cfc9 | bg-status-error | README.md · 设计令牌（W7 定稿） |
+ * | 浅粉沙错误文字 | #6e1d14 | text-status-error-foreground | README.md · 设计令牌（W7 定稿） |
+ * | 完成、PR 开放底色 | #14301f | bg-status-success | 规范-8a.dc.html · H5 |
+ * | 侧边栏受限标签底色 | #ecd2c0 | bg-status-restricted | 规范-8a.dc.html · H5 / StyleM-8a.dc.html · 整窗 |
+ * | 侧边栏受限标签文字 | #8a3510 | text-status-restricted-foreground | 规范-8a.dc.html · H5 / StyleM-8a.dc.html · 整窗 |
+ * | G1 受限、离线角色文字 | #a8461a | text-status-offline-foreground | 规范-8a.dc.html · G1 |
+ * | 目标标签底色 | #10302d | bg-status-target | 规范-8a.dc.html · H5 |
+ * | 目标标签文字（不定义图标色相） | #5fd3c7 | text-status-target-foreground | 规范-8a.dc.html · H5 |
+ * | 子 Agent、已合并、重要底色 | #2a1f3d | bg-status-emphasis | 规范-8a.dc.html · H5 |
+ * | 子 Agent、已合并、重要文字 | #c3a6ff | text-status-emphasis-foreground | 规范-8a.dc.html · H5 |
+ * | 开发版、每日构建版文字 | #d8d8dc | text-status-neutral-foreground | 规范-8a.dc.html · H5 |
+ * | 底座石纹压暗叠层 | rgba(0, 0, 0, 0.2) | bg-stone-dim | README.md · 设计令牌 / StyleM-8a.dc.html · 整窗 |
+ * | 抽屉与对话框压暗幕 | rgba(0, 0, 0, 0.55) | bg-stone-scrim | 规范-8a.dc.html · H4 / StyleM-8a.dc.html · 整窗 |
+ * | 侧边栏石纹覆色 | rgba(28, 28, 31, 0.82) | bg-stone-sidebar-veil | StyleM-8a.dc.html · 整窗 |
+ * | 对话石板石纹覆色 | rgba(32, 32, 35, 0.86) | bg-stone-chat-veil | StyleM-8a.dc.html · 整窗 |
+ * | 右侧石板石纹覆色 | rgba(36, 36, 40, 0.88) | bg-stone-panel-veil | StyleM-8a.dc.html · 整窗 |
+ * | 详情卡石纹覆色 | rgba(42, 42, 46, 0.82) | bg-stone-detail-veil | StyleM-8a.dc.html · 整窗 |
+ * | 对话框石纹覆色 | rgba(42, 42, 46, 0.86) | bg-stone-dialog-veil | 规范-8a.dc.html · H4 |
+ * | 通用石板 | inset 0 1.5px 0 rgba(255,255,255,.095), 0 0 0 1px rgba(0,0,0,.55), 0 4px 0 #060607, 14px 22px 30px -8px rgba(0,0,0,.79) | shadow-slab | README.md · 设计令牌 |
+ * | 通用凸起卡片 | inset 0 1.5px 0 rgba(255,255,255,.095), 0 0 0 1px rgba(0,0,0,.484), 0 3px 0 #09090a, 10px 16px 24px -8px rgba(0,0,0,.6) | shadow-raise-l | README.md · 设计令牌 |
+ * | 通用小按钮 | inset 0 1px 0 rgba(255,255,255,.09), 0 0 0 1px rgba(0,0,0,.44), 0 1.5px 0 #09090a | shadow-raise-xs | README.md · 设计令牌 |
+ * | 通用凹槽 | inset 2px 3px 10px rgba(0,0,0,.6), inset 0 0 0 1px rgba(0,0,0,.4) | shadow-well | README.md · 设计令牌 |
+ * | 通用输入区 | inset 1.5px 2px 4px rgba(0,0,0,.65) | shadow-input | README.md · 设计令牌 |
+ * | 通用选中白圈 | inset 0 0 0 2px #F2F2F3 | shadow-selected | README.md · 设计令牌 |
+ * | 键盘焦点圈；H2 向内 outline 的等效几何 | inset 0 0 0 1.5px #F2F2F3 | shadow-focus | 规范-8a.dc.html · G1 / H1 / H2 |
+ * | 具体控件与侧边栏多选白圈 | inset 0 0 0 1.5px #F2F2F3 | shadow-selected-control | 规范-8a.dc.html · G1 / StyleM-8a.dc.html · 整窗 |
+ * | 通用白键底边 | 0 1.5px 0 #8E8E96 | shadow-primary-edge | README.md · 设计令牌 |
+ * | 控件白键底边 | 0 2px 0 #8E8E96 | shadow-primary-edge-control | 规范-8a.dc.html · H1 / H5 |
+ * | 主按钮 | 0 2px 0 #8E8E96, 3px 5px 9px -3px rgba(0,0,0,.8) | shadow-primary | 规范-8a.dc.html · H1 / StyleM-8a.dc.html · 整窗 |
+ * | 发送与引导消息白键 | inset 0 1px 0 rgba(255,255,255,0.018), 0 2px 0 #8E8E96, 0 3px 2px rgba(0,0,0,0.66), 5px 9px 14px -4px rgba(0,0,0,0.9) | shadow-primary-send | StyleM-8a.dc.html · 整窗 |
+ * | 白键按下 | inset 0 1px 2px rgba(0,0,0,.3) | shadow-primary-pressed | 规范-8a.dc.html · H1 |
+ * | 白键退出提示 | 0 2px 0 #8E8E96, 8px 14px 22px -6px rgba(0,0,0,.8) | shadow-primary-toast | 规范-8a.dc.html · H3 |
+ * | 抬起 raise-m | inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.66), 0 0 0 1px rgba(0,0,0,0.44), 0 2px 0 #09090a, 6px 10px 16px -4px rgba(0,0,0,0.66) | shadow-raise-m | 规范-8a.dc.html · G1 |
+ * | 微凸按钮与 Select | inset 0 1px 0 rgba(255,255,255,0.09), 0 0 0 1px rgba(0,0,0,0.44), 0 1.5px 0 #09090a, 2px 3px 5px -1px rgba(0,0,0,0.55) | shadow-raise-xs-control | 规范-8a.dc.html · G1 / H1 / StyleM-8a.dc.html · 整窗 |
+ * | 微凸控件悬停 | inset 0 1px 0 rgba(255,255,255,0.11), 0 0 0 1px rgba(0,0,0,0.44), 0 1.5px 0 #09090a, 2px 3px 5px -1px rgba(0,0,0,0.55) | shadow-raise-xs-hover | 规范-8a.dc.html · H1 |
+ * | 微凸控件按下 | inset 1.5px 2px 3px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,0,0,0.44) | shadow-raise-xs-pressed | 规范-8a.dc.html · H1 |
+ * | 选中标签与分段滑块 | inset 0 1px 0 rgba(255,255,255,0.09), 0 1.5px 0 #09090a | shadow-raise-tab | 规范-8a.dc.html · H1 |
+ * | 规范浮起层 | inset 0 1.5px 0 rgba(255,255,255,0.095), inset 0 -2px 0 rgba(0,0,0,0.66), 0 0 0 1px rgba(0,0,0,0.484), 0 3px 0 #09090a, 0 5px 2px rgba(0,0,0,0.484), 16px 26px 34px -8px rgba(0,0,0,0.748) | shadow-raise-l-spec | 规范-8a.dc.html · G1 |
+ * | 规范石板层 | inset 0 1.5px 0 rgba(255,255,255,0.095), inset 1.5px 0 0 rgba(255,255,255,0.055), inset 0 -2px 0 rgba(0,0,0,0.704), 0 0 0 1px rgba(0,0,0,0.55), 0 4px 0 #060607, 0 6px 2px rgba(0,0,0,0.55), 18px 28px 36px -8px rgba(0,0,0,0.792) | shadow-slab-spec | 规范-8a.dc.html · G1 |
+ * | 整窗石板（左右侧边与远投影） | inset 0 1.5px 0 rgba(255,255,255,0.095), inset 1.5px 0 0 rgba(255,255,255,0.055), inset 0 -2px 0 rgba(0,0,0,0.704), inset -1.5px 0 0 rgba(0,0,0,0.44), 0 0 0 1px rgba(0,0,0,0.55), 0 4px 0 #060607, 0 6px 2px rgba(0,0,0,0.55), 18px 28px 36px -8px rgba(0,0,0,0.792), 40px 64px 90px -24px rgba(0,0,0,0.66) | shadow-slab-frame | StyleM-8a.dc.html · 整窗 |
+ * | 整窗详情卡 | inset 0 1.5px 0 rgba(255,255,255,0.095), inset 0 -2px 0 rgba(0,0,0,0.66), 0 0 0 1px rgba(0,0,0,0.484), 0 3px 0 #09090a, 0 5px 2px rgba(0,0,0,0.484), 16px 26px 34px -8px rgba(0,0,0,0.748), 36px 60px 80px -24px rgba(0,0,0,0.572) | shadow-raise-detail | StyleM-8a.dc.html · 整窗 |
+ * | 菜单弹层 | inset 0 1.5px 0 rgba(255,255,255,0.095), 0 0 0 1px rgba(0,0,0,0.5), 0 3px 0 #09090a, 16px 26px 34px -8px rgba(0,0,0,0.75) | shadow-overlay | 规范-8a.dc.html · H2 |
+ * | 整窗弹层远投影 | inset 0 1.5px 0 rgba(255,255,255,0.095), 0 0 0 1px rgba(0,0,0,0.5), 0 3px 0 #09090a, 16px 26px 34px -8px rgba(0,0,0,0.75), 36px 60px 80px -24px rgba(0,0,0,0.6) | shadow-overlay-frame | StyleM-8a.dc.html · 整窗 |
+ * | Toast 浮层 | inset 0 1.5px 0 rgba(255,255,255,0.095), 0 0 0 1px rgba(0,0,0,0.5), 0 3px 0 #09090a, 12px 20px 28px -8px rgba(0,0,0,0.8) | shadow-toast | 规范-8a.dc.html · H3 |
+ * | 对话框 | inset 0 1.5px 0 rgba(255,255,255,0.095), inset 0 -2px 0 rgba(0,0,0,0.66), 0 0 0 1px rgba(0,0,0,0.5), 0 3px 0 #09090a, 20px 32px 50px -10px rgba(0,0,0,0.85) | shadow-dialog | 规范-8a.dc.html · H4 |
+ * | 搜索、输入、代码与分段凹槽 | inset 2px 3px 5px rgba(0,0,0,0.66), inset -1px -1px 0 rgba(255,255,255,0.07), inset 0 0 0 1px rgba(0,0,0,0.33) | shadow-well-control | 规范-8a.dc.html · G1 / H1 / StyleM-8a.dc.html · 整窗 |
+ * | 输入悬停 | inset 2px 3px 5px rgba(0,0,0,0.66), inset -1px -1px 0 rgba(255,255,255,0.07), inset 0 0 0 1px #3a3a40 | shadow-well-hover | 规范-8a.dc.html · H1 |
+ * | 输入编辑态 | inset 2px 3px 6px rgba(0,0,0,0.8), inset 0 0 0 1px #46464d | shadow-well-editing | 规范-8a.dc.html · H1 |
+ * | 输入焦点态 | inset 2px 3px 5px rgba(0,0,0,0.66), inset 0 0 0 1.5px #F2F2F3 | shadow-well-focus | 规范-8a.dc.html · H1 |
+ * | 分段轨道 | inset 2px 3px 5px rgba(0,0,0,0.66), inset -1px -1px 0 rgba(255,255,255,0.07) | shadow-well-track | 规范-8a.dc.html · H1 |
+ * | 幽灵按钮、菜单项按下 | inset 1.5px 2px 3px rgba(0,0,0,0.6) | shadow-well-pressed | 规范-8a.dc.html · H1 / H2 |
+ * | 当前项目凹槽 | inset 1.5px 2px 3px rgba(0,0,0,0.616), inset -1px -1px 0 rgba(255,255,255,0.055) | shadow-well-project | StyleM-8a.dc.html · 整窗 |
+ * | 紧凑侧边栏行 | inset 1px 1.5px 3px rgba(0,0,0,0.44), inset -1px -1px 0 rgba(255,255,255,0.07) | shadow-well-compact | StyleM-8a.dc.html · 整窗 |
+ * | 进度轨道 | inset 1px 1px 2px rgba(0,0,0,0.77) | shadow-well-progress | 规范-8a.dc.html · H3 / StyleM-8a.dc.html · 整窗 |
+ * | 侧边栏新建 | inset 0 1px 0 rgba(255,255,255,0.09), inset 0 -1px 0 rgba(0,0,0,0.66), 0 0 0 1px rgba(0,0,0,0.396), 0 2px 0 #09090a, 3px 5px 8px -2px rgba(0,0,0,0.616) | shadow-raise-new-thread | StyleM-8a.dc.html · 整窗 |
+ * | 工作日志 | inset 0 1px 0 rgba(255,255,255,0.1), inset 0 -1px 0 rgba(0,0,0,0.66), 0 0 0 1px rgba(0,0,0,0.44), 0 2px 0 #09090a, 6px 10px 16px -4px rgba(0,0,0,0.66) | shadow-raise-log | StyleM-8a.dc.html · 整窗 |
+ * | 品牌石块 | inset 0 1px 0 rgba(255,255,255,0.09), inset 0 -1px 0 rgba(0,0,0,0.396), 0 2px 4px rgba(0,0,0,0.396), 0 8px 16px -8px rgba(0,0,0,0.77) | shadow-raise-brand | StyleM-8a.dc.html · 整窗 |
+ * | 状态标签微凸 | inset 0 1px 0 rgba(255,255,255,0.045), 0 1px 0 rgba(0,0,0,0.66) | shadow-tag | StyleM-8a.dc.html · 整窗 |
+ * | 快捷键 | inset 0 1px 0 rgba(255,255,255,0.09), 0 1.5px 0 #09090a | shadow-keycap | 规范-8a.dc.html · H5 |
+ * | 危险实心按钮 | 0 2px 0 #7f1f17, 3px 5px 9px -3px rgba(0,0,0,.8) | shadow-danger | 规范-8a.dc.html · H1 |
+ * | 危险实心底边 | 0 2px 0 #7f1f17 | shadow-danger-edge | 规范-8a.dc.html · H1 / H4 |
+ * | 危险按钮按下 | inset 0 1px 2px rgba(0,0,0,.35) | shadow-danger-pressed | 规范-8a.dc.html · H1 |
+ * | 描边按钮 | inset 0 0 0 1.5px #46464d | shadow-outline-control | 规范-8a.dc.html · H1 / StyleM-8a.dc.html · 整窗 |
+ * | 描边悬停 | inset 0 0 0 1.5px #5a5a62 | shadow-outline-control-hover | 规范-8a.dc.html · H1 |
+ * | 描边按下 | inset 0 0 0 1.5px #5a5a62, inset 1.5px 2px 3px rgba(0,0,0,0.6) | shadow-outline-control-pressed | 规范-8a.dc.html · H1 |
+ * | 描边禁用 | inset 0 0 0 1.5px #2e2e33 | shadow-outline-control-disabled | 规范-8a.dc.html · H1 |
+ * | 危险描边 | inset 0 0 0 1.5px rgba(255,123,107,.45) | shadow-outline-danger | 规范-8a.dc.html · H1 |
+ * | 危险描边悬停 | inset 0 0 0 1.5px rgba(255,123,107,.6) | shadow-outline-danger-hover | 规范-8a.dc.html · H1 |
+ * | 危险描边按下 | inset 0 0 0 1.5px rgba(255,123,107,.6), inset 1.5px 2px 3px rgba(0,0,0,0.6) | shadow-outline-danger-pressed | 规范-8a.dc.html · H1 |
+ * | 危险描边禁用 | inset 0 0 0 1.5px rgba(255,123,107,.15) | shadow-outline-danger-disabled | 规范-8a.dc.html · H1 |
+ * | 关闭开关轨道 | inset 1.5px 2px 3px rgba(0,0,0,.75), inset -1px -1px 0 rgba(255,255,255,.06) | shadow-switch-track | 规范-8a.dc.html · H1 |
+ * | 开关轨道悬停 | inset 1.5px 2px 3px rgba(0,0,0,.75), inset 0 0 0 1px #3a3a40 | shadow-switch-hover | 规范-8a.dc.html · H1 |
+ * | 开关轨道按下 | inset 1.5px 2px 3px rgba(0,0,0,.75) | shadow-switch-pressed | 规范-8a.dc.html · H1 |
+ * | 开启开关轨道 | inset 0 1px 2px rgba(0,0,0,.25) | shadow-switch-on | 规范-8a.dc.html · H1 |
+ * | 关闭开关滑块 | inset 0 1px 0 rgba(255,255,255,.15), 0 1px 0 #09090a | shadow-switch-thumb | 规范-8a.dc.html · H1 |
+ * | 开启开关滑块 | 0 1px 1px rgba(0,0,0,.4) | shadow-switch-thumb-on | 规范-8a.dc.html · H1 |
+ * | 发送按钮禁用 | inset 0 1px 0 rgba(255,255,255,0.06), 0 1px 0 #09090a | shadow-send-disabled | StyleM-8a.dc.html · 整窗 |
+ * | 石板 | 22px | rounded-slab | 规范-8a.dc.html · H6 |
+ * | 卡片下限 | 18px | rounded-card | 规范-8a.dc.html · H6 |
+ * | 卡片上限 | 20px | rounded-card-large | 规范-8a.dc.html · H6 |
+ * | 卡片行 | 16px | rounded-card-row | 规范-8a.dc.html · H6 |
+ * | 紧凑行 | 12px | rounded-compact-row | 规范-8a.dc.html · H6 |
+ * | 菜单、Toast 弹层 | 16px | rounded-overlay | README.md · 设计令牌 / 规范-8a.dc.html · H2 / H3 |
+ * | 较大弹层 | 18px | rounded-overlay-large | README.md · 设计令牌 |
+ * | 对话框 | 24px | rounded-dialog | 规范-8a.dc.html · H6 |
+ * | 菜单行 | 10px | rounded-menu-row | 规范-8a.dc.html · H6 |
+ * | 徽标 | 10px | rounded-tag | README.md · 设计令牌 / 规范-8a.dc.html · H5 |
+ * | 输入框外壳 | 26px | rounded-composer | 规范-8a.dc.html · H6 |
+ * | 快捷键 | 7px | rounded-keycap | 规范-8a.dc.html · H5 |
+ * | 正文 | 14px / 1.55 | text-body | 规范-8a.dc.html · H6 |
+ * | 回复正文 | 14.5px / 1.75 | text-reply | 规范-8a.dc.html · H6 |
+ * | 界面标题 | 14.5px / 1.55 / 700 | text-heading | 规范-8a.dc.html · H6 |
+ * | 次要文字下限 | 12px / 1.55 | text-secondary-copy | 规范-8a.dc.html · H6 |
+ * | 次要文字上限 | 13px / 1.55 | text-secondary-copy-large | 规范-8a.dc.html · H6 |
+ * | 搜索、输入等半像素文字 | 13.5px / 1.55 | text-control | 规范-8a.dc.html · H1 / StyleM-8a.dc.html · 整窗 |
+ * | 元信息下限 | 11px / 1.55 | text-meta | 规范-8a.dc.html · H6 |
+ * | 元信息上限 | 11.5px / 1.55 | text-meta-large | 规范-8a.dc.html · H6 |
+ * | 分段控件与上下文文字 | 12.5px / 1.55 | text-secondary-copy-medium | StyleM-8a.dc.html · 整窗 |
+ * | 卡片标题 | 17px / 1.55 | text-card-title | 规范-8a.dc.html · H6 |
+ * | 计划标题 | 19px / 1.55 | text-plan-title | 规范-8a.dc.html · H6 |
+ * | 对话标题 | 19px / 1.55 | text-chat-title | README.md · 设计令牌 / StyleM-8a.dc.html · 整窗 |
+ * | 页面标题 | 32px / 1.55 | text-page-title | README.md · 设计令牌 |
+ * | 新对话大标题 | 42px / 1.25 | text-new-chat-title | 规范-8a.dc.html · H6 / StyleM-8a.dc.html · 整窗 |
+ * | 对话框标题 | 21px / 1.35 | text-dialog-title | 规范-8a.dc.html · H4 |
+ * | 代码正文 | 12.5px / 22px | text-code-copy | 规范-8a.dc.html · H6 / StyleM-8a.dc.html · 整窗 |
+ * | 终端输出 | 12px / 20px | text-terminal-copy | 规范-8a.dc.html · H6 / StyleM-8a.dc.html · 整窗 |
+ * | 文字阴影 | 0 1px 0 rgba(0,0,0,.45) | text-shadow-stone | README.md · 设计令牌 / StyleM-8a.dc.html · 整窗 |
+ * | 代码行高 | 22px | leading-code | 规范-8a.dc.html · H6 |
+ * | 终端行高 | 20px | leading-terminal | 规范-8a.dc.html · H6 |
+ * | 品牌 T3 CODE 字距 | .34em | tracking-brand | StyleM-8a.dc.html · 整窗 |
+ * | 待处理小点 | #ff6b35 | bg-attention | 规范-8a.dc.html · G1 |
+ *
+ * | 标题栏高度 | 48px | h-12 | 规范-8a.dc.html · H6 |
+ * | 卡片行高度 | 78px | h-19.5 | 规范-8a.dc.html · H6 |
+ * | 紧凑行高度 | 36px | h-9 | 规范-8a.dc.html · H6 |
+ * | 菜单项高度 | 34px | h-8.5 | 规范-8a.dc.html · H6 |
+ * | 控件高度一 | 28px | h-7 | 规范-8a.dc.html · H6 |
+ * | 控件高度二 | 30px | h-7.5 | 规范-8a.dc.html · H6 |
+ * | 控件高度三 | 34px | h-8.5 | 规范-8a.dc.html · H6 |
+ * | 控件高度四 | 38px | h-9.5 | 规范-8a.dc.html · H6 |
+ * | 控件高度五 | 40px | h-10 | 规范-8a.dc.html · H6 |
+ * | 项目栏宽度 | 52px | w-13 | 规范-8a.dc.html · H6 |
+ * | 侧边栏宽度 | 276px | w-69 | 规范-8a.dc.html · H6 |
+ * | 侧边栏抽屉宽度 | 300px | w-75 | 规范-8a.dc.html · H6 |
+ * | 时间线宽度 | 736px | w-184 | 规范-8a.dc.html · H6 |
+ * | 输入框宽度 | 760px | w-190 | 规范-8a.dc.html · H6 |
+ * | 详情卡片宽度 | 280px | w-70 | 规范-8a.dc.html · H6 |
+ * | 右侧面板覆盖层宽度 | 600px | w-150 | 规范-8a.dc.html · H6 |
+ * | 对话框宽度 | 420px | w-105 | 规范-8a.dc.html · H6 |
+ *
+ * 框架尺寸合同（仅 CSS 变量，不登记尺寸工具类；窄窗口由 FR1 消费，不在这里应用媒体查询）：
+ * | 用途 | 设计值 | CSS 变量 | 来源 |
+ * | --- | --- | --- | --- |
+ * | 标题栏高 | 48px | var(--frame-titlebar-height) | 规范-8a.dc.html · H6 / StyleM-8a.dc.html · 整窗 |
+ * | 项目栏宽 | 52px | var(--frame-projectbar-width) | 规范-8a.dc.html · H6 / StyleM-8a.dc.html · 整窗 |
+ * | 侧边栏宽 | 276px | var(--frame-sidebar-width) | 规范-8a.dc.html · H6 / StyleM-8a.dc.html · 整窗 |
+ * | 窗口内边距（上、横向、下） | 0 16px 20px | var(--frame-padding) | StyleM-8a.dc.html · 整窗 |
+ * | 窗口上边距 | 0px | var(--frame-padding-top) | StyleM-8a.dc.html · 整窗 |
+ * | 窗口横向边距 | 16px | var(--frame-padding-inline) | 规范-8a.dc.html · H6 / StyleM-8a.dc.html · 整窗 |
+ * | 窗口底边距 | 20px | var(--frame-padding-bottom) | 规范-8a.dc.html · H6 / StyleM-8a.dc.html · 整窗 |
+ * | 石板间距 | 16px | var(--frame-slab-gap) | 规范-8a.dc.html · H6 / StyleM-8a.dc.html · 整窗 |
+ * | 窄窗口石板间距 | 8px | var(--frame-slab-gap-narrow) | StyleM-8a.dc.html · 整窗 |
+ * | 窄窗口最大宽度 | 1024px | var(--frame-narrow-max-width) | README.md · 窗口框架 |
+ * | StyleM 系统按钮实际留白 | 138px | var(--frame-system-buttons-width) | StyleM-8a.dc.html · 整窗 |
+ * | README 系统按钮留白范围上限 | 140px | var(--frame-system-buttons-max-width) | README.md · 窗口框架 |
+ *
+ * 材质合同：README.md · 设计令牌 / StyleM-8a.dc.html · 整窗：
+ * #0b0b0c 底座（bg-background）+ stone-8a.png 平铺 + rgba(0,0,0,.2)（bg-stone-dim）。
+ * 石纹文件与合成工具类由 F1.2 在 slab.css 接入；本次不引用尚未交付的资源。
+ * 纹理覆色只登记颜色，不能拿 bg-stone-*-veil 代替完整材质；层叠和玻璃行为由 F1.2 实现。
+ * G1 受限、离线文字 #a8461a 与 H5/StyleM 侧边栏标签 #8a3510 分用途保留；
+ * 通用 warning 采用 README W7 的 #e8dcc0 / #7a5000，通用 error 采用 #f0cfc9 / #6e1d14。
+ * 选中用 2px；具体控件的 1.5px 选中例外用 shadow-selected-control，焦点用 shadow-focus。
+ * H1 画有向外偏移的 outline；当前 lint 要求状态指示器向内绘制。
+ * 此处登记 1.5px 的向内 shadow-focus（H2 同样向内），不新增向外指示器工具类。
+ * README 五条通用阴影原值保留；G1、H1–H5、StyleM 的不同投影按场景另列。
+ * README 卡片圆角范围与 H6 不同：卡片用 H6 的 18–20px，16px 专用于 H6 卡片行。
+ * 不包含字体族（F2）、图标色相（F8）、设计稿展台装饰或画板标注色。
+ */
+@theme {
+  /* 规范-8a.dc.html · G1；标题栏 chrome：#0b0b0c。 */
+  --color-stone-chrome: #0b0b0c;
+
+  /* 规范-8a.dc.html · G1；工具栏底色：#0b0b0c。 */
+  --color-stone-toolbar: #0b0b0c;
+
+  /* 规范-8a.dc.html · G1；工具栏文字：#ececee。 */
+  --color-fg-toolbar: #ececee;
+
+  /* 规范-8a.dc.html · G1；工具栏描边兜底（通常无分隔线）：#1c1c1f。 */
+  --color-stone-toolbar-border: #1c1c1f;
+
+  /* 规范-8a.dc.html · G1；工具栏凸起控件：#2e2e33。 */
+  --color-raise-toolbar: #2e2e33;
+
+  /* 规范-8a.dc.html · G1；工具栏控件悬停：#38383e。 */
+  --color-raise-toolbar-hover: #38383e;
+
+  /* README.md · 设计令牌；凹槽：#18181b。 */
+  --color-well-surface: #18181b;
+
+  /* README.md · 设计令牌；较浅凹槽：#1e1e21。 */
+  --color-well-raised: #1e1e21;
+
+  /* README.md · 设计令牌；不可用文字：#5e5e66。 */
+  --color-fg-disabled: #5e5e66;
+
+  /* 规范-8a.dc.html · H1 / H5；中性版本标签与控件文字：#d8d8dc。 */
+  --color-fg-detail: #d8d8dc;
+
+  /* 规范-8a.dc.html · H1；按钮禁用文字：#5a5a62。 */
+  --color-fg-control-disabled: #5a5a62;
+
+  /* 规范-8a.dc.html · H1 / H2；图标与菜单禁用文字：#4a4a52。 */
+  --color-fg-icon-disabled: #4a4a52;
+
+  /* 规范-8a.dc.html · G1；石板侧面：#060607。 */
+  --color-stone-edge: #060607;
+
+  /* 规范-8a.dc.html · G1；凸起件侧面：#09090a。 */
+  --color-raise-edge: #09090a;
+
+  /* 规范-8a.dc.html · G1；白键侧面：#8E8E96。 */
+  --color-raise-primary-edge: #8e8e96;
+
+  /* 规范-8a.dc.html · G1；搜索命中：#4a3a17。 */
+  --color-well-search-match: #4a3a17;
+
+  /* 规范-8a.dc.html · G1；当前搜索命中：#eea52b。 */
+  --color-well-search-match-active: #eea52b;
+
+  /* 规范-8a.dc.html · G1；终端底色：#121214。 */
+  --color-well-terminal: #121214;
+
+  /* 规范-8a.dc.html · G1；终端文字：#ececee。 */
+  --color-fg-terminal: #ececee;
+
+  /* 规范-8a.dc.html · G1；终端光标：#F2F2F3。 */
+  --color-fg-terminal-cursor: #f2f2f3;
+
+  /* 规范-8a.dc.html · G1；终端选区：#3a3a40。 */
+  --color-well-terminal-selection: #3a3a40;
+
+  /* README.md · 设计令牌（W7 定稿）；信息标签底色：#16233f。 */
+  --color-status-info: #16233f;
+
+  /* README.md · 设计令牌（W7 定稿） / 规范-8a.dc.html · H5；浅沙警告文字（含等待、唤醒、通用受限）：#7a5000。 */
+  --color-status-warning-foreground: #7a5000;
+
+  /* README.md · 设计令牌（W7 定稿）；浅粉沙错误底色：#f0cfc9。 */
+  --color-status-error: #f0cfc9;
+
+  /* README.md · 设计令牌（W7 定稿）；浅粉沙错误文字：#6e1d14。 */
+  --color-status-error-foreground: #6e1d14;
+
+  /* 规范-8a.dc.html · H5；完成、PR 开放底色：#14301f。 */
+  --color-status-success: #14301f;
+
+  /* 规范-8a.dc.html · H5 / StyleM-8a.dc.html · 整窗；侧边栏受限标签底色：#ecd2c0。 */
+  --color-status-restricted: #ecd2c0;
+
+  /* 规范-8a.dc.html · H5 / StyleM-8a.dc.html · 整窗；侧边栏受限标签文字：#8a3510。 */
+  --color-status-restricted-foreground: #8a3510;
+
+  /* 规范-8a.dc.html · G1；G1 受限、离线角色文字：#a8461a。 */
+  --color-status-offline-foreground: #a8461a;
+
+  /* 规范-8a.dc.html · H5；目标标签底色：#10302d。 */
+  --color-status-target: #10302d;
+
+  /* 规范-8a.dc.html · H5；目标标签文字（不定义图标色相）：#5fd3c7。 */
+  --color-status-target-foreground: #5fd3c7;
+
+  /* 规范-8a.dc.html · H5；子 Agent、已合并、重要底色：#2a1f3d。 */
+  --color-status-emphasis: #2a1f3d;
+
+  /* 规范-8a.dc.html · H5；子 Agent、已合并、重要文字：#c3a6ff。 */
+  --color-status-emphasis-foreground: #c3a6ff;
+
+  /* 规范-8a.dc.html · H5；开发版、每日构建版文字：#d8d8dc。 */
+  --color-status-neutral-foreground: #d8d8dc;
+
+  /* README.md · 设计令牌 / StyleM-8a.dc.html · 整窗；底座石纹压暗叠层：rgba(0, 0, 0, 0.2)。 */
+  --color-stone-dim: rgba(0, 0, 0, 0.2);
+
+  /* 规范-8a.dc.html · H4 / StyleM-8a.dc.html · 整窗；抽屉与对话框压暗幕：rgba(0, 0, 0, 0.55)。 */
+  --color-stone-scrim: rgba(0, 0, 0, 0.55);
+
+  /* StyleM-8a.dc.html · 整窗；侧边栏石纹覆色：rgba(28, 28, 31, 0.82)。 */
+  --color-stone-sidebar-veil: rgba(28, 28, 31, 0.82);
+
+  /* StyleM-8a.dc.html · 整窗；对话石板石纹覆色：rgba(32, 32, 35, 0.86)。 */
+  --color-stone-chat-veil: rgba(32, 32, 35, 0.86);
+
+  /* StyleM-8a.dc.html · 整窗；右侧石板石纹覆色：rgba(36, 36, 40, 0.88)。 */
+  --color-stone-panel-veil: rgba(36, 36, 40, 0.88);
+
+  /* StyleM-8a.dc.html · 整窗；详情卡石纹覆色：rgba(42, 42, 46, 0.82)。 */
+  --color-stone-detail-veil: rgba(42, 42, 46, 0.82);
+
+  /* 规范-8a.dc.html · H4；对话框石纹覆色：rgba(42, 42, 46, 0.86)。 */
+  --color-stone-dialog-veil: rgba(42, 42, 46, 0.86);
+
+  /* README.md · 设计令牌；通用石板：inset 0 1.5px 0 rgba(255,255,255,.095), 0 0 0 1px rgba(0,0,0,.55), 0 4px 0 #060607, 14px 22px 30px -8px rgba(0,0,0,.79)。 */
+  --shadow-slab:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.095), 0 0 0 1px rgba(0, 0, 0, 0.55), 0 4px 0 #060607,
+    14px 22px 30px -8px rgba(0, 0, 0, 0.79);
+
+  /* README.md · 设计令牌；通用凸起卡片：inset 0 1.5px 0 rgba(255,255,255,.095), 0 0 0 1px rgba(0,0,0,.484), 0 3px 0 #09090a, 10px 16px 24px -8px rgba(0,0,0,.6)。 */
+  --shadow-raise-l:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.095), 0 0 0 1px rgba(0, 0, 0, 0.484), 0 3px 0 #09090a,
+    10px 16px 24px -8px rgba(0, 0, 0, 0.6);
+
+  /* README.md · 设计令牌；通用小按钮：inset 0 1px 0 rgba(255,255,255,.09), 0 0 0 1px rgba(0,0,0,.44), 0 1.5px 0 #09090a。 */
+  --shadow-raise-xs:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09), 0 0 0 1px rgba(0, 0, 0, 0.44), 0 1.5px 0 #09090a;
+
+  /* README.md · 设计令牌；通用凹槽：inset 2px 3px 10px rgba(0,0,0,.6), inset 0 0 0 1px rgba(0,0,0,.4)。 */
+  --shadow-well: inset 2px 3px 10px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(0, 0, 0, 0.4);
+
+  /* README.md · 设计令牌；通用输入区：inset 1.5px 2px 4px rgba(0,0,0,.65)。 */
+  --shadow-input: inset 1.5px 2px 4px rgba(0, 0, 0, 0.65);
+
+  /* README.md · 设计令牌；通用选中白圈：inset 0 0 0 2px #F2F2F3。 */
+  --shadow-selected: inset 0 0 0 2px #f2f2f3;
+
+  /* 规范-8a.dc.html · G1 / H1 / H2；键盘焦点圈；H2 向内 outline 的等效几何：inset 0 0 0 1.5px #F2F2F3。 */
+  --shadow-focus: inset 0 0 0 1.5px #f2f2f3;
+
+  /* 规范-8a.dc.html · G1 / StyleM-8a.dc.html · 整窗；具体控件与侧边栏多选白圈：inset 0 0 0 1.5px #F2F2F3。 */
+  --shadow-selected-control: inset 0 0 0 1.5px #f2f2f3;
+
+  /* README.md · 设计令牌；通用白键底边：0 1.5px 0 #8E8E96。 */
+  --shadow-primary-edge: 0 1.5px 0 #8e8e96;
+
+  /* 规范-8a.dc.html · H1 / H5；控件白键底边：0 2px 0 #8E8E96。 */
+  --shadow-primary-edge-control: 0 2px 0 #8e8e96;
+
+  /* 规范-8a.dc.html · H1 / StyleM-8a.dc.html · 整窗；主按钮：0 2px 0 #8E8E96, 3px 5px 9px -3px rgba(0,0,0,.8)。 */
+  --shadow-primary: 0 2px 0 #8e8e96, 3px 5px 9px -3px rgba(0, 0, 0, 0.8);
+
+  /* StyleM-8a.dc.html · 整窗；发送与引导消息白键：inset 0 1px 0 rgba(255,255,255,0.018), 0 2px 0 #8E8E96, 0 3px 2px rgba(0,0,0,0.66), 5px 9px 14px -4px rgba(0,0,0,0.9)。 */
+  --shadow-primary-send:
+    inset 0 1px 0 rgba(255, 255, 255, 0.018), 0 2px 0 #8e8e96, 0 3px 2px rgba(0, 0, 0, 0.66),
+    5px 9px 14px -4px rgba(0, 0, 0, 0.9);
+
+  /* 规范-8a.dc.html · H1；白键按下：inset 0 1px 2px rgba(0,0,0,.3)。 */
+  --shadow-primary-pressed: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+
+  /* 规范-8a.dc.html · H3；白键退出提示：0 2px 0 #8E8E96, 8px 14px 22px -6px rgba(0,0,0,.8)。 */
+  --shadow-primary-toast: 0 2px 0 #8e8e96, 8px 14px 22px -6px rgba(0, 0, 0, 0.8);
+
+  /* 规范-8a.dc.html · G1；抬起 raise-m：inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.66), 0 0 0 1px rgba(0,0,0,0.44), 0 2px 0 #09090a, 6px 10px 16px -4px rgba(0,0,0,0.66)。 */
+  --shadow-raise-m:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12), inset 0 -1px 0 rgba(0, 0, 0, 0.66),
+    0 0 0 1px rgba(0, 0, 0, 0.44), 0 2px 0 #09090a, 6px 10px 16px -4px rgba(0, 0, 0, 0.66);
+
+  /* 规范-8a.dc.html · G1 / H1 / StyleM-8a.dc.html · 整窗；微凸按钮与 Select：inset 0 1px 0 rgba(255,255,255,0.09), 0 0 0 1px rgba(0,0,0,0.44), 0 1.5px 0 #09090a, 2px 3px 5px -1px rgba(0,0,0,0.55)。 */
+  --shadow-raise-xs-control:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09), 0 0 0 1px rgba(0, 0, 0, 0.44), 0 1.5px 0 #09090a,
+    2px 3px 5px -1px rgba(0, 0, 0, 0.55);
+
+  /* 规范-8a.dc.html · H1；微凸控件悬停：inset 0 1px 0 rgba(255,255,255,0.11), 0 0 0 1px rgba(0,0,0,0.44), 0 1.5px 0 #09090a, 2px 3px 5px -1px rgba(0,0,0,0.55)。 */
+  --shadow-raise-xs-hover:
+    inset 0 1px 0 rgba(255, 255, 255, 0.11), 0 0 0 1px rgba(0, 0, 0, 0.44), 0 1.5px 0 #09090a,
+    2px 3px 5px -1px rgba(0, 0, 0, 0.55);
+
+  /* 规范-8a.dc.html · H1；微凸控件按下：inset 1.5px 2px 3px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,0,0,0.44)。 */
+  --shadow-raise-xs-pressed: inset 1.5px 2px 3px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(0, 0, 0, 0.44);
+
+  /* 规范-8a.dc.html · H1；选中标签与分段滑块：inset 0 1px 0 rgba(255,255,255,0.09), 0 1.5px 0 #09090a。 */
+  --shadow-raise-tab: inset 0 1px 0 rgba(255, 255, 255, 0.09), 0 1.5px 0 #09090a;
+
+  /* 规范-8a.dc.html · G1；规范浮起层：inset 0 1.5px 0 rgba(255,255,255,0.095), inset 0 -2px 0 rgba(0,0,0,0.66), 0 0 0 1px rgba(0,0,0,0.484), 0 3px 0 #09090a, 0 5px 2px rgba(0,0,0,0.484), 16px 26px 34px -8px rgba(0,0,0,0.748)。 */
+  --shadow-raise-l-spec:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.095), inset 0 -2px 0 rgba(0, 0, 0, 0.66),
+    0 0 0 1px rgba(0, 0, 0, 0.484), 0 3px 0 #09090a, 0 5px 2px rgba(0, 0, 0, 0.484),
+    16px 26px 34px -8px rgba(0, 0, 0, 0.748);
+
+  /* 规范-8a.dc.html · G1；规范石板层：inset 0 1.5px 0 rgba(255,255,255,0.095), inset 1.5px 0 0 rgba(255,255,255,0.055), inset 0 -2px 0 rgba(0,0,0,0.704), 0 0 0 1px rgba(0,0,0,0.55), 0 4px 0 #060607, 0 6px 2px rgba(0,0,0,0.55), 18px 28px 36px -8px rgba(0,0,0,0.792)。 */
+  --shadow-slab-spec:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.095), inset 1.5px 0 0 rgba(255, 255, 255, 0.055),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.704), 0 0 0 1px rgba(0, 0, 0, 0.55), 0 4px 0 #060607,
+    0 6px 2px rgba(0, 0, 0, 0.55), 18px 28px 36px -8px rgba(0, 0, 0, 0.792);
+
+  /* StyleM-8a.dc.html · 整窗；整窗石板（左右侧边与远投影）：inset 0 1.5px 0 rgba(255,255,255,0.095), inset 1.5px 0 0 rgba(255,255,255,0.055), inset 0 -2px 0 rgba(0,0,0,0.704), inset -1.5px 0 0 rgba(0,0,0,0.44), 0 0 0 1px rgba(0,0,0,0.55), 0 4px 0 #060607, 0 6px 2px rgba(0,0,0,0.55), 18px 28px 36px -8px rgba(0,0,0,0.792), 40px 64px 90px -24px rgba(0,0,0,0.66)。 */
+  --shadow-slab-frame:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.095), inset 1.5px 0 0 rgba(255, 255, 255, 0.055),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.704), inset -1.5px 0 0 rgba(0, 0, 0, 0.44),
+    0 0 0 1px rgba(0, 0, 0, 0.55), 0 4px 0 #060607, 0 6px 2px rgba(0, 0, 0, 0.55),
+    18px 28px 36px -8px rgba(0, 0, 0, 0.792), 40px 64px 90px -24px rgba(0, 0, 0, 0.66);
+
+  /* StyleM-8a.dc.html · 整窗；整窗详情卡：inset 0 1.5px 0 rgba(255,255,255,0.095), inset 0 -2px 0 rgba(0,0,0,0.66), 0 0 0 1px rgba(0,0,0,0.484), 0 3px 0 #09090a, 0 5px 2px rgba(0,0,0,0.484), 16px 26px 34px -8px rgba(0,0,0,0.748), 36px 60px 80px -24px rgba(0,0,0,0.572)。 */
+  --shadow-raise-detail:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.095), inset 0 -2px 0 rgba(0, 0, 0, 0.66),
+    0 0 0 1px rgba(0, 0, 0, 0.484), 0 3px 0 #09090a, 0 5px 2px rgba(0, 0, 0, 0.484),
+    16px 26px 34px -8px rgba(0, 0, 0, 0.748), 36px 60px 80px -24px rgba(0, 0, 0, 0.572);
+
+  /* 规范-8a.dc.html · H2；菜单弹层：inset 0 1.5px 0 rgba(255,255,255,0.095), 0 0 0 1px rgba(0,0,0,0.5), 0 3px 0 #09090a, 16px 26px 34px -8px rgba(0,0,0,0.75)。 */
+  --shadow-overlay:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.095), 0 0 0 1px rgba(0, 0, 0, 0.5), 0 3px 0 #09090a,
+    16px 26px 34px -8px rgba(0, 0, 0, 0.75);
+
+  /* StyleM-8a.dc.html · 整窗；整窗弹层远投影：inset 0 1.5px 0 rgba(255,255,255,0.095), 0 0 0 1px rgba(0,0,0,0.5), 0 3px 0 #09090a, 16px 26px 34px -8px rgba(0,0,0,0.75), 36px 60px 80px -24px rgba(0,0,0,0.6)。 */
+  --shadow-overlay-frame:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.095), 0 0 0 1px rgba(0, 0, 0, 0.5), 0 3px 0 #09090a,
+    16px 26px 34px -8px rgba(0, 0, 0, 0.75), 36px 60px 80px -24px rgba(0, 0, 0, 0.6);
+
+  /* 规范-8a.dc.html · H3；Toast 浮层：inset 0 1.5px 0 rgba(255,255,255,0.095), 0 0 0 1px rgba(0,0,0,0.5), 0 3px 0 #09090a, 12px 20px 28px -8px rgba(0,0,0,0.8)。 */
+  --shadow-toast:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.095), 0 0 0 1px rgba(0, 0, 0, 0.5), 0 3px 0 #09090a,
+    12px 20px 28px -8px rgba(0, 0, 0, 0.8);
+
+  /* 规范-8a.dc.html · H4；对话框：inset 0 1.5px 0 rgba(255,255,255,0.095), inset 0 -2px 0 rgba(0,0,0,0.66), 0 0 0 1px rgba(0,0,0,0.5), 0 3px 0 #09090a, 20px 32px 50px -10px rgba(0,0,0,0.85)。 */
+  --shadow-dialog:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.095), inset 0 -2px 0 rgba(0, 0, 0, 0.66),
+    0 0 0 1px rgba(0, 0, 0, 0.5), 0 3px 0 #09090a, 20px 32px 50px -10px rgba(0, 0, 0, 0.85);
+
+  /* 规范-8a.dc.html · G1 / H1 / StyleM-8a.dc.html · 整窗；搜索、输入、代码与分段凹槽：inset 2px 3px 5px rgba(0,0,0,0.66), inset -1px -1px 0 rgba(255,255,255,0.07), inset 0 0 0 1px rgba(0,0,0,0.33)。 */
+  --shadow-well-control:
+    inset 2px 3px 5px rgba(0, 0, 0, 0.66), inset -1px -1px 0 rgba(255, 255, 255, 0.07),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.33);
+
+  /* 规范-8a.dc.html · H1；输入悬停：inset 2px 3px 5px rgba(0,0,0,0.66), inset -1px -1px 0 rgba(255,255,255,0.07), inset 0 0 0 1px #3a3a40。 */
+  --shadow-well-hover:
+    inset 2px 3px 5px rgba(0, 0, 0, 0.66), inset -1px -1px 0 rgba(255, 255, 255, 0.07),
+    inset 0 0 0 1px #3a3a40;
+
+  /* 规范-8a.dc.html · H1；输入编辑态：inset 2px 3px 6px rgba(0,0,0,0.8), inset 0 0 0 1px #46464d。 */
+  --shadow-well-editing: inset 2px 3px 6px rgba(0, 0, 0, 0.8), inset 0 0 0 1px #46464d;
+
+  /* 规范-8a.dc.html · H1；输入焦点态：inset 2px 3px 5px rgba(0,0,0,0.66), inset 0 0 0 1.5px #F2F2F3。 */
+  --shadow-well-focus: inset 2px 3px 5px rgba(0, 0, 0, 0.66), inset 0 0 0 1.5px #f2f2f3;
+
+  /* 规范-8a.dc.html · H1；分段轨道：inset 2px 3px 5px rgba(0,0,0,0.66), inset -1px -1px 0 rgba(255,255,255,0.07)。 */
+  --shadow-well-track:
+    inset 2px 3px 5px rgba(0, 0, 0, 0.66), inset -1px -1px 0 rgba(255, 255, 255, 0.07);
+
+  /* 规范-8a.dc.html · H1 / H2；幽灵按钮、菜单项按下：inset 1.5px 2px 3px rgba(0,0,0,0.6)。 */
+  --shadow-well-pressed: inset 1.5px 2px 3px rgba(0, 0, 0, 0.6);
+
+  /* StyleM-8a.dc.html · 整窗；当前项目凹槽：inset 1.5px 2px 3px rgba(0,0,0,0.616), inset -1px -1px 0 rgba(255,255,255,0.055)。 */
+  --shadow-well-project:
+    inset 1.5px 2px 3px rgba(0, 0, 0, 0.616), inset -1px -1px 0 rgba(255, 255, 255, 0.055);
+
+  /* StyleM-8a.dc.html · 整窗；紧凑侧边栏行：inset 1px 1.5px 3px rgba(0,0,0,0.44), inset -1px -1px 0 rgba(255,255,255,0.07)。 */
+  --shadow-well-compact:
+    inset 1px 1.5px 3px rgba(0, 0, 0, 0.44), inset -1px -1px 0 rgba(255, 255, 255, 0.07);
+
+  /* 规范-8a.dc.html · H3 / StyleM-8a.dc.html · 整窗；进度轨道：inset 1px 1px 2px rgba(0,0,0,0.77)。 */
+  --shadow-well-progress: inset 1px 1px 2px rgba(0, 0, 0, 0.77);
+
+  /* StyleM-8a.dc.html · 整窗；侧边栏新建：inset 0 1px 0 rgba(255,255,255,0.09), inset 0 -1px 0 rgba(0,0,0,0.66), 0 0 0 1px rgba(0,0,0,0.396), 0 2px 0 #09090a, 3px 5px 8px -2px rgba(0,0,0,0.616)。 */
+  --shadow-raise-new-thread:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 -1px 0 rgba(0, 0, 0, 0.66),
+    0 0 0 1px rgba(0, 0, 0, 0.396), 0 2px 0 #09090a, 3px 5px 8px -2px rgba(0, 0, 0, 0.616);
+
+  /* StyleM-8a.dc.html · 整窗；工作日志：inset 0 1px 0 rgba(255,255,255,0.1), inset 0 -1px 0 rgba(0,0,0,0.66), 0 0 0 1px rgba(0,0,0,0.44), 0 2px 0 #09090a, 6px 10px 16px -4px rgba(0,0,0,0.66)。 */
+  --shadow-raise-log:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1), inset 0 -1px 0 rgba(0, 0, 0, 0.66),
+    0 0 0 1px rgba(0, 0, 0, 0.44), 0 2px 0 #09090a, 6px 10px 16px -4px rgba(0, 0, 0, 0.66);
+
+  /* StyleM-8a.dc.html · 整窗；品牌石块：inset 0 1px 0 rgba(255,255,255,0.09), inset 0 -1px 0 rgba(0,0,0,0.396), 0 2px 4px rgba(0,0,0,0.396), 0 8px 16px -8px rgba(0,0,0,0.77)。 */
+  --shadow-raise-brand:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 -1px 0 rgba(0, 0, 0, 0.396),
+    0 2px 4px rgba(0, 0, 0, 0.396), 0 8px 16px -8px rgba(0, 0, 0, 0.77);
+
+  /* StyleM-8a.dc.html · 整窗；状态标签微凸：inset 0 1px 0 rgba(255,255,255,0.045), 0 1px 0 rgba(0,0,0,0.66)。 */
+  --shadow-tag: inset 0 1px 0 rgba(255, 255, 255, 0.045), 0 1px 0 rgba(0, 0, 0, 0.66);
+
+  /* 规范-8a.dc.html · H5；快捷键：inset 0 1px 0 rgba(255,255,255,0.09), 0 1.5px 0 #09090a。 */
+  --shadow-keycap: inset 0 1px 0 rgba(255, 255, 255, 0.09), 0 1.5px 0 #09090a;
+
+  /* 规范-8a.dc.html · H1；危险实心按钮：0 2px 0 #7f1f17, 3px 5px 9px -3px rgba(0,0,0,.8)。 */
+  --shadow-danger: 0 2px 0 #7f1f17, 3px 5px 9px -3px rgba(0, 0, 0, 0.8);
+
+  /* 规范-8a.dc.html · H1 / H4；危险实心底边：0 2px 0 #7f1f17。 */
+  --shadow-danger-edge: 0 2px 0 #7f1f17;
+
+  /* 规范-8a.dc.html · H1；危险按钮按下：inset 0 1px 2px rgba(0,0,0,.35)。 */
+  --shadow-danger-pressed: inset 0 1px 2px rgba(0, 0, 0, 0.35);
+
+  /* 规范-8a.dc.html · H1 / StyleM-8a.dc.html · 整窗；描边按钮：inset 0 0 0 1.5px #46464d。 */
+  --shadow-outline-control: inset 0 0 0 1.5px #46464d;
+
+  /* 规范-8a.dc.html · H1；描边悬停：inset 0 0 0 1.5px #5a5a62。 */
+  --shadow-outline-control-hover: inset 0 0 0 1.5px #5a5a62;
+
+  /* 规范-8a.dc.html · H1；描边按下：inset 0 0 0 1.5px #5a5a62, inset 1.5px 2px 3px rgba(0,0,0,0.6)。 */
+  --shadow-outline-control-pressed:
+    inset 0 0 0 1.5px #5a5a62, inset 1.5px 2px 3px rgba(0, 0, 0, 0.6);
+
+  /* 规范-8a.dc.html · H1；描边禁用：inset 0 0 0 1.5px #2e2e33。 */
+  --shadow-outline-control-disabled: inset 0 0 0 1.5px #2e2e33;
+
+  /* 规范-8a.dc.html · H1；危险描边：inset 0 0 0 1.5px rgba(255,123,107,.45)。 */
+  --shadow-outline-danger: inset 0 0 0 1.5px rgba(255, 123, 107, 0.45);
+
+  /* 规范-8a.dc.html · H1；危险描边悬停：inset 0 0 0 1.5px rgba(255,123,107,.6)。 */
+  --shadow-outline-danger-hover: inset 0 0 0 1.5px rgba(255, 123, 107, 0.6);
+
+  /* 规范-8a.dc.html · H1；危险描边按下：inset 0 0 0 1.5px rgba(255,123,107,.6), inset 1.5px 2px 3px rgba(0,0,0,0.6)。 */
+  --shadow-outline-danger-pressed:
+    inset 0 0 0 1.5px rgba(255, 123, 107, 0.6), inset 1.5px 2px 3px rgba(0, 0, 0, 0.6);
+
+  /* 规范-8a.dc.html · H1；危险描边禁用：inset 0 0 0 1.5px rgba(255,123,107,.15)。 */
+  --shadow-outline-danger-disabled: inset 0 0 0 1.5px rgba(255, 123, 107, 0.15);
+
+  /* 规范-8a.dc.html · H1；关闭开关轨道：inset 1.5px 2px 3px rgba(0,0,0,.75), inset -1px -1px 0 rgba(255,255,255,.06)。 */
+  --shadow-switch-track:
+    inset 1.5px 2px 3px rgba(0, 0, 0, 0.75), inset -1px -1px 0 rgba(255, 255, 255, 0.06);
+
+  /* 规范-8a.dc.html · H1；开关轨道悬停：inset 1.5px 2px 3px rgba(0,0,0,.75), inset 0 0 0 1px #3a3a40。 */
+  --shadow-switch-hover: inset 1.5px 2px 3px rgba(0, 0, 0, 0.75), inset 0 0 0 1px #3a3a40;
+
+  /* 规范-8a.dc.html · H1；开关轨道按下：inset 1.5px 2px 3px rgba(0,0,0,.75)。 */
+  --shadow-switch-pressed: inset 1.5px 2px 3px rgba(0, 0, 0, 0.75);
+
+  /* 规范-8a.dc.html · H1；开启开关轨道：inset 0 1px 2px rgba(0,0,0,.25)。 */
+  --shadow-switch-on: inset 0 1px 2px rgba(0, 0, 0, 0.25);
+
+  /* 规范-8a.dc.html · H1；关闭开关滑块：inset 0 1px 0 rgba(255,255,255,.15), 0 1px 0 #09090a。 */
+  --shadow-switch-thumb: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 1px 0 #09090a;
+
+  /* 规范-8a.dc.html · H1；开启开关滑块：0 1px 1px rgba(0,0,0,.4)。 */
+  --shadow-switch-thumb-on: 0 1px 1px rgba(0, 0, 0, 0.4);
+
+  /* StyleM-8a.dc.html · 整窗；发送按钮禁用：inset 0 1px 0 rgba(255,255,255,0.06), 0 1px 0 #09090a。 */
+  --shadow-send-disabled: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 1px 0 #09090a;
+
+  /* 规范-8a.dc.html · H6；石板：22px。 */
+  --radius-slab: 22px;
+
+  /* 规范-8a.dc.html · H6；卡片下限：18px。 */
+  --radius-card: 18px;
+
+  /* 规范-8a.dc.html · H6；卡片上限：20px。 */
+  --radius-card-large: 20px;
+
+  /* 规范-8a.dc.html · H6；卡片行：16px。 */
+  --radius-card-row: 16px;
+
+  /* 规范-8a.dc.html · H6；紧凑行：12px。 */
+  --radius-compact-row: 12px;
+
+  /* README.md · 设计令牌 / 规范-8a.dc.html · H2 / H3；菜单、Toast 弹层：16px。 */
+  --radius-overlay: 16px;
+
+  /* README.md · 设计令牌；较大弹层：18px。 */
+  --radius-overlay-large: 18px;
+
+  /* 规范-8a.dc.html · H6；对话框：24px。 */
+  --radius-dialog: 24px;
+
+  /* 规范-8a.dc.html · H6；菜单行：10px。 */
+  --radius-menu-row: 10px;
+
+  /* README.md · 设计令牌 / 规范-8a.dc.html · H5；徽标：10px。 */
+  --radius-tag: 10px;
+
+  /* 规范-8a.dc.html · H6；输入框外壳：26px。 */
+  --radius-composer: 26px;
+
+  /* 规范-8a.dc.html · H5；快捷键：7px。 */
+  --radius-keycap: 7px;
+
+  /* 规范-8a.dc.html · H6；正文：14px，行高 1.55；未单列行高时沿用 H6 界面 1.55。 */
+  --text-body: 14px;
+  --text-body--line-height: 1.55;
+
+  /* 规范-8a.dc.html · H6；回复正文：14.5px，行高 1.75；未单列行高时沿用 H6 界面 1.55。 */
+  --text-reply: 14.5px;
+  --text-reply--line-height: 1.75;
+
+  /* 规范-8a.dc.html · H6；界面标题：14.5px，行高 1.55，字重 700；未单列行高时沿用 H6 界面 1.55。 */
+  --text-heading: 14.5px;
+  --text-heading--line-height: 1.55;
+  --text-heading--font-weight: 700;
+
+  /* 规范-8a.dc.html · H6；次要文字下限：12px，行高 1.55；未单列行高时沿用 H6 界面 1.55。 */
+  --text-secondary-copy: 12px;
+  --text-secondary-copy--line-height: 1.55;
+
+  /* 规范-8a.dc.html · H6；次要文字上限：13px，行高 1.55；未单列行高时沿用 H6 界面 1.55。 */
+  --text-secondary-copy-large: 13px;
+  --text-secondary-copy-large--line-height: 1.55;
+
+  /* 规范-8a.dc.html · H1 / StyleM-8a.dc.html · 整窗；搜索、输入等半像素文字：13.5px，行高 1.55；未单列行高时沿用 H6 界面 1.55。 */
+  --text-control: 13.5px;
+  --text-control--line-height: 1.55;
+
+  /* 规范-8a.dc.html · H6；元信息下限：11px，行高 1.55；未单列行高时沿用 H6 界面 1.55。 */
+  --text-meta: 11px;
+  --text-meta--line-height: 1.55;
+
+  /* 规范-8a.dc.html · H6；元信息上限：11.5px，行高 1.55；未单列行高时沿用 H6 界面 1.55。 */
+  --text-meta-large: 11.5px;
+  --text-meta-large--line-height: 1.55;
+
+  /* StyleM-8a.dc.html · 整窗；分段控件与上下文文字：12.5px，行高 1.55；未单列行高时沿用 H6 界面 1.55。 */
+  --text-secondary-copy-medium: 12.5px;
+  --text-secondary-copy-medium--line-height: 1.55;
+
+  /* 规范-8a.dc.html · H6；卡片标题：17px，行高 1.55；未单列行高时沿用 H6 界面 1.55。 */
+  --text-card-title: 17px;
+  --text-card-title--line-height: 1.55;
+
+  /* 规范-8a.dc.html · H6；计划标题：19px，行高 1.55；未单列行高时沿用 H6 界面 1.55。 */
+  --text-plan-title: 19px;
+  --text-plan-title--line-height: 1.55;
+
+  /* README.md · 设计令牌 / StyleM-8a.dc.html · 整窗；对话标题：19px，行高 1.55；未单列行高时沿用 H6 界面 1.55。 */
+  --text-chat-title: 19px;
+  --text-chat-title--line-height: 1.55;
+
+  /* README.md · 设计令牌；页面标题：32px，行高 1.55；未单列行高时沿用 H6 界面 1.55。 */
+  --text-page-title: 32px;
+  --text-page-title--line-height: 1.55;
+
+  /* 规范-8a.dc.html · H6 / StyleM-8a.dc.html · 整窗；新对话大标题：42px，StyleM 显式行高 1.25。 */
+  --text-new-chat-title: 42px;
+  --text-new-chat-title--line-height: 1.25;
+
+  /* 规范-8a.dc.html · H4；对话框标题：21px，显式行高 1.35。 */
+  --text-dialog-title: 21px;
+  --text-dialog-title--line-height: 1.35;
+
+  /* 规范-8a.dc.html · H6 / StyleM-8a.dc.html · 整窗；代码正文：12.5px，行高 22px；copy 后缀避免与 text-code 颜色类重名。 */
+  --text-code-copy: 12.5px;
+  --text-code-copy--line-height: 22px;
+
+  /* 规范-8a.dc.html · H6 / StyleM-8a.dc.html · 整窗；终端输出：12px，行高 20px。 */
+  --text-terminal-copy: 12px;
+  --text-terminal-copy--line-height: 20px;
+
+  /* README.md · 设计令牌 / StyleM-8a.dc.html · 整窗；石板文字：0 1px 0 rgba(0,0,0,.45)。 */
+  --text-shadow-stone: 0 1px 0 rgba(0, 0, 0, 0.45);
+
+  /* 规范-8a.dc.html · H6；代码行高：22px，与调用方选择的字号独立。 */
+  --leading-code: 22px;
+
+  /* 规范-8a.dc.html · H6；终端行高：20px，与调用方选择的字号独立。 */
+  --leading-terminal: 20px;
+
+  /* StyleM-8a.dc.html · 整窗；品牌 T3 CODE 字距：.34em。 */
+  --tracking-brand: 0.34em;
+}
+
+/* 注意点颜色以变量暴露给后续纯 CSS；inline 让 Tailwind 在使用处解析该变量。 */
+@theme inline {
+  /* 规范-8a.dc.html · G1；待处理小点：#ff6b35，颜色由 --attention 提供。 */
+  --color-attention: var(--attention);
+}
+
+/* 框架任务尚未接入；这里只登记当前定稿值，不改变现有窗口布局。 */
+:root {
+  /* 规范-8a.dc.html · G1；需要处理的小点：#ff6b35。 */
+  --attention: #ff6b35;
+  /* 规范-8a.dc.html · H6 / StyleM-8a.dc.html · 整窗；标题栏高：48px。 */
+  --frame-titlebar-height: 48px;
+  /* 规范-8a.dc.html · H6 / StyleM-8a.dc.html · 整窗；项目栏宽：52px。 */
+  --frame-projectbar-width: 52px;
+  /* 规范-8a.dc.html · H6 / StyleM-8a.dc.html · 整窗；侧边栏宽：276px。 */
+  --frame-sidebar-width: 276px;
+  /* StyleM-8a.dc.html · 整窗；窗口内边距（上、横向、下）：0 16px 20px。 */
+  --frame-padding: 0 16px 20px;
+  /* StyleM-8a.dc.html · 整窗；窗口上边距：0px。 */
+  --frame-padding-top: 0px;
+  /* 规范-8a.dc.html · H6 / StyleM-8a.dc.html · 整窗；窗口横向边距：16px。 */
+  --frame-padding-inline: 16px;
+  /* 规范-8a.dc.html · H6 / StyleM-8a.dc.html · 整窗；窗口底边距：20px。 */
+  --frame-padding-bottom: 20px;
+  /* 规范-8a.dc.html · H6 / StyleM-8a.dc.html · 整窗；石板间距：16px。 */
+  --frame-slab-gap: 16px;
+  /* StyleM-8a.dc.html · 整窗；窄窗口石板间距：8px。 */
+  --frame-slab-gap-narrow: 8px;
+  /* README.md · 窗口框架；窄窗口最大宽度：1024px。 */
+  --frame-narrow-max-width: 1024px;
+  /* StyleM-8a.dc.html · 整窗；StyleM 系统按钮实际留白：138px。 */
+  --frame-system-buttons-width: 138px;
+  /* README.md · 窗口框架；README 系统按钮留白范围上限：140px。 */
+  --frame-system-buttons-max-width: 140px;
+}
