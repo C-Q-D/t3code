@@ -1,6 +1,7 @@
 /** Verifies floating preview gestures commit shared layout only after interaction ends. */
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, expect, it, vi } from "vite-plus/test";
+import { resolveChatCanvasLayout, type ChatCanvasPreview } from "../chat/chatCanvasLayout";
 import { EnvironmentId, ThreadId } from "@t3tools/contracts";
 
 const state = vi.hoisted(() => ({
@@ -9,12 +10,16 @@ const state = vi.hoisted(() => ({
   close: vi.fn(),
   reportPreview: vi.fn(),
   clearPreview: vi.fn(),
-  frame: { x: 100, y: 80, width: 360, height: 240 },
+  frame: { x: 100, y: 80, width: 360, height: 272 },
 }));
+/** Supplies the production canvas policy to the isolated pointer-handler test. */
+const resolvePreviewFrame = (preview: ChatCanvasPreview) =>
+  resolveChatCanvasLayout({ container: { width: 1000, height: 700 }, preview }).frame;
 vi.mock("../chat/ChatCanvasContext", () => ({
   useChatCanvas: () => ({
     container: { width: 1000, height: 700 },
     previewKey: "browser:tab",
+    resolvePreviewFrame,
     layout: { frame: state.frame },
     reportPreview: state.reportPreview,
     clearPreview: state.clearPreview,
@@ -92,7 +97,7 @@ it.each([
     dx: 2000,
     dy: 2000,
     x: 628,
-    y: 448,
+    y: 416,
     width: 360,
     finish: "onLostPointerCapture",
     eventType: "lostpointercapture",

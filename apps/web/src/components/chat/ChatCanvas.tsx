@@ -1,3 +1,4 @@
+/** Measures chat obstacles and shares one layout policy with floating preview gestures. */
 import {
   useCallback,
   useLayoutEffect,
@@ -107,6 +108,29 @@ export function ChatCanvas({
     if (timelineElement) observed.push(timelineElement);
     return observeResize(observed, measure);
   }, [composerOverlayElement, timelineElement, detailsCardTopInset]);
+  const resolveLayout = useCallback(
+    (nextPreview: ChatCanvasPreview | null) =>
+      resolveChatCanvasLayout({
+        ...measurements,
+        container: { width: measurements.width, height: measurements.height },
+        preview: nextPreview,
+        detailsCard,
+        findBar:
+          detailsCardTopInset > 0
+            ? {
+                left: measurements.findBarLeft,
+                right: measurements.findBarRight,
+                bottom: measurements.findBarBottom,
+              }
+            : null,
+      }),
+    [measurements, detailsCard, detailsCardTopInset],
+  );
+  // This callback changes only when constraints do, not when a preview is reported.
+  const resolvePreviewFrame = useCallback(
+    (nextPreview: ChatCanvasPreview) => resolveLayout(nextPreview).frame,
+    [resolveLayout],
+  );
   const context = useMemo(() => {
     const container = { width: measurements.width, height: measurements.height };
     const findBar =
@@ -120,13 +144,8 @@ export function ChatCanvas({
     return {
       container,
       lane: { padding: measurements.padding, minChatWidth: measurements.minChatWidth },
-      layout: resolveChatCanvasLayout({
-        ...measurements,
-        container,
-        preview,
-        detailsCard,
-        findBar,
-      }),
+      layout: resolveLayout(preview),
+      resolvePreviewFrame,
       previewKey: preview?.key ?? null,
       reportPreview,
       clearPreview,
@@ -135,9 +154,10 @@ export function ChatCanvas({
       detailsCardTopInset: findBar?.bottom ?? 0,
     };
   }, [
+    resolveLayout,
+    resolvePreviewFrame,
     measurements,
     preview,
-    detailsCard,
     reportPreview,
     clearPreview,
     reportDetailsCard,

@@ -68,6 +68,7 @@ it("removes the visible card while collapsed and renders it again on restore", a
             React.ContextType<typeof ChatCanvasContext>
           >["layout"],
           previewKey: null,
+          resolvePreviewFrame: () => null,
           reportPreview: vi.fn(),
           clearPreview: vi.fn(),
           registerTimeline: vi.fn(),
@@ -112,6 +113,7 @@ it.each(["Escape", "outside press"])(
                 React.ContextType<typeof ChatCanvasContext>
               >["layout"],
               previewKey: null,
+              resolvePreviewFrame: () => null,
               reportPreview: vi.fn(),
               clearPreview: vi.fn(),
               registerTimeline: vi.fn(),

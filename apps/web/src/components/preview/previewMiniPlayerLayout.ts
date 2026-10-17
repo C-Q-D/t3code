@@ -1,3 +1,4 @@
+/** Fits floating preview outer frames while preserving source aspect inside V4 titlebar and margins. */
 import type { DevicePlatform, PreviewViewportSetting } from "@t3tools/contracts";
 
 import type { BrowserSurfaceContentPresentation } from "~/browser/browserSurfaceStore";
@@ -13,8 +14,10 @@ export const PREVIEW_MINI_PLAYER_EDGE_GAP = 12;
 export const PREVIEW_MINI_PLAYER_CORNER_RADIUS = 12;
 // The mini-player shell straddles this webview at 47 and 49: above --z-sheet, under dialogs (50).
 export const PREVIEW_MINI_PLAYER_WEBVIEW_Z_INDEX = 48;
-// A fresh player is the largest box at the source aspect ratio that fits here.
-const PREVIEW_MINI_PLAYER_DEFAULT_BOX = { width: 320, height: 320 } as const;
+// V4: 6px on either side, a 34px titlebar and 6px bottom margin.
+const FRAME_EXTRA_WIDTH = 12;
+const FRAME_EXTRA_HEIGHT = 40;
+const DEFAULT_FRAME_WIDTH = 360;
 const PREVIEW_MINI_PLAYER_MIN_SIZE = { width: 240, height: 150 } as const;
 
 export interface PreviewMiniPlayerFrame extends PreviewMiniPlayerPosition, PreviewMiniPlayerSize {}
@@ -141,8 +144,8 @@ const availableArea = (
 });
 
 /**
- * Width is the player's only free dimension; height always follows the source
- * aspect ratio so the webview fills the box without letterboxing. The player
+ * Width is the outer frame's free dimension; subtract horizontal chrome before
+ * deriving content height, then add vertical chrome to avoid letterboxing. The player
  * may upscale the source, and a tight container wins over the minimum.
  */
 function fitPreviewMiniPlayerWidth(
@@ -152,22 +155,24 @@ function fitPreviewMiniPlayerWidth(
 ): PreviewMiniPlayerSize {
   const aspectRatio = source.width / source.height;
   const width = Math.min(
-    Math.max(
-      desiredWidth,
-      PREVIEW_MINI_PLAYER_MIN_SIZE.width,
-      PREVIEW_MINI_PLAYER_MIN_SIZE.height * aspectRatio,
+    Math.round(
+      Math.max(
+        desiredWidth,
+        PREVIEW_MINI_PLAYER_MIN_SIZE.width,
+        (PREVIEW_MINI_PLAYER_MIN_SIZE.height - FRAME_EXTRA_HEIGHT) * aspectRatio +
+          FRAME_EXTRA_WIDTH,
+      ),
     ),
-    Math.max(1, max.width),
-    Math.max(1, max.height * aspectRatio),
+    Math.floor(Math.max(1, max.width)),
+    Math.floor(Math.max(1, (max.height - FRAME_EXTRA_HEIGHT) * aspectRatio + FRAME_EXTRA_WIDTH)),
   );
-  return { width: Math.round(width), height: Math.round(width / aspectRatio) };
-}
-
-function defaultPreviewMiniPlayerWidth(source: PreviewMiniPlayerSize): number {
-  return Math.min(
-    PREVIEW_MINI_PLAYER_DEFAULT_BOX.width,
-    (PREVIEW_MINI_PLAYER_DEFAULT_BOX.height * source.width) / source.height,
-  );
+  return {
+    width,
+    height: Math.min(
+      Math.max(1, Math.floor(max.height)),
+      Math.round(Math.max(0, width - FRAME_EXTRA_WIDTH) / aspectRatio) + FRAME_EXTRA_HEIGHT,
+    ),
+  };
 }
 
 const clampToContainer = (
@@ -292,7 +297,7 @@ export function resolvePreviewMiniPlayerFrame(input: {
     obstacles = NO_PREVIEW_MINI_PLAYER_OBSTACLES,
   } = input;
   const size = fitPreviewMiniPlayerWidth(
-    width ?? defaultPreviewMiniPlayerWidth(source),
+    width ?? DEFAULT_FRAME_WIDTH,
     source,
     availableArea(
       container,
@@ -371,10 +376,12 @@ export function resizePreviewMiniPlayer(input: {
   // dominant axes jumps when one axis grows while the other shrinks.
   const desired =
     horizontal && vertical
-      ? (desiredWidth + desiredHeight / aspectRatio) / (1 + 1 / aspectRatio ** 2)
+      ? (desiredWidth +
+          (desiredHeight - FRAME_EXTRA_HEIGHT + FRAME_EXTRA_WIDTH / aspectRatio) / aspectRatio) /
+        (1 + 1 / aspectRatio ** 2)
       : horizontal
         ? desiredWidth
-        : desiredHeight * aspectRatio;
+        : (desiredHeight - FRAME_EXTRA_HEIGHT) * aspectRatio + FRAME_EXTRA_WIDTH;
   const size = fitPreviewMiniPlayerWidth(desired, source, max);
   const position = clampPreviewMiniPlayerPosition(
     { x: west ? right - size.width : start.x, y: north ? bottom - size.height : start.y },

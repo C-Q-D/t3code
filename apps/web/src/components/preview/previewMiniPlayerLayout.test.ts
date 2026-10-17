@@ -1,3 +1,4 @@
+/** Verifies outer-frame fitting, source-content aspect and obstacle avoidance for V4 previews. */
 import { FILL_PREVIEW_VIEWPORT } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
@@ -63,7 +64,7 @@ describe("resolveDeviceMiniPlayerSourceSize", () => {
     ).toEqual({ width: 1_179, height: 2_556 });
   });
 
-  it("floats a phone at the minimum width rather than the default box", () => {
+  it("fits the default phone frame into the available height", () => {
     expect(
       resolvePreviewMiniPlayerFrame({
         width: null,
@@ -71,7 +72,7 @@ describe("resolveDeviceMiniPlayerSourceSize", () => {
         source: resolveDeviceMiniPlayerSourceSize("ios", null),
         container,
       }),
-    ).toMatchObject({ width: 240, height: 520 });
+    ).toMatchObject({ width: 305, height: 675 });
   });
 });
 
@@ -92,10 +93,10 @@ describe("resolvePreviewMiniPlayerFrame", () => {
   it("opens at the source aspect ratio in the top-right corner", () => {
     expect(
       resolvePreviewMiniPlayerFrame({ width: null, position: null, source, container }),
-    ).toEqual({ x: 668, y: PREVIEW_MINI_PLAYER_EDGE_GAP, width: 320, height: 200 });
+    ).toEqual({ x: 628, y: PREVIEW_MINI_PLAYER_EDGE_GAP, width: 360, height: 258 });
   });
 
-  it("keeps a tall source at the minimum width instead of the default box", () => {
+  it("fits a tall source and its chrome into the container", () => {
     expect(
       resolvePreviewMiniPlayerFrame({
         width: null,
@@ -103,13 +104,13 @@ describe("resolvePreviewMiniPlayerFrame", () => {
         source: { width: 390, height: 844 },
         container,
       }),
-    ).toEqual({ x: 748, y: PREVIEW_MINI_PLAYER_EDGE_GAP, width: 240, height: 519 });
+    ).toEqual({ x: 683, y: PREVIEW_MINI_PLAYER_EDGE_GAP, width: 305, height: 674 });
   });
 
   it("derives height from the stored width", () => {
     expect(
       resolvePreviewMiniPlayerFrame({ width: 480, position: { x: 100, y: 80 }, source, container }),
-    ).toEqual({ x: 100, y: 80, width: 480, height: 300 });
+    ).toEqual({ x: 100, y: 80, width: 480, height: 333 });
   });
 
   it("shrinks to the space above the composer without losing the stored width", () => {
@@ -120,7 +121,7 @@ describe("resolvePreviewMiniPlayerFrame", () => {
       container,
       obstacles: tallComposer,
     });
-    expect(frame).toEqual({ x: 100, y: PREVIEW_MINI_PLAYER_EDGE_GAP, width: 602, height: 376 });
+    expect(frame).toEqual({ x: 100, y: PREVIEW_MINI_PLAYER_EDGE_GAP, width: 549, height: 376 });
   });
 
   it("keeps a tall frame parked beside the composer across layout passes", () => {
@@ -129,7 +130,7 @@ describe("resolvePreviewMiniPlayerFrame", () => {
     const phone = { width: 390, height: 844 };
     const beside = { composer: { left: 300, right: 900, height: 300 }, detailsCard: null };
     const resized = resizePreviewMiniPlayer({
-      start: { x: 12, y: 100, width: 240, height: 519 },
+      start: { x: 12, y: 100, width: 240, height: 533 },
       direction: "east",
       delta: { x: 10, y: 0 },
       source: phone,
@@ -155,12 +156,12 @@ describe("resolvePreviewMiniPlayerFrame", () => {
         source: { width: 480, height: 320 },
         container,
       }),
-    ).toMatchObject({ width: 900, height: 600 });
+    ).toMatchObject({ width: 900, height: 632 });
   });
 });
 
 describe("resizePreviewMiniPlayer", () => {
-  const start = { x: 300, y: 200, width: 320, height: 200 };
+  const start = { x: 300, y: 200, width: 320, height: 233 };
 
   it("keeps the aspect ratio when dragging the right edge", () => {
     expect(
@@ -171,7 +172,7 @@ describe("resizePreviewMiniPlayer", () => {
         source,
         container,
       }),
-    ).toEqual({ x: 300, y: 200, width: 480, height: 300 });
+    ).toEqual({ x: 300, y: 200, width: 480, height: 333 });
   });
 
   it("anchors the right edge when dragging from the left", () => {
@@ -183,7 +184,7 @@ describe("resizePreviewMiniPlayer", () => {
         source,
         container,
       }),
-    ).toEqual({ x: 140, y: 200, width: 480, height: 300 });
+    ).toEqual({ x: 140, y: 200, width: 480, height: 333 });
   });
 
   it("anchors the bottom edge when dragging the top up", () => {
@@ -195,7 +196,7 @@ describe("resizePreviewMiniPlayer", () => {
         source,
         container,
       }),
-    ).toEqual({ x: 300, y: 100, width: 480, height: 300 });
+    ).toEqual({ x: 300, y: 100, width: 481, height: 333 });
   });
 
   it("does not jump when corner motion crosses opposing dominant axes", () => {
@@ -220,38 +221,38 @@ describe("resizePreviewMiniPlayer", () => {
         source,
         container,
       }),
-    ).toEqual({ x: 300, y: 200, width: 379, height: 237 });
+    ).toEqual({ x: 300, y: 200, width: 380, height: 270 });
   });
 
   it("stops at the container edge in the drag direction", () => {
     expect(
       resizePreviewMiniPlayer({
-        start: { x: 600, y: 12, width: 320, height: 200 },
+        start: { x: 600, y: 12, width: 320, height: 233 },
         direction: "east",
         delta: { x: 500, y: 0 },
         source,
         container,
       }),
-    ).toEqual({ x: 600, y: 12, width: 388, height: 243 });
+    ).toEqual({ x: 600, y: 12, width: 388, height: 275 });
   });
 
   it("shifts the player when the free axis would overflow", () => {
     expect(
       resizePreviewMiniPlayer({
-        start: { x: 12, y: 400, width: 320, height: 200 },
+        start: { x: 12, y: 400, width: 320, height: 233 },
         direction: "east",
         delta: { x: 300, y: 0 },
         source,
         container,
       }),
-    ).toEqual({ x: 12, y: 300, width: 620, height: 388 });
+    ).toEqual({ x: 12, y: 268, width: 620, height: 420 });
   });
 
   it("lets a player beside a tall composer keep its height on an edge drag", () => {
     // A portrait player parked in the margin left of the composer, already
     // taller than the rows above the composer, nudged from its right edge.
     const phone = { width: 390, height: 844 };
-    const start = { x: 12, y: 100, width: 240, height: 519 };
+    const start = { x: 12, y: 100, width: 240, height: 533 };
     const beside = { composer: { left: 300, right: 900, height: 300 }, detailsCard: null };
     expect(
       resizePreviewMiniPlayer({
@@ -262,7 +263,7 @@ describe("resizePreviewMiniPlayer", () => {
         container,
         obstacles: beside,
       }),
-    ).toEqual({ x: 12, y: 100, width: 250, height: 541 });
+    ).toEqual({ x: 12, y: 100, width: 250, height: 555 });
     // The same drag with the composer under the player is still held above it.
     expect(
       resizePreviewMiniPlayer({
@@ -273,20 +274,20 @@ describe("resizePreviewMiniPlayer", () => {
         container,
         obstacles: beside,
       }),
-    ).toMatchObject({ height: 376 });
+    ).toMatchObject({ height: 375 });
   });
 
   it("stops growing downward at the composer beneath the player's columns", () => {
     expect(
       resizePreviewMiniPlayer({
-        start: { x: 300, y: 100, width: 320, height: 200 },
+        start: { x: 300, y: 100, width: 320, height: 233 },
         direction: "south",
         delta: { x: 0, y: 400 },
         source,
         container,
         obstacles: tallComposer,
       }),
-    ).toEqual({ x: 300, y: 100, width: 461, height: 288 });
+    ).toEqual({ x: 300, y: 100, width: 408, height: 288 });
   });
 
   it("respects the minimum size", () => {
@@ -298,7 +299,7 @@ describe("resizePreviewMiniPlayer", () => {
         source,
         container,
       }),
-    ).toEqual({ x: 300, y: 200, width: 240, height: 150 });
+    ).toEqual({ x: 300, y: 200, width: 240, height: 183 });
   });
 });
 
@@ -312,7 +313,7 @@ describe("resolvePreviewMiniPlayerFrame with the details card", () => {
         container,
         obstacles: withCard,
       }),
-    ).toEqual({ x: 988 - 320, y: 260 + gap, width: 320, height: 200 });
+    ).toEqual({ x: 628, y: 272, width: 360, height: 258 });
   });
 
   it("opens left of the card when it cannot fit beneath it", () => {
@@ -326,7 +327,7 @@ describe("resolvePreviewMiniPlayerFrame with the details card", () => {
         container,
         obstacles: tallCard,
       }),
-    ).toEqual({ x: 680 - gap - 320, y: 700 - 150 - gap - 200, width: 320, height: 200 });
+    ).toEqual({ x: 308, y: 280, width: 360, height: 258 });
   });
 
   it("keeps a stored player's size when the card covers its columns", () => {
@@ -342,9 +343,9 @@ describe("resolvePreviewMiniPlayerFrame with the details card", () => {
     });
     expect(frame).toEqual({
       x: 680 - gap - 480,
-      y: 700 - 150 - gap - 300,
+      y: 205,
       width: 480,
-      height: 300,
+      height: 333,
     });
   });
 });
