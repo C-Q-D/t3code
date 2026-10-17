@@ -6,10 +6,10 @@ import { useNavigate, useParams } from "@tanstack/react-router";
 import type { EnvironmentId, OrchestrationV2ThreadShell, ThreadId } from "@t3tools/contracts";
 import * as Option from "effect/Option";
 import {
-  CircleAlertIcon,
+  CircleXIcon,
   CircleCheckIcon,
   MessageCircleQuestionIcon,
-  ShieldQuestionIcon,
+  ShieldAlertIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
 
@@ -180,20 +180,27 @@ function EnvironmentNotifications({
         (activeEnvironmentId !== environmentId || activeThreadId !== thread.id)
       ) {
         const toastId = toastManager.add({
-          type: kind === "completion" ? "success" : status === "failed" ? "error" : "warning",
+          type:
+            kind === "completion"
+              ? "success"
+              : status === "failed"
+                ? "error"
+                : status === "input"
+                  ? "info"
+                  : "warning",
           title,
           description: thread.title,
           data: {
             hideCopyButton: true,
             leadingIcon:
               kind === "completion" ? (
-                <CircleCheckIcon aria-hidden className="size-4 text-success-foreground" />
+                <CircleCheckIcon aria-hidden className="size-3.75" />
               ) : status === "approval" ? (
-                <ShieldQuestionIcon aria-hidden className="size-4 text-warning-foreground" />
+                <ShieldAlertIcon aria-hidden className="size-3.75" />
               ) : status === "failed" ? (
-                <CircleAlertIcon aria-hidden className="size-4 text-destructive-foreground" />
+                <CircleXIcon aria-hidden className="size-3.75" />
               ) : (
-                <MessageCircleQuestionIcon aria-hidden className="size-4 text-info-foreground" />
+                <MessageCircleQuestionIcon aria-hidden className="size-3.75" />
               ),
           },
           actionProps: {

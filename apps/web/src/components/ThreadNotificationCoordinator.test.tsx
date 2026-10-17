@@ -254,36 +254,39 @@ describe("thread notifications", () => {
   );
 
   it.each([
-    ["input", "Input needed"],
-    ["approval", "Approval needed"],
-    ["sessionError", "Thread failed"],
-    ["turnError", "Thread failed"],
-    ["limited", "Usage limit reached"],
-  ] as const)("uses the same %s event for in-app and desktop alerts", async (event, title) => {
-    state.mode = "notifications-and-sound";
-    await render();
-    state[event] = true;
-    await render();
-    await render();
-    expect(state.add).toHaveBeenCalledTimes(1);
-    expect(state.add).toHaveBeenLastCalledWith(expect.objectContaining({ title }));
-    expect(state.sound).toHaveBeenCalledWith("input", expect.any(Function));
-    expect(state.notification).not.toHaveBeenCalled();
+    ["input", "Input needed", "info"],
+    ["approval", "Approval needed", "warning"],
+    ["sessionError", "Thread failed", "error"],
+    ["turnError", "Thread failed", "error"],
+    ["limited", "Usage limit reached", "warning"],
+  ] as const)(
+    "uses the same %s event for in-app and desktop alerts",
+    async (event, title, type) => {
+      state.mode = "notifications-and-sound";
+      await render();
+      state[event] = true;
+      await render();
+      await render();
+      expect(state.add).toHaveBeenCalledTimes(1);
+      expect(state.add).toHaveBeenLastCalledWith(expect.objectContaining({ title, type }));
+      expect(state.sound).toHaveBeenCalledWith("input", expect.any(Function));
+      expect(state.notification).not.toHaveBeenCalled();
 
-    state[event] = false;
-    await render();
-    state.focused = false;
-    state[event] = true;
-    await render();
-    await render();
-    expect(state.add).toHaveBeenCalledTimes(1);
-    expect(state.notification).toHaveBeenCalledTimes(1);
-    expect(state.notification).toHaveBeenCalledWith(title, {
-      body: "Fix the login form",
-      tag: "env-1:thread-1",
-      silent: true,
-    });
-  });
+      state[event] = false;
+      await render();
+      state.focused = false;
+      state[event] = true;
+      await render();
+      await render();
+      expect(state.add).toHaveBeenCalledTimes(1);
+      expect(state.notification).toHaveBeenCalledTimes(1);
+      expect(state.notification).toHaveBeenCalledWith(title, {
+        body: "Fix the login form",
+        tag: "env-1:thread-1",
+        silent: true,
+      });
+    },
+  );
 
   it("alerts when only a dev server is left running, not while a monitor can wake the agent", async () => {
     await render();

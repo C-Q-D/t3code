@@ -1,1 +1,13 @@
-/* F5 Toast：本线新增的令牌（@theme）与全局样式写在这里。 */
+/* H3 Toast details absent from the shared token contract; surfaces remain owned by dropdown-glass. */
+@theme {
+  /* 规范-8a.dc.html · H3: 28px notification icon tiles have 9px corners. */
+  --radius-toast-icon: 9px;
+
+  /* 规范-8a.dc.html · H3: the loading icon sits in a neutral recessed tile (#151517). */
+  --color-toast-loading-tile: #151517;
+  --shadow-toast-loading-tile: inset 1px 1.5px 2px
+    color-mix(in srgb, var(--color-black) 60%, transparent);
+
+  /* 规范-8a.dc.html · H3: dark action keys use only a 1.5px stone bottom edge. */
+  --shadow-toast-action: 0 1.5px 0 var(--color-raise-edge);
+}
