@@ -1070,6 +1070,7 @@ export function DiagnosticsSettingsPanel() {
         <SettingsSection title={t.settings.diagnostics.graphite.tracing}>
           <SettingsRow
             title={t.settings.diagnostics.graphite.exportTrace}
+            description={t.settings.diagnostics.graphite.exportTraceUnavailable}
             control={
               <Button size="md" variant="secondary" disabled>
                 {t.settings.diagnostics.graphite.export}
@@ -1078,6 +1079,7 @@ export function DiagnosticsSettingsPanel() {
           />
           <SettingsRow
             title={t.settings.diagnostics.graphite.signals}
+            description={t.settings.diagnostics.graphite.signalsUnavailable}
             control={
               <Button
                 size="icon-md"

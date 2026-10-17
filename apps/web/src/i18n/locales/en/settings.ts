@@ -1039,6 +1039,8 @@ export const settings = {
       exportTrace: "Trace export",
       export: "Export",
       signals: "Signals",
+      exportTraceUnavailable: "This entry is not available yet. Configure OTLP export below.",
+      signalsUnavailable: "This entry is not available yet. Send signals from the process table.",
     },
     traceMode: {
       local: "Local trace file",

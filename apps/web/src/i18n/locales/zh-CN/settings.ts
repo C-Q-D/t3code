@@ -986,6 +986,8 @@ export const settings: Messages["settings"] = {
       exportTrace: "追踪导出",
       export: "导出",
       signals: "信号",
+      exportTraceUnavailable: "此入口尚未提供。请在下方配置 OTLP 导出。",
+      signalsUnavailable: "此入口尚未提供。请在进程表中发送信号。",
     },
     traceMode: {
       local: "本地追踪文件",

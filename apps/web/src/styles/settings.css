@@ -331,7 +331,8 @@
   .diagnostics-process-row {
     @apply flex min-h-12 items-center gap-3 rounded-settings-row-surface py-2 pr-1.5 pl-2.5;
     content-visibility: auto;
-    contain-intrinsic-size: auto 56px;
+    /* Estimate the content box: ~56px row height minus py-2 (8px on each side). */
+    contain-intrinsic-size: auto 40px;
   }
   .diagnostics-icon-well {
     @apply flex size-8 shrink-0 items-center justify-center rounded-diagnostics-icon bg-diagnostics-well shadow-diagnostics-well;
