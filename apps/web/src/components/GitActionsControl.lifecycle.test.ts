@@ -200,6 +200,29 @@ afterEach(async () => {
 });
 
 describe("Git action targets across thread navigation", () => {
+  it("runs the details card's commit-and-push action in its own checkout", async () => {
+    let renderer!: ReturnType<typeof create>;
+    await act(async () => {
+      renderer = create(
+        createElement(MemoGitActionsControl, {
+          ...props("details-thread", "/details-checkout"),
+          displayMode: "panel",
+        }),
+      );
+    });
+    renderers.push(renderer);
+    const button = renderer.root
+      .findAllByType("button")
+      .find((candidate) => candidate.children.includes("Commit & push"));
+    expect(button).toBeDefined();
+    expect(button!.props.disabled).toBe(false);
+    await act(async () => button!.props.onClick());
+    expect(state.actions.at(-1)).toMatchObject({
+      scope: { environmentId: "environment", cwd: "/details-checkout" },
+      input: { threadId: "details-thread", action: "commit_push" },
+    });
+  });
+
   it("runs a retained PR toast in the thread that produced it", async () => {
     const renderer = await renderActions("first", "/first");
     await clickQuickAction(renderer);

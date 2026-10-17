@@ -708,6 +708,11 @@ export const chat: Messages["chat"] = {
     editAutomation: "编辑自动任务",
     runNow: "立即运行",
     watchingHint: "正在关注：检查完成、有人评论或分支出现冲突时，Agent 会被唤醒。点击以停止。",
+    watch: "关注",
+    /** Names the pull request watch to start. */
+    startWatching: (number) => `关注 #${number}`,
+    /** Compact label for the pull request badge. */
+    prLabel: (number) => `PR #${number}`,
     /** Names the pull request by number. */
     pullRequest: (number) => `PR #${number}`,
     /** Names the selected pull request merge method. */

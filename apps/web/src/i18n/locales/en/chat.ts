@@ -747,6 +747,11 @@ export const chat = {
     runNow: "Run now",
     watchingHint:
       "Watching: the agent wakes when checks finish, someone comments, or the branch conflicts. Click to stop.",
+    watch: "Watch",
+    /** Names the pull request watch to start. */
+    startWatching: (number: number): string => `Watch #${number}`,
+    /** Compact label for the pull request badge. */
+    prLabel: (number: number): string => `PR #${number}`,
     /** Names the pull request by number. */
     pullRequest: (number: number): string => `Pull request #${number}`,
     /** Names the selected pull request merge method. */

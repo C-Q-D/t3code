@@ -7,6 +7,8 @@ const state = vi.hoisted(() => ({
   status: "success" as PullRequestCheck["status"],
   extraStatus: null as PullRequestCheck["status"] | null,
   perform: vi.fn(),
+  mergeability: "mergeable",
+  startHandoff: vi.fn(),
 }));
 
 vi.mock("~/state/entities", () => ({ useServerConfigs: () => new Map() }));
@@ -17,9 +19,10 @@ vi.mock("~/state/query", () => ({
     data: {
       number: 1,
       title: "Test PR",
+      url: "https://github.com/example/project/pull/1",
       state: "open",
       isDraft: false,
-      mergeability: "mergeable",
+      mergeability: state.mergeability,
       headBranch: "feature",
       baseBranch: "main",
       changedFiles: 1,
@@ -42,7 +45,7 @@ vi.mock("~/state/query", () => ({
 }));
 vi.mock("../pullRequest/usePullRequestActions", () => ({
   usePullRequestActionRunner: () => ({ actionPending: false, perform: state.perform }),
-  usePullRequestHandoffs: () => ({ handoff: null, startHandoff: vi.fn() }),
+  usePullRequestHandoffs: () => ({ handoff: null, startHandoff: state.startHandoff }),
 }));
 vi.mock("../ui/popover", () => ({
   Popover: ({ children }: { children: ReactNode }) => children,
@@ -75,6 +78,45 @@ afterEach(() => {
   vi.unstubAllGlobals();
   state.status = "success";
   state.extraStatus = null;
+  state.mergeability = "mergeable";
+  vi.clearAllMocks();
+});
+
+it("keeps conflict recovery available while preventing a merge and displaying the watch explanation", () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  state.mergeability = "conflicting";
+  state.status = "failure";
+  const stopWatching = vi.fn();
+  act(() => {
+    renderer = create(
+      <ThreadDetailsPrRow
+        environmentId={EnvironmentId.make("environment")}
+        pr={null}
+        number={1}
+        status={null}
+        project={null}
+        label="Test PR"
+        openAriaLabel="Open PR"
+        onOpen={vi.fn()}
+        onStopWatching={stopWatching}
+      />,
+    );
+  });
+  const buttons = renderer.root.findAllByType("button");
+  const merge = buttons.find((button) => button.children.includes("Merge"));
+  expect(merge?.props.disabled).toBe(true);
+  expect(buttons.some((button) => button.children.includes("Resolve"))).toBe(true);
+  const fix = buttons.find((button) => button.children.includes("Fix"));
+  expect(fix?.props.disabled).toBe(false);
+  act(() => fix!.props.onClick());
+  expect(state.startHandoff).toHaveBeenCalledWith("findings", expect.anything());
+  const explanation = buttons.find((button) =>
+    button.children.some((child) => typeof child === "string" && child.startsWith("Watching:")),
+  );
+  expect(explanation).toBeDefined();
+  act(() => explanation!.props.onClick());
+  expect(stopWatching).toHaveBeenCalledOnce();
+  expect(state.perform).not.toHaveBeenCalled();
 });
 
 it("requires a new merge click after passing checks become pending and pass again", () => {

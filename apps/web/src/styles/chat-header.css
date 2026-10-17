@@ -1,1 +1,26 @@
 /* DT1–DT2 对话页顶栏与详情卡：本线新增的令牌（@theme）与全局样式写在这里。 */
+
+@theme {
+  /* 对话页-8a.dc.html · F1：工作区、分支与 PR 的凹槽。 */
+  --color-thread-details-well: #151517;
+  /* 对话页-8a.dc.html · F1：冲突说明。 */
+  --color-thread-details-conflict: #ff9c5c;
+  /* 对话页-8a.dc.html · F1：节分隔线及其下沿反光。 */
+  --color-thread-details-divider: rgba(0, 0, 0, 0.6);
+  --shadow-thread-details-divider: 0 1px 0 rgba(255, 255, 255, 0.06);
+  /* 对话页-8a.dc.html · F1：关注说明白键。 */
+  --radius-thread-details-hint: 14px;
+}
+
+.thread-details-section-separated::before {
+  content: "";
+  height: --spacing(0.25);
+  margin-block: --spacing(0.5);
+  background: var(--color-thread-details-divider);
+  box-shadow: var(--shadow-thread-details-divider);
+}
+
+/* F1 keeps twelve pixels between controls even when their owner adds a wrapper. */
+[data-thread-details-card] [data-thread-panel-run-context] {
+  gap: --spacing(3);
+}

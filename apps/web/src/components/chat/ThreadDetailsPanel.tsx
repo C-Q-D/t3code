@@ -1,5 +1,8 @@
 /** Composes thread workspace, version control, automation and relationship details. */
 import { t } from "~/i18n";
+import { formatDiffCount } from "@t3tools/client-runtime/diff-count";
+import { useEnvironmentQuery } from "~/state/query";
+import { vcsEnvironment } from "~/state/vcs";
 import type {
   EditorId,
   EnvironmentId,
@@ -12,6 +15,7 @@ import type { DraftId } from "../../composerDraftStore";
 import { useT3ProjectFileScripts } from "../../hooks/useT3ProjectFileScripts";
 import { type EnvMode, type EnvironmentOption } from "../BranchToolbar.logic";
 import { BranchToolbar } from "../BranchToolbar";
+import { BranchToolbarBranchSelector } from "../BranchToolbarBranchSelector";
 import BaseGitActionsControl from "../GitActionsControl";
 import ProjectScriptsControl, {
   type NewProjectScriptInput,
@@ -23,9 +27,11 @@ import { OpenInPicker } from "./OpenInPicker";
 import { ThreadDetailsSection } from "./ThreadDetailsSection";
 import { ThreadAutomationsPanel } from "./ThreadAutomationsPanel";
 import { ThreadRelationshipsPanel } from "./ThreadRelationshipsControl";
+import { ThreadDetailsControl } from "./ThreadDetailsControl";
 
 const GitActionsControl = memo(BaseGitActionsControl);
 
+/** Detail-card context and existing environment, Git, script, and navigation callbacks. */
 export interface ThreadDetailsPanelProps extends Pick<
   ComponentProps<typeof ThreadDetailsCard>,
   "anchor" | "handle" | "onPresentationChange"
@@ -83,6 +89,13 @@ export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
     props.activeProjectScripts ? props.gitCwd : null,
   );
   const activeThreadRef = { environmentId: props.environmentId, threadId: props.threadId };
+  // The cached status query also feeds GitActionsControl; the section owns the header slot.
+  const statusQuery = useEnvironmentQuery(
+    props.gitCwd && props.activeProjectName
+      ? vcsEnvironment.status({ environmentId: props.environmentId, input: { cwd: props.gitCwd } })
+      : null,
+  );
+  const changes = statusQuery.data?.branchChanges ?? statusQuery.data?.workingTree;
   const branchToolbarProps = {
     showGitControls: props.isGitRepo,
     environmentId: props.environmentId,
@@ -119,9 +132,9 @@ export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
             headingId="thread-details-workspace-heading"
             title={t.chat.details.workspace}
             separated={false}
-            showHeading={false}
+            showHeading={density === "full"}
           >
-            <div className="flex flex-col">
+            <div className="flex flex-col gap-3">
               {density === "full" ? (
                 <BranchToolbar
                   layout="panel"
@@ -164,17 +177,51 @@ export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
             <ThreadDetailsSection
               headingId="thread-details-version-control-heading"
               title={t.chat.details.versionControl}
-              showHeading={false}
+              showHeading={density === "full"}
               separated={density === "full"}
+              actions={
+                props.isGitRepo && props.activeProjectName ? (
+                  <ThreadDetailsControl
+                    part="stat"
+                    aria-label={t.git.diff.changes}
+                    disabled={!props.onOpenChanges}
+                    onClick={props.onOpenChanges}
+                  >
+                    <span className="text-diff-addition-foreground">
+                      +{formatDiffCount(changes?.insertions ?? 0)}
+                    </span>
+                    <span className="text-diff-deletion-foreground">
+                      −{formatDiffCount(changes?.deletions ?? 0)}
+                    </span>
+                  </ThreadDetailsControl>
+                ) : undefined
+              }
             >
-              <div className="flex flex-col">
+              <div className="flex flex-col gap-3">
                 {props.isGitRepo ? (
-                  <BranchToolbar layout="panel" panelSection="branch" {...branchToolbarProps} />
-                ) : null}
-                {props.activeProjectName ? (
+                  <BranchToolbarBranchSelector
+                    displayMode="panel"
+                    {...branchToolbarProps}
+                    effectiveEnvModeOverride={props.envMode}
+                    panelActions={
+                      props.activeProjectName ? (
+                        <GitActionsControl
+                          displayMode="panel"
+                          compact={density !== "full"}
+                          showChangesRow={false}
+                          gitCwd={props.gitCwd}
+                          activeThreadRef={activeThreadRef}
+                          {...(props.draftId ? { draftId: props.draftId } : {})}
+                          {...(props.onOpenChanges ? { onOpenChanges: props.onOpenChanges } : {})}
+                        />
+                      ) : null
+                    }
+                  />
+                ) : props.activeProjectName ? (
                   <GitActionsControl
                     displayMode="panel"
                     compact={density !== "full"}
+                    showChangesRow={false}
                     gitCwd={props.gitCwd}
                     activeThreadRef={activeThreadRef}
                     {...(props.draftId ? { draftId: props.draftId } : {})}

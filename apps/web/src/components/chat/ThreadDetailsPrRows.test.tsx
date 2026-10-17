@@ -4,24 +4,44 @@ import { create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, expect, it, vi } from "vite-plus/test";
 
 const watchCommand = vi.hoisted(() => vi.fn());
+const watchState = vi.hoisted(() => ({ supported: true, permitted: true }));
+vi.mock("~/state/session", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("~/state/session")>()),
+  useEnvironmentScope: () => watchState.permitted,
+  readEnvironmentScope: () => watchState.permitted,
+}));
 
 vi.mock("./ThreadDetailsPrRow", () => ({
   ThreadDetailsPrRow: ({
     number,
     onStopWatching,
+    onStartWatching,
   }: {
     number: number;
     onStopWatching?: () => void;
+    onStartWatching?: () => void;
   }) => (
     <span
       data-row={String(number)}
       data-watched={onStopWatching ? "" : undefined}
       onClick={onStopWatching}
+      onDoubleClick={onStartWatching}
     />
   ),
 }));
-vi.mock("~/state/entities", () => ({ useProjects: () => [] }));
-vi.mock("~/state/threads", () => ({ threadEnvironment: {} }));
+vi.mock("~/state/entities", () => ({
+  useProjects: () => [],
+  useServerConfigs: () =>
+    new Map([
+      [
+        "environment",
+        { environment: { capabilities: { threadPullRequestWatch: watchState.supported } } },
+      ],
+    ]),
+}));
+vi.mock("~/state/threads", () => ({
+  threadEnvironment: {},
+}));
 vi.mock("~/state/use-atom-command", () => ({ useAtomCommand: () => watchCommand }));
 vi.mock("~/lib/openPullRequestLink", () => ({
   parseChangeRequestUrl: () => null,
@@ -64,6 +84,9 @@ let renderer: ReactTestRenderer;
 afterEach(() => {
   act(() => renderer?.unmount());
   vi.unstubAllGlobals();
+  watchState.supported = true;
+  watchState.permitted = true;
+  watchCommand.mockClear();
 });
 
 function render(links: ReadonlyArray<ThreadPullRequestLink>, current: ThreadPullRequestLink) {
@@ -161,4 +184,33 @@ it("lets only watched pull requests stop their watch", () => {
       watching: false,
     },
   });
+});
+
+it("starts an unwatched PR through the existing command in the thread's environment", () => {
+  render([bottom], bottom);
+  const row = renderer.root.findByProps({ "data-row": "1" });
+  expect(row.props.onDoubleClick).toBeTypeOf("function");
+  act(() => row.props.onDoubleClick());
+  expect(watchCommand).toHaveBeenCalledWith({
+    environmentId: "environment",
+    input: {
+      threadId: "thread",
+      host: "github.com",
+      repository: "pingdotgg/t3code",
+      number: 1,
+      watching: true,
+    },
+  });
+});
+
+it.each([
+  [false, true],
+  [true, false],
+])("offers no watch mutation when support=%s and permission=%s", (supported, permitted) => {
+  watchState.supported = supported;
+  watchState.permitted = permitted;
+  render([bottom], bottom);
+  const row = renderer.root.findByProps({ "data-row": "1" });
+  expect(row.props.onDoubleClick).toBeUndefined();
+  expect(row.props.onClick).toBeUndefined();
 });

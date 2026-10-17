@@ -125,7 +125,7 @@ export function ThreadDetailsCard({
   const card = (
     <div
       className={cn(
-        "dropdown-glass isolate contain-paint grid max-h-full grid-rows-[minmax(0,1fr)] overflow-hidden rounded-3xl",
+        "surface-glass isolate grid max-h-full grid-rows-[minmax(0,1fr)] overflow-hidden rounded-slab shadow-raise-detail",
         mode === "popover" &&
           "max-h-[min(calc(100dvh-6.5rem),calc(var(--available-height,100dvh)-1rem))]",
       )}
@@ -133,7 +133,9 @@ export function ThreadDetailsCard({
       data-thread-details-card
     >
       <ScrollArea scrollFade className="min-h-0">
-        <div ref={setContentElement}>{children(density)}</div>
+        <div ref={setContentElement} className="flex flex-col gap-3 p-4">
+          {children(density)}
+        </div>
       </ScrollArea>
     </div>
   );

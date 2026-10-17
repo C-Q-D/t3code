@@ -1,34 +1,11 @@
-/** Displays a linked pull request and the action that can unblock it. */
+/** Presents an F1 PR well and watch explanation while retaining existing host actions and gates. */
 import { t } from "~/i18n";
 import { ThreadDetailsControl } from "./ThreadDetailsControl";
 import { PullRequestGlyph } from "../pullRequest/pullRequestIcons";
-/**
- * The thread details panel's pull request row: what the thread's pull request is, and the one
- * thing worth doing to it right now.
- *
- * The row itself opens the pull request in the right panel, exactly as it always has. Once the
- * host answers, the title gets the full first line and a second line carries the number, checks,
- * watch, and a single action slot, ranked by what unblocks the merge next: "Resolve" on
- * conflicts, "Ready" on a draft, "Fix" under failing checks, and "Merge" only once the branch is
- * clean and its checks pass. While checks run the slot reports
- * that instead — a merge offered mid-run would race the very runs that gate it. Everything else
- * the host knows (title, state, checks tally, diff size) lives in the row's tooltip, so a hover
- * answers what previously took opening the panel.
- *
- * Until the detail arrives — or where pull requests are not supported at all — the row renders
- * from the linked snapshot or branch summary, or just the link when status is unavailable.
- */
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import type { EnvironmentId, ProjectId, PullRequestRef } from "@t3tools/contracts";
 import { sourceControlRepositorySelector } from "@t3tools/shared/sourceControl";
-import {
-  ArrowUpRightIcon,
-  EyeIcon,
-  EyeOffIcon,
-  FileDiffIcon,
-  GitBranchIcon,
-  TriangleAlertIcon,
-} from "lucide-react";
+import { EyeIcon, FileDiffIcon, GitBranchIcon, TriangleAlertIcon } from "lucide-react";
 import { useState, type MouseEvent as ReactMouseEvent } from "react";
 
 import { useLiveRefresh } from "~/hooks/useLiveRefresh";
@@ -59,11 +36,7 @@ import {
   usePullRequestActionRunner,
   usePullRequestHandoffs,
 } from "../pullRequest/usePullRequestActions";
-import {
-  ChangeRequestStatusIcon,
-  type PrStatusIndicator,
-  type ThreadPr,
-} from "../ThreadStatusIndicators";
+import { type PrStatusIndicator, type ThreadPr } from "../ThreadStatusIndicators";
 import {
   AlertDialog,
   AlertDialogClose,
@@ -74,19 +47,15 @@ import {
   AlertDialogTitle,
 } from "../ui/alert-dialog";
 import { Button } from "../ui/button";
+import { Badge } from "../ui/badge";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
-import {
-  THREAD_DETAILS_PANEL_ICON_CLASS,
-  THREAD_DETAILS_PANEL_LABEL_CLASS,
-  THREAD_DETAILS_PANEL_SPLIT_GROUP_CLASS,
-  THREAD_DETAILS_PANEL_SPLIT_SEPARATOR_CLASS,
-} from "./threadDetailsPanelStyles";
 
 /**
  * Renders one pull-request row with status and permission-aware host actions.
  * @param props - Required environmentId, PR data, number, labels, and open callback. reference may
  * be null or omitted; status and project may be null when unavailable. Optional onActed refreshes
- * stale status after a mutation, and onStopWatching ends the server watch.
+ * stale status after a mutation. Watch callbacks start/stop the existing command; isWatching
+ * preserves persisted watch presentation when mutation permission is unavailable.
  * @returns The pull-request row element; never null. Host actions execute only through user
  * interaction.
  */
@@ -102,6 +71,8 @@ export function ThreadDetailsPrRow({
   onOpen,
   onActed,
   onStopWatching,
+  onStartWatching,
+  isWatching,
 }: {
   environmentId: EnvironmentId;
   pr: ThreadPr;
@@ -117,6 +88,10 @@ export function ThreadDetailsPrRow({
   onActed?: () => void;
   /** Set while the server watches this pull request for the thread; stops the watch. */
   onStopWatching?: (() => void) | undefined;
+  /** Starts the existing thread watch when supported and permitted by the destination server. */
+  onStartWatching?: (() => void) | undefined;
+  /** Persisted watch state remains visible even when the current connection cannot mutate it. */
+  isWatching?: boolean | undefined;
 }) {
   const serverConfigs = useServerConfigs();
   const supportsPullRequests =
@@ -203,7 +178,7 @@ export function ThreadDetailsPrRow({
 
   const startFixChecks = () => {
     if (detail === null) return;
-    // The compact row fetches no conversation, so the handoff carries the failing checks alone;
+    // The details card fetches no conversation, so the handoff carries the failing checks alone;
     // review threads keep arriving through the full panel's richer version of this action.
     void startHandoff(
       "findings",
@@ -229,20 +204,6 @@ export function ThreadDetailsPrRow({
           state: detail.state,
           isDraft: detail.isDraft,
         });
-  const icon = statePresentation ? (
-    <statePresentation.Icon
-      aria-hidden
-      className={cn("size-4 shrink-0", statePresentation.toneClassName)}
-    />
-  ) : pr && status ? (
-    <ChangeRequestStatusIcon
-      state={pr.state}
-      className={cn(THREAD_DETAILS_PANEL_ICON_CLASS, status.colorClass)}
-    />
-  ) : (
-    <PullRequestGlyph.pullRequest className={THREAD_DETAILS_PANEL_ICON_CLASS} />
-  );
-
   // Everything the host reported, at a glance. The rows stay short; the tooltip is where the
   // rest of the answer lives — styled like the sidebar's thread tooltip, title above icon-led
   // detail rows, so the two read as one family.
@@ -315,161 +276,137 @@ export function ThreadDetailsPrRow({
       </TooltipPopup>
     );
 
-  const trailingAction =
-    rowAction === "resolve"
-      ? {
-          label: t.chat.details.resolve,
-          pendingLabel: t.chat.details.preparing,
-          pending: handoff === "conflicts",
-          destructive: true,
-          suffix: <ArrowUpRightIcon aria-hidden className="size-3 shrink-0" />,
-          tooltip: t.chat.details.checkTheBranchOutAndResolveThe,
-          onClick: startResolveConflicts,
-        }
-      : rowAction === "ready"
-        ? {
-            label: t.chat.details.ready,
-            pendingLabel: t.chat.details.marking,
-            pending: actionPending,
-            destructive: false,
-            suffix: null,
-            tooltip: t.chat.details.markThisPullRequestAsReadyFor,
-            onClick: () => void perform("ready"),
-          }
-        : rowAction === "fix"
-          ? {
-              label: t.chat.details.fix,
-              pendingLabel: t.chat.details.preparing,
-              pending: handoff === "findings",
-              destructive: true,
-              suffix: <ArrowUpRightIcon aria-hidden className="size-3 shrink-0" />,
-              tooltip: t.chat.details.fixTheFailingChecksInANew,
-              onClick: startFixChecks,
-            }
-          : rowAction === "merge"
-            ? {
-                label: t.chat.details.merge,
-                pendingLabel: t.chat.details.merging,
-                pending: actionPending,
-                destructive: false,
-                suffix: null,
-                tooltip: t.chat.details.mergeMethod(selectedMergeMethod),
-                onClick: () => setConfirmingMerge(true),
-              }
-            : null;
-
-  // The server ends a watch when the pull request closes, so only an open one shows the eye.
   const watching =
-    onStopWatching !== undefined && (detail?.state ?? pr?.state ?? "open") === "open";
-  const watchControl = (part: "secondary" | "icon") =>
-    watching ? (
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <ThreadDetailsControl
-              type="button"
-              variant="ghost"
-              size="sm"
-              part={part}
-              className="group/watch"
-              aria-label={t.chat.details.stopWatching(number)}
-              onClick={onStopWatching}
-            />
-          }
-        >
-          <EyeIcon
-            aria-hidden
-            className={cn(part === "icon" ? "size-3.5" : "size-4", "group-hover/watch:hidden")}
-          />
-          <EyeOffIcon
-            aria-hidden
-            className={cn(
-              part === "icon" ? "size-3.5" : "size-4",
-              "hidden group-hover/watch:block",
-            )}
-          />
-        </TooltipTrigger>
-        <TooltipPopup side="top">{t.chat.details.watchingHint}</TooltipPopup>
-      </Tooltip>
-    ) : null;
-
-  const openRow = (text: string, part: "row" | "primary") => (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <ThreadDetailsControl
-            type="button"
-            variant="ghost"
-            size="sm"
-            part={part}
-            aria-label={openAriaLabel}
-            onClick={onOpen}
-          />
-        }
-      >
-        {icon}
-        <span className={cn("min-w-0 flex-1 truncate text-left", THREAD_DETAILS_PANEL_LABEL_CLASS)}>
-          {text}
-        </span>
-      </TooltipTrigger>
-      {rowTooltip}
-    </Tooltip>
-  );
-
+    (isWatching ?? onStopWatching !== undefined) &&
+    (detail?.state ?? pr?.state ?? "open") === "open";
+  const isOpen = (detail?.state ?? pr?.state ?? "open") === "open";
+  const busy = actionPending || handoff !== null;
   const showChecks = detail !== null && checksRollup !== null && !conflicting && !detail.isDraft;
+  const badgeVariant =
+    (detail?.state ?? pr?.state) === "merged"
+      ? "accent"
+      : (detail?.state ?? pr?.state) === "closed"
+        ? "danger"
+        : (detail?.isDraft ?? pr?.isDraft)
+          ? "neutral"
+          : "success";
+  const PrIcon = statePresentation?.Icon ?? PullRequestGlyph.pullRequest;
 
   return (
     <>
-      {detail !== null && (showChecks || trailingAction !== null || watching) ? (
-        // Two lines so the title keeps the full row width: the number, checks, watch, and the
-        // next action sit underneath, aligned with the title text. The second line hugs its title
-        // and the block keeps space below, so stacked pull requests read as separate pairs.
-        <div className="pb-2">
-          {openRow(detail.title, "row")}
-          <div className="-mt-1 flex h-6 min-w-0 items-center gap-0.5 ps-9 pe-1 text-xs text-muted-foreground">
-            <span className="me-1 shrink-0 tabular-nums">#{number}</span>
-            {showChecks && checksRollup !== null ? (
-              <PullRequestChecksPopover
-                checksState={checksRollup}
-                checks={detail.checks}
-                variant="count"
-                render={<ThreadDetailsControl part="meta" />}
-              />
-            ) : null}
-            {watchControl("icon")}
-            <span className="flex-1" />
-            {trailingAction ? (
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <ThreadDetailsControl
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      part="meta"
-                      tone={trailingAction.destructive ? "destructive" : "primary"}
-                      disabled={actionPending || handoff !== null}
-                      onClick={trailingAction.onClick}
-                    />
-                  }
-                >
-                  {trailingAction.pending ? trailingAction.pendingLabel : trailingAction.label}
-                  {trailingAction.suffix}
-                </TooltipTrigger>
-                <TooltipPopup side="top">{trailingAction.tooltip}</TooltipPopup>
-              </Tooltip>
-            ) : null}
+      <div className="flex min-w-0 flex-col gap-2 rounded-card-row bg-thread-details-well p-2.5 shadow-well-control">
+        <div className="flex min-w-0 items-center justify-between gap-2">
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <ThreadDetailsControl
+                  part="icon"
+                  className="h-auto w-auto"
+                  aria-label={openAriaLabel}
+                  onClick={onOpen}
+                />
+              }
+            >
+              <Badge variant={badgeVariant}>
+                <PrIcon aria-hidden />
+                {t.chat.details.prLabel(number)}
+              </Badge>
+            </TooltipTrigger>
+            {rowTooltip}
+          </Tooltip>
+          {detail ? (
+            <PullRequestDiffStat additions={detail.additions} deletions={detail.deletions} />
+          ) : null}
+        </div>
+        {conflicting && detail ? (
+          <div className="flex items-center gap-1.5 text-secondary-copy text-thread-details-conflict">
+            <TriangleAlertIcon aria-hidden className="size-3.25 shrink-0" />
+            {t.chat.details.conflicts(detail.baseBranch)}
           </div>
-        </div>
-      ) : watching ? (
-        <div className={THREAD_DETAILS_PANEL_SPLIT_GROUP_CLASS}>
-          {openRow(label, "primary")}
-          <span aria-hidden="true" className={THREAD_DETAILS_PANEL_SPLIT_SEPARATOR_CLASS} />
-          {watchControl("secondary")}
-        </div>
-      ) : (
-        openRow(label, "row")
-      )}
+        ) : null}
+        {detail === null ? (
+          <span className="truncate text-secondary-copy text-secondary-label">{label}</span>
+        ) : null}
+        {showChecks && checksRollup !== null && detail ? (
+          <PullRequestChecksPopover
+            checksState={checksRollup}
+            checks={detail.checks}
+            variant="count"
+            render={<ThreadDetailsControl part="meta" />}
+          />
+        ) : null}
+        {isOpen ? (
+          <div className="flex flex-wrap gap-1.5">
+            {conflicting ? (
+              <ThreadDetailsControl
+                part="meta"
+                tone={rowAction === "resolve" ? "primary" : "default"}
+                disabled={busy}
+                onClick={startResolveConflicts}
+              >
+                {handoff === "conflicts" ? t.chat.details.preparing : t.chat.details.resolve}
+              </ThreadDetailsControl>
+            ) : null}
+            {conflicting || rowAction === "fix" ? (
+              <ThreadDetailsControl
+                part="meta"
+                tone={rowAction === "fix" ? "primary" : "default"}
+                disabled={busy || checksState !== "failing"}
+                onClick={startFixChecks}
+              >
+                {handoff === "findings" ? t.chat.details.preparing : t.chat.details.fix}
+              </ThreadDetailsControl>
+            ) : null}
+            {rowAction === "ready" ? (
+              <ThreadDetailsControl
+                part="meta"
+                tone="primary"
+                disabled={busy}
+                onClick={() => void perform("ready")}
+              >
+                {actionPending ? t.chat.details.marking : t.chat.details.ready}
+              </ThreadDetailsControl>
+            ) : null}
+            {detail ? (
+              <ThreadDetailsControl
+                part="meta"
+                tone={rowAction === "merge" ? "primary" : "default"}
+                disabled={busy || rowAction !== "merge"}
+                onClick={() => setConfirmingMerge(true)}
+              >
+                {actionPending && rowAction === "merge"
+                  ? t.chat.details.merging
+                  : t.chat.details.merge}
+              </ThreadDetailsControl>
+            ) : null}
+            <ThreadDetailsControl
+              part="watch"
+              aria-label={
+                watching
+                  ? t.chat.details.stopWatching(number)
+                  : t.chat.details.startWatching(number)
+              }
+              aria-pressed={watching}
+              disabled={busy || (watching ? !onStopWatching : !onStartWatching)}
+              onClick={watching ? onStopWatching : onStartWatching}
+            >
+              <EyeIcon aria-hidden className="size-3.25" />
+              {t.chat.details.watch}
+            </ThreadDetailsControl>
+          </div>
+        ) : null}
+      </div>
+      {watching ? (
+        <button
+          type="button"
+          aria-label={t.chat.details.stopWatching(number)}
+          onClick={onStopWatching}
+          disabled={!onStopWatching}
+          className="w-full cursor-pointer rounded-thread-details-hint bg-primary px-3 py-2.5 text-left text-secondary-copy leading-relaxed text-primary-foreground text-shadow-none shadow-primary-toast focus-visible:inset-shadow-focus"
+        >
+          {t.chat.details.watchingHint}
+        </button>
+      ) : null}
       {rowAction === "merge" ? (
         <AlertDialog open={confirmingMerge} onOpenChange={(open) => setConfirmingMerge(open)}>
           <AlertDialogPopup>

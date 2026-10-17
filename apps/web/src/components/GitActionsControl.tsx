@@ -122,6 +122,7 @@ import { sourceControlClients } from "@t3tools/client-runtime/source-control-cli
 import { formatDiffCount } from "@t3tools/client-runtime/diff-count";
 import { useOpenLink } from "~/browser/useOpenLink";
 
+/** Repository action target and presentation; panel-specific options do not alter toolbar rendering. */
 interface GitActionsControlProps {
   presentation?: "toolbar" | "menu";
   gitCwd: string | null;
@@ -134,6 +135,8 @@ interface GitActionsControlProps {
   onOpenPullRequest?: ((number: number) => void) | undefined;
   displayMode?: "toolbar" | "panel";
   compact?: boolean;
+  /** The details section can place the existing changes action in its heading instead. */
+  showChangesRow?: boolean;
   onOpenChanges?: () => void;
 }
 
@@ -1038,6 +1041,7 @@ export default function GitActionsControl({
   draftId,
   displayMode = "toolbar",
   compact = false,
+  showChangesRow = true,
   onOpenChanges,
 }: GitActionsControlProps) {
   const isPanel = displayMode === "panel";
@@ -1808,7 +1812,99 @@ export default function GitActionsControl({
             {initAction.isPending ? t.git.actions.initializing : t.git.actions.initializeGit}
           </span>
         </ThreadDetailsControl>
-      ) : compact && !gitActionProgress && !visibleInlineSuccess ? null : (
+      ) : compact && !gitActionProgress && !visibleInlineSuccess ? null : isPanel &&
+        !gitActionProgress &&
+        !visibleInlineSuccess ? (
+        <div className="flex flex-col gap-3">
+          {gitStatusForActions?.hasWorkingTreeChanges ? (
+            <>
+              <div className="flex gap-1.5">
+                <ThreadDetailsControl
+                  part="action"
+                  className="flex-5"
+                  disabled={
+                    !canWriteSourceControl ||
+                    isGitActionRunning ||
+                    gitActionMenuItems.find((item) => item.id === "commit")?.disabled !== false
+                  }
+                  onClick={() => {
+                    const item = gitActionMenuItems.find((candidate) => candidate.id === "commit");
+                    if (item) openDialogForMenuItem(item);
+                  }}
+                >
+                  {t.git.actions.commit}
+                </ThreadDetailsControl>
+                <ThreadDetailsControl
+                  part="action"
+                  tone="primary"
+                  className="flex-8"
+                  disabled={
+                    !canWriteSourceControl ||
+                    isGitActionRunning ||
+                    !hasPrimaryRemote ||
+                    gitStatusForActions.refName === null
+                  }
+                  onClick={() => void runGitActionWithToast({ action: "commit_push" })}
+                >
+                  {t.git.actions.commitPush}
+                </ThreadDetailsControl>
+              </div>
+              {gitStatusForActions.pr?.state !== "open" ? (
+                <ThreadDetailsControl
+                  part="outline"
+                  disabled={
+                    !canWriteSourceControl ||
+                    isGitActionRunning ||
+                    !hasPrimaryRemote ||
+                    gitStatusForActions.refName === null
+                  }
+                  onClick={() => void runGitActionWithToast({ action: "commit_push_pr" })}
+                >
+                  <SourceControlIcon aria-hidden className="size-3.5" />
+                  {t.git.actions.commitPushRequest(changeRequestTerminology.shortLabel)}
+                </ThreadDetailsControl>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <ThreadDetailsControl
+                part="action"
+                className="w-full"
+                disabled={
+                  !canWriteSourceControl ||
+                  isGitActionRunning ||
+                  quickAction.disabled ||
+                  !!quickActionDisabledReason
+                }
+                onClick={runQuickAction}
+              >
+                {quickAction.disabled && gitStatusForActions?.pr?.state === "open"
+                  ? t.git.actions.push
+                  : quickAction.label}
+              </ThreadDetailsControl>
+              {quickActionDisabledReason ? (
+                <p className="px-1.5 text-meta-large text-muted-foreground">
+                  {quickActionDisabledReason}
+                </p>
+              ) : null}
+            </>
+          )}
+          <Menu
+            onOpenChange={(open) => {
+              if (open) requestVcsStatusRefresh(refreshVcsStatus, activeEnvironmentId, gitCwd);
+            }}
+          >
+            <MenuTrigger
+              render={<ThreadDetailsControl part="meta" />}
+              disabled={isGitActionRunning}
+            >
+              {t.git.actions.gitActionOptions}
+              <ChevronDownIcon aria-hidden className="size-3.5" />
+            </MenuTrigger>
+            <MenuPopup align="end">{gitItems}</MenuPopup>
+          </Menu>
+        </div>
+      ) : (
         <ActionGroup
           role="group"
           aria-label={t.git.actions.gitActions}
@@ -1949,7 +2045,7 @@ export default function GitActionsControl({
         </ActionGroup>
       )}
 
-      {isPanel && isRepo ? (
+      {isPanel && isRepo && showChangesRow ? (
         <ThreadDetailsControl
           type="button"
           variant="ghost"

@@ -1,5 +1,6 @@
 /** Displays linked pull requests with expandable additional rows. */
 import { t } from "~/i18n";
+import { AuthOrchestrationOperateScope } from "@t3tools/contracts";
 import { ThreadDetailsControl } from "./ThreadDetailsControl";
 import type { EnvironmentId, ScopedThreadRef, ThreadPullRequestLink } from "@t3tools/contracts";
 import {
@@ -12,9 +13,10 @@ import { useState, type ComponentProps, type MouseEvent as ReactMouseEvent } fro
 
 import { findProjectOnChangeRequestHost, parseChangeRequestUrl } from "~/lib/openPullRequestLink";
 
-import { useProjects } from "~/state/entities";
+import { useProjects, useServerConfigs } from "~/state/entities";
 import { threadEnvironment } from "~/state/threads";
 import { useAtomCommand } from "~/state/use-atom-command";
+import { readEnvironmentScope, useEnvironmentScope } from "~/state/session";
 
 import { pullRequestListLines } from "../pullRequest/pullRequestListLines";
 import { MorphIcon } from "~/components/MorphIcon";
@@ -22,18 +24,27 @@ import { linkedPullRequestSnapshotStatus, prStatusIndicator } from "../ThreadSta
 
 import { ThreadDetailsPrRow } from "./ThreadDetailsPrRow";
 
+/**
+ * Resolves a linked PR's project and snapshot without changing its watch state or navigation.
+ * @param props - Destination environment, persisted link, open callback and optional watch/actions.
+ * @returns One details row, using the snapshot until host details arrive.
+ */
 function ThreadDetailsPrLinkRow({
   environmentId,
   link,
   onOpen,
   onActed,
   onStopWatching,
+  onStartWatching,
+  isWatching,
 }: {
   environmentId: EnvironmentId;
   link: ThreadPullRequestLink;
   onOpen: (event: ReactMouseEvent<HTMLElement>) => void;
   onActed?: (() => void) | undefined;
   onStopWatching?: (() => void) | undefined;
+  onStartWatching?: (() => void) | undefined;
+  isWatching?: boolean | undefined;
 }) {
   const projects = useProjects();
   const parsed = parseChangeRequestUrl(link.url);
@@ -58,6 +69,8 @@ function ThreadDetailsPrLinkRow({
       openAriaLabel={link.url}
       onOpen={onOpen}
       onStopWatching={onStopWatching}
+      onStartWatching={onStartWatching}
+      isWatching={isWatching}
       {...(onActed ? { onActed } : {})}
     />
   );
@@ -84,11 +97,20 @@ export function ThreadDetailsPrRows({
 }) {
   const [expanded, setExpanded] = useState(false);
   const watch = useAtomCommand(threadEnvironment.watchPullRequest, { reportFailure: true });
-  // Only watched links get the eye; the row hides it once the server records the stop.
-  const stopWatching = (link: ThreadPullRequestLink | null) =>
-    link?.watch === undefined
+  const permitted = useEnvironmentScope(threadRef.environmentId, AuthOrchestrationOperateScope);
+  const supported =
+    useServerConfigs().get(threadRef.environmentId)?.environment.capabilities
+      .threadPullRequestWatch === true;
+  // Both mutations target this thread's environment; an unsupported server gets no command.
+  const setWatching = (link: ThreadPullRequestLink | null, watching: boolean) =>
+    !link ||
+    !supported ||
+    !permitted ||
+    link.snapshot?.state === "closed" ||
+    link.snapshot?.state === "merged"
       ? undefined
-      : () =>
+      : () => {
+          if (!readEnvironmentScope(threadRef.environmentId, AuthOrchestrationOperateScope)) return;
           void watch({
             environmentId: threadRef.environmentId,
             input: {
@@ -96,10 +118,16 @@ export function ThreadDetailsPrRows({
               host: link.host,
               repository: link.repository,
               number: link.number,
-              watching: false,
+              watching,
             },
           });
-  const currentRow = <ThreadDetailsPrRow {...row} onStopWatching={stopWatching(currentLink)} />;
+        };
+  const watchProps = (link: ThreadPullRequestLink | null) => ({
+    isWatching: link?.watch !== undefined,
+    onStartWatching: link?.watch === undefined ? setWatching(link, true) : undefined,
+    onStopWatching: link?.watch === undefined ? undefined : setWatching(link, false),
+  });
+  const currentRow = <ThreadDetailsPrRow {...row} {...watchProps(currentLink)} />;
   const rest =
     currentLink === null
       ? []
@@ -119,7 +147,7 @@ export function ThreadDetailsPrRows({
               link={link}
               onOpen={(event) => onOpenLink(event, link.url)}
               onActed={row.onActed}
-              onStopWatching={stopWatching(link)}
+              {...watchProps(link)}
             />
           ))
         : null}

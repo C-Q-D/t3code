@@ -6,6 +6,7 @@ import { useAtomValue } from "@effect/atom-react";
 import { ThreadDetailsControl } from "./ThreadDetailsControl";
 import { ThreadHoverCardPopup } from "../ThreadHoverCard";
 import { ThreadDetailsSection } from "./ThreadDetailsSection";
+import { Badge } from "../ui/badge";
 import { CollapsibleSectionHeader, SectionHeaderStatus } from "../ui/collapsible-section-header";
 import { SubagentTooltipContent } from "./SubagentTooltipContent";
 import { PullRequestGlyph } from "../pullRequest/pullRequestIcons";
@@ -591,14 +592,12 @@ export function ThreadRelationshipsPanel(props: {
                       <AgentElapsed agent={agent} compact />
                     </span>
                   ) : !isMergeTarget ? (
-                    <span
-                      className={
-                        workflowGroup
-                          ? "sr-only"
-                          : `shrink-0 text-2xs ${failed ? "text-destructive" : "text-muted-foreground"} ${trailingVisibilityClass}`
-                      }
-                    >
-                      {threadRelationshipStatusLabel(rowStatus)}
+                    <span className={workflowGroup ? "sr-only" : trailingVisibilityClass}>
+                      <Badge
+                        variant={failed ? "danger" : rowStatus === "running" ? "info" : "neutral"}
+                      >
+                        {threadRelationshipStatusLabel(rowStatus)}
+                      </Badge>
                     </span>
                   ) : null}
                 </>
@@ -646,7 +645,10 @@ export function ThreadRelationshipsPanel(props: {
                 );
               }
               return (
-                <li key={threadId} className="group relative flex h-8 items-center rounded-lg">
+                <li
+                  key={threadId}
+                  className="group relative flex h-9.5 items-center rounded-full bg-thread-details-well shadow-well-control"
+                >
                   {isMergeTarget ? (
                     <div className={THREAD_DETAILS_PANEL_SPLIT_GROUP_CLASS}>
                       <Tooltip>

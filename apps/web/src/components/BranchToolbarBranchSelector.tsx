@@ -1,3 +1,4 @@
+/** Selects checkout refs and presents linked PRs; panel-only controls reuse the same actions. */
 import { t } from "~/i18n";
 import { ThreadDetailsControl } from "./chat/ThreadDetailsControl";
 import { ComposerContextLabel } from "./ComposerContextLabel";
@@ -17,7 +18,7 @@ import {
   type VcsRef,
   type ThreadId,
 } from "@t3tools/contracts";
-import { ChevronDownIcon, GitBranchIcon } from "lucide-react";
+import { ChevronDownIcon, CopyIcon, GitBranchIcon } from "lucide-react";
 import {
   useCallback,
   useDeferredValue,
@@ -29,6 +30,7 @@ import {
   useTransition,
   type MouseEvent as ReactMouseEvent,
   type Ref,
+  type ReactNode,
 } from "react";
 
 import { useComposerDraftStore, type DraftId } from "../composerDraftStore";
@@ -81,6 +83,8 @@ interface BranchToolbarBranchSelectorProps {
   ref?: Ref<BranchToolbarBranchSelectorHandle>;
   className?: string;
   displayMode?: "toolbar" | "panel";
+  /** Detail-card Git actions appear between the branch well and its linked pull requests. */
+  panelActions?: ReactNode;
   environmentId: EnvironmentId;
   threadId: ThreadId;
   draftId?: DraftId;
@@ -98,11 +102,17 @@ function toBranchActionErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : t.chat.branchToolbar.genericError;
 }
 
+/**
+ * Selects a ref for the supplied environment/thread, with existing checkout and PR navigation.
+ * @param props - Checkout state and callbacks; panelActions is an optional detail-card slot only.
+ * @returns The ref picker and linked PRs. Copying reuses the context-menu clipboard handler.
+ */
 export function BranchToolbarBranchSelector({
   forceNewWorktree = false,
   ref,
   className,
   displayMode = "toolbar",
+  panelActions,
   environmentId,
   threadId,
   draftId,
@@ -750,7 +760,7 @@ export function BranchToolbarBranchSelector({
       <div
         className={cn(
           "flex min-w-0",
-          displayMode === "panel" ? "w-full flex-col items-stretch" : "items-center gap-1",
+          displayMode === "panel" ? "w-full flex-col items-stretch gap-3" : "items-center gap-1",
           className,
         )}
       >
@@ -769,7 +779,11 @@ export function BranchToolbarBranchSelector({
           />
         ) : null}
         <span
-          className="flex min-w-0"
+          className={cn(
+            "flex min-w-0",
+            displayMode === "panel" &&
+              "items-center rounded-full bg-thread-details-well pe-1.5 shadow-well-control",
+          )}
           onMouseDownCapture={(event) => {
             if (event.button !== 0 || event.ctrlKey) {
               event.stopPropagation();
@@ -780,7 +794,7 @@ export function BranchToolbarBranchSelector({
           <ComboboxTrigger
             render={
               displayMode === "panel" ? (
-                <ThreadDetailsControl part="select" />
+                <ThreadDetailsControl part="branch" className="flex-1" />
               ) : (
                 <ComposerControl size="xs" />
               )
@@ -805,7 +819,20 @@ export function BranchToolbarBranchSelector({
               <ChevronDownIcon className="size-3 shrink-0 opacity-50" />
             ) : null}
           </ComboboxTrigger>
+          {displayMode === "panel" ? (
+            <ThreadDetailsControl
+              part="icon"
+              aria-label={t.chat.branchToolbar.copyBranch}
+              disabled={!resolvedActiveBranch}
+              onClick={() => {
+                if (resolvedActiveBranch) copyBranchName(resolvedActiveBranch);
+              }}
+            >
+              <CopyIcon aria-hidden className="size-3.5" />
+            </ThreadDetailsControl>
+          ) : null}
         </span>
+        {displayMode === "panel" ? panelActions : null}
         {displayMode === "panel" && prNumber !== undefined && prUrl !== undefined ? (
           <ThreadDetailsPrRows
             threadRef={threadRef}

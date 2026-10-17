@@ -1,8 +1,13 @@
+/** Shared F1 section headings, spacing and recessed dividers for thread details. */
 import type { ComponentProps, ReactNode } from "react";
 
 import { cn } from "../../lib/utils";
 
-/** Sections share header and content insets in both the sidebar and popover. */
+/**
+ * Groups F1 detail content under one accessible heading in either card presentation.
+ * @param props - Heading ID/title, optional actions and content; separated adds the F1 divider.
+ * @returns A section labelled by its visible heading, or directly by title when hidden.
+ */
 export function ThreadDetailsSection({
   headingId,
   title,
@@ -23,17 +28,14 @@ export function ThreadDetailsSection({
       {...props}
       aria-labelledby={showHeading ? headingId : undefined}
       aria-label={showHeading ? undefined : title}
-      className={cn("px-2 pt-2 pb-2.5", separated && "border-t border-border/65")}
+      className={cn("flex min-w-0 flex-col gap-3", separated && "thread-details-section-separated")}
     >
       <div
-        className={cn(
-          "mb-1 flex min-h-8 min-w-0 items-center justify-between gap-2 px-1.5",
-          !showHeading && "hidden",
-        )}
+        className={cn("flex min-w-0 items-center justify-between gap-2", !showHeading && "hidden")}
       >
         <h3
           id={headingId}
-          className="min-w-0 truncate text-2xs font-medium text-muted-foreground select-none"
+          className="min-w-0 truncate font-serif text-card-title font-bold text-foreground select-none"
         >
           {title}
         </h3>
