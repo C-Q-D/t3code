@@ -10,6 +10,7 @@ import { useState, type ReactNode } from "react";
 
 import { AgentElapsed } from "./AgentElapsed";
 import { SubagentTooltipContent } from "./SubagentTooltipContent";
+import { getSubagentPixelIconName } from "../icons/subagentPixelIcon";
 import { ThreadHoverCardPopup } from "../ThreadHoverCard";
 import { ThreadRelationshipIcon } from "./ThreadRelationshipIcon";
 import { cn } from "../../lib/utils";
@@ -55,9 +56,10 @@ function phaseStatusLabel(phase: SubagentWorkflowGroup["phases"][number]) {
   return phase.state === "done" ? "done" : "notStarted";
 }
 
-/** Members run under the coordinator's provider, so they share its glyph. */
+/** Members share the coordinator's provider and use their own stable child character. */
 function WorkflowMemberRow({
   member,
+  siblings,
   providerInstanceId,
   provider,
   providers,
@@ -66,6 +68,7 @@ function WorkflowMemberRow({
   isThreadAvailable,
 }: {
   member: RuntimeSubagent;
+  siblings: Parameters<typeof getSubagentPixelIconName>[2];
   providerInstanceId: ProviderInstanceId;
   provider: ServerProvider | undefined;
   providers: ReadonlyArray<ServerProvider> | undefined;
@@ -75,6 +78,7 @@ function WorkflowMemberRow({
 }) {
   const threadId = member.childThreadId;
   const canOpen = threadId !== null && isThreadAvailable(threadId);
+  const pixelIconName = getSubagentPixelIconName(driver, member.id, siblings);
   return (
     <li>
       <Tooltip>
@@ -89,7 +93,12 @@ function WorkflowMemberRow({
             />
           }
         >
-          <ThreadRelationshipIcon driver={driver} provider={provider} status={member.status} />
+          <ThreadRelationshipIcon
+            driver={driver}
+            provider={provider}
+            pixelIconName={pixelIconName}
+            status={member.status}
+          />
           <span className="min-w-0 flex-1 truncate">{member.title}</span>
           <span className="sr-only">{t.app.subagent.status[member.status] ?? member.status}</span>
           {member.startedAt ? (
@@ -100,6 +109,7 @@ function WorkflowMemberRow({
         </TooltipTrigger>
         <ThreadHoverCardPopup side="left">
           <SubagentTooltipContent
+            pixelIconName={pixelIconName}
             title={member.title}
             model={member.model}
             providerInstanceId={providerInstanceId}
@@ -121,6 +131,7 @@ function WorkflowMemberRow({
 /** Renders a workflow tree; thread navigation and stopping are delegated to the supplied callbacks. */
 export function ThreadLineageWorkflowRow({
   group,
+  siblings,
   header,
   providerInstanceId,
   provider,
@@ -133,6 +144,8 @@ export function ThreadLineageWorkflowRow({
   stopDisabled,
 }: {
   readonly group: SubagentWorkflowGroup;
+  /** Loaded parent projection; phase-local lists can omit members of the same run. */
+  readonly siblings?: Parameters<typeof getSubagentPixelIconName>[2];
   readonly header: ReactNode;
   readonly providerInstanceId: ProviderInstanceId;
   readonly provider: ServerProvider | undefined;
@@ -237,6 +250,7 @@ export function ThreadLineageWorkflowRow({
                       <WorkflowMemberRow
                         key={member.id}
                         member={member}
+                        siblings={siblings}
                         providerInstanceId={providerInstanceId}
                         provider={provider}
                         providers={providers}
@@ -254,6 +268,7 @@ export function ThreadLineageWorkflowRow({
             <WorkflowMemberRow
               key={member.id}
               member={member}
+              siblings={siblings}
               providerInstanceId={providerInstanceId}
               provider={provider}
               providers={providers}

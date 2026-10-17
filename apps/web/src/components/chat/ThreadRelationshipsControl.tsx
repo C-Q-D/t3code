@@ -1,4 +1,6 @@
 /** Displays related threads and their navigation, merge and agent controls. */
+import { PixelSubagentIcon } from "../icons/PixelLucideIcon";
+import { getSubagentPixelIconName } from "../icons/subagentPixelIcon";
 import { t } from "~/i18n";
 import { useAtomValue } from "@effect/atom-react";
 import { ThreadDetailsControl } from "./ThreadDetailsControl";
@@ -41,7 +43,6 @@ import * as DateTime from "effect/DateTime";
 import { useNavigate } from "@tanstack/react-router";
 import {
   ArrowRightIcon,
-  BotIcon,
   CornerLeftUpIcon,
   GitForkIcon,
   LoaderCircleIcon,
@@ -484,7 +485,7 @@ export function ThreadRelationshipsPanel(props: {
               const RelationshipIcon = isParent
                 ? CornerLeftUpIcon
                 : isSubagent
-                  ? BotIcon
+                  ? PixelSubagentIcon
                   : GitForkIcon;
               const relationship = relationshipLabel(edge, props.threadId);
               const projectedAgent =
@@ -523,6 +524,11 @@ export function ThreadRelationshipsPanel(props: {
                   (agent?.providerInstanceId ?? node?.thread?.providerInstanceId),
               );
               const providerDriver = agent?.driver ?? provider?.driver;
+              const pixelIconName = getSubagentPixelIconName(
+                providerDriver,
+                agent?.id,
+                projection?.subagents,
+              );
               const canStopWorkflow =
                 canOperateWorkflow &&
                 workflowGroup?.workflow.status === "running" &&
@@ -538,6 +544,7 @@ export function ThreadRelationshipsPanel(props: {
               const RelationshipPopup = agent ? ThreadHoverCardPopup : TooltipPopup;
               const relationshipTooltip = agent ? (
                 <SubagentTooltipContent
+                  pixelIconName={pixelIconName}
                   title={threadTitle}
                   model={agent.model}
                   providerInstanceId={agent.providerInstanceId}
@@ -561,6 +568,7 @@ export function ThreadRelationshipsPanel(props: {
               const relationshipContent = (
                 <>
                   <ThreadRelationshipIcon
+                    pixelIconName={isSubagent && !isParent ? pixelIconName : undefined}
                     driver={isSubagent && !isParent ? providerDriver : undefined}
                     provider={provider}
                     fallbackIcon={RelationshipIcon}
@@ -621,6 +629,7 @@ export function ThreadRelationshipsPanel(props: {
                   <ThreadLineageWorkflowRow
                     key={threadId}
                     group={workflowGroup}
+                    siblings={projection?.subagents}
                     providerInstanceId={agent.providerInstanceId}
                     provider={provider}
                     providers={providers}

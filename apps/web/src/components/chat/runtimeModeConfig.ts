@@ -1,7 +1,8 @@
 /** Defines runtime mode display labels independently of protocol values. */
+import { PixelSparkIcon } from "../icons/PixelLucideIcon";
 import { t } from "~/i18n";
 import type { RuntimeMode } from "@t3tools/contracts";
-import { type LucideIcon, LockIcon, LockOpenIcon, PenLineIcon, SparklesIcon } from "lucide-react";
+import { type LucideIcon, LockIcon, LockOpenIcon, PenLineIcon } from "lucide-react";
 
 export const runtimeModeConfig: Record<
   RuntimeMode,
@@ -20,7 +21,7 @@ export const runtimeModeConfig: Record<
   auto: {
     label: t.chat.runtimeMode.auto,
     description: t.chat.runtimeMode.supportedProvidersApproveRoutineActionsOthersStill,
-    icon: SparklesIcon,
+    icon: PixelSparkIcon,
   },
   "full-access": {
     label: t.chat.runtimeMode.fullAccess,

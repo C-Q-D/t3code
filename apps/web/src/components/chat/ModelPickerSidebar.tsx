@@ -1,8 +1,10 @@
+/** Renders provider model-picker navigation with shared pixel artwork. */
+import { PixelSparkIcon } from "../icons/PixelLucideIcon";
 import { t } from "~/i18n";
 import { Toolbar } from "@base-ui/react/toolbar";
 import { type ProviderInstanceId } from "@t3tools/contracts";
 import { memo, useLayoutEffect, useRef, useState } from "react";
-import { SparklesIcon, StarIcon } from "lucide-react";
+import { StarIcon } from "lucide-react";
 import { ProviderInstanceIcon } from "./ProviderInstanceIcon";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { cn } from "~/lib/utils";
@@ -221,7 +223,7 @@ export const ModelPickerSidebar = memo(function ModelPickerSidebar(props: {
                 />
                 {showNewBadge ? (
                   <span className={NEW_BADGE_CLASS} aria-hidden>
-                    <SparklesIcon className="size-2" />
+                    <PixelSparkIcon className="size-2" />
                   </span>
                 ) : null}
               </Toolbar.Button>

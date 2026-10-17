@@ -1,3 +1,5 @@
+/** Renders chat composition controls with shared pixel artwork. */
+import { PixelAgentIcon } from "../icons/PixelLucideIcon";
 import { t } from "~/i18n";
 import { formatProviderSkillDisplayName } from "@t3tools/shared/inlineSkills";
 import { useComposerTypingGuard } from "./useComposerTypingGuard";
@@ -1090,7 +1092,6 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { toastManager } from "../ui/toast";
 import {
   FileIcon,
-  BotIcon,
   CircleAlertIcon,
   PaperclipIcon,
   PencilRulerIcon,
@@ -1293,7 +1294,7 @@ const ComposerFooterModeControls = memo(function ComposerFooterModeControls(prop
             />
           ) : (
             <ComposerControlIcon
-              icon={BotIcon}
+              icon={PixelAgentIcon}
               size={size}
               opticalSize={size === "xs" ? "default" : "large"}
             />

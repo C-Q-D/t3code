@@ -1,4 +1,5 @@
 /** Owns pull request detail panel on the web pull-request surface; host data and agent context remain unchanged. */
+import { PixelSparkIcon } from "../icons/PixelLucideIcon";
 import { t } from "~/i18n";
 import { parseChangeRequestUrl } from "@t3tools/shared/changeRequestUrl";
 import { useAtomValue } from "@effect/atom-react";
@@ -46,7 +47,6 @@ import {
   PanelRightIcon,
   PlayIcon,
   RotateCcwIcon,
-  SparklesIcon,
   TriangleAlertIcon,
 } from "lucide-react";
 import {
@@ -2287,7 +2287,7 @@ export function PullRequestDetailPanel({
                   </MenuItem>
                   {reviewGuidesEnabled && guideWriter.canWrite ? (
                     <MenuItem disabled={guideWriter.running} onClick={writeGuide}>
-                      <SparklesIcon className="size-3.5" />
+                      <PixelSparkIcon className="size-3.5" />
                       {guideWriter.running
                         ? "Writing guide..."
                         : guideWriter.data?.guide == null

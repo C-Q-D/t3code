@@ -1,3 +1,4 @@
+/** Presents Codex setup while keeping ChatGPT account actions separate. */
 import { t } from "~/i18n";
 import { AuthProvidersManageScope } from "@t3tools/contracts";
 import { useEnvironmentScope } from "../../state/session";
@@ -33,7 +34,7 @@ import { ChatGptConnectionButton } from "./ChatGptConnectionButton";
 import { ChatGptUsageButton } from "./ChatGptUsageButton";
 import { ChatGptAccountPicker } from "./ChatGptAccountPicker";
 import { Input } from "../ui/input";
-import { OpenAI } from "../Icons";
+import { PixelCodexIcon } from "../icons/PixelLucideIcon";
 import { RedactedSensitiveText } from "./RedactedSensitiveText";
 import { SettingsRow } from "./settingsLayout";
 import { AddCodexAccountDialog } from "./AddCodexAccountDialog";
@@ -1151,7 +1152,7 @@ function CodexWelcomeCard({
   return (
     <div className="rounded-lg border border-border bg-background px-4 py-4">
       <div className="flex flex-wrap items-center gap-3">
-        <OpenAI className="size-5 shrink-0 fill-foreground" />
+        <PixelCodexIcon className="size-5 shrink-0" />
         <div className="min-w-0 flex-1">
           <h3 className="text-sm font-medium">{title}</h3>
           <div className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{description}</div>

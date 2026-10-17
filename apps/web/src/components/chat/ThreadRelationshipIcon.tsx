@@ -1,9 +1,11 @@
 /** Displays relationship status labels and icons without changing stored statuses. */
 import { t } from "~/i18n";
 import type { ProviderDriverKind, ServerProvider } from "@t3tools/contracts";
-import { BotIcon, type LucideIcon } from "lucide-react";
+import { type LucideIcon } from "lucide-react";
+import { PixelSubagentIcon } from "../icons/PixelLucideIcon";
+import { PixelIcon } from "../icons/PixelIcon";
+import type { PixelIconName } from "../icons/pixelSprites";
 import { cn } from "../../lib/utils";
-import { ProviderInstanceIcon } from "./ProviderInstanceIcon";
 
 /**
  * Formats the display status of a related thread without changing its stored discriminator.
@@ -50,29 +52,24 @@ export function threadRelationshipStatusLabel(status: string | null): string {
   }
 }
 
-/** Shared by lineage and timeline links, including the provider glyph and status badge. */
+/** Shared child character and status badge; parent/fork links keep their supplied fallback icon. */
 export function ThreadRelationshipIcon({
   driver,
-  provider,
   status,
-  fallbackIcon: FallbackIcon = BotIcon,
+  pixelIconName,
+  fallbackIcon: FallbackIcon = PixelSubagentIcon,
 }: {
   driver?: ProviderDriverKind | undefined;
   provider?: ServerProvider | undefined;
   status: string | null;
+  pixelIconName?: PixelIconName | undefined;
   fallbackIcon?: LucideIcon;
 }) {
   const iconClassName = "size-4 shrink-0 text-muted-foreground";
   return (
     <span className="relative inline-flex size-4 shrink-0 items-center justify-center">
-      {driver ? (
-        <ProviderInstanceIcon
-          driverKind={driver}
-          displayName={provider?.displayName ?? driver}
-          acpRegistryIconUrl={provider?.iconUrl}
-          iconClassName={iconClassName}
-          className="z-auto"
-        />
+      {driver || pixelIconName ? (
+        <PixelIcon name={pixelIconName ?? "subagent"} className={iconClassName} />
       ) : (
         <FallbackIcon className={iconClassName} />
       )}

@@ -33,7 +33,6 @@ import {
 } from "@t3tools/contracts";
 import type { TimestampFormat } from "@t3tools/contracts/settings";
 import {
-  BotIcon,
   ChevronRightIcon,
   ArrowRightLeftIcon,
   ArrowRightIcon,
@@ -52,6 +51,9 @@ import { cn } from "~/lib/utils";
 import { TimelineSystemDivider } from "./TimelineSystemDivider";
 import { Button, InlineButton } from "../ui/button";
 import { T3Wordmark } from "../T3Wordmark";
+import { PixelIcon } from "../icons/PixelIcon";
+import type { PixelIconName } from "../icons/pixelSprites";
+import { getSubagentPixelIconName } from "../icons/subagentPixelIcon";
 
 const LIFECYCLE_TYPES = new Set<OrchestrationV2TurnItem["type"]>([
   "run_interrupt_request",
@@ -285,15 +287,16 @@ export function SubagentElapsed({ agent }: { agent: Parameters<typeof AgentElaps
   return <AgentElapsed agent={agent} />;
 }
 
-/** Round provider tile with the agents panel's status dot; rings let a header stack overlap. */
+/** Child character with the agents panel's status dot; rings let a header stack overlap. */
 export function SubagentAvatar({
-  driver,
-  provider,
+  pixelIconName = "subagent",
   status,
   className,
 }: {
   driver?: ProviderDriverKind | undefined;
   provider?: ServerProvider | undefined;
+  /** Computed from run/parent groups in the loaded projection, never the visible row order. */
+  pixelIconName?: PixelIconName | undefined;
   /** Omitted inside an overlapped stack, where a covered dot would only add noise. */
   status?: OrchestrationV2TurnItem["status"] | undefined;
   className?: string;
@@ -306,17 +309,7 @@ export function SubagentAvatar({
         className,
       )}
     >
-      {driver ? (
-        <ProviderInstanceIcon
-          driverKind={driver}
-          displayName={provider?.displayName ?? driver}
-          acpRegistryIconUrl={provider?.iconUrl}
-          className="z-auto"
-          iconClassName="size-3.5"
-        />
-      ) : (
-        <BotIcon className="size-3.5 text-muted-foreground" />
-      )}
+      <PixelIcon name={pixelIconName} className="size-3.5" />
       {status ? (
         <span
           className={cn(
@@ -427,6 +420,11 @@ function SubagentTimelineLink(props: {
     readonly timestamp: string;
   };
 }) {
+  const pixelIconName = useAtomValue(
+    environmentThreadDetails.threadAtom(props.parentRef),
+    (thread) =>
+      getSubagentPixelIconName(props.driver, props.subagentId, thread?.projection.subagents),
+  );
   const agent = useAtomValue(
     environmentThreadDetails.threadAtom(props.parentRef),
     (thread) => thread?.projection.subagents.find((agent) => agent.id === props.subagentId) ?? null,
@@ -450,6 +448,7 @@ function SubagentTimelineLink(props: {
   const content = (
     <>
       <SubagentAvatar
+        pixelIconName={pixelIconName}
         driver={props.driver}
         provider={props.provider}
         status={status ?? undefined}
@@ -527,6 +526,7 @@ function SubagentTimelineLink(props: {
       <ThreadHoverCardPopup>
         <SubagentTimelineTooltip
           {...props}
+          pixelIconName={pixelIconName}
           elapsed={agent ? <AgentElapsed agent={projectedSubagentsToRuntime([agent])[0]!} /> : null}
           model={agent?.model ?? null}
           modelSelection={agent?.modelSelection}
@@ -539,8 +539,15 @@ function SubagentTimelineLink(props: {
   );
 }
 
+/**
+ * Adds available parent/child workspace metadata to the shared subagent hover card.
+ * @param props Timeline identity, model, timing, and state, plus the same pixel character as the row.
+ * Parent/child projects may be unavailable; a null child thread ID omits child workspace metadata.
+ * @returns Tooltip content using live thread/project shells without changing navigation or provider state.
+ */
 function SubagentTimelineTooltip(
   props: Parameters<typeof SubagentTimelineLink>[0] & {
+    pixelIconName: PixelIconName;
     model: string | null;
     modelSelection: OrchestrationV2Subagent["modelSelection"];
     elapsed: ReactNode;
@@ -557,6 +564,7 @@ function SubagentTimelineTooltip(
   const childProject = useProject(child ? scopeProjectRef(environmentId, child.projectId) : null);
   return (
     <SubagentTooltipContent
+      pixelIconName={props.pixelIconName}
       title={formatSubagentDisplayTitle(child?.title ?? props.title)}
       model={props.model}
       providerInstanceId={props.providerInstanceId}

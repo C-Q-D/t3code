@@ -1,3 +1,5 @@
+/** Renders provider settings navigation with shared pixel artwork. */
+import { PixelAgentIcon } from "../icons/PixelLucideIcon";
 import { t } from "~/i18n";
 import {
   lazy,
@@ -13,7 +15,6 @@ import {
 import {
   ArchiveIcon,
   BlocksIcon,
-  BotIcon,
   createLucideIcon,
   CalendarClockIcon,
   GitBranchIcon,
@@ -85,7 +86,7 @@ const SETTINGS_SECTION_ICONS: Readonly<
   "/settings/projects": PanelsTopLeftIcon,
   "/settings/keybindings": KeyboardIcon,
   "/settings/snap-shot": SnapShotIcon,
-  "/settings/providers": BotIcon,
+  "/settings/providers": PixelAgentIcon,
   "/settings/integrations": BlocksIcon,
   "/settings/scheduled-tasks": CalendarClockIcon,
   "/settings/discussions": MessagesSquareIcon,

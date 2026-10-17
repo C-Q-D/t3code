@@ -1,9 +1,11 @@
+/** Renders provider identity; Codex and Claude use fixed-color graphite characters. */
+import { PixelCodexIcon, PixelClaudeIcon } from "../icons/PixelLucideIcon";
 import { type CSSProperties, memo } from "react";
 
 import { providerInstanceInitials } from "@t3tools/client-runtime/state/provider-instance-display";
 
 import { ProviderDriverKind } from "@t3tools/contracts";
-import { AntigravityIcon, ClaudeAI, Icon, OpenAI } from "../Icons";
+import { AntigravityIcon, Icon } from "../Icons";
 
 import { cn } from "~/lib/utils";
 import { providerClients } from "../settings/providerDriverMeta";
@@ -15,8 +17,8 @@ import {
 } from "../settings/AcpRegistryIcon";
 
 const PROVIDER_ICON_BY_PROVIDER: Partial<Record<ProviderDriverKind, Icon>> = {
-  [ProviderDriverKind.make("codex")]: OpenAI,
-  [ProviderDriverKind.make("claudeAgent")]: ClaudeAI,
+  [ProviderDriverKind.make("codex")]: PixelCodexIcon,
+  [ProviderDriverKind.make("claudeAgent")]: PixelClaudeIcon,
   [ProviderDriverKind.make("antigravity")]: AntigravityIcon,
 };
 

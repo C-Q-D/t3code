@@ -1,3 +1,5 @@
+/** Renders model reasoning choices with shared pixel artwork. */
+import { PixelThinkIcon } from "../icons/PixelLucideIcon";
 import { t } from "~/i18n";
 import {
   type ModelSelection,
@@ -18,7 +20,6 @@ import {
   normalizeModelSlug,
 } from "@t3tools/shared/model";
 import { memo, useCallback } from "react";
-import { BrainIcon } from "lucide-react";
 import {
   Menu,
   MenuGroup,
@@ -663,7 +664,7 @@ export const TraitsPicker = memo(function TraitsPicker({
                 size === "xs" ? "gap-1" : "gap-1.5",
               )}
             >
-              <ComposerControlIcon icon={BrainIcon} size={size} />
+              <ComposerControlIcon icon={PixelThinkIcon} size={size} />
               <span data-composer-control-label className="min-w-0 truncate">
                 {triggerLabel}
               </span>
@@ -671,7 +672,7 @@ export const TraitsPicker = memo(function TraitsPicker({
             </span>
           ) : (
             <>
-              <ComposerControlIcon icon={BrainIcon} size={size} />
+              <ComposerControlIcon icon={PixelThinkIcon} size={size} />
               <span data-composer-control-label>{triggerLabel}</span>
               <ComposerControlChevron size={size} />
             </>

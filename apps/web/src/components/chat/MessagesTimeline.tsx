@@ -1,4 +1,6 @@
 /** Renders web conversation items, activity folds and attachment previews. */
+import { PixelSubagentIcon, PixelThinkIcon } from "../icons/PixelLucideIcon";
+import { getSubagentPixelIconName } from "../icons/subagentPixelIcon";
 import { t } from "~/i18n";
 import { ThreadFindTimelineContext } from "./ThreadFindProvider";
 import { shouldPreserveAssistantLineBreaks } from "@t3tools/shared/markdownPipeline";
@@ -124,8 +126,6 @@ import type { Root, RootContent } from "mdast";
 import { T3Wordmark } from "../T3Wordmark";
 import { ThreadContextChip } from "../ThreadContextChip";
 import {
-  BotIcon,
-  BrainIcon,
   CheckIcon,
   ChevronDownIcon,
   ChevronRightIcon,
@@ -1473,7 +1473,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
             <TimelineSystemDivider
               label={t.chat.timeline.subagentOf}
               detail={parentThreadLink.title}
-              icon={BotIcon}
+              icon={PixelSubagentIcon}
               actionLabel={t.chat.timeline.openParentThread}
               onAction={() => onOpenThread(parentThreadLink.threadId)}
             />
@@ -3518,6 +3518,7 @@ const V2SubagentGroup = memo(function V2SubagentGroup({
             {agents.slice(0, 3).map(({ item, status }) => (
               <SubagentAvatar
                 key={item.id}
+                pixelIconName={getSubagentPixelIconName(item.driver, item.subagentId, liveAgents)}
                 driver={item.driver}
                 provider={ctx.providerStatuses.find(
                   (provider) => provider.instanceId === item.providerInstanceId,
@@ -5366,14 +5367,19 @@ function ToolActivityImageIcon(props: {
   );
 }
 
+/**
+ * Resolves a work-log icon key without changing the persisted or derived activity name.
+ * @param props Activity icon key and caller-owned sizing/layout classes; bot and brain use pixel artwork.
+ * @returns A decorative activity glyph, also usable as the fallback for a tool-supplied image.
+ */
 function WorkEntryIcon({ name, className }: { name: WorkEntryIconName; className: string }) {
   switch (name) {
     case "pull-request":
       return <PullRequestGlyph.pullRequest className={className} aria-hidden />;
     case "bot":
-      return <BotIcon className={className} aria-hidden />;
+      return <PixelSubagentIcon className={className} aria-hidden />;
     case "brain":
-      return <BrainIcon className={className} aria-hidden />;
+      return <PixelThinkIcon className={className} aria-hidden />;
     case "browser":
     case "computer":
       return <BrowserAppIcon className={className} />;
