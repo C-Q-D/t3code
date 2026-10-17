@@ -44,6 +44,41 @@
   --radius-project-mark: 6px;
   /* StyleM-8a project monogram: 1px inset outline, using the shared border color. */
   --shadow-chat-project-mark: inset 0 0 0 1px var(--color-border);
+  /* StyleM-8a topGroup: recessed control well and its selected 30×28 button. */
+  --color-chat-controls-well: #070708;
+  --color-chat-control-selected-label: #a3a3ab;
+  --radius-chat-controls-well: 14px;
+  --radius-chat-control: 11px;
+  /* StyleM-8a topGroup lc-icon filter: the same engraved edge on all three glyphs. */
+  --shadow-chat-control-icon: 0 1px 0 rgba(0, 0, 0, 0.55);
+}
+
+/* The whole well remains clickable inside Electron's draggable titlebar. */
+.chat-panel-layout-controls {
+  -webkit-app-region: no-drag;
+}
+
+.chat-panel-layout-controls svg {
+  filter: drop-shadow(var(--shadow-chat-control-icon));
+}
+
+/* Outrank index.css's legacy toolbar colors only inside this well, including tooltip triggers. */
+html[data-theme-id] .chat-panel-layout-controls button[aria-pressed] {
+  @apply text-secondary-label;
+  --control-icon-color: currentColor;
+}
+
+html[data-theme-id] .chat-panel-layout-controls button[aria-pressed]:hover {
+  @apply text-foreground;
+}
+
+html[data-theme-id] .chat-panel-layout-controls button[aria-pressed][data-pressed] {
+  @apply text-chat-control-selected-label;
+}
+
+html[data-theme-id] .chat-panel-layout-controls button[aria-pressed]:disabled {
+  @apply text-fg-icon-disabled;
+  --lucide-hue-override: currentColor;
 }
 
 /* The window header uses a 4px breadcrumb rhythm, independent of page breadcrumbs. */

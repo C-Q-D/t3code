@@ -2412,7 +2412,6 @@ export default function ChatView(props: ChatViewProps) {
   );
   const canMaximizeRightPanel = rightPanelOpen && !shouldUsePlanSidebarSheet;
   const rightPanelMaximized = canMaximizeRightPanel && rightPanelState.maximized === true;
-  const inlineRightPanelOwnsTitleBar = rightPanelOpen && !shouldUsePlanSidebarSheet;
   const [threadPanelPresentation, setThreadPanelPresentation] =
     useState<ThreadPanelPresentation>("inline");
   const [threadPanelPopoverHandle] = useState(PopoverCreateHandle);
@@ -11359,21 +11358,7 @@ export default function ChatView(props: ChatViewProps) {
     onToggleThreadPanel: toggleThreadPanel,
     onToggleRightPanel: toggleRightPanel,
   } satisfies PanelLayoutControlsProps;
-  const panelToggleControls = (
-    <PanelLayoutControls
-      {...panelToggleControlProps}
-      showThreadPanelControl={!inlineRightPanelOwnsTitleBar}
-    />
-  );
-  const threadPanelHeaderControl = (
-    <div className="flex items-center" data-workspace-titlebar-controls>
-      <PanelLayoutControls
-        {...panelToggleControlProps}
-        showTerminalControl={false}
-        showRightPanelControl={false}
-      />
-    </div>
-  );
+  const panelToggleControls = <PanelLayoutControls {...panelToggleControlProps} />;
   const panelLayoutControls = (
     <div className="flex items-center gap-1" data-workspace-titlebar-controls>
       {!shouldUsePlanSidebarSheet ? (
@@ -11383,9 +11368,8 @@ export default function ChatView(props: ChatViewProps) {
             "flex shrink-0",
             panelAnimationsActive &&
               "motion-safe:transition-opacity motion-safe:duration-(--panel-animation-duration) motion-safe:ease-out",
-            // Closed, the control leaves the flex flow so the cluster is only as wide as the two
-            // toggles the header reserves room for; anchored to the cluster's left edge, it fades
-            // out where it stood rather than over the terminal toggle.
+            // Closed, maximize leaves the flex flow so the three-button well keeps its width.
+            // It fades out to the cluster's left rather than over a panel toggle.
             rightPanelOpen
               ? "pointer-events-auto opacity-100"
               : "pointer-events-none absolute right-full mr-1 opacity-0",
@@ -11451,12 +11435,7 @@ export default function ChatView(props: ChatViewProps) {
           parentThreadLink={parentThreadLink}
           onOpenThread={onOpenRelatedThread}
           popoverAnchorRef={threadPanelPopoverAnchorRef}
-          actions={
-            <>
-              {inlineRightPanelOwnsTitleBar ? threadPanelHeaderControl : null}
-              {!rightPanelControlsInPanel ? panelLayoutControls : null}
-            </>
-          }
+          actions={!rightPanelControlsInPanel ? panelLayoutControls : null}
           onNewThreadInProject={handleNewThreadInActiveProject}
           {...(activeDraftLogicalProjectKey
             ? { onOpenProjectSettings: handleOpenDraftProjectSettings }
