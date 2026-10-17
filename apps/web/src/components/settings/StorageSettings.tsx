@@ -7,6 +7,7 @@ import type {
 } from "@t3tools/contracts";
 import { resolveWorktreeCleanup } from "@t3tools/shared/projectSettings";
 import { useMemo, useRef, useState } from "react";
+import { FolderOpenIcon, MinusIcon, PlusIcon } from "lucide-react";
 import { useAtomValue } from "@effect/atom-react";
 import { Atom } from "effect/reactivity";
 import {
@@ -23,13 +24,8 @@ import { toastManager } from "../ui/toast";
 import { Input } from "../ui/input";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { Switch } from "../ui/switch";
-import {
-  NumberField,
-  NumberFieldDecrement,
-  NumberFieldGroup,
-  NumberFieldIncrement,
-  NumberFieldInput,
-} from "../ui/number-field";
+import { NumberField as NumberFieldPrimitive } from "@base-ui/react/number-field";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import {
   SettingResetButton,
   SettingsPageContainer,
@@ -39,7 +35,6 @@ import {
 } from "./settingsLayout";
 import { SettingsScopeNotice } from "./SettingsScopeNotice";
 import { FoldedSettingsSection } from "./FoldedSettingsSection";
-import { SettingsGroup } from "./SettingsGroup";
 import type { ScopedSettingsTarget } from "./scopedSettings";
 import { useSettingsScope } from "./SettingsScopeContext";
 import { searchableSetting } from "./settingsSearch";
@@ -50,7 +45,11 @@ import {
   useUpdateScopedSettings,
 } from "./useScopedSettings";
 
-/** Edits the worktree location for the selected environments. */
+/**
+ * Edits the selected environments' worktree path on blur and preserves the scoped reset.
+ * The disabled browse affordance matches P1 without implying a directory picker exists.
+ * @returns The path row, or null when a selected environment lacks path support.
+ */
 function WorktreesDirectoryRow() {
   const { connectedEnvironments, targets } = useSettingsScope();
   const settings = useScopedSettings();
@@ -81,29 +80,62 @@ function WorktreesDirectoryRow() {
         ) : null
       }
       control={
-        <Input
-          key={`${scopeKey}:${mixed}:${settings.worktreesDirectory}`}
-          aria-label={t.settings.rows.storageWorktreesLocation.title}
-          autoCapitalize="none"
-          spellCheck={false}
-          placeholder={mixed ? t.settings.general.mixed : t.settings.connections.endpoints.default}
-          defaultValue={mixed ? "" : settings.worktreesDirectory}
-          onChange={() => {
-            edited.current = true;
-          }}
-          onBlur={(event) => {
-            const value = event.target.value.trim();
-            if (edited.current && (mixed || value !== settings.worktreesDirectory))
-              updateSettings({ worktreesDirectory: value });
-            edited.current = false;
-          }}
-        />
+        <div className="relative w-65 max-w-full">
+          <Input
+            size="settings"
+            font="mono"
+            key={`${scopeKey}:${mixed}:${settings.worktreesDirectory}`}
+            aria-label={t.settings.rows.storageWorktreesLocation.title}
+            autoCapitalize="none"
+            spellCheck={false}
+            placeholder={
+              mixed ? t.settings.general.mixed : t.settings.connections.endpoints.default
+            }
+            defaultValue={mixed ? "" : settings.worktreesDirectory}
+            onChange={() => {
+              edited.current = true;
+            }}
+            onBlur={(event) => {
+              const value = event.target.value.trim();
+              if (edited.current && (mixed || value !== settings.worktreesDirectory))
+                updateSettings({ worktreesDirectory: value });
+              edited.current = false;
+            }}
+          />
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <span
+                  tabIndex={0}
+                  className="absolute right-1.5 top-1 rounded-full outline-none focus-visible:inset-shadow-focus"
+                />
+              }
+            >
+              <button
+                type="button"
+                disabled
+                aria-label={t.settings.storage.browseUnavailable}
+                className="flex size-6 items-center justify-center rounded-full bg-secondary text-fg-icon-disabled"
+              >
+                <FolderOpenIcon className="size-3" aria-hidden />
+              </button>
+            </TooltipTrigger>
+            <TooltipPopup>{t.settings.storage.browseUnavailable}</TooltipPopup>
+          </Tooltip>
+        </div>
       }
+      className="storage-location-row"
     />
   );
 }
 
-/** Edits an optional retention period in days. */
+/**
+ * Edits retention without changing the existing commit and rounding rules.
+ * @param props.label Accessible name for this retention rule and its step buttons.
+ * @param props.value Saved days (1–3650), or null when disabled.
+ * @param props.onChange Persists committed days or null; enabling retains the existing eight-day default.
+ * @returns A settings-sized day stepper and the existing enable switch.
+ */
 function RetentionControl({
   label,
   value,
@@ -123,12 +155,11 @@ function RetentionControl({
   return (
     <div className="flex items-center gap-3">
       {value !== null ? (
-        <NumberField
+        <NumberFieldPrimitive.Root
           value={draft}
           min={1}
           max={3650}
           step={1}
-          size="sm"
           className="w-auto"
           onValueChange={setDraft}
           onValueCommitted={(next) => {
@@ -140,21 +171,38 @@ function RetentionControl({
             }
           }}
         >
-          <NumberFieldGroup>
-            <NumberFieldDecrement aria-label={t.settings.storage.decrease(label)} />
-            <NumberFieldInput
+          <NumberFieldPrimitive.Group
+            render={
+              <div className="flex h-8 items-center rounded-card-row bg-input p-0.75 shadow-well-track" />
+            }
+          >
+            <NumberFieldPrimitive.Decrement
+              aria-label={t.settings.storage.decrease(label)}
+              render={<Button variant="secondary" size="icon-stepper" />}
+            >
+              <MinusIcon aria-hidden />
+            </NumberFieldPrimitive.Decrement>
+            <NumberFieldPrimitive.Input
               aria-label={t.settings.storage.inDays(label)}
-              size={new Intl.NumberFormat().format(draft ?? value).length}
-              className="field-sizing-content w-auto min-w-[1ch] grow-0 text-right"
+              render={
+                <input className="h-6.5 w-11 min-w-0 rounded-keycap bg-transparent text-center font-mono text-secondary-copy-large tabular-nums outline-none focus-visible:inset-shadow-focus" />
+              }
             />
-            <span aria-hidden="true" className="self-center pr-2 text-xs">
+            <span aria-hidden="true" className="pr-2 text-secondary-copy text-secondary-label">
               {t.settings.storage.days}
             </span>
-            <NumberFieldIncrement aria-label={t.settings.storage.increase(label)} />
-          </NumberFieldGroup>
-        </NumberField>
+            <NumberFieldPrimitive.Increment
+              aria-label={t.settings.storage.increase(label)}
+              render={<Button variant="secondary" size="icon-stepper" />}
+            >
+              <PlusIcon aria-hidden />
+            </NumberFieldPrimitive.Increment>
+          </NumberFieldPrimitive.Group>
+        </NumberFieldPrimitive.Root>
       ) : (
-        <span className="text-xs text-muted-foreground">{t.settings.connections.status.off}</span>
+        <span className="text-secondary-copy text-secondary-label">
+          {t.settings.connections.status.off}
+        </span>
       )}
       <Switch
         aria-label={label}
@@ -174,7 +222,12 @@ function keepWhenLabels() {
   } as const;
 }
 
-/** Displays server cleanup results without rewriting diagnostic reasons. */
+/**
+ * Displays cleanup entries, omitted counts and the empty result without rewriting server reasons.
+ * @param props.report Latest cleanup report; entries retain the server's order and outcomes.
+ * @param props.environmentLabel Prefix for multi-environment reports; omitted for a single environment.
+ * @returns Settings rows with removed file sizes and failed reasons, or the existing empty message.
+ */
 function CleanupResults({
   report,
   environmentLabel,
@@ -205,7 +258,7 @@ function CleanupResults({
             }
             control={
               entry.outcome === "removed" && (
-                <span className="text-xs text-muted-foreground">
+                <span className="text-secondary-copy text-secondary-label">
                   {[
                     entry.kind !== "worktree" && entry.files !== null
                       ? t.settings.merge.storageFiles(entry.files)
@@ -221,13 +274,13 @@ function CleanupResults({
         );
       })}
       {report.omittedCount > 0 && (
-        <p className="px-3 py-2.5 text-xs text-muted-foreground sm:px-4">
+        <p className="px-3.5 py-2.5 text-secondary-copy-medium text-secondary-label">
           {environmentLabel ? `${environmentLabel}: ` : ""}
           {t.settings.merge.storageMoreResults(report.omittedCount)}
         </p>
       )}
       {report.entries.length === 0 && report.omittedCount === 0 && (
-        <p className="px-3 py-2.5 text-xs text-muted-foreground sm:px-4">
+        <p className="px-3.5 py-2.5 text-secondary-copy-medium text-secondary-label">
           {environmentLabel ? `${environmentLabel}: ` : ""}
           {t.settings.merge.storageNothingToClean}
         </p>
@@ -236,7 +289,11 @@ function CleanupResults({
   );
 }
 
-/** Runs eligible environment cleanup and displays its latest report. */
+/**
+ * Runs cleanup on permitted environments and displays the latest server reports.
+ * Keeps the existing direct execution, single-flight command and failure toasts; no confirmation is added.
+ * @returns The P1 artifacts row and an expandable report, or null when cleanup is unsupported.
+ */
 function CleanupSection() {
   useRelativeTimeTick(60_000);
   const { connectedEnvironments } = useSettingsScope();
@@ -347,34 +404,33 @@ function CleanupSection() {
     }
   };
   return (
-    <SettingsSection id="storage-cleanup" title={t.settings.merge.storageCleanup} variant="plain">
-      <SettingsGroup>
-        <SettingsRow
-          {...searchableSetting("storage-delete-now")}
-          description={
-            <span>
-              {!hasRules
-                ? t.settings.merge.storageEnableRule
-                : summaries.map(({ environment, description }) => (
-                    <span key={environment.environmentId} className="block">
-                      {supported.length > 1 ? `${environment.label}: ` : ""}
-                      {description}
-                    </span>
-                  ))}
-            </span>
-          }
-          control={
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={pending || !hasRules || !state.some((entry) => entry.allowed)}
-              onClick={() => void deleteNow()}
-            >
-              {pending ? t.settings.merge.storageDeleting : t.settings.merge.storageDeleteNow}
-            </Button>
-          }
-        />
-      </SettingsGroup>
+    <div id="storage-cleanup">
+      <SettingsRow
+        {...searchableSetting("storage-delete-now")}
+        title={t.settings.storage.artifactsAndLogs}
+        description={
+          <span>
+            {!hasRules
+              ? t.settings.merge.storageEnableRule
+              : summaries.map(({ environment, description }) => (
+                  <span key={environment.environmentId} className="block">
+                    {supported.length > 1 ? `${environment.label}: ` : ""}
+                    {description}
+                  </span>
+                ))}
+          </span>
+        }
+        control={
+          <Button
+            variant="destructive-outline"
+            size="md"
+            disabled={pending || !hasRules || !state.some((entry) => entry.allowed)}
+            onClick={() => void deleteNow()}
+          >
+            {pending ? t.settings.merge.storageDeleting : t.settings.merge.storageDeleteNow}
+          </Button>
+        }
+      />
       {summaries.some(({ report }) => report !== null) && (
         <FoldedSettingsSection
           id="storage-cleanup-last-run"
@@ -404,11 +460,15 @@ function CleanupSection() {
           )}
         </FoldedSettingsSection>
       )}
-    </SettingsSection>
+    </div>
   );
 }
 
-/** Edits scoped retention and worktree cleanup rules. */
+/**
+ * Groups P1 storage controls while retaining additional cleanup rules and scope capabilities.
+ * Existing scoped writes, inheritance, reset actions and search destinations remain authoritative.
+ * @returns Storage settings for the selected scope, or its existing capability notice.
+ */
 export function StorageSettingsPanel() {
   const { scope, connectedEnvironments, targets, target } = useSettingsScope();
   const scopedSettings = useScopedSettings();
@@ -477,8 +537,104 @@ export function StorageSettingsPanel() {
 
   return (
     <SettingsPageContainer>
-      <SettingsSection id="storage-worktrees" title={t.settings.storage.worktrees}>
+      <SettingsSection id="storage-worktrees" title={t.settings.storage.worktreesAndArtifacts}>
+        {(!isProjectScope || (!mixedModes && mode === "custom")) && (
+          <>
+            <SettingsRow
+              title={t.settings.storage.worktreeCleanup}
+              status={ruleStatus("worktreeAfterDays")}
+              description={t.settings.storage.removeWorktreesAfterTheirThreadsHint}
+              serverScoped={!isProjectScope}
+              control={
+                <Select
+                  value={
+                    ruleStatus("worktreeAfterDays")
+                      ? null
+                      : settings.worktreeAfterDays === null
+                        ? "off"
+                        : "enabled"
+                  }
+                  onValueChange={(next) => {
+                    if (next === "off") updateWorktree({ worktreeAfterDays: null });
+                    else if (next === "enabled")
+                      updateWorktree({ worktreeAfterDays: settings.worktreeAfterDays ?? 8 });
+                  }}
+                >
+                  <SelectTrigger size="settings" aria-label={t.settings.storage.worktreeCleanup}>
+                    <SelectValue>
+                      {ruleStatus("worktreeAfterDays")
+                        ? t.settings.general.mixed
+                        : settings.worktreeAfterDays === null
+                          ? t.settings.connections.status.off
+                          : t.settings.storage.afterDays(settings.worktreeAfterDays)}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectPopup align="end" alignItemWithTrigger={false}>
+                    <SelectItem value="off">{t.settings.connections.status.off}</SelectItem>
+                    <SelectItem value="enabled">
+                      {t.settings.storage.afterDays(settings.worktreeAfterDays ?? 8)}
+                    </SelectItem>
+                  </SelectPopup>
+                </Select>
+              }
+            />
+          </>
+        )}
         {!isProjectScope && <WorktreesDirectoryRow />}
+        {!isProjectScope && <CleanupSection />}
+        {(!isProjectScope || (!mixedModes && mode === "custom")) && (
+          <>
+            {connectedEnvironments.every(
+              (environment) =>
+                environment.serverConfig?.environment.capabilities.storageCleanupRun === true,
+            ) && (
+              <SettingsRow
+                {...searchableSetting("storage-worktree-keep-when")}
+                status={ruleStatus("worktreeKeepWhen")}
+                description={
+                  settings.worktreeKeepWhen === "any-local-files"
+                    ? t.settings.merge.storageAnyFilesHint
+                    : settings.worktreeKeepWhen === "tracked-changes"
+                      ? t.settings.merge.storageTrackedHint
+                      : t.settings.merge.storageUncommittedHint
+                }
+                serverScoped={!isProjectScope}
+                control={
+                  <Select
+                    value={ruleStatus("worktreeKeepWhen") ? null : settings.worktreeKeepWhen}
+                    onValueChange={(next) => {
+                      if (
+                        next === "any-local-files" ||
+                        next === "uncommitted-changes" ||
+                        next === "tracked-changes"
+                      )
+                        updateWorktree({ worktreeKeepWhen: next });
+                    }}
+                  >
+                    <SelectTrigger size="settings" aria-label={t.settings.merge.storageKeepLocal}>
+                      <SelectValue>
+                        {ruleStatus("worktreeKeepWhen")
+                          ? t.settings.merge.storageMixed
+                          : keepWhenLabels()[settings.worktreeKeepWhen]}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectPopup align="end" alignItemWithTrigger={false}>
+                      <SelectItem value="any-local-files">
+                        {t.settings.merge.storageAnyFiles}
+                      </SelectItem>
+                      <SelectItem value="uncommitted-changes">
+                        {t.settings.merge.storageUncommitted}
+                      </SelectItem>
+                      <SelectItem value="tracked-changes">
+                        {t.settings.merge.storageTracked}
+                      </SelectItem>
+                    </SelectPopup>
+                  </Select>
+                }
+              />
+            )}
+          </>
+        )}
         {isProjectScope && (
           <SettingsRow
             title={t.settings.storage.automaticWorktreeCleanup}
@@ -502,7 +658,10 @@ export function StorageSettingsPanel() {
                     updateSettings({ worktreeCleanup: { mode: "custom", rules: {} } });
                 }}
               >
-                <SelectTrigger size="sm" aria-label={t.settings.storage.automaticWorktreeCleanup}>
+                <SelectTrigger
+                  size="settings"
+                  aria-label={t.settings.storage.automaticWorktreeCleanup}
+                >
                   <SelectValue>
                     {mixedModes
                       ? t.settings.general.mixed
@@ -525,19 +684,6 @@ export function StorageSettingsPanel() {
         {(!isProjectScope || (!mixedModes && mode === "custom")) && (
           <>
             <SettingsRow
-              title={t.settings.storage.deleteWorktreesWithDeletedThreads}
-              status={ruleStatus("worktreeOnDelete")}
-              description={t.settings.storage.removeUnusedWorktreesActiveArchivedHint}
-              serverScoped={!isProjectScope}
-              control={
-                <Switch
-                  aria-label={t.settings.storage.deleteWorktreesWithDeletedThreads}
-                  checked={settings.worktreeOnDelete}
-                  onCheckedChange={(worktreeOnDelete) => updateWorktree({ worktreeOnDelete })}
-                />
-              }
-            />
-            <SettingsRow
               title={t.settings.storage.deleteInactiveWorktrees}
               status={ruleStatus("worktreeAfterDays")}
               description={t.settings.storage.removeWorktreesAfterTheirThreadsHint}
@@ -547,6 +693,19 @@ export function StorageSettingsPanel() {
                   label={t.settings.storage.deleteInactiveWorktrees}
                   value={settings.worktreeAfterDays}
                   onChange={(worktreeAfterDays) => updateWorktree({ worktreeAfterDays })}
+                />
+              }
+            />
+            <SettingsRow
+              title={t.settings.storage.deleteWorktreesWithDeletedThreads}
+              status={ruleStatus("worktreeOnDelete")}
+              description={t.settings.storage.removeUnusedWorktreesActiveArchivedHint}
+              serverScoped={!isProjectScope}
+              control={
+                <Switch
+                  aria-label={t.settings.storage.deleteWorktreesWithDeletedThreads}
+                  checked={settings.worktreeOnDelete}
+                  onCheckedChange={(worktreeOnDelete) => updateWorktree({ worktreeOnDelete })}
                 />
               }
             />
@@ -576,55 +735,6 @@ export function StorageSettingsPanel() {
                 />
               }
             />
-            {connectedEnvironments.every(
-              (environment) =>
-                environment.serverConfig?.environment.capabilities.storageCleanupRun === true,
-            ) && (
-              <SettingsRow
-                {...searchableSetting("storage-worktree-keep-when")}
-                status={ruleStatus("worktreeKeepWhen")}
-                description={
-                  settings.worktreeKeepWhen === "any-local-files"
-                    ? t.settings.merge.storageAnyFilesHint
-                    : settings.worktreeKeepWhen === "tracked-changes"
-                      ? t.settings.merge.storageTrackedHint
-                      : t.settings.merge.storageUncommittedHint
-                }
-                serverScoped={!isProjectScope}
-                control={
-                  <Select
-                    value={ruleStatus("worktreeKeepWhen") ? null : settings.worktreeKeepWhen}
-                    onValueChange={(next) => {
-                      if (
-                        next === "any-local-files" ||
-                        next === "uncommitted-changes" ||
-                        next === "tracked-changes"
-                      )
-                        updateWorktree({ worktreeKeepWhen: next });
-                    }}
-                  >
-                    <SelectTrigger size="sm" aria-label={t.settings.merge.storageKeepLocal}>
-                      <SelectValue>
-                        {ruleStatus("worktreeKeepWhen")
-                          ? t.settings.merge.storageMixed
-                          : keepWhenLabels()[settings.worktreeKeepWhen]}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectPopup align="end" alignItemWithTrigger={false}>
-                      <SelectItem value="any-local-files">
-                        {t.settings.merge.storageAnyFiles}
-                      </SelectItem>
-                      <SelectItem value="uncommitted-changes">
-                        {t.settings.merge.storageUncommitted}
-                      </SelectItem>
-                      <SelectItem value="tracked-changes">
-                        {t.settings.merge.storageTracked}
-                      </SelectItem>
-                    </SelectPopup>
-                  </Select>
-                }
-              />
-            )}
           </>
         )}
       </SettingsSection>
@@ -659,7 +769,6 @@ export function StorageSettingsPanel() {
           />
         </SettingsSection>
       )}
-      {!isProjectScope && <CleanupSection />}
     </SettingsPageContainer>
   );
 }

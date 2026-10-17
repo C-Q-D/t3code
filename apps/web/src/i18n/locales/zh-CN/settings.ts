@@ -3524,6 +3524,12 @@ ${address}`
     },
   },
   storage: {
+    afterDays: (days: number) => `${days} 天后`,
+    worktreesAndArtifacts: "worktree 与产物",
+    worktreeCleanup: "worktree 清理",
+    artifactsAndLogs: "产物和日志",
+    browseUnavailable: "浏览文件夹（暂不可用，请手动输入路径）",
+
     folderWorktreesCreatedAnyDriveHint:
       "新 worktree 的创建文件夹，可位于任意磁盘，例如 D：\\worktrees 或 ~/worktrees。现有 worktree 保持原位。留空则使用 T3主目录。",
     worktreeLocation: "worktree 位置",

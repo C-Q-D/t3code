@@ -266,3 +266,10 @@
   --color-settings-task-well: #151517;
   --shadow-settings-task-well: inset 1.5px 2px 3px rgba(0, 0, 0, 0.6);
 }
+
+/* 其余屏-6 P1 / SettingsPage8a path well: reserve the trailing 24px browse affordance. */
+@layer utilities {
+  .storage-location-row [data-slot="input"] {
+    padding-right: --spacing(9);
+  }
+}

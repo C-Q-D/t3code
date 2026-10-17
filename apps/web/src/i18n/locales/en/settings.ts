@@ -3719,6 +3719,12 @@ ${address}`
     } satisfies Record<SourceControlWritingStyleMode, { label: string; description: string }>,
   },
   storage: {
+    afterDays: (days: number) => `After ${days} days`,
+    worktreesAndArtifacts: "Worktrees and artifacts",
+    worktreeCleanup: "Worktree cleanup",
+    artifactsAndLogs: "Artifacts and logs",
+    browseUnavailable: "Browse folder (unavailable; enter the path manually)",
+
     folderWorktreesCreatedAnyDriveHint:
       "Folder where new worktrees are created, on any drive, such as D:\\worktrees or ~/worktrees. Existing worktrees stay where they are. Leave empty to use the T3 home folder.",
     worktreeLocation: "worktree location",
