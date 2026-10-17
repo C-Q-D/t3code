@@ -10,6 +10,45 @@ import { ToastProvider, toastManager } from "./toast";
 
 vi.mock("@tanstack/react-router", () => ({ useParams: () => null }));
 
+/** Both stack modes must let Base UI choose the single announcement path before and after viewport focus. */
+it.each([undefined, "stone"] as const)(
+  "preserves high-priority announcement ownership with stack=%s",
+  async (stack) => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    try {
+      await act(async () => root.render(<ToastProvider timeout={0} stack={stack} />));
+      await act(async () => {
+        toastManager.add({
+          title: "Save failed",
+          type: "error",
+          priority: "high",
+          data: { appearance: "error-stripe" },
+        });
+      });
+      const viewport = document.querySelector<HTMLElement>('[data-slot="toast-viewport"]')!;
+      const card = viewport.querySelector<HTMLElement>('[role="alertdialog"]')!;
+      expect(card.getAttribute("aria-hidden")).toBe("true");
+      expect(card.hasAttribute("inert")).toBe(false);
+      expect(document.querySelectorAll('[role="alert"]')).toHaveLength(1);
+
+      await act(async () => viewport.dispatchEvent(new MouseEvent("mouseover", { bubbles: true })));
+      expect(card.getAttribute("aria-hidden")).toBe("true");
+      await act(async () => viewport.focus());
+      expect(document.activeElement).toBe(viewport);
+      expect(card.hasAttribute("aria-hidden")).toBe(false);
+      expect(card.hasAttribute("inert")).toBe(false);
+      expect(document.querySelectorAll('[role="alert"]')).toHaveLength(0);
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+      vi.unstubAllGlobals();
+    }
+  },
+);
+
 /** Exercises real Base UI expansion; inert is the native focus/accessibility boundary, which jsdom does not itself enforce. */
 it("restores the fourth and fifth stone notifications on expansion with limit=5", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);

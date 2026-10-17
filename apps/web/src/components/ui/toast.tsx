@@ -655,12 +655,14 @@ function Toasts({ position, stack }: { position: ToastPosition; stack?: "stone" 
                 stack === "stone"
                   ? (rootProps, state) => {
                       const { hidden } = getStoneToastLayer(visibleIndex, state);
+                      // Base UI hides unfocused high-priority roots while its separate alert announces them.
+                      // Stone may add access restrictions, but must not remove the provider's restrictions.
                       return (
                         <div
                           {...rootProps}
                           data-stack-hidden={hidden ? "" : undefined}
-                          inert={hidden}
-                          aria-hidden={hidden || undefined}
+                          inert={hidden ? true : rootProps.inert}
+                          aria-hidden={hidden ? true : rootProps["aria-hidden"]}
                         />
                       );
                     }
