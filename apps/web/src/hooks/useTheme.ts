@@ -204,6 +204,7 @@ function writeAppearanceModePreference(appearanceMode: ThemePreferenceMode): voi
 /**
  * Replaces the previous selection once before the first palette is applied.
  * Returns whether migration ran; throws ThemeStorageError with the failing key.
+ * Restores the original mix if the theme write fails, without replacing that error.
  * The marker is written last so an incomplete write is retried on the next load.
  */
 function migrateGraphiteTheme(): boolean {
@@ -212,11 +213,23 @@ function migrateGraphiteTheme(): boolean {
   let operation: "read" | "write" = "read";
   try {
     if (window.localStorage.getItem(storageKey) !== null) return false;
-    operation = "write";
     // A saved light half overrides a dark-only base, so replace the whole mix.
     storageKey = THEME_HALVES_STORAGE_KEY;
+    const previousHalvesRaw = window.localStorage.getItem(storageKey);
+    operation = "write";
     window.localStorage.removeItem(storageKey);
-    writeThemePreference("graphite");
+    try {
+      writeThemePreference("graphite");
+    } catch (cause) {
+      if (previousHalvesRaw !== null) {
+        try {
+          window.localStorage.setItem(THEME_HALVES_STORAGE_KEY, previousHalvesRaw);
+        } catch {
+          // Storage may reject restoration too; preserve the original theme-write error.
+        }
+      }
+      throw cause;
+    }
     storageKey = GRAPHITE_MIGRATION_STORAGE_KEY;
     window.localStorage.setItem(storageKey, "true");
     return true;

@@ -28,6 +28,41 @@ afterEach(() => {
 });
 
 describe("Graphite theme migration", () => {
+  it("restores the original mix and preserves the error when the theme write fails", async () => {
+    const storage = createStorage();
+    const originalMix = '{ "light": "t3-chat", "dark": "ocean" }';
+    const cause = new Error("theme storage quota exceeded");
+    storage.setItem("t3code:theme", "system");
+    storage.setItem("t3code:theme-halves:v1", originalMix);
+    const setItem = storage.setItem.bind(storage);
+    vi.spyOn(storage, "setItem").mockImplementation((key, value) => {
+      if (key === "t3code:theme") throw cause;
+      setItem(key, value);
+    });
+    vi.stubGlobal("window", { localStorage: storage });
+
+    const { readThemePreference, ThemeStorageError } = await import("./useTheme");
+
+    const error = (() => {
+      try {
+        readThemePreference();
+      } catch (failure) {
+        return failure;
+      }
+      return undefined;
+    })();
+    expect(error).toBeInstanceOf(ThemeStorageError);
+    expect(error).toMatchObject({
+      operation: "write",
+      storageKey: "t3code:theme",
+      theme: "graphite",
+      cause,
+    });
+    expect(storage.getItem("t3code:theme-halves:v1")).toBe(originalMix);
+    expect(storage.getItem("t3code:theme")).toBe("system");
+    expect(storage.getItem("t3code:theme-migrated-graphite")).toBeNull();
+  });
+
   it("initializes empty storage with Graphite and records the migration before first application", async () => {
     const storage = createStorage();
     vi.stubGlobal("window", { localStorage: storage });
