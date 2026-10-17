@@ -79,6 +79,7 @@ const twMerge = extendTailwindMerge({
         "code-copy",
         "terminal-copy",
         "window-brand",
+        "discussion-table-title",
       ],
       shadow: [
         "slab",
@@ -168,6 +169,9 @@ const twMerge = extendTailwindMerge({
         "discussion-wave",
         "discussion-seat",
         "discussion-seat-halo",
+        "discussion-table-note",
+        "discussion-table-tag",
+        "discussion-table-outline",
       ],
       leading: ["code", "terminal"],
       tracking: ["brand"],

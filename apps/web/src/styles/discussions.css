@@ -62,3 +62,46 @@
   --shadow-discussion-seat-halo: 0 0 0 2px
     color-mix(in srgb, var(--discussion-seat-color) 90%, transparent);
 }
+
+/* DC0.2 · 讨论页-8a v3 状态 G1–G7 / 组件规范 S3、S6：纯 SVG 的石盘与底板材质。 */
+@theme {
+  --color-discussion-table-top: #34343a;
+  --color-discussion-table-bottom: #1f1f22;
+  --color-discussion-seat-highlight: rgba(255, 255, 255, 0.1);
+  --text-discussion-table-title: 30px;
+  --text-discussion-table-title--line-height: 1;
+}
+
+/* SVG presentation attributes have no utility-class candidates to keep these radii alive. */
+@theme static {
+  --radius-discussion-table-note: 5px;
+  --radius-discussion-table-tag: 10px;
+  --radius-discussion-table-outline: 6px;
+}
+
+.discussion-svg-seat-top {
+  stop-color: color-mix(
+    in srgb,
+    var(--discussion-seat-color) 34%,
+    var(--color-discussion-seat-gradient-top)
+  );
+}
+.discussion-svg-seat-bottom {
+  stop-color: color-mix(in srgb, var(--discussion-seat-color) 10%, var(--sidebar));
+}
+.discussion-svg-seat-outline {
+  stroke: color-mix(
+    in srgb,
+    var(--discussion-seat-color) var(--discussion-seat-outline-opacity),
+    transparent
+  );
+}
+.discussion-svg-seat-next-outline {
+  stroke: color-mix(in srgb, var(--discussion-seat-color) 65%, transparent);
+}
+.discussion-svg-user-outline {
+  stroke: color-mix(in srgb, var(--color-discussion-pixel-white) 12%, transparent);
+}
+.discussion-svg-seat-halo {
+  stroke: color-mix(in srgb, var(--discussion-seat-color) 90%, transparent);
+}
