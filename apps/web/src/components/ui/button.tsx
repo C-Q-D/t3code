@@ -77,6 +77,9 @@ const buttonVariants = cva(
           "size-6.5 rounded-compact-stepper-key p-0 [&_svg:not([class*='size-'])]:size-3.75",
         // SettingsPage8a M2: 22px inline text actions sit beside setting labels across categories.
         "inline-label": "h-5.5 gap-1 px-2 text-meta-large [&_svg:not([class*='size-'])]:size-2.75",
+        // PRDetail8a copy menu: icon-plus-chevron triggers use a 30px capsule with natural width.
+        "icon-menu":
+          "h-7.5 gap-0.5 rounded-full pl-2 pr-1.5 [&_svg:not([class*='size-'])]:size-3.5",
       },
       variant: {
         default:

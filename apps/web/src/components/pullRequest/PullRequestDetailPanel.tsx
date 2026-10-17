@@ -1855,7 +1855,7 @@ export function PullRequestDetailPanel({
                     <MenuTrigger
                       render={
                         <Button
-                          size="icon-md"
+                          size="icon-menu"
                           variant="ghost-muted"
                           aria-label={t.git.pullRequest.copyMenu}
                         />

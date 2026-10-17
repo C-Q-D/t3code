@@ -17,6 +17,13 @@ export function FaviconImage(props: {
   );
 }
 
+/**
+ * Tries favicon sources in order, remembering failed URLs until this keyed instance remounts.
+ * @param props.sources Candidate URLs in priority order; an empty list immediately uses fallback.
+ * @param props.fallback Content rendered when every candidate has failed or no candidates exist.
+ * @param props.className Optional classes applied to the image, not to fallback content.
+ * @returns The first unfailed image or fallback; image errors advance to the next candidate.
+ */
 function FaviconImageAttempt(props: {
   sources: ReadonlyArray<string>;
   fallback: ReactNode;
