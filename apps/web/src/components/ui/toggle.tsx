@@ -31,6 +31,9 @@ const toggleVariants = cva(
           "h-6 min-w-0 rounded-compact-row px-2 text-secondary-copy before:rounded-compact-row sm:text-secondary-copy",
         // Panel8a K4: the same 28px / r9 geometry as shared compact icon keys.
         "panel-icon": "size-7 min-w-7 rounded-device-control p-0 before:rounded-device-control",
+        // SettingsPage8a O2: 28px segments with 12px insets in the shared 34px dialog track.
+        dialog:
+          "h-7 min-w-0 rounded-segmented-item px-3 text-secondary-copy-medium before:rounded-segmented-item sm:text-secondary-copy-medium",
       },
       variant: {
         default: "border-transparent",

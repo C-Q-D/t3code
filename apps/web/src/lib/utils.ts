@@ -305,6 +305,7 @@ const twMerge = extendTailwindMerge({
         "discussion-draft-drag",
         "discussion-loading",
         "source-control-inset",
+        "settings-task-well",
       ],
       "inset-shadow": [
         "selected",

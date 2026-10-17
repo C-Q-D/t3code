@@ -8,7 +8,7 @@ import { cn } from "~/lib/utils";
 
 /** Preserves native sizing and the unstyled composition path used by InputGroup. */
 type InputProps = Omit<InputPrimitive.Props & React.RefAttributes<HTMLInputElement>, "size"> & {
-  size?: "sm" | "compact" | "default" | "lg" | "settings" | "stepper" | number;
+  size?: "sm" | "compact" | "default" | "lg" | "settings" | "stepper" | "md" | number;
   /** Monospace with tabular digits, for paths, commands, colors and numbers. */
   font?: "default" | "mono";
   unstyled?: boolean;
@@ -34,6 +34,8 @@ function Input({
     // SettingsPage8a M2 path inputs and day stepper share the 32px control geometry.
     size === "settings" && "h-8 px-3 text-secondary-copy",
     size === "stepper" && "h-6.5 px-0 text-center text-secondary-copy-large",
+    // SettingsPage8a O2 time and O3 template fields use 34px wells.
+    size === "md" && "h-8.5 px-3 text-secondary-copy-large",
     props.type === "search" &&
       "[&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-decoration]:appearance-none [&::-webkit-search-results-button]:appearance-none [&::-webkit-search-results-decoration]:appearance-none",
     // Number fields are typed into; browser spin buttons crowd narrow fields and step by 1.

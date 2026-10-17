@@ -25,6 +25,8 @@ const badgeVariants = cva(
         default: "",
         lg: "h-5.5 rounded-badge-large pl-1.75 pr-2.25 text-secondary-copy font-bold shadow-tag [&_svg:not([class*='size-'])]:size-3",
         sm: "h-4.5 gap-0.75 rounded-badge-compact px-1.5 font-mono text-meta font-normal",
+        // SettingsPage8a O1–O4 lists: 20px result/source tags, 11px labels and 8px insets.
+        settings: "h-5 px-2 text-meta text-shadow-none",
       },
       variant: {
         // Light surfaces keep F8 semantic icons dark instead of recoloring their strokes.
@@ -49,6 +51,8 @@ const badgeVariants = cva(
         accent: "bg-status-emphasis text-status-emphasis-foreground",
         // External labels use H5's neutral palette rather than consumer-defined colors.
         label: "bg-secondary text-secondary-label",
+        // SettingsPage8a O2 paused tasks and O3 built-in templates share this neutral surface.
+        "settings-neutral": "bg-settings-inheritance-surface text-secondary-label",
       },
     },
   },

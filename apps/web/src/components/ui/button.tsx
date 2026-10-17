@@ -55,10 +55,10 @@ const buttonVariants = cva(
           "size-7 rounded-device-control p-0 [&_svg:not([class*='size-'])]:size-3.5",
         // SettingsPage8a M2 day stepper: 26px circular controls inside a 32px well.
         "icon-stepper": "size-6.5 p-0 [&_svg:not([class*='size-'])]:size-3.25",
-        // 讨论页 H4/H5 cancellation, 讨论设置-8a L3 cancel and Onboarding8a Q3 cloud/authorization
-        // actions: 36px capsule with 16px inline padding.
+        // 讨论页 H4/H5 and 讨论设置-8a L3 cancel, SettingsPage8a O2 editor and Onboarding8a Q3
+        // cloud/authorization actions: 36px capsule with 16px inline padding.
         "dialog-action": "h-9 px-4 text-control",
-        // 讨论页 H4/H5 and 讨论设置-8a L3 save: 36px confirmation capsule with 18px inline padding.
+        // 讨论页 H4/H5, 讨论设置-8a L3 and SettingsPage8a O2 save: 36px capsule with 18px inline padding.
         "dialog-action-wide": "h-9 px-4.5 text-control",
         // 讨论页 H6: 28px notice action.
         notice: "h-7 gap-1.25 px-2.5 text-secondary-copy-medium font-semibold",
