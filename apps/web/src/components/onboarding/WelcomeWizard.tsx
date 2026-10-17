@@ -26,11 +26,11 @@ import {
 } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
 import {
-  ArrowRightIcon,
   CheckIcon,
   ChevronRightIcon,
   CloudIcon,
-  LinkIcon,
+  PlusIcon,
+  ShieldIcon,
   MonitorIcon,
   TerminalIcon,
 } from "lucide-react";
@@ -86,7 +86,7 @@ import { TerminalViewport } from "../ThreadTerminalDrawer";
 import { CloudEnvironmentConnectRows } from "../cloud/CloudEnvironmentConnectList";
 import { presentSavedCloudEnvironmentConnection } from "../cloud/cloudEnvironmentConnectionPresentation";
 import { ProviderInstanceIcon } from "../chat/ProviderInstanceIcon";
-import { T3Wordmark } from "../T3Wordmark";
+import { PixelIcon } from "../icons/PixelIcon";
 import { Alert, AlertDescription } from "../ui/alert";
 import { Button } from "../ui/button";
 import { CommandBlock } from "../CommandBlock";
@@ -96,7 +96,12 @@ import { Input } from "../ui/input";
 import { Tooltip, TooltipTrigger, TooltipPopup } from "../ui/tooltip";
 import { ScrollArea } from "../ui/scroll-area";
 import { Spinner } from "../ui/spinner";
-import { WizardPanel, WizardSteps, WizardPopup, WizardHeader } from "../ui/wizard";
+import {
+  OnboardingPanel as WizardPanel,
+  OnboardingSteps as WizardSteps,
+  OnboardingPopup as WizardPopup,
+  OnboardingHeader as WizardHeader,
+} from "./OnboardingSurface";
 import { Dialog } from "../ui/dialog";
 import { toastManager } from "../ui/toast";
 import { cn } from "../../lib/utils";
@@ -116,9 +121,9 @@ const NO_ENVIRONMENTS: readonly EnvironmentId[] = [];
 
 const AGENT_ONBOARDING_THREAD_ID = ThreadId.make("onboarding-agent-setup");
 const ONBOARDING_STAGES = [
-  t.account.onboarding.connect,
-  t.account.onboarding.agents,
-  t.account.onboarding.projects,
+  t.account.onboarding.connectComputers,
+  t.account.onboarding.connectAgents,
+  t.account.onboarding.chooseProjects,
 ] as const;
 const SCAN_LIMIT_MESSAGE = t.account.onboarding.scanLimit;
 
@@ -234,22 +239,10 @@ export function WelcomeWizard({
   return (
     <Dialog open disablePointerDismissal onOpenChange={(_, event) => event.cancel()}>
       <WizardPopup
-        size="wide"
-        bottomStickOnMobile={false}
-        showCloseButton={false}
+        welcome
         initialFocus={() => document.getElementById("onboarding-pairing-url") ?? true}
       >
-        <WizardHeader
-          title={t.account.onboarding.setup}
-          identity={
-            <div className="flex items-baseline gap-1.5" role="img" aria-label="T3 Code">
-              <T3Wordmark className="h-4 w-auto shrink-0" aria-hidden />
-              <span className="text-2xl font-medium tracking-tight text-muted-foreground">
-                Code
-              </span>
-            </div>
-          }
-        >
+        <WizardHeader title={t.account.onboarding.setup}>
           <WizardSteps
             steps={ONBOARDING_STAGES}
             currentStep={stageIndex}
@@ -284,9 +277,14 @@ export function WelcomeWizard({
               }}
             />
           ) : step === "agents" ? (
-            <AgentsStep environmentIds={setupIds} onContinue={() => setStep("import")} />
+            <AgentsStep
+              environmentIds={setupIds}
+              onBack={() => setStep("connection")}
+              onContinue={() => setStep("import")}
+            />
           ) : (
             <ImportStep
+              onBack={() => setStep("agents")}
               scans={scans}
               isImporting={isImporting}
               setIsImporting={setIsImporting}
@@ -343,19 +341,20 @@ function ConnectionStep({
   }, [ready]);
   return (
     <>
-      <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-        {t.account.onboarding.connectComputers}
-      </h1>
-      <p className="mt-2.5 text-sm leading-relaxed text-muted-foreground">
-        {t.account.onboarding.computersHint}
-      </p>
+      <h1 className="sr-only">{t.account.onboarding.connectComputers}</h1>
+      <p className="sr-only">{t.account.onboarding.computersHint}</p>
       {directEnvironments.length > 0 ? (
-        <fieldset className="mt-5 space-y-2">
+        <fieldset className="space-y-2.5">
           <legend className="sr-only">{t.account.onboarding.computersToSetUp}</legend>
           {directEnvironments.map((environment) => (
             <label
               key={environment.environmentId}
-              className="flex cursor-pointer items-center gap-3 rounded-lg border border-border bg-background px-3 py-3"
+              className={cn(
+                "flex min-h-13 cursor-pointer items-center gap-3 rounded-card-row px-3.5 py-2",
+                selectedIds.has(environment.environmentId)
+                  ? "bg-accent inset-shadow-selected-control"
+                  : "bg-ov5-row shadow-ov5-row",
+              )}
             >
               <Checkbox
                 checked={selectedIds.has(environment.environmentId)}
@@ -369,10 +368,10 @@ function ConnectionStep({
               <MonitorIcon className="size-4 shrink-0 text-muted-foreground" />
               <span className="min-w-0 flex-1">
                 <span className="flex items-baseline justify-between gap-3">
-                  <span className="min-w-0 text-sm font-medium break-words">
+                  <span className="min-w-0 text-control font-medium break-words">
                     {environment.label}
                   </span>
-                  <span className="shrink-0 text-xs text-muted-foreground">
+                  <span className="shrink-0 text-secondary-copy text-muted-foreground">
                     {/* Same rule as Settings: a switched-off computer reads Off, not Not connected. */}
                     {!environment.entry.enabled && environment.connection.phase !== "unsupported"
                       ? "Off"
@@ -380,7 +379,7 @@ function ConnectionStep({
                   </span>
                 </span>
                 {environment.displayUrl ? (
-                  <span className="mt-0.5 block text-xs break-all text-muted-foreground">
+                  <span className="mt-0.5 block text-secondary-copy break-all text-muted-foreground">
                     {environment.displayUrl}
                   </span>
                 ) : null}
@@ -389,28 +388,16 @@ function ConnectionStep({
           ))}
         </fieldset>
       ) : null}
-      <div className="mt-4 space-y-2">
-        {cloudEnabled ? (
-          <ConnectAccountOption
-            autoSelectedComputers={autoSelectedComputers}
-            disabled={isPairing}
-            selectedIds={selectedIds}
-            onToggleEnvironment={onToggleEnvironment}
-          />
-        ) : null}
-        <div className="rounded-lg border border-border bg-background">
+      <div className="mt-2.5 space-y-2.5">
+        <div className="rounded-card-row shadow-outline-control">
           <Collapsible open={pairingOpen} onOpenChange={setPairingOpen}>
             <CollapsibleTrigger
               disabled={isPairing}
               render={
-                <Button
-                  variant="ghost"
-                  size="sm-multiline"
-                  className="min-h-14 w-full justify-start"
-                />
+                <Button variant="ghost" size="onboarding-row" className="w-full justify-start" />
               }
             >
-              <LinkIcon className="size-4 text-muted-foreground" />
+              <PlusIcon className="size-4" />
               <span className="flex-1 text-left">{t.account.onboarding.addComputer}</span>
               <ChevronRightIcon
                 className={cn("size-4 text-muted-foreground", pairingOpen && "rotate-90")}
@@ -431,15 +418,24 @@ function ConnectionStep({
             </CollapsiblePanel>
           </Collapsible>
         </div>
+        {cloudEnabled ? (
+          <ConnectAccountOption
+            autoSelectedComputers={autoSelectedComputers}
+            disabled={isPairing}
+            selectedIds={selectedIds}
+            onToggleEnvironment={onToggleEnvironment}
+          />
+        ) : null}
       </div>
       {skippedLabels.length > 0 ? (
-        <p className="mt-4 text-xs text-muted-foreground">
+        <p className="mt-4 text-secondary-copy text-muted-foreground">
           {t.account.onboarding.skippedSetup(skippedLabels.join(", "), skippedLabels.length)}
         </p>
       ) : null}
-      <div className="mt-6 flex flex-col-reverse gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-        <p className="min-w-0 text-xs leading-relaxed text-muted-foreground">
-          {t.account.onboarding.privacyHint}{" "}
+      <div className="mt-3 flex flex-col gap-4.5">
+        <p className="min-w-0 text-secondary-copy-medium text-secondary-label">
+          <ShieldIcon className="mr-2 inline size-3.5" />
+          {t.account.onboarding.connectPrivacy}{" "}
           <a
             className="underline underline-offset-2 hover:text-foreground"
             href={PRIVACY_POLICY_URL}
@@ -451,14 +447,14 @@ function ConnectionStep({
           .
         </p>
         <Button
+          size="onboarding"
           className="shrink-0 self-end"
           ref={continueRef}
           autoFocus={!expandPairingInitially}
           disabled={!ready || isPairing}
           onClick={onContinue}
         >
-          {t.account.onboarding.continue}
-          <ArrowRightIcon className="size-3.5" />
+          {t.account.onboarding.next}
         </Button>
       </div>
     </>
@@ -485,7 +481,7 @@ function ConnectAccountOption({
   const onDiscoveryReady = useCallback(() => setDiscoveryReady(true), []);
 
   return (
-    <div className="rounded-lg border border-border bg-background">
+    <div className="rounded-card-row bg-ov5-well shadow-well-pressed">
       <Collapsible open={expanded && !!isSignedIn && discoveryReady} onOpenChange={setExpanded}>
         <CollapsibleTrigger
           disabled={disabled || !isLoaded}
@@ -496,13 +492,18 @@ function ConnectAccountOption({
               openAuthPrompt();
             }
           }}
-          render={
-            <Button variant="ghost" size="sm-multiline" className="min-h-14 w-full justify-start" />
-          }
+          render={<Button variant="ghost" size="onboarding-row" className="w-full justify-start" />}
         >
           <CloudIcon className="size-4 text-muted-foreground" />
           <span className="flex-1 text-left">T3 Connect</span>
-          <span className="text-xs text-muted-foreground">
+          <span
+            className={cn(
+              "text-secondary-copy-medium",
+              !isSignedIn && isLoaded
+                ? "inline-flex h-8 items-center rounded-full bg-secondary px-3.5 font-semibold text-foreground shadow-raise-tab"
+                : "text-secondary-label",
+            )}
+          >
             {!isLoaded
               ? t.account.onboarding.loadingSignIn
               : !isSignedIn
@@ -511,9 +512,9 @@ function ConnectAccountOption({
                   ? t.account.onboarding.loadingComputers
                   : null}
           </span>
-          <ChevronRightIcon
-            className={cn("size-4 text-muted-foreground", expanded && isSignedIn && "rotate-90")}
-          />
+          {isSignedIn ? (
+            <ChevronRightIcon className={cn("size-4", expanded && "rotate-90")} />
+          ) : null}
         </CollapsibleTrigger>
         <CollapsiblePanel keepMounted>
           <div className="px-3 pb-3">
@@ -527,16 +528,20 @@ function ConnectAccountOption({
                   selection={{ selectedIds, onChange: onToggleEnvironment, autoSelectedComputers }}
                   refreshWhileEmpty
                   empty={
-                    <p className="py-3 text-sm text-muted-foreground">
+                    <p className="py-3 text-control text-muted-foreground">
                       {t.account.onboarding.noComputers}
                     </p>
                   }
                 />
               ) : null}
             </div>
-            <p className="text-sm text-muted-foreground">{t.account.onboarding.runOnComputers}</p>
+            <p className="text-control text-muted-foreground">
+              {t.account.onboarding.runOnComputers}
+            </p>
             <CommandBlock command="npx t3 connect" className="mt-3" />
-            <p className="mt-3 text-xs text-muted-foreground">{t.account.onboarding.keepRunning}</p>
+            <p className="mt-3 text-secondary-copy text-muted-foreground">
+              {t.account.onboarding.keepRunning}
+            </p>
           </div>
         </CollapsiblePanel>
       </Collapsible>
@@ -596,7 +601,10 @@ function PairingForm({
         }}
       >
         <div>
-          <label className="block text-sm text-muted-foreground" htmlFor="onboarding-pairing-url">
+          <label
+            className="block text-control text-muted-foreground"
+            htmlFor="onboarding-pairing-url"
+          >
             {t.account.onboarding.pairingLink}
           </label>
           <Input
@@ -634,7 +642,7 @@ function PairingForm({
           <div className="flex items-center justify-between gap-3">
             <CollapsibleTrigger
               type="button"
-              className="group flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+              className="group flex items-center gap-1 text-control text-muted-foreground hover:text-foreground"
             >
               <ChevronRightIcon className="size-3.5 group-data-panel-open:rotate-90" />
               {t.account.onboarding.needPairingLink}
@@ -644,9 +652,11 @@ function PairingForm({
             </Button>
           </div>
           <CollapsiblePanel>
-            <p className="pt-3 text-sm text-muted-foreground">{t.account.onboarding.runOnHost}</p>
+            <p className="pt-3 text-control text-muted-foreground">
+              {t.account.onboarding.runOnHost}
+            </p>
             <CommandBlock command="npx t3 pair" className="mt-2" />
-            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+            <p className="mt-2 text-secondary-copy leading-relaxed text-muted-foreground">
               {t.account.onboarding.startCodePrefix}
               <code className="font-mono">npx t3 serve</code>
               {t.account.onboarding.addFlag} <code className="font-mono">--tailscale</code>
@@ -677,9 +687,11 @@ interface AgentTerminalSession {
 /** Codex uses managed setup; existing CLI installs retain the terminal path. */
 function AgentsStep({
   environmentIds,
+  onBack,
   onContinue,
 }: {
   readonly environmentIds: readonly EnvironmentId[];
+  readonly onBack: () => void;
   readonly onContinue: () => void;
 }) {
   const { environments } = useEnvironments();
@@ -688,12 +700,13 @@ function AgentsStep({
       title={t.account.onboarding.connectAgents}
       description={t.account.onboarding.agentsHint}
     >
-      <ScrollArea scrollFade className="mt-5 h-auto max-h-[min(32rem,55dvh)]">
+      <ScrollArea scrollFade className="h-auto max-h-128">
         <div className="space-y-5 pr-3">
           {environmentIds.map((environmentId) => (
             <ConnectedAgentsStep
               key={environmentId}
               environmentId={environmentId}
+              showMachineLabel={environmentIds.length > 1}
               machineLabel={
                 environments.find((environment) => environment.environmentId === environmentId)
                   ?.label ?? t.account.onboarding.computer
@@ -702,10 +715,12 @@ function AgentsStep({
           ))}
         </div>
       </ScrollArea>
-      <div className="mt-6 flex justify-end">
-        <Button autoFocus onClick={onContinue}>
-          {t.account.onboarding.continue}
-          <ArrowRightIcon className="size-3.5" />
+      <div className="mt-5.5 flex justify-between gap-2">
+        <Button size="onboarding" variant="ghost" onClick={onBack}>
+          {t.account.onboarding.back}
+        </Button>
+        <Button size="onboarding" autoFocus onClick={onContinue}>
+          {t.account.onboarding.next}
         </Button>
       </div>
     </StepShell>
@@ -716,9 +731,11 @@ function AgentsStep({
 function ConnectedAgentsStep({
   environmentId,
   machineLabel,
+  showMachineLabel,
 }: {
   readonly environmentId: EnvironmentId;
   readonly machineLabel: string;
+  readonly showMachineLabel: boolean;
 }) {
   const providers = useAtomValue(serverEnvironment.providersValueAtom(environmentId));
   const refreshProviders = useAtomCommand(serverEnvironment.refreshProviders, {
@@ -765,13 +782,15 @@ function ConnectedAgentsStep({
   }
   return (
     <section>
-      <h2 className="mb-2 text-sm font-medium">{machineLabel}</h2>
+      <h2 className={showMachineLabel ? "mb-2 text-control font-medium" : "sr-only"}>
+        {machineLabel}
+      </h2>
       {!canOperateTerminal ? (
-        <p className="mb-2 text-sm text-muted-foreground">
+        <p className="mb-2 text-control text-muted-foreground">
           {t.account.onboarding.noTerminalPermission}
         </p>
       ) : null}
-      <div className="space-y-1.5">
+      <div className="space-y-2">
         {primaryAgents.map(({ driver, provider, instanceId }) =>
           driver === "codex" && serverConfig !== null ? (
             <OnboardingCodexSetup
@@ -812,7 +831,7 @@ function ConnectedAgentsStep({
           ) : (
             <AgentCard
               key={driver}
-              driver={driver}
+              driver={ProviderDriverKind.make(driver)}
               provider={provider}
               terminalOpen={terminalSession?.driver === driver}
               terminalAvailable={serverConfig !== null && canOperateTerminal}
@@ -844,6 +863,19 @@ function ConnectedAgentsStep({
             />
           ),
         )}
+      </div>
+      <div className="mt-2 space-y-2">
+        {providers
+          ?.filter((provider) => provider.driver !== "codex" && provider.driver !== "claudeAgent")
+          .map((provider) => (
+            <AgentCard
+              key={provider.instanceId}
+              driver={provider.driver}
+              provider={provider}
+              terminalOpen={false}
+              terminalAvailable={false}
+            />
+          ))}
       </div>
       {providers?.some(
         (provider) =>
@@ -878,6 +910,7 @@ function ConnectedAgentsStep({
   );
 }
 
+/** Preserves managed account setup and the explicitly selected CLI path for this provider instance. */
 function OnboardingCodexSetup({
   createdAccount,
   onAutoStartConsumed,
@@ -941,7 +974,7 @@ function OnboardingCodexSetup({
   };
   return existingChosen ? (
     <AgentCard
-      driver="codex"
+      driver={ProviderDriverKind.make("codex")}
       provider={provider}
       terminalOpen={terminalOpen}
       terminalAvailable={canOperateTerminal}
@@ -971,11 +1004,11 @@ function AgentCard({
   terminalAvailable,
   onOpenTerminal,
 }: {
-  readonly driver: OnboardingAgentDriver;
+  readonly driver: ServerProvider["driver"];
   readonly provider: ServerProvider | undefined;
   readonly terminalOpen: boolean;
   readonly terminalAvailable: boolean;
-  readonly onOpenTerminal: () => void;
+  readonly onOpenTerminal?: () => void;
 }) {
   const meta = providerClients.get(ProviderDriverKind.make(driver));
   const displayName =
@@ -984,38 +1017,47 @@ function AgentCard({
   const providerState = getOnboardingProviderState(provider);
 
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-border bg-background px-4 py-4">
-      <ProviderInstanceIcon
-        driverKind={ProviderDriverKind.make(driver)}
-        displayName={displayName}
-        iconClassName="size-5"
-      />
+    <div className="flex min-h-13 items-center gap-3 rounded-card-row bg-ov5-row py-2 pr-2.5 pl-3 shadow-ov5-row">
+      <span className="flex size-7.5 shrink-0 items-center justify-center rounded-full">
+        {driver === "claudeAgent" || driver === "codex" ? (
+          <PixelIcon name={driver === "claudeAgent" ? "claude" : "codex"} size={24} />
+        ) : (
+          <ProviderInstanceIcon
+            driverKind={driver}
+            displayName={displayName}
+            iconClassName="size-5"
+          />
+        )}
+      </span>
       <div className="min-w-0 flex-1">
-        <span className="block text-sm font-medium text-foreground">{displayName}</span>
-        <p className="mt-0.5 text-xs leading-relaxed break-words whitespace-pre-wrap text-muted-foreground">
+        <span className="block text-control font-medium text-foreground">{displayName}</span>
+        <p
+          className={
+            providerState === "attention" ? "text-secondary-copy text-secondary-label" : "sr-only"
+          }
+        >
           {providerState === "ready" ? t.account.onboarding.readyToCode : summary.headline}
           {providerState !== "ready" && summary.detail ? ` · ${summary.detail}` : ""}
         </p>
       </div>
       <div className="shrink-0">
         {providerState === "ready" ? (
-          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-success-foreground">
+          <span className="inline-flex h-5.5 items-center gap-1.25 rounded-full bg-status-success px-2.25 text-secondary-copy font-semibold text-success-foreground">
             <CheckIcon className="size-3.5" />
             {t.account.onboarding.ready}
           </span>
         ) : providerState === "checking" ? (
-          <span className="text-xs text-muted-foreground">{t.account.onboarding.checking}</span>
+          <span className="inline-flex h-5.5 items-center rounded-full px-2.25 text-secondary-copy font-semibold text-code-foreground">
+            {t.account.onboarding.checking}
+          </span>
         ) : providerState === "disabled" ? (
-          <span className="text-xs text-muted-foreground">{t.account.onboarding.disabled}</span>
+          <span className="text-secondary-copy text-muted-foreground">
+            {t.account.onboarding.disabled}
+          </span>
         ) : providerState === "attention" ? (
-          <span className="text-xs text-muted-foreground">{summary.headline}</span>
+          <span className="text-secondary-copy text-muted-foreground">{summary.headline}</span>
         ) : (
-          <Button
-            size="xs"
-            variant="ghost"
-            onClick={onOpenTerminal}
-            disabled={terminalOpen || !terminalAvailable}
-          >
+          <Button size="md" onClick={onOpenTerminal} disabled={terminalOpen || !terminalAvailable}>
             <TerminalIcon className="size-3.5" />
             {providerState === "signIn"
               ? t.account.onboarding.signIn
@@ -1137,10 +1179,10 @@ function AgentInstallTerminal({
   return (
     <div
       data-thread-terminal-drawer
-      className="mt-4 overflow-hidden rounded-lg border border-border/70 bg-background text-foreground"
+      className="mt-3.5 overflow-hidden rounded-ov5-row bg-well-terminal px-3.5 py-2.5 text-code-foreground shadow-ov5-terminal"
     >
-      <div className="flex items-center justify-between border-b border-border/60 bg-background/60 px-3 py-1.5">
-        <span className="text-2xs font-medium text-muted-foreground">
+      <div className="flex items-center justify-between gap-2 pb-2">
+        <span className="text-meta-large font-medium text-muted-foreground">
           {!canOperateTerminal ? (
             t.account.onboarding.noTerminalPermission
           ) : setupState === "writeFailed" ? (
@@ -1206,11 +1248,13 @@ const IMPORT_PERMISSION_MESSAGE = t.account.onboarding.noImportPermission;
 
 /** Scans the supplied environments, lets users select projects, and imports selected projects/history; reports partial failures before completing the wizard. */
 function ImportStep({
+  onBack,
   scans,
   isImporting,
   setIsImporting,
   onDone,
 }: {
+  readonly onBack: () => void;
   readonly scans: ReturnType<typeof useProjectScans>;
   readonly isImporting: boolean;
   readonly setIsImporting: (value: boolean) => void;
@@ -1452,12 +1496,10 @@ function ImportStep({
   if (scans.every((scan) => scan.data === null) && scans.some((scan) => scan.isPending)) {
     return (
       <div className="flex h-full min-h-40 flex-col">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-          {t.account.onboarding.yourProjects}
-        </h1>
+        <h1 className="sr-only">{t.account.onboarding.yourProjects}</h1>
         <div className="flex flex-1 flex-col items-center justify-center gap-3 py-6">
           <Spinner size="lg" tone="muted" />
-          <p className="text-center text-sm text-muted-foreground">
+          <p className="text-center text-control text-muted-foreground">
             {t.account.onboarding.lookingForProjects}
           </p>
         </div>
@@ -1476,28 +1518,19 @@ function ImportStep({
       description={t.account.onboarding.importHint}
     >
       {candidates.length > 0 ? (
-        <div className="mt-5 flex items-center justify-between gap-3 text-xs text-muted-foreground">
-          <span role="status">
-            {t.account.onboarding.selectedCount(selected.length, candidates.length)}
-          </span>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="xs"
-              disabled={isImporting || selected.length === candidates.length}
-              onClick={() => setSelectedPaths(new Set(candidates.map((item) => item.key)))}
-            >
-              {t.account.onboarding.selectAll}
-            </Button>
-            <Button
-              variant="ghost"
-              size="xs"
-              disabled={isImporting || selected.length === 0}
-              onClick={() => setSelectedPaths(new Set())}
-            >
-              {t.account.onboarding.selectNone}
-            </Button>
-          </div>
+        <div className="flex items-center justify-between gap-2.5 px-1.5 pb-1 text-secondary-copy text-muted-foreground">
+          <span role="status">{t.account.onboarding.foundProjects(candidates.length)}</span>
+          <label className="order-first flex cursor-pointer items-center gap-2.5 text-control font-bold text-foreground">
+            <Checkbox
+              checked={selected.length === candidates.length}
+              indeterminate={selected.length > 0 && selected.length < candidates.length}
+              disabled={isImporting}
+              onCheckedChange={(checked) =>
+                setSelectedPaths(checked ? new Set(candidates.map((item) => item.key)) : new Set())
+              }
+            />
+            {t.account.onboarding.selectAll}
+          </label>
         </div>
       ) : null}
       <ScrollArea scrollFade className="mt-2 h-auto max-h-80">
@@ -1512,21 +1545,21 @@ function ImportStep({
             return (
               <fieldset
                 key={scan.environmentId}
-                className="min-w-0 space-y-0.5"
+                className="min-w-0 space-y-1.5"
                 disabled={isImporting}
               >
                 {scans.length > 1 ? (
-                  <legend className="mb-2 text-sm font-medium">{label}</legend>
+                  <legend className="mb-2 text-control font-medium">{label}</legend>
                 ) : null}
                 {scan.isPending && scan.data === null ? (
-                  <div className="flex items-center gap-2 py-3 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-2 py-3 text-control text-muted-foreground">
                     <Spinner size="md" />
                     {t.account.onboarding.scanningProjects}
                   </div>
                 ) : scan.error !== null ? (
                   <div
                     role="alert"
-                    className="flex items-center justify-between gap-3 text-sm text-muted-foreground"
+                    className="flex items-center justify-between gap-3 text-control text-muted-foreground"
                   >
                     <span>
                       {t.account.onboarding.checkProjectsFailed}
@@ -1537,12 +1570,12 @@ function ImportStep({
                     </Button>
                   </div>
                 ) : scanCandidates.length === 0 ? (
-                  <p className="py-2 text-sm text-muted-foreground">
+                  <p className="py-2 text-control text-muted-foreground">
                     {t.account.onboarding.noProjects}
                   </p>
                 ) : null}
                 {scan.data?.truncated ? (
-                  <p className="text-xs text-muted-foreground" role="status">
+                  <p className="text-secondary-copy text-muted-foreground" role="status">
                     {SCAN_LIMIT_MESSAGE}
                   </p>
                 ) : null}
@@ -1557,13 +1590,24 @@ function ImportStep({
         </div>
       </ScrollArea>
       {visibleImportError ? (
-        <p className="mt-3 text-sm text-destructive">{visibleImportError}</p>
+        <p className="mt-3 text-control text-destructive">{visibleImportError}</p>
       ) : null}
-      <div className="mt-6 flex flex-wrap items-center justify-end gap-3">
-        <Button variant="ghost-muted" disabled={isImporting} onClick={finishAfterImport}>
+      <div className="mt-5.5 flex flex-wrap items-center justify-end gap-2">
+        <div className="mr-auto">
+          <Button size="onboarding" variant="ghost" disabled={isImporting} onClick={onBack}>
+            {t.account.onboarding.back}
+          </Button>
+        </div>
+        <Button
+          size="onboarding"
+          variant="outline"
+          disabled={isImporting}
+          onClick={finishAfterImport}
+        >
           {t.account.onboarding.dontImport}
         </Button>
         <Button
+          size="onboarding"
           autoFocus
           disabled={!canImport || isImporting || selected.length === 0}
           onClick={() => void runImport(selected)}
@@ -1633,10 +1677,10 @@ function ImportCandidateList({
             />
             <CollapsibleTrigger className="group flex min-w-0 flex-1 items-center gap-1.5 text-left">
               <ChevronRightIcon className="size-3.5 shrink-0 text-muted-foreground transition-transform group-data-panel-open:rotate-90" />
-              <span className="truncate text-sm text-muted-foreground">
+              <span className="truncate text-control text-muted-foreground">
                 {t.account.onboarding.otherFolders}
               </span>
-              <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums">
+              <span className="ml-auto shrink-0 text-secondary-copy text-muted-foreground tabular-nums">
                 {other.length} {other.length === 1 ? "folder" : "folders"}
               </span>
             </CollapsibleTrigger>
@@ -1659,6 +1703,7 @@ function ImportCandidateList({
   );
 }
 
+/** Keeps repository clone groups selectable together and expanded independently. */
 function ImportRepositoryGroup({
   group,
   selectedKeys,
@@ -1693,7 +1738,7 @@ function ImportRepositoryGroup({
         />
         <CollapsibleTrigger className="group flex min-w-0 flex-1 items-center gap-1.5 text-left">
           <ChevronRightIcon className="size-3.5 shrink-0 text-muted-foreground transition-transform group-data-panel-open:rotate-90" />
-          <span className="truncate text-sm font-medium">{group.label}</span>
+          <span className="truncate text-control font-medium">{group.label}</span>
           <ImportRowMeta
             sources={[...new Set(group.candidates.flatMap((c) => c.sources))]}
             threadCount={group.threadCount}
@@ -1737,6 +1782,7 @@ function ProjectPathText({
   );
 }
 
+/** Displays one selectable project; path and source metadata retain the original import identity. */
 function ImportCandidateRow({
   candidate,
   label,
@@ -1757,22 +1803,22 @@ function ImportCandidateRow({
   return (
     <label
       className={cn(
-        "flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-muted/40 has-disabled:cursor-default",
+        "flex min-h-12.5 cursor-pointer items-center gap-2.5 rounded-ov5-row bg-ov5-row px-3 py-1.5 shadow-ov5-row hover:bg-secondary has-disabled:cursor-default",
         nested && "pl-8",
       )}
     >
       <Checkbox checked={checked} onCheckedChange={(value) => onCheckedChange(value === true)} />
       <Tooltip>
-        <TooltipTrigger
-          render={<span className="flex min-w-0 flex-1 items-baseline gap-2 truncate" />}
-        >
+        <TooltipTrigger render={<span className="flex min-w-0 flex-1 flex-col truncate" />}>
           {label !== undefined ? (
-            <span className="truncate text-sm font-medium">{label}</span>
+            <span className="truncate text-control font-medium">{label}</span>
           ) : null}
           {path !== undefined ? (
             <ProjectPathText
               path={path}
-              className={label === undefined ? "text-xs" : "text-2xs text-muted-foreground"}
+              className={
+                label === undefined ? "text-secondary-copy" : "text-meta-large text-secondary-label"
+              }
             />
           ) : null}
         </TooltipTrigger>
@@ -1788,9 +1834,8 @@ function ImportCandidateRow({
 }
 
 /**
- * Trailing columns shared by every import row: source icons, thread count,
- * last activity. Each column has a fixed width and each icon has its own slot
- * so nothing shifts between rows that differ in sources or digit count.
+ * Shows the real discovery sources; history count and age stay accessible without
+ * adding columns absent from Q2. Repository clone grouping remains unchanged.
  */
 function ImportRowMeta({
   sources,
@@ -1805,37 +1850,18 @@ function ImportRowMeta({
   // "just now" does not fit the fixed column, so collapse it.
   const age = relative === null ? "" : relative.suffix === null ? "now" : relative.value;
   return (
-    <span className="ml-auto grid shrink-0 grid-cols-[1rem_1rem_2.5rem_2.25rem] items-center gap-x-1 text-xs text-muted-foreground tabular-nums">
-      <span className="flex size-4 items-center justify-center">
-        {sources?.includes("claudeAgent") ? (
-          <span role="img" aria-label="Claude Code">
-            <ProviderInstanceIcon
-              driverKind={ProviderDriverKind.make("claudeAgent")}
-              displayName="Claude Code"
-              iconClassName="size-3"
-            />
-          </span>
-        ) : null}
+    <span className="ml-auto shrink-0 text-meta-large whitespace-nowrap text-muted-foreground">
+      {sources?.map((source) => (source === "claudeAgent" ? "Claude Code" : "Codex")).join(" · ")}
+      <span className="sr-only">
+        {threadCount} · {age}
       </span>
-      <span className="flex size-4 items-center justify-center">
-        {sources?.includes("codex") ? (
-          <span role="img" aria-label="Codex">
-            <ProviderInstanceIcon
-              driverKind={ProviderDriverKind.make("codex")}
-              displayName="Codex"
-              iconClassName="size-3"
-            />
-          </span>
-        ) : null}
-      </span>
-      <span className="text-right">{threadCount}</span>
-      <span className="text-right whitespace-nowrap">{age}</span>
     </span>
   );
 }
 
 // ── Shared bits ──────────────────────────────────────────────
 
+/** Retains accessible step headings while the visible numbered header identifies the current stage. */
 function StepShell({
   title,
   description,
@@ -1847,10 +1873,8 @@ function StepShell({
 }) {
   return (
     <>
-      <h1 className="text-2xl font-semibold tracking-tight text-foreground">{title}</h1>
-      {description ? (
-        <p className="mt-2.5 text-sm leading-relaxed text-muted-foreground">{description}</p>
-      ) : null}
+      <h1 className="sr-only">{title}</h1>
+      {description ? <p className="sr-only">{description}</p> : null}
       {children}
     </>
   );

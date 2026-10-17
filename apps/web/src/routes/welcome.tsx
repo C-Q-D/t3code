@@ -1,16 +1,16 @@
+/** Hosts first-run setup on the graphite base and preserves the existing completion navigation. */
 import { createFileRoute, redirect, useLocation, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { EnvironmentId } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
 import * as Option from "effect/Option";
 
-import { NoProjectsHero } from "../components/NoProjectsHero";
 import { WelcomeWizard } from "../components/onboarding/WelcomeWizard";
 import { useNewThreadHandler } from "../hooks/useHandleNewThread";
 
 const decodeEnvironmentId = Schema.decodeOption(EnvironmentId);
 
-/** Onboarding overlays the workspace. Visiting /welcome reopens setup. */
+/** Visiting /welcome reopens setup while startup navigation stays suspended. */
 export const Route = createFileRoute("/welcome")({
   beforeLoad: ({ context }) => {
     const { authGateState } = context;
@@ -21,6 +21,7 @@ export const Route = createFileRoute("/welcome")({
   component: WelcomeRouteView,
 });
 
+/** Resolves optional resumed agent setup and navigates only after completion succeeds. */
 function WelcomeRouteView() {
   const { authGateState } = Route.useRouteContext();
   const navigate = useNavigate();
@@ -39,8 +40,7 @@ function WelcomeRouteView() {
   // local server to offer.
   const localAvailable = authGateState.status === "authenticated";
   return (
-    <>
-      <NoProjectsHero />
+    <div data-onboarding-route className="h-full min-h-0 stone-base">
       {isWelcomeRoute && !dismissed ? (
         <WelcomeWizard
           localAvailable={localAvailable}
@@ -57,6 +57,6 @@ function WelcomeRouteView() {
           }}
         />
       ) : null}
-    </>
+    </div>
   );
 }

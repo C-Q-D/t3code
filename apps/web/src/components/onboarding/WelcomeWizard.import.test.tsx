@@ -1,3 +1,4 @@
+/** Verifies onboarding permissions and asynchronous setup behavior through the user flow. */
 import { RegistryContext } from "@effect/atom-react";
 import {
   AuthOrchestrationOperateScope,
@@ -110,11 +111,11 @@ vi.mock("../ui/dialog", () => ({
   DialogTitle: "div",
   DialogHeader: "div",
 }));
-vi.mock("../ui/wizard", () => ({
-  WizardPanel: "div",
-  WizardSteps: "div",
-  WizardPopup: "div",
-  WizardHeader: "div",
+vi.mock("./OnboardingSurface", () => ({
+  OnboardingPanel: "div",
+  OnboardingSteps: "div",
+  OnboardingPopup: "div",
+  OnboardingHeader: "div",
 }));
 vi.mock("../ui/scroll-area", () => ({ ScrollArea: "div" }));
 vi.mock("../ui/tooltip", () => ({ Tooltip: "div", TooltipTrigger: "span", TooltipPopup: "span" }));
@@ -218,6 +219,7 @@ async function click(label: string) {
   await act(async () => target.props.onClick());
 }
 
+/** Enters the target setup step through the same navigation available to the user. */
 async function mountImport(remote = false) {
   state.selectedEnvironment = remote ? "remote" : "primary";
   await act(async () => {
@@ -227,8 +229,8 @@ async function mountImport(remote = false) {
       </RegistryContext.Provider>,
     );
   });
-  await click("Continue");
-  await click("Continue");
+  await click("Next");
+  await click("Next");
   expect(text(renderer!.root)).toContain("Import your projects");
 }
 

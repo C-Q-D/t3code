@@ -55,3 +55,38 @@
   --shadow-ov3-inactive-icon:
     inset 2px 3px 5px rgba(0, 0, 0, 0.66), inset -1px -1px 0 rgba(255, 255, 255, 0.06);
 }
+
+/* OV5: Onboarding8a.dc.html Q1–Q3. Geometry and shadows absent from the base contract. */
+@theme {
+  --color-ov5-row: #26262a;
+  --color-ov5-well: #151517;
+  --color-ov5-complete: #3a3a40;
+  --radius-ov5-panel: 26px;
+  --radius-ov5-row: 14px;
+  --radius-ov5-cloud: 11px;
+  --text-ov5-title: 30px;
+  --text-ov5-title--line-height: 1.2;
+  --text-ov5-connect-title: 24px;
+  --text-ov5-connect-title--line-height: 1.55;
+  --shadow-ov5-row: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 1.5px 0 #09090a;
+  --shadow-ov5-step: inset 1px 1px 2px rgba(0, 0, 0, 0.6);
+  --shadow-ov5-terminal:
+    inset 2px 3px 6px rgba(0, 0, 0, 0.75), inset -1px -1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* Keep Electron's existing brand and window controls reachable above the first-run surface. */
+.ov5-welcome-backdrop,
+.ov5-welcome-viewport {
+  top: var(--workspace-topbar-height, 48px);
+}
+
+/* Q1 chrome integration: retain the shell's native controls and brand, hide workspace-only controls. */
+body:has([data-onboarding-route]) [data-titlebar-sidebar-control],
+body:has([data-onboarding-route]) [data-titlebar-brand] a > [aria-hidden],
+body:has([data-onboarding-route]) [data-titlebar-brand] > div,
+body:has([data-onboarding-route]) .window-titlebar-slot {
+  display: none;
+}
+body:has([data-onboarding-route]) [data-titlebar-brand] {
+  margin-left: 0;
+}

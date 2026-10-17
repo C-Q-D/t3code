@@ -10,6 +10,9 @@ export const account: Messages["account"] = {
     meshHint: "连接你的设备 — 在同一处发布此环境并连接其他设备。",
     dontShowAgain: "不再显示",
     notNow: "暂不",
+    next: "下一步",
+    back: "返回",
+    connectPrivacy: "对话内容和代码只保存在你连接的电脑上。登录 T3 Connect 只用来同步环境列表。",
     continue: "继续",
     enabling: "正在启用…",
     done: "完成",
@@ -82,6 +85,8 @@ export const account: Messages["account"] = {
     importHint: "从所选电脑上的 Claude Code 和 Codex 导入项目及对话。",
     skippedSetup: (labels: string, _count: number) =>
       `由于未连接，设置将跳过 ${labels}。你可以稍后在设置中配置。`,
+    /** Labels the actual number of discovered projects, without importing design sample data. */
+    foundProjects: (count) => `从 Claude Code 和 Codex 找到 ${count} 个项目`,
     selectAll: "全选",
     selectNone: "取消全选",
     scanningProjects: "正在查找项目…",

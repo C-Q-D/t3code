@@ -1,3 +1,4 @@
+/** Verifies onboarding permissions and asynchronous setup behavior through the user flow. */
 import { RegistryContext } from "@effect/atom-react";
 import {
   BearerConnectionTarget,
@@ -93,11 +94,11 @@ vi.mock("../ui/dialog", () => ({
   DialogTitle: "div",
   DialogHeader: "div",
 }));
-vi.mock("../ui/wizard", () => ({
-  WizardPanel: "div",
-  WizardPopup: "div",
-  WizardHeader: "div",
-  WizardSteps: ({ onStepChange }: { onStepChange: (step: number) => void }) => (
+vi.mock("./OnboardingSurface", () => ({
+  OnboardingPanel: "div",
+  OnboardingPopup: "div",
+  OnboardingHeader: "div",
+  OnboardingSteps: ({ onStepChange }: { onStepChange: (step: number) => void }) => (
     <button onClick={() => onStepChange(0)}>Back</button>
   ),
 }));
@@ -232,6 +233,7 @@ async function click(label: string) {
 function hasViewport() {
   return renderer!.root.findAllByProps({ "data-terminal-viewport": true }).length > 0;
 }
+/** Enters the target setup step through the same navigation available to the user. */
 async function enterRemoteAgents() {
   await act(async () => {
     renderer = create(
@@ -240,7 +242,7 @@ async function enterRemoteAgents() {
       </RegistryContext.Provider>,
     );
   });
-  await click("Continue");
+  await click("Next");
   expect(text(renderer!.root)).toContain("Paired computer");
 }
 
@@ -312,7 +314,7 @@ describe("welcome agent terminal setup", () => {
     expect(state.open).not.toHaveBeenCalled();
     expect(state.write).not.toHaveBeenCalled();
     expect(state.close).not.toHaveBeenCalled();
-    await click("Continue");
+    await click("Next");
     await click("Do not import projects");
     expect(state.complete).toHaveBeenCalledOnce();
     expect(state.done).toHaveBeenCalledExactlyOnceWith(undefined);
@@ -430,7 +432,7 @@ describe("welcome agent terminal setup", () => {
     await click("Close");
     expect(hasViewport()).toBe(false);
     expect(state.close).not.toHaveBeenCalled();
-    await click("Continue");
+    await click("Next");
     expect(text(renderer!.root)).toContain("Import your projects");
   });
 

@@ -1,4 +1,6 @@
-// @vitest-environment jsdom
+/** Verifies onboarding completion, import warnings, and retry behavior.
+ * @vitest-environment jsdom
+ */
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { EnvironmentId, ProjectId } from "@t3tools/contracts";
@@ -144,8 +146,8 @@ it("enters the workspace after a partial import and warns after navigation finis
   });
   const onDone = vi.fn(() => navigation);
   await act(async () => root.render(<WelcomeWizard localAvailable onDone={onDone} />));
-  await click("Continue");
-  await click("Continue");
+  await click("Next");
+  await click("Next");
   await click("Import 1 project");
   expect(onDone).toHaveBeenCalledWith({
     environmentId: EnvironmentId.make("test-env"),
@@ -179,8 +181,8 @@ it.each([
     });
     const onDone = vi.fn();
     await act(async () => root.render(<WelcomeWizard localAvailable onDone={onDone} />));
-    await click("Continue");
-    await click("Continue");
+    await click("Next");
+    await click("Next");
     await click("Import 1 project");
     expect(onDone).toHaveBeenCalledOnce();
     if (warning === null && importedCount > 0) {
@@ -202,8 +204,8 @@ it("keeps setup open when saving completion fails and preserves the import warni
   mocks.complete.mockRejectedValueOnce(new Error("settings unavailable"));
   const onDone = vi.fn();
   await act(async () => root.render(<WelcomeWizard localAvailable onDone={onDone} />));
-  await click("Continue");
-  await click("Continue");
+  await click("Next");
+  await click("Next");
   await click("Import 1 project");
   expect(onDone).not.toHaveBeenCalled();
   expect(mocks.toast).toHaveBeenCalledWith(

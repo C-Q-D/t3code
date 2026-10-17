@@ -55,7 +55,8 @@ const buttonVariants = cva(
           "size-7 rounded-device-control p-0 [&_svg:not([class*='size-'])]:size-3.5",
         // SettingsPage8a M2 day stepper: 26px circular controls inside a 32px well.
         "icon-stepper": "size-6.5 p-0 [&_svg:not([class*='size-'])]:size-3.25",
-        // 讨论页 H4/H5: 36px cancellation capsule with 16px inline padding.
+        // 讨论页 H4/H5 cancellation and Onboarding8a Q3 cloud/authorization actions:
+        // 36px capsule with 16px inline padding.
         "dialog-action": "h-9 px-4 text-control",
         // 讨论页 H4/H5: 36px confirmation capsule with 18px inline padding.
         "dialog-action-wide": "h-9 px-4.5 text-control",
@@ -63,6 +64,10 @@ const buttonVariants = cva(
         notice: "h-7 gap-1.25 px-2.5 text-secondary-copy-medium font-semibold",
         // 讨论页 H7: 32px recovery action with 14px inline padding.
         recovery: "h-8 px-3.5",
+        // Onboarding8a Q1/Q2 footer: 38px capsule, also shared by wizard navigation actions.
+        onboarding: "h-9.5 px-4.5 text-control",
+        // Onboarding8a Q1/Q2 computer and cloud entry rows use a 44px rounded rectangle.
+        "onboarding-row": "h-11 gap-2.5 rounded-card-row px-3.5 text-control",
       },
       variant: {
         default:

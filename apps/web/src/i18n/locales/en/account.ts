@@ -9,6 +9,10 @@ export const account = {
       "Mesh your devices together — publish this environment and connect the rest, all in one place.",
     dontShowAgain: "Don't show this again",
     notNow: "Not now",
+    next: "Next",
+    back: "Back",
+    connectPrivacy:
+      "Conversations and code stay on your connected computers. T3 Connect sign-in only synchronizes the environment list.",
     continue: "Continue",
     enabling: "Enabling…",
     done: "Done",
@@ -85,6 +89,8 @@ export const account = {
       "Import projects and conversations from Claude Code and Codex on your selected computers.",
     skippedSetup: (labels: string, count: number) =>
       `Not connected, so setup skips ${labels}. You can set ${count === 1 ? "it" : "them"} up later from Settings.`,
+    /** Labels the actual number of discovered projects, without importing design sample data. */
+    foundProjects: (count: number) => `Found ${count} projects from Claude Code and Codex`,
     selectAll: "Select all",
     selectNone: "Select none",
     scanningProjects: "Looking for projects…",

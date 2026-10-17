@@ -100,6 +100,8 @@ const twMerge = extendTailwindMerge({
         "ov3-inactive-title",
         "discussion-dialog-heading",
         "discussion-error-heading",
+        "ov5-title",
+        "ov5-connect-title",
       ],
       shadow: [
         "slab",
@@ -282,6 +284,9 @@ const twMerge = extendTailwindMerge({
         "sidebar-resize-grip",
         "sidebar-context-drag",
         "legacy-sidebar-sort",
+        "ov5-row",
+        "ov5-step",
+        "ov5-terminal",
       ],
       "inset-shadow": [
         "selected",
@@ -381,6 +386,9 @@ const twMerge = extendTailwindMerge({
         "settings-motion-panel",
         "ov3-report",
         "sidebar-resize-grip",
+        "ov5-panel",
+        "ov5-row",
+        "ov5-cloud",
       ],
       leading: [
         "code",

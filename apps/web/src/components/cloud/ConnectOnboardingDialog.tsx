@@ -2,12 +2,7 @@
 import { t } from "~/i18n";
 import { useAuth } from "@clerk/react";
 import { useAtomValue } from "@effect/atom-react";
-import {
-  AuthAdministrativeScopes,
-  AuthRelayReadScope,
-  AuthRelayWriteScope,
-  type AuthSessionState,
-} from "@t3tools/contracts";
+import { AuthRelayReadScope, AuthRelayWriteScope, type AuthSessionState } from "@t3tools/contracts";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { useEffect, useRef, useState } from "react";
 
@@ -29,9 +24,15 @@ import { CloudEnvironmentConnectRows } from "./CloudEnvironmentConnectList";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
 import { Dialog } from "../ui/dialog";
-import { Switch } from "../ui/switch";
+import { cn } from "~/lib/utils";
 import { toastManager } from "../ui/toast";
-import { WizardSteps, WizardPopup, WizardHeader, WizardPanel, WizardFooter } from "../ui/wizard";
+import {
+  OnboardingSteps as WizardSteps,
+  OnboardingPopup as WizardPopup,
+  OnboardingHeader as WizardHeader,
+  OnboardingPanel as WizardPanel,
+  OnboardingFooter as WizardFooter,
+} from "../onboarding/OnboardingSurface";
 
 /**
  * Post-sign-in onboarding wizard for T3 Connect. Opens on every in-session
@@ -242,6 +243,7 @@ function ConfiguredConnectOnboardingDialog() {
     >
       <WizardPopup>
         <WizardHeader
+          cloud
           title={t.account.onboarding.setupConnect}
           description={<>{t.account.onboarding.meshHint}</>}
         >
@@ -294,21 +296,28 @@ function ConfiguredConnectOnboardingDialog() {
         </WizardPanel>
         <WizardFooter
           leading={
-            <label className="flex cursor-pointer items-center gap-2 self-start text-xs text-muted-foreground sm:self-center">
-              <Checkbox
-                checked={dontShowAgain}
-                onCheckedChange={(checked) => setDontShowAgain(checked === true)}
-              />
+            <Button
+              size="dialog-action"
+              variant="ghost-muted"
+              aria-pressed={dontShowAgain}
+              onClick={() => setDontShowAgain((value) => !value)}
+            >
               {t.account.onboarding.dontShowAgain}
-            </label>
+            </Button>
           }
         >
           {step === "publish" ? (
             <>
-              <Button variant="ghost" disabled={isApplying} onClick={() => setStep("devices")}>
+              <Button
+                size="dialog-action"
+                variant="outline"
+                disabled={isApplying}
+                onClick={() => setStep("devices")}
+              >
                 {t.account.onboarding.notNow}
               </Button>
               <Button
+                size="dialog-action"
                 disabled={isApplying || !canManageRelay || linkStateData === null}
                 onClick={() => void applyPublishSelection()}
               >
@@ -316,7 +325,7 @@ function ConfiguredConnectOnboardingDialog() {
               </Button>
             </>
           ) : (
-            <Button disabled={isApplying} onClick={complete}>
+            <Button size="dialog-action" disabled={isApplying} onClick={complete}>
               {t.account.onboarding.done}
             </Button>
           )}
@@ -349,7 +358,7 @@ function PublishStep({
 }) {
   return (
     <div className="space-y-3">
-      <div className="rounded-lg border">
+      <div className="space-y-1.5">
         <OnboardingToggleRow
           title={t.account.onboarding.publishEnvironment}
           description={t.account.onboarding.publishHint}
@@ -365,11 +374,14 @@ function PublishStep({
           onCheckedChange={onPublishAgentActivityChange}
         />
       </div>
-      {operationError ? <p className="text-xs text-destructive">{operationError}</p> : null}
+      {operationError ? (
+        <p className="text-secondary-copy text-destructive">{operationError}</p>
+      ) : null}
     </div>
   );
 }
 
+/** Makes the whole publication option selectable while preserving disabled state and parent callbacks. */
 function OnboardingToggleRow({
   title,
   description,
@@ -384,18 +396,21 @@ function OnboardingToggleRow({
   readonly onCheckedChange: (enabled: boolean) => void;
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 border-t border-border/60 px-4 py-3 first:border-t-0">
-      <div className="min-w-0">
-        <p className="text-sm font-medium">{title}</p>
-        <p className="mt-1 text-xs text-muted-foreground">{description}</p>
-      </div>
-      <Switch
+    <label
+      className={cn(
+        "flex min-h-11 cursor-pointer items-center gap-2.5 rounded-ov5-row px-3 text-control has-disabled:cursor-default",
+        checked ? "bg-accent inset-shadow-selected-control" : "bg-ov5-row",
+      )}
+    >
+      <Checkbox
         aria-label={title}
         checked={checked}
         disabled={disabled}
-        onCheckedChange={onCheckedChange}
+        onCheckedChange={(value) => onCheckedChange(value === true)}
       />
-    </div>
+      <span>{title}</span>
+      <span className="sr-only">{description}</span>
+    </label>
   );
 }
 
@@ -408,13 +423,13 @@ function DevicesStep() {
   );
 
   return (
-    <div className="overflow-hidden rounded-lg border">
+    <div className="overflow-hidden rounded-ov5-row bg-ov5-well shadow-well-pressed">
       <CloudEnvironmentConnectRows
         primaryEnvironmentId={primaryEnvironment?.environmentId ?? null}
         savedEnvironments={savedEnvironments}
         showSavedEnvironments
         empty={
-          <p className="px-4 py-6 text-center text-sm text-muted-foreground">
+          <p className="px-4 py-6 text-center text-control text-muted-foreground">
             {t.account.onboarding.noOtherEnvironments}
           </p>
         }
