@@ -66,6 +66,7 @@ function ResizablePreviewPanelShell(props: PreviewPanelShellProps) {
     enabled: props.mode === "inline" && !props.maximized,
     widthStorageKey: props.widthStorageKey,
     defaultWidth: props.defaultWidth,
+    standalone: props.standalone,
   });
   return <PreviewPanelShellFrame {...props} inlineSize={inlineSize} hostRef={hostRef} />;
 }

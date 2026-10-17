@@ -1,8 +1,10 @@
+/** Keeps inline panel widths within their host while reserving usable sibling space. */
 import { type RefObject, useLayoutEffect, useState } from "react";
 
 import { type ResizableWidthHandlers, useResizableWidth } from "./useResizableWidth";
 import { observeResize } from "../lib/observeResize";
 
+/** Current clamped width in CSS pixels and the panel's drag handlers. */
 export interface PreviewPanelInlineSize {
   readonly width: number;
   readonly handlers: ResizableWidthHandlers;
@@ -23,6 +25,11 @@ const PREVIEW_PANEL_MAX_WIDTH_FRACTION = 0.7;
 const SIBLING_COLUMN_MIN_WIDTH = 360;
 const PREVIEW_PANEL_DEFAULT_WIDTH = 540;
 
+/**
+ * Sizes an inline panel from its host ref or explicit container, with optional storage defaults.
+ * Standalone slabs reserve the inherited CSS gap; other hosts reserve no extra space.
+ * Returns a clamped pixel width and handlers that persist completed resizes.
+ */
 export function usePreviewPanelInlineSize(
   hostRef?: RefObject<HTMLElement | null>,
   options: {
@@ -31,9 +38,16 @@ export function usePreviewPanelInlineSize(
     readonly defaultWidth?: number | undefined;
     /** Measure this row instead of the panel's parent. */
     readonly container?: HTMLElement | null | undefined;
+    /** Reserve --frame-slab-gap for a separate slab; defaults to false. */
+    readonly standalone?: boolean | undefined;
   } = {},
 ): PreviewPanelInlineSize {
-  const maxWidth = useViewportClampedMaxWidth(hostRef, options.enabled ?? true, options.container);
+  const maxWidth = useViewportClampedMaxWidth(
+    hostRef,
+    options.enabled ?? true,
+    options.container,
+    options.standalone ?? false,
+  );
   return useResizableWidth({
     storageKey: options.widthStorageKey ?? PREVIEW_PANEL_WIDTH_STORAGE_KEY,
     defaultWidth: options.defaultWidth ?? PREVIEW_PANEL_DEFAULT_WIDTH,
@@ -52,6 +66,7 @@ function useViewportClampedMaxWidth(
   hostRef: RefObject<HTMLElement | null> | undefined,
   enabled: boolean,
   container: HTMLElement | null | undefined,
+  standalone: boolean,
 ): number {
   const [maxWidth, setMaxWidth] = useState(() =>
     getPreviewPanelMaxWidth(typeof window === "undefined" ? 1280 : window.innerWidth),
@@ -65,7 +80,14 @@ function useViewportClampedMaxWidth(
     // row resizes every frame of a sidebar drag, but the cap rarely moves, and an
     // unchanged cap skips re-rendering the panel's owner.
     const measure = () => {
-      setMaxWidth(getPreviewPanelMaxWidth(window.innerWidth, row?.clientWidth));
+      // Read the same inherited pixel token as the shell's margin, rather than
+      // duplicating the theme's spacing value in the resize calculation.
+      const gapSource = hostRef?.current ?? row;
+      const gap =
+        standalone && gapSource
+          ? Number.parseFloat(getComputedStyle(gapSource).getPropertyValue("--frame-slab-gap")) || 0
+          : 0;
+      setMaxWidth(getPreviewPanelMaxWidth(window.innerWidth, row?.clientWidth, gap));
     };
     measure();
     let frame = 0;
@@ -83,13 +105,23 @@ function useViewportClampedMaxWidth(
       if (frame !== 0) window.cancelAnimationFrame(frame);
       stopObserving?.();
     };
-  }, [container, hostRef, enabled]);
+  }, [container, hostRef, enabled, standalone]);
   return maxWidth;
 }
-export function getPreviewPanelMaxWidth(viewportWidth: number, containerWidth?: number): number {
+/**
+ * Returns the panel cap in CSS pixels from viewport, optional row width, and sibling gap (default 0).
+ * Preserves the panel's minimum when the row cannot accommodate both columns' minimums.
+ */
+export function getPreviewPanelMaxWidth(
+  viewportWidth: number,
+  containerWidth?: number,
+  gap = 0,
+): number {
   const fractionCap = Math.floor(viewportWidth * PREVIEW_PANEL_MAX_WIDTH_FRACTION);
   const containerCap =
-    containerWidth === undefined ? Infinity : Math.floor(containerWidth) - SIBLING_COLUMN_MIN_WIDTH;
+    containerWidth === undefined
+      ? Infinity
+      : Math.floor(containerWidth - gap) - SIBLING_COLUMN_MIN_WIDTH;
   // Never below the panel's own minimum: when the row cannot fit both
   // columns' minimums the sibling yields, and useResizableWidth's clamp must
   // not see max < min (it would resolve the inversion to min and, via

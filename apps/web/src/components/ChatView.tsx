@@ -2282,6 +2282,7 @@ export default function ChatView(props: ChatViewProps) {
   const browserAvailable = isPreviewSupportedInRuntime() || activeEnvironmentServerBrowser;
   const previewPanelInlineSize = usePreviewPanelInlineSize(undefined, {
     container: workspaceLayoutElement,
+    standalone: true,
     defaultWidth: 560,
     widthStorageKey: `t3code:preview-panel-width:${activeThreadKey}`,
   });
