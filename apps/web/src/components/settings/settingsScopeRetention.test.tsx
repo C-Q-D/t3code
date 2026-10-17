@@ -35,6 +35,7 @@ vi.mock("./SettingsScopeContext", async () => {
     SettingsScopeProvider: ({ children }: { children: ReactNode }) => (
       <Scope value={state.scope}>{children}</Scope>
     ),
+    useOptionalSettingsScope: () => null,
     useSettingsScope: () => {
       const { search, environmentId } = useContext(Scope);
       return {
@@ -47,21 +48,19 @@ vi.mock("./SettingsScopeContext", async () => {
   };
 });
 vi.mock("../../state/environments", () => ({ useEnvironments: () => ({ environments: [] }) }));
-vi.mock("../ui/sidebar", () => ({
-  SidebarInset: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-}));
-vi.mock("../WorkspacePageHeader", () => ({
-  WorkspacePageHeader: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-}));
 vi.mock("./settingsLayout", () => ({
   SettingsPageContainer: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
-vi.mock("./SettingsBreadcrumb", () => ({ SettingsBreadcrumb: () => null }));
+vi.mock("./SettingsBreadcrumb", () => ({
+  SettingsBreadcrumb: () => null,
+  SettingsPageHeading: () => null,
+}));
 vi.mock("../sidebar/mainAppLocation", () => ({ useNavigateToMainApp: () => vi.fn() }));
 vi.mock("../../hooks/useNavigateBack", () => ({ useEscapeToGoBack: () => undefined }));
 vi.mock("./SettingsPanels", () => ({ useSettingsRestore: () => ({ changedSettingLabels: [] }) }));
 
 import { Route } from "../../routes/settings";
+import { TitlebarSlotProvider } from "../frame/titlebarSlot";
 
 function StatefulContent() {
   const [value, setValue] = useState(0);
@@ -79,7 +78,13 @@ await Layout.preload?.();
 
 async function render(scope: ScopeState) {
   state.scope = scope;
-  await act(async () => root.render(<Layout />));
+  await act(async () =>
+    root.render(
+      <TitlebarSlotProvider>
+        <Layout />
+      </TitlebarSlotProvider>,
+    ),
+  );
 }
 function retainedValue() {
   return container.querySelector('button[aria-label="Retained value"]')?.textContent ?? null;

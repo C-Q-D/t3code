@@ -1,11 +1,15 @@
+/** Groups settings rows on the shared graphite card surface; rows own their content and controls. */
 import type { ComponentProps } from "react";
 
 import { cn } from "../../lib/utils";
 
-/** Shared settings card surface, with optional separators between rows. */
+/**
+ * Renders a grouped stone card or a plain stack from props.
+ * divided remains opt-in; the design's default uses spacing rather than separators.
+ */
 export function SettingsGroup({
   variant = "grouped",
-  divided = true,
+  divided = false,
   className,
   ...props
 }: ComponentProps<"div"> & {
@@ -18,11 +22,9 @@ export function SettingsGroup({
       className={cn(
         "relative overflow-visible text-foreground",
         variant === "grouped"
-          ? "rounded-xl border border-border/60 bg-card/40 shadow-xs/5"
+          ? "stone-settings-group rounded-card-surface bg-surface-raised p-1 shadow-settings-group-elevation"
           : "space-y-1",
-        variant === "grouped" &&
-          divided &&
-          "[&>*+*]:border-t [&>*+*]:border-border/50 [&>[data-slot=settings-row]]:rounded-none",
+        variant === "grouped" && divided && "divide-y divide-border",
         className,
       )}
     />

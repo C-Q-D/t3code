@@ -1,5 +1,21 @@
-/* Settings navigation tokens from SettingsNav8a.dc.html, shared by M2/M4 and P1. */
+/* Settings shell and navigation tokens from SettingsPage8a/SettingsNav8a.dc.html, M2/M4 and P1. */
 @theme {
+  /* SettingsPage8a.dc.html M2: source badges, scope controls, row radii, card elevation and title leading. */
+  --color-settings-inheritance-surface: #26262a;
+  --color-settings-scope-control: #2b2b30;
+  --color-settings-target-surface: #3a3a40;
+  /* StyleM-8a.dc.html: the inert c-1 titlebar group keeps its drawn geometry. */
+  --color-settings-toolbar-well: #070708;
+  --radius-settings-row-surface: 14px;
+  --radius-settings-toolbar-tray: 14px;
+  --radius-settings-toolbar-key: 11px;
+  --leading-settings-page-heading: 1.2;
+  --shadow-settings-group-elevation:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.095), inset 0 -2px 0 rgba(0, 0, 0, 0.66),
+    0 0 0 1px rgba(0, 0, 0, 0.484), 0 3px 0 #09090a, 10px 16px 24px -8px rgba(0, 0, 0, 0.7);
+  --shadow-settings-toolbar-key-elevation:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09), 0 0 0 1px rgba(0, 0, 0, 0.44), 0 1.5px 0 #09090a,
+    2px 3px 5px -1px rgba(0, 0, 0, 0.55);
   --color-settings-connect: #26262a;
   --color-settings-avatar: #3a3a40;
   --color-settings-match: #f3c55e;
@@ -16,4 +32,59 @@
   --shadow-settings-footer-rule: 0 1px 0 rgba(255, 255, 255, 0.05);
   --shadow-settings-connect-row: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 1.5px 0 #09090a;
   --shadow-settings-avatar-edge: 0 1.5px 0 #09090a;
+}
+
+/* SettingsPage8a M2 uses the shared stone asset beneath the detail-card veil. */
+@utility stone-settings-group {
+  background-image:
+    linear-gradient(var(--color-stone-detail-veil), var(--color-stone-detail-veil)),
+    url("../assets/stone-8a.webp");
+  background-repeat: repeat;
+}
+
+@keyframes settings-target-fade {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@layer utilities {
+  /* Keep the existing destination lifecycle, overriding index.css's shadow animation
+     only inside the settings shell. A finite opacity overlay avoids repainting row contents. */
+  .settings-page-shell [data-settings-page-scroll] div.settings-search-target-pulse,
+  .settings-page-shell
+    [data-settings-page-scroll]
+    section.settings-search-target-pulse
+    > div:first-child {
+    position: relative;
+    isolation: isolate;
+    animation: none;
+    border-radius: var(--radius-settings-row-surface);
+  }
+
+  .settings-page-shell [data-settings-page-scroll] div.settings-search-target-pulse::before,
+  .settings-page-shell
+    [data-settings-page-scroll]
+    section.settings-search-target-pulse
+    > div:first-child::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: var(--color-settings-target-surface);
+    box-shadow: var(--inset-shadow-selected-control);
+    pointer-events: none;
+    animation: settings-target-fade 1300ms ease-out both;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .settings-page-shell .settings-search-target-pulse::before {
+      animation: none;
+    }
+  }
 }

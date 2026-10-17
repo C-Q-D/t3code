@@ -803,14 +803,18 @@ export const settings: Messages["settings"] = {
     ariaLabel: "设置面包屑导航",
     title: "设置",
   },
+  pageShell: {
+    returnToConversation: "返回对话",
+    restoreDeviceDefaults: "恢复设备默认值",
+    panelControls: "对话面板控件（设置页不可用）",
+  },
   scopeSentence: {
-    applying: "应用于项目",
-    on: "环境",
-    across: "环境范围",
+    applying: "作用于",
+    within: "中的",
     environmentAriaLabel: "环境范围",
     unavailableEnvironment: "环境不可用",
     noEnvironments: "没有环境",
-    allEnvironments: "全部环境",
+    allEnvironments: "所有环境",
     offline: "离线",
     projectAriaLabel: "项目范围",
     unavailableProject: "项目不可用",
@@ -818,6 +822,7 @@ export const settings: Messages["settings"] = {
     pickerAriaLabel: (scope: string, label: string) => `${scope}：${label}`,
   },
   scopeNotice: {
+    projectChanges: (project: string) => `你正在修改 ${project} 的设置，改动只对这个项目生效。`,
     environment: "环境",
     openAllEnvironments: "打开全部环境",
     checkoutLabel: (project: string, environment: string, workspaceRoot: string) =>

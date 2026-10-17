@@ -1,3 +1,4 @@
+/** Shows each setting's effective source and its existing per-target inheritance inspector. */
 import { t } from "~/i18n";
 import {
   DEFAULT_SERVER_SETTINGS,
@@ -7,7 +8,7 @@ import {
   type ServerSettings,
   type WorktreeSubmodules,
 } from "@t3tools/contracts";
-import { CheckIcon, LayersIcon } from "lucide-react";
+import { CheckIcon } from "lucide-react";
 import * as Equal from "effect/Equal";
 
 import { cn } from "../../lib/utils";
@@ -15,7 +16,7 @@ import type { EnvironmentPresentation } from "../../state/environments";
 import { EnvironmentMachineIcon } from "../EnvironmentMachineIcon";
 import { resolveEnvModeLabel, WORKTREE_SUBMODULES_LABELS } from "../BranchToolbar.logic";
 import { PULL_REQUEST_MERGE_METHOD_LABELS } from "../pullRequest/pullRequestDetail.logic";
-import { Button, InlineButton } from "../ui/button";
+import { InlineButton } from "../ui/button";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import type { ProjectOverrideEntry, ScopedSettingsTarget } from "./scopedSettings";
@@ -162,9 +163,7 @@ export type SettingInheritanceState =
   | "mixed";
 
 /**
- * A small indicator beside a row's title that opens a top-down view of where
- * the setting's value comes from on each selected target. It sits inline so
- * narrowing to a project does not add a caption line to every row.
+ * A project whose override can be inspected and reset from the inheritance popover.
  */
 export interface SettingOverridingProject extends ProjectOverrideEntry {
   readonly label: string;
@@ -172,6 +171,10 @@ export interface SettingOverridingProject extends ProjectOverrideEntry {
   readonly open: () => void;
 }
 
+/**
+ * Renders a source badge from state/summary and opens the existing target chains on activation.
+ * targets/environments/keys describe real values; overridingProjects and onClearOverrides retain project actions.
+ */
 export function SettingInheritance({
   state,
   summary,
@@ -221,25 +224,30 @@ export function SettingInheritance({
           render={
             <PopoverTrigger
               render={
-                <Button
-                  size="icon-micro"
-                  variant="ghost-muted"
+                <button
+                  type="button"
+                  className={cn(
+                    "inline-flex h-5 max-w-full cursor-pointer items-center rounded-tag px-2 text-meta leading-normal font-semibold text-shadow-none outline-none focus-visible:inset-shadow-focus",
+                    state === "mixed"
+                      ? "bg-warning-surface text-status-warning-foreground"
+                      : state === "overridden"
+                        ? "bg-update-surface text-update-foreground"
+                        : state === "default"
+                          ? "bg-settings-inheritance-surface text-muted-foreground"
+                          : "bg-settings-inheritance-surface text-code-foreground",
+                  )}
                   aria-label={t.settings.settingInheritance.showWhereThisValueComesFrom(
                     overrideSummary,
                   )}
-                />
+                >
+                  <span className="truncate">
+                    {state === "mixed" ? t.settings.general.mixed : summary}
+                  </span>
+                </button>
               }
             />
           }
-        >
-          <LayersIcon
-            className={cn(
-              "size-3",
-              state === "overridden" && "text-primary",
-              state === "mixed" && "text-warning",
-            )}
-          />
-        </TooltipTrigger>
+        />
         <TooltipPopup side="top">{overrideSummary}</TooltipPopup>
       </Tooltip>
       <PopoverPopup align="start" width="md" padding="none">

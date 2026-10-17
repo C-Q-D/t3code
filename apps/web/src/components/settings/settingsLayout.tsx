@@ -1,3 +1,4 @@
+/** Shared settings sections, rows, inheritance affordances and search destinations; routes own page scrolling. */
 import { SettingsGroup } from "./SettingsGroup";
 import { t } from "~/i18n";
 import { AuthSettingsWriteScope } from "@t3tools/contracts";
@@ -20,11 +21,10 @@ import {
 
 import { usePrimarySettingsAvailable } from "../../hooks/useSettings";
 import { cn } from "../../lib/utils";
-import { WorkspacePageContainer, type WorkspacePageWidth } from "../WorkspacePageContainer";
+import type { WorkspacePageWidth } from "../WorkspacePageContainer";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { useOptionalSettingsScope } from "./SettingsScopeContext";
-import { SettingsScopeSentence } from "./SettingsScopeSentence";
 import {
   isProjectScopedSettingKey,
   listProjectOverrides,
@@ -173,7 +173,7 @@ export function useRelativeTimeTick(intervalMs = 1_000) {
   return nowMs;
 }
 
-/** Muted section headings have no descriptions; explanatory copy belongs to individual settings. */
+/** Serif section headings name each group; explanatory copy belongs to individual settings. */
 export function SettingsSection({
   title,
   hideTitle = false,
@@ -201,17 +201,17 @@ export function SettingsSection({
       {...sectionProps}
       ref={targetRef}
       tabIndex={sectionProps.id ? -1 : sectionProps.tabIndex}
-      className={cn(!hideTitle && "space-y-2.5", className)}
+      className={cn(!hideTitle && "space-y-2", className)}
     >
       {hideTitle ? (
         <h2 className="sr-only">{title}</h2>
       ) : (
         <div
           data-settings-scroll-target
-          className="flex min-h-7 items-start justify-between gap-4 px-3 sm:px-4"
+          className="flex min-h-7 items-start justify-between gap-4 px-1"
         >
           <div className="flex min-w-0 items-center gap-1">
-            <h2 className="flex min-h-7 items-center gap-2 text-sm font-normal text-foreground/70">
+            <h2 className="flex min-h-7 items-center gap-2 font-serif text-plan-title leading-normal font-bold text-foreground">
               {icon}
               {title}
             </h2>
@@ -259,7 +259,7 @@ export function SettingsUnavailableGroup({
  * Control sizing across settings follows three tiers so rows share a baseline:
  * - `control` slot: `size="sm"` (Button, Select, Input, NumberField) or `icon-sm`.
  * - Section `headerAction`s and buttons inside list items, cards, toolbars: `xs` / `icon-xs`.
- * - Inline affordances (reset arrows, info tooltips, table-cell buttons): `icon-micro`.
+ * - Inline affordances: `icon-micro`, or `micro` for the labelled project inheritance reset.
  * Dialog footers keep the app-wide default button size.
  */
 export function SettingsRow({
@@ -269,6 +269,7 @@ export function SettingsRow({
   resetAction,
   onResetOverride,
   control,
+  controlLayout = "inline",
   serverScoped = false,
   settingKeys = EMPTY_SETTING_KEYS,
   mixed: mixedOverride,
@@ -283,6 +284,8 @@ export function SettingsRow({
   /** Replaces the default override clear for rows with side effects beyond the settings key. */
   onResetOverride?: () => void;
   control?: ReactNode;
+  /** Inline controls align right; full controls occupy a separate row. Children always span the row. */
+  controlLayout?: "inline" | "full";
   serverScoped?: boolean;
   settingKeys?: readonly (keyof ServerSettings)[];
   mixed?: boolean;
@@ -319,11 +322,13 @@ export function SettingsRow({
     (!canWriteSettings ||
       !(context ? context.connectedEnvironments.length > 0 : primarySettingsAvailable));
   const inheritedFrom =
-    source === "environment" && context?.scope.environmentIds.length === 1
-      ? (context.environments.find(
-          (environment) => environment.environmentId === context.scope.environmentIds[0],
-        )?.label ?? t.settings.layout.environment)
-      : t.settings.layout.environment;
+    context && !context.search.machine && context.scope.kind !== "checkout"
+      ? t.settings.scopeSentence.allEnvironments
+      : source === "environment" && context?.scope.environmentIds.length === 1
+        ? (context.environments.find(
+            (environment) => environment.environmentId === context.scope.environmentIds[0],
+          )?.label ?? t.settings.layout.environment)
+        : t.settings.layout.environment;
   const environmentSettingsById = useMemo(
     () =>
       new Map(
@@ -364,6 +369,7 @@ export function SettingsRow({
       <SettingResetButton
         label={typeof title === "string" ? title : t.settings.layout.override}
         tooltip={t.settings.layout.resetToInherited}
+        showLabel
         onClick={() => (onResetOverride ? onResetOverride() : clearOverrides(scopedKeys))}
       />
     ) : null
@@ -377,14 +383,11 @@ export function SettingsRow({
           // Focusable so keyboard users can still reach the explanation.
           <span
             tabIndex={0}
-            className="flex w-full items-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring @min-[32rem]/settings-row:w-auto"
+            className="flex max-w-full items-center rounded-menu-row outline-none focus-visible:inset-shadow-focus"
           />
         }
       >
-        <div
-          inert
-          className="flex w-full items-center gap-2 opacity-50 @min-[32rem]/settings-row:w-auto"
-        >
+        <div inert className="flex max-w-full items-center gap-2 opacity-50">
           {control}
         </div>
       </TooltipTrigger>
@@ -413,8 +416,8 @@ export function SettingsRow({
       : environmentWide && control
         ? inertControl(t.settings.layout.environmentWideHint)
         : control;
-  // Server rows get an indicator beside the title that opens the resolution
-  // chain per target at every scope; client rows keep a plain status only.
+  // The text badge still opens the resolution chain; changing its presentation
+  // must not remove the per-target values or project reset actions in that chain.
   const customized =
     context !== null &&
     settingKeys.some((key) =>
@@ -463,35 +466,35 @@ export function SettingsRow({
       tabIndex={rowProps.id ? -1 : rowProps.tabIndex}
       data-slot="settings-row"
       className={cn(
-        "@container/settings-row rounded-xl px-3 sm:px-4 aria-disabled:opacity-64 aria-disabled:[&_*]:text-muted-foreground",
-        children ? "pt-3 pb-1" : "py-3",
+        "@container/settings-row flex flex-col gap-3 rounded-settings-row-surface py-2.5 pr-3 pl-3.5 aria-disabled:opacity-64 aria-disabled:[&_*]:text-muted-foreground",
         className,
       )}
     >
-      <div className="flex flex-col gap-3 @min-[32rem]/settings-row:grid @min-[32rem]/settings-row:grid-cols-[minmax(0,1fr)_minmax(10rem,auto)] @min-[32rem]/settings-row:items-center @min-[32rem]/settings-row:gap-8">
-        <div className="min-w-0 flex-1 space-y-1">
-          <div className="flex min-h-5 items-center gap-1.5">
-            <h3 className="text-sm font-medium text-foreground">{title}</h3>
-            {renderedInheritance ? (
-              <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center">
-                {renderedInheritance}
-              </span>
-            ) : null}
-            <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center">
-              {renderedReset}
-            </span>
+      <div className="flex min-h-8 flex-wrap items-center gap-4">
+        <div className="min-w-0 flex-1 basis-52 space-y-0.5">
+          <div className="flex min-h-5 flex-wrap items-center gap-2">
+            <h3 className="text-control leading-normal font-semibold text-foreground">{title}</h3>
+            {renderedInheritance}
+            {renderedReset}
           </div>
           {description ? (
-            <p className="max-w-xl text-xs leading-normal text-muted-foreground/80">
+            <p className="text-secondary-copy-medium leading-normal text-secondary-label">
               {description}
             </p>
           ) : null}
           {renderedStatus ? (
-            <div className="pt-0.5 text-xs text-muted-foreground">{renderedStatus}</div>
+            <div className="pt-0.5 text-secondary-copy leading-normal text-muted-foreground">
+              {renderedStatus}
+            </div>
           ) : null}
         </div>
         {renderedControl ? (
-          <div className="flex w-full min-w-0 shrink-0 items-center gap-2 @min-[32rem]/settings-row:w-auto @min-[32rem]/settings-row:justify-end">
+          <div
+            className={cn(
+              "ml-auto flex min-w-0 max-w-full shrink-0 items-center justify-end gap-2",
+              controlLayout === "full" && "w-full basis-full",
+            )}
+          >
             {renderedControl}
           </div>
         ) : null}
@@ -512,17 +515,21 @@ export function SettingsRow({
  * @param props.label Setting name used in the accessible action name.
  * @param props.tooltip Tooltip text; defaults to the localized reset text.
  * @param props.disabled Whether the button is disabled; defaults to false.
+ * @param props.showLabel Whether to show the project inheritance reset label; defaults to false.
  * @param props.onClick Callback that performs the reset.
  */
 export function SettingResetButton({
   label,
   tooltip = t.common.resetToDefault,
   disabled = false,
+  showLabel = false,
   onClick,
 }: {
   label: string;
   tooltip?: string;
   disabled?: boolean;
+  /** Project override resets show their inheritance action; other existing callers retain an icon. */
+  showLabel?: boolean;
   onClick: () => void;
 }) {
   return (
@@ -530,8 +537,8 @@ export function SettingResetButton({
       <TooltipTrigger
         render={
           <Button
-            size="icon-micro"
-            variant="ghost-muted"
+            size={showLabel ? "micro" : "icon-micro"}
+            variant={showLabel ? "outline" : "ghost-muted"}
             aria-label={t.common.resetLabelToDefault(label)}
             disabled={disabled}
             onClick={(event) => {
@@ -540,6 +547,7 @@ export function SettingResetButton({
             }}
           >
             <Undo2Icon className="size-3" />
+            {showLabel ? t.settings.layout.resetToInherited : null}
           </Button>
         }
       />
@@ -548,6 +556,10 @@ export function SettingResetButton({
   );
 }
 
+/**
+ * Provides search destination context and aligned child content; the route owns scrolling and the header.
+ * width retains existing wide/expanded layouts; the readable default follows the design's 820px frame.
+ */
 export function SettingsPageContainer({
   children,
   className,
@@ -580,13 +592,13 @@ export function SettingsPageContainer({
       onTargetHandled={clearTargetHash}
     >
       <div
-        className="topbar-scroll-fade scrollbar-gutter-both flex-1 overflow-y-auto"
-        data-settings-page-scroll
+        className={cn(
+          "mx-auto flex w-full flex-col gap-5.5 px-7 pt-5.5 pb-12",
+          width === "readable" ? "max-w-205" : width === "wide" ? "max-w-5xl" : "max-w-6xl",
+          className,
+        )}
       >
-        <WorkspacePageContainer width={width} className={cn("gap-8", className)}>
-          <SettingsScopeSentence />
-          {children}
-        </WorkspacePageContainer>
+        {children}
       </div>
     </SettingsSearchTargetProvider>
   );

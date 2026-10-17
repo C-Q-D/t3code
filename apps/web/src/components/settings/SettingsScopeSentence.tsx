@@ -1,3 +1,4 @@
+/** Presents environment and project scope pickers; axis helpers retain selection semantics. */
 import { t } from "~/i18n";
 import { resolveEnvironmentMachineKind } from "@t3tools/contracts";
 import { useLocation } from "@tanstack/react-router";
@@ -8,7 +9,6 @@ import type { SidebarProjectSnapshot } from "../../sidebarProjectGrouping";
 import { useEnvironments, type EnvironmentPresentation } from "../../state/environments";
 import { EnvironmentMachineIcon } from "../EnvironmentMachineIcon";
 import { ProjectFavicon } from "../ProjectFavicon";
-import { InlineButton } from "../ui/button";
 import {
   Menu,
   MenuPopup,
@@ -37,6 +37,7 @@ export const SETTINGS_DEVICE_ONLY_PATHS: ReadonlySet<string> = new Set([
   "/settings/connections",
 ]);
 
+/** Current axis values, available choices, and the existing scope-selection action. */
 interface SettingsScopeMenuProps {
   readonly value: SettingsScopeSearch;
   readonly groups: readonly SidebarProjectSnapshot[];
@@ -46,8 +47,8 @@ interface SettingsScopeMenuProps {
 }
 
 /**
- * "Applying settings for <project> across <environment>" at the top of a settings
- * page. The two pickers are the targets a change is written to. A project is
+ * "Applies to <environment> in <project>" at the top of a settings page.
+ * The two pickers are the targets a change is written to. A project is
  * the same project on every environment, so the environment alone decides
  * where a project override is written.
  */
@@ -64,25 +65,21 @@ export function SettingsScopeSentence() {
     onChange: scope.selectScope,
   };
   return (
-    <p className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 px-3 text-base text-muted-foreground sm:px-4">
-      {/* Each connective stays with its picker so a wrap never strands "on". */}
-      <span className="flex min-w-0 items-center gap-1.5">
+    <p className="flex min-w-0 flex-wrap items-center gap-2 text-control leading-normal text-code-foreground">
+      {/* Keep each connective with its picker when a narrow page wraps the sentence. */}
+      <span className="flex min-w-0 items-center gap-2">
         <span className="shrink-0">{t.settings.scopeSentence.applying}</span>
-        <ProjectScopeMenu {...props} />
-      </span>
-      <span className="flex min-w-0 items-center gap-1.5">
-        <span className="shrink-0">
-          {/* A legacy checkout link names one environment without `machine`. */}
-          {scope.search.machine || scope.scope.kind === "checkout"
-            ? t.settings.scopeSentence.on
-            : t.settings.scopeSentence.across}
-        </span>
         <EnvironmentScopeMenu {...props} />
+      </span>
+      <span className="flex min-w-0 items-center gap-2">
+        <span className="shrink-0">{t.settings.scopeSentence.within}</span>
+        <ProjectScopeMenu {...props} />
       </span>
     </p>
   );
 }
 
+/** Renders an axis picker labelled by ariaLabel/label, with its existing radio choices as children. */
 function ScopeMenu({
   ariaLabel,
   icon,
@@ -98,18 +95,19 @@ function ScopeMenu({
     <Menu>
       <MenuTrigger
         aria-label={t.settings.scopeSentence.pickerAriaLabel(ariaLabel, label)}
-        render={<InlineButton tone="picker" />}
-        className="min-w-0 max-w-72"
+        render={<button type="button" />}
+        className={`inline-flex h-7.5 min-w-0 max-w-72 cursor-pointer items-center gap-1.25 rounded-full bg-settings-scope-control pr-2 ${icon ? "pl-2.5" : "pl-3"} text-secondary-copy-large leading-normal font-semibold text-foreground shadow-raise-tab outline-none hover:bg-accent focus-visible:inset-shadow-focus`}
       >
         {icon}
         <span className="min-w-0 truncate">{label}</span>
-        <ChevronDownIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+        <ChevronDownIcon aria-hidden className="size-3.25 shrink-0" />
       </MenuTrigger>
       <MenuPopup align="start">{children}</MenuPopup>
     </Menu>
   );
 }
 
+/** Lists environment choices from props; selection still runs selectEnvironmentAxis, including checkout handling. */
 function EnvironmentScopeMenu({
   value,
   groups,
@@ -196,12 +194,13 @@ function EnvironmentScopeMenu({
   );
 }
 
+/** Lists real project groups and the all-projects choice; forwards axis changes through onChange. */
 function ProjectScopeMenu({ value, groups, onChange }: SettingsScopeMenuProps) {
   const selected = groups.find((group) => group.projectKey === value.project);
   return (
     <ScopeMenu
       ariaLabel={t.settings.scopeSentence.projectAriaLabel}
-      icon={selected ? <ProjectFavicon project={selected} className="size-3.5 shrink-0" /> : null}
+      icon={selected ? <ProjectFavicon project={selected} className="size-4 shrink-0" /> : null}
       label={
         selected?.displayName ??
         (value.project

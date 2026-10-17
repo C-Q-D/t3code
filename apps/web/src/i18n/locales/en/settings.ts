@@ -853,10 +853,14 @@ export const settings = {
     ariaLabel: "Settings breadcrumb",
     title: "Settings",
   },
+  pageShell: {
+    returnToConversation: "Return to conversation",
+    restoreDeviceDefaults: "Restore device defaults",
+    panelControls: "Conversation panel controls (unavailable in settings)",
+  },
   scopeSentence: {
-    applying: "Applying settings for",
-    on: "on",
-    across: "across",
+    applying: "Applies to",
+    within: "in",
     environmentAriaLabel: "Environment scope",
     unavailableEnvironment: "Unavailable environment",
     noEnvironments: "No environments",
@@ -868,6 +872,8 @@ export const settings = {
     pickerAriaLabel: (scope: string, label: string) => `${scope}: ${label}`,
   },
   scopeNotice: {
+    projectChanges: (project: string) =>
+      `You are changing settings for ${project}. Changes apply only to this project.`,
     environment: "Environment",
     openAllEnvironments: "Open all environments",
     checkoutLabel: (project: string, environment: string, workspaceRoot: string) =>
