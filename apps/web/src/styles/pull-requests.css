@@ -52,3 +52,40 @@
 .pr-comment-copy .chat-markdown {
   @apply text-secondary-copy-large text-fg-detail leading-pr-comment;
 }
+
+/* 其余屏-2.dc.html L4/L5 / PRPage8a: 400px list and 11.5px metadata. */
+@theme {
+  --spacing-pr-list: 400px;
+  --text-pr-list-meta: 11.5px;
+  --text-pr-list-meta--line-height: 1.5;
+  --color-pr-filter-idle: #2b2b30;
+  --color-pr-filter-open: #4a4a52;
+  --shadow-pr-filter-idle: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 1px 0 #09090a;
+}
+
+/* Branch and update metadata remain visible; skipped rows reserve their full three/four lines. */
+@utility pr-list-row {
+  content-visibility: auto;
+  contain-intrinsic-block-size: auto 86px;
+}
+
+@utility pr-list-row-expanded {
+  contain-intrinsic-block-size: auto 108px;
+}
+
+/* A running action must stay reachable after the pointer leaves the row. */
+@utility pr-list-actions {
+  &:has([data-pull-request-action-pending="true"]) {
+    display: flex;
+  }
+}
+
+/* The feature supplies its search glyph and spacing instead of WebKit's extra decoration. */
+@utility pr-list-search {
+  &::-webkit-search-cancel-button,
+  &::-webkit-search-decoration,
+  &::-webkit-search-results-button,
+  &::-webkit-search-results-decoration {
+    appearance: none;
+  }
+}

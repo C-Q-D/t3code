@@ -91,6 +91,7 @@ const twMerge = extendTailwindMerge({
         "composer-question",
         "pn5-search",
         "pn5-hint",
+        "pr-list-meta",
       ],
       shadow: [
         "slab",
@@ -214,6 +215,7 @@ const twMerge = extendTailwindMerge({
         "timeline-provider-warning",
         "timeline-setup-key",
         "timeline-scroll",
+        "pr-filter-idle",
       ],
       "inset-shadow": [
         "selected",

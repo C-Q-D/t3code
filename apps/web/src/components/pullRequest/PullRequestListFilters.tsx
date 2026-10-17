@@ -14,34 +14,28 @@ import {
   CircleDashedIcon,
   CircleSlashIcon,
   CircleXIcon,
+  ChevronDownIcon,
   EyeOffIcon,
   FolderGit2Icon,
   LayersIcon,
-  ListFilterIcon,
   SearchIcon,
-  TagIcon,
-  UserRoundIcon,
 } from "lucide-react";
-import { type ElementType, useState } from "react";
+import { type ElementType, type ReactNode, useState } from "react";
 
 import { getSourceControlPresentationForKind } from "~/sourceControlPresentation";
 import { ProjectFavicon, type ProjectFaviconProject } from "../ProjectFavicon";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "../ui/input-group";
-import { Button } from "../ui/button";
+import { Well } from "../ui/well";
+import { cn } from "~/lib/utils";
 
 import {
   Menu,
   MenuCheckboxItem,
-  MenuGroupLabel,
   MenuItem,
   MenuPopup,
   MenuRadioGroup,
   MenuRadioItem,
   MenuRadioItemIndicator,
-  MenuSeparator,
-  MenuSub,
-  MenuSubPopup,
-  MenuSubTrigger,
   MenuTrigger,
 } from "../ui/menu";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
@@ -113,30 +107,34 @@ export function PullRequestSearchInput({
 }) {
   const [draft, setDraft] = useState<string | null>(null);
   return (
-    <InputGroup className="min-w-0 flex-1 **:[input]:h-9 sm:**:[input]:h-8">
-      <InputGroupAddon>
-        {busy ? <Spinner aria-hidden /> : <SearchIcon aria-hidden />}
-      </InputGroupAddon>
-      <InputGroupInput
-        type="search"
-        value={draft ?? value}
-        onFocus={() => setDraft(value)}
-        onBlur={() => setDraft(null)}
-        onChange={(event) => {
-          setDraft(event.currentTarget.value);
-          onChange(event.currentTarget.value);
-        }}
-        placeholder={t.git.pullRequest.searchPullRequestsOrLabelBug}
-        aria-label={t.git.pullRequest.searchPullRequests}
+    <div className="group/pr-search relative min-w-0 flex-1">
+      <Well tone="input" radius="pill" depth="control" className="flex min-w-0 items-center">
+        <span className="ml-3.5 flex shrink-0 items-center text-muted-foreground">
+          {busy ? <Spinner aria-hidden /> : <SearchIcon aria-hidden className="size-3.75" />}
+        </span>
+        <input
+          className="pr-list-search h-9.5 min-w-0 flex-1 rounded-full bg-transparent pl-2 pr-3.5 text-control text-foreground outline-none placeholder:text-placeholder"
+          type="search"
+          value={draft ?? value}
+          onFocus={() => setDraft(value)}
+          onBlur={() => setDraft(null)}
+          onChange={(event) => {
+            setDraft(event.currentTarget.value);
+            onChange(event.currentTarget.value);
+          }}
+          placeholder={t.git.pullRequest.searchPullRequestsOrLabelBug}
+          aria-label={t.git.pullRequest.searchPullRequests}
+        />
+      </Well>
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-0 rounded-full group-focus-within/pr-search:inset-shadow-focus"
       />
-    </InputGroup>
+    </div>
   );
 }
 
-/**
- * List narrowings live behind one filter control, separate from sorting. The trigger carries a
- * count whenever any filter is off its default, so a narrowed list is never a mystery.
- */
+/** Radio sentinel for the unscoped project; actual projects use composite environment/id keys. */
 const ALL_PROJECTS_VALUE = "all";
 /** MenuRadioGroup wants a string, so "every host" wears the one value no host can be. */
 const ALL_HOSTS_VALUE = "";
@@ -191,24 +189,25 @@ function PullRequestFilterRadioGroup<Value extends string>({
 }) {
   return (
     <MenuRadioGroup
+      aria-label={label}
       value={value}
       onValueChange={(next) => {
         if (next !== value) onChange(next as Value);
       }}
     >
-      <MenuGroupLabel>{label}</MenuGroupLabel>
       {options.map((option) => {
         // A host the server has already said it cannot read is not a choice here: offering
         // it would answer the press by replacing a working list with that failure.
         const item = (
           <MenuRadioItem
+            density="compact"
             key={option.value}
             value={option.value}
             className={option.unavailable ? "data-disabled:pointer-events-auto" : undefined}
             disabled={option.unavailable !== undefined}
           >
             <span className="flex min-w-0 items-center gap-2">
-              <PullRequestFilterOptionIcon option={option} />
+              {option.project ? <PullRequestFilterOptionIcon option={option} /> : null}
               <span className="min-w-0 flex-1 truncate">{option.label}</span>
               {option.unavailable ? (
                 <span className="shrink-0">{t.git.pullRequest.unavailable}</span>
@@ -229,37 +228,99 @@ function PullRequestFilterRadioGroup<Value extends string>({
   );
 }
 
-function PullRequestFilterRadioSubmenu<Value extends string>({
+/**
+ * A 26px list filter chip; Base UI supplies menu state, keyboard navigation and dismissal.
+ * @param props The filter label, active narrowing and trigger contents.
+ * @returns A trigger sized for the PR list's wrapping filter bar.
+ */
+function PullRequestFilterTrigger({
+  label,
+  active,
+  sorting = false,
+  children,
+}: {
+  label: string;
+  active: boolean;
+  sorting?: boolean;
+  children?: ReactNode;
+}) {
+  return (
+    <MenuTrigger
+      aria-label={label}
+      render={<button type="button" />}
+      className={cn(
+        "inline-flex min-w-0 max-w-full items-center gap-0.75 rounded-full pl-2.5 pr-1.5 text-secondary-copy outline-none focus-visible:inset-shadow-focus data-popup-open:bg-pr-filter-open hover:bg-accent",
+        sorting ? "h-7 bg-transparent text-secondary-label" : "h-6.5",
+        !sorting && active
+          ? "bg-accent font-semibold text-foreground inset-shadow-selected-control"
+          : !sorting && "bg-pr-filter-idle text-code-foreground shadow-pr-filter-idle",
+      )}
+    >
+      <span className="truncate">{children ?? label}</span>
+      <ChevronDownIcon aria-hidden className="size-3 shrink-0" />
+    </MenuTrigger>
+  );
+}
+
+const EMPTY_SUPPLEMENTARY_OPTIONS: ReadonlyArray<string> = [];
+
+/**
+ * Opens one list narrowing directly from the filter bar, without changing its stored value.
+ * @param props Current value, supported choices and the existing update callback; valueOnly labels sorting by its selected choice.
+ * @returns A filter chip and a radio menu, retaining unavailable-option explanations.
+ */
+export function PullRequestFilterSelect<Value extends string>({
   label,
   value,
   options,
   onChange,
+  onOpenChange,
+  valueOnly = false,
+  supplementaryOptions = EMPTY_SUPPLEMENTARY_OPTIONS,
 }: {
   label: string;
   value: Value;
   options: ReadonlyArray<PullRequestFilterOption<Value>>;
   onChange: (value: Value) => void;
+  onOpenChange?: ((open: boolean) => void) | undefined;
+  valueOnly?: boolean;
+  /** Board choices absent from the filter contract remain visible but cannot issue a request. */
+  supplementaryOptions?: ReadonlyArray<string>;
 }) {
   const current = options.find((option) => option.value === value) ?? options[0];
   if (!current) return null;
   return (
-    <MenuSub>
-      <MenuSubTrigger>
-        <PullRequestFilterOptionIcon option={current} />
-        <span className="flex-1">{label}</span>
-        <span className="min-w-0 max-w-32 truncate text-xs text-muted-foreground">
-          {current.label}
-        </span>
-      </MenuSubTrigger>
-      <MenuSubPopup>
+    <Menu onOpenChange={onOpenChange}>
+      <PullRequestFilterTrigger
+        label={t.git.pullRequest.filterValue(label, current.label)}
+        active={!valueOnly && value !== "all" && value !== ""}
+        sorting={valueOnly}
+      >
+        {valueOnly ? (
+          <span className="flex items-center gap-1.25">
+            <current.Icon aria-hidden className="size-3.25" />
+            {current.label}
+          </span>
+        ) : value !== "all" && value !== "" ? (
+          t.git.pullRequest.filterValue(label, current.label)
+        ) : (
+          label
+        )}
+      </PullRequestFilterTrigger>
+      <MenuPopup align="start" side="bottom" className={valueOnly ? "w-40" : "w-42.5"}>
         <PullRequestFilterRadioGroup
           label={label}
           value={value}
           options={options}
           onChange={onChange}
         />
-      </MenuSubPopup>
-    </MenuSub>
+        {supplementaryOptions.map((option) => (
+          <MenuItem key={option} density="compact" disabled>
+            {option}
+          </MenuItem>
+        ))}
+      </MenuPopup>
+    </Menu>
   );
 }
 
@@ -272,7 +333,9 @@ function PullRequestAuthorFilter({
   value,
   options,
   onChange,
+  onOpenChange,
 }: {
+  onOpenChange?: ((open: boolean) => void) | undefined;
   value: string | undefined;
   options: ReadonlyArray<PullRequestAuthorFacet>;
   onChange: (author: string | undefined) => void;
@@ -293,15 +356,13 @@ function PullRequestAuthorFilter({
   ].slice(0, 10);
   const select = (next: string) => next.toLowerCase() !== login && onChange(next || undefined);
   return (
-    <MenuSub>
-      <MenuSubTrigger>
-        <UserRoundIcon aria-hidden className="size-3.5" />
-        <span className="flex-1">{t.git.pullRequest.author}</span>
-        <span className="min-w-0 max-w-32 truncate text-xs text-muted-foreground">
-          {value ?? t.git.pullRequest.anyone}
-        </span>
-      </MenuSubTrigger>
-      <MenuSubPopup>
+    <Menu onOpenChange={onOpenChange}>
+      <PullRequestFilterTrigger label={t.git.pullRequest.author} active={value !== undefined}>
+        {value
+          ? t.git.pullRequest.filterValue(t.git.pullRequest.author, value)
+          : t.git.pullRequest.author}
+      </PullRequestFilterTrigger>
+      <MenuPopup align="start" side="bottom">
         <div className="p-1 pb-2">
           <InputGroup>
             <InputGroupAddon>
@@ -321,14 +382,18 @@ function PullRequestAuthorFilter({
           </InputGroup>
         </div>
         <MenuRadioGroup value={selected?.actor.login ?? value ?? ""} onValueChange={select}>
-          <MenuRadioItem value="">
+          <MenuRadioItem density="compact" value="">
             <span className="flex min-w-0 items-center gap-2">
               <LayersIcon aria-hidden className="size-3.5" />
               {t.git.pullRequest.anyone}
             </span>
           </MenuRadioItem>
           {visible.map((option) => (
-            <MenuRadioItem key={option.actor.login.toLowerCase()} value={option.actor.login}>
+            <MenuRadioItem
+              density="compact"
+              key={option.actor.login.toLowerCase()}
+              value={option.actor.login}
+            >
               <span className="flex min-w-0 items-center gap-2">
                 <PullRequestActorAvatar actor={option.actor} />
                 <span className="min-w-0 flex-1 truncate">{option.actor.login}</span>
@@ -343,8 +408,8 @@ function PullRequestAuthorFilter({
             <MenuItem disabled>{t.git.pullRequest.noAuthorsFound}</MenuItem>
           ) : null}
         </MenuRadioGroup>
-      </MenuSubPopup>
-    </MenuSub>
+      </MenuPopup>
+    </Menu>
   );
 }
 
@@ -357,7 +422,9 @@ function PullRequestLabelFilter({
   value,
   options,
   onChange,
+  onOpenChange,
 }: {
+  onOpenChange?: ((open: boolean) => void) | undefined;
   value: ReadonlyArray<string>;
   options: ReadonlyArray<PullRequestLabelFacet>;
   onChange: (labels: ReadonlyArray<string>) => void;
@@ -370,17 +437,16 @@ function PullRequestLabelFilter({
     ...options,
   ];
   return (
-    <MenuSub>
-      <MenuSubTrigger>
-        <TagIcon aria-hidden className="size-3.5" />
-        <span className="flex-1">{t.git.pullRequest.labels}</span>
-        <span className="text-xs text-muted-foreground">
-          {value.length === 0
-            ? t.git.pullRequest.any
-            : t.git.pullRequest.selectedLabels(value.length)}
-        </span>
-      </MenuSubTrigger>
-      <MenuSubPopup>
+    <Menu onOpenChange={onOpenChange}>
+      <PullRequestFilterTrigger label={t.git.pullRequest.labels} active={value.length > 0}>
+        {value.length > 0
+          ? t.git.pullRequest.filterValue(
+              t.git.pullRequest.labels,
+              t.git.pullRequest.selectedLabels(value.length),
+            )
+          : t.git.pullRequest.labels}
+      </PullRequestFilterTrigger>
+      <MenuPopup align="start" side="bottom">
         {visible.length === 0 ? (
           <MenuItem disabled>{t.git.pullRequest.noLabelsInThisView}</MenuItem>
         ) : (
@@ -390,6 +456,7 @@ function PullRequestLabelFilter({
             const dot = pullRequestLabelColor(option.color);
             return (
               <MenuCheckboxItem
+                density="compact"
                 key={key}
                 checked={checked}
                 onCheckedChange={(next) =>
@@ -415,13 +482,16 @@ function PullRequestLabelFilter({
             );
           })
         )}
-      </MenuSubPopup>
-    </MenuSub>
+      </MenuPopup>
+    </Menu>
   );
 }
 
+const EMPTY_AUTHORS: ReadonlyArray<PullRequestAuthorFacet> = [];
+const EMPTY_LABELS: ReadonlyArray<PullRequestLabelFacet> = [];
+
 /**
- * Renders pull request filters menu from the supplied display data and callbacks.
+ * Renders independent list filters while preserving existing scope and facet callbacks.
  * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
  * @returns The rendered surface.
  */
@@ -435,8 +505,8 @@ export function PullRequestFiltersMenu({
   onInvolvement,
   filters,
   onFilters,
-  authorOptions = [],
-  labelOptions = [],
+  authorOptions = EMPTY_AUTHORS,
+  labelOptions = EMPTY_LABELS,
   host,
   hostOptions,
   onHost,
@@ -449,7 +519,7 @@ export function PullRequestFiltersMenu({
   unavailable,
   onProject,
 }: {
-  onOpenChange?: (open: boolean) => void;
+  onOpenChange?: ((open: boolean) => void) | undefined;
   state: PullRequestListState;
   stateOptions: ReadonlyArray<PullRequestFilterOption<PullRequestListState>>;
   onState: (state: PullRequestListState) => void;
@@ -463,15 +533,15 @@ export function PullRequestFiltersMenu({
   labelOptions?: ReadonlyArray<PullRequestLabelFacet>;
   host: string | undefined;
   /**
-   * Includes the "all hosts" entry, whose value is the empty string. With fewer than two real
-   * hosts there is nothing to switch between, so the whole group stays out of the menu.
+   * Includes the "all hosts" entry, whose value is the empty string. The chip is hidden
+   * until at least one host is known.
    */
   hostOptions: ReadonlyArray<PullRequestFilterOption<string>>;
   onHost: (host: string | undefined) => void;
   server: EnvironmentId | undefined;
   /**
-   * Includes the "all servers" entry, whose value is the empty string. With one server there is
-   * nothing to switch between, so the whole group stays out of the menu.
+   * Includes the "all servers" entry, whose value is the empty string. The chip is hidden
+   * until at least one server is known.
    */
   serverOptions: ReadonlyArray<PullRequestFilterOption<string>>;
   onServer: (server: EnvironmentId | undefined) => void;
@@ -493,18 +563,6 @@ export function PullRequestFiltersMenu({
   onProject: (projectId: ProjectId | undefined, environmentId: EnvironmentId | undefined) => void;
 }) {
   const selectedLabels = (filters.labels ?? []).flatMap((group) => group);
-  const filterCount = [
-    state !== "open",
-    involvement !== "all",
-    host,
-    server,
-    projectId,
-    filters.draft,
-    filters.review,
-    filters.checks,
-    filters.author,
-    ...selectedLabels,
-  ].filter(Boolean).length;
   const updateFilters = (next: Partial<PullRequestListFilters>) =>
     onFilters(
       Object.fromEntries(
@@ -538,98 +596,103 @@ export function PullRequestFiltersMenu({
       })),
   ];
   return (
-    <Menu onOpenChange={onOpenChange}>
-      <MenuTrigger render={<Button variant="outline" />}>
-        <ListFilterIcon className="size-4" />
-        <span>{t.git.pullRequest.filters}</span>
-        {filterCount > 0 ? (
-          <span className="rounded-full bg-muted px-1.5 text-xs text-muted-foreground tabular-nums">
-            {filterCount}
-          </span>
-        ) : null}
-      </MenuTrigger>
-      <MenuPopup align="end" side="bottom">
-        <PullRequestFilterRadioSubmenu
-          label={t.git.pullRequest.state}
-          value={state}
-          options={stateOptions}
-          onChange={onState}
-        />
-        <PullRequestFilterRadioSubmenu
-          label={t.git.pullRequest.involvement}
-          value={involvement}
-          options={involvementOptions}
-          onChange={onInvolvement}
-        />
-        <MenuSeparator />
-        <PullRequestAuthorFilter
-          value={filters.author}
-          options={authorOptions}
-          onChange={(author) => updateFilters({ author })}
-        />
-        <PullRequestLabelFilter
-          value={selectedLabels}
-          options={labelOptions}
-          onChange={(labels) =>
-            updateFilters({
-              labels: labels.length === 0 ? undefined : labels.slice(0, 10).map((label) => [label]),
-            })
-          }
-        />
-        <PullRequestFilterRadioSubmenu
-          label={t.git.pullRequest.draft}
-          value={filters.draft ?? UNFILTERED_VALUE}
-          options={DRAFT_OPTIONS}
-          onChange={(draft) => updateFilter("draft", draft)}
-        />
-        <PullRequestFilterRadioSubmenu
-          label={t.git.pullRequest.review}
-          value={filters.review ?? UNFILTERED_VALUE}
-          options={REVIEW_OPTIONS}
-          onChange={(review) => updateFilter("review", review)}
-        />
-        <PullRequestFilterRadioSubmenu
-          label={t.git.pullRequest.checks}
-          value={filters.checks ?? UNFILTERED_VALUE}
-          options={CHECKS_OPTIONS}
-          onChange={(checks) => updateFilter("checks", checks)}
-        />
-        {hostOptions.length > 2 ? (
-          <>
-            <MenuSeparator />
-            <PullRequestFilterRadioSubmenu
-              label={t.git.pullRequest.host}
-              value={host ?? ALL_HOSTS_VALUE}
-              options={hostOptions}
-              onChange={(next) => onHost(next === ALL_HOSTS_VALUE ? undefined : next)}
-            />
-          </>
-        ) : null}
-        {serverOptions.length > 2 ? (
-          <>
-            <MenuSeparator />
-            <PullRequestFilterRadioSubmenu
-              label={t.git.pullRequest.server}
-              value={server ?? ALL_SERVERS_VALUE}
-              options={serverOptions}
-              onChange={(next) =>
-                onServer(next === ALL_SERVERS_VALUE ? undefined : (next as EnvironmentId))
-              }
-            />
-          </>
-        ) : null}
-        <MenuSeparator />
-        <PullRequestFilterRadioSubmenu
-          label={t.git.pullRequest.project}
-          value={projectValue}
-          options={projectOptions}
-          onChange={(next) => {
-            const project = projects.find((candidate) => pullRequestProjectKey(candidate) === next);
-            if (project) onProject(project.id, project.environmentId);
-            else if (projectId !== undefined) onProject(undefined, undefined);
-          }}
-        />
-      </MenuPopup>
-    </Menu>
+    <div
+      className="flex flex-wrap items-center gap-1.5"
+      role="group"
+      aria-label={t.git.pullRequest.filters}
+    >
+      <PullRequestFilterSelect
+        onOpenChange={onOpenChange}
+        label={t.git.pullRequest.state}
+        value={state}
+        options={stateOptions}
+        onChange={onState}
+      />
+      <PullRequestFilterSelect
+        onOpenChange={onOpenChange}
+        label={t.git.pullRequest.involvement}
+        value={involvement}
+        options={involvementOptions}
+        onChange={onInvolvement}
+        supplementaryOptions={[
+          t.git.pullRequest.awaitingMe,
+          t.git.pullRequest.reviewRequested,
+          t.git.pullRequest.otherInvolvement,
+        ]}
+      />
+      {hostOptions.length > 1 ? (
+        <>
+          <PullRequestFilterSelect
+            onOpenChange={onOpenChange}
+            label={t.git.pullRequest.host}
+            value={host ?? ALL_HOSTS_VALUE}
+            options={hostOptions}
+            onChange={(next) => onHost(next === ALL_HOSTS_VALUE ? undefined : next)}
+          />
+        </>
+      ) : null}
+      <PullRequestFilterSelect
+        onOpenChange={onOpenChange}
+        label={t.git.pullRequest.project}
+        value={projectValue}
+        options={projectOptions}
+        onChange={(next) => {
+          const project = projects.find((candidate) => pullRequestProjectKey(candidate) === next);
+          if (project) onProject(project.id, project.environmentId);
+          else if (projectId !== undefined) onProject(undefined, undefined);
+        }}
+      />
+      {serverOptions.length > 1 ? (
+        <>
+          <PullRequestFilterSelect
+            onOpenChange={onOpenChange}
+            label={t.git.pullRequest.server}
+            value={server ?? ALL_SERVERS_VALUE}
+            options={serverOptions}
+            onChange={(next) =>
+              onServer(next === ALL_SERVERS_VALUE ? undefined : (next as EnvironmentId))
+            }
+          />
+        </>
+      ) : null}
+
+      <PullRequestAuthorFilter
+        onOpenChange={onOpenChange}
+        value={filters.author}
+        options={authorOptions}
+        onChange={(author) => updateFilters({ author })}
+      />
+      <PullRequestLabelFilter
+        onOpenChange={onOpenChange}
+        value={selectedLabels}
+        options={labelOptions}
+        onChange={(labels) =>
+          updateFilters({
+            labels: labels.length === 0 ? undefined : labels.slice(0, 10).map((label) => [label]),
+          })
+        }
+      />
+      <PullRequestFilterSelect
+        onOpenChange={onOpenChange}
+        label={t.git.pullRequest.draft}
+        value={filters.draft ?? UNFILTERED_VALUE}
+        options={DRAFT_OPTIONS}
+        onChange={(draft) => updateFilter("draft", draft)}
+      />
+      <PullRequestFilterSelect
+        onOpenChange={onOpenChange}
+        label={t.git.pullRequest.review}
+        value={filters.review ?? UNFILTERED_VALUE}
+        options={REVIEW_OPTIONS}
+        onChange={(review) => updateFilter("review", review)}
+      />
+      <PullRequestFilterSelect
+        onOpenChange={onOpenChange}
+        label={t.git.pullRequest.checks}
+        value={filters.checks ?? UNFILTERED_VALUE}
+        options={CHECKS_OPTIONS}
+        onChange={(checks) => updateFilter("checks", checks)}
+      />
+    </div>
   );
 }

@@ -96,7 +96,7 @@ function MenuItem({
   ...props
 }: MenuPrimitive.Item.Props & {
   inset?: boolean;
-  density?: "default" | "touch";
+  density?: "default" | "touch" | "compact";
   variant?: "default" | "destructive" | "ghost";
 }) {
   return (
@@ -105,6 +105,8 @@ function MenuItem({
         menuRowClassName,
         "flex data-inset:ps-8 data-[variant=destructive]:not-data-disabled:text-error data-[variant=destructive]:not-data-disabled:[--menu-icon-color:currentColor]",
         density === "touch" && "min-h-10",
+        // H2 submenus and PRPage8a L5 share 32px rows with 13px copy.
+        density === "compact" && "min-h-8 text-secondary-copy-large",
         className,
       )}
       data-density={density}
@@ -137,9 +139,11 @@ function MenuCheckboxItem({
   children,
   checked,
   variant = "default",
+  density = "default",
   ...props
 }: MenuPrimitive.CheckboxItem.Props & {
   variant?: "default" | "switch";
+  density?: "default" | "compact";
 }) {
   return (
     <MenuPrimitive.CheckboxItem
@@ -150,6 +154,7 @@ function MenuCheckboxItem({
         variant === "switch"
           ? "grid-cols-[1fr_auto] gap-4 pe-1.5"
           : "grid-cols-[0.875rem_minmax(0,1fr)]",
+        density === "compact" && "min-h-8 text-secondary-copy-large",
         className,
       )}
       data-slot="menu-checkbox-item"
@@ -198,15 +203,18 @@ function MenuRadioItem({
   className,
   children,
   hideIndicator: _hideIndicator = false,
+  density = "default",
   ...props
 }: MenuPrimitive.RadioItem.Props & {
   hideIndicator?: boolean;
+  density?: "default" | "compact";
 }) {
   return (
     <MenuPrimitive.RadioItem
       className={cn(
         menuRowClassName,
         "flex in-data-[side=none]:min-w-[calc(var(--anchor-width)+1.25rem)] not-data-disabled:data-checked:not-active:bg-accent",
+        density === "compact" && "min-h-8 text-secondary-copy-large",
         className,
       )}
       data-slot="menu-radio-item"

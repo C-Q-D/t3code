@@ -23,10 +23,8 @@ import type {
 import { useAtomValue } from "@effect/atom-react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
-  ArrowDownUpIcon,
   CalendarArrowDownIcon,
   CalendarArrowUpIcon,
-  ChevronDownIcon,
   ClockIcon,
   EyeIcon,
   LayersIcon,
@@ -36,7 +34,6 @@ import {
   Plug2Icon,
   Maximize2Icon,
   Minimize2Icon,
-  SearchIcon,
   UserLockIcon,
   type LucideIcon,
 } from "lucide-react";
@@ -105,7 +102,7 @@ import { environmentMachineIcon } from "../components/EnvironmentMachineIcon";
 import { PullRequestDetailPanel } from "../components/pullRequest/PullRequestDetailPanel";
 import {
   PullRequestFiltersMenu,
-  PullRequestFilterOptionIcon,
+  PullRequestFilterSelect,
   PullRequestSearchInput,
   pullRequestHostLabel,
   pullRequestProjectKey,
@@ -120,13 +117,8 @@ import {
 } from "../components/pullRequest/PullRequestRow";
 import { PullRequestsUnavailableState } from "../components/pullRequest/PullRequestsUnavailableState";
 import { RightPanelTabs, type PullRequestTabStatusSeed } from "../components/RightPanelTabs";
-import {
-  WorkspaceBreadcrumb,
-  WorkspaceBreadcrumbItem,
-  WorkspaceBreadcrumbSeparator,
-} from "../components/WorkspaceBreadcrumb";
-import { WorkspacePageContainer } from "../components/WorkspacePageContainer";
-import { WorkspacePageHeader } from "../components/WorkspacePageHeader";
+import { useTitlebarSlot } from "../components/frame/titlebarSlot";
+import { pullRequestListDetailWidth } from "../components/pullRequest/pullRequestListLayout.logic";
 import { isCommandPaletteOpen } from "../commandPaletteBus";
 import { isElectron } from "../env";
 import { resolveShortcutCommand, shortcutLabelForCommand } from "../keybindings";
@@ -136,9 +128,7 @@ import {
   RightPanelMaximizeControl,
 } from "../components/chat/PanelLayoutControls";
 import { Button } from "../components/ui/button";
-import { Menu, MenuPopup, MenuRadioGroup, MenuRadioItem, MenuTrigger } from "../components/ui/menu";
 import { SidebarInset } from "../components/ui/sidebar";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../components/ui/tooltip";
 import { useLiveRefresh } from "../hooks/useLiveRefresh";
 import { useOpenPanelPullRequestUrl } from "../hooks/useOpenPanelPullRequestUrl";
 import { writeTextToClipboard } from "../hooks/useCopyToClipboard";
@@ -166,7 +156,6 @@ import {
 } from "../state/pullRequests";
 import { useAtomCommand } from "../state/use-atom-command";
 import { cn } from "~/lib/utils";
-import { Separator } from "~/components/ui/separator";
 import { primaryServerKeybindingsAtom } from "~/state/server";
 import { getSourceControlPresentationForKind } from "~/sourceControlPresentation";
 import { PullRequestGlyph } from "~/components/pullRequest/pullRequestIcons";
@@ -210,8 +199,7 @@ export interface PullRequestsSearch extends PullRequestListPreferences {
 }
 
 /**
- * A group reads like the sidebar's shelves: its glyph, its name, how many, then a rule out
- * to the edge. The glyph is the one the involvement filter uses for the same idea.
+ * Group glyphs use the same vocabulary as the participation filter.
  */
 const GROUP_ICONS: Record<string, LucideIcon> = {
   authored: PenLineIcon,
@@ -219,6 +207,11 @@ const GROUP_ICONS: Record<string, LucideIcon> = {
   others: UsersIcon,
 };
 
+/**
+ * Names an existing participation group and counts only its displayed entries.
+ * @param props Group identity, localized label and the rows selected by the current filters.
+ * @returns A compact heading above that group's rows; grouping order remains owned by the list logic.
+ */
 function PullRequestGroupHeader({
   group,
 }: {
@@ -226,20 +219,19 @@ function PullRequestGroupHeader({
 }) {
   const Icon = GROUP_ICONS[group.key] ?? LayersIcon;
   return (
-    <div className="flex items-center gap-2 px-3 pb-1 text-xs font-medium text-muted-foreground/70">
+    <div className="flex items-center gap-2 px-3 pb-1 pt-2 text-secondary-copy font-medium text-muted-foreground">
       <Icon aria-hidden className="size-3.5 shrink-0" />
       <h2 className="shrink-0">{group.label}</h2>
-      <span className="shrink-0 tabular-nums text-muted-foreground/50">{group.entries.length}</span>
-      <Separator className="min-w-2 flex-1" />
+      <span className="ml-auto shrink-0 font-mono tabular-nums">{group.entries.length}</span>
     </div>
   );
 }
 
 // The state filters wear the same glyphs the rows do, so the two read as one vocabulary.
 const INVOLVEMENT_TABS = [
-  { value: "all", label: t.git.pullRequest.all, Icon: LayersIcon },
-  { value: "reviewing", label: t.git.pullRequest.reviewing, Icon: EyeIcon },
   { value: "authored", label: t.git.pullRequest.authored, Icon: PenLineIcon },
+  { value: "reviewing", label: t.git.pullRequest.reviewing, Icon: EyeIcon },
+  { value: "all", label: t.git.pullRequest.all, Icon: LayersIcon },
 ] as const satisfies ReadonlyArray<PullRequestFilterOption<PullRequestInvolvement>>;
 
 const STATE_TABS = [
@@ -250,13 +242,13 @@ const STATE_TABS = [
 ] as const satisfies ReadonlyArray<PullRequestFilterOption<PullRequestListState>>;
 
 const SORT_OPTIONS = [
-  { value: "ready", label: t.git.pullRequest.mergeReadiness, Icon: ListChecksIcon },
-  { value: "blocked", label: t.git.pullRequest.blockedOnMe, Icon: UserLockIcon },
   { value: "updated", label: t.git.pullRequest.recentlyUpdated, Icon: ClockIcon },
   { value: "newest", label: t.git.pullRequest.newestShown, Icon: CalendarArrowDownIcon },
   { value: "oldest", label: t.git.pullRequest.oldestShown, Icon: CalendarArrowUpIcon },
   { value: "largest", label: t.git.pullRequest.largestShown, Icon: Maximize2Icon },
   { value: "smallest", label: t.git.pullRequest.smallestShown, Icon: Minimize2Icon },
+  { value: "ready", label: t.git.pullRequest.mergeReadiness, Icon: ListChecksIcon },
+  { value: "blocked", label: t.git.pullRequest.blockedOnMe, Icon: UserLockIcon },
 ] as const satisfies ReadonlyArray<PullRequestFilterOption<PullRequestListSort>>;
 
 /** Long enough that a keystroke does not become a request, short enough to feel answered. */
@@ -1359,6 +1351,16 @@ function PullRequestsRouteView() {
   );
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [defaultDetailWidth, setDefaultDetailWidth] = useState<number | null>(null);
+  const measureListHost = useCallback((host: HTMLDivElement | null) => {
+    if (host === null) return;
+    const listWidth = Number.parseFloat(
+      getComputedStyle(host).getPropertyValue("--spacing-pr-list"),
+    );
+    // Measure before mounting the resizable panel: it reads its default only on mount.
+    // Saved splitter widths still win; a fresh layout leaves the board's 400px for the list.
+    setDefaultDetailWidth(pullRequestListDetailWidth(host.clientWidth, listWidth || 400));
+  }, []);
 
   /**
    * The line counts, asked for once the rows are on screen. On GitHub they are forty per cent of
@@ -1882,24 +1884,28 @@ function PullRequestsRouteView() {
       onToggleRightPanel={toggleRightPanel}
     />
   );
-  const openPanelControls = (
-    <div
-      // The bare workspace-titlebar-controls inset plus mr-px: the same
-      // anchor the thread view's controls and the sidebar trigger use, so
-      // every titlebar cluster in the app sits one shared inset from its
-      // edge.
-      className="absolute top-[var(--workspace-controls-top)] right-[var(--workspace-controls-right)] z-50 mr-px flex h-[var(--workspace-topbar-height)] items-center gap-1 [-webkit-app-region:no-drag]"
-      data-workspace-titlebar-controls
-    >
-      {rightPanelState.isOpen ? (
-        <RightPanelMaximizeControl
-          maximized={rightPanelMaximized}
-          onToggle={toggleRightPanelMaximized}
+  const titlebar = useTitlebarSlot({
+    breadcrumb: <h1 className="font-serif text-plan-title font-bold">PR</h1>,
+    actions: (
+      <div className="flex items-center gap-2">
+        <PullRequestRefreshControl
+          refreshing={refreshing}
+          onRefresh={() => void refreshFromHost()}
         />
-      ) : null}
-      {panelToggleControls}
-    </div>
-  );
+        {pullRequestsSupported ? (
+          <div className="flex items-center gap-1">
+            {rightPanelState.isOpen ? (
+              <RightPanelMaximizeControl
+                maximized={rightPanelMaximized}
+                onToggle={toggleRightPanelMaximized}
+              />
+            ) : null}
+            {panelToggleControls}
+          </div>
+        ) : null}
+      </div>
+    ),
+  });
   // The rows carried over from the last filters can also narrow to nothing one step further on,
   // where involvement is applied against the viewers of the answer they came from. "Nothing under
   // these filters" is a claim, and it is the wrong one to make about a question still in flight,
@@ -1946,9 +1952,9 @@ function PullRequestsRouteView() {
           onLoadMore={loadMore}
         />
       ) : (
-        <div className={cn("space-y-3", closeSweepKeys.size > 0 && "**:pointer-events-none")}>
+        <div className={cn("space-y-2", closeSweepKeys.size > 0 && "**:pointer-events-none")}>
           {displayGroups.map((group) => (
-            <div key={group.key} className="space-y-0.5">
+            <div key={group.key} className="space-y-0.75">
               {group.label ? <PullRequestGroupHeader group={group} /> : null}
               {group.entries.map((entry) => {
                 const entryKey = pullRequestEntryKey(entry);
@@ -2013,7 +2019,7 @@ function PullRequestsRouteView() {
             </span>
           ) : canContinue || pageSize < MAX_PAGE_SIZE ? (
             <Button
-              size="sm"
+              size="toolbar"
               variant="outline"
               onClick={loadMore}
               disabled={listQuery.isPending || showingCarried}
@@ -2058,11 +2064,9 @@ function PullRequestsRouteView() {
     })),
   ];
   const sortMenu = (
-    <CompactFilterMenu
+    <PullRequestFilterSelect
       label={t.git.pullRequest.sortPullRequests}
-      triggerIcon={<ArrowDownUpIcon aria-hidden className="size-4" />}
-      triggerLabel={t.git.pullRequest.sort}
-      outlined
+      valueOnly
       value={sort}
       options={SORT_OPTIONS}
       onChange={(next) => updateListScope({ sort: next })}
@@ -2110,55 +2114,10 @@ function PullRequestsRouteView() {
     />
   );
   const columnProps = {
-    refreshing,
-    onRefresh: () => void refreshFromHost(),
-    searchValue: search.q ?? "",
-    involvement: search.involvement,
-    state: search.state,
-    host: search.host,
-    hostMenuOptions,
-    onInvolvement: (involvement: PullRequestInvolvement) => updateListScope({ involvement }),
-    onState: (state: PullRequestListState) => updateListScope({ state }),
-    onHost: (host: string | undefined) => updateListScope({ host }),
     searchInput,
     sortMenu,
     filtersMenu,
-    rightPanelControl:
-      // Footprint reserve while the panel is closed: the toggle itself stays
-      // mounted at the fixed titlebar inset in both states so it cannot move
-      // on toggle, and this spacer keeps refresh from sliding underneath it
-      // (sized per header padding so refresh ends a normal gap short of it).
-      !pullRequestsSupported ? null : (
-        <span
-          aria-hidden
-          className={cn(
-            "shrink-0",
-            rightPanelState.isOpen ? "-ml-3 w-0" : "w-7 sm:w-5",
-            panelAnimationsActive && "transition-[width,margin] ease-out",
-          )}
-          style={
-            panelAnimationsActive
-              ? { transitionDuration: `${panelAnimationDurationMs}ms` }
-              : undefined
-          }
-        />
-      ),
-    titlebarControls:
-      // While the panel is closed the strip lives inside the header: a no-drag
-      // descendant beats the header's desktop drag-region, where a floating
-      // sibling loses (app-region hit-testing ignores z-index). While the
-      // floating strip crosses the header during motion, the narrow extension
-      // keeps that overlap non-draggable without moving the toggle.
-      pullRequestsSupported ? (
-        rightPanelPresent ? (
-          <span
-            aria-hidden
-            className="pointer-events-none absolute inset-y-0 left-full w-7 [-webkit-app-region:no-drag]"
-          />
-        ) : (
-          openPanelControls
-        )
-      ) : null,
+    shownCount,
     rightPanelOpen: rightPanelState.isOpen,
     maximizedAway: rightPanelMaximized,
     listBody,
@@ -2260,11 +2219,14 @@ function PullRequestsRouteView() {
 
   return (
     <SidebarInset className="h-full min-h-0 overflow-hidden overscroll-y-none">
-      <div className="relative flex min-h-0 flex-1">
-        {pullRequestsSupported && rightPanelPresent ? openPanelControls : null}
+      {titlebar}
+      <div ref={measureListHost} className="relative flex min-h-0 flex-1">
         <PullRequestsColumn {...columnProps} />
 
-        {rightPanelPresent && renderedPullRequestSurface && panelEnvironmentId !== null ? (
+        {rightPanelPresent &&
+        renderedPullRequestSurface &&
+        panelEnvironmentId !== null &&
+        defaultDetailWidth !== null ? (
           <RightPanelTabs
             mode="inline"
             open={rightPanelState.isOpen}
@@ -2272,10 +2234,7 @@ function PullRequestsRouteView() {
             keybindings={keybindings}
             getShortcutContext={getShortcutContext}
             widthStorageKey="t3code:pull-request-panel-width"
-            // Default to roughly half the viewport: the PR list needs more
-            // room than a chat, so the 540px chat-preview default squashes
-            // it. SSR has no window, so fall back to a reasonable width.
-            defaultWidth={typeof window === "undefined" ? 640 : Math.floor(window.innerWidth / 2)}
+            defaultWidth={defaultDetailWidth}
             surfaces={renderedRightPanelSurfaces}
             environmentId={panelEnvironmentId}
             activeSurfaceId={renderedPullRequestSurface.id}
@@ -2400,405 +2359,84 @@ function PullRequestsRouteView() {
   );
 }
 
-/** A compact stand-in for one pill group when the header is narrow. */
-function CompactFilterMenu<Value extends string>({
-  label,
-  triggerIcon,
-  triggerLabel,
-  outlined = false,
-  iconOnly = false,
-  value,
-  options,
-  onChange,
-  className,
-}: {
-  label: string;
-  triggerIcon?: ReactNode;
-  triggerLabel?: string;
-  outlined?: boolean;
-  iconOnly?: boolean;
-  value: Value;
-  options: ReadonlyArray<PullRequestFilterOption<Value>>;
-  onChange: (value: Value) => void;
-  className?: string;
-}) {
-  const current = options.find((option) => option.value === value) ?? options[0];
-  if (!current) return null;
-  return (
-    <Menu>
-      <MenuTrigger
-        aria-label={triggerLabel || iconOnly ? `${label}: ${current.label}` : label}
-        title={iconOnly ? `${label}: ${current.label}` : undefined}
-        render={
-          outlined ? (
-            <Button variant="outline" size={iconOnly ? "icon" : "default"} />
-          ) : (
-            <Button variant="ghost-muted" size="sm" />
-          )
-        }
-        className={cn("min-w-0", className)}
-      >
-        {iconOnly ? (
-          <current.Icon aria-hidden className="size-4" />
-        ) : triggerLabel ? (
-          <>
-            {triggerIcon}
-            <span>{triggerLabel}</span>
-          </>
-        ) : (
-          <>
-            <span className="truncate">{current.label}</span>
-            <ChevronDownIcon aria-hidden className="size-3 shrink-0 text-muted-foreground/70" />
-          </>
-        )}
-      </MenuTrigger>
-      <MenuPopup align="start" side="bottom">
-        <MenuRadioGroup value={value} onValueChange={(next) => onChange(next as Value)}>
-          {options.map((option) => {
-            const item = (
-              <MenuRadioItem
-                key={option.value}
-                value={option.value}
-                disabled={option.unavailable !== undefined}
-                className="data-disabled:pointer-events-auto"
-              >
-                <span className="flex min-w-0 items-center gap-2">
-                  <PullRequestFilterOptionIcon option={option} />
-                  {option.label}
-                </span>
-              </MenuRadioItem>
-            );
-            return option.unavailable === undefined ? (
-              item
-            ) : (
-              <Tooltip key={option.value}>
-                <TooltipTrigger render={item} />
-                <TooltipPopup side="right">{option.unavailable}</TooltipPopup>
-              </Tooltip>
-            );
-          })}
-        </MenuRadioGroup>
-      </MenuPopup>
-    </Menu>
-  );
-}
-
 /**
- * The search, folded to an icon until asked for. Opening moves focus into the input — the
- * whole point of pressing it is to type. It stays open while it holds a query, so an active
- * search is never invisible; empty and blurred, it folds back.
- * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
- * @returns The rendered surface.
- */
-function ExpandableSearch({
-  searchInput,
-  searchValue,
-  open,
-  onOpenChange,
-  focusToken,
-  onFocusWithin,
-}: {
-  searchInput: ReactNode;
-  searchValue: string;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  /** Bumped to pull focus into the input while it is already showing — the Mod+F path. */
-  focusToken: number;
-  /**
-   * Focus entering and leaving the expanded input. An unmount fires no blur, which is the
-   * point: whoever unmounted this can still see the reader was mid-typing and move the
-   * focus somewhere that continues the sentence.
-   */
-  onFocusWithin?: (focused: boolean) => void;
-}) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    if (!open) return;
-    containerRef.current?.querySelector("input")?.focus();
-  }, [open]);
-  const appliedFocusToken = useRef(focusToken);
-  useEffect(() => {
-    if (appliedFocusToken.current === focusToken) return;
-    appliedFocusToken.current = focusToken;
-    const input = containerRef.current?.querySelector("input");
-    input?.focus();
-    input?.select();
-  }, [focusToken]);
-  if (open || searchValue.length > 0) {
-    return (
-      <div
-        ref={containerRef}
-        className="w-56 min-w-24 shrink"
-        onFocus={() => onFocusWithin?.(true)}
-        onBlur={() => {
-          onFocusWithin?.(false);
-          if (searchValue.length === 0) onOpenChange(false);
-        }}
-      >
-        {searchInput}
-      </div>
-    );
-  }
-  return (
-    <Button
-      size="icon-sm"
-      variant="ghost"
-      aria-label={t.git.pullRequest.searchPullRequests}
-      onClick={() => onOpenChange(true)}
-    >
-      <SearchIcon className="size-4" />
-    </Button>
-  );
-}
-
-/**
- * The pull request list column. The full controls live at the top of the scroll flow; once
- * they scroll away, the title transforms into the scope itself — "Pull Requests / Open ▾
- * Authored ▾" — where each segment is the menu for that filter, and a folded search sits on
- * the right. Scrolled back up, the topbar returns to the plain title. The topbar is the
- * window drag region throughout; its interactive children opt out through the `.drag-region`
- * descendant rules.
- * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
- * @returns The rendered surface.
+ * Keeps search, independent filter chips and counts above the scrolling list.
+ * @param props Existing controls and body; the 400px preferred list width yields to the persisted detail-panel splitter.
+ * @returns The list column; Ctrl/Command+F focuses and selects the persistent search field.
  */
 function PullRequestsColumn({
-  refreshing,
-  onRefresh,
-  searchValue,
-  involvement,
-  state,
-  host,
-  hostMenuOptions,
-  onInvolvement,
-  onState,
-  onHost,
   searchInput,
   sortMenu,
   filtersMenu,
-  rightPanelControl,
-  titlebarControls,
+  shownCount,
   rightPanelOpen,
   maximizedAway,
   listBody,
   scrollRef,
 }: {
-  refreshing: boolean;
-  onRefresh: () => void;
-  searchValue: string;
-  involvement: PullRequestInvolvement;
-  state: PullRequestListState;
-  host: string | undefined;
-  hostMenuOptions: ReadonlyArray<PullRequestFilterOption<string>>;
-  onInvolvement: (involvement: PullRequestInvolvement) => void;
-  onState: (state: PullRequestListState) => void;
-  onHost: (host: string | undefined) => void;
   searchInput: ReactNode;
   sortMenu: ReactNode;
   filtersMenu: ReactNode;
-  rightPanelControl: ReactNode;
-  titlebarControls: ReactNode;
+  shownCount: number;
   rightPanelOpen: boolean;
-  /** The panel beside the list is maximized, so the list gives up its width. */
   maximizedAway: boolean;
   listBody: ReactNode;
   scrollRef: RefObject<HTMLDivElement | null>;
 }) {
-  const markerRef = useRef<HTMLDivElement | null>(null);
-  const [condensed, setCondensed] = useState(false);
-  useEffect(() => {
-    const marker = markerRef.current;
-    if (!marker) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => setCondensed(entry ? !entry.isIntersecting : false),
-      { root: scrollRef.current },
-    );
-    observer.observe(marker);
-    return () => observer.disconnect();
-  }, []);
-  // Typing into the topbar search narrows the list, and a short enough list un-scrolls the
-  // page — which dissolves the condensed topbar and unmounts the very input being typed in.
-  // The two inputs are one search to the reader, so the focus follows the value into the
-  // in-flow bar, caret at the end, and the sentence continues.
-  const topbarSearchFocusedRef = useRef(false);
-  const inFlowSearchRef = useRef<HTMLDivElement | null>(null);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchFocusToken, setSearchFocusToken] = useState(0);
-  const searchExpanded = searchOpen || searchValue.length > 0;
-  // Mod+F belongs to this page's own search: the desktop shell binds no find-in-page, so the
-  // shortcut would otherwise do nothing. Condensed, it unfolds the topbar search; at the top,
-  // it focuses the in-flow bar and selects the query the way a find field would.
+  const searchRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented) return;
+      if (event.defaultPrevented || event.altKey || event.shiftKey) return;
       if (event.key.toLowerCase() !== "f" || !(event.metaKey || event.ctrlKey)) return;
-      if (event.altKey || event.shiftKey) return;
       event.preventDefault();
-      if (condensed) {
-        setSearchOpen(true);
-        setSearchFocusToken((token) => token + 1);
-        return;
-      }
-      const input = inFlowSearchRef.current?.querySelector("input");
+      const input = searchRef.current?.querySelector("input");
       input?.focus();
       input?.select();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [condensed]);
-  useEffect(() => {
-    if (condensed) return;
-    // The fold-out is gone from the chrome; forgetting it open keeps the next condensing
-    // from starting with an empty expanded search nobody asked for.
-    setSearchOpen(false);
-    if (!topbarSearchFocusedRef.current) return;
-    topbarSearchFocusedRef.current = false;
-    const input = inFlowSearchRef.current?.querySelector("input");
-    if (!input) return;
-    input.focus();
-    input.setSelectionRange(input.value.length, input.value.length);
-  }, [condensed]);
+  }, []);
 
   return (
-    // Painted flat like the chat column: the inset underneath carries the chrome grain, and a
-    // content surface that lets it show reads as a different background than every thread.
     <div
       className={cn(
-        "@container/pr-list flex min-h-0 min-w-0 flex-col overflow-x-hidden bg-background",
-        maximizedAway ? "w-0 flex-none" : "flex-1",
+        "@container/pr-list flex h-full min-h-0 min-w-0 flex-col gap-2.5 overflow-hidden",
+        maximizedAway ? "w-0 flex-none" : rightPanelOpen ? "basis-pr-list flex-1" : "flex-1",
       )}
     >
-      {/* A closed right panel leaves this column full-width, so the shared header
-          reserves native window controls and hosts the controls strip itself: on
-          desktop the header is a drag-region, and only a no-drag descendant wins
-          clicks from it - a floating sibling loses to app-region hit-testing no
-          matter its z-index. While the panel is open, the strip mounts back at
-          the route level, whose box spans the panel too, so the toggle keeps one
-          fixed top-right anchor. */}
-      <WorkspacePageHeader
-        electron={isElectron}
-        reserveNativeControls={!rightPanelOpen}
-        className="relative bg-background"
-      >
-        {titlebarControls}
-        {condensed ? (
-          <WorkspaceBreadcrumb
-            ariaLabel={t.git.pullRequest.pullRequestScope}
-            className="overflow-hidden"
-          >
-            {/* An expanded search owns the scarce horizontal space. The page title stays
-                available to readers while the live filters remain available in both states. */}
-            <WorkspaceBreadcrumbItem current className={cn(searchExpanded && "sr-only")}>
-              <h1 className="truncate">{t.git.pullRequest.pullRequests}</h1>
-            </WorkspaceBreadcrumbItem>
-            {searchExpanded ? null : <WorkspaceBreadcrumbSeparator />}
-            <WorkspaceBreadcrumbItem className="shrink gap-1.5">
-              <CompactFilterMenu
-                label={t.git.pullRequest.filterByState}
-                value={state}
-                options={STATE_TABS}
-                onChange={onState}
-                className="shrink-0"
-              />
-              <CompactFilterMenu
-                label={t.git.pullRequest.filterByInvolvement}
-                value={involvement}
-                options={INVOLVEMENT_TABS}
-                onChange={onInvolvement}
-              />
-              {hostMenuOptions.length > 2 ? (
-                <CompactFilterMenu
-                  label={t.git.pullRequest.filterByHost}
-                  value={host ?? ""}
-                  options={hostMenuOptions}
-                  onChange={(next) => onHost(next === "" ? undefined : next)}
-                />
-              ) : null}
-            </WorkspaceBreadcrumbItem>
-          </WorkspaceBreadcrumb>
-        ) : (
-          <WorkspaceBreadcrumb ariaLabel={t.git.pullRequest.pullRequestsBreadcrumb}>
-            <WorkspaceBreadcrumbItem current>
-              <h1 className="truncate">{t.git.pullRequest.pullRequests}</h1>
-            </WorkspaceBreadcrumbItem>
-          </WorkspaceBreadcrumb>
-        )}
-        <div className="min-w-0 flex-1" />
-        {condensed ? (
-          <div className="flex shrink items-center gap-1.5">
-            <ExpandableSearch
-              searchInput={searchInput}
-              searchValue={searchValue}
-              open={searchOpen}
-              onOpenChange={setSearchOpen}
-              focusToken={searchFocusToken}
-              onFocusWithin={(focused) => {
-                topbarSearchFocusedRef.current = focused;
-              }}
-            />
-            <PullRequestRefreshControl compact refreshing={refreshing} onRefresh={onRefresh} />
-          </div>
-        ) : null}
-        {rightPanelControl}
-      </WorkspacePageHeader>
-
-      <div
-        ref={scrollRef}
-        className="topbar-scroll-fade scrollbar-gutter-both min-h-0 flex-1 overflow-y-auto"
-      >
-        {/* The top padding is the shared fade band's height, the same pairing the
-            settings page makes: at rest the controls sit fully below the mask, and only
-            content actually passing under the chrome fades. */}
-        <WorkspacePageContainer width="expanded" className="min-h-full gap-4">
-          <div className="flex flex-col gap-3">
-            <div ref={inFlowSearchRef} className="flex flex-wrap items-center gap-2">
-              <div className="min-w-0 basis-full @lg/pr-list:basis-0 @lg/pr-list:flex-1">
-                {searchInput}
-              </div>
-              {sortMenu}
-              {filtersMenu}
-              <CompactFilterMenu
-                label={t.git.pullRequest.filterByProvider}
-                outlined
-                iconOnly={host !== undefined}
-                triggerIcon={<Plug2Icon aria-hidden className="size-4" />}
-                triggerLabel={t.git.pullRequest.all}
-                value={host ?? ""}
-                options={hostMenuOptions}
-                onChange={(next) => onHost(next === "" ? undefined : next)}
-              />
-              {!condensed ? (
-                <PullRequestRefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-              ) : null}
-            </div>
-            {/* Scrolled past this marker, the controls are gone and the title takes over. */}
-            <div ref={markerRef} aria-hidden className="-mt-3 h-px w-full" />
-          </div>
-
-          {listBody}
-        </WorkspacePageContainer>
+      <div className="flex shrink-0 flex-col gap-2.5 pl-4 pr-3 pt-4">
+        <div ref={searchRef}>{searchInput}</div>
+        {filtersMenu}
+        <div className="flex min-w-0 items-center justify-between gap-2 px-1">
+          <span className="text-secondary-copy text-muted-foreground" role="status">
+            {t.git.pullRequest.listCount(shownCount)}
+          </span>
+          {sortMenu}
+        </div>
+      </div>
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-3 pb-3 pl-4">
+        {listBody}
       </div>
     </div>
   );
 }
 
 /**
- * Renders pull request refresh control from the supplied display data and callbacks.
- * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
- * @returns The rendered surface.
+ * Refreshes host data from the shared titlebar; disabled while that refresh is running.
+ * @param props Refresh progress and the existing cache-bypassing refresh callback.
+ * @returns A 30px titlebar action with an accessible label.
  */
 function PullRequestRefreshControl({
-  compact = false,
   refreshing,
   onRefresh,
 }: {
-  compact?: boolean;
   refreshing: boolean;
   onRefresh: () => void;
 }) {
   return (
     <Button
-      size={compact ? "icon-sm" : "icon"}
-      variant={compact ? "ghost" : "outline"}
+      size="icon-md"
+      variant="ghost"
       aria-label={t.git.pullRequest.refreshPullRequests}
       onClick={onRefresh}
       disabled={refreshing}
