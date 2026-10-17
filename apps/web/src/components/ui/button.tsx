@@ -43,6 +43,8 @@ const buttonVariants = cva(
         toolbar: "h-8 px-3",
         // 讨论页-8a v3 F1/F2: More and Send use 32×32px circular icon buttons.
         "icon-toolbar": "size-8 p-0 [&_svg:not([class*='size-'])]:size-4",
+        // PRDetail8a header Ask/Explain controls: shared 30px text-button size across 8a boards.
+        md: "h-7.5 gap-1.25 px-2.5 text-secondary-copy-medium [&_svg:not([class*='size-'])]:size-3.5",
       },
       variant: {
         default:

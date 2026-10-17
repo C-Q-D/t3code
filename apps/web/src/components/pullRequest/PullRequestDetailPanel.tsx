@@ -1832,7 +1832,7 @@ export function PullRequestDetailPanel({
               {detail ? (
                 <>
                   <Button
-                    size="compact"
+                    size="md"
                     variant="ghost"
                     disabled={handoff !== null}
                     onClick={askAboutPullRequest}
@@ -1841,7 +1841,7 @@ export function PullRequestDetailPanel({
                     {handoff === "ask" ? t.git.pullRequest.opening : t.git.pullRequest.askAQuestion}
                   </Button>
                   <Button
-                    size="compact"
+                    size="md"
                     variant="secondary"
                     disabled={handoff !== null}
                     onClick={explainPullRequest}
