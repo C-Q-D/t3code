@@ -1,6 +1,7 @@
 /** Renders the legacy project/thread tree; reads the same project scope as ProjectRail. */
 import { t } from "~/i18n";
 import { filterLegacySidebarProjects } from "./LegacySidebar.logic";
+import { useLegacySidebarSelectionReset } from "./sidebar/useLegacySidebarSelectionReset";
 import { useSupportsMultiplePullRequests } from "~/hooks/useSupportsMultiplePullRequests";
 import { resolveThreadCurrentPullRequestLink } from "@t3tools/shared/threadPullRequests";
 import { Spinner } from "~/components/ui/spinner";
@@ -201,7 +202,6 @@ import {
   resolveThreadStatusPill,
   sidebarThreadStatusLabel,
   orderItemsByPreferredIds,
-  shouldClearThreadSelectionOnMouseDown,
   sortProjectsForSidebar,
   useSidebarRowSubscriptionLease,
   useThreadJumpHintVisibility,
@@ -3259,9 +3259,11 @@ const SidebarProjectsContent = memo(function SidebarProjectsContent(
   );
 });
 
+/** Renders the legacy project/thread tree with the shared rail scope and thread selection. */
 export default function LegacySidebar() {
   const projects = useProjects();
   const projectScopeKey = useUiStateStore((store) => store.sidebarProjectScopeKey);
+  useLegacySidebarSelectionReset(projectScopeKey);
   const sidebarThreads = useThreadShells();
   const projectExpandedById = useUiStateStore((store) => store.projectExpandedById);
   const projectOrder = useUiStateStore((store) => store.projectOrder);
@@ -3760,20 +3762,6 @@ export default function LegacySidebar() {
     sidebarThreadByKey,
     threadJumpThreadKeys,
   ]);
-
-  useEffect(() => {
-    const onMouseDown = (event: globalThis.MouseEvent) => {
-      if (!useThreadSelectionStore.getState().hasSelection()) return;
-      const target = event.target instanceof HTMLElement ? event.target : null;
-      if (!shouldClearThreadSelectionOnMouseDown(target)) return;
-      clearSelection();
-    };
-
-    window.addEventListener("mousedown", onMouseDown);
-    return () => {
-      window.removeEventListener("mousedown", onMouseDown);
-    };
-  }, [clearSelection]);
 
   const desktopUpdateButtonDisabled = isDesktopUpdateButtonDisabled(desktopUpdateState);
   const desktopUpdateButtonAction = desktopUpdateState
