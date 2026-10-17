@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import { buildPeriodColumns } from "./UsageProviderChart";
-import { chartScale, niceScale } from "./usageChart.logic";
+import { bandShare, chartScale, niceScale } from "./usageChart.logic";
 import { providersWithUsage } from "./usageProviders";
 
 describe("chartScale", () => {
@@ -175,5 +175,18 @@ describe("hourly chart columns", () => {
         "cost",
       ).map((column) => column.total),
     ).toEqual([0, 4, 0]);
+  });
+});
+
+describe("bandShare", () => {
+  it("fills the whole column for a single provider below one dollar", () => {
+    expect(bandShare(0.2, 0.2)).toBe(1);
+  });
+  it("splits a sub-dollar column by relative contribution", () => {
+    expect(bandShare(0.05, 0.2)).toBeCloseTo(0.25);
+    expect(bandShare(0.15, 0.2)).toBeCloseTo(0.75);
+  });
+  it("leaves an empty column unfilled", () => {
+    expect(bandShare(0, 0)).toBe(0);
   });
 });

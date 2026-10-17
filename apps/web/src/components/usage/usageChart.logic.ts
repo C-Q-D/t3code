@@ -28,3 +28,8 @@ export function chartScale(
     ? { max: TICK_COUNT, ticks: PLACEHOLDER_TICKS, labeled: false }
     : { ...niceScale(peak, TICK_COUNT), labeled: true };
 }
+
+/** Returns a provider's nonnegative share of its column for flex sizing; an empty column has no filled bands. */
+export function bandShare(value: number, total: number): number {
+  return total > 0 ? value / total : 0;
+}

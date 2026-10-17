@@ -206,6 +206,9 @@ export function UsagePage() {
   const canReadDiagnostics = selectedEnvironments.some(
     (environment) => environment.canReadDiagnostics,
   );
+  // Cost and token views also show quota cards once usage has answered.
+  const limitsVisible =
+    selectedEnvironments.length > 0 && (showingLimits || (shown !== null && canReadDiagnostics));
 
   const days = useMemo(
     () => enumerateDays(shownWindow.sinceDay, shownWindow.untilDay),
@@ -351,8 +354,7 @@ export function UsagePage() {
     }
     refreshingRef.current = true;
     setIsRefreshing(true);
-    void refresh(nextWindow).finally(() => {
-      setLimitsNow(Date.now());
+    void Promise.all([refresh(nextWindow), refreshLimits()]).finally(() => {
       refreshingRef.current = false;
       setIsRefreshing(false);
     });
@@ -371,8 +373,8 @@ export function UsagePage() {
     void refreshLimits(true);
   });
   useEffect(() => {
-    if (showingLimits && connectedLimitsEnvironments) autoRefreshLimits();
-  }, [showingLimits, connectedLimitsEnvironments]);
+    if (limitsVisible && connectedLimitsEnvironments) autoRefreshLimits();
+  }, [limitsVisible, connectedLimitsEnvironments]);
 
   // Names the period on screen, which is the previous one until the new one answers.
   const windowLabel =
@@ -538,9 +540,7 @@ export function UsagePage() {
                       className="text-secondary-copy-large text-secondary-label"
                       aria-label={windowLabel}
                     >
-                      {windowDays === 1
-                        ? t.tools.usage.past24h
-                        : t.tools.usage.pastDays(windowDays)}
+                      {shownHourly ? t.tools.usage.past24h : t.tools.usage.pastDays(days.length)}
                     </span>
                     <span className="sr-only">
                       {formatCount(merged.sessions)}

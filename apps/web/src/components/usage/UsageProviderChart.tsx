@@ -14,7 +14,7 @@ import {
 } from "@t3tools/shared/usageFormat";
 import { cn } from "~/lib/utils";
 import { PROVIDER_ORDER, PROVIDER_PRESENTATION } from "./usageProviders";
-import { chartScale } from "./usageChart.logic";
+import { bandShare, chartScale } from "./usageChart.logic";
 import { observeResize } from "~/lib/observeResize";
 
 const NONE_LOADING: ReadonlySet<UsageProviderKind> = new Set();
@@ -208,7 +208,7 @@ export function UsageProviderChart({
                   key={band.provider}
                   className={cn("min-h-0", loadingProviders.has(band.provider) && "opacity-40")}
                   style={{
-                    flexGrow: band.value,
+                    flexGrow: bandShare(band.value, column.total),
                     backgroundColor: PROVIDER_PRESENTATION[band.provider].color,
                   }}
                 />

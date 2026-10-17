@@ -1,4 +1,10 @@
-import { EnvironmentId, ProviderInstanceId, USAGE_CONTRACT_VERSION } from "@t3tools/contracts";
+import {
+  EnvironmentId,
+  ProviderInstanceId,
+  UsageDay,
+  USAGE_CONTRACT_VERSION,
+  type UsageSummaryInput,
+} from "@t3tools/contracts";
 import { mergeUsage } from "@t3tools/shared/usageMerge";
 import { StrictMode, act } from "react";
 import { DEFAULT_RESOLVED_KEYBINDINGS } from "@t3tools/shared/keybindings";
@@ -9,6 +15,10 @@ const state = vi.hoisted(() => ({
   presentations: new Map(),
   refreshProviders: vi.fn(async () => undefined),
   metric: "limits",
+  windowDays: 30,
+  showUsage: false,
+  shownWindow: null as UsageSummaryInput | null,
+  refresh: vi.fn(async () => undefined),
 }));
 vi.mock("@effect/atom-react", () => ({
   useAtomValue: (atom: unknown) =>
@@ -29,34 +39,33 @@ vi.mock("../../state/use-atom-command", () => ({ useAtomCommand: () => state.ref
 vi.mock("../../env", () => ({ isElectron: false }));
 vi.mock("../../hooks/useSettings", () => ({ usePrimarySettings: () => "24h" }));
 vi.mock("../../state/usage", () => ({
-  useUsage: () => ({
-    merged: mergeUsage([], USAGE_CONTRACT_VERSION),
-    environments: [
-      {
-        environmentId: EnvironmentId.make("test"),
-        label: "Test",
-        isPending: false,
-        error: null,
-        summary: null,
-      },
-    ],
-    selectedEnvironments: [
-      {
-        environmentId: EnvironmentId.make("test"),
-        label: "Test",
-        isPending: false,
-        error: null,
-        summary: null,
-      },
-    ],
-    isPending: false,
-    shown: null,
-    isPartial: false,
-    refresh: async () => undefined,
-  }),
+  useUsage: (input: UsageSummaryInput, selectedIds: ReadonlySet<EnvironmentId> | null) => {
+    const environments = [...state.presentations].map(([environmentId, presentation]) => ({
+      environmentId,
+      label: presentation.entry.target.label,
+      isPending: false,
+      canReadDiagnostics: true,
+      isConnected: presentation.connection.phase === "connected",
+      error: null,
+      summary: null,
+    }));
+    return {
+      merged: mergeUsage([], USAGE_CONTRACT_VERSION),
+      environments,
+      selectedEnvironments: environments.filter(
+        (environment) => selectedIds === null || selectedIds.has(environment.environmentId),
+      ),
+      isPending: false,
+      shown: state.showUsage
+        ? { window: state.shownWindow ?? input, merged: mergeUsage([], USAGE_CONTRACT_VERSION) }
+        : null,
+      isPartial: false,
+      refresh: state.refresh,
+    };
+  },
 }));
 vi.mock("./usagePagePreferences", () => ({
-  readUsagePagePreferences: () => ({ metric: state.metric, windowDays: 30 }),
+  readUsagePagePreferences: () => ({ metric: state.metric, windowDays: state.windowDays }),
   saveUsagePagePreferences: vi.fn(),
 }));
 vi.mock("../ui/button", () => ({ Button: "button", InlineButton: "button" }));
@@ -89,7 +98,10 @@ vi.mock("../WorkspaceBreadcrumb", () => ({
 vi.mock("../WorkspacePageContainer", () => ({ WorkspacePageContainer: "main" }));
 vi.mock("../WorkspacePageHeader", () => ({ WorkspacePageHeader: "header" }));
 vi.mock("./UsageProviderChart", () => ({ UsageProviderChart: "div" }));
-vi.mock("./UsagePriceOverrides", () => ({ UsagePriceOverrides: () => null }));
+vi.mock("./UsagePriceOverrides", () => ({
+  UsagePriceOverrides: () => null,
+  UsagePriceSummary: () => null,
+}));
 vi.mock("../chat/ProviderInstanceIcon", () => ({ ProviderInstanceIcon: () => null }));
 vi.mock("../settings/RedactedSensitiveText", () => ({ RedactedSensitiveText: "span" }));
 vi.mock("../settings/providerDriverMeta", () => ({
@@ -106,6 +118,10 @@ beforeEach(() => {
   vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-09-11T12:00:00Z"));
   environmentNumber += 1;
   state.metric = "limits";
+  state.windowDays = 30;
+  state.showUsage = false;
+  state.shownWindow = null;
+  state.refresh.mockClear();
   state.refreshProviders.mockClear();
   state.presentations = new Map([
     [
@@ -260,29 +276,155 @@ it("waits for connection and refreshes new environments during a slow refresh", 
   await act(() => finishRefresh());
 });
 
-it("keeps manual refresh busy until the already-running automatic check settles", async () => {
-  let finishRefresh!: () => void;
-  const pending = new Promise<undefined>((resolve) => {
-    finishRefresh = () => resolve(undefined);
-  });
-  state.refreshProviders.mockImplementationOnce(() => pending);
+it.each(["limits", "cost", "tokens"])(
+  "keeps %s refresh busy until the already-running automatic check settles",
+  async (metric) => {
+    state.metric = metric;
+    state.showUsage = true;
+    let finishRefresh!: () => void;
+    const pending = new Promise<undefined>((resolve) => {
+      finishRefresh = () => resolve(undefined);
+    });
+    state.refreshProviders.mockImplementationOnce(() => pending);
+    await act(() => {
+      renderer = create(<UsagePage />);
+    });
+    const button = () =>
+      renderer.root.findAll(
+        (node) =>
+          node.type === "button" &&
+          node.props["aria-label"] === (metric === "limits" ? "Refresh limits" : "Refresh usage"),
+      )[0]!;
+    expect(state.refreshProviders).toHaveBeenCalledTimes(1);
+    await act(() => button().props.onClick());
+    try {
+      expect(button().props["aria-busy"]).toBe(true);
+      expect(state.refreshProviders).toHaveBeenCalledTimes(1);
+    } finally {
+      await act(async () => {
+        finishRefresh();
+        await pending;
+      });
+    }
+    expect(button().props["aria-busy"]).toBe(false);
+  },
+);
+
+it.each(["cost", "tokens"])(
+  "refreshes visible quotas on entering %s and on manual refresh",
+  async (metric) => {
+    state.metric = metric;
+    state.showUsage = true;
+    await act(() => {
+      renderer = create(
+        <StrictMode>
+          <UsagePage />
+        </StrictMode>,
+      );
+    });
+    expect(state.refreshProviders).toHaveBeenCalledTimes(1);
+    await act(() =>
+      renderer.root
+        .findAll(
+          (node) => node.type === "button" && node.props["aria-label"] === "Refresh usage",
+        )[0]!
+        .props.onClick(),
+    );
+    expect(state.refreshProviders).toHaveBeenCalledTimes(2);
+    expect(state.refresh).toHaveBeenCalledTimes(1);
+  },
+);
+
+it.each(["cost", "tokens"])(
+  "refreshes newly connected environments while viewing %s",
+  async (metric) => {
+    state.metric = metric;
+    state.showUsage = true;
+    await act(() => {
+      renderer = create(<UsagePage />);
+    });
+    expect(state.refreshProviders).toHaveBeenCalledTimes(1);
+    const [id, presentation] = [...state.presentations][0]!;
+    const nextId = EnvironmentId.make(`${id}-next`);
+    state.presentations = new Map([[nextId, presentation]]);
+    await act(() => renderer.update(<UsagePage />));
+    expect(state.refreshProviders).toHaveBeenCalledTimes(2);
+    expect(state.refreshProviders).toHaveBeenLastCalledWith({ environmentId: nextId, input: {} });
+  },
+);
+
+it("keeps the period label with the displayed window while the new range waits", async () => {
+  state.metric = "cost";
+  state.showUsage = true;
+  state.windowDays = 7;
+  state.shownWindow = {
+    sinceDay: UsageDay.make("2026-09-05"),
+    untilDay: UsageDay.make("2026-09-11"),
+    timeZone: "UTC",
+    resolution: "day",
+  };
   await act(() => {
     renderer = create(<UsagePage />);
   });
-  const button = () =>
+  const period = () =>
     renderer.root.findAll(
-      (node) => node.type === "button" && node.props["aria-label"] === "Refresh limits",
+      (node) =>
+        node.type === "span" &&
+        typeof node.props["aria-label"] === "string" &&
+        typeof node.children[0] === "string" &&
+        node.children[0].startsWith("Past "),
     )[0]!;
-  expect(state.refreshProviders).toHaveBeenCalledTimes(1);
-  await act(() => button().props.onClick());
-  try {
-    expect(button().props["aria-busy"]).toBe(true);
-    expect(state.refreshProviders).toHaveBeenCalledTimes(1);
-  } finally {
-    await act(async () => {
-      finishRefresh();
-      await pending;
-    });
-  }
-  expect(button().props["aria-busy"]).toBe(false);
+  expect(period().children).toEqual(["Past 7 days"]);
+  const shownAria = period().props["aria-label"];
+  await act(() =>
+    renderer.root
+      .findAll((node) => node.type === "div" && node.props["aria-label"] === "Usage period")[0]!
+      .props.onValueChange(["90"]),
+  );
+  expect(period().children).toEqual(["Past 7 days"]);
+  expect(period().props["aria-label"]).toBe(shownAria);
+  expect(
+    renderer.root.findAll(
+      (node) => node.type === "div" && node.props["aria-label"] === "Usage period",
+    )[0]!.props.value,
+  ).toEqual(["90"]);
+  state.shownWindow = {
+    sinceDay: UsageDay.make("2026-06-14"),
+    untilDay: UsageDay.make("2026-09-11"),
+    timeZone: "UTC",
+    resolution: "day",
+  };
+  await act(() => renderer.update(<UsagePage />));
+  expect(period().children).toEqual(["Past 90 days"]);
+  expect(period().props["aria-label"]).not.toBe(shownAria);
 });
+
+it.each(["cost", "tokens"])(
+  "refreshes the selected environments on %s without refreshing excluded ones",
+  async (metric) => {
+    state.metric = metric;
+    state.showUsage = true;
+    const [id, presentation] = [...state.presentations][0]!;
+    const otherId = EnvironmentId.make(`${id}-other`);
+    state.presentations.set(otherId, { ...presentation, entry: { target: { label: "Other" } } });
+    await act(() => {
+      renderer = create(<UsagePage />);
+    });
+    expect(state.refreshProviders).toHaveBeenCalledTimes(2);
+    vi.mocked(Date.now).mockReturnValue(Date.parse("2026-09-11T12:05:00Z"));
+    const testEnvironment = () =>
+      renderer.root.findAll(
+        (node) =>
+          node.type === "div" &&
+          typeof node.props.onCheckedChange === "function" &&
+          node.findAll((child) => child.type === "span" && child.children.includes("Test")).length >
+            0,
+      )[0]!;
+    await act(() => testEnvironment().props.onCheckedChange(false));
+    expect(state.refreshProviders).toHaveBeenCalledTimes(3);
+    expect(state.refreshProviders).toHaveBeenLastCalledWith({ environmentId: otherId, input: {} });
+    await act(() => testEnvironment().props.onCheckedChange(true));
+    expect(state.refreshProviders).toHaveBeenCalledTimes(4);
+    expect(state.refreshProviders).toHaveBeenLastCalledWith({ environmentId: id, input: {} });
+  },
+);
