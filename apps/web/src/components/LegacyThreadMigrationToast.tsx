@@ -2,6 +2,7 @@
 import { t } from "~/i18n";
 import { useAtomValue } from "@effect/atom-react";
 import { useEffect, useRef } from "react";
+import { ArchiveRestoreIcon } from "lucide-react";
 
 import { primaryServerLegacyThreadMigrationAtom } from "../state/server";
 import { toastManager } from "./ui/toast";
@@ -23,6 +24,10 @@ export function LegacyThreadMigrationToast() {
         title: t.app.migration.restoring,
         description: t.app.migration.progress(migration.totalThreadCount),
         timeout: 0,
+        data: {
+          leadingIcon: <ArchiveRestoreIcon aria-hidden className="size-3.75" />,
+          iconTone: "neutral",
+        },
       });
       return;
     }

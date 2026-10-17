@@ -321,6 +321,10 @@ const twMerge = extendTailwindMerge({
         "discussion-avatar-choice",
         "discussion-avatar-selected",
         "discussion-settings-empty",
+        "ov2-stack-front",
+        "ov2-stack-back",
+        "ov2-stack-far",
+        "ov2-count",
       ],
       "inset-shadow": [
         "selected",

@@ -244,3 +244,101 @@ body:has([data-onboarding-route]) [data-titlebar-brand] {
     @apply cursor-not-allowed opacity-60;
   }
 }
+
+/* OV2: 其余屏-9.dc.html S1/S2. Opt-in stack and icon treatments keep F5 defaults intact. */
+@theme {
+  --color-ov2-stack-middle: #242427;
+  --color-ov2-attention-tile: #3a2e12;
+  --shadow-ov2-stack-front:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.095), 0 0 0 1px rgba(0, 0, 0, 0.5), 0 3px 0 #09090a,
+    16px 26px 36px -8px rgba(0, 0, 0, 0.85);
+  --shadow-ov2-stack-back:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 0 0 1px rgba(0, 0, 0, 0.5), 0 2px 0 #09090a;
+  --shadow-ov2-stack-far:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 0 1px rgba(0, 0, 0, 0.5), 0 2px 0 #09090a;
+  --shadow-ov2-count: 0 1.5px 0 #09090a;
+}
+
+/* One Base UI viewport owns hover, focus, timer pausing, and announcements for every card. */
+[data-slot="toast-viewport"][data-stack="stone"] {
+  --toast-inset: --spacing(9);
+  bottom: --spacing(50);
+  right: --spacing(9);
+  width: calc(100% - --spacing(18));
+  max-width: --spacing(90);
+}
+
+.ov2-toast-count {
+  top: calc(-1 * var(--toast-frontmost-height) - --spacing(9.5));
+}
+
+[data-stack="stone"][data-position]:not([data-slot="toast-viewport"]) {
+  transition-property: transform, opacity;
+}
+
+/* A collapsed back card is a 60px stone edge; it never scales text or animates layout. */
+[data-stack="stone"][data-stack-behind]:not([data-expanded]) {
+  width: calc(100% - var(--ov2-inset-x) * 2);
+  right: var(--ov2-inset-x);
+  height: --spacing(15);
+  background: var(--color-ov2-stack-middle);
+  box-shadow: var(--shadow-ov2-stack-back);
+}
+
+[data-stack="stone"][data-stack-layer="2"]:not([data-expanded]) {
+  background: var(--color-well-raised);
+  box-shadow: var(--shadow-ov2-stack-far);
+}
+
+[data-stack="stone"][data-stack-behind]:not([data-expanded]):not([data-starting-style]):not(
+    [data-ending-style]
+  ) {
+  transform: translateX(var(--toast-swipe-movement-x))
+    translateY(
+      calc(
+        --spacing(15) - var(--toast-frontmost-height) + var(--ov2-offset-y) +
+          var(--toast-swipe-movement-y)
+      )
+    );
+}
+
+[data-stack="stone"][data-stack-layer="0"]:not([data-appearance="error-stripe"]) {
+  box-shadow: var(--shadow-ov2-stack-front);
+}
+
+[data-stack="stone"][data-stack-hidden] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+[data-stack="stone"][data-stack-behind]:not([data-expanded]) [data-slot="toast-close"] {
+  visibility: hidden;
+}
+
+[data-slot="toast-viewport"][data-stack="stone"]:has([data-expanded]) .ov2-toast-count {
+  opacity: 0;
+}
+
+[data-slot="toast-icon"][data-tone="neutral"] {
+  background: var(--color-toast-loading-tile);
+  box-shadow: none;
+}
+
+[data-slot="toast-icon"][data-tone="update"] {
+  background: var(--color-update-surface);
+  box-shadow: none;
+}
+
+[data-slot="toast-icon"][data-tone="attention"] {
+  background: var(--color-ov2-attention-tile);
+}
+
+[data-slot="toast-icon"][data-tone="success"] {
+  background: var(--color-status-success);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-stack="stone"][data-position]:not([data-slot="toast-viewport"]) {
+    transition: none;
+  }
+}

@@ -83,7 +83,7 @@ export const app: Messages["app"] = {
     openFile: "打开 keybindings.json",
   },
   migration: {
-    restoring: "正在恢复对话…",
+    restoring: "正在迁移旧版对话…",
     /** Describes the number of threads being migrated. */
     progress: (count) =>
       `正在从上一版本迁移 ${count.toLocaleString()} 个对话。此过程不影响你继续工作。`,
@@ -135,8 +135,7 @@ export const app: Messages["app"] = {
     checkError: "无法检查权限。稍后将自动重试。",
   },
   clone: {
-    /** Formats the message using name. */
-    cloning: (name) => `正在克隆 ${name}`,
+    cloningRepository: "正在克隆仓库",
     cancelError: "取消克隆失败",
     /** Formats the message using name. */
     cloned: (name) => `已克隆 ${name}`,
@@ -259,7 +258,7 @@ export const app: Messages["app"] = {
     started: "开始于",
     hide: "隐藏请求",
     show: "显示请求",
-    slowTitle: "部分请求响应缓慢",
+    slowTitle: "请求比平时慢",
   },
   thread: {
     thisThread: "此对话",

@@ -1,6 +1,7 @@
 /** Shows a consolidated warning for slow RPC acknowledgements and their start times. */
 import { t } from "~/i18n";
 import { useEffect, useRef } from "react";
+import { HourglassIcon } from "lucide-react";
 
 import { type SlowRpcAckRequest, useSlowRpcAckRequests } from "../rpc/requestLatencyState";
 import { toastManager } from "./ui/toast";
@@ -52,6 +53,8 @@ export function SlowRpcRequestToastCoordinator() {
 
     const nextToast = {
       data: {
+        leadingIcon: <HourglassIcon aria-hidden className="size-3.75" />,
+        iconTone: "neutral" as const,
         expandableContent: <SlowRequestDetails requests={slowRequests} />,
         expandableDescriptionTrigger: true,
         expandableLabels: { collapse: t.app.requests.hide, expand: t.app.requests.show },

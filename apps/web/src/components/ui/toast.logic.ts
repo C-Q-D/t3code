@@ -1,6 +1,15 @@
 /** Pure presentation decisions for toast visibility, stacking, actions, and determinate progress. */
 import type { ScopedThreadRef, ThreadId } from "@t3tools/contracts";
 
+/** Returns S1's pixel insets and visibility for a zero-based visible layer; only the first three layers are shown. */
+export function getStoneToastLayer(visibleIndex: number) {
+  return {
+    inset: visibleIndex * 12,
+    offset: visibleIndex === 0 ? 0 : visibleIndex * -10,
+    hidden: visibleIndex >= 3,
+  };
+}
+
 /**
  * Returns a whole percentage in [0, 100] for loading toasts only.
  * Missing or non-finite progressPercent means unknown progress and returns null,

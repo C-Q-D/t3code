@@ -34,6 +34,7 @@ import { useCopyToClipboard } from "~/hooks/useCopyToClipboard";
 import { resolveThreadRouteTarget } from "~/threadRoutes";
 import {
   buildVisibleToastLayout,
+  getStoneToastLayer,
   hasVisibleToastAction,
   resolveToastProgressPercent,
   shouldHideCollapsedToastContent,
@@ -48,6 +49,8 @@ export type ThreadToastData = {
   threadRef?: ScopedThreadRef | null;
   threadId?: ThreadId | null;
   leadingIcon?: ReactNode;
+  /** S1/S2 icon tile treatment, independent of notification priority and lifecycle. */
+  iconTone?: "neutral" | "update" | "attention" | "success" | undefined;
   /** Loading progress in percent; finite values are rounded and clamped to 0–100. Omit or use null when unknown. */
   progressPercent?: number | null;
   tooltipStyle?: boolean;
@@ -358,6 +361,7 @@ function ToastBodyContent({
                 "bg-(--color-toast-loading-tile) shadow-(--shadow-toast-loading-tile)",
             )}
             data-slot="toast-icon"
+            data-tone={toastData?.iconTone}
           >
             {leadingIcon || (Icon ? <Icon className="size-3.75" /> : null)}
           </div>
@@ -455,6 +459,8 @@ type ToastPosition =
 
 interface ToastProviderProps extends Toast.Provider.Props {
   position?: ToastPosition;
+  /** Opt-in S1 geometry; omitted retains the existing stack and viewport defaults. */
+  stack?: "stone" | undefined;
 }
 
 function useActiveThreadRefFromRoute(): ScopedThreadRef | null {
@@ -559,17 +565,17 @@ function ThreadToastVisibleAutoDismiss({
 }
 
 /** Keeps all appearances in one viewport so interaction and announcement state have one owner. */
-function ToastProvider({ children, position = "top-right", ...props }: ToastProviderProps) {
+function ToastProvider({ children, position = "top-right", stack, ...props }: ToastProviderProps) {
   return (
     <Toast.Provider toastManager={toastManager} {...props}>
       {children}
-      <Toasts position={position} />
+      <Toasts position={position} stack={stack} />
     </Toast.Provider>
   );
 }
 
 /** Renders managed toasts at position; appearance is opt-in and dismissal remains keyboard accessible. */
-function Toasts({ position }: { position: ToastPosition }) {
+function Toasts({ position, stack }: { position: ToastPosition; stack?: "stone" | undefined }) {
   const { toasts } = Toast.useToastManager<ThreadToastData>();
   const activeThreadRef = useActiveThreadRefFromRoute();
   const isTop = position.startsWith("top");
@@ -577,6 +583,8 @@ function Toasts({ position }: { position: ToastPosition }) {
     shouldRenderThreadScopedToast(toast.data, activeThreadRef),
   );
   const visibleToastLayout = buildVisibleToastLayout(visibleToasts);
+  const remainingCount =
+    visibleToasts.filter((toast) => toast.transitionStatus !== "ending").length - 1;
 
   useEffect(() => {
     const activeToastIds = new Set(toasts.map((toast) => toast.id));
@@ -601,6 +609,7 @@ function Toasts({ position }: { position: ToastPosition }) {
           "data-[position*=center]:-translate-x-1/2 data-[position*=center]:left-1/2",
         )}
         data-position={position}
+        data-stack={stack}
         data-slot="toast-viewport"
         style={
           {
@@ -608,7 +617,16 @@ function Toasts({ position }: { position: ToastPosition }) {
           } as CSSProperties
         }
       >
+        {stack === "stone" && remainingCount > 0 ? (
+          <span
+            aria-hidden
+            className="ov2-toast-count pointer-events-none absolute right-2.5 z-10000 flex h-5.5 items-center rounded-full bg-accent px-2.25 font-mono text-meta text-code-foreground shadow-ov2-count"
+          >
+            +{remainingCount}
+          </span>
+        ) : null}
         {visibleToastLayout.items.map(({ toast, visibleIndex, offsetY }) => {
+          const stoneLayer = stack === "stone" ? getStoneToastLayer(visibleIndex) : undefined;
           const hideCollapsedContent = shouldHideCollapsedToastContent(
             visibleIndex,
             visibleToastLayout.items.length,
@@ -619,6 +637,10 @@ function Toasts({ position }: { position: ToastPosition }) {
           return (
             <Toast.Root
               data-appearance={toast.data?.appearance}
+              data-stack={stack}
+              data-stack-layer={stoneLayer ? visibleIndex : undefined}
+              data-stack-behind={stack === "stone" && visibleIndex > 0 ? "" : undefined}
+              data-stack-hidden={stoneLayer?.hidden ? "" : undefined}
               className={cn(
                 "dropdown-glass absolute z-[calc(9999-var(--toast-index))] w-full overflow-visible select-none rounded-overlay text-foreground text-shadow-stone [transition:transform_.5s_cubic-bezier(.22,1,.36,1),opacity_.5s,height_.15s]",
                 // Base positioning using data-position
@@ -678,6 +700,12 @@ function Toasts({ position }: { position: ToastPosition }) {
                 {
                   "--toast-index": visibleIndex,
                   "--toast-offset-y": `${offsetY}px`,
+                  ...(stoneLayer
+                    ? {
+                        "--ov2-inset-x": `${stoneLayer.inset}px`,
+                        "--ov2-offset-y": `${stoneLayer.offset}px`,
+                      }
+                    : {}),
                 } as CSSProperties
               }
               swipeDirection={

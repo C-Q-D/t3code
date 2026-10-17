@@ -26,6 +26,7 @@ import {
 import { resolveSidebarThreadStatus } from "./Sidebar.logic";
 import { toastManager } from "./ui/toast";
 
+/** Coordinates configured notification channels without changing thread lifecycle or deduplication. */
 export function ThreadNotificationCoordinator() {
   const environmentIds = useEnvironmentIds();
   const mode = useClientSettings((settings) => settings.notificationMode);
@@ -192,6 +193,8 @@ function EnvironmentNotifications({
           description: thread.title,
           data: {
             hideCopyButton: true,
+            actionVariant: "default",
+            iconTone: status === "approval" || status === "limited" ? "attention" : undefined,
             leadingIcon:
               kind === "completion" ? (
                 <CircleCheckIcon aria-hidden className="size-3.75" />

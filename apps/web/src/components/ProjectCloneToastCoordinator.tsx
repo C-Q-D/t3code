@@ -15,6 +15,7 @@ import {
   type ProjectId,
 } from "@t3tools/contracts";
 import { useCallback, useEffect, useRef } from "react";
+import { GitBranchIcon } from "lucide-react";
 
 import { useNewThreadHandler } from "../hooks/useHandleNewThread";
 import { useRemoveClonedProject } from "../hooks/useRemoveClonedProject";
@@ -127,8 +128,8 @@ function EnvironmentCloneToasts({ environmentId }: { environmentId: EnvironmentI
       if (clone.phase === "running") {
         const options = stackedThreadToast({
           type: "loading",
-          title: t.app.clone.cloning(name),
-          description: projectCloneProgressSummary(clone),
+          title: t.app.clone.cloningRepository,
+          description: `${name} · ${projectCloneProgressSummary(clone)}`,
           timeout: 0,
           actionProps: {
             children: t.common.confirm.cancel,
@@ -138,7 +139,12 @@ function EnvironmentCloneToasts({ environmentId }: { environmentId: EnvironmentI
               );
             },
           },
-          data: { hideCopyButton: true },
+          data: {
+            hideCopyButton: true,
+            leadingIcon: <GitBranchIcon aria-hidden className="size-3.75" />,
+            iconTone: "neutral",
+            progressPercent: clone.percent,
+          },
         });
         if (tracked) {
           toastManager.update(tracked.toastId, options);

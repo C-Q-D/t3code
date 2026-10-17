@@ -85,7 +85,7 @@ export const app = {
     openFile: "Open keybindings.json",
   },
   migration: {
-    restoring: "Restoring your threads…",
+    restoring: "Migrating legacy threads…",
     /** Describes the number of threads being migrated. */
     progress: (count: number) =>
       `Migrating ${count.toLocaleString()} ${count === 1 ? "thread" : "threads"} from the previous version. You can keep working while this finishes.`,
@@ -143,8 +143,7 @@ export const app = {
     checkError: "Could not check permissions. We'll try again automatically.",
   },
   clone: {
-    /** Formats the message using name. */
-    cloning: (name: string) => `Cloning ${name}`,
+    cloningRepository: "Cloning repository",
     cancelError: "Failed to cancel clone",
     /** Formats the message using name. */
     cloned: (name: string) => `Cloned ${name}`,
@@ -271,7 +270,7 @@ export const app = {
     started: "Started ",
     hide: "Hide requests",
     show: "Show requests",
-    slowTitle: "Some requests are slow",
+    slowTitle: "Request is taking longer than usual",
   },
   thread: {
     thisThread: "this thread",

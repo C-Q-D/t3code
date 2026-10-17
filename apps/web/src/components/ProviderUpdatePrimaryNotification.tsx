@@ -78,6 +78,11 @@ function addProviderUpdateToast(input: {
       actionProps: hiddenToastActionProps,
       data: {
         hideCopyButton: true,
+        leadingIcon:
+          input.view.type === "loading" ? (
+            <DownloadIcon aria-hidden className="size-3.75" />
+          ) : undefined,
+        iconTone: input.view.type === "loading" ? "update" : undefined,
         ...(input.view.dismissAfterVisibleMs !== undefined
           ? { dismissAfterVisibleMs: input.view.dismissAfterVisibleMs }
           : {}),

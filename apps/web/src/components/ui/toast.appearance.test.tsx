@@ -58,33 +58,65 @@ it.each([
 );
 
 /** Mixed appearances must share one interaction and announcement region. */
-it("keeps default and striped notifications in one viewport", async () => {
+it.each([undefined, "stone"] as const)(
+  "keeps mixed notifications in one viewport with stack=%s",
+  async (stack) => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    try {
+      await act(async () => {
+        root.render(<ToastProvider timeout={0} stack={stack} />);
+      });
+      await act(async () => {
+        toastManager.add({ type: "error", title: "Default failure", priority: "high" });
+        toastManager.add({
+          type: "error",
+          title: "Striped failure",
+          description: "Original failure",
+          data: { appearance: "error-stripe" },
+        });
+      });
+      const viewports = document.querySelectorAll('[data-slot="toast-viewport"]');
+      expect(viewports).toHaveLength(1);
+      expect(
+        Array.from(
+          viewports[0]!.querySelectorAll('[data-slot="toast-title"]'),
+          (node) => node.textContent,
+        ),
+      ).toEqual(expect.arrayContaining(["Default failure", "Striped failure"]));
+      expect(document.querySelectorAll('[role="alert"]')).toHaveLength(1);
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+      vi.unstubAllGlobals();
+    }
+  },
+);
+
+/** The S1 badge reports real pending cards and follows dismissals without adding another live region. */
+it("updates the S1 remaining count as notifications close", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   const container = document.createElement("div");
   document.body.append(container);
   const root = createRoot(container);
   try {
+    await act(async () =>
+      root.render(<ToastProvider timeout={0} stack="stone" position="bottom-right" />),
+    );
+    let firstId = "";
+    let secondId = "";
     await act(async () => {
-      root.render(<ToastProvider timeout={0} />);
+      firstId = toastManager.add({ title: "First" });
+      secondId = toastManager.add({ title: "Second" });
+      toastManager.add({ title: "Third" });
     });
-    await act(async () => {
-      toastManager.add({ type: "error", title: "Default failure", priority: "high" });
-      toastManager.add({
-        type: "error",
-        title: "Striped failure",
-        description: "Original failure",
-        data: { appearance: "error-stripe" },
-      });
-    });
-    const viewports = document.querySelectorAll('[data-slot="toast-viewport"]');
-    expect(viewports).toHaveLength(1);
-    expect(
-      Array.from(
-        viewports[0]!.querySelectorAll('[data-slot="toast-title"]'),
-        (node) => node.textContent,
-      ),
-    ).toEqual(expect.arrayContaining(["Default failure", "Striped failure"]));
-    expect(document.querySelectorAll('[role="alert"]')).toHaveLength(1);
+    expect(document.querySelector(".ov2-toast-count")?.textContent).toBe("+2");
+    await act(async () => toastManager.close(firstId));
+    expect(document.querySelector(".ov2-toast-count")?.textContent).toBe("+1");
+    await act(async () => toastManager.close(secondId));
+    expect(document.querySelector(".ov2-toast-count")).toBeNull();
   } finally {
     await act(async () => root.unmount());
     container.remove();

@@ -5,6 +5,7 @@ import { sessionHasLegacyPermissions, type EnvironmentId } from "@t3tools/contra
 import { useNavigate } from "@tanstack/react-router";
 import * as Schema from "effect/Schema";
 import { useEffect } from "react";
+import { ShieldCheckIcon } from "lucide-react";
 
 import { getLocalStorageItem, setLocalStorageItem } from "../hooks/useLocalStorage";
 import { useEnvironments } from "../state/environments";
@@ -63,6 +64,8 @@ function EnvironmentPermissionNotice({
         },
       },
       data: {
+        leadingIcon: <ShieldCheckIcon aria-hidden className="size-3.75" />,
+        iconTone: "success",
         actionLayout: "stacked-end",
         secondaryActionProps: { children: t.app.actions.dismiss, onClick: dismiss },
         secondaryActionVariant: "ghost",
@@ -72,6 +75,7 @@ function EnvironmentPermissionNotice({
   return null;
 }
 
+/** Mounts one legacy-permission notice observer per connected environment. */
 export function PermissionUpdateNotice() {
   const { environments } = useEnvironments();
   return environments.map(({ environmentId, label }) => (

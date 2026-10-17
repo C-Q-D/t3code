@@ -158,6 +158,7 @@ function RootRouteNotFoundView() {
   );
 }
 
+/** Composes authentication gates, application surfaces, and shared notification providers. */
 function RootRouteView() {
   useEffect(() => installDesktopPasteAsText(window.desktopBridge, window), []);
   const pathname = useLocation({ select: (location) => location.pathname });
@@ -207,7 +208,7 @@ function RootRouteView() {
   // and other startup dialogs suspended until setup finishes.
   if (pathname === "/welcome") {
     return (
-      <ToastProvider>
+      <ToastProvider position="bottom-right" stack="stone">
         <AnchoredToastProvider>
           <DocumentTitleSync />
           <ContrastAppearanceSync />
@@ -248,7 +249,7 @@ function RootRouteView() {
   // decision is known, so a fresh install renders nothing (not the shell,
   // not a flash of threads) before landing on the welcome wizard.
   return (
-    <ToastProvider>
+    <ToastProvider position="bottom-right" stack="stone">
       <AnchoredToastProvider>
         <DocumentTitleSync />
         <ContrastAppearanceSync />
