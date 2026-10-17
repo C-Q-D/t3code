@@ -1,4 +1,6 @@
+/** Renders the legacy project/thread tree; reads the same project scope as ProjectRail. */
 import { t } from "~/i18n";
+import { filterLegacySidebarProjects } from "./LegacySidebar.logic";
 import { useSupportsMultiplePullRequests } from "~/hooks/useSupportsMultiplePullRequests";
 import { resolveThreadCurrentPullRequestLink } from "@t3tools/shared/threadPullRequests";
 import { Spinner } from "~/components/ui/spinner";
@@ -3259,6 +3261,7 @@ const SidebarProjectsContent = memo(function SidebarProjectsContent(
 
 export default function LegacySidebar() {
   const projects = useProjects();
+  const projectScopeKey = useUiStateStore((store) => store.sidebarProjectScopeKey);
   const sidebarThreads = useThreadShells();
   const projectExpandedById = useUiStateStore((store) => store.projectExpandedById);
   const projectOrder = useUiStateStore((store) => store.projectOrder);
@@ -3546,7 +3549,11 @@ export default function LegacySidebar() {
     [sidebarThreads],
   );
   const sortedProjects = useMemo(() => {
-    const sortableProjects = sidebarProjects.map((project) => ({
+    const sortableProjects = filterLegacySidebarProjects(
+      sidebarProjects,
+      projectScopeKey,
+      projectGroupingSettings,
+    ).map((project) => ({
       ...project,
       id: project.projectKey,
     }));
@@ -3571,6 +3578,8 @@ export default function LegacySidebar() {
   }, [
     sidebarProjectSortOrder,
     physicalToLogicalKey,
+    projectScopeKey,
+    projectGroupingSettings,
     projectPhysicalKeyByScopedRef,
     sidebarProjectByKey,
     sidebarProjects,

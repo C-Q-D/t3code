@@ -12,7 +12,7 @@ import {
   SearchIcon,
   SettingsIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
+import { useEffect, useMemo, useReducer, useRef, type ComponentProps } from "react";
 import { t } from "~/i18n";
 import { cn } from "~/lib/utils";
 import { openCommandPalette } from "../../commandPaletteBus";
@@ -55,7 +55,11 @@ import {
 } from "../ui/combobox";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { isSidebarUtilityPage, useNavigateToMainApp } from "./mainAppLocation";
-import { deriveProjectRailSelection, toggleProjectRailScope } from "./projectRail.logic";
+import {
+  deriveProjectRailSelection,
+  reduceProjectRailPickerState,
+  toggleProjectRailScope,
+} from "./projectRail.logic";
 
 /**
  * Feature-specific 38px stone key. label supplies the localized accessible name and tooltip.
@@ -108,8 +112,10 @@ export function ProjectRail() {
   const pathname = useLocation({ select: (location) => location.pathname });
   const onUtilityPage = isSidebarUtilityPage(pathname);
   const pullRequestsSupported = usePullRequestsSupported();
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
+  const [{ open, query }, dispatchPicker] = useReducer(reduceProjectRailPickerState, {
+    open: false,
+    query: "",
+  });
   const highlightedKey = useRef<string | null>(null);
   const suppressScopeChange = useRef(false);
   const filter = useComboboxFilter();
@@ -176,7 +182,7 @@ export function ProjectRail() {
   function openProjectSettings(project: SidebarProjectSnapshot) {
     // Base UI can commit its highlighted item as the popup closes; settings must not select it.
     suppressScopeChange.current = true;
-    setOpen(false);
+    dispatchPicker({ type: "project-settings-opened" });
     void navigate({
       to: "/projects/$projectKey",
       params: { projectKey: getSidebarProjectSettingsKey(project, settings, projects) },
@@ -204,8 +210,7 @@ export function ProjectRail() {
         open={open}
         onOpenChange={(nextOpen) => {
           if (nextOpen) suppressScopeChange.current = false;
-          setOpen(nextOpen);
-          if (!nextOpen) setQuery("");
+          dispatchPicker({ type: "open-changed", open: nextOpen });
         }}
         itemToStringLabel={(item) => item.label}
         isItemEqualToValue={(a, b) => a.value === b.value}
@@ -239,7 +244,9 @@ export function ProjectRail() {
                 aria-label={t.sidebar.projects.searchAriaLabel}
                 placeholder={t.sidebar.projects.searchPlaceholder}
                 value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                onChange={(event) =>
+                  dispatchPicker({ type: "query-changed", query: event.target.value })
+                }
                 onKeyDown={(event) => {
                   if (
                     event.defaultPrevented ||

@@ -2,7 +2,12 @@
 import { describe, expect, it } from "vite-plus/test";
 import { EnvironmentId, ProjectId, ProviderInstanceId } from "@t3tools/contracts";
 import { buildSidebarProjectSnapshots } from "../../sidebarProjectGrouping";
-import { deriveProjectRailSelection, toggleProjectRailScope } from "./projectRail.logic";
+import {
+  deriveProjectRailSelection,
+  reduceProjectRailPickerState,
+  toggleProjectRailScope,
+} from "./projectRail.logic";
+import { filterSidebarProjectScopeItems } from "../Sidebar.logic";
 
 const environmentId = EnvironmentId.make("local");
 const groups = buildSidebarProjectSnapshots({
@@ -25,6 +30,29 @@ const groups = buildSidebarProjectSnapshots({
 });
 
 describe("project rail scope", () => {
+  it("reopens all project choices after leaving a searched popup for project settings", () => {
+    const items = [
+      { value: "all", label: "All projects" },
+      { value: "alpha", label: "Alpha" },
+      { value: "beta", label: "Beta" },
+    ];
+    const searched = reduceProjectRailPickerState(
+      { open: true, query: "" },
+      { type: "query-changed", query: "Alpha" },
+    );
+    const closed = reduceProjectRailPickerState(searched, { type: "project-settings-opened" });
+    expect(closed.open).toBe(false);
+    const reopened = reduceProjectRailPickerState(closed, { type: "open-changed", open: true });
+    expect(reopened).toEqual({ open: true, query: "" });
+    expect(
+      filterSidebarProjectScopeItems({
+        items,
+        query: reopened.query,
+        matches: (item, query) => item.label.includes(query),
+      }).map((item) => item.value),
+    ).toEqual(["all", "alpha", "beta"]);
+  });
+
   it("selects, switches and cancels the same project filter on a second click", () => {
     expect(toggleProjectRailScope(null, "alpha")).toBe("alpha");
     expect(toggleProjectRailScope("alpha", "beta")).toBe("beta");
