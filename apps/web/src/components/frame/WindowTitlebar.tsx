@@ -15,7 +15,8 @@ import { Badge } from "../ui/badge";
 import { TitlebarSlotOutlet } from "./titlebarSlot";
 
 /**
- * Renders the persistent 48px titlebar, independent of sidebar visibility.
+ * Renders the persistent titlebar, independent of sidebar visibility.
+ * Its 48px design baseline expands with the native window controls overlay.
  * sidebarControl supplies the existing toggle and its keyboard bindings.
  * onLeadingWidthChange receives the live left cluster's right edge in CSS pixels;
  * the shell uses it to keep sidebar-width environment artwork behind that cluster.
@@ -50,7 +51,7 @@ export function WindowTitlebar({
 
   return (
     <header
-      className="window-titlebar drag-region relative flex h-12 w-full shrink-0 items-center text-foreground text-shadow-stone"
+      className="window-titlebar drag-region relative flex h-(--workspace-topbar-height) w-full shrink-0 items-center text-foreground text-shadow-stone"
       data-window-titlebar=""
     >
       {backdropVariant ? (

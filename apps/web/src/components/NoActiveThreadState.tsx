@@ -8,7 +8,7 @@ import { WorkspacePageHeader } from "./WorkspacePageHeader";
 /** Renders the inactive workspace with guidance to select or create a thread. */
 export function NoActiveThreadState() {
   return (
-    <SidebarInset className="h-dvh min-h-0 overflow-hidden overscroll-y-none">
+    <SidebarInset className="h-full min-h-0 overflow-hidden overscroll-y-none">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden bg-background">
         <WorkspacePageHeader electron={isElectron} className="border-b border-border">
           {isElectron ? (

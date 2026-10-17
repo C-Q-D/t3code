@@ -53,9 +53,9 @@
   -webkit-app-region: no-drag;
 }
 
-/* The existing sidebar is viewport-fixed. Keep it below the new shell row until
-   FR1 grid takes ownership of the slab layout; no changes to the shared UI primitive. */
+/* The sidebar is viewport-fixed, so match the shell's dynamic viewport and the
+   titlebar's WCO-aware height rather than the static 48px design token. */
 .window-frame-workspace [data-slot="sidebar-container"] {
-  top: var(--frame-titlebar-height);
-  height: calc(100svh - var(--frame-titlebar-height));
+  top: var(--workspace-topbar-height);
+  height: calc(100dvh - var(--workspace-topbar-height));
 }

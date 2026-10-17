@@ -309,7 +309,8 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
             sidebarControl={<SidebarControl />}
             onLeadingWidthChange={setTitlebarLeadingWidth}
           />
-          <div className="window-frame-workspace flex min-h-0 w-full flex-1">
+          {/* Bound route heights to the space left by the titlebar, not their content. */}
+          <div className="window-frame-workspace flex h-0 min-h-0 w-full flex-1">
             <ProjectProjectionRetention />
             <Sidebar
               side="left"
