@@ -17,6 +17,8 @@ describe("cn", () => {
     ["text-fg-disabled text-attention", "text-attention"],
     ["bg-stone-chrome bg-well-surface", "bg-well-surface"],
     ["shadow-slab shadow-raise-m", "shadow-raise-m"],
+    ["shadow-well shadow-pr-description-well", "shadow-pr-description-well"],
+    ["shadow-raise-m shadow-pr-review-card", "shadow-pr-review-card"],
     ["shadow-slab shadow-stone-edge", "shadow-slab shadow-stone-edge"],
     ["shadow-slab shadow-black/50", "shadow-slab shadow-black/50"],
     ["text-shadow-stone text-shadow-fg-disabled", "text-shadow-stone text-shadow-fg-disabled"],
@@ -25,8 +27,11 @@ describe("cn", () => {
     ["rounded-lg rounded-card-surface", "rounded-card-surface"],
     ["rounded-tag rounded-badge-large", "rounded-badge-large"],
     ["rounded-s-none rounded-s-split-join", "rounded-s-split-join"],
+    ["rounded-card-row rounded-pr-description", "rounded-pr-description"],
     ["leading-code leading-terminal", "leading-terminal"],
     ["leading-code leading-6", "leading-6"],
+    ["leading-code leading-pr-description", "leading-pr-description"],
+    ["leading-pr-description leading-pr-comment", "leading-pr-comment"],
     ["tracking-brand tracking-wide", "tracking-wide"],
   ])("merges %s according to its utility group", (classes, expected) => {
     assert.strictEqual(cn(classes), expected);

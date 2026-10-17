@@ -188,6 +188,8 @@ const twMerge = extendTailwindMerge({
         "sidebar-row-drag",
         "sidebar-jump",
         "sidebar-bulk",
+        "pr-description-well",
+        "pr-review-card",
       ],
       "inset-shadow": [
         "selected",
@@ -247,6 +249,7 @@ const twMerge = extendTailwindMerge({
         "sidebar-search-hit",
         "badge-large",
         "split-join",
+        "pr-description",
       ],
       leading: [
         "code",
@@ -256,6 +259,8 @@ const twMerge = extendTailwindMerge({
         "discussion-composer",
         "discussion-record",
         "chat-project-menu",
+        "pr-description",
+        "pr-comment",
       ],
       tracking: ["brand", "chat-draft"],
     },

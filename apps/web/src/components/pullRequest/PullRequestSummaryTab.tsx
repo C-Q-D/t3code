@@ -40,6 +40,7 @@ import {
   MenuTrigger,
 } from "../ui/menu";
 import { toastManager } from "../ui/toast";
+import { Toggle, ToggleGroup } from "../ui/toggle-group";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import {
   PullRequestActorLabel,
@@ -55,6 +56,7 @@ import { PullRequestLabelPicker } from "./PullRequestLabelPicker";
 import { PullRequestReviewerPicker } from "./PullRequestReviewerPicker";
 import { PullRequestActivityUnavailableState } from "./PullRequestActivityUnavailableState";
 import {
+  availablePullRequestReviewVerdicts,
   latestPullRequestReviewOutcomes,
   orderPullRequestComments,
   pullRequestFindingKey,
@@ -72,6 +74,7 @@ import { PullRequestMarkdownEditor } from "./PullRequestMarkdownEditor";
 import { PullRequestReactionBar } from "./PullRequestReactions";
 import { PullRequestConversationGhost } from "./PullRequestGhosts";
 import { sectionCollapseAnchorScrollTop } from "./pullRequestSummaryScroll.logic";
+import { PullRequestReviewForm } from "./PullRequestReviewForm";
 
 /** One reviewer, however a host happens to have cased their login this time. */
 function reviewerKey(login: string): string {
@@ -96,7 +99,12 @@ function CommentIdentity({
     : null;
   return (
     <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-      <PullRequestActorLabel actor={actor} profileUrl={profileUrl} className="max-w-full" />
+      <PullRequestActorLabel
+        actor={actor}
+        profileUrl={profileUrl}
+        avatarSize="xl"
+        className="max-w-full"
+      />
       <Tooltip>
         <TooltipTrigger
           render={
@@ -289,6 +297,7 @@ function CollapsedComment({
   );
 }
 
+/** Keep host metadata available even where the narrow board does not illustrate it. */
 function MetaRow({
   icon,
   label,
@@ -309,14 +318,18 @@ function MetaRow({
   );
 }
 
+/** Collapsible summary section; preserve the heading's scroll position and optional mounted drafts. */
 function Section({
   title,
+  prominent = false,
   defaultOpen = true,
   keepMounted = false,
   actions,
   children,
 }: {
   title: string;
+  /** Only the illustrated description heading uses the board's serif title treatment. */
+  prominent?: boolean;
   defaultOpen?: boolean;
   keepMounted?: boolean;
   /** Heading controls stay separate from the collapse trigger so they remain independently usable. */
@@ -358,7 +371,12 @@ function Section({
         ref={headingRef}
         className="sticky top-0 z-10 flex w-full items-center bg-background pr-4"
       >
-        <CollapsibleTrigger className="flex min-w-0 flex-1 items-center gap-1.5 px-4 py-3 text-left text-xs font-medium text-muted-foreground hover:text-foreground">
+        <CollapsibleTrigger
+          className={cn(
+            "flex min-w-0 flex-1 items-center gap-1.5 px-4 py-3 text-left text-xs font-medium text-muted-foreground hover:text-foreground",
+            prominent && "gap-2 py-0 font-serif text-card-title font-bold text-foreground",
+          )}
+        >
           <span>{title}</span>
           <ChevronRightIcon
             aria-hidden
@@ -371,7 +389,7 @@ function Section({
         {actions}
       </div>
       <CollapsiblePanel keepMounted={keepMounted}>
-        <div className="px-4 pb-4">{children}</div>
+        <div className={cn("px-4 pb-4", prominent && "pt-3.5")}>{children}</div>
       </CollapsiblePanel>
     </Collapsible>
   );
@@ -425,6 +443,8 @@ export function PullRequestSummaryTab({
   onRefresh: () => void;
   onRefreshChecks?: () => void;
 }) {
+  const reviewRef = useRef<HTMLTextAreaElement>(null);
+  const reviewVerdicts = availablePullRequestReviewVerdicts(detail);
   // Keyed by the pull request, so opening another one starts at the end of its conversation
   // rather than wherever the last one had been read back to.
   const [shown, setShown] = useState({ url: detail.url, count: COMMENT_PAGE });
@@ -631,7 +651,7 @@ export function PullRequestSummaryTab({
         environmentId={environmentId}
         reference={reference}
         onRefresh={onRefresh}
-        className="ml-auto justify-end"
+        className="justify-start"
       />
     );
     return (
@@ -639,9 +659,9 @@ export function PullRequestSummaryTab({
         key={`${detail.url}:${comment.id}`}
         // Offscreen comments skip style, layout and paint. Bot comments carry pages of
         // highlighted code, and the conversation is below the description either way.
-        className="group rounded-lg border border-border/60 bg-background [contain-intrinsic-block-size:160px] [content-visibility:auto]"
+        className="group pr-summary-comment flex flex-col gap-2"
       >
-        <div className="flex flex-wrap items-start gap-2 rounded-t-lg bg-muted/25 px-3 py-2.5">
+        <div className="flex flex-wrap items-start gap-2">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <CommentIdentity comment={comment} detail={detail} />
             {outcome ? (
@@ -666,9 +686,8 @@ export function PullRequestSummaryTab({
                 : fixFindingLabel}
             </Button>
           ) : null}
-          {reactionBar}
         </div>
-        <div className="px-3">
+        <div className="ml-7.5">
           <CommentLocation comment={comment} thread={thread} />
         </div>
         {/* A verdict usually carries no words, and an empty markdown block reads as
@@ -676,8 +695,13 @@ export function PullRequestSummaryTab({
                           Kept where this reader may rewrite the remark: the pencil lives in here,
                           and hiding the block would take away the only way back to it. */}
         {body === null && !commentEditing.canEdit(comment) ? null : (
-          <CommentBody className="px-3 py-3" comment={comment} editing={commentEditing} />
+          <CommentBody
+            className="pr-comment-copy ml-7.5 rounded-pr-description bg-popover px-3.5 py-2.5 text-fg-detail shadow-raise-xs-control"
+            comment={comment}
+            editing={commentEditing}
+          />
         )}
+        <div className="ml-7.5">{reactionBar}</div>
       </article>
     );
   };
@@ -798,8 +822,29 @@ export function PullRequestSummaryTab({
         </div>
       </section>
 
-      <Section key={`description:${detail.url}`} title={t.git.pullRequest.description} keepMounted>
-        <div className="group">
+      <Section
+        key={`description:${detail.url}`}
+        title={t.git.pullRequest.description}
+        prominent
+        keepMounted
+        actions={
+          bodyScope !== detail.url ? (
+            <ToggleGroup aria-label={t.git.pullRequest.markdownEditorMode} value={["preview"]}>
+              {canEditPullRequestChangeRequest(detail) ? (
+                <Toggle
+                  value="write"
+                  aria-label={t.git.pullRequest.editDescription}
+                  onClick={() => setBodyScope(detail.url)}
+                >
+                  {t.git.actions.edit}
+                </Toggle>
+              ) : null}
+              <Toggle value="preview">{t.git.pullRequest.preview}</Toggle>
+            </ToggleGroup>
+          ) : null
+        }
+      >
+        <div className="group pr-description-copy rounded-pr-description bg-pr-description-surface px-4 py-3 text-code-foreground shadow-pr-description-well">
           {bodyScope === detail.url ? (
             <PullRequestMarkdownEditor
               // Empty is a real answer here: saving nothing is how a description is cleared.
@@ -827,12 +872,6 @@ export function PullRequestSummaryTab({
                 environmentId={environmentId}
                 threadRef={threadRef}
               />
-              {canEditPullRequestChangeRequest(detail) ? (
-                <PullRequestEditButton
-                  aria-label={t.git.pullRequest.editDescription}
-                  onClick={() => setBodyScope(detail.url)}
-                />
-              ) : null}
             </div>
           )}
         </div>
@@ -989,6 +1028,21 @@ export function PullRequestSummaryTab({
           </>
         )}
       </Section>
+      {reviewVerdicts.length > 0 ? (
+        // Keep the retained floating comment entry clear of the inline submit at the scroll end.
+        <div className="px-4 pb-18">
+          <PullRequestReviewForm
+            environmentId={environmentId}
+            reference={reference}
+            verdicts={reviewVerdicts}
+            requestChangesSummaryRequired={sourceControlClients
+              .get(detail.provider)
+              .reviewSummaryRequired("request-changes")}
+            textareaRef={reviewRef}
+            onSubmitted={onRefresh}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

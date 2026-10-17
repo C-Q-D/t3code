@@ -46,6 +46,17 @@ export const PULL_REQUEST_MERGE_METHOD_LABELS: Record<PullRequestMergeMethod, st
   rebase: t.git.pullRequest.rebaseAndMerge,
 };
 
+/**
+ * Offer only review verdicts supported by the host and granted to this account.
+ * @param detail Current host capabilities and viewer permissions for the selected PR.
+ * @returns Their intersection in host order, shared by the inline and floating entry points.
+ */
+export function availablePullRequestReviewVerdicts(detail: PullRequestDetailView) {
+  return detail.capabilities.review.verdicts.filter((verdict) =>
+    detail.viewerPermissions.verdicts.includes(verdict),
+  );
+}
+
 /** Old environments keep their existing actions; new ones must finish stack discovery first. */
 export function allowsSinglePullRequestMerge(input: {
   supportsStackActions: boolean;

@@ -5,7 +5,7 @@ import type { ComponentProps, ReactNode } from "react";
 
 import { cn } from "~/lib/utils";
 
-import { Toggle, ToggleGroup } from "../ui/toggle-group";
+import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
 
 /**
  * Renders title and head-to-base metadata for loaded and loading details.
@@ -77,31 +77,31 @@ export function PullRequestDetailTabBar<Tab extends string>({
 }) {
   return (
     <nav
-      className="col-span-2 flex min-w-0 flex-wrap items-center gap-2 border-t border-border/60 px-4 py-2"
+      className="col-span-2 flex min-w-0 flex-wrap items-center gap-1 px-4 pt-1 pb-3"
       aria-label={t.git.pullRequest.pullRequestTabs}
       inert={inert}
     >
-      <ToggleGroup
+      <Tabs
         className="shrink-0"
-        size="segmented"
-        variant="segmented"
-        value={[value]}
+        value={value}
         onValueChange={(next) => {
-          const nextTab = tabs.find((item) => item.value === next[0])?.value;
+          const nextTab = tabs.find((item) => item.value === next)?.value;
           if (nextTab) onValueChange?.(nextTab);
         }}
       >
-        {tabs.map((tab) => (
-          <Toggle
-            key={tab.value}
-            value={tab.value}
-            onPointerEnter={onTabIntent ? () => onTabIntent(tab.value) : undefined}
-            onFocus={onTabIntent ? () => onTabIntent(tab.value) : undefined}
-          >
-            {tab.label}
-          </Toggle>
-        ))}
-      </ToggleGroup>
+        <TabsList aria-label={t.git.pullRequest.pullRequestTabs}>
+          {tabs.map((tab) => (
+            <TabsTrigger
+              key={tab.value}
+              value={tab.value}
+              onPointerEnter={onTabIntent ? () => onTabIntent(tab.value) : undefined}
+              onFocus={onTabIntent ? () => onTabIntent(tab.value) : undefined}
+            >
+              {tab.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
       {children}
     </nav>
   );

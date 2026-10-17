@@ -1,3 +1,4 @@
+/** Protect PR isolation and snapshot cleanup for review drafts shared by multiple surfaces. */
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 import { ProjectId } from "@t3tools/contracts";
 
@@ -13,7 +14,7 @@ function comment(id: string, body = id): PendingReviewComment {
 
 describe("pull request review drafts", () => {
   beforeEach(() => {
-    usePullRequestReviewStore.setState({ drafts: {}, summaries: {} });
+    usePullRequestReviewStore.setState(usePullRequestReviewStore.getInitialState(), true);
   });
 
   it("removes only the line comments included in a submitted snapshot", () => {
@@ -72,5 +73,28 @@ describe("pull request review drafts", () => {
     usePullRequestReviewStore.getState().clearSummary("review-a", "Submitted body");
 
     expect(usePullRequestReviewStore.getState().summaries["review-a"]).toBe("Revised body");
+  });
+
+  it("isolates verdicts by PR and clears only the submitted selection", () => {
+    const store = usePullRequestReviewStore.getState();
+    store.setVerdict("review-a", "approve");
+    store.setVerdict("review-b", "request-changes");
+    store.clearVerdict("review-a", "approve");
+    expect(usePullRequestReviewStore.getState().verdicts).toEqual({
+      "review-b": "request-changes",
+    });
+    store.setVerdict("review-a", "comment");
+    store.clearVerdict("review-a", "approve");
+    expect(usePullRequestReviewStore.getState().verdicts["review-a"]).toBe("comment");
+  });
+
+  it("locks each PR independently and releases only the completed request", () => {
+    const store = usePullRequestReviewStore.getState();
+    expect(store.beginSubmission("review-a")).toBe(true);
+    expect(store.beginSubmission("review-b")).toBe(true);
+    expect(store.beginSubmission("review-a")).toBe(false);
+    store.endSubmission("review-a");
+    expect(store.beginSubmission("review-a")).toBe(true);
+    expect(store.beginSubmission("review-b")).toBe(false);
   });
 });

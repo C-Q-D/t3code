@@ -1,5 +1,11 @@
 import { SourceControlProviderKind } from "@t3tools/contracts";
-import { EnvironmentId, ProjectId, type PullRequestDetailView } from "@t3tools/contracts";
+/** Protect summary editing, comment filters, and the inline review's permission boundary. */
+import {
+  EnvironmentId,
+  ProjectId,
+  type PullRequestDetailView,
+  type PullRequestReviewVerdict,
+} from "@t3tools/contracts";
 import { act, type ReactNode } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
@@ -25,6 +31,7 @@ vi.mock("../ui/tooltip", () => ({
 }));
 
 import { PullRequestSummaryTab } from "./PullRequestSummaryTab";
+import { usePullRequestReviewStore } from "./pullRequestReviewStore";
 
 const detail: PullRequestDetailView = {
   provider: SourceControlProviderKind.make("github"),
@@ -80,6 +87,7 @@ const detail: PullRequestDetailView = {
 
 let renderer: ReactTestRenderer;
 beforeEach(() => {
+  usePullRequestReviewStore.setState(usePullRequestReviewStore.getInitialState(), true);
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   const store = new Map<string, string>();
   vi.stubGlobal(
@@ -167,6 +175,46 @@ it("keeps an unsaved description when collapsed and reopened", () => {
   click("Description");
   expect(renderer.root.findByType("textarea").props.value).toBe("Unsaved description");
 });
+
+it.each([
+  { host: ["approve"], viewer: [], visible: [] },
+  { host: [], viewer: ["approve"], visible: [] },
+  { host: ["comment", "approve", "request-changes"], viewer: ["approve"], visible: ["Approve"] },
+] satisfies Array<{
+  host: PullRequestReviewVerdict[];
+  viewer: PullRequestReviewVerdict[];
+  visible: string[];
+}>)(
+  "offers inline review only for the host/account intersection ($host / $viewer)",
+  ({ host, viewer, visible }) => {
+    act(() => {
+      renderer = create(
+        render({
+          ...detail,
+          capabilities: {
+            ...detail.capabilities,
+            review: { ...detail.capabilities.review, verdicts: host },
+          },
+          viewerPermissions: { ...detail.viewerPermissions, verdicts: viewer },
+        }),
+      );
+    });
+    const editors = renderer.root
+      .findAllByType("textarea")
+      .filter((node) => node.props["aria-label"] === "Review summary");
+    expect(editors).toHaveLength(visible.length > 0 ? 1 : 0);
+    if (visible.length > 0) {
+      const group = renderer.root
+        .findAllByType("div")
+        .find((node) => node.props["aria-label"] === "Review verdict")!;
+      expect(
+        group
+          .findAllByType("button")
+          .map((button) => button.children.filter((child) => typeof child === "string").join("")),
+      ).toEqual(visible);
+    }
+  },
+);
 
 function texts() {
   return renderer.root

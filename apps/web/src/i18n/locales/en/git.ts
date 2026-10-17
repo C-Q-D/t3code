@@ -614,7 +614,6 @@ export const git = {
     theReviewCouldNotBeSubmitted: "The review could not be submitted",
     summarizeYourReviewRequiredToRequestChanges:
       "Summarize your review (required to request changes)",
-    summarizeYourReviewOptional: "Summarize your review (optional)",
     reviewSummary: "Review summary",
     reviewVerdict: "Review verdict",
     submitting: "Submitting...",

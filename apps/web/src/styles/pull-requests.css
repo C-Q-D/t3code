@@ -9,6 +9,17 @@
   --text-pr-avatar--line-height: 1.5;
   /* PRDetail8a.dc.html · L1：通用分体按钮接缝两侧圆角为 5px。 */
   --radius-split-join: 5px;
+  /* PRDetail8a.dc.html · 描述凹槽与评论气泡：14px 圆角，正文行高 1.7 / 1.65。 */
+  --radius-pr-description: 14px;
+  --color-pr-description-surface: #1a1a1d;
+  --leading-pr-description: 1.7;
+  --leading-pr-comment: 1.65;
+  --shadow-pr-description-well:
+    inset 1.5px 2px 3px rgba(0, 0, 0, 0.6), inset -1px -1px 0 rgba(255, 255, 255, 0.05);
+  /* PRDetail8a.dc.html · 评论下方评审卡：凸起投影；浮动入口复用同一张卡。 */
+  --shadow-pr-review-card:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.095), 0 0 0 1px rgba(0, 0, 0, 0.484), 0 3px 0 #09090a,
+    10px 16px 24px -8px rgba(0, 0, 0, 0.7);
 }
 
 /* A folded track keeps its child's scrollHeight measurable for the scroll refund. */
@@ -18,4 +29,19 @@
 
 @utility pr-detail-expanded {
   grid-template-rows: 1fr;
+}
+
+/* The new avatar/bubble/reaction layout estimates 128px instead of the former 160px card. */
+@utility pr-summary-comment {
+  content-visibility: auto;
+  contain-intrinsic-block-size: 128px;
+}
+
+/* Host Markdown is generated below this feature surface, so its text follows the board here. */
+.pr-description-copy .chat-markdown {
+  @apply text-secondary-copy-large text-code-foreground leading-pr-description;
+}
+
+.pr-comment-copy .chat-markdown {
+  @apply text-secondary-copy-large text-fg-detail leading-pr-comment;
 }

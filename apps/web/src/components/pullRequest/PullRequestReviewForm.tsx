@@ -1,21 +1,14 @@
-/** Owns pull request review form on the web pull-request surface; host data and agent context remain unchanged. */
+/** Shared inline and floating review form; PR-keyed drafts and submission claims live in the review store. */
 import { t } from "~/i18n";
 import { useAtomCommand } from "~/state/use-atom-command";
-/**
- * The review half of the floating composer: the summary and the verdict that sends it, together
- * with whatever line comments the review is holding. The count of those lives on the composer's
- * trigger and mode toggle, and each pending card can be dropped from the diff, so neither is
- * repeated here. The popover around it belongs to PullRequestComposer.
- */
 import type { EnvironmentId, PullRequestRef, PullRequestReviewVerdict } from "@t3tools/contracts";
 import { CheckIcon, MessageSquareIcon, XCircleIcon } from "lucide-react";
-import { useState, type ReactNode, type RefObject } from "react";
+import type { ReactNode, RefObject } from "react";
 
 import { pullRequestEnvironment } from "~/state/pullRequests";
 
 import { Button } from "../ui/button";
-import { Select, SelectItem, SelectPopup, SelectTrigger } from "../ui/select";
-import { Textarea } from "../ui/textarea";
+import { Toggle, ToggleGroup } from "../ui/toggle-group";
 import { toastManager } from "../ui/toast";
 import {
   pullRequestReviewKey,
@@ -30,12 +23,6 @@ const VERDICTS: ReadonlyArray<{
   readonly icon: ReactNode;
 }> = [
   {
-    value: "comment",
-    label: t.git.diff.comment,
-    sent: t.git.pullRequest.reviewSubmitted,
-    icon: <MessageSquareIcon className="size-3" />,
-  },
-  {
     value: "approve",
     label: t.git.pullRequest.approve,
     sent: t.git.pullRequest.pullRequestApproved,
@@ -47,12 +34,19 @@ const VERDICTS: ReadonlyArray<{
     sent: t.git.pullRequest.changesRequested,
     icon: <XCircleIcon className="size-3" />,
   },
+  {
+    value: "comment",
+    label: t.git.diff.comment,
+    sent: t.git.pullRequest.reviewSubmitted,
+    icon: <MessageSquareIcon className="size-3" />,
+  },
 ];
 
 /**
- * Renders pull request review form from the supplied display data and callbacks.
- * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
- * @returns The rendered surface.
+ * Render the same review editor in a summary card or the existing composer popover.
+ * @param props PR/environment identity, permitted verdicts, host summary requirement, focus ref,
+ * and a success callback. Host failures retain the draft and report through the existing toast.
+ * @returns A review card subscribed to the PR's shared body, verdict, line drafts, and request lock.
  */
 export function PullRequestReviewForm({
   environmentId,
@@ -60,8 +54,6 @@ export function PullRequestReviewForm({
   verdicts,
   requestChangesSummaryRequired,
   textareaRef,
-  pending,
-  onPendingChange,
   onSubmitted,
 }: {
   environmentId: EnvironmentId;
@@ -69,17 +61,20 @@ export function PullRequestReviewForm({
   verdicts: ReadonlyArray<PullRequestReviewVerdict>;
   requestChangesSummaryRequired: boolean;
   textareaRef: RefObject<HTMLTextAreaElement | null>;
-  pending: boolean;
-  onPendingChange: (pending: boolean) => void;
   onSubmitted: () => void;
 }) {
-  const [requestedVerdict, setRequestedVerdict] = useState<PullRequestReviewVerdict>("comment");
   const comments = usePendingReviewComments(reference);
   const reviewKey = pullRequestReviewKey(reference);
   // The panel stays mounted while the selected pull request changes. Keeping summaries beside
   // the keyed line-comment drafts makes the selected pull request's body correct on the first
   // render, before an effect could reset state left behind by the previous one.
   const body = usePullRequestReviewStore((store) => store.summaries[reviewKey] ?? "");
+  const requestedVerdict = usePullRequestReviewStore(
+    (store) => store.verdicts[reviewKey] ?? "comment",
+  );
+  const pending = usePullRequestReviewStore((store) => store.submitting[reviewKey] === true);
+  const setVerdict = usePullRequestReviewStore((store) => store.setVerdict);
+  const clearVerdict = usePullRequestReviewStore((store) => store.clearVerdict);
   const removeComments = usePullRequestReviewStore((store) => store.removeComments);
   const setSummary = usePullRequestReviewStore((store) => store.setSummary);
   const clearSummary = usePullRequestReviewStore((store) => store.clearSummary);
@@ -91,11 +86,16 @@ export function PullRequestReviewForm({
   const selectedVerdict =
     offered.find((verdict) => verdict.value === requestedVerdict) ?? offered[0];
 
+  /**
+   * Submit one snapshot under the shared PR claim; the atom command retains its host I/O policy.
+   * @param verdict Permitted selection and existing success message for the snapshot being sent.
+   * @returns Completion after host settlement and feedback; failures leave the shared draft intact.
+   */
   const submit = async (verdict: (typeof VERDICTS)[number]) => {
-    if (pending) return;
+    // Both surfaces can retain a click callback from the same render; claim before any await.
+    if (!usePullRequestReviewStore.getState().beginSubmission(reviewKey)) return;
     const submittedBody = body;
     const submittedComments = comments;
-    onPendingChange(true);
     const result = await submitReview({
       environmentId,
       input: {
@@ -105,7 +105,7 @@ export function PullRequestReviewForm({
         comments: submittedComments,
       },
     });
-    onPendingChange(false);
+    usePullRequestReviewStore.getState().endSubmission(reviewKey);
     if (result._tag === "Failure") {
       // The draft is kept: whatever went wrong, retyping the review is not the answer.
       toastManager.add({ type: "error", title: t.git.pullRequest.theReviewCouldNotBeSubmitted });
@@ -118,69 +118,68 @@ export function PullRequestReviewForm({
       submittedComments.map((comment) => comment.id),
     );
     clearSummary(reviewKey, submittedBody);
+    clearVerdict(reviewKey, verdict.value);
     toastManager.add({ type: "success", title: verdict.sent });
     onSubmitted();
   };
 
-  // Forgejo requires a summary when requesting changes, even with inline comments.
+  /**
+   * Keep host-specific empty-body rules: Forgejo requires a change-request summary even with lines.
+   * @param verdict Permitted review type being considered.
+   * @returns Whether the current shared body and line comments meet the existing submission rule.
+   */
   const canSubmit = (verdict: PullRequestReviewVerdict) =>
     verdict === "request-changes" && requestChangesSummaryRequired
       ? body.trim().length > 0
       : verdict === "approve" || body.trim().length > 0 || comments.length > 0;
 
   return (
-    <>
-      <Textarea
+    <div className="surface-glass flex min-w-0 flex-col gap-2.5 rounded-card-row p-3 shadow-pr-review-card">
+      <div className="min-w-0 overflow-x-auto">
+        <ToggleGroup
+          aria-label={t.git.pullRequest.reviewVerdict}
+          value={[selectedVerdict?.value ?? ""]}
+          disabled={pending}
+          onValueChange={(next) => {
+            const verdict = offered.find((item) => item.value === next[0]);
+            if (verdict) setVerdict(reviewKey, verdict.value);
+          }}
+        >
+          {offered.map((verdict) => (
+            <Toggle key={verdict.value} value={verdict.value}>
+              {selectedVerdict?.value === verdict.value ? verdict.icon : null}
+              {verdict.label}
+            </Toggle>
+          ))}
+        </ToggleGroup>
+      </div>
+      {/* This editor surface owns the board's 56px minimum; shared Textarea has a taller shell. */}
+      <textarea
+        className="field-sizing-content min-h-14 max-h-64 w-full resize-y rounded-menu-row bg-input px-3 py-2 text-secondary-copy-large text-fg-detail shadow-well-pressed outline-none placeholder:text-placeholder focus-visible:inset-shadow-focus"
         ref={textareaRef}
-        rows={3}
+        rows={2}
         value={body}
         placeholder={
           requestChangesSummaryRequired && verdicts.includes("request-changes")
             ? t.git.pullRequest.summarizeYourReviewRequiredToRequestChanges
-            : t.git.pullRequest.summarizeYourReviewOptional
+            : t.git.diff.addAComment
         }
         aria-label={t.git.pullRequest.reviewSummary}
         onChange={(event) => setSummary(reviewKey, event.target.value)}
       />
-      <div className="mt-2 flex justify-between gap-2">
-        <Select
-          value={selectedVerdict?.value ?? null}
-          disabled={pending}
-          onValueChange={(value) => {
-            if (value !== null) setRequestedVerdict(value);
-          }}
-        >
-          <SelectTrigger
-            size="xs"
-            className="w-auto min-w-0"
-            aria-label={t.git.pullRequest.reviewVerdict}
-          >
-            <span className="flex items-center gap-1.5">
-              {selectedVerdict?.icon}
-              {selectedVerdict?.label}
-            </span>
-          </SelectTrigger>
-          <SelectPopup side="top" alignItemWithTrigger={false}>
-            {offered.map((verdict) => (
-              <SelectItem key={verdict.value} value={verdict.value}>
-                <span className="flex items-center gap-1.5">
-                  {verdict.icon}
-                  {verdict.label}
-                </span>
-              </SelectItem>
-            ))}
-          </SelectPopup>
-        </Select>
+      <div className="flex justify-end">
         <Button
-          size="xs"
+          size="default"
           disabled={pending || selectedVerdict === undefined || !canSubmit(selectedVerdict.value)}
           onClick={() => {
             if (selectedVerdict !== undefined) void submit(selectedVerdict);
           }}
         >
-          {pending ? t.git.pullRequest.submitting : t.git.pullRequest.submitReview}
+          {pending
+            ? t.git.pullRequest.submitting
+            : (selectedVerdict?.label ?? t.git.pullRequest.submitReview)}
         </Button>
       </div>
-    </>
+    </div>
   );
 }

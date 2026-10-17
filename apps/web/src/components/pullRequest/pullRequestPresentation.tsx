@@ -500,8 +500,8 @@ export function PullRequestActorLabel({
   actor: PullRequestActor | null;
   className?: string;
   variant?: "label" | "avatar";
-  /** lg is the 20px avatar used beside the detail header's branch names. */
-  avatarSize?: "default" | "lg";
+  /** lg is 20px beside branch names; xl is the board's 22px conversation avatar. */
+  avatarSize?: "default" | "lg" | "xl";
   tooltip?: boolean;
   profileUrl?: string | null;
 }) {
@@ -510,8 +510,13 @@ export function PullRequestActorLabel({
     <span className={cn("flex min-w-0 items-center", variant === "label" && "gap-1.5")}>
       <PullRequestActorAvatar
         actor={actor}
-        {...(avatarSize === "lg"
-          ? { className: "size-5 bg-well-raised text-pr-avatar font-bold text-foreground" }
+        {...(avatarSize !== "default"
+          ? {
+              className: cn(
+                avatarSize === "lg" ? "size-5" : "size-5.5",
+                "bg-well-raised text-pr-avatar font-bold text-foreground",
+              ),
+            }
           : {})}
       />
       <span className={variant === "label" ? "truncate font-medium text-foreground" : "sr-only"}>

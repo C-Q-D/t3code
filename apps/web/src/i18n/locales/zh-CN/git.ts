@@ -579,7 +579,6 @@ export const git: Messages["git"] = {
     requestChanges: "请求修改",
     theReviewCouldNotBeSubmitted: "无法提交评审",
     summarizeYourReviewRequiredToRequestChanges: "总结评审（请求修改时必填）",
-    summarizeYourReviewOptional: "总结评审（可选）",
     reviewSummary: "评审摘要",
     reviewVerdict: "评审结论",
     submitting: "正在提交…",

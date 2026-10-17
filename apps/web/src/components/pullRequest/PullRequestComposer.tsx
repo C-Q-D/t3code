@@ -19,6 +19,7 @@ import { Popover, PopoverClose, PopoverPopup, PopoverTitle, PopoverTrigger } fro
 import { Toggle, ToggleGroup } from "../ui/toggle-group";
 import { PullRequestCommentForm } from "./PullRequestCommentForm";
 import { PullRequestReviewForm } from "./PullRequestReviewForm";
+import { availablePullRequestReviewVerdicts } from "./pullRequestDetail.logic";
 import {
   pullRequestReviewKey,
   usePendingReviewComments,
@@ -57,19 +58,21 @@ export function PullRequestComposer({
   openReviewRequest?: number | undefined;
 }) {
   const [open, setOpen] = useState(false);
-  const [reviewPending, setReviewPending] = useState(false);
   const [requestedMode, setRequestedMode] = useState<"comment" | "review">("comment");
   const commentRef = useRef<HTMLTextAreaElement>(null);
   const reviewRef = useRef<HTMLTextAreaElement>(null);
   const pendingComments = usePendingReviewComments(reference);
   const clearComments = usePullRequestReviewStore((store) => store.clear);
-  // A summary typed but not sent is review work too, and it outlives the popover. Selected as a
-  // boolean rather than the text, so typing one does not re-render the composer per keystroke.
+  // A summary or explicit verdict is review work too, including approval without a body.
+  // Subscribe to a boolean so editing shared text does not re-render the composer per keystroke.
   const reviewKey = pullRequestReviewKey(reference);
-  const summaryStarted = usePullRequestReviewStore(
-    (store) => (store.summaries[reviewKey] ?? "").trim().length > 0,
+  const reviewPending = usePullRequestReviewStore((store) => store.submitting[reviewKey] === true);
+  const draftStarted = usePullRequestReviewStore(
+    (store) =>
+      (store.summaries[reviewKey] ?? "").trim().length > 0 ||
+      store.verdicts[reviewKey] !== undefined,
   );
-  const reviewStarted = pendingComments.length > 0 || summaryStarted;
+  const reviewStarted = pendingComments.length > 0 || draftStarted;
   const [answeredOpenRequest, setAnsweredOpenRequest] = useState(openReviewRequest);
   if (openReviewRequest !== answeredOpenRequest) {
     setAnsweredOpenRequest(openReviewRequest);
@@ -81,9 +84,7 @@ export function PullRequestComposer({
   // all, and what this account may do on this repository. Either one saying no means a control
   // that would only ever end in a refusal.
   const canComment = detail.capabilities.comment && detail.viewerPermissions.comment;
-  const verdicts = detail.capabilities.review.verdicts.filter((verdict) =>
-    detail.viewerPermissions.verdicts.includes(verdict),
-  );
+  const verdicts = availablePullRequestReviewVerdicts(detail);
   if (!canComment && verdicts.length === 0) return null;
 
   const mode = canComment ? (verdicts.length === 0 ? "comment" : requestedMode) : "review";
@@ -185,8 +186,6 @@ export function PullRequestComposer({
                 .get(detail.provider)
                 .reviewSummaryRequired("request-changes")}
               textareaRef={reviewRef}
-              pending={reviewPending}
-              onPendingChange={setReviewPending}
               onSubmitted={() => {
                 setOpen(false);
                 onReviewSubmitted();
