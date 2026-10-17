@@ -351,3 +351,30 @@
     @apply py-3;
   }
 }
+
+/* ST14 — 其余屏-6 P5 imports SettingsPage8a: 32px icon wells and the shared 48px list geometry. */
+@theme {
+  --color-licenses-well: #151517;
+  --radius-licenses-icon: 9px;
+  --shadow-licenses-well: inset 1.5px 2px 3px rgba(0, 0, 0, 0.6);
+}
+
+@layer components {
+  .licenses-notice-list {
+    @apply flex flex-col gap-0.5 rounded-settings-row-surface py-2.5 pr-3 pl-3.5;
+  }
+  .licenses-notice-row {
+    @apply flex min-h-12 items-center gap-3 rounded-settings-row-surface py-2 pr-1.5 pl-2.5 hover:bg-secondary;
+  }
+  .licenses-icon-well {
+    @apply flex size-8 shrink-0 items-center justify-center rounded-licenses-icon bg-licenses-well shadow-licenses-well;
+  }
+  .licenses-empty {
+    @apply rounded-settings-row-surface bg-licenses-well px-4 py-4.5 text-center text-secondary-copy-large text-secondary-label shadow-licenses-well;
+  }
+}
+
+/* The feature owns trigger geometry; keep the shared collapsible primitive unchanged. */
+.licenses-notice-row [data-slot="collapsible-trigger"] {
+  @apply rounded-settings-row-surface focus-visible:inset-shadow-focus;
+}

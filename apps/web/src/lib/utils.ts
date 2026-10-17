@@ -315,6 +315,7 @@ const twMerge = extendTailwindMerge({
         "connections-icon",
         "connections-qr",
         "diagnostics-well",
+        "licenses-well",
       ],
       "inset-shadow": [
         "selected",
@@ -427,6 +428,7 @@ const twMerge = extendTailwindMerge({
         "connections-icon",
         "diagnostics-icon",
         "diagnostics-bar",
+        "licenses-icon",
       ],
       leading: [
         "code",

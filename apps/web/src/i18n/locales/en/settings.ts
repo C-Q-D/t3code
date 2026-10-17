@@ -2931,6 +2931,7 @@ ${address}`
       "Notifications are unavailable in this browser. Sound only is still available.",
   },
   openSourceLicenses: {
+    title: "Open source licenses",
     licenseManifestRequestFailedStatusError: (
       stringResponseStatus: string | number | boolean | null | undefined,
     ) => `The license manifest request failed with status ${stringResponseStatus}.`,
@@ -2947,7 +2948,6 @@ ${address}`
     searchLicenses: "Search licenses",
     openSourceNoticesAreUnavailable: "Open-source notices are unavailable",
     theLicenseManifestCouldNotLoad: "The license manifest could not load.",
-    thirdPartyNotices: "Third-party notices",
     noLicensesMatchThatSearch: "No licenses match that search.",
     loadingOpenSourceNotices: "Loading open-source notices…",
   },

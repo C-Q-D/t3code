@@ -1,5 +1,6 @@
+/** Displays the shipped license manifest; filtering, retries and single-entry expansion stay local. */
 import { t } from "~/i18n";
-import { ChevronRightIcon, ExternalLinkIcon, SearchIcon } from "lucide-react";
+import { ChevronRightIcon, ExternalLinkIcon, ScaleIcon, SearchIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
@@ -13,7 +14,7 @@ import {
 
 import { Button } from "../ui/button";
 import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "../ui/collapsible";
-import { InputGroup, InputGroupAddon, InputGroupInput } from "../ui/input-group";
+import { Input } from "../ui/input";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { SettingsPageContainer, SettingsSection } from "./settingsLayout";
 
@@ -24,6 +25,7 @@ type LicenseManifestState =
 
 let licenseManifestPromise: Promise<ThirdPartyLicenseManifest> | undefined;
 
+/** Fetches and validates bundled notices with a 30-second timeout and no automatic retry; rejects on failure. */
 async function fetchLicenseManifest(): Promise<ThirdPartyLicenseManifest> {
   const signal = AbortSignal.timeout(30_000);
   try {
@@ -47,6 +49,7 @@ async function fetchLicenseManifest(): Promise<ThirdPartyLicenseManifest> {
   }
 }
 
+/** Shares a successful manifest request; clears rejected requests so an explicit retry can fetch again. */
 function loadLicenseManifest(): Promise<ThirdPartyLicenseManifest> {
   licenseManifestPromise ??= fetchLicenseManifest().catch((error: unknown) => {
     licenseManifestPromise = undefined;
@@ -55,6 +58,7 @@ function loadLicenseManifest(): Promise<ThirdPartyLicenseManifest> {
   return licenseManifestPromise;
 }
 
+/** Renders a real manifest entry; open and onOpenChange keep expansion controlled by the parent. */
 function LicenseNoticeRow({
   entry,
   open,
@@ -67,39 +71,48 @@ function LicenseNoticeRow({
   return (
     <Collapsible open={open} onOpenChange={onOpenChange}>
       <article>
-        <div className="flex min-h-10 items-center hover:bg-muted/35 sm:min-h-9">
-          <CollapsibleTrigger className="group flex min-h-10 min-w-0 flex-1 items-center gap-2.5 px-3 text-left sm:min-h-9 sm:px-4">
+        <div className="licenses-notice-row">
+          <CollapsibleTrigger className="group flex min-w-0 flex-1 items-center gap-3 text-left outline-none">
+            <span className="licenses-icon-well">
+              <ScaleIcon aria-hidden className="size-3.75" strokeWidth={1.75} />
+            </span>
+            <span className="flex min-w-0 flex-1 flex-col gap-0.25">
+              <span className="flex min-w-0 flex-wrap items-baseline gap-2">
+                <span className="break-words text-control leading-normal font-semibold text-foreground">
+                  {entry.name}
+                </span>
+                {entry.version ? (
+                  <code className="text-secondary-copy text-muted-foreground">{entry.version}</code>
+                ) : null}
+              </span>
+              <span className="text-secondary-copy-medium leading-normal text-secondary-label">
+                {formatLicenseBundles(entry.bundles)}
+              </span>
+            </span>
+            <span className="max-w-2/5 shrink-0 truncate font-mono text-secondary-copy text-muted-foreground">
+              {entry.license}
+            </span>
             <ChevronRightIcon
               aria-hidden
-              className="size-3.5 shrink-0 text-muted-foreground transition-transform duration-200 group-data-panel-open:rotate-90"
+              className="size-3.5 shrink-0 transition-transform duration-200 motion-reduce:transition-none group-data-panel-open:rotate-90"
             />
-            <span className="flex min-w-0 flex-1 items-baseline gap-2">
-              <span className="truncate font-medium text-foreground">{entry.name}</span>
-              {entry.version ? (
-                <code className="shrink-0 text-xs text-muted-foreground">{entry.version}</code>
-              ) : null}
-            </span>
-            <span className="max-w-[42%] shrink-0 truncate text-xs text-muted-foreground">
-              {entry.license} · {formatLicenseBundles(entry.bundles)}
-            </span>
           </CollapsibleTrigger>
           {entry.sourceUrl ? (
             <Button
               aria-label={t.settings.openSourceLicenses.viewProjectSourceFor(entry.name)}
-              className="me-3 shrink-0 sm:me-4"
               render={<a href={entry.sourceUrl} rel="noreferrer noopener" target="_blank" />}
-              size="icon-micro"
+              size="icon-sm"
               title={t.settings.openSourceLicenses.projectSource}
               variant="ghost-muted"
             >
-              <ExternalLinkIcon aria-hidden className="size-3" />
+              <ExternalLinkIcon aria-hidden className="size-3.75" />
             </Button>
           ) : null}
         </div>
-        <CollapsiblePanel>
+        <CollapsiblePanel animate={false}>
           {open ? (
-            <div className="px-9 pt-1 pb-4 sm:px-10">
-              <pre className="max-w-[76ch] whitespace-pre-wrap break-words font-mono text-xs/5 text-foreground/80">
+            <div className="px-3 pt-1 pb-4 sm:pl-13.5">
+              <pre className="whitespace-pre-wrap break-words font-mono text-secondary-copy leading-5 text-code-foreground">
                 {entry.noticeText}
               </pre>
             </div>
@@ -110,6 +123,7 @@ function LicenseNoticeRow({
   );
 }
 
+/** Shows total notices or filtered/total counts supplied by the manifest view. */
 function LicenseCount({
   filteredCount,
   totalCount,
@@ -118,7 +132,7 @@ function LicenseCount({
   totalCount: number;
 }) {
   return (
-    <p className="whitespace-nowrap text-xs font-normal text-muted-foreground tabular-nums">
+    <p className="whitespace-nowrap text-secondary-copy font-normal text-muted-foreground tabular-nums">
       {filteredCount === totalCount
         ? t.settings.openSourceLicenses.notices(String(totalCount))
         : t.settings.openSourceLicenses.of(String(filteredCount), String(totalCount))}
@@ -126,6 +140,7 @@ function LicenseCount({
   );
 }
 
+/** Keeps the existing query/count controls; empty blur and Escape close the search input. */
 function LicenseHeaderAction({
   query,
   onQueryChange,
@@ -151,7 +166,7 @@ function LicenseHeaderAction({
               <Button
                 aria-label={t.settings.openSourceLicenses.searchOpenSourceLicenses}
                 onClick={() => onSearchOpenChange(true)}
-                size="icon-micro"
+                size="icon-sm"
                 type="button"
                 variant="ghost-muted"
               >
@@ -170,11 +185,8 @@ function LicenseHeaderAction({
       <div className="hidden sm:block">
         <LicenseCount filteredCount={filteredCount} totalCount={totalCount} />
       </div>
-      <InputGroup className="w-36 sm:w-44">
-        <InputGroupAddon>
-          <SearchIcon aria-hidden className="size-3" />
-        </InputGroupAddon>
-        <InputGroupInput
+      <div className="w-36 sm:w-44">
+        <Input
           aria-label={t.settings.openSourceLicenses.searchOpenSourceLicenses}
           autoFocus
           onBlur={() => {
@@ -188,33 +200,35 @@ function LicenseHeaderAction({
             onSearchOpenChange(false);
           }}
           placeholder={t.settings.openSourceLicenses.searchLicenses}
-          size="sm"
+          size="settings"
           type="search"
           value={query}
         />
-      </InputGroup>
+      </div>
     </div>
   );
 }
 
+/** Displays a manifest failure message and invokes onRetry only on an explicit user action. */
 function LicenseManifestError({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
     <div className="flex flex-col items-start gap-3 px-3 py-5 sm:px-4">
       <div className="flex flex-col gap-1">
-        <h3 className="text-sm font-medium text-foreground">
+        <h3 className="text-control font-semibold text-foreground">
           {t.settings.openSourceLicenses.openSourceNoticesAreUnavailable}
         </h3>
-        <p className="max-w-[70ch] text-pretty text-xs leading-normal text-muted-foreground/80">
+        <p className="text-pretty text-secondary-copy-medium leading-normal text-secondary-label">
           {message}
         </p>
       </div>
-      <Button type="button" size="xs" variant="outline" onClick={onRetry}>
+      <Button type="button" size="settings-list" variant="outline" onClick={onRetry}>
         {t.settings.snapShotSetup.retry}
       </Button>
     </div>
   );
 }
 
+/** Loads the shipped manifest without settings mutations and preserves its order, search and one-open-row behavior. */
 export function OpenSourceLicensesPanel() {
   const [state, setState] = useState<LicenseManifestState>({ status: "loading" });
   const [query, setQuery] = useState("");
@@ -255,7 +269,7 @@ export function OpenSourceLicensesPanel() {
   return (
     <SettingsPageContainer>
       <SettingsSection
-        title={t.settings.openSourceLicenses.thirdPartyNotices}
+        title={t.settings.openSourceLicenses.title}
         headerAction={
           state.status === "ready" ? (
             <LicenseHeaderAction
@@ -270,7 +284,7 @@ export function OpenSourceLicensesPanel() {
         }
       >
         {state.status === "ready" ? (
-          <div className="text-base sm:text-sm">
+          <div className="licenses-notice-list">
             {filteredEntries.length > 0 ? (
               filteredEntries.map((entry) => {
                 const entryKey = thirdPartyLicenseEntryKey(entry);
@@ -284,7 +298,7 @@ export function OpenSourceLicensesPanel() {
                 );
               })
             ) : (
-              <p className="px-3 py-8 text-center text-sm/6 text-muted-foreground sm:px-4">
+              <p className="licenses-empty">
                 {t.settings.openSourceLicenses.noLicensesMatchThatSearch}
               </p>
             )}
@@ -292,7 +306,7 @@ export function OpenSourceLicensesPanel() {
         ) : state.status === "error" ? (
           <LicenseManifestError message={state.message} onRetry={retry} />
         ) : (
-          <p className="px-3 py-5 text-sm/6 text-muted-foreground sm:px-4">
+          <p className="px-3.5 py-5 text-secondary-copy-large text-secondary-label">
             {t.settings.openSourceLicenses.loadingOpenSourceNotices}
           </p>
         )}

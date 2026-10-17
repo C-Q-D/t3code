@@ -2800,6 +2800,7 @@ ${address}`
     unavailableHint: "此浏览器无法使用通知。仍可仅使用声音。",
   },
   openSourceLicenses: {
+    title: "开源许可证",
     licenseManifestRequestFailedStatusError: (
       stringResponseStatus: string | number | boolean | null | undefined,
     ) => `许可证清单请求失败，状态码为${stringResponseStatus}。`,
@@ -2816,7 +2817,6 @@ ${address}`
     searchLicenses: "搜索许可证",
     openSourceNoticesAreUnavailable: "开源声明不可用",
     theLicenseManifestCouldNotLoad: "无法加载许可证清单。",
-    thirdPartyNotices: "第三方声明",
     noLicensesMatchThatSearch: "没有匹配搜索的许可证。",
     loadingOpenSourceNotices: "正在加载开源声明…",
   },
