@@ -1,66 +1,76 @@
-/* Layout/style containment keeps each transform local without clipping the expanded ripple. */
+/* 8a: only speaker sprites and bars animate; the seat halo is deliberately static. */
 [data-discussion-motion] {
   contain: layout style;
 }
+
+/* Parent cards own their hover offset; the reusable seat never adds another hover animation. */
+[data-discussion-pixel-seat] {
+  transition:
+    transform 0.12s,
+    box-shadow 0.12s;
+}
+
+/* PixelAvatar still emits these until DC1 replaces it; suppress the duplicate ripple. */
 [data-discussion-motion="seatRipple"] {
   position: absolute;
-  inset: 0;
-  border: 1.5px solid var(--discussion-avatar-color);
+  inset: -4px;
+  border: 2px solid var(--discussion-avatar-color);
   border-radius: inherit;
   box-sizing: border-box;
   pointer-events: none;
-  animation: seatRipple 2.4s cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
 }
 [data-discussion-motion="seatRipple"]:nth-of-type(2) {
-  animation-delay: 1.2s;
+  display: none;
 }
+
 [data-discussion-motion="spriteBob"] {
-  animation: spriteBob 0.9s linear infinite;
+  animation: spriteBob 0.9s steps(1, end) infinite;
 }
+
+[data-discussion-wave-bar],
 [data-discussion-motion="seatWave"] {
+  display: block;
   width: 2px;
   height: 14px;
-  border-radius: 1px;
+  border-radius: var(--radius-discussion-wave);
   background: currentColor;
   transform-origin: center;
   transform: scaleY(0.3);
+}
+[data-discussion-motion="seatWave"] {
   animation: seatWave var(--discussion-wave-duration) ease-in-out var(--discussion-wave-delay)
-    infinite;
+    infinite alternate;
 }
-@keyframes seatRipple {
-  0% {
-    transform: scale(1);
-    opacity: 0.6;
-  }
-  100% {
-    transform: scale(1.9);
-    opacity: 0;
-  }
-}
+
 @keyframes spriteBob {
-  0%,
-  49% {
+  0% {
     transform: translateY(0);
   }
-  50%,
-  100% {
+  50% {
     transform: translateY(-2px);
   }
 }
 @keyframes seatWave {
-  0%,
-  100% {
+  from {
     transform: scaleY(0.3);
   }
-  50% {
+  to {
     transform: scaleY(1);
   }
 }
+
 html[data-discussion-motion-paused] [data-discussion-motion] {
   animation-play-state: paused;
 }
 @media (prefers-reduced-motion: reduce) {
+  [data-discussion-pixel-seat] {
+    transition: none;
+  }
   [data-discussion-motion] {
     animation: none !important;
+  }
+  [data-discussion-wave-bar],
+  [data-discussion-motion="seatWave"] {
+    transform: scaleY(0.6);
   }
 }

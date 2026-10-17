@@ -1,1 +1,64 @@
 /* DC0–DC6：本线新增的令牌（@theme）与全局样式写在这里。 */
+
+/* DC0.1 · README-讨论模式「座位色板」及 px-seat.js / 讨论组件规范-8a S1、S2、S6。 */
+@theme {
+  --color-discussion-seat-blue: #82abff;
+  --color-discussion-seat-purple: #b99cff;
+  --color-discussion-seat-teal: #5fd3c7;
+  --color-discussion-seat-lime: #b5d86a;
+  --color-discussion-seat-pink: #ff8fc7;
+  --color-discussion-seat-sand: #d8c3a5;
+  --radius-discussion-wave: 1px;
+}
+
+/* px-seat.js：SVG 属性引用的固定色需要 static，避免 Tailwind 按工具类使用量裁掉它们。 */
+@theme static {
+  --color-discussion-pixel-skin: #f5c9a0;
+  --color-discussion-pixel-ink: #1c1917;
+  --color-discussion-pixel-hair: #4a3426;
+  --color-discussion-pixel-mouth: #c2410c;
+  --color-discussion-pixel-gold: #facc15;
+  --color-discussion-pixel-gold-shade: #ca8a04;
+  --color-discussion-pixel-white: #f8fafc;
+  --color-discussion-pixel-red: #ef4444;
+  --color-discussion-pixel-metal: #a1a1aa;
+  --color-discussion-pixel-neutral: #71717a;
+  --color-discussion-pixel-black: #000000;
+}
+
+/* px-seat.js / S1 的底板、凹槽及用户头像专用阴影。 */
+@theme {
+  --color-discussion-seat-gradient-top: #26262a;
+  --color-discussion-seat-next: rgba(0, 0, 0, 0.18);
+  --shadow-discussion-seat-next: inset 1px 2px 3px rgba(0, 0, 0, 0.55);
+  --shadow-discussion-seat-user:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+    0 1.5px 0 #09090a;
+}
+
+/* S1 / px-seat.js：inline 让座位变量在实例处求值，不在根节点提前解析。 */
+@theme inline {
+  --radius-discussion-seat: var(--discussion-seat-radius);
+  --radius-discussion-seat-halo: var(--discussion-seat-halo-radius);
+  --color-discussion-seat-outline: color-mix(
+    in srgb,
+    var(--discussion-seat-color) 65%,
+    transparent
+  );
+  --background-image-discussion-seat-plate: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--discussion-seat-color) 34%, var(--color-discussion-seat-gradient-top)),
+    color-mix(in srgb, var(--discussion-seat-color) 10%, var(--sidebar))
+  );
+  --shadow-discussion-seat:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 0 0 1px
+      color-mix(
+        in srgb,
+        var(--discussion-seat-color) var(--discussion-seat-outline-opacity),
+        transparent
+      ),
+    0 1.5px 0 #09090a;
+  --shadow-discussion-seat-halo: 0 0 0 2px
+    color-mix(in srgb, var(--discussion-seat-color) 90%, transparent);
+}

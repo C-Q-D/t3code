@@ -1,21 +1,21 @@
-/** Owns the shared neutral seat and ordered discussion palette; no provider colors are involved. */
+/** Owns the 8a speaking-order palette; persona and provider do not affect seat colors. */
 const NEUTRAL = {
-  color: "var(--color-zinc-500)",
-  textClassName: "text-zinc-600 dark:text-zinc-400",
+  color: "#a9a9b1",
+  textClassName: "text-secondary-label",
 };
 const SEAT_COLORS = [
-  { color: "var(--color-blue-500)", textClassName: "text-blue-600 dark:text-blue-400" },
-  { color: "var(--color-violet-500)", textClassName: "text-violet-600 dark:text-violet-400" },
-  { color: "var(--color-amber-500)", textClassName: "text-amber-600 dark:text-amber-400" },
-  { color: "var(--color-emerald-500)", textClassName: "text-emerald-600 dark:text-emerald-400" },
-  { color: "var(--color-rose-500)", textClassName: "text-rose-600 dark:text-rose-400" },
-  { color: "var(--color-cyan-500)", textClassName: "text-cyan-600 dark:text-cyan-400" },
+  { color: "#82abff", textClassName: "text-discussion-seat-blue" },
+  { color: "#b99cff", textClassName: "text-discussion-seat-purple" },
+  { color: "#5fd3c7", textClassName: "text-discussion-seat-teal" },
+  { color: "#b5d86a", textClassName: "text-discussion-seat-lime" },
+  { color: "#ff8fc7", textClassName: "text-discussion-seat-pink" },
+  { color: "#d8c3a5", textClassName: "text-discussion-seat-sand" },
 ] as const;
 
 /**
  * Resolves stable seat colors, independently of the persona and provider.
  * @param seat Zero for neutral previews; positive integer for one-based speaking order.
- * @returns Tailwind 500 tile color and 600/400 light/dark text classes. Invalid indices use neutral.
+ * @returns Design hex color and matching text token. Seats seven onward repeat; invalid seats use neutral.
  */
 export function discussionSeatColor(seat: number) {
   return Number.isInteger(seat) && seat > 0
