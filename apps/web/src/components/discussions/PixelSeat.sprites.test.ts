@@ -3,6 +3,9 @@
  * @vitest-environment jsdom
  */
 import * as NodeURL from "node:url";
+import * as NodeModule from "node:module";
+import * as NodePath from "node:path";
+import * as NodeFSP from "node:fs/promises";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import { it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
@@ -13,12 +16,27 @@ import { acquirePixelSeatSprites, pixelSeatSymbolId } from "./PixelSeat.sprites"
 
 it.effect("retains the handoff pixel palette even when no color utility references it", () =>
   Effect.gen(function* () {
-    const cssPath = NodeURL.fileURLToPath(
-      new NodeURL.URL("../../styles/discussions.css", import.meta.url),
-    );
+    const cssPath = NodeURL.fileURLToPath(new NodeURL.URL("../../index.css", import.meta.url));
     const fs = yield* FileSystem.FileSystem;
     const css = yield* fs.readFileString(cssPath);
-    const compiler = yield* Effect.promise(() => compile(css));
+    // The production entry supplies the theme and utilities required by discussions.css.
+    // Build no candidates: sprite colors must survive without a matching color utility.
+    const compiler = yield* Effect.promise(() =>
+      compile(css, {
+        base: NodePath.dirname(cssPath),
+        loadStylesheet: async (id, base) => {
+          // Node's default package condition selects JS; explicitly select Tailwind's CSS entry.
+          const path = NodeModule.createRequire(NodePath.join(base, "index.css")).resolve(
+            id === "tailwindcss" ? "tailwindcss/index.css" : id,
+          );
+          return {
+            path,
+            base: NodePath.dirname(path),
+            content: await NodeFSP.readFile(path, "utf8"),
+          };
+        },
+      }),
+    );
     const palette = Object.fromEntries(
       [...compiler.build([]).matchAll(/--color-discussion-pixel-([a-z-]+):\s*(#[0-9a-f]+);/g)].map(
         (match) => [match[1], match[2]],
