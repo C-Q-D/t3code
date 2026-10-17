@@ -1,5 +1,6 @@
+/** Presents composer notices without owning their priority, visibility, or actions. */
 import { t } from "~/i18n";
-import { InfoIcon } from "lucide-react";
+import { ChevronDownIcon, InfoIcon, LayersIcon } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import { cn } from "~/lib/utils";
@@ -11,6 +12,7 @@ import { observeResize } from "~/lib/observeResize";
 // Match the duration-220 exit transition before removing a dismissed notice.
 const DISMISS_TRANSITION_MS = 220;
 
+/** A caller-owned notice, including its existing recovery and dismissal actions. */
 export interface ComposerBannerStackItem {
   readonly id: string;
   readonly variant: ComposerBannerVariant;
@@ -18,12 +20,15 @@ export interface ComposerBannerStackItem {
   readonly icon: ReactNode;
   readonly title: ReactNode;
   readonly description?: ReactNode;
+  /** Current run's real task counts; omitted when no current plan reports progress. */
+  readonly progress?: { readonly completedSteps: number; readonly totalSteps: number } | null;
   readonly children?: ReactNode;
   readonly actions?: ReactNode;
   readonly dismissLabel?: string;
   readonly onDismiss?: () => void;
 }
 
+/** A notice whose caller renders custom content, such as provider activity. */
 export type ComposerBannerStackContent = Pick<
   ComposerBannerStackItem,
   "id" | "variant" | "priority"
@@ -31,6 +36,7 @@ export type ComposerBannerStackContent = Pick<
 
 type ComposerBannerStackEntry = ComposerBannerStackItem | ComposerBannerStackContent;
 
+/** Orders activity first, urgent notices next, then ordinary notices; ties retain input order. */
 function bannerPriority(item: ComposerBannerStackEntry) {
   if (item.priority === "activity") {
     return 0;
@@ -49,6 +55,7 @@ interface ComposerBannerStackProps {
   readonly attachedAbove?: ReactNode;
 }
 
+/** Displays ordered notices; expansion keeps keyboard focus and dismissal waits for the exit transition. */
 export function ComposerBannerStack({ className, items, attachedAbove }: ComposerBannerStackProps) {
   const [stackExpanded, setStackExpanded] = useState(false);
   const noticesRef = useRef<HTMLDivElement>(null);
@@ -125,7 +132,7 @@ export function ComposerBannerStack({ className, items, attachedAbove }: Compose
         <div
           ref={noticesRef}
           data-chat-composer-collapsed-controls="true"
-          className={cn("relative z-20 min-h-3", stackExpanded && "z-50")}
+          className={cn("composer-notices relative z-20", stackExpanded && "z-50")}
           onPointerEnter={(event) => {
             if (event.pointerType === "touch") return;
             if (document.activeElement === peekRef.current) {
@@ -153,9 +160,10 @@ export function ComposerBannerStack({ className, items, attachedAbove }: Compose
           }}
         >
           {showCollapsedStackCap && firstStackedItem ? (
-            <ComposerBanner.Peek
+            <button
+              type="button"
               ref={peekRef}
-              variant={firstStackedItem.variant}
+              data-slot="composer-banner-peek"
               aria-label={t.composer.bannerStack.showOtherNotices}
               aria-expanded={stackExpanded}
               aria-controls={expandedItemsId}
@@ -166,8 +174,18 @@ export function ComposerBannerStack({ className, items, attachedAbove }: Compose
                 pendingFocusRef.current = "notice";
                 setStackExpanded(true);
               }}
-              className={cn(stackExpanded && "pointer-events-none invisible opacity-0")}
-            />
+              className={cn(
+                "composer-notices-toggle absolute inset-x-0 bottom-0 cursor-pointer focus-visible:inset-shadow-focus",
+                stackExpanded && "pointer-events-none invisible opacity-0",
+              )}
+            >
+              <LayersIcon aria-hidden />
+              <span className="min-w-0 flex-1 truncate text-start">
+                {t.composer.bannerStack.otherNotices}
+              </span>
+              <span className="composer-notices-count">{stackedItems.length}</span>
+              <ChevronDownIcon aria-hidden />
+            </button>
           ) : null}
           <div
             id={expandedItemsId}
@@ -176,15 +194,12 @@ export function ComposerBannerStack({ className, items, attachedAbove }: Compose
             aria-label={t.composer.bannerStack.otherNotices}
             tabIndex={-1}
             data-composer-banner-stack-expanded-items="true"
-            className={cn(
-              "grid transition-[grid-template-rows] duration-150 ease-out focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring",
-              stackExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
-            )}
+            className={cn("focus-visible:inset-shadow-focus", !stackExpanded && "hidden")}
           >
             <div className="min-h-0 overflow-hidden">
               <div
                 className={cn(
-                  "transform-gpu space-y-2 pb-2 transition-[opacity,transform] duration-150 ease-out will-change-[opacity,transform]",
+                  "space-y-2 pb-2 transition-opacity duration-150 ease-out",
                   stackExpanded
                     ? "pointer-events-auto visible translate-y-0 opacity-100"
                     : "pointer-events-none invisible translate-y-1 opacity-0",
@@ -194,7 +209,7 @@ export function ComposerBannerStack({ className, items, attachedAbove }: Compose
                   <div
                     key={item.id}
                     className={cn(
-                      "transition-[opacity,translate] duration-220 ease-in",
+                      "transition-opacity duration-220 ease-in",
                       exitingItemId === item.id
                         ? "pointer-events-none translate-y-28 opacity-0"
                         : "opacity-100",
@@ -215,14 +230,14 @@ export function ComposerBannerStack({ className, items, attachedAbove }: Compose
       ) : null}
       {attachedAbove}
       <ComposerBanner.Attachment
-        className={className}
+        className={cn("composer-notice-attachment", className)}
         data-composer-banner-drawer="true"
         data-chat-composer-collapsed-controls="true"
       >
         <div
           key={frontItem.id}
           className={cn(
-            "relative z-10 transition-[opacity,translate] duration-220 ease-in",
+            "relative z-10 transition-opacity duration-220 ease-in",
             exitingItemId === frontItem.id
               ? "pointer-events-none translate-y-16 opacity-0"
               : "opacity-100",
@@ -286,6 +301,7 @@ function NoticeDescription({ children }: { children: ReactNode }) {
     <span className="contents">
       <span
         ref={descriptionRef}
+        data-composer-notice-description="true"
         className="w-0 min-w-0 grow truncate text-muted-foreground @max-[400px]:sr-only"
       >
         {children}
@@ -322,6 +338,7 @@ function NoticeDescription({ children }: { children: ReactNode }) {
   );
 }
 
+/** Renders supplied content or a standard notice, forwarding dismissals to the stack's transition. */
 function ComposerBannerStackAlert({
   item,
   attached,
@@ -339,6 +356,8 @@ function ComposerBannerStackAlert({
         density="comfortable"
         placement={attached ? "attached" : "floating"}
         variant={item.variant}
+        className="composer-notice surface-glass"
+        data-composer-notice-id={item.id}
       >
         {item.content}
       </ComposerBanner.Root>
@@ -350,6 +369,8 @@ function ComposerBannerStackAlert({
       placement={attached ? "attached" : "floating"}
       variant={item.variant}
       density="comfortable"
+      className="composer-notice surface-glass"
+      data-composer-notice-id={item.id}
     >
       <ComposerBanner.Row layout="wrap-actions">
         <ComposerBanner.Icon className="h-(--composer-banner-icon-column) self-start">
@@ -359,6 +380,19 @@ function ComposerBannerStackAlert({
           <span className="min-w-0 truncate font-medium leading-7 sm:leading-6">{item.title}</span>
           {item.description ? <NoticeDescription>{item.description}</NoticeDescription> : null}
         </ComposerBanner.Content>
+        {item.progress && item.progress.totalSteps > 0 ? (
+          <span className="composer-goal-progress">
+            <progress
+              className="composer-goal-progress-track"
+              aria-label={t.composer.bannerStack.goalProgress}
+              value={item.progress.completedSteps}
+              max={item.progress.totalSteps}
+            />
+            <span className="font-mono text-meta-large text-secondary-label tabular-nums">
+              {item.progress.completedSteps}/{item.progress.totalSteps}
+            </span>
+          </span>
+        ) : null}
         {item.actions || item.onDismiss ? (
           <ComposerBanner.Actions>
             {item.actions}

@@ -133,6 +133,23 @@ afterEach(async () => {
 });
 
 describe("ComposerPrimaryActions", () => {
+  it("opens the ready plan in a new thread without submitting the current form", async () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    const onImplementPlanInNewThread = vi.fn();
+    const { onSubmit } = await mountActions({
+      showPlanFollowUpPrompt: true,
+      promptHasText: false,
+      onImplementPlanInNewThread,
+    });
+    const newThreadButton = Array.from(container!.querySelectorAll("button")).find(
+      (button) => button.textContent === "Implement in a new thread",
+    );
+    expect(newThreadButton, "U1 exposes the existing new-thread action directly").toBeDefined();
+    await act(async () => newThreadButton!.click());
+    expect(onImplementPlanInNewThread).toHaveBeenCalledOnce();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
   it("labels the queued edit check as Save and keeps the existing form submission", async () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     const { button, onSubmit } = await mountActions({

@@ -3,7 +3,6 @@ import { t } from "~/i18n";
 import { memo, useContext, type MouseEventHandler, type PointerEventHandler } from "react";
 import {
   CheckIcon,
-  ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   Minimize2Icon,
@@ -16,10 +15,8 @@ import { formatContextWindowTokens } from "~/lib/contextWindow";
 import { cn } from "~/lib/utils";
 import { useShortcutModifierState } from "../../shortcutModifierState";
 import { StageBackdropButtonArt, useSidebarStageBackdropVariant } from "../SidebarStageBackdrop";
-import { Menu, MenuItem, MenuPopup, MenuTrigger } from "../ui/menu";
 import { Spinner } from "../ui/spinner";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
-import { composerFloatingLayerProps } from "./composerEventScope";
 import { ComposerSubmissionStateContext } from "./composerSubmissionState";
 import { getComposerSubmissionState } from "./composerSubmissionState.logic";
 import {
@@ -220,61 +217,65 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
   }
 
   if (showPlanFollowUpPrompt && (promptHasText || !canResume)) {
-    if (promptHasText) {
-      return (
+    // U1 exposes all plan choices; disabled choices keep the existing dispatch conditions.
+    return (
+      <div
+        data-chat-composer-implement-actions="true"
+        className="flex flex-wrap items-center justify-end gap-1.5"
+      >
         <button
           type="submit"
-          className={cn(messageActionPillClassName, "h-9 sm:h-8", compact ? "px-3" : "px-4")}
+          className={cn(
+            promptHasText ? messageActionPillClassName : "composer-plan-secondary",
+            promptHasText && "h-9 sm:h-8",
+            compact ? "px-3" : "px-4",
+          )}
           {...pointerFocusProps}
-          disabled={isSendBusy || isSendDisabled || isConnecting || isEnvironmentUnavailable}
+          disabled={
+            !promptHasText ||
+            isSendBusy ||
+            isSendDisabled ||
+            isConnecting ||
+            isEnvironmentUnavailable
+          }
         >
-          {isConnecting || isSendBusy
+          {promptHasText && (isConnecting || isSendBusy)
             ? t.composer.primaryActions.sending
             : t.composer.primaryActions.refine}
         </button>
-      );
-    }
-
-    return (
-      <div data-chat-composer-implement-actions="true" className="flex items-center justify-end">
+        <button
+          type="button"
+          className="composer-plan-secondary px-3.5"
+          {...pointerFocusProps}
+          disabled={
+            promptHasText ||
+            isSendBusy ||
+            isSendDisabled ||
+            isConnecting ||
+            isEnvironmentUnavailable
+          }
+          onClick={() => {
+            if (canOperateThread) onImplementPlanInNewThread();
+          }}
+        >
+          {t.composer.primaryActions.implementNewThread}
+        </button>
         <button
           type="submit"
-          className={cn(messageActionPillClassName, "h-9 rounded-r-none px-4 sm:h-8")}
+          className={cn(messageActionPillClassName, "h-9 px-4 sm:h-8")}
           {...pointerFocusProps}
-          disabled={isSendBusy || isSendDisabled || isConnecting || isEnvironmentUnavailable}
+          disabled={
+            promptHasText ||
+            isSendBusy ||
+            isSendDisabled ||
+            isConnecting ||
+            isEnvironmentUnavailable
+          }
         >
-          {isConnecting || isSendBusy
+          {!promptHasText && (isConnecting || isSendBusy)
             ? t.composer.primaryActions.sending
             : t.composer.primaryActions.implement}
         </button>
-        <Menu>
-          <MenuTrigger
-            render={
-              <button
-                type="button"
-                className={cn(
-                  messageActionPillClassName,
-                  "h-9 rounded-l-none border-l border-message-action-foreground/20 px-2 sm:h-8",
-                )}
-                aria-label={t.composer.primaryActions.implementationActions}
-                {...pointerFocusProps}
-                disabled={isSendBusy || isSendDisabled || isConnecting || isEnvironmentUnavailable}
-              />
-            }
-          >
-            <ChevronDownIcon className="size-3.5" />
-          </MenuTrigger>
-          <MenuPopup align="end" side="top" {...composerFloatingLayerProps}>
-            <MenuItem
-              disabled={isSendBusy || isSendDisabled || isConnecting || isEnvironmentUnavailable}
-              onClick={() => {
-                if (canOperateThread) onImplementPlanInNewThread();
-              }}
-            >
-              {t.composer.primaryActions.implementNewThread}
-            </MenuItem>
-          </MenuPopup>
-        </Menu>
       </div>
     );
   }

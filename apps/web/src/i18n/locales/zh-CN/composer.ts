@@ -10,6 +10,7 @@ export const composer: Messages["composer"] = {
     runtimeAriaLabel: "运行模式",
   },
   attachments: {
+    uploadProgress: "附件上传进度",
     questionServerUpdateHint: "请更新此服务器，才能在回答问题时发送文件",
     reattachFileHint: "请重新附加中断的文件或将其移除",
     reattachFilesHint: "请重新附加中断的文件或将其移除",
@@ -128,7 +129,6 @@ export const composer: Messages["composer"] = {
     sending: "正在发送…",
     refine: "完善",
     implement: "实施",
-    implementationActions: "实施操作",
     implementNewThread: "在新对话中实施",
     fullLabel: "完整",
     compactLabel: "压缩",
@@ -269,6 +269,7 @@ export const composer: Messages["composer"] = {
     disconnected: "请求修改、发送后续消息或附加图片",
   },
   bannerStack: {
+    goalProgress: "当前任务进度",
     showOtherNotices: "显示其他通知",
     otherNotices: "其他通知",
     showDetails: "显示通知详情",

@@ -62,3 +62,255 @@
 @utility composer-primary-key {
   --lucide-hue-override: currentColor;
 }
+
+/* 补充屏-2.dc.html · U1: banner rows, task disclosure, attachment wells and plan choices. */
+@theme {
+  --color-composer-notice: #26262a;
+  --color-composer-notice-label: #c4c4ca;
+  --color-composer-notice-count: #94949c;
+  --color-composer-warning-title: #2e2617;
+  --color-composer-warning-action: #5c4a2a;
+  --color-composer-goal-fill: #5fd3c7;
+  --color-composer-task-completed: #6fd896;
+  --color-composer-task-running: #8fb4ff;
+  --color-composer-attachment: #151517;
+  --color-composer-attachment-track: #0e0e10;
+  --radius-composer-notice: 14px;
+  --leading-composer-banner: 1.5;
+  --shadow-composer-notice: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 2px 0 #09090a;
+  --shadow-composer-warning: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 2px 0 #a08f68;
+  --shadow-composer-task-pill: inset 0 1px 0 rgba(255, 255, 255, 0.09), 0 1.5px 0 #09090a;
+  --shadow-composer-task-list:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.44), 0 2px 0 #09090a;
+  --shadow-composer-attachment: inset 1.5px 2px 3px rgba(0, 0, 0, 0.6);
+  --shadow-composer-attachment-failed:
+    inset 1.5px 2px 3px rgba(0, 0, 0, 0.6), inset 0 0 0 1.5px rgba(255, 123, 107, 0.5);
+}
+
+/* Feature-owned native controls; shared ui buttons retain their chosen recipes. */
+@utility composer-plan-secondary {
+  @apply inline-flex h-9.5 shrink-0 items-center justify-center rounded-full border-0 bg-secondary font-semibold text-secondary-copy-large text-foreground shadow-composer-task-pill outline-none enabled:cursor-pointer enabled:hover:bg-accent focus-visible:inset-shadow-focus disabled:pointer-events-none disabled:text-fg-control-disabled disabled:shadow-none;
+}
+
+@layer utilities {
+  html[data-theme-id="graphite"] {
+    /* U1 rows span the input width and sit above it, without the legacy attachment overlap. */
+    [data-chat-composer-form]
+      > [data-slot="composer-banner-attachment"]:has(.composer-notice, .composer-tasks-badge) {
+      @apply mb-2 w-full;
+    }
+
+    .composer-notices {
+      @apply mb-2 min-h-10;
+    }
+
+    .composer-notices-toggle {
+      @apply flex h-10 w-full items-center gap-2.5 rounded-composer-notice border-0 bg-composer-notice py-0 pr-1.5 pl-3 text-secondary-copy-large leading-composer-banner text-composer-notice-label shadow-composer-notice;
+    }
+
+    .composer-notices-toggle > svg {
+      @apply size-3.5;
+    }
+
+    .composer-notices-count {
+      @apply font-mono text-meta-large text-composer-notice-count;
+    }
+
+    .composer-notice-attachment {
+      @apply mb-2 w-full;
+    }
+
+    .composer-notice.surface-glass {
+      @apply rounded-composer-notice py-1.5 pr-1.5 pl-3 text-secondary-copy-large leading-composer-banner text-foreground shadow-composer-notice;
+      --composer-banner-icon-column: --spacing(3.5);
+      --stone-surface-color: var(--color-composer-notice);
+    }
+
+    .composer-notice[data-slot="composer-banner"]::before,
+    .composer-notice[data-slot="composer-banner"]::after,
+    .composer-tasks-tab[data-slot="composer-banner"]::before,
+    .composer-tasks-tab[data-slot="composer-banner"]::after {
+      @apply hidden;
+    }
+
+    .composer-notice [data-composer-banner-row] {
+      @apply min-h-7 gap-x-2.5;
+    }
+
+    .composer-notice [data-slot="composer-banner-icon"] {
+      @apply h-7;
+    }
+
+    .composer-notice [data-slot="composer-banner-icon"] > svg {
+      @apply size-3.5;
+    }
+
+    .composer-notice[data-variant="warning"] {
+      @apply text-composer-warning-title text-shadow-none shadow-composer-warning;
+      --stone-surface-color: var(--warning-surface);
+      --lucide-hue-override: currentColor;
+    }
+
+    .composer-notice[data-variant="warning"] [data-slot="composer-banner-content"] > :first-child {
+      @apply font-semibold;
+    }
+
+    .composer-notice[data-variant="warning"] [data-composer-notice-description] {
+      @apply text-composer-warning-action;
+    }
+
+    .composer-notice[data-variant="error"] {
+      @apply text-error-foreground text-shadow-none;
+      --stone-surface-color: var(--error-surface);
+      --lucide-hue-override: currentColor;
+    }
+
+    .composer-notice[data-variant="error"] [data-composer-notice-description] {
+      @apply text-error-foreground;
+    }
+
+    .composer-goal-progress {
+      @apply ml-auto flex shrink-0 items-center gap-2.5 pr-1.5;
+    }
+
+    .composer-goal-progress-track {
+      @apply h-1.5 w-20 appearance-none overflow-hidden rounded-full border-0 bg-input text-composer-goal-fill;
+    }
+
+    .composer-goal-progress-track::-webkit-progress-bar {
+      @apply rounded-full bg-input;
+    }
+
+    .composer-goal-progress-track::-webkit-progress-value {
+      @apply rounded-full bg-composer-goal-fill;
+    }
+
+    .composer-tasks-tab {
+      @apply bg-transparent p-0;
+    }
+
+    /* The stack can host the same task disclosure instead of a standard notice row. */
+    .composer-notice.surface-glass:has(> .composer-tasks) {
+      @apply p-0 shadow-none;
+      --stone-surface-color: transparent;
+    }
+
+    [data-slot="composer-banner-attachment"]:has(> .composer-tasks-tab) {
+      @apply mb-2 w-full;
+    }
+
+    .composer-tasks-badge {
+      @apply inline-flex min-h-7.5 w-auto gap-1.5 rounded-full bg-secondary py-0 pr-3 pl-2.5 text-secondary-copy-medium leading-composer-banner font-semibold text-foreground shadow-composer-task-pill;
+    }
+
+    .composer-tasks-badge [data-slot="composer-banner-icon"],
+    .composer-tasks-badge [data-slot="composer-banner-icon"] > svg {
+      @apply size-3.25;
+    }
+
+    .composer-tasks-badge [data-composer-task-progress] {
+      @apply min-w-0 font-mono text-meta font-normal text-secondary-label;
+    }
+
+    .composer-tasks [data-composer-tasks-scroll] {
+      @apply mt-2 mb-1.5 rounded-overlay bg-surface-raised shadow-composer-task-list;
+    }
+
+    .composer-tasks [data-composer-tasks-list] {
+      @apply gap-0.5 p-2 text-secondary-copy-large leading-composer-banner;
+    }
+
+    .composer-tasks [data-composer-tasks-list] [data-task-status] {
+      @apply min-h-8.5 gap-2.5 rounded-menu-row px-2.5 py-0;
+      --composer-banner-icon-column: --spacing(3.5);
+    }
+
+    .composer-tasks [data-task-status] [data-slot="composer-banner-icon"] > svg {
+      @apply size-3.5;
+    }
+
+    .composer-tasks [data-task-status="completed"] [data-slot="composer-banner-content"] {
+      @apply text-secondary-label line-through;
+    }
+
+    .composer-tasks [data-task-status="inProgress"] {
+      @apply bg-secondary;
+    }
+
+    .composer-tasks [data-task-status="inProgress"] [data-slot="composer-banner-content"] {
+      @apply text-foreground;
+    }
+
+    .composer-tasks [data-task-status="pending"] [data-slot="composer-banner-content"] {
+      @apply text-composer-notice-label;
+    }
+
+    .composer-task-status {
+      @apply text-meta-large text-composer-notice-count;
+    }
+
+    .composer-tasks [data-task-status="completed"] .composer-task-status {
+      @apply text-composer-task-completed;
+    }
+
+    .composer-tasks [data-task-status="inProgress"] .composer-task-status {
+      @apply text-composer-task-running;
+    }
+
+    .composer-tasks [data-composer-task-duration]:empty {
+      @apply hidden;
+    }
+
+    .composer-plan-ready {
+      @apply flex min-h-10 px-4.5 py-2 text-reply leading-composer-banner;
+    }
+
+    .composer-attachments {
+      @apply mb-3 flex max-w-full flex-wrap items-start gap-2 empty:hidden;
+    }
+
+    .composer-attachment-images {
+      @apply mb-0;
+    }
+
+    .composer-attachment-files {
+      @apply contents;
+    }
+
+    .composer-attachment-card {
+      @apply h-14 rounded-compact-row bg-composer-attachment shadow-composer-attachment;
+    }
+
+    .composer-attachment-file {
+      @apply font-mono text-secondary-copy text-foreground;
+    }
+
+    .composer-attachment-card[data-attachment-failed="true"] {
+      @apply text-error shadow-composer-attachment-failed;
+    }
+
+    .composer-attachment-video[data-attachment-reattach="true"] {
+      @apply w-auto min-w-14 px-3;
+    }
+
+    .composer-attachment-card[data-attachment-failed="true"] .composer-attachment-meta {
+      @apply rounded-full bg-secondary px-2.25 py-1 font-sans text-meta-large font-semibold text-foreground;
+    }
+
+    .composer-attachment-upload {
+      @apply inset-x-1.5 bottom-1.5 bg-transparent p-0;
+    }
+
+    .composer-attachment-progress {
+      @apply block h-1 w-full appearance-none overflow-hidden rounded-full border-0 bg-composer-attachment-track;
+    }
+
+    .composer-attachment-progress::-webkit-progress-bar {
+      @apply rounded-full bg-composer-attachment-track;
+    }
+
+    .composer-attachment-progress::-webkit-progress-value {
+      @apply bg-composer-notice-label;
+    }
+  }
+}

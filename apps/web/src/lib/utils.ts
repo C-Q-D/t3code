@@ -233,6 +233,12 @@ const twMerge = extendTailwindMerge({
         "terminal-divider-column",
         "terminal-divider-row",
         "terminal-jump",
+        "composer-notice",
+        "composer-warning",
+        "composer-task-pill",
+        "composer-task-list",
+        "composer-attachment",
+        "composer-attachment-failed",
       ],
       "inset-shadow": [
         "selected",
@@ -320,6 +326,7 @@ const twMerge = extendTailwindMerge({
         "notice",
         "timeline-quote-key",
         "terminal-tool",
+        "composer-notice",
       ],
       leading: [
         "code",
@@ -337,6 +344,7 @@ const twMerge = extendTailwindMerge({
         "pn5-copy",
         "sidebar-update",
         "callout",
+        "composer-banner",
       ],
       tracking: ["brand", "chat-draft", "timeline-secret"],
     },

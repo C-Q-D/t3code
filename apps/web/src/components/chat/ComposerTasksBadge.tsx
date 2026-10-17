@@ -1,24 +1,25 @@
+/** Shows provider task progress and its disclosure list; task updates remain caller-owned. */
 import { t } from "~/i18n";
-import { CheckIcon, CircleDotIcon, CircleIcon, ListTodoIcon } from "lucide-react";
+import { CircleCheckIcon, CircleDotIcon, CircleIcon, ListTodoIcon } from "lucide-react";
 import { memo, type ComponentProps } from "react";
 
 import { formatDuration } from "../../session-logic";
 import { cn } from "~/lib/utils";
 import { ComposerBanner } from "./ComposerBanner";
 
+/** Provider-supplied task summary; completed and total counts are displayed unchanged. */
 export interface ComposerTasksProgress {
   readonly step: string;
   readonly completedSteps: number;
   readonly totalSteps: number;
 }
 
+/** One provider task and its optional measured duration in milliseconds. */
 export interface ComposerTaskStep {
   readonly durationMs?: number;
   readonly step: string;
   readonly status: "pending" | "inProgress" | "completed";
 }
-
-const MAX_TASK_SEGMENTS = 10;
 
 const taskStatusLabels = {
   pending: t.composer.tasks.pending,
@@ -26,6 +27,7 @@ const taskStatusLabels = {
   completed: t.composer.tasks.completed,
 } satisfies Record<ComposerTaskStep["status"], string>;
 
+/** Keeps repeated task labels distinct while retaining the provider's order. */
 function keyedTaskSteps(steps: readonly ComposerTaskStep[]) {
   const occurrences = new Map<string, number>();
   return steps.map((step) => {
@@ -35,56 +37,15 @@ function keyedTaskSteps(steps: readonly ComposerTaskStep[]) {
   });
 }
 
-function TaskSegments({
-  className,
-  steps,
-}: {
-  readonly className?: string;
-  readonly steps: readonly ComposerTaskStep[];
-}) {
-  if (steps.length <= 1 || steps.length > MAX_TASK_SEGMENTS) return null;
-
-  return (
-    <span aria-hidden className={cn("flex w-10 shrink-0 items-center gap-0.5", className)}>
-      {keyedTaskSteps(steps).map(({ key, step }) => (
-        <span
-          key={key}
-          className={cn(
-            "h-[3px] min-w-0 flex-1 rounded-full",
-            step.status === "completed"
-              ? "bg-success"
-              : step.status === "inProgress"
-                ? "bg-primary"
-                : "bg-muted-foreground/25",
-          )}
-        />
-      ))}
-    </span>
-  );
-}
-
-function TaskSummary({
-  expanded,
-  progress,
-  steps,
-}: {
-  readonly expanded: boolean;
-  readonly progress: ComposerTasksProgress;
-  readonly steps: readonly ComposerTaskStep[];
-}) {
+/** U1 keeps the pill compact; the disclosure label still announces the current step. */
+function TaskSummary({ progress }: { readonly progress: ComposerTasksProgress }) {
   return (
     <>
       <ComposerBanner.Icon>
         <ListTodoIcon />
       </ComposerBanner.Icon>
       <ComposerBanner.Content>
-        <span className="shrink-0 text-muted-foreground">{t.composer.tasks.title}</span>
-        <span
-          className="min-w-0 flex-1 truncate text-left font-medium text-foreground/80"
-          data-composer-task-current="true"
-        >
-          {progress.step}
-        </span>
+        <span>{t.composer.tasks.title}</span>
       </ComposerBanner.Content>
       <ComposerBanner.Actions>
         <ComposerBanner.Count
@@ -93,19 +54,17 @@ function TaskSummary({
         >
           {progress.completedSteps}/{progress.totalSteps}
         </ComposerBanner.Count>
-        <TaskSegments className="hidden w-20 @min-[560px]:flex" steps={steps} />
-        <ComposerBanner.ToggleIcon expanded={expanded} />
       </ComposerBanner.Actions>
     </>
   );
 }
 
+/** Toggles the caller-owned drawer and announces progress, including its current task. */
 export const ComposerTasksBadge = memo(function ComposerTasksBadge({
   expanded,
   onToggle,
   placement = "tab",
   progress,
-  steps,
 }: {
   readonly expanded: boolean;
   readonly onToggle: () => void;
@@ -126,21 +85,27 @@ export const ComposerTasksBadge = memo(function ComposerTasksBadge({
         progress.step,
       )}
       data-composer-tasks-badge="true"
+      className="composer-tasks-badge"
       onClick={onToggle}
       onPointerDown={(event) => event.preventDefault()}
     >
-      <TaskSummary expanded={expanded} progress={progress} steps={steps} />
+      <TaskSummary progress={progress} />
     </ComposerBanner.Row>
   );
   return placement === "inline" ? (
     row
   ) : (
-    <ComposerBanner.Root density="comfortable" data-composer-shoulder-tab>
+    <ComposerBanner.Root
+      density="comfortable"
+      data-composer-shoulder-tab
+      className="composer-tasks-tab"
+    >
       {row}
     </ComposerBanner.Root>
   );
 });
 
+/** Renders the disclosure and, when expanded, the ordered tasks with their status and duration. */
 export const ComposerTasksContent = memo(function ComposerTasksContent({
   expanded,
   onToggle,
@@ -154,6 +119,7 @@ export const ComposerTasksContent = memo(function ComposerTasksContent({
 }) {
   return (
     <div
+      className="composer-tasks"
       data-chat-composer-collapsed-controls="true"
       data-chat-composer-tasks-drawer={expanded ? "true" : undefined}
     >
@@ -175,19 +141,10 @@ export const ComposerTasksContent = memo(function ComposerTasksContent({
             data-composer-tasks-list="true"
           >
             {keyedTaskSteps(steps).map(({ key, step }) => (
-              <ComposerBanner.Row key={key} render={<li />} className="items-start py-1 pe-2">
-                <ComposerBanner.Icon
-                  className={cn(
-                    "h-4",
-                    step.status === "completed"
-                      ? "text-success"
-                      : step.status === "inProgress"
-                        ? "text-primary"
-                        : "text-muted-foreground/40",
-                  )}
-                >
+              <ComposerBanner.Row key={key} render={<li />} data-task-status={step.status}>
+                <ComposerBanner.Icon className="h-4">
                   {step.status === "completed" ? (
-                    <CheckIcon />
+                    <CircleCheckIcon />
                   ) : step.status === "inProgress" ? (
                     <CircleDotIcon />
                   ) : (
@@ -204,10 +161,10 @@ export const ComposerTasksContent = memo(function ComposerTasksContent({
                         : "text-muted-foreground/70",
                   )}
                 >
-                  <span className="sr-only">{taskStatusLabels[step.status]}: </span>
                   {step.step}
                 </ComposerBanner.Content>
                 <ComposerBanner.Actions>
+                  <span className="composer-task-status">{taskStatusLabels[step.status]}</span>
                   <span
                     className="w-12 text-right text-3xs/4 text-muted-foreground/45 tabular-nums"
                     data-composer-task-duration="true"
@@ -228,6 +185,7 @@ export const ComposerTasksContent = memo(function ComposerTasksContent({
   );
 });
 
+/** Attaches an expanded task list and returns collapse actions to its owner. */
 export const ComposerTasksDrawer = memo(function ComposerTasksDrawer({
   onCollapse,
   ...props
@@ -236,7 +194,7 @@ export const ComposerTasksDrawer = memo(function ComposerTasksDrawer({
 }) {
   return (
     <ComposerBanner.Attachment>
-      <ComposerBanner.Root>
+      <ComposerBanner.Root className="composer-tasks-tab">
         <ComposerTasksContent {...props} expanded onToggle={onCollapse} />
       </ComposerBanner.Root>
     </ComposerBanner.Attachment>

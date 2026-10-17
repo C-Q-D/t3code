@@ -8,6 +8,7 @@ export const composer = {
     runtimeAriaLabel: "Runtime mode",
   },
   attachments: {
+    uploadProgress: "Attachment upload progress",
     questionServerUpdateHint: "Update this server to send files with question answers",
     reattachFileHint: "Attach the interrupted file again or remove it",
     reattachFilesHint: "Attach the interrupted files again or remove them",
@@ -130,7 +131,6 @@ export const composer = {
     sending: "Sending...",
     refine: "Refine",
     implement: "Implement",
-    implementationActions: "Implementation actions",
     implementNewThread: "Implement in a new thread",
     fullLabel: "Full",
     compactLabel: "Compact",
@@ -273,6 +273,7 @@ export const composer = {
     disconnected: "Ask for changes, send follow-ups, or attach images",
   },
   bannerStack: {
+    goalProgress: "Current task progress",
     showOtherNotices: "Show other notices",
     otherNotices: "Other notices",
     showDetails: "Show notice details",

@@ -7620,6 +7620,8 @@ export default function ChatView(props: ChatViewProps) {
           ? presentation.title
           : `${presentation.title} · ${presentation.usage}`,
       description: presentation.objective,
+      // Use only the current run's plan counts; goal token budgets are not task completion.
+      progress: activeComposerTasksProgress,
       actions: isWorking ? undefined : (
         <>
           {presentation.canResume ? (
@@ -7643,7 +7645,7 @@ export default function ChatView(props: ChatViewProps) {
         </>
       ),
     };
-  }, [activeGoal, activeThread, isWorking, sendStandaloneCommand]);
+  }, [activeComposerTasksProgress, activeGoal, activeThread, isWorking, sendStandaloneCommand]);
 
   const backgroundWorkBannerItem = useMemo<ComposerBannerStackItem | null>(() => {
     const presentation = presentPendingBackgroundWork(activeBackgroundTasks);
