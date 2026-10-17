@@ -15,7 +15,7 @@ vi.mock("~/previewStateStore", () => ({
       tab: {
         runtime: "desktop",
         navStatus: { _tag: "Success", url: "http://localhost:5173/settings", title: "Settings" },
-        viewport: { _tag: "freeform", width: 900, height: 600 },
+        viewport: { _tag: "freeform", ...source },
       },
     },
     desktopByTabId: { tab: { hasWebContents: true, zoomFactor: 1 } },
@@ -56,7 +56,7 @@ const threadRef = {
   threadId: ThreadId.make("gesture-thread"),
 };
 const threadKey = scopedThreadKey(threadRef);
-const source = { width: 900, height: 600 };
+let source = { width: 900, height: 600 };
 const reportPreview = vi.fn();
 const clearPreview = vi.fn();
 let parentRenders = 0;
@@ -156,6 +156,7 @@ beforeEach(() => {
   usePreviewMiniPlayerStore.setState({ byThreadKey: {} });
   usePreviewMiniPlayerStore.getState().open(threadRef, { kind: "browser", tabId: "tab" });
   usePreviewMiniPlayerStore.getState().resize(threadRef, "browser:tab", 360, { x: 100, y: 80 });
+  source = { width: 900, height: 600 };
   parentRenders = 0;
 });
 afterEach(async () => {
@@ -249,5 +250,35 @@ it.each([
     expect(local.y).toBeGreaterThanOrEqual(minimumY);
     await act(async () => handle.props.onPointerUp(event));
     expect(displayedFrame()).toEqual(local);
+  },
+);
+
+it.each([
+  { name: "inside", x: 200, y: 100 },
+  { name: "past right edge", x: 1000, y: 100 },
+  { name: "past left edge", x: -300, y: 100 },
+  { name: "past top edge", x: 200, y: -300 },
+  { name: "past bottom edge", x: 200, y: 800 },
+  { name: "over composer", x: 200, y: 350 },
+])(
+  "keeps a portrait drag $name clear of the composer and unchanged on release",
+  async ({ x, y }) => {
+    source = { width: 390, height: 844 };
+    await act(async () => {
+      renderer = create(<Harness bounds={{ width: 800, height: 500 }} composerHeight={180} />);
+    });
+    const start = displayedFrame();
+    const rendersBefore = parentRenders;
+    const storedBefore = usePreviewMiniPlayerStore.getState().byThreadKey[threadKey];
+    const { handle, event } = await movePointer(null, x - start.x, y - start.y);
+    const local = displayedFrame();
+    expect(parentRenders).toBe(rendersBefore);
+    expect(usePreviewMiniPlayerStore.getState().byThreadKey[threadKey]).toBe(storedBefore);
+    await act(async () => handle.props.onPointerUp(event));
+    expect(displayedFrame()).toEqual(local);
+    // The composer spans x=48..752 and starts at y=320 in this canvas.
+    expect(local.x + local.width <= 48 || local.x >= 752 || local.y + local.height <= 320).toBe(
+      true,
+    );
   },
 );

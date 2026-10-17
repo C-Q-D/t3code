@@ -279,7 +279,9 @@ export function clampPreviewMiniPlayerPosition(
  * Resolves the on-screen frame from the stored width and position. Clamping
  * happens here on every layout pass instead of being written back to the
  * store, so a temporarily narrow container never destroys the user's chosen
- * width. A player without a position sits in the top-right corner, or tucks
+ * width. Composer occupancy uses container-clamped columns so an off-canvas
+ * request and its persisted position receive the same height constraint.
+ * A player without a position sits in the top-right corner, or tucks
  * under the details card with right edges aligned when the card owns it.
  */
 export function resolvePreviewMiniPlayerFrame(input: {
@@ -296,6 +298,15 @@ export function resolvePreviewMiniPlayerFrame(input: {
     container,
     obstacles = NO_PREVIEW_MINI_PLAYER_OBSTACLES,
   } = input;
+  // Decide composer occupancy from reachable columns, not an off-canvas pointer.
+  // Use the container-fitted width first, since tall sources can already be
+  // narrower than their saved width before any obstacle consumes height.
+  const containerSize = fitPreviewMiniPlayerWidth(
+    width ?? DEFAULT_FRAME_WIDTH,
+    source,
+    availableArea(container, NO_PREVIEW_MINI_PLAYER_OBSTACLES, null),
+  );
+  const reachablePosition = position && clampToContainer(position, container, containerSize);
   const size = fitPreviewMiniPlayerWidth(
     width ?? DEFAULT_FRAME_WIDTH,
     source,
@@ -305,7 +316,7 @@ export function resolvePreviewMiniPlayerFrame(input: {
       // ceiling is a placement concern, not a sizing one, and the clamp pass
       // relocates the frame into columns the card leaves open.
       position && width ? { composer: obstacles.composer, detailsCard: null } : obstacles,
-      position && width ? spanOf(position.x, width) : null,
+      reachablePosition && width ? spanOf(reachablePosition.x, containerSize.width) : null,
     ),
   );
   const { detailsCard } = obstacles;
