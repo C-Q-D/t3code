@@ -1,5 +1,6 @@
 "use client";
 
+/** Shared toggle groups; segmented groups own the recessed track, while items own their states. */
 import type { Toggle as TogglePrimitive } from "@base-ui/react/toggle";
 import { ToggleGroup as ToggleGroupPrimitive } from "@base-ui/react/toggle-group";
 import type { VariantProps } from "class-variance-authority";
@@ -13,6 +14,7 @@ const ToggleGroupContext = React.createContext<VariantProps<typeof toggleVariant
   variant: "default",
 });
 
+/** Inherit the variant and size in each item; Base UI owns selection and keyboard navigation. */
 function ToggleGroup({
   className,
   variant = "segmented",
@@ -30,7 +32,10 @@ function ToggleGroup({
           ? "*:pointer-coarse:after:min-w-auto"
           : "*:pointer-coarse:after:min-h-auto",
         variant === "segmented"
-          ? "gap-0.5 rounded-lg bg-input/40 p-0.5"
+          ? cn(
+              "gap-0 rounded-segmented-track bg-input p-0.75 shadow-well-track data-disabled:opacity-40 data-disabled:shadow-none",
+              orientation === "horizontal" ? "h-8.5" : "flex-col",
+            )
           : variant === "default"
             ? "gap-0.5"
             : orientation === "horizontal"
@@ -49,6 +54,7 @@ function ToggleGroup({
   );
 }
 
+/** Allow an item to override the group's appearance without changing its selection behavior. */
 function Toggle({
   className,
   children,

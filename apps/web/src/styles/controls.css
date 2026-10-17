@@ -33,3 +33,19 @@
   --shadow-input-disabled-edge: inset 0 0 0 1px rgba(0, 0, 0, 0.4);
   --shadow-input-focus-depth: inset 2px 3px 5px rgba(0, 0, 0, 0.66);
 }
+
+/* F3.3：规范-8a.dc.html H1 的分段选择与标签页；不替代 StyleM 的页面尺寸。 */
+@theme {
+  /* H1：未选中分段项的悬停底色。 */
+  --color-segmented-hover: #222226;
+  /* H1：选中滑块为 #3a3a40；共享色值，但不借用终端选区的用途名称。 */
+  --color-segmented-selected: var(--color-well-terminal-selection);
+  /* H1：未选中标签的悬停与按下底色。 */
+  --color-tab-hover: #26262a;
+  --color-tab-pressed: #1a1a1d;
+  /* H1：分段项按下比通用凹槽更浅，须保留其独立几何。 */
+  --shadow-segmented-pressed: inset 1px 1.5px 2px rgba(0, 0, 0, 0.6);
+  /* H1：34px 轨道内边距 3px，留下 28px 滑块；两层圆角分别为 17px / 14px。 */
+  --radius-segmented-track: 17px;
+  --radius-segmented-item: 14px;
+}
