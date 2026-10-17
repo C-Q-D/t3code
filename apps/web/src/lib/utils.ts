@@ -210,6 +210,10 @@ const twMerge = extendTailwindMerge({
         "device-tools",
         "device-controls",
         "device-frame",
+        "timeline-find",
+        "timeline-provider-warning",
+        "timeline-setup-key",
+        "timeline-scroll",
       ],
       "inset-shadow": [
         "selected",
@@ -286,6 +290,7 @@ const twMerge = extendTailwindMerge({
         "device-tool",
         "device-control",
         "device-frame",
+        "timeline-minimap-strip",
       ],
       leading: [
         "code",

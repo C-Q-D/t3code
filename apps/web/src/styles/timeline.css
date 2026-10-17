@@ -123,3 +123,244 @@
 .chat-markdown .timeline-markdown-table tbody tr:last-child td {
   border-bottom: 0;
 }
+
+/* TL2.1 · 补充屏-1 T1 / W7: values absent from the shared token contract. */
+@theme {
+  /* T1: find controls, minimap markers, and the inverse Provider setup key. */
+  --color-timeline-find-control: #c4c4ca;
+  --color-timeline-minimap-marker: #5a5a62;
+  --color-timeline-setup-key: #111113;
+  --color-timeline-setup-label: #f2f2f3;
+  --color-timeline-dismiss-hover: rgba(0, 0, 0, 0.08);
+  /* T1: shell elevation; the inner field reuses shadow-well-pressed and inset-shadow-focus. */
+  --shadow-timeline-find:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.095), 0 0 0 1px rgba(0, 0, 0, 0.5), 0 3px 0 #09090a,
+    12px 20px 28px -8px rgba(0, 0, 0, 0.8);
+  /* T1 / W7: the floating Provider banner adds a distant shadow to the sand edge. */
+  --shadow-timeline-provider-warning:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 2px 0 #a08f68, 10px 16px 24px -8px rgba(0, 0, 0, 0.75);
+  --shadow-timeline-setup-key: 0 1.5px 0 #000;
+  /* T1: the 32px scroll key has a longer cast shadow than generic toolbar buttons. */
+  --shadow-timeline-scroll:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09), 0 0 0 1px rgba(0, 0, 0, 0.44), 0 1.5px 0 #09090a,
+    6px 10px 16px -4px rgba(0, 0, 0, 0.7);
+  --radius-timeline-minimap-strip: 2px;
+}
+
+/* Dynamic lane insets keep floating controls beside the workspace card and preview. */
+.timeline-find-bar {
+  @apply absolute top-2.5 z-50;
+  right: calc(var(--chat-lane-inset-end, 0px) + --spacing(3));
+  max-width: calc(100% - --spacing(6));
+}
+
+.timeline-find-controls {
+  @apply flex h-10.5 items-center gap-1 rounded-full pr-1 pl-3 text-secondary-copy-large text-foreground shadow-timeline-find;
+}
+
+.timeline-find-icon {
+  @apply size-3.5 shrink-0;
+  stroke-width: 1.75;
+}
+
+.timeline-find-input {
+  @apply h-7.5 w-50 min-w-0 rounded-full border-0 bg-input px-2.5 text-secondary-copy-large text-foreground shadow-well-pressed outline-none caret-message-action placeholder:text-placeholder;
+}
+
+.timeline-find-input:focus-visible {
+  @apply inset-shadow-focus;
+}
+
+/* Match the existing search primitive: the explicit close control owns dismissal. */
+.timeline-find-input::-webkit-search-cancel-button,
+.timeline-find-input::-webkit-search-decoration,
+.timeline-find-input::-webkit-search-results-button,
+.timeline-find-input::-webkit-search-results-decoration {
+  appearance: none;
+}
+
+.timeline-find-count {
+  @apply shrink-0 px-1.5 font-mono text-secondary-copy text-secondary-label tabular-nums whitespace-nowrap;
+}
+
+.timeline-find-count-empty {
+  @apply text-error;
+}
+
+/* T1's small controls have feature geometry: 28px navigation and a 22px minimap key. */
+.timeline-find-button,
+.timeline-provider-dismiss {
+  @apply flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent p-0 text-timeline-find-control;
+}
+
+.timeline-find-button > svg {
+  @apply size-3.75;
+}
+
+.timeline-find-button:last-child > svg {
+  @apply size-3.5;
+}
+
+.timeline-find-button:disabled,
+.timeline-minimap-navigation-button:disabled {
+  @apply cursor-default text-fg-control-disabled;
+}
+
+.timeline-find-button:enabled:hover,
+.timeline-find-retry:hover,
+.timeline-minimap-navigation-button:enabled:hover {
+  @apply bg-secondary text-foreground;
+}
+
+.timeline-find-button:focus-visible,
+.timeline-find-retry:focus-visible,
+.timeline-provider-setup:focus-visible,
+.timeline-provider-dismiss:focus-visible,
+.timeline-minimap-navigation-button:focus-visible,
+.timeline-scroll-button:focus-visible {
+  @apply outline-none inset-shadow-focus;
+}
+
+.timeline-find-retry {
+  @apply min-h-7 cursor-pointer rounded-full border-0 bg-transparent px-2 text-secondary-copy-large text-foreground;
+}
+
+.timeline-provider-lane {
+  @apply mx-auto w-165 pt-16;
+  max-width: calc(100% - --spacing(6));
+}
+
+.timeline-provider-banner {
+  @apply pointer-events-auto flex min-h-11 items-center gap-2.5 rounded-overlay py-1.5 pr-1.5 pl-3.5 text-secondary-copy-large text-warning text-shadow-none shadow-timeline-provider-warning;
+  --lucide-hue-override: currentColor;
+}
+
+.timeline-provider-banner[data-severity="error"] {
+  @apply text-status-error-foreground shadow-raise-l;
+}
+
+.timeline-provider-banner > svg {
+  @apply size-3.75 shrink-0;
+}
+
+.timeline-provider-message {
+  @apply min-w-0 flex-1 font-semibold text-warning-foreground;
+}
+
+.timeline-provider-banner[data-severity="error"] .timeline-provider-message {
+  @apply text-status-error-foreground;
+}
+
+/* T1's inverse sand-banner action is feature-specific; no shared Button is repainted. */
+.timeline-provider-setup {
+  @apply min-h-7.5 shrink-0 cursor-pointer rounded-full border-0 bg-timeline-setup-key px-3 text-secondary-copy-medium font-extrabold text-timeline-setup-label shadow-timeline-setup-key;
+}
+
+.timeline-provider-setup:hover {
+  @apply bg-surface-raised;
+}
+
+.timeline-provider-setup:active {
+  @apply shadow-well-pressed;
+}
+
+.timeline-provider-dismiss {
+  @apply text-status-warning-foreground;
+}
+
+.timeline-provider-banner[data-severity="error"] .timeline-provider-dismiss {
+  @apply text-status-error-foreground;
+}
+
+.timeline-provider-dismiss:hover {
+  @apply bg-timeline-dismiss-hover;
+}
+
+.timeline-provider-dismiss > svg {
+  @apply size-3.5;
+}
+
+.timeline-minimap {
+  right: var(--chat-lane-inset-end, 0px);
+}
+
+@media (pointer: fine) {
+  .timeline-minimap {
+    @apply block;
+  }
+}
+
+.timeline-minimap-rail {
+  @apply top-40 right-3;
+  max-height: calc(100% - --spacing(55));
+}
+
+.timeline-minimap-strip {
+  @apply right-1.25 h-0.75 w-3.5 rounded-timeline-minimap-strip bg-timeline-minimap-marker;
+  transform: translateY(-50%) scaleX(0.714286);
+}
+
+.timeline-minimap-strip[data-current="true"],
+.timeline-minimap-strip[data-active="true"] {
+  transform: translateY(-50%) scaleX(1);
+}
+
+.timeline-minimap-highlight {
+  @apply rounded-timeline-minimap-strip bg-primary opacity-0;
+}
+
+.timeline-minimap-strip:is([data-current="true"], [data-active="true"], [data-in-view="true"])
+  .timeline-minimap-highlight {
+  @apply opacity-100;
+}
+
+.timeline-minimap-preview {
+  @apply right-9;
+  max-width: calc(100vw - --spacing(16));
+}
+
+.timeline-minimap-preview-surface {
+  @apply rounded-tag bg-primary px-2.5 py-1.25 text-secondary-copy font-semibold text-primary-foreground text-shadow-none shadow-primary-edge-control;
+  --lucide-hue-override: currentColor;
+}
+
+.timeline-minimap-navigation {
+  @apply right-0.25;
+}
+
+.timeline-minimap-previous {
+  bottom: calc(100% + --spacing(1.5));
+}
+
+.timeline-minimap-next {
+  top: calc(100% + --spacing(1.5));
+}
+
+.timeline-minimap-navigation-button {
+  @apply flex size-5.5 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent p-0 text-muted-foreground;
+}
+
+.timeline-minimap-navigation-button > svg {
+  @apply size-3.25;
+}
+
+/* The wrapper keeps ChatView's measured composer clearance; only horizontal alignment changes. */
+.chat-scroll-to-bottom {
+  @apply justify-end pr-3;
+}
+
+.timeline-scroll-button {
+  @apply relative inline-flex h-8 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-full border-0 bg-raise-toolbar pr-3 pl-2.5 text-secondary-copy-medium font-semibold text-foreground shadow-timeline-scroll;
+}
+
+.timeline-scroll-button:enabled:hover {
+  @apply bg-raise-toolbar-hover;
+}
+
+.timeline-scroll-button:enabled:active {
+  @apply shadow-raise-xs-pressed;
+}
+
+.timeline-scroll-button:disabled {
+  @apply cursor-default text-fg-control-disabled shadow-none;
+}

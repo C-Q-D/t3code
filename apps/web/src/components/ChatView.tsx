@@ -2,6 +2,7 @@
 import { t } from "~/i18n";
 import { ThreadFind, ThreadFindCanvas, type ThreadFindControls } from "./chat/ThreadFindProvider";
 import { THREAD_FIND_BAR_RESERVED_HEIGHT } from "./chat/ThreadFindBar";
+import { TimelineScrollToBottomButton } from "./chat/TimelineScrollToBottomButton";
 import { useDiscussionSeatBanner } from "./discussions/DiscussionSeatBanner";
 import { usageLimitRecoveryBannerItem } from "./chat/UsageLimitRecoveryBanner";
 import {
@@ -311,7 +312,6 @@ import {
   CheckCircle2Icon,
   MessageCircleIcon,
   PaperclipIcon,
-  ChevronDownIcon,
   DownloadIcon,
   GitBranchIcon,
   TargetIcon,
@@ -11625,7 +11625,7 @@ export default function ChatView(props: ChatViewProps) {
                   className="chat-scroll-to-bottom pointer-events-none absolute z-30 flex justify-center py-1.5"
                   style={{ bottom: scrollToEndClearance + 4 }}
                 >
-                  <Button
+                  <TimelineScrollToBottomButton
                     data-scroll-to-end
                     aria-label={t.chat.view.scrollToEnd}
                     onPointerDown={(event) => event.preventDefault()}
@@ -11634,12 +11634,9 @@ export default function ChatView(props: ChatViewProps) {
                       scrollToEnd(true);
                     }}
                     className="pointer-events-auto"
-                    size="xs"
-                    variant="glass"
                   >
-                    <ChevronDownIcon className="size-3.5" />
                     {t.chat.view.scrollToEnd}
-                  </Button>
+                  </TimelineScrollToBottomButton>
                 </div>
               )}
             </div>

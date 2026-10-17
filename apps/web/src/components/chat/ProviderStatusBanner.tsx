@@ -2,9 +2,7 @@
 import { t } from "~/i18n";
 import { type ProviderInstanceId, type ServerProvider } from "@t3tools/contracts";
 import { memo } from "react";
-import { InfoIcon, XIcon } from "lucide-react";
-import { Alert, AlertAction, AlertDescription, AlertTitle } from "../ui/alert";
-import { Button, InlineButton } from "../ui/button";
+import { CircleAlertIcon, TriangleAlertIcon, XIcon } from "lucide-react";
 import { formatProviderDriverKindLabel } from "../../providerModels";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
@@ -117,42 +115,49 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
       : t.chat.providerStatus.status(providerName);
   const message = incompatible?.message ?? getProviderStatusMessage(status);
   const isWarning =
-    incompatible?.status !== "broken" && (status.status === "warning" || incompatible !== null);
+    incompatible?.status !== "broken" &&
+    (isUnauthenticated || status.status === "warning" || incompatible !== null);
 
   return (
-    <div className="pointer-events-auto mx-auto w-fit max-w-[calc(100%-2rem)] pt-3">
-      <Alert
-        variant={isWarning ? "warning" : "error"}
+    <div className="timeline-provider-lane">
+      <div
+        className="timeline-provider-banner alert-glass"
+        data-variant={isWarning ? "warning" : "error"}
+        data-severity={isWarning ? "warning" : "error"}
         role={incompatible && incompatible.status !== "broken" ? "status" : "alert"}
-        surface="glass"
-        controlAlignment="first-line"
       >
-        <InfoIcon />
-        <AlertTitle>{title}</AlertTitle>
-        <AlertDescription>
+        {isWarning ? (
+          <TriangleAlertIcon aria-hidden="true" />
+        ) : (
+          <CircleAlertIcon aria-hidden="true" />
+        )}
+        <span className="sr-only">{title}</span>
+        <div className="timeline-provider-message">
           <Tooltip>
             <TooltipTrigger render={<div className="line-clamp-3" />}>{message}</TooltipTrigger>
             <TooltipPopup side="top" className="whitespace-pre-wrap">
               {message}
             </TooltipPopup>
           </Tooltip>
-          {onOpenProviderSetup && hasProviderSetup(status) ? (
-            <InlineButton onClick={() => onOpenProviderSetup(status.instanceId)}>
-              {t.chat.providerStatus.openProviderSetup}
-            </InlineButton>
-          ) : null}
-        </AlertDescription>
-        <AlertAction>
-          <Button
-            aria-label={t.chat.providerStatus.dismiss(providerName, status.status)}
-            onClick={onDismiss}
-            size="icon-xs"
-            variant="ghost-muted"
+        </div>
+        {onOpenProviderSetup && hasProviderSetup(status) ? (
+          <button
+            type="button"
+            className="timeline-provider-setup"
+            onClick={() => onOpenProviderSetup(status.instanceId)}
           >
-            <XIcon />
-          </Button>
-        </AlertAction>
-      </Alert>
+            {t.chat.providerStatus.openProviderSetup}
+          </button>
+        ) : null}
+        <button
+          type="button"
+          className="timeline-provider-dismiss"
+          aria-label={t.chat.providerStatus.dismiss(providerName, status.status)}
+          onClick={onDismiss}
+        >
+          <XIcon />
+        </button>
+      </div>
     </div>
   );
 });

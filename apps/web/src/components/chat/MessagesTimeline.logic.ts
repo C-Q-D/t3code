@@ -349,7 +349,8 @@ export function workEntryIsVisibleInGroup(
     !workEntryIndicatesToolNeutralStatus(entry)
   );
 }
-const TIMELINE_MINIMAP_ITEM_SPACING = 8;
+// 补充屏-1 T1: 3px strips with a 6px gap, measured between marker centers.
+const TIMELINE_MINIMAP_ITEM_SPACING = 9;
 export const TIMELINE_MINIMAP_MIN_ITEMS = 2;
 const TIMELINE_MINIMAP_MAX_HEIGHT_CSS = "calc(100vh - 18rem)";
 const TIMELINE_MINIMAP_PERSISTENT_GUTTER = 48;
@@ -415,6 +416,11 @@ export function resolveTimelineIsAtEnd(state: TimelineEndState | undefined): boo
   return contentLength - scroll - scrollLength <= TIMELINE_FOLLOW_REARM_THRESHOLD_PX;
 }
 
+/**
+ * Sizes the marker rail independently of virtual row heights.
+ * @param itemCount - Number of minimap markers; zero still yields a nonzero CSS rail.
+ * @returns Center-to-center rail height capped to the available viewport, as a CSS min expression.
+ */
 export function resolveTimelineMinimapHeightStyle(itemCount: number): string {
   const naturalHeight = Math.max(1, (itemCount - 1) * TIMELINE_MINIMAP_ITEM_SPACING);
   return `min(${naturalHeight}px, ${TIMELINE_MINIMAP_MAX_HEIGHT_CSS})`;

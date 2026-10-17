@@ -1,4 +1,7 @@
-// @vitest-environment jsdom
+/**
+ * Exercises timeline interactions and the geometry shared by scrolling and minimap navigation.
+ * @vitest-environment jsdom
+ */
 
 import {
   ApprovalRequestId,
@@ -1215,7 +1218,8 @@ describe("MessagesTimeline", () => {
     expect(resolveTimelineIsAtEnd({ isNearEnd: true, isAtEnd: false })).toBe(false);
     expect(resolveTimelineIsAtEnd({ isAtEnd: false })).toBe(false);
 
-    expect(resolveTimelineMinimapHeightStyle(5)).toBe("min(32px, calc(100vh - 18rem))");
+    // T1: five 3px markers separated by 6px gaps have 36px between first/last centers.
+    expect(resolveTimelineMinimapHeightStyle(5)).toBe("min(36px, calc(100vh - 18rem))");
     expect(resolveTimelineMinimapTopPercent(2, 5)).toBe(50);
     expect(
       resolveTimelineMinimapIndexFromPointer({

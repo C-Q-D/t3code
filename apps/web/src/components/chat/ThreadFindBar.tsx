@@ -1,9 +1,7 @@
 /** Renders localized thread search controls; search and navigation state belongs to the caller. */
 import { t } from "~/i18n";
 import { useEffect, useRef, type KeyboardEvent } from "react";
-import { ChevronDownIcon, ChevronUpIcon, XIcon } from "lucide-react";
-import { Button } from "../ui/button";
-import { InputGroup, InputGroupAddon, InputGroupInput } from "../ui/input-group";
+import { ChevronDownIcon, ChevronUpIcon, SearchIcon, XIcon } from "lucide-react";
 import { cn } from "~/lib/utils";
 import { formatThreadFindCount } from "./threadFind";
 import { THREAD_DETAILS_CARD_GAP } from "./threadDetailsCardLayout";
@@ -25,10 +23,10 @@ interface ThreadFindBarProps {
 }
 
 /**
- * Room the open bar takes at the top of the chat canvas: its `h-9` height plus
+ * Room the open bar takes at the top of the chat canvas: its 42px height plus
  * the shared 12px gap below it, so the details card starts on the same rhythm.
  */
-export const THREAD_FIND_BAR_RESERVED_HEIGHT = 36 + THREAD_DETAILS_CARD_GAP;
+export const THREAD_FIND_BAR_RESERVED_HEIGHT = 42 + THREAD_DETAILS_CARD_GAP;
 
 /** Renders the search bar, focuses it on request, and delegates all search actions to props. */
 export function ThreadFindBar(props: ThreadFindBarProps) {
@@ -63,24 +61,19 @@ export function ThreadFindBar(props: ThreadFindBarProps) {
   };
 
   return (
-    // Fades in while the details popover slides out from under it.
-    <div
-      data-thread-find-bar
-      className="absolute top-3 right-3 z-40 w-[min(var(--thread-details-panel-width),calc(100%-1.5rem))] transition-opacity duration-150 ease-out starting:opacity-0 motion-reduce:transition-none"
-    >
-      <InputGroup
-        variant="popover"
-        size="lg"
+    <div data-thread-find-bar className="timeline-find-bar">
+      <div
         onContextMenu={(event) => event.stopPropagation()}
         role="search"
         aria-label={t.chat.threadFind.label}
         aria-busy={props.status === "loading" || props.counting === true}
-        className="w-full"
+        className="timeline-find-controls dropdown-glass"
       >
-        <InputGroupInput
+        <SearchIcon aria-hidden="true" className="timeline-find-icon" />
+        <input
           ref={inputRef}
           type="search"
-          size="sm"
+          className="timeline-find-input"
           value={props.query}
           aria-label={t.chat.threadFind.label}
           placeholder={t.chat.threadFind.label}
@@ -90,49 +83,44 @@ export function ThreadFindBar(props: ThreadFindBarProps) {
           onChange={(event) => props.onQueryChange(event.target.value)}
           onKeyDown={handleKeyDown}
         />
-        <InputGroupAddon align="inline-end" inset="pill">
-          <span
-            aria-live="polite"
-            className={cn(
-              "min-w-10 text-center text-xs tabular-nums",
-              noResults ? "text-destructive" : "text-muted-foreground",
-            )}
-          >
-            {label}
-          </span>
-          {props.status === "error" ? (
-            <Button size="xs" variant="ghost" onClick={props.onRetry}>
-              {t.chat.threadFind.retry}
-            </Button>
-          ) : null}
-          <Button
-            size="icon-xs"
-            variant="ghost"
-            aria-label={t.chat.threadFind.previous}
-            disabled={navigationDisabled}
-            onClick={props.onPrevious}
-          >
-            <ChevronUpIcon />
-          </Button>
-          <Button
-            size="icon-xs"
-            variant="ghost"
-            aria-label={t.chat.threadFind.next}
-            disabled={navigationDisabled}
-            onClick={props.onNext}
-          >
-            <ChevronDownIcon />
-          </Button>
-          <Button
-            size="icon-xs"
-            variant="ghost"
-            aria-label={t.chat.threadFind.close}
-            onClick={props.onClose}
-          >
-            <XIcon />
-          </Button>
-        </InputGroupAddon>
-      </InputGroup>
+        <span
+          aria-live="polite"
+          className={cn("timeline-find-count", noResults && "timeline-find-count-empty")}
+        >
+          {label}
+        </span>
+        {props.status === "error" ? (
+          <button type="button" className="timeline-find-retry" onClick={props.onRetry}>
+            {t.chat.threadFind.retry}
+          </button>
+        ) : null}
+        <button
+          type="button"
+          className="timeline-find-button"
+          aria-label={t.chat.threadFind.previous}
+          disabled={navigationDisabled}
+          onClick={props.onPrevious}
+        >
+          <ChevronUpIcon />
+        </button>
+        <button
+          type="button"
+          className="timeline-find-button"
+          aria-label={t.chat.threadFind.next}
+          disabled={navigationDisabled}
+          onClick={props.onNext}
+        >
+          <ChevronDownIcon />
+        </button>
+        <button
+          type="button"
+          className="timeline-find-button"
+          aria-label={t.chat.threadFind.close}
+          onClick={props.onClose}
+        >
+          <XIcon />
+        </button>
+      </div>
     </div>
   );
 }
