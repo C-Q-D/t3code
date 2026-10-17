@@ -18,12 +18,15 @@ import {
 } from "@t3tools/contracts";
 
 export const DEFAULT_SANS_FONT_STACK =
-  '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+  '"Instrument Sans Variable", "Noto Sans SC Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
 
 // Concrete names first: some engines alias `ui-monospace` to the
 // proportional system UI font, which would break every code surface.
 export const DEFAULT_CODE_FONT_STACK =
-  '"SF Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace';
+  '"IBM Plex Mono", "Noto Sans SC Variable", "SF Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace';
+
+export const DEFAULT_SERIF_FONT_STACK =
+  '"Cormorant Garamond Variable", "Noto Serif SC Variable", Georgia, serif';
 
 export const TYPOGRAPHY_ADVANCED_STORAGE_KEY = "t3code:typography-advanced";
 
@@ -91,6 +94,7 @@ export interface AppearanceFontPreferences {
 /**
  * Apply the preferences to the root element. Unset families remove the
  * override so the stylesheet defaults (and theme changes) stay in charge.
+ * Brand and heading serif typography stays fixed regardless of preferences.
  *
  * Sizes are always written: the interface size drives the root font size (and
  * with it every rem-based dimension), while the prompt and code sizes stay in
@@ -100,6 +104,7 @@ export function applyAppearanceFontVariables(
   root: HTMLElement,
   preferences: AppearanceFontPreferences,
 ): void {
+  root.style.setProperty("--font-serif", DEFAULT_SERIF_FONT_STACK);
   const families: ReadonlyArray<readonly [variable: string, custom: string, fallback: string]> = [
     ["--font-sans", preferences.sans, DEFAULT_SANS_FONT_STACK],
     ["--font-mono", preferences.code, DEFAULT_CODE_FONT_STACK],

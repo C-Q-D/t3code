@@ -1,12 +1,16 @@
+// @vitest-environment jsdom
+
 import { describe, expect, it } from "vite-plus/test";
 
 import {
   areFontAdvancesMonospace,
+  applyAppearanceFontVariables,
   clampCodeFontSize,
   clampInterfaceFontSize,
   clampPromptFontSize,
   DEFAULT_CODE_FONT_STACK,
   DEFAULT_SANS_FONT_STACK,
+  DEFAULT_SERIF_FONT_STACK,
   appearanceFontStack,
   cssFontFamilies,
   resolveDefaultFamilyLabel,
@@ -61,12 +65,47 @@ describe("resolveDefaultFamilyLabel", () => {
 describe("appearanceFontStack", () => {
   it("prepends the custom family to the default stack", () => {
     expect(appearanceFontStack("Fira Code", DEFAULT_CODE_FONT_STACK)).toBe(
-      `"Fira Code", ${DEFAULT_CODE_FONT_STACK}`,
+      '"Fira Code", "IBM Plex Mono", "Noto Sans SC Variable", "SF Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace',
     );
   });
 
   it("falls back to the default stack when unset", () => {
-    expect(appearanceFontStack("", DEFAULT_SANS_FONT_STACK)).toBe(DEFAULT_SANS_FONT_STACK);
+    expect(appearanceFontStack("", DEFAULT_SANS_FONT_STACK)).toBe(
+      '"Instrument Sans Variable", "Noto Sans SC Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
+    );
+  });
+});
+
+describe("applyAppearanceFontVariables", () => {
+  it("keeps bundled fallbacks for custom fonts and restores the fixed serif stack", () => {
+    const root = document.createElement("div");
+    const preferences = {
+      sans: "Custom Sans",
+      code: "Custom Mono",
+      composer: "",
+      sizeInterface: 16,
+      sizePrompt: 14,
+      sizeCode: 13,
+      smoothing: false,
+    };
+
+    applyAppearanceFontVariables(root, preferences);
+
+    expect(root.style.getPropertyValue("--font-sans")).toBe(
+      '"Custom Sans", "Instrument Sans Variable", "Noto Sans SC Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
+    );
+    expect(root.style.getPropertyValue("--font-mono")).toBe(
+      '"Custom Mono", "IBM Plex Mono", "Noto Sans SC Variable", "SF Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace',
+    );
+    expect(root.style.getPropertyValue("--font-serif")).toBe(
+      '"Cormorant Garamond Variable", "Noto Serif SC Variable", Georgia, serif',
+    );
+
+    applyAppearanceFontVariables(root, { ...preferences, sans: "", code: "" });
+
+    expect(root.style.getPropertyValue("--font-sans")).toBe("");
+    expect(root.style.getPropertyValue("--font-mono")).toBe("");
+    expect(root.style.getPropertyValue("--font-serif")).toBe(DEFAULT_SERIF_FONT_STACK);
   });
 });
 
