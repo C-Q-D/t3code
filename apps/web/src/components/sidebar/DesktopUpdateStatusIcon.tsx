@@ -1,3 +1,4 @@
+/** Renders desktop update status icons; callers own status changes and optional checking motion. */
 import { RefreshIcon } from "~/components/ui/refresh-icon";
 import { CheckIcon, CircleArrowUpIcon, DownloadIcon, RotateCwIcon } from "lucide-react";
 import type { AnimationEventHandler } from "react";
@@ -18,28 +19,6 @@ export type DesktopUpdateStatusIconState =
 function normalizeDesktopUpdateDownloadPercent(percent: number | null): number {
   if (percent === null || !Number.isFinite(percent)) return 0;
   return Math.min(100, Math.max(0, percent));
-}
-
-export function shouldShowDesktopUpdateCheckIcon({
-  isAnimationLatched,
-  isChecking,
-  prefersReducedMotion,
-}: {
-  readonly isAnimationLatched: boolean;
-  readonly isChecking: boolean;
-  readonly prefersReducedMotion: boolean;
-}): boolean {
-  return isChecking || (isAnimationLatched && !prefersReducedMotion);
-}
-
-export function shouldContinueDesktopUpdateCheckAnimation({
-  isChecking,
-  prefersReducedMotion,
-}: {
-  readonly isChecking: boolean;
-  readonly prefersReducedMotion: boolean;
-}): boolean {
-  return isChecking && !prefersReducedMotion;
 }
 
 function DesktopUpdateAvailableIcon() {

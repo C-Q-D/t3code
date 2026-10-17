@@ -1347,30 +1347,10 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
     },
     [onAcknowledgeWoke, props.wokeAt, threadRef],
   );
-  const handleContextMenu = useCallback(
-    (event: ReactMouseEvent) => {
-      event.preventDefault();
-      const trigger = event.currentTarget instanceof HTMLElement ? event.currentTarget : undefined;
-      onContextMenu(threadRef, { x: event.clientX, y: event.clientY }, trigger);
-    },
-    [onContextMenu, threadRef],
-  );
-  const handleKeyDown = useCallback(
-    (event: ReactKeyboardEvent) => {
-      if (event.target !== event.currentTarget) return;
-      if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
-        event.preventDefault();
-        const trigger =
-          event.currentTarget instanceof HTMLElement ? event.currentTarget : undefined;
-        const rect = event.currentTarget.getBoundingClientRect();
-        onContextMenu(threadRef, { x: rect.left, y: rect.bottom }, trigger);
-        return;
-      }
-      if (event.key !== "Enter" && event.key !== " ") return;
-      event.preventDefault();
-      onThreadActivate(threadRef);
-    },
-    [onContextMenu, onThreadActivate, threadRef],
+  const { handleContextMenu, handleKeyDown } = useSidebarThreadContextMenuTrigger(
+    threadRef,
+    onContextMenu,
+    onThreadActivate,
   );
   const handleDoubleClick = useCallback(
     (event: ReactMouseEvent) => {
@@ -2262,6 +2242,134 @@ const SidebarSearchResultRow = memo(function SidebarSearchResultRow(props: {
     </li>
   );
 });
+
+/** Opens the row menu from pointer or keyboard input while retaining Enter/Space activation. */
+export function useSidebarThreadContextMenuTrigger(
+  threadRef: ScopedThreadRef,
+  onContextMenu: (
+    threadRef: ScopedThreadRef,
+    position: { x: number; y: number },
+    trigger?: HTMLElement,
+  ) => void,
+  onThreadActivate: (threadRef: ScopedThreadRef) => void,
+) {
+  const handleContextMenu = useCallback(
+    (event: ReactMouseEvent) => {
+      event.preventDefault();
+      const trigger = event.currentTarget instanceof HTMLElement ? event.currentTarget : undefined;
+      onContextMenu(threadRef, { x: event.clientX, y: event.clientY }, trigger);
+    },
+    [onContextMenu, threadRef],
+  );
+  const handleKeyDown = useCallback(
+    (event: ReactKeyboardEvent) => {
+      if (event.target !== event.currentTarget) return;
+      if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
+        event.preventDefault();
+        const trigger =
+          event.currentTarget instanceof HTMLElement ? event.currentTarget : undefined;
+        const rect = event.currentTarget.getBoundingClientRect();
+        onContextMenu(threadRef, { x: rect.left, y: rect.bottom }, trigger);
+        return;
+      }
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      onThreadActivate(threadRef);
+    },
+    [onContextMenu, onThreadActivate, threadRef],
+  );
+  return { handleContextMenu, handleKeyDown };
+}
+
+/** Owns a single pending menu selection and its Base UI popup; cancellation resolves null. */
+export function useSidebarThreadContextMenu() {
+  const router = useRouter();
+  const [threadContextMenu, setThreadContextMenu] = useState<{
+    items: readonly ContextMenuItem<ThreadActionMenuId>[];
+    position: { x: number; y: number };
+  } | null>(null);
+  const threadMenuResolutionRef = useRef<((action: ThreadActionMenuId | null) => void) | null>(
+    null,
+  );
+  const threadMenuFocusRef = useRef<HTMLElement | null>(null);
+  const finishThreadContextMenu = useCallback((action: ThreadActionMenuId | null = null) => {
+    const resolve = threadMenuResolutionRef.current;
+    threadMenuResolutionRef.current = null;
+    setThreadContextMenu(null);
+    resolve?.(action);
+  }, []);
+  // Drafts and non-thread pages share a null thread key, so observe navigation itself.
+  useEffect(() => {
+    const unsubscribe = router.subscribe("onBeforeNavigate", () => finishThreadContextMenu());
+    return () => {
+      unsubscribe();
+      finishThreadContextMenu();
+    };
+  }, [router, finishThreadContextMenu]);
+  const threadMenuAnchor = useMemo(
+    () => ({
+      getBoundingClientRect: () =>
+        DOMRect.fromRect({
+          x: threadContextMenu?.position.x ?? 0,
+          y: threadContextMenu?.position.y ?? 0,
+        }),
+    }),
+    [threadContextMenu?.position.x, threadContextMenu?.position.y],
+  );
+  const showThreadContextMenu = useCallback(
+    (
+      items: readonly ContextMenuItem<ThreadActionMenuId>[],
+      position: { x: number; y: number },
+      trigger?: HTMLElement,
+    ) => {
+      finishThreadContextMenu();
+      threadMenuFocusRef.current =
+        trigger ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+      return new Promise<ThreadActionMenuId | null>((resolve) => {
+        threadMenuResolutionRef.current = resolve;
+        setThreadContextMenu({ items, position });
+      });
+    },
+    [finishThreadContextMenu],
+  );
+  const popup = (
+    <Menu
+      open={threadContextMenu !== null}
+      modal={false}
+      onOpenChange={(open) => {
+        if (!open) finishThreadContextMenu();
+      }}
+    >
+      {threadContextMenu ? (
+        <MenuPopup
+          anchor={threadMenuAnchor}
+          align="start"
+          sideOffset={0}
+          finalFocus={() =>
+            threadMenuFocusRef.current?.isConnected ? threadMenuFocusRef.current : false
+          }
+        >
+          <ThreadMenuItems
+            items={threadContextMenu.items}
+            onSelect={finishThreadContextMenu}
+            radioChoices
+            renderLabel={(item) => (
+              <>
+                <span className="min-w-0 max-w-64 flex-1 truncate">{item.label}</span>
+                {item.id === "auto-settle" ? (
+                  <span className="shrink-0 text-secondary-copy text-secondary-label in-data-disabled:text-current">
+                    {item.children?.find((child) => child.checked)?.label}
+                  </span>
+                ) : null}
+              </>
+            )}
+          />
+        </MenuPopup>
+      ) : null}
+    </Menu>
+  );
+  return { show: showThreadContextMenu, close: finishThreadContextMenu, popup };
+}
 
 /** Renders workspace navigation and dispatches project, thread and discussion entry actions. */
 export default function Sidebar() {
@@ -4398,48 +4506,11 @@ export default function Sidebar() {
   const exportTranscript = useAtomCommand(serverEnvironment.exportTranscript, {
     reportFailure: false,
   });
-  const [threadContextMenu, setThreadContextMenu] = useState<{
-    items: readonly ContextMenuItem<ThreadActionMenuId>[];
-    position: { x: number; y: number };
-  } | null>(null);
-  const threadMenuResolutionRef = useRef<((action: ThreadActionMenuId | null) => void) | null>(
-    null,
-  );
-  const threadMenuFocusRef = useRef<HTMLElement | null>(null);
-  const finishThreadContextMenu = useCallback((action: ThreadActionMenuId | null = null) => {
-    const resolve = threadMenuResolutionRef.current;
-    threadMenuResolutionRef.current = null;
-    setThreadContextMenu(null);
-    resolve?.(action);
-  }, []);
-  // Resolve cancellation before navigation or unmount can leave an old action pending.
-  useEffect(() => () => finishThreadContextMenu(), [routeThreadKey, finishThreadContextMenu]);
-  const threadMenuAnchor = useMemo(
-    () => ({
-      getBoundingClientRect: () =>
-        DOMRect.fromRect({
-          x: threadContextMenu?.position.x ?? 0,
-          y: threadContextMenu?.position.y ?? 0,
-        }),
-    }),
-    [threadContextMenu?.position.x, threadContextMenu?.position.y],
-  );
-  const showThreadContextMenu = useCallback(
-    (
-      items: readonly ContextMenuItem<ThreadActionMenuId>[],
-      position: { x: number; y: number },
-      trigger?: HTMLElement,
-    ) => {
-      finishThreadContextMenu();
-      threadMenuFocusRef.current =
-        trigger ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
-      return new Promise<ThreadActionMenuId | null>((resolve) => {
-        threadMenuResolutionRef.current = resolve;
-        setThreadContextMenu({ items, position });
-      });
-    },
-    [finishThreadContextMenu],
-  );
+  const {
+    show: showThreadContextMenu,
+    close: finishThreadContextMenu,
+    popup: threadContextMenuPopup,
+  } = useSidebarThreadContextMenu();
   const handleThreadContextMenu = useCallback(
     (threadRef: ScopedThreadRef, position: { x: number; y: number }, trigger?: HTMLElement) => {
       void (async () => {
@@ -4896,40 +4967,7 @@ export default function Sidebar() {
   return (
     <>
       <ThreadContextDragGhost />
-      <Menu
-        open={threadContextMenu !== null}
-        modal={false}
-        onOpenChange={(open) => {
-          if (!open) finishThreadContextMenu();
-        }}
-      >
-        {threadContextMenu ? (
-          <MenuPopup
-            anchor={threadMenuAnchor}
-            align="start"
-            sideOffset={0}
-            finalFocus={() =>
-              threadMenuFocusRef.current?.isConnected ? threadMenuFocusRef.current : false
-            }
-          >
-            <ThreadMenuItems
-              items={threadContextMenu.items}
-              onSelect={finishThreadContextMenu}
-              radioChoices
-              renderLabel={(item) => (
-                <>
-                  <span className="min-w-0 max-w-64 flex-1 truncate">{item.label}</span>
-                  {item.id === "auto-settle" ? (
-                    <span className="shrink-0 text-secondary-copy text-secondary-label in-data-disabled:text-current">
-                      {item.children?.find((child) => child.checked)?.label}
-                    </span>
-                  ) : null}
-                </>
-              )}
-            />
-          </MenuPopup>
-        ) : null}
-      </Menu>
+      {threadContextMenuPopup}
       <SidebarThreadDndContext
         sensors={dndSensors}
         autoScroll={!isContextDrag}

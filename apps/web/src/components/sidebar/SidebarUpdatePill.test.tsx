@@ -1,10 +1,38 @@
+/**
+ * Verifies release-note access and live update status transitions without an animation latch.
+ * @vitest-environment jsdom
+ */
 import type { DesktopUpdateState } from "@t3tools/contracts";
+import { act } from "react";
+import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vite-plus/test";
+import { TooltipProvider } from "../ui/tooltip";
+
+type EnvironmentModule = typeof import("../../env");
+const updateInput = vi.hoisted(() => ({ state: null as DesktopUpdateState | null }));
+// Only replace service inputs; the update control and its Base UI wrappers stay real.
+vi.mock("../../state/desktopUpdate", () => ({ useDesktopUpdateState: () => updateInput.state }));
+vi.mock("../../env", async (importOriginal) => ({
+  ...(await importOriginal<EnvironmentModule>()),
+  isElectron: true,
+}));
+vi.mock("./useUpdateEverything", () => ({
+  useUpdateEverything: () => ({
+    hasUpdates: false,
+    summary: "",
+    lines: [],
+    restarts: [],
+    skipped: [],
+    run: async () => {},
+  }),
+}));
+vi.mock("./updateEverythingRun", () => ({ useUpdateEverythingRun: () => null }));
 
 import {
   handleSidebarUpdateReleaseNotesPopoverOpenChange,
   openSidebarUpdateReleaseNotesPopoverOnForwardTab,
   shouldUseSidebarUpdateReleaseNotesPopover,
+  SidebarUpdatePill,
 } from "./SidebarUpdatePill";
 
 const nightlyState: DesktopUpdateState = {
@@ -84,3 +112,54 @@ describe("sidebar update release notes popover", () => {
     expect(open).not.toHaveBeenCalled();
   });
 });
+
+it.each([
+  ["available", "Update available"],
+  ["up-to-date", "Check for updates"],
+  ["error", "Network unavailable"],
+] as const)(
+  "replaces checking immediately with %s and clears the previous state on recheck",
+  async (status, label) => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    const renderStatus = async (nextStatus: DesktopUpdateState["status"]) => {
+      updateInput.state = {
+        ...nightlyState,
+        channel: "latest",
+        releaseNotes: [],
+        status: nextStatus,
+        availableVersion: nextStatus === "available" ? "0.0.36" : null,
+        message: nextStatus === "error" ? "Network unavailable" : null,
+        errorContext: nextStatus === "error" ? "check" : null,
+        canRetry: true,
+      };
+      await act(() =>
+        root.render(
+          <TooltipProvider>
+            <SidebarUpdatePill />
+          </TooltipProvider>,
+        ),
+      );
+      const button = container.querySelector("button");
+      expect(button).not.toBeNull();
+      return button!;
+    };
+    try {
+      for (const nextStatus of ["checking", status, "checking", status] as const) {
+        const button = await renderStatus(nextStatus);
+        const checking = nextStatus === "checking";
+        expect(button.textContent).toBe(checking ? "Checking for updates…" : label);
+        expect(button.getAttribute("aria-disabled") === "true").toBe(checking);
+        if (checking) expect(button.textContent).not.toContain(label);
+        else expect(button.textContent).not.toContain("Checking for updates…");
+      }
+    } finally {
+      await act(() => root.unmount());
+      container.remove();
+      updateInput.state = null;
+      vi.unstubAllGlobals();
+    }
+  },
+);
