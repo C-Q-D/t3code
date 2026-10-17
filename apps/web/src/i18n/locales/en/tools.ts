@@ -606,7 +606,7 @@ export const tools = {
   usage: {
     providerCount: (count: number) => `${count} providers`,
     connecting: "Connecting…",
-    allProviders: "All providers",
+    allProviders: "All usage sources",
     noProviders: "No providers",
     updatingProviders: (count: number) => `Updating ${count} providers…`,
     updatingProvider: (label: string) => `Updating ${label}…`,
@@ -751,6 +751,7 @@ export const tools = {
     saveFailed: "Could not save. Try again.",
     limits: "Limits",
     past24h: "Past 24h",
+    pastDays: (days: number) => `Past ${days} days`,
     sevenDays: "7 days",
     thirtyDays: "30 days",
     ninetyDays: "90 days",

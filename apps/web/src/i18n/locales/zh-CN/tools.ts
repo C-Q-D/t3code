@@ -725,6 +725,7 @@ export const tools: Messages["tools"] = {
     saveFailed: "无法保存，请重试。",
     limits: "限额",
     past24h: "过去24小时",
+    pastDays: (days: number) => `过去 ${days} 天`,
     sevenDays: "7天",
     thirtyDays: "30天",
     ninetyDays: "90天",

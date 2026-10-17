@@ -1,3 +1,4 @@
+/** Provider identity and stable reading order shared by usage charts, tables and details. */
 import type { UsageProviderKind } from "@t3tools/contracts";
 
 import { ProviderDriverKind } from "@t3tools/contracts";
@@ -16,12 +17,12 @@ type UsageProviderPresentation = {
 export const PROVIDER_PRESENTATION = {
   codex: {
     label: "Codex",
-    color: "var(--contrast-foreground)",
+    color: "var(--color-usage-codex)",
     driverKind: ProviderDriverKind.make("codex"),
   },
   claude: {
-    label: "Claude Code",
-    color: "#d97757",
+    label: "Claude",
+    color: "var(--color-usage-claude)",
     driverKind: ProviderDriverKind.make("claudeAgent"),
   },
   grok: {

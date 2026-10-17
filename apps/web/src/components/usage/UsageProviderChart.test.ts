@@ -1,9 +1,25 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { buildPeriodColumns, chartScale, niceScale } from "./UsageProviderChart";
+import { buildPeriodColumns } from "./UsageProviderChart";
+import { chartScale, niceScale } from "./usageChart.logic";
 import { providersWithUsage } from "./usageProviders";
 
 describe("chartScale", () => {
+  it("fits the combined height of a stacked provider column", () => {
+    const scale = chartScale(
+      [
+        {
+          total: 100,
+          bands: [
+            { provider: "codex", value: 40 },
+            { provider: "claude", value: 60 },
+          ],
+        },
+      ],
+      new Set(),
+    );
+    expect(scale.max).toBe(100);
+  });
   const column = (codex: number) => ({
     total: codex,
     bands: [{ provider: "codex" as const, value: codex }],

@@ -1,1 +1,31 @@
-/* U1：本线新增的令牌（@theme）与全局样式写在这里。 */
+/* U1: UsagePage8a.dc.html, imported by 其余屏-3.dc.html M1. Fixed provider colors are brand colors. */
+/* Brand variables are referenced by runtime styles, so retain them without utility-class consumers. */
+@theme static {
+  --color-usage-claude: #d97757;
+  --color-usage-codex: #e8e8ea;
+  --color-usage-total-well: #151517;
+  --color-usage-chart-baseline: rgba(0, 0, 0, 0.6);
+  /* StyleM-8a.dc.html: recessed group around the three titlebar controls. */
+  --color-usage-titlebar-well: #070708;
+  --radius-usage-titlebar: 14px;
+  --radius-usage-titlebar-key: 11px;
+  --text-usage-total: 36px;
+  --text-usage-total--line-height: 1;
+  --radius-usage-total: 14px;
+  --radius-usage-bar: 8px;
+  --radius-usage-swatch: 3px;
+  --shadow-usage-chart:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.095), inset 0 -2px 0 rgba(0, 0, 0, 0.66),
+    0 0 0 1px rgba(0, 0, 0, 0.484), 0 3px 0 #09090a, 12px 20px 28px -8px rgba(0, 0, 0, 0.7);
+  --shadow-usage-total:
+    inset 1.5px 2px 3px rgba(0, 0, 0, 0.6), inset -1px -1px 0 rgba(255, 255, 255, 0.05);
+  --shadow-usage-bar: inset 0 1px 0 rgba(255, 255, 255, 0.25), 4px 6px 10px -4px rgba(0, 0, 0, 0.8);
+  --shadow-usage-baseline: 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Reuse the shipped stone texture, with M1's detail-surface veil. */
+.usage-chart-surface {
+  background-image:
+    linear-gradient(var(--color-stone-detail-veil), var(--color-stone-detail-veil)),
+    url("../assets/stone-8a.webp");
+}
