@@ -10,6 +10,7 @@ import { Button } from "~/components/ui/button";
 import { Input, type InputProps } from "~/components/ui/input";
 import { MorphIcon } from "~/components/MorphIcon";
 import { ScrollArea } from "~/components/ui/scroll-area";
+import { Slab } from "~/components/ui/slab";
 import {
   Sheet,
   SheetDescription,
@@ -42,6 +43,10 @@ type SidebarContextProps = {
   setOpenMobile: (open: boolean) => void;
   isMobile: boolean;
   toggleSidebar: () => void;
+  /** Captures visibility in memory once, until restore consumes the snapshot. */
+  saveSidebarState: () => void;
+  /** Restores both visibility modes; does nothing without a saved snapshot. */
+  restoreSidebarState: () => void;
 };
 
 type SidebarResizableOptions = {
@@ -96,6 +101,12 @@ function useSidebarVisibility() {
   return isMobile ? openMobile : open;
 }
 
+/**
+ * Owns desktop and drawer visibility, toggle actions, and an in-memory panel snapshot.
+ * defaultOpen seeds uncontrolled desktop visibility; open/onOpenChange allow control.
+ * Desktop changes retain the existing cookie behavior; snapshots do not persist.
+ * Native div props, children, and CSS geometry pass through to the shared wrapper.
+ */
 function SidebarProvider({
   defaultOpen = true,
   open: openProp,
@@ -148,6 +159,7 @@ function SidebarProvider({
   // We add a state so that we can do data-state="expanded" or "collapsed".
   // This makes it easier to style the sidebar with Tailwind classes.
   const state = resolveSidebarState({ isMobile, open, openMobile });
+  const savedVisibility = React.useRef<{ open: boolean; openMobile: boolean } | null>(null);
 
   const contextValue = React.useMemo<SidebarContextProps>(
     () => ({
@@ -160,6 +172,17 @@ function SidebarProvider({
       setOpenMobile,
       state,
       toggleSidebar,
+      saveSidebarState() {
+        // Preserve the first snapshot if a panel changes tabs while the sidebar is hidden.
+        savedVisibility.current ??= { open, openMobile };
+      },
+      restoreSidebarState() {
+        const saved = savedVisibility.current;
+        if (!saved) return;
+        savedVisibility.current = null;
+        if (saved.open !== open) void setOpen(saved.open);
+        setOpenMobile(saved.openMobile);
+      },
     }),
     [
       state,
@@ -212,7 +235,7 @@ function Sidebar({
   ...props
 }: React.ComponentProps<"div"> & {
   side?: "left" | "right";
-  variant?: "sidebar" | "floating" | "inset";
+  variant?: "sidebar" | "floating" | "inset" | "frame";
   collapsible?: "offcanvas" | "icon" | "none";
   resizable?: boolean | SidebarResizableOptions;
 }) {
@@ -327,19 +350,34 @@ function Sidebar({
             // Adjust the padding for floating and inset variants.
             variant === "floating" || variant === "inset"
               ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]"
-              : "group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[side=left]:border-r group-data-[side=right]:border-l",
+              : variant === "frame"
+                ? "group-data-[collapsible=icon]:w-(--sidebar-width-icon)"
+                : "group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[side=left]:border-r group-data-[side=right]:border-l",
             className,
           )}
           data-slot="sidebar-container"
           {...props}
         >
-          <div
-            className="flex h-full w-full flex-col bg-sidebar surface-grain group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow-sm/5"
-            data-sidebar="sidebar"
-            data-slot="sidebar-inner"
-          >
-            {children}
-          </div>
+          {variant === "frame" ? (
+            <Slab
+              tone="sidebar"
+              radius="slab"
+              elevation="slab-frame"
+              className="stone-sidebar flex h-full min-h-0 w-full flex-col overflow-hidden"
+              data-sidebar="sidebar"
+              data-slot="sidebar-inner"
+            >
+              {children}
+            </Slab>
+          ) : (
+            <div
+              className="flex h-full w-full flex-col bg-sidebar surface-grain group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow-sm/5"
+              data-sidebar="sidebar"
+              data-slot="sidebar-inner"
+            >
+              {children}
+            </div>
+          )}
         </div>
       </div>
     </SidebarInstanceContext>

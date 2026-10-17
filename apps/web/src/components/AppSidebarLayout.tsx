@@ -1,3 +1,4 @@
+/** Composes the shared titlebar and stone workspace grid; routes own their inner panels. */
 import { t } from "~/i18n";
 import { useAtomValue } from "@effect/atom-react";
 import * as Schema from "effect/Schema";
@@ -41,16 +42,19 @@ import { useSidebarStageBackdropVariant } from "./SidebarStageBackdrop";
 import { useProjects } from "../state/entities";
 import {
   clampThreadSidebarWidth,
-  resolveInitialThreadSidebarWidth,
-  resolveThreadSidebarMaximumWidth,
   resolveThreadSidebarMinimumWidth,
-  THREAD_MAIN_CONTENT_MIN_WIDTH,
   THREAD_SIDEBAR_WIDTH_STORAGE_KEY,
 } from "./threadSidebarWidth";
 import { Sidebar, SidebarProvider, SidebarRail, SidebarTrigger, useSidebar } from "./ui/sidebar";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 import { WindowTitlebar } from "./frame/WindowTitlebar";
 import { TitlebarSlotProvider } from "./frame/titlebarSlot";
+import { Slab } from "./ui/slab";
+import {
+  resolveFrameGeometry,
+  resolveFrameInitialSidebarWidth,
+  resolveFrameSidebarMaximumWidth,
+} from "./frame/frameGeometry";
 
 const MACOS_TRAFFIC_LIGHTS_LEFT_INSET = "var(--desktop-window-controls-inset, 90px)";
 
@@ -63,15 +67,30 @@ function readViewportWidth(): number {
   return window.innerWidth;
 }
 
+/** Reads the CSS frame contract so resize limits reserve the project rail and gutters. */
+function readFrameGeometry() {
+  const styles = getComputedStyle(document.documentElement);
+  const pixels = (name: string) => Number.parseFloat(styles.getPropertyValue(name));
+  return resolveFrameGeometry({
+    sidebarWidth: pixels("--frame-sidebar-width"),
+    projectbarWidth: pixels("--frame-projectbar-width"),
+    paddingInline: pixels("--frame-padding-inline"),
+    slabGap: pixels("--frame-slab-gap"),
+  });
+}
+
+/** Restores a user's drag width, or the frame's design width when no preference exists. */
 function readInitialThreadSidebarWidth(): number {
+  const frame = readFrameGeometry();
   try {
-    return resolveInitialThreadSidebarWidth(
+    return resolveFrameInitialSidebarWidth(
       getLocalStorageItem(THREAD_SIDEBAR_WIDTH_STORAGE_KEY, Schema.Finite),
       window.innerWidth,
+      frame,
     );
   } catch (error) {
     console.error("Could not read persisted thread sidebar width.", error);
-    return resolveInitialThreadSidebarWidth(null, window.innerWidth);
+    return resolveFrameInitialSidebarWidth(null, window.innerWidth, frame);
   }
 }
 
@@ -238,15 +257,20 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
   // that would otherwise refresh a render-time snapshot.
   const viewportWidth = useSyncExternalStore(subscribeToViewportWidth, readViewportWidth);
   const [titlebarLeadingWidth, setTitlebarLeadingWidth] = useState(0);
+  const [frame] = useState(readFrameGeometry);
   const sidebarMinimumWidth = resolveThreadSidebarMinimumWidth(titlebarLeadingWidth);
-  const sidebarMaximumWidth = resolveThreadSidebarMaximumWidth(viewportWidth, sidebarMinimumWidth);
+  const sidebarMaximumWidth = resolveFrameSidebarMaximumWidth(
+    viewportWidth,
+    sidebarMinimumWidth,
+    frame,
+  );
   const resetSidebarWidth = () => {
     try {
       removeLocalStorageItem(THREAD_SIDEBAR_WIDTH_STORAGE_KEY);
     } catch (error) {
       console.error("Could not clear persisted thread sidebar width.", error);
     }
-    setSidebarWidth(resolveInitialThreadSidebarWidth(null, viewportWidth));
+    setSidebarWidth(resolveFrameInitialSidebarWidth(null, viewportWidth, frame));
   };
   const [isWindowFullscreen, setIsWindowFullscreen] = useState(() => {
     const getWindowFullscreenState = window.desktopBridge?.getWindowFullscreenState;
@@ -305,51 +329,77 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
   return (
     <PanelAnimationSuppressionProvider value={panelAnimationsSuppressed}>
       <TitlebarSlotProvider>
-        <SidebarProvider
-          className="h-dvh! min-h-0! flex-col"
-          data-panel-animations={routePanelAnimationsActive ? "true" : "false"}
-          defaultOpen
-          style={sidebarProviderStyle}
-        >
-          <WindowTitlebar
-            sidebarControl={<SidebarControl />}
-            onLeadingWidthChange={setTitlebarLeadingWidth}
-          />
-          {/* Bound route heights to the space left by the titlebar, not their content. */}
-          <div className="window-frame-workspace flex h-0 min-h-0 w-full flex-1">
-            <ProjectProjectionRetention />
-            <Sidebar
-              side="left"
-              collapsible="offcanvas"
-              data-app-sidebar=""
-              role="navigation"
-              aria-label={isOnSettings ? t.sidebar.chrome.settings : t.sidebar.chrome.threads}
-              resizable={{
-                maxWidth: sidebarMaximumWidth,
-                minWidth: sidebarMinimumWidth,
-                shouldAcceptWidth: ({ currentWidth, nextWidth, wrapper }) =>
-                  nextWidth <= currentWidth ||
-                  wrapper.clientWidth - nextWidth >= THREAD_MAIN_CONTENT_MIN_WIDTH,
-                storageKey: THREAD_SIDEBAR_WIDTH_STORAGE_KEY,
-                onResize: setSidebarWidth,
-              }}
-              // The narrow-window sidebar is a sheet, portaled outside the provider's styles.
-              style={windowControlsInsetStyle}
-            >
-              {isOnSettings ? (
-                <SettingsSidebarNav pathname={pathname} />
-              ) : legacySidebarEnabled ? (
-                <LegacyThreadSidebar />
-              ) : (
-                <ThreadSidebar />
-              )}
-              <SidebarRail onDoubleClick={resetSidebarWidth} />
-            </Sidebar>
-            {children}
-            <NavigationHistoryShortcuts />
-            <MainAppLocationTracker />
-          </div>
-        </SidebarProvider>
+        <div className="window-frame-shell stone-base h-dvh min-h-0">
+          <SidebarProvider
+            className="grid! h-full! min-h-0! grid-rows-[var(--workspace-topbar-height)_minmax(0,1fr)]"
+            data-app-shell=""
+            data-panel-animations={routePanelAnimationsActive ? "true" : "false"}
+            defaultOpen
+            style={sidebarProviderStyle}
+          >
+            <WindowTitlebar
+              sidebarControl={<SidebarControl />}
+              onLeadingWidthChange={setTitlebarLeadingWidth}
+            />
+            {/* Bound route heights to the space left by the titlebar, not their content. */}
+            <div className="window-frame-workspace grid min-h-0 min-w-0">
+              <ProjectProjectionRetention />
+              {/* FR2 supplies the project controls; reserve their design column now. */}
+              <div
+                className="window-frame-projectbar"
+                data-frame-projectbar=""
+                aria-hidden="true"
+              />
+              <Sidebar
+                side="left"
+                variant="frame"
+                collapsible="offcanvas"
+                data-app-sidebar=""
+                role="navigation"
+                aria-label={isOnSettings ? t.sidebar.chrome.settings : t.sidebar.chrome.threads}
+                resizable={{
+                  maxWidth: sidebarMaximumWidth,
+                  minWidth: sidebarMinimumWidth,
+                  shouldAcceptWidth: ({ currentWidth, nextWidth, wrapper }) =>
+                    nextWidth <= currentWidth ||
+                    nextWidth <=
+                      resolveFrameSidebarMaximumWidth(
+                        wrapper.clientWidth,
+                        sidebarMinimumWidth,
+                        frame,
+                      ),
+                  storageKey: THREAD_SIDEBAR_WIDTH_STORAGE_KEY,
+                  onResize: setSidebarWidth,
+                }}
+                // The narrow-window sidebar is a sheet, portaled outside the provider's styles.
+                style={windowControlsInsetStyle}
+              >
+                {isOnSettings ? (
+                  <SettingsSidebarNav pathname={pathname} />
+                ) : legacySidebarEnabled ? (
+                  <LegacyThreadSidebar />
+                ) : (
+                  <ThreadSidebar />
+                )}
+                <SidebarRail onDoubleClick={resetSidebarWidth} />
+              </Sidebar>
+              <div className="window-frame-main flex min-h-0 min-w-0 flex-col">
+                <Slab
+                  tone="card"
+                  radius="slab"
+                  elevation="slab-frame"
+                  className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+                  render={<div className="stone-frame-card" />}
+                  data-frame-main=""
+                >
+                  {children}
+                </Slab>
+              </div>
+              <NavigationHistoryShortcuts />
+              <MainAppLocationTracker />
+            </div>
+          </SidebarProvider>
+        </div>
       </TitlebarSlotProvider>
     </PanelAnimationSuppressionProvider>
   );

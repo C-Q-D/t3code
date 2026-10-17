@@ -12,6 +12,154 @@
   --spacing-brand-groove: 2.5px;
   --color-brand-groove: #6a6a72;
   --shadow-brand-engraving: 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 1px 1px rgba(0, 0, 0, 0.77);
+
+  /* StyleM-8a.dc.html · main slab: stone under an 86% card-color veil. */
+  --color-frame-card-veil: rgba(32, 32, 35, 0.86);
+}
+
+@utility stone-frame-card {
+  background-image:
+    linear-gradient(var(--color-frame-card-veil), var(--color-frame-card-veil)),
+    url("../assets/stone-8a.webp");
+  background-repeat: repeat;
+}
+
+/* Both rows use the WCO-aware titlebar height; never subtract a second baseline. */
+.window-frame-shell {
+  --workspace-topbar-height: max(
+    var(--frame-titlebar-height),
+    env(titlebar-area-height, var(--frame-titlebar-height))
+  );
+}
+
+.window-frame-workspace {
+  grid-template-columns: var(--frame-projectbar-width) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  column-gap: var(--frame-slab-gap);
+  padding: var(--frame-padding);
+}
+
+.window-frame-projectbar {
+  grid-column: 1;
+  grid-row: 1;
+  min-height: 0;
+}
+
+.window-frame-main {
+  grid-column: -2 / -1;
+  grid-row: 1;
+}
+
+/* Page roots already own their scroll containers and height. The frame supplies
+   the card surface so their old background/grain must not cover the stone. */
+.window-frame-main > [data-frame-main] > :is([data-slot="sidebar-inset"], .bg-background) {
+  background: transparent;
+}
+
+/* These variables inherit through the entire main subtree: bg-background uses
+   the slab color and surface-grain loses the old texture, so main content shares
+   one stone-colored foundation. The titlebar, sidebar, and external portals are outside it. */
+html[data-theme-id="graphite"] [data-frame-main] {
+  --background: var(--card);
+  --surface-grain: none;
+}
+
+/* Keep the existing 768px sheet breakpoint until FR3 replaces it. max-content
+   follows sidebar-gap's drag width, without restyling the entire app each frame. */
+@media (min-width: 768px) {
+  .window-frame-workspace:has(> [data-variant="frame"]) {
+    grid-template-columns: var(--frame-projectbar-width) max-content minmax(0, 1fr);
+    /* Put the first gutter on the collapsing sidebar and the second on main.
+       Main's gutter remains when the sidebar disappears, without a 16px jump. */
+    column-gap: 0;
+  }
+
+  .window-frame-workspace:has(> [data-variant="frame"][data-collapsible="offcanvas"]) {
+    grid-template-columns: var(--frame-projectbar-width) minmax(0, 1fr);
+  }
+
+  .window-frame-workspace:has(> [data-variant="frame"]) > .window-frame-main {
+    margin-inline-start: var(--frame-slab-gap);
+  }
+
+  .window-frame-workspace > [data-variant="frame"] {
+    position: relative;
+    grid-column: 2;
+    grid-row: 1;
+    min-height: 0;
+    margin-inline-start: var(--frame-slab-gap);
+  }
+
+  .window-frame-workspace > [data-variant="frame"][data-collapsible="offcanvas"] {
+    display: none;
+    margin-inline-start: 0;
+  }
+
+  /* The grid owns sidebar position and height, including the bottom gutter.
+     Leave the resize rail outside the clipped inner slab. */
+  .window-frame-workspace > [data-variant="frame"] > [data-slot="sidebar-container"] {
+    position: absolute;
+    inset: 0 auto 0 0;
+    height: 100%;
+    padding: 0;
+    border: 0;
+  }
+
+  .window-frame-workspace
+    > [data-variant="frame"][data-collapsible="offcanvas"]
+    > [data-slot="sidebar-container"] {
+    left: calc(var(--sidebar-width) * -1);
+  }
+
+  /* Reuse the gap's existing width transition and panel animation gate. Display
+     stays rendered through exit; the track list changes only when exit finishes.
+     On entry the three tracks return immediately while starting-style seeds zero width. */
+  [data-app-shell][data-panel-animations="true"]
+    .window-frame-workspace:has(> [data-variant="frame"][data-collapsible="offcanvas"]) {
+    transition: grid-template-columns var(--panel-animation-duration) step-end allow-discrete;
+  }
+
+  [data-app-shell][data-panel-animations="true"] .window-frame-workspace > [data-variant="frame"] {
+    transition:
+      display var(--panel-animation-duration) allow-discrete,
+      margin-inline-start var(--panel-animation-duration) ease-out;
+  }
+
+  @starting-style {
+    [data-app-shell][data-panel-animations="true"]
+      .window-frame-workspace
+      > [data-variant="frame"] {
+      margin-inline-start: 0;
+    }
+
+    [data-app-shell][data-panel-animations="true"]
+      .window-frame-workspace
+      > [data-variant="frame"]
+      > [data-slot="sidebar-gap"] {
+      width: 0;
+    }
+
+    [data-app-shell][data-panel-animations="true"]
+      .window-frame-workspace
+      > [data-variant="frame"]
+      > [data-slot="sidebar-container"] {
+      left: calc(var(--sidebar-width) * -1);
+    }
+  }
+
+  /* The hook normally closes the animation gate too; this covers a preference
+     change immediately, including a transition already running in the renderer. */
+  @media (prefers-reduced-motion: reduce) {
+    [data-app-shell][data-panel-animations="true"]
+      .window-frame-workspace:has(> [data-variant="frame"][data-collapsible="offcanvas"]),
+    [data-app-shell][data-panel-animations="true"] .window-frame-workspace > [data-variant="frame"],
+    [data-app-shell][data-panel-animations="true"]
+      .window-frame-workspace
+      > [data-variant="frame"]
+      > [data-slot] {
+      transition: none;
+    }
+  }
 }
 
 /* StyleM-8a: the titlebar shares the stone base; texture belongs to FR1 grid. */
@@ -51,11 +199,4 @@
 .window-titlebar .no-drag,
 .window-titlebar .no-drag * {
   -webkit-app-region: no-drag;
-}
-
-/* The sidebar is viewport-fixed, so match the shell's dynamic viewport and the
-   titlebar's WCO-aware height rather than the static 48px design token. */
-.window-frame-workspace [data-slot="sidebar-container"] {
-  top: var(--workspace-topbar-height);
-  height: calc(100dvh - var(--workspace-topbar-height));
 }
