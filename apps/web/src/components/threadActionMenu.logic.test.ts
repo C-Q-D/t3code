@@ -3,7 +3,9 @@ import { describe, expect, it } from "vite-plus/test";
 
 import {
   buildDraftActionMenuItems,
+  buildSidebarThreadActionMenuItems,
   buildThreadActionMenuItems,
+  threadActionRequiresOperate,
   type ThreadActionMenuState,
 } from "./threadActionMenu.logic";
 
@@ -39,6 +41,158 @@ function allIds(state: ThreadActionMenuState): string[] {
     items.flatMap((item) => [item.id, ...(item.children ? flatten(item.children) : [])]);
   return flatten(buildThreadActionMenuItems(state));
 }
+
+describe("buildSidebarThreadActionMenuItems", () => {
+  it.each([false, true])("shows discard only with user draft content (%s)", (hasDraft) => {
+    const items = buildSidebarThreadActionMenuItems({ ...baseState, hasDraft });
+    expect(items.some((item) => item.id === "discard-draft")).toBe(hasDraft);
+  });
+
+  it.each([false, true])("keeps wake visible and gates it by snooze state (%s)", (isSnoozed) => {
+    const items = buildSidebarThreadActionMenuItems({ ...baseState, hasDraft: false, isSnoozed });
+    const wake = items.find((item) => item.id === "unsnooze");
+    const snooze = items.find((item) => item.id === "snooze");
+    expect(wake).toBeDefined();
+    expect(wake?.disabled === true).toBe(!isSnoozed);
+    expect(snooze).toBeDefined();
+    expect(snooze?.disabled === true).toBe(isSnoozed);
+  });
+
+  it("follows V2 groups, flattens copy actions and retains project filtering", () => {
+    const items = buildSidebarThreadActionMenuItems({
+      ...baseState,
+      branch: "main",
+      hasDraft: true,
+      projectFilter: { label: "Project", isActive: false },
+    });
+    expect(items.map((item) => item.id)).toEqual([
+      "rename",
+      "regenerate-title",
+      "mark-unread",
+      "pin",
+      "settle",
+      "unsnooze",
+      "snooze",
+      "copy-path",
+      "copy-branch",
+      "copy-thread-id",
+      "export-transcript",
+      "new-thread-on-branch",
+      "project-settings",
+      "filter-by-project",
+      "auto-settle",
+      "discard-draft",
+      "archive",
+      "delete",
+    ]);
+    expect(items.filter((item) => item.separatorBefore).map((item) => item.id)).toEqual([
+      "pin",
+      "copy-path",
+      "new-thread-on-branch",
+      "discard-draft",
+    ]);
+    expect(items.find((item) => item.id === "auto-settle")?.children).toEqual([
+      { id: "auto-settle:enabled", label: "Enabled", checked: true },
+      { id: "auto-settle:disabled", label: "Disabled", checked: false },
+    ]);
+    expect(items.at(-1)).toMatchObject({ id: "delete", destructive: true });
+  });
+
+  it("keeps unsupported and missing-branch V2 actions visible but unavailable", () => {
+    const items = buildSidebarThreadActionMenuItems({
+      ...baseState,
+      hasDraft: false,
+      supports: {
+        settlement: false,
+        autoSettleOptOut: false,
+        snooze: false,
+        pinning: false,
+        titleRegeneration: false,
+      },
+    });
+    for (const id of [
+      "pin",
+      "settle",
+      "unsnooze",
+      "snooze",
+      "regenerate-title",
+      "auto-settle",
+      "copy-branch",
+      "new-thread-on-branch",
+    ]) {
+      expect(
+        items.find((item) => item.id === id),
+        id,
+      ).toMatchObject({ disabled: true });
+    }
+  });
+
+  it("preserves operate gating and running-state archive restrictions", () => {
+    const items = buildSidebarThreadActionMenuItems({
+      ...baseState,
+      hasDraft: true,
+      canOperate: false,
+      isSnoozed: true,
+      isRunning: true,
+    });
+    for (const id of [
+      "rename",
+      "regenerate-title",
+      "pin",
+      "settle",
+      "unsnooze",
+      "auto-settle",
+      "export-transcript",
+      "archive",
+      "delete",
+    ]) {
+      expect(
+        items.find((item) => item.id === id),
+        id,
+      ).toMatchObject({ disabled: true });
+    }
+    for (const id of [
+      "mark-unread",
+      "copy-path",
+      "copy-thread-id",
+      "project-settings",
+      "discard-draft",
+    ]) {
+      expect(items.find((item) => item.id === id)?.disabled, id).not.toBe(true);
+    }
+    expect(threadActionRequiresOperate("discard-draft")).toBe(false);
+    expect(
+      buildSidebarThreadActionMenuItems({ ...baseState, hasDraft: false, isRunning: true }).find(
+        (item) => item.id === "archive",
+      )?.disabled,
+    ).toBe(true);
+  });
+
+  it("leaves titlebar ordering, copy submenu and snooze visibility unchanged", () => {
+    buildSidebarThreadActionMenuItems({ ...baseState, hasDraft: true });
+    expect(ids(baseState)).toEqual([
+      "pin",
+      "settle",
+      "snooze",
+      "rename",
+      "regenerate-title",
+      "mark-unread",
+      "auto-settle",
+      "copy",
+      "export-transcript",
+      "project-settings",
+      "archive",
+      "delete",
+    ]);
+    expect(
+      buildThreadActionMenuItems(baseState)
+        .find((item) => item.id === "copy")
+        ?.children?.map((item) => item.id),
+    ).toEqual(["copy-path", "copy-thread-id"]);
+    expect(ids({ ...baseState, isSnoozed: true })).toContain("unsnooze");
+    expect(ids({ ...baseState, isSnoozed: true })).not.toContain("snooze");
+  });
+});
 
 describe("buildThreadActionMenuItems", () => {
   it.each([false, true])(

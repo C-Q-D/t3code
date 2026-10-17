@@ -68,6 +68,9 @@ import {
   MenuPopup,
   MenuItem,
   MenuCheckboxItem,
+  MenuRadioGroup,
+  MenuRadioItem,
+  MenuRadioItemIndicator,
   MenuSeparator,
   MenuSub,
   MenuSubTrigger,
@@ -127,20 +130,47 @@ const threadMenuIcons = {
   trash: TrashIcon,
 };
 
-/** Renders the shared action model with H2 menu rows, preserving disabled and checked states. */
-function ThreadMenuItems({
+/** Renders H2 action rows; optional label and choice slots leave titlebar defaults intact. */
+export function ThreadMenuItems({
   items,
   onSelect,
+  renderLabel,
+  radioChoices = false,
 }: {
   items: readonly ContextMenuItem<ThreadActionMenuId>[];
   onSelect: (action: ThreadActionMenuId) => void;
+  /** Sidebar supplies V2 labels; the titlebar keeps its existing icon labels. */
+  renderLabel?: ((item: ContextMenuItem<ThreadActionMenuId>) => ReactNode) | undefined;
+  /** V2 uses mutually exclusive choices with a trailing check. */
+  radioChoices?: boolean;
 }) {
+  if (radioChoices && items.length > 0 && items.every((item) => item.checked !== undefined)) {
+    return (
+      <MenuRadioGroup value={items.find((item) => item.checked)?.id ?? ""}>
+        {items.map((item) => (
+          <MenuRadioItem
+            key={item.id}
+            value={item.id}
+            disabled={item.disabled}
+            onClick={() => onSelect(item.id)}
+          >
+            <span className="flex items-center gap-2.5">
+              {renderLabel ? renderLabel(item) : item.label}
+              {item.checked ? <MenuRadioItemIndicator /> : null}
+            </span>
+          </MenuRadioItem>
+        ))}
+      </MenuRadioGroup>
+    );
+  }
   return items.map((item) => {
     const Icon =
       item.icon && item.icon in threadMenuIcons
         ? threadMenuIcons[item.icon as keyof typeof threadMenuIcons]
         : null;
-    const label = (
+    const label = renderLabel ? (
+      renderLabel(item)
+    ) : (
       <>
         {Icon ? <Icon /> : null}
         <span>{item.label}</span>
@@ -153,7 +183,12 @@ function ThreadMenuItems({
           <MenuSub>
             <MenuSubTrigger disabled={item.disabled}>{label}</MenuSubTrigger>
             <MenuSubPopup>
-              <ThreadMenuItems items={item.children} onSelect={onSelect} />
+              <ThreadMenuItems
+                items={item.children}
+                onSelect={onSelect}
+                renderLabel={renderLabel}
+                radioChoices={radioChoices}
+              />
             </MenuSubPopup>
           </MenuSub>
         ) : item.checked !== undefined ? (

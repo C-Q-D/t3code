@@ -30,6 +30,7 @@ export type ThreadActionMenuId =
   | "copy-branch"
   | "export-transcript"
   | "copy-thread-id"
+  | "discard-draft"
   | "archive"
   | "delete";
 
@@ -133,13 +134,13 @@ export function threadActionRequiresOperate(action: ThreadActionMenuId): boolean
     "copy-path",
     "copy-branch",
     "copy-thread-id",
+    "discard-draft",
   ].includes(action);
 }
 
 /**
- * Single source for the per-thread action menu: the sidebar row's right-click
- * menu and the chat header menu share labels, ordering, and capability gating.
- * Each surface supplies state for the actions it supports.
+ * Builds the titlebar menu and the base commands used by the sidebar adapter.
+ * Sidebar presentation has its own ordering while retaining these permission rules.
  * @param state Current destination permissions, thread lifecycle and optional capabilities.
  * @returns Ordered menu entries; export follows Copy at the top level and is disabled without operate.
  * This function performs no mutations; callers recheck grants when an item is selected.
@@ -304,4 +305,95 @@ export function buildThreadActionMenuItems(
             }
           : item,
       );
+}
+
+/**
+ * Adapts commands to V2 groups without changing the titlebar menu.
+ * @param state Menu-open snapshot; hasDraft means unsent user content, including attachments.
+ * @returns Ordered rows with disabled placeholders for missing capabilities or branches.
+ * Discard stays local; callers recheck server grants before executing other guarded actions.
+ */
+export function buildSidebarThreadActionMenuItems(
+  state: ThreadActionMenuState & { readonly hasDraft: boolean },
+): ReadonlyArray<ContextMenuItem<ThreadActionMenuId>> {
+  // Derive every V2 command, then disable unavailable capabilities instead of
+  // hiding them. The titlebar keeps its existing capability-based visibility.
+  const commands = buildThreadActionMenuItems({
+    ...state,
+    isSnoozed: false,
+    supports: {
+      settlement: true,
+      autoSettleOptOut: true,
+      snooze: true,
+      pinning: true,
+      titleRegeneration: true,
+    },
+  });
+  const command = (
+    id: ThreadActionMenuId,
+    available = true,
+  ): ContextMenuItem<ThreadActionMenuId> => {
+    const item = commands.find((candidate) => candidate.id === id);
+    if (!item) throw new Error(`Missing sidebar thread command: ${id}`);
+    const { separatorBefore: _separatorBefore, ...row } = item;
+    const disabled = item.disabled === true || !available;
+    return {
+      ...row,
+      disabled,
+      ...(disabled && row.children
+        ? { children: row.children.map((child) => ({ ...child, disabled: true })) }
+        : {}),
+    };
+  };
+  const items: ContextMenuItem<ThreadActionMenuId>[] = [
+    command("rename"),
+    command("regenerate-title", state.supports.titleRegeneration),
+    command("mark-unread"),
+    { ...command(state.isPinned ? "unpin" : "pin", state.supports.pinning), separatorBefore: true },
+    command(state.isSettled ? "unsettle" : "settle", state.supports.settlement),
+    {
+      id: "unsnooze",
+      label: t.sidebar.actions.wake,
+      icon: "clock",
+      disabled: !state.canOperate || !state.supports.snooze || !state.isSnoozed,
+    },
+    {
+      ...command("snooze", state.supports.snooze && !state.isSnoozed),
+      label: t.sidebar.actions.snooze,
+    },
+    { id: "copy-path", label: t.sidebar.actions.copyPath, icon: "folder", separatorBefore: true },
+    {
+      id: "copy-branch",
+      label: t.sidebar.actions.copyBranch,
+      icon: "git-branch",
+      disabled: !state.branch,
+    },
+    { id: "copy-thread-id", label: t.sidebar.actions.copyThreadId, icon: "hash" },
+    command("export-transcript"),
+    {
+      id: "new-thread-on-branch",
+      label: state.branch
+        ? t.sidebar.thread.newThreadOnBranch(state.branch)
+        : t.sidebar.actions.newThreadOnBranchUnavailable,
+      icon: "message-square-plus",
+      disabled: !state.branch,
+      separatorBefore: true,
+    },
+    command("project-settings"),
+    ...(state.projectFilter ? [command("filter-by-project")] : []),
+    command("auto-settle", state.supports.autoSettleOptOut),
+    ...(state.hasDraft
+      ? [
+          {
+            id: "discard-draft" as const,
+            label: t.sidebar.thread.discardDraft,
+            icon: "trash",
+            separatorBefore: true,
+          },
+        ]
+      : []),
+    { ...command("archive"), label: t.sidebar.actions.archive, separatorBefore: !state.hasDraft },
+    command("delete"),
+  ];
+  return items;
 }

@@ -2,13 +2,18 @@
 import { t } from "~/i18n";
 import { serverEnvironment } from "../state/server";
 import { useAtomCommand } from "../state/use-atom-command";
-import { type EnvironmentId, type ScopedProjectRef } from "@t3tools/contracts";
+import {
+  type ContextMenuItem,
+  type EnvironmentId,
+  type ScopedProjectRef,
+} from "@t3tools/contracts";
 import { ThreadHoverCard, ThreadHoverCardPopup } from "./ThreadHoverCard";
 import {
   setThreadChangeRequestSnapshot,
   ThreadTerminalStatusButton,
 } from "./ThreadStatusIndicators";
 import { ThreadContextDragGhost } from "./chat/ThreadContextDragGhost";
+import { ThreadMenuItems } from "./chat/ChatHeader";
 import {
   dropThreadContext,
   endThreadContextDrag,
@@ -179,8 +184,9 @@ import { cn } from "~/lib/utils";
 import { EnvironmentMachineIcon } from "./EnvironmentMachineIcon";
 import {
   buildDraftActionMenuItems,
-  buildThreadActionMenuItems,
+  buildSidebarThreadActionMenuItems,
   threadActionRequiresOperate,
+  type ThreadActionMenuId,
 } from "./threadActionMenu.logic";
 import {
   animateSidebarLayoutChanges,
@@ -1100,7 +1106,11 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
   onCancelRename: () => void;
   isRenaming: boolean;
   renamingTitle: string;
-  onContextMenu: (threadRef: ScopedThreadRef, position: { x: number; y: number }) => void;
+  onContextMenu: (
+    threadRef: ScopedThreadRef,
+    position: { x: number; y: number },
+    trigger?: HTMLElement,
+  ) => void;
   onSettle: (threadRef: ScopedThreadRef) => void;
   onActionSweepStart: (
     threadRef: ScopedThreadRef,
@@ -1340,18 +1350,27 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
   const handleContextMenu = useCallback(
     (event: ReactMouseEvent) => {
       event.preventDefault();
-      onContextMenu(threadRef, { x: event.clientX, y: event.clientY });
+      const trigger = event.currentTarget instanceof HTMLElement ? event.currentTarget : undefined;
+      onContextMenu(threadRef, { x: event.clientX, y: event.clientY }, trigger);
     },
     [onContextMenu, threadRef],
   );
   const handleKeyDown = useCallback(
     (event: ReactKeyboardEvent) => {
       if (event.target !== event.currentTarget) return;
+      if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
+        event.preventDefault();
+        const trigger =
+          event.currentTarget instanceof HTMLElement ? event.currentTarget : undefined;
+        const rect = event.currentTarget.getBoundingClientRect();
+        onContextMenu(threadRef, { x: rect.left, y: rect.bottom }, trigger);
+        return;
+      }
       if (event.key !== "Enter" && event.key !== " ") return;
       event.preventDefault();
       onThreadActivate(threadRef);
     },
-    [onThreadActivate, threadRef],
+    [onContextMenu, onThreadActivate, threadRef],
   );
   const handleDoubleClick = useCallback(
     (event: ReactMouseEvent) => {
@@ -4379,14 +4398,57 @@ export default function Sidebar() {
   const exportTranscript = useAtomCommand(serverEnvironment.exportTranscript, {
     reportFailure: false,
   });
+  const [threadContextMenu, setThreadContextMenu] = useState<{
+    items: readonly ContextMenuItem<ThreadActionMenuId>[];
+    position: { x: number; y: number };
+  } | null>(null);
+  const threadMenuResolutionRef = useRef<((action: ThreadActionMenuId | null) => void) | null>(
+    null,
+  );
+  const threadMenuFocusRef = useRef<HTMLElement | null>(null);
+  const finishThreadContextMenu = useCallback((action: ThreadActionMenuId | null = null) => {
+    const resolve = threadMenuResolutionRef.current;
+    threadMenuResolutionRef.current = null;
+    setThreadContextMenu(null);
+    resolve?.(action);
+  }, []);
+  // Resolve cancellation before navigation or unmount can leave an old action pending.
+  useEffect(() => () => finishThreadContextMenu(), [routeThreadKey, finishThreadContextMenu]);
+  const threadMenuAnchor = useMemo(
+    () => ({
+      getBoundingClientRect: () =>
+        DOMRect.fromRect({
+          x: threadContextMenu?.position.x ?? 0,
+          y: threadContextMenu?.position.y ?? 0,
+        }),
+    }),
+    [threadContextMenu?.position.x, threadContextMenu?.position.y],
+  );
+  const showThreadContextMenu = useCallback(
+    (
+      items: readonly ContextMenuItem<ThreadActionMenuId>[],
+      position: { x: number; y: number },
+      trigger?: HTMLElement,
+    ) => {
+      finishThreadContextMenu();
+      threadMenuFocusRef.current =
+        trigger ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+      return new Promise<ThreadActionMenuId | null>((resolve) => {
+        threadMenuResolutionRef.current = resolve;
+        setThreadContextMenu({ items, position });
+      });
+    },
+    [finishThreadContextMenu],
+  );
   const handleThreadContextMenu = useCallback(
-    (threadRef: ScopedThreadRef, position: { x: number; y: number }) => {
+    (threadRef: ScopedThreadRef, position: { x: number; y: number }, trigger?: HTMLElement) => {
       void (async () => {
         const api = readLocalApi();
         if (!api) return;
         const threadKey = scopedThreadKey(threadRef);
         const selectionState = useThreadSelectionStore.getState();
         if (selectionState.hasSelection() && selectionState.selectedThreadKeys.has(threadKey)) {
+          finishThreadContextMenu();
           await handleMultiSelectContextMenu(position);
           return;
         }
@@ -4396,9 +4458,7 @@ export default function Sidebar() {
           thread.worktreePath ??
           projectByKey.get(`${thread.environmentId}:${thread.projectId}`)?.workspaceRoot ??
           null;
-        // Un-settle pins the thread active until real activity clears the pin.
-        // Environments without
-        // the settlement capability get no lifecycle items at all.
+        // V2 keeps unavailable lifecycle commands visible; the model disables them.
         const supportsSettlement =
           serverConfigs.get(thread.environmentId)?.environment.capabilities.threadSettlement ===
           true;
@@ -4427,8 +4487,11 @@ export default function Sidebar() {
             ),
           ) ?? null;
         const clicked = await settlePromise(() =>
-          api.contextMenu.show(
-            buildThreadActionMenuItems({
+          showThreadContextMenu(
+            buildSidebarThreadActionMenuItems({
+              hasDraft: composerDraftHasUserContent(
+                useComposerDraftStore.getState().getComposerDraft(threadRef),
+              ),
               canOperate: readEnvironmentScope(
                 threadRef.environmentId,
                 AuthOrchestrationOperateScope,
@@ -4457,6 +4520,7 @@ export default function Sidebar() {
               snoozePresets,
             }),
             position,
+            trigger,
           ),
         );
         if (clicked._tag === "Failure" || clicked.value === null) return;
@@ -4470,6 +4534,9 @@ export default function Sidebar() {
           return;
         }
         switch (clicked.value) {
+          case "discard-draft":
+            discardComposerDraft(threadRef);
+            return;
           case "filter-by-project":
             // This item is the only scope control here, so picking the
             // already-scoped project again is the way back to all projects.
@@ -4692,6 +4759,8 @@ export default function Sidebar() {
       copyPathToClipboard,
       copyThreadIdToClipboard,
       deleteThread,
+      finishThreadContextMenu,
+      showThreadContextMenu,
       handleMultiSelectContextMenu,
       exportTranscript,
       markThreadUnread,
@@ -4827,6 +4896,40 @@ export default function Sidebar() {
   return (
     <>
       <ThreadContextDragGhost />
+      <Menu
+        open={threadContextMenu !== null}
+        modal={false}
+        onOpenChange={(open) => {
+          if (!open) finishThreadContextMenu();
+        }}
+      >
+        {threadContextMenu ? (
+          <MenuPopup
+            anchor={threadMenuAnchor}
+            align="start"
+            sideOffset={0}
+            finalFocus={() =>
+              threadMenuFocusRef.current?.isConnected ? threadMenuFocusRef.current : false
+            }
+          >
+            <ThreadMenuItems
+              items={threadContextMenu.items}
+              onSelect={finishThreadContextMenu}
+              radioChoices
+              renderLabel={(item) => (
+                <>
+                  <span className="min-w-0 max-w-64 flex-1 truncate">{item.label}</span>
+                  {item.id === "auto-settle" ? (
+                    <span className="shrink-0 text-secondary-copy text-secondary-label in-data-disabled:text-current">
+                      {item.children?.find((child) => child.checked)?.label}
+                    </span>
+                  ) : null}
+                </>
+              )}
+            />
+          </MenuPopup>
+        ) : null}
+      </Menu>
       <SidebarThreadDndContext
         sensors={dndSensors}
         autoScroll={!isContextDrag}
