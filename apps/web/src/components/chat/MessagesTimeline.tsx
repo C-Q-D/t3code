@@ -132,6 +132,7 @@ import {
   ChevronDownIcon,
   ChevronRightIcon,
   ChevronUpIcon,
+  ChevronsUpIcon,
   CircleAlertIcon,
   DownloadIcon,
   EyeIcon,
@@ -1746,8 +1747,9 @@ function TimelineHistoryControl(props: MessagesTimelineHistoryControls) {
             disabled={props.loading}
             aria-label={t.chat.timeline.loadEarlierTurns}
             onClick={() => props.onLoadEarlier()}
-            className="w-full py-1.5 text-xs text-muted-foreground/60 hover:text-foreground disabled:cursor-default"
+            className="timeline-history-button"
           >
+            <ChevronsUpIcon aria-hidden="true" className="size-3.5" />
             {props.loading ? t.chat.timeline.loadingEarlierTurns : t.chat.timeline.loadEarlierTurns}
           </button>
         ) : null}

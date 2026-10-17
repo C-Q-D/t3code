@@ -310,10 +310,12 @@ import { resolveChatShortcutCommand, shortcutLabelForCommand } from "../keybindi
 import ThreadTerminalDrawer from "./ThreadTerminalDrawer";
 import {
   AlarmClockIcon,
+  AlarmClockCheckIcon,
   CheckCircle2Icon,
   MessageCircleIcon,
   FileUpIcon,
-  DownloadIcon,
+  HourglassIcon,
+  FolderXIcon,
   GitBranchIcon,
   TargetIcon,
   WifiOffIcon,
@@ -501,6 +503,8 @@ import type {
   ComposerBannerStackItem,
 } from "./chat/ComposerBannerStack";
 import { ThreadStatusLine } from "./chat/ThreadStatusLine";
+import { TimelineBannerAction, TimelineStatusBanners } from "./chat/TimelineStatusBanners";
+import { partitionTimelineBanners } from "./chat/timelineBannerRouting.logic";
 import { formatRelativeTimeLabel, formatRelativeTimeUntilLabel } from "../timestampFormat";
 import { ComposerSurface } from "./chat/ComposerSurface";
 import { resolveThreadSyncPhase } from "../threadSync";
@@ -2567,13 +2571,17 @@ export default function ChatView(props: ChatViewProps) {
         id: `project-clone:${projectId}`,
         variant: "info",
         priority: "activity",
-        icon: <DownloadIcon />,
-        title: t.chat.view.cloning(name),
-        description: projectCloneProgressSummary(activeProjectClone),
+        icon: <HourglassIcon />,
+        title: t.chat.view.cloningRepository,
+        description: (
+          <>
+            {t.chat.view.cloning(name)} {projectCloneProgressSummary(activeProjectClone)}
+          </>
+        ),
         actions: (
           <Button
-            size="xs"
-            variant="ghost"
+            size="md"
+            variant="secondary"
             onClick={() =>
               void runProjectCloneAction(t.chat.view.cancelCloneError, () =>
                 cancelProjectClone({ environmentId, input: { projectId } }),
@@ -2589,21 +2597,26 @@ export default function ChatView(props: ChatViewProps) {
     return {
       id: `project-clone:${projectId}`,
       variant: cancelled ? "warning" : "error",
-      icon: <DownloadIcon />,
-      title: cancelled ? t.chat.view.cancelledCloning(name) : t.chat.view.cloneError(name),
-      description: cancelled ? t.chat.view.retryCloneHint : activeProjectClone.error,
+      icon: <FolderXIcon />,
+      title: t.chat.view.repositoryNotCloned,
+      description: (
+        <>
+          {cancelled ? t.chat.view.cancelledCloning(name) : t.chat.view.cloneError(name)}{" "}
+          {cancelled ? t.chat.view.retryCloneHint : activeProjectClone.error}
+        </>
+      ),
       actions: (
         <>
           <Button
-            size="xs"
-            variant="ghost"
+            size="md"
+            variant="secondary"
             onClick={() => void removeClonedProject({ environmentId, projectId })}
           >
             {t.chat.view.removeProject}
           </Button>
           <Button
-            size="xs"
-            variant="ghost"
+            size="md"
+            variant="secondary"
             onClick={() =>
               void runProjectCloneAction(t.chat.view.retryCloneError, () =>
                 retryProjectClone({ environmentId, input: { projectId } }),
@@ -3132,6 +3145,19 @@ export default function ChatView(props: ChatViewProps) {
           {t.chat.view.disconnectServer}
         </Button>
       ) : undefined;
+    const timelineDisconnectAction =
+      canDisconnectActiveEnvironment && activeEnvironmentUnavailableState ? (
+        <TimelineBannerAction
+          quiet
+          disabled={disconnectingEnvironment}
+          title={t.chat.view.disconnectServerHint}
+          onClick={() =>
+            void handleDisconnectActiveEnvironment(activeEnvironmentUnavailableState.environmentId)
+          }
+        >
+          {t.chat.view.disconnectServer}
+        </TimelineBannerAction>
+      ) : undefined;
     const environmentReconnecting =
       unavailableConnection !== null &&
       (unavailableConnection.phase === "connecting" ||
@@ -3145,7 +3171,7 @@ export default function ChatView(props: ChatViewProps) {
       items.push({
         id: `environment-unavailable:${activeEnvironmentUnavailableState.environmentId}`,
         variant: unavailableConnection.phase === "error" ? "error" : "warning",
-        icon: <WifiOffIcon />,
+        icon: environmentReconnecting ? <HourglassIcon /> : <WifiOffIcon />,
         title: t.chat.view.environmentOffline(
           activeEnvironmentUnavailableState.label,
           environmentReconnecting,
@@ -3153,9 +3179,7 @@ export default function ChatView(props: ChatViewProps) {
         actions: (
           <>
             {!environmentReconnecting ? (
-              <Button
-                size="xs"
-                variant="ghost"
+              <TimelineBannerAction
                 onClick={() =>
                   void handleReconnectActiveEnvironment(
                     activeEnvironmentUnavailableState.environmentId,
@@ -3163,9 +3187,9 @@ export default function ChatView(props: ChatViewProps) {
                 }
               >
                 {t.chat.view.reconnect}
-              </Button>
+              </TimelineBannerAction>
             ) : null}
-            {disconnectAction}
+            {timelineDisconnectAction}
           </>
         ),
       });
@@ -4275,7 +4299,6 @@ export default function ChatView(props: ChatViewProps) {
   )
     ? activeProviderStatus
     : null;
-  const hasTimelineTopBanner = Boolean(timelineThreadError) || visibleProviderStatus !== null;
   const activeProjectCwd = activeProject?.workspaceRoot ?? null;
   const activeThreadWorktreePath = activeThread?.worktreePath ?? null;
   const activeWorkspaceRoot = activeThreadWorktreePath ?? activeProjectCwd ?? undefined;
@@ -7724,13 +7747,8 @@ export default function ChatView(props: ChatViewProps) {
     isStoppingBackgroundWork,
     onOpenRelatedThread,
   ]);
-  // Settled, snoozed, and woke are thread state, not composer actions: each
-  // gets one quiet line after the last message instead of a banner. A woken
-  // thread announces itself here, not just in the sidebar pill. Dismissing
-  // marks the wake as seen (same acknowledgment as the pill); sending a
-  // message clears it as a side effect of the send path.
-  // Memoized: it is the timeline's list footer, and a new element re-renders that footer.
-  // nowMinute keeps the relative time fresh.
+  // T2 thread state lives in the overlay, so relative-time updates do not invalidate the list footer.
+  // Dismissing a wake still acknowledges it; sending still clears it through the existing send path.
   const threadStatusLine = useMemo(() => {
     void nowMinute;
     return activeThreadSnoozed ? (
@@ -7759,8 +7777,9 @@ export default function ChatView(props: ChatViewProps) {
       />
     ) : activeThreadWokeVisible ? (
       <ThreadStatusLine
-        icon={<AlarmClockIcon />}
+        icon={<AlarmClockCheckIcon />}
         label={t.chat.view.wokeFromSnooze}
+        emphasized
         actionLabel={t.chat.view.dismiss}
         onAction={acknowledgeActiveThreadWoke}
       />
@@ -7797,6 +7816,16 @@ export default function ChatView(props: ChatViewProps) {
       activeThread?.modelSelection,
       providerStatuses,
     ],
+  );
+  // Keep the remaining footer independent of banner changes, including relative-time refreshes.
+  const timelineFooter = useMemo(
+    () =>
+      paintOnlyDisplayedTimeline || pendingHandoff === null ? null : (
+        <div className="chat-content-lane">
+          <HandoffRow endpoints={pendingHandoff} providers={providerStatuses} pending />
+        </div>
+      ),
+    [paintOnlyDisplayedTimeline, pendingHandoff, providerStatuses],
   );
   const compactThreadUnavailable =
     !canOperateThread ||
@@ -7915,9 +7944,7 @@ export default function ChatView(props: ChatViewProps) {
       ? { environmentId, ...activeThreadShell.discussion }
       : null,
   );
-  const composerBannerItems = useMemo<
-    (ComposerBannerStackItem | ComposerBannerStackContent)[]
-  >(() => {
+  const chatBannerItems = useMemo<(ComposerBannerStackItem | ComposerBannerStackContent)[]>(() => {
     const discussionSeatItems = discussionSeatBanner === null ? [] : [discussionSeatBanner];
     const limitRecoveryItems = limitRecoveryBanner === null ? [] : [limitRecoveryBanner];
     const backgroundWorkItems = [
@@ -7954,13 +7981,13 @@ export default function ChatView(props: ChatViewProps) {
         icon: <GitBranchIcon />,
         title: (
           <span className="flex min-w-0 items-baseline gap-1.5">
-            <span className="shrink-0 font-normal text-muted-foreground">
+            <span className="shrink-0 font-normal text-warning-foreground">
               {t.chat.view.branchChanged}
             </span>
             <Tooltip>
               <TooltipTrigger
                 render={
-                  <code className="min-w-0 truncate font-medium text-foreground">
+                  <code className="min-w-0 truncate font-medium text-warning-foreground">
                     {localCheckoutBranchMismatch.threadBranch}
                   </code>
                 }
@@ -7976,8 +8003,8 @@ export default function ChatView(props: ChatViewProps) {
         ),
         actions: (
           <Button
-            size="xs"
-            variant="ghost"
+            size="md"
+            variant="secondary"
             disabled={!canWriteSourceControl || isRestoringThreadBranch}
             onClick={handleRestoreThreadBranch}
           >
@@ -8010,6 +8037,11 @@ export default function ChatView(props: ChatViewProps) {
     systemComposerBannerItems,
     usageLimitsBanner,
   ]);
+
+  const { composer: composerBannerItems, timeline: timelineBannerItems } = useMemo(
+    () => partitionTimelineBanners(chatBannerItems),
+    [chatBannerItems],
+  );
 
   useEffect(() => {
     setPendingServerThreadEnvMode(null);
@@ -11509,24 +11541,27 @@ export default function ChatView(props: ChatViewProps) {
             ) : null}
             {/* Banners overlay the timeline without changing its content height. */}
             <div className="chat-banner-lane pointer-events-none absolute top-0 z-20 flex flex-col">
-              <ProviderStatusBanner
-                status={visibleProviderStatus}
-                onDismiss={() => setDismissedProviderStatusBannerKey(providerStatusBannerKey)}
-                onOpenProviderSetup={openProviderSetup}
-              />
-              <ThreadErrorBanner
-                error={timelineThreadError}
-                errorClass={
-                  localServerError === null && visibleThreadError === serverRuntime?.lastError
-                    ? (serverRuntime?.lastErrorClass ?? null)
-                    : null
-                }
-                onDismiss={() => {
-                  setThreadError(activeThread.id, null);
-                  dismissThreadErrorBannerForSession(threadErrorBannerKey);
-                  setThreadErrorBannerDismissTick((tick) => tick + 1);
-                }}
-              />
+              <TimelineStatusBanners items={timelineBannerItems}>
+                <ProviderStatusBanner
+                  status={visibleProviderStatus}
+                  onDismiss={() => setDismissedProviderStatusBannerKey(providerStatusBannerKey)}
+                  onOpenProviderSetup={openProviderSetup}
+                />
+                <ThreadErrorBanner
+                  error={timelineThreadError}
+                  errorClass={
+                    localServerError === null && visibleThreadError === serverRuntime?.lastError
+                      ? (serverRuntime?.lastErrorClass ?? null)
+                      : null
+                  }
+                  onDismiss={() => {
+                    setThreadError(activeThread.id, null);
+                    dismissThreadErrorBannerForSession(threadErrorBannerKey);
+                    setThreadErrorBannerDismissTick((tick) => tick + 1);
+                  }}
+                />
+                {paintOnlyDisplayedTimeline ? null : threadStatusLine}
+              </TimelineStatusBanners>
             </div>
             {/* Messages Wrapper */}
             <div className="relative flex min-h-0 flex-1 flex-col bg-background">
@@ -11562,22 +11597,7 @@ export default function ChatView(props: ChatViewProps) {
                 {...(draftId ? { onWorktreeSetupWorkLocally } : {})}
                 {...(onOpenWorktreeSetupTerminal ? { onOpenWorktreeSetupTerminal } : {})}
                 isPreparingWorktree={!paintOnlyDisplayedTimeline && isPreparingWorktree}
-                footer={
-                  paintOnlyDisplayedTimeline ? null : pendingHandoff === null ? (
-                    threadStatusLine
-                  ) : (
-                    <>
-                      <div className="chat-content-lane">
-                        <HandoffRow
-                          endpoints={pendingHandoff}
-                          providers={providerStatuses}
-                          pending
-                        />
-                      </div>
-                      {threadStatusLine}
-                    </>
-                  )
-                }
+                footer={timelineFooter}
                 listRef={legendListRef}
                 timelineEntries={displayedTimeline.entries}
                 providerStatuses={
@@ -11641,7 +11661,7 @@ export default function ChatView(props: ChatViewProps) {
                 onManualNavigation={cancelTimelineLiveFollowForUserNavigation}
                 cancelPositionRestoreRef={cancelPositionRestoreRef}
                 hideEmptyPlaceholder={isDraftHeroState || threadDetailLoading}
-                topFadeEnabled={!hasTimelineTopBanner}
+                topFadeEnabled
                 {...(paintOnlyDisplayedTimeline || threadHistoryControls === undefined
                   ? {}
                   : { historyControls: threadHistoryControls })}

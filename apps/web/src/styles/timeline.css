@@ -515,3 +515,72 @@
 .timeline-selection-toolbar {
   --lucide-hue-override: currentColor;
 }
+
+/* TL2.2 · 补充屏-1 T2: the history control's pressed well has no shared semantic color. */
+@theme {
+  --color-timeline-history-well: #151517;
+  --color-timeline-history-label: #c4c4ca;
+}
+
+/* Only this overlay is measured for find reveal; it never contributes to list height. */
+.timeline-status-stack {
+  @apply mx-auto flex w-190 max-w-full flex-col gap-2.5 px-3 pt-16;
+}
+
+.timeline-status-stack:empty {
+  display: none;
+}
+
+/* The common stack owns vertical placement; Provider keeps its T1 width and appearance. */
+.timeline-status-stack .timeline-provider-lane {
+  @apply pt-0;
+}
+
+.timeline-status-dismiss {
+  @apply flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent p-0 text-status-warning-foreground;
+  --lucide-hue-override: currentColor;
+}
+
+.timeline-status-dismiss:hover {
+  @apply bg-timeline-dismiss-hover;
+}
+
+.timeline-status-dismiss:focus-visible,
+.timeline-history-button:focus-visible {
+  @apply outline-none inset-shadow-focus;
+}
+
+.timeline-history-button {
+  @apply mx-auto inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-full border-0 bg-timeline-history-well pr-3.5 pl-3 text-secondary-copy-medium text-timeline-history-label shadow-well-pressed;
+}
+
+.timeline-history-button:enabled:hover {
+  @apply text-foreground;
+}
+
+.timeline-history-button:disabled {
+  @apply cursor-default text-fg-control-disabled;
+}
+
+/* Keep list props and header height stable when banners toggle; only suppress the visual fade. */
+.chat-banner-lane:has(.timeline-status-stack:not(:empty)) + div .topbar-scroll-fade {
+  mask-image: none;
+  -webkit-mask-image: none;
+}
+
+/* T2's secondary offline action stays legible on the shared sand surface. */
+.timeline-status-link {
+  @apply min-h-7.5 shrink-0 cursor-pointer rounded-full border-0 bg-transparent px-3 text-secondary-copy-medium text-warning-foreground;
+}
+
+.timeline-status-link:enabled:hover {
+  @apply bg-timeline-dismiss-hover;
+}
+
+.timeline-status-link:focus-visible {
+  @apply outline-none inset-shadow-focus;
+}
+
+.timeline-status-link:disabled {
+  @apply cursor-default text-fg-control-disabled;
+}

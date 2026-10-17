@@ -78,17 +78,32 @@ afterEach(async () => {
   container.remove();
   canvas.remove();
   Reflect.deleteProperty(Range.prototype, "getBoundingClientRect");
-  vi.clearAllMocks();
+  // Scroll implementations close over fixture geometry; they must not leak into the next case.
+  vi.resetAllMocks();
   vi.unstubAllGlobals();
 });
 
 describe("find result navigation", () => {
+  it("reveals below all stacked notices, not only the Provider banner", async () => {
+    const stack = document.createElement("div");
+    stack.dataset.timelineStatusBanners = "";
+    stack.getBoundingClientRect = () => new DOMRect(0, 64, 736, 152);
+    const provider = document.createElement("div");
+    provider.dataset.providerStatusBanner = "";
+    provider.getBoundingClientRect = () => new DOMRect(0, 64, 660, 44);
+    stack.append(provider);
+    canvas.prepend(stack);
+    rect = new DOMRect(0, 140, 40, 20);
+    await act(async () => root.render(<Probe {...props} />));
+    expect(scrollToOffset).toHaveBeenCalledExactlyOnceWith({ offset: 224, animated: false });
+  });
+
   it.each([
     { label: "short but sufficient", composerInset: 400 },
     { label: "insufficient", composerInset: 490 },
   ])("settles below the banner in a $label viewport", async ({ composerInset }) => {
     const banner = document.createElement("div");
-    banner.dataset.providerStatusBanner = "";
+    banner.dataset.timelineStatusBanners = "";
     banner.getBoundingClientRect = () => new DOMRect(0, 64, 660, 44);
     canvas.prepend(banner);
     rect = new DOMRect(0, 40, 40, 20);
@@ -124,7 +139,7 @@ describe("find result navigation", () => {
     { label: "wrapped", height: 88, offset: 248 },
   ])("reveals text below the actual $label Provider banner", async ({ height, offset }) => {
     const banner = document.createElement("div");
-    banner.dataset.providerStatusBanner = "";
+    banner.dataset.timelineStatusBanners = "";
     banner.getBoundingClientRect = () => new DOMRect(0, 64, 660, height);
     canvas.prepend(banner);
     // The old 96px boundary considers this match visible despite the banner covering it.

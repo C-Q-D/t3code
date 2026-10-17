@@ -1,30 +1,38 @@
-import type { ReactNode } from "react";
+/** Presents durable thread state in the timeline overlay, retaining the caller's explicit recovery action. */
+import { memo, type ReactNode } from "react";
 
-import { InlineButton } from "../ui/button";
+import { Button } from "../ui/button";
+import { Alert, AlertAction, AlertDescription } from "../ui/alert";
 
 /**
- * One quiet line after the last message for thread state that does not change
- * what Enter does: settled, snoozed, or just woke. Sending a message clears each of
- * them, so the action is only the explicit way out.
+ * Displays settled, snoozed, or newly woken state; the caller owns visibility and recovery.
  */
-export function ThreadStatusLine(props: {
+export const ThreadStatusLine = memo(function ThreadStatusLine(props: {
   readonly icon: ReactNode;
   readonly label: string;
   readonly actionLabel: string;
   readonly actionDisabled?: boolean;
+  readonly emphasized?: boolean;
   readonly onAction: () => void;
 }) {
   return (
-    <div
-      data-chat-thread-status-line="true"
-      className="mx-auto flex w-full min-w-0 max-w-(--chat-content-max-width) items-center gap-1.5 px-1 pb-2 text-muted-foreground text-xs [&_svg]:size-3.5 [&_svg]:shrink-0"
-    >
-      {props.icon}
-      <span className="min-w-0 truncate">{props.label}</span>
-      <span aria-hidden="true">·</span>
-      <InlineButton tone="muted" disabled={props.actionDisabled} onClick={props.onAction}>
-        {props.actionLabel}
-      </InlineButton>
+    <div data-chat-thread-status-line="true" className="pointer-events-auto">
+      <Alert variant="sand" surface="glass" size="status-bar" role="status">
+        {props.icon}
+        <AlertDescription>
+          <span className={props.emphasized ? "font-semibold" : undefined}>{props.label}</span>
+        </AlertDescription>
+        <AlertAction>
+          <Button
+            size="md"
+            variant="secondary"
+            disabled={props.actionDisabled}
+            onClick={props.onAction}
+          >
+            {props.actionLabel}
+          </Button>
+        </AlertAction>
+      </Alert>
     </div>
   );
-}
+});

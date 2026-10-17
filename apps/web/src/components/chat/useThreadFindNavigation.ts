@@ -151,10 +151,10 @@ export function useThreadFindNavigation({
       if (revealedMatchRef.current === matchKey) return;
       if (!listReady || rowIndex < 0) return;
       const viewport = container?.getBoundingClientRect();
-      // Read only this canvas's overlay when revealing, so wrapping is respected without polling rows.
+      // Measure the entire overlay stack so every visible banner is excluded without polling rows.
       const bannerBounds = container
         ?.closest("[data-chat-canvas]")
-        ?.querySelector<HTMLElement>("[data-provider-status-banner]")
+        ?.querySelector<HTMLElement>("[data-timeline-status-banners]")
         ?.getBoundingClientRect();
       const bannerBottom = bannerBounds && bannerBounds.height > 0 ? bannerBounds.bottom : null;
       const materialize = () => {

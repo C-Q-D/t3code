@@ -3,8 +3,8 @@ import { t } from "~/i18n";
 import type { OrchestrationV2ProviderFailureClass } from "@t3tools/contracts";
 import { memo } from "react";
 import { Alert, AlertAction, AlertDescription } from "../ui/alert";
-import { Button } from "../ui/button";
-import { CircleAlertIcon, XIcon } from "lucide-react";
+import { CircleXIcon } from "lucide-react";
+import { TimelineBannerDismiss } from "./TimelineStatusBanners";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { OpenAI } from "../Icons";
 import { ChatGptUsageButton } from "../settings/ChatGptUsageButton";
@@ -38,10 +38,10 @@ export function isThreadErrorBannerDismissedForSession(bannerKey: string | null)
   return bannerKey !== null && sessionDismissedThreadErrorBannerKeys.has(bannerKey);
 }
 
+/** Shows a real error or usage-limit explanation with the caller's existing recovery and dismissal. */
 export const ThreadErrorBanner = memo(function ThreadErrorBanner({
   error,
   onDismiss,
-  errorClass,
   chatGptUsageLimit = false,
 }: {
   error: string | null;
@@ -50,15 +50,10 @@ export const ThreadErrorBanner = memo(function ThreadErrorBanner({
   chatGptUsageLimit?: boolean;
 }) {
   if (!error) return null;
-  const variant = errorClass === "usage_limit" ? "warning" : "error";
   return (
-    <div className="pointer-events-auto mx-auto w-fit max-w-[min(48rem,calc(100%-2rem))] pt-3">
-      <Alert variant={variant} surface="glass" controlAlignment="first-line" data-variant={variant}>
-        {chatGptUsageLimit ? (
-          <OpenAI className="size-4 text-foreground!" aria-hidden="true" />
-        ) : (
-          <CircleAlertIcon />
-        )}
+    <div className="pointer-events-auto">
+      <Alert variant="sand" size="status-bar" surface="glass" controlAlignment="first-line">
+        {chatGptUsageLimit ? <OpenAI aria-hidden="true" /> : <CircleXIcon aria-hidden="true" />}
         <AlertDescription>
           {chatGptUsageLimit ? (
             <div className="space-y-1">
@@ -76,16 +71,12 @@ export const ThreadErrorBanner = memo(function ThreadErrorBanner({
         </AlertDescription>
         {(chatGptUsageLimit || onDismiss) && (
           <AlertAction>
-            {chatGptUsageLimit ? <ChatGptUsageButton variant="default" size="sm" /> : null}
+            {chatGptUsageLimit ? <ChatGptUsageButton variant="default" size="md" /> : null}
             {onDismiss ? (
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                aria-label={t.chat.providerStatus.dismissError}
-                onClick={onDismiss}
-              >
-                <XIcon />
-              </Button>
+              <TimelineBannerDismiss
+                label={t.chat.providerStatus.dismissError}
+                onDismiss={onDismiss}
+              />
             ) : null}
           </AlertAction>
         )}

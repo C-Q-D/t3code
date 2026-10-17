@@ -1,3 +1,4 @@
+/** Shared alert surfaces and densities; callers supply message content and actions. */
 import { cva, type VariantProps } from "class-variance-authority";
 import { Children, isValidElement } from "react";
 import type * as React from "react";
@@ -28,6 +29,11 @@ const alertVariants = cva("relative rounded-xl border px-3.5 py-3 text-card-fore
       // W7 solid sand notice, shared by Markdown callouts and status banners.
       sand: "rounded-notice border-0 bg-warning-surface px-3.5 py-2.5 text-body leading-callout text-warning-foreground shadow-notice-sand text-shadow-none [--lucide-hue-override:currentColor] [&>div]:items-start [&>div]:gap-2.5 [&>div>div:has(>svg)]:mt-0.75 [&>div>div:has(>svg)]:size-4 [&>div>div:has(>[data-slot=alert-title])]:block [&_[data-slot=alert-title]]:inline [&_[data-slot=alert-title]]:font-bold [&_[data-slot=alert-title]]:text-status-warning-foreground [&_[data-slot=alert-description]]:inline [&_[data-slot=alert-description]]:text-inherit [&>div>div>svg]:text-warning",
     },
+    size: {
+      // 补充屏-1 T2 / W7: 44px status bars use 16px corners and 15px leading icons.
+      "status-bar":
+        "min-h-11 rounded-overlay py-1.5 pr-1.5 pl-3.5 text-secondary-copy-large leading-5 [&>div]:min-h-8 [&>div]:items-center [&>div]:gap-2.5 [&>div]:pt-0 [&>div>div:has(>svg)]:mt-0 [&>div>div:has(>svg)]:size-3.75 [&>div>div>svg]:size-3.75 [&>div>div:has(>[data-slot=alert-action])]:h-auto [&>div>div:has(>[data-slot=alert-action])]:self-center",
+    },
   },
 });
 
@@ -50,10 +56,12 @@ function alertChildSlot(child: React.ReactElement): string | undefined {
   }
 }
 
+/** Renders slotted content at the selected density; omitted size preserves existing layouts. */
 function Alert({
   className,
   variant,
   surface,
+  size,
   controlAlignment = "center",
   children,
   ...props
@@ -82,7 +90,7 @@ function Alert({
 
   return (
     <div
-      className={cn(alertVariants({ surface, variant }), className)}
+      className={cn(alertVariants({ surface, variant, size }), className)}
       data-slot="alert"
       data-variant={variant ?? "default"}
       role="alert"
