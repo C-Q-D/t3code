@@ -1,3 +1,4 @@
+/** Model options retain provider metadata, availability explanations, favorites, and jump shortcuts. */
 import { t } from "~/i18n";
 import { type ProviderDriverKind, type ProviderInstanceId } from "@t3tools/contracts";
 import { memo } from "react";
@@ -17,6 +18,7 @@ import { cn } from "~/lib/utils";
 import { modelPickerModelKey } from "./modelPickerKeys";
 import { ProviderInstanceIcon } from "./ProviderInstanceIcon";
 
+/** Renders one virtualized model option; selection and persistence stay with the picker. */
 export const ModelListRow = memo(function ModelListRow(props: {
   index: number;
   model: ModelEsque;
@@ -35,7 +37,6 @@ export const ModelListRow = memo(function ModelListRow(props: {
   acpRegistryIconUrl?: string | undefined;
   isFavorite: boolean;
   isSelected: boolean;
-  showSelection?: boolean;
   showProvider: boolean;
   preferShortName?: boolean;
   useTriggerLabel?: boolean;
@@ -54,14 +55,17 @@ export const ModelListRow = memo(function ModelListRow(props: {
       value={modelPickerModelKey(props.instanceId, props.model.slug)}
       disabled={Boolean(props.disabledReason)}
       className={cn(
-        "group relative w-full !min-w-0 max-w-full cursor-pointer",
+        "group relative w-full min-w-0 max-w-full cursor-pointer",
         props.disabledReason &&
           "data-disabled:pointer-events-auto data-disabled:cursor-not-allowed",
       )}
     >
-      <div className="min-w-0 flex-1 text-left">
+      <span className="composer-model-check" data-checked={props.isSelected} aria-hidden="true">
+        {props.isSelected ? <CheckIcon className="size-2.75" /> : null}
+      </span>
+      <div className={cn("min-w-0 flex-1 text-left", props.unavailable && "text-placeholder")}>
         <div className="flex min-w-0 items-center gap-2">
-          <div className="min-w-0 truncate text-xs font-medium leading-snug">
+          <div className={cn("min-w-0 truncate", props.isSelected && "font-semibold")}>
             {props.useTriggerLabel
               ? getTriggerDisplayModelLabel(props.model)
               : getDisplayModelName(
@@ -70,12 +74,14 @@ export const ModelListRow = memo(function ModelListRow(props: {
                 )}
           </div>
           {props.showNewBadge ? (
-            <span
-              className="shrink-0 rounded border border-update/35 bg-update/15 px-0.5 py-px text-3xs font-bold uppercase leading-none tracking-wide text-update-foreground"
-              aria-label={t.composer.modelPicker.newAriaLabel}
-            >
+            <Badge variant="action" size="sm" aria-label={t.composer.modelPicker.newAriaLabel}>
               {t.composer.modelPicker.newBadge}
-            </span>
+            </Badge>
+          ) : null}
+          {props.disabledReason && !props.unavailable ? (
+            <Badge variant="restricted" size="sm">
+              {t.composer.modelPicker.limited}
+            </Badge>
           ) : null}
           {props.unavailable ? (
             <Badge variant="outline" size="sm">
@@ -93,7 +99,7 @@ export const ModelListRow = memo(function ModelListRow(props: {
               className="size-3"
               iconClassName="size-3"
             />
-            <span className="truncate text-xs font-normal leading-snug text-muted-foreground/70">
+            <span className="truncate text-secondary-copy font-normal text-secondary-label">
               {providerLabel}
             </span>
           </div>
@@ -101,9 +107,6 @@ export const ModelListRow = memo(function ModelListRow(props: {
       </div>
 
       <div className="flex shrink-0 items-center gap-1.5">
-        {props.showSelection && props.isSelected ? (
-          <CheckIcon className="size-3.5" aria-hidden="true" />
-        ) : null}
         {props.jumpLabel ? <Kbd>{props.jumpLabel}</Kbd> : null}
         <Tooltip>
           <TooltipTrigger
@@ -126,12 +129,7 @@ export const ModelListRow = memo(function ModelListRow(props: {
                     : t.composer.modelPicker.addFavorite
                 }
               >
-                <StarIcon
-                  className={cn(
-                    "size-3.5 sm:size-3",
-                    props.isFavorite && "fill-current text-warning",
-                  )}
-                />
+                <StarIcon className={cn("size-3.5", props.isFavorite && "fill-current")} />
               </Button>
             }
           />

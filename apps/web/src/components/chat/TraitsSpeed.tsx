@@ -4,7 +4,6 @@ import type { ProviderDriverKind, ProviderOptionDescriptor } from "@t3tools/cont
 import { getProviderOptionCurrentValue } from "@t3tools/shared/model";
 import { ZapIcon } from "lucide-react";
 import { UltrafastIcon } from "../Icons";
-import { cn } from "~/lib/utils";
 import { ComposerControlIcon, type ComposerControlSize } from "./ComposerControl";
 
 /**
@@ -55,7 +54,7 @@ export function getTraitsSpeedDisplay(
  * @returns The icon and accessible label; never null.
  */
 export function TraitsSpeedIcon({
-  provider,
+  provider: _provider,
   speedIcon,
   size = "sm",
 }: {
@@ -68,14 +67,7 @@ export function TraitsSpeedIcon({
       <ComposerControlIcon
         icon={speedIcon === "ultrafast" ? UltrafastIcon : ZapIcon}
         size={size}
-        className={cn(
-          "fill-current opacity-80",
-          size === "xs"
-            ? "text-current"
-            : provider === "claudeAgent"
-              ? "text-[#d97757]"
-              : "text-foreground",
-        )}
+        className="fill-current"
       />
       <span className="sr-only">
         {speedIcon === "ultrafast" ? t.chat.speed.ultrafastModeOn : t.chat.speed.fastModeOn}

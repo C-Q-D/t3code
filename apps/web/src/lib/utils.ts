@@ -239,6 +239,8 @@ const twMerge = extendTailwindMerge({
         "composer-task-list",
         "composer-attachment",
         "composer-attachment-failed",
+        "composer-model-check",
+        "composer-trait-switch",
       ],
       "inset-shadow": [
         "selected",
@@ -327,6 +329,8 @@ const twMerge = extendTailwindMerge({
         "timeline-quote-key",
         "terminal-tool",
         "composer-notice",
+        "composer-segment",
+        "composer-model-check",
       ],
       leading: [
         "code",

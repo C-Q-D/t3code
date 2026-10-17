@@ -1,5 +1,6 @@
 /** Renders model reasoning choices with shared pixel artwork. */
 import { PixelThinkIcon } from "../icons/PixelLucideIcon";
+import { Menu as MenuPrimitive } from "@base-ui/react/menu";
 import { t } from "~/i18n";
 import {
   type ModelSelection,
@@ -20,15 +21,7 @@ import {
   normalizeModelSlug,
 } from "@t3tools/shared/model";
 import { memo, useCallback } from "react";
-import {
-  Menu,
-  MenuGroup,
-  MenuPopup,
-  MenuRadioGroup,
-  MenuRadioItem,
-  MenuSeparator as MenuDivider,
-  MenuTrigger,
-} from "../ui/menu";
+import { Menu, MenuGroup, MenuPopup, MenuSeparator as MenuDivider, MenuTrigger } from "../ui/menu";
 import { useComposerDraftStore, DraftId } from "../../composerDraftStore";
 import { getProviderModelCapabilities } from "../../providerModels";
 import { cn } from "~/lib/utils";
@@ -52,6 +45,7 @@ const SAVED_OPTION_LABELS: Readonly<Record<string, string>> = {
   variant: t.composer.traits.reasoning,
 };
 
+/** Labels saved descriptor IDs when provider metadata is missing, retaining unknown custom IDs. */
 function savedOptionLabel(id: string): string {
   return (
     SAVED_OPTION_LABELS[id] ??
@@ -94,6 +88,7 @@ type TraitsPersistence =
 
 const ULTRATHINK_PROMPT_PREFIX = "Ultrathink:\n";
 
+/** Identifies the provider default without dispatching a new selection. */
 function DefaultBadge() {
   return (
     <Badge variant="outline" size="sm" className="min-w-0">
@@ -102,6 +97,7 @@ function DefaultBadge() {
   );
 }
 
+/** Replaces only the named descriptor's value, preserving every other provider option. */
 function replaceDescriptorCurrentValue(
   descriptors: ReadonlyArray<ProviderOptionDescriptor>,
   descriptorId: string,
@@ -122,6 +118,7 @@ function replaceDescriptorCurrentValue(
   );
 }
 
+/** Resolves a select value from saved/reported selection; null means no string value is known. */
 function getDescriptorStringValue(
   descriptor: Extract<ProviderOptionDescriptor, { type: "select" }> | null,
   selection?: ModelSelection | null,
@@ -134,6 +131,7 @@ function getDescriptorStringValue(
   return typeof value === "string" ? value : null;
 }
 
+/** Derives capability-backed controls and prompt effort locks without writing to the draft. */
 function getSelectedTraits(
   provider: ProviderDriverKind,
   models: ReadonlyArray<ServerProviderModel>,
@@ -216,6 +214,7 @@ function getSelectedTraits(
   };
 }
 
+/** Derives visible controls, including read-only saved options for unavailable OpenCode models. */
 function getTraitsSectionVisibility(input: {
   provider: ProviderDriverKind;
   models: ReadonlyArray<ServerProviderModel>;
@@ -258,6 +257,7 @@ function getTraitsSectionVisibility(input: {
   };
 }
 
+/** Returns whether this model has any available controls or saved read-only traits. */
 export function shouldRenderTraitsControls(input: {
   provider: ProviderDriverKind;
   models: ReadonlyArray<ServerProviderModel>;
@@ -270,6 +270,7 @@ export function shouldRenderTraitsControls(input: {
   return getTraitsSectionVisibility(input).hasAnyControls;
 }
 
+/** Provider capabilities and current draft values; persistence targets are supplied separately. */
 export interface TraitsMenuContentProps {
   provider: ProviderDriverKind;
   instanceId?: ProviderInstanceId;
@@ -285,6 +286,7 @@ export interface TraitsMenuContentProps {
   isComposerOwned?: boolean;
 }
 
+/** Uses provider descriptors for every segment and switch, preserving prompt-injected effort rules. */
 export const TraitsMenuContent = memo(function TraitsMenuContentImpl({
   provider,
   instanceId,
@@ -368,7 +370,7 @@ export const TraitsMenuContent = memo(function TraitsMenuContentImpl({
 
   if (modelIsUnavailable) {
     return (
-      <>
+      <div className="composer-traits-content">
         {descriptors.map((descriptor, index) => {
           const value = getProviderOptionCurrentLabel(
             descriptor,
@@ -380,108 +382,145 @@ export const TraitsMenuContent = memo(function TraitsMenuContentImpl({
             <div key={descriptor.id}>
               {index > 0 ? <MenuDivider /> : null}
               <MenuGroup>
-                <div className="px-2 pt-1.5 pb-1 font-medium text-muted-foreground text-xs">
-                  {descriptor.label}
-                </div>
-                <div className="px-2 pb-1.5 text-muted-foreground/80 text-xs">{value}</div>
+                <div className="composer-trait-label">{descriptor.label}</div>
+                <div className="px-1 text-secondary-copy text-placeholder">{value}</div>
               </MenuGroup>
             </div>
           );
         })}
-      </>
+      </div>
     );
   }
 
   return (
-    <>
-      {selectDescriptors.map((descriptor, index) => {
+    <div className="composer-traits-content">
+      {selectDescriptors.map((descriptor) => {
         const selectedValue =
           ultrathinkPromptControlled && descriptor.id === primarySelectDescriptor?.id
             ? "ultrathink"
             : (getDescriptorStringValue(descriptor, modelSelection, reportedModelSelection) ?? "");
+        const selectedOption = descriptor.options.find((option) => option.id === selectedValue);
 
         return (
           <div key={descriptor.id}>
-            {index > 0 ? <MenuDivider /> : null}
             <MenuGroup>
-              <div className="px-2 pt-1.5 pb-1 font-medium text-muted-foreground text-xs">
+              <div className="composer-trait-label">
                 {descriptor.label}
+                {selectedOption?.isDefault ? <DefaultBadge /> : null}
               </div>
               {ultrathinkInBodyText && descriptor.id === primarySelectDescriptor?.id ? (
-                <div className="px-2 pb-1.5 text-muted-foreground/80 text-xs">
+                <div className="px-1 pb-1.5 text-secondary-copy text-secondary-label">
                   {t.composer.traits.ultrathinkBodyHint}
                 </div>
               ) : null}
-              <MenuRadioGroup
-                value={selectedValue}
-                onValueChange={(value) => handleSelectChange(descriptor, value)}
-              >
-                {descriptor.options.map((option) => (
-                  <MenuRadioItem
+              {/* Keep menu semantics so arrow navigation and close-on-pick match the old rows. */}
+              {descriptor.options.some(
+                (option) => !descriptor.promptInjectedValues?.includes(option.id),
+              ) ? (
+                <MenuPrimitive.RadioGroup
+                  aria-label={descriptor.label}
+                  className="composer-trait-segments"
+                  value={selectedValue}
+                  onValueChange={(value) => handleSelectChange(descriptor, value)}
+                >
+                  {descriptor.options.map((option) =>
+                    descriptor.promptInjectedValues?.includes(option.id) ? null : (
+                      <MenuPrimitive.RadioItem
+                        key={option.id}
+                        value={option.id}
+                        className="composer-trait-segment"
+                        title={
+                          option.isDefault
+                            ? `${t.composer.traits.default}${option.description ? ` · ${option.description}` : ""}`
+                            : option.description
+                        }
+                        // Base UI keeps radio menus open by default. Close on pick so
+                        // the traits menu behaves like the model picker.
+                        closeOnClick
+                        disabled={
+                          ultrathinkInBodyText && descriptor.id === primarySelectDescriptor?.id
+                        }
+                      >
+                        <span className="truncate">{option.label}</span>
+                      </MenuPrimitive.RadioItem>
+                    ),
+                  )}
+                </MenuPrimitive.RadioGroup>
+              ) : null}
+              {descriptor.options.map((option) =>
+                descriptor.promptInjectedValues?.includes(option.id) ? (
+                  <MenuPrimitive.CheckboxItem
                     key={option.id}
-                    value={option.id}
-                    hideIndicator
-                    // Base UI keeps radio menus open by default. Close on pick so
-                    // the traits menu behaves like the model picker.
-                    closeOnClick
+                    className="composer-trait-switch-row mt-2.25"
+                    checked={selectedValue === option.id}
                     disabled={ultrathinkInBodyText && descriptor.id === primarySelectDescriptor?.id}
+                    title={option.description}
+                    closeOnClick
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        handleSelectChange(descriptor, option.id);
+                      } else {
+                        // Removing only our prefix restores the provider value already saved underneath.
+                        onPromptChange(prompt.replace(/^Ultrathink:\s*/i, ""));
+                      }
+                    }}
                   >
-                    <span className="flex w-full min-w-0 flex-col">
-                      <span className="flex w-full min-w-0 items-center justify-between gap-3">
-                        <span className="min-w-0 truncate">
-                          {option.label}
-                          {option.isDefault ? (
-                            <>
-                              {" "}
-                              <DefaultBadge />
-                            </>
-                          ) : null}
-                        </span>
-                      </span>
-                      {option.description ? (
-                        <span className="max-w-56 text-pretty text-muted-foreground/80 text-xs">
-                          {option.description}
-                        </span>
-                      ) : null}
+                    <PixelThinkIcon className="size-3.5 shrink-0" aria-hidden="true" />
+                    <span className="min-w-0 flex-1">{option.label}</span>
+                    <span className="composer-trait-switch" aria-hidden="true">
+                      <span />
                     </span>
-                  </MenuRadioItem>
-                ))}
-              </MenuRadioGroup>
+                  </MenuPrimitive.CheckboxItem>
+                ) : null,
+              )}
+              {selectedOption?.description ? (
+                <p className="composer-trait-description">{selectedOption.description}</p>
+              ) : null}
             </MenuGroup>
           </div>
         );
       })}
-      {booleanDescriptors.map((descriptor, index) => {
-        const selectedValue = descriptor.currentValue === true ? "on" : "off";
-
-        return (
-          <div key={descriptor.id}>
-            {index > 0 || selectDescriptors.length > 0 ? <MenuDivider /> : null}
-            <MenuGroup>
-              <div className="px-2 py-1.5 font-medium text-muted-foreground text-xs">
-                {descriptor.label}
-              </div>
-              <MenuRadioGroup
-                value={selectedValue}
-                onValueChange={(value) => {
-                  updateDescriptors(
-                    replaceDescriptorCurrentValue(descriptors, descriptor.id, value === "on"),
-                  );
-                }}
-              >
-                {(["on", "off"] as const).map((value) => (
-                  <MenuRadioItem key={value} value={value} hideIndicator closeOnClick>
-                    <span className="flex w-full min-w-0 items-center justify-between gap-3">
-                      <span>{value === "on" ? t.composer.traits.on : t.composer.traits.off}</span>
-                    </span>
-                  </MenuRadioItem>
-                ))}
-              </MenuRadioGroup>
-            </MenuGroup>
-          </div>
-        );
-      })}
-    </>
+      {booleanDescriptors.map((descriptor) =>
+        descriptor.id === "fastMode" ? (
+          <MenuGroup key={descriptor.id}>
+            <div className="composer-trait-label">{descriptor.label}</div>
+            <MenuPrimitive.RadioGroup
+              className="composer-trait-segments"
+              aria-label={descriptor.label}
+              value={descriptor.currentValue === true ? "on" : "off"}
+              onValueChange={(value) =>
+                updateDescriptors(
+                  replaceDescriptorCurrentValue(descriptors, descriptor.id, value === "on"),
+                )
+              }
+            >
+              <MenuPrimitive.RadioItem value="on" className="composer-trait-segment" closeOnClick>
+                {t.composer.traits.fast}
+              </MenuPrimitive.RadioItem>
+              <MenuPrimitive.RadioItem value="off" className="composer-trait-segment" closeOnClick>
+                {t.composer.traits.normal}
+              </MenuPrimitive.RadioItem>
+            </MenuPrimitive.RadioGroup>
+          </MenuGroup>
+        ) : (
+          <MenuPrimitive.CheckboxItem
+            key={descriptor.id}
+            className="composer-trait-switch-row"
+            checked={descriptor.currentValue === true}
+            closeOnClick
+            onCheckedChange={(checked) =>
+              updateDescriptors(replaceDescriptorCurrentValue(descriptors, descriptor.id, checked))
+            }
+          >
+            <PixelThinkIcon className="size-3.5 shrink-0" aria-hidden="true" />
+            <span className="min-w-0 flex-1">{descriptor.label}</span>
+            <span className="composer-trait-switch" aria-hidden="true">
+              <span />
+            </span>
+          </MenuPrimitive.CheckboxItem>
+        ),
+      )}
+    </div>
   );
 });
 
@@ -568,6 +607,7 @@ export function buildTraitsTriggerDisplay(input: {
   return { label: labels.join(" · ") };
 }
 
+/** Opens provider traits on demand; the composer retains its existing trigger and submission state. */
 export const TraitsPicker = memo(function TraitsPicker({
   provider,
   instanceId,
@@ -680,7 +720,11 @@ export const TraitsPicker = memo(function TraitsPicker({
         </TooltipTrigger>
         <TooltipPopup side="top">{triggerLabel}</TooltipPopup>
       </Tooltip>
-      <MenuPopup align="start" {...(isComposerOwned ? composerFloatingLayerProps : {})}>
+      <MenuPopup
+        data-composer-traits-popup="true"
+        align="start"
+        {...(isComposerOwned ? composerFloatingLayerProps : {})}
+      >
         <TraitsMenuContent
           provider={provider}
           {...(instanceId ? { instanceId } : {})}

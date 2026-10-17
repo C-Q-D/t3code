@@ -1,3 +1,4 @@
+/** Presents provider-driven composer suggestions; the composer owns filtering and keyboard selection. */
 import { t } from "~/i18n";
 import { formatProviderSkillDisplayName } from "@t3tools/shared/inlineSkills";
 import {
@@ -21,16 +22,16 @@ import {
   UserRoundIcon,
   type LucideIcon,
 } from "lucide-react";
-import { memo, useLayoutEffect, useRef } from "react";
+import { Fragment, memo, useLayoutEffect, useRef } from "react";
 
 import { type ComposerSlashCommand, type ComposerTriggerKind } from "../../composer-logic";
 import { cn } from "~/lib/utils";
 import { Badge } from "../ui/badge";
 import { Command, CommandGroup, CommandItem, CommandList } from "../ui/command";
 import { PierreEntryIcon } from "./PierreEntryIcon";
-import { ComposerBanner } from "./ComposerBanner";
 import { resolvePullRequestState } from "../pullRequest/pullRequestPresentation";
 
+/** A selectable suggestion with the payload needed by the composer's existing insertion path. */
 export type ComposerCommandItem =
   | {
       id: string;
@@ -78,6 +79,7 @@ export type ComposerCommandItem =
       description: string;
     };
 
+/** Displays suggestions in their supplied order without taking focus from the editor. */
 export const ComposerCommandMenu = memo(function ComposerCommandMenu(props: {
   listId: string;
   items: ComposerCommandItem[];
@@ -109,35 +111,42 @@ export const ComposerCommandMenu = memo(function ComposerCommandMenu(props: {
         );
       }}
     >
-      <ComposerBanner.Surface
+      <div
         ref={listRef}
-        className="flex min-h-0 w-full flex-col overflow-hidden pb-(--chat-composer-attachment-overlap) **:data-[slot=command-item]:rounded-lg **:data-[slot=scroll-area-scrollbar]:data-[orientation=vertical]:my-4"
+        className="composer-command-menu dropdown-glass relative flex min-h-0 w-80 max-w-full flex-col rounded-overlay"
         data-composer-command-drawer="true"
       >
         {props.items.length > 0 ? (
           <CommandList
             id={props.listId}
             aria-label={props.triggerKind ? LISTBOX_LABEL_BY_TRIGGER[props.triggerKind] : undefined}
-            className="max-h-72 min-h-0 scroll-pb-6"
+            className="max-h-72 min-h-0"
           >
             <CommandGroup>
-              {props.items.map((item) => (
-                <ComposerCommandMenuItem
-                  key={item.id}
-                  optionId={composerSuggestionOptionId(props.listId, item.id)}
-                  item={item}
-                  triggerKind={props.triggerKind}
-                  resolvedTheme={props.resolvedTheme}
-                  isActive={props.activeItemId === item.id}
-                  onHighlight={props.onHighlightedItemChange}
-                  onSelect={props.onSelect}
-                />
-              ))}
+              <div className="flex flex-col gap-px">
+                {props.items.map((item, index) => (
+                  <Fragment key={item.id}>
+                    {index === 0 ||
+                    suggestionGroup(item) !== suggestionGroup(props.items[index - 1]!) ? (
+                      <div className="composer-command-heading">{suggestionGroup(item)}</div>
+                    ) : null}
+                    <ComposerCommandMenuItem
+                      optionId={composerSuggestionOptionId(props.listId, item.id)}
+                      item={item}
+                      triggerKind={props.triggerKind}
+                      resolvedTheme={props.resolvedTheme}
+                      isActive={props.activeItemId === item.id}
+                      onHighlight={props.onHighlightedItemChange}
+                      onSelect={props.onSelect}
+                    />
+                  </Fragment>
+                ))}
+              </div>
             </CommandGroup>
           </CommandList>
         ) : (
-          <div className="px-5 pt-3.5 pb-7">
-            <p className="text-secondary-label text-xs">
+          <div className="px-4 py-3" role="status">
+            <p className="text-secondary-label text-secondary-copy">
               {props.isLoading
                 ? props.triggerKind === "skill"
                   ? t.composer.commandMenu.searchingSkills
@@ -153,11 +162,12 @@ export const ComposerCommandMenu = memo(function ComposerCommandMenu(props: {
             </p>
           </div>
         )}
-      </ComposerBanner.Surface>
+      </div>
     </Command>
   );
 });
 
+/** Renders one suggestion, retaining its payload, accessible option ID, and pointer behavior. */
 const ComposerCommandMenuItem = memo(function ComposerCommandMenuItem(props: {
   optionId: string;
   item: ComposerCommandItem;
@@ -199,17 +209,22 @@ const ComposerCommandMenuItem = memo(function ComposerCommandMenuItem(props: {
         />
       ) : null}
       {props.item.type === "thread" ? (
-        <MessagesSquareIcon aria-hidden="true" className="size-4 shrink-0 text-secondary-label" />
+        <MessagesSquareIcon aria-hidden="true" className="size-3.5 shrink-0" />
       ) : null}
       {pullRequestPresentation ? (
         <pullRequestPresentation.Icon
           role="img"
           aria-label={pullRequestPresentation.label}
-          className={cn("size-4 shrink-0", pullRequestPresentation.toneClassName)}
+          className="size-3.5 shrink-0"
         />
       ) : null}
       <span className="flex min-w-0 flex-1 items-center gap-2">
-        <span className="min-w-0 max-w-[45%] shrink-0 truncate font-sans text-xs font-medium">
+        <span
+          className={cn(
+            "min-w-0 max-w-40 shrink truncate",
+            props.item.type !== "thread" && props.item.type !== "pull-request" && "font-mono",
+          )}
+        >
           {isSlashSkill ? (
             <>
               <span className="text-secondary-label">/skill:</span>
@@ -219,7 +234,7 @@ const ComposerCommandMenuItem = memo(function ComposerCommandMenuItem(props: {
             props.item.label
           )}
         </span>
-        <span className="min-w-0 flex-1 truncate text-left text-secondary-label text-xs">
+        <span className="min-w-0 flex-1 truncate text-left text-secondary-label text-secondary-copy">
           {props.item.description}
         </span>
         {skillSourceKind ? (
@@ -228,11 +243,19 @@ const ComposerCommandMenuItem = memo(function ComposerCommandMenuItem(props: {
             showSkillSuffix={props.triggerKind === "skill"}
           />
         ) : null}
+        {props.item.type === "slash-command" || props.item.type === "provider-slash-command" ? (
+          <Badge variant="neutral" size="sm">
+            {props.item.type === "slash-command"
+              ? t.composer.commandMenu.appSource
+              : t.composer.commandMenu.providerSource}
+          </Badge>
+        ) : null}
       </span>
     </CommandItem>
   );
 });
 
+/** Encodes arbitrary provider IDs into distinct editor/listbox option IDs, including lone surrogates. */
 export function composerSuggestionOptionId(listId: string, itemId: string): string {
   // JSON escapes lone UTF-16 surrogates before URI encoding without losing identity.
   return `${listId}-${encodeURIComponent(JSON.stringify(itemId))}`;
@@ -263,11 +286,21 @@ const SKILL_SOURCE_LABEL_BY_KIND: Record<ProviderSkillSourceKind, string> = {
   other: t.composer.commandMenu.providerSource,
 };
 
+/** Chooses a heading without regrouping results, so editor keyboard order stays authoritative. */
+function suggestionGroup(item: ComposerCommandItem): string {
+  if (item.type === "skill") return t.composer.commandMenu.skillsLabel;
+  if (item.type === "path" || item.type === "pull-request")
+    return t.composer.commandMenu.filesAndPullRequests;
+  if (item.type === "thread") return t.composer.commandMenu.threadsLabel;
+  return t.composer.commandMenu.commandsLabel;
+}
+
+/** Shows the provider-reported skill source; unknown kinds retain the Provider label. */
 function SkillSourceBadge(props: { kind: ProviderSkillSourceKind; showSkillSuffix: boolean }) {
   const Icon = SKILL_SOURCE_ICON_BY_KIND[props.kind];
   return (
-    <Badge className="ms-auto" variant="secondary">
-      <Icon aria-hidden="true" className="text-current" />
+    <Badge className="ms-auto" variant="neutral" size="sm">
+      <Icon aria-hidden="true" />
       {SKILL_SOURCE_LABEL_BY_KIND[props.kind]}
       {props.showSkillSuffix ? t.composer.commandMenu.skillSuffix : null}
     </Badge>

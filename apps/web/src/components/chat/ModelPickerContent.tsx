@@ -1,4 +1,6 @@
+/** Virtualized, provider-driven model selection with search, favorites, and keyboard shortcuts. */
 import { t } from "~/i18n";
+import { Combobox as ComboboxPrimitive } from "@base-ui/react/combobox";
 import {
   ANTIGRAVITY_DEFAULT_MODEL,
   type ProviderInstanceId,
@@ -12,7 +14,7 @@ import { formatProviderUpdateRequiredNotice } from "@t3tools/client-runtime/prov
 import { useNavigate } from "@tanstack/react-router";
 import { LegendList, type LegendListRef } from "@legendapp/list/react";
 import { memo, useMemo, useState, useCallback, useEffect, useLayoutEffect, useRef } from "react";
-import { ChevronRightIcon } from "lucide-react";
+import { ChevronRightIcon, GitForkIcon, SearchIcon } from "lucide-react";
 import { ModelListRow } from "./ModelListRow";
 import { ModelPickerSidebar } from "./ModelPickerSidebar";
 import { getProviderStatusMessage, hasProviderSetup } from "./ProviderStatusBanner";
@@ -23,13 +25,7 @@ import {
   parseModelPickerModelKey,
 } from "./modelPickerKeys";
 import { buildModelPickerSearchText, scoreModelPickerSearch } from "./modelPickerSearch";
-import {
-  Combobox,
-  ComboboxEmpty,
-  ComboboxSearchInput,
-  ComboboxItem,
-  ComboboxListVirtualized,
-} from "../ui/combobox";
+import { Combobox, ComboboxEmpty, ComboboxItem, ComboboxListVirtualized } from "../ui/combobox";
 import { ModelEsque } from "./providerIconUtils";
 import { isCommandPaletteOpen } from "../../commandPaletteBus";
 import { primaryServerKeybindingsAtom } from "../../state/server";
@@ -54,6 +50,7 @@ import {
 } from "../../providerInstances";
 import { providerModelKey, sortProviderModelItems } from "../../modelOrdering";
 
+/** Provider-supplied model metadata paired with the instance used for routing selections. */
 type ModelPickerItem = {
   slug: string;
   name: string;
@@ -71,6 +68,7 @@ type ModelPickerItem = {
   isUnavailable?: boolean | undefined;
 };
 
+/** Resolves the active slug, or Antigravity's auto alias/default; returns undefined when unavailable. */
 export function resolveModelPickerSelectedModel(input: {
   driverKind: ProviderDriverKind | undefined;
   model: string;
@@ -88,6 +86,7 @@ export function resolveModelPickerSelectedModel(input: {
   return input.options.find((option) => option.slug === input.model);
 }
 
+/** Keeps ready options and the active unavailable OpenCode/Antigravity model, excluding auto aliases. */
 export function shouldIncludeModelPickerOption(input: {
   readonly entry: ProviderInstanceEntry;
   readonly option: ModelEsque;
@@ -107,6 +106,7 @@ export function shouldIncludeModelPickerOption(input: {
   );
 }
 
+/** Offers setup only for enabled providers with a setup flow and a missing usable installation/model. */
 export function shouldOfferModelPickerSetup(
   entry: ProviderInstanceEntry,
   options: ReadonlyArray<ModelEsque>,
@@ -122,6 +122,7 @@ export function shouldOfferModelPickerSetup(
   );
 }
 
+/** Wraps through favorites and selectable instances in the requested keyboard direction. */
 export function adjacentModelPickerProvider(input: {
   entries: ReadonlyArray<ProviderInstanceEntry>;
   selectedInstanceId: ProviderInstanceId | "favorites";
@@ -151,12 +152,15 @@ export function adjacentModelPickerProvider(input: {
 }
 
 const EMPTY_MODEL_JUMP_LABELS = new Map<string, string>();
-const MODEL_LIST_ESTIMATED_ITEM_SIZE = 52;
+// H2 rows are 34px; favorites/search add the provider line and are measured by LegendList.
+const MODEL_LIST_ESTIMATED_ITEM_SIZE = 34;
 
+/** Retains the virtualizer's existing separation between measured options. */
 function ModelListSeparator() {
   return <div className="h-0.5" />;
 }
 
+/** Displays current provider options; callbacks own model writes, setup, and closing the popup. */
 export const ModelPickerContent = memo(function ModelPickerContent(props: {
   environmentId: EnvironmentId | null;
   /** The instance currently selected in the composer (combobox "value"). */
@@ -843,7 +847,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
     <TooltipProvider delay={0}>
       <div
         ref={pickerContentRef}
-        className="relative flex max-h-86.5 w-screen max-w-90 flex-row overflow-hidden"
+        className="composer-model-picker relative flex max-h-86.5 w-screen max-w-167 flex-row overflow-hidden"
         // Hold the height from when the search started; results scroll instead of resizing.
         style={isSearching ? { height: searchHeight } : undefined}
         data-model-picker-content="true"
@@ -910,71 +914,73 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
             }
           }}
         >
-          <div
-            className={cn(
-              "flex min-h-0 flex-1 flex-col overflow-hidden bg-muted/40",
-              showSidebar && "border-l border-border/70",
-            )}
-          >
-            <ComboboxSearchInput
-              ref={searchInputRef}
-              placeholder={t.composer.modelPicker.searchPlaceholder}
-              value={searchQuery}
-              onChange={(e) => {
-                if (!isSearching) setSearchHeight(pickerContentRef.current?.offsetHeight ?? 0);
-                setSearchQuery(e.target.value);
-              }}
-              onKeyDown={(e) => {
-                if (
-                  showSidebar &&
-                  !e.altKey &&
-                  !e.ctrlKey &&
-                  !e.metaKey &&
-                  ((e.key === "ArrowLeft" && !e.shiftKey && searchQuery.length === 0) ||
-                    (e.key === "Tab" && e.shiftKey))
-                ) {
-                  const sidebar = e.currentTarget
-                    .closest("[data-model-picker-content]")
-                    ?.querySelector("[data-model-picker-sidebar]");
-                  const button =
-                    sidebar?.querySelector<HTMLButtonElement>(
-                      'button[aria-pressed="true"]:not(:disabled)',
-                    ) ?? sidebar?.querySelector<HTMLButtonElement>("button:not(:disabled)");
-                  if (button) {
+          <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-hidden p-2.5">
+            <div className="composer-model-search">
+              <SearchIcon className="size-3.25 shrink-0" aria-hidden="true" />
+              <ComboboxPrimitive.Input
+                ref={searchInputRef}
+                className="min-w-0 flex-1 outline-none"
+                aria-label={t.composer.modelPicker.searchPlaceholder}
+                placeholder={t.composer.modelPicker.searchPlaceholder}
+                value={searchQuery}
+                onChange={(e) => {
+                  if (!isSearching) setSearchHeight(pickerContentRef.current?.offsetHeight ?? 0);
+                  setSearchQuery(e.target.value);
+                }}
+                onKeyDown={(e) => {
+                  if (
+                    showSidebar &&
+                    !e.altKey &&
+                    !e.ctrlKey &&
+                    !e.metaKey &&
+                    ((e.key === "ArrowLeft" && !e.shiftKey && searchQuery.length === 0) ||
+                      (e.key === "Tab" && e.shiftKey))
+                  ) {
+                    const sidebar = e.currentTarget
+                      .closest("[data-model-picker-content]")
+                      ?.querySelector("[data-model-picker-sidebar]");
+                    const button =
+                      sidebar?.querySelector<HTMLButtonElement>(
+                        'button[aria-pressed="true"]:not(:disabled)',
+                      ) ?? sidebar?.querySelector<HTMLButtonElement>("button:not(:disabled)");
+                    if (button) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      button.focus();
+                      return;
+                    }
+                  }
+                  if (e.key === "Escape") {
                     e.preventDefault();
                     e.stopPropagation();
-                    button.focus();
+                    props.onRequestClose?.();
                     return;
                   }
-                }
-                if (e.key === "Escape") {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  props.onRequestClose?.();
-                  return;
-                }
-                if (e.key === "Enter" && highlightedModelKeyRef.current) {
-                  (e as typeof e & { preventBaseUIHandler?: () => void }).preventBaseUIHandler?.();
-                  e.preventDefault();
-                  e.stopPropagation();
-                  const legacyInstanceId = parseModelPickerLegacySectionKey(
-                    highlightedModelKeyRef.current,
-                  );
-                  if (legacyInstanceId) {
-                    toggleLegacySection(legacyInstanceId);
+                  if (e.key === "Enter" && highlightedModelKeyRef.current) {
+                    (
+                      e as typeof e & { preventBaseUIHandler?: () => void }
+                    ).preventBaseUIHandler?.();
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const legacyInstanceId = parseModelPickerLegacySectionKey(
+                      highlightedModelKeyRef.current,
+                    );
+                    if (legacyInstanceId) {
+                      toggleLegacySection(legacyInstanceId);
+                      return;
+                    }
+                    const model = parseModelPickerModelKey(highlightedModelKeyRef.current);
+                    if (model) {
+                      handleModelSelect(model.slug, model.instanceId, e.shiftKey);
+                    }
                     return;
                   }
-                  const model = parseModelPickerModelKey(highlightedModelKeyRef.current);
-                  if (model) {
-                    handleModelSelect(model.slug, model.instanceId, e.shiftKey);
-                  }
-                  return;
-                }
-                e.stopPropagation();
-              }}
-              onMouseDown={(e) => e.stopPropagation()}
-              onTouchStart={(e) => e.stopPropagation()}
-            />
+                  e.stopPropagation();
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+              />
+            </div>
 
             {/* Model list */}
             <div
@@ -998,10 +1004,10 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
                           className="group w-full cursor-pointer"
                         >
                           <div className="min-w-0 flex-1 text-left">
-                            <div className="text-xs font-medium leading-snug">
+                            <div className="text-meta-large text-secondary-label">
                               {t.composer.modelPicker.legacy}
                             </div>
-                            <div className="mt-1 text-xs font-normal leading-snug text-muted-foreground/70">
+                            <div className="text-meta text-secondary-label">
                               {t.composer.modelPicker.modelCount(legacySection.legacyModels.length)}
                             </div>
                           </div>
@@ -1039,8 +1045,11 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
                             ? selectedModelKeySet.has(modelKey)
                             : modelKey === activeModelKey
                         }
-                        showSelection={selectedModelKeys !== undefined}
-                        showProvider
+                        showProvider={
+                          isSearching ||
+                          selectedInstanceId === "favorites" ||
+                          Boolean(model.subProvider)
+                        }
                         preferShortName={!isLocked}
                         useTriggerLabel={false}
                         showNewBadge={model.badge === "new"}
@@ -1108,6 +1117,12 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
                 </InlineButton>
               </p>
             ))}
+            {onToggleModel ? (
+              <div className="composer-model-worktree-note">
+                <GitForkIcon className="size-3.25 shrink-0" aria-hidden="true" />
+                <span>{t.chat.branchToolbar.modelWorktreeHint}</span>
+              </div>
+            ) : null}
           </div>
         </Combobox>
       </div>

@@ -314,3 +314,155 @@
     }
   }
 }
+
+/* 补充屏-2.dc.html · U3 checkbox and U4 segmented controls/switch. */
+@theme {
+  --radius-composer-segment: 13px;
+  --radius-composer-model-check: 5px;
+  --shadow-composer-model-check: inset 0 0 0 1.5px #3a3a40;
+  --shadow-composer-trait-switch: inset 1.5px 2px 3px rgba(0, 0, 0, 0.75);
+}
+
+@layer utilities {
+  html[data-theme-id="graphite"] {
+    /* U2 is independent of the old 17px attachment seam; retain the existing anchor. */
+    .composer-command-menu {
+      @apply -translate-y-4.25;
+    }
+
+    .composer-command-heading {
+      @apply px-2.5 pt-2 pb-0.5 text-meta-large text-secondary-label;
+    }
+
+    .composer-command-heading:first-child {
+      @apply pt-1.5;
+    }
+
+    /* U3 keeps the existing provider rail and its keyboard/favorites behavior. */
+    .composer-model-picker [data-model-picker-sidebar] {
+      @apply w-16 bg-stone-dim;
+    }
+
+    .composer-model-picker [data-model-picker-sidebar] > div > div {
+      @apply items-center gap-1.5 px-3.25 py-2.5;
+    }
+
+    .composer-model-picker [data-model-picker-provider] {
+      @apply w-9.5;
+    }
+
+    .composer-model-picker [data-model-picker-provider] button {
+      @apply size-9.5 rounded-compact-row;
+    }
+
+    .composer-model-picker [data-model-picker-provider] button[aria-pressed="true"] {
+      @apply bg-accent inset-shadow-selected-control;
+    }
+
+    .composer-model-picker [data-model-picker-selected-indicator] {
+      @apply hidden;
+    }
+
+    .composer-model-search {
+      @apply mb-1.5 flex h-8.5 shrink-0 items-center gap-2 rounded-full bg-input px-3 text-control text-placeholder shadow-well-pressed;
+    }
+
+    .composer-model-search:focus-within {
+      @apply inset-shadow-focus;
+    }
+
+    .composer-model-search input {
+      @apply bg-transparent text-foreground placeholder:text-placeholder;
+    }
+
+    .composer-model-check {
+      @apply flex size-4 shrink-0 items-center justify-center rounded-composer-model-check shadow-composer-model-check;
+    }
+
+    .composer-model-check[data-checked="true"] {
+      @apply bg-primary text-primary-foreground shadow-none;
+      --lucide-hue-override: currentColor;
+    }
+
+    .composer-model-worktree-note {
+      @apply mt-1.5 flex shrink-0 items-center gap-2 rounded-tag bg-composer-attachment px-2.5 py-2 text-secondary-copy text-composer-notice-label;
+    }
+
+    /* U4 uses feature-owned Base UI items; shared menu row densities are untouched. */
+    [data-composer-traits-popup] {
+      @apply w-80;
+    }
+
+    .composer-traits-content {
+      @apply flex min-w-0 flex-col gap-2.5 p-1;
+    }
+
+    .composer-trait-label {
+      @apply mb-1 flex items-center gap-2 px-1 text-meta-large text-secondary-label;
+    }
+
+    .composer-trait-segments {
+      @apply flex h-8 min-w-0 gap-0 rounded-full bg-input p-0.75 shadow-well-pressed;
+    }
+
+    .composer-trait-segment {
+      @apply flex min-w-0 flex-1 cursor-pointer items-center justify-center rounded-composer-segment px-1 text-secondary-copy-medium text-secondary-label outline-none;
+    }
+
+    .composer-trait-segment[data-checked] {
+      @apply bg-segmented-selected font-bold text-foreground shadow-composer-option-selected;
+    }
+
+    .composer-trait-segment[data-highlighted] {
+      @apply bg-accent;
+    }
+
+    .composer-trait-segment:focus-visible {
+      @apply inset-shadow-focus;
+    }
+
+    .composer-trait-segment:not([data-disabled]):active {
+      @apply shadow-well-pressed;
+    }
+
+    .composer-trait-segment[data-disabled] {
+      @apply cursor-not-allowed opacity-40;
+    }
+
+    .composer-trait-description {
+      @apply mt-1 px-1 text-secondary-copy text-secondary-label;
+    }
+
+    .composer-trait-switch-row {
+      @apply flex min-h-5 cursor-pointer items-center gap-2.5 rounded-tag px-1 text-control font-semibold outline-none;
+    }
+
+    .composer-trait-switch-row[data-highlighted] {
+      @apply bg-accent;
+    }
+
+    .composer-trait-switch-row:focus-visible {
+      @apply inset-shadow-focus;
+    }
+
+    .composer-trait-switch-row[data-disabled] {
+      @apply pointer-events-none cursor-not-allowed opacity-40;
+    }
+
+    .composer-trait-switch {
+      @apply flex h-5 w-9 shrink-0 items-center rounded-full bg-input p-0.5 shadow-composer-trait-switch;
+    }
+
+    .composer-trait-switch > span {
+      @apply size-4 rounded-full bg-fg-control-disabled;
+    }
+
+    .composer-trait-switch-row[data-checked] .composer-trait-switch {
+      @apply bg-primary shadow-switch-on;
+    }
+
+    .composer-trait-switch-row[data-checked] .composer-trait-switch > span {
+      @apply translate-x-4 bg-primary-foreground;
+    }
+  }
+}

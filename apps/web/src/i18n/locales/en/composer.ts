@@ -106,6 +106,8 @@ export const composer = {
     pathsLabel: "Files and folders",
     pullRequestsLabel: "Pull requests",
     commandsLabel: "Commands",
+    filesAndPullRequests: "Files and folders · PR",
+    threadsLabel: "Threads",
     skillsLabel: "Skills",
     appSource: "App",
     repoSource: "Repo",
@@ -413,8 +415,6 @@ export const composer = {
     default: "Default",
     ultrathinkBodyHint:
       'Your prompt contains "ultrathink" in the text. Remove it to change this option.',
-    on: "On",
-    off: "Off",
     fast: "Fast",
     normal: "Normal",
     ultrafast: "Ultrafast",
