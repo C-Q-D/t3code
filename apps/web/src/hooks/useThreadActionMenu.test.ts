@@ -1,4 +1,4 @@
-/** Verifies observable thread action handling and grant checks at the native menu boundary. */
+/** Verifies observable thread action handling and grant checks at the route-owned menu boundary. */
 import {
   AuthOrchestrationOperateScope,
   EnvironmentId,
@@ -78,7 +78,6 @@ vi.mock("../state/use-atom-command", () => ({
 }));
 vi.mock("../localApi", () => ({
   readLocalApi: () => ({
-    contextMenu: { show: state.show, close: () => {} },
     dialogs: {
       confirm: async () => {
         recordEffect("confirm");
@@ -160,6 +159,7 @@ const createMenu = () =>
     threadRef: target,
     projectCwd: "/project",
     onStartRename: () => recordEffect("rename"),
+    menuPresenter: { show: state.show, close: () => {} },
   });
 
 beforeEach(() => {
@@ -205,7 +205,7 @@ describe("thread menu permissions", () => {
     "settle",
     "archive",
     "export-transcript",
-  ] as const)("%s rechecks after the native menu closes", async (action) => {
+  ] as const)("%s rechecks after the menu closes", async (action) => {
     state.granted.add("secondary");
     const choice = deferred<ThreadActionMenuId | null>();
     state.show.mockReturnValue(choice.promise);

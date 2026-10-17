@@ -178,6 +178,7 @@ const twMerge = extendTailwindMerge({
         "discussion-live",
         "discussion-next-tag",
         "discussion-file-rule",
+        "chat-project-mark",
       ],
       "inset-shadow": ["selected", "focus", "selected-control", "project-rail-hover"],
       "text-shadow": ["stone"],
@@ -223,6 +224,7 @@ const twMerge = extendTailwindMerge({
         "discussion-bubble",
         "discussion-user-bubble",
         "discussion-command",
+        "project-mark",
       ],
       leading: [
         "code",

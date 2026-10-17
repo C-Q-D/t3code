@@ -11,6 +11,7 @@ import {
 import { canSnooze, effectiveSnoozed } from "@t3tools/client-runtime/state/thread-settled";
 import {
   AuthOrchestrationOperateScope,
+  type ContextMenuItem,
   type ScopedThreadRef,
   type ThreadId,
 } from "@t3tools/contracts";
@@ -66,13 +67,13 @@ function failureToast(title: string, error: unknown) {
 /**
  * The per-thread action menu (pin, settle, snooze, rename, copy, delete…) as
  * a self-contained hook, for surfaces other than the sidebar row — today the
- * chat header. Renders through the native context-menu bridge and dispatches
+ * chat header. Uses the route-owned menu presenter and dispatches
  * through the same mutations the sidebar uses.
  *
  * Unlike the sidebar, settle and snooze here never navigate away: the caller
  * is acting on the thread they are reading, and ChatView's parked-thread
  * banner already offers the way back.
- * @param input Nullable thread destination, nullable fallback project path, and rename callback.
+ * @param input Thread destination, fallback path, rename callback and route-owned presenter.
  * @returns A menu-opening callback; no thread means no menu. Actions recheck destination grants.
  * Export writes on the selected server and reports its path or failure reason in a toast.
  */
@@ -81,8 +82,16 @@ export function useThreadActionMenu(input: {
   /** Fallback for "Copy path" when the thread has no worktree. */
   readonly projectCwd: string | null;
   readonly onStartRename: () => void;
+  /** Route-owned UI menus resolve with an action, or null on dismissal. */
+  readonly menuPresenter: {
+    show: (
+      items: readonly ContextMenuItem<ThreadActionMenuId>[],
+      position: { x: number; y: number },
+    ) => Promise<ThreadActionMenuId | null>;
+    close: () => void;
+  };
 }) {
-  const { threadRef, projectCwd, onStartRename } = input;
+  const { threadRef, projectCwd, onStartRename, menuPresenter } = input;
   const exportTranscript = useAtomCommand(serverEnvironment.exportTranscript, {
     reportFailure: false,
   });
@@ -184,7 +193,7 @@ export function useThreadActionMenu(input: {
           supports,
           snoozePresets,
         });
-        const clicked = await settlePromise(() => api.contextMenu.show(items, position));
+        const clicked = await settlePromise(() => menuPresenter.show(items, position));
         if (clicked._tag === "Failure" || clicked.value === null) return;
         const action: ThreadActionMenuId = clicked.value;
         if (
@@ -399,6 +408,7 @@ export function useThreadActionMenu(input: {
       handleNewThread,
       logicalProjectKeyByPhysicalKey,
       markThreadUnread,
+      menuPresenter,
       onStartRename,
       pinThread,
       projectCwd,
@@ -416,9 +426,5 @@ export function useThreadActionMenu(input: {
     ],
   );
 
-  const closeMenu = useCallback(() => {
-    void readLocalApi()?.contextMenu.close();
-  }, []);
-
-  return { openMenu, closeMenu };
+  return { openMenu, closeMenu: menuPresenter.close };
 }

@@ -34,3 +34,25 @@
     calc(var(--anchor-width) - --spacing(3))
   );
 }
+
+/* Chat titlebar additions from StyleM-8a.dc.html; shared elevation and type use F1 tokens. */
+@theme {
+  /* Project capsule label, breadcrumb chevron and title hover in the 8a window header. */
+  --color-chat-project-label: #c4c4ca;
+  --color-chat-crumb-separator: #73737b;
+  --color-chat-title-hover: #2c2c31;
+  --radius-project-mark: 6px;
+  /* StyleM-8a project monogram: 1px inset outline, using the shared border color. */
+  --shadow-chat-project-mark: inset 0 0 0 1px var(--color-border);
+}
+
+/* The window header uses a 4px breadcrumb rhythm, independent of page breadcrumbs. */
+.chat-titlebar-breadcrumb ol {
+  gap: --spacing(1);
+}
+
+/* Preserve label centering within the 32px controls without breadcrumb text-box padding. */
+.chat-titlebar-breadcrumb [data-slot="workspace-breadcrumb-text"] {
+  padding-block: 0;
+  text-box: normal;
+}
