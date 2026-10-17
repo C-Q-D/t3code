@@ -293,6 +293,7 @@ describe("searchSettings", () => {
 
   it("keeps the local toggle searchable without offering hidden host publishing controls", () => {
     const availability = {
+      canReadRelay: true,
       hasCloudPublicConfig: true,
       hasEnvironment: true,
       hasProviderSettingsEnvironment: true,
@@ -314,8 +315,38 @@ describe("searchSettings", () => {
     expect(browser).toContain("publish-agent-activity");
   });
 
+  it.each([
+    [false, false],
+    [false, true],
+    [true, false],
+    [true, true],
+  ])(
+    "matches relay row visibility with read=%s and tunnel=%s",
+    (canReadRelay, managedTunnelActive) => {
+      const availability = {
+        hasCloudPublicConfig: true,
+        hasEnvironment: true,
+        hasProviderSettingsEnvironment: true,
+        hasMacProviderSettingsEnvironment: false,
+        canManageLocalBackend: true,
+        isWslSettingsRowVisible: false,
+        hasThreadAutoSettlement: false,
+        canReadRelay,
+        managedTunnelActive,
+      };
+      const ids = filterAvailableSettingsSearchItems(availability).map((item) => item.id);
+
+      expect(ids).toContain("t3-connect");
+      expect.soft(ids.includes("publish-agent-activity")).toBe(canReadRelay);
+      expect
+        .soft(ids.includes("hold-webhooks-while-offline"))
+        .toBe(canReadRelay && managedTunnelActive);
+    },
+  );
+
   it("offers webhook holding only while the managed tunnel is on, like its row", () => {
     const availability = {
+      canReadRelay: true,
       hasCloudPublicConfig: true,
       hasEnvironment: true,
       hasProviderSettingsEnvironment: true,

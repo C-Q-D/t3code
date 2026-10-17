@@ -1,5 +1,6 @@
+/** Keeps settings search destinations aligned with current environment capabilities and permissions. */
 import { useMemo } from "react";
-import { AuthEnvironmentMaintainScope } from "@t3tools/contracts";
+import { AuthEnvironmentMaintainScope, AuthRelayReadScope } from "@t3tools/contracts";
 
 import { usePrimaryCloudLinkState } from "~/cloud/primaryCloudLinkState";
 import { hasCloudPublicConfig } from "~/cloud/publicConfig";
@@ -17,10 +18,12 @@ import {
   getThreadAutoSettlementSearchAvailability,
 } from "./settingsSearch";
 
+/** Recomputes visible search rows when the selected environment or its relay permissions change. */
 export function useAvailableSettingsSearchItems(scopeSearch: SettingsScopeSearch = {}) {
   const { environments } = useEnvironments();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const localEnvironmentDisabled = isLocalEnvironmentDisabled();
+  const canReadRelay = useEnvironmentScope(primaryEnvironmentId, AuthRelayReadScope);
   const canMaintain = useEnvironmentScope(primaryEnvironmentId, AuthEnvironmentMaintainScope);
   const canManageLocalBackend = !localEnvironmentDisabled && canMaintain;
   const desktopWsl = useEnvironmentQuery(
@@ -54,6 +57,7 @@ export function useAvailableSettingsSearchItems(scopeSearch: SettingsScopeSearch
             }),
         ),
         canManageLocalBackend,
+        canReadRelay,
         isWslSettingsRowVisible: isWslSettingsRowVisible({
           state: desktopWsl.data,
           error: desktopWsl.error,
@@ -65,6 +69,7 @@ export function useAvailableSettingsSearchItems(scopeSearch: SettingsScopeSearch
     [
       managedTunnelActive,
       canManageLocalBackend,
+      canReadRelay,
       desktopWsl.data,
       desktopWsl.error,
       environments,

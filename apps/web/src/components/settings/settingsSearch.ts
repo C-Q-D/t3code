@@ -72,6 +72,8 @@ export interface SettingsSearchItem {
   readonly wslAvailableOnly?: boolean;
   // Its row only renders while this environment's T3 Connect managed tunnel is on.
   readonly managedTunnelOnly?: boolean;
+  /** Relay controls disappear when CloudLinkRow renders its permission explanation. */
+  readonly requiresRelayRead?: boolean;
   /**
    * Sorts after every other match. Keybinding commands mirror rows on other
    * surfaces, so "model" must still lead with Default model, not Model Picker.
@@ -90,6 +92,7 @@ export interface SettingsSearchAvailability {
   readonly isWslSettingsRowVisible: boolean;
   readonly hasThreadAutoSettlement: boolean;
   readonly managedTunnelActive?: boolean;
+  readonly canReadRelay?: boolean;
 }
 
 /**
@@ -999,6 +1002,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "hold-webhooks-while-offline",
+    requiresRelayRead: true,
     localEnvironmentOnly: true,
     title: t.settings.rows.holdWebhooksWhileOffline.title,
     to: "/settings/connections",
@@ -1009,6 +1013,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "publish-agent-activity",
+    requiresRelayRead: true,
     localEnvironmentOnly: true,
     title: t.settings.rows.publishAgentActivity.title,
     to: "/settings/connections",
@@ -1178,6 +1183,7 @@ export function searchableSetting(id: SettingsSearchItemId): {
   return { id: anchorId, title };
 }
 
+/** Excludes controls whose render prerequisites are absent, including relay read permission. */
 export function filterAvailableSettingsSearchItems(
   availability: SettingsSearchAvailability,
 ): ReadonlyArray<SettingsSearchItem> {
@@ -1192,7 +1198,8 @@ export function filterAvailableSettingsSearchItems(
       (!item.localEnvironmentOnly || !availability.localEnvironmentDisabled) &&
       (!item.wslAvailableOnly || availability.isWslSettingsRowVisible) &&
       (!item.requiresThreadAutoSettlement || availability.hasThreadAutoSettlement) &&
-      (!item.managedTunnelOnly || availability.managedTunnelActive === true),
+      (!item.managedTunnelOnly || availability.managedTunnelActive === true) &&
+      (!item.requiresRelayRead || availability.canReadRelay === true),
   );
 }
 
