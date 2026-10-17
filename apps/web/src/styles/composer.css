@@ -1,1 +1,20 @@
 /* CP1–CP2 输入框：本线新增的令牌（@theme）与全局样式写在这里。 */
+
+@theme {
+  /* 对话页-8a.dc.html · E1：输入框栈宽 760px，独立于时间线的 736px 内容宽度。 */
+  --container-composer: 760px;
+  /* 对话页-8a.dc.html · E1 / StyleM-8a.dc.html：底栏微凸按钮底色。 */
+  --color-composer-control: #2b2b30;
+}
+
+/* ContextStrip consumes these variables independently of the raised input surface. */
+@utility composer-shell {
+  --chat-composer-drawer-inset: calc(var(--spacing) * 5.5);
+  --chat-composer-glass-surface: var(--surface-raised);
+  --chat-composer-outline: var(--border);
+}
+
+/* StyleM / E1: white keys keep their icons dark instead of inheriting F8 category hues. */
+@utility composer-primary-key {
+  --lucide-hue-override: currentColor;
+}

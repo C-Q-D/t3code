@@ -1,7 +1,8 @@
+/** Renders composer actions; dispatch, permissions, and shortcuts remain caller-controlled. */
 import { t } from "~/i18n";
 import { memo, type MouseEventHandler, type PointerEventHandler } from "react";
 import { CheckIcon, ChevronDownIcon, ChevronLeftIcon, Minimize2Icon, PlayIcon } from "lucide-react";
-import { CornerUpRight, ListPlus } from "lucide";
+import { CornerDownRight, ListPlus } from "lucide";
 import { MorphIcon } from "~/components/MorphIcon";
 import { useEnvironmentIdentificationMode } from "~/hooks/useSettings";
 import { formatContextWindowTokens } from "~/lib/contextWindow";
@@ -18,6 +19,7 @@ import {
   resolveComposerDispatchMode,
 } from "@t3tools/client-runtime/state/composer-dispatch";
 
+/** Progress and submission availability for the active provider question. */
 interface PendingActionState {
   questionIndex: number;
   isLastQuestion: boolean;
@@ -26,6 +28,7 @@ interface PendingActionState {
   isComplete: boolean;
 }
 
+/** Conversation state and existing handlers used to select the primary action. */
 interface ComposerPrimaryActionsProps {
   compact: boolean;
   canOperateThread: boolean;
@@ -88,6 +91,7 @@ const preventPointerFocus: PointerEventHandler<HTMLElement> = (event) => {
   event.preventDefault();
 };
 
+/** Selects and presents the action without changing form submission or alternate dispatch. */
 export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
   compact,
   canOperateThread,
@@ -276,6 +280,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
   }
 
   const showResume = canResume && !hasSendableContent && !isEditingQueuedMessage;
+  const showActionText = !isEditingQueuedMessage && (showResume || isRunning);
 
   const compactTokens =
     compactBeforeSendTokens !== null && !showResume && !isEditingQueuedMessage
@@ -322,10 +327,11 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
     <button
       type={showResume ? "button" : "submit"}
       className={cn(
-        "relative isolate flex h-9 w-9 items-center justify-center overflow-hidden rounded-full shadow-xs transition-all duration-150 enabled:cursor-pointer enabled:inset-shadow-control-highlight hover:scale-105 active:inset-shadow-control-pressed active:shadow-none disabled:pointer-events-none disabled:opacity-64 disabled:shadow-none disabled:hover:scale-100 sm:h-8 sm:w-8 [&_svg]:pointer-events-none",
+        "composer-primary-key relative isolate inline-flex h-10 shrink-0 items-center justify-center overflow-hidden rounded-full border-0 font-extrabold text-body text-shadow-none outline-none enabled:cursor-pointer enabled:active:translate-y-0.5 enabled:active:shadow-primary-pressed focus-visible:inset-shadow-focus disabled:pointer-events-none disabled:bg-accent disabled:text-placeholder disabled:shadow-send-disabled [&_svg]:pointer-events-none",
+        showActionText ? "gap-1.75 pr-4.5 pl-3.5" : "w-10 p-0",
         stageBackdropVariant
-          ? "bg-transparent text-white enabled:shadow-black/24 enabled:hover:brightness-110"
-          : "bg-message-action text-message-action-foreground enabled:shadow-message-action/24 hover:bg-message-action-hover",
+          ? "bg-transparent text-white enabled:shadow-primary-send enabled:hover:brightness-110"
+          : "bg-primary text-primary-foreground enabled:shadow-primary-send enabled:hover:bg-message-action-hover",
       )}
       {...pointerFocusProps}
       onClick={showResume ? onResume : onSubmitMessage}
@@ -346,13 +352,13 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
       {isConnecting || isSendBusy ? (
         <Spinner size="sm" aria-hidden="true" />
       ) : showResume ? (
-        <PlayIcon className="size-4 fill-current" aria-hidden="true" />
+        <PlayIcon className="size-3.5" strokeWidth={2.5} aria-hidden="true" />
       ) : isEditingQueuedMessage ? (
         <CheckIcon className="size-4" aria-hidden="true" />
       ) : isRunning ? (
-        <MorphIcon className="size-4" icon={isQueuing ? ListPlus : CornerUpRight} />
+        <MorphIcon className="size-4" icon={isQueuing ? ListPlus : CornerDownRight} />
       ) : (
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 14 14" fill="none" aria-hidden="true">
           <path
             d="M7 11.5V2.5M7 2.5L3 6.5M7 2.5L11 6.5"
             stroke="currentColor"
@@ -362,6 +368,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
           />
         </svg>
       )}
+      {showActionText ? <span>{submitLabel}</span> : null}
     </button>
   );
 

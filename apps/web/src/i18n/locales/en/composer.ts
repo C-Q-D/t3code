@@ -115,7 +115,7 @@ export const composer = {
     skillSuffix: " Skill",
   },
   primaryActions: {
-    resume: "Resume thread",
+    resume: "Continue conversation",
     openToCompact: "Open composer to compact and send",
     send: "Send message",
     submit: "Submit",
@@ -146,7 +146,7 @@ export const composer = {
     updateQueued: "Update queued message",
     queue: "Queue message",
     steer: "Steer message",
-    submitMessage: "Submit message",
+    submitMessage: "Send message",
     disconnected: "Environment disconnected",
     connecting: "Connecting",
     preparingWorktree: "Preparing worktree",

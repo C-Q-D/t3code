@@ -1,4 +1,7 @@
-import { createElement } from "react";
+// @vitest-environment jsdom
+/** Verifies primary action visibility and dispatch at the composer's form boundary. */
+import { act, createElement, type ComponentProps } from "react";
+import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
@@ -16,6 +19,54 @@ vi.mock("../SidebarStageBackdrop", () => ({
 }));
 
 import { ComposerPrimaryActions } from "./ComposerPrimaryActions";
+
+let root: Root | undefined;
+let container: HTMLDivElement | undefined;
+
+/** Mounts the real action inside a form; overrides describe the current conversation state. */
+async function mountActions(
+  overrides: Partial<ComponentProps<typeof ComposerPrimaryActions>> = {},
+) {
+  container = document.createElement("div");
+  document.body.append(container);
+  root = createRoot(container);
+  const onSubmit = vi.fn();
+  const onResume = vi.fn();
+  await act(async () => {
+    root?.render(
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          onSubmit();
+        }}
+      >
+        <ComposerPrimaryActions
+          compact={false}
+          canOperateThread
+          pendingAction={null}
+          isRunning={false}
+          canInterrupt={false}
+          showPlanFollowUpPrompt={false}
+          promptHasText
+          isSendBusy={false}
+          sendDisabledReason={null}
+          isConnecting={false}
+          isEnvironmentUnavailable={false}
+          isPreparingWorktree={false}
+          hasSendableContent
+          onResume={onResume}
+          onPreviousPendingQuestion={() => {}}
+          onInterrupt={() => {}}
+          onImplementPlanInNewThread={() => {}}
+          {...overrides}
+        />
+      </form>,
+    );
+  });
+  const button = container.querySelector("button");
+  if (!button) throw new Error("Primary action is missing");
+  return { button, onSubmit, onResume };
+}
 
 function renderPendingActions(isRunning: boolean) {
   return renderToStaticMarkup(
@@ -69,12 +120,69 @@ function renderSendButton(sendDisabledReason: string | null = null) {
   );
 }
 
-afterEach(() => {
+afterEach(async () => {
+  await act(async () => root?.unmount());
+  root = undefined;
+  container?.remove();
+  container = undefined;
+  vi.unstubAllGlobals();
   stageArtworkState.mode = "none";
   stageArtworkState.variant = null;
 });
 
 describe("ComposerPrimaryActions", () => {
+  it("keeps ordinary send icon-only and submits the form", async () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    const { button, onSubmit } = await mountActions();
+
+    expect(button.textContent).toBe("");
+    expect(button.getAttribute("aria-label")).toBe("Send message");
+    await act(async () => button.click());
+    expect(onSubmit).toHaveBeenCalledOnce();
+  });
+
+  it("shows steer and queue text as Control changes the running action", async () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    const { button, onSubmit } = await mountActions({ isRunning: true, canInterrupt: true });
+
+    expect(button.textContent).toBe("Steer message");
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Control", ctrlKey: true }));
+    });
+    expect(button.textContent).toBe("Queue message");
+    await act(async () => button.click());
+    expect(onSubmit).toHaveBeenCalledOnce();
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent("keyup", { key: "Control" }));
+    });
+    expect(button.textContent).toBe("Steer message");
+  });
+
+  it("shows the configured queue default and the alternate steer label", async () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    const { button } = await mountActions({ isRunning: true, followUpBehavior: "queue" });
+
+    expect(button.textContent).toBe("Queue message");
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Control", ctrlKey: true }));
+    });
+    expect(button.textContent).toBe("Steer message");
+  });
+
+  it("shows continue text and resumes without submitting an empty form", async () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    const { button, onResume, onSubmit } = await mountActions({
+      canResume: true,
+      hasSendableContent: false,
+      promptHasText: false,
+    });
+
+    expect(button.textContent).toBe("Continue conversation");
+    await act(async () => button.click());
+    expect(onResume).toHaveBeenCalledOnce();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
   it("disables and labels the send button while feedback is uploading", () => {
     const markup = renderSendButton("Sending feedback");
 

@@ -288,6 +288,7 @@ import {
   ComposerControl,
   ComposerControlIcon,
   ComposerControlSeparator,
+  ComposerControlVariantContext,
   ComposerSelectControl,
 } from "./ComposerControl";
 import { resolveComposerMenuActiveItemId } from "./composerMenuHighlight";
@@ -1093,7 +1094,7 @@ import { toastManager } from "../ui/toast";
 import {
   FileIcon,
   CircleAlertIcon,
-  PaperclipIcon,
+  PlusIcon,
   PencilRulerIcon,
   PlayIcon,
   ShieldIcon,
@@ -5551,7 +5552,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   const hiddenRestingBlockIds = restingBlockDefs
     .slice(restingBlockDefs.length - restingHiddenBlockCount)
     .map((def) => def.id);
-  const composerControls = showProviderUnavailable ? (
+  const composerControlsContent = showProviderUnavailable ? (
     <ComposerControl
       type="button"
       disabled={!providerSetupInstanceId}
@@ -5636,7 +5637,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         triggerClassName={
           composerControlsCollapsed
             ? cn(
-                "min-w-13 shrink text-xs!",
+                "min-w-13 shrink",
                 !showInlineRestingControls &&
                   "@max-[640px]/composer-surface:[&_[data-chat-provider-model-picker-label]]:w-0 @max-[640px]/composer-surface:[&_[data-chat-provider-model-picker-label]]:flex-none",
               )
@@ -5715,6 +5716,11 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         </div>
       </>
     </>
+  );
+  const composerControls = (
+    <ComposerControlVariantContext value="composer">
+      {composerControlsContent}
+    </ComposerControlVariantContext>
   );
   const showTasksTab =
     !hasBannerItems &&
@@ -6837,7 +6843,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         if (isInsideRestingComposerControlScope(event.target)) return;
         composerMentionDragHandlers.onDrop(event);
       }}
-      className="mx-auto w-full min-w-0 max-w-(--chat-content-max-width)"
+      className="mx-auto w-full min-w-0 max-w-composer"
       data-chat-composer-form="true"
       {...threadContextDropTargetProps()}
     >
@@ -6849,7 +6855,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
               aria-hidden={restingControlsVisible ? undefined : true}
               inert={restingControlsVisible ? undefined : true}
               className={cn(
-                "relative flex w-max min-w-0 max-w-full items-center gap-1 font-normal text-muted-foreground/70 [&_button]:text-xs!",
+                "relative flex w-max min-w-0 max-w-full items-center gap-1 font-normal text-muted-foreground/70",
                 !restingControlsVisible && "invisible",
               )}
             >
@@ -7056,7 +7062,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
             data-chat-composer-surface="true"
             data-chat-composer-mobile-collapsed={isComposerCollapsedMobile ? "true" : "false"}
             className={cn(
-              "rounded-3xl transition-[background-color] duration-200",
+              "rounded-composer transition-[background-color] duration-200",
               "in-data-[thread-context-over]:bg-accent/45 in-data-[thread-context-over]:ring-1 in-data-[thread-context-over]:ring-inset in-data-[thread-context-over]:ring-primary/70",
               isDragOverComposer ? "bg-accent/45 ring-1 ring-inset ring-primary/70" : null,
               projectSelectionRequired ? "opacity-75" : null,
@@ -7756,17 +7762,17 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                       <Tooltip>
                         <TooltipTrigger
                           render={
-                            <Button
+                            <ComposerControl
                               type="button"
-                              variant="ghost"
-                              size="icon-sm"
+                              variant="composer"
+                              className="w-8.5 p-0"
                               onPointerDown={(event) => event.preventDefault()}
                               onClick={() => attachmentInputRef.current?.click()}
                               aria-label={t.composer.attachments.attach}
                             />
                           }
                         >
-                          <PaperclipIcon />
+                          <PlusIcon className="size-4.25" />
                         </TooltipTrigger>
                         <TooltipPopup>{t.composer.attachments.attach}</TooltipPopup>
                       </Tooltip>
@@ -7841,7 +7847,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     aria-hidden={restingControlsVisible ? undefined : true}
                     inert={restingControlsVisible ? undefined : true}
                     className={cn(
-                      "relative flex w-max min-w-0 max-w-full items-center gap-1 text-muted-foreground/70 [&_button]:text-xs!",
+                      "relative flex w-max min-w-0 max-w-full items-center gap-1 text-muted-foreground/70",
                       !restingControlsVisible && "invisible",
                     )}
                   >

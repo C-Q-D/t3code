@@ -143,7 +143,7 @@ export const composer: Messages["composer"] = {
     updateQueued: "更新排队的消息",
     queue: "排队发送消息",
     steer: "引导消息",
-    submitMessage: "提交消息",
+    submitMessage: "发送消息",
     disconnected: "环境已断开",
     connecting: "正在连接",
     preparingWorktree: "正在准备 worktree",
