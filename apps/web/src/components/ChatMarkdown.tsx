@@ -217,6 +217,8 @@ import { resolveLinkTarget } from "../browser/browserLinkTarget";
 import { PullRequestLinkPreview } from "./pullRequest/PullRequestLinkPreview";
 
 interface ChatMarkdownProps {
+  /** Opt into D1 code/table chrome; other surfaces and composer frames keep their existing look. */
+  presentation?: "timeline" | undefined;
   text: string;
   cwd: string | undefined;
   threadRef?: ScopedThreadRef | undefined;
@@ -250,6 +252,9 @@ interface ChatMarkdownProps {
       author. Rendered tags and their styling are unchanged. */
   headingLevelOffset?: number | undefined;
 }
+
+// One value per Markdown tree avoids threading presentation through every fence renderer.
+const MarkdownTimelineContext = React.createContext(false);
 
 export interface ChatMarkdownContextReference {
   kind: string;
@@ -571,9 +576,11 @@ function readInitialWordWrapSetting(): boolean {
  * Renders a Markdown table with cell expansion and clipboard export controls.
  * @param props - Native table attributes and children; children may be null or empty. Copy actions
  * write Markdown or CSV to the clipboard and report failures to the console.
- * @returns The table and its action toolbar; never null.
+ * @returns The table and cell-expansion control; timeline exports sit in the last header, while
+ * other surfaces retain the footer export menu. Never null.
  */
 function MarkdownTable({ children, ...props }: React.ComponentProps<"table">) {
+  const timeline = use(MarkdownTimelineContext);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const tableRef = useRef<HTMLTableElement | null>(null);
   const [expanded, setExpanded] = useState(readInitialWordWrapSetting);
@@ -644,17 +651,67 @@ function MarkdownTable({ children, ...props }: React.ComponentProps<"table">) {
     [],
   );
 
+  const copyMenu = (
+    <Menu>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <MenuTrigger
+              render={
+                timeline ? (
+                  <button
+                    type="button"
+                    aria-label={copyLabel}
+                    className="-my-1 -me-1.5 flex size-6.5 shrink-0 cursor-pointer items-center justify-center rounded-timeline-table-copy bg-accent text-foreground shadow-raise-tab hover:bg-secondary focus-visible:outline-none focus-visible:inset-shadow-focus"
+                  />
+                ) : (
+                  <Button
+                    type="button"
+                    variant="ghost-muted"
+                    size="icon-xs"
+                    aria-label={copyLabel}
+                  />
+                )
+              }
+            />
+          }
+        >
+          <MorphIcon className={timeline ? "size-3.25" : "size-3"} icon={copied ? Check : Copy} />
+        </TooltipTrigger>
+        <TooltipPopup side="top">{copyLabel}</TooltipPopup>
+      </Tooltip>
+      <MenuPopup align="end">
+        <MenuItem onClick={() => handleCopy("markdown")}>
+          {timeline ? <FileTextIcon aria-hidden className="size-3.5" /> : null}
+          {t.chat.markdown.copyAsMarkdown}
+        </MenuItem>
+        <MenuItem onClick={() => handleCopy("csv")}>
+          {timeline ? <FileSpreadsheetIcon aria-hidden className="size-3.5" /> : null}
+          {t.chat.markdown.copyAsCSV}
+        </MenuItem>
+      </MenuPopup>
+    </Menu>
+  );
+  const headerTable = timeline ? tableWithHeaderAction(children, copyMenu) : null;
   return (
     <div
       ref={containerRef}
-      className="chat-markdown-table-container"
+      className={cn("chat-markdown-table-container", timeline && "timeline-markdown-table")}
       data-expanded={expanded ? "true" : "false"}
     >
-      <ScrollArea radius="none" chainVerticalScroll scrollFade className="w-full max-w-full">
-        <table ref={tableRef} {...props}>
-          {children}
-        </table>
-      </ScrollArea>
+      <div
+        className={
+          timeline
+            ? "overflow-hidden rounded-card-row bg-timeline-file shadow-timeline-table"
+            : undefined
+        }
+      >
+        <ScrollArea radius="none" chainVerticalScroll scrollFade className="w-full max-w-full">
+          <table ref={tableRef} {...props}>
+            {headerTable?.children ?? children}
+          </table>
+        </ScrollArea>
+      </div>
       <div className="mt-0.5 flex items-center justify-between select-none">
         <Tooltip>
           <TooltipTrigger
@@ -673,36 +730,55 @@ function MarkdownTable({ children, ...props }: React.ComponentProps<"table">) {
           </TooltipTrigger>
           <TooltipPopup side="top">{expandLabel}</TooltipPopup>
         </Tooltip>
-        <Menu>
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <MenuTrigger
-                  render={
-                    <Button
-                      type="button"
-                      variant="ghost-muted"
-                      size="icon-xs"
-                      aria-label={copyLabel}
-                    />
-                  }
-                />
-              }
-            >
-              <MorphIcon className="size-3" icon={copied ? Check : Copy} />
-            </TooltipTrigger>
-            <TooltipPopup side="top">{copyLabel}</TooltipPopup>
-          </Tooltip>
-          <MenuPopup align="end">
-            <MenuItem onClick={() => handleCopy("markdown")}>
-              {t.chat.markdown.copyAsMarkdown}
-            </MenuItem>
-            <MenuItem onClick={() => handleCopy("csv")}>{t.chat.markdown.copyAsCSV}</MenuItem>
-          </MenuPopup>
-        </Menu>
+        {headerTable?.inserted ? null : copyMenu}
       </div>
     </div>
   );
+}
+
+/**
+ * Put the existing export menu inside the last header cell, without adding an exported column.
+ * @param children Markdown's table sections, possibly empty; non-header content passes through.
+ * @param action Existing copy menu; its icon-only trigger contributes no text to clipboard exports.
+ * @returns Sections and whether the action was inserted. Headerless HTML tables retain the footer
+ * export entry rather than losing a previously available operation.
+ */
+function tableWithHeaderAction(children: ReactNode, action: ReactNode) {
+  let inserted = false;
+  const sections = Children.map(children, (section) => {
+    if (!isValidElement<ComponentProps<"thead">>(section) || section.type !== "thead")
+      return section;
+    return React.cloneElement(
+      section,
+      undefined,
+      Children.map(section.props.children, (row) => {
+        if (inserted || !isValidElement<ComponentProps<"tr">>(row) || row.type !== "tr") return row;
+        const cells = Children.toArray(row.props.children);
+        const lastHeader = cells.findLastIndex(
+          (cell) => isValidElement(cell) && cell.type === "th",
+        );
+        if (lastHeader < 0) return row;
+        inserted = true;
+        return React.cloneElement(
+          row,
+          undefined,
+          cells.map((cell, index) =>
+            index === lastHeader && isValidElement<ComponentProps<"th">>(cell)
+              ? React.cloneElement(
+                  cell,
+                  undefined,
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="min-w-0 truncate">{cell.props.children}</span>
+                    <span data-thread-find-ignore>{action}</span>
+                  </span>,
+                )
+              : cell,
+          ),
+        );
+      }),
+    );
+  });
+  return { children: sections, inserted };
 }
 
 /**
@@ -774,6 +850,12 @@ const THREAD_FIND_IGNORE_PROPS = {
   "data-thread-find-ignore": "",
 } as React.HTMLAttributes<HTMLDivElement>;
 
+/**
+ * Frame rendered and editable fences; only a timeline Markdown parent enables D1 chrome.
+ * @param props Language/optional filename, theme, wrap state (defaults true), content and optional
+ * header actions/title. as defaults to div and supports the composer's existing node-view wrapper.
+ * @returns The code surface and header; Mermaid and composer frames keep their existing appearance.
+ */
 export function MarkdownCodeBlockFrame({
   as: Wrapper = "div",
   language,
@@ -796,26 +878,44 @@ export function MarkdownCodeBlockFrame({
   headerProps?: React.HTMLAttributes<HTMLDivElement>;
   children: React.ReactNode;
 }) {
+  const timeline = use(MarkdownTimelineContext) && language !== "mermaid";
   return (
     <Wrapper
-      className="chat-markdown-codeblock my-[0.65rem] overflow-hidden rounded-lg border border-border/70 bg-secondary leading-snug dark:border-transparent dark:bg-input/32"
+      className={
+        timeline
+          ? "chat-markdown-codeblock timeline-codeblock my-3.5 overflow-hidden rounded-card-surface bg-code text-code-foreground shadow-well-control"
+          : "chat-markdown-codeblock my-[0.65rem] overflow-hidden rounded-lg border border-border/70 bg-secondary leading-snug dark:border-transparent dark:bg-input/32"
+      }
       data-language={language}
       data-wrap={wrapped ? "true" : "false"}
     >
       <div
         {...headerProps}
         className={cn(
-          "chat-markdown-codeblock-header flex items-center justify-between gap-2 pt-1.5 pr-1.5 pb-0 pl-3 select-none",
+          "chat-markdown-codeblock-header flex items-center justify-between select-none",
+          timeline ? "h-10 gap-0.5 ps-4 pe-2" : "gap-2 pt-1.5 pr-1.5 pb-0 pl-3",
           headerProps?.className,
         )}
       >
         {title ?? (
-          <span className="inline-flex min-w-0 items-center gap-1.5 font-mono text-2xs">
-            <MarkdownCodeBlockTitleContent
-              fenceTitle={fenceTitle}
-              language={language}
-              theme={theme}
-            />
+          <span
+            className={
+              timeline
+                ? "inline-flex h-5.5 min-w-0 items-center gap-1.5 rounded-full bg-timeline-log-hover px-2.5 text-secondary-copy font-semibold text-timeline-code-label"
+                : "inline-flex min-w-0 items-center gap-1.5 font-mono text-2xs"
+            }
+          >
+            {timeline && !fenceTitle ? (
+              <span className="truncate">
+                {language === "typescript" ? "TypeScript" : language}
+              </span>
+            ) : (
+              <MarkdownCodeBlockTitleContent
+                fenceTitle={fenceTitle}
+                language={language}
+                theme={theme}
+              />
+            )}
           </span>
         )}
         {actions}
@@ -869,6 +969,10 @@ function MarkdownCodeBlockTitleContent({
   );
 }
 
+// D1 code-well actions are circular and use the well's hover, unlike the 10px-corner message actions.
+const TIMELINE_CODE_ACTION_CLASS =
+  "flex size-7.5 shrink-0 cursor-pointer items-center justify-center rounded-full bg-transparent text-secondary-label hover:bg-timeline-log-hover hover:text-foreground focus-visible:outline-none focus-visible:inset-shadow-focus";
+
 /**
  * Renders code or diagram content with copy, wrapping, and optional shell execution controls.
  * @param props - Required code and language strings (which may be empty), light/dark theme,
@@ -902,6 +1006,7 @@ function MarkdownCodeBlock({
   diagram?: boolean;
   children: ReactNode;
 }) {
+  const timeline = use(MarkdownTimelineContext) && language !== "mermaid";
   const [copied, setCopied] = useState(false);
   const [wrapped, setWrapped] = useState(readInitialWordWrapSetting);
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -961,16 +1066,25 @@ function MarkdownCodeBlock({
     <Tooltip>
       <TooltipTrigger
         render={
-          <Button
-            type="button"
-            variant="ghost-muted"
-            size="icon-xs"
-            onClick={handleCopy}
-            aria-label={copyLabel}
-          />
+          timeline ? (
+            <button
+              type="button"
+              className={TIMELINE_CODE_ACTION_CLASS}
+              onClick={handleCopy}
+              aria-label={copyLabel}
+            />
+          ) : (
+            <Button
+              type="button"
+              variant="ghost-muted"
+              size="icon-xs"
+              onClick={handleCopy}
+              aria-label={copyLabel}
+            />
+          )
         }
       >
-        <MorphIcon className="size-3" icon={copied ? Check : Copy} />
+        <MorphIcon className={timeline ? "size-3.75" : "size-3"} icon={copied ? Check : Copy} />
       </TooltipTrigger>
       <TooltipPopup side="top">{copyLabel}</TooltipPopup>
     </Tooltip>
@@ -1003,21 +1117,32 @@ function MarkdownCodeBlock({
           aria-label={t.chat.markdown.codeBlockActions}
         >
           {leadingActions}
+          {timeline ? copyButton : null}
           {canWrap ? (
             <Tooltip>
               <TooltipTrigger
                 render={
-                  <Button
-                    type="button"
-                    variant={wrapped ? "secondary" : "ghost-muted"}
-                    size="icon-xs"
-                    aria-pressed={wrapped}
-                    onClick={() => setWrapped((value) => !value)}
-                    aria-label={wrapLabel}
-                  />
+                  timeline ? (
+                    <button
+                      type="button"
+                      className={TIMELINE_CODE_ACTION_CLASS}
+                      aria-pressed={wrapped}
+                      onClick={() => setWrapped((value) => !value)}
+                      aria-label={wrapLabel}
+                    />
+                  ) : (
+                    <Button
+                      type="button"
+                      variant={wrapped ? "secondary" : "ghost-muted"}
+                      size="icon-xs"
+                      aria-pressed={wrapped}
+                      onClick={() => setWrapped((value) => !value)}
+                      aria-label={wrapLabel}
+                    />
+                  )
                 }
               >
-                <WrapTextIcon className="size-3" />
+                <WrapTextIcon className={timeline ? "size-3.75" : "size-3"} />
               </TooltipTrigger>
               <TooltipPopup side="top">{wrapLabel}</TooltipPopup>
             </Tooltip>
@@ -1026,21 +1151,30 @@ function MarkdownCodeBlock({
             <Tooltip>
               <TooltipTrigger
                 render={
-                  <Button
-                    type="button"
-                    variant="ghost-muted"
-                    size="icon-xs"
-                    onClick={() => onRunShellCommand(command)}
-                    aria-label={t.chat.markdown.runInTerminal}
-                  />
+                  timeline ? (
+                    <button
+                      type="button"
+                      className={TIMELINE_CODE_ACTION_CLASS}
+                      onClick={() => onRunShellCommand(command)}
+                      aria-label={t.chat.markdown.runInTerminal}
+                    />
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="ghost-muted"
+                      size="icon-xs"
+                      onClick={() => onRunShellCommand(command)}
+                      aria-label={t.chat.markdown.runInTerminal}
+                    />
+                  )
                 }
               >
-                <PlayIcon className="size-3" />
+                <PlayIcon className={timeline ? "size-3.75" : "size-3"} />
               </TooltipTrigger>
               <TooltipPopup side="top">{t.chat.markdown.runInTerminal}</TooltipPopup>
             </Tooltip>
           ) : null}
-          {copyButton}
+          {timeline ? null : copyButton}
         </span>
       }
     >
@@ -3497,6 +3631,7 @@ const CHAT_MARKDOWN_COMPONENTS = {
 function ChatMarkdown({
   text,
   className,
+  presentation,
   lineBreaks = false,
   parseRawHtml = true,
   extraRemarkPlugins = EMPTY_REMARK_PLUGINS,
@@ -3530,28 +3665,33 @@ function ChatMarkdown({
     <div
       ref={markdownRef}
       className={cn(
-        "chat-markdown w-full min-w-0 text-sm leading-relaxed text-foreground/[calc(80%+var(--appearance-contrast-boost)/5)] [overflow-wrap:anywhere] [word-break:break-word]",
+        "chat-markdown w-full min-w-0 [overflow-wrap:anywhere] [word-break:break-word]",
+        presentation === "timeline"
+          ? "text-reply text-fg-detail"
+          : "text-sm leading-relaxed text-foreground/[calc(80%+var(--appearance-contrast-boost)/5)]",
         className,
       )}
       // Gates the fade-in for blocks that arrive while the response streams.
       data-streaming={componentState.isStreaming ? "" : undefined}
       onCopy={handleCopy}
     >
-      <ChatMarkdownRendererContext value={componentState}>
-        <ReactMarkdown
-          remarkPlugins={remarkPlugins}
-          rehypePlugins={
-            parseRawHtml
-              ? CHAT_MARKDOWN_RENDER_REHYPE_PLUGINS
-              : CHAT_MARKDOWN_LITERAL_HTML_REHYPE_PLUGINS
-          }
-          skipHtml={false}
-          components={CHAT_MARKDOWN_COMPONENTS}
-          urlTransform={markdownUrlTransform}
-        >
-          {text}
-        </ReactMarkdown>
-      </ChatMarkdownRendererContext>
+      <MarkdownTimelineContext value={presentation === "timeline"}>
+        <ChatMarkdownRendererContext value={componentState}>
+          <ReactMarkdown
+            remarkPlugins={remarkPlugins}
+            rehypePlugins={
+              parseRawHtml
+                ? CHAT_MARKDOWN_RENDER_REHYPE_PLUGINS
+                : CHAT_MARKDOWN_LITERAL_HTML_REHYPE_PLUGINS
+            }
+            skipHtml={false}
+            components={CHAT_MARKDOWN_COMPONENTS}
+            urlTransform={markdownUrlTransform}
+          >
+            {text}
+          </ReactMarkdown>
+        </ChatMarkdownRendererContext>
+      </MarkdownTimelineContext>
       {localMediaPreview ? (
         <ExpandedImageDialog
           preview={localMediaPreview}

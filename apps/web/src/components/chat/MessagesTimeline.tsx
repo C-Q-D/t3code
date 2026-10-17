@@ -137,6 +137,8 @@ import {
   EyeIcon,
   FileTextIcon,
   GitForkIcon,
+  HandIcon,
+  ShrinkIcon,
   GlobeIcon,
   type LucideIcon,
   MessageCircleIcon,
@@ -1650,7 +1652,8 @@ const ConversationTimeline = memo(function ConversationTimeline({
               keyExtractor={keyExtractor}
               getItemType={getItemType}
               renderItem={renderItem}
-              estimatedItemSize={90}
+              // Bootstrap for D1's 25.375px reply lines and 30px actions; measured type averages take over.
+              estimatedItemSize={120}
               initialScrollAtEnd={
                 !findActive && citationRequest === null && rememberedPosition?.atEnd !== false
               }
@@ -1750,7 +1753,14 @@ function keyExtractor(item: MessagesTimelineRow) {
   return item.id;
 }
 
+/**
+ * Keep LegendList's measured size averages separate for each event shape.
+ * @param item Visible timeline row, including compact lifecycle tags and taller inspectors.
+ * @returns A stable size-pool key; this does not measure or mount additional rows.
+ */
 function getItemType(item: MessagesTimelineRow) {
+  // Recessed lifecycle tags must not share size estimates with tall event inspectors.
+  if (item.kind === "event") return `event:${item.projectedItem.item.type}`;
   return item.kind === "message" ? `message:${item.message.role}` : item.kind;
 }
 
@@ -2207,38 +2217,13 @@ function WorktreeSetupTimelineRow({
   );
 }
 
+/** Render the existing compaction status as a static D1 tag without a repainting shimmer. */
 function ContextCompactionTimelineRow({
   row,
 }: {
   row: Extract<TimelineRow, { kind: "context-compaction" }>;
 }) {
-  return (
-    <div
-      role="separator"
-      aria-label={row.label}
-      className="mx-auto flex w-full max-w-(--chat-content-max-width) items-center gap-3 py-1 text-muted-foreground text-xs"
-    >
-      <span className="h-px flex-1 bg-border/70" />
-      <span
-        ref={row.active ? observeVisibleAnimation : undefined}
-        className="relative shrink-0 overflow-hidden"
-      >
-        <span className="flex items-center gap-1.5">
-          <Minimize2Icon aria-hidden="true" className="size-3" />
-          {row.label}
-        </span>
-        {row.active ? (
-          <ActivityShimmerOverlay>
-            <span className="flex items-center gap-1.5">
-              <Minimize2Icon aria-hidden="true" className="size-3" />
-              {row.label}
-            </span>
-          </ActivityShimmerOverlay>
-        ) : null}
-      </span>
-      <span className="h-px flex-1 bg-border/70" />
-    </div>
-  );
+  return <TimelineSystemDivider label={row.label} icon={ShrinkIcon} />;
 }
 
 function UserVideoAttachment({ file }: { readonly file: ChatFileAttachment }) {
@@ -2855,8 +2840,22 @@ function TimelineRowTimestamp({
   );
 }
 
+/** Render an existing turn disclosure, using the D1 hand tag for an interrupted turn. */
 function TurnFoldTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "turn-fold" }> }) {
   const ctx = use(TimelineRowCtx);
+
+  if (row.interrupted) {
+    return (
+      <TimelineSystemDivider
+        label={row.label}
+        detail={row.summary}
+        icon={HandIcon}
+        actionLabel={row.label}
+        expanded={row.expanded}
+        onAction={() => ctx.onToggleTurnFold(row.runId)}
+      />
+    );
+  }
 
   return (
     <WorkLogButton
@@ -2938,6 +2937,8 @@ function AssistantTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "mess
             listRef={ctx.listRef}
           >
             <ChatMarkdown
+              presentation="timeline"
+              className="timeline-assistant-markdown"
               text={messageText}
               cwd={ctx.markdownCwd}
               threadRef={ctx.threadRef ?? undefined}
@@ -3003,8 +3004,8 @@ function AssistantForkButton({
         render={
           <Button
             type="button"
-            size="xs"
-            variant="ghost"
+            size="icon-md"
+            variant="ghost-muted"
             disabled={busy}
             onClick={() => {
               setBusy(true);
@@ -3016,7 +3017,7 @@ function AssistantForkButton({
           />
         }
       >
-        <GitForkIcon className={cn("size-3", busy && "animate-pulse")} />
+        <GitForkIcon className="size-3.75" />
       </TooltipTrigger>
       <TooltipPopup side="top">{t.chat.timeline.forkFromThisResponse}</TooltipPopup>
     </Tooltip>
@@ -3042,6 +3043,7 @@ function AssistantMetaTimelineRow({
   );
 }
 
+/** Render the retained response actions in D1 order, preserving hover, focus and touch visibility. */
 function AssistantMessageMeta({
   className,
   projectedItem,
@@ -3062,7 +3064,7 @@ function AssistantMessageMeta({
   return (
     <div
       className={cn(
-        "flex items-center gap-2 text-xs tabular-nums transition-opacity duration-200",
+        "flex items-center gap-0.5 text-secondary-copy tabular-nums transition-opacity duration-200",
         alwaysVisible
           ? "opacity-100"
           : "opacity-0 pointer-coarse:opacity-100 focus-within:opacity-100 group-hover/assistant:opacity-100",
@@ -3074,17 +3076,19 @@ function AssistantMessageMeta({
           {projectedItem.item.status}
         </span>
       ) : null}
+      {projectedItem?.item.type === "assistant_message" ? (
+        <AssistantForkButton projectedItem={projectedItem} />
+      ) : null}
       <AssistantCopyButton
         message={message}
         showCopyButton={showCopyButton}
         streaming={copyStreaming}
       />
-      {projectedItem?.item.type === "assistant_message" ? (
-        <AssistantForkButton projectedItem={projectedItem} />
-      ) : null}
       {!message.streaming && (
         <Tooltip>
-          <TooltipTrigger render={<p className="text-muted-foreground text-xs tabular-nums" />}>
+          <TooltipTrigger
+            render={<p className="ms-1.5 text-muted-foreground text-secondary-copy tabular-nums" />}
+          >
             {formatDayAwareTimestamp(message.updatedAt, ctx.timestampFormat)}
           </TooltipTrigger>
           <TooltipPopup>
@@ -3115,7 +3119,7 @@ function AssistantCopyButton({
     return null;
   }
 
-  return <MessageCopyButton text={assistantCopyState.text ?? ""} variant="ghost" />;
+  return <MessageCopyButton text={assistantCopyState.text ?? ""} size="icon-md" variant="ghost" />;
 }
 
 function ProposedPlanTimelineRow({

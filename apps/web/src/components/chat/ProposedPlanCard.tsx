@@ -19,12 +19,19 @@ import {
   normalizePlanMarkdownForExport,
 } from "../../proposedPlan";
 import ChatMarkdown from "../ChatMarkdown";
-import { EllipsisIcon } from "lucide-react";
+import {
+  CheckIcon,
+  ClipboardCopyIcon,
+  DownloadIcon,
+  FolderDownIcon,
+  ListChecksIcon,
+  ChevronUpIcon,
+  ChevronDownIcon,
+} from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import { Menu, MenuItem, MenuPopup, MenuTrigger } from "../ui/menu";
+import { Tooltip, TooltipTrigger, TooltipPopup } from "../ui/tooltip";
 import { cn } from "~/lib/utils";
-import { Badge } from "../ui/badge";
 import {
   Dialog,
   DialogDescription,
@@ -40,6 +47,12 @@ import { useCopyToClipboard } from "~/hooks/useCopyToClipboard";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { readEnvironmentScope, useEnvironmentScope } from "~/state/session";
 
+/**
+ * Render the retained plan with D1 header actions; short plans do not gain a new collapse behavior.
+ * @param props Markdown and environment scope; missing workspaceRoot disables saving. findActive
+ * keeps the full plan mounted so existing search can reveal a match beyond the preview.
+ * @returns Plan content, existing export actions and the permitted workspace-save dialog.
+ */
 export const ProposedPlanCard = memo(function ProposedPlanCard({
   planMarkdown,
   environmentId,
@@ -165,39 +178,100 @@ export const ProposedPlanCard = memo(function ProposedPlanCard({
   };
 
   return (
-    <div className="rounded-3xl border border-border/80 bg-card/70 p-4 sm:p-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <Badge variant="secondary">{t.chat.plan.plan}</Badge>
+    <div className="timeline-plan rounded-card-large bg-surface-raised p-1.5 pb-4 shadow-raise-l-spec">
+      <div className="flex h-11.5 min-w-0 items-center gap-2.5 ps-3.5 pe-1.5">
+        <div className="flex min-w-0 flex-1 items-center gap-2.5">
+          <ListChecksIcon aria-hidden className="size-4.25 shrink-0" />
           {/* Same heading level as the message author headings in the timeline,
               so a plan's own headings nest beneath it in the outline. */}
-          <h3 data-thread-find-text="true" className="truncate text-sm font-medium text-foreground">
+          <h3
+            data-thread-find-text="true"
+            className="truncate font-serif text-plan-title font-bold text-foreground"
+          >
             {title}
           </h3>
         </div>
-        <Menu>
-          <MenuTrigger
-            render={
-              <Button aria-label={t.chat.plan.planActions} size="icon-xs" variant="outline" />
-            }
-          >
-            <EllipsisIcon aria-hidden="true" className="size-4" />
-          </MenuTrigger>
-          <MenuPopup align="end">
-            <MenuItem onClick={handleCopyPlan}>
-              {isCopied ? t.chat.plan.copied : t.chat.plan.copyToClipboard}
-            </MenuItem>
-            <MenuItem onClick={handleDownload}>{t.chat.plan.downloadAsMarkdown}</MenuItem>
-            <MenuItem
-              onClick={openSaveDialog}
-              disabled={!canWriteFiles || !workspaceRoot || isSavingToWorkspace}
+        <div className="flex shrink-0 items-center">
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  size="icon-toolbar"
+                  variant="ghost-muted"
+                  onClick={handleCopyPlan}
+                  aria-label={isCopied ? t.chat.plan.copied : t.chat.plan.copyToClipboard}
+                />
+              }
             >
-              {t.chat.plan.saveToWorkspace}
-            </MenuItem>
-          </MenuPopup>
-        </Menu>
+              {isCopied ? (
+                <CheckIcon aria-hidden className="size-3.75" />
+              ) : (
+                <ClipboardCopyIcon aria-hidden className="size-3.75" />
+              )}
+            </TooltipTrigger>
+            <TooltipPopup>
+              {isCopied ? t.chat.plan.copied : t.chat.plan.copyToClipboard}
+            </TooltipPopup>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  size="icon-toolbar"
+                  variant="ghost-muted"
+                  onClick={handleDownload}
+                  aria-label={t.chat.plan.downloadAsMarkdown}
+                />
+              }
+            >
+              <DownloadIcon aria-hidden className="size-3.75" />
+            </TooltipTrigger>
+            <TooltipPopup>{t.chat.plan.downloadAsMarkdown}</TooltipPopup>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  size="icon-toolbar"
+                  variant="ghost-muted"
+                  onClick={openSaveDialog}
+                  disabled={!canWriteFiles || !workspaceRoot || isSavingToWorkspace}
+                  aria-label={t.chat.plan.saveToWorkspace}
+                />
+              }
+            >
+              <FolderDownIcon aria-hidden className="size-3.75" />
+            </TooltipTrigger>
+            <TooltipPopup>{t.chat.plan.saveToWorkspace}</TooltipPopup>
+          </Tooltip>
+          {canCollapse ? (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    size="icon-toolbar"
+                    variant="secondary"
+                    data-scroll-anchor-ignore
+                    aria-expanded={expanded}
+                    aria-label={expanded ? t.chat.plan.collapsePlan : t.chat.plan.expandPlan}
+                    onClick={() => setExpanded((value) => !value)}
+                  />
+                }
+              >
+                {expanded ? (
+                  <ChevronUpIcon aria-hidden className="size-4" />
+                ) : (
+                  <ChevronDownIcon aria-hidden className="size-4" />
+                )}
+              </TooltipTrigger>
+              <TooltipPopup>
+                {expanded ? t.chat.plan.collapsePlan : t.chat.plan.expandPlan}
+              </TooltipPopup>
+            </Tooltip>
+          ) : null}
+        </div>
       </div>
-      <div className="mt-4">
+      <div className="mx-4.5 mt-1">
         <div
           ref={findRevealRef}
           className={cn("relative", isCollapsed && "max-h-104 overflow-hidden")}
@@ -206,6 +280,8 @@ export const ProposedPlanCard = memo(function ProposedPlanCard({
         >
           {showPreview ? (
             <ChatMarkdown
+              presentation="timeline"
+              className="timeline-plan-markdown"
               text={collapsedPreview ?? ""}
               cwd={cwd}
               environmentId={environmentId}
@@ -215,6 +291,8 @@ export const ProposedPlanCard = memo(function ProposedPlanCard({
             />
           ) : (
             <ChatMarkdown
+              presentation="timeline"
+              className="timeline-plan-markdown"
               text={displayedPlanMarkdown}
               cwd={cwd}
               environmentId={environmentId}
@@ -227,18 +305,6 @@ export const ProposedPlanCard = memo(function ProposedPlanCard({
             <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-linear-to-t from-card/95 via-card/80 to-transparent" />
           ) : null}
         </div>
-        {canCollapse ? (
-          <div className="mt-4 flex justify-center">
-            <Button
-              size="sm"
-              variant="outline"
-              data-scroll-anchor-ignore
-              onClick={() => setExpanded((value) => !value)}
-            >
-              {expanded ? t.chat.plan.collapsePlan : t.chat.plan.expandPlan}
-            </Button>
-          </div>
-        ) : null}
       </div>
 
       <Dialog

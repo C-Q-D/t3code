@@ -680,7 +680,7 @@ export const chat = {
     copyToClipboard: "Copy to clipboard",
     downloadAsMarkdown: "Download as markdown",
     saveToWorkspace: "Save to workspace",
-    collapsePlan: "Collapse plan",
+    collapsePlan: "Collapse",
     expandPlan: "Expand plan",
     savePlanToWorkspace: "Save plan to workspace",
     theWorkspace: "the workspace",

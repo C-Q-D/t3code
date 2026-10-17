@@ -22,6 +22,23 @@
   --shadow-timeline-log-content:
     inset 0 -1px 0 rgba(0, 0, 0, 0.66), 0 0 0 1px rgba(0, 0, 0, 0.44), 0 2px 0 #09090a,
     6px 10px 16px -4px rgba(0, 0, 0, 0.66);
+
+  /* 对话页-8a D1：生命周期刻线、中断状态、表格与行内代码；合同表未覆盖的角色。 */
+  --color-timeline-rule: rgba(0, 0, 0, 0.65);
+  --color-timeline-interrupted: #ff9c5c;
+  --color-timeline-table-header: #26262a;
+  --color-timeline-table-rule: rgba(0, 0, 0, 0.5);
+  --color-timeline-table-header-rule: rgba(0, 0, 0, 0.6);
+  --color-timeline-code-label: #b2b2b9;
+  --shadow-timeline-rule: 0 1px 0 rgba(255, 255, 255, 0.05);
+  --shadow-timeline-table:
+    inset 1.5px 2px 3px rgba(0, 0, 0, 0.6), inset -1px -1px 0 rgba(255, 255, 255, 0.05),
+    0 0 0 1px rgba(0, 0, 0, 0.4);
+  --radius-timeline-inline: 7px;
+  --radius-timeline-table-copy: 8px;
+  /* 对话页-8a D1：计划头部 32px 图标按钮、11px 圆角。 */
+  --radius-toolbar-icon: 11px;
+  --leading-timeline-plan: 1.7;
 }
 
 /* Keep the side shadows while clipping the edge shared with the adjacent virtual item. */
@@ -31,4 +48,78 @@
 
 .timeline-worklog-content {
   clip-path: inset(0 calc(var(--spacing) * -12) calc(var(--spacing) * -12));
+}
+
+/* D1 reply/plan typography is opt-in: other Markdown surfaces retain their existing scale. */
+.chat-markdown.timeline-assistant-markdown {
+  @apply text-reply text-fg-detail;
+}
+
+.chat-markdown.timeline-plan-markdown {
+  @apply text-body leading-timeline-plan text-fg-detail;
+}
+
+.chat-markdown.timeline-assistant-markdown
+  > :is(p, ul, ol, blockquote, .timeline-codeblock, .timeline-markdown-table) {
+  @apply my-3.5;
+}
+
+.chat-markdown.timeline-plan-markdown ol {
+  @apply my-0 ps-6.5;
+}
+
+.chat-markdown.timeline-plan-markdown li + li {
+  @apply mt-2;
+}
+
+.chat-markdown:is(.timeline-assistant-markdown, .timeline-plan-markdown) > :first-child {
+  margin-top: 0;
+}
+
+.chat-markdown:is(.timeline-assistant-markdown, .timeline-plan-markdown) > :last-child {
+  margin-bottom: 0;
+}
+
+.chat-markdown:is(.timeline-assistant-markdown, .timeline-plan-markdown) :not(pre) > code {
+  @apply rounded-timeline-inline border-0 bg-popover px-1.75 py-0.5 font-mono text-secondary-copy-medium text-fg-detail;
+}
+
+/* These selectors beat index.css's shared pre rules without changing composer or Mermaid frames. */
+.chat-markdown .timeline-codeblock pre {
+  @apply px-4.5 pt-0 pb-4 font-mono text-code-copy leading-code text-code-foreground;
+}
+
+.chat-markdown .timeline-codeblock pre code,
+.chat-markdown .timeline-codeblock .chat-markdown-shiki .shiki {
+  @apply text-code-copy leading-code;
+}
+
+.timeline-plan {
+  background-image:
+    linear-gradient(var(--color-stone-detail-veil), var(--color-stone-detail-veil)),
+    url("../assets/stone-8a.webp");
+}
+
+.chat-markdown .timeline-markdown-table table {
+  @apply text-control;
+}
+
+.chat-markdown .timeline-markdown-table :is(th, td) {
+  @apply px-3.5 py-2.5;
+}
+
+.chat-markdown .timeline-markdown-table thead th {
+  @apply border-timeline-table-header-rule bg-timeline-table-header font-bold text-foreground;
+}
+
+.chat-markdown .timeline-markdown-table tbody td {
+  @apply border-timeline-table-rule text-fg-detail;
+}
+
+.chat-markdown .timeline-markdown-table tbody td:not(:first-child) {
+  @apply font-mono text-secondary-copy-medium text-secondary-label;
+}
+
+.chat-markdown .timeline-markdown-table tbody tr:last-child td {
+  border-bottom: 0;
 }

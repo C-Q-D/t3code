@@ -37,8 +37,9 @@ import {
   ArrowRightIcon,
   GitForkIcon,
   MessageSquareIcon,
-  MinusIcon,
-  XIcon,
+  CircleStopIcon,
+  HandIcon,
+  ShrinkIcon,
 } from "lucide-react";
 
 import { Tooltip, TooltipTrigger, TooltipPopup } from "../ui/tooltip";
@@ -90,21 +91,11 @@ export function V2LifecycleRow(props: {
   const { item } = props;
   if (item.type === "run_interrupt_request") {
     return (
-      <div className="flex justify-end px-1 py-1" data-v2-item-type={item.type}>
-        <div className="flex max-w-[80%] items-center gap-2 text-xs text-destructive">
-          <span aria-hidden="true" className="font-mono">
-            ■
-          </span>
-          <span className="font-medium">{t.chat.timeline.interruptRequested}</span>
-          <span aria-hidden="true" className="opacity-50">
-            ·
-          </span>
-          <span className="font-medium">{item.message}</span>
-          <span className="text-3xs text-muted-foreground">
-            {formatShortTimestamp(props.createdAt, props.timestampFormat)}
-          </span>
-        </div>
-      </div>
+      <TimelineSystemDivider
+        label={t.chat.timeline.interruptRequested}
+        icon={HandIcon}
+        detail={`${item.message} · ${formatShortTimestamp(props.createdAt, props.timestampFormat)}`}
+      />
     );
   }
   if (item.type === "run_interrupt_result") {
@@ -112,8 +103,8 @@ export function V2LifecycleRow(props: {
       <TimelineSystemDivider
         label={t.chat.timeline.runInterrupted}
         detail={item.message}
-        tone="danger"
-        icon={XIcon}
+        tone="interrupted"
+        icon={CircleStopIcon}
       />
     );
   }
@@ -131,7 +122,12 @@ export function V2LifecycleRow(props: {
             ? t.chat.timeline.compactingContext
             : t.chat.timeline.contextCompacted;
     return (
-      <TimelineSystemDivider label={label} detail={item.summary ?? tokenDetail} icon={MinusIcon} />
+      <TimelineSystemDivider
+        label={label}
+        detail={item.summary ?? tokenDetail}
+        showDetailSeparator={false}
+        icon={ShrinkIcon}
+      />
     );
   }
   if (item.type === "handoff") {

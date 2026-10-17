@@ -642,6 +642,7 @@ type MessagesTimelineRowContent =
       runId: RunId;
       label: string;
       summary?: string;
+      interrupted?: true;
       expanded: boolean;
     }
   | {
@@ -807,6 +808,7 @@ interface TurnFold {
   hiddenEntryIds: ReadonlySet<string>;
   label: string;
   summary?: string;
+  interrupted?: true;
 }
 
 interface SupersededAttemptFold {
@@ -1328,6 +1330,7 @@ function deriveTurnFolds(input: {
       hiddenEntryIds,
       label,
       ...(summary ? { summary } : {}),
+      ...(isLatestInterruptedTurn ? { interrupted: true as const } : {}),
     });
   }
   return foldsByAnchorEntryId;
@@ -1749,6 +1752,7 @@ export function deriveMessagesTimelineRows(input: {
         runId: turnFold.runId,
         label: turnFold.label,
         ...(turnFold.summary ? { summary: turnFold.summary } : {}),
+        ...(turnFold.interrupted ? { interrupted: true as const } : {}),
         expanded: input.expandedRunIds?.has(turnFold.runId) ?? false,
       });
     }
@@ -2401,6 +2405,7 @@ function isRowUnchanged(a: MessagesTimelineRow, b: MessagesTimelineRow): boolean
         a.createdAt === bf.createdAt &&
         a.label === bf.label &&
         a.summary === bf.summary &&
+        a.interrupted === bf.interrupted &&
         a.expanded === bf.expanded
       );
     }

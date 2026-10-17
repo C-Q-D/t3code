@@ -16,6 +16,7 @@ import { getSyntaxHighlighterPromise } from "../lib/syntaxHighlighting";
 import { GitHubIcon } from "./Icons";
 import { Button } from "./ui/button";
 import { setMarkdownTaskChecked } from "./files/filePreviewMode";
+import { ProposedPlanCard } from "./chat/ProposedPlanCard";
 
 vi.mock("../hooks/useFileMetadata", () => ({ useFileMetadata: () => null }));
 vi.mock("@effect/atom-react", () => ({ useAtomValue: () => null }));
@@ -1346,4 +1347,196 @@ describe("ChatMarkdown in-page links", () => {
       }
     },
   );
+});
+
+describe("D1 timeline table exports", () => {
+  it("keeps CSV export available for an authored HTML table without a header", async () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    const writeText = vi.fn(async (_text: string) => {});
+    vi.stubGlobal("navigator", { clipboard: { writeText } });
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    try {
+      await act(async () =>
+        root.render(
+          <ChatMarkdown
+            cwd={undefined}
+            presentation="timeline"
+            text="<table><tbody><tr><td>A</td><td>B</td></tr></tbody></table>"
+          />,
+        ),
+      );
+      const copy = container.querySelector<HTMLButtonElement>("button[aria-label='Copy table']");
+      expect(copy, "Tables without a header still need their existing export entry").not.toBeNull();
+      await act(async () => copy!.click());
+      const csv = Array.from(document.querySelectorAll<HTMLElement>("[role='menuitem']")).find(
+        (element) => element.textContent === "Copy as CSV",
+      );
+      expect(csv).toBeDefined();
+      await act(async () => csv!.click());
+      expect(writeText).toHaveBeenCalledExactlyOnceWith("A,B");
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it.each([
+    ["Copy as Markdown", "| Name | Result |\n| --- | --- |\n| Alpha | 0 |"],
+    ["Copy as CSV", "Name,Result\nAlpha,0"],
+  ])("exports unchanged cells through the last header's %s menu", async (label, expected) => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    const writeText = vi.fn(async (_text: string) => {});
+    vi.stubGlobal("navigator", { clipboard: { writeText } });
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    try {
+      await act(async () =>
+        root.render(
+          <ChatMarkdown
+            cwd={undefined}
+            presentation="timeline"
+            text={"| Name | Result |\n| --- | --- |\n| Alpha | 0 |"}
+          />,
+        ),
+      );
+      const headerCopy = container.querySelector<HTMLButtonElement>(
+        "thead th:last-child button[aria-label='Copy table']",
+      );
+      expect(
+        headerCopy,
+        "The existing export menu must be reachable in the last header",
+      ).not.toBeNull();
+      await act(async () => headerCopy!.click());
+      const item = Array.from(document.querySelectorAll<HTMLElement>("[role='menuitem']")).find(
+        (element) => element.textContent === label,
+      );
+      expect(item, "Both existing export formats remain available").toBeDefined();
+      await act(async () => item!.click());
+      expect(writeText).toHaveBeenCalledExactlyOnceWith(expected);
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
+describe("D1 plan header actions", () => {
+  it("expands and collapses a long plan from its header while copying the full plan", async () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    const writeText = vi.fn(async (_text: string) => {});
+    vi.stubGlobal("navigator", { clipboard: { writeText } });
+    const plan =
+      "# Work plan\n\n" + "1. Keep the existing plan content.\n".repeat(21) + "22. FINAL STEP\n";
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    try {
+      await act(async () =>
+        root.render(
+          <ProposedPlanCard
+            planMarkdown={plan}
+            environmentId={EnvironmentId.make("local")}
+            cwd={undefined}
+            workspaceRoot={undefined}
+          />,
+        ),
+      );
+      expect(container.textContent).not.toContain("FINAL STEP");
+      const expand = container.querySelector<HTMLButtonElement>("button[aria-label='Expand plan']");
+      expect(expand).not.toBeNull();
+      await act(async () => expand!.click());
+      expect(container.textContent).toContain("FINAL STEP");
+      const collapse = container.querySelector<HTMLButtonElement>("button[aria-label='Collapse']");
+      expect(collapse).not.toBeNull();
+      await act(async () => collapse!.click());
+      expect(container.textContent).not.toContain("FINAL STEP");
+      const copy = container.querySelector<HTMLButtonElement>(
+        "button[aria-label='Copy to clipboard']",
+      );
+      expect(copy).not.toBeNull();
+      await act(async () => copy!.click());
+      expect(writeText).toHaveBeenCalledExactlyOnceWith(plan);
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
+describe("D1 code-well actions", () => {
+  it("copies the complete code after toggling wrap from the new toolbar", async () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    const writeText = vi.fn(async (_text: string) => {});
+    vi.stubGlobal("navigator", { clipboard: { writeText } });
+    const settings = await import("../hooks/useSettings");
+    const savedSettings = settings.getClientSettings();
+    vi.spyOn(settings, "getClientSettings").mockReturnValue({ ...savedSettings, wordWrap: true });
+    await getSyntaxHighlighterPromise("text");
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    try {
+      await act(async () =>
+        root.render(
+          <ChatMarkdown
+            cwd={undefined}
+            presentation="timeline"
+            text={"```text\nfirst  line\nsecond line\n```"}
+          />,
+        ),
+      );
+      const wrap = container.querySelector<HTMLButtonElement>("button[aria-pressed]");
+      expect(wrap).not.toBeNull();
+      expect(wrap!.getAttribute("aria-pressed")).toBe("true");
+      await act(async () => wrap!.click());
+      expect(wrap!.getAttribute("aria-pressed")).toBe("false");
+      const copy = container.querySelector<HTMLButtonElement>("button[aria-label='Copy code']");
+      expect(copy).not.toBeNull();
+      await act(async () => copy!.click());
+      expect(writeText).toHaveBeenCalledExactlyOnceWith("first  line\nsecond line\n");
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+      vi.unstubAllGlobals();
+      vi.restoreAllMocks();
+    }
+  });
+
+  it("runs the complete shell command from the timeline toolbar with its spacing intact", async () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    const run = vi.fn();
+    await getSyntaxHighlighterPromise("bash");
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    try {
+      await act(async () =>
+        root.render(
+          <ChatMarkdown
+            cwd={undefined}
+            presentation="timeline"
+            text={"```bash\necho 'a  b'\n```"}
+            onRunShellCommand={run}
+          />,
+        ),
+      );
+      const button = container.querySelector<HTMLButtonElement>(
+        "button[aria-label='Run in terminal']",
+      );
+      expect(button).not.toBeNull();
+      expect(run).not.toHaveBeenCalled();
+      await act(async () => button!.click());
+      expect(run).toHaveBeenCalledExactlyOnceWith("echo 'a  b'");
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+      vi.unstubAllGlobals();
+    }
+  });
 });

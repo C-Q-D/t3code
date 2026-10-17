@@ -645,7 +645,7 @@ export const chat: Messages["chat"] = {
     copyToClipboard: "复制到剪贴板",
     downloadAsMarkdown: "下载为Markdown",
     saveToWorkspace: "保存到工作区",
-    collapsePlan: "折叠计划",
+    collapsePlan: "收起",
     expandPlan: "展开计划",
     savePlanToWorkspace: "将计划保存到工作区",
     theWorkspace: "工作区",

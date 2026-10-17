@@ -1832,6 +1832,7 @@ describe("deriveMessagesTimelineRows", () => {
         kind: "turn-fold",
         runId: "turn-1",
         label: "You stopped after 47s",
+        interrupted: true,
         expanded: false,
       }),
     ]);
