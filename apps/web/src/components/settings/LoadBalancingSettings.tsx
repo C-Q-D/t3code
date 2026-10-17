@@ -1,3 +1,4 @@
+/** Presents client load balancing and per-environment preferences without changing their stored values. */
 import { t } from "~/i18n";
 import { resolveEnvironmentMachineKind } from "@t3tools/contracts";
 
@@ -8,9 +9,8 @@ import {
 } from "~/hooks/useSettings";
 import type { EnvironmentPresentation } from "~/state/environments";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
-import { Switch } from "../ui/switch";
 import { EnvironmentRow, environmentTransportLabel } from "./EnvironmentRow";
-import { FoldedSettingsSection } from "./FoldedSettingsSection";
+import { SettingsRow } from "./settingsLayout";
 import { searchableSetting } from "./settingsSearch";
 
 const preferences = [
@@ -29,13 +29,14 @@ export function loadPreferenceForWeight(weight: number | undefined): LoadPrefere
   return weight < 50 ? 25 : 100;
 }
 
+/** Returns the localized label for a normalized load preference. */
 function preferenceLabel(preference: LoadPreference): string {
   return preferences.find((entry) => entry.value === preference)!.label;
 }
 
 /**
- * Closed-header summary: the machines not at Normal, so the folded section
- * still tells you what is set. Null when every machine is at the default.
+ * Summarizes machines whose weight differs from Normal in environment order.
+ * Returns null when every machine uses the default preference.
  */
 export function summarizeLoadPreferences(
   environments: ReadonlyArray<Pick<EnvironmentPresentation, "environmentId" | "label">>,
@@ -51,10 +52,9 @@ export function summarizeLoadPreferences(
 }
 
 /**
- * Folded section under the environments list. Its switch turns balancing on
- * for this client, and the body holds one row per switched-on machine with
- * how often that machine should receive new threads. Rendered only when two
- * or more machines are on, since one machine has nothing to balance against.
+ * Shows the P2 balancing row and its per-machine preferences inside the environment card.
+ * environments contains enabled machines; fewer than two hides the row as before.
+ * Controls retain hydration guards and write only the existing client settings.
  */
 export function LoadBalancingSettings({
   environments,
@@ -69,66 +69,86 @@ export function LoadBalancingSettings({
 
   const { id, title } = searchableSetting("load-balancing");
   return (
-    <FoldedSettingsSection
+    <SettingsRow
       id={id}
       title={title}
-      summary={
+      status={
         settings.loadBalancingEnabled
           ? summarizeLoadPreferences(environments, settings.loadBalancingWeights)
           : t.settings.connections.status.off
       }
       control={
-        <Switch
-          aria-label={t.settings.loadBalancing.automaticallyBalanceLoad}
-          checked={settings.loadBalancingEnabled}
+        <Select
+          value={settings.loadBalancingEnabled ? "automatic" : "off"}
           disabled={!settingsHydrated}
-          onCheckedChange={(loadBalancingEnabled) => updateSettings({ loadBalancingEnabled })}
-        />
+          onValueChange={(value) => {
+            if (value !== "automatic" && value !== "off") return;
+            updateSettings({ loadBalancingEnabled: value === "automatic" });
+          }}
+        >
+          <SelectTrigger
+            size="settings"
+            aria-label={t.settings.loadBalancing.automaticallyBalanceLoad}
+          >
+            <SelectValue>
+              {settings.loadBalancingEnabled
+                ? t.settings.connections.groups.automaticBalancing
+                : t.settings.connections.status.off}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectPopup align="end" alignItemWithTrigger={false}>
+            <SelectItem value="automatic">
+              {t.settings.connections.groups.automaticBalancing}
+            </SelectItem>
+            <SelectItem value="off">{t.settings.connections.status.off}</SelectItem>
+          </SelectPopup>
+        </Select>
       }
     >
-      <p className="px-3 py-2.5 text-xs text-muted-foreground sm:px-4">
+      <p className="text-secondary-copy-medium text-secondary-label">
         {t.settings.loadBalancing.threadsSharedProjectsStartMachineHint}
       </p>
-      {environments.map((environment) => (
-        <EnvironmentRow
-          key={environment.environmentId}
-          kind={resolveEnvironmentMachineKind(environment.serverConfig)}
-          label={environment.label}
-          subtitle={environmentTransportLabel(environment)}
-        >
-          <Select
-            items={preferences}
-            value={loadPreferenceForWeight(
-              settings.loadBalancingWeights[environment.environmentId],
-            )}
-            disabled={!settingsHydrated || !settings.loadBalancingEnabled}
-            onValueChange={(value) => {
-              if (value === null) return;
-              updateSettings({
-                loadBalancingWeights: {
-                  ...settings.loadBalancingWeights,
-                  [environment.environmentId]: value,
-                },
-              });
-            }}
+      <div className="space-y-0.5">
+        {environments.map((environment) => (
+          <EnvironmentRow
+            key={environment.environmentId}
+            kind={resolveEnvironmentMachineKind(environment.serverConfig)}
+            label={environment.label}
+            subtitle={environmentTransportLabel(environment)}
           >
-            <SelectTrigger
-              size="xs"
-              className="w-32"
-              aria-label={t.settings.loadBalancing.loadPreference(environment.label)}
+            <Select
+              items={preferences}
+              value={loadPreferenceForWeight(
+                settings.loadBalancingWeights[environment.environmentId],
+              )}
+              disabled={!settingsHydrated || !settings.loadBalancingEnabled}
+              onValueChange={(value) => {
+                if (value === null) return;
+                updateSettings({
+                  loadBalancingWeights: {
+                    ...settings.loadBalancingWeights,
+                    [environment.environmentId]: value,
+                  },
+                });
+              }}
             >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectPopup align="end" alignItemWithTrigger={false}>
-              {preferences.map(({ value, label }) => (
-                <SelectItem key={value} value={value}>
-                  {label}
-                </SelectItem>
-              ))}
-            </SelectPopup>
-          </Select>
-        </EnvironmentRow>
-      ))}
-    </FoldedSettingsSection>
+              <SelectTrigger
+                size="settings"
+                aria-label={t.settings.loadBalancing.loadPreference(environment.label)}
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectPopup align="end" alignItemWithTrigger={false}>
+                {preferences.map(({ value, label }) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectPopup>
+            </Select>
+          </EnvironmentRow>
+        ))}
+      </div>
+    </SettingsRow>
   );
 }

@@ -1,3 +1,4 @@
+/** Configures local-agent availability through the existing desktop restart confirmation. */
 import { t } from "~/i18n";
 import { useState } from "react";
 
@@ -13,12 +14,11 @@ import {
 } from "../ui/alert-dialog";
 import { Button } from "../ui/button";
 import { Spinner } from "../ui/spinner";
-import { Switch } from "../ui/switch";
+import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { SettingsRow } from "./settingsLayout";
 import { searchableSetting } from "./settingsSearch";
 
-// Toggling relaunches the desktop app, so the switch only reflects the value
-// this process started with; there is no live state to keep in sync.
+/** The picker reflects startup state; choosing a different value opens confirmation before the desktop relaunches. */
 export function LocalEnvironmentSetting() {
   const setEnabled = window.desktopBridge?.setLocalEnvironmentEnabled;
   const [enabled] = useState(() => !isLocalEnvironmentDisabled());
@@ -46,18 +46,34 @@ export function LocalEnvironmentSetting() {
     <>
       <SettingsRow
         {...searchableSetting("local-environment")}
-        description={
-          enabled
-            ? t.settings.localEnvironmentSetting.runAgentsComputerTurnOffHint
-            : t.settings.localEnvironmentSetting.turnedOffAgentsRunRemoteHint
-        }
         control={
-          <Switch
-            checked={enabled}
-            disabled={isUpdating}
-            onCheckedChange={() => setConfirmOpen(true)}
-            aria-label={t.settings.rows.localEnvironment.title}
-          />
+          <Select
+            value={enabled ? "enabled" : "disabled"}
+            onValueChange={(value) => {
+              if (value !== null && (value === "enabled") !== enabled) setConfirmOpen(true);
+            }}
+          >
+            <SelectTrigger
+              size="settings"
+              disabled={isUpdating}
+              aria-label={t.settings.rows.localEnvironment.title}
+              aria-description={
+                enabled
+                  ? t.settings.localEnvironmentSetting.runAgentsComputerTurnOffHint
+                  : t.settings.localEnvironmentSetting.turnedOffAgentsRunRemoteHint
+              }
+            >
+              <SelectValue>
+                {enabled
+                  ? t.settings.connections.groups.thisDevice
+                  : t.settings.connections.status.off}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectPopup align="end" alignItemWithTrigger={false}>
+              <SelectItem value="enabled">{t.settings.connections.groups.thisDevice}</SelectItem>
+              <SelectItem value="disabled">{t.settings.connections.status.off}</SelectItem>
+            </SelectPopup>
+          </Select>
         }
       />
       <AlertDialog

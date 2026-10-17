@@ -1172,6 +1172,15 @@ export const settings = {
     traceModeDescription: (mode: string) => `${mode}.`,
   },
   connections: {
+    groups: {
+      automaticBalancing: "Automatic balancing",
+      sharingOverviewHint: "Sharing status only. Change each environment's permissions below.",
+      local: "Local",
+      environments: "Environments",
+      pairing: "Pairing",
+      thisMachine: "This machine",
+      thisDevice: "This device",
+    },
     scopes: {
       orchestrationRead: {
         title: "View environment",

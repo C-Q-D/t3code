@@ -68,7 +68,7 @@ const buttonVariants = cva(
         onboarding: "h-9.5 px-4.5 text-control",
         // Onboarding8a Q1/Q2 computer and cloud entry rows use a 44px rounded rectangle.
         "onboarding-row": "h-11 gap-2.5 rounded-card-row px-3.5 text-control",
-        // SettingsPage8a O1–O4: shared list actions are 28px capsules with 11px padding.
+        // SettingsPage8a O1–O4 and P2: shared list actions are 28px capsules with 11px padding.
         "settings-list": "h-7 px-2.75 text-secondary-copy",
         // 讨论页-8a v3 H3: the shared compact capsule with 12px inline padding.
         "compact-padded": "h-7 gap-1.25 px-3 text-secondary-copy-medium font-semibold",

@@ -311,6 +311,8 @@ const twMerge = extendTailwindMerge({
         "discussion-diff-header",
         "discussion-diff-overlay",
         "archive-thread-inset",
+        "connections-icon",
+        "connections-qr",
       ],
       "inset-shadow": [
         "selected",
@@ -420,6 +422,7 @@ const twMerge = extendTailwindMerge({
         "discussion-diff-skeleton",
         "compact-stepper-key",
         "archive-thread-icon",
+        "connections-icon",
       ],
       leading: [
         "code",

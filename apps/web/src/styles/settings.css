@@ -296,3 +296,15 @@
     @apply rounded-settings-row-surface bg-archive-thread-well px-4 py-4.5 text-center text-secondary-copy-large leading-archive-thread-empty text-secondary-label shadow-archive-thread-inset;
   }
 }
+
+/* ST11: 其余屏-6 P2 imports SettingsPage8a's environment list and pairing tile. */
+@theme {
+  --color-connections-well: #151517;
+  --radius-connections-icon: 9px;
+  --shadow-connections-icon: inset 1.5px 2px 3px rgba(0, 0, 0, 0.6);
+  --shadow-connections-qr: 0 2px 0 #8e8e96, 6px 10px 16px -4px rgba(0, 0, 0, 0.7);
+}
+
+@utility connections-environment-row {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}

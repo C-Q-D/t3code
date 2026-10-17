@@ -1,3 +1,4 @@
+/** Presents environment identity and controls; transport labels keep their existing route semantics. */
 import { t } from "~/i18n";
 import {
   type ConnectionTarget,
@@ -14,6 +15,7 @@ import type { EnvironmentPresentation } from "~/state/environments";
 import { isDesktopLocalConnectionTarget } from "~/connection/desktopLocal";
 import { EnvironmentMachineIcon } from "../EnvironmentMachineIcon";
 
+/** Formats an SSH target authority, including its optional user and port, without opening a connection. */
 export function formatDesktopSshTarget(target: DesktopSshEnvironmentTarget): string {
   const authority = target.username ? `${target.username}@${target.hostname}` : target.hostname;
   return target.port ? `${authority}:${target.port}` : authority;
@@ -64,6 +66,7 @@ export function EnvironmentRow({
   kind,
   label,
   subtitle,
+  status,
   below,
   detail,
   dimmed = false,
@@ -73,6 +76,8 @@ export function EnvironmentRow({
   readonly kind: EnvironmentMachineKind;
   readonly label: string;
   readonly subtitle: ReactNode;
+  /** Connected status beside the name; absent for rows without a verified connection. */
+  readonly status?: string | null;
   /** Extra content under the subtitle, such as update progress. */
   readonly below?: ReactNode;
   /** Expanded content under the whole row, aligned with the label, such as its routes. */
@@ -84,15 +89,24 @@ export function EnvironmentRow({
   return (
     <div
       className={cn(
-        "grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 px-3 py-2.5 sm:px-4",
+        "connections-environment-row grid min-h-12 items-center gap-x-3 rounded-settings-row-surface py-2 pr-1.5 pl-2.5",
         dimmed && "opacity-60",
         className,
       )}
     >
-      <EnvironmentMachineIcon aria-hidden kind={kind} className="size-4 text-muted-foreground" />
-      <div className="min-w-0">
-        <p className="truncate text-sm font-medium text-foreground">{label}</p>
-        <div className="truncate text-xs text-muted-foreground">{subtitle}</div>
+      <span className="flex size-8 items-center justify-center rounded-connections-icon bg-connections-well shadow-connections-icon">
+        <EnvironmentMachineIcon aria-hidden kind={kind} className="size-3.75" />
+      </span>
+      <div className="min-w-0 space-y-0.25">
+        <div className="flex min-w-0 items-center gap-2">
+          <p className="truncate text-control font-semibold text-foreground">{label}</p>
+          {status ? (
+            <span className="flex h-5 shrink-0 items-center rounded-full bg-status-success px-2 text-meta font-semibold text-success-foreground text-shadow-none">
+              {status}
+            </span>
+          ) : null}
+        </div>
+        <div className="truncate text-secondary-copy-medium text-secondary-label">{subtitle}</div>
         {below}
       </div>
       <div className="flex shrink-0 items-center gap-1">{children}</div>

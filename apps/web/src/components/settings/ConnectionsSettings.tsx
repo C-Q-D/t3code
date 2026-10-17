@@ -4,8 +4,8 @@ import { SessionPermissions, authScopeMessages } from "./SessionPermissions";
 import { AUTH_SCOPE_OPTIONS as PAIRING_SCOPE_OPTIONS } from "@t3tools/shared/authScopeOptions";
 import {
   ChevronRightIcon,
+  CopyIcon,
   ChevronsLeftRightEllipsisIcon,
-  EllipsisIcon,
   PlusIcon,
   QrCodeIcon,
   RouteIcon,
@@ -91,7 +91,6 @@ import {
   environmentTransportLabel,
   formatDesktopSshTarget,
 } from "./EnvironmentRow";
-import { FoldedSettingsSection } from "./FoldedSettingsSection";
 import { LoadBalancingSettings } from "./LoadBalancingSettings";
 import { GitHubRoutingSettings } from "./GitHubRoutingSettings";
 import { Input } from "../ui/input";
@@ -129,16 +128,22 @@ import {
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
 import { QRCodeSvg } from "../ui/qr-code";
 import { Spinner } from "../ui/spinner";
-import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
+import {
+  Select,
+  SelectItem,
+  SelectPopup,
+  SelectTrigger,
+  SelectValue,
+  SelectButton,
+} from "../ui/select";
 import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "../ui/menu";
 import { Switch } from "../ui/switch";
 import { stackedThreadToast, toastManager } from "../ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { Alert, AlertDescription } from "../ui/alert";
 import { Button } from "../ui/button";
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../ui/empty";
 import { AnimatedHeight } from "../AnimatedHeight";
-import { EnvironmentMachineIcon } from "../EnvironmentMachineIcon";
+import { ENVIRONMENT_MACHINE_KIND_LABELS, EnvironmentMachineIcon } from "../EnvironmentMachineIcon";
 import { Textarea } from "../ui/textarea";
 import { getPairingTokenFromUrl, setPairingTokenOnUrl } from "../../pairingUrl";
 import { readHostedPairingRequest } from "../../hostedPairing";
@@ -161,6 +166,7 @@ import {
   supportsServerUpdateThreadContinuation,
 } from "~/versionSkew";
 import { hasCloudPublicConfig } from "~/cloud/publicConfig";
+import { useT3ConnectAuthPrompt } from "../clerk/useT3ConnectAuthPrompt";
 import { RemoveT3ConnectEnvironmentDialog } from "../clerk/RemoveT3ConnectEnvironmentDialog";
 import { useCloudLinkController } from "~/cloud/useCloudLinkController";
 import { authEnvironment } from "~/state/auth";
@@ -197,7 +203,7 @@ import {
   type ServerUpdateTarget,
 } from "../ServerUpdateAction";
 import { CloudEnvironmentConnectRows } from "../cloud/CloudEnvironmentConnectList";
-import { ITEM_ROW_CLASSNAME, ITEM_ROW_INNER_CLASSNAME } from "./itemRows";
+import { ITEM_ROW_INNER_CLASSNAME } from "./itemRows";
 import {
   resolveShortcutCommand,
   shortcutLabelForCommand,
@@ -394,8 +400,9 @@ const ENDPOINT_ROW_CLASSNAME = "first:rounded-t-xl last:rounded-b-xl px-3 py-2.5
 
 type AccessSectionPresentation = "current" | "endpoint-rail";
 
+/** Returns the shared inset spacing for pairing and authorized-client rows. */
 function accessRowClassName(_presentation: AccessSectionPresentation) {
-  return ITEM_ROW_CLASSNAME;
+  return "rounded-settings-row-surface py-2.5 pr-3 pl-3.5";
 }
 
 function endpointRowClassName(presentation: AccessSectionPresentation, isAvailable: boolean) {
@@ -565,6 +572,7 @@ type PairingLinkListRowProps = {
   canRevoke: boolean;
 };
 
+/** Renders a live pairing credential; sharing, expiry, revocation and clipboard fallback retain their existing guards. */
 const PairingLinkListRow = memo(function PairingLinkListRow({
   pairingLink,
   credential,
@@ -824,9 +832,10 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
                   onClick={(event) => event.currentTarget.select()}
                 />
                 {isRevealValueUrl && isRevealValueQrShareable ? (
-                  <div className="flex justify-center rounded-xl border border-border/60 bg-muted/30 p-4">
+                  <div className="flex justify-center py-2">
                     <QRCodeSvg
                       value={revealValue}
+                      variant="settings"
                       size={132}
                       level="M"
                       marginSize={2}
@@ -860,11 +869,8 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
         </div>
       </div>
       {isQrPanelOpen && qrPairingUrl !== null ? (
-        <div
-          id={qrPanelId}
-          className="mt-3 flex flex-col gap-4 border-t border-border/50 pt-3 sm:flex-row sm:items-start sm:justify-between"
-        >
-          <div className="min-w-0 flex-1 space-y-3">
+        <div id={qrPanelId} className="mt-3 flex flex-col items-center gap-4.5 sm:flex-row">
+          <div className="min-w-0 w-full flex-1 space-y-2.5">
             {endpointCopyOptions.length > 1 ? (
               <div
                 className="space-y-1.5"
@@ -906,11 +912,14 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
                 })}
               </div>
             ) : null}
-            <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-2.5 py-1.5">
+            <p className="text-secondary-copy-medium text-secondary-label">
+              {t.settings.connections.pairing.linkTitle}
+            </p>
+            <div className="flex h-9 items-center gap-2 rounded-full bg-input pr-1.5 pl-3.5 shadow-well-track">
               <Tooltip>
                 <TooltipTrigger
                   render={
-                    <code className="min-w-0 flex-1 truncate font-mono text-2xs text-muted-foreground">
+                    <code className="min-w-0 flex-1 truncate font-mono text-secondary-copy-medium text-foreground">
                       {qrPairingUrl}
                     </code>
                   }
@@ -918,12 +927,12 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
                 <TooltipPopup side="top">{qrPairingUrl}</TooltipPopup>
               </Tooltip>
               <Button
-                size="xs"
-                variant="ghost"
-                className="shrink-0"
+                size="icon-sm"
+                variant="secondary"
+                aria-label={t.settings.connections.pairing.copyLink}
                 onClick={() => copyPairingValue(qrPairingUrl, copyKindForUrl(qrPairingUrl))}
               >
-                {t.settings.connections.pairing.copyLink}
+                <CopyIcon aria-hidden className="size-3.25" />
               </Button>
             </div>
             <Button size="xs" variant="ghost" onClick={handleCopyCode}>
@@ -931,17 +940,18 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
             </Button>
           </div>
           {canRenderQrForSelection ? (
-            <div className="w-fit shrink-0 self-center rounded-xl bg-white p-3 sm:self-start">
+            <div className="order-first shrink-0">
               <QRCodeSvg
                 value={qrPairingUrl}
-                size={168}
+                variant="settings"
+                size={132}
                 level="M"
-                marginSize={1}
+                marginSize={4}
                 title={t.settings.connections.pairing.qrAriaLabel}
               />
             </div>
           ) : (
-            <div className="flex size-[192px] shrink-0 items-center justify-center self-center rounded-xl border border-border/50 p-4 sm:self-start">
+            <div className="order-first flex size-33 shrink-0 items-center justify-center rounded-settings-row-surface bg-input p-4 shadow-input-well">
               <p className="text-center text-2xs text-muted-foreground/70">
                 {t.settings.connections.endpoints.loopbackQrHint}
               </p>
@@ -1656,6 +1666,7 @@ function SavedBackendListRow({
     <EnvironmentRow
       kind={machineKind}
       label={environment.label}
+      status={isConnected ? t.settings.connections.access.connected : null}
       dimmed={!enabled}
       subtitle={
         <span className="flex min-w-0 items-center gap-1">
@@ -1813,14 +1824,14 @@ function SavedBackendListRow({
           render={
             <Button
               type="button"
-              variant="ghost-muted"
-              size="icon-xs"
+              variant="secondary"
+              size="settings-list"
               disabled={isRemoving}
               aria-label={t.settings.connections.environment.actionsAriaLabel(environment.label)}
             />
           }
         >
-          <EllipsisIcon className="size-3.5" />
+          {t.settings.actions.edit}
         </MenuTrigger>
         <MenuPopup align="end">
           <EnvironmentIconMenu
@@ -1886,7 +1897,9 @@ function CloudLinkSwitch({
   );
 }
 
+/** Displays relay controls with their original permission checks; signed-out users use the existing Clerk prompt. */
 function ConfiguredCloudLinkRow({ canManageRelay }: { readonly canManageRelay: boolean }) {
+  const { openAuthPrompt } = useT3ConnectAuthPrompt();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const {
     isSignedIn,
@@ -1983,24 +1996,49 @@ function ConfiguredCloudLinkRow({ canManageRelay }: { readonly canManageRelay: b
       {window.desktopBridge ? (
         <SettingsRow
           title={searchableSetting("t3-connect").title}
-          description={
-            managedTunnelActive
-              ? t.settings.connections.cloud.availableHint
-              : t.settings.connections.cloud.enableHint
-          }
           status={operationError ?? primaryCloudLinkState.error}
           control={
+            <Tooltip>
+              <TooltipTrigger render={<span className="inline-flex" />}>
+                {!isSignedIn ? (
+                  <Button size="md" variant="secondary" onClick={openAuthPrompt}>
+                    {t.settings.sidebarNav.signIn}
+                  </Button>
+                ) : (
+                  <CloudLinkSwitch
+                    checked={managedTunnelActive}
+                    disabled={
+                      !canManageRelay ||
+                      !isSignedIn ||
+                      primaryCloudLinkState.data === null ||
+                      primaryCloudLinkState.isPending ||
+                      isBusy
+                    }
+                    disabledReason={disabledReason}
+                    onCheckedChange={(enabled) => void updateManagedTunnel(enabled)}
+                  />
+                )}
+              </TooltipTrigger>
+              <TooltipPopup side="top">
+                {managedTunnelActive
+                  ? t.settings.connections.cloud.availableHint
+                  : t.settings.connections.cloud.enableHint}
+              </TooltipPopup>
+            </Tooltip>
+          }
+        />
+      ) : null}
+      {managedTunnelActive ? (
+        <SettingsRow
+          title={searchableSetting("hold-webhooks-while-offline").title}
+          description={t.settings.connections.cloud.webhooksDescription}
+          control={
             <CloudLinkSwitch
-              checked={managedTunnelActive}
-              disabled={
-                !canManageRelay ||
-                !isSignedIn ||
-                primaryCloudLinkState.data === null ||
-                primaryCloudLinkState.isPending ||
-                isBusy
-              }
+              ariaLabel={t.settings.connections.cloud.webhooksAriaLabel}
+              checked={holdWebhooksWhileOffline}
+              disabled={!canManageRelay || !isSignedIn || primaryCloudLinkState.isPending || isBusy}
               disabledReason={disabledReason}
-              onCheckedChange={(enabled) => void updateManagedTunnel(enabled)}
+              onCheckedChange={(enabled) => void updateHoldWebhooks(enabled)}
             />
           }
         />
@@ -2024,21 +2062,6 @@ function ConfiguredCloudLinkRow({ canManageRelay }: { readonly canManageRelay: b
           />
         }
       />
-      {managedTunnelActive ? (
-        <SettingsRow
-          title={searchableSetting("hold-webhooks-while-offline").title}
-          description={t.settings.connections.cloud.webhooksDescription}
-          control={
-            <CloudLinkSwitch
-              ariaLabel={t.settings.connections.cloud.webhooksAriaLabel}
-              checked={holdWebhooksWhileOffline}
-              disabled={!canManageRelay || !isSignedIn || primaryCloudLinkState.isPending || isBusy}
-              disabledReason={disabledReason}
-              onCheckedChange={(enabled) => void updateHoldWebhooks(enabled)}
-            />
-          }
-        />
-      ) : null}
     </>
   );
 }
@@ -2062,21 +2085,17 @@ function CloudLinkRow({
   return <ConfiguredCloudLinkRow canManageRelay={canManageRelay} />;
 }
 
+/** Explains an empty environment list without manufacturing a connected example machine. */
 function EmptyRemoteEnvironments({ cloudEnabled = true }: { readonly cloudEnabled?: boolean }) {
   return (
-    <Empty className="min-h-52">
-      <EmptyMedia variant="icon">
-        <ChevronsLeftRightEllipsisIcon />
-      </EmptyMedia>
-      <EmptyHeader>
-        <EmptyTitle>{t.settings.connections.environment.empty}</EmptyTitle>
-        <EmptyDescription>
-          {cloudEnabled
-            ? t.settings.connections.environment.emptyCloudHint
-            : t.settings.connections.environment.emptyHint}
-        </EmptyDescription>
-      </EmptyHeader>
-    </Empty>
+    <div className="rounded-settings-row-surface bg-connections-well px-4 py-4.5 text-center text-secondary-copy-large text-secondary-label shadow-connections-icon">
+      <p>{t.settings.connections.environment.empty}</p>
+      <p>
+        {cloudEnabled
+          ? t.settings.connections.environment.emptyCloudHint
+          : t.settings.connections.environment.emptyHint}
+      </p>
+    </div>
   );
 }
 
@@ -2098,6 +2117,7 @@ function CloudRemoteEnvironmentRows({
   ) : null;
 }
 
+/** Renders the connection groups; existing environment, relay and access scopes remain authoritative for every action. */
 export function ConnectionsSettings() {
   const desktopBridge = window.desktopBridge;
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
@@ -3475,7 +3495,7 @@ export function ConnectionsSettings() {
             status={<span className="block text-destructive">{desktopWslError}</span>}
             control={
               <Button
-                size="sm"
+                size="toolbar"
                 variant="outline"
                 onClick={loadWslState}
                 disabled={isLoadingWslState}
@@ -3510,7 +3530,7 @@ export function ConnectionsSettings() {
           }
           control={
             <Button
-              size="sm"
+              size="toolbar"
               variant="outline"
               disabled={isUpdatingWslBackend}
               onClick={() => handleSelectWslMode(BACKEND_VALUE_WSL_OFF)}
@@ -3540,7 +3560,6 @@ export function ConnectionsSettings() {
       <>
         <SettingsRow
           {...searchableSetting("wsl-backend")}
-          description={t.settings.connections.wsl.description}
           status={
             desktopWslError ? (
               <span className="block text-destructive">{desktopWslError}</span>
@@ -3559,9 +3578,9 @@ export function ConnectionsSettings() {
               }}
             >
               <SelectTrigger
-                size="sm"
-                className="w-full sm:w-56"
+                size="settings"
                 aria-label={t.settings.rows.wslBackend.title}
+                aria-description={t.settings.connections.wsl.description}
                 disabled={isUpdatingWslBackend}
               >
                 <SelectValue>{selectLabel}</SelectValue>
@@ -3660,6 +3679,7 @@ export function ConnectionsSettings() {
   const renderNetworkAccessRow = () => (
     <SettingsRow
       title={searchableSetting("network-access").title}
+      aria-description={t.settings.connections.network.localHint}
       description={
         isLocalBackendNetworkAccessible ? (
           <NetworkAccessDescription
@@ -3679,9 +3699,7 @@ export function ConnectionsSettings() {
                   : t.settings.connections.network.exposedHint
             }
           />
-        ) : desktopServerExposureState ? (
-          t.settings.connections.network.localHint
-        ) : (
+        ) : desktopServerExposureState ? null : (
           t.settings.actions.loading
         )
       }
@@ -3733,37 +3751,23 @@ export function ConnectionsSettings() {
         <>
           <SettingsSection
             {...searchableSetting("connections-environment")}
-            title={
-              primaryEnvironment?.label ??
-              (desktopBridge
-                ? t.settings.rows.connectionsEnvironment.title
-                : t.settings.connections.environment.primary)
-            }
-            icon={
-              <EnvironmentMachineIcon
-                aria-hidden
-                kind={
-                  primaryServerConfig
-                    ? resolveEnvironmentMachineKind(primaryServerConfig)
-                    : "desktop"
-                }
-                className="size-4"
-              />
-            }
-            headerAction={
-              primaryEnvironmentId !== null ? (
+            title={t.settings.connections.groups.local}
+          >
+            <SettingsRow
+              {...searchableSetting("environment-icon")}
+              control={
                 <Menu>
-                  <MenuTrigger
-                    render={
-                      <Button
-                        type="button"
-                        variant="ghost-muted"
-                        size="icon-xs"
-                        aria-label={t.settings.connections.environment.machineActionsAriaLabel}
-                      />
+                  <MenuTrigger render={<SelectButton size="settings" />}>
+                    <EnvironmentMachineIcon
+                      aria-hidden
+                      kind={resolveEnvironmentMachineKind(primaryServerConfig)}
+                      className="size-3.75"
+                    />
+                    {
+                      ENVIRONMENT_MACHINE_KIND_LABELS[
+                        resolveEnvironmentMachineKind(primaryServerConfig)
+                      ]
                     }
-                  >
-                    <EllipsisIcon className="size-3.5" />
                   </MenuTrigger>
                   <MenuPopup align="end">
                     <EnvironmentIconMenu
@@ -3772,141 +3776,21 @@ export function ConnectionsSettings() {
                     />
                   </MenuPopup>
                 </Menu>
-              ) : null
-            }
-          >
+              }
+            />
             <LocalEnvironmentSetting />
-            {canManageLocalBackend ? (
-              <SettingsRow
-                title={t.settings.connections.environment.version}
-                description={
-                  primaryServerUpdateState.status !== "idle" ? (
-                    <ServerUpdateProgress state={primaryServerUpdateState} />
-                  ) : (
-                    [
-                      primaryServerConfig?.environment.serverVersion ?? null,
-                      primaryEnvironment?.displayUrl ?? null,
-                    ]
-                      .filter((value): value is string => value !== null)
-                      .join(" · ") || t.settings.actions.loading
-                  )
-                }
-                control={
-                  primaryVersionMismatch &&
-                  primaryEnvironmentId !== null &&
-                  primaryServerUpdateState.status !== "running" ? (
-                    <ServerUpdateAction
-                      size="sm"
-                      environmentId={primaryEnvironmentId}
-                      serverLabel={
-                        primaryEnvironment
-                          ? t.settings.connections.environment.primaryServerLabel(
-                              primaryEnvironment.label,
-                            )
-                          : t.settings.connections.environment.server
-                      }
-                      selfUpdate={resolveServerSelfUpdateCapability(primaryServerConfig)}
-                      installation={
-                        primaryServerConfig?.environment.capabilities.serverInstallation
-                      }
-                      desktopAppUpdate={supportsDesktopAppUpdate(primaryServerConfig)}
-                      threadContinuation={supportsServerUpdateThreadContinuation(
-                        primaryServerConfig,
-                      )}
-                      targetVersion={primaryVersionMismatch.clientVersion}
-                      label={
-                        primaryServerUpdateState.status === "failed"
-                          ? t.settings.connections.environment.retryUpdate
-                          : t.settings.connections.environment.updateVersion(
-                              primaryVersionMismatch.clientVersion,
-                            )
-                      }
-                    />
-                  ) : primaryServerUpdateState.status === "idle" && primaryServerConfig ? (
-                    <span className="text-xs text-muted-foreground">
-                      {t.settings.connections.environment.upToDate}
-                    </span>
-                  ) : undefined
-                }
-              />
-            ) : null}
             {canManageLocalBackend && desktopBridge ? (
               <>
                 {renderNetworkAccessRow()}
                 {renderEndpointRows("endpoint-rail")}
                 {renderTailscaleRow()}
                 {renderWslRow()}
-                {canReadRelay || canManageRelay ? (
-                  <CloudLinkRow canReadRelay={canReadRelay} canManageRelay={canManageRelay} />
-                ) : null}
               </>
             ) : canManageLocalBackend ? (
-              <>
-                {renderDisabledNetworkAccessRow()}
-                {canReadRelay || canManageRelay ? (
-                  <CloudLinkRow canReadRelay={canReadRelay} canManageRelay={canManageRelay} />
-                ) : null}
-              </>
-            ) : null}
-            {primaryEnvironment ? (
-              <details className="group px-3 sm:px-4">
-                <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-md text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-                  {t.settings.merge.permissions}
-                  <ChevronRightIcon
-                    aria-hidden
-                    className="size-3 text-muted-foreground group-open:rotate-90"
-                  />
-                </summary>
-                <SessionPermissions
-                  environmentId={primaryEnvironment.environmentId}
-                  connected={primaryEnvironment.connection.phase === "connected"}
-                />
-              </details>
+              <>{renderDisabledNetworkAccessRow()}</>
             ) : null}
           </SettingsSection>
 
-          {canReadAccess || canWriteAccess ? (
-            <FoldedSettingsSection
-              id="authorized-clients"
-              title={t.settings.connections.access.authorizedClients}
-              summary={summarizeAuthorizedClients(
-                desktopClientSessions,
-                visibleDesktopPairingLinks,
-              )}
-              control={
-                canWriteAccess ? (
-                  <AuthorizedClientsHeaderAction
-                    delegatableScopes={currentSessionScopes ?? []}
-                    onPairingLinkCreated={handlePairingLinkCreated}
-                    clientSessions={
-                      canReadAccess &&
-                      authAccessChanges.error === null &&
-                      authAccessChanges.data?.type === "snapshot"
-                        ? desktopClientSessions
-                        : null
-                    }
-                    isRevokingOtherClients={isRevokingOtherDesktopClients}
-                    onRevokeOtherClients={handleRevokeOtherDesktopClients}
-                  />
-                ) : undefined
-              }
-            >
-              <ScrollArea
-                scrollFade
-                chainVerticalScroll
-                className="max-h-[22.5rem]"
-                data-testid="authorized-clients-scroll-area"
-              >
-                {canReadAccess ? (
-                  renderAuthorizedClients("current")
-                ) : (
-                  <p className="px-4 py-3 text-xs text-muted-foreground">
-                    {t.settings.connections.access.readPermissionHint}
-                  </p>
-                )}
-              </ScrollArea>
-            </FoldedSettingsSection>
-          ) : null}
           <AlertDialog
             open={isDesktopServerExposureDialogOpen && canManageLocalBackend}
             onOpenChange={(open) => {
@@ -4186,16 +4070,16 @@ export function ConnectionsSettings() {
           </Dialog>
         </>
       ) : (
-        <SettingsSection {...searchableSetting("connections-environment")}>
+        <SettingsSection
+          {...searchableSetting("connections-environment")}
+          title={t.settings.connections.groups.local}
+        >
           <SettingsRow
             title={t.settings.connections.environment.noSelection}
             description={t.settings.connections.environment.connectHint}
           />
           {/* A turned-off local environment leaves no primary environment, so its switch lives here too. */}
           <LocalEnvironmentSetting />
-          {canReadRelay || canManageRelay ? (
-            <CloudLinkRow canReadRelay={canReadRelay} canManageRelay={canManageRelay} />
-          ) : null}
         </SettingsSection>
       )}
     </>
@@ -4204,9 +4088,16 @@ export function ConnectionsSettings() {
   return (
     <SettingsPageContainer>
       {primarySettings}
+      {(primaryEnvironmentId === null || canManageLocalBackend) &&
+      (canReadRelay || canManageRelay) &&
+      hasCloudPublicConfig() ? (
+        <SettingsSection title="T3 Connect">
+          <CloudLinkRow canReadRelay={canReadRelay} canManageRelay={canManageRelay} />
+        </SettingsSection>
+      ) : null}
       <SettingsSection
         {...searchableSetting("remote-environments")}
-        title={t.settings.rows.remoteEnvironments.title}
+        title={t.settings.connections.groups.environments}
         headerAction={
           <div className="flex items-center gap-1">
             {savedServerUpdateTargets.length > 0 ? (
@@ -4229,8 +4120,8 @@ export function ConnectionsSettings() {
                     <DialogTrigger
                       render={
                         <Button
-                          size="xs"
-                          variant="ghost-muted"
+                          size="toolbar"
+                          variant="outline"
                           aria-label={t.settings.connections.environment.addEnvironment}
                         >
                           <PlusIcon className="size-3" />
@@ -4285,25 +4176,165 @@ export function ConnectionsSettings() {
           </div>
         }
       >
-        {listedEnvironments.map((environment) => (
-          <SavedBackendListRow
-            key={environment.environmentId}
-            environment={environment}
-            removingEnvironmentId={removingSavedEnvironmentId}
-            onSetEnabled={handleSetSavedBackendEnabled}
-            onRemove={handleRemoveSavedBackend}
-            onAddRoute={(target) => {
-              setRouteTarget(target);
-              setSavedBackendError(null);
-              setAddBackendDialogOpen(true);
-            }}
+        {primaryEnvironment ? (
+          <>
+            <SettingsRow
+              title={t.settings.connections.groups.thisMachine}
+              control={
+                <SelectButton size="settings" disabled>
+                  {primaryEnvironment.label}
+                </SelectButton>
+              }
+            />
+            <div className="px-3.5 py-2.5">
+              <EnvironmentRow
+                kind={resolveEnvironmentMachineKind(primaryServerConfig)}
+                label={primaryEnvironment.label}
+                subtitle={environmentTransportLabel(primaryEnvironment)}
+                status={
+                  primaryEnvironment.connection.phase === "connected"
+                    ? t.settings.connections.access.connected
+                    : null
+                }
+              />
+            </div>
+          </>
+        ) : null}
+        <div className="space-y-0.5 px-3.5 py-2.5">
+          {listedEnvironments.map((environment) => (
+            <SavedBackendListRow
+              key={environment.environmentId}
+              environment={environment}
+              removingEnvironmentId={removingSavedEnvironmentId}
+              onSetEnabled={handleSetSavedBackendEnabled}
+              onRemove={handleRemoveSavedBackend}
+              onAddRoute={(target) => {
+                setRouteTarget(target);
+                setSavedBackendError(null);
+                setAddBackendDialogOpen(true);
+              }}
+            />
+          ))}
+          <CloudRemoteEnvironmentRows
+            primaryEnvironmentId={primaryEnvironmentId}
+            savedEnvironments={savedEnvironments}
           />
-        ))}
-        <CloudRemoteEnvironmentRows
-          primaryEnvironmentId={primaryEnvironmentId}
-          savedEnvironments={savedEnvironments}
-        />
+        </div>
+        {primaryEnvironmentId !== null && canManageLocalBackend ? (
+          <SettingsRow
+            title={t.settings.connections.environment.version}
+            description={
+              primaryServerUpdateState.status !== "idle" ? (
+                <ServerUpdateProgress state={primaryServerUpdateState} />
+              ) : (
+                [
+                  primaryServerConfig?.environment.serverVersion ?? null,
+                  primaryEnvironment?.displayUrl ?? null,
+                ]
+                  .filter((value): value is string => value !== null)
+                  .join(" · ") || t.settings.actions.loading
+              )
+            }
+            control={
+              primaryVersionMismatch &&
+              primaryEnvironmentId !== null &&
+              primaryServerUpdateState.status !== "running" ? (
+                <ServerUpdateAction
+                  size="sm"
+                  environmentId={primaryEnvironmentId}
+                  serverLabel={
+                    primaryEnvironment
+                      ? t.settings.connections.environment.primaryServerLabel(
+                          primaryEnvironment.label,
+                        )
+                      : t.settings.connections.environment.server
+                  }
+                  selfUpdate={resolveServerSelfUpdateCapability(primaryServerConfig)}
+                  installation={primaryServerConfig?.environment.capabilities.serverInstallation}
+                  desktopAppUpdate={supportsDesktopAppUpdate(primaryServerConfig)}
+                  threadContinuation={supportsServerUpdateThreadContinuation(primaryServerConfig)}
+                  targetVersion={primaryVersionMismatch.clientVersion}
+                  label={
+                    primaryServerUpdateState.status === "failed"
+                      ? t.settings.connections.environment.retryUpdate
+                      : t.settings.connections.environment.updateVersion(
+                          primaryVersionMismatch.clientVersion,
+                        )
+                  }
+                />
+              ) : primaryServerUpdateState.status === "idle" && primaryServerConfig ? (
+                <span className="text-xs text-muted-foreground">
+                  {t.settings.connections.environment.upToDate}
+                </span>
+              ) : undefined
+            }
+          />
+        ) : null}
+        {primaryEnvironment ? (
+          <details className="group px-3 sm:px-4">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-md text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+              {t.settings.merge.permissions}
+              <ChevronRightIcon
+                aria-hidden
+                className="size-3 text-muted-foreground group-open:rotate-90"
+              />
+            </summary>
+            <SessionPermissions
+              environmentId={primaryEnvironment.environmentId}
+              connected={primaryEnvironment.connection.phase === "connected"}
+            />
+          </details>
+        ) : null}
+        <LoadBalancingSettings environments={loadBalancingEnvironments} />
+        <GitHubRoutingSettings environments={loadBalancingEnvironments} />
       </SettingsSection>
+      {primaryEnvironmentId !== null ? (
+        <>
+          {canReadAccess || canWriteAccess ? (
+            <SettingsSection
+              id="authorized-clients"
+              title={t.settings.connections.groups.pairing}
+              headerAction={
+                canWriteAccess ? (
+                  <AuthorizedClientsHeaderAction
+                    delegatableScopes={currentSessionScopes ?? []}
+                    onPairingLinkCreated={handlePairingLinkCreated}
+                    clientSessions={
+                      canReadAccess &&
+                      authAccessChanges.error === null &&
+                      authAccessChanges.data?.type === "snapshot"
+                        ? desktopClientSessions
+                        : null
+                    }
+                    isRevokingOtherClients={isRevokingOtherDesktopClients}
+                    onRevokeOtherClients={handleRevokeOtherDesktopClients}
+                  />
+                ) : undefined
+              }
+            >
+              <p className="px-3.5 pt-2.5 pb-1 text-secondary-copy-medium text-secondary-label">
+                {t.settings.connections.access.authorizedClients}
+                {" · "}
+                {summarizeAuthorizedClients(desktopClientSessions, visibleDesktopPairingLinks)}
+              </p>
+              <ScrollArea
+                scrollFade
+                chainVerticalScroll
+                className="max-h-90"
+                data-testid="authorized-clients-scroll-area"
+              >
+                {canReadAccess ? (
+                  renderAuthorizedClients("current")
+                ) : (
+                  <p className="px-4 py-3 text-xs text-muted-foreground">
+                    {t.settings.connections.access.readPermissionHint}
+                  </p>
+                )}
+              </ScrollArea>
+            </SettingsSection>
+          ) : null}
+        </>
+      ) : null}
       {hasCloudPublicConfig() ? (
         <RemoveT3ConnectEnvironmentDialog
           environmentLabel={pendingT3ConnectRemoval?.label ?? null}
@@ -4315,8 +4346,6 @@ export function ConnectionsSettings() {
           }}
         />
       ) : null}
-      <LoadBalancingSettings environments={loadBalancingEnvironments} />
-      <GitHubRoutingSettings environments={loadBalancingEnvironments} />
     </SettingsPageContainer>
   );
 }

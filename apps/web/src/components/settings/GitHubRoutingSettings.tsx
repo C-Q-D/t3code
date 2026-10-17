@@ -1,3 +1,4 @@
+/** Presents per-environment GitHub sharing permissions; the overview switch never grants access. */
 import { t } from "~/i18n";
 import { useAtomValue } from "@effect/atom-react";
 import { resolveEnvironmentMachineKind } from "@t3tools/contracts";
@@ -14,7 +15,9 @@ import { useAtomCommand } from "~/state/use-atom-command";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { toastManager } from "../ui/toast";
 import { EnvironmentRow, environmentTransportLabel } from "./EnvironmentRow";
-import { FoldedSettingsSection } from "./FoldedSettingsSection";
+import { SettingsRow } from "./settingsLayout";
+import { Switch } from "../ui/switch";
+import { Tooltip, TooltipTrigger, TooltipPopup } from "../ui/tooltip";
 import { searchableSetting } from "./settingsSearch";
 
 const options: ReadonlyArray<{ value: GitHubRoutingPermission; label: string }> = [
@@ -29,7 +32,7 @@ const summaryLabels = {
 };
 
 /**
- * Closed-header summary: the machines that share, grouped by permission.
+ * Summarizes sharing machines by permission, preserving their order within each group.
  * Null when nothing is shared.
  */
 export function summarizeGitHubRouting(
@@ -45,10 +48,10 @@ export function summarizeGitHubRouting(
 }
 
 /**
- * Folded section under the environments list. One row per switched-on machine
- * with how much of its GitHub access the other machines may use. The trust
- * warning is the first line of the body so it sits next to the control.
- * Rendered only when two or more machines are on.
+ * Shows P2's sharing overview and the existing per-machine permission controls.
+ * environments contains enabled machines; fewer than two hides the row as before.
+ * The disabled overview is display-only because there is no global sharing permission.
+ * Catalog readiness, unsupported routes, saving guards and command error reporting stay authoritative.
  */
 export function GitHubRoutingSettings({
   environments,
@@ -63,67 +66,84 @@ export function GitHubRoutingSettings({
   if (environments.length < 2) return null;
 
   const { id, title } = searchableSetting("github-routing");
+  const summary = summarizeGitHubRouting(
+    environments.map((environment) => ({
+      label: environment.label,
+      permission: gitHubRoutingPermissionFor(environment.entry, permissions),
+    })),
+  );
   return (
-    <FoldedSettingsSection
+    <SettingsRow
       id={id}
       title={title}
-      summary={
-        summarizeGitHubRouting(
-          environments.map((environment) => ({
-            label: environment.label,
-            permission: gitHubRoutingPermissionFor(environment.entry, permissions),
-          })),
-        ) ?? t.settings.connections.status.off
+      status={summary ?? t.settings.connections.status.off}
+      control={
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <span
+                tabIndex={0}
+                className="inline-flex rounded-full outline-none focus-visible:inset-shadow-focus"
+              />
+            }
+          >
+            <Switch checked={summary !== null} disabled aria-label={title} />
+          </TooltipTrigger>
+          <TooltipPopup side="top">
+            {t.settings.connections.groups.sharingOverviewHint}
+          </TooltipPopup>
+        </Tooltip>
       }
     >
-      <p className="px-3 py-2.5 text-xs text-muted-foreground sm:px-4">
+      <p className="text-secondary-copy-medium text-secondary-label">
         {t.settings.gitHubRouting.machinesTrustReadPrDataHint}
       </p>
-      {environments.map((environment) => (
-        <EnvironmentRow
-          key={environment.environmentId}
-          kind={resolveEnvironmentMachineKind(environment.serverConfig)}
-          label={environment.label}
-          subtitle={environmentTransportLabel(environment)}
-        >
-          <Select
-            items={options}
-            value={gitHubRoutingPermissionFor(environment.entry, permissions)}
-            disabled={
-              !catalog.isReady || saving || gitHubRoutingConnectionKey(environment.entry) === null
-            }
-            onValueChange={(permission) => {
-              if (permission === null) return;
-              setSaving(true);
-              void update({ environmentId: environment.environmentId, permission }).then(
-                (result) => {
-                  setSaving(false);
-                  if (result._tag === "Failure")
-                    toastManager.add({
-                      type: "error",
-                      title: t.settings.gitHubRouting.saveGitHubRoutingPermissionError,
-                    });
-                },
-              );
-            }}
+      <div className="space-y-0.5">
+        {environments.map((environment) => (
+          <EnvironmentRow
+            key={environment.environmentId}
+            kind={resolveEnvironmentMachineKind(environment.serverConfig)}
+            label={environment.label}
+            subtitle={environmentTransportLabel(environment)}
           >
-            <SelectTrigger
-              size="xs"
-              className="w-32"
-              aria-label={t.settings.gitHubRouting.gitHubRouting(environment.label)}
+            <Select
+              items={options}
+              value={gitHubRoutingPermissionFor(environment.entry, permissions)}
+              disabled={
+                !catalog.isReady || saving || gitHubRoutingConnectionKey(environment.entry) === null
+              }
+              onValueChange={(permission) => {
+                if (permission === null) return;
+                setSaving(true);
+                void update({ environmentId: environment.environmentId, permission }).then(
+                  (result) => {
+                    setSaving(false);
+                    if (result._tag === "Failure")
+                      toastManager.add({
+                        type: "error",
+                        title: t.settings.gitHubRouting.saveGitHubRoutingPermissionError,
+                      });
+                  },
+                );
+              }}
             >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectPopup align="end" alignItemWithTrigger={false}>
-              {options.map(({ value, label }) => (
-                <SelectItem key={value} value={value}>
-                  {label}
-                </SelectItem>
-              ))}
-            </SelectPopup>
-          </Select>
-        </EnvironmentRow>
-      ))}
-    </FoldedSettingsSection>
+              <SelectTrigger
+                size="settings"
+                aria-label={t.settings.gitHubRouting.gitHubRouting(environment.label)}
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectPopup align="end" alignItemWithTrigger={false}>
+                {options.map(({ value, label }) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectPopup>
+            </Select>
+          </EnvironmentRow>
+        ))}
+      </div>
+    </SettingsRow>
   );
 }

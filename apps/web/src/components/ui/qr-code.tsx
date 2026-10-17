@@ -1,7 +1,11 @@
+/** Generates QR vectors; optional presentation variants do not change the encoded payload. */
 import { memo } from "react";
+import { cn } from "~/lib/utils";
 import { QrCode } from "@t3tools/shared/qrCode";
 
+/** QR payload, geometry, error correction and explicit high-contrast colors. */
 type QRCodeSvgProps = {
+  variant?: "default" | "settings";
   value: string;
   size?: number;
   level?: "L" | "M" | "Q" | "H";
@@ -19,6 +23,7 @@ const ERROR_CORRECTION_LEVELS = {
   H: QrCode.Ecc.HIGH,
 } as const;
 
+/** Compresses horizontal runs into SVG path commands; marginSize is the quiet zone in QR modules. */
 function buildQrPathData(qrCode: ReturnType<typeof QrCode.encodeText>, marginSize: number): string {
   const commands: Array<string> = [];
 
@@ -49,7 +54,9 @@ function buildQrPathData(qrCode: ReturnType<typeof QrCode.encodeText>, marginSiz
   return commands.join("");
 }
 
+/** Renders an encoded QR image; settings adds the shared raised tile while preserving color and size defaults. */
 export const QRCodeSvg = memo(function QRCodeSvg({
+  variant = "default",
   value,
   size = 128,
   level = "L",
@@ -71,7 +78,12 @@ export const QRCodeSvg = memo(function QRCodeSvg({
       shapeRendering="crispEdges"
       role={title ? "img" : undefined}
       aria-label={title}
-      className={className}
+      className={cn(
+        // SettingsPage8a P2: shared 132px pairing tile, also used in the manual-copy dialog.
+        variant === "settings" &&
+          "rounded-settings-row-surface bg-primary p-2 text-shadow-none shadow-connections-qr",
+        className,
+      )}
     >
       {title ? <title>{title}</title> : null}
       <rect width={viewBoxSize} height={viewBoxSize} fill={backgroundColor} />

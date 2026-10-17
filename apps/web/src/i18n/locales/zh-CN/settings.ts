@@ -1116,6 +1116,15 @@ export const settings: Messages["settings"] = {
       `${mode === "light" ? "浅色" : mode === "dark" ? "深色" : mode}。`,
   },
   connections: {
+    groups: {
+      automaticBalancing: "自动均衡",
+      sharingOverviewHint: "这里只显示共享状态。请在下方分别修改各环境的权限。",
+      local: "本地",
+      environments: "环境",
+      pairing: "配对",
+      thisMachine: "此机器",
+      thisDevice: "此设备",
+    },
     scopes: {
       orchestrationRead: {
         title: "查看环境",
