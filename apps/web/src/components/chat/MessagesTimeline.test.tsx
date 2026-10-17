@@ -1264,8 +1264,8 @@ describe("MessagesTimeline", () => {
     expect(resolveTimelineMinimapHitStripWidth(0, 0)).toBe(0);
     expect(resolveTimelineMinimapHitStripWidth(Number.NaN, 768)).toBe(0);
 
-    // Prev/next buttons reach 14px past the strip's left edge; a narrower
-    // strip means they would sit on the content column.
+    // The right-side minimap uses 22px prev/next keys. The existing pointer
+    // activation gate requires a strip width of at least 14px.
     expect(resolveTimelineMinimapNavigationInteractive(40)).toBe(true);
     expect(resolveTimelineMinimapNavigationInteractive(14)).toBe(true);
     expect(resolveTimelineMinimapNavigationInteractive(8)).toBe(false);

@@ -3,7 +3,7 @@ import type { LegendListRef } from "@legendapp/list/react";
 import { useCallback, useEffect, useLayoutEffect, useRef, type RefObject } from "react";
 import type { ThreadFindMatch } from "./threadFind";
 import { useThreadFindHighlights } from "./threadFindHighlights";
-import { resolveThreadFindRevealTop } from "./useThreadFindNavigation.logic";
+import { resolveThreadFindRevealBounds } from "./useThreadFindNavigation.logic";
 
 const FIND_MATCH_VIEW_MARGIN = 96;
 
@@ -177,11 +177,16 @@ export function useThreadFindNavigation({
             index: rowIndex,
             animated: false,
             viewOffset:
-              resolveThreadFindRevealTop({
-                viewportTop: viewport?.top ?? 0,
-                margin: FIND_MATCH_VIEW_MARGIN,
-                bannerBottom,
-              }) - (viewport?.top ?? 0),
+              bannerBottom === null
+                ? FIND_MATCH_VIEW_MARGIN
+                : resolveThreadFindRevealBounds({
+                    viewportTop: viewport?.top ?? 0,
+                    viewportBottom: viewport?.bottom ?? 0,
+                    contentInsetEndAdjustment,
+                    matchHeight: range?.getBoundingClientRect().height ?? 0,
+                    maxMargin: FIND_MATCH_VIEW_MARGIN,
+                    bannerBottom,
+                  }).top - (viewport?.top ?? 0),
           })
           .then(() => {
             if (positioningRef.current !== request || currentMatchKeyRef.current !== matchKey)
@@ -207,15 +212,21 @@ export function useThreadFindNavigation({
       }
       const rect = range.getBoundingClientRect();
       if (!viewport || rect.height === 0) return;
-      // Shrink the margin when the band above the composer is short, so the match stays inside it.
-      const margin = Math.min(
-        FIND_MATCH_VIEW_MARGIN,
-        Math.max(0, (viewport.height - contentInsetEndAdjustment - rect.height) / 2),
-      );
-      const top = resolveThreadFindRevealTop({ viewportTop: viewport.top, margin, bannerBottom });
-      const bottom = viewport.bottom - margin - contentInsetEndAdjustment;
+      const { top, bottom, alignTop } = resolveThreadFindRevealBounds({
+        viewportTop: viewport.top,
+        viewportBottom: viewport.bottom,
+        contentInsetEndAdjustment,
+        matchHeight: rect.height,
+        maxMargin: FIND_MATCH_VIEW_MARGIN,
+        bannerBottom,
+      });
+      // An oversized match stays top-aligned rather than alternating between incompatible bounds.
       const delta =
-        rect.top < top ? rect.top - top : rect.bottom > bottom ? rect.bottom - bottom : 0;
+        alignTop || rect.top < top
+          ? rect.top - top
+          : rect.bottom > bottom
+            ? rect.bottom - bottom
+            : 0;
       // A new list can expose DOM text before its virtual row sizes settle.
       // Await row positioning before measuring an offscreen occurrence.
       if (

@@ -84,6 +84,42 @@ afterEach(async () => {
 
 describe("find result navigation", () => {
   it.each([
+    { label: "short but sufficient", composerInset: 400 },
+    { label: "insufficient", composerInset: 490 },
+  ])("settles below the banner in a $label viewport", async ({ composerInset }) => {
+    const banner = document.createElement("div");
+    banner.dataset.providerStatusBanner = "";
+    banner.getBoundingClientRect = () => new DOMRect(0, 64, 660, 44);
+    canvas.prepend(banner);
+    rect = new DOMRect(0, 40, 40, 20);
+    let scroll = 300;
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      frames.push(callback);
+      return frames.length;
+    });
+    props.listRef.current = {
+      scrollToIndex,
+      scrollToOffset,
+      getState: () => ({ scroll }),
+    } as unknown as LegendListRef;
+    scrollToOffset.mockImplementation(async ({ offset }) => {
+      rect = new DOMRect(0, rect.top + scroll - offset, 40, 20);
+      scroll = offset;
+    });
+    await act(async () =>
+      root.render(<Probe {...props} contentInsetEndAdjustment={composerInset} />),
+    );
+    await act(async () => frames.splice(0).forEach((callback) => callback(0)));
+    await act(async () => frames.splice(0).forEach((callback) => callback(16)));
+    await act(async () => frames.splice(0).forEach((callback) => callback(32)));
+    expect(scrollToOffset).toHaveBeenCalledExactlyOnceWith({ offset: 232, animated: false });
+    expect(rect.top).toBe(108);
+    expect(scroll).toBe(232);
+    expect(frames).toHaveLength(0);
+  });
+
+  it.each([
     { label: "single-line", height: 44, offset: 292 },
     { label: "wrapped", height: 88, offset: 248 },
   ])("reveals text below the actual $label Provider banner", async ({ height, offset }) => {

@@ -1,16 +1,27 @@
 /** Resolves search reveal bounds independently of DOM measurement and virtual-list scrolling. */
 
 /**
- * Keeps a revealed match below both the normal viewport margin and the Provider overlay.
- * @param input - Viewport top, existing margin, and visible banner bottom in CSS pixels;
- * bannerBottom is null when the banner is absent. Both positions use viewport coordinates.
- * @returns The first unobscured vertical position for the match, in viewport CSS pixels.
+ * Fits reveal margins inside the space between the Provider overlay and composer.
+ * @param input - Viewport bounds and visible banner bottom in viewport CSS pixels;
+ * bannerBottom is null when absent. Composer inset, match height, and maximum margin are CSS pixels.
+ * @returns Reveal bounds in viewport coordinates and a top-only alignment policy when an overlay
+ * leaves too little room for the match. Without a banner, the original symmetric margins apply.
  */
-export function resolveThreadFindRevealTop(input: {
+export function resolveThreadFindRevealBounds(input: {
   viewportTop: number;
-  margin: number;
+  viewportBottom: number;
+  contentInsetEndAdjustment: number;
+  matchHeight: number;
+  maxMargin: number;
   bannerBottom: number | null;
-}): number {
-  const defaultTop = input.viewportTop + input.margin;
-  return Math.max(defaultTop, input.bannerBottom ?? defaultTop);
+}) {
+  const availableTop = Math.max(input.viewportTop, input.bannerBottom ?? input.viewportTop);
+  const availableBottom = input.viewportBottom - input.contentInsetEndAdjustment;
+  const availableHeight = availableBottom - availableTop;
+  const margin = Math.min(input.maxMargin, Math.max(0, (availableHeight - input.matchHeight) / 2));
+  return {
+    top: Math.max(input.viewportTop + margin, availableTop),
+    bottom: availableBottom - margin,
+    alignTop: input.bannerBottom !== null && availableHeight < input.matchHeight,
+  };
 }
