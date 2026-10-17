@@ -1,3 +1,7 @@
+/**
+ * Verifies integration entry behavior, O1 ordering and real profile selection.
+ * @vitest-environment jsdom
+ */
 import {
   DEFAULT_CLIENT_SETTINGS,
   DEFAULT_UNIFIED_SETTINGS,
@@ -10,10 +14,16 @@ import {
   RouterProvider,
 } from "@tanstack/react-router";
 import { act, StrictMode, type ReactNode } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { t } from "~/i18n";
 import { create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
-const { listBrowserImportSources } = vi.hoisted(() => ({
+type SettingsModule = typeof import("../../hooks/useSettings");
+type LayoutModule = typeof import("./settingsLayout");
+
+const { listBrowserImportSources, updateSettings } = vi.hoisted(() => ({
+  updateSettings: vi.fn(),
   listBrowserImportSources: vi.fn().mockResolvedValue([]),
 }));
 
@@ -38,17 +48,17 @@ vi.mock("../../state/environments", () => ({
   usePrimaryEnvironmentId: () => null,
 }));
 vi.mock("../../hooks/useSettings", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../hooks/useSettings")>()),
+  ...(await importOriginal<SettingsModule>()),
   PRIMARY_SETTINGS_UNAVAILABLE_MESSAGE: "Connect to an environment",
   useClientSettings: (selector?: (settings: typeof DEFAULT_CLIENT_SETTINGS) => unknown) =>
-    selector ? selector(DEFAULT_CLIENT_SETTINGS) : DEFAULT_CLIENT_SETTINGS,
+    selector ? selector(profileSettings) : profileSettings,
   useClientSettingsHydrated: () => true,
   usePrimarySettingsAvailable: () => true,
   usePrimarySettings: () => DEFAULT_UNIFIED_SETTINGS,
-  useUpdatePrimarySettings: () => vi.fn(),
+  useUpdatePrimarySettings: () => updateSettings,
 }));
 vi.mock("./settingsLayout", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("./settingsLayout")>()),
+  ...(await importOriginal<LayoutModule>()),
   SettingsPageContainer: ({ children }: { children: ReactNode }) => children,
 }));
 // The scoped agent-access rows need the settings layout's scope provider;
@@ -71,14 +81,21 @@ import { IntegrationsSettingsPanel } from "./IntegrationsSettings";
 import { platformSetupStatus } from "../device/DeviceSetup";
 
 let renderer: ReactTestRenderer | undefined;
+let domRoot: Root | undefined;
+let profileSettings = { ...DEFAULT_CLIENT_SETTINGS };
 
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   listBrowserImportSources.mockClear();
+  updateSettings.mockClear();
+  profileSettings = { ...DEFAULT_CLIENT_SETTINGS };
 });
 
 afterEach(async () => {
   await act(() => renderer?.unmount());
+  await act(() => domRoot?.unmount());
+  domRoot = undefined;
+  document.body.replaceChildren();
   vi.unstubAllGlobals();
 });
 
@@ -108,13 +125,44 @@ describe("Integrations browser discovery", () => {
     expect(listBrowserImportSources).not.toHaveBeenCalled();
   });
 
-  it("places device settings directly after browser settings", async () => {
+  it("selects a real browser profile and writes its id as the default", async () => {
+    profileSettings = {
+      ...DEFAULT_CLIENT_SETTINGS,
+      browserProfiles: [{ id: "profile-work", name: "Work", kind: "persistent" }],
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    domRoot = createRoot(container);
+    const router = createRouter({
+      routeTree: createRootRoute({ component: IntegrationsSettingsPanel }),
+      history: createMemoryHistory(),
+    });
+    await router.load();
+    await act(() => domRoot!.render(<RouterProvider router={router} />));
+
+    const trigger = document.querySelector<HTMLButtonElement>(
+      `button[aria-label="${t.settings.rows.browserDefaultProfile.title}"]`,
+    );
+    expect(trigger).not.toBeNull();
+    await act(() => trigger!.click());
+    const option = Array.from(document.querySelectorAll<HTMLElement>('[role="option"]')).find(
+      (element) => element.textContent === "Work",
+    );
+    expect(option).toBeDefined();
+    await act(() => option!.click());
+    expect(updateSettings).toHaveBeenCalledExactlyOnceWith({
+      browserDefaultProfileId: "profile-work",
+    });
+  });
+
+  it("places devices before browser profiles, recording and links as specified by O1", async () => {
     await openSettings();
     const sections = renderer!.root
       .findAll((node) => node.type === "section")
       .map((node) => node.props.id)
       .filter(Boolean);
-    expect(sections.indexOf("devices")).toBeGreaterThan(sections.indexOf("browser"));
+    // O1: browser access (mocked above), devices, profiles, recording, links.
+    expect(sections).toEqual(["devices", "browser", "browser-recording", "browser-links"]);
   });
 });
 

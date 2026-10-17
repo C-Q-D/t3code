@@ -229,3 +229,9 @@
     grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 }
+
+/* SettingsPage8a O1 has title-only rows. Keep the shared scoped-access component
+   intact; only its ordinary description is hidden on the integration surface. */
+.settings-integrations #agent-browser-access > div > div > p {
+  display: none;
+}

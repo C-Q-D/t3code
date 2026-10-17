@@ -1,17 +1,14 @@
+/**
+ * Integrations settings compose scoped agent access and device management with
+ * device-local browser defaults. Preview defaults apply to manually opened tabs
+ * and agent preview_open calls that do not supply their own values.
+ */
 import { t } from "~/i18n";
 import { DeviceHostUpdates } from "../device/DeviceHostUpdates";
 import { DeviceToolVersions } from "../device/DeviceToolVersions";
 import { useScopedSettings, useUpdateScopedSettings } from "./useScopedSettings";
 import { ScopedSwitch } from "./ScopedSwitch";
 import { DeviceHostsSettings } from "./DeviceHostsSettings";
-/**
- * Integrations settings - preferences for surfaces T3 Code embeds rather than
- * owns. Browser is the first section: the defaults a preview tab opens at,
- * applied to both hand-opened tabs and agent `preview_open` calls that don't
- * state their own size.
- *
- * @module IntegrationsSettings
- */
 import {
   AuthSettingsWriteScope,
   BrowserImportFailureReason,
@@ -61,8 +58,6 @@ import {
   DeviceHubSetupStatus,
   PlatformStatus,
   platformSetupStatus,
-  deviceHubDescription,
-  agentDeviceDescription,
 } from "~/components/device/DeviceSetup";
 import { isElectron } from "../../env";
 
@@ -101,6 +96,7 @@ import {
   SelectValue,
 } from "../ui/select";
 import { Switch } from "../ui/switch";
+import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import {
   getClientSettings,
@@ -249,6 +245,7 @@ const rotateViewport = (
   height: viewport.width,
 });
 
+/** Edits viewport defaults; dimension commits retain integer, dimension and area limits. */
 function BrowserViewportSetting({ disabled }: { readonly disabled: boolean }) {
   const viewport = useClientSettings((settings) => settings.browserDefaultViewport);
   const updateSettings = useUpdatePrimarySettings();
@@ -301,7 +298,7 @@ function BrowserViewportSetting({ disabled }: { readonly disabled: boolean }) {
   return (
     <SettingsRow
       {...searchableSetting("browser-default-viewport")}
-      description={t.settings.rows.browserDefaultViewport.description}
+
       resetAction={
         !disabled && viewport._tag !== DEFAULT_BROWSER_VIEWPORT._tag ? (
           <SettingResetButton
@@ -318,8 +315,7 @@ function BrowserViewportSetting({ disabled }: { readonly disabled: boolean }) {
             disabled={disabled}
           >
             <SelectTrigger
-              size="sm"
-              className="w-full min-w-0 sm:w-44"
+              size="settings"
               aria-label={t.settings.rows.browserDefaultViewport.title}
             >
               <SelectValue>{viewportSelectLabel(viewport)}</SelectValue>
@@ -415,6 +411,7 @@ function BrowserViewportSetting({ disabled }: { readonly disabled: boolean }) {
   );
 }
 
+/** Edits the device-local zoom using the supported levels; disabled keeps the stored value visible. */
 function BrowserZoomSetting({ disabled }: { readonly disabled: boolean }) {
   const zoomFactor = useClientSettings((settings) => settings.browserDefaultZoomFactor);
   const updateSettings = useUpdatePrimarySettings();
@@ -422,7 +419,7 @@ function BrowserZoomSetting({ disabled }: { readonly disabled: boolean }) {
   return (
     <SettingsRow
       {...searchableSetting("browser-default-zoom")}
-      description={t.settings.rows.browserDefaultZoom.description}
+
       resetAction={
         !disabled && zoomFactor !== DEFAULT_PREVIEW_ZOOM_FACTOR ? (
           <SettingResetButton
@@ -442,11 +439,7 @@ function BrowserZoomSetting({ disabled }: { readonly disabled: boolean }) {
             if (next !== undefined) updateSettings({ browserDefaultZoomFactor: next });
           }}
         >
-          <SelectTrigger
-            size="sm"
-            className="w-full sm:w-40"
-            aria-label={t.settings.rows.browserDefaultZoom.title}
-          >
+          <SelectTrigger size="settings" aria-label={t.settings.rows.browserDefaultZoom.title}>
             <SelectValue>{zoomLabel(zoomFactor)}</SelectValue>
           </SelectTrigger>
           <SelectPopup align="end" alignItemWithTrigger={false}>
@@ -462,6 +455,7 @@ function BrowserZoomSetting({ disabled }: { readonly disabled: boolean }) {
   );
 }
 
+/** Edits the existing appearance preference through O1's single-selection segment; disabled prevents local writes. */
 function BrowserAppearanceSetting({ disabled }: { readonly disabled: boolean }) {
   const appearance = useClientSettings((settings) => settings.browserDefaultAppearance);
   const updateSettings = useUpdatePrimarySettings();
@@ -469,7 +463,7 @@ function BrowserAppearanceSetting({ disabled }: { readonly disabled: boolean }) 
   return (
     <SettingsRow
       {...searchableSetting("browser-default-appearance")}
-      description={t.settings.rows.browserDefaultAppearance.description}
+
       resetAction={
         !disabled && appearance !== DEFAULT_PREVIEW_APPEARANCE ? (
           <SettingResetButton
@@ -479,35 +473,30 @@ function BrowserAppearanceSetting({ disabled }: { readonly disabled: boolean }) 
         ) : null
       }
       control={
-        <Select
+        <ToggleGroup
+          size="settings"
           disabled={disabled}
-          value={appearance}
-          onValueChange={(value) => {
+          value={[appearance]}
+          aria-label={t.settings.rows.browserDefaultAppearance.title}
+          onValueChange={(values) => {
+            const value = values[0];
             if (value === "system" || value === "light" || value === "dark") {
               updateSettings({ browserDefaultAppearance: value });
             }
           }}
         >
-          <SelectTrigger
-            size="sm"
-            className="w-full sm:w-40"
-            aria-label={t.settings.rows.browserDefaultAppearance.title}
-          >
-            <SelectValue>{APPEARANCE_LABELS[appearance]}</SelectValue>
-          </SelectTrigger>
-          <SelectPopup align="end" alignItemWithTrigger={false}>
-            {Object.entries(APPEARANCE_LABELS).map(([value, label]) => (
-              <SelectItem hideIndicator key={value} value={value}>
-                {label}
-              </SelectItem>
-            ))}
-          </SelectPopup>
-        </Select>
+          {Object.entries(APPEARANCE_LABELS).map(([value, label]) => (
+            <ToggleGroupItem key={value} value={value}>
+              {label}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
       }
     />
   );
 }
 
+/** Edits key and mouse overlays for future recordings; disabled leaves saved choices visible. */
 function BrowserRecordingInputSettings({ disabled }: { readonly disabled: boolean }) {
   const showKeys = useClientSettings((settings) => settings.browserRecordingShowKeyPresses);
   const showMouse = useClientSettings((settings) => settings.browserRecordingShowMousePresses);
@@ -516,7 +505,7 @@ function BrowserRecordingInputSettings({ disabled }: { readonly disabled: boolea
     <>
       <SettingsRow
         {...searchableSetting("browser-recording-key-presses")}
-        description={t.settings.rows.browserRecordingKeyPresses.description}
+
         control={
           <Switch
             disabled={disabled}
@@ -530,7 +519,7 @@ function BrowserRecordingInputSettings({ disabled }: { readonly disabled: boolea
       />
       <SettingsRow
         {...searchableSetting("browser-recording-mouse-presses")}
-        description={t.settings.rows.browserRecordingMousePresses.description}
+
         control={
           <Switch
             disabled={disabled}
@@ -546,6 +535,7 @@ function BrowserRecordingInputSettings({ disabled }: { readonly disabled: boolea
   );
 }
 
+/** Edits the supported recording rate and retains the existing default reset. */
 function BrowserRecordingFrameRateSetting({ disabled }: { readonly disabled: boolean }) {
   const frameRate = useClientSettings((settings) => settings.browserRecordingFrameRate);
   const updateSettings = useUpdatePrimarySettings();
@@ -553,7 +543,7 @@ function BrowserRecordingFrameRateSetting({ disabled }: { readonly disabled: boo
   return (
     <SettingsRow
       {...searchableSetting("browser-recording-frame-rate")}
-      description={t.settings.rows.browserRecordingFrameRate.description}
+
       resetAction={
         !disabled && frameRate !== DEFAULT_BROWSER_RECORDING_FRAME_RATE ? (
           <SettingResetButton
@@ -576,8 +566,7 @@ function BrowserRecordingFrameRateSetting({ disabled }: { readonly disabled: boo
           }}
         >
           <SelectTrigger
-            size="sm"
-            className="w-full sm:w-40"
+            size="settings"
             aria-label={t.settings.rows.browserRecordingFrameRate.title}
           >
             <SelectValue>{frameRate} fps</SelectValue>
@@ -600,6 +589,7 @@ const LINK_TARGET_LABELS: Readonly<Record<BrowserLinkTarget, string>> = {
   app: "T3 Code",
 };
 
+/** Edits the existing system/app destination; it does not choose a new preview surface. */
 function BrowserLinkTargetSetting({ disabled }: { readonly disabled: boolean }) {
   const linkTarget = useClientSettings((settings) => settings.browserLinkTarget);
   const updateSettings = useUpdatePrimarySettings();
@@ -607,7 +597,7 @@ function BrowserLinkTargetSetting({ disabled }: { readonly disabled: boolean }) 
   return (
     <SettingsRow
       {...searchableSetting("browser-link-target")}
-      description={t.settings.rows.browserLinkTarget.description}
+
       resetAction={
         !disabled && linkTarget !== DEFAULT_BROWSER_LINK_TARGET ? (
           <SettingResetButton
@@ -626,11 +616,7 @@ function BrowserLinkTargetSetting({ disabled }: { readonly disabled: boolean }) 
             }
           }}
         >
-          <SelectTrigger
-            size="sm"
-            className="w-full sm:w-40"
-            aria-label={t.settings.rows.browserLinkTarget.title}
-          >
+          <SelectTrigger size="settings" aria-label={t.settings.rows.browserLinkTarget.title}>
             <SelectValue>{LINK_TARGET_LABELS[linkTarget]}</SelectValue>
           </SelectTrigger>
           <SelectPopup align="end" alignItemWithTrigger={false}>
@@ -664,6 +650,7 @@ function DeviceIntegrationSettings() {
   );
 }
 
+/** Renders O1 device rows for the selected environment; preserves setup, scoped access and platform diagnostics. */
 function DeviceIntegrationControls({
   environmentId,
   enabled,
@@ -753,7 +740,7 @@ function DeviceIntegrationControls({
         <div className="flex flex-wrap gap-2">
           {state.supportsToolUpdate && needsUpdate ? (
             <Button
-              size="sm"
+              size="toolbar"
               disabled={!environmentId || pending !== null || busy}
               onClick={() => {
                 if (!environmentId) return;
@@ -777,7 +764,7 @@ function DeviceIntegrationControls({
           ) : null}
           {state.supportsToolInspection ? (
             <Button
-              size="sm"
+              size="toolbar"
               variant="outline"
               disabled={!environmentId || pending !== null || busy}
               onClick={() => {
@@ -805,11 +792,42 @@ function DeviceIntegrationControls({
 
   return (
     <>
+      <DeviceHostsSettings environmentId={environmentId} />
+      <SettingsRow
+        {...searchableSetting("agent-device-access")}
+        serverScoped
+        settingKeys={["enableAgentDeviceAccess"]}
+        control={
+          <>
+            <DeviceToolVersions
+              action={versionActions("agent")}
+              kind="agent"
+              tools={state.hosts.find((host) => host.kind === "local")?.tools}
+            />
+            {pending === "agent" ? <AgentDeviceSetupStatus state={state} pending compact /> : null}
+            <ScopedSwitch
+              settingKeys={["enableAgentDeviceAccess"]}
+              checked={agentAccessEnabled}
+              disabled={
+                !canConfigure ||
+                connectedEnvironments.length === 0 ||
+                (!projectScope && (!loaded || !anyHubEnabled || busy)) ||
+                pending !== null
+              }
+              aria-label={t.settings.rows.agentDeviceAccess.title}
+              onCheckedChange={(checked) =>
+                projectScope
+                  ? updateSettings({ enableAgentDeviceAccess: Boolean(checked) })
+                  : void update("agent", { agentAccessEnabled: Boolean(checked) })
+              }
+            />
+          </>
+        }
+      />
       <SettingsRow
         {...searchableSetting("device-hub")}
         serverScoped
         settingKeys={["enableDeviceSupport"]}
-        description={deviceHubDescription}
         control={
           <>
             <DeviceToolVersions
@@ -865,7 +883,7 @@ function DeviceIntegrationControls({
             }
             control={
               <Button
-                size="sm"
+                size="toolbar"
                 variant="outline"
                 disabled={!environmentId || !enabled || busy || pending !== null}
                 onClick={() => {
@@ -882,49 +900,17 @@ function DeviceIntegrationControls({
           />
         ) : null}
       </AnimatedHeight>
-      <SettingsRow
-        {...searchableSetting("agent-device-access")}
-        serverScoped
-        settingKeys={["enableAgentDeviceAccess"]}
-        description={agentDeviceDescription}
-        control={
-          <>
-            <DeviceToolVersions
-              action={versionActions("agent")}
-              kind="agent"
-              tools={state.hosts.find((host) => host.kind === "local")?.tools}
-            />
-            {pending === "agent" ? <AgentDeviceSetupStatus state={state} pending compact /> : null}
-            <ScopedSwitch
-              settingKeys={["enableAgentDeviceAccess"]}
-              checked={agentAccessEnabled}
-              disabled={
-                !canConfigure ||
-                connectedEnvironments.length === 0 ||
-                (!projectScope && (!loaded || !anyHubEnabled || busy)) ||
-                pending !== null
-              }
-              aria-label={t.settings.rows.agentDeviceAccess.title}
-              onCheckedChange={(checked) =>
-                projectScope
-                  ? updateSettings({ enableAgentDeviceAccess: Boolean(checked) })
-                  : void update("agent", { agentAccessEnabled: Boolean(checked) })
-              }
-            />
-          </>
-        }
-      />
       {environmentId ? (
         <DeviceHostUpdates
           state={{ ...state, hosts: state.hosts.filter((host) => host.kind === "local") }}
           environmentId={environmentId}
         />
       ) : null}
-      <DeviceHostsSettings environmentId={environmentId} />
     </>
   );
 }
 
+/** Edits automatic floating previews and restores the existing default when requested. */
 function BrowserAutoShowFloatingPreviewSetting({ disabled }: { readonly disabled: boolean }) {
   const autoShow = useClientSettings((settings) => settings.browserAutoShowFloatingPreview);
   const updateSettings = useUpdatePrimarySettings();
@@ -932,7 +918,7 @@ function BrowserAutoShowFloatingPreviewSetting({ disabled }: { readonly disabled
   return (
     <SettingsRow
       {...searchableSetting("browser-auto-show-floating-preview")}
-      description={t.settings.rows.browserAutoShowFloatingPreview.description}
+
       resetAction={
         !disabled && autoShow !== DEFAULT_BROWSER_AUTO_SHOW_FLOATING_PREVIEW ? (
           <SettingResetButton
@@ -1026,6 +1012,18 @@ function BrowserProfilesSetting({ disabled }: { readonly disabled: boolean }) {
   const listedProfiles = profiles.filter((profile) => profile.kind !== "incognito");
   const resolvedDefaultId =
     findBrowserProfile(listedProfiles, defaultProfileId)?.id ?? DEFAULT_BROWSER_PROFILE_ID;
+
+  /** Sets a listed persistent profile as the default; ignores disabled, importing or stale selections. */
+  const setDefaultProfile = (id: string | null) => {
+    if (
+      id === null ||
+      profileWritesDisabled ||
+      importInFlightRef.current ||
+      !listedProfiles.some((profile) => profile.id === id)
+    )
+      return;
+    updateSettings({ browserDefaultProfileId: id });
+  };
 
   const createProfile = (baseName: string) => {
     if (!settingsHydrated || importInFlightRef.current) return undefined;
@@ -1263,338 +1261,372 @@ function BrowserProfilesSetting({ disabled }: { readonly disabled: boolean }) {
   const atProfileLimit = userProfiles.length >= BROWSER_PROFILE_MAX_COUNT;
 
   return (
-    <SettingsRow
-      {...searchableSetting("browser-profiles")}
-      description={t.settings.rows.browserProfiles.description}
-      control={
-        <Menu onOpenChange={(open) => open && loadSources()}>
-          <MenuTrigger
-            render={
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={profileWritesDisabled || importInFlight}
-              />
-            }
-          >
-            <PlusIcon />
-            {t.settings.integrations.profiles.add}
-          </MenuTrigger>
-          <MenuPopup align="end">
-            <MenuItem
-              disabled={!settingsHydrated || atProfileLimit}
-              onClick={() => createProfile("New profile")}
+    <>
+      <SettingsRow
+        {...searchableSetting("browser-profiles")}
+
+        control={
+          <Menu onOpenChange={(open) => open && loadSources()}>
+            <MenuTrigger
+              render={
+                <Button
+                  size="toolbar"
+                  variant="outline"
+                  disabled={profileWritesDisabled || importInFlight}
+                />
+              }
             >
-              {t.settings.integrations.profiles.blankProfile}
-            </MenuItem>
-            {atProfileLimit ? (
-              <MenuItem disabled>{t.settings.integrations.profiles.limitHint}</MenuItem>
-            ) : null}
-            <MenuSeparator />
-            <MenuGroup>
-              <MenuGroupLabel>{t.settings.integrations.profiles.importLabel}</MenuGroupLabel>
-              {sources === null ? (
-                <MenuItem disabled>{t.settings.integrations.profiles.loadingBrowsers}</MenuItem>
-              ) : importableSources.length === 0 ? (
-                <MenuItem disabled>{t.settings.integrations.profiles.noBrowsers}</MenuItem>
-              ) : (
-                // Every source is a plain row — running, needs-permission and
-                // ready all look the same here. The wizard picks up whatever
-                // state the source is in and walks the user forward from there.
-                <>
-                  {importableSources.map((source) => (
-                    <MenuItem
-                      key={source.id}
-                      disabled={!settingsHydrated || primaryEnvironment == null}
-                      onClick={() => {
-                        if (!settingsHydrated || primaryEnvironment == null) return;
-                        setImportSession({
-                          source,
-                          environmentId: primaryEnvironment.environmentId,
-                          environmentName: resolveEnvironmentOptionLabel({
-                            isPrimary: true,
-                            environmentId: primaryEnvironment.environmentId,
-                            runtimeLabel: primaryEnvironment.label,
-                          }),
-                        });
-                      }}
-                    >
-                      {source.name}
-                    </MenuItem>
-                  ))}
-                  {primaryEnvironment == null ? (
-                    <MenuItem disabled>
-                      {t.settings.integrations.profiles.importConnectHint}
-                    </MenuItem>
-                  ) : null}
-                </>
-              )}
-            </MenuGroup>
-          </MenuPopup>
-        </Menu>
-      }
-    >
-      {/*
-        The bordered container groups rows unambiguously at any width, and
-        carries the bottom spacing `SettingsRow` leaves to its children
-        (`pt-3 pb-1`).
-      */}
-      <div className="mt-2 mb-2 overflow-hidden rounded-lg border border-border/60">
-        {listedProfiles.map((profile, index) => {
-          const builtIn = isBuiltInBrowserProfileId(profile.id);
-          const isDefault = profile.id === resolvedDefaultId;
-          return (
-            <div
-              key={profile.id}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2",
-                index > 0 && "border-t border-border/60",
-              )}
-            >
-              <span className="flex min-w-0 flex-1 items-center gap-2">
-                {builtIn ? (
-                  // Dimmed here rather than on the table: a wrapper-level dim
-                  // stacks with the rename field's and the row menu button's
-                  // own, landing them near 0.41 while every other disabled
-                  // control in the block sits at 0.64.
-                  <span
-                    className={cn(
-                      "truncate text-sm text-foreground",
-                      profileWritesDisabled && "opacity-64",
-                    )}
-                  >
-                    {profile.name}
-                  </span>
+              <PlusIcon />
+              {t.settings.integrations.profiles.add}
+            </MenuTrigger>
+            <MenuPopup align="end">
+              <MenuItem
+                disabled={!settingsHydrated || atProfileLimit}
+                onClick={() => createProfile("New profile")}
+              >
+                {t.settings.integrations.profiles.blankProfile}
+              </MenuItem>
+              {atProfileLimit ? (
+                <MenuItem disabled>{t.settings.integrations.profiles.limitHint}</MenuItem>
+              ) : null}
+              <MenuSeparator />
+              <MenuGroup>
+                <MenuGroupLabel>{t.settings.integrations.profiles.importLabel}</MenuGroupLabel>
+                {sources === null ? (
+                  <MenuItem disabled>{t.settings.integrations.profiles.loadingBrowsers}</MenuItem>
+                ) : importableSources.length === 0 ? (
+                  <MenuItem disabled>{t.settings.integrations.profiles.noBrowsers}</MenuItem>
                 ) : (
-                  <DraftInput
-                    nativeInput
-                    size="sm"
-                    className="w-full max-w-56"
-                    aria-label={t.settings.integrations.profiles.renameAriaLabel(profile.name)}
-                    disabled={profileWritesDisabled || importInFlight}
-                    maxLength={BROWSER_PROFILE_NAME_MAX_LENGTH}
-                    value={profile.name}
-                    onCommit={(next) => renameProfile(profile.id, next)}
-                  />
+                  // Every source is a plain row — running, needs-permission and
+                  // ready all look the same here. The wizard picks up whatever
+                  // state the source is in and walks the user forward from there.
+                  <>
+                    {importableSources.map((source) => (
+                      <MenuItem
+                        key={source.id}
+                        disabled={!settingsHydrated || primaryEnvironment == null}
+                        onClick={() => {
+                          if (!settingsHydrated || primaryEnvironment == null) return;
+                          setImportSession({
+                            source,
+                            environmentId: primaryEnvironment.environmentId,
+                            environmentName: resolveEnvironmentOptionLabel({
+                              isPrimary: true,
+                              environmentId: primaryEnvironment.environmentId,
+                              runtimeLabel: primaryEnvironment.label,
+                            }),
+                          });
+                        }}
+                      >
+                        {source.name}
+                      </MenuItem>
+                    ))}
+                    {primaryEnvironment == null ? (
+                      <MenuItem disabled>
+                        {t.settings.integrations.profiles.importConnectHint}
+                      </MenuItem>
+                    ) : null}
+                  </>
                 )}
-                {/* Dimmed with the rest of the row, whose controls are all disabled. */}
-                {isDefault ? (
-                  <span className={cn("flex", profileWritesDisabled && "opacity-64")}>
-                    <Badge>{t.settings.integrations.profiles.default}</Badge>
-                  </span>
-                ) : null}
-              </span>
-              <Menu>
-                <MenuTrigger
-                  render={
-                    <Button
-                      size="icon-xs"
-                      variant="ghost-muted"
+              </MenuGroup>
+            </MenuPopup>
+          </Menu>
+        }
+      >
+        {/* Keep profile management inline: O1's compact row must not remove existing actions. */}
+        <div className="my-2 overflow-hidden rounded-settings-row-surface bg-input shadow-well-control">
+          {listedProfiles.map((profile, index) => {
+            const builtIn = isBuiltInBrowserProfileId(profile.id);
+            const isDefault = profile.id === resolvedDefaultId;
+            return (
+              <div
+                key={profile.id}
+                className={cn(
+                  "flex min-h-12 items-center gap-3 px-3.5 py-2.5",
+                  index > 0 && "border-t border-settings-divider",
+                )}
+              >
+                <span className="flex min-w-0 flex-1 items-center gap-2">
+                  {builtIn ? (
+                    // Dimmed here rather than on the table: a wrapper-level dim
+                    // stacks with the rename field's and the row menu button's
+                    // own, landing them near 0.41 while every other disabled
+                    // control in the block sits at 0.64.
+                    <span
+                      className={cn(
+                        "truncate text-sm text-foreground",
+                        profileWritesDisabled && "opacity-64",
+                      )}
+                    >
+                      {profile.name}
+                    </span>
+                  ) : (
+                    <DraftInput
+                      nativeInput
+                      size="settings"
+                      className="w-full max-w-56"
+                      aria-label={t.settings.integrations.profiles.renameAriaLabel(profile.name)}
                       disabled={profileWritesDisabled || importInFlight}
-                      aria-label={t.settings.integrations.profiles.actionsAriaLabel(profile.name)}
+                      maxLength={BROWSER_PROFILE_NAME_MAX_LENGTH}
+                      value={profile.name}
+                      onCommit={(next) => renameProfile(profile.id, next)}
                     />
-                  }
-                >
-                  <MoreVertical />
-                </MenuTrigger>
-                <MenuPopup align="end">
-                  <MenuItem
-                    disabled={!settingsHydrated || isDefault}
-                    onClick={() => {
-                      if (settingsHydrated) {
-                        updateSettings({ browserDefaultProfileId: profile.id });
-                      }
-                    }}
+                  )}
+                  {/* Dimmed with the rest of the row, whose controls are all disabled. */}
+                  {isDefault ? (
+                    <span className={cn("flex", profileWritesDisabled && "opacity-64")}>
+                      <Badge variant="neutral" size="sm">
+                        {t.settings.integrations.profiles.default}
+                      </Badge>
+                    </span>
+                  ) : null}
+                </span>
+                <Menu>
+                  <MenuTrigger
+                    render={
+                      <Button
+                        size="icon-toolbar"
+                        variant="ghost-muted"
+                        disabled={profileWritesDisabled || importInFlight}
+                        aria-label={t.settings.integrations.profiles.actionsAriaLabel(profile.name)}
+                      />
+                    }
                   >
-                    {t.settings.integrations.profiles.setDefault}
-                  </MenuItem>
-                  <MenuItem
-                    disabled={!settingsHydrated || !removalAvailable}
-                    onClick={() => {
-                      // Clearing a server copy closes its open tabs, so it asks first.
-                      if (serverProfileData.environmentIds.length > 0) {
-                        setProfilePendingClear(profile);
-                      } else clearProfileData(profile.id, profile.name);
-                    }}
-                  >
-                    {t.settings.integrations.profiles.clear}
-                  </MenuItem>
-                  {builtIn ? null : (
+                    <MoreVertical />
+                  </MenuTrigger>
+                  <MenuPopup align="end">
                     <MenuItem
-                      variant="destructive"
+                      disabled={!settingsHydrated || isDefault}
+                      onClick={() => setDefaultProfile(profile.id)}
+                    >
+                      {t.settings.integrations.profiles.setDefault}
+                    </MenuItem>
+                    <MenuItem
                       disabled={!settingsHydrated || !removalAvailable}
                       onClick={() => {
-                        if (settingsHydrated) setProfilePendingRemoval(profile);
+                        // Clearing a server copy closes its open tabs, so it asks first.
+                        if (serverProfileData.environmentIds.length > 0) {
+                          setProfilePendingClear(profile);
+                        } else clearProfileData(profile.id, profile.name);
                       }}
                     >
-                      {t.settings.integrations.profiles.remove}
+                      {t.settings.integrations.profiles.clear}
                     </MenuItem>
-                  )}
-                  {!removalAvailable ? (
-                    <>
-                      <MenuSeparator />
-                      <MenuItem disabled>
-                        {environmentsReady
-                          ? t.settings.integrations.profiles.clearConnectHint
-                          : t.settings.integrations.profiles.checkingEnvironments}
+                    {builtIn ? null : (
+                      <MenuItem
+                        variant="destructive"
+                        disabled={!settingsHydrated || !removalAvailable}
+                        onClick={() => {
+                          if (settingsHydrated) setProfilePendingRemoval(profile);
+                        }}
+                      >
+                        {t.settings.integrations.profiles.remove}
                       </MenuItem>
-                    </>
-                  ) : null}
-                </MenuPopup>
-              </Menu>
-            </div>
-          );
-        })}
-      </div>
-      <AlertDialog
-        open={profilePendingRemoval !== null}
-        onOpenChange={(open) => {
-          if (!open && !profileRemovalInFlight) {
-            setProfilePendingRemoval(null);
-            setProfileRemovalError(null);
-          }
-        }}
-      >
-        <AlertDialogPopup>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t.settings.integrations.profiles.removeTitle(profilePendingRemoval?.name ?? "")}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t.settings.integrations.profiles.removeDescription}
-            </AlertDialogDescription>
-            {profileRemovalError ? (
-              <p aria-live="polite" className="text-sm text-destructive">
-                {profileRemovalError}
-              </p>
-            ) : null}
-            {!removalAvailable ? (
-              <p className="text-sm text-muted-foreground">
-                {t.settings.integrations.profiles.removeConnectHint}
-              </p>
-            ) : null}
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogClose
-              disabled={profileRemovalInFlight}
-              render={<Button variant="outline" disabled={profileRemovalInFlight} />}
-            >
-              {t.settings.actions.cancel}
-            </AlertDialogClose>
-            <Button
-              variant="destructive"
-              disabled={profileRemovalInFlight || !settingsHydrated || !removalAvailable}
-              onClick={() => {
-                if (profilePendingRemoval && settingsHydrated && removalAvailable) {
-                  void removeProfile(profilePendingRemoval.id);
-                }
-              }}
-            >
-              {profileRemovalInFlight
-                ? t.settings.integrations.profiles.removing
-                : t.settings.integrations.profiles.removeProfile}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogPopup>
-      </AlertDialog>
-      <AlertDialog
-        open={profilePendingClear !== null}
-        onOpenChange={(open) => {
-          if (!open) setProfilePendingClear(null);
-        }}
-      >
-        <AlertDialogPopup>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t.settings.integrations.profiles.clearTitle(profilePendingClear?.name ?? "")}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t.settings.integrations.profiles.clearDescription}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogClose render={<Button variant="outline" />}>
-              {t.settings.actions.cancel}
-            </AlertDialogClose>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                if (profilePendingClear)
-                  clearProfileData(profilePendingClear.id, profilePendingClear.name);
-                setProfilePendingClear(null);
-              }}
-            >
-              {t.settings.integrations.profiles.clearData}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogPopup>
-      </AlertDialog>
-      {importSession ? (
-        <BrowserImportWizard
-          source={importSession.source}
-          destinationEnvironmentName={importSession.environmentName}
-          targetProfiles={listedProfiles.map((profile) => ({ id: profile.id, name: profile.name }))}
-          canCreateProfile={settingsHydrated && !atProfileLimit}
-          onImport={(input) =>
-            runWizardImport(importSession.source, importSession.environmentId, input)
-          }
-          onRefreshSource={() => refreshImportSource(importSession.source.id)}
-          onCheckFullDiskAccess={
-            window.desktopBridge?.checkSystemPermission
-              ? () => window.desktopBridge!.checkSystemPermission!("full-disk-access")
-              : undefined
-          }
-          onOpenFullDiskAccessSettings={async () => {
-            // Rejects outside the desktop shell (and on shells that predate the
-            // method), so the one toast covers every way the link can fail.
-            await readLocalApi()
-              ?.shell.openSystemSettings("full-disk-access")
-              .catch(() => {
-                toastManager.add({
-                  type: "error",
-                  title: t.settings.integrations.profiles.openSettingsError,
-                  description: t.settings.integrations.profiles.openSettingsHint,
-                });
-              });
+                    )}
+                    {!removalAvailable ? (
+                      <>
+                        <MenuSeparator />
+                        <MenuItem disabled>
+                          {environmentsReady
+                            ? t.settings.integrations.profiles.clearConnectHint
+                            : t.settings.integrations.profiles.checkingEnvironments}
+                        </MenuItem>
+                      </>
+                    ) : null}
+                  </MenuPopup>
+                </Menu>
+              </div>
+            );
+          })}
+        </div>
+        <AlertDialog
+          open={profilePendingRemoval !== null}
+          onOpenChange={(open) => {
+            if (!open && !profileRemovalInFlight) {
+              setProfilePendingRemoval(null);
+              setProfileRemovalError(null);
+            }
           }}
-          onClose={() => setImportSession(null)}
-        />
-      ) : null}
-    </SettingsRow>
+        >
+          <AlertDialogPopup>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {t.settings.integrations.profiles.removeTitle(profilePendingRemoval?.name ?? "")}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {t.settings.integrations.profiles.removeDescription}
+              </AlertDialogDescription>
+              {profileRemovalError ? (
+                <p aria-live="polite" className="text-sm text-destructive">
+                  {profileRemovalError}
+                </p>
+              ) : null}
+              {!removalAvailable ? (
+                <p className="text-sm text-muted-foreground">
+                  {t.settings.integrations.profiles.removeConnectHint}
+                </p>
+              ) : null}
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogClose
+                disabled={profileRemovalInFlight}
+                render={<Button variant="outline" disabled={profileRemovalInFlight} />}
+              >
+                {t.settings.actions.cancel}
+              </AlertDialogClose>
+              <Button
+                variant="destructive"
+                disabled={profileRemovalInFlight || !settingsHydrated || !removalAvailable}
+                onClick={() => {
+                  if (profilePendingRemoval && settingsHydrated && removalAvailable) {
+                    void removeProfile(profilePendingRemoval.id);
+                  }
+                }}
+              >
+                {profileRemovalInFlight
+                  ? t.settings.integrations.profiles.removing
+                  : t.settings.integrations.profiles.removeProfile}
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogPopup>
+        </AlertDialog>
+        <AlertDialog
+          open={profilePendingClear !== null}
+          onOpenChange={(open) => {
+            if (!open) setProfilePendingClear(null);
+          }}
+        >
+          <AlertDialogPopup>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {t.settings.integrations.profiles.clearTitle(profilePendingClear?.name ?? "")}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {t.settings.integrations.profiles.clearDescription}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogClose render={<Button variant="outline" />}>
+                {t.settings.actions.cancel}
+              </AlertDialogClose>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  if (profilePendingClear)
+                    clearProfileData(profilePendingClear.id, profilePendingClear.name);
+                  setProfilePendingClear(null);
+                }}
+              >
+                {t.settings.integrations.profiles.clearData}
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogPopup>
+        </AlertDialog>
+        {importSession ? (
+          <BrowserImportWizard
+            source={importSession.source}
+            destinationEnvironmentName={importSession.environmentName}
+            targetProfiles={listedProfiles.map((profile) => ({
+              id: profile.id,
+              name: profile.name,
+            }))}
+            canCreateProfile={settingsHydrated && !atProfileLimit}
+            onImport={(input) =>
+              runWizardImport(importSession.source, importSession.environmentId, input)
+            }
+            onRefreshSource={() => refreshImportSource(importSession.source.id)}
+            onCheckFullDiskAccess={
+              window.desktopBridge?.checkSystemPermission
+                ? () => window.desktopBridge!.checkSystemPermission!("full-disk-access")
+                : undefined
+            }
+            onOpenFullDiskAccessSettings={async () => {
+              // Rejects outside the desktop shell (and on shells that predate the
+              // method), so the one toast covers every way the link can fail.
+              await readLocalApi()
+                ?.shell.openSystemSettings("full-disk-access")
+                .catch(() => {
+                  toastManager.add({
+                    type: "error",
+                    title: t.settings.integrations.profiles.openSettingsError,
+                    description: t.settings.integrations.profiles.openSettingsHint,
+                  });
+                });
+            }}
+            onClose={() => setImportSession(null)}
+          />
+        ) : null}
+      </SettingsRow>
+      <SettingsRow
+        id="browser-default-profile"
+        title={t.settings.rows.browserDefaultProfile.title}
+        resetAction={
+          !profileWritesDisabled && resolvedDefaultId !== DEFAULT_BROWSER_PROFILE_ID ? (
+            <SettingResetButton
+              label={t.settings.rows.browserDefaultProfile.title}
+              onClick={() => setDefaultProfile(DEFAULT_BROWSER_PROFILE_ID)}
+            />
+          ) : null
+        }
+        control={
+          <Select
+            value={resolvedDefaultId}
+            disabled={profileWritesDisabled || importInFlight}
+            onValueChange={setDefaultProfile}
+          >
+            <SelectTrigger size="settings" aria-label={t.settings.rows.browserDefaultProfile.title}>
+              <SelectValue>
+                {findBrowserProfile(listedProfiles, resolvedDefaultId)?.name}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectPopup align="end" alignItemWithTrigger={false}>
+              {listedProfiles.map((profile) => (
+                <SelectItem key={profile.id} value={profile.id}>
+                  {profile.name}
+                </SelectItem>
+              ))}
+            </SelectPopup>
+          </Select>
+        }
+      />
+    </>
   );
 }
 
+/** Composes O1's five groups while preserving scoped access and device-local preview writes. */
 export function IntegrationsSettingsPanel() {
-  // Client-local preview defaults are editable only where the preview exists.
   const previewDefaultsDisabled = !isElectron;
   const previewDefaults = (
     <>
-      <BrowserProfilesSetting disabled={previewDefaultsDisabled} />
-      <BrowserViewportSetting disabled={previewDefaultsDisabled} />
-      <BrowserZoomSetting disabled={previewDefaultsDisabled} />
-      <BrowserAppearanceSetting disabled={previewDefaultsDisabled} />
-      <BrowserRecordingFrameRateSetting disabled={previewDefaultsDisabled} />
-      <BrowserRecordingInputSettings disabled={previewDefaultsDisabled} />
-      <BrowserLinkTargetSetting disabled={previewDefaultsDisabled} />
-      <BrowserAutoShowFloatingPreviewSetting disabled={previewDefaultsDisabled} />
+      <SettingsSection id="browser" title={t.settings.integrations.groups.profiles}>
+        <BrowserProfilesSetting disabled={previewDefaultsDisabled} />
+        <BrowserViewportSetting disabled={previewDefaultsDisabled} />
+        <BrowserZoomSetting disabled={previewDefaultsDisabled} />
+        <BrowserAppearanceSetting disabled={previewDefaultsDisabled} />
+      </SettingsSection>
+      <SettingsSection id="browser-recording" title={t.settings.integrations.groups.recording}>
+        <BrowserRecordingFrameRateSetting disabled={previewDefaultsDisabled} />
+        <BrowserRecordingInputSettings disabled={previewDefaultsDisabled} />
+      </SettingsSection>
+      <SettingsSection id="browser-links" title={t.settings.integrations.groups.links}>
+        <BrowserLinkTargetSetting disabled={previewDefaultsDisabled} />
+        <BrowserAutoShowFloatingPreviewSetting disabled={previewDefaultsDisabled} />
+      </SettingsSection>
     </>
   );
 
   return (
-    <SettingsPageContainer>
-      {/* Server-authoritative agent access is scoped by the header selection;
-          the preview defaults below are device-local and ignore it. */}
+    <SettingsPageContainer className="settings-integrations">
+      {/* Agent access follows the header scope; preview defaults remain device-local. */}
       <ProjectDefaultsSettings category="integrations" />
-      <SettingsSection id="browser" title={t.settings.sections.browser}>
-        {previewDefaultsDisabled ? (
-          <SettingsUnavailableGroup message={t.settings.integrations.desktopOnlyHint}>
-            {previewDefaults}
-          </SettingsUnavailableGroup>
-        ) : (
-          previewDefaults
-        )}
-      </SettingsSection>
       <DeviceIntegrationSettings />
+      {previewDefaultsDisabled ? (
+        <SettingsUnavailableGroup message={t.settings.integrations.desktopOnlyHint}>
+          {previewDefaults}
+        </SettingsUnavailableGroup>
+      ) : (
+        previewDefaults
+      )}
     </SettingsPageContainer>
   );
 }

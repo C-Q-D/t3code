@@ -682,7 +682,7 @@ export const settings = {
       title: "Default browser appearance",
 
       options: {
-        system: "System",
+        system: "System default",
         light: "Light",
         dark: "Dark",
       },
@@ -1921,6 +1921,11 @@ export const settings = {
       `${seconds.toLocaleString(undefined, { maximumFractionDigits: 1 })} ${seconds === 1 ? "second" : "seconds"}`,
   },
   integrations: {
+    groups: {
+      profiles: "Browser profiles",
+      recording: "Recording",
+      links: "Links",
+    },
     profiles: {
       clearUnavailableError: "Browser profile data is not available to clear.",
       limitError: "Browser profile limit reached.",

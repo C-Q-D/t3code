@@ -777,7 +777,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "browser-default-profile",
     title: t.settings.rows.browserDefaultProfile.title,
     to: "/settings/integrations",
-    targetId: "browser-profiles",
+    targetId: "browser-default-profile",
   },
   {
     id: "browser-default-viewport",

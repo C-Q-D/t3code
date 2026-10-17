@@ -619,7 +619,7 @@ export const settings: Messages["settings"] = {
 
       options: {
         fill: "填满面板",
-        responsive: "自适应",
+        responsive: "响应式",
       },
       description: "你和 Agent 使用的标签页尺寸。“填满面板”会适应面板；其他尺寸会显示设备工具栏。",
       resetLabel: "默认浏览器视口",
@@ -639,7 +639,7 @@ export const settings: Messages["settings"] = {
       title: "默认浏览器外观",
 
       options: {
-        system: "系统",
+        system: "系统默认",
         light: "浅色",
         dark: "深色",
       },
@@ -1836,6 +1836,11 @@ export const settings: Messages["settings"] = {
       `${seconds.toLocaleString(undefined, { maximumFractionDigits: 1 })}秒`,
   },
   integrations: {
+    groups: {
+      profiles: "浏览器配置",
+      recording: "录制",
+      links: "链接",
+    },
     profiles: {
       clearUnavailableError: "浏览器配置数据不可用，无法清除。",
       limitError: "已达到浏览器配置数量上限。",

@@ -1,3 +1,4 @@
+/** Manages scoped SSH device hosts and their live connection states; local host selection is not supported here. */
 import { t } from "~/i18n";
 import { DeviceToolVersions } from "../device/DeviceToolVersions";
 import { AuthSettingsWriteScope } from "@t3tools/contracts";
@@ -23,6 +24,7 @@ import { DeviceHostEditor } from "./DeviceHostEditor";
 import { useHostConnectionChecks } from "./useHostConnectionChecks";
 import { deviceHostConnectionKey } from "./deviceHostConnectionChecks";
 
+/** Edits hosts for the selected environment scope; project scopes remain read-only. */
 export function DeviceHostsSettings(props: { environmentId: EnvironmentId | null }) {
   const { scope, environments, connectedEnvironments } = useSettingsScope();
   const canConfigure = useEnvironmentScope(props.environmentId, AuthSettingsWriteScope);
@@ -89,10 +91,9 @@ export function DeviceHostsSettings(props: { environmentId: EnvironmentId | null
       title={t.settings.rows.deviceHosts.title}
       serverScoped
       settingKeys={["deviceHosts"]}
-      description={t.settings.deviceHosts.addRemoteMachinesSimulatorEmulatorHint}
       control={
         <Button
-          size="sm"
+          size="toolbar"
           variant="outline"
           disabled={
             !canConfigure || projectScope || busy || !props.environmentId || editing !== null
@@ -175,6 +176,7 @@ export function DeviceHostsSettings(props: { environmentId: EnvironmentId | null
   );
 }
 
+/** Renders configured hosts with connection progress, platform availability and existing retry actions. */
 function DeviceHostList({
   environmentLabel,
   environmentId,
@@ -200,7 +202,9 @@ function DeviceHostList({
   return (
     <>
       {hosts.length === 0 ? (
-        <p className="py-2 text-sm text-muted-foreground">{t.settings.deviceHosts.noDeviceHosts}</p>
+        <p className="rounded-settings-row-surface bg-input px-4 py-4.5 text-center text-control leading-relaxed text-secondary-label shadow-well-control">
+          {t.settings.deviceHosts.noDeviceHosts}
+        </p>
       ) : null}
       {hosts.map((host) => {
         const status = state.hostStatuses[host.id];
@@ -226,7 +230,10 @@ function DeviceHostList({
                 ? status.detail
                 : undefined;
         return (
-          <div key={host.id} className="flex items-center gap-2 border-t border-border/50 py-2.5">
+          <div
+            key={host.id}
+            className="flex min-h-12 items-center gap-3 border-t border-settings-divider px-3.5 py-2.5"
+          >
             <div className="min-w-0 flex-1">
               <div className="flex min-w-0 items-center gap-2">
                 <p className="truncate text-sm font-medium">{host.label}</p>
@@ -299,7 +306,7 @@ function DeviceHostList({
               <MenuTrigger
                 render={
                   <Button
-                    size="icon-sm"
+                    size="icon-toolbar"
                     variant="ghost-muted"
                     disabled={busy}
                     aria-label={host.label + t.settings.deviceHosts.options}
@@ -325,7 +332,7 @@ function DeviceHostList({
             state.supportsHostRetry &&
             state.hostStatus !== "disabled" ? (
               <Button
-                size="sm"
+                size="toolbar"
                 variant="outline"
                 disabled={busy || retrying !== null}
                 onClick={() => {
@@ -341,7 +348,7 @@ function DeviceHostList({
               </Button>
             ) : (
               <Button
-                size="sm"
+                size="toolbar"
                 variant="outline"
                 disabled={busy || progress !== null}
                 onClick={() => void testConnection(host)}
