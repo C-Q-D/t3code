@@ -53,6 +53,7 @@ import {
   sortLogicalProjectsForSidebar,
   sortInboxThreadsByReturn,
   resolveSidebarDropTarget,
+  sidebarMarkerId,
   planSidebarThreadDrop,
   sortPinnedThreadsForSidebar,
   sortProjectsForSidebar,
@@ -2266,6 +2267,14 @@ describe("Working shelf (beta)", () => {
       marker("settled-header"),
       row("s1", "settled"),
     ];
+
+    it.each([
+      ["snoozed-header", "snoozed"],
+      ["settled-header", "settled"],
+    ] as const)("rejects the hidden %s at the top of a single-shelf list", (header, section) => {
+      const shelf = [marker(header), row("first", section), row("source", section)];
+      expect(resolveSidebarDropTarget(shelf, "source", sidebarMarkerId(header))).toBeNull();
+    });
 
     it("never drops into the Working shelf, and keeps it out of the inbox order", () => {
       expect(resolveSidebarDropTarget(items, "a1", "w1")).toBeNull();

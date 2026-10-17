@@ -239,6 +239,8 @@ export type SidebarDropTarget = {
   readonly activeOrder: readonly string[];
 };
 
+/** Resolve a writable destination in the visible list. Leading single-shelf headers
+ * are structural sentinels, not the pinned boundary used by the Active list. */
 export function resolveSidebarDropTarget(
   items: readonly SidebarListItem[],
   activeKey: string,
@@ -247,6 +249,14 @@ export function resolveSidebarDropTarget(
   const activeIndex = items.findIndex((item) => sidebarListItemId(item) === activeKey);
   const overIndex = items.findIndex((item) => sidebarListItemId(item) === overId);
   if (activeIndex === -1 || overIndex === -1 || items[activeIndex]?.kind !== "thread") return null;
+  const first = items[0];
+  if (
+    overIndex === 0 &&
+    first?.kind === "marker" &&
+    (first.marker === "snoozed-header" || first.marker === "settled-header")
+  ) {
+    return null;
+  }
   const moved = items.filter((_, index) => index !== activeIndex);
   moved.splice(overIndex, 0, items[activeIndex]!);
   const section = sectionAtSidebarSlot(moved, overIndex);

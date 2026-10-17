@@ -43,6 +43,19 @@ export function writeSidebarTab(tab: SidebarTab): { readonly key: string; readon
   return { key: SIDEBAR_TAB_STORAGE_KEY, value: tab };
 }
 
+/** Reveal a selected search result in its existing shelf after clearing search.
+ * Keys and shelf sets must be environment-scoped and include paginated history;
+ * all other results (including pinned/working rows) belong to Active. No lifecycle mutation. */
+export function resolveSidebarSearchResultTab(input: {
+  readonly threadKey: string;
+  readonly snoozedThreadKeys: ReadonlySet<string>;
+  readonly settledThreadKeys: ReadonlySet<string>;
+}): SidebarTab {
+  if (input.snoozedThreadKeys.has(input.threadKey)) return "later";
+  if (input.settledThreadKeys.has(input.threadKey)) return "settled";
+  return "active";
+}
+
 /** Project preclassified shelves without re-sorting. getThreadKey must return an environment-scoped
  * key; routeThreadKey retains an open settled row beyond the positive settledVisibleCount (default 10).
  * Memoize this separately from search input so keystrokes do not rebuild every shelf. */

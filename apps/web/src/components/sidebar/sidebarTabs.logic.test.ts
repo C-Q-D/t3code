@@ -4,6 +4,7 @@ import {
   buildSidebarTabs,
   nextSidebarSettledVisibleCount,
   readSidebarTab,
+  resolveSidebarSearchResultTab,
   resolveSidebarTabDropIntent,
   resolveSidebarTabView,
   sidebarTabJumpNumbers,
@@ -26,6 +27,52 @@ function shelves(overrides: Partial<SidebarTabShelves<string>> = {}): SidebarTab
 
 const getThreadKey = (key: string) => key;
 const settledThreads = Array.from({ length: 37 }, (_, index) => `settled-${index + 1}`);
+
+describe("opening a search result", () => {
+  const rows = shelves({
+    pinnedThreads: ["env:pin"],
+    activeThreads: ["env:ordinary"],
+    workingThreads: ["env:working"],
+    snoozedThreads: ["env:later"],
+    settledThreads: ["env:settled", ...settledThreads],
+  });
+  const snoozedThreadKeys = new Set(rows.snoozedThreads);
+  const settledThreadKeys = new Set(rows.settledThreads);
+
+  it.each([
+    { threadKey: "env:later", previousTab: "active", expectedTab: "later" },
+    { threadKey: "env:settled", previousTab: "active", expectedTab: "settled" },
+    { threadKey: "settled-36", previousTab: "active", expectedTab: "settled" },
+    { threadKey: "env:pin", previousTab: "later", expectedTab: "active" },
+  ] as const)(
+    "reveals $threadKey in $expectedTab after clearing search",
+    ({ threadKey, previousTab, expectedTab }) => {
+      const searching = resolveSidebarTabView({
+        tabs: buildSidebarTabs(rows, { getThreadKey }),
+        currentTab: previousTab,
+        searchQuery: "needle",
+        searchResults: [threadKey],
+      });
+      expect(searching.rows).toContain(threadKey);
+      const tab = resolveSidebarSearchResultTab({
+        threadKey,
+        snoozedThreadKeys,
+        settledThreadKeys,
+      });
+      const tabs = buildSidebarTabs(rows, { getThreadKey, routeThreadKey: threadKey });
+      const view = resolveSidebarTabView({
+        tabs,
+        currentTab: tab,
+        searchQuery: "",
+        searchResults: [],
+      });
+      expect(view.mode).toBe("tab");
+      expect(tab).toBe(expectedTab);
+      expect(view.rows).toContain(threadKey);
+      expect(writeSidebarTab(tab)).toEqual({ key: "t3code:sidebar-tab", value: expectedTab });
+    },
+  );
+});
 
 describe("sidebar tab membership and counts", () => {
   it("combines pins, ordinary and beta working rows in existing sidebar order", () => {

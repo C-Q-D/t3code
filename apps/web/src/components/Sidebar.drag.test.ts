@@ -1,3 +1,4 @@
+/** Exercise drag hit testing and projection with measured fixtures, including 8a font scaling. */
 import { describe, expect, it, vi } from "vite-plus/test";
 import { closestCenter, type CollisionDetection } from "@dnd-kit/core";
 import { verticalListSortingStrategy, type SortingStrategy } from "@dnd-kit/sortable";
@@ -61,7 +62,8 @@ function preview(
   over: string,
   scale = 1,
 ) {
-  const strategy = createSidebarSortingStrategy(input);
+  // Existing fixtures use 82/36px reference nodes; measured sizes below still own the projection.
+  const strategy = createSidebarSortingStrategy({ cardHeight: 82, slimHeight: 36, ...input });
   const args = layout(input.items, active, over, scale);
   return new Map(
     input.items.map((item, index) => [sidebarListItemId(item), strategy({ ...args, index })]),
@@ -305,6 +307,8 @@ describe("sidebar drag projection", () => {
       thread("s", "settled"),
     ];
     const strategy = createSidebarSortingStrategy({
+      cardHeight: 82,
+      slimHeight: 36,
       items,
       settledOrder: over === sidebarMarkerId("settled-header") ? ["a1", "s"] : ["s"],
       settledExpanded: true,
@@ -335,6 +339,8 @@ describe("sidebar drag projection", () => {
     ["p2", "p1"],
   ])("preserves existing pinned transforms from %s to %s", (active, over) => {
     const strategy = createSidebarSortingStrategy({
+      cardHeight: 82,
+      slimHeight: 36,
       items: pinned,
       settledOrder: [],
       settledExpanded: true,
@@ -373,6 +379,8 @@ describe("sidebar drag projection", () => {
       thread("s", "settled"),
     ];
     const strategy = createSidebarSortingStrategy({
+      cardHeight: 82,
+      slimHeight: 36,
       items,
       settledOrder: [],
       settledExpanded: true,
@@ -514,6 +522,39 @@ describe("sidebar drag projection", () => {
       2,
     );
     expect(result.get(sidebarMarkerId("pinned-divider"))?.y).toBe(32 + 165);
+  });
+
+  it("uses measured card heights to scale labels instead of freezing the default-font dimensions", () => {
+    const items = [pinnedHeader, thread("p", "pinned"), divider, thread("a", "active")];
+    const strategy = createSidebarSortingStrategy({
+      items,
+      boundaryLabelHeight: 16,
+      settledOrder: [],
+      settledExpanded: false,
+    });
+    const args = layout(items, "a", "p", 1.5, 81);
+    // 24px scaled label + 121.5px measured arriving card + 1px CSS gap.
+    expect(strategy({ ...args, index: 2 })?.y).toBe(146.5);
+  });
+
+  it("includes the compact row's scaled tail padding when deriving missing card geometry", () => {
+    const items = [pinnedHeader, divider, settledHeader, thread("s", "settled")];
+    const strategy = createSidebarSortingStrategy({
+      items,
+      cardHeight: 81,
+      slimHeight: 37,
+      boundaryLabelHeight: 16,
+      settledOrder: ["s"],
+      settledExpanded: true,
+    });
+    const args = layout(items, "s", sidebarMarkerId("pinned-header"), 1.5);
+    // The sortable node includes the h-9 content and pb-0.25 tail: 37 * 1.5.
+    args.rects[3] = { ...args.rects[3]!, height: 55.5, bottom: args.rects[3]!.top + 55.5 };
+    args.activeNodeRect = args.rects[3];
+    // 24px label + 121.5px arriving card + 1px gap.
+    expect(strategy({ ...args, index: 1 })?.y).toBe(146.5);
+    // The empty Active hint is h-9 (54px here), without a compact row's tail padding.
+    expect(strategy({ ...args, index: 2 })?.y).toBe(225.5);
   });
 
   it("keeps the pinned header above the first arriving pin", () => {
@@ -700,6 +741,8 @@ describe("sidebar drag projection", () => {
 
   it("updates the projection when the target or measured geometry changes", () => {
     const strategy = createSidebarSortingStrategy({
+      cardHeight: 82,
+      slimHeight: 36,
       items: pinned,
       settledOrder: [],
       settledExpanded: true,
@@ -746,6 +789,8 @@ describe("sidebar drag projection", () => {
       marker("settled-placeholder"),
     ];
     const strategy = createSidebarSortingStrategy({
+      cardHeight: 82,
+      slimHeight: 36,
       items,
       settledOrder: [],
       settledExpanded: false,

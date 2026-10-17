@@ -1,3 +1,4 @@
+/** Sidebar drag hit testing and measured layout projection; lifecycle commands belong to Sidebar. */
 import { closestCenter, type CollisionDetection, type Modifier } from "@dnd-kit/core";
 import { verticalListSortingStrategy, type SortingStrategy } from "@dnd-kit/sortable";
 import {
@@ -108,6 +109,8 @@ export function createSidebarSortingStrategy(input: {
   settledVisibleCount?: number;
   routeThreadKey?: string | null;
   snoozedThreadCount?: number;
+  /** Outer row heights at the default font size, used only as reference/fallback.
+   * Measurements always win; defaults include card/compact tail padding: 81/37px. */
   cardHeight?: number;
   slimHeight?: number;
   /** Space each pinned boundary opens for its label while dragging. The
@@ -133,8 +136,10 @@ export function createSidebarSortingStrategy(input: {
       snoozed: [],
       settled: [],
     };
-    let cardHeight = input.cardHeight;
-    let slimHeight = input.slimHeight;
+    const referenceCardHeight = input.cardHeight ?? 81;
+    const referenceSlimHeight = input.slimHeight ?? 37;
+    let cardHeight: number | undefined;
+    let slimHeight: number | undefined;
     let headerScale: number | undefined;
     for (const [index, item] of items.entries()) {
       if (item.kind === "marker") {
@@ -149,11 +154,16 @@ export function createSidebarSortingStrategy(input: {
       else slimHeight ??= rects[index]?.height;
       if (item.key !== active.key) groups[item.section].push(item);
     }
-    // Cards are 4.875rem + 0.25rem padding; slim rows/placeholders are h-9.
+    // 81px is the card's default-font reference, not a fixed measured height.
+    // Compact sortable nodes include their 1px rem tail; the CSS gap stays 1px.
     const scale =
-      slimHeight !== undefined ? slimHeight / 36 : (headerScale ?? (cardHeight ?? 82) / 82);
-    cardHeight ??= 82 * scale;
-    slimHeight ??= 36 * scale;
+      slimHeight !== undefined
+        ? slimHeight / referenceSlimHeight
+        : (headerScale ?? (cardHeight ?? referenceCardHeight) / referenceCardHeight);
+    cardHeight ??= referenceCardHeight * scale;
+    slimHeight ??= referenceSlimHeight * scale;
+    // Empty targets reveal an h-9 hint, without the compact sortable row's tail padding.
+    const placeholderHeight = 36 * scale;
     const labelHeight = (input.boundaryLabelHeight ?? 0) * scale;
     const group = groups[target.section];
     const order =
@@ -216,7 +226,7 @@ export function createSidebarSortingStrategy(input: {
         (item.marker === "pinned-header" || item.marker === "pinned-divider")
         ? labelHeight
         : item.kind === "marker" && item.marker.endsWith("placeholder")
-          ? slimHeight
+          ? placeholderHeight
           : moved
             ? fallback
             : (rect?.height ?? fallback);

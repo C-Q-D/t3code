@@ -271,6 +271,7 @@ import {
   writeSidebarTab,
   type SidebarTab,
   resolveSidebarTabView,
+  resolveSidebarSearchResultTab,
   sidebarTabJumpNumbers,
   SIDEBAR_SETTLED_INITIAL_COUNT,
   SIDEBAR_SETTLED_PAGE_COUNT,
@@ -680,8 +681,8 @@ function SortableSidebarMarker(props: {
   );
 }
 
-// Empty targets stay measurable without reserving space at rest. The sorting
-// strategy opens their hint space during a drag.
+/** Keep the empty Active target measurable without reserving resting space.
+ * The sorting strategy opens its hint during a drag; props select its label and target state. */
 function SidebarSectionPlaceholder(props: {
   marker: "active-placeholder";
   label: string;
@@ -1786,6 +1787,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
   const itemClassName = cn(
     // The sortable projection owns a 1px gap. Tail padding supplies B1 spacing
     // without changing that geometry contract: card 78+3+1, compact 36+1+1.
+    // 81px is the card's default-font baseline; projection scales from measured outer rows.
     variant === "card" ? "list-none pb-0.75" : "list-none pb-0.25",
     sortable?.isDragging
       ? "sidebar-drag-source relative z-20"
@@ -2985,12 +2987,27 @@ export default function Sidebar() {
     setThreadSearchQuery("");
     setActiveSearchResultIndex(0);
   }, []);
+  /** Reveal the result's shelf before closing search, without waking or reopening the thread. */
   const selectThreadSearchResult = useCallback(
     (thread: EnvironmentThreadShell) => {
+      const threadRef = scopeThreadRef(thread.environmentId, thread.id);
+      handleSidebarTabChange(
+        resolveSidebarSearchResultTab({
+          threadKey: scopedThreadKey(threadRef),
+          snoozedThreadKeys,
+          settledThreadKeys,
+        }),
+      );
       clearThreadSearch();
-      navigateToThread(scopeThreadRef(thread.environmentId, thread.id));
+      navigateToThread(threadRef);
     },
-    [clearThreadSearch, navigateToThread],
+    [
+      clearThreadSearch,
+      handleSidebarTabChange,
+      navigateToThread,
+      snoozedThreadKeys,
+      settledThreadKeys,
+    ],
   );
   const handleThreadSearchKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLInputElement>) => {
@@ -3681,8 +3698,6 @@ export default function Sidebar() {
         items: sidebarListItems,
         enabled: !isContextDrag && currentTab === "active",
         boundaryLabelHeight: SIDEBAR_DRAG_LABEL_HEIGHT,
-        cardHeight: 81,
-        slimHeight: 36,
         settledOrder: draggedSettledOrder,
         ...(draggedActiveOrder === undefined ? {} : { activeOrder: draggedActiveOrder }),
         settledExpanded: currentTab === "settled",
