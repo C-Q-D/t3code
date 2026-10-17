@@ -24,7 +24,7 @@ import { isModelPickerOpen } from "../modelPickerVisibility";
 import { selectActiveRightPanel, useRightPanelStore } from "../rightPanelStore";
 import { selectThreadTerminalUiState, useTerminalUiStateStore } from "../terminalUiStateStore";
 import { resolveThreadRouteRef } from "../threadRoutes";
-import { cn, isMacPlatform } from "../lib/utils";
+import { isMacPlatform } from "../lib/utils";
 import { primaryServerKeybindingsAtom } from "../state/server";
 import { useEnvironmentIdentificationMode, useLegacySidebarEnabled } from "../hooks/useSettings";
 import {
@@ -36,7 +36,6 @@ import LegacyThreadSidebar from "./LegacySidebar";
 import { useThreadVisitedMigration } from "../hooks/useThreadVisitedMigration";
 import ThreadSidebar from "./Sidebar";
 import { SettingsSidebarNav } from "./settings/SettingsSidebarNav";
-import { SidebarBrandWidthProbe, SidebarChromeHeader } from "./sidebar/SidebarChrome";
 import { MainAppLocationTracker } from "./sidebar/mainAppLocation";
 import { useSidebarStageBackdropVariant } from "./SidebarStageBackdrop";
 import { useProjects } from "../state/entities";
@@ -48,14 +47,7 @@ import {
   THREAD_MAIN_CONTENT_MIN_WIDTH,
   THREAD_SIDEBAR_WIDTH_STORAGE_KEY,
 } from "./threadSidebarWidth";
-import {
-  Sidebar,
-  SidebarProvider,
-  SidebarRail,
-  SidebarTrigger,
-  useSidebar,
-  useSidebarVisibility,
-} from "./ui/sidebar";
+import { Sidebar, SidebarProvider, SidebarRail, SidebarTrigger, useSidebar } from "./ui/sidebar";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 import { WindowTitlebar } from "./frame/WindowTitlebar";
 import { TitlebarSlotProvider } from "./frame/titlebarSlot";
@@ -83,11 +75,11 @@ function readInitialThreadSidebarWidth(): number {
   }
 }
 
+/** Keeps the existing toggle shortcuts and accessibility contract in the shared titlebar. */
 function SidebarControl() {
   const usagePageOpen = useLocation({ select: (location) => location.pathname === "/usage" });
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
-  const { toggleSidebar, isMobile, mobileSheetMounted } = useSidebar();
-  const isSidebarVisible = useSidebarVisibility();
+  const { toggleSidebar } = useSidebar();
   const environmentIdentificationMode = useEnvironmentIdentificationMode();
   const stageBackdropVariant = useSidebarStageBackdropVariant(
     environmentIdentificationMode === "artwork",
@@ -138,15 +130,8 @@ function SidebarControl() {
   }, [keybindings, toggleSidebar, usagePageOpen]);
 
   return (
-    // The right-side layout controls carry mr-px (border compensation inside
-    // the panel), so the trigger mirrors it: both clusters sit one extra pixel
-    // off their edge and the titlebar reads symmetric.
-    // The sheet owns its trigger until its closing transition unmounts it.
     <div
-      className={cn(
-        "pointer-events-none fixed left-[var(--workspace-controls-left)] top-[var(--workspace-controls-top)] z-50 ml-px flex h-[var(--workspace-topbar-height)] items-center",
-        isMobile && mobileSheetMounted && "hidden",
-      )}
+      className="window-titlebar-sidebar-control relative flex size-8 shrink-0 items-center justify-center"
       data-sidebar-control=""
     >
       <Tooltip>
@@ -155,11 +140,8 @@ function SidebarControl() {
             <SidebarTrigger
               // Over the stage artwork the trigger is a control on imagery, like the media
               // viewer's arrows; that variant positions itself, so the layout is reset here.
-              variant={isSidebarVisible && stageBackdropVariant ? "media-navigation" : "ghost"}
-              className={cn(
-                "pointer-events-auto",
-                isSidebarVisible && stageBackdropVariant && "relative top-auto translate-y-0",
-              )}
+              variant={stageBackdropVariant ? "media-navigation" : "ghost"}
+              className={stageBackdropVariant ? "relative top-auto translate-y-0" : undefined}
               aria-label={t.sidebar.layout.toggleSidebarAriaLabel}
             />
           }
@@ -249,8 +231,8 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
   // and a clamped drag ends with an unchanged width, which skips the re-render
   // that would otherwise refresh a render-time snapshot.
   const viewportWidth = useSyncExternalStore(subscribeToViewportWidth, readViewportWidth);
-  const [brandWidth, setBrandWidth] = useState(0);
-  const sidebarMinimumWidth = resolveThreadSidebarMinimumWidth(brandWidth);
+  const [titlebarLeadingWidth, setTitlebarLeadingWidth] = useState(0);
+  const sidebarMinimumWidth = resolveThreadSidebarMinimumWidth(titlebarLeadingWidth);
   const sidebarMaximumWidth = resolveThreadSidebarMaximumWidth(viewportWidth, sidebarMinimumWidth);
   const resetSidebarWidth = () => {
     try {
@@ -323,9 +305,11 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
           defaultOpen
           style={sidebarProviderStyle}
         >
-          <WindowTitlebar />
+          <WindowTitlebar
+            sidebarControl={<SidebarControl />}
+            onLeadingWidthChange={setTitlebarLeadingWidth}
+          />
           <div className="window-frame-workspace flex min-h-0 w-full flex-1">
-            <SidebarBrandWidthProbe onWidthChange={setBrandWidth} />
             <ProjectProjectionRetention />
             <Sidebar
               side="left"
@@ -346,10 +330,7 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
               style={windowControlsInsetStyle}
             >
               {isOnSettings ? (
-                <>
-                  <SidebarChromeHeader isElectron={isElectron} />
-                  <SettingsSidebarNav pathname={pathname} />
-                </>
+                <SettingsSidebarNav pathname={pathname} />
               ) : legacySidebarEnabled ? (
                 <LegacyThreadSidebar />
               ) : (
@@ -358,7 +339,6 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
               <SidebarRail onDoubleClick={resetSidebarWidth} />
             </Sidebar>
             {children}
-            <SidebarControl />
             <NavigationHistoryShortcuts />
             <MainAppLocationTracker />
           </div>

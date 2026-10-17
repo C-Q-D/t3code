@@ -33,8 +33,7 @@ export const sidebar = {
   },
   chrome: {
     goToThreadsAriaLabel: "Go to threads",
-    brandAriaLabel: "T3",
-    brandName: "Code",
+    titlebarBrandName: "T3 CODE",
     back: "Back",
     settings: "Settings",
     threads: "Threads",

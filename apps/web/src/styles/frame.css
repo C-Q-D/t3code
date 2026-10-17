@@ -1,8 +1,28 @@
 /* FR1–FR3 窗口框架：本线新增的令牌（@theme）与全局样式写在这里。 */
 
+@theme {
+  /* StyleM-8a.dc.html · titlebar brand: Cormorant Garamond, 19px / 1.55 / 600.
+     Font assets are supplied by F2; retain the design's CJK and serif fallbacks. */
+  --font-window-brand: "Cormorant Garamond", "Noto Serif SC", serif;
+  --text-window-brand: 19px;
+  --text-window-brand--line-height: 1.55;
+  --radius-brand-mark: 9px;
+
+  /* StyleM-8a.dc.html · the three engraved bars inside the 30px brand stone. */
+  --spacing-brand-groove: 2.5px;
+  --color-brand-groove: #6a6a72;
+  --shadow-brand-engraving: 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 1px 1px rgba(0, 0, 0, 0.77);
+}
+
 /* StyleM-8a: the titlebar shares the stone base; texture belongs to FR1 grid. */
 .window-titlebar {
   padding-left: var(--frame-padding-inline);
+}
+
+/* Configure the existing trigger through its inherited geometry tokens. */
+.window-titlebar-sidebar-control {
+  --workspace-titlebar-control-size: 2rem;
+  --control-radius: var(--radius-menu-row);
 }
 
 .window-titlebar-slot {

@@ -78,6 +78,7 @@ const twMerge = extendTailwindMerge({
         "dialog-title",
         "code-copy",
         "terminal-copy",
+        "window-brand",
       ],
       shadow: [
         "slab",
@@ -139,6 +140,7 @@ const twMerge = extendTailwindMerge({
         "input-disabled-edge",
         "input-focus-depth",
         "segmented-pressed",
+        "brand-engraving",
       ],
       "inset-shadow": ["selected", "focus", "selected-control"],
       "text-shadow": ["stone"],
@@ -158,6 +160,7 @@ const twMerge = extendTailwindMerge({
         "badge-compact",
         "segmented-track",
         "segmented-item",
+        "brand-mark",
       ],
       leading: ["code", "terminal"],
       tracking: ["brand"],

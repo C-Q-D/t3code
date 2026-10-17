@@ -35,8 +35,7 @@ export const sidebar: Messages["sidebar"] = {
   },
   chrome: {
     goToThreadsAriaLabel: "前往对话",
-    brandAriaLabel: "T3",
-    brandName: "Code",
+    titlebarBrandName: "T3 CODE",
     back: "返回",
     settings: "设置",
     threads: "对话",
