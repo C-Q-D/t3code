@@ -72,7 +72,7 @@ type DiscussionEntryRowProps = DiscussionStatementHeading & {
  * @param props.receiptSeatNumber One-based receipt color, zero when no avatar is available.
  * @param props.receiptAvatarState Idle when read, next when pending for a known seat.
  * @param props.userRead Whether the user bubble is raised; unread interjections use a dashed outline.
- * @param props.receiptPaused Whether a pending receipt uses the paused icon instead of the clock.
+ * @param props.receiptPaused True only for an unread interjection with a known reader while paused.
  * @param props.threadId Entry-specific thread, seat fallback, or null when unavailable.
  * @param props.statusLabel Interrupted/failed text, null for completed entries.
  * @param props.badgeVariant Warning/error presentation, null for completed entries.
@@ -82,6 +82,12 @@ type DiscussionEntryRowProps = DiscussionStatementHeading & {
  */
 function DiscussionEntryRow(props: DiscussionEntryRowProps) {
   const { entry } = props;
+  // File selection can rerender this row without changing Markdown or its thread context.
+  const threadRef = useMemo(
+    () =>
+      props.threadId ? { environmentId: props.environmentId, threadId: props.threadId } : undefined,
+    [props.environmentId, props.threadId],
+  );
   if (entry.kind === "user")
     return (
       <div className="flex items-start gap-3">
@@ -179,11 +185,7 @@ function DiscussionEntryRow(props: DiscussionEntryRowProps) {
               lineBreaks={shouldPreserveAssistantLineBreaks(entry.text)}
               cwd={props.cwd}
               environmentId={props.environmentId}
-              threadRef={
-                props.threadId
-                  ? { environmentId: props.environmentId, threadId: props.threadId }
-                  : undefined
-              }
+              threadRef={threadRef}
             />
           ) : null}
           <DiscussionFiles
@@ -455,7 +457,11 @@ export function DiscussionTranscript({
                 receiptSeatNumber={userView?.seatIndex == null ? 0 : userView.seatIndex + 1}
                 receiptAvatarState={userView?.avatarState ?? "idle"}
                 userRead={userView?.read ?? true}
-                receiptPaused={discussion.status === "paused"}
+                receiptPaused={
+                  userView?.read === false &&
+                  userView.seatIndex !== null &&
+                  discussion.status === "paused"
+                }
                 selectedPath={
                   selectedDiff?.entryId === entry.id ? selectedDiff.filePath : undefined
                 }
