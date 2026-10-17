@@ -15,7 +15,13 @@ import {
 } from "@t3tools/client-runtime/work-log/item-detail";
 import { formatDiffCount } from "@t3tools/client-runtime/diff-count";
 import { isJavaScriptReplTool } from "@t3tools/shared/toolActivity";
-import { ExternalLinkIcon, GitBranchIcon, RotateCcwIcon } from "lucide-react";
+import {
+  CircleCheckIcon,
+  CircleXIcon,
+  ExternalLinkIcon,
+  GitBranchIcon,
+  RotateCcwIcon,
+} from "lucide-react";
 import { memo, Suspense, use, useMemo } from "react";
 
 import { useTheme } from "../../hooks/useTheme";
@@ -32,7 +38,9 @@ import { resolveExternalWebLinkHref } from "./externalLinkContextMenu";
 import type { ExpandedImagePreview } from "./ExpandedImagePreview";
 import { ShellCommandBlock } from "./ShellCommandBlock";
 
+/** Retained item and actions; presentation opts into D1 only for timeline callers. */
 interface V2ItemInspectorProps {
+  readonly presentation?: "timeline" | undefined;
   readonly projectedItem: OrchestrationV2ProjectedTurnItem;
   readonly environmentId: EnvironmentId;
   readonly cwd?: string | undefined;
@@ -164,11 +172,12 @@ interface ToolOutputState {
 /**
  * Renders a tool's textual and image output, including its loading or unavailable state.
  * @param props - Required environmentId, images (possibly empty), pending and empty flags. output
- * and error may be null; onImageExpand may be undefined.
+ * and error may be null; onImageExpand may be undefined. presentation="timeline" selects D1 output
+ * color; absent presentation preserves the default inspector appearance.
  * @returns Tool output content or its availability message; an empty fragment when there is no
  * content or state message, never null.
  */
-function ToolOutput(props: ToolOutputState) {
+function ToolOutput(props: ToolOutputState & { readonly presentation?: "timeline" | undefined }) {
   const images = props.images.map((resource) => (
     <ChatMarkdownAssetImage
       key={resource.index}
@@ -180,7 +189,14 @@ function ToolOutput(props: ToolOutputState) {
     />
   ));
   const text = props.output ? (
-    <div className="max-h-80 overflow-auto text-muted-foreground">{props.output}</div>
+    <div
+      className={cn(
+        "max-h-80 overflow-auto",
+        props.presentation === "timeline" ? "text-secondary-label" : "text-muted-foreground",
+      )}
+    >
+      {props.output}
+    </div>
   ) : props.pending ? (
     <div className="text-muted-foreground italic">{t.chat.inspector.loadingOutput}</div>
   ) : props.error ? (
@@ -210,19 +226,33 @@ export function FetchedToolOutput(props: {
   );
 }
 
-/** A tool call's body: the call itself in the foreground, its result muted below. */
+/**
+ * Show retained call/output data, with explicit exit results only in the D1 timeline view.
+ * @param props Output state plus optional command, arguments, tool name and exit code. An absent
+ * exit code is unknown; presentation="timeline" shows zero as success, while default callers hide it.
+ * @returns Call details and available output; never infers success from missing output or status.
+ */
 function ToolCallBody(
   props: ToolOutputState & {
     readonly command?: string;
     readonly args?: unknown;
     readonly toolName?: string | null;
     readonly exitCode?: number | undefined;
+    readonly presentation?: "timeline" | undefined;
   },
 ) {
   const call = toolCallLines({ command: props.command, args: props.args });
   return (
-    <div className={cn("space-y-1.5", monoClassName)}>
-      {call.command ? <ShellCommandBlock command={call.command} /> : null}
+    <div
+      className={
+        props.presentation === "timeline"
+          ? "font-mono text-terminal-copy leading-terminal whitespace-pre-wrap break-words select-text"
+          : cn("space-y-1.5", monoClassName)
+      }
+    >
+      {call.command ? (
+        <ShellCommandBlock command={call.command} presentation={props.presentation} />
+      ) : null}
       {call.args ? (
         <div className="text-foreground/85">
           {call.args.map(([key, value]) => (
@@ -239,13 +269,26 @@ function ToolCallBody(
       ) : null}
       {call.argsText ? <StructuredValue value={call.argsText} highlightJson /> : null}
       <ToolOutput {...props} />
-      {props.exitCode !== undefined && props.exitCode !== 0 ? (
-        <div className="text-destructive">{t.chat.inspector.exitCode(props.exitCode)}</div>
+      {props.exitCode !== undefined &&
+      (props.presentation === "timeline" || props.exitCode !== 0) ? (
+        props.presentation === "timeline" ? (
+          <div className="mt-1.5 flex items-center gap-1.5 text-muted-foreground">
+            {props.exitCode === 0 ? (
+              <CircleCheckIcon aria-hidden className="size-3.25 text-success" />
+            ) : (
+              <CircleXIcon aria-hidden className="size-3.25 text-error" />
+            )}
+            {t.chat.timeline.commandExitCode(props.exitCode)}
+          </div>
+        ) : (
+          <div className="text-destructive">{t.chat.inspector.exitCode(props.exitCode)}</div>
+        )
       ) : null}
     </div>
   );
 }
 
+/** Inspect retained or fetched item details; default presentation remains suitable outside the timeline. */
 export const V2ItemInspector = memo(function V2ItemInspector(props: V2ItemInspectorProps) {
   const fetched = useFetchedTurnItem(props.projectedItem, props.environmentId);
   const item = fetched.item;
@@ -256,7 +299,13 @@ export const V2ItemInspector = memo(function V2ItemInspector(props: V2ItemInspec
     sourceItemId: props.projectedItem.sourceItemId,
   });
   return (
-    <div className="space-y-2 text-xs" data-v2-item-inspector={item.type}>
+    <div
+      className={cn(
+        "space-y-2",
+        props.presentation === "timeline" ? "text-terminal-copy leading-terminal" : "text-xs",
+      )}
+      data-v2-item-inspector={item.type}
+    >
       {item.type === "reasoning" && item.text ? (
         <div className="rounded-md border border-border/45 bg-muted/15 p-2 italic text-muted-foreground">
           <ChatMarkdown
@@ -275,6 +324,7 @@ export const V2ItemInspector = memo(function V2ItemInspector(props: V2ItemInspec
         <ToolCallBody
           command={item.input}
           exitCode={item.exitCode}
+          presentation={props.presentation}
           {...outputState}
           onImageExpand={props.onImageExpand}
         />
@@ -377,6 +427,7 @@ export const V2ItemInspector = memo(function V2ItemInspector(props: V2ItemInspec
       {item.type === "dynamic_tool" ? (
         <ToolCallBody
           toolName={item.toolName}
+          presentation={props.presentation}
           args={item.input}
           {...outputState}
           onImageExpand={props.onImageExpand}

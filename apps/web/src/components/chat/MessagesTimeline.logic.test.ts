@@ -670,6 +670,98 @@ describe("resolveAssistantMessageCopyState", () => {
 });
 
 describe("deriveMessagesTimelineRows", () => {
+  it("keeps elapsed time and work counts on the same fold and refreshes changed counts", () => {
+    const runId = RunId.make("summary-run");
+    const at = "2026-01-01T00:00:00Z";
+    const end = "2026-01-01T00:00:30Z";
+    const command: TimelineEntry = {
+      kind: "work",
+      id: "summary-command",
+      createdAt: at,
+      entry: {
+        id: "summary-command",
+        createdAt: at,
+        runId,
+        label: "Command",
+        tone: "tool",
+        itemType: "command_execution",
+        command: "vp test run",
+        toolLifecycleStatus: "completed",
+      },
+    };
+    const input = {
+      timelineEntries: [
+        {
+          kind: "message",
+          id: "summary-prompt",
+          createdAt: at,
+          message: {
+            id: MessageId.make("summary-prompt"),
+            role: "user",
+            text: "Check files",
+            runId,
+            createdAt: at,
+            updatedAt: at,
+            streaming: false,
+          },
+        },
+        {
+          kind: "work",
+          id: "summary-read",
+          createdAt: at,
+          entry: {
+            id: "summary-read",
+            createdAt: at,
+            runId,
+            label: "Read",
+            tone: "tool",
+            requestKind: "file-read",
+            changedFiles: ["src/a.ts"],
+            toolLifecycleStatus: "completed",
+          },
+        },
+        command,
+        {
+          kind: "message",
+          id: "summary-reply",
+          createdAt: end,
+          message: {
+            id: MessageId.make("summary-reply"),
+            role: "assistant",
+            text: "Done",
+            runId,
+            createdAt: end,
+            updatedAt: end,
+            streaming: false,
+          },
+        },
+      ] satisfies TimelineEntry[],
+      isWorking: false,
+      activeTurnStartedAt: null,
+      turnDiffSummaries: [],
+      supportsConversationRollback: false,
+    };
+    const rows = deriveMessagesTimelineRows(input);
+    expect(rows.find((row) => row.kind === "turn-fold")).toMatchObject({
+      label: "Worked for 30s",
+      summary: "Read 1 file · Ran 1 command",
+    });
+    const initial = computeStableMessagesTimelineRows(rows, { byId: new Map(), result: [] });
+    const moreWork = deriveMessagesTimelineRows({
+      ...input,
+      timelineEntries: [
+        ...input.timelineEntries.slice(0, 3),
+        { ...command, id: "another-command", entry: { ...command.entry, id: "another-command" } },
+        input.timelineEntries[3]!,
+      ],
+    });
+    const updated = computeStableMessagesTimelineRows(moreWork, initial);
+    expect(updated.result.find((row) => row.kind === "turn-fold")).toMatchObject({
+      label: "Worked for 30s",
+      summary: "Read 1 file · Ran 2 commands",
+    });
+  });
+
   it("stops stranded thinking after a steer and follows the next thought or tool", () => {
     const runId = RunId.make("steered-run");
     const at = "2026-10-01T06:19:10Z";

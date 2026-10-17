@@ -1,5 +1,6 @@
 /** Derives web timeline rows and display labels from conversation state. */
 import { t } from "~/i18n";
+import { workLogSummaryCounts } from "./WorkLog.logic";
 import { worktreeSetupAgentStarted } from "@t3tools/client-runtime/worktree-setup";
 export { worktreeSetupAgentStarted } from "@t3tools/client-runtime/worktree-setup";
 import { isLiveSubagentTurnItem } from "@t3tools/client-runtime/state/subagentRuntime";
@@ -640,6 +641,7 @@ type MessagesTimelineRowContent =
       createdAt: string;
       runId: RunId;
       label: string;
+      summary?: string;
       expanded: boolean;
     }
   | {
@@ -804,6 +806,7 @@ interface TurnFold {
   createdAt: string;
   hiddenEntryIds: ReadonlySet<string>;
   label: string;
+  summary?: string;
 }
 
 interface SupersededAttemptFold {
@@ -1308,12 +1311,23 @@ function deriveTurnFolds(input: {
         ? t.chat.timeline.workedFor(duration)
         : t.chat.timeline.worked;
 
+    const counts = workLogSummaryCounts(
+      group.entries.flatMap((entry) => (entry.kind === "work" ? [entry.entry] : [])),
+    );
+    const summary = [
+      counts.readFiles ? t.chat.timeline.summaryReadFiles(counts.readFiles) : null,
+      counts.commands ? t.chat.timeline.summaryCommands(counts.commands) : null,
+      counts.changedFiles ? t.chat.timeline.summaryChangedFiles(counts.changedFiles) : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
     foldsByAnchorEntryId.set(group.anchorEntryId, {
       runId,
       anchorEntryId: group.anchorEntryId,
       createdAt: group.startBoundary ?? firstEntry.createdAt,
       hiddenEntryIds,
       label,
+      ...(summary ? { summary } : {}),
     });
   }
   return foldsByAnchorEntryId;
@@ -1734,6 +1748,7 @@ export function deriveMessagesTimelineRows(input: {
         createdAt: turnFold.createdAt,
         runId: turnFold.runId,
         label: turnFold.label,
+        ...(turnFold.summary ? { summary: turnFold.summary } : {}),
         expanded: input.expandedRunIds?.has(turnFold.runId) ?? false,
       });
     }
@@ -2382,7 +2397,12 @@ function isRowUnchanged(a: MessagesTimelineRow, b: MessagesTimelineRow): boolean
 
     case "turn-fold": {
       const bf = b as typeof a;
-      return a.createdAt === bf.createdAt && a.label === bf.label && a.expanded === bf.expanded;
+      return (
+        a.createdAt === bf.createdAt &&
+        a.label === bf.label &&
+        a.summary === bf.summary &&
+        a.expanded === bf.expanded
+      );
     }
 
     case "attempt-fold": {

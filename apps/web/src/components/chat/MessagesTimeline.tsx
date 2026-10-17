@@ -2865,7 +2865,19 @@ function TurnFoldTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "turn-
       data-scroll-anchor-ignore
       onClick={() => ctx.onToggleTurnFold(row.runId)}
       icon={<SparklesIcon aria-hidden className="size-3.75 text-secondary-label" />}
-      label={<span className="font-semibold text-foreground tabular-nums">{row.label}</span>}
+      label={
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="shrink-0 font-semibold text-foreground tabular-nums">{row.label}</span>
+          {row.summary ? (
+            <>
+              <span aria-hidden className="text-placeholder">
+                ·
+              </span>
+              <span className="min-w-0 truncate">{row.summary}</span>
+            </>
+          ) : null}
+        </span>
+      }
       trailing={
         <>
           <TimelineRowTimestamp createdAt={row.createdAt} timestampFormat={ctx.timestampFormat} />
@@ -3363,6 +3375,7 @@ function V2EventTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "event"
           ) : null}
           <div className={presentation.detail ? "mt-2" : undefined}>
             <V2ItemInspector
+              presentation="timeline"
               projectedItem={row.projectedItem}
               environmentId={ctx.activeThreadEnvironmentId}
               cwd={ctx.markdownCwd}
@@ -3438,6 +3451,7 @@ function V2EventTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "event"
           ) : null}
           <div className="mt-2">
             <V2ItemInspector
+              presentation="timeline"
               projectedItem={row.projectedItem}
               environmentId={ctx.activeThreadEnvironmentId}
               cwd={ctx.markdownCwd}
@@ -6071,6 +6085,7 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
         <WorkLogDetails kind="panel">
           {workEntry.projectedItem && plainOutput === undefined ? (
             <V2ItemInspector
+              presentation="timeline"
               projectedItem={workEntry.projectedItem}
               environmentId={ctx.activeThreadEnvironmentId}
               cwd={ctx.markdownCwd}

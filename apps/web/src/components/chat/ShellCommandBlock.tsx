@@ -1,3 +1,4 @@
+/** Renders shell commands; the opt-in timeline view uses D1 truncation without changing other callers. */
 import {
   commandHighlightLanguage,
   withVisibleControlCharacters,
@@ -7,6 +8,7 @@ import { Suspense, use, useMemo } from "react";
 import { useTheme } from "../../hooks/useTheme";
 import { RenderErrorBoundary } from "../RenderErrorBoundary";
 import { HighlightedTokens } from "./HighlightedTokens";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
 // Shell words wrap as a unit, so `--exclude` or a quoted string is not split
 // at a hyphen; a word longer than the line still breaks anywhere.
@@ -55,13 +57,36 @@ function HighlightedCommand({ code, theme }: { code: string; theme: "light" | "d
 }
 
 /**
- * The command a command_execution item ran, syntax highlighted. Scripts inside
- * it, such as a `bash -lc` script or a Python heredoc, get their own grammar.
+ * Display a retained command without changing its source text.
+ * @param props command may be blank (renders nothing). presentation="timeline" selects D1's
+ * single-line command and full-text tooltip; absent presentation preserves highlighted wrapping.
+ * @returns A command block or null for blank input. Grammar failures retain the plain fallback.
  */
-export function ShellCommandBlock({ command }: { command: string }) {
+export function ShellCommandBlock({
+  command,
+  presentation,
+}: {
+  command: string;
+  presentation?: "timeline" | undefined;
+}) {
   const { resolvedTheme } = useTheme();
   const code = withVisibleControlCharacters(command.trim());
   if (!code) return null;
+  if (presentation === "timeline") {
+    return (
+      <Tooltip>
+        <TooltipTrigger render={<div tabIndex={0} className="min-w-0 truncate text-foreground" />}>
+          <span aria-hidden className="text-primary select-none">
+            ${" "}
+          </span>
+          {code}
+        </TooltipTrigger>
+        <TooltipPopup variant="code">
+          <span className="whitespace-pre-wrap">{command.trim()}</span>
+        </TooltipPopup>
+      </Tooltip>
+    );
+  }
   const plain = <PlainWords code={code} />;
   return (
     // The tool body sets the monospace, pre-wrapped text this sits in.
