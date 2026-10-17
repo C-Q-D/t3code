@@ -2862,6 +2862,7 @@ function LegacySidebarOptions({
   );
 
   const radioName = React.useId();
+  const titleId = React.useId();
   return (
     <Popover>
       <PopoverTrigger
@@ -2880,9 +2881,12 @@ function LegacySidebarOptions({
         side="bottom"
         padding="none"
         className="w-62.5"
-        aria-label={t.sidebar.options.title}
+        aria-labelledby={titleId}
       >
         <div className="flex flex-col gap-2.5 p-3 text-secondary-copy-large leading-sidebar-context-drag">
+          <h2 id={titleId} className="font-bold">
+            {t.sidebar.options.title}
+          </h2>
           <div className="flex items-center gap-2">
             <span className="flex-1 text-code-foreground">{t.sidebar.options.sortProjects}</span>
             <Select

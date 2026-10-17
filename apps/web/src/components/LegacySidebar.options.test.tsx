@@ -163,7 +163,12 @@ it("writes all three settings through the options form and restores focus on Esc
     trigger.click();
   });
   await flushFocus();
-  expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+  const dialog = document.querySelector('[role="dialog"]');
+  expect(dialog).not.toBeNull();
+  const title = dialog!.querySelector("h2");
+  expect(title?.textContent).toBe("Sidebar options");
+  expect(dialog!.getAttribute("aria-labelledby")).toBe(title!.id);
+  expect(dialog!.hasAttribute("aria-label")).toBe(false);
   const projectSort = control("Sort projects");
   await act(() => projectSort.click());
   await flushFocus();
