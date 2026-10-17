@@ -239,8 +239,9 @@
   font-weight: 700;
 }
 
+/* The disabled well supplies slab's color input so its important background retains opacity mixing. */
 .surface-glass.discussion-composer-disabled {
-  background: var(--color-well-raised);
+  --stone-surface-color: var(--color-well-raised);
   box-shadow: var(--shadow-input-well);
 }
 
@@ -506,9 +507,9 @@
   --shadow-discussion-loading: inset 2px 3px 8px rgba(0, 0, 0, 0.6);
 }
 
-/* L6's search well stays local to the project picker; no shared Combobox recipe changes. */
+/* L6's search well supplies slab's color input, retaining opacity mixing without changing shared Comboboxes. */
 .surface-glass.discussion-project-search {
-  background: var(--input);
+  --stone-surface-color: var(--input);
   box-shadow: var(--shadow-input-well);
 }
 
