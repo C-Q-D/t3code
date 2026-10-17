@@ -28,6 +28,9 @@ const selectTriggerVariants = cva(
         // SettingsPage8a M2: shortcut pickers place a keycap inside the shared recessed well.
         keycap:
           "justify-center bg-input text-foreground shadow-well-track [&:is(:disabled,[data-disabled])]:text-fg-control-disabled",
+        // 讨论页 H4: full-size dialog picker, including loading/failure material.
+        dialog:
+          "w-full min-w-0 bg-select-control text-foreground shadow-discussion-select not-disabled:not-data-disabled:hover:bg-accent focus-visible:inset-shadow-focus [&:is(:disabled,[data-disabled])]:bg-discussion-select-disabled [&:is(:disabled,[data-disabled])]:text-discussion-select-disabled-label [&:is(:disabled,[data-disabled])]:shadow-discussion-select-disabled",
       },
       size: {
         compact: "h-7 gap-1 px-2 text-secondary-copy",
@@ -39,6 +42,8 @@ const selectTriggerVariants = cva(
         settings: "h-8 w-auto min-w-30 ps-3 pe-2.5",
         // SettingsPage8a M2: 32px shortcut well, at least 90px wide.
         shortcut: "h-8 w-auto min-w-22.5 px-3",
+        // 讨论页 H4: large dialog picker with 14px copy and 14/12px horizontal insets.
+        dialog: "h-10 ps-3.5 pe-3 text-body",
       },
     },
   },

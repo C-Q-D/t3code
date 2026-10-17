@@ -26,7 +26,6 @@ import { useAtomCommand } from "~/state/use-atom-command";
 import { useTitlebarSlot } from "../frame/titlebarSlot";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "../ui/empty";
 import { SidebarInset } from "../ui/sidebar";
 import { toastManager } from "../ui/toast";
 import { useMediaQuery } from "~/hooks/useMediaQuery";
@@ -49,7 +48,7 @@ import {
  * Keeps failures inside the workspace with a recovery link.
  * @param props.title Error title, or null while directory/subscription data is pending.
  * @param props.description Optional explanation; query failures retain the query's message.
- * @returns Titlebar portal and an Empty message, without a loading animation.
+ * @returns Titlebar portal and H7 empty-table error state; loading remains blank and static.
  */
 export function DiscussionPageMessage({
   title,
@@ -70,17 +69,25 @@ export function DiscussionPageMessage({
       {titlebar}
       <div className="flex min-h-0 flex-1 items-center justify-center p-6">
         {title ? (
-          <Empty>
-            <EmptyHeader>
-              <EmptyTitle>{title}</EmptyTitle>
-              {description ? <EmptyDescription>{description}</EmptyDescription> : null}
-            </EmptyHeader>
-            <EmptyContent>
-              <Button variant="outline" size="sm" render={<Link to="/discussions" />}>
+          <section className="flex min-w-0 flex-col items-center gap-3.5 pb-15 text-center">
+            <div aria-hidden="true" className="relative mb-2.5 h-37.5 w-60">
+              <div className="discussion-error-table absolute top-7.5 left-1/2 size-37.5 -translate-x-1/2 rounded-full bg-discussion-error-table shadow-discussion-error-table" />
+              <span className="discussion-error-chair absolute top-14 left-7 size-7.5 rounded-device-control" />
+              <span className="discussion-error-chair absolute top-0 left-26.25 size-7.5 rounded-device-control" />
+              <span className="discussion-error-chair absolute top-14 right-7 size-7.5 rounded-device-control" />
+            </div>
+            <h2 className="font-serif text-discussion-error-heading font-bold">{title}</h2>
+            {description ? <p className="text-body text-secondary-label">{description}</p> : null}
+            <div className="mt-1.5">
+              <Button
+                variant="dialog-secondary"
+                size="recovery"
+                render={<Link to="/discussions" />}
+              >
                 {t.discussions.page.back}
               </Button>
-            </EmptyContent>
-          </Empty>
+            </div>
+          </section>
         ) : null}
       </div>
     </SidebarInset>

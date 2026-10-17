@@ -62,6 +62,7 @@ function DialogViewport({ className, ...props }: DialogPrimitive.Viewport.Props)
 /** Renders dialog children with the requested variant and layout; showCloseButton controls its accessible dismiss action and remaining props go to the dialog primitive. */
 function DialogPopup({
   className,
+  size,
   children,
   showCloseButton = true,
   bottomStickOnMobile = true,
@@ -70,6 +71,8 @@ function DialogPopup({
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean;
   bottomStickOnMobile?: boolean;
+  /** H4/H5: explicit 440px and 400px confirmation widths, without changing the default. */
+  size?: "default" | "wide" | "compact";
   variant?: "default" | "media";
 }) {
   return (
@@ -89,6 +92,8 @@ function DialogPopup({
             "row-start-2 text-popover-foreground",
             variant === "default" && "max-h-full",
             bottomStickOnMobile && DIALOG_MOBILE_SHEET_CLASS,
+            size === "wide" && "max-w-110",
+            size === "compact" && "max-w-100",
             className,
           )}
           data-slot="dialog-popup"
@@ -144,10 +149,20 @@ function DialogFooter({
 }
 
 /** Keeps the accessible title intact and exposes rich title text through the native hover hint. */
-function DialogTitle({ className, title, onMouseEnter, ...props }: DialogPrimitive.Title.Props) {
+function DialogTitle({
+  className,
+  size,
+  title,
+  onMouseEnter,
+  ...props
+}: DialogPrimitive.Title.Props & { size?: "lg" }) {
   return (
     <DialogPrimitive.Title
-      className={cn("min-w-0 truncate font-serif text-dialog-title font-bold", className)}
+      className={cn(
+        "min-w-0 truncate font-serif text-dialog-title font-bold",
+        size === "lg" && "text-discussion-dialog-heading",
+        className,
+      )}
       data-slot="dialog-title"
       title={title}
       onMouseEnter={(event) => {

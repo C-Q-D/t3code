@@ -1,18 +1,23 @@
 /** Selects seat-thread identity and localized notice data without subscriptions or navigation effects. */
-import type { DiscussionListResult } from "@t3tools/contracts";
+import type { DiscussionListResult, DiscussionPersonaAvatar } from "@t3tools/contracts";
 import { AsyncResult } from "effect/reactivity";
 import type { discussions } from "~/i18n/locales/en/discussions";
 
 /** Stored association from a server thread shell; drafts and ordinary threads provide null. */
 export type DiscussionSeatAssociation = { discussionId: string; seatId: string };
-/** Only the title and matching persona affect the banner; other list changes are ignored. */
-export type DiscussionSeatBannerMetadata = { title: string; personaName: string | null };
+/** Only the matching identity, seat color position and title affect the banner. */
+export type DiscussionSeatBannerMetadata = {
+  title: string;
+  personaName: string | null;
+  avatar: DiscussionPersonaAvatar | null;
+  seatIndex: number;
+};
 
 /**
  * Selects metadata only from a current success; failures must not reuse a stale title or link.
  * @param association Stored server-thread discussion and seat identity.
  * @param result Shared list subscription result, including initial and failed states.
- * @returns Matching title/persona, or null when the title cannot be read.
+ * @returns Matching title/persona/avatar and zero-based seat position (-1 when missing), or null when the title cannot be read.
  */
 export function discussionSeatBannerMetadata(
   association: DiscussionSeatAssociation,
@@ -21,9 +26,13 @@ export function discussionSeatBannerMetadata(
   const list = result._tag === "Success" ? result.value.discussions : null;
   const item = list?.find((candidate) => candidate.id === association.discussionId);
   if (!item?.title) return null;
+  const seatIndex = item.seats.findIndex((seat) => seat.id === association.seatId);
+  const seat = item.seats[seatIndex];
   return {
     title: item.title,
-    personaName: item.seats.find((seat) => seat.id === association.seatId)?.personaName ?? null,
+    personaName: seat?.personaName ?? null,
+    avatar: seat?.avatar ?? null,
+    seatIndex,
   };
 }
 
@@ -36,7 +45,7 @@ export function discussionSeatBannerMetadata(
  */
 export function discussionSeatBannerView(
   association: DiscussionSeatAssociation | null,
-  metadata: DiscussionSeatBannerMetadata | null,
+  metadata: Pick<DiscussionSeatBannerMetadata, "title" | "personaName"> | null,
   copy: typeof discussions,
 ) {
   if (!association) return null;

@@ -266,3 +266,85 @@
 [data-discussion-live] .chat-markdown:has(> p:last-child)::after {
   display: none;
 }
+
+/* DC3 · 讨论页-8a v3 面板与对话框 H4–H7: only missing role-specific tokens. */
+@theme {
+  --text-discussion-dialog-heading: 24px;
+  --text-discussion-dialog-heading--line-height: 1.2;
+  --text-discussion-error-heading: 26px;
+  --text-discussion-error-heading--line-height: 1.55;
+  --color-discussion-submit-disabled: #5a5a60;
+  --color-discussion-select-disabled: #232326;
+  --color-discussion-select-disabled-label: #6e6e76;
+  --shadow-discussion-primary-key:
+    inset 0 1px 0 #fff, 0 0 0 1px rgba(0, 0, 0, 0.5), 0 2px 0 #8e8e96;
+  --shadow-discussion-select:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09), 0 0 0 1px rgba(0, 0, 0, 0.5), 0 2px 0 #09090a;
+  --shadow-discussion-select-disabled: inset 1px 1.5px 3px rgba(0, 0, 0, 0.5);
+  --color-discussion-danger-ink: #1c0905;
+  --color-discussion-seat-notice: #1d2230;
+  --color-discussion-error-chair: rgba(236, 236, 238, 0.18);
+  --shadow-discussion-summary-well:
+    inset 1.5px 2px 4px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(0, 0, 0, 0.4);
+  --shadow-discussion-summary-row:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.45), 0 2px 0 #09090a;
+  --shadow-discussion-summary-radio: inset 1px 1.5px 3px rgba(0, 0, 0, 0.7), 0 0 0 1px #3a3a40;
+  --shadow-discussion-danger-key:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 0 0 1px rgba(0, 0, 0, 0.5), 0 2px 0 #9c3b2f;
+  --shadow-discussion-seat-notice: inset 0 0 0 1px rgba(130, 171, 255, 0.32), 0 1.5px 0 #09090a;
+  --shadow-discussion-error-table:
+    inset 0 2px 0 rgba(255, 255, 255, 0.07), inset 0 -6px 12px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(0, 0, 0, 0.6), 0 5px 0 #060607;
+  --background-image-discussion-error-table: radial-gradient(
+    circle at 40% 32%,
+    #2c2c31,
+    #222225 62%,
+    #1d1d20
+  );
+}
+
+/* H7 is a decorative empty table, not the populated DC0 table and its turn geometry. */
+.discussion-error-table {
+  mask-image: linear-gradient(var(--color-discussion-pixel-black) 55%, transparent 100%);
+}
+.discussion-error-chair {
+  border: 1.5px dashed var(--color-discussion-error-chair);
+}
+
+/* H6 uses the shared stack slots. Scope by its stable id so other notices retain CP2 styling. */
+@layer utilities {
+  html[data-theme-id="graphite"]
+    .composer-notice[data-composer-notice-id="discussion-seat-thread"] {
+    @apply py-2.5 pr-2 pl-3 shadow-discussion-seat-notice;
+    --stone-surface-color: var(--color-discussion-seat-notice);
+    --composer-banner-icon-column: --spacing(7);
+  }
+  html[data-theme-id="graphite"]
+    [data-composer-notice-id="discussion-seat-thread"]
+    [data-slot="composer-banner-icon"] {
+    @apply size-7 rounded-device-control bg-status-info;
+  }
+  html[data-theme-id="graphite"]
+    [data-composer-notice-id="discussion-seat-thread"]
+    [data-slot="composer-banner-icon"]
+    > svg {
+    @apply size-3.75;
+  }
+  html[data-theme-id="graphite"]
+    [data-composer-notice-id="discussion-seat-thread"]
+    [data-slot="composer-banner-content"] {
+    @apply flex-col items-start gap-0.25 whitespace-normal;
+  }
+  html[data-theme-id="graphite"]
+    [data-composer-notice-id="discussion-seat-thread"]
+    [data-slot="composer-banner-content"]
+    > :first-child {
+    @apply overflow-visible whitespace-normal text-control font-semibold;
+    line-height: var(--text-control--line-height);
+  }
+  html[data-theme-id="graphite"]
+    [data-composer-notice-id="discussion-seat-thread"]
+    [data-composer-notice-description] {
+    @apply w-full text-secondary-copy-medium text-secondary-label;
+  }
+}

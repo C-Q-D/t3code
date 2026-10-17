@@ -5,10 +5,15 @@ import {
   AlertDialogPopup,
   AlertDialogTitle,
   AlertDialogDescription,
-  AlertDialogFooter,
 } from "../ui/alert-dialog";
 import { Button } from "../ui/button";
-/** Prevents dismissal while the shared header queue is submitting deletion. */
+/**
+ * Confirms deletion without changing the page command or its navigation behavior.
+ * @param props.pending Disables both actions and dismissal while deletion is queued.
+ * @param props.onClose Cancels locally without deleting records.
+ * @param props.onSubmit Page-owned deletion; the page handles errors and navigation.
+ * @returns H5 alert dialog; no persistence or retry is owned here.
+ */
 export function DiscussionDeleteDialog({
   pending,
   onClose,
@@ -25,19 +30,31 @@ export function DiscussionDeleteDialog({
         if (!open && !pending) onClose();
       }}
     >
-      <AlertDialogPopup className="max-w-100" bottomStickOnMobile={false}>
-        <div className="flex flex-col gap-2 p-5">
-          <AlertDialogTitle>{t.discussions.page.deleteTitle}</AlertDialogTitle>
-          <AlertDialogDescription>{t.discussions.page.deleteDescription}</AlertDialogDescription>
+      <AlertDialogPopup size="compact" bottomStickOnMobile={false}>
+        <div className="flex flex-col gap-2.5 p-6">
+          <AlertDialogTitle size="lg">{t.discussions.page.deleteTitle}</AlertDialogTitle>
+          <AlertDialogDescription variant="confirmation">
+            {t.discussions.page.deleteDescription}
+          </AlertDialogDescription>
+          <div data-slot="alert-dialog-footer" className="mt-2.5 flex justify-end gap-2">
+            <Button
+              variant="dialog-secondary"
+              size="dialog-cancel"
+              disabled={pending}
+              onClick={onClose}
+            >
+              {t.discussions.page.cancel}
+            </Button>
+            <Button
+              variant="danger-key"
+              size="dialog-action"
+              disabled={pending}
+              onClick={() => void onSubmit()}
+            >
+              {t.discussions.page.delete}
+            </Button>
+          </div>
         </div>
-        <AlertDialogFooter>
-          <Button variant="outline" disabled={pending} onClick={onClose}>
-            {t.discussions.page.cancel}
-          </Button>
-          <Button variant="destructive" disabled={pending} onClick={() => void onSubmit()}>
-            {t.discussions.page.delete}
-          </Button>
-        </AlertDialogFooter>
       </AlertDialogPopup>
     </AlertDialog>
   );

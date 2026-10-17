@@ -1,5 +1,5 @@
 /** Protects permanent seat-thread attribution and independently specified localized copy. */
-import { DiscussionListItem } from "@t3tools/contracts";
+import { DiscussionListItem, DiscussionSeatId } from "@t3tools/contracts";
 import { Cause, Option } from "effect";
 import { AsyncResult } from "effect/reactivity";
 import * as Schema from "effect/Schema";
@@ -30,10 +30,33 @@ const item = Schema.decodeSync(DiscussionListItem)({
   updatedAt: "2026-10-14T00:00:00.000Z",
   endedAt: null,
 });
+const secondSeatId = Schema.decodeSync(DiscussionSeatId)("seat-b");
 const association = { discussionId: "discussion-a", seatId: "seat-a" };
 const description = "发言由讨论驱动，在这里发的消息不会进入讨论记录。";
 
 describe("seat thread banner", () => {
+  it("uses the associated seat's avatar and physical position, not the first seat", () => {
+    const secondSeat = {
+      ...item.seats[0]!,
+      id: secondSeatId,
+      personaName: "反方",
+      avatar: "opponent" as const,
+    };
+    expect(
+      discussionSeatBannerMetadata(
+        { ...association, seatId: "seat-b" },
+        AsyncResult.success({ discussions: [{ ...item, seats: [...item.seats, secondSeat] }] }),
+      ),
+    ).toEqual({ title: "缓存策略", personaName: "反方", avatar: "opponent", seatIndex: 1 });
+  });
+  it("omits the identity tile when the associated seat is missing", () => {
+    expect(
+      discussionSeatBannerMetadata(
+        { ...association, seatId: "missing" },
+        AsyncResult.success({ discussions: [item] }),
+      ),
+    ).toEqual({ title: "缓存策略", personaName: null, avatar: null, seatIndex: -1 });
+  });
   it("names both the discussion and matching seat", () =>
     expect(
       discussionSeatBannerView(

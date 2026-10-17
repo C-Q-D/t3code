@@ -55,6 +55,12 @@ const buttonVariants = cva(
           "size-7 rounded-device-control p-0 [&_svg:not([class*='size-'])]:size-3.5",
         // SettingsPage8a M2 day stepper: 26px circular controls inside a 32px well.
         "icon-stepper": "size-6.5 p-0 [&_svg:not([class*='size-'])]:size-3.25",
+        // 讨论页 H4/H5: 36px dialog actions; H6: 28px notice action.
+        "dialog-action": "h-9 px-4.5 text-control",
+        "dialog-cancel": "h-9 px-4 text-control",
+        notice: "h-7 gap-1.25 px-2.5 text-secondary-copy-medium font-semibold",
+        // 讨论页 H7: 32px recovery action with 14px inline padding.
+        recovery: "h-8 px-3.5",
       },
       variant: {
         default:
@@ -85,6 +91,17 @@ const buttonVariants = cva(
           "bg-secondary text-foreground shadow-raise-xs-control not-disabled:not-aria-disabled:hover:bg-accent not-disabled:not-aria-disabled:hover:text-message-action-hover not-disabled:not-aria-disabled:hover:shadow-raise-xs-hover not-disabled:not-aria-disabled:[:active,[data-pressed]]:bg-control-secondary-pressed not-disabled:not-aria-disabled:[:active,[data-pressed]]:text-foreground not-disabled:not-aria-disabled:[:active,[data-pressed]]:translate-y-[1.5px] not-disabled:not-aria-disabled:[:active,[data-pressed]]:shadow-raise-xs-pressed [:disabled,[aria-disabled=true]]:bg-control-secondary-disabled [:disabled,[aria-disabled=true]]:text-fg-control-disabled [:disabled,[aria-disabled=true]]:shadow-none focus-visible:shadow-raise-tab",
         "warning-outline":
           "border-[1.5px] border-warning/32 bg-warning-surface text-warning-foreground shadow-raise-xs-control not-disabled:not-aria-disabled:[:active,[data-pressed]]:shadow-none not-disabled:not-aria-disabled:[:hover,[data-pressed]]:border-warning/40 not-disabled:not-aria-disabled:[:hover,[data-pressed]]:bg-warning/16 [:disabled,[aria-disabled=true]]:text-fg-control-disabled [:disabled,[aria-disabled=true]]:shadow-none",
+        // 讨论页 H4/H5: raised cancellation key and light danger confirmation key.
+        "dialog-secondary":
+          "bg-select-control text-foreground shadow-raise-xs not-disabled:not-aria-disabled:hover:bg-accent not-disabled:not-aria-disabled:active:translate-y-0.5 not-disabled:not-aria-disabled:active:shadow-raise-xs-pressed [:disabled,[aria-disabled=true]]:bg-control-secondary-disabled [:disabled,[aria-disabled=true]]:text-fg-disabled [:disabled,[aria-disabled=true]]:shadow-none",
+        "danger-key":
+          "bg-error text-discussion-danger-ink font-bold text-shadow-none shadow-discussion-danger-key not-disabled:not-aria-disabled:hover:bg-control-danger-label-hover not-disabled:not-aria-disabled:active:translate-y-0.5 not-disabled:not-aria-disabled:active:shadow-danger-pressed [:disabled,[aria-disabled=true]]:bg-error-surface [:disabled,[aria-disabled=true]]:text-control-danger-disabled [:disabled,[aria-disabled=true]]:shadow-none",
+        // 讨论页 H4: white confirmation key, including the explicitly drawn submitting state.
+        "dialog-primary":
+          "[--lucide-hue-override:currentColor] bg-primary text-primary-foreground font-bold text-shadow-none shadow-discussion-primary-key not-disabled:not-aria-disabled:hover:bg-message-action-hover not-disabled:not-aria-disabled:active:translate-y-0.5 not-disabled:not-aria-disabled:active:shadow-primary-pressed [:disabled,[aria-disabled=true]]:bg-discussion-submit-disabled [:disabled,[aria-disabled=true]]:text-popover [:disabled,[aria-disabled=true]]:shadow-none",
+        // 讨论页 H6: stronger ghost text for a notice's recovery action.
+        "ghost-strong":
+          "bg-transparent text-foreground font-semibold not-disabled:not-aria-disabled:hover:bg-select-control [:disabled,[aria-disabled=true]]:text-fg-control-disabled",
       },
     },
     compoundVariants: [

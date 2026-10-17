@@ -3,11 +3,12 @@ import { useAtomValue } from "@effect/atom-react";
 import type { EnvironmentId, DiscussionId, DiscussionSeatId } from "@t3tools/contracts";
 import { Link } from "@tanstack/react-router";
 import { Atom } from "effect/reactivity";
-import { MessagesSquareIcon } from "lucide-react";
+import { ArrowUpRightIcon, MessagesSquareIcon } from "lucide-react";
 import { useMemo } from "react";
 import { t } from "~/i18n";
 import { serverEnvironment } from "~/state/server";
 import type { ComposerBannerStackItem } from "../chat/ComposerBannerStack";
+import { PixelSeat } from "./PixelSeat";
 import { Button } from "../ui/button";
 import {
   discussionSeatBannerMetadata,
@@ -40,7 +41,12 @@ export function useDiscussionSeatBanner(
       const result = get(serverEnvironment.discussionsLive({ environmentId, input: {} }));
       const next = discussionSeatBannerMetadata({ discussionId, seatId }, result);
       // The full list is shared, but unrelated titles/seats/status updates must not rerender ChatView.
-      if (previous?.title === next?.title && previous?.personaName === next?.personaName)
+      if (
+        previous?.title === next?.title &&
+        previous?.personaName === next?.personaName &&
+        previous?.avatar === next?.avatar &&
+        previous?.seatIndex === next?.seatIndex
+      )
         return previous;
       previous = next;
       return next;
@@ -53,10 +59,24 @@ export function useDiscussionSeatBanner(
   return {
     ...notice,
     icon: <MessagesSquareIcon />,
+    title: (
+      <span className="inline-flex flex-wrap items-center gap-1.5">
+        {notice.title}
+        {metadata?.avatar && metadata.personaName ? (
+          <PixelSeat
+            role={metadata.avatar}
+            seatIndex={metadata.seatIndex}
+            state="idle"
+            size={18}
+            label={metadata.personaName}
+          />
+        ) : null}
+      </span>
+    ),
     actions: target ? (
       <Button
-        size="xs"
-        variant="ghost"
+        size="notice"
+        variant="ghost-strong"
         render={
           <Link
             to="/discussions/$environmentId/$discussionId"
@@ -65,6 +85,7 @@ export function useDiscussionSeatBanner(
         }
       >
         {t.discussions.seatThread.open}
+        <ArrowUpRightIcon className="size-3.25" aria-hidden />
       </Button>
     ) : null,
   };

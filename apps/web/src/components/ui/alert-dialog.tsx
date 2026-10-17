@@ -42,6 +42,7 @@ function AlertDialogViewport({ className, ...props }: AlertDialogPrimitive.Viewp
 /** Uses the last available footer button as the primary action unless initialFocus is supplied; forwards popup refs and all primitive props. */
 function AlertDialogPopup({
   className,
+  size,
   bottomStickOnMobile = true,
   portalContainer,
   initialFocus,
@@ -49,6 +50,8 @@ function AlertDialogPopup({
   ...props
 }: AlertDialogPrimitive.Popup.Props & {
   bottomStickOnMobile?: boolean;
+  /** H4/H5: explicit 440px and 400px confirmation widths, without changing the default. */
+  size?: "default" | "wide" | "compact";
   portalContainer?: AlertDialogPrimitive.Portal.Props["container"];
 }) {
   const popupRef = useRef<HTMLDivElement | null>(null);
@@ -104,6 +107,8 @@ function AlertDialogPopup({
             DIALOG_POPUP_CLASS,
             "row-start-2 max-h-full text-popover-foreground",
             bottomStickOnMobile && DIALOG_MOBILE_SHEET_CLASS,
+            size === "wide" && "max-w-110",
+            size === "compact" && "max-w-100",
             className,
           )}
           data-slot="alert-dialog-popup"
@@ -152,13 +157,18 @@ function AlertDialogFooter({
 /** Preserves the full accessible title while exposing truncated rich text in the native hover hint. */
 function AlertDialogTitle({
   className,
+  size,
   title,
   onMouseEnter,
   ...props
-}: AlertDialogPrimitive.Title.Props) {
+}: AlertDialogPrimitive.Title.Props & { size?: "lg" }) {
   return (
     <AlertDialogPrimitive.Title
-      className={cn("min-w-0 shrink-0 truncate font-serif text-dialog-title font-bold", className)}
+      className={cn(
+        "min-w-0 shrink-0 truncate font-serif text-dialog-title font-bold",
+        size === "lg" && "text-discussion-dialog-heading",
+        className,
+      )}
       data-slot="alert-dialog-title"
       title={title}
       onMouseEnter={(event) => {
@@ -170,7 +180,12 @@ function AlertDialogTitle({
   );
 }
 
-function AlertDialogDescription({ className, ...props }: AlertDialogPrimitive.Description.Props) {
+/** Preserves accessible description semantics; confirmation uses the H5 body-copy treatment. */
+function AlertDialogDescription({
+  className,
+  variant,
+  ...props
+}: AlertDialogPrimitive.Description.Props & { variant?: "confirmation" }) {
   return (
     <AlertDialogPrimitive.Description
       className={cn(
@@ -178,6 +193,7 @@ function AlertDialogDescription({ className, ...props }: AlertDialogPrimitive.De
         // approval) scrolls in place instead of pushing the actions out of
         // the popup, which the viewport already caps.
         "wrap-anywhere max-h-[min(24rem,60dvh)] min-h-0 overflow-y-auto overscroll-contain text-muted-foreground text-sm select-text",
+        variant === "confirmation" && "text-body text-code-foreground",
         className,
       )}
       data-slot="alert-dialog-description"
