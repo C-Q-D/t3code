@@ -1,5 +1,12 @@
+/** Floating theme draft editor; keeps live preview, inspection, persistence and cancellation together. */
 import { t } from "~/i18n";
-import { MousePointer2Icon, PaintbrushIcon, PlusIcon, XIcon } from "lucide-react";
+import {
+  GripHorizontalIcon,
+  MousePointer2Icon,
+  PaintbrushIcon,
+  PlusIcon,
+  XIcon,
+} from "lucide-react";
 import { ChevronDown, ChevronUp } from "lucide";
 import {
   useCallback,
@@ -283,6 +290,7 @@ function getManagedEditorColors(
   );
 }
 
+/** Edits the supplied theme or seed in a movable panel; onSaved owns activation and restoreTheme restores the saved palette on close. */
 export function ThemeEditorPanel({
   open,
   onOpenChange,
@@ -939,20 +947,26 @@ export function ThemeEditorPanel({
   };
 
   const renderNameField = () => (
-    <label className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] items-center gap-3">
-      <span className="text-sm font-medium">{t.settings.themeEditor.themeName}</span>
-      <Input
-        autoFocus
-        size="sm"
-        onChange={(event) => {
-          setName(event.currentTarget.value);
-          // Most save failures are name collisions; retyping is the fix, so
-          // the stale message goes with the old name.
-          setError(null);
-        }}
-        placeholder={isEditing ? t.settings.themeEditor.themeName : t.settings.themeEditor.eGAurora}
-        value={name}
-      />
+    <label className="grid grid-cols-3 items-center gap-2">
+      <span className="text-secondary-copy-large font-medium">
+        {t.settings.themeEditor.themeName}
+      </span>
+      <span className="col-span-2 min-w-0">
+        <Input
+          autoFocus
+          size="settings"
+          onChange={(event) => {
+            setName(event.currentTarget.value);
+            // Most save failures are name collisions; retyping is the fix, so
+            // the stale message goes with the old name.
+            setError(null);
+          }}
+          placeholder={
+            isEditing ? t.settings.themeEditor.themeName : t.settings.themeEditor.eGAurora
+          }
+          value={name}
+        />
+      </span>
     </label>
   );
 
@@ -961,7 +975,7 @@ export function ThemeEditorPanel({
     // A locked mode stays hoverable so the tooltip can say why it is off;
     // a real disabled attribute would swallow the pointer events.
     const button = (
-      <Toggle aria-disabled={lockReason !== null} value={appearance}>
+      <Toggle size="settings" aria-disabled={lockReason !== null} value={appearance}>
         {appearance === "light"
           ? t.settings.rows.browserDefaultAppearance.options.light
           : t.settings.rows.browserDefaultAppearance.options.dark}
@@ -977,50 +991,53 @@ export function ThemeEditorPanel({
   };
 
   const renderAppearanceButtons = () => (
-    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] items-center gap-3">
-      <span className="text-sm font-medium">{t.settings.pages.appearance}</span>
-      <ToggleGroup
-        aria-label={t.settings.themeEditor.themeAppearance}
-        variant="segmented"
-        value={[activeAppearance]}
-        onValueChange={(next) => {
-          const appearance = next[0];
-          if (
-            (appearance === "light" || appearance === "dark") &&
-            appearanceLockReason(appearance) === null
-          ) {
-            setActiveAppearance(appearance);
-          }
-        }}
-      >
-        {renderAppearanceButton("light")}
-        {renderAppearanceButton("dark")}
-      </ToggleGroup>
+    <div className="grid grid-cols-3 items-center gap-2">
+      <span className="text-secondary-copy-large font-medium">{t.settings.pages.appearance}</span>
+      <span className="col-span-2">
+        <ToggleGroup
+          size="settings"
+          aria-label={t.settings.themeEditor.themeAppearance}
+          variant="segmented"
+          value={[activeAppearance]}
+          onValueChange={(next) => {
+            const appearance = next[0];
+            if (
+              (appearance === "light" || appearance === "dark") &&
+              appearanceLockReason(appearance) === null
+            ) {
+              setActiveAppearance(appearance);
+            }
+          }}
+        >
+          {renderAppearanceButton("light")}
+          {renderAppearanceButton("dark")}
+        </ToggleGroup>
+      </span>
     </div>
   );
 
   const renderColorsHeader = () => (
-    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] items-start gap-3">
+    <div className="flex flex-col gap-2">
       <div>
-        <h3 className="text-sm font-medium">{t.settings.themeEditor.colors}</h3>
+        <h3 className="text-secondary-copy-large font-medium">{t.settings.themeEditor.colors}</h3>
         {isAdvanced ? null : (
-          <p className="text-xs text-muted-foreground">
+          <p className="text-secondary-copy text-muted-foreground">
             {t.settings.themeEditor.twoColorsRestDerived}
           </p>
         )}
       </div>
-      <div className="flex min-w-0 items-start gap-3">
+      <div className="flex w-full min-w-0 items-start gap-2">
         {isAdvanced ? (
           <Input
             aria-label={t.settings.themeEditor.filterColors}
             className="min-w-0 flex-1"
             onChange={(event) => setRoleQuery(event.currentTarget.value)}
             placeholder={t.settings.themeEditor.filterColors}
-            size="sm"
+            size="settings"
             value={roleQuery}
           />
         ) : null}
-        <label className="ml-auto flex shrink-0 cursor-pointer items-center gap-2 pt-0.5 text-sm font-medium">
+        <label className="ml-auto flex shrink-0 cursor-pointer items-center gap-2 pt-0.5 text-secondary-copy-large font-medium">
           <span>{t.settings.rows.backgroundActivity.options.advanced}</span>
           <Switch
             aria-label={t.settings.themeEditor.advancedColorsAriaLabel}
@@ -1034,7 +1051,7 @@ export function ThemeEditorPanel({
 
   const renderRoleFields = (
     families: ReadonlyArray<ThemeEditorColorFamily>,
-    gridClassName = "grid gap-2 sm:grid-cols-2",
+    gridClassName = "grid gap-1",
   ) => (
     <div className={gridClassName}>
       {families.map((family) => (
@@ -1069,12 +1086,14 @@ export function ThemeEditorPanel({
       <div className="space-y-5">
         {groups.map((group) => (
           <section className="space-y-2" key={group.id}>
-            <h4 className="text-sm font-medium text-foreground">{group.title}</h4>
+            <h4 className="text-secondary-copy-large font-medium text-foreground">{group.title}</h4>
             {renderRoleFields(group.families, "grid gap-1")}
           </section>
         ))}
         {groups.length === 0 ? (
-          <p className="text-xs text-muted-foreground">{t.settings.themeEditor.noMatches}</p>
+          <p className="text-secondary-copy text-muted-foreground">
+            {t.settings.themeEditor.noMatches}
+          </p>
         ) : null}
       </div>
     ) : (
@@ -1176,7 +1195,7 @@ export function ThemeEditorPanel({
     <div
       aria-label={isEditing ? t.settings.themeEditor.editTheme : t.settings.themeEditor.createTheme}
       className={cn(
-        "dialog-glass fixed z-[110] flex max-h-[min(42rem,calc(100dvh-6rem))] w-[min(26rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-xl border text-popover-foreground",
+        "ov4-theme-editor dropdown-glass fixed flex w-75 flex-col gap-2 overflow-hidden rounded-overlay-large p-3 text-popover-foreground",
         position === null && "bottom-4 right-4",
         isMinimized && "max-h-none",
       )}
@@ -1192,18 +1211,20 @@ export function ThemeEditorPanel({
       }}
     >
       <div
-        className="flex cursor-grab touch-none select-none items-center gap-1 border-b border-border/70 px-3 py-2 active:cursor-grabbing"
+        className="flex cursor-grab touch-none select-none items-center gap-2 active:cursor-grabbing"
         onPointerCancel={endDrag}
         onPointerDown={handleDragPointerDown}
         onPointerMove={handleDragPointerMove}
         onPointerUp={endDrag}
       >
-        <div className="flex min-w-0 flex-1 items-baseline gap-2">
-          <h2 className="shrink-0 truncate text-sm font-medium">
-            {isEditing ? t.settings.themeEditor.editTheme : t.settings.themeEditor.createTheme}
+        <GripHorizontalIcon aria-hidden className="size-3.5 shrink-0" />
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <h2 className="truncate text-control font-bold">
+            {t.settings.themeEditor.panelTitle}
+            {name ? ` · ${name}` : ""}
           </h2>
           {isMinimized ? null : (
-            <p className="truncate text-xs text-muted-foreground">
+            <p className="truncate text-secondary-copy text-muted-foreground">
               {isInspecting
                 ? t.settings.themeEditor.selectAnElementEscToCancel
                 : selectedRole
@@ -1228,7 +1249,7 @@ export function ThemeEditorPanel({
                     : t.settings.themeEditor.inspectAppColors
                 }
                 aria-pressed={isInspecting}
-                size="xs"
+                size="icon-stepper"
                 variant={isInspecting ? "secondary" : "ghost"}
                 onClick={() => {
                   if (isInspecting) {
@@ -1239,7 +1260,6 @@ export function ThemeEditorPanel({
                 }}
               >
                 <MousePointer2Icon />
-                {isInspecting ? t.settings.actions.cancel : t.settings.themeEditor.inspect}
               </Button>
             }
           />
@@ -1255,7 +1275,7 @@ export function ThemeEditorPanel({
               ? t.settings.themeEditor.expandTheThemeEditor
               : t.settings.themeEditor.minimizeTheThemeEditor
           }
-          size="icon-xs"
+          size="icon-stepper"
           variant="ghost"
           onClick={() => setIsMinimized(!isMinimized)}
         >
@@ -1263,7 +1283,7 @@ export function ThemeEditorPanel({
         </Button>
         <Button
           aria-label={t.settings.themeEditor.closeTheThemeEditor}
-          size="icon-xs"
+          size="icon-stepper"
           variant="ghost"
           onClick={() => onOpenChange(false)}
         >
@@ -1273,12 +1293,12 @@ export function ThemeEditorPanel({
 
       {isMinimized ? null : (
         <>
-          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto py-3 pl-3 pr-1.5">
+          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
             {renderNameField()}
             {/* Inline and above the color list: the panel scrolls, and an
                 error parked below every role would go unseen. */}
             {error ? (
-              <p aria-live="polite" className="text-sm text-destructive">
+              <p aria-live="polite" className="text-secondary-copy-large text-destructive">
                 {error}
               </p>
             ) : null}
@@ -1288,7 +1308,7 @@ export function ThemeEditorPanel({
               {renderColorFields()}
             </div>
           </div>
-          <div className="flex items-center justify-end gap-2 border-t border-border/70 px-3 py-2">
+          <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
             <Button size="sm" variant="ghost" onClick={() => onOpenChange(false)}>
               {t.settings.actions.cancel}
             </Button>

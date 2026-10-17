@@ -80,6 +80,8 @@ export const app = {
     workstation: "Workstation",
   },
   keybindings: {
+    invalidTitle: "Invalid keybindings configuration",
+    openSettings: "Open keybindings",
     openError: "Unable to open keybindings file",
     unknownOpenError: "Unknown error opening file.",
     openFile: "Open keybindings.json",

@@ -355,3 +355,68 @@ body:has([data-onboarding-route]) [data-titlebar-brand] {
 [data-stack="stone"][data-appearance="error-stripe"][data-stack-layer="2"]:not([data-expanded]) {
   box-shadow: var(--shadow-ov2-error-stripe), var(--shadow-ov2-stack-far);
 }
+
+/* OV4 · 补充屏-3.dc.html V4: floating editor, browser frame and orange-sand keybinding notice. */
+@theme {
+  --color-ov4-color-row: #151517;
+  --color-ov4-warning-surface: #ecd2c0;
+  --color-ov4-warning-title: #33201a;
+  --color-ov4-warning-copy: #5c3a2a;
+  --color-ov4-warning-icon: #a8461a;
+  --radius-ov4-color-row: 8px;
+  --radius-ov4-swatch: 4px;
+  --inset-shadow-ov4-swatch: inset 0 0 0 1px var(--border);
+  --shadow-ov4-floating:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.095), 0 0 0 1px rgba(0, 0, 0, 0.5), 0 3px 0 #09090a,
+    16px 26px 34px -8px rgba(0, 0, 0, 0.85);
+  --shadow-ov4-warning:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 2px 0 #a3826d, 12px 20px 28px -8px rgba(0, 0, 0, 0.8);
+}
+
+/* Reuse the glass surface recipe and its opacity setting; only V4's throw differs. */
+.ov4-theme-editor,
+.ov4-preview-frame {
+  --shadow-overlay: var(--shadow-ov4-floating);
+}
+.ov4-theme-editor {
+  z-index: 110;
+  max-width: calc(100vw - 2rem);
+  max-height: min(42rem, calc(100dvh - 6rem));
+}
+.ov4-preview-controls {
+  z-index: 49;
+}
+
+/* The warning stays in the existing Toast stack. Flatten its generic title/icon
+   wrappers so the feature owns one V4 row without a second surface or title. */
+.dropdown-glass:has(.ov4-keybindings-warning) {
+  --popover: var(--color-ov4-warning-surface);
+  --shadow-overlay: var(--shadow-ov4-warning);
+  width: min(380px, calc(100vw - 2rem));
+  text-shadow: none;
+}
+.dropdown-glass:has(.ov4-keybindings-warning) [data-slot="toast-icon"],
+.dropdown-glass:has(.ov4-keybindings-warning) div:has(> [data-slot="toast-title"]) {
+  display: none;
+}
+.dropdown-glass:has(.ov4-keybindings-warning) > div:has(.ov4-keybindings-warning) {
+  padding: 0;
+}
+.dropdown-glass:has(.ov4-keybindings-warning) [data-slot="toast-description"] {
+  overflow: visible;
+  white-space: normal;
+}
+.ov4-keybindings-warning {
+  --lucide-hue-override: currentColor;
+  color: var(--color-ov4-warning-icon);
+}
+/* Keep the existing dismissal reachable without covering V4's recovery action. */
+.dropdown-glass:has(.ov4-keybindings-warning) > div:has(> [data-slot="toast-close"]) {
+  top: -28px;
+  right: 0;
+}
+
+/* Native guest layer 48 sits between these independently transformed siblings. */
+.ov4-preview-frame {
+  z-index: 47;
+}

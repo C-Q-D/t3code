@@ -3680,6 +3680,7 @@ ${address}`
     itSNowActive: "已生效。",
   },
   themeEditor: {
+    panelTitle: "主题编辑器",
     foundation: "基础",
     background: "背景",
     surface: "表面",

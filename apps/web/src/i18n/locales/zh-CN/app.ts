@@ -78,6 +78,8 @@ export const app: Messages["app"] = {
     workstation: "工作站",
   },
   keybindings: {
+    invalidTitle: "快捷键配置有误",
+    openSettings: "打开快捷键",
     openError: "无法打开快捷键文件",
     unknownOpenError: "打开文件时发生未知错误。",
     openFile: "打开 keybindings.json",

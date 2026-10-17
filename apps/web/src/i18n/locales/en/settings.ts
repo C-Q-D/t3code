@@ -3881,6 +3881,7 @@ ${address}`
     itSNowActive: "It’s now active.",
   },
   themeEditor: {
+    panelTitle: "Theme editor",
     foundation: "Foundation",
     background: "Background",
     surface: "Surface",

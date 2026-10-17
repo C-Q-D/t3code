@@ -326,6 +326,8 @@ const twMerge = extendTailwindMerge({
         "ov2-stack-far",
         "ov2-count",
         "ov2-error-stripe",
+        "ov4-floating",
+        "ov4-warning",
       ],
       "inset-shadow": [
         "selected",
@@ -333,6 +335,7 @@ const twMerge = extendTailwindMerge({
         "selected-control",
         "project-rail-hover",
         "sidebar-search-focus",
+        "ov4-swatch",
       ],
       "text-shadow": ["stone"],
       radius: [
@@ -441,6 +444,8 @@ const twMerge = extendTailwindMerge({
         "licenses-icon",
         "ov1-option",
         "ov1-checkbox",
+        "ov4-color-row",
+        "ov4-swatch",
       ],
       leading: [
         "code",

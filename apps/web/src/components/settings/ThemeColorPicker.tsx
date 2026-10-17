@@ -1,10 +1,10 @@
+/** Theme role swatches and color controls; preserves alpha and commits valid picker values to the draft. */
 import { t } from "~/i18n";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { isThemeColor, themeColorToHex, type ThemeColorRole } from "../../themePalette";
 import { cn } from "../../lib/utils";
 import { hexToHsv, hsvToHex, type HsvColor } from "../../lib/color";
 import { ColorHueSlider, ColorSaturationValuePlane } from "../ui/color-picker";
-import { Input } from "../ui/input";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 /** Returns the localized display label for a theme color role. */
@@ -55,6 +55,7 @@ function themeRgbValue(hex: string) {
   return themeHexToRgb(hex).join(", ");
 }
 
+/** Presents HSV and text editors for label/value; emits valid colors through onChange while retaining incoming alpha. */
 function ThemeColorPickerPanel({
   label,
   value,
@@ -177,7 +178,7 @@ function ThemeColorPickerPanel({
           onChange={(h) => commitHsv({ ...hsv, h })}
           onInteractionEnd={flushPendingCommit}
         />
-        <div className="grid grid-cols-[1fr_1.2fr] gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <label className="grid min-w-0 gap-1">
             <span className="px-1 text-3xs font-semibold uppercase tracking-widest text-muted-foreground">
               HEX
@@ -232,6 +233,7 @@ function ThemeColorPickerPanel({
   );
 }
 
+/** Opens the picker for the supplied role label/value and notifies onInteract so the editor can highlight its usage. */
 function ThemeColorPicker({
   label,
   value,
@@ -251,14 +253,14 @@ function ThemeColorPicker({
             <PopoverTrigger
               render={
                 <button
-                  className="relative flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full border border-foreground/30 transition-transform hover:scale-105 focus-visible:outline-2 focus-visible:outline-solid focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                  className="relative flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-ov4-swatch after:absolute after:-inset-1 focus-visible:inset-shadow-focus"
                   aria-label={t.settings.themeColorPicker.chooseColor(label)}
                   onFocus={onInteract}
                   onPointerDown={onInteract}
                   type="button"
                 >
                   <span
-                    className="absolute inset-0 rounded-full shadow-sm"
+                    className="size-4 rounded-ov4-swatch inset-shadow-ov4-swatch"
                     style={{ backgroundColor: value }}
                   />
                 </button>
@@ -281,6 +283,7 @@ function ThemeColorPicker({
   );
 }
 
+/** Edits one role without regenerating siblings; selection highlights its usage while invalid text stays editable. */
 export const ThemeColorField = memo(function ThemeColorField({
   role,
   value,
@@ -308,22 +311,28 @@ export const ThemeColorField = memo(function ThemeColorField({
   return (
     <div
       className={cn(
-        "flex min-h-11 min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 transition-[background-color,box-shadow]",
-        selected && "bg-accent/60 inset-ring inset-ring-ring",
+        "flex h-7.5 min-w-0 items-center gap-2 rounded-ov4-color-row bg-ov4-color-row px-2 font-mono text-secondary-copy",
+        selected && "inset-shadow-selected-control",
       )}
       data-theme-color-role={role}
     >
+      <ThemeColorPicker
+        label={label}
+        onChange={(nextValue) => onChange(role, nextValue)}
+        onInteract={() => onSelect?.(role)}
+        value={swatchValue}
+      />
       <Tooltip>
         <TooltipTrigger
           render={
             <button
               aria-label={t.settings.themeColorPicker.usage(Boolean(selected), label)}
               aria-pressed={selected}
-              className="flex min-w-0 flex-1 cursor-pointer items-center rounded-md text-left text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+              className="flex min-w-0 flex-1 cursor-pointer items-center rounded-ov4-swatch text-left text-secondary-copy text-foreground outline-none focus-visible:inset-shadow-focus"
               onClick={() => onToggleSelected?.(role)}
               type="button"
             >
-              <span className="min-w-0 flex-1 truncate">{label}</span>
+              <span className="min-w-0 flex-1 truncate">{role}</span>
             </button>
           }
         />
@@ -331,27 +340,17 @@ export const ThemeColorField = memo(function ThemeColorField({
           {t.settings.themeColorPicker.whereIsUsed(Boolean(selected), label)}
         </TooltipPopup>
       </Tooltip>
-      <div className="ml-auto flex shrink-0 items-center gap-2">
-        <ThemeColorPicker
-          label={label}
-          onChange={(nextValue) => onChange(role, nextValue)}
-          onInteract={() => onSelect?.(role)}
-          value={swatchValue}
-        />
-        <Input
-          aria-invalid={!isColorValue}
-          aria-label={t.settings.themeColorPicker.hexValue(label)}
-          className="w-28 shrink-0"
-          font="mono"
-          id={`${role}-hex`}
-          nativeInput
-          onChange={(event) => onChange(role, event.currentTarget.value)}
-          onFocus={() => onSelect?.(role)}
-          onPointerDown={() => onSelect?.(role)}
-          size="compact"
-          value={editorValue}
-        />
-      </div>
+      <input
+        aria-invalid={!isColorValue}
+        aria-label={t.settings.themeColorPicker.hexValue(label)}
+        className="h-6 min-w-0 w-20 shrink-0 rounded-ov4-swatch bg-transparent text-right font-mono text-secondary-copy text-foreground outline-none focus-visible:inset-shadow-focus"
+        id={`${role}-hex`}
+        onChange={(event) => onChange(role, event.currentTarget.value)}
+        onFocus={() => onSelect?.(role)}
+        onPointerDown={() => onSelect?.(role)}
+        spellCheck={false}
+        value={editorValue}
+      />
     </div>
   );
 });
