@@ -40,6 +40,29 @@ function installViewport(initialWidth: number) {
   };
 }
 
+/**
+ * Waits for the actual focus move because committing React updates does not flush Base UI's RAF.
+ * @param action Interaction that opens or dismisses the drawer.
+ * @param hasExpectedFocus Whether focus has reached the required destination.
+ * @returns Completion after the interaction commits and focus reaches that destination.
+ */
+async function actUntilFocused(action: () => void, hasExpectedFocus: () => boolean) {
+  let resolveFocused: () => void = () => {};
+  const focused = new Promise<void>((resolve) => {
+    resolveFocused = resolve;
+  });
+  const onFocus = () => {
+    if (hasExpectedFocus()) resolveFocused();
+  };
+  document.addEventListener("focusin", onFocus);
+  try {
+    await act(action);
+    if (!hasExpectedFocus()) await focused;
+  } finally {
+    document.removeEventListener("focusin", onFocus);
+  }
+}
+
 afterEach(() => vi.unstubAllGlobals());
 
 describe("sidebar drawer breakpoint", () => {
@@ -191,25 +214,28 @@ describe("frame drawer dismissal", () => {
       const trigger = container.querySelector("button");
       if (!trigger) throw new Error("Missing sidebar trigger");
       trigger.focus();
-      await act(() => trigger.click());
+      const hasDrawerFocus = () =>
+        document.querySelector('[role="dialog"]')?.contains(document.activeElement) === true;
+      const hasTriggerFocus = () => document.activeElement === trigger;
+      await actUntilFocused(() => trigger.click(), hasDrawerFocus);
       expect(trigger.getAttribute("aria-pressed")).toBe("true");
       expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Drawer action");
       expect(document.querySelector('[role="dialog"]')?.contains(document.activeElement)).toBe(
         true,
       );
-      await act(() =>
-        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })),
-      );
+      await actUntilFocused(() => {
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      }, hasTriggerFocus);
       expect(trigger.getAttribute("aria-pressed")).toBe("false");
       expect(document.activeElement).toBe(trigger);
-      await act(() => trigger.click());
+      await actUntilFocused(() => trigger.click(), hasDrawerFocus);
       const viewport = document.querySelector('[role="dialog"]')?.parentElement;
       if (!viewport) throw new Error("Missing drawer viewport");
-      await act(() => {
+      await actUntilFocused(() => {
         viewport.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, button: 0 }));
         viewport.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, button: 0 }));
         viewport.dispatchEvent(new MouseEvent("click", { bubbles: true, button: 0 }));
-      });
+      }, hasTriggerFocus);
       expect(trigger.getAttribute("aria-pressed")).toBe("false");
       expect(document.activeElement).toBe(trigger);
     } finally {
