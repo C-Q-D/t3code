@@ -3372,6 +3372,7 @@ ${address}`
     ) => `${groupDisplayName} / ${environmentLabel ?? "所有检出目录"}`,
   },
   snapShot: {
+    shortcutToggleUnavailable: "暂不支持单独关闭捕获快捷键。可使用下方控件修改快捷键。",
     checkingSnapshots: "正在检查快照…",
     notSupportedOnThisPlatform: "此平台不支持。",
     turnThisOnToSetUpSnapshots: "开启此选项以设置快照。",

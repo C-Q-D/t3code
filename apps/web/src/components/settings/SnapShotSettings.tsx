@@ -1,3 +1,4 @@
+/** Desktop snapshot preferences; preserves capture setup and shortcut validation behind N3's settings rows. */
 import { t } from "~/i18n";
 import { useAtomValue } from "@effect/atom-react";
 import {
@@ -55,12 +56,14 @@ import {
   type CaptureSetupStep,
 } from "./SnapShotSetupDialog.logic";
 
-const soundOptionRowClassName = "grid grid-cols-[1fr_auto]";
+const soundOptionRowClassName = "flex items-center justify-between gap-2";
 
+/** Maps a failed capture operation to a localized error, preserving the bridge's diagnostic message. */
 function captureSettingsError(title: string, error: unknown) {
   return { title, message: error instanceof Error ? error.message : t.settings.restore.retryHint };
 }
 
+/** Availability belongs to the current shortcut candidate; idle and pending checks cannot authorize saving. */
 type ShortcutCheck =
   | { readonly status: "idle"; readonly availability: null }
   | { readonly status: "checking"; readonly availability: null }
@@ -69,6 +72,11 @@ type ShortcutCheck =
       readonly availability: DesktopSnapShotShortcutAvailability;
     };
 
+/**
+ * Renders device-local capture settings and the existing permission wizard, with no props.
+ * Writes use the client settings hook; bridge failures surface through the wizard or a toast.
+ * Registration, permission checks and their retry policy remain owned by the desktop bridge.
+ */
 export function SnapShotSettings() {
   const settings = useClientSettings();
   const updateSettings = useUpdateClientSettings();
@@ -393,7 +401,7 @@ export function SnapShotSettings() {
                 {settings.snapShotEnabled &&
                 !snapShotSetupComplete(state, settings.snapShotIncludeAccessibility) ? (
                   <Button
-                    size="xs"
+                    size="toolbar"
                     variant="outline"
                     disabled={setupBusy}
                     onClick={() => void openSetup()}
@@ -443,9 +451,25 @@ export function SnapShotSettings() {
                 }
                 status={managedShortcut ? undefined : shortcutStatus}
                 control={
-                  managedShortcut ? (
+                  <Switch
+                    checked={Boolean(state?.shortcutRegistered)}
+                    disabled
+                    aria-label={t.settings.rows.snapShotShortcut.title}
+                    aria-describedby="snap-shot-shortcut-toggle-hint"
+                  />
+                }
+              >
+                {/* N3 draws a toggle, but the contract has no independent shortcut enable flag. */}
+                <p
+                  id="snap-shot-shortcut-toggle-hint"
+                  className="text-secondary-copy text-muted-foreground"
+                >
+                  {t.settings.snapShot.shortcutToggleUnavailable}
+                </p>
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  {managedShortcut ? (
                     <Button
-                      size="xs"
+                      size="toolbar"
                       variant="outline"
                       disabled={setupBusy}
                       onClick={() => void openSetup("shortcut")}
@@ -458,14 +482,14 @@ export function SnapShotSettings() {
                       {shortcutChanged ? (
                         <>
                           <Button
-                            size="xs"
+                            size="toolbar"
                             disabled={!canSaveShortcut || setupBusy}
                             onClick={() => void saveShortcut()}
                           >
                             {setupBusy ? t.settings.snapShotSetup.saving : t.settings.snapShot.save}
                           </Button>
                           <Button
-                            size="xs"
+                            size="toolbar"
                             variant="ghost"
                             disabled={setupBusy}
                             onClick={() => {
@@ -482,7 +506,7 @@ export function SnapShotSettings() {
                         state.shortcutCanRetry !== false &&
                         !isModifierPairShortcut(savedShortcut) ? (
                         <Button
-                          size="xs"
+                          size="toolbar"
                           variant="ghost"
                           disabled={setupBusy || state.shortcutPending}
                           onClick={() => void setup("retry-shortcut")}
@@ -491,18 +515,26 @@ export function SnapShotSettings() {
                         </Button>
                       ) : null}
                     </>
-                  )
-                }
-              />
+                  )}
+                </div>
+              </SettingsRow>
               <SettingsRow
                 {...searchableSetting("snap-shot-sound")}
                 description={t.settings.snapShot.soundPlayedCaptureStartsHint}
                 control={
+                  <Switch
+                    checked={settings.snapShotPlaySound}
+                    disabled={!captureAvailable}
+                    aria-label={t.settings.rows.snapShotSound.title}
+                    onCheckedChange={(checked) => void save({ snapShotPlaySound: checked })}
+                  />
+                }
+              >
+                <div className="flex justify-end">
                   <Menu>
                     <MenuTrigger
                       aria-label={t.settings.snapShot.snapshotSound + soundLabel}
-                      render={<SelectButton size="sm" />}
-                      className="w-auto min-w-0"
+                      render={<SelectButton size="settings" />}
                       disabled={!captureAvailable}
                     >
                       {soundSelection === "off" ? (
@@ -525,17 +557,18 @@ export function SnapShotSettings() {
                         }
                         value={soundSelection}
                       >
-                        <MenuRadioItem closeOnClick value="off">
+                        <MenuRadioItem density="compact" closeOnClick value="off">
                           {t.settings.connections.status.off}
                         </MenuRadioItem>
                         <div className={soundOptionRowClassName}>
-                          <MenuRadioItem closeOnClick value="soft-pop">
+                          <MenuRadioItem density="compact" closeOnClick value="soft-pop">
                             {t.settings.snapShot.whoosh}
                             <span className="text-muted-foreground">
                               {t.settings.snapShot.default}
                             </span>
                           </MenuRadioItem>
                           <MenuItem
+                            density="compact"
                             aria-label={t.settings.snapShot.playWhoosh}
                             closeOnClick={false}
                             onClick={() => playSnapShotSound("soft-pop")}
@@ -544,10 +577,11 @@ export function SnapShotSettings() {
                           </MenuItem>
                         </div>
                         <div className={soundOptionRowClassName}>
-                          <MenuRadioItem closeOnClick value="camera-shutter">
+                          <MenuRadioItem density="compact" closeOnClick value="camera-shutter">
                             {t.settings.snapShot.click}
                           </MenuRadioItem>
                           <MenuItem
+                            density="compact"
                             aria-label={t.settings.snapShot.playClick}
                             closeOnClick={false}
                             onClick={() => playSnapShotSound("camera-shutter")}
@@ -558,8 +592,8 @@ export function SnapShotSettings() {
                       </MenuRadioGroup>
                     </MenuPopup>
                   </Menu>
-                }
-              />
+                </div>
+              </SettingsRow>
               <SettingsRow
                 {...searchableSetting("snap-shot-flash")}
                 description={t.settings.snapShot.showGentleCueCapturedWindowHint}

@@ -3551,6 +3551,8 @@ ${address}`
     ) => `${groupDisplayName} / ${environmentLabel ?? "All checkouts"}`,
   },
   snapShot: {
+    shortcutToggleUnavailable:
+      "Shortcut capture cannot be switched off separately. Use the controls below to change the shortcut.",
     checkingSnapshots: "Checking snapshots…",
     notSupportedOnThisPlatform: "Not supported on this platform.",
     turnThisOnToSetUpSnapshots: "Turn this on to set up snapshots.",

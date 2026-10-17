@@ -1,3 +1,4 @@
+/** Snapshot permission and shortcut wizard; desktop backend rules own progression and completion. */
 import { t } from "~/i18n";
 import { PermissionChecklist, PermissionContinueButton } from "../permissions/PermissionChecklist";
 import { usePermissionStatus } from "../permissions/usePermissionStatus";
@@ -11,7 +12,8 @@ import { MacAccessibilityIcon, MacScreenRecordingIcon } from "../Icons";
 import { CaptureShortcutConfig } from "./CaptureShortcutConfig";
 import { Button } from "../ui/button";
 import { Dialog, DialogDescription } from "../ui/dialog";
-import { WizardSteps, WizardPopup, WizardHeader, WizardPanel, WizardFooter } from "../ui/wizard";
+import { WizardPopup, WizardHeader, WizardFooter } from "../ui/wizard";
+import { ToggleGroup, Toggle } from "../ui/toggle-group";
 import {
   captureSetupAccessReady,
   captureSetupBackend,
@@ -29,6 +31,15 @@ const SETUP_STEPS = [
 
 const GNOME_ACCESS_COPY = t.settings.snapShotSetup.gnome.access;
 
+/**
+ * Presents the existing two-step setup in the graphite dialog shell.
+ * State and initialStep select the backend flow; wasEnabled controls cancellation rollback.
+ * includeAccessibility selects required permissions. busy/error reflect the caller's pending action.
+ * Shortcut props carry the shared recorder, validation status and save eligibility.
+ * onSaveShortcut/onEnable resolve true only after verification; onAction/onRefresh delegate to
+ * the desktop bridge without adding retries or timeouts. onClose receives completion status,
+ * and onLeaveStep stops recording before navigation. Errors remain visible in the active step.
+ */
 export function SnapShotSetupDialog({
   state,
   initialStep,
@@ -206,20 +217,33 @@ export function SnapShotSetupDialog({
               : t.settings.snapShotSetup.title
           }
         >
-          <WizardSteps
-            steps={SETUP_STEPS.map((item) => item.label)}
-            currentStep={stepIndex}
-            isStepDisabled={(index) => busy || index > stepIndex}
-            onStepChange={(index) => {
-              const next = SETUP_STEPS[index];
+          <ToggleGroup
+            size="settings"
+            aria-label={t.app.wizard.progress}
+            value={[step]}
+            onValueChange={(values) => {
+              const next = SETUP_STEPS.find((item) => item.id === values[0]);
               if (next && next.id !== step) changeStep(next.id);
             }}
-          />
+          >
+            {SETUP_STEPS.map((item, index) => (
+              <Toggle
+                key={item.id}
+                value={item.id}
+                disabled={busy || index > stepIndex}
+                aria-current={item.id === step ? "step" : undefined}
+                aria-label={t.app.wizard.step(item.label, index + 1, "")}
+              >
+                <span aria-hidden>{index + 1}</span>
+                {item.label}
+              </Toggle>
+            ))}
+          </ToggleGroup>
         </WizardHeader>
-        <WizardPanel>
-          <div className="space-y-4 text-sm">
+        <div className="px-5.5 py-5">
+          <div className="space-y-4 text-control">
             <div className="space-y-2" aria-live="polite">
-              <h3 className="flex items-center gap-2 font-medium">{title}</h3>
+              <h3 className="flex items-center gap-2 font-semibold">{title}</h3>
               <DialogDescription>{description}</DialogDescription>
             </div>
             {step === "access" ? (
@@ -228,7 +252,9 @@ export function SnapShotSetupDialog({
                   role="status"
                   aria-atomic="true"
                   className={
-                    checked && !busy && !error ? "text-xs text-muted-foreground" : "sr-only"
+                    checked && !busy && !error
+                      ? "text-secondary-copy text-muted-foreground"
+                      : "sr-only"
                   }
                 >
                   {checked && !busy && !error ? captureSetupCheckMessage(state) : null}
@@ -260,13 +286,13 @@ export function SnapShotSetupDialog({
                   />
                 ) : null}
                 {permissionStatus.error && macPermissions ? (
-                  <p role="status" className="text-xs text-muted-foreground">
+                  <p role="status" className="text-secondary-copy text-muted-foreground">
                     {permissionStatus.error}
                   </p>
                 ) : null}
                 {helperBackend && helper?.status === "error" ? (
                   <Button
-                    size="xs"
+                    size="toolbar"
                     variant="outline"
                     disabled={busy}
                     onClick={() => void onAction(installHelper)}
@@ -287,7 +313,7 @@ export function SnapShotSetupDialog({
               <div className="space-y-3">
                 {shortcutInput}
                 {shortcutStatus ? (
-                  <p className="text-xs text-muted-foreground" role="status">
+                  <p className="text-secondary-copy text-muted-foreground" role="status">
                     {shortcutStatus}
                   </p>
                 ) : null}
@@ -298,7 +324,7 @@ export function SnapShotSetupDialog({
                 !isModifierPairShortcut(state.shortcut) ? (
                   <Button
                     variant="ghost"
-                    size="sm"
+                    size="toolbar"
                     disabled={busy}
                     onClick={() => void onAction("retry-shortcut")}
                   >
@@ -310,17 +336,17 @@ export function SnapShotSetupDialog({
               </div>
             )}
             {step === "shortcut" && !accessReady ? (
-              <p role="alert" className="text-destructive">
+              <p role="alert" className="text-error">
                 {t.settings.snapShotSetup.access.attentionHint}
               </p>
             ) : null}
             {error ? (
-              <p role="alert" className="text-destructive">
+              <p role="alert" className="text-error">
                 {t.settings.snapShotSetup.stepError}
               </p>
             ) : null}
             {details.length > 0 || (step === "access" && (backend === "gnome" || helperBackend)) ? (
-              <details className="text-xs text-muted-foreground">
+              <details className="text-secondary-copy text-muted-foreground">
                 <summary className="cursor-pointer">
                   {t.settings.rows.backgroundActivity.options.advanced}
                 </summary>
@@ -335,7 +361,7 @@ export function SnapShotSetupDialog({
                   ) : null}
                   {step === "access" && backend === "gnome" && extension?.status === "enabled" ? (
                     <Button
-                      size="xs"
+                      size="toolbar"
                       variant="ghost"
                       disabled={busy}
                       onClick={() => void onAction("disable-extension")}
@@ -345,7 +371,7 @@ export function SnapShotSetupDialog({
                   ) : null}
                   {step === "access" && helperBackend && helper?.status !== "not-installed" ? (
                     <Button
-                      size="xs"
+                      size="toolbar"
                       variant="ghost"
                       disabled={busy}
                       onClick={() => void onAction(removeHelper)}
@@ -357,7 +383,7 @@ export function SnapShotSetupDialog({
               </details>
             ) : null}
           </div>
-        </WizardPanel>
+        </div>
         <WizardFooter>
           {step !== "access" ? (
             <Button variant="ghost" disabled={busy} onClick={() => changeStep("access")}>
