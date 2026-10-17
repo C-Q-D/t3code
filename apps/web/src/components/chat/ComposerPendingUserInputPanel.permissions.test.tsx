@@ -1,4 +1,7 @@
-// @vitest-environment jsdom
+/**
+ * Verifies permission restrictions at the pending input panel boundary.
+ * @vitest-environment jsdom
+ */
 import { EnvironmentId, RuntimeRequestId, ThreadId } from "@t3tools/contracts";
 import { act, type ReactNode } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";

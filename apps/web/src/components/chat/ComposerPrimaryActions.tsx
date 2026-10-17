@@ -1,6 +1,6 @@
 /** Renders composer actions; dispatch, permissions, and shortcuts remain caller-controlled. */
 import { t } from "~/i18n";
-import { memo, type MouseEventHandler, type PointerEventHandler } from "react";
+import { memo, useContext, type MouseEventHandler, type PointerEventHandler } from "react";
 import {
   CheckIcon,
   ChevronDownIcon,
@@ -20,6 +20,8 @@ import { Menu, MenuItem, MenuPopup, MenuTrigger } from "../ui/menu";
 import { Spinner } from "../ui/spinner";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { composerFloatingLayerProps } from "./composerEventScope";
+import { ComposerSubmissionStateContext } from "./composerSubmissionState";
+import { getComposerSubmissionState } from "./composerSubmissionState.logic";
 import {
   alternateComposerDispatchAction,
   resolveComposerDispatchMode,
@@ -126,6 +128,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
   keepFullHistory = false,
   onToggleKeepFullHistory,
 }: ComposerPrimaryActionsProps) {
+  const sharedSubmissionState = useContext(ComposerSubmissionStateContext);
   const pointerFocusProps = preserveComposerFocusOnPointerDown
     ? { onPointerDown: preventPointerFocus }
     : undefined;
@@ -281,6 +284,17 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
   }
 
   const showResume = canResume && !hasSendableContent && !isEditingQueuedMessage;
+  const submissionState =
+    sharedSubmissionState ??
+    getComposerSubmissionState({
+      canOperateThread,
+      isSendBusy,
+      sendDisabledReason,
+      isConnecting,
+      isEnvironmentUnavailable,
+      hasSendableContent,
+      canResume: showResume,
+    });
   const showActionText = !isEditingQueuedMessage && (showResume || isRunning);
 
   const compactTokens =
@@ -336,13 +350,8 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
       )}
       {...pointerFocusProps}
       onClick={showResume ? onResume : onSubmitMessage}
-      disabled={
-        isSendBusy ||
-        isSendDisabled ||
-        isConnecting ||
-        isEnvironmentUnavailable ||
-        (!hasSendableContent && !showResume)
-      }
+      disabled={submissionState.disabled}
+      aria-busy={submissionState.busy}
       aria-label={submitStatus ?? submitLabel}
     >
       {stageBackdropVariant ? (
@@ -350,7 +359,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
           <StageBackdropButtonArt variant={stageBackdropVariant} />
         </span>
       ) : null}
-      {isConnecting || isSendBusy ? (
+      {submissionState.busy ? (
         <Spinner size="sm" aria-hidden="true" />
       ) : showResume ? (
         <PlayIcon className="size-3.5" strokeWidth={2.5} aria-hidden="true" />

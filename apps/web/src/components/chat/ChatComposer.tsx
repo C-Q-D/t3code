@@ -66,6 +66,7 @@ import { folderDropTarget, resolveDroppedFolderPath } from "./folderDrop";
 import { createModelSelection, normalizeModelSlug } from "@t3tools/shared/model";
 import { USAGE_LIMITS_COMMAND } from "@t3tools/shared/usageLimits";
 import {
+  createElement,
   memo,
   type ComponentProps,
   type ReactNode,
@@ -281,6 +282,8 @@ import { ComposerPendingApprovalActions } from "./ComposerPendingApprovalActions
 import { CompactComposerControlsMenu } from "./CompactComposerControlsMenu";
 import { ComposerImageThumbnail } from "./ComposerImageThumbnail";
 import { ComposerPrimaryActions } from "./ComposerPrimaryActions";
+import { ComposerSubmissionStateContext } from "./composerSubmissionState";
+import { getComposerSubmissionState } from "./composerSubmissionState.logic";
 import { ComposerPendingApprovalPanel } from "./ComposerPendingApprovalPanel";
 import { ComposerPendingUserInputPanel } from "./ComposerPendingUserInputPanel";
 import { ComposerPlanFollowUpBanner } from "./ComposerPlanFollowUpBanner";
@@ -3089,6 +3092,30 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   );
   const showResumeAction =
     canResume && !composerDraftHasUserContent(composerDraft) && !isEditingQueuedMessage;
+  const isSubmissionEnvironmentUnavailable =
+    environmentUnavailable !== null || noProviderAvailable || projectSelectionRequired;
+  // The hosted queue and footer submit the same draft; keep one state across their render locations.
+  const submissionState = useMemo(
+    () =>
+      getComposerSubmissionState({
+        canOperateThread,
+        isSendBusy,
+        sendDisabledReason,
+        isConnecting,
+        isEnvironmentUnavailable: isSubmissionEnvironmentUnavailable,
+        hasSendableContent: composerSendState.hasSendableContent,
+        canResume: showResumeAction,
+      }),
+    [
+      canOperateThread,
+      isSendBusy,
+      sendDisabledReason,
+      isConnecting,
+      isSubmissionEnvironmentUnavailable,
+      composerSendState.hasSendableContent,
+      showResumeAction,
+    ],
+  );
   const collapsedComposerPrimaryActionDisabled =
     phase === "running" ||
     isSendBusy ||
@@ -6771,7 +6798,9 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
 
   // Render
   // ------------------------------------------------------------------
-  return (
+  return createElement(
+    ComposerSubmissionStateContext,
+    { value: submissionState },
     <form
       ref={composerFormRef}
       onSubmit={submitComposer}
@@ -7931,6 +7960,6 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           </div>
         </ComposerSurface.Main>
       </div>
-    </form>
+    </form>,
   );
 });

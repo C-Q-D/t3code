@@ -20,7 +20,7 @@ import {
   SquarePenIcon,
   XIcon,
 } from "lucide-react";
-import { useId, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
+import { useContext, useId, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
 
 import { useAssetUrls } from "../../assets/assetUrls";
 import { threadEnvironment } from "../../state/threads";
@@ -29,6 +29,8 @@ import { useAtomCommand } from "../../state/use-atom-command";
 import { isImageAttachment, type ChatMessage } from "../../types";
 import { cn } from "~/lib/utils";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { Spinner } from "../ui/spinner";
+import { ComposerSubmissionStateContext } from "./composerSubmissionState";
 
 export interface EditQueuedRunRequest {
   readonly runId: RunId;
@@ -60,7 +62,8 @@ export interface QueuedRunsControlHandle {
  * edit/cancel callbacks. editingRunId is null when no saved run is being edited; shortcut labels
  * may be null or undefined. Optional ref may be null and exposes the queue control handle.
  * @returns The queue controls when entries exist, or null for an empty queue. Render inside the
- * composer form: the edit check submits that form, while other actions invoke host queue commands.
+ * composer form and its ComposerSubmissionStateContext: the edit check submits that form,
+ * while other actions invoke host queue commands. Saving stays disabled outside that scope.
  */
 export function QueuedRunsControl({
   ref,
@@ -79,6 +82,7 @@ export function QueuedRunsControl({
   readonly onEditQueuedRun: (request: EditQueuedRunRequest) => void;
   readonly onCancelEdit: () => void;
 }) {
+  const submissionState = useContext(ComposerSubmissionStateContext);
   const projection = useThreadProjection(
     scopeThreadRef(props.environmentId, props.threadId),
   )?.projection;
@@ -464,12 +468,17 @@ export function QueuedRunsControl({
                           <button
                             type="submit"
                             aria-label={t.composer.primaryActions.saveQueued}
-                            disabled={busyRunId !== null}
+                            disabled={submissionState?.disabled ?? true}
+                            aria-busy={submissionState?.busy ?? false}
                             className="composer-primary-key ml-2 inline-flex size-7.5 shrink-0 cursor-pointer items-center justify-center rounded-menu-row border-0 bg-primary p-0 text-primary-foreground shadow-primary-edge outline-none hover:bg-message-action-hover focus-visible:inset-shadow-focus disabled:pointer-events-none disabled:opacity-50"
                           />
                         }
                       >
-                        <CheckIcon className="size-3.75" strokeWidth={2.5} aria-hidden="true" />
+                        {submissionState?.busy ? (
+                          <Spinner size="sm" aria-hidden="true" />
+                        ) : (
+                          <CheckIcon className="size-3.75" strokeWidth={2.5} aria-hidden="true" />
+                        )}
                       </TooltipTrigger>
                       <TooltipPopup>{t.composer.primaryActions.saveQueued}</TooltipPopup>
                     </Tooltip>

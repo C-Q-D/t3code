@@ -1,4 +1,7 @@
-// @vitest-environment jsdom
+/**
+ * Verifies question navigation and draft retention across the pending input workflow.
+ * @vitest-environment jsdom
+ */
 import { EnvironmentId, RuntimeRequestId, ThreadId } from "@t3tools/contracts";
 import { act, useState, type ReactNode } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";

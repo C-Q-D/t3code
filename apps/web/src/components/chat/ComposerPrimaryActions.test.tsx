@@ -1,5 +1,7 @@
-// @vitest-environment jsdom
-/** Verifies primary action visibility and dispatch at the composer's form boundary. */
+/**
+ * Verifies primary action visibility and dispatch at the composer's form boundary.
+ * @vitest-environment jsdom
+ */
 import { act, createElement, type ComponentProps } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";

@@ -1,3 +1,4 @@
+/** Presents compact context usage while retaining detailed usage and compaction in a popover. */
 import { t } from "~/i18n";
 import { Button } from "../ui/button";
 import { type ContextWindowSnapshot, formatContextWindowTokens } from "~/lib/contextWindow";
@@ -20,6 +21,12 @@ function formatPercentage(value: number | null): string | null {
   return `${Math.round(value)}%`;
 }
 
+/**
+ * Shows context usage as a compact meter with the existing details and compaction popover.
+ * @param props Current usage snapshot; optional model name labels details. onCompact enables
+ * compaction when supplied; compactDisabled and its nullable reason describe host restrictions.
+ * @returns The usage trigger and its details; unavailable usage retains the snapshot's empty state.
+ */
 export function ContextWindowMeter(props: {
   usage: ContextWindowSnapshot;
   modelDisplayName?: string | null;

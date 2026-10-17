@@ -1,4 +1,7 @@
-// @vitest-environment jsdom
+/**
+ * Verifies queued-message display and editing through the composer's form boundary.
+ * @vitest-environment jsdom
+ */
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -39,6 +42,21 @@ vi.mock("../../assets/assetUrls", () => ({
 }));
 
 import { QueuedRunsControl } from "./QueuedRunsControl";
+import { ComposerPrimaryActions } from "./ComposerPrimaryActions";
+import { ComposerSubmissionStateContext } from "./composerSubmissionState";
+import {
+  getComposerSubmissionState,
+  type ComposerSubmissionInput,
+} from "./composerSubmissionState.logic";
+
+vi.mock("~/hooks/useSettings", () => ({
+  useEnvironmentIdentificationMode: () => "none",
+}));
+
+vi.mock("../SidebarStageBackdrop", () => ({
+  StageBackdropButtonArt: () => null,
+  useSidebarStageBackdropVariant: () => null,
+}));
 
 let root: Root | undefined;
 let container: HTMLDivElement | undefined;
@@ -160,14 +178,16 @@ describe("QueuedRunsControl attachments and edit mode", () => {
             onSubmit();
           }}
         >
-          <QueuedRunsControl
-            environmentId={"environment:test" as never}
-            optimisticMessages={[]}
-            threadId={"thread:test" as never}
-            editingRunId={"run:queued" as never}
-            onEditQueuedRun={() => undefined}
-            onCancelEdit={() => undefined}
-          />
+          <ComposerSubmissionStateContext value={{ disabled: false, busy: false }}>
+            <QueuedRunsControl
+              environmentId={"environment:test" as never}
+              optimisticMessages={[]}
+              threadId={"thread:test" as never}
+              editingRunId={"run:queued" as never}
+              onEditQueuedRun={() => undefined}
+              onCancelEdit={() => undefined}
+            />
+          </ComposerSubmissionStateContext>
         </form>,
       );
     });
@@ -182,6 +202,113 @@ describe("QueuedRunsControl attachments and edit mode", () => {
     await act(async () => save?.click());
     expect(onSubmit).toHaveBeenCalledOnce();
   });
+
+  it.each<{
+    scenario: string;
+    overrides: Partial<ComposerSubmissionInput>;
+    busy: boolean;
+  }>([
+    {
+      scenario: "the draft has no text or attachments",
+      overrides: { hasSendableContent: false },
+      busy: false,
+    },
+    { scenario: "an edit is being saved", overrides: { isSendBusy: true }, busy: true },
+    {
+      scenario: "the connection is being established",
+      overrides: { isConnecting: true },
+      busy: true,
+    },
+    {
+      scenario: "operate permission has been revoked",
+      overrides: { canOperateThread: false },
+      busy: false,
+    },
+    {
+      scenario: "another send restriction applies",
+      overrides: { sendDisabledReason: "Uploads pending" },
+      busy: false,
+    },
+    {
+      scenario: "the environment is unavailable",
+      overrides: { isEnvironmentUnavailable: true },
+      busy: false,
+    },
+  ])(
+    "blocks both save entries when $scenario, then enables them on recovery",
+    async ({ overrides, busy }) => {
+      vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+      state.projection = { projection: { messages: [] } };
+      state.workflow = workflowWithAttachment();
+      container = document.createElement("div");
+      document.body.append(container);
+      root = createRoot(container);
+      const onSubmit = vi.fn();
+      const ready: ComposerSubmissionInput = {
+        canOperateThread: true,
+        isSendBusy: false,
+        sendDisabledReason: null,
+        isConnecting: false,
+        isEnvironmentUnavailable: false,
+        hasSendableContent: true,
+      };
+      const render = async (input: ComposerSubmissionInput) => {
+        await act(async () => {
+          root?.render(
+            <ComposerSubmissionStateContext value={getComposerSubmissionState(input)}>
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  onSubmit();
+                }}
+              >
+                <QueuedRunsControl
+                  environmentId={"environment:test" as never}
+                  optimisticMessages={[]}
+                  threadId={"thread:test" as never}
+                  editingRunId={"run:queued" as never}
+                  onEditQueuedRun={() => undefined}
+                  onCancelEdit={() => undefined}
+                />
+                <ComposerPrimaryActions
+                  {...input}
+                  compact={false}
+                  pendingAction={null}
+                  isRunning
+                  canInterrupt
+                  showPlanFollowUpPrompt={false}
+                  promptHasText={input.hasSendableContent}
+                  isPreparingWorktree={false}
+                  isEditingQueuedMessage
+                  onPreviousPendingQuestion={() => undefined}
+                  onInterrupt={() => undefined}
+                  onImplementPlanInNewThread={() => undefined}
+                />
+              </form>
+            </ComposerSubmissionStateContext>,
+          );
+        });
+      };
+      await render({ ...ready, ...overrides });
+      const saves = container.querySelectorAll<HTMLButtonElement>('button[type="submit"]');
+      expect(saves).toHaveLength(2);
+      // Check the footer first: the regression is the inline save remaining actionable.
+      expect(saves[1]?.disabled).toBe(true);
+      expect(saves[0]?.disabled).toBe(true);
+      for (const save of saves) {
+        expect(save.getAttribute("aria-busy")).toBe(String(busy));
+        await act(async () => save.click());
+      }
+      expect(onSubmit).not.toHaveBeenCalled();
+      await render(ready);
+      for (const save of saves) {
+        expect(save.disabled).toBe(false);
+        expect(save.getAttribute("aria-busy")).toBe("false");
+        await act(async () => save.click());
+      }
+      expect(onSubmit).toHaveBeenCalledTimes(2);
+    },
+  );
 
   it("renders an attachment thumbnail on the queued row", () => {
     state.projection = { projection: { messages: [] } };
