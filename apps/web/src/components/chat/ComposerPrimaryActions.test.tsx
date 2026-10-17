@@ -131,6 +131,18 @@ afterEach(async () => {
 });
 
 describe("ComposerPrimaryActions", () => {
+  it("labels the queued edit check as Save and keeps the existing form submission", async () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    const { button, onSubmit } = await mountActions({
+      isRunning: true,
+      isEditingQueuedMessage: true,
+    });
+    expect(button.getAttribute("aria-label")).toBe("Save");
+    expect(button.textContent).toBe("");
+    await act(async () => button.click());
+    expect(onSubmit).toHaveBeenCalledOnce();
+  });
+
   it("keeps ordinary send icon-only and submits the form", async () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     const { button, onSubmit } = await mountActions();

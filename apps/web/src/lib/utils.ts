@@ -253,6 +253,8 @@ const twMerge = extendTailwindMerge({
         "split-join",
         "pr-description",
         "pr-linked-row",
+        "composer-queue-row",
+        "composer-queue-toggle",
       ],
       leading: [
         "code",

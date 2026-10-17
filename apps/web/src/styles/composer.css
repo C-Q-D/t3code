@@ -5,6 +5,18 @@
   --container-composer: 760px;
   /* 对话页-8a.dc.html · E1 / StyleM-8a.dc.html：底栏微凸按钮底色。 */
   --color-composer-control: #2b2b30;
+  /* 对话页-8a.dc.html · E1：排队计数凹槽、计数文字与编辑行。 */
+  --color-composer-queue-badge: #151517;
+  --color-composer-queue-count: #b2b2b9;
+  --color-composer-queue-selected: #3a3a40;
+  /* 对话页-8a.dc.html · E1：正在编辑排队消息时的取消按钮文字。 */
+  --color-composer-queue-action: #c4c4ca;
+  /* StyleM-8a.dc.html · 底栏上下文条：轨道与填充。 */
+  --color-composer-context-track: #2a2a2e;
+  --color-composer-context-fill: #c4c4ca;
+  /* 对话页-8a.dc.html · E1：展开后的排队子行 14px、取消/收起控件 9px。 */
+  --radius-composer-queue-row: 14px;
+  --radius-composer-queue-toggle: 9px;
 }
 
 /* ContextStrip consumes these variables independently of the raised input surface. */

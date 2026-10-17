@@ -8,6 +8,7 @@ import {
 } from "./ContextWindowMeter.logic";
 import { Minimize2Icon } from "lucide-react";
 import { composerFloatingLayerProps } from "./composerEventScope";
+import { cn } from "~/lib/utils";
 
 function formatPercentage(value: number | null): string | null {
   if (value === null || !Number.isFinite(value)) {
@@ -29,9 +30,6 @@ export function ContextWindowMeter(props: {
   const { usage, modelDisplayName, onCompact, compactDisabled, compactDisabledReason } = props;
   const usedPercentage = formatPercentage(usage.usedPercentage);
   const normalizedPercentage = Math.max(0, Math.min(100, usage.usedPercentage ?? 0));
-  const radius = 9.75;
-  const circumference = 2 * Math.PI * radius;
-  const dashOffset = circumference * (1 - normalizedPercentage / 100);
   const totalProcessedTokens = usage.totalProcessedTokens ?? null;
   const showTotalProcessed = totalProcessedTokens !== null && totalProcessedTokens > 0;
   const isOverloaded = normalizedPercentage > 90;
@@ -46,10 +44,9 @@ export function ContextWindowMeter(props: {
         delay={150}
         closeDelay={onCompact ? 150 : 0}
         render={
-          <Button
-            size="icon-sm"
-            variant="ghost-muted"
-            className="size-7"
+          <button
+            type="button"
+            className="inline-flex h-8.5 shrink-0 cursor-pointer items-center gap-2 rounded-full border-0 bg-transparent px-2 font-mono text-secondary-copy text-secondary-label outline-none hover:text-foreground focus-visible:inset-shadow-focus"
             aria-label={
               usage.maxTokens !== null && usedPercentage
                 ? t.composer.contextWindow.usedPercentageAriaLabel(usedPercentage)
@@ -58,35 +55,20 @@ export function ContextWindowMeter(props: {
                   )
             }
           >
-            <span className="relative flex size-5 items-center justify-center">
-              <svg
-                viewBox="0 0 24 24"
-                className="-rotate-90 absolute inset-0 size-full transform-gpu mx-0!"
-                aria-hidden="true"
-              >
-                <circle
-                  cx="12"
-                  cy="12"
-                  r={radius}
-                  fill="none"
-                  className="stroke-muted-foreground/24"
-                  strokeWidth="3"
-                />
-                <circle
-                  cx="12"
-                  cy="12"
-                  r={radius}
-                  fill="none"
-                  stroke={usageColor}
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeDasharray={circumference}
-                  strokeDashoffset={dashOffset}
-                  className="transition-[stroke-dashoffset,stroke] duration-500 ease-out motion-reduce:transition-none"
-                />
-              </svg>
+            <span
+              aria-hidden="true"
+              className="flex h-1.5 w-13 shrink-0 overflow-hidden rounded-full bg-composer-context-track shadow-well-progress"
+            >
+              <span
+                className={cn(
+                  "h-full rounded-full",
+                  isOverloaded ? "bg-error" : "bg-composer-context-fill",
+                )}
+                style={{ width: `${normalizedPercentage}%` }}
+              />
             </span>
-          </Button>
+            <span className="tabular-nums">{usedPercentage ?? "—"}</span>
+          </button>
         }
       />
       <PopoverPopup
@@ -183,5 +165,5 @@ export function ContextWindowMeter(props: {
 
 /** Holds the meter's footprint while a thread's activities are still loading. */
 export function ContextWindowMeterPlaceholder() {
-  return <span aria-hidden="true" className="size-7 shrink-0" />;
+  return <span aria-hidden="true" className="h-8.5 w-24.5 shrink-0" />;
 }

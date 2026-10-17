@@ -143,7 +143,7 @@ export const composer = {
     compactHistoryTooltip: (tokens: string) =>
       `Next send compacts ${tokens} tokens first. Click to keep full history`,
     compactSend: "Compact and send",
-    updateQueued: "Update queued message",
+    saveQueued: "Save",
     queue: "Queue message",
     steer: "Steer message",
     submitMessage: "Send message",

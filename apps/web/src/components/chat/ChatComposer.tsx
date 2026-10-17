@@ -6845,6 +6845,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       }}
       className="mx-auto w-full min-w-0 max-w-composer"
       data-chat-composer-form="true"
+      data-composer-drop-target
       {...threadContextDropTargetProps()}
     >
       {composerControlsCollapsed && restingControlsHost
@@ -6864,13 +6865,13 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
             restingControlsHost,
           )
         : null}
+      {props.queuedRunsControl}
       <ComposerBanner.Dock>
         <ComposerBanner.Column>
           <ComposerBannerStack
             key={activeThreadId}
             className="relative z-0"
             items={bannerStackItems}
-            attachedAbove={props.queuedRunsControl}
           />
           {!activityStackItem && (shownSyncPhase || inlineTasksBadge) ? (
             <ComposerBanner.Attachment>
@@ -7055,7 +7056,10 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           data-model-only-strip={
             restingControlsHost?.closest("[data-composer-model-strip]") ? "true" : undefined
           }
-          className={composerProviderState.composerFrameClassName}
+          className={cn(
+            composerProviderState.composerFrameClassName,
+            isEditingQueuedMessage && "inset-shadow-selected-control",
+          )}
         >
           <div
             ref={composerSurfaceRef}
@@ -7069,6 +7073,11 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
               composerProviderState.composerSurfaceClassName,
             )}
           >
+            {isEditingQueuedMessage ? (
+              <div className="px-5.5 pt-3.5 text-secondary-copy font-semibold text-secondary-label">
+                {t.chat.queue.editingQueuedPrefix}
+              </div>
+            ) : null}
             {showCollapsedMobilePromptRow ? (
               <div className="flex items-center justify-between gap-2 px-3 py-2">
                 <button
@@ -7133,7 +7142,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
               data-chat-composer-body="true"
               className={cn(
                 "relative px-3 pb-2 sm:px-4",
-                "pt-3.5 sm:pt-4",
+                isEditingQueuedMessage ? "px-5.5 pt-1 sm:px-5.5 sm:pt-1" : "pt-3.5 sm:pt-4",
                 isComposerApprovalState && "pb-3 sm:pb-4",
                 isComposerCollapsedMobile && "hidden",
                 isComposerResting && "py-2 sm:py-2",

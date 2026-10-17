@@ -140,7 +140,7 @@ export const composer: Messages["composer"] = {
     compactHistoryTooltip: (tokens: string) =>
       `下次发送先压缩 ${tokens} 个 token。点击可保留完整历史`,
     compactSend: "压缩并发送",
-    updateQueued: "更新排队的消息",
+    saveQueued: "保存",
     queue: "排队发送消息",
     steer: "引导消息",
     submitMessage: "发送消息",

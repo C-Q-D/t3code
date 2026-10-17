@@ -12,10 +12,13 @@ import type {
 } from "@t3tools/contracts";
 import {
   Clock3Icon,
-  CornerUpRightIcon,
+  CheckIcon,
+  ChevronDownIcon,
+  CornerDownRightIcon,
   GripVerticalIcon,
   ListOrderedIcon,
-  PencilIcon,
+  SquarePenIcon,
+  XIcon,
 } from "lucide-react";
 import { useId, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
 
@@ -25,8 +28,6 @@ import { useThreadProjection } from "../../state/entities";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { isImageAttachment, type ChatMessage } from "../../types";
 import { cn } from "~/lib/utils";
-import { ComposerBanner } from "./ComposerBanner";
-import { Button } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
 export interface EditQueuedRunRequest {
@@ -44,6 +45,10 @@ interface QueuedRowThumbnail {
 
 const QUEUED_RUN_DRAG_TYPE = "application/x-t3code-queued-run";
 
+// E1's queue actions belong to this floating row, including its 30px hit targets.
+const queueActionClassName =
+  "inline-flex size-7.5 shrink-0 items-center justify-center border-0 bg-transparent p-0 text-secondary-label outline-none enabled:cursor-pointer enabled:hover:bg-secondary enabled:hover:text-foreground focus-visible:inset-shadow-focus disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-3.75";
+
 export interface QueuedRunsControlHandle {
   steerNext: (repeat: boolean) => boolean;
   editLatest: (repeat: boolean) => boolean;
@@ -54,8 +59,8 @@ export interface QueuedRunsControlHandle {
  * @param props - Required environment/thread IDs, optimisticMessages (possibly empty), and
  * edit/cancel callbacks. editingRunId is null when no saved run is being edited; shortcut labels
  * may be null or undefined. Optional ref may be null and exposes the queue control handle.
- * @returns The queue controls when entries exist, or null for an empty queue. Actions invoke the
- * host queue commands.
+ * @returns The queue controls when entries exist, or null for an empty queue. Render inside the
+ * composer form: the edit check submits that form, while other actions invoke host queue commands.
  */
 export function QueuedRunsControl({
   ref,
@@ -254,16 +259,20 @@ export function QueuedRunsControl({
   };
 
   return (
-    <ComposerBanner.Attachment>
-      <ComposerBanner.Root
-        role="region"
-        aria-label={t.chat.queue.count(items.length)}
-        aria-live="polite"
-        data-chat-composer-collapsed-controls="true"
-        className="relative z-0"
-      >
-        <ComposerBanner.Row
-          render={<button type="button" />}
+    <div
+      role="region"
+      aria-label={t.chat.queue.count(items.length)}
+      aria-live="polite"
+      data-chat-composer-collapsed-controls="true"
+      className={cn(
+        "surface-glass relative z-0 mb-2 w-full text-secondary-copy-large shadow-raise-m",
+        expanded ? "flex flex-col gap-1 rounded-card-large p-1.5" : "rounded-full",
+      )}
+    >
+      {expanded ? (
+        <button
+          type="button"
+          className="flex h-8.5 w-full cursor-pointer items-center gap-2 rounded-composer-queue-toggle border-0 bg-transparent pr-1.5 pl-2.5 text-left font-bold outline-none focus-visible:inset-shadow-focus"
           aria-label={
             expanded ? t.chat.queue.collapseQueuedMessages : t.chat.queue.expandQueuedMessages
           }
@@ -272,249 +281,295 @@ export function QueuedRunsControl({
           onPointerDown={(event) => event.preventDefault()}
           onClick={() => setExpanded((value) => !value)}
         >
-          <ComposerBanner.Icon>
-            <ListOrderedIcon />
-          </ComposerBanner.Icon>
-          <ComposerBanner.Content className="text-muted-foreground">
-            {t.chat.queue.queued}
-          </ComposerBanner.Content>
-          <ComposerBanner.Actions>
-            <ComposerBanner.Count>{items.length}</ComposerBanner.Count>
-            <ComposerBanner.ToggleIcon expanded={expanded} />
-          </ComposerBanner.Actions>
-        </ComposerBanner.Row>
-        <ComposerBanner.Scroll className={cn("max-h-32", !expanded && "hidden")}>
-          <ComposerBanner.Children render={<ol />} id={queueListId}>
-            {items.map((item) => {
-              const previewText = replaceComposerContextReferences(item.text, (reference) =>
-                reference.kind === "image" && item.thumbnails.length > 0 ? "" : reference.label,
-              ).trim();
-              const rowRunId = item.runId;
-              const rowServerIndex = item.serverIndex;
-              const isEditing = rowRunId !== null && rowRunId === props.editingRunId;
-              const rowDraggable =
-                rowRunId !== null && rowServerIndex !== null && canReorder && busyRunId === null;
-              return (
-                <ComposerBanner.Row
-                  render={<li />}
-                  key={item.key}
-                  aria-current={isEditing ? "true" : undefined}
-                  className={cn(
-                    "relative rounded-sm",
-                    isEditing && "bg-accent text-accent-foreground",
-                    dragState !== null && dragState.runId === item.runId && "opacity-50",
-                  )}
-                  draggable={rowDraggable}
-                  onDragStart={(event) => {
-                    if (item.runId === null || dragArmedRunIdRef.current !== item.runId) {
+          <ListOrderedIcon className="size-3.5" aria-hidden="true" />
+          <span className="flex-1">{t.chat.queue.count(items.length)}</span>
+          <span className="flex size-7 items-center justify-center rounded-composer-queue-toggle text-secondary-label hover:bg-secondary">
+            <ChevronDownIcon className="size-3.75" aria-hidden="true" />
+          </span>
+        </button>
+      ) : null}
+      <ol
+        id={queueListId}
+        className={cn(
+          "m-0 list-none p-0",
+          expanded && "flex max-h-32 flex-col gap-1 overflow-y-auto overscroll-contain",
+        )}
+      >
+        {items.map((item, index) => {
+          const previewText = replaceComposerContextReferences(item.text, (reference) =>
+            reference.kind === "image" && item.thumbnails.length > 0 ? "" : reference.label,
+          ).trim();
+          const rowRunId = item.runId;
+          const rowServerIndex = item.serverIndex;
+          const isEditing = rowRunId !== null && rowRunId === props.editingRunId;
+          const rowDraggable =
+            rowRunId !== null && rowServerIndex !== null && canReorder && busyRunId === null;
+          return (
+            <li
+              key={item.key}
+              aria-current={isEditing ? "true" : undefined}
+              className={cn(
+                "relative flex h-10.5 shrink-0 items-center gap-2 pr-1.5 pl-2",
+                expanded ? "rounded-composer-queue-row" : "rounded-full",
+                !expanded && index > 0 && "hidden",
+                isEditing &&
+                  "bg-composer-queue-selected text-foreground inset-shadow-selected-control",
+                dragState !== null && dragState.runId === item.runId && "opacity-50",
+              )}
+              draggable={rowDraggable}
+              onDragStart={(event) => {
+                if (item.runId === null || dragArmedRunIdRef.current !== item.runId) {
+                  event.preventDefault();
+                  return;
+                }
+                event.dataTransfer.setData(QUEUED_RUN_DRAG_TYPE, item.runId);
+                event.dataTransfer.effectAllowed = "move";
+                setDragState({ runId: item.runId, insertIndex: null });
+              }}
+              onDragEnd={() => {
+                dragArmedRunIdRef.current = null;
+                setDragState(null);
+              }}
+              onDragOver={(event) => {
+                if (dragState === null || item.serverIndex === null) return;
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "move";
+                const rect = event.currentTarget.getBoundingClientRect();
+                const insertIndex =
+                  event.clientY < rect.top + rect.height / 2
+                    ? item.serverIndex
+                    : item.serverIndex + 1;
+                if (dragState.insertIndex !== insertIndex) {
+                  setDragState({ runId: dragState.runId, insertIndex });
+                }
+              }}
+              onDrop={(event) => {
+                if (dragState === null) return;
+                event.preventDefault();
+                completeDrag(dragState.runId, dragState.insertIndex);
+              }}
+            >
+              {item.serverIndex !== null && dragState?.insertIndex === item.serverIndex ? (
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute inset-x-0 top-0 h-0.5 rounded bg-primary/70"
+                />
+              ) : null}
+              {item.serverIndex === queued.length - 1 &&
+              dragState?.insertIndex === queued.length ? (
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 rounded bg-primary/70"
+                />
+              ) : null}
+              {!expanded ? (
+                <button
+                  type="button"
+                  className="flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border-0 bg-composer-queue-badge px-2.5 text-secondary-copy font-semibold text-composer-queue-count shadow-well-control outline-none focus-visible:inset-shadow-focus"
+                  aria-label={t.chat.queue.expandQueuedMessages}
+                  aria-expanded={false}
+                  aria-controls={queueListId}
+                  onPointerDown={(event) => event.preventDefault()}
+                  onClick={() => setExpanded(true)}
+                >
+                  <ListOrderedIcon className="size-3.25" aria-hidden="true" />
+                  {t.chat.queue.count(items.length)}
+                </button>
+              ) : null}
+              {canReorder && rowRunId !== null && rowServerIndex !== null ? (
+                <button
+                  type="button"
+                  aria-label={t.chat.queue.reorderQueuedMessageDragOrPressThe}
+                  className="inline-flex w-3.75 shrink-0 cursor-grab items-center justify-center self-stretch border-0 bg-transparent p-0 text-placeholder outline-none focus-visible:inset-shadow-focus active:cursor-grabbing disabled:cursor-default"
+                  disabled={busyRunId !== null}
+                  onPointerDown={() => {
+                    dragArmedRunIdRef.current = rowRunId;
+                  }}
+                  onKeyDown={(event) => {
+                    if (busyRunId !== null) return;
+                    if (event.key === "ArrowUp" && rowServerIndex > 0) {
                       event.preventDefault();
-                      return;
+                      void move(rowRunId, queued[rowServerIndex - 1]?.run.id ?? null);
                     }
-                    event.dataTransfer.setData(QUEUED_RUN_DRAG_TYPE, item.runId);
-                    event.dataTransfer.effectAllowed = "move";
-                    setDragState({ runId: item.runId, insertIndex: null });
-                  }}
-                  onDragEnd={() => {
-                    dragArmedRunIdRef.current = null;
-                    setDragState(null);
-                  }}
-                  onDragOver={(event) => {
-                    if (dragState === null || item.serverIndex === null) return;
-                    event.preventDefault();
-                    event.dataTransfer.dropEffect = "move";
-                    const rect = event.currentTarget.getBoundingClientRect();
-                    const insertIndex =
-                      event.clientY < rect.top + rect.height / 2
-                        ? item.serverIndex
-                        : item.serverIndex + 1;
-                    if (dragState.insertIndex !== insertIndex) {
-                      setDragState({ runId: dragState.runId, insertIndex });
+                    if (event.key === "ArrowDown" && rowServerIndex < queued.length - 1) {
+                      event.preventDefault();
+                      void move(rowRunId, queued[rowServerIndex + 2]?.run.id ?? null);
                     }
-                  }}
-                  onDrop={(event) => {
-                    if (dragState === null) return;
-                    event.preventDefault();
-                    completeDrag(dragState.runId, dragState.insertIndex);
                   }}
                 >
-                  {item.serverIndex !== null && dragState?.insertIndex === item.serverIndex ? (
-                    <span
-                      aria-hidden
-                      className="pointer-events-none absolute inset-x-0 top-0 h-0.5 rounded bg-primary/70"
-                    />
-                  ) : null}
-                  {item.serverIndex === queued.length - 1 &&
-                  dragState?.insertIndex === queued.length ? (
-                    <span
-                      aria-hidden
-                      className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 rounded bg-primary/70"
-                    />
-                  ) : null}
-                  <ComposerBanner.Icon aria-hidden={false}>
-                    {canReorder && rowRunId !== null && rowServerIndex !== null ? (
-                      <Button
-                        size="icon-xs"
-                        variant="ghost-muted"
-                        aria-label={t.chat.queue.reorderQueuedMessageDragOrPressThe}
-                        className="cursor-grab active:cursor-grabbing disabled:cursor-default"
-                        disabled={busyRunId !== null}
-                        onPointerDown={() => {
-                          dragArmedRunIdRef.current = rowRunId;
-                        }}
-                        onKeyDown={(event) => {
-                          if (busyRunId !== null) return;
-                          if (event.key === "ArrowUp" && rowServerIndex > 0) {
-                            event.preventDefault();
-                            void move(rowRunId, queued[rowServerIndex - 1]?.run.id ?? null);
-                          }
-                          if (event.key === "ArrowDown" && rowServerIndex < queued.length - 1) {
-                            event.preventDefault();
-                            void move(rowRunId, queued[rowServerIndex + 2]?.run.id ?? null);
-                          }
-                        }}
+                  <GripVerticalIcon className="size-3.75" aria-hidden="true" />
+                </button>
+              ) : null}
+              <div
+                className={cn(
+                  "flex min-w-0 flex-1 items-center gap-2",
+                  isEditing ? "text-foreground" : "text-fg-detail",
+                )}
+              >
+                {isEditing ? (
+                  <span className="sr-only">{t.chat.queue.editingQueuedPrefix}</span>
+                ) : null}
+                {item.pending ? (
+                  <Clock3Icon
+                    aria-label={t.chat.queue.savingQueuedMessage}
+                    className="size-3 shrink-0 text-muted-foreground/60"
+                  />
+                ) : null}
+                {item.thumbnails.length > 0 ? (
+                  <span className="flex shrink-0 items-center gap-0.5">
+                    {item.thumbnails.map((thumbnail) => (
+                      <span
+                        key={thumbnail.key}
+                        className="size-7 overflow-hidden rounded-keycap bg-composer-queue-badge shadow-well-control"
                       >
-                        <GripVerticalIcon />
-                      </Button>
-                    ) : null}
-                  </ComposerBanner.Icon>
-                  <ComposerBanner.Content className="text-foreground/80">
-                    {isEditing ? (
-                      <span className="sr-only">{t.chat.queue.editingQueuedPrefix}</span>
-                    ) : null}
-                    {item.pending ? (
-                      <Clock3Icon
-                        aria-label={t.chat.queue.savingQueuedMessage}
-                        className="size-3 shrink-0 text-muted-foreground/60"
-                      />
-                    ) : null}
-                    {item.thumbnails.length > 0 ? (
-                      <span className="flex shrink-0 items-center gap-0.5">
-                        {item.thumbnails.map((thumbnail) => (
+                        {thumbnail.url ? (
+                          <img
+                            src={thumbnail.url}
+                            alt={thumbnail.name}
+                            className="size-full object-cover"
+                          />
+                        ) : (
                           <span
-                            key={thumbnail.key}
-                            className="size-4 overflow-hidden rounded border border-border/70 bg-background"
-                          >
-                            {thumbnail.url ? (
-                              <img
-                                src={thumbnail.url}
-                                alt={thumbnail.name}
-                                className="size-full object-cover"
-                              />
-                            ) : (
-                              <span
-                                aria-label={thumbnail.name}
-                                className="block size-full bg-muted/60"
-                              />
-                            )}
-                          </span>
-                        ))}
+                            aria-label={thumbnail.name}
+                            className="block size-full bg-muted/60"
+                          />
+                        )}
                       </span>
-                    ) : null}
+                    ))}
+                  </span>
+                ) : null}
+                <Tooltip>
+                  <TooltipTrigger render={<span className="min-w-0 flex-1 truncate" />}>
+                    {previewText}
+                  </TooltipTrigger>
+                  <TooltipPopup side="top" className="max-w-96 break-words">
+                    {previewText}
+                  </TooltipPopup>
+                </Tooltip>
+              </div>
+              <div className="flex shrink-0 items-center">
+                {isEditing ? (
+                  <>
+                    <button
+                      type="button"
+                      className="h-7 cursor-pointer rounded-composer-queue-toggle border-0 bg-transparent px-2.5 text-secondary-copy-medium font-semibold text-composer-queue-action outline-none hover:bg-secondary focus-visible:inset-shadow-focus"
+                      aria-label={t.chat.queue.cancelEditingQueuedMessage}
+                      onClick={props.onCancelEdit}
+                    >
+                      {t.chat.queue.cancel}
+                    </button>
                     <Tooltip>
-                      <TooltipTrigger render={<span className="min-w-0 flex-1 truncate" />}>
-                        {previewText}
+                      <TooltipTrigger
+                        render={
+                          <button
+                            type="submit"
+                            aria-label={t.composer.primaryActions.saveQueued}
+                            disabled={busyRunId !== null}
+                            className="composer-primary-key ml-2 inline-flex size-7.5 shrink-0 cursor-pointer items-center justify-center rounded-menu-row border-0 bg-primary p-0 text-primary-foreground shadow-primary-edge outline-none hover:bg-message-action-hover focus-visible:inset-shadow-focus disabled:pointer-events-none disabled:opacity-50"
+                          />
+                        }
+                      >
+                        <CheckIcon className="size-3.75" strokeWidth={2.5} aria-hidden="true" />
                       </TooltipTrigger>
-                      <TooltipPopup side="top" className="max-w-96 break-words">
-                        {previewText}
+                      <TooltipPopup>{t.composer.primaryActions.saveQueued}</TooltipPopup>
+                    </Tooltip>
+                  </>
+                ) : (
+                  <>
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <button
+                            type="button"
+                            className={cn(
+                              queueActionClassName,
+                              expanded ? "rounded-menu-row" : "rounded-full",
+                            )}
+                            aria-label={t.chat.queue.editQueuedMessage}
+                            disabled={item.runId === null || busyRunId !== null}
+                            onClick={() => {
+                              if (item.runId !== null && item.messageId !== null) {
+                                setExpanded(true);
+                                props.onEditQueuedRun({
+                                  runId: item.runId,
+                                  messageId: item.messageId,
+                                  text: item.text,
+                                  attachments: item.attachments,
+                                });
+                              }
+                            }}
+                          />
+                        }
+                      >
+                        <SquarePenIcon aria-hidden="true" />
+                      </TooltipTrigger>
+                      <TooltipPopup>
+                        {t.chat.queue.editInComposer(
+                          item.serverIndex === queued.length - 1
+                            ? (props.editShortcutLabel ?? null)
+                            : null,
+                        )}
                       </TooltipPopup>
                     </Tooltip>
-                  </ComposerBanner.Content>
-                  <ComposerBanner.Actions>
-                    {isEditing ? (
-                      <Button
-                        size="xs"
-                        variant="ghost"
-                        aria-label={t.chat.queue.cancelEditingQueuedMessage}
-                        onClick={props.onCancelEdit}
-                      >
-                        {t.chat.queue.cancel}
-                      </Button>
-                    ) : (
-                      <>
-                        <Tooltip>
-                          <TooltipTrigger
-                            render={
-                              <Button
-                                size="icon-xs"
-                                variant="ghost-muted"
-                                aria-label={t.chat.queue.editQueuedMessage}
-                                disabled={item.runId === null || busyRunId !== null}
-                                onClick={() => {
-                                  if (item.runId !== null && item.messageId !== null) {
-                                    props.onEditQueuedRun({
-                                      runId: item.runId,
-                                      messageId: item.messageId,
-                                      text: item.text,
-                                      attachments: item.attachments,
-                                    });
-                                  }
-                                }}
-                              />
+                    <Tooltip>
+                      <TooltipTrigger render={<span className="flex shrink-0" />}>
+                        <button
+                          type="button"
+                          className={cn(
+                            queueActionClassName,
+                            expanded ? "rounded-menu-row" : "rounded-full",
+                          )}
+                          aria-label={t.chat.queue.sendSteer(null)}
+                          disabled={
+                            item.runId === null ||
+                            busyRunId !== null ||
+                            !workflow?.canPromoteToSteer
+                          }
+                          onClick={() => {
+                            if (item.runId !== null) {
+                              void steer(item.runId);
                             }
-                          >
-                            <PencilIcon />
-                          </TooltipTrigger>
-                          <TooltipPopup>
-                            {t.chat.queue.editInComposer(
-                              item.serverIndex === queued.length - 1
-                                ? (props.editShortcutLabel ?? null)
-                                : null,
+                          }}
+                        >
+                          <CornerDownRightIcon aria-hidden="true" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipPopup>
+                        {activeRun === null
+                          ? t.chat.queue.thereIsNoActiveRunToSteer
+                          : t.chat.queue.sendSteer(
+                              item.serverIndex === 0 ? (props.steerShortcutLabel ?? null) : null,
                             )}
-                          </TooltipPopup>
-                        </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger render={<span className="flex shrink-0" />}>
-                            <Button
-                              size="xs"
-                              variant="ghost-muted"
-                              disabled={
-                                item.runId === null ||
-                                busyRunId !== null ||
-                                !workflow?.canPromoteToSteer
-                              }
-                              onClick={() => {
-                                if (item.runId !== null) {
-                                  void steer(item.runId);
-                                }
-                              }}
-                            >
-                              <CornerUpRightIcon />
-                              {t.chat.queue.steer}
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipPopup>
-                            {activeRun === null
-                              ? t.chat.queue.thereIsNoActiveRunToSteer
-                              : t.chat.queue.sendSteer(
-                                  item.serverIndex === 0
-                                    ? (props.steerShortcutLabel ?? null)
-                                    : null,
-                                )}
-                          </TooltipPopup>
-                        </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger
-                            render={
-                              <ComposerBanner.Dismiss
-                                aria-label={t.chat.queue.removeQueuedMessage}
-                                disabled={item.runId === null || busyRunId !== null}
-                                onClick={() => {
-                                  if (item.runId !== null) void remove(item.runId);
-                                }}
-                              />
-                            }
+                      </TooltipPopup>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <button
+                            type="button"
+                            className={cn(
+                              queueActionClassName,
+                              expanded ? "rounded-menu-row" : "rounded-full",
+                            )}
+                            aria-label={t.chat.queue.removeQueuedMessage}
+                            disabled={item.runId === null || busyRunId !== null}
+                            onClick={() => {
+                              if (item.runId !== null) void remove(item.runId);
+                            }}
                           />
-                          <TooltipPopup>{t.chat.queue.removeFromQueue}</TooltipPopup>
-                        </Tooltip>
-                      </>
-                    )}
-                  </ComposerBanner.Actions>
-                </ComposerBanner.Row>
-              );
-            })}
-          </ComposerBanner.Children>
-        </ComposerBanner.Scroll>
-      </ComposerBanner.Root>
-    </ComposerBanner.Attachment>
+                        }
+                      >
+                        <XIcon aria-hidden="true" />
+                      </TooltipTrigger>
+                      <TooltipPopup>{t.chat.queue.removeFromQueue}</TooltipPopup>
+                    </Tooltip>
+                  </>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
   );
 }

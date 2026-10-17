@@ -291,7 +291,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
   const submitLabel = showResume
     ? t.composer.primaryActions.resume
     : isEditingQueuedMessage
-      ? t.composer.primaryActions.updateQueued
+      ? t.composer.primaryActions.saveQueued
       : compactsBeforeSend
         ? t.composer.primaryActions.compactSend
         : isQueuing
