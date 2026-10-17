@@ -99,6 +99,37 @@ describe("Graphite theme migration", () => {
     expect(toggle).toHaveBeenCalledWith("dark", true);
   });
 
+  it("migrates an environment theme once and preserves its reselection across reloads", async () => {
+    const storage = createStorage();
+    storage.setItem("t3code:theme", "nightfall");
+    vi.stubGlobal("window", { localStorage: storage });
+    vi.stubGlobal("document", { documentElement: { classList: { toggle: vi.fn() } } });
+    const palette = await import("../themePalette");
+    const nightfall = {
+      id: "nightfall",
+      label: "Nightfall",
+      appearance: "dark" as const,
+      colors: palette.getDefaultThemeColors("dark"),
+    };
+    palette.setEnvironmentThemes([nightfall]);
+
+    const { readThemePreference, writeThemePreference } = await import("./useTheme");
+
+    expect(storage.getItem("t3code:theme")).toBe("graphite");
+    expect(storage.getItem("t3code:theme-migrated-graphite")).toBe("true");
+    expect(readThemePreference()).toBe("graphite");
+
+    writeThemePreference("nightfall");
+    vi.resetModules();
+    const reloadedPalette = await import("../themePalette");
+    reloadedPalette.setEnvironmentThemes([nightfall]);
+    const reloadedTheme = await import("./useTheme");
+
+    expect(storage.getItem("t3code:theme")).toBe("nightfall");
+    expect(reloadedTheme.readThemePreference()).toBe("nightfall");
+    expect(storage.getItem("t3code:theme-migrated-graphite")).toBe("true");
+  });
+
   it("preserves a later theme choice when the migration key exists", async () => {
     const storage = createStorage();
     storage.setItem("t3code:theme", "ocean");

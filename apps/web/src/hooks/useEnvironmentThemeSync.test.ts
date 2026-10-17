@@ -15,6 +15,12 @@ const LIGHT_THEME = {
   canvas: "#eff1f5",
 } as const satisfies EnvironmentTheme;
 
+/**
+ * Installs browser and React fakes with Nightfall selected after Graphite migration.
+ * @param mode Stored appearance preference; defaults to dark.
+ * @returns Controls for publishing themes and inspecting snapshots, styles, and the root.
+ * Module import failures reject setup; afterEach restores globals, mocks, and modules.
+ */
 async function setupThemeSync(mode: "dark" | "system" = "dark") {
   const storage = new Map<string, string>([["t3code:theme", NIGHTFALL_THEME.id]]);
   const styles = new Map<string, string>();
@@ -68,6 +74,8 @@ async function setupThemeSync(mode: "dark" | "system" = "dark") {
 
   const palette = await import("../themePalette");
   storage.set(palette.THEME_APPEARANCE_MODE_STORAGE_KEY, mode);
+  // useTheme.ts migration marker: migration finished before the user reselected Nightfall.
+  storage.set("t3code:theme-migrated-graphite", "true");
   const { useTheme } = await import("./useTheme");
   const { useEnvironmentThemeSync } = await import("./useEnvironmentTheme");
   const flushEffects = () => {
@@ -141,7 +149,7 @@ describe("published theme refresh", () => {
     expectPreview();
     publish([LIGHT_THEME, { ...NIGHTFALL_THEME, id: "unused-theme" }]);
     expectPreview();
-    expect(publish([]).theme).toBe("system");
+    expect(publish([]).theme).toBe("graphite"); // F0 makes Graphite the default theme.
     expectPreview();
 
     const current = publish([{ ...NIGHTFALL_THEME, canvas: "#112233" }]);
