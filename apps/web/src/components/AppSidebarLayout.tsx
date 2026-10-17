@@ -212,6 +212,12 @@ function ProjectProjectionRetention() {
   return null;
 }
 
+/**
+ * Wraps workspace routes with the shared titlebar and route-specific sidebar.
+ * children supplies the route content; page roots must take their height from
+ * the parent workspace, which receives the space below the titlebar.
+ * Mount within the app router and environment providers for navigation and shortcuts.
+ */
 export function AppSidebarLayout({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const legacySidebarEnabled = useLegacySidebarEnabled();

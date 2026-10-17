@@ -6,7 +6,12 @@ import { NewThreadLinkView } from "../components/promptLinks/NewThreadLinkView";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "../components/ui/empty";
 import { SidebarInset } from "../components/ui/sidebar";
 
-// The query is read raw: the router's own search parsing turns `prompt=123` into a number.
+/**
+ * Handles /new within the workspace, returning a link view or a visible parse error.
+ * Reads the raw query because router search parsing turns `prompt=123` into a number.
+ * Mount through the router under AppSidebarLayout; page height comes from the
+ * parent workspace rather than the viewport.
+ */
 function NewThreadLinkRoute() {
   const search = useLocation({ select: (location) => location.searchStr });
   const parsed = useMemo(() => parseNewThreadLink(search), [search]);

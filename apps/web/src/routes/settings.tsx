@@ -114,6 +114,11 @@ function SettingsScopeBoundary({ pathname, children }: { pathname: string; child
   return children;
 }
 
+/**
+ * Renders the settings header and scoped child route, with Escape returning to the app.
+ * Mount under SettingsScopeProvider within AppSidebarLayout. Height comes from the
+ * parent workspace; the child content uses the space left below the settings header.
+ */
 function SettingsContentLayout() {
   const location = useLocation();
   const navigateToMainApp = useNavigateToMainApp();

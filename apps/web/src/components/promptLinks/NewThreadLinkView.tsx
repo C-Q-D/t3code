@@ -355,6 +355,12 @@ function PullRequestLinkCheckout({
   );
 }
 
+/**
+ * Renders a prompt-link status or confirmation page within the workspace.
+ * title names the state; optional description adds context, and optional children
+ * supplies actions. Omitted optional content is hidden. Height comes from the
+ * parent workspace, leaving room for the shared window titlebar.
+ */
 function LinkPage({
   title,
   description,
