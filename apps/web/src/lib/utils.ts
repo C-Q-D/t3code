@@ -95,6 +95,9 @@ const twMerge = extendTailwindMerge({
         "pr-link-title",
         "pn6-empty-title",
         "files-title",
+        "ov3-project-title",
+        "ov3-error-title",
+        "ov3-inactive-title",
       ],
       shadow: [
         "slab",
@@ -261,6 +264,10 @@ const twMerge = extendTailwindMerge({
         "settings-theme-dot",
         "settings-motion-panel",
         "settings-slider-thumb",
+        "ov3-slab",
+        "ov3-secondary",
+        "ov3-copy",
+        "ov3-inactive-icon",
       ],
       "inset-shadow": [
         "selected",
@@ -358,6 +365,7 @@ const twMerge = extendTailwindMerge({
         "files-well",
         "pn3-comment",
         "settings-motion-panel",
+        "ov3-report",
       ],
       leading: [
         "code",
@@ -377,6 +385,8 @@ const twMerge = extendTailwindMerge({
         "callout",
         "composer-banner",
         "files-prose",
+        "ov3-hint",
+        "ov3-report",
       ],
       tracking: ["brand", "chat-draft", "timeline-secret"],
     },

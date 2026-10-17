@@ -444,7 +444,6 @@ export const account = {
     errorReport: "Error report",
     copied: "Copied",
     copyError: "Copy error",
-    routerError: "An unexpected router error occurred.",
     keybindingsUpdated: "Keybindings updated",
     keybindingsReloaded: "Keybindings configuration reloaded successfully.",
     invalidKeybindings: "Invalid keybindings configuration",

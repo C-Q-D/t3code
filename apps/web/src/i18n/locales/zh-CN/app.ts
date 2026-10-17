@@ -104,9 +104,8 @@ export const app: Messages["app"] = {
     androidApkLink: "Android 测试版 APK 链接",
   },
   projects: {
-    heroTitle: "我们要做什么？",
+    heroTitle: "添加项目以开始",
     addFirst: "添加项目，开始第一个对话。",
-    addOrStart: "添加项目，或直接开始。",
     startWithout: "不创建项目，直接开始",
     open: "打开项目",
     remove: "移除项目",

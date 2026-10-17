@@ -419,7 +419,6 @@ export const account: Messages["account"] = {
     errorReport: "错误报告",
     copied: "已复制",
     copyError: "复制错误",
-    routerError: "路由发生意外错误。",
     keybindingsUpdated: "快捷键已更新",
     keybindingsReloaded: "快捷键配置已重新加载。",
     invalidKeybindings: "快捷键配置无效",

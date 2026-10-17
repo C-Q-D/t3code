@@ -108,9 +108,8 @@ export const app = {
     androidApkLink: "Android beta APK link",
   },
   projects: {
-    heroTitle: "What should we work on?",
+    heroTitle: "Add a project to get started",
     addFirst: "Add a project to start your first thread.",
-    addOrStart: "Add a project, or start without one.",
     startWithout: "Start without a project",
     open: "Open project",
     remove: "Remove project",

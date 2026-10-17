@@ -13,7 +13,14 @@ import {
   useNavigate,
   useRouter,
 } from "@tanstack/react-router";
-import { Check, Copy } from "lucide";
+import {
+  ArrowLeftIcon,
+  CheckIcon,
+  ChevronDownIcon,
+  CopyIcon,
+  TriangleAlertIcon,
+} from "lucide-react";
+import { errorReport } from "./-rootErrorReport.logic";
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 
 import { APP_BASE_NAME, APP_DISPLAY_NAME, APP_STAGE_LABEL, APP_VERSION } from "../branding";
@@ -47,9 +54,6 @@ import { ThemeEditorHost } from "../components/settings/ThemeEditorHost";
 import { useCopyToClipboard } from "../hooks/useCopyToClipboard";
 import { useDefaultThemeAdoption } from "../hooks/useDefaultTheme";
 import { useEnvironmentThemeSync } from "../hooks/useEnvironmentTheme";
-import { Button } from "../components/ui/button";
-import { MorphIcon } from "~/components/MorphIcon";
-import { StandalonePage, StandalonePageHeader } from "../components/ui/standalone-page";
 import {
   AnchoredToastProvider,
   stackedThreadToast,
@@ -57,7 +61,6 @@ import {
   toastManager,
 } from "../components/ui/toast";
 import { isElectron } from "../env";
-import { cn } from "../lib/utils";
 import { applyAppearanceFontVariables } from "~/appearanceFonts";
 import { applyAppearanceContrast } from "~/appearanceContrast";
 import { useClientSettings } from "../hooks/useSettings";
@@ -137,14 +140,20 @@ export const Route = createRootRoute({
 /** Renders localized missing-route guidance and a home link without changing the current router state during render. */
 function RootRouteNotFoundView() {
   return (
-    <main className="flex min-h-0 min-w-0 flex-1 items-center justify-center p-6">
-      <div className="flex max-w-sm flex-col items-center gap-4 text-center">
-        <h1 className="text-lg font-medium text-foreground">{t.account.routes.notFound}</h1>
-        <p className="text-sm text-muted-foreground">
+    <main className="ov3-route-page stone-base">
+      <section className="ov3-error-card dialog-glass max-w-110">
+        <span className="font-mono text-secondary-copy-large text-placeholder">404</span>
+        <h1 className="font-serif text-ov3-error-title font-bold">{t.account.routes.notFound}</h1>
+        <p className="text-body leading-ov3-hint text-code-foreground">
           {t.account.routes.notFoundHint(APP_DISPLAY_NAME)}
         </p>
-        <Button render={<Link to="/" replace />}>{t.account.routes.home}</Button>
-      </div>
+        <div className="mt-1.5 self-start">
+          <Link to="/" replace className="ov3-action ov3-action-primary gap-1.5 pr-4 pl-3">
+            <ArrowLeftIcon className="size-3.75" aria-hidden="true" />
+            {t.account.routes.home}
+          </Link>
+        </div>
+      </section>
     </main>
   );
 }
@@ -409,106 +418,86 @@ function HostedStaticEnvironmentBootstrap() {
   return null;
 }
 
-/** Renders the supplied router error with retry/reload controls and an English diagnostic report; dictionary lookups occur only during rendering. */
+/** Renders recovery controls using only router state and local React state, outside the failing app providers. */
 function RootRouteErrorView({ error }: ErrorComponentProps) {
   const router = useRouter();
-  const message = errorMessage(error);
-  // Router pathname rather than window.location: desktop uses hash history, where the window path is always "/".
+  const [reportOpen, setReportOpen] = useState(true);
+  // Desktop uses hash history: use the router pathname to omit query credentials.
   const pathname = useLocation({ select: (location) => location.pathname });
-  const report = useMemo(() => errorReport(error, pathname), [error, pathname]);
+  const report = useMemo(
+    () =>
+      errorReport(error, pathname, `${APP_DISPLAY_NAME} ${APP_VERSION}`, new Date().toISOString()),
+    [error, pathname],
+  );
 
   return (
-    <StandalonePage tone="error">
-      <StandalonePageHeader
-        eyebrow={APP_DISPLAY_NAME}
-        title={t.account.routes.somethingWrong}
-        description={message}
-      />
-
-      <div className="mt-5 flex flex-wrap gap-2">
-        <Button size="sm" onClick={() => void router.invalidate()}>
-          {t.account.routes.tryAgain}
-        </Button>
-        <Button size="sm" variant="outline" onClick={() => window.location.reload()}>
-          {t.account.routes.reload}
-        </Button>
-        <CopyErrorButton report={report} />
-      </div>
-
-      <div className="mt-5 overflow-hidden rounded-lg border border-border/70 bg-background/55">
-        <p className="px-3 py-1.5 text-xs font-medium text-muted-foreground">
-          {t.account.routes.errorReport}
-        </p>
-        <pre className="max-h-64 overflow-auto border-t border-border/70 bg-background/80 px-3 py-2 text-xs whitespace-pre-wrap text-foreground/85">
-          {report}
-        </pre>
-      </div>
-    </StandalonePage>
+    <main className="ov3-route-page stone-base">
+      <section className="ov3-error-card dialog-glass max-w-115">
+        <span className="flex size-10 items-center justify-center rounded-compact-row bg-error-surface">
+          <TriangleAlertIcon className="size-4.75" aria-hidden="true" />
+        </span>
+        <h1 className="font-serif text-ov3-error-title font-bold">
+          {t.account.routes.somethingWrong}
+        </h1>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="ov3-action ov3-action-primary px-4.5"
+            onClick={() => void router.invalidate()}
+          >
+            {t.account.routes.tryAgain}
+          </button>
+          <button
+            type="button"
+            className="ov3-action ov3-action-outline px-4"
+            onClick={() => window.location.reload()}
+          >
+            {t.account.routes.reload}
+          </button>
+        </div>
+        <div className="overflow-hidden rounded-ov3-report bg-ov3-report shadow-well-pressed">
+          <div className="flex h-9.5 items-center gap-2 pr-1.5 pl-3">
+            <button
+              type="button"
+              className="flex min-w-0 flex-1 items-center gap-2 self-stretch text-left text-secondary-copy-large font-semibold outline-none focus-visible:inset-shadow-focus"
+              aria-expanded={reportOpen}
+              aria-controls="ov3-error-report"
+              onClick={() => setReportOpen(!reportOpen)}
+            >
+              <ChevronDownIcon
+                className={reportOpen ? "size-3.5" : "size-3.5 -rotate-90"}
+                aria-hidden="true"
+              />
+              {t.account.routes.errorReport}
+            </button>
+            <CopyErrorButton report={report} />
+          </div>
+          <pre
+            id="ov3-error-report"
+            hidden={!reportOpen}
+            className="max-h-64 overflow-auto px-3.5 pb-3 font-mono text-meta-large leading-ov3-report whitespace-pre text-secondary-label text-shadow-none"
+          >
+            {report}
+          </pre>
+        </div>
+      </section>
+    </main>
   );
 }
 
-/** Copies the full error report and swaps to a check mark for a moment as confirmation. */
+/** Copies the supplied full report; the context-free clipboard hook clears its confirmation timer on unmount. */
 function CopyErrorButton({ report }: { report: string }) {
   const { copyToClipboard, isCopied } = useCopyToClipboard({ target: "error-report" });
+  const Icon = isCopied ? CheckIcon : CopyIcon;
 
   return (
-    <Button size="sm" variant="outline" onClick={() => copyToClipboard(report)}>
-      <MorphIcon className={cn(isCopied && "text-success")} icon={isCopied ? Check : Copy} />
-      {isCopied ? t.account.routes.copied : t.account.routes.copyError}
-    </Button>
+    <button type="button" className="ov3-copy-action" onClick={() => copyToClipboard(report)}>
+      <Icon className="size-3" aria-hidden="true" />
+      <span aria-live="polite">
+        {isCopied ? t.account.routes.copied : t.account.routes.copyError}
+      </span>
+    </button>
   );
-}
-
-/** Returns the supplied router error message or a localized fallback; does not change the English report generated separately. */
-function errorMessage(error: unknown): string {
-  if (error instanceof Error && error.message.trim().length > 0) {
-    return error.message;
-  }
-
-  if (typeof error === "string" && error.trim().length > 0) {
-    return error;
-  }
-
-  return t.account.routes.routerError;
-}
-
-function errorDetails(error: unknown): string {
-  if (error instanceof Error) {
-    return error.stack ?? error.message;
-  }
-
-  if (typeof error === "string") {
-    return error;
-  }
-
-  try {
-    return JSON.stringify(error, null, 2);
-  } catch {
-    return "No additional error details are available.";
-  }
-}
-
-const MAX_ERROR_CAUSE_DEPTH = 5;
-
-/**
- * Full error text for bug reports: app build, page path, time, then the stack
- * and any cause chain. Takes the pathname only so tokens in the query never
- * land on the clipboard.
- */
-function errorReport(error: unknown, pathname: string): string {
-  const lines = [
-    `${APP_DISPLAY_NAME} ${APP_VERSION}`,
-    `Path: ${pathname}`,
-    `Time: ${new Date().toISOString()}`,
-    "",
-    errorDetails(error),
-  ];
-  let cause = error instanceof Error ? error.cause : undefined;
-  for (let depth = 0; cause !== undefined && depth < MAX_ERROR_CAUSE_DEPTH; depth += 1) {
-    lines.push("", "Caused by:", errorDetails(cause));
-    cause = cause instanceof Error ? cause.cause : undefined;
-  }
-  return lines.join("\n");
 }
 
 function AuthenticatedTracingBootstrap() {

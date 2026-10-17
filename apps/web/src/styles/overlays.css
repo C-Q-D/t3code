@@ -1,1 +1,57 @@
 /* OV1–OV5：本线新增的令牌（@theme）与全局样式写在这里。 */
+
+/* OV3: 其余屏-9.dc.html S3 empty workspace and standalone recovery pages. */
+@theme {
+  --text-ov3-project-title: 34px;
+  --text-ov3-project-title--line-height: normal;
+  --text-ov3-error-title: 28px;
+  --text-ov3-error-title--line-height: normal;
+  --leading-ov3-hint: 1.7;
+  --leading-ov3-report: 1.6;
+  --radius-ov3-report: 14px;
+  --color-ov3-report: #151517;
+  --shadow-ov3-slab:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.095), 0 0 0 1px rgba(0, 0, 0, 0.55), 0 4px 0 #060607,
+    18px 28px 36px -8px rgba(0, 0, 0, 0.79);
+  --shadow-ov3-secondary: inset 0 1px 0 rgba(255, 255, 255, 0.09), 0 1.5px 0 #09090a;
+  --shadow-ov3-copy: 0 1.5px 0 #09090a;
+}
+
+/* Keep recovery independent from the workspace, settings, and toast providers. */
+.ov3-route-page {
+  @apply flex h-full min-h-0 min-w-0 flex-1 items-center justify-center overflow-auto scrollbar-gutter-both p-6 text-foreground text-shadow-stone;
+}
+
+.ov3-error-card {
+  @apply my-auto flex w-full min-w-0 flex-col gap-3 rounded-dialog p-7;
+}
+
+/* S3's 38px actions and 28px report copy key are feature-owned recipes. */
+.ov3-action {
+  @apply inline-flex h-9.5 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 text-control outline-none focus-visible:inset-shadow-focus aria-disabled:cursor-not-allowed;
+}
+
+.ov3-action-primary {
+  --lucide-hue-override: currentColor;
+  @apply bg-primary font-extrabold text-primary-foreground text-shadow-none shadow-primary-edge-control hover:bg-message-action-hover active:translate-y-0.5 active:shadow-primary-pressed;
+}
+
+.ov3-action-outline {
+  @apply bg-transparent font-normal text-fg-detail shadow-outline-control hover:bg-secondary active:shadow-outline-control-pressed;
+}
+
+.ov3-action-secondary {
+  @apply bg-secondary font-semibold text-foreground shadow-ov3-secondary;
+}
+
+.ov3-copy-action {
+  @apply inline-flex h-7 shrink-0 cursor-pointer items-center justify-center gap-1.25 rounded-full border-0 bg-secondary px-2.5 text-secondary-copy font-semibold text-foreground shadow-ov3-copy outline-none hover:bg-accent active:translate-y-0.5 focus-visible:inset-shadow-focus;
+}
+
+/* OV3 continuation: 其余屏-9.dc.html S3, inactive-thread heading and 52px icon well. */
+@theme {
+  --text-ov3-inactive-title: 26px;
+  --text-ov3-inactive-title--line-height: normal;
+  --shadow-ov3-inactive-icon:
+    inset 2px 3px 5px rgba(0, 0, 0, 0.66), inset -1px -1px 0 rgba(255, 255, 255, 0.06);
+}
