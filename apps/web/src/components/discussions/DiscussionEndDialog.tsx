@@ -1,6 +1,7 @@
 /** Owns per-opening summary choices; the page owns commands and the shared header submission lock. */
 import { useAtomValue } from "@effect/atom-react";
 import type { Discussion, EnvironmentId, DiscussionEndInput } from "@t3tools/contracts";
+import { Select as SelectPrimitive } from "@base-ui/react/select";
 import { Radio as RadioPrimitive } from "@base-ui/react/radio";
 import { ChevronsUpDownIcon, LoaderCircleIcon } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -13,7 +14,7 @@ import { applyProviderInstanceSettings, deriveProviderInstanceEntries } from "~/
 import { getCustomModelOptionsByInstance } from "~/modelSelection";
 import { Dialog, DialogPopup, DialogTitle } from "../ui/dialog";
 import { RadioGroup } from "../ui/radio-group";
-import { Select, SelectTrigger, SelectValue, SelectPopup, SelectItem } from "../ui/select";
+import { Select, SelectValue, SelectPopup, SelectItem } from "../ui/select";
 import { Button } from "../ui/button";
 import { PixelSeat } from "./PixelSeat";
 import { PxWave } from "./PxWave";
@@ -29,6 +30,7 @@ import {
 
 /**
  * Renders H4 choices while preserving the existing submission and lifecycle gates.
+ * The native submit button and Base UI trigger keep H4-only state materials local to this feature.
  * @param props.discussion Current snapshot; seats retain their physical color positions.
  * @param props.environmentId Environment supplying provider labels and summary templates.
  * @param props.pending Locks selection, submission and dismissal during the page command.
@@ -166,10 +168,8 @@ export function DiscussionEndDialog({
               }}
               disabled={pending || summary.disabled}
             >
-              <SelectTrigger
-                size="dialog"
-                variant="dialog"
-                icon={<ChevronsUpDownIcon aria-hidden />}
+              <SelectPrimitive.Trigger
+                className="discussion-end-template"
                 aria-labelledby="discussion-summary-label"
               >
                 <SelectValue>
@@ -177,7 +177,10 @@ export function DiscussionEndDialog({
                     summary.options.find((p) => p.id === summary.selected)?.label ??
                     t.discussions.page.summaryTemplate}
                 </SelectValue>
-              </SelectTrigger>
+                <SelectPrimitive.Icon>
+                  <ChevronsUpDownIcon className="size-3.5" aria-hidden />
+                </SelectPrimitive.Icon>
+              </SelectPrimitive.Trigger>
               <SelectPopup>
                 {summary.options.map((p) => (
                   <SelectItem key={p.id} value={p.id}>
@@ -196,23 +199,23 @@ export function DiscussionEndDialog({
           <div className="flex justify-end gap-2">
             <Button
               variant="dialog-secondary"
-              size="dialog-cancel"
+              size="dialog-action"
               disabled={pending}
               onClick={onClose}
             >
               {t.discussions.page.cancel}
             </Button>
-            <Button
-              size="dialog-action"
-              variant="dialog-primary"
+            <button
+              type="button"
+              className="discussion-end-submit"
               disabled={!input}
               onClick={() => {
                 if (input) void onSubmit(input);
               }}
             >
-              {pending ? <LoaderCircleIcon aria-hidden /> : null}
+              {pending ? <LoaderCircleIcon className="size-3.5" aria-hidden /> : null}
               {t.discussions.page.endSubmit}
-            </Button>
+            </button>
           </div>
         </div>
       </DialogPopup>

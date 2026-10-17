@@ -39,7 +39,7 @@ export function DiscussionDeleteDialog({
           <div data-slot="alert-dialog-footer" className="mt-2.5 flex justify-end gap-2">
             <Button
               variant="dialog-secondary"
-              size="dialog-cancel"
+              size="dialog-action"
               disabled={pending}
               onClick={onClose}
             >
@@ -47,7 +47,7 @@ export function DiscussionDeleteDialog({
             </Button>
             <Button
               variant="danger-key"
-              size="dialog-action"
+              size="dialog-action-wide"
               disabled={pending}
               onClick={() => void onSubmit()}
             >

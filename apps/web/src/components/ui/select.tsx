@@ -28,9 +28,6 @@ const selectTriggerVariants = cva(
         // SettingsPage8a M2: shortcut pickers place a keycap inside the shared recessed well.
         keycap:
           "justify-center bg-input text-foreground shadow-well-track [&:is(:disabled,[data-disabled])]:text-fg-control-disabled",
-        // 讨论页 H4: full-size dialog picker, including loading/failure material.
-        dialog:
-          "w-full min-w-0 bg-select-control text-foreground shadow-discussion-select not-disabled:not-data-disabled:hover:bg-accent focus-visible:inset-shadow-focus [&:is(:disabled,[data-disabled])]:bg-discussion-select-disabled [&:is(:disabled,[data-disabled])]:text-discussion-select-disabled-label [&:is(:disabled,[data-disabled])]:shadow-discussion-select-disabled",
       },
       size: {
         compact: "h-7 gap-1 px-2 text-secondary-copy",

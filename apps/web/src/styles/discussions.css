@@ -348,3 +348,20 @@
     @apply w-full text-secondary-copy-medium text-secondary-label;
   }
 }
+
+/* H4: feature-owned controls, following OV3's native-action pattern rather than restyling UI exports. */
+.discussion-end-submit {
+  @apply relative inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full border-0 px-4.5 text-control font-bold text-shadow-none outline-none focus-visible:inset-shadow-focus disabled:pointer-events-none;
+  @apply bg-primary text-primary-foreground shadow-discussion-primary-key enabled:hover:bg-message-action-hover enabled:active:translate-y-0.5 enabled:active:shadow-primary-pressed disabled:bg-discussion-submit-disabled disabled:text-popover disabled:shadow-none;
+  @apply pointer-coarse:after:absolute pointer-coarse:after:size-full pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11;
+  --lucide-hue-override: currentColor;
+}
+
+.discussion-end-template {
+  @apply relative inline-flex h-10 w-full min-w-0 cursor-pointer select-none items-center justify-between gap-1.5 rounded-full border-0 ps-3.5 pe-3 text-left text-body outline-none focus-visible:inset-shadow-focus disabled:pointer-events-none data-disabled:pointer-events-none;
+  @apply bg-select-control text-foreground shadow-discussion-select not-disabled:not-data-disabled:hover:bg-accent;
+}
+
+.discussion-end-template:is(:disabled, [data-disabled]) {
+  @apply bg-discussion-select-disabled text-discussion-select-disabled-label shadow-discussion-select-disabled;
+}
