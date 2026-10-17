@@ -21,6 +21,24 @@
     inset 1.5px 2px 3px rgba(0, 0, 0, 0.6), inset -1px -1px 0 rgba(255, 255, 255, 0.05);
   --shadow-usage-bar: inset 0 1px 0 rgba(255, 255, 255, 0.25), 4px 6px 10px -4px rgba(0, 0, 0, 0.8);
   --shadow-usage-baseline: 0 1px 0 rgba(255, 255, 255, 0.05);
+  /* UsagePage8a.dc.html M1: inset tables, model share track, and raised quota cards. */
+  --color-usage-table-well: #1a1a1d;
+  --color-usage-table-header: #26262a;
+  --color-usage-row-divider: rgba(0, 0, 0, 0.5);
+  --color-usage-share-track: #0e0e10;
+  --color-usage-limit-ahead: #ff9c5c;
+  --radius-usage-model-dot: 2px;
+  --radius-usage-limit-marker: 1px;
+  --text-usage-limit-number: 15px;
+  --text-usage-limit-number--line-height: 1.5;
+  --leading-usage-limit-note: 1.6;
+  --shadow-usage-table:
+    inset 1.5px 2px 3px rgba(0, 0, 0, 0.6), inset -1px -1px 0 rgba(255, 255, 255, 0.05),
+    0 0 0 1px rgba(0, 0, 0, 0.4);
+  --shadow-usage-limit:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.095), 0 0 0 1px rgba(0, 0, 0, 0.484), 0 3px 0 #09090a,
+    10px 16px 24px -8px rgba(0, 0, 0, 0.7);
+  --shadow-usage-limit-track: inset 1px 1px 2px rgba(0, 0, 0, 0.77);
 }
 
 /* Reuse the shipped stone texture, with M1's detail-surface veil. */
@@ -28,4 +46,12 @@
   background-image:
     linear-gradient(var(--color-stone-detail-veil), var(--color-stone-detail-veil)),
     url("../assets/stone-8a.webp");
+}
+
+/* M1's 1.6fr / 1fr / 70px model columns, expressed against the shared spacing scale. */
+.usage-model-table col:first-child {
+  width: calc((100% - --spacing(17.5)) * 1.6 / 2.6);
+}
+.usage-model-table col:nth-child(2) {
+  width: calc((100% - --spacing(17.5)) / 2.6);
 }

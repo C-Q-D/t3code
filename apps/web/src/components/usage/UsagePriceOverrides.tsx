@@ -28,6 +28,7 @@ import { Label } from "../ui/label";
 import { Menu, MenuCheckboxItem, MenuPopup, MenuSeparator, MenuTrigger } from "../ui/menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 import { Tooltip, TooltipTrigger, TooltipPopup } from "../ui/tooltip";
+import { customPriceModels } from "./usageOverview.logic";
 import { USAGE_PRICE_FIELDS } from "./usagePriceForm";
 import {
   isEmptyUsagePriceDraft,
@@ -43,6 +44,14 @@ import {
   type UsagePriceTarget,
   type UsagePriceWriteResult,
 } from "./usagePriceTargets";
+
+// M1 displays output last; parsing and validation retain the field definitions' original order.
+const PRICE_COLUMNS = [
+  USAGE_PRICE_FIELDS[0],
+  USAGE_PRICE_FIELDS[2],
+  USAGE_PRICE_FIELDS[3],
+  USAGE_PRICE_FIELDS[1],
+];
 
 const priceTargetsAtom = Atom.make((get): readonly UsagePriceTarget[] =>
   [...get(environmentPresentations.presentationsAtom)].map(([environmentId, environment]) => {
@@ -131,14 +140,7 @@ export function UsagePriceOverrides({
   const focusRowRef = useRef<string | null>(null);
   const nextRowId = useRef(0);
   const updateSettings = useAtomCommand(serverEnvironment.updateSettings, { reportFailure: false });
-  const customModels = [
-    ...new Set(
-      selected.flatMap((environment) => [
-        ...Object.keys(environment.prices ?? {}),
-        ...Object.keys(environment.aliases ?? {}),
-      ]),
-    ),
-  ].sort();
+  const customModels = customPriceModels(selected);
   const models = [
     ...new Set([
       ...customModels,
@@ -356,12 +358,12 @@ export function UsagePriceOverrides({
             </p>
           ) : (
             <>
-              <div className="min-w-0 overflow-hidden rounded-lg border border-border">
+              <div className="min-w-0 overflow-hidden rounded-card-row bg-usage-table-well shadow-usage-table">
                 <Table className="min-w-180 table-fixed" aria-label={t.tools.usage.customPrices}>
                   <colgroup>
-                    <col className="w-[22%]" />
-                    <col className="w-[18%]" />
-                    {USAGE_PRICE_FIELDS.map((field) => (
+                    <col className="w-2/9" />
+                    <col className="w-1/6" />
+                    {PRICE_COLUMNS.map((field) => (
                       <col key={field.key} />
                     ))}
                     <col className="w-10" />
@@ -370,7 +372,7 @@ export function UsagePriceOverrides({
                     <TableRow>
                       <TableHead>{t.tools.usage.modelId}</TableHead>
                       <TableHead>{t.tools.usage.mapTo}</TableHead>
-                      {USAGE_PRICE_FIELDS.map((field) => (
+                      {PRICE_COLUMNS.map((field) => (
                         <TableHead key={field.key}>{field.label}</TableHead>
                       ))}
                       <TableHead>
@@ -480,7 +482,7 @@ export function UsagePriceOverrides({
                                 </span>
                               </TableCell>
                             ) : (
-                              USAGE_PRICE_FIELDS.map((field) => {
+                              PRICE_COLUMNS.map((field) => {
                                 const cell = usagePriceCell(selected, row.model, field.key);
                                 return (
                                   <TableCell key={field.key}>
@@ -634,5 +636,109 @@ export function UsagePriceOverrides({
         </DialogFooter>
       </DialogPopup>
     </Dialog>
+  );
+}
+
+/** Read-only M1 price table for selected environments; every row opens the existing editor without writing settings. */
+export function UsagePriceSummary({
+  selectedEnvironmentIds,
+  onEditModel,
+}: {
+  readonly selectedEnvironmentIds: ReadonlySet<EnvironmentId> | null;
+  readonly onEditModel: (model?: string) => void;
+}) {
+  const environments = useAtomValue(priceTargetsAtom);
+  const selected = environments.filter(
+    (environment) =>
+      selectedEnvironmentIds === null || selectedEnvironmentIds.has(environment.environmentId),
+  );
+  const models = customPriceModels(selected);
+  return (
+    <section className="flex min-w-0 flex-col gap-2.5">
+      <div className="flex flex-wrap items-baseline gap-2.5">
+        <h2 className="font-serif text-plan-title font-bold">{t.tools.usage.customPrices}</h2>
+        <span className="text-secondary-copy text-muted-foreground">{t.tools.usage.priceUnit}</span>
+        <div className="ml-auto">
+          <Button variant="ghost" size="compact" onClick={() => onEditModel()}>
+            {t.tools.usage.modelPrices}
+          </Button>
+        </div>
+      </div>
+      <div className="min-w-0 overflow-x-auto rounded-card-row bg-usage-table-well shadow-usage-table">
+        <table className="w-full min-w-160 table-fixed text-secondary-copy-large">
+          <colgroup>
+            <col className="w-4/17" />
+            <col className="w-3/17" />
+            {PRICE_COLUMNS.map((field) => (
+              <col key={field.key} />
+            ))}
+          </colgroup>
+          <thead className="bg-usage-table-header">
+            <tr>
+              <th className="px-3.5 py-2.5 text-left font-bold">{t.tools.usage.modelId}</th>
+              <th className="px-3.5 py-2.5 text-left font-bold">{t.tools.usage.mapTo}</th>
+              {PRICE_COLUMNS.map((field) => (
+                <th key={field.key} className="px-3.5 py-2.5 text-right font-bold">
+                  {field.key === "inputCostPerMillionTokens"
+                    ? t.tools.usage.inputPrice
+                    : field.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {models.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-3.5 py-2.25 text-muted-foreground">
+                  {selected.some((target) => target.prices === null)
+                    ? t.tools.usage.somePricesUnavailable
+                    : t.tools.usage.noCustomPrices}
+                </td>
+              </tr>
+            ) : (
+              models.map((model) => {
+                const alias = usageAliasCell(selected, model);
+                return (
+                  <tr
+                    key={model}
+                    className="relative border-t border-usage-row-divider hover:bg-secondary focus-within:bg-secondary"
+                  >
+                    <td className="px-3.5 py-2.25 font-mono text-secondary-copy">
+                      <button
+                        type="button"
+                        className="block w-full truncate text-left outline-none after:absolute after:inset-0"
+                        onClick={() => onEditModel(model)}
+                      >
+                        {model}
+                      </button>
+                    </td>
+                    <td className="truncate px-3.5 py-2.25">
+                      {alias.value ||
+                        (alias.placeholder === t.tools.usage.none ? "—" : alias.placeholder)}
+                    </td>
+                    {PRICE_COLUMNS.map((field) => {
+                      const cell = usagePriceCell(selected, model, field.key);
+                      return (
+                        <td
+                          key={field.key}
+                          className="px-3.5 py-2.25 text-right font-mono text-secondary-copy tabular-nums"
+                        >
+                          {cell.value !== ""
+                            ? Number(cell.value).toFixed(2)
+                            : cell.placeholder === t.tools.usage.mixed ||
+                                cell.placeholder === t.tools.usage.unavailable
+                              ? cell.placeholder
+                              : "—"}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
