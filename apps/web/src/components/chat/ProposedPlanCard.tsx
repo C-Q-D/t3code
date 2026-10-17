@@ -196,7 +196,7 @@ export const ProposedPlanCard = memo(function ProposedPlanCard({
             <TooltipTrigger
               render={
                 <Button
-                  size="icon-toolbar"
+                  size="icon-toolbar-key"
                   variant="ghost-muted"
                   onClick={handleCopyPlan}
                   aria-label={isCopied ? t.chat.plan.copied : t.chat.plan.copyToClipboard}
@@ -217,7 +217,7 @@ export const ProposedPlanCard = memo(function ProposedPlanCard({
             <TooltipTrigger
               render={
                 <Button
-                  size="icon-toolbar"
+                  size="icon-toolbar-key"
                   variant="ghost-muted"
                   onClick={handleDownload}
                   aria-label={t.chat.plan.downloadAsMarkdown}
@@ -232,7 +232,7 @@ export const ProposedPlanCard = memo(function ProposedPlanCard({
             <TooltipTrigger
               render={
                 <Button
-                  size="icon-toolbar"
+                  size="icon-toolbar-key"
                   variant="ghost-muted"
                   onClick={openSaveDialog}
                   disabled={!canWriteFiles || !workspaceRoot || isSavingToWorkspace}
@@ -249,7 +249,7 @@ export const ProposedPlanCard = memo(function ProposedPlanCard({
               <TooltipTrigger
                 render={
                   <Button
-                    size="icon-toolbar"
+                    size="icon-toolbar-key"
                     variant="secondary"
                     data-scroll-anchor-ignore
                     aria-expanded={expanded}

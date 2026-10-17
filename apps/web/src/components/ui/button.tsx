@@ -48,7 +48,8 @@ const buttonVariants = cva(
         // 对话页-8a D1：用户消息悬停操作，30×30px、10px 圆角。
         "icon-md": "size-7.5 rounded-tag p-0 [&_svg:not([class*='size-'])]:size-3.75",
         // 对话页-8a D1：建议计划头部的 32×32px 图标操作，11px 圆角。
-        "icon-toolbar": "size-8 rounded-toolbar-icon p-0 [&_svg:not([class*='size-'])]:size-3.75",
+        "icon-toolbar-key":
+          "size-8 rounded-toolbar-icon p-0 [&_svg:not([class*='size-'])]:size-3.75",
       },
       variant: {
         default:
