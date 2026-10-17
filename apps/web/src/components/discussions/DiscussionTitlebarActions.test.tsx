@@ -1,5 +1,5 @@
 /**
- * Checks real menu portal removal and focus transfer when the titlebar becomes full width.
+ * Checks menu portal removal and owned focus transfer in both titlebar layout directions.
  * @vitest-environment jsdom
  */
 import { act, useLayoutEffect } from "react";
@@ -88,6 +88,71 @@ it.each([false, true])(
       else Reflect.deleteProperty(Element.prototype, "getAnimations");
       vi.unstubAllGlobals();
       vi.useRealTimers();
+    }
+  },
+);
+
+it.each([
+  { initialCompact: false, outside: false },
+  { initialCompact: true, outside: false },
+  { initialCompact: true, outside: true },
+])(
+  "preserves closed-menu focus ownership (compact=$initialCompact, outside=$outside)",
+  async ({ initialCompact, outside }) => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    let setCompact: (value: boolean) => void = () => {
+      throw new Error("Layout not mounted");
+    };
+    /** Supplies actual action portals while controlling only the measured layout result. */
+    function Route() {
+      const { setCompact: updateLayout } = useTitlebarPanelLayout();
+      useLayoutEffect(() => {
+        setCompact = updateLayout;
+      }, [updateLayout]);
+      return useTitlebarSlot({
+        panel: <aside>diff</aside>,
+        actions: (
+          <DiscussionTitlebarActions
+            actions={["stop", "end"]}
+            enabled={() => true}
+            onAction={() => {}}
+          />
+        ),
+      });
+    }
+    try {
+      await act(() =>
+        root.render(
+          <TitlebarSlotProvider>
+            <input aria-label="outside" />
+            <TitlebarSlotOutlet name="actions" />
+            <TitlebarSlotOutlet name="panel" />
+            <Route />
+          </TitlebarSlotProvider>,
+        ),
+      );
+      await act(() => setCompact(initialCompact));
+      const previous = outside
+        ? container.querySelector<HTMLInputElement>("input")!
+        : container.querySelector<HTMLButtonElement>("button")!;
+      await act(() => container.querySelector<HTMLButtonElement>("button")!.focus());
+      await act(() => previous.focus());
+      expect(document.activeElement).toBe(previous);
+      expect(document.querySelector('[role="menu"]')).toBeNull();
+      await act(() => setCompact(!initialCompact));
+      expect(document.querySelector('[role="menu"]')).toBeNull();
+      const next = container.querySelector<HTMLButtonElement>("button")!;
+      expect(next.getAttribute("aria-label")).toBe(
+        initialCompact ? t.discussions.page.stop : t.discussions.page.more,
+      );
+      expect(document.activeElement).toBe(outside ? previous : next);
+    } finally {
+      await act(() => root.unmount());
+      container.remove();
+      vi.unstubAllGlobals();
     }
   },
 );

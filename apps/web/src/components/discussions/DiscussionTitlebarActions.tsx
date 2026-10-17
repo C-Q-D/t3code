@@ -1,5 +1,5 @@
 /** Keeps a single focusable discussion action surface mounted across titlebar layout changes. */
-import { useCallback, useRef } from "react";
+import { useCallback, useLayoutEffect, useRef } from "react";
 import { EllipsisIcon, PauseIcon, PlayIcon, Trash2Icon } from "lucide-react";
 import { t } from "~/i18n";
 import { useTitlebarPanelLayout } from "../frame/titlebarSlot";
@@ -13,6 +13,8 @@ type Action = DiscussionHeaderView["actions"][number];
  * Uses the same permissions and commands for the menu and full buttons.
  * Base UI restores focus after the portaled menu unmounts; its target is resolved
  * against the replacement controls, not the removed compact trigger.
+ * Closed-menu controls record focus ownership before replacement so a layout
+ * switch restores their focus without taking focus from another workspace control.
  */
 export function DiscussionTitlebarActions({
   actions,
@@ -25,12 +27,22 @@ export function DiscussionTitlebarActions({
 }) {
   const { compact } = useTitlebarPanelLayout();
   const container = useRef<HTMLDivElement>(null);
+  // Track direct DOM focus before controls unmount. Portaled menu items are
+  // outside this region and keep using Base UI's existing finalFocus handling.
+  const hasControlFocus = useRef(false);
+  const previousCompact = useRef(compact);
   const returnFocus = useCallback(
     () =>
       container.current?.querySelector<HTMLButtonElement>("button:not(:disabled)") ??
       container.current,
     [],
   );
+  useLayoutEffect(() => {
+    const layoutChanged = previousCompact.current !== compact;
+    previousCompact.current = compact;
+    if (!layoutChanged || !hasControlFocus.current) return;
+    returnFocus()?.focus();
+  }, [compact, returnFocus]);
   /** Shares menu item dispatch and permission checks between compact and ended-discussion menus. */
   const menuItem = (action: Action) => (
     <MenuItem
@@ -50,7 +62,17 @@ export function DiscussionTitlebarActions({
     </MenuItem>
   );
   return (
-    <div ref={container} tabIndex={-1} className="ml-auto flex min-w-0 items-center gap-2">
+    <div
+      ref={container}
+      tabIndex={-1}
+      className="ml-auto flex min-w-0 items-center gap-2"
+      onFocusCapture={(event) => {
+        hasControlFocus.current = event.currentTarget.contains(event.target);
+      }}
+      onBlurCapture={(event) => {
+        hasControlFocus.current = event.currentTarget.contains(event.relatedTarget);
+      }}
+    >
       {compact ? (
         <Menu key="compact">
           <MenuTrigger
