@@ -90,14 +90,14 @@ export function DiffCommentAnnotation({
   return (
     <div
       data-diff-comment-annotation
-      className="px-3 py-2 font-sans text-foreground"
+      className="pn3-comment surface-glass mx-2 mt-1.5 mb-2 flex min-w-0 flex-col gap-2 rounded-pn3-comment p-2.5 font-sans text-control text-foreground shadow-pn3-comment"
       contentEditable={false}
       onPointerDown={(event) => event.stopPropagation()}
     >
       <Textarea
         ref={textareaRef}
         autoFocus={focusOnMount}
-        size="sm"
+        size="review"
         value={displayedText}
         placeholder={placeholder}
         aria-label={t.git.diff.commentLines(rangeLabel)}
@@ -117,16 +117,16 @@ export function DiffCommentAnnotation({
           }
         }}
       />
-      <div className="mt-1.5 flex items-center gap-1">
-        <span className="mr-auto text-3xs text-muted-foreground/70">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="mr-auto text-secondary-copy text-muted-foreground">
           {t.git.diff.ctrlEnterToSend}
         </span>
-        <Button variant="ghost-muted" size="xs" onClick={onCancel}>
+        <Button variant="ghost-muted" size="compact" onClick={onCancel}>
           {t.common.confirm.cancel}
         </Button>
         {secondaryAction ? (
           <Button
-            size="xs"
+            size="compact"
             variant="outline"
             disabled={!secondaryAction.allowEmpty && !trimmedText}
             onClick={() => secondaryAction.onAction(trimmedText)}
@@ -135,7 +135,11 @@ export function DiffCommentAnnotation({
             {secondaryAction.label}
           </Button>
         ) : null}
-        <Button size="xs" disabled={pending || !trimmedText} onClick={() => onComment(trimmedText)}>
+        <Button
+          size="compact"
+          disabled={pending || !trimmedText}
+          onClick={() => onComment(trimmedText)}
+        >
           {submitLabel}
         </Button>
       </div>

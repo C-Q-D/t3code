@@ -169,9 +169,9 @@ export function DiffFileTree({
   }, [model, paths, revealRequestId, selectedPath]);
 
   return (
-    <div className={cn("flex min-h-0 flex-1 flex-col bg-background", className)}>
+    <div className={cn("flex min-h-0 flex-1 flex-col rounded-card-row bg-transparent", className)}>
       <div
-        className="flex h-10 min-h-10 shrink-0 items-center gap-1 border-b border-border/60 bg-background px-2 text-xs text-muted-foreground in-data-[preview-panel-mode=inline]:mb-3 in-data-[preview-panel-mode=inline]:h-7 in-data-[preview-panel-mode=inline]:min-h-7 in-data-[preview-panel-mode=inline]:border-b-transparent"
+        className="mb-2 flex h-9.5 shrink-0 items-center gap-1 rounded-compact-row bg-input px-2 text-secondary-copy text-muted-foreground shadow-pn3-header"
         data-surface-subheader
       >
         <span className="px-1 font-medium text-foreground">{t.git.actions.files}</span>
@@ -183,7 +183,7 @@ export function DiffFileTree({
               render={
                 <Button
                   type="button"
-                  size="icon-xs"
+                  size="icon-compact-key"
                   variant="ghost"
                   aria-label={
                     allDirectoriesExpanded

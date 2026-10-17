@@ -255,6 +255,8 @@ const twMerge = extendTailwindMerge({
         "files-preview",
         "files-track",
         "settings-project-well",
+        "pn3-header",
+        "pn3-comment",
       ],
       "inset-shadow": [
         "selected",
@@ -350,6 +352,7 @@ const twMerge = extendTailwindMerge({
         "pn6-search-option",
         "pn6-match",
         "files-well",
+        "pn3-comment",
       ],
       leading: [
         "code",

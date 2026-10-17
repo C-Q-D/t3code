@@ -1,3 +1,4 @@
+/** Hosts the Diff toolbar and loading states inside the existing right-panel slab. */
 import type { ReactNode } from "react";
 
 import { isElectron } from "~/env";
@@ -5,19 +6,21 @@ import { cn } from "~/lib/utils";
 
 import { Skeleton } from "./ui/skeleton";
 
+/** Placement selected by the existing right-panel host. */
 export type DiffPanelMode = "inline" | "sheet" | "sidebar" | "embedded";
 
+/** Preserve native drag regions only where this Diff owns window chrome. */
 function getDiffPanelHeaderRowClassName(mode: DiffPanelMode) {
   const shouldUseDragRegion = isElectron && mode !== "sheet" && mode !== "embedded";
   return cn(
-    "flex items-center justify-between gap-2",
-    mode === "embedded" ? "px-2" : "px-4",
+    "pn3-toolbar flex min-h-8.5 shrink-0 flex-wrap items-center justify-between gap-0.5",
     shouldUseDragRegion
-      ? "drag-region h-[var(--workspace-topbar-height)] border-b border-border wco:pr-(--workspace-native-controls-inset)"
-      : "flex h-10 min-h-10 shrink-0 items-center border-b border-border/60 bg-background in-data-[preview-panel-mode=inline]:mb-3 in-data-[preview-panel-mode=inline]:h-7 in-data-[preview-panel-mode=inline]:min-h-7 in-data-[preview-panel-mode=inline]:border-b-transparent",
+      ? "drag-region min-h-(--workspace-topbar-height) wco:pr-(--workspace-native-controls-inset)"
+      : "h-auto",
   );
 }
 
+/** Render the scope toolbar and body; panel tabs remain owned by the parent. */
 export function DiffPanelShell(props: {
   mode: DiffPanelMode;
   header: ReactNode;
@@ -28,7 +31,7 @@ export function DiffPanelShell(props: {
   return (
     <div
       className={cn(
-        "flex h-full min-w-0 flex-col bg-background",
+        "flex h-full min-h-0 min-w-0 flex-col gap-2 bg-transparent px-3 pb-3",
         props.mode === "inline"
           ? "w-[42vw] min-w-[360px] max-w-[560px] shrink-0 border-l border-border"
           : "w-full",
@@ -46,13 +49,14 @@ export function DiffPanelShell(props: {
   );
 }
 
+/** Match the 38px K4 file header while metadata is loading. */
 export function DiffFileHeaderSkeleton({
   titleWidth,
 }: {
   titleWidth: "short" | "medium" | "long";
 }) {
   return (
-    <div className="flex h-8 items-center gap-2 px-2 pr-3">
+    <div className="flex h-9.5 items-center gap-2.5 rounded-compact-row bg-input px-3.5 shadow-pn3-header">
       <div className="flex size-5 shrink-0 items-center justify-center">
         <Skeleton className="size-2.5" />
       </div>
@@ -75,6 +79,7 @@ export function DiffFileHeaderSkeleton({
   );
 }
 
+/** Reserve one code placeholder row without starting a viewer or worker. */
 function DiffCodeLineSkeleton({ width }: { width: "short" | "medium" | "long" }) {
   return (
     <div className="flex items-center gap-3">
@@ -89,6 +94,7 @@ function DiffCodeLineSkeleton({ width }: { width: "short" | "medium" | "long" })
   );
 }
 
+/** Announce loading while preserving the file-list structure. */
 export function DiffPanelLoadingState(props: { label: string }) {
   return (
     <div

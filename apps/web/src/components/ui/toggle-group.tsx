@@ -44,6 +44,8 @@ function ToggleGroup({
         className,
         // SettingsPage8a M2/M3 adds a compact track without changing existing sizes.
         variant === "segmented" && size === "settings" && "h-8 rounded-card-row",
+        // Panel8a K4: compact 28px track with 2px inset around the segments.
+        variant === "segmented" && size === "panel" && "h-7 rounded-full p-0.5",
       )}
       data-size={size}
       data-slot="toggle-group"

@@ -14,11 +14,10 @@ import {
   ArrowRightIcon,
   CheckIcon,
   ChevronDownIcon,
-  Columns2Icon,
   FolderTreeIcon,
   PilcrowIcon,
-  Rows3Icon,
   TextWrapIcon,
+  TextSearchIcon,
 } from "lucide-react";
 import { ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown } from "lucide";
 import * as Schema from "effect/Schema";
@@ -39,7 +38,6 @@ import {
   buildFileDiffContentVersion,
   buildFileDiffIdentityKey,
   getDiffCollapseIconClassName,
-  getDiffLineStat,
   getRenderablePatch,
   resolveDiffThemeName,
   resolveFileDiffPath,
@@ -575,18 +573,7 @@ export default function DiffPanel({
     [renderableFileEntries],
   );
   const allDiffFilesCollapsed = areAllDiffFilesCollapsed(diffFileKeys, collapsedDiffFileKeys);
-  const diffLineStat = useMemo(() => {
-    if (!selectedTurn && selectedGitSource?.files) {
-      return selectedGitSource.files.reduce(
-        (total, file) => ({
-          additions: total.additions + file.additions,
-          deletions: total.deletions + file.deletions,
-        }),
-        { additions: 0, deletions: 0 },
-      );
-    }
-    return getDiffLineStat(renderableFiles);
-  }, [renderableFiles, selectedGitSource, selectedTurn]);
+
   const fileTreeEntries = useMemo(() => diffFileTreeEntries(renderableFiles), [renderableFiles]);
   const selectedDiffFileKey = selectedFilePath
     ? (codeViewFiles.find((candidate) => candidate.filePath === selectedFilePath)?.fileKey ?? null)
@@ -756,10 +743,10 @@ export default function DiffPanel({
 
   const headerRow = (
     <>
-      <div className="flex min-w-0 flex-1 items-center gap-3 [-webkit-app-region:no-drag]">
+      <div className="flex min-w-0 flex-1 items-center gap-2">
         <DropdownMenu>
           <DropdownMenuTrigger
-            render={<Button size="xs" variant="secondary" />}
+            render={<Button size="md" variant="secondary" />}
             className="max-w-full"
             aria-label={t.git.diff.scopeLabel(selectedScopeLabel)}
           >
@@ -929,22 +916,14 @@ export default function DiffPanel({
           </div>
         )}
       </div>
-      <div className="flex shrink-0 items-center gap-1 [-webkit-app-region:no-drag]">
-        {codeViewFiles.length > 0 || (!selectedTurn && selectedGitSource?.files?.length) ? (
-          <DiffStatLabel
-            additions={diffLineStat.additions}
-            deletions={diffLineStat.deletions}
-            className="mr-1 text-2xs"
-            layout="inline"
-          />
-        ) : null}
+      <div className="flex shrink-0 items-center gap-0.5">
         {canRefreshGitDiff && (
           <Tooltip>
             <TooltipTrigger
               render={
                 <Button
                   type="button"
-                  size="icon-sm"
+                  size="icon-compact-key"
                   variant="ghost"
                   aria-label={isRefreshingDiff ? t.git.diff.refreshingDiff : t.git.diff.refreshDiff}
                   onClick={refreshDiffFromUserAction}
@@ -964,7 +943,7 @@ export default function DiffPanel({
               render={
                 <Button
                   type="button"
-                  size="icon-sm"
+                  size="icon-compact-key"
                   variant="ghost"
                   aria-label={
                     allDiffFilesCollapsed ? t.git.diff.expandAllFiles : t.git.diff.collapseAllFiles
@@ -987,6 +966,7 @@ export default function DiffPanel({
           aria-label={t.git.diff.diffLayout}
           className="shrink-0"
           variant="segmented"
+          size="panel"
           value={[diffLayout]}
           onValueChange={(value) => {
             const next = value[0];
@@ -996,10 +976,10 @@ export default function DiffPanel({
           }}
         >
           <Toggle aria-label={t.git.diff.stackedDiffView} value="stacked">
-            <Rows3Icon className="size-3.5" />
+            {t.git.diff.stacked}
           </Toggle>
           <Toggle aria-label={t.git.diff.splitDiffView} value="split">
-            <Columns2Icon className="size-3.5" />
+            {t.git.diff.split}
           </Toggle>
         </ToggleGroup>
         <Tooltip>
@@ -1010,7 +990,7 @@ export default function DiffPanel({
                   wordWrap ? t.git.diff.disableDiffLineWrapping : t.git.diff.enableDiffLineWrapping
                 }
                 variant="ghost"
-                size="sm"
+                size="panel-icon"
                 pressed={wordWrap}
                 onPressedChange={(pressed) => {
                   setWordWrap(Boolean(pressed));
@@ -1020,9 +1000,7 @@ export default function DiffPanel({
           >
             <TextWrapIcon className="size-3.5" />
           </TooltipTrigger>
-          <TooltipPopup side="top">
-            {wordWrap ? t.git.diff.disableLineWrapping : t.git.diff.enableLineWrapping}
-          </TooltipPopup>
+          <TooltipPopup side="top">{t.git.diff.wrapLines}</TooltipPopup>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger
@@ -1034,7 +1012,7 @@ export default function DiffPanel({
                     : t.git.diff.hideWhitespaceChanges
                 }
                 variant="ghost"
-                size="sm"
+                size="panel-icon"
                 pressed={diffIgnoreWhitespace}
                 onPressedChange={(pressed) => {
                   setDiffIgnoreWhitespace(Boolean(pressed));
@@ -1044,11 +1022,23 @@ export default function DiffPanel({
           >
             <PilcrowIcon className="size-3.5" />
           </TooltipTrigger>
-          <TooltipPopup side="top">
-            {diffIgnoreWhitespace
-              ? t.git.diff.showWhitespaceChanges
-              : t.git.diff.hideWhitespaceChanges}
-          </TooltipPopup>
+          <TooltipPopup side="top">{t.git.diff.whitespaceChanges}</TooltipPopup>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                size="icon-compact-key"
+                variant="ghost-muted"
+                aria-label={t.git.diff.findAndReplace}
+                disabled={codeViewFiles.length === 0}
+                onClick={() => codeView?.getInstance()?.openSearch()}
+              />
+            }
+          >
+            <TextSearchIcon className="size-3.5" />
+          </TooltipTrigger>
+          <TooltipPopup side="top">{t.git.diff.findAndReplace}</TooltipPopup>
         </Tooltip>
         {diffFileKeys.length > 0 && (
           <Tooltip>
@@ -1057,7 +1047,7 @@ export default function DiffPanel({
                 <Toggle
                   aria-label={fileTreeOpen ? t.git.diff.hideFileTree : t.git.diff.showFileTree}
                   variant="ghost"
-                  size="sm"
+                  size="panel-icon"
                   pressed={fileTreeOpen}
                   onPressedChange={(pressed) => setFileTreeOpen(Boolean(pressed))}
                 />
@@ -1065,9 +1055,7 @@ export default function DiffPanel({
             >
               <FolderTreeIcon className="size-3.5" />
             </TooltipTrigger>
-            <TooltipPopup side="top">
-              {fileTreeOpen ? t.git.diff.hideFileTree : t.git.diff.showFileTree}
-            </TooltipPopup>
+            <TooltipPopup side="top">{t.git.diff.fileTree}</TooltipPopup>
           </Tooltip>
         )}
       </div>
@@ -1098,7 +1086,7 @@ export default function DiffPanel({
         )
       ) : (
         <>
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-transparent">
             {isSelectedPatchTruncated && !lazySource && (
               <p className="shrink-0 border-b border-border/70 bg-muted/40 px-3 py-1.5 text-2xs text-muted-foreground">
                 {t.git.diff.thisPreviewExceedsTheSizeLimitChangesShownAreIncomplete}
@@ -1250,7 +1238,7 @@ export default function DiffPanel({
                   />
                 </div>
                 {fileTreeOpen ? (
-                  <aside className="flex w-[min(16rem,40%)] min-w-40 shrink-0 border-l border-border/60">
+                  <aside className="pn3-file-tree-aside flex min-w-40 shrink-0 pl-2">
                     <DiffFileTree
                       ariaLabel={t.git.diff.sectionFiles(reviewSectionDisplayTitle)}
                       entries={fileTreeEntries}

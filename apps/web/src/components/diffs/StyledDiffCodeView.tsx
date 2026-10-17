@@ -73,32 +73,62 @@ export const DIFF_VIEW_UNSAFE_CSS = `${DIFF_SURFACE_THEME_UNSAFE_CSS}
   background-image: none !important;
 }
 
+/* K4 file headers are recessed 38px wells; the metrics below use the same height. */
 [data-file-info] {
   background-color: var(--code-background) !important;
   border-block-color: transparent !important;
   color: var(--code-foreground) !important;
 }
-
 [data-diffs-header] {
   position: sticky !important;
   top: 0;
   z-index: 4;
-  background-color: var(--code-background) !important;
-  border-bottom-color: transparent !important;
+  box-sizing: border-box;
+  background-color: var(--color-input) !important;
+  border: 0 !important;
+  border-radius: var(--radius-compact-row);
+  box-shadow: var(--shadow-pn3-header);
+  color: var(--color-foreground) !important;
   align-items: center !important;
-  font-family: var(--font-sans) !important;
-  font-size: 12px !important;
+  font-family: var(--font-mono) !important;
+  font-size: var(--text-secondary-copy) !important;
   line-height: 1 !important;
-  min-height: 32px !important;
-  padding-block: 6px !important;
-  padding-inline: 8px 12px !important;
+  height: calc(var(--spacing) * 9.5) !important;
+  min-height: calc(var(--spacing) * 9.5) !important;
+  padding-block: 0 !important;
+  padding-inline: calc(var(--spacing) * 3.5) !important;
 }
 
-[data-diffs-header]:hover {
-  /* A native scrollbar gutter cannot be painted by descendants. Use an inset edge cue instead
-     of a full-width band that would look accidentally clipped at the gutter. */
-  background-color: var(--code-background) !important;
-  box-shadow: inset 3px 0 color-mix(in srgb, var(--code-foreground) 24%, transparent);
+/* Keep the selected blue/orange or red/green palette; K4 changes tint strength only. */
+:is([data-diff], [data-file], [data-virtualizer-buffer]) {
+  --diffs-font-size: var(--text-code-copy);
+  --diffs-line-height: var(--text-code-copy--line-height);
+  --diffs-grid-number-column-width: calc(var(--spacing) * 11);
+  --diffs-bg-context-override: var(--code-background);
+  --diffs-addition-color-override: var(--diff-addition);
+  --diffs-deletion-color-override: var(--diff-deletion);
+  --diffs-bg-addition-override: color-mix(in srgb, var(--code-background) 90%, var(--diff-addition));
+  --diffs-bg-addition-number-override: var(--diffs-bg-addition-override);
+  --diffs-bg-deletion-override: color-mix(in srgb, var(--code-background) 90%, var(--diff-deletion));
+  --diffs-bg-deletion-number-override: var(--diffs-bg-deletion-override);
+}
+/* Pierre normally mixes a supplied tint again. Use K4's final 10% tint once,
+   while leaving its selected-line and hover layers above this base intact. */
+[data-background] :is([data-line], [data-column-number], [data-gutter-buffer], [data-no-newline])[data-line-type="change-addition"] {
+  --diffs-computed-diff-line-bg: var(--diffs-bg-addition-override);
+}
+[data-background] :is([data-line], [data-column-number], [data-gutter-buffer], [data-no-newline])[data-line-type="change-deletion"] {
+  --diffs-computed-diff-line-bg: var(--diffs-bg-deletion-override);
+}
+[data-column-number] {
+  color: var(--color-fg-control-disabled) !important;
+  padding-inline-end: calc(var(--spacing) * 2.5);
+}
+[data-indicators="classic"] [data-line] {
+  padding-inline-start: calc(var(--spacing) * 4);
+}
+[data-indicators="classic"] [data-line]::before {
+  width: calc(var(--spacing) * 4);
 }
 
 /* Hunk separators are the way to the unchanged lines between hunks. They keep the library's
@@ -137,10 +167,9 @@ export const DIFF_VIEW_UNSAFE_CSS = `${DIFF_SURFACE_THEME_UNSAFE_CSS}
   line-height: 1 !important;
 }
 
-/* Pierre clips file names with overflow: hidden for its start ellipsis. A 1em line box cuts off
-   descenders. Only the clipped names get room: 16px plus the header's 12px of padding stays
-   inside its 32px min-height, which diffHeaderHeight assumes. */
-[data-diffs-header] :is([data-title], [data-prev-name]) {
+/* Keep clipped names tall enough for descenders in single-file renderers too. */
+[data-diffs-header] [data-title],
+[data-diffs-header] [data-prev-name] {
   line-height: 16px !important;
 }
 
@@ -153,12 +182,24 @@ export const DIFF_VIEW_UNSAFE_CSS = `${DIFF_SURFACE_THEME_UNSAFE_CSS}
 [data-diffs-header] [data-additions-count],
 [data-diffs-header] [data-deletions-count] {
   font-family: var(--font-mono) !important;
-  font-size: 11px !important;
+  font-size: var(--text-secondary-copy) !important;
   font-variant-numeric: tabular-nums;
   line-height: 1 !important;
 }
 
-[data-diffs-header] [data-change-icon],
+[data-diffs-header] [data-additions-count] {
+  color: var(--diff-addition) !important;
+  order: 0;
+}
+[data-diffs-header] [data-deletions-count] {
+  color: var(--diff-deletion) !important;
+  order: 1;
+}
+/* K4 keeps the collapse key beside the path; renamed paths retain their direction arrow. */
+[data-diffs-header] [data-change-icon] {
+  display: none;
+}
+
 [data-diffs-header] [data-rename-icon] {
   display: block;
   flex-shrink: 0;
@@ -166,8 +207,7 @@ export const DIFF_VIEW_UNSAFE_CSS = `${DIFF_SURFACE_THEME_UNSAFE_CSS}
 
 [data-title] {
   cursor: pointer;
-  transition: color 120ms ease;
-  font-family: var(--font-sans) !important;
+  font-family: var(--font-mono) !important;
 }
 
 [data-title]:hover {
@@ -197,6 +237,20 @@ export const DIFF_VIEW_UNSAFE_CSS = `${DIFF_SURFACE_THEME_UNSAFE_CSS}
 }
 `;
 
+/* Only CodeView installs our split filename slot. Standalone PR excerpts retain Pierre's title. */
+const CODE_VIEW_FILENAME_CSS = `
+/* The React filename slot splits directory and basename, as K4 requires. */
+[data-diffs-header] [data-title] {
+  display: none;
+}
+[data-diffs-header] slot[name="header-filename-suffix"] {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+`;
+
+/** Caller options; this adapter owns CSS and the matching virtual row metrics. */
 export type StyledDiffCodeViewOptions<LAnnotation> = Omit<
   NonNullable<CodeViewProps<LAnnotation, undefined>["options"]>,
   "unsafeCSS" | "itemMetrics" | "layout"
@@ -221,28 +275,47 @@ export function StyledDiffCodeView<LAnnotation = undefined>({
   viewerRef,
   className,
   unsafeCSSExtra,
+  renderHeaderFilenameSuffix,
   ...props
 }: StyledDiffCodeViewProps<LAnnotation>) {
   return (
     <DiffWorkerPoolProvider>
       <CodeView<LAnnotation>
         {...props}
+        renderHeaderFilenameSuffix={(item) => {
+          const path = item.type === "file" ? item.file.name : item.fileDiff.name;
+          const split = path.lastIndexOf("/") + 1;
+          return (
+            <span className="flex min-w-0 flex-1 items-center gap-2">
+              <span
+                data-title
+                className="flex min-w-0 cursor-pointer font-mono text-secondary-copy"
+              >
+                <span className="truncate text-muted-foreground">{path.slice(0, split)}</span>
+                <span className="shrink-0 text-foreground">{path.slice(split)}</span>
+              </span>
+              {renderHeaderFilenameSuffix?.(item)}
+            </span>
+          );
+        }}
         {...(viewerRef ? { ref: viewerRef } : {})}
         // The custom element itself is focusable for keyboard scrolling. Its native outline sits
         // outside the panel clipping boundary; actual controls inside retain their own indicators.
         className={
           className
-            ? `diff-render-surface [--code-background:var(--background)] outline-none ${className}`
-            : "diff-render-surface [--code-background:var(--background)] outline-none"
+            ? `diff-render-surface pn3-code-view outline-none ${className}`
+            : "diff-render-surface pn3-code-view outline-none"
         }
         options={{
+          diffIndicators: "classic",
           ...options,
           searchMessages: t.git.diffSearch,
           unsafeCSS: unsafeCSSExtra
-            ? `${DIFF_VIEW_UNSAFE_CSS}\n${unsafeCSSExtra}`
-            : DIFF_VIEW_UNSAFE_CSS,
+            ? `${DIFF_VIEW_UNSAFE_CSS}\n${CODE_VIEW_FILENAME_CSS}\n${unsafeCSSExtra}`
+            : `${DIFF_VIEW_UNSAFE_CSS}\n${CODE_VIEW_FILENAME_CSS}`,
           itemMetrics: {
-            diffHeaderHeight: 32,
+            diffHeaderHeight: 38,
+            lineHeight: 22,
             hunkSeparatorHeight: 24,
             // Pierre uses its general file spacing as a fallback in expanded-file layout paths.
             // Keep it zero alongside the explicit paddingTop or expanding the first file can

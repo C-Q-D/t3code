@@ -455,3 +455,39 @@
     @apply rounded-tag bg-sidebar px-3 py-2 font-mono text-secondary-copy text-fg-detail;
   }
 }
+
+/* PN3 · 其余屏-1 K4 imports Panel8a: file header well and inline comment stone.
+   New tokens cover values absent from the shared contract; existing theme roles own color. */
+@theme {
+  --shadow-pn3-header:
+    inset 2px 3px 5px rgba(0, 0, 0, 0.66), inset -1px -1px 0 rgba(255, 255, 255, 0.07);
+  --shadow-pn3-comment:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09), 0 0 0 1px rgba(0, 0, 0, 0.44), 0 2px 0 #09090a,
+    6px 10px 16px -4px rgba(0, 0, 0, 0.66);
+  --radius-pn3-comment: 14px;
+}
+
+/* Native drag regions must not swallow toolbar input in the standalone placement. */
+.pn3-toolbar > * {
+  -webkit-app-region: no-drag;
+}
+.pn3-file-tree-aside {
+  width: min(16rem, 40%);
+}
+
+/* Pierre owns these shadow roots. Supply inherited tokens rather than per-line React state. */
+.pn3-code-view {
+  --code-background: var(--background);
+  --diffs-font-size: var(--text-code-copy);
+  --diffs-line-height: var(--text-code-copy--line-height);
+  --diffs-search-panel-bg: var(--popover);
+  --diffs-search-panel-fg: var(--foreground);
+  --diffs-search-panel-accent: var(--primary);
+}
+.pn3-code-view [data-diff-comment-annotation].pn3-comment {
+  margin-inline-start: calc(var(--spacing) * 15);
+}
+/* Standalone file previews and PR excerpts use a smaller inset in narrow containers. */
+.pn3-comment {
+  margin-inline-start: min(calc(var(--spacing) * 15), 10%);
+}

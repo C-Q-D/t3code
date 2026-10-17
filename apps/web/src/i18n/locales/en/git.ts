@@ -969,6 +969,9 @@ export const git = {
     preparingPullRequestThread: "Preparing pull request thread",
   },
   diff: {
+    whitespaceChanges: "Whitespace changes",
+    fileTree: "File tree",
+    findAndReplace: "Find and replace",
     diffOptions: "Diff options",
     wrapLines: "Wrap lines",
     stacked: "Stacked",

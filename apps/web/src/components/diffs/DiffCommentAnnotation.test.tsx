@@ -1,3 +1,4 @@
+/** Checks comment content and action availability; visual geometry follows the K4 board. */
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vite-plus/test";
 
@@ -25,8 +26,6 @@ describe("DiffCommentAnnotation", () => {
     expect(markup).toContain("Add a comment…");
     expect(markup).toContain(">Comment</button>");
     expect(markup).toContain("autofocus");
-    // The comment box is the standard small Textarea, not a bespoke surface.
-    expect(markup).toMatch(/<span[^>]*data-size="sm"[^>]*data-slot="textarea-control"/);
   });
 
   it("lets a pull-request diff configure actions without replacing the composer", () => {
