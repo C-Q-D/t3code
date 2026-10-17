@@ -23,6 +23,22 @@ export function discussionTemplatesLoadError(
 }
 
 /**
+ * Assigns announcement ownership while every affected section keeps its visible error.
+ * Called only when a section displays an error; shared prompt failures belong to persona.
+ * @param section Section displaying a subscription failure.
+ * @param templatesError Failure from the template subscription itself.
+ * @returns The live alert role only for the section that owns the failing subscription.
+ */
+export function discussionSettingsErrorRole(
+  section: "persona" | "summary" | "templates",
+  templatesError: string | null,
+): "alert" | undefined {
+  return section === "persona" || (section === "templates" && Boolean(templatesError))
+    ? "alert"
+    : undefined;
+}
+
+/**
  * Projects visible labels and ordered operations; builtins cannot be deleted.
  * @param prompt Ownership and server-computed modification state.
  * @returns Labels in display order and operations in left-to-right order, before permission gating.

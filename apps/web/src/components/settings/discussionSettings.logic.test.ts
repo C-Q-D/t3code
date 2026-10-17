@@ -15,6 +15,7 @@ import {
   discussionPromptRow,
   discussionSeatSummary,
   discussionTemplatesLoadError,
+  discussionSettingsErrorRole,
 } from "./discussionSettings.logic";
 import { getSettingsSearchTargetScope, searchSettings } from "./settingsSearch";
 
@@ -38,6 +39,21 @@ describe("discussion settings", () => {
     expect(discussionTemplatesLoadError(null, "Prompt subscription failed")).toBe(
       "Prompt subscription failed",
     );
+  });
+  it("announces a shared prompt failure once while retaining all three visible errors", () => {
+    expect(discussionTemplatesLoadError(null, "Prompt subscription failed")).toBe(
+      "Prompt subscription failed",
+    );
+    expect(discussionSettingsErrorRole("persona", null)).toBe("alert");
+    expect(discussionSettingsErrorRole("summary", null)).toBeUndefined();
+    expect(discussionSettingsErrorRole("templates", null)).toBeUndefined();
+  });
+  it("announces the template subscription's own failure independently", () => {
+    expect(
+      discussionTemplatesLoadError("Template subscription failed", "Prompt subscription failed"),
+    ).toBe("Template subscription failed");
+    expect(discussionSettingsErrorRole("templates", "Template subscription failed")).toBe("alert");
+    expect(discussionSettingsErrorRole("summary", "Template subscription failed")).toBeUndefined();
   });
   it("finds the discussions page by both languages and keeps its scope available", () => {
     expect(searchSettings("discussions").some((item) => item.to === "/settings/discussions")).toBe(

@@ -49,6 +49,7 @@ import {
   discussionPromptRow,
   discussionSeatSummary,
   discussionTemplatesLoadError,
+  discussionSettingsErrorRole,
 } from "./discussionSettings.logic";
 import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settingsLayout";
 
@@ -230,7 +231,10 @@ function DiscussionEnvironmentSettings({
           }
         >
           {promptsQuery.error ? (
-            <div className="discussion-settings-state py-2.5" role="alert">
+            <div
+              className="discussion-settings-state py-2.5"
+              role={discussionSettingsErrorRole(kind, templatesQuery.error)}
+            >
               <p className="text-foreground">{t.settings.discussions.loadError}</p>
               <p className="text-secondary-copy-medium">{promptsQuery.error}</p>
             </div>
@@ -343,7 +347,10 @@ function DiscussionEnvironmentSettings({
         }
       >
         {templatesLoadError ? (
-          <div className="discussion-settings-state py-2.5" role="alert">
+          <div
+            className="discussion-settings-state py-2.5"
+            role={discussionSettingsErrorRole("templates", templatesQuery.error)}
+          >
             <p className="text-foreground">{t.settings.discussions.loadError}</p>
             <p className="text-secondary-copy-medium">{templatesLoadError}</p>
           </div>

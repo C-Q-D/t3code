@@ -56,3 +56,38 @@ it.each([
     }
   },
 );
+
+/** Mixed appearances must share one interaction and announcement region. */
+it("keeps default and striped notifications in one viewport", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  try {
+    await act(async () => {
+      root.render(<ToastProvider timeout={0} />);
+    });
+    await act(async () => {
+      toastManager.add({ type: "error", title: "Default failure", priority: "high" });
+      toastManager.add({
+        type: "error",
+        title: "Striped failure",
+        description: "Original failure",
+        data: { appearance: "error-stripe" },
+      });
+    });
+    const viewports = document.querySelectorAll('[data-slot="toast-viewport"]');
+    expect(viewports).toHaveLength(1);
+    expect(
+      Array.from(
+        viewports[0]!.querySelectorAll('[data-slot="toast-title"]'),
+        (node) => node.textContent,
+      ),
+    ).toEqual(expect.arrayContaining(["Default failure", "Striped failure"]));
+    expect(document.querySelectorAll('[role="alert"]')).toHaveLength(1);
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+    vi.unstubAllGlobals();
+  }
+});

@@ -558,32 +558,23 @@ function ThreadToastVisibleAutoDismiss({
   return null;
 }
 
-/** Keeps the configured H3 position; opt-in L4 errors use their separate bottom-right stack. */
+/** Keeps all appearances in one viewport so interaction and announcement state have one owner. */
 function ToastProvider({ children, position = "top-right", ...props }: ToastProviderProps) {
   return (
     <Toast.Provider toastManager={toastManager} {...props}>
       {children}
       <Toasts position={position} />
-      <Toasts position="bottom-right" appearance="error-stripe" />
     </Toast.Provider>
   );
 }
 
 /** Renders managed toasts at position; appearance is opt-in and dismissal remains keyboard accessible. */
-function Toasts({
-  position,
-  appearance,
-}: {
-  position: ToastPosition;
-  appearance?: "error-stripe";
-}) {
+function Toasts({ position }: { position: ToastPosition }) {
   const { toasts } = Toast.useToastManager<ThreadToastData>();
   const activeThreadRef = useActiveThreadRefFromRoute();
   const isTop = position.startsWith("top");
-  const visibleToasts = toasts.filter(
-    (toast) =>
-      toast.data?.appearance === appearance &&
-      shouldRenderThreadScopedToast(toast.data, activeThreadRef),
+  const visibleToasts = toasts.filter((toast) =>
+    shouldRenderThreadScopedToast(toast.data, activeThreadRef),
   );
   const visibleToastLayout = buildVisibleToastLayout(visibleToasts);
 
@@ -595,8 +586,6 @@ function Toasts({
       }
     }
   }, [toasts]);
-
-  if (appearance && visibleToasts.length === 0) return null;
 
   return (
     <Toast.Portal data-slot="toast-portal">
