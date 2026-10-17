@@ -137,8 +137,8 @@ function PullRequestRowImpl({
       data-pull-request-stats-key={statsKey}
       data-pull-request-key={statsKey}
       className={cn(
-        // Keep the action buttons inside the same skipped row, but outside its selection button.
-        "group/pr-page-row relative rounded-card-row pr-list-row",
+        // Shared columns reserve the actions' actual width without narrowing the metadata lines.
+        "group/pr-page-row relative rounded-card-row pr-list-row pr-list-row-layout",
         hasExtraLine && "pr-list-row-expanded",
         selected
           ? "bg-raise-toolbar shadow-raise-m"
@@ -150,11 +150,11 @@ function PullRequestRowImpl({
         aria-current={selected ? "true" : undefined}
         onClick={() => onSelect(entry)}
         className={cn(
-          "flex w-full min-w-0 cursor-pointer flex-col gap-1 rounded-card-row px-3 py-2.5 text-left outline-none focus-visible:inset-shadow-focus",
+          "col-span-2 col-start-1 row-start-1 grid min-w-0 cursor-pointer grid-cols-subgrid content-start gap-y-1 rounded-card-row px-3 py-2.5 text-left outline-none focus-visible:inset-shadow-focus",
           hasExtraLine ? "min-h-27" : "min-h-21.5",
         )}
       >
-        <span className="flex w-full min-w-0 items-center gap-1.5">
+        <span className="col-start-1 flex w-full min-w-0 items-center gap-1.5">
           {entry.isDraft && entry.state === "open" ? (
             <Badge size="sm" variant="neutral">
               {t.git.pullRequest.draft}
@@ -170,7 +170,7 @@ function PullRequestRowImpl({
             {entry.title}
           </span>
         </span>
-        <span className="flex w-full min-w-0 items-center gap-2 font-mono text-pr-list-meta text-muted-foreground">
+        <span className="col-span-2 flex w-full min-w-0 items-center gap-2 font-mono text-pr-list-meta text-muted-foreground">
           <PullRequestStateGlyph state={entry.state} isDraft={entry.isDraft} className="size-3" />
           {/* The number keeps the request's own copy/open context menu. */}
           <span
@@ -232,7 +232,7 @@ function PullRequestRowImpl({
             className="font-mono"
           />
         </span>
-        <span className="@container/pr-row-meta flex w-full min-w-0 items-center gap-1.5 text-secondary-copy text-muted-foreground">
+        <span className="@container/pr-row-meta col-span-2 flex w-full min-w-0 items-center gap-1.5 text-secondary-copy text-muted-foreground">
           <span className="min-w-0 flex-1">
             <PullRequestRowBranches head={entry.headBranch} base={entry.baseBranch} />
           </span>
@@ -249,7 +249,7 @@ function PullRequestRowImpl({
           ) : null}
         </span>
         {hasExtraLine ? (
-          <span className="@container/pr-row-meta flex w-full min-w-0 items-center gap-1.5 text-secondary-copy text-muted-foreground">
+          <span className="@container/pr-row-meta col-span-2 flex w-full min-w-0 items-center gap-1.5 text-secondary-copy text-muted-foreground">
             {matchedElsewhere ? (
               <Tooltip>
                 <TooltipTrigger
@@ -291,8 +291,8 @@ function PullRequestRowImpl({
       {hostActions.size > 0 ? (
         <div
           className={cn(
-            "pr-list-actions absolute right-2 top-2 hidden rounded-full bg-secondary group-hover/pr-page-row:flex group-focus-within/pr-page-row:flex",
-            speedMode && "flex",
+            "pr-list-actions col-start-2 row-start-1 ml-1.5 mr-2 mt-2 hidden self-start rounded-full bg-secondary group-hover/pr-page-row:flex group-focus-within/pr-page-row:flex",
+            speedMode && "flex mt-1.25",
           )}
         >
           <PullRequestListActions

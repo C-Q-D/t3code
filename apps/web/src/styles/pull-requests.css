@@ -106,3 +106,14 @@
 @utility pr-popup {
   -webkit-app-region: no-drag;
 }
+
+/* PRPage8a title actions size their own column; the selection button shares it through subgrid. */
+@utility pr-list-row-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+
+  /* Host capabilities can exist without an action for this row; an empty group reserves nothing. */
+  & > .pr-list-actions:not(:has(button)) {
+    display: none;
+  }
+}
