@@ -310,6 +310,7 @@ const twMerge = extendTailwindMerge({
         "discussion-diff-well",
         "discussion-diff-header",
         "discussion-diff-overlay",
+        "archive-thread-inset",
       ],
       "inset-shadow": [
         "selected",
@@ -418,6 +419,7 @@ const twMerge = extendTailwindMerge({
         "source-control-icon",
         "discussion-diff-skeleton",
         "compact-stepper-key",
+        "archive-thread-icon",
       ],
       leading: [
         "code",
@@ -440,6 +442,7 @@ const twMerge = extendTailwindMerge({
         "ov3-hint",
         "ov3-report",
         "sidebar-context-drag",
+        "archive-thread-empty",
       ],
       tracking: ["brand", "chat-draft", "timeline-secret"],
     },

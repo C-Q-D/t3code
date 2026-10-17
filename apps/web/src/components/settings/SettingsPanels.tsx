@@ -9,7 +9,6 @@ import { NotificationSettings } from "./NotificationSettings";
 import { PRIVACY_POLICY_URL } from "../../legalLinks";
 import {
   ArchiveIcon,
-  ArchiveX,
   CheckIcon,
   ChevronRightIcon,
   FolderOpenIcon,
@@ -3551,6 +3550,11 @@ export function GeneralSettingsPanel() {
   );
 }
 
+/**
+ * Renders scoped archive groups with P3 list wells, preserving snapshot ordering.
+ * Successful mutations refresh snapshots; deletion requires confirmation and failures use toasts.
+ * @returns Project groups or the existing loading, error, and empty states.
+ */
 export function ArchivedThreadsPanel() {
   const { scope } = useSettingsScope();
   const { unarchiveThread, confirmAndDeleteThread } = useThreadActions();
@@ -3666,27 +3670,27 @@ export function ArchivedThreadsPanel() {
           id={isLoadingArchive ? undefined : searchableSetting("archive").id}
           title={searchableSetting("archive").title}
         >
-          <SettingsRow
-            title={
-              <span className="inline-flex items-center gap-2">
-                {isLoadingArchive ? (
+          <div className="archive-thread-list">
+            <div className="archive-thread-empty" role="status">
+              {isLoadingArchive && (
+                <span className="mb-2 inline-flex">
                   <Spinner size="sm" tone="muted" />
-                ) : (
-                  <ArchiveIcon className="size-3.5 text-muted-foreground" />
-                )}
+                </span>
+              )}
+              <p>
                 {isLoadingArchive
                   ? t.settings.archive.loading
                   : archiveError
                     ? t.settings.archive.loadError
                     : t.settings.archive.empty}
-              </span>
-            }
-            description={
-              isLoadingArchive
-                ? t.settings.archive.loadingHint
-                : (archiveError ?? t.settings.archive.emptyHint)
-            }
-          />
+              </p>
+              <p>
+                {isLoadingArchive
+                  ? t.settings.archive.loadingHint
+                  : (archiveError ?? t.settings.archive.emptyHint)}
+              </p>
+            </div>
+          </div>
         </SettingsSection>
       ) : (
         archivedGroups.map(({ project, threads: projectThreads }, index) => (
@@ -3696,47 +3700,57 @@ export function ArchivedThreadsPanel() {
             title={project.title}
             icon={<ProjectFavicon project={project} />}
           >
-            {projectThreads.map((thread) => (
-              <SettingsRow
-                key={thread.id}
-                onContextMenu={(event) => {
-                  event.preventDefault();
-                  void (async () => {
-                    const result = await settlePromise(() =>
-                      handleArchivedThreadContextMenu(
-                        scopeThreadRef(thread.environmentId, thread.id),
-                        {
-                          x: event.clientX,
-                          y: event.clientY,
-                        },
-                      ),
-                    );
-                    if (result._tag === "Failure") {
-                      const error = squashAtomCommandFailure(result);
-                      toastManager.add(
-                        stackedThreadToast({
-                          type: "error",
-                          title: t.settings.archive.actionError,
-                          description:
-                            error instanceof Error
-                              ? error.message
-                              : t.settings.archive.actionErrorDescription,
-                        }),
+            <div className="archive-thread-list">
+              {projectThreads.map((thread) => (
+                <div
+                  className="archive-thread-row"
+                  key={thread.id}
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    void (async () => {
+                      const result = await settlePromise(() =>
+                        handleArchivedThreadContextMenu(
+                          scopeThreadRef(thread.environmentId, thread.id),
+                          {
+                            x: event.clientX,
+                            y: event.clientY,
+                          },
+                        ),
                       );
-                    }
-                  })();
-                }}
-                title={thread.title}
-                description={t.settings.archive.historyHint(
-                  formatRelativeTimeLabel(thread.archivedAt ?? thread.createdAt),
-                  formatRelativeTimeLabel(thread.createdAt),
-                )}
-                control={
+                      if (result._tag === "Failure") {
+                        const error = squashAtomCommandFailure(result);
+                        toastManager.add(
+                          stackedThreadToast({
+                            type: "error",
+                            title: t.settings.archive.actionError,
+                            description:
+                              error instanceof Error
+                                ? error.message
+                                : t.settings.archive.actionErrorDescription,
+                          }),
+                        );
+                      }
+                    })();
+                  }}
+                >
+                  <span className="archive-thread-icon" aria-hidden="true">
+                    <ArchiveIcon className="size-3.75" strokeWidth={1.75} />
+                  </span>
+                  <div className="flex min-w-0 flex-1 flex-col gap-0.25">
+                    <div className="truncate text-control leading-normal font-semibold">
+                      {thread.title}
+                    </div>
+                    <div className="truncate text-secondary-copy-medium leading-normal text-secondary-label">
+                      {t.settings.archive.historyHint(
+                        formatRelativeTimeLabel(thread.archivedAt ?? thread.createdAt),
+                        formatRelativeTimeLabel(thread.createdAt),
+                      )}
+                    </div>
+                  </div>
                   <Button
                     type="button"
-                    variant="outline"
-                    size="xs"
-                    className="shrink-0"
+                    variant="secondary"
+                    size="settings-list"
                     onClick={() => {
                       void (async () => {
                         const result = await unarchiveThread(
@@ -3762,12 +3776,11 @@ export function ArchivedThreadsPanel() {
                       })();
                     }}
                   >
-                    <ArchiveX className="size-3.5" />
                     <span>{t.settings.archive.unarchive}</span>
                   </Button>
-                }
-              />
-            ))}
+                </div>
+              ))}
+            </div>
           </SettingsSection>
         ))
       )}

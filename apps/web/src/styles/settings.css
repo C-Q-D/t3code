@@ -273,3 +273,26 @@
     padding-right: --spacing(9);
   }
 }
+
+/* ST12 — 其余屏-6 P3 imports SettingsPage8a: archive icon/empty wells and empty copy rhythm. */
+@theme {
+  --color-archive-thread-well: #151517;
+  --radius-archive-thread-icon: 9px;
+  --shadow-archive-thread-inset: inset 1.5px 2px 3px rgba(0, 0, 0, 0.6);
+  --leading-archive-thread-empty: 1.65;
+}
+
+@layer components {
+  .archive-thread-list {
+    @apply flex flex-col gap-0.5 rounded-settings-row-surface py-2.5 pr-3 pl-3.5;
+  }
+  .archive-thread-row {
+    @apply flex min-h-12 items-center gap-3 rounded-settings-row-surface py-2 pr-1.5 pl-2.5;
+  }
+  .archive-thread-icon {
+    @apply flex size-8 shrink-0 items-center justify-center rounded-archive-thread-icon bg-archive-thread-well shadow-archive-thread-inset;
+  }
+  .archive-thread-empty {
+    @apply rounded-settings-row-surface bg-archive-thread-well px-4 py-4.5 text-center text-secondary-copy-large leading-archive-thread-empty text-secondary-label shadow-archive-thread-inset;
+  }
+}
