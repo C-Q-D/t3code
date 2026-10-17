@@ -753,8 +753,6 @@ export const git: Messages["git"] = {
     workspaceRepositoryPlaceholder: "工作区/仓库",
     projectRepositoryPlaceholder: "项目/仓库",
     detachedHead: "（HEAD已分离）",
-    /** Reports selected files and total files. */
-    selectedFileCounts: (selected, total) => `（${selected} / ${total}）`,
     /** Formats elapsedSeconds using seconds. */
     elapsedSeconds: (seconds) => `${seconds}秒`,
     /** Formats elapsedMinutes using minutes, seconds. */
@@ -903,7 +901,6 @@ export const git: Messages["git"] = {
     files: "文件",
     edit: "编辑",
     none: "无",
-    excluded: "已排除",
     /** Formats the selected and total file counts with locale-specific punctuation. */
     fileSelectionLabel: (selected: number, total: number) => `文件（${selected} / ${total}）`,
     commitMessageOptional: "提交消息（可选）",

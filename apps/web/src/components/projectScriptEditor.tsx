@@ -60,7 +60,7 @@ import {
 } from "./ui/dialog";
 import { Input } from "./ui/input";
 import { Kbd } from "./ui/kbd";
-import { formatShortcutKeyLabel } from "../keybindings";
+import { formatShortcutKeycaps } from "../keybindings";
 import { parseKeybindingShortcut } from "@t3tools/shared/keybindings";
 
 const SCRIPT_ICONS: Array<{ id: ProjectScriptIcon; label: string }> = [
@@ -379,13 +379,9 @@ export function ProjectScriptEditorDialog({
                         aria-hidden
                       >
                         {shortcut ? (
-                          <>
-                            {shortcut.modKey || shortcut.ctrlKey ? <Kbd>Ctrl</Kbd> : null}
-                            {shortcut.altKey ? <Kbd>Alt</Kbd> : null}
-                            {shortcut.shiftKey ? <Kbd>Shift</Kbd> : null}
-                            {shortcut.metaKey ? <Kbd>Meta</Kbd> : null}
-                            <Kbd>{formatShortcutKeyLabel(shortcut.key)}</Kbd>
-                          </>
+                          formatShortcutKeycaps(shortcut).map((label) => (
+                            <Kbd key={label}>{label}</Kbd>
+                          ))
                         ) : keybinding ? (
                           <Kbd>{keybinding}</Kbd>
                         ) : null}

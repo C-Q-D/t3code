@@ -1,3 +1,4 @@
+/** Tests action-editor saves and captured shortcut labels through the rendered editor. */
 import { EnvironmentId } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
 import { AsyncResult } from "effect/reactivity";
@@ -247,5 +248,60 @@ describe("project action editor save lifecycle", () => {
       await completion;
     });
     expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+describe("project action shortcut keycaps", () => {
+  it.each([
+    {
+      name: "macOS mod displays Command",
+      platform: "MacIntel",
+      metaKey: true,
+      ctrlKey: false,
+      binding: "mod+t",
+      caps: ["⌘", "T"],
+    },
+    {
+      name: "macOS Command+Control displays separate keycaps",
+      platform: "MacIntel",
+      metaKey: true,
+      ctrlKey: true,
+      binding: "mod+ctrl+t",
+      caps: ["⌃", "⌘", "T"],
+    },
+    {
+      name: "non-macOS mod displays Ctrl",
+      platform: "Win32",
+      metaKey: false,
+      ctrlKey: true,
+      binding: "mod+t",
+      caps: ["Ctrl", "T"],
+    },
+    {
+      name: "non-macOS Control+Meta displays separate keycaps",
+      platform: "Win32",
+      metaKey: true,
+      ctrlKey: true,
+      binding: "mod+meta+t",
+      caps: ["Ctrl", "Meta", "T"],
+    },
+  ])("$name", ({ platform, metaKey, ctrlKey, binding, caps }) => {
+    vi.stubGlobal("navigator", { platform });
+    open(request("build"));
+    act(() => {
+      renderer!.root.findByProps({ id: "script-keybinding" }).props.onKeyDown({
+        key: "t",
+        code: "KeyT",
+        metaKey,
+        ctrlKey,
+        altKey: false,
+        shiftKey: false,
+        preventDefault() {},
+      });
+    });
+    expect(renderer!.root.findByProps({ id: "script-keybinding" }).props.value).toBe(binding);
+    expect(renderer!.root.findAllByType("kbd").map((keycap) => keycap.children.join(""))).toEqual(
+      caps,
+    );
   });
 });

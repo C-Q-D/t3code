@@ -199,10 +199,16 @@ export function formatShortcutKeyLabel(key: string): string {
   return key.slice(0, 1).toUpperCase() + key.slice(1);
 }
 
-export function formatShortcutLabel(
+/**
+ * Returns ordered keycap labels using the same platform resolution as shortcut matching.
+ * @param shortcut Parsed binding; explicit Control and Meta remain independent of mod.
+ * @param platform Client platform, defaulting to navigator.platform.
+ * @returns Modifier labels followed by the formatted key, using macOS symbols on Mac.
+ */
+export function formatShortcutKeycaps(
   shortcut: KeybindingShortcut,
   platform = navigator.platform,
-): string {
+): string[] {
   const keyLabel = formatShortcutKeyLabel(shortcut.key);
   const useMetaForMod = isMacPlatform(platform);
   const showMeta = shortcut.metaKey || (shortcut.modKey && useMetaForMod);
@@ -210,17 +216,21 @@ export function formatShortcutLabel(
   const showAlt = shortcut.altKey;
   const showShift = shortcut.shiftKey;
 
-  if (useMetaForMod) {
-    return `${showCtrl ? "\u2303" : ""}${showAlt ? "\u2325" : ""}${showShift ? "\u21e7" : ""}${showMeta ? "\u2318" : ""}${keyLabel}`;
-  }
-
   const parts: string[] = [];
-  if (showCtrl) parts.push("Ctrl");
-  if (showAlt) parts.push("Alt");
-  if (showShift) parts.push("Shift");
-  if (showMeta) parts.push("Meta");
+  if (showCtrl) parts.push(useMetaForMod ? "⌃" : "Ctrl");
+  if (showAlt) parts.push(useMetaForMod ? "⌥" : "Alt");
+  if (showShift) parts.push(useMetaForMod ? "⇧" : "Shift");
+  if (showMeta) parts.push(useMetaForMod ? "⌘" : "Meta");
   parts.push(keyLabel);
-  return parts.join("+");
+  return parts;
+}
+
+/** Formats a binding as one label; platform defaults to the client's navigator.platform. */
+export function formatShortcutLabel(
+  shortcut: KeybindingShortcut,
+  platform = navigator.platform,
+): string {
+  return formatShortcutKeycaps(shortcut, platform).join(isMacPlatform(platform) ? "" : "+");
 }
 
 export function shortcutLabelForCommand(

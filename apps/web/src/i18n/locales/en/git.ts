@@ -793,8 +793,6 @@ export const git = {
     workspaceRepositoryPlaceholder: "workspace/repository",
     projectRepositoryPlaceholder: "project/repository",
     detachedHead: "(detached HEAD)",
-    /** Reports selected files and total files. */
-    selectedFileCounts: (selected: number, total: number) => `(${selected} of ${total})`,
     /** Formats elapsedSeconds using seconds. */
     elapsedSeconds: (seconds: number) => `${seconds}s`,
     /** Formats elapsedMinutes using minutes, seconds. */
@@ -956,7 +954,6 @@ export const git = {
     files: "Files",
     edit: "Edit",
     none: "none",
-    excluded: "Excluded",
     /** Formats the selected and total file counts with locale-specific punctuation. */
     fileSelectionLabel: (selected: number, total: number) => `Files (${selected} / ${total})`,
     commitMessageOptional: "Commit message (optional)",
