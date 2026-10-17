@@ -165,8 +165,8 @@ export function useThreadActionMenu(input: {
       void (async () => {
         const api = readLocalApi();
         if (!api) return;
-        // Snapshot at open time — the menu is modal, so state read now is
-        // what the user is looking at.
+        // Snapshot the rows at open time to match the user's visible choices.
+        // The titlebar menu is non-modal; mutations still recheck permission below.
         const thread = readThreadShell(threadRef);
         if (!thread) return;
         const now = new Date();

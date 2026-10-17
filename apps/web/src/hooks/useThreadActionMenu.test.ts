@@ -154,6 +154,7 @@ const target = {
   threadId: ThreadId.make("thread"),
 };
 const position = { x: 10, y: 20 };
+/** Creates a secondary-environment menu; effects record the chosen command without server I/O. */
 const createMenu = () =>
   useThreadActionMenu({
     threadRef: target,

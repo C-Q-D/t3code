@@ -1,5 +1,7 @@
-// @vitest-environment jsdom
-/** Draft ownership cases are existing behavior snapshots, not new requirements; C2 adds the scratch entry. */
+/**
+ * Draft ownership snapshots and C2's scratch entry use the real project picker and draft store.
+ * @vitest-environment jsdom
+ */
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { EnvironmentId, ProjectId, ProviderInstanceId } from "@t3tools/contracts";

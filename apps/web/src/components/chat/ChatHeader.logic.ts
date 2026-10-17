@@ -14,13 +14,25 @@ const titlebarMenuGroups: readonly (readonly ThreadActionMenuId[])[] = [
 /**
  * Groups existing commands like V2 and exposes Copy's children as individual rows.
  * @param items Shared menu snapshot including capability, permission and lifecycle gating.
+ * @param copyLabels Localized standalone action labels; submenu nouns lose their Copy parent here.
  * @returns New top-level rows; nested snooze/settings choices and all action flags stay intact.
  * Unknown commands retain their input order in a final group so no action silently disappears.
  */
 export function buildTitlebarThreadMenuItems(
   items: readonly ContextMenuItem<ThreadActionMenuId>[],
+  copyLabels: Readonly<Record<"copy-path" | "copy-branch" | "copy-thread-id", string>>,
 ): readonly ContextMenuItem<ThreadActionMenuId>[] {
-  const rows = items.flatMap((item) => (item.id === "copy" ? (item.children ?? []) : [item]));
+  const rows = items.flatMap((item) =>
+    item.id === "copy"
+      ? (item.children ?? []).map((child) => ({
+          ...child,
+          label:
+            child.id === "copy-path" || child.id === "copy-branch" || child.id === "copy-thread-id"
+              ? copyLabels[child.id]
+              : child.label,
+        }))
+      : [item],
+  );
   const positions = new Map(
     titlebarMenuGroups
       .flatMap((group, groupIndex) => group.map((id) => ({ id, groupIndex })))

@@ -87,6 +87,7 @@ interface ChatHeaderProps {
   parentThreadLink: { threadId: ThreadId; title: string } | null;
   onOpenThread: (threadId: ThreadId) => void;
   actions: ReactNode;
+  /** Full-width titlebar reference for details, including drafts without visible actions. */
   popoverAnchorRef: RefObject<HTMLElement | null>;
   onNewThreadInProject: () => void;
   onOpenProjectSettings?: (() => void) | undefined;
@@ -194,7 +195,16 @@ export const ChatHeader = memo(function ChatHeader({
   const activeProjectName = activeProject?.title;
   const activeProjectCwd = activeProject?.workspaceRoot ?? null;
   const interfaceFont = useClientSettings((settings) => settings.fontFamilySans);
-  const [breadcrumbContainer, setBreadcrumbContainer] = useState<HTMLDivElement | null>(null);
+  const [breadcrumbContainer, setBreadcrumbElement] = useState<HTMLDivElement | null>(null);
+  // Keyboard-opened draft details have no action trigger. The persistent titlebar
+  // supplies an anchor with usable width even while the actions slot is empty.
+  const setBreadcrumbContainer = useCallback(
+    (element: HTMLDivElement | null) => {
+      setBreadcrumbElement(element);
+      popoverAnchorRef.current = element?.closest<HTMLElement>("[data-window-titlebar]") ?? null;
+    },
+    [popoverAnchorRef],
+  );
   const [collapseParentTitle, setCollapseParentTitle] = useState(false);
   const activeThreadRef = useMemo(
     () => scopeThreadRef(activeThreadEnvironmentId, activeThreadId),
@@ -334,7 +344,14 @@ export const ChatHeader = memo(function ChatHeader({
         finishMenu();
         return new Promise<ThreadActionMenuId | null>((resolve) => {
           menuResolutionRef.current = resolve;
-          setMenu({ items: buildTitlebarThreadMenuItems(items), position });
+          setMenu({
+            items: buildTitlebarThreadMenuItems(items, {
+              "copy-path": t.chat.header.copyPath,
+              "copy-branch": t.chat.header.copyBranch,
+              "copy-thread-id": t.chat.header.copyThreadId,
+            }),
+            position,
+          });
         });
       },
       close: () => finishMenu(),
@@ -403,8 +420,8 @@ export const ChatHeader = memo(function ChatHeader({
     },
     [isServerThread, menuPresenter, onOpenProjectSettings, openMenu, renamingTitle],
   );
-  // Listen on the persistent chrome only while this route owns its breadcrumb.
-  // This preserves right-click on the blank drag area after removing the page header.
+  // Right-clicks from the title/project no-drag slots bubble to the titlebar.
+  // Electron handles blank drag areas through the OS, as it did before the redesign.
   useEffect(() => {
     const titlebar = breadcrumbContainer?.closest<HTMLElement>("[data-window-titlebar]");
     if (!titlebar) return;
@@ -569,14 +586,7 @@ export const ChatHeader = memo(function ChatHeader({
   const slots = useTitlebarSlot({
     breadcrumb,
     actions: isServerThread ? (
-      <div
-        ref={(element) => {
-          popoverAnchorRef.current = element;
-        }}
-        className="flex h-(--workspace-topbar-height) items-center"
-      >
-        {actions}
-      </div>
+      <div className="flex h-(--workspace-topbar-height) items-center">{actions}</div>
     ) : null,
   });
   return (

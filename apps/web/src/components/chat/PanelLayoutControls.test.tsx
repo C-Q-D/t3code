@@ -1,5 +1,7 @@
-// @vitest-environment jsdom
-/** Existing behavior snapshot, not a new requirement: details still opens through its popover handle. */
+/**
+ * Existing behavior snapshot: details still opens through its popover handle.
+ * @vitest-environment jsdom
+ */
 import { act, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";

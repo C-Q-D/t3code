@@ -1,11 +1,15 @@
-// @vitest-environment jsdom
-/** Tests rename rules and observable titlebar interactions; ignores visual class implementation. */
+/**
+ * Tests rename rules and observable titlebar interactions; ignores visual class implementation.
+ * @vitest-environment jsdom
+ */
 import { act, createElement, createRef } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { EnvironmentId, ProjectId, ThreadId } from "@t3tools/contracts";
 import { afterEach, beforeEach, vi } from "vite-plus/test";
 import type { useThreadActionMenu } from "~/hooks/useThreadActionMenu";
 import { TitlebarSlotOutlet, TitlebarSlotProvider } from "../frame/titlebarSlot";
+import { chat as englishChat } from "../../i18n/locales/en/chat";
+import { chat as chineseChat } from "../../i18n/locales/zh-CN/chat";
 
 const commands = vi.hoisted(() => ({
   update: vi.fn().mockResolvedValue({ _tag: "Success" }),
@@ -88,7 +92,6 @@ describe("chat titlebar interactions", () => {
             "header",
             { "data-window-titlebar": "" },
             createElement(TitlebarSlotOutlet, { name: "breadcrumb" }),
-            createElement("div", { "data-drag-space": "" }),
             createElement(TitlebarSlotOutlet, { name: "actions" }),
           ),
           createElement(
@@ -182,11 +185,11 @@ describe("chat titlebar interactions", () => {
     expect(document.activeElement?.textContent).toBe("Original title");
   });
 
-  it("opens from the blank titlebar and starts rename from the menu; Escape discards it", async () => {
+  it("opens from the no-drag title slot and starts rename from the menu; Escape discards it", async () => {
     await renderRoute();
     await act(async () =>
       container
-        .querySelector("[data-drag-space]")!
+        .querySelector('[data-titlebar-slot="breadcrumb"]')!
         .dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true })),
     );
     const rename = document.querySelector('[role="menuitem"]')!;
@@ -224,23 +227,71 @@ describe("chat titlebar interactions", () => {
   });
 });
 
+it.each([
+  {
+    locale: "en",
+    messages: englishChat.header,
+    expected: ["Copy path", "Copy branch", "Copy thread ID"],
+  },
+  {
+    locale: "zh-CN",
+    messages: chineseChat.header,
+    expected: ["复制路径", "复制分支", "复制对话ID"],
+  },
+])(
+  "uses standalone clipboard action labels in $locale without changing availability",
+  ({ messages, expected }) => {
+    const result = buildTitlebarThreadMenuItems(
+      [
+        {
+          id: "copy",
+          label: "Copy",
+          children: [
+            { id: "copy-path", label: "Path", icon: "folder" },
+            { id: "copy-branch", label: "Branch", disabled: true, icon: "git-branch" },
+            { id: "copy-thread-id", label: "Thread ID", icon: "hash" },
+          ],
+        },
+      ],
+      {
+        "copy-path": messages.copyPath,
+        "copy-branch": messages.copyBranch,
+        "copy-thread-id": messages.copyThreadId,
+      },
+    );
+    expect(result.map(({ label }) => label)).toEqual(expected);
+    expect(result.map(({ id, disabled, icon }) => ({ id, disabled, icon }))).toEqual([
+      { id: "copy-path", disabled: undefined, icon: "folder" },
+      { id: "copy-branch", disabled: true, icon: "git-branch" },
+      { id: "copy-thread-id", disabled: undefined, icon: "hash" },
+    ]);
+  },
+);
+
 it("groups existing commands like V2 while preserving disabled commands and checked submenus", () => {
   const choices = [{ id: "auto-settle:enabled" as const, label: "Enabled", checked: true }];
-  const result = buildTitlebarThreadMenuItems([
-    { id: "new-thread-on-branch", label: "New on branch" },
-    { id: "pin", label: "Pin", disabled: true },
-    { id: "rename", label: "Rename", separatorBefore: true },
-    { id: "auto-settle", label: "Auto settle", children: choices },
+  const result = buildTitlebarThreadMenuItems(
+    [
+      { id: "new-thread-on-branch", label: "New on branch" },
+      { id: "pin", label: "Pin", disabled: true },
+      { id: "rename", label: "Rename", separatorBefore: true },
+      { id: "auto-settle", label: "Auto settle", children: choices },
+      {
+        id: "copy",
+        label: "Copy",
+        children: [
+          { id: "copy-path", label: "Path" },
+          { id: "copy-thread-id", label: "ID" },
+        ],
+      },
+      { id: "delete", label: "Delete", destructive: true },
+    ],
     {
-      id: "copy",
-      label: "Copy",
-      children: [
-        { id: "copy-path", label: "Path" },
-        { id: "copy-thread-id", label: "ID" },
-      ],
+      "copy-path": englishChat.header.copyPath,
+      "copy-branch": englishChat.header.copyBranch,
+      "copy-thread-id": englishChat.header.copyThreadId,
     },
-    { id: "delete", label: "Delete", destructive: true },
-  ]);
+  );
   expect(result.map(({ id, separatorBefore }) => ({ id, separatorBefore }))).toEqual([
     { id: "rename", separatorBefore: false },
     { id: "pin", separatorBefore: true },

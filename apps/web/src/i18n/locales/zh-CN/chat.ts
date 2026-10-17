@@ -422,6 +422,9 @@ export const chat: Messages["chat"] = {
     renameError: "重命名对话失败",
     genericError: "发生错误。",
     projectSettings: "项目设置",
+    copyPath: "复制路径",
+    copyBranch: "复制分支",
+    copyThreadId: "复制对话ID",
     breadcrumb: "对话导航路径",
     /** Formats the newThread message from the supplied projectName. */
     newThread: (projectName) => `在 ${projectName} 中新建对话`,

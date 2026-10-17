@@ -454,6 +454,9 @@ export const chat = {
     renameError: "Failed to rename thread",
     genericError: "An error occurred.",
     projectSettings: "Project settings",
+    copyPath: "Copy path",
+    copyBranch: "Copy branch",
+    copyThreadId: "Copy thread ID",
     breadcrumb: "Thread breadcrumb",
     /** Formats the newThread message from the supplied projectName. */
     newThread: (projectName: string | undefined) => `New thread in ${projectName}`,
