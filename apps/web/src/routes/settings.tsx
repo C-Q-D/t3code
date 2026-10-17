@@ -177,7 +177,10 @@ function SettingsContentLayout() {
   return (
     <main className="settings-page-shell flex h-full min-h-0 min-w-0 flex-col text-control leading-normal text-foreground text-shadow-stone">
       {titlebar}
+      {/* Reset scroll before the new category's target refs run. Keep hash changes
+          out of this identity so clearing a handled search target preserves its scroll. */}
       <div
+        key={location.pathname}
         className="scrollbar-gutter-both min-h-0 flex-1 overflow-y-auto"
         data-settings-page-scroll
       >

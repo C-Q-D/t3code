@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+/** Exercises scope retention and page scrolling through the settings shell and real search-target lifecycle. */
 import { act, useState, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
@@ -11,6 +12,8 @@ interface ScopeState {
 
 const state = vi.hoisted(() => ({
   pathname: "/settings/diagnostics",
+  hash: "",
+  navigate: vi.fn(),
   scope: { search: {}, environmentId: null } as ScopeState,
 }));
 
@@ -21,8 +24,9 @@ vi.mock("@tanstack/react-router", async (importOriginal) => ({
     useSearch: () => state.scope.search,
     useNavigate: () => vi.fn(),
   }),
+  useNavigate: () => state.navigate,
   useLocation: (options?: { select: (location: unknown) => unknown }) => {
-    const location = { pathname: state.pathname, hash: "", state: {} };
+    const location = { pathname: state.pathname, hash: state.hash, state: {} };
     return options ? options.select(location) : location;
   },
   Outlet: () => <StatefulContent />,
@@ -48,9 +52,6 @@ vi.mock("./SettingsScopeContext", async () => {
   };
 });
 vi.mock("../../state/environments", () => ({ useEnvironments: () => ({ environments: [] }) }));
-vi.mock("./settingsLayout", () => ({
-  SettingsPageContainer: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-}));
 vi.mock("./SettingsBreadcrumb", () => ({
   SettingsBreadcrumb: () => null,
   SettingsPageHeading: () => null,
@@ -61,13 +62,18 @@ vi.mock("./SettingsPanels", () => ({ useSettingsRestore: () => ({ changedSetting
 
 import { Route } from "../../routes/settings";
 import { TitlebarSlotProvider } from "../frame/titlebarSlot";
+import { SettingsPageContainer, SettingsSearchTarget } from "./settingsLayout";
 
+/** Supplies an interactive child page and a real search destination without loading individual settings panels. */
 function StatefulContent() {
   const [value, setValue] = useState(0);
   return (
-    <button aria-label="Retained value" onClick={() => setValue(value + 1)}>
-      {value}
-    </button>
+    <SettingsPageContainer>
+      <button aria-label="Retained value" onClick={() => setValue(value + 1)}>
+        {value}
+      </button>
+      <SettingsSearchTarget id="theme">Theme</SettingsSearchTarget>
+    </SettingsPageContainer>
   );
 }
 
@@ -75,7 +81,12 @@ let root: Root;
 let container: HTMLDivElement;
 const Layout = Route.options.component!;
 await Layout.preload?.();
+const originalScrollIntoView = Object.getOwnPropertyDescriptor(
+  HTMLElement.prototype,
+  "scrollIntoView",
+);
 
+/** Applies the supplied router scope while retaining the mounted app shell. */
 async function render(scope: ScopeState) {
   state.scope = scope;
   await act(async () =>
@@ -90,8 +101,35 @@ function retainedValue() {
   return container.querySelector('button[aria-label="Retained value"]')?.textContent ?? null;
 }
 
+/** Reads the actual scroll container so assertions cover DOM state rather than reset callbacks. */
+function pageScroll() {
+  const element = container.querySelector<HTMLElement>("[data-settings-page-scroll]");
+  if (!element) throw new Error("Settings page scroll container is missing.");
+  return element;
+}
+
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  state.pathname = "/settings/diagnostics";
+  state.hash = "";
+  state.navigate.mockReset();
+  vi.stubGlobal(
+    "matchMedia",
+    vi.fn(() => ({ matches: true })),
+  );
+  // jsdom has no layout/scrollIntoView. Supply fixed geometry and the browser's
+  // centered-scroll effect; the real target ref still owns when scrolling happens.
+  vi.spyOn(HTMLElement.prototype, "offsetTop", "get").mockReturnValue(1200);
+  vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(40);
+  vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(480);
+  Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+    configurable: true,
+    value(this: HTMLElement) {
+      const scroll = this.closest<HTMLElement>("[data-settings-page-scroll]");
+      if (!scroll) throw new Error("Search destination has no settings scroll container.");
+      scroll.scrollTop = this.offsetTop - (scroll.clientHeight - this.offsetHeight) / 2;
+    },
+  });
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -99,6 +137,12 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root.unmount());
   container.remove();
+  vi.restoreAllMocks();
+  if (originalScrollIntoView) {
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", originalScrollIntoView);
+  } else {
+    Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
+  }
   vi.unstubAllGlobals();
 });
 
@@ -130,4 +174,40 @@ it.each([
   await render(after);
 
   expect(retainedValue()).toBe(expected);
+});
+
+it("starts a different settings category at the top after scrolling the previous page", async () => {
+  await render(first);
+  pageScroll().scrollTop = 640;
+  expect(pageScroll().scrollTop).toBe(640);
+
+  state.pathname = "/settings/appearance";
+  await render(first);
+
+  expect(pageScroll().scrollTop).toBe(0);
+});
+
+it("keeps a search destination centered after changing category and clearing its hash", async () => {
+  await render(first);
+  pageScroll().scrollTop = 640;
+
+  state.pathname = "/settings/appearance";
+  state.hash = "theme";
+  await render(first);
+
+  expect(pageScroll().scrollTop).toBe(980);
+  expect(document.activeElement?.id).toBe("theme");
+  expect(state.navigate).toHaveBeenCalledWith({
+    hash: "",
+    replace: true,
+    resetScroll: false,
+    hashScrollIntoView: false,
+    state: { settingsTargetHighlight: true },
+  });
+
+  state.hash = "";
+  await render(first);
+
+  expect(pageScroll().scrollTop).toBe(980);
+  expect(document.activeElement?.id).toBe("theme");
 });
