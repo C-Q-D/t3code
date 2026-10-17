@@ -1,1 +1,188 @@
-/* F8 图标：本线新增的令牌（@theme）与全局样式写在这里。 */
+/* 按设计稿 lc-icon.js 的方案 B 为 Lucide 线条分色；不改变背景、填充或像素角色。 */
+@layer base {
+  :root {
+    --icon-hue-blue: #82abff;
+    --icon-hue-green: #6fd896;
+    --icon-hue-red: #ff7b6b;
+    --icon-hue-amber: #f0b84a;
+    --icon-hue-purple: #b99cff;
+    --icon-hue-teal: #5fd3c7;
+    --icon-hue-orange: #ff9f78;
+    --icon-hue-pink: #ff8fc7;
+  }
+
+  /* 将 lc-icon.js 的“明确颜色时不上色”推广到语义容器，避免分类色掩盖错误等状态。
+     只匹配实际的状态色类；中性色仍分色，带变体前缀的状态由调用方处理。 */
+  .text-error,
+  .text-error-foreground,
+  .text-warning,
+  .text-warning-foreground,
+  .text-success,
+  .text-success-foreground,
+  .text-info,
+  .text-info-foreground,
+  .text-destructive,
+  .text-destructive-foreground,
+  .text-destructive\/80,
+  .text-status-warning-foreground,
+  .text-status-error-foreground,
+  .text-status-restricted-foreground,
+  .text-status-offline-foreground,
+  .text-status-target-foreground,
+  .text-status-emphasis-foreground,
+  .text-status-neutral-foreground {
+    --lucide-hue-override: currentColor;
+  }
+
+  /* base 层让 text-* 和内联颜色优先；浅底容器通过继承的 override 使用当前文字色。 */
+  svg.lucide-file-code,
+  svg.lucide-code,
+  svg.lucide-code-xml,
+  svg.lucide-monitor,
+  svg.lucide-smartphone,
+  svg.lucide-cloud,
+  svg.lucide-globe,
+  svg.lucide-mail,
+  svg.lucide-download,
+  svg.lucide-upload,
+  svg.lucide-save,
+  svg.lucide-chart-column,
+  svg.lucide-message-square,
+  svg.lucide-messages-square,
+  svg.lucide-message-square-plus,
+  svg.lucide-message-square-text,
+  svg.lucide-message-square-dashed,
+  svg.lucide-copy,
+  svg.lucide-clipboard-copy,
+  svg.lucide-search,
+  svg.lucide-search-x,
+  svg.lucide-scan-search,
+  svg.lucide-text-search,
+  svg.lucide-file-search,
+  svg.lucide-zoom-in,
+  svg.lucide-eye,
+  svg.lucide-external-link,
+  svg.lucide-square-arrow-out-up-right,
+  svg.lucide-volume-2,
+  svg.lucide-clock,
+  svg.lucide-history,
+  svg.lucide-radio,
+  svg.lucide-app-window,
+  svg.lucide-list-tree,
+  svg.lucide-folder-tree,
+  svg.lucide-info,
+  svg.lucide-hourglass,
+  svg.lucide-circle-dot {
+    color: var(--lucide-hue-override, var(--icon-hue-blue));
+  }
+
+  svg.lucide-git-pull-request,
+  svg.lucide-git-pull-request-arrow,
+  svg.lucide-git-pull-request-create-arrow,
+  svg.lucide-square-terminal,
+  svg.lucide-terminal,
+  svg.lucide-play,
+  svg.lucide-list-todo,
+  svg.lucide-list-checks,
+  svg.lucide-sheet,
+  svg.lucide-alarm-clock-check,
+  svg.lucide-flag,
+  svg.lucide-circle-check,
+  svg.lucide-check-check,
+  svg.lucide-shield-check {
+    color: var(--lucide-hue-override, var(--icon-hue-green));
+  }
+
+  svg.lucide-git-pull-request-closed,
+  svg.lucide-trash-2,
+  svg.lucide-delete,
+  svg.lucide-eraser,
+  svg.lucide-power,
+  svg.lucide-bug,
+  svg.lucide-calendar-x,
+  svg.lucide-alarm-clock-off,
+  svg.lucide-folder-x,
+  svg.lucide-file-x,
+  svg.lucide-pin-off,
+  svg.lucide-message-square-warning,
+  svg.lucide-circle-x,
+  svg.lucide-octagon-alert,
+  svg.lucide-circle-stop,
+  svg.lucide-shield-off {
+    color: var(--lucide-hue-override, var(--icon-hue-red));
+  }
+
+  svg.lucide-folder,
+  svg.lucide-folder-open,
+  svg.lucide-folder-plus,
+  svg.lucide-folder-git-2,
+  svg.lucide-folder-down,
+  svg.lucide-pencil,
+  svg.lucide-pencil-line,
+  svg.lucide-square-pen,
+  svg.lucide-file-pen,
+  svg.lucide-pause,
+  svg.lucide-key-round,
+  svg.lucide-star,
+  svg.lucide-lock,
+  svg.lucide-globe-lock,
+  svg.lucide-sun-moon,
+  svg.lucide-lightbulb,
+  svg.lucide-hand,
+  svg.lucide-snail,
+  svg.lucide-cookie,
+  svg.lucide-archive,
+  svg.lucide-archive-restore,
+  svg.lucide-alarm-clock,
+  svg.lucide-pin,
+  svg.lucide-circle-alert,
+  svg.lucide-triangle-alert,
+  svg.lucide-shield-alert {
+    color: var(--lucide-hue-override, var(--icon-hue-amber));
+  }
+
+  svg.lucide-git-merge,
+  svg.lucide-smile-plus,
+  svg.lucide-flask-conical,
+  svg.lucide-layers {
+    color: var(--lucide-hue-override, var(--icon-hue-purple));
+  }
+
+  svg.lucide-git-branch,
+  svg.lucide-git-branch-plus,
+  svg.lucide-git-fork,
+  svg.lucide-server,
+  svg.lucide-hard-drive,
+  svg.lucide-network,
+  svg.lucide-cpu,
+  svg.lucide-plug,
+  svg.lucide-link,
+  svg.lucide-link-2,
+  svg.lucide-undo-2,
+  svg.lucide-rotate-cw,
+  svg.lucide-rotate-ccw,
+  svg.lucide-rotate-ccw-square,
+  svg.lucide-refresh-cw,
+  svg.lucide-refresh-ccw,
+  svg.lucide-target,
+  svg.lucide-timer,
+  svg.lucide-calendar-clock,
+  svg.lucide-gauge,
+  svg.lucide-chart-pie {
+    color: var(--lucide-hue-override, var(--icon-hue-teal));
+  }
+
+  svg.lucide-hammer,
+  svg.lucide-gitlab,
+  svg.lucide-image,
+  svg.lucide-camera,
+  svg.lucide-wifi-off {
+    color: var(--lucide-hue-override, var(--icon-hue-orange));
+  }
+
+  svg.lucide-palette,
+  svg.lucide-paintbrush,
+  svg.lucide-webhook {
+    color: var(--lucide-hue-override, var(--icon-hue-pink));
+  }
+}
