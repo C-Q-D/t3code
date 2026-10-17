@@ -1564,7 +1564,6 @@ describe("MessagesTimeline", () => {
     expect(markup).toContain('data-maintain-scroll-at-end-item-layout="true"');
     expect(markup).toContain('data-maintain-scroll-at-end-layout="true"');
     expect(markup).toContain('data-user-message-collapsed="true"');
-    expect(markup).toContain('data-user-message-fade="true"');
     expect(markup).toContain('data-user-message-footer="true"');
   });
 
@@ -1578,7 +1577,6 @@ describe("MessagesTimeline", () => {
 
     expect(markup).not.toContain("Show full message");
     expect(markup).toContain('data-user-message-collapsible="false"');
-    expect(markup).toContain("rounded-2xl bg-message p-3");
   });
 
   it("identifies user-role messages sent by another agent", async () => {
@@ -1638,8 +1636,6 @@ describe("MessagesTimeline", () => {
     expect(markup).toContain("data-base-ui-tooltip-trigger");
     expect(markup).toContain("lucide-redo-2");
     expect(markup).toContain('data-user-message-intent="steer"');
-    expect(markup).toContain("items-center justify-end gap-1");
-    expect(markup).toContain("gap-1 text-xs leading-none text-muted-foreground");
     expect(markup.indexOf("Steer")).toBeLessThan(markup.indexOf("Adjust the current turn"));
   });
 

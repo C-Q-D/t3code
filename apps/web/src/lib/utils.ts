@@ -196,6 +196,8 @@ const twMerge = extendTailwindMerge({
         "composer-panel-primary",
         "composer-option-selected",
         "composer-choice",
+        "timeline-user",
+        "timeline-file",
       ],
       "inset-shadow": [
         "selected",
@@ -261,6 +263,7 @@ const twMerge = extendTailwindMerge({
         "composer-queue-toggle",
         "composer-panel-row",
         "composer-split",
+        "timeline-user",
       ],
       leading: [
         "code",
@@ -273,6 +276,7 @@ const twMerge = extendTailwindMerge({
         "pr-description",
         "pr-comment",
         "pr-linked-copy",
+        "timeline-user",
       ],
       tracking: ["brand", "chat-draft"],
     },

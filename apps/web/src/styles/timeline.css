@@ -1,1 +1,16 @@
 /* TL1–TL4 时间线：本线新增的令牌（@theme）与全局样式写在这里。 */
+
+@theme {
+  /* 对话页-8a D1 / StyleM-8a：用户气泡的宽度、折角、行距与凸起石面。 */
+  --container-timeline-user: 78%;
+  --radius-timeline-user: 22px 22px 6px 22px;
+  --leading-timeline-user: 1.65;
+  --shadow-timeline-user:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 -1px 0 rgba(0, 0, 0, 0.66),
+    0 0 0 1px rgba(0, 0, 0, 0.396), 0 2px 0 #09090a, 3px 5px 8px -2px rgba(0, 0, 0, 0.616);
+
+  /* 对话页-8a D1：文件附件凹槽与来源标签共用的深色石面。 */
+  --color-timeline-file: #1a1a1d;
+  --shadow-timeline-file:
+    inset 1.5px 2px 3px rgba(0, 0, 0, 0.6), inset -1px -1px 0 rgba(255, 255, 255, 0.05);
+}

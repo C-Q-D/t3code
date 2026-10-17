@@ -466,6 +466,7 @@ export const chat: Messages["chat"] = {
     previousTurn: "上一轮",
     nextTurn: "下一轮",
     sentByAutomation: "由自动任务发送",
+    sentByT3Code: "由 T3 Code 发送",
     openSendingThread: "打开发送方对话",
     sentByAnotherAgent: "由其他 Agent 发送",
     you: "你",

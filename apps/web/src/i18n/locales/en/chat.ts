@@ -497,6 +497,7 @@ export const chat = {
     previousTurn: "Previous turn",
     nextTurn: "Next turn",
     sentByAutomation: "Sent by automation",
+    sentByT3Code: "Sent by T3 Code",
     openSendingThread: "Open sending thread",
     sentByAnotherAgent: "Sent by another agent",
     you: "You",

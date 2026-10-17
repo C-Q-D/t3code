@@ -127,6 +127,7 @@ import { T3Wordmark } from "../T3Wordmark";
 import { ThreadContextChip } from "../ThreadContextChip";
 import {
   CheckIcon,
+  CalendarClockIcon,
   ChevronDownIcon,
   ChevronRightIcon,
   ChevronUpIcon,
@@ -139,6 +140,7 @@ import {
   MessageCircleIcon,
   MousePointerClickIcon,
   PaintbrushIcon,
+  PencilLineIcon,
   MinusIcon,
   Redo2Icon,
   Minimize2Icon,
@@ -146,7 +148,6 @@ import {
   SmartphoneIcon,
   SquarePenIcon,
   TerminalIcon,
-  Undo2Icon,
   HammerIcon,
   WrenchIcon,
   Code2Icon,
@@ -2334,6 +2335,15 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
     (attachment) => !isImageAttachment(attachment) && !isFileAttachment(attachment),
   );
   const userMessage = resolveUserMessagePresentation(row.message);
+  const intentMarker =
+    row.message.inputIntent && row.message.inputIntent !== "turn_start"
+      ? row.message.inputIntent
+      : null;
+  const itemStatus = row.projectedItem?.item.status;
+  const visibleItemStatus =
+    itemStatus !== "completed" && itemStatus !== "pending" && itemStatus !== "waiting"
+      ? itemStatus
+      : undefined;
   const resolvedContext = useMemo(() => resolveUserMessageContext(row.message), [row.message]);
   const previewImages = useMemo(
     () => userImages.filter((image) => image.name.startsWith("preview-annotation-")),
@@ -2466,56 +2476,66 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
   );
 
   return (
-    <div className="group flex flex-col items-end gap-1">
-      {userMessage.attribution === "automation" ? (
-        <p
-          className="me-1 text-2xs text-muted-foreground/70"
-          data-user-message-attribution="automation"
-        >
-          {userMessage.scheduledTaskId ? (
-            <Link
-              to="/settings/scheduled-tasks"
-              search={{
-                environmentId: ctx.activeThreadEnvironmentId,
-                taskId: userMessage.scheduledTaskId,
-              }}
-              className="rounded-sm hover:text-muted-foreground hover:underline focus-visible:outline-2 focus-visible:outline-ring"
-            >
-              {t.chat.timeline.sentByAutomation}
-            </Link>
-          ) : (
-            t.chat.timeline.sentByAutomation
-          )}
-        </p>
-      ) : userMessage.attribution === "t3code" ? (
-        <p
-          className="me-1 text-2xs text-muted-foreground/70"
-          data-user-message-attribution="t3code"
-        >
-          Sent by T3 Code
-        </p>
-      ) : userMessage.attribution === "agent" ? (
-        <p className="me-1 text-2xs text-muted-foreground/70" data-user-message-attribution="agent">
-          {senderThreadId ? (
-            <InlineButton
-              onClick={() => ctx.onOpenThread(senderThreadId)}
-              tone="muted"
-              aria-label={t.chat.timeline.openSendingThread}
-            >
-              {t.chat.timeline.sentByAnotherAgent}
-            </InlineButton>
-          ) : (
-            t.chat.timeline.sentByAnotherAgent
-          )}
-        </p>
-      ) : null}
-      {row.message.inputIntent && row.message.inputIntent !== "turn_start" ? (
-        <UserMessageIntentMarker intent={row.message.inputIntent} />
-      ) : null}
-      <div className="relative max-w-[80%] rounded-2xl bg-message p-3 text-message-foreground">
+    <div className="group flex flex-col items-end gap-1.5">
+      <div className="relative flex min-w-0 max-w-timeline-user flex-col gap-2.5 rounded-timeline-user bg-message px-4.5 py-3 text-body leading-timeline-user text-message-foreground shadow-timeline-user">
         <MessageAuthorHeading>{t.chat.timeline.you}</MessageAuthorHeading>
+        {userMessage.attribution || intentMarker || visibleItemStatus ? (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {userMessage.attribution === "automation" ? (
+              <p
+                className="flex h-5 items-center gap-1 whitespace-nowrap rounded-tag bg-timeline-file ps-1.75 pe-2.25 text-meta-large font-semibold text-code-foreground"
+                data-user-message-attribution="automation"
+              >
+                <CalendarClockIcon aria-hidden="true" className="size-3" />
+                {userMessage.scheduledTaskId ? (
+                  <Link
+                    to="/settings/scheduled-tasks"
+                    search={{
+                      environmentId: ctx.activeThreadEnvironmentId,
+                      taskId: userMessage.scheduledTaskId,
+                    }}
+                    className="rounded-sm hover:underline focus-visible:outline-2 focus-visible:outline-ring"
+                  >
+                    {t.chat.timeline.sentByAutomation}
+                  </Link>
+                ) : (
+                  t.chat.timeline.sentByAutomation
+                )}
+              </p>
+            ) : userMessage.attribution === "t3code" ? (
+              <p
+                className="flex h-5 items-center whitespace-nowrap rounded-tag bg-timeline-file px-2.25 text-meta-large font-semibold text-code-foreground"
+                data-user-message-attribution="t3code"
+              >
+                {t.chat.timeline.sentByT3Code}
+              </p>
+            ) : userMessage.attribution === "agent" ? (
+              <p
+                className="flex h-5 items-center whitespace-nowrap rounded-tag bg-timeline-file px-2.25 text-meta-large font-semibold text-code-foreground"
+                data-user-message-attribution="agent"
+              >
+                {senderThreadId ? (
+                  <InlineButton
+                    onClick={() => ctx.onOpenThread(senderThreadId)}
+                    aria-label={t.chat.timeline.openSendingThread}
+                  >
+                    {t.chat.timeline.sentByAnotherAgent}
+                  </InlineButton>
+                ) : (
+                  t.chat.timeline.sentByAnotherAgent
+                )}
+              </p>
+            ) : null}
+            {intentMarker ? <UserMessageIntentMarker intent={intentMarker} /> : null}
+            {visibleItemStatus ? (
+              <span className="flex h-5 items-center whitespace-nowrap rounded-tag bg-error-surface px-2.25 text-meta-large font-semibold text-error shadow-tag">
+                {visibleItemStatus}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
         {(regularImages.length > 0 || userVideos.length > 0) && (
-          <div className="mb-2 grid max-w-[210px] grid-cols-2 gap-2">
+          <div className="grid max-w-52.5 grid-cols-2 gap-2">
             {regularImages.map((image) => (
               <div
                 key={image.id}
@@ -2544,7 +2564,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
                     />
                   </button>
                 ) : (
-                  <div className="flex min-h-[72px] items-center justify-center px-2 py-3 text-center text-2xs text-muted-foreground/70">
+                  <div className="flex min-h-18 items-center justify-center px-2 py-3 text-center text-2xs text-muted-foreground/70">
                     {image.name}
                   </div>
                 )}
@@ -2559,22 +2579,30 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
           </div>
         )}
         {unchippedFiles.length > 0 || unknownAttachments.length > 0 ? (
-          <div className="mb-2 flex flex-col gap-1">
+          <div className="flex flex-col items-start gap-2">
             {unchippedFiles.map((file) => {
               const fileIdentity = (
                 <>
-                  <PierreEntryIcon pathValue={file.name} kind="file" theme={ctx.resolvedTheme} />
+                  <PierreEntryIcon
+                    pathValue={file.name}
+                    kind="file"
+                    theme={ctx.resolvedTheme}
+                    className="size-3.5"
+                  />
                   <span className="min-w-0 flex-1 truncate">{file.name}</span>
                 </>
               );
               if (file.downloadable !== false) {
                 return (
-                  <div key={file.id} className="flex min-w-0 items-center gap-1">
+                  <div
+                    key={file.id}
+                    className="flex h-8.5 min-w-0 max-w-full items-center gap-1 rounded-tag bg-timeline-file ps-2.5 pe-3 font-mono text-secondary-copy text-fg-detail shadow-timeline-file"
+                  >
                     <button
                       type="button"
                       aria-label={t.chat.timeline.preview(file.name)}
                       onClick={() => ctx.onFileOpen(file)}
-                      className="focus-visible:ring-ring/70 flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md py-1 text-left text-sm hover:underline focus-visible:ring-2 focus-visible:ring-inset focus-visible:outline-none"
+                      className="flex h-full min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-tag text-left hover:underline focus-visible:inset-shadow-focus focus-visible:outline-none"
                     >
                       {fileIdentity}
                       <EyeIcon className="size-4 shrink-0" />
@@ -2599,17 +2627,24 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
               }
 
               return (
-                <div key={file.id} className="flex min-w-0 items-center gap-2 py-1 text-sm">
+                <div
+                  key={file.id}
+                  className="flex h-8.5 min-w-0 max-w-full items-center gap-2 rounded-tag bg-timeline-file ps-2.5 pe-3 font-mono text-secondary-copy text-fg-detail shadow-timeline-file"
+                >
                   {fileIdentity}
                 </div>
               );
             })}
             {unknownAttachments.map((attachment) => (
-              <div key={attachment.id} className="flex min-w-0 items-center gap-2 py-1 text-sm">
+              <div
+                key={attachment.id}
+                className="flex h-8.5 min-w-0 max-w-full items-center gap-2 rounded-tag bg-timeline-file ps-2.5 pe-3 font-mono text-secondary-copy text-fg-detail shadow-timeline-file"
+              >
                 <PierreEntryIcon
                   pathValue={attachment.name}
                   kind="file"
                   theme={ctx.resolvedTheme}
+                  className="size-3.5"
                 />
                 <span className="min-w-0 flex-1 truncate">{attachment.name}</span>
               </div>
@@ -2625,20 +2660,12 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
           />
         </div>
       </div>
-      {row.projectedItem &&
-      row.projectedItem.item.status !== "completed" &&
-      row.projectedItem.item.status !== "pending" &&
-      row.projectedItem.item.status !== "waiting" ? (
-        <div className="me-1 flex items-center gap-1.5">
-          <span className="rounded-full border border-destructive/25 bg-destructive/8 px-1.5 py-0.5 text-3xs font-medium text-destructive">
-            {row.projectedItem.item.status}
-          </span>
-        </div>
-      ) : null}
-      <div className="flex w-full max-w-[80%] items-center justify-end pe-1 text-xs tabular-nums opacity-0 transition-opacity duration-200 pointer-coarse:opacity-100 focus-within:opacity-100 group-hover:opacity-100">
+      <div className="flex w-full max-w-timeline-user items-center justify-end text-secondary-copy tabular-nums opacity-0 transition-opacity duration-150 pointer-coarse:opacity-100 focus-within:opacity-100 group-hover:opacity-100 motion-reduce:transition-none">
         <div className="flex shrink-0 items-center gap-2">
           <Tooltip>
-            <TooltipTrigger render={<p className="text-muted-foreground text-xs tabular-nums" />}>
+            <TooltipTrigger
+              render={<p className="text-placeholder text-secondary-copy tabular-nums" />}
+            >
               {formatDayAwareTimestamp(row.message.createdAt, ctx.timestampFormat)}
             </TooltipTrigger>
             <TooltipPopup>
@@ -2659,6 +2686,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
                     }
                   : {})}
                 variant="ghost"
+                size="icon-xs"
               />
             )}
             {promptLink !== null && (
@@ -2667,6 +2695,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
                 label="Copy prompt link"
                 icon={LinkIconNode}
                 variant="ghost"
+                size="icon-xs"
               />
             )}
           </div>
@@ -2707,7 +2736,7 @@ function UserMessageIntentMarker({
       <TooltipTrigger
         render={
           <div
-            className="me-1 flex items-center justify-end gap-1 text-xs leading-none text-muted-foreground"
+            className="flex h-5 items-center gap-1 whitespace-nowrap rounded-tag bg-update-surface px-2.25 text-meta-large font-semibold text-update-foreground shadow-tag"
             data-user-message-intent={intent}
           />
         }
@@ -2770,7 +2799,7 @@ function RevertUserMessageButton({
         render={
           <Button
             type="button"
-            size="xs"
+            size="icon-xs"
             variant="ghost"
             disabled={activity.isRevertingCheckpoint || activity.isWorking}
             onClick={() => ctx.onRevertToTurnCount(turnCount, messageId)}
@@ -2778,7 +2807,7 @@ function RevertUserMessageButton({
           />
         }
       >
-        <Undo2Icon className="size-3" />
+        <PencilLineIcon className="size-3.75" />
       </TooltipTrigger>
       <TooltipPopup side="top">{t.chat.timeline.editFromHere}</TooltipPopup>
     </Tooltip>
@@ -4795,6 +4824,38 @@ const userMessageContextPresentationRegistry = createContextPresentationRegistry
         const disabled =
           attachment.downloadable === false && (!isVideo || attachment.previewUrl === undefined);
         const size = formatAttachmentSize(record.sizeBytes);
+        // D1's file well belongs to sent messages; the composer keeps its inline chip.
+        if (!isVideo) {
+          return (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    aria-label={t.chat.timeline.attachment(false, record.name, size)}
+                    data-markdown-copy={context.copyMarkdown}
+                    onClick={() => context.onOpenFile(attachment)}
+                    className="inline-flex h-8.5 max-w-full cursor-pointer items-center gap-2 rounded-tag bg-timeline-file ps-2.5 pe-3 align-middle font-mono text-secondary-copy text-fg-detail shadow-timeline-file hover:underline focus-visible:inset-shadow-focus focus-visible:outline-none disabled:cursor-default"
+                  />
+                }
+              >
+                <PierreEntryIcon
+                  pathValue={record.name}
+                  kind="file"
+                  theme={context.resolvedTheme}
+                  className="size-3.5"
+                />
+                <span className="min-w-0 truncate">{record.name}</span>
+              </TooltipTrigger>
+              <TooltipPopup side="top">
+                {record.name}
+                <br />
+                {size}
+              </TooltipPopup>
+            </Tooltip>
+          );
+        }
         return (
           <FileChip
             name={record.name}
@@ -4950,9 +5011,11 @@ function UserMessageContextReferenceChip(props: {
   });
 }
 
-const COLLAPSED_USER_MESSAGE_FADE_HEIGHT_REM = 1.75;
-const COLLAPSED_USER_MESSAGE_FADE_MASK = `linear-gradient(to bottom, black calc(100% - ${COLLAPSED_USER_MESSAGE_FADE_HEIGHT_REM}rem), transparent)`;
-
+/**
+ * Clips D1 previews to three lines without changing the length policy or find-reveal behavior.
+ * @param props - Message text, context renderer, skills, working directory and optional footer.
+ * @returns The complete body in the DOM, with a local expand/collapse control for long messages.
+ */
 const CollapsibleUserMessageBody = memo(function CollapsibleUserMessageBody(props: {
   text: string;
   renderContextReference: (reference: ChatMarkdownContextReference) => ReactNode;
@@ -4974,21 +5037,12 @@ const CollapsibleUserMessageBody = memo(function CollapsibleUserMessageBody(prop
       {hasVisibleBody ? (
         <div
           ref={findRevealRef}
-          className={cn("relative", isCollapsed && "max-h-44 overflow-hidden")}
+          className={cn("relative", isCollapsed && "line-clamp-3")}
           data-user-message-body="true"
           data-thread-find-text="true"
           data-thread-find-fold={isCollapsed ? "" : undefined}
           data-user-message-collapsed={isCollapsed ? "true" : "false"}
           data-user-message-collapsible={canCollapse ? "true" : "false"}
-          data-user-message-fade={isCollapsed ? "true" : "false"}
-          style={
-            isCollapsed
-              ? {
-                  WebkitMaskImage: COLLAPSED_USER_MESSAGE_FADE_MASK,
-                  maskImage: COLLAPSED_USER_MESSAGE_FADE_MASK,
-                }
-              : undefined
-          }
         >
           <UserMessageBody
             text={props.text}
@@ -5001,23 +5055,21 @@ const CollapsibleUserMessageBody = memo(function CollapsibleUserMessageBody(prop
       {showCollapseControl || props.footer ? (
         <div
           className={cn(
-            "mt-1.5 flex items-center gap-2",
-            showCollapseControl && props.footer ? "justify-between" : "justify-end",
+            "mt-2 flex items-center gap-2",
+            showCollapseControl ? "justify-between" : "justify-end",
           )}
           data-user-message-footer="true"
         >
           {showCollapseControl ? (
-            <Button
+            <button
               type="button"
-              size="xs"
-              variant="ghost-muted"
               aria-expanded={expanded}
               data-scroll-anchor-ignore
               onClick={() => setExpanded((value) => !value)}
-              className="-ml-1"
+              className="cursor-pointer self-start rounded-sm text-secondary-copy-medium font-semibold text-code-foreground underline decoration-border underline-offset-3 hover:text-message-foreground focus-visible:outline-2 focus-visible:outline-ring"
             >
               {expanded ? t.chat.timeline.showLess : t.chat.timeline.showFullMessage}
-            </Button>
+            </button>
           ) : null}
           {props.footer ? (
             <div className="ml-auto flex items-center gap-2">{props.footer}</div>
@@ -5028,6 +5080,11 @@ const CollapsibleUserMessageBody = memo(function CollapsibleUserMessageBody(prop
   );
 });
 
+/**
+ * Renders user Markdown with D1 typography, context links and literal HTML.
+ * @param props - Message text, optional context renderer, skills and working directory.
+ * @returns Markdown content, or null for empty text; uses TimelineRowCtx for thread navigation.
+ */
 const UserMessageBody = memo(function UserMessageBody(props: {
   text: string;
   renderContextReference?: (reference: ChatMarkdownContextReference) => ReactNode;
@@ -5044,7 +5101,7 @@ const UserMessageBody = memo(function UserMessageBody(props: {
       cwd={props.markdownCwd}
       threadRef={ctx.threadRef ?? undefined}
       skills={props.skills}
-      className="text-foreground"
+      className="text-body leading-timeline-user text-message-foreground"
       lineBreaks
       parseRawHtml={false}
       renderContextReference={props.renderContextReference}
