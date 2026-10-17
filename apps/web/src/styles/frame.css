@@ -200,3 +200,23 @@ html[data-theme-id="graphite"] [data-frame-main] {
 .window-titlebar .no-drag * {
   -webkit-app-region: no-drag;
 }
+
+/* FR2 · StyleM-8a project rail and 补充屏-3 V3 project settings key. */
+@theme {
+  --radius-project-rail: 11px;
+  --radius-project-rail-settings: 9px;
+  --color-project-rail-idle: rgba(255, 255, 255, 0.006);
+  --color-project-rail-hover: #2c2c31;
+  --color-project-rail-divider: rgba(0, 0, 0, 0.77);
+  --inset-shadow-project-rail-hover: inset 0 0 0 1px var(--border);
+  --shadow-project-rail-divider: 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.project-rail-back {
+  --lucide-hue-override: currentColor;
+}
+
+/* The 52px rail has no space for a reserved scrollbar; wheel and keyboard scrolling stay native. */
+.project-rail-scroll {
+  scrollbar-width: none;
+}

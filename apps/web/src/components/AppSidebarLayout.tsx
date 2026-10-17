@@ -38,6 +38,7 @@ import { useThreadVisitedMigration } from "../hooks/useThreadVisitedMigration";
 import ThreadSidebar from "./Sidebar";
 import { SettingsSidebarNav } from "./settings/SettingsSidebarNav";
 import { MainAppLocationTracker } from "./sidebar/mainAppLocation";
+import { ProjectRail } from "./sidebar/ProjectRail";
 import { useSidebarStageBackdropVariant } from "./SidebarStageBackdrop";
 import { useProjects } from "../state/entities";
 import {
@@ -344,12 +345,9 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
             {/* Bound route heights to the space left by the titlebar, not their content. */}
             <div className="window-frame-workspace grid min-h-0 min-w-0">
               <ProjectProjectionRetention />
-              {/* FR2 supplies the project controls; reserve their design column now. */}
-              <div
-                className="window-frame-projectbar"
-                data-frame-projectbar=""
-                aria-hidden="true"
-              />
+              <div className="window-frame-projectbar" data-frame-projectbar="">
+                <ProjectRail />
+              </div>
               <Sidebar
                 side="left"
                 variant="frame"
