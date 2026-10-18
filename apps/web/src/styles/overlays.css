@@ -82,7 +82,7 @@
 
 /* Q1 chrome integration: retain the shell's native controls and brand, hide workspace-only controls. */
 body:has([data-onboarding-route]) [data-titlebar-sidebar-control],
-body:has([data-onboarding-route]) [data-titlebar-brand] a > [aria-hidden],
+body:has([data-onboarding-route]) [data-titlebar-brand] > span > [aria-hidden],
 body:has([data-onboarding-route]) [data-titlebar-brand] > div,
 body:has([data-onboarding-route]) .window-titlebar-slot {
   display: none;

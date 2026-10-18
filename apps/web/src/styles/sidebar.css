@@ -100,10 +100,6 @@
   @apply py-1.5 text-secondary-copy leading-sidebar-update text-error;
 }
 
-.sidebar-update-pill[data-status="disabled"] {
-  @apply text-secondary-copy leading-sidebar-update text-muted-foreground;
-}
-
 .sidebar-update-pill:not([aria-disabled="true"]):hover {
   @apply bg-sidebar-row-hover;
 }

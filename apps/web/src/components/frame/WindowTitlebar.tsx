@@ -1,5 +1,4 @@
 /** Owns window chrome geometry; routes supply content and Electron owns system buttons. */
-import { Link } from "@tanstack/react-router";
 import { useCallback, useRef, type ReactNode } from "react";
 
 import { t } from "~/i18n";
@@ -91,12 +90,8 @@ export function WindowTitlebar({
         <div className="no-drag flex size-8 shrink-0 items-center" data-titlebar-sidebar-control="">
           {sidebarControl}
         </div>
-        <div className="no-drag ml-2 flex shrink-0 items-center gap-2" data-titlebar-brand="">
-          <Link
-            to="/"
-            aria-label={t.sidebar.chrome.goToThreadsAriaLabel}
-            className="flex shrink-0 items-center gap-3 rounded-menu-row text-foreground outline-none focus-visible:inset-shadow-focus"
-          >
+        <div className="ml-2 flex shrink-0 items-center gap-2" data-titlebar-brand="">
+          <span className="drag-region flex shrink-0 items-center gap-3 text-foreground">
             <span
               aria-hidden="true"
               className="flex size-7.5 shrink-0 items-center rounded-brand-mark bg-popover pl-2 shadow-raise-brand"
@@ -110,9 +105,9 @@ export function WindowTitlebar({
             <span className="font-window-brand text-window-brand font-semibold tracking-brand whitespace-nowrap">
               {t.sidebar.chrome.titlebarBrandName}
             </span>
-          </Link>
+          </span>
           {pillLabel ? (
-            <div className="ml-1 flex h-7 items-center">
+            <div className="no-drag ml-1 flex h-7 items-center">
               <Badge data-environment-identification="pill" size="sm" variant="secondary">
                 {pillLabel}
               </Badge>

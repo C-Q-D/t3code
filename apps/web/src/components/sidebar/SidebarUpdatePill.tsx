@@ -415,6 +415,7 @@ function SidebarUpdateControl() {
     }
   }, [action, everything]);
 
+  if (state?.status === "disabled") return null;
   // Web has no local app to check, so it only shows the button for remote work.
   if (!isElectron && !runsEverything && !isRunningEverything) return null;
 
@@ -462,15 +463,13 @@ function SidebarUpdateControl() {
         )}
       </span>
       <span className="sidebar-update-pill-label">
-        {state?.status === "disabled"
-          ? t.sidebar.updates.unavailableHint
-          : showCheckIcon
-            ? t.sidebar.updates.checking
-            : state?.status === "available" && !runsEverything && !isRunningEverything
-              ? t.sidebar.updates.available
-              : state?.status === "error" && !runsEverything && !isRunningEverything
-                ? getDesktopUpdateButtonTooltip(state)
-                : tooltip}
+        {showCheckIcon
+          ? t.sidebar.updates.checking
+          : state?.status === "available" && !runsEverything && !isRunningEverything
+            ? t.sidebar.updates.available
+            : state?.status === "error" && !runsEverything && !isRunningEverything
+              ? getDesktopUpdateButtonTooltip(state)
+              : tooltip}
       </span>
     </button>
   );

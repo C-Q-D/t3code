@@ -38,7 +38,6 @@ export const sidebar: Messages["sidebar"] = {
       `在当前项目中新建对话：Shift+点击${shortcut ? `（${shortcut}）` : ""}`,
   },
   chrome: {
-    goToThreadsAriaLabel: "前往对话",
     titlebarBrandName: "T3 CODE",
     back: "返回",
     settings: "设置",

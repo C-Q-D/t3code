@@ -334,7 +334,7 @@ html[data-theme-id="graphite"] [data-frame-main] {
 .window-titlebar[data-discussion-layout] > [data-titlebar-slot="breadcrumb"] {
   overflow: hidden;
 }
-.window-titlebar[data-discussion-layout="compact"] [data-titlebar-brand] > a > span:last-child,
+.window-titlebar[data-discussion-layout="compact"] [data-titlebar-brand] > span > span:last-child,
 .window-titlebar[data-discussion-layout="compact"] [data-titlebar-brand] > div,
 .window-titlebar[data-discussion-layout="compact"] [data-discussion-project] {
   display: none;

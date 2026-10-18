@@ -5,11 +5,12 @@ import { SidebarThreadUndoNotice } from "./SidebarThreadUndoNotice";
 import { SidebarProviderUpdatePill } from "./SidebarProviderUpdatePill";
 import { SidebarUpdateArchitectureWarning, SidebarUpdatePill } from "./SidebarUpdatePill";
 
+/** Collapse empty notice containers while keeping undo, provider, and architecture notices visible. */
 export const SidebarChromeFooter = memo(function SidebarChromeFooter() {
   return (
-    <SidebarFooter>
+    <SidebarFooter className="not-has-[[data-slot=alert],.sidebar-provider-update,.sidebar-update-pill]:hidden">
       <SidebarThreadUndoNotice />
-      <div className="sidebar-update-stack">
+      <div className="sidebar-update-stack not-has-[[data-slot=alert],.sidebar-provider-update,.sidebar-update-pill]:hidden">
         <SidebarProviderUpdatePill />
         <SidebarUpdateArchitectureWarning />
         <SidebarMenu>

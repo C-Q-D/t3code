@@ -36,7 +36,6 @@ export const sidebar = {
       `New thread in current project: Shift+click${shortcut ? ` (${shortcut})` : ""}`,
   },
   chrome: {
-    goToThreadsAriaLabel: "Go to threads",
     titlebarBrandName: "T3 CODE",
     back: "Back",
     settings: "Settings",

@@ -113,6 +113,40 @@ describe("sidebar update release notes popover", () => {
   });
 });
 
+it("hides disabled builds and restores available updates when the state changes", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  try {
+    updateInput.state = { ...nightlyState, enabled: false, status: "disabled" };
+    await act(() =>
+      root.render(
+        <TooltipProvider>
+          <SidebarUpdatePill />
+        </TooltipProvider>,
+      ),
+    );
+    expect(container.textContent).toBe("");
+    expect(container.querySelector("button")).toBeNull();
+
+    updateInput.state = { ...nightlyState, channel: "latest", releaseNotes: [] };
+    await act(() =>
+      root.render(
+        <TooltipProvider>
+          <SidebarUpdatePill />
+        </TooltipProvider>,
+      ),
+    );
+    expect(container.querySelector("button")?.textContent).toBe("Update available");
+  } finally {
+    await act(() => root.unmount());
+    container.remove();
+    updateInput.state = null;
+    vi.unstubAllGlobals();
+  }
+});
+
 it.each([
   ["available", "Update available"],
   ["up-to-date", "Check for updates"],

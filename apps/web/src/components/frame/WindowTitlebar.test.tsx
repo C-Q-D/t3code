@@ -2,7 +2,7 @@
  * Exercises measured discussion-header budgets and release through real route portals.
  * @vitest-environment jsdom
  */
-import { act, Profiler, type ReactNode } from "react";
+import { act, Profiler } from "react";
 import { createRoot } from "react-dom/client";
 import { expect, it, vi } from "vite-plus/test";
 import { WindowTitlebar } from "./WindowTitlebar";
@@ -24,10 +24,6 @@ vi.mock("~/hooks/useSettings", () => ({ useEnvironmentIdentificationMode: () => 
 vi.mock("../SidebarStageBackdrop", () => ({
   useEnvironmentStageLabel: () => null,
   resolveSidebarStageBackdropVariant: () => null,
-}));
-vi.mock("@tanstack/react-router", () => ({
-  /** Navigation is outside the geometry contract; preserve the brand's rendered children. */
-  Link: ({ children }: { children: ReactNode }) => <a href="/">{children}</a>,
 }));
 
 /** Supplies long live route content; closing the panel must restore the original frame layout. */
