@@ -1,5 +1,8 @@
+/** Checks default card layout and independently specified drag-placement geometry. */
 import { describe, expect, it } from "vite-plus/test";
 import {
+  createThreadDetailsCardPlacement,
+  resolveThreadDetailsCardPosition,
   resolveThreadDetailsCardDensity,
   resolveThreadDetailsCardLayout,
   resolveThreadDetailsPopoverLayout,
@@ -120,5 +123,58 @@ describe("A5 overlay card", () => {
       height: 0,
       gap: 14,
     });
+  });
+});
+
+describe("dragged card placement", () => {
+  it.each([
+    [
+      "right edge",
+      { side: "right" as const, inset: 12, top: 12 },
+      1000,
+      800,
+      { left: 708, top: 12 },
+    ],
+    [
+      "left and bottom clamp",
+      { side: "left" as const, inset: -50, top: 600 },
+      1000,
+      800,
+      { left: 12, top: 388 },
+    ],
+    [
+      "right and top clamp",
+      { side: "left" as const, inset: 900, top: -50 },
+      1000,
+      800,
+      { left: 708, top: 12 },
+    ],
+    [
+      "resized right anchor",
+      { side: "right" as const, inset: 120, top: 50 },
+      1400,
+      800,
+      { left: 1000, top: 50 },
+    ],
+    [
+      "undersized canvas",
+      { side: "right" as const, inset: 120, top: 50 },
+      300,
+      420,
+      { left: 12, top: 12 },
+    ],
+  ])("resolves %s", (_label, placement, width, height, expected) => {
+    expect(
+      resolveThreadDetailsCardPosition(placement, { width, height }, { width: 280, height: 400 }),
+    ).toEqual(expected);
+  });
+
+  it.each([
+    [100, { side: "left", inset: 100, top: 50 }],
+    [600, { side: "right", inset: 120, top: 50 }],
+    [359, { side: "left", inset: 359, top: 50 }],
+    [360, { side: "right", inset: 360, top: 50 }],
+  ])("anchors release at left %s by the card center", (left, expected) => {
+    expect(createThreadDetailsCardPlacement({ left, top: 50 }, 280, 1000)).toEqual(expected);
   });
 });

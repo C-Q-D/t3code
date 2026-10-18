@@ -1,3 +1,5 @@
+/** Computes card geometry without storing placement or changing canvas obstacles. */
+import type { ThreadDetailsCardPlacement } from "../../threadDetailsCardPlacementStore";
 import type { PreviewMiniPlayerFrame } from "../preview/previewMiniPlayerLayout";
 import { DETAILS_CARD_CLEARANCE } from "./chatCanvasLayout";
 
@@ -5,6 +7,47 @@ import { DETAILS_CARD_CLEARANCE } from "./chatCanvasLayout";
 export const THREAD_DETAILS_CARD_GAP = 12;
 // Keep in sync with --thread-details-panel-width, which sizes the popover and the find bar.
 const THREAD_DETAILS_CARD_WIDTH = 280;
+
+/**
+ * Resolves an edge anchor without letting window resizing push the card off canvas.
+ * @param placement - Saved edge and offsets in CSS pixels; default placement is handled by the caller.
+ * @param container - Canvas dimensions in CSS pixels.
+ * @param card - Measured card dimensions in CSS pixels.
+ * @returns Canvas-relative left/top, clamped to a 12px gap; undersized axes use 12px.
+ */
+export function resolveThreadDetailsCardPosition(
+  placement: ThreadDetailsCardPlacement,
+  container: { width: number; height: number },
+  card: { width: number; height: number },
+) {
+  const gap = THREAD_DETAILS_CARD_GAP;
+  const left =
+    placement.side === "left" ? placement.inset : container.width - card.width - placement.inset;
+  return {
+    left: Math.max(gap, Math.min(left, container.width - card.width - gap)),
+    top: Math.max(gap, Math.min(placement.top, container.height - card.height - gap)),
+  };
+}
+
+/**
+ * Keeps released cards near their chosen edge when the canvas width changes.
+ * @param position - Released canvas-relative left/top in CSS pixels; top is preserved.
+ * @param cardWidth - Measured card width in CSS pixels.
+ * @param containerWidth - Canvas width in CSS pixels.
+ * @returns Edge-relative placement; a center exactly at the canvas midpoint anchors right.
+ */
+export function createThreadDetailsCardPlacement(
+  position: { left: number; top: number },
+  cardWidth: number,
+  containerWidth: number,
+): ThreadDetailsCardPlacement {
+  const side = position.left + cardWidth / 2 < containerWidth / 2 ? "left" : "right";
+  return {
+    side,
+    inset: side === "left" ? position.left : containerWidth - position.left - cardWidth,
+    top: position.top,
+  };
+}
 
 export function resolveThreadDetailsCardDensity(
   height: number,
