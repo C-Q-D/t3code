@@ -390,7 +390,7 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
       <TitlebarSlotProvider>
         <div className="window-frame-shell stone-base h-dvh min-h-0">
           <SidebarProvider
-            className="grid! h-full! min-h-0! grid-rows-[var(--workspace-topbar-height)_minmax(0,1fr)]"
+            className="grid! h-full! min-h-0! grid-cols-[minmax(0,1fr)] grid-rows-[var(--workspace-topbar-height)_minmax(0,1fr)]"
             data-app-shell=""
             data-panel-animations={routePanelAnimationsActive ? "true" : "false"}
             defaultOpen

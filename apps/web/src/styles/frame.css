@@ -161,7 +161,24 @@ html[data-theme-id="graphite"] [data-frame-main] {
 
 /* StyleM-8a: the titlebar shares the stone base; texture belongs to FR1 grid. */
 .window-titlebar {
+  /* The shell's zero-minimum column, not breadcrumb min-content, owns this width. */
+  min-width: 0;
   padding-left: var(--frame-padding-inline);
+}
+
+/* Alignment space belongs only to an inline sidebar. Discussion panel headers
+   have their own grid tracks and retain those tracks when the sidebar closes. */
+[data-app-shell][data-sidebar-state="collapsed"]
+  > .window-titlebar:not([data-discussion-layout])
+  > [data-titlebar-spacer] {
+  display: none;
+}
+
+/* Keep this boundary aligned with FRAME_NARROW_MAX_WIDTH: the sidebar is a drawer. */
+@media (max-width: 1024px) {
+  .window-titlebar:not([data-discussion-layout]) > [data-titlebar-spacer] {
+    display: none;
+  }
 }
 
 /* Configure the existing trigger through its inherited geometry tokens. */
@@ -179,6 +196,12 @@ html[data-theme-id="graphite"] [data-frame-main] {
 
 .window-titlebar-slot[data-titlebar-slot="breadcrumb"] {
   flex: 0 1 auto;
+}
+
+/* Let project and parent-thread labels share the available breadcrumb budget.
+   Their existing text spans provide ellipses; keep controls and focus rings unclipped. */
+.window-titlebar .chat-titlebar-breadcrumb li:not([aria-hidden="true"]) {
+  flex-shrink: 1;
 }
 
 .window-titlebar-slot[data-titlebar-slot="actions"] {
