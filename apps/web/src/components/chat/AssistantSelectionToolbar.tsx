@@ -161,7 +161,7 @@ export function AssistantSelectionToolbar({
   return createPortal(
     <div
       ref={shellRef}
-      className="timeline-selection-toolbar fixed z-50 max-w-full rounded-notice bg-primary p-0.75 text-shadow-none shadow-timeline-quote-toolbar"
+      className="dropdown-glass fixed z-50 max-w-full rounded-overlay p-1 text-shadow-stone"
       style={{ left: selection.position.x, top: selection.position.y }}
       onPointerDown={(event) => event.preventDefault()}
     >
@@ -174,7 +174,7 @@ export function AssistantSelectionToolbar({
             ? t.chat.citation.selectionIsTooLongToCite
             : t.chat.citation.citeSelectionInComposer
         }
-        className="flex h-7 cursor-pointer items-center gap-1.25 rounded-timeline-quote-key bg-primary-foreground px-2.5 text-secondary-copy-medium font-bold text-primary hover:opacity-90 focus-visible:outline-none focus-visible:inset-shadow-focus disabled:cursor-default disabled:opacity-50"
+        className="flex h-7 cursor-pointer items-center gap-1.25 rounded-menu-row px-2.5 text-secondary-copy-medium font-bold text-foreground enabled:hover:bg-accent focus-visible:outline-none focus-visible:inset-shadow-focus disabled:cursor-default disabled:opacity-50"
         onClick={cite}
         onKeyDown={(event) => {
           event.stopPropagation();
@@ -184,7 +184,7 @@ export function AssistantSelectionToolbar({
           }
         }}
       >
-        <QuoteIcon aria-hidden="true" className="size-3.25" />
+        <QuoteIcon aria-hidden="true" className="size-3.25 text-current" />
         {tooLong ? t.chat.citation.shortenSelection : t.chat.citation.cite}
       </button>
     </div>,

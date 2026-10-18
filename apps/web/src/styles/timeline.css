@@ -495,7 +495,7 @@
   @apply mb-0;
 }
 
-/* Supplemental screen 1 T3: diagram well, embedded app surfaces and white citation toolbar. */
+/* Supplemental screen 1 T3: diagram well, embedded app surfaces and registered citation tokens. */
 @theme {
   --color-timeline-diagram-toggle: #0a0a0b;
   --color-timeline-embed: #151517;
@@ -509,11 +509,6 @@
 /* The header action delegates to the rendered diagram; no render-state effect or cache key is added. */
 .timeline-mermaid-frame:not(:has([data-mermaid-expand])) .timeline-mermaid-expand {
   display: none;
-}
-
-/* The white citation key needs the authored foreground, independent of automatic icon category hues. */
-.timeline-selection-toolbar {
-  --lucide-hue-override: currentColor;
 }
 
 /* TL2.2 · 补充屏-1 T2: the history control's pressed well has no shared semantic color. */
