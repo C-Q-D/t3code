@@ -281,7 +281,7 @@
 }
 
 .timeline-minimap {
-  right: var(--chat-lane-inset-end, 0px);
+  right: var(--chat-minimap-inset-end, 0px);
 }
 
 @media (pointer: fine) {
