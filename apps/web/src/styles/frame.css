@@ -99,6 +99,9 @@ html[data-theme-id="graphite"] [data-frame-main] {
      Leave the resize rail outside the clipped inner slab. */
   .window-frame-workspace > [data-variant="frame"] > [data-slot="sidebar-container"] {
     position: absolute;
+    /* StyleM's inline sidebar paints before main; a raised container casts its
+       exterior shadow over main's left edge instead of only into the gutter. */
+    z-index: auto;
     inset: 0 auto 0 0;
     height: 100%;
     padding: 0;
