@@ -1,4 +1,4 @@
-/** Computes conversation, minimap and floating preview geometry from canvas obstacles. */
+/** Computes conversation and floating preview geometry from canvas obstacles. */
 import {
   clampPreviewMiniPlayerPosition,
   resolvePreviewMiniPlayerFrame,
@@ -29,7 +29,7 @@ export const DETAILS_CARD_CLEARANCE = 32;
  * Resolves chat and overlay placement without changing measured inputs.
  * @param options - Canvas and obstacle bounds in CSS pixels, optional chat width limits,
  * padding (48px by default), composer height (zero by default), and nullable preview state.
- * @returns Chat lane, minimap right inset, preview frame and overlap flags; absent previews
+ * @returns Chat lane, preview frame and overlap flags; absent previews
  * have a null frame. Only an inline details card should be supplied as an obstacle.
  */
 export function resolveChatCanvasLayout({
@@ -204,11 +204,5 @@ export function resolveChatCanvasLayout({
     frame.x + frame.width > detailsCard.left &&
     frame.y < detailsCard.bottom,
   );
-  // Centered chat can clear the card without an inset; the edge-anchored minimap cannot.
-  // Keep the rail's own gap and move its hit strip, preview and buttons together.
-  const minimapInsetEnd = Math.max(
-    chat.insetEnd,
-    detailsCard ? container.width - detailsCard.left : 0,
-  );
-  return { chat, minimapInsetEnd, frame, overlapsChat, overlapsDetailsCard };
+  return { chat, frame, overlapsChat, overlapsDetailsCard };
 }

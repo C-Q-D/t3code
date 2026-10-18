@@ -280,8 +280,9 @@
   @apply size-3.5;
 }
 
+/* Anchored to the left gutter, away from the right-hand workspace card, so it never has to move aside. */
 .timeline-minimap {
-  right: var(--chat-minimap-inset-end, 0px);
+  left: var(--chat-lane-inset-start, 0px);
 }
 
 @media (pointer: fine) {
@@ -291,12 +292,12 @@
 }
 
 .timeline-minimap-rail {
-  @apply top-40 right-3;
+  @apply top-40 left-3;
   max-height: calc(100% - --spacing(55));
 }
 
 .timeline-minimap-strip {
-  @apply right-1.25 h-0.75 w-3.5 rounded-timeline-minimap-strip bg-timeline-minimap-marker;
+  @apply left-1.25 h-0.75 w-3.5 rounded-timeline-minimap-strip bg-timeline-minimap-marker;
   transform: translateY(-50%) scaleX(0.714286);
 }
 
@@ -315,7 +316,7 @@
 }
 
 .timeline-minimap-preview {
-  @apply right-9;
+  @apply left-9;
   max-width: calc(100vw - --spacing(16));
 }
 
@@ -325,7 +326,7 @@
 }
 
 .timeline-minimap-navigation {
-  @apply right-0.25;
+  @apply left-0.25;
 }
 
 .timeline-minimap-previous {

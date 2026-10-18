@@ -52,7 +52,6 @@ describe("chat canvas layout", () => {
 
   it("centers chat in the whole container without a preview", () => {
     expect(resolve(1344, null).chat).toEqual({ left: 288, width: 768, insetStart: 0, insetEnd: 0 });
-    expect(resolve(1344, null).minimapInsetEnd).toBe(0);
     expect(
       resolveChatCanvasLayout({
         container: { width: 390, height: 900 },
@@ -70,7 +69,6 @@ describe("chat canvas layout", () => {
   it("moves chat only as far as the preview requires", () => {
     const result = resolve(1344);
     expect(result.chat).toEqual({ left: 232, width: 768, insetStart: 0, insetEnd: 112 });
-    expect(result.minimapInsetEnd).toBe(112);
     expectClear(result);
   });
   it("shrinks chat modestly after using the left margin", () => {
@@ -323,30 +321,6 @@ describe("chat canvas layout", () => {
 });
 
 describe("workspace card beside chat", () => {
-  it.each([
-    [1147, 87, 237],
-    [1584, 424, 0],
-    [1920, 592, 0],
-  ])(
-    "keeps the minimap left of the inline card on a %spx canvas without moving chat",
-    (width, chatLeft, chatInsetEnd) => {
-      const detailsCard = { left: width - 292, right: width - 12, bottom: 400 };
-      const result = resolveChatCanvasLayout({
-        container: { width, height: 900 },
-        maxChatWidth: 736,
-        preview: null,
-        detailsCard,
-      });
-      // The 280px card and its 12px outer margin must precede the rail's own 12px gap.
-      expect(result.minimapInsetEnd).toBe(width - detailsCard.left);
-      expect(result.chat).toEqual({
-        left: chatLeft,
-        width: 736,
-        insetStart: 0,
-        insetEnd: chatInsetEnd,
-      });
-    },
-  );
   const withCard = (width: number, player: ChatCanvasPreview | null = null, maxChatWidth = 736) =>
     resolveChatCanvasLayout({
       container: { width, height: 900 },
@@ -392,7 +366,6 @@ describe("workspace card beside chat", () => {
   it("keeps centered chat in place when a new preview opens below the card", () => {
     expect(withCard(1440, preview)).toEqual({
       chat: { left: 352, width: 736, insetStart: 0, insetEnd: 0 },
-      minimapInsetEnd: 292,
       frame: { x: 1108, y: 655, width: 320, height: 233 },
       overlapsChat: false,
       overlapsDetailsCard: false,
