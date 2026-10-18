@@ -69,7 +69,8 @@ describe("sidebar drawer breakpoint", () => {
   it.each([
     { width: 768, initial: "drawer/collapsed", toggled: "drawer/expanded" },
     { width: 1023, initial: "drawer/collapsed", toggled: "drawer/expanded" },
-    { width: 1024, initial: "grid/expanded", toggled: "grid/collapsed" },
+    { width: 1024, initial: "drawer/collapsed", toggled: "drawer/expanded" },
+    { width: 1025, initial: "grid/expanded", toggled: "grid/collapsed" },
   ])(
     "uses the expected visibility mode at $width CSS pixels",
     async ({ width, initial, toggled }) => {

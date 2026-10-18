@@ -28,11 +28,11 @@ it.each([
   { key: "f", ctrlKey: false, metaKey: true },
   { key: "/", ctrlKey: false, metaKey: false },
 ])(
-  "opens and focuses settings search from a closed drawer with $key/$ctrlKey/$metaKey",
+  "opens and focuses settings search from a closed 1024px drawer with $key/$ctrlKey/$metaKey",
   async (shortcut) => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     vi.stubGlobal("matchMedia", (query: string) => ({
-      matches: 900 <= Number(/max-width: (\d+)px/.exec(query)?.[1]),
+      matches: 1024 <= Number(/max-width: (\d+)px/.exec(query)?.[1]),
       addEventListener() {},
       removeEventListener() {},
     }));

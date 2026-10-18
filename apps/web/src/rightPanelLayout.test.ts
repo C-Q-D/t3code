@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vite-plus/test";
 import {
   DISCUSSION_PANEL_OVERLAY_MEDIA_QUERY,
+  RIGHT_PANEL_INLINE_LAYOUT_MEDIA_QUERY,
   resolveRightPanelSidebarAction,
   shouldUseRightPanelSheet,
   shouldUseDiscussionPanelSheet,
@@ -22,10 +23,15 @@ describe("right panel placement", () => {
     [760, true],
     [1023, true],
     [1023.5, true],
-    [1024, false],
+    [1024, true],
+    [1025, false],
     [1440, false],
   ])("uses an overlay at %spx: %s", (width, sheet) => {
     expect(shouldUseRightPanelSheet(width)).toBe(sheet);
+  });
+
+  it("includes 1024px in the chat overlay media query", () => {
+    expect(RIGHT_PANEL_INLINE_LAYOUT_MEDIA_QUERY).toBe("(max-width: 1024px)");
   });
 });
 

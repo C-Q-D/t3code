@@ -23,6 +23,7 @@ import {
 import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
 import { useResizeDrag } from "~/hooks/useResizeDrag";
 import { useMediaQuery } from "~/hooks/useMediaQuery";
+import { FRAME_NARROW_MEDIA_QUERY } from "~/frameBreakpoints";
 import { FRAME_SIDEBAR_DRAWER_GEOMETRY } from "~/components/frame/sidebarDrawerGeometry";
 import { getLocalStorageItem, setLocalStorageItem } from "~/hooks/useLocalStorage";
 import { resolveSidebarState, type ResponsiveSidebarState } from "./sidebarState";
@@ -125,7 +126,7 @@ function SidebarProvider({
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }) {
-  const isMobile = useMediaQuery({ max: 1024 });
+  const isMobile = useMediaQuery(FRAME_NARROW_MEDIA_QUERY);
   const [openMobile, setOpenMobile] = React.useState(false);
   const [mobileSheetMounted, setMobileSheetMounted] = React.useState(false);
   const setMobileSheetElement = React.useCallback((element: HTMLDivElement | null) => {
