@@ -42,6 +42,29 @@
   background-repeat: repeat;
 }
 
+/* Only panels wrapping a whole settings card need exterior paint. Keep clipping
+   through the shared 200ms height transition, then reveal the unchanged shadow.
+   Closing restores clipping immediately, including interrupted opening motion. */
+.settings-page-shell [data-slot="collapsible-panel"]:has(> .stone-settings-group) {
+  transition-property: height, overflow;
+  transition-duration: 200ms, 0s;
+  transition-behavior: normal, allow-discrete;
+}
+
+.settings-page-shell
+  [data-slot="collapsible-panel"][data-open]:not([data-starting-style]):has(
+    > .stone-settings-group
+  ) {
+  overflow: visible;
+  transition-delay: 0s, 200ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-page-shell [data-slot="collapsible-panel"]:has(> .stone-settings-group) {
+    transition: none;
+  }
+}
+
 @keyframes settings-target-fade {
   0%,
   50% {
