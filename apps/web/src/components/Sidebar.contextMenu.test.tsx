@@ -231,6 +231,37 @@ it("cancels on Escape and restores focus to the originating row", async () => {
   expect(dispatched).toEqual([]);
 });
 
+it.each([
+  ["Snooze", "Custom…", "snooze:custom"],
+  ["Auto-settle", "Disabled", "auto-settle:disabled"],
+])(
+  "keeps the parent open when hovering the %s submenu and dispatches its choice",
+  async (label, choiceLabel, action) => {
+    await mountMenu();
+    await openRow("thread-a");
+    const submenu = [...document.querySelectorAll<HTMLElement>('[aria-haspopup="menu"]')].find(
+      (element) => element.textContent?.startsWith(label),
+    );
+    expect(submenu).toBeDefined();
+    await act(() => {
+      submenu!.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+      submenu!.dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+    });
+    // Advance the real Base UI hover delay; no menu state or component is mocked.
+    await act(() => vi.advanceTimersByTimeAsync(200));
+    await flushFocus();
+    expect(document.querySelectorAll('[role="menu"]')).toHaveLength(2);
+    expect(resolutions).toEqual([]);
+    const choice = [...document.querySelectorAll<HTMLElement>('[role^="menuitem"]')].find(
+      (element) => element.textContent === choiceLabel,
+    )!;
+    await act(() => choice.click());
+    await flushFocus();
+    expect(dispatched).toEqual([{ thread: "thread-a", action }]);
+    expect(document.querySelectorAll('[role="menu"]')).toHaveLength(0);
+  },
+);
+
 it("opening another row cancels the first promise and only dispatches for the second row", async () => {
   await mountMenu();
   await openRow("thread-a");

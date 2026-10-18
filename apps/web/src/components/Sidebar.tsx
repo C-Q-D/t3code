@@ -1,5 +1,6 @@
 /** Renders project and thread navigation and dispatches scoped menu actions; server services own export IO. */
 import { t } from "~/i18n";
+import { ContextMenu } from "@base-ui/react/context-menu";
 import { serverEnvironment } from "../state/server";
 import { useAtomCommand } from "../state/use-atom-command";
 import {
@@ -2333,9 +2334,9 @@ export function useSidebarThreadContextMenu() {
     [finishThreadContextMenu],
   );
   const popup = (
-    <Menu
+    // ContextMenu registers a root node without a Menu.Trigger, so children are not siblings.
+    <ContextMenu.Root
       open={threadContextMenu !== null}
-      modal={false}
       onOpenChange={(open) => {
         if (!open) finishThreadContextMenu();
       }}
@@ -2344,6 +2345,7 @@ export function useSidebarThreadContextMenu() {
         <MenuPopup
           anchor={threadMenuAnchor}
           align="start"
+          alignOffset={0}
           sideOffset={0}
           finalFocus={() =>
             threadMenuFocusRef.current?.isConnected ? threadMenuFocusRef.current : false
@@ -2366,7 +2368,7 @@ export function useSidebarThreadContextMenu() {
           />
         </MenuPopup>
       ) : null}
-    </Menu>
+    </ContextMenu.Root>
   );
   return { show: showThreadContextMenu, close: finishThreadContextMenu, popup };
 }

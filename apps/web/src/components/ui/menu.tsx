@@ -8,6 +8,7 @@ import type * as React from "react";
 import { cn } from "~/lib/utils";
 
 const Menu = MenuPrimitive.Root;
+const MenuCreateHandle = MenuPrimitive.createHandle;
 
 // H2 shares one row treatment across commands, choices, and submenu triggers.
 // Highlight fill follows Base UI even when pointer focus stays focus-visible.
@@ -353,6 +354,7 @@ function MenuSubPopup({
 
 export {
   Menu,
+  MenuCreateHandle,
   Menu as DropdownMenu,
   MenuTrigger,
   MenuTrigger as DropdownMenuTrigger,

@@ -65,6 +65,8 @@ import { useClientSettings } from "../../hooks/useSettings";
 import { useTitlebarSlot } from "../frame/titlebarSlot";
 import {
   Menu,
+  MenuCreateHandle,
+  MenuTrigger,
   MenuPopup,
   MenuItem,
   MenuCheckboxItem,
@@ -359,6 +361,7 @@ export const ChatHeader = memo(function ChatHeader({
     },
     [activeThreadEnvironmentId, activeThreadId, activeThreadTitle, updateThreadMetadata],
   );
+  const [menuHandle] = useState(MenuCreateHandle);
   const [menu, setMenu] = useState<{
     items: readonly ContextMenuItem<ThreadActionMenuId>[];
     position: { x: number; y: number };
@@ -581,7 +584,17 @@ export const ChatHeader = memo(function ChatHeader({
               <Tooltip>
                 <TooltipTrigger
                   render={
-                    <button
+                    <MenuTrigger
+                      handle={menuHandle}
+                      render={
+                        <button className="group/thread-title inline-flex h-8 min-w-0 max-w-full cursor-pointer items-center gap-1.5 rounded-full px-3 text-left font-serif text-chat-title font-bold text-foreground outline-none hover:bg-chat-title-hover focus-visible:inset-shadow-focus" />
+                      }
+                      onMouseDown={(event) => event.preventBaseUIHandler()}
+                      onClick={(event) => {
+                        // The route presenter owns async action discovery and the open state.
+                        event.preventBaseUIHandler();
+                        openMenuFromTitle(event);
+                      }}
                       ref={(button) => {
                         titleButtonRef.current = button;
                         if (button && restoreTitleFocusRef.current) {
@@ -593,9 +606,7 @@ export const ChatHeader = memo(function ChatHeader({
                       aria-label={t.chat.header.threadActions(activeThreadTitle)}
                       aria-haspopup="menu"
                       aria-expanded={menu !== null}
-                      onClick={openMenuFromTitle}
                       onDoubleClick={canOperateThread ? handleTitleDoubleClick : undefined}
-                      className="group/thread-title inline-flex h-8 min-w-0 max-w-full cursor-pointer items-center gap-1.5 rounded-full px-3 text-left font-serif text-chat-title font-bold text-foreground outline-none hover:bg-chat-title-hover focus-visible:inset-shadow-focus"
                     />
                   }
                 >
@@ -627,7 +638,9 @@ export const ChatHeader = memo(function ChatHeader({
   return (
     <>
       {slots}
+      {/* The detached title trigger registers the root node across the titlebar portal. */}
       <Menu
+        handle={menuHandle}
         open={menu !== null}
         onOpenChange={(open) => {
           if (!open) finishMenu();
