@@ -2,8 +2,10 @@
 import { t } from "~/i18n";
 import { Outlet, createFileRoute, redirect, useLocation } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
+import { ScrollArea as ScrollAreaPrimitive } from "@base-ui/react/scroll-area";
 import { Columns3Icon, PanelBottomIcon, PanelRightIcon } from "lucide-react";
 import { Button } from "../components/ui/button";
+import { ScrollBar } from "../components/ui/scroll-area";
 import { useSettingsRestore } from "../components/settings/SettingsPanels";
 
 import { SettingsBreadcrumb, SettingsPageHeading } from "../components/settings/SettingsBreadcrumb";
@@ -179,41 +181,52 @@ function SettingsContentLayout() {
       {titlebar}
       {/* Reset scroll before the new category's target refs run. Keep hash changes
           out of this identity so clearing a handled search target preserves its scroll. */}
-      <div
+      <ScrollAreaPrimitive.Root
         key={location.pathname}
-        className="scrollbar-gutter-both min-h-0 flex-1 overflow-y-auto"
-        data-settings-page-scroll
+        className="relative min-h-0 flex-1 overflow-hidden"
       >
-        <header className="mx-auto flex w-full max-w-205 flex-col gap-2.5 px-7 pt-5.5">
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={() => void navigateToMainApp()}
-              className="flex cursor-pointer items-center gap-1.5 rounded-menu-row text-secondary-copy leading-normal text-muted-foreground outline-none hover:text-foreground focus-visible:inset-shadow-focus"
-            >
-              <Kbd size="compact">Esc</Kbd>
-              {t.settings.pageShell.returnToConversation}
-            </button>
-          </div>
-          <div className="flex items-center gap-3">
-            <SettingsPageHeading pathname={location.pathname} />
-            {location.pathname === "/settings/general" ? (
-              <div className="ms-auto flex shrink-0 items-center">
-                <RestoreDeviceDefaultsButton
-                  onRestored={() => setRestoreSignal((value) => value + 1)}
-                />
+        {/* Keep the search marker on the viewport; Base UI owns overflow measurements. */}
+        <ScrollAreaPrimitive.Viewport
+          className="settings-page-viewport scrollbar-gutter-both h-full outline-none"
+          tabIndex={-1}
+          data-settings-page-scroll
+        >
+          <ScrollAreaPrimitive.Content>
+            <header className="mx-auto flex w-full max-w-205 flex-col gap-2.5 px-7 pt-5.5">
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => void navigateToMainApp()}
+                  className="flex cursor-pointer items-center gap-1.5 rounded-menu-row text-secondary-copy leading-normal text-muted-foreground outline-none hover:text-foreground focus-visible:inset-shadow-focus"
+                >
+                  <Kbd size="compact">Esc</Kbd>
+                  {t.settings.pageShell.returnToConversation}
+                </button>
               </div>
-            ) : null}
-          </div>
-          <SettingsScopeSentence />
-          <SettingsProjectScopeNotice />
-        </header>
-        <div key={`${contentScopeKey}:${restoreSignal}`}>
-          <SettingsScopeBoundary pathname={location.pathname}>
-            <Outlet />
-          </SettingsScopeBoundary>
-        </div>
-      </div>
+              <div className="flex items-center gap-3">
+                <SettingsPageHeading pathname={location.pathname} />
+                {location.pathname === "/settings/general" ? (
+                  <div className="ms-auto flex shrink-0 items-center">
+                    <RestoreDeviceDefaultsButton
+                      onRestored={() => setRestoreSignal((value) => value + 1)}
+                    />
+                  </div>
+                ) : null}
+              </div>
+              <SettingsScopeSentence />
+              <SettingsProjectScopeNotice />
+            </header>
+            <div key={`${contentScopeKey}:${restoreSignal}`}>
+              <SettingsScopeBoundary pathname={location.pathname}>
+                <Outlet />
+              </SettingsScopeBoundary>
+            </div>
+          </ScrollAreaPrimitive.Content>
+        </ScrollAreaPrimitive.Viewport>
+        <ScrollBar orientation="vertical" />
+        <ScrollBar orientation="horizontal" />
+        <ScrollAreaPrimitive.Corner />
+      </ScrollAreaPrimitive.Root>
     </main>
   );
 }

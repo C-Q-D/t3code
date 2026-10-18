@@ -53,6 +53,12 @@
 }
 
 @layer utilities {
+  /* Match ScrollArea's distance-limited fade and keep keyboard destinations clear of it. */
+  .settings-page-viewport {
+    @apply mask-t-from-[calc(100%-min(var(--fade-size),var(--scroll-area-overflow-y-start)))] mask-b-from-[calc(100%-min(var(--fade-size),var(--scroll-area-overflow-y-end)))] scroll-p-[var(--fade-size)] focus-visible:mask-none;
+    --fade-size: 1.5rem;
+  }
+
   /* Keep the existing destination lifecycle, overriding index.css's shadow animation
      only inside the settings shell. A finite opacity overlay avoids repainting row contents. */
   .settings-page-shell [data-settings-page-scroll] div.settings-search-target-pulse,
