@@ -776,7 +776,6 @@ export const settings: Messages["settings"] = {
   sidebarNav: {
     connectTitle: "T3 Connect",
     signIn: "登录",
-    back: "返回",
     accountAvatar: "账户头像",
     searchPlaceholder: "搜索",
     searchAriaLabel: "搜索设置",

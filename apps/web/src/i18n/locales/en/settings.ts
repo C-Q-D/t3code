@@ -826,7 +826,6 @@ export const settings = {
   sidebarNav: {
     connectTitle: "T3 Connect",
     signIn: "Sign in",
-    back: "Back",
     accountAvatar: "Account avatar",
     searchPlaceholder: "Search",
     searchAriaLabel: "Search settings",

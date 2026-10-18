@@ -14,7 +14,6 @@ import {
 } from "react";
 import {
   ArchiveIcon,
-  ArrowLeftIcon,
   CameraIcon,
   CalendarClockIcon,
   FolderGit2Icon,
@@ -37,7 +36,6 @@ import { Button } from "../ui/button";
 import { Kbd } from "../ui/kbd";
 import { Input } from "../ui/input";
 import { SidebarContent, useSidebar } from "../ui/sidebar";
-import { useNavigateToMainApp } from "../sidebar/mainAppLocation";
 import { scrollToSettingsTarget } from "./settingsLayout";
 import {
   searchSettings,
@@ -96,7 +94,6 @@ const SETTINGS_NAV_ITEMS: ReadonlyArray<{
  */
 export function SettingsSidebarNav({ pathname }: { pathname: string }) {
   const navigate = useNavigate();
-  const navigateToMainApp = useNavigateToMainApp();
   const currentHash = useLocation({ select: (location) => location.hash });
   const currentSearch = useLocation({ select: (location) => location.search });
   const scopeSearch = useMemo(() => validateSettingsScopeSearch(currentSearch), [currentSearch]);
@@ -368,21 +365,16 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
           aria-hidden="true"
           className="mx-1 mb-1 h-0.25 bg-settings-divider shadow-settings-footer-rule"
         />
-        <Suspense fallback={null}>
-          <T3ConnectSidebarSignIn variant="settings" />
-        </Suspense>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            className="flex h-9.5 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-compact-row px-3 text-secondary-copy-large leading-normal text-fg-detail outline-none hover:bg-settings-connect focus-visible:inset-shadow-focus"
-            onClick={() => {
-              if (isMobile) setOpenMobile(false);
-              void navigateToMainApp();
-            }}
-          >
-            <ArrowLeftIcon aria-hidden="true" className="size-3.75 shrink-0" strokeWidth={2} />
-            {t.settings.sidebarNav.back}
-          </button>
+          <div className="peer min-w-0 flex-1 empty:hidden">
+            <Suspense fallback={null}>
+              <T3ConnectSidebarSignIn variant="settings" />
+            </Suspense>
+          </div>
+          {/* Clerk hides sign-in for an active account; keep its avatar beside an account label. */}
+          <span className="hidden min-w-0 flex-1 truncate px-3 font-semibold peer-empty:block">
+            {t.settings.sidebarNav.connectTitle}
+          </span>
           <Suspense fallback={null}>
             <T3ConnectSidebarAvatar variant="settings" />
           </Suspense>
