@@ -6,12 +6,6 @@
   --font-window-brand: "Cormorant Garamond", "Noto Serif SC", serif;
   --text-window-brand: 19px;
   --text-window-brand--line-height: 1.55;
-  --radius-brand-mark: 9px;
-
-  /* StyleM-8a.dc.html · the three engraved bars inside the 30px brand stone. */
-  --spacing-brand-groove: 2.5px;
-  --color-brand-groove: #6a6a72;
-  --shadow-brand-engraving: 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 1px 1px rgba(0, 0, 0, 0.77);
 
   /* StyleM-8a.dc.html · main slab: stone under an 86% card-color veil. */
   --color-frame-card-veil: rgba(32, 32, 35, 0.86);
@@ -334,7 +328,7 @@ html[data-theme-id="graphite"] [data-frame-main] {
 .window-titlebar[data-discussion-layout] > [data-titlebar-slot="breadcrumb"] {
   overflow: hidden;
 }
-.window-titlebar[data-discussion-layout="compact"] [data-titlebar-brand] > span > span:last-child,
+.window-titlebar[data-discussion-layout="compact"] [data-titlebar-brand] > span,
 .window-titlebar[data-discussion-layout="compact"] [data-titlebar-brand] > div,
 .window-titlebar[data-discussion-layout="compact"] [data-discussion-project] {
   display: none;

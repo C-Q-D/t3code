@@ -163,7 +163,6 @@
  * | 进度轨道 | inset 1px 1px 2px rgba(0,0,0,0.77) | shadow-well-progress | 规范-8a.dc.html · H3 / StyleM-8a.dc.html · 整窗 |
  * | 侧边栏新建 | inset 0 1px 0 rgba(255,255,255,0.09), inset 0 -1px 0 rgba(0,0,0,0.66), 0 0 0 1px rgba(0,0,0,0.396), 0 2px 0 #09090a, 3px 5px 8px -2px rgba(0,0,0,0.616) | shadow-raise-new-thread | StyleM-8a.dc.html · 整窗 |
  * | 工作日志 | inset 0 1px 0 rgba(255,255,255,0.1), inset 0 -1px 0 rgba(0,0,0,0.66), 0 0 0 1px rgba(0,0,0,0.44), 0 2px 0 #09090a, 6px 10px 16px -4px rgba(0,0,0,0.66) | shadow-raise-log | StyleM-8a.dc.html · 整窗 |
- * | 品牌石块 | inset 0 1px 0 rgba(255,255,255,0.09), inset 0 -1px 0 rgba(0,0,0,0.396), 0 2px 4px rgba(0,0,0,0.396), 0 8px 16px -8px rgba(0,0,0,0.77) | shadow-raise-brand | StyleM-8a.dc.html · 整窗 |
  * | 状态标签微凸 | inset 0 1px 0 rgba(255,255,255,0.045), 0 1px 0 rgba(0,0,0,0.66) | shadow-tag | StyleM-8a.dc.html · 整窗 |
  * | 快捷键 | inset 0 1px 0 rgba(255,255,255,0.09), 0 1.5px 0 #09090a | shadow-keycap | 规范-8a.dc.html · H5 |
  * | 危险实心按钮 | 0 2px 0 #7f1f17, 3px 5px 9px -3px rgba(0,0,0,.8) | shadow-danger | 规范-8a.dc.html · H1 |
@@ -548,11 +547,6 @@
   --shadow-raise-log:
     inset 0 1px 0 rgba(255, 255, 255, 0.1), inset 0 -1px 0 rgba(0, 0, 0, 0.66),
     0 0 0 1px rgba(0, 0, 0, 0.44), 0 2px 0 #09090a, 6px 10px 16px -4px rgba(0, 0, 0, 0.66);
-
-  /* StyleM-8a.dc.html · 整窗；品牌石块：inset 0 1px 0 rgba(255,255,255,0.09), inset 0 -1px 0 rgba(0,0,0,0.396), 0 2px 4px rgba(0,0,0,0.396), 0 8px 16px -8px rgba(0,0,0,0.77)。 */
-  --shadow-raise-brand:
-    inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 -1px 0 rgba(0, 0, 0, 0.396),
-    0 2px 4px rgba(0, 0, 0, 0.396), 0 8px 16px -8px rgba(0, 0, 0, 0.77);
 
   /* StyleM-8a.dc.html · 整窗；状态标签微凸：inset 0 1px 0 rgba(255,255,255,0.045), 0 1px 0 rgba(0,0,0,0.66)。 */
   --shadow-tag: inset 0 1px 0 rgba(255, 255, 255, 0.045), 0 1px 0 rgba(0, 0, 0, 0.66);

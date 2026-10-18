@@ -91,20 +91,8 @@ export function WindowTitlebar({
           {sidebarControl}
         </div>
         <div className="ml-2 flex shrink-0 items-center gap-2" data-titlebar-brand="">
-          <span className="drag-region flex shrink-0 items-center gap-3 text-foreground">
-            <span
-              aria-hidden="true"
-              className="flex size-7.5 shrink-0 items-center rounded-brand-mark bg-popover pl-2 shadow-raise-brand"
-            >
-              <span className="flex flex-col gap-0.75">
-                <span className="h-brand-groove w-3.25 rounded-full bg-brand-groove shadow-brand-engraving" />
-                <span className="h-brand-groove w-2.5 rounded-full bg-brand-groove shadow-brand-engraving" />
-                <span className="h-brand-groove w-1.75 rounded-full bg-brand-groove shadow-brand-engraving" />
-              </span>
-            </span>
-            <span className="font-window-brand text-window-brand font-semibold tracking-brand whitespace-nowrap">
-              {t.sidebar.chrome.titlebarBrandName}
-            </span>
+          <span className="drag-region shrink-0 font-window-brand text-window-brand font-semibold tracking-brand whitespace-nowrap text-foreground">
+            {t.sidebar.chrome.titlebarBrandName}
           </span>
           {pillLabel ? (
             <div className="no-drag ml-1 flex h-7 items-center">
