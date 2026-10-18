@@ -30,7 +30,10 @@ import {
   resolveThreadDetailsPopoverLayout,
 } from "./threadDetailsCardLayout";
 import { observeResize } from "../../lib/observeResize";
-import { useThreadDetailsCardPlacementStore } from "../../threadDetailsCardPlacementStore";
+import {
+  useThreadDetailsCardPlacementStore,
+  type ThreadDetailsCardPlacement,
+} from "../../threadDetailsCardPlacementStore";
 
 // Keep in sync with the blank-surface cursor exclusions in chat-header.css.
 const CARD_CONTROLS =
@@ -39,6 +42,12 @@ const CARD_CONTROLS =
 /** Local pointer frame; only a completed drag is published to the persisted store. */
 interface CardDrag {
   threadKey: string;
+  containerWidth: number;
+  containerHeight: number;
+  cardWidth: number;
+  cardHeight: number;
+  topInset: number;
+  placement: ThreadDetailsCardPlacement | null;
   pointerId: number;
   pointerX: number;
   pointerY: number;
@@ -204,6 +213,26 @@ export function ThreadDetailsCard({
     measure();
     return observeResize(cardElement, measure);
   }, [cardElement]);
+  // A transform is relative to the layout at pointerdown. Cancel before paint when
+  // that basis changes, rather than applying the old delta to a newly fitted card.
+  useLayoutEffect(() => {
+    const drag = dragRef.current;
+    if (!drag) return;
+    if (
+      mode === "inline" &&
+      drag.containerWidth === canvas?.container.width &&
+      drag.containerHeight === canvas?.container.height &&
+      drag.cardWidth === cardSize.width &&
+      drag.cardHeight === cardSize.height &&
+      drag.topInset === topInset &&
+      drag.placement === savedPlacement &&
+      drag.origin.left === (floatingPosition?.left ?? placement?.x) &&
+      drag.origin.top === (floatingPosition?.top ?? placement?.y)
+    )
+      return;
+    dragRef.current = null;
+    clearCardDrag(drag);
+  });
   useLayoutEffect(
     () => () => {
       const drag = dragRef.current;
@@ -269,6 +298,12 @@ export function ThreadDetailsCard({
     const origin = floatingPosition ?? { left: placement.x, top: placement.y };
     dragRef.current = {
       threadKey,
+      containerWidth: canvas.container.width,
+      containerHeight: canvas.container.height,
+      cardWidth: cardSize.width,
+      cardHeight: cardSize.height,
+      topInset,
+      placement: savedPlacement,
       pointerId: event.pointerId,
       pointerX: event.clientX,
       pointerY: event.clientY,

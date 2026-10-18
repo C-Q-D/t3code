@@ -245,3 +245,37 @@ it("ignores search inset and restores placement after a narrow presentation", as
   expect(card().style.left).toBe("1000px");
   expect(card().style.top).toBe("100px");
 });
+
+it.each([
+  ["default", null, "", "12px", "12px"],
+  ["saved", { side: "right" as const, inset: 120, top: 100 }, "700px", "100px", ""],
+])(
+  "cancels a %s drag before paint when the inline canvas resizes",
+  async (_label, original, left, top, right) => {
+    store.setState({ placement: original });
+    await renderCard();
+    const element = card();
+    const subscriber = vi.fn();
+    const unsubscribe = store.subscribe(subscriber);
+    try {
+      await pointer(element, "pointerdown", 950, 140);
+      await pointer(element, "pointermove", 850, 140);
+      expect(element.style.transform).toBe("translate(-100px, 0px)");
+      await renderCard(1100);
+      expect(card()).toBe(element);
+      expect(element.style.transform).toBe("");
+      expect(element.releasePointerCapture).toHaveBeenCalledWith(1);
+      expect(store.getState().placement).toEqual(original);
+      expect(element.style.left).toBe(left);
+      expect(element.style.top).toBe(top);
+      expect(element.style.right).toBe(right);
+      await pointer(element, "pointermove", 750, 140);
+      await pointer(element, "pointerup", 750, 140);
+      expect(element.style.transform).toBe("");
+      expect(store.getState().placement).toEqual(original);
+      expect(subscriber).not.toHaveBeenCalled();
+    } finally {
+      unsubscribe();
+    }
+  },
+);
