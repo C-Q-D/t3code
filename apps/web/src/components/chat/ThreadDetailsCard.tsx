@@ -1,6 +1,14 @@
-/** Places and sizes the thread details card within the chat canvas. */
+/** Places and sizes the thread details card; inline drags persist only after release. */
 import { t } from "~/i18n";
-import { useLayoutEffect, useState, type ReactNode, type RefObject } from "react";
+import {
+  useLayoutEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+  type RefObject,
+} from "react";
+import { flushSync } from "react-dom";
 import type { ScopedThreadRef } from "@t3tools/contracts";
 import { scopedThreadKey } from "@t3tools/client-runtime/environment";
 import { ScrollArea } from "../ui/scroll-area";
@@ -14,11 +22,44 @@ import {
 import type { ThreadPanelPresentation } from "../../rightPanelLayout";
 import { useChatCanvas } from "./ChatCanvasContext";
 import {
+  createThreadDetailsCardPlacement,
+  resolveThreadDetailsCardPosition,
+  THREAD_DETAILS_CARD_GAP,
   resolveThreadDetailsCardDensity,
   resolveThreadDetailsCardLayout,
   resolveThreadDetailsPopoverLayout,
 } from "./threadDetailsCardLayout";
 import { observeResize } from "../../lib/observeResize";
+import { useThreadDetailsCardPlacementStore } from "../../threadDetailsCardPlacementStore";
+
+// Keep in sync with the blank-surface cursor exclusions in chat-header.css.
+const CARD_CONTROLS =
+  'button, a, input, textarea, select, option, label, summary, [role="button"], [role="link"], [role="textbox"], [role="combobox"], [role="checkbox"], [role="radio"], [role="switch"], [role="slider"], [role="spinbutton"], [role="tab"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="option"], [role="treeitem"], [role="scrollbar"], [contenteditable]:not([contenteditable="false"]), [data-slot="scroll-area-scrollbar"]';
+
+/** Local pointer frame; only a completed drag is published to the persisted store. */
+interface CardDrag {
+  threadKey: string;
+  pointerId: number;
+  pointerX: number;
+  pointerY: number;
+  origin: { left: number; top: number };
+  latest: { left: number; top: number };
+  moved: boolean;
+  element: HTMLElement;
+  userSelect: string;
+  transition: string;
+}
+
+/** Restores transient DOM styles and capture on completion, cancellation, or unmount. */
+function clearCardDrag(drag: CardDrag) {
+  drag.element.style.transform = "";
+  drag.element.style.userSelect = drag.userSelect;
+  drag.element.style.transition = drag.transition;
+  delete drag.element.dataset.dragging;
+  if (drag.element.hasPointerCapture(drag.pointerId)) {
+    drag.element.releasePointerCapture(drag.pointerId);
+  }
+}
 
 // Collapse ownership outlives card mounts; each caller must release its own request.
 const collapsedThreads = new Map<
@@ -79,21 +120,26 @@ export function ThreadDetailsCard({
   children: (density: "full" | "compact" | "essential") => ReactNode;
 }) {
   const canvas = useChatCanvas();
+  const threadKey = scopedThreadKey(threadRef);
+  const savedPlacement = useThreadDetailsCardPlacementStore((state) => state.placement);
+  const dragRef = useRef<CardDrag | null>(null);
+  const [cardElement, setCardElement] = useState<HTMLElement | null>(null);
+  const [cardSize, setCardSize] = useState({ width: 280, height: 0 });
   const preferredPlacement = canvas
     ? resolveThreadDetailsCardLayout({
         container: canvas.container,
         lane: canvas.lane,
         frame: null,
-        topInset: canvas.detailsCardTopInset,
+        topInset: savedPlacement ? 0 : canvas.detailsCardTopInset,
       })
     : null;
   const placement = canvas
     ? resolveThreadDetailsCardLayout({
         container: canvas.container,
         lane: canvas.lane,
-        frame: canvas.layout.frame,
-        overlapsDetailsCard: canvas.layout.overlapsDetailsCard,
-        topInset: canvas.detailsCardTopInset,
+        frame: savedPlacement ? null : canvas.layout.frame,
+        overlapsDetailsCard: !savedPlacement && canvas.layout.overlapsDetailsCard,
+        topInset: savedPlacement ? 0 : canvas.detailsCardTopInset,
       })
     : null;
   const mode = placement ? "inline" : "popover";
@@ -117,7 +163,14 @@ export function ThreadDetailsCard({
   });
   const contentHeights =
     measurements.key === measurementKey ? measurements.heights : { full: 0, compact: 0 };
-  const height = placement?.height ?? overlay.height;
+  const floatingPosition =
+    savedPlacement && canvas
+      ? resolveThreadDetailsCardPosition(savedPlacement, canvas.container, cardSize)
+      : null;
+  const height =
+    floatingPosition && canvas && mode === "inline"
+      ? Math.max(0, canvas.container.height - floatingPosition.top - THREAD_DETAILS_CARD_GAP)
+      : (placement?.height ?? overlay.height);
   const density =
     mode === "popover" ? "full" : resolveThreadDetailsCardDensity(height, contentHeights);
   const reportDetailsCard = canvas?.reportDetailsCard;
@@ -131,11 +184,35 @@ export function ThreadDetailsCard({
       : undefined;
   useLayoutEffect(() => {
     reportDetailsCard?.(
-      inlineOpen && cardLeft !== undefined && cardRight !== undefined && cardBottom !== undefined
+      !savedPlacement &&
+        inlineOpen &&
+        cardLeft !== undefined &&
+        cardRight !== undefined &&
+        cardBottom !== undefined
         ? { left: cardLeft, right: cardRight, bottom: cardBottom }
         : null,
     );
-  }, [reportDetailsCard, inlineOpen, cardLeft, cardRight, cardBottom]);
+  }, [reportDetailsCard, inlineOpen, cardLeft, cardRight, cardBottom, savedPlacement]);
+  useLayoutEffect(() => {
+    if (!cardElement) return;
+    const measure = () => {
+      const { width, height } = cardElement.getBoundingClientRect();
+      setCardSize((current) =>
+        current.width === width && current.height === height ? current : { width, height },
+      );
+    };
+    measure();
+    return observeResize(cardElement, measure);
+  }, [cardElement]);
+  useLayoutEffect(
+    () => () => {
+      const drag = dragRef.current;
+      if (!drag || drag.element !== cardElement || drag.threadKey !== threadKey) return;
+      dragRef.current = null;
+      clearCardDrag(drag);
+    },
+    [cardElement, threadKey],
+  );
   useLayoutEffect(() => () => reportDetailsCard?.(null), [reportDetailsCard]);
   useLayoutEffect(() => {
     onPresentationChange(mode);
@@ -176,6 +253,70 @@ export function ThreadDetailsCard({
     measure();
     return observeResize(element, measure);
   }, [contentElement, density, measurementKey]);
+  /** Starts capture only on blank inline content; controls retain their native gestures. */
+  const beginDrag = (event: ReactPointerEvent<HTMLElement>) => {
+    if (
+      event.button !== 0 ||
+      event.pointerType !== "mouse" ||
+      !event.isPrimary ||
+      dragRef.current ||
+      !placement ||
+      !canvas
+    )
+      return;
+    if (event.target instanceof Element && event.target.closest(CARD_CONTROLS)) return;
+    const element = event.currentTarget;
+    const origin = floatingPosition ?? { left: placement.x, top: placement.y };
+    dragRef.current = {
+      threadKey,
+      pointerId: event.pointerId,
+      pointerX: event.clientX,
+      pointerY: event.clientY,
+      origin,
+      latest: origin,
+      moved: false,
+      element,
+      userSelect: element.style.userSelect,
+      transition: element.style.transition,
+    };
+    element.setPointerCapture(event.pointerId);
+    element.style.userSelect = "none";
+    element.style.transition = "none";
+    event.preventDefault();
+  };
+  /** Updates only the DOM transform; current rendered dimensions keep all edges contained. */
+  const moveDrag = (event: ReactPointerEvent<HTMLElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId || !canvas) return;
+    const dx = event.clientX - drag.pointerX;
+    const dy = event.clientY - drag.pointerY;
+    if (!drag.moved && Math.hypot(dx, dy) <= 3) return;
+    drag.moved = true;
+    drag.latest = resolveThreadDetailsCardPosition(
+      { side: "left", inset: drag.origin.left + dx, top: drag.origin.top + dy },
+      canvas.container,
+      drag.element.getBoundingClientRect(),
+    );
+    drag.element.dataset.dragging = "true";
+    drag.element.style.transform = `translate(${drag.latest.left - drag.origin.left}px, ${drag.latest.top - drag.origin.top}px)`;
+    event.preventDefault();
+  };
+  /** Commits before removing the transform so the release cannot paint the old position. */
+  const endDrag = (event: ReactPointerEvent<HTMLElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    if (event.type === "pointerup") moveDrag(event);
+    dragRef.current = null;
+    if (event.type === "pointerup" && drag.moved && canvas) {
+      const next = createThreadDetailsCardPlacement(
+        drag.latest,
+        drag.element.getBoundingClientRect().width,
+        canvas.container.width,
+      );
+      flushSync(() => useThreadDetailsCardPlacementStore.getState().place(next));
+    }
+    clearCardDrag(drag);
+  };
   const card = (
     <div
       className="surface-glass isolate grid max-h-full grid-rows-1 overflow-hidden rounded-slab shadow-raise-detail"
@@ -222,20 +363,32 @@ export function ThreadDetailsCard({
       {placement ? (
         inlineOpen ? (
           <aside
+            ref={setCardElement}
+            onPointerDown={beginDrag}
+            onPointerMove={moveDrag}
+            onPointerUp={endDrag}
+            onPointerCancel={endDrag}
+            onLostPointerCapture={endDrag}
+            onDoubleClick={(event) => {
+              if (event.target instanceof Element && event.target.closest(CARD_CONTROLS)) return;
+              useThreadDetailsCardPlacementStore.getState().reset();
+            }}
             aria-label={t.chat.details.threadDetails}
             // Slides down to make room for the find bar, but returns in the same frame
             // the bar closes: a floating preview below moves up at once and would
             // otherwise overlap the card mid-slide.
             className={cn(
               "absolute z-20",
-              topInset > 0 &&
+              !savedPlacement &&
+                topInset > 0 &&
                 "transition-[top] duration-150 ease-out motion-reduce:transition-none",
             )}
             style={{
-              // Anchored to the right edge like the find bar, so both follow a resizing
-              // canvas in the same frame instead of waiting for its next measurement.
-              right: placement.right,
-              top: placement.y,
+              // The default follows the find bar's right anchor during resize;
+              // a saved drag instead uses the clamped canvas-relative position.
+              left: floatingPosition?.left,
+              right: floatingPosition ? undefined : placement.right,
+              top: floatingPosition?.top ?? placement.y,
               width: placement.width,
               maxHeight: height,
             }}
