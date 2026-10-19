@@ -1,6 +1,7 @@
 /** Renders scoped settings panels through shared controls; server settings own validation and persistence. */
 import { SettingsGroup } from "./SettingsGroup";
 import { LanguageSetting } from "./LanguageSetting";
+import { BackgroundImageSetting } from "./BackgroundImageSetting";
 import { t } from "~/i18n";
 import { usePhysicsMotion } from "~/hooks/usePhysicsMotion";
 import { SNOOZE_UI_ENABLED } from "~/snoozeUi";
@@ -1347,6 +1348,8 @@ export function AppearanceSettingsPanel() {
             </div>
           }
         />
+
+        {isElectron ? <BackgroundImageSetting /> : null}
 
         <SettingsRow
           {...searchableSetting("diff-color-scheme")}

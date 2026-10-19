@@ -39,7 +39,11 @@ export function createBackgroundImageStore(bridge?: BackgroundImageBridge) {
         } finally {
           set({ busy: false });
         }
-      })();
+      })().catch((error: unknown) => {
+        // A later user action can retry a failed read; never retry a native write automatically.
+        initialLoad = undefined;
+        throw error;
+      });
       return initialLoad;
     },
     pick: async () => {

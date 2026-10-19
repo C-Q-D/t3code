@@ -192,10 +192,17 @@ export const settings: Messages["settings"] = {
       resetLabel: "对比度",
     },
     settingGlassOpacity: {
-      title: "玻璃不透明度",
-
-      description: "值越高，菜单、对话框和输入框越不透明。",
-      resetLabel: "玻璃不透明度",
+      title: "透明度",
+      description: "值越低，窗口越透，能看到背景图和桌面。",
+      resetLabel: "透明度",
+    },
+    backgroundImage: {
+      title: "背景图",
+      default: "默认：暮色山峦",
+      custom: "自定义图片",
+      choose: "选择图片…",
+      restoreDefault: "恢复默认",
+      error: "无法更新背景图，请重试。",
     },
     diffColorScheme: {
       title: "Diff 颜色",

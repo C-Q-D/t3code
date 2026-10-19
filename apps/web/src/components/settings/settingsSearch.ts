@@ -295,7 +295,14 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "setting-glass-opacity",
     title: t.settings.rows.settingGlassOpacity.title,
     to: "/settings/appearance",
-    searchTerms: ["transparent transparency solid menus dialogs composer"],
+    searchTerms: ["glass opacity transparent transparency window desktop 透明度 桌面"],
+  },
+  {
+    id: "background-image",
+    title: t.settings.rows.backgroundImage.title,
+    to: "/settings/appearance",
+    searchTerms: ["background image wallpaper dusk ridges custom 默认 暮色山峦 自定义 图片 壁纸"],
+    desktopOnly: true,
   },
   {
     id: "diff-color-scheme",

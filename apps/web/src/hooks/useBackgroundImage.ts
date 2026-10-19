@@ -13,5 +13,10 @@ const backgroundImageStore = createBackgroundImageStore(bridge);
 
 /** Returns the shared image and serialized native actions; callers report rejected IPC operations. */
 export function useBackgroundImage() {
-  return useStore(backgroundImageStore);
+  const state = useStore(backgroundImageStore);
+  return {
+    ...state,
+    canPick: typeof bridge?.pickBackgroundImage === "function",
+    canClear: typeof bridge?.clearBackgroundImage === "function",
+  };
 }

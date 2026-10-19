@@ -63,4 +63,18 @@ describe("background image selection", () => {
     expect(store.getState().url).toBe(customUrl);
     expect(store.getState().busy).toBe(false);
   });
+
+  it("allows a user action to retry after the startup read fails", async () => {
+    const store = createBackgroundImageStore({
+      getBackgroundImage: vi
+        .fn()
+        .mockRejectedValueOnce(new Error("read failed"))
+        .mockResolvedValue(null),
+      pickBackgroundImage: async () => customUrl,
+    });
+    await expect(store.getState().load()).rejects.toThrow("read failed");
+    await store.getState().pick();
+    expect(store.getState().url).toBe(customUrl);
+    expect(store.getState().busy).toBe(false);
+  });
 });

@@ -81,6 +81,15 @@ html[data-theme-id="graphite"] [data-slot="composer-context-strip"]::before {
   backdrop-filter: none;
 }
 
+/* Banner and command-menu surfaces paint through their own pseudo-element, not surface-glass. */
+html[data-theme-id="graphite"] [data-composer-banner-surface]::before {
+  background:
+    linear-gradient(var(--chat-composer-attached-tint), var(--chat-composer-attached-tint)),
+    var(--chat-composer-attached-surface);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
 /* StyleM / E1: white keys keep their icons dark instead of inheriting F8 category hues. */
 @utility composer-primary-key {
   --lucide-hue-override: currentColor;

@@ -217,10 +217,17 @@ export const settings = {
       resetLabel: "contrast",
     },
     settingGlassOpacity: {
-      title: "Glass opacity",
-
-      description: "Higher values make menus, dialogs, and the composer more solid.",
-      resetLabel: "glass opacity",
+      title: "Transparency",
+      description: "Lower values let the background image and desktop show through.",
+      resetLabel: "transparency",
+    },
+    backgroundImage: {
+      title: "Background image",
+      default: "Default: Dusk ridges",
+      custom: "Custom image",
+      choose: "Choose image…",
+      restoreDefault: "Use default",
+      error: "Could not update the background image. Please try again.",
     },
     diffColorScheme: {
       title: "Diff colors",
