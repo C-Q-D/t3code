@@ -1,10 +1,20 @@
 /** Exercises resize gestures through their visible width and persisted result. */
-import { act, useLayoutEffect, type PointerEvent } from "react";
+import { act, useLayoutEffect, type PointerEvent, type ReactNode, type MouseEvent } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { setPhysicsEnabled } from "../lib/motion/preference";
 import { activeJobs } from "../lib/motion/loop";
+
+import { Sidebar, SidebarProvider, SidebarRail, useSidebar } from "../components/ui/sidebar";
+
+// Only visual tooltip plumbing and viewport queries are replaced; the rail session and provider are real.
+vi.mock("../components/ui/tooltip", () => ({
+  Tooltip: ({ children }: { children: ReactNode }) => children,
+  TooltipTrigger: ({ render }: { render: ReactNode }) => render,
+  TooltipPopup: () => null,
+}));
+vi.mock("./useMediaQuery", () => ({ useMediaQuery: () => false }));
 
 import { RESIZABLE_WIDTH_PROPERTY, useResizableWidth } from "./useResizableWidth";
 
@@ -361,5 +371,85 @@ describe("physical panel resizing", () => {
     expect(result.width).toBe(200);
     expect(collapse).not.toHaveBeenCalled();
     expect(activeJobs()).toBe(0);
+  });
+});
+
+/** Exposes the provider's actual visibility; no alternate collapse implementation in the fixture. */
+function RailState() {
+  const { open } = useSidebar();
+  return <output>{String(open)}</output>;
+}
+
+/** Mount a real rail with local geometry and persistence, avoiding layout-dependent DOM measurements. */
+async function mountRail(open = false, side: "left" | "right" = "left") {
+  vi.stubGlobal("cookieStore", { set: vi.fn().mockResolvedValue(undefined) });
+  await act(() =>
+    renderer.update(
+      <SidebarProvider defaultOpen={open}>
+        <Sidebar side={side} resizable={{ minWidth: 200, maxWidth: 800, storageKey: "rail-width" }}>
+          <SidebarRail />
+          <RailState />
+        </Sidebar>
+      </SidebarProvider>,
+    ),
+  );
+  const widthStyle = {
+    setProperty: (key: string, value: string) => hostStyle.set(key, value),
+    removeProperty: (key: string) => hostStyle.delete(key),
+  };
+  const container = { style: widthStyle, getBoundingClientRect: () => ({ width: 400 }) };
+  const sidebar = { querySelector: () => container };
+  const rail = {
+    ...target,
+    setAttribute() {},
+    removeAttribute() {},
+    closest: (selector: string) => (selector.includes("wrapper") ? { style: widthStyle } : sidebar),
+  };
+  return {
+    handle: () => renderer.root.findByProps({ "data-slot": "sidebar-rail" }),
+    event: (x: number, time: number) => ({ ...pointer(x, time), currentTarget: rail }),
+    open: () => renderer.root.findByType("output").children[0],
+  };
+}
+
+describe("sidebar rail gestures", () => {
+  it.each(["left", "right"] as const)(
+    "opens collapsed %s rail beyond 24px and ignores its following click",
+    async (side) => {
+      setPhysicsEnabled(true);
+      const rail = await mountRail(false, side);
+      await act(() => {
+        rail.handle().props.onPointerDown(rail.event(100, 0));
+        rail.handle().props.onPointerUp(rail.event(side === "left" ? 125 : 75, 100));
+      });
+      expect(rail.open()).toBe("true");
+      await act(() => rail.handle().props.onClick({ preventDefault() {} } as MouseEvent));
+      expect(rail.open()).toBe("true");
+      expect(setItem).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([0, 23, 24])("retains click toggle for a %spx collapsed drag", async (distance) => {
+    setPhysicsEnabled(true);
+    const rail = await mountRail();
+    await act(() => {
+      rail.handle().props.onPointerDown(rail.event(100, 0));
+      rail.handle().props.onPointerUp(rail.event(100 + distance, 100));
+    });
+    expect(rail.open()).toBe("false");
+    await act(() => rail.handle().props.onClick({ preventDefault() {} } as MouseEvent));
+    expect(rail.open()).toBe("true");
+  });
+
+  it("collapses an inward throw without storing the shrunken sidebar width", async () => {
+    setPhysicsEnabled(true);
+    const rail = await mountRail(true);
+    await act(() => {
+      rail.handle().props.onPointerDown(rail.event(400, 0));
+      rail.handle().props.onPointerUp(rail.event(250, 50));
+    });
+    expect(rail.open()).toBe("false");
+    expect(setItem).not.toHaveBeenCalled();
+    expect(hostStyle.has("width")).toBe(false);
   });
 });

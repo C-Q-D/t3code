@@ -2285,7 +2285,10 @@ export default function ChatView(props: ChatViewProps) {
   );
   // Electron hosts its own browser tabs; other clients need the environment to host them.
   const browserAvailable = isPreviewSupportedInRuntime() || activeEnvironmentServerBrowser;
+  // The close action is defined after surface state; keep sizing wired to its latest committed closure.
+  const closePreviewPanelRef = useRef<(() => void) | null>(null);
   const previewPanelInlineSize = usePreviewPanelInlineSize(undefined, {
+    onCollapse: () => closePreviewPanelRef.current?.(),
     container: workspaceLayoutElement,
     standalone: true,
     defaultWidth: 560,
@@ -5966,6 +5969,9 @@ export default function ChatView(props: ChatViewProps) {
       useRightPanelStore.getState().close(activeThreadRef);
     }
   }, [activeRightPanelSurface, activeThreadRef]);
+  useLayoutEffect(() => {
+    closePreviewPanelRef.current = closePreviewPanel;
+  }, [closePreviewPanel]);
   const togglePreviewPanel = useCallback(() => {
     if (!activeThreadRef || !browserAvailable) return;
     if (previewPanelOpen) {

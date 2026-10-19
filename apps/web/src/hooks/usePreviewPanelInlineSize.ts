@@ -34,6 +34,8 @@ export function usePreviewPanelInlineSize(
   hostRef?: RefObject<HTMLElement | null>,
   options: {
     readonly enabled?: boolean | undefined;
+    /** Collapse using the host action while keeping its last saved width. */
+    readonly onCollapse?: (() => void) | undefined;
     readonly widthStorageKey?: string | undefined;
     readonly defaultWidth?: number | undefined;
     /** Measure this row instead of the panel's parent. */
@@ -54,6 +56,7 @@ export function usePreviewPanelInlineSize(
     minWidth: PREVIEW_PANEL_MIN_WIDTH,
     maxWidth,
     edge: "left",
+    onCollapse: options.onCollapse,
   });
 }
 

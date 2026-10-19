@@ -38,6 +38,7 @@ interface PreviewPanelShellProps {
   maximized?: boolean;
   inlineSize?: PreviewPanelInlineSize;
   open?: boolean;
+  onCollapse?: (() => void) | undefined;
   /**
    * Overrides the localStorage key used to persist the panel width. Callers
    * embedding this shell for a different surface (e.g. the pull requests
@@ -67,6 +68,7 @@ function ResizablePreviewPanelShell(props: PreviewPanelShellProps) {
     widthStorageKey: props.widthStorageKey,
     defaultWidth: props.defaultWidth,
     standalone: props.standalone,
+    onCollapse: props.onCollapse,
   });
   return <PreviewPanelShellFrame {...props} inlineSize={inlineSize} hostRef={hostRef} />;
 }

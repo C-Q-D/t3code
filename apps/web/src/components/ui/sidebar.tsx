@@ -21,6 +21,7 @@ import {
   SheetTitle,
 } from "~/components/ui/sheet";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
+import { isPhysicsEnabled } from "~/lib/motion/preference";
 import { useResizeDrag } from "~/hooks/useResizeDrag";
 import { useMediaQuery } from "~/hooks/useMediaQuery";
 import { FRAME_NARROW_MEDIA_QUERY } from "~/frameBreakpoints";
@@ -487,7 +488,7 @@ function SidebarRail({
   onPointerUp,
   ...props
 }: React.ComponentProps<"button">) {
-  const { open, toggleSidebar } = useSidebar();
+  const { open, setOpen, toggleSidebar } = useSidebar();
   const sidebarInstance = React.use(SidebarInstanceContext);
   const railRef = React.useRef<HTMLButtonElement | null>(null);
   const widthReadoutRef = React.useRef<HTMLSpanElement | null>(null);
@@ -499,7 +500,24 @@ function SidebarRail({
   const railLabel = canResize ? t.app.sidebar.resize : t.app.sidebar.toggle;
   const railTitle = canResize ? t.app.sidebar.dragResize : t.app.sidebar.toggle;
   const resize = useResizeDrag<HTMLButtonElement>((event) => {
-    if (!resolvedResizable || !open) return null;
+    if (!resolvedResizable) return null;
+    suppressClickRef.current = false;
+    const side = sidebarInstance?.side ?? "left";
+    if (!open) {
+      if (!isPhysicsEnabled()) return null;
+      // Collapsed rails measure outward travel without changing the remembered open width.
+      return {
+        width: 0,
+        edge: side === "left" ? "right" : "left",
+        resize: (distance) => distance,
+        finish(distance) {
+          if (distance > 24) {
+            suppressClickRef.current = true;
+            setOpen(true);
+          }
+        },
+      };
+    }
     const rail = event.currentTarget;
     const wrapper = rail.closest<HTMLElement>("[data-slot='sidebar-wrapper']");
     const sidebarRoot = rail.closest<HTMLElement>("[data-slot='sidebar']");
@@ -508,7 +526,6 @@ function SidebarRail({
     );
     if (!wrapper || !sidebarRoot || !sidebarContainer) return null;
 
-    const side = sidebarInstance?.side ?? "left";
     let width = clampSidebarWidth(
       sidebarContainer.getBoundingClientRect().width,
       resolvedResizable,
@@ -534,8 +551,25 @@ function SidebarRail({
     rail.setAttribute("data-resizing", "true");
     setIsResizing(true);
 
+    let acceptedFrame = true;
     return {
       width,
+      physics: {
+        get min() {
+          return latestResizable.current?.minWidth ?? resolvedResizable.minWidth;
+        },
+        get max() {
+          return latestResizable.current?.maxWidth ?? resolvedResizable.maxWidth;
+        },
+        onFling() {
+          if (!acceptedFrame) return;
+          suppressClickRef.current = true;
+          setOpen(false);
+        },
+      },
+      paint(value) {
+        if (acceptedFrame) setTargetWidth(value);
+      },
       edge: side === "left" ? "right" : "left",
       resize(value) {
         const options = latestResizable.current;
@@ -550,6 +584,7 @@ function SidebarRail({
             sidebarRoot,
             wrapper,
           }) ?? true;
+        acceptedFrame = accepted;
         if (accepted) {
           setTargetWidth(nextWidth);
           width = nextWidth;
@@ -635,7 +670,7 @@ function SidebarRail({
             aria-label={railLabel}
             className={cn(
               /* disable pointer events only when offcanvas sidebar is collapsed, that's when the rail sits over the native scrollbar on windows and linux. icon mode stays fully clickable. */
-              "-translate-x-1/2 group-data-[side=left]:-right-4 absolute inset-y-0 z-20 hidden w-4 after:absolute after:inset-y-0 after:left-1/2 after:w-[2px] hover:after:bg-sidebar-border group-data-[side=right]:left-0 sm:flex [[data-collapsible=offcanvas][data-state=collapsed]_&]:pointer-events-none",
+              "-translate-x-1/2 group-data-[side=left]:-right-4 absolute inset-y-0 z-20 hidden w-4 after:absolute after:inset-y-0 after:left-1/2 after:w-[2px] hover:after:bg-sidebar-border group-data-[side=right]:left-0 sm:flex legacy:[[data-collapsible=offcanvas][data-state=collapsed]_&]:pointer-events-none",
               "[[data-panel-animations=true]_&]:transition-all [[data-panel-animations=true]_&]:[transition-duration:var(--panel-animation-duration)] [[data-panel-animations=true]_&]:ease-(--panel-animation-easing)",
               "in-data-[side=left]:cursor-w-resize in-data-[side=right]:cursor-e-resize",
               "[[data-side=left][data-state=collapsed]_&]:cursor-e-resize [[data-side=right][data-state=collapsed]_&]:cursor-w-resize",
