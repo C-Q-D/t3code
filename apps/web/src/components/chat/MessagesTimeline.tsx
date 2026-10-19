@@ -3315,6 +3315,7 @@ function V2EventTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "event"
           presentation.tone === "danger" && "border-destructive/25 bg-destructive/5",
           presentation.tone === "success" && "border-success/20 bg-success/5",
         )}
+        data-timeline-card-tone={presentation.tone}
         data-v2-item-type={item.type}
         data-v2-item-visibility={visibility}
         data-v2-event-disclosure="true"
@@ -3396,6 +3397,7 @@ function V2EventTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "event"
         presentation.tone === "success" && "border-success/20 bg-success/5",
         presentation.tone === "muted" && "border-border/60 bg-card/30",
       )}
+      data-timeline-card-tone={presentation.tone}
       data-v2-item-type={item.type}
       data-v2-item-visibility={visibility}
     >

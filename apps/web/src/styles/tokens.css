@@ -17,13 +17,13 @@
  * | 用途 | 设计值 | 类名 | 来源（文件 · 画板或章节） |
  * | --- | --- | --- | --- |
  * | 窗口底座 | #0b0b0c | bg-background | README.md · 设计令牌 / 规范-8a.dc.html · G1 |
- * | 石纹窗口底座；仅石墨外壳使用，与 stone-sidebar 二选一 | #0b0b0c + 640×640 WebP 平铺 + rgba(0,0,0,.2) | stone-base | README.md · 设计令牌 / StyleM-8a.dc.html · 整窗 |
- * | 石纹侧边栏；与 stone-base 二选一 | #1c1c1f + 640×640 WebP 平铺 + rgba(28,28,31,.82) | stone-sidebar | StyleM-8a.dc.html · 整窗 |
- * | 石墨实心凸起面；阴影由页面选择 | #28282c，玻璃值低于 80 时按 (80−值)×0.625% 混黑 | surface-glass | 规范-8a.dc.html · G1 / F1.2 已定 Q2=B |
- * | 石墨菜单与弹层底座 | #2a2a2e + shadow-overlay，同上述混黑公式 | dropdown-glass | 规范-8a.dc.html · G1 / H2 / F1.2 已定 Q2=B |
- * | 石墨对话框底座 | #2a2a2e + shadow-dialog，同上述混黑公式 | dialog-glass | 规范-8a.dc.html · G1 / H4 / F1.2 已定 Q2=B |
+ * | 石墨窗口底座 | 背景图 alpha = --glass-opacity，其上叠 rgba(0,0,0,.2)；Windows Electron 根背景透明，其他宿主 #0b0b0c 兜底 | stone-base | styles/slab.css |
+ * | 石墨侧边栏；与 stone-base 分层绘制 | #1c1c1f，alpha = --glass-opacity，无石纹；其他主题的底座与侧栏保留原石纹规则 | stone-sidebar | styles/slab.css |
+ * | 石墨实心凸起面；阴影由页面选择，输入框主外壳单独随透明度变化 | #28282c，不混黑 | surface-glass | styles/slab.css / styles/composer.css |
+ * | 石墨菜单与弹层底座 | 实心 #2a2a2e + shadow-overlay，不混黑 | dropdown-glass | styles/slab.css |
+ * | 石墨对话框底座 | 实心 #2a2a2e + shadow-dialog，不混黑 | dialog-glass | styles/slab.css |
  * | 石墨对话框暗幕；不随玻璃值变化 | rgba(0,0,0,.55)，无模糊 | dialog-backdrop | 规范-8a.dc.html · H4 / StyleM-8a.dc.html · 整窗 R1 |
- * | 石墨实心状态提示；保留变体文字和图标规则 | info #16233f、warning #e8dcc0、error #f0cfc9；success 保留 4% 着色；同上述混黑公式 | alert-glass | README.md · 设计令牌 / 补充屏-1.dc.html · W7 / F1.2 已定 Q2=B |
+ * | 石墨实心状态提示；保留变体文字和图标规则 | info #16233f、warning #e8dcc0、error #f0cfc9；success 保留 4% 着色，不混黑 | alert-glass | styles/slab.css |
  * | 侧边栏石板 | #1c1c1f | bg-sidebar | README.md · 设计令牌 / 规范-8a.dc.html · G1 |
  * | 对话区石板 | #202023 | bg-card | README.md · 设计令牌 / 规范-8a.dc.html · G1 |
  * | 凸起卡片与输入框外壳 | #28282c | bg-surface-raised | README.md · 设计令牌 / 规范-8a.dc.html · G1 |

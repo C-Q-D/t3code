@@ -105,6 +105,37 @@ html[data-theme-id="graphite"] .timeline-plan {
   background: var(--popover);
 }
 
+/* The message canvas is translucent. Composite card tints onto a solid card color,
+   rather than onto the window, so status colors stay stable at every glass opacity. */
+html[data-theme-id="graphite"] [data-timeline-card-tone] {
+  background-color: var(--card);
+}
+
+html[data-theme-id="graphite"] [data-timeline-card-tone="warning"] {
+  background-color: color-mix(in srgb, var(--warning) 5%, var(--card));
+}
+
+html[data-theme-id="graphite"] [data-timeline-card-tone="danger"] {
+  background-color: color-mix(in srgb, var(--destructive) 5%, var(--card));
+}
+
+html[data-theme-id="graphite"] [data-timeline-card-tone="success"] {
+  background-color: color-mix(in srgb, var(--success) 5%, var(--card));
+}
+
+/* Fold controls and changed-file cards have their own tints, outside the event-card path. */
+html[data-theme-id="graphite"] .chat-message-canvas button[data-superseded-attempt-id] {
+  background-color: color-mix(in srgb, var(--muted) 20%, var(--card));
+}
+
+html[data-theme-id="graphite"] .chat-message-canvas button[data-superseded-attempt-id]:hover {
+  background-color: color-mix(in srgb, var(--muted) 35%, var(--card));
+}
+
+html[data-theme-id="graphite"] .chat-message-canvas [data-changed-files-state="tree"] {
+  background-color: color-mix(in srgb, var(--input) 20%, var(--card));
+}
+
 .chat-markdown .timeline-markdown-table table {
   @apply text-control;
 }

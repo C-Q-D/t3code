@@ -174,6 +174,7 @@ export function V2LifecycleRow(props: {
       return (
         <div
           data-v2-item-type={item.type}
+          data-timeline-card-tone="muted"
           className="flex min-w-0 items-center gap-3 rounded-lg border border-border/60 p-3"
         >
           <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted/60">
