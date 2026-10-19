@@ -1090,6 +1090,7 @@ import { SpringTimeline } from "../../lib/motion/springTimeline";
 import { springToLinear } from "../../lib/motion/springToLinear";
 import { TOKENS } from "../../lib/motion/tokens";
 import { composerRestingVelocity } from "./composerRestingSpring";
+import { attachComposerImpact } from "./composerImpact";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { readEnvironmentScope } from "../../state/session";
 import { serverEnvironment } from "../../state/server";
@@ -6286,6 +6287,23 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     },
     [expandMobileComposer, insertComposerText, isComposerCollapsedMobile],
   );
+
+  useEffect(() => {
+    const form = composerFormRef.current;
+    if (!physics || !form) return;
+    const impact = attachComposerImpact(
+      form,
+      (text) => insertComposerTextAtEnd(text, { ensureLeadingBoundary: true }),
+      () => {
+        toastManager.add({
+          type: "error",
+          title: t.composer.context.addErrorToast,
+          description: t.composer.context.busyHint,
+        });
+      },
+    );
+    return impact.dispose;
+  }, [physics, insertComposerTextAtEnd]);
 
   // Context produced by other panels (diff comments, preview picks) asks the store to place
   // its chip; while this composer is mounted for the draft, that means the caret.
