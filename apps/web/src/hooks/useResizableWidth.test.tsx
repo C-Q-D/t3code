@@ -51,6 +51,7 @@ const cancelAnimationFrame = vi.fn();
 let events: EventTarget;
 let frame: FrameRequestCallback | undefined;
 
+/** Creates a pointer sample at clientX CSS pixels and an explicit millisecond timestamp. */
 function pointer(clientX = 100, timeStamp = 0) {
   return {
     button: 0,
@@ -63,6 +64,7 @@ function pointer(clientX = 100, timeStamp = 0) {
   } as unknown as PointerEvent<HTMLElement>;
 }
 
+/** Mounts the real width hook with configurable bounds, persistence key and collapse action. */
 function Panel({
   edge = "left",
   maxWidth = 800,
@@ -386,7 +388,11 @@ async function mountRail(open = false, side: "left" | "right" = "left") {
   await act(() =>
     renderer.update(
       <SidebarProvider defaultOpen={open}>
-        <Sidebar side={side} resizable={{ minWidth: 200, maxWidth: 800, storageKey: "rail-width" }}>
+        <Sidebar
+          side={side}
+          collapsible="icon"
+          resizable={{ minWidth: 200, maxWidth: 800, storageKey: "rail-width" }}
+        >
           <SidebarRail />
           <RailState />
         </Sidebar>
@@ -453,3 +459,49 @@ describe("sidebar rail gestures", () => {
     expect(hostStyle.has("width")).toBe(false);
   });
 });
+
+// Review regressions use real gesture ownership and spring integration, not a mirrored projection.
+it("keeps a 10000px/s outward rebound continuous when grabbed again", async () => {
+  setPhysicsEnabled(true);
+  await act(() => {
+    result.handlers.onPointerDown(pointer(100, 0));
+    result.handlers.onPointerUp(pointer(-400, 50));
+  });
+  await act(() => frame?.(16));
+  await act(() => frame?.(32));
+  await act(() => frame?.(48));
+  await act(() => frame?.(64));
+  const before = parseFloat(hostStyle.get(RESIZABLE_WIDTH_PROPERTY)!);
+  expect(before).toBeGreaterThan(800);
+  await act(() => result.handlers.onPointerDown(pointer(100, 100)));
+  expect(
+    Math.abs(parseFloat(hostStyle.get(RESIZABLE_WIDTH_PROPERTY)!) - before),
+  ).toBeLessThanOrEqual(1);
+  await act(() => result.handlers.onPointerMove(pointer(100, 110)));
+  await act(() => frame?.(80));
+  expect(
+    Math.abs(parseFloat(hostStyle.get(RESIZABLE_WIDTH_PROPERTY)!) - before),
+  ).toBeLessThanOrEqual(1);
+  expect(activeJobs()).toBe(0);
+});
+
+it.each(["blur", "cancel", "lost capture"])(
+  "abandons collapsed rail expansion on %s",
+  async (reason) => {
+    setPhysicsEnabled(true);
+    const rail = await mountRail();
+    await act(() => {
+      rail.handle().props.onPointerDown(rail.event(100, 0));
+      rail.handle().props.onPointerMove(rail.event(130, 100));
+    });
+    await act(() => frame?.(16));
+    await act(() => {
+      if (reason === "blur") events.dispatchEvent(new Event("blur"));
+      if (reason === "cancel") rail.handle().props.onPointerCancel(rail.event(130, 110));
+      if (reason === "lost capture") rail.handle().props.onLostPointerCapture(rail.event(130, 110));
+    });
+    expect(rail.open()).toBe("false");
+    expect(captured).toBe(false);
+    expect(setItem).not.toHaveBeenCalled();
+  },
+);

@@ -16,6 +16,8 @@ interface ResizeSession {
   finish: (width: number, moved: boolean) => void;
   /** Paints a transient size without persisting or clamping it. */
   paint?: (visual: number) => void;
+  /** Marks physics-only interactions that have no elastic bounds, such as a collapsed rail probe. */
+  physicalInteraction?: boolean;
   physics?: { min: number; max: number; rubberPx?: number; onFling?: (() => void) | undefined };
   /** Runs on every end; false means no width was committed. */
   cleanup?: (committed: boolean) => void;
@@ -29,6 +31,8 @@ interface ActiveResize<T extends HTMLElement> {
   startPosition: number;
   pendingPosition: number;
   origin: number;
+  /** Uncompressed size; both the spring and the next pointer gesture use this coordinate space. */
+  raw: number;
   width: number;
   visual: number;
   moved: boolean;
@@ -56,6 +60,7 @@ export function useResizeDrag<T extends HTMLElement>(
       (active.pendingPosition - active.startPosition) * (session.edge === "right" ? 1 : -1);
     active.moved ||= Math.abs(delta) > 2;
     const raw = active.origin + delta;
+    active.raw = raw;
     active.width = session.resize(raw);
     active.visual =
       active.physical && session.physics
@@ -120,12 +125,14 @@ export function useResizeDrag<T extends HTMLElement>(
         if (active.settling) return;
         active.settling = true;
         release(active);
-        const spring = new Spring({ value: active.visual, target: active.width, velocity });
+        const spring = new Spring({ value: active.raw, target: active.width, velocity });
         active.stop = stopMotion;
         startMotion((dt) => {
           const moving = spring.step(dt);
-          active.visual = spring.value;
-          active.session.paint?.(spring.value);
+          active.raw = spring.value;
+          // Keep momentum in raw space: every painted value remains inside the elastic curve's range.
+          active.visual = rubberClamp(spring.value, bounds.min, bounds.max, bounds.rubberPx ?? 160);
+          active.session.paint?.(active.visual);
           if (!moving) complete(active, true);
           return moving;
         });
@@ -170,7 +177,7 @@ export function useResizeDrag<T extends HTMLElement>(
       active.pendingPosition = active.session.edge === "top" ? event.clientY : event.clientX;
       active.tracker.add(active.pendingPosition, 0, event.timeStamp);
     }
-    finish(true, usePosition);
+    finish(usePosition || !active.physical, usePosition);
   };
 
   const refresh = useCallback(() => {
@@ -199,15 +206,11 @@ export function useResizeDrag<T extends HTMLElement>(
       event.preventDefault();
       event.stopPropagation();
       const visual = caught?.visual ?? session.width;
-      let origin = visual;
-      const physical = isPhysicsEnabled() && session.physics !== undefined;
-      if (caught && physical && session.physics) {
-        const { min, max, rubberPx = 160 } = session.physics;
-        const boundary = Math.max(min, Math.min(max, visual));
-        const excess = visual - boundary;
-        // Invert the elastic curve so grabbing an overshoot does not compress it a second time.
-        origin = boundary + excess / (0.55 * (1 - Math.abs(excess) / rubberPx));
-      }
+      // The spring owns raw size, so recapture never needs a potentially singular inverse curve.
+      const origin = caught?.raw ?? session.width;
+      const physical =
+        isPhysicsEnabled() &&
+        (session.physicalInteraction === true || session.physics !== undefined);
       const tracker = new VelocityTracker();
       const position = session.edge === "top" ? event.clientY : event.clientX;
       tracker.add(position, 0, event.timeStamp);
@@ -218,6 +221,7 @@ export function useResizeDrag<T extends HTMLElement>(
         startPosition: position,
         pendingPosition: position,
         origin,
+        raw: origin,
         width: caught?.width ?? session.width,
         visual,
         moved: caught?.moved ?? false,
