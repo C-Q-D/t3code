@@ -26,6 +26,8 @@ import { createSidebarCollisionDetection } from "../Sidebar.drag";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 
 vi.mock("@tanstack/react-router", () => ({ useLocation: () => "/" }));
+const snoozeFlag = vi.hoisted(() => ({ SNOOZE_UI_ENABLED: true }));
+vi.mock("../../snoozeUi", () => snoozeFlag);
 
 let root: Root;
 let host: HTMLDivElement;
@@ -155,8 +157,14 @@ async function dropAt(x: number, y = 95) {
   await point(document, "pointerup", x, y);
 }
 
-/** Use the production sensor, including its distance threshold, release and cancellation path. */
-function RegistrationFixture({ onDrop }: { onDrop: (id: string | null) => void }) {
+/** Use the production sensor for project or Today headers; onDrop observes the actual release target. */
+function RegistrationFixture({
+  onDrop,
+  today = null,
+}: {
+  onDrop: (id: string | null) => void;
+  today?: SidebarThreadHeaderProps["today"];
+}) {
   const registeredSensors = useSensors(
     useSensor(SidebarPointerSensor, {
       distance: 6,
@@ -171,7 +179,7 @@ function RegistrationFixture({ onDrop }: { onDrop: (id: string | null) => void }
       autoScroll={false}
       onDragEnd={(event) => onDrop(event.over ? String(event.over.id) : null)}
     >
-      <SidebarThreadHeader {...headerProps} />
+      <SidebarThreadHeader {...headerProps} today={today} />
       <DragSource />
     </DndContext>
   );
@@ -194,6 +202,8 @@ async function point(target: EventTarget, type: string, x: number, y: number) {
 }
 
 beforeEach(() => {
+  // The original gesture suite protects restoration when the fork switch is enabled.
+  snoozeFlag.SNOOZE_UI_ENABLED = true;
   installMessages("en", en);
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (
@@ -205,6 +215,8 @@ beforeEach(() => {
     if (text?.startsWith("Active")) return new DOMRect(0, 80, 90, 30);
     if (text?.startsWith("Later")) return new DOMRect(95, 80, 90, 30);
     if (text?.startsWith("Settled")) return new DOMRect(190, 80, 90, 30);
+    if (text?.startsWith("AI replying")) return new DOMRect(0, 80, 140, 30);
+    if (text?.startsWith("Needs you")) return new DOMRect(150, 80, 140, 30);
     return new DOMRect(0, 0, 300, 300);
   });
   host = document.createElement("div");
@@ -241,7 +253,7 @@ describe("header drag registration", () => {
   });
 });
 
-describe("sidebar tab lifecycle gestures", () => {
+describe("sidebar tab lifecycle gestures with snooze UI enabled", () => {
   it("settles a row dropped on Settled without invoking list sorting", async () => {
     const { state, actions } = lifecycle();
     await act(() =>
@@ -413,5 +425,46 @@ describe("sidebar tab lifecycle gestures", () => {
     expect(state.source.section).toBe("active");
     expect(state.mutations).toBe(0);
     expect(state.listTarget).toBeNull();
+  });
+});
+
+describe("header gestures with snooze UI disabled", () => {
+  beforeEach(() => {
+    snoozeFlag.SNOOZE_UI_ENABLED = false;
+  });
+
+  it("shows only project Active and Settled tabs and cannot receive a Later drop", async () => {
+    const onDrop = vi.fn<(id: string | null) => void>();
+    await act(() => root.render(<RegistrationFixture onDrop={onDrop} />));
+    const tabLabels = Array.from(
+      host.querySelectorAll("button[aria-pressed]"),
+      (button) => button.textContent,
+    );
+    expect(tabLabels).toEqual(["Active1", "Settled0"]);
+    await dropAt(140);
+    expect(onDrop).toHaveBeenCalledExactlyOnceWith(null);
+  });
+
+  it.each([
+    { tab: "working", x: 40 },
+    { tab: "waiting", x: 230 },
+  ] as const)("does not register Today's $tab tab as a pointer drop target", async ({ tab, x }) => {
+    const onDrop = vi.fn<(id: string | null) => void>();
+    await act(() =>
+      root.render(
+        <RegistrationFixture
+          onDrop={onDrop}
+          today={{
+            currentTab: tab,
+            counts: { working: 2, waiting: 3 },
+            onTabChange: () => {},
+          }}
+        />,
+      ),
+    );
+    expect(host.textContent).toContain("AI replying2");
+    expect(host.textContent).toContain("Needs you3");
+    await dropAt(x);
+    expect(onDrop).toHaveBeenCalledExactlyOnceWith(null);
   });
 });
