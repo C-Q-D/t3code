@@ -67,7 +67,10 @@ export function useSortableFling({
       setPhysicsSorting(enabled);
       if (!enabled || !containerRef.current) return;
       const document = containerRef.current.ownerDocument;
+      // Only the activating pointer owns this gesture's momentum and release clock.
+      const pointerId = (event.activatorEvent as PointerEvent).pointerId;
       const sample = (event: PointerEvent) => {
+        if (event.pointerId !== pointerId) return;
         tracker.current.addPointerEvent(event);
       };
       tracker.current.reset();
@@ -77,6 +80,7 @@ export function useSortableFling({
       }
       // dnd-kit omits the release event; window capture samples it before the sensor ends the drag.
       const release = (event: PointerEvent) => {
+        if (event.pointerId !== pointerId) return;
         sample(event);
         releaseTime.current = event.timeStamp;
       };

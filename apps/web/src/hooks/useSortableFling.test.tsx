@@ -76,7 +76,7 @@ function Harness({ reversed = false, overlay = false }: { reversed?: boolean; ov
 function startEvent(keyboard = false): DragStartEvent {
   const activatorEvent = keyboard
     ? new KeyboardEvent("keydown", { key: " " })
-    : new MouseEvent("pointerdown", { clientX: 0, clientY: 0 });
+    : new PointerEvent("pointerdown", { pointerId: 1, clientX: 0, clientY: 0 });
   Object.defineProperty(activatorEvent, "timeStamp", { value: now });
   return {
     activatorEvent,
@@ -102,7 +102,7 @@ function endEvent(): DragEndEvent {
 async function drag(keyboard = false) {
   await act(() => handlers.onDragStart(startEvent(keyboard)));
   now = 40;
-  const move = new MouseEvent("pointermove", { clientX: 40, clientY: 0 });
+  const move = new PointerEvent("pointermove", { pointerId: 1, clientX: 40, clientY: 0 });
   Object.defineProperty(move, "timeStamp", { value: now });
   document.dispatchEvent(move);
 }
@@ -110,7 +110,12 @@ async function drag(keyboard = false) {
 /** Snapshot before the consumer commits the new order in the same React batch. */
 async function release(overlay = false) {
   await act(() => {
-    const up = new MouseEvent("pointerup", { clientX: 40, clientY: 0, bubbles: true });
+    const up = new PointerEvent("pointerup", {
+      pointerId: 1,
+      clientX: 40,
+      clientY: 0,
+      bubbles: true,
+    });
     Object.defineProperty(up, "timeStamp", { value: now });
     document.dispatchEvent(up);
     handlers.onDragEnd(endEvent());
@@ -169,6 +174,44 @@ it("measures the visible overlay instead of the active placeholder", async () =>
   await release(true);
   expect(node("a").style.transform).toBe("translate(60.00px, 20.00px)");
 });
+
+it.each(["pointermove", "pointerup"])(
+  "ignores another pointer's %s before sorting commits",
+  async (type) => {
+    await drag();
+    await act(() => {
+      const up = new PointerEvent("pointerup", {
+        pointerId: 1,
+        clientX: 40,
+        clientY: 0,
+        bubbles: true,
+      });
+      Object.defineProperty(up, "timeStamp", { value: 40 });
+      document.dispatchEvent(up);
+      // A delayed sort callback must retain the owner's release time, even if another finger acts meanwhile.
+      now = 240;
+      const other = new PointerEvent(type, {
+        pointerId: 2,
+        clientX: -1000,
+        clientY: 500,
+        bubbles: true,
+      });
+      Object.defineProperty(other, "timeStamp", { value: now });
+      document.dispatchEvent(other);
+      handlers.onDragEnd(endEvent());
+      released = true;
+      root.render(<Harness reversed />);
+    });
+    expect(offsets.offsetOf(node("a")).x.velocity).toBe(1000);
+    expect(offsets.offsetOf(node("a")).y.velocity).toBe(0);
+    expect(node("a").style.transform).toBe("translate(30.00px, 0.00px)");
+    clock.advance(240);
+    expect(offsets.readOffset(node("a")).x).toBeGreaterThan(30);
+    for (let time = 256; time < 3240; time += 16) clock.advance(time);
+    expect(offsets.readOffset(node("a"))).toEqual({ x: 0, y: 0 });
+    expect(activeJobs()).toBe(0);
+  },
+);
 
 it.each(["disabled", "keyboard"])(
   "leaves transforms and pointer listeners alone for %s sorting",
