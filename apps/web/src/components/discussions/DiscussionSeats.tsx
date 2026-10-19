@@ -28,7 +28,9 @@ import {
   PlusIcon,
   XIcon,
 } from "lucide-react";
-import { useId, useState, type ReactNode } from "react";
+import { useContext, useId, useRef, useState, type ReactNode, type RefObject } from "react";
+import { SortableFlingContext, useSortableFling } from "~/hooks/useSortableFling";
+import { isPhysicsEnabled } from "~/lib/motion/preference";
 import { t } from "~/i18n";
 import { useEnvironmentSettings } from "~/hooks/useSettings";
 import { getCustomModelOptionsByInstance } from "~/modelSelection";
@@ -87,6 +89,9 @@ export function DiscussionSeats({
   readonly headerAction?: ReactNode;
 }) {
   const prefix = useId();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLElement>(null);
+  const fling = useSortableFling({ containerRef, overlayRef });
   const [identity, setIdentity] = useState({
     seats,
     ids: seats.map((_, index) => `${prefix}:0:${index}`),
@@ -167,8 +172,14 @@ export function DiscussionSeats({
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
-        onDragStart={() => setOpenId(null)}
-        onDragEnd={({ active, over }) => {
+        onDragStart={(event) => {
+          fling.onDragStart(event);
+          setOpenId(null);
+        }}
+        onDragCancel={fling.onDragCancel}
+        onDragEnd={(event) => {
+          fling.onDragEnd(event);
+          const { active, over } = event;
           if (!over || active.id === over.id) return;
           const from = identity.ids.indexOf(String(active.id));
           const to = identity.ids.indexOf(String(over.id));
@@ -181,208 +192,222 @@ export function DiscussionSeats({
           }
         }}
       >
-        <SortableContext items={identity.ids} strategy={rectSortingStrategy}>
-          <div className="discussion-seats-well flex flex-wrap justify-center gap-y-5 rounded-composer bg-well-surface px-3.5 pt-4.5 pb-5 shadow-well">
-            {seats.map((seat, index) => {
-              const id = identity.ids[index] ?? `${prefix}:${identity.revision}:${index}`;
-              const options = getCustomModelOptionsByInstance(
-                settings,
-                providers,
-                seat.modelSelection.instanceId,
-                seat.modelSelection.model,
-              );
-              const presentation = presentations[index]!;
-              return (
-                <DiscussionSeatCard
-                  key={id}
-                  id={id}
-                  open={openId === id}
-                  onOpenChange={(open) => setOpenId(open ? id : null)}
-                  index={index}
-                  presentation={presentation}
-                  onMove={(to) => {
-                    const next = moveDiscussionSeat(seats, index, to);
-                    if (next === seats) return;
-                    const ids = [...identity.ids];
-                    ids.splice(index, 1);
-                    ids.splice(to, 0, id);
-                    replace(next, ids);
-                  }}
-                  onRemove={() => {
-                    setOpenId(null);
-                    replace(
-                      removeDiscussionSeat(seats, index),
-                      identity.ids.filter((_, position) => position !== index),
-                    );
-                  }}
-                >
-                  <div className="flex w-69.5 max-w-full flex-col gap-2.5 p-3">
-                    <div className="flex flex-col gap-1.5">
-                      <label
-                        id={`${id}-persona-label`}
-                        className="text-xs font-medium text-muted-foreground"
-                      >
-                        {t.discussions.persona}
-                      </label>
-                      <Select
-                        items={personas.map((prompt) => ({ value: prompt.id, label: prompt.name }))}
-                        value={seat.personaPromptId}
-                        onValueChange={(value) => {
-                          const selected = personas.find((prompt) => prompt.id === value);
-                          if (selected)
-                            replace(changeDiscussionSeatPersona(seats, index, selected.id));
-                        }}
-                      >
-                        <SelectTrigger aria-labelledby={`${id}-persona-label`}>
-                          <PixelSeat
-                            role={presentation.avatar}
-                            seatIndex={index}
-                            state="idle"
-                            size={20}
-                            label={presentation.name}
-                          />
-                          <span className="min-w-0 flex-1 truncate">
-                            <SelectValue />
-                          </span>
-                        </SelectTrigger>
-                        <SelectPopup>
-                          {personas.map((prompt) => (
-                            <SelectItem key={prompt.id} value={prompt.id}>
-                              {prompt.name}
-                            </SelectItem>
-                          ))}
-                        </SelectPopup>
-                      </Select>
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <span
-                        id={`${id}-models-label`}
-                        className="text-xs font-medium text-muted-foreground"
-                      >
-                        {t.discussions.model}
-                      </span>
-                      <div
-                        role="group"
-                        aria-labelledby={`${id}-models-label`}
-                        className="flex max-h-52 flex-col gap-0.25 overflow-y-auto rounded-compact-row bg-well-raised p-1 shadow-input-well"
-                      >
-                        {entries.map((instance) => {
-                          const supported =
-                            support.data?.instances.find(
-                              (item) => item.instanceId === instance.instanceId,
-                            )?.supported === true;
-                          const models = options.get(instance.instanceId) ?? [];
-                          if (!supported)
+        <SortableFlingContext value={fling.physicsSorting}>
+          <SortableContext items={identity.ids} strategy={rectSortingStrategy}>
+            <div
+              ref={containerRef}
+              className="discussion-seats-well flex flex-wrap justify-center gap-y-5 rounded-composer bg-well-surface px-3.5 pt-4.5 pb-5 shadow-well"
+            >
+              {seats.map((seat, index) => {
+                const id = identity.ids[index] ?? `${prefix}:${identity.revision}:${index}`;
+                const options = getCustomModelOptionsByInstance(
+                  settings,
+                  providers,
+                  seat.modelSelection.instanceId,
+                  seat.modelSelection.model,
+                );
+                const presentation = presentations[index]!;
+                return (
+                  <DiscussionSeatCard
+                    key={id}
+                    id={id}
+                    open={openId === id}
+                    onOpenChange={(open) => setOpenId(open ? id : null)}
+                    index={index}
+                    presentation={presentation}
+                    onMove={(to) => {
+                      const next = moveDiscussionSeat(seats, index, to);
+                      if (next === seats) return;
+                      const ids = [...identity.ids];
+                      ids.splice(index, 1);
+                      ids.splice(to, 0, id);
+                      replace(next, ids);
+                    }}
+                    onRemove={() => {
+                      setOpenId(null);
+                      replace(
+                        removeDiscussionSeat(seats, index),
+                        identity.ids.filter((_, position) => position !== index),
+                      );
+                    }}
+                  >
+                    <div className="flex w-69.5 max-w-full flex-col gap-2.5 p-3">
+                      <div className="flex flex-col gap-1.5">
+                        <label
+                          id={`${id}-persona-label`}
+                          className="text-xs font-medium text-muted-foreground"
+                        >
+                          {t.discussions.persona}
+                        </label>
+                        <Select
+                          items={personas.map((prompt) => ({
+                            value: prompt.id,
+                            label: prompt.name,
+                          }))}
+                          value={seat.personaPromptId}
+                          onValueChange={(value) => {
+                            const selected = personas.find((prompt) => prompt.id === value);
+                            if (selected)
+                              replace(changeDiscussionSeatPersona(seats, index, selected.id));
+                          }}
+                        >
+                          <SelectTrigger aria-labelledby={`${id}-persona-label`}>
+                            <PixelSeat
+                              role={presentation.avatar}
+                              seatIndex={index}
+                              state="idle"
+                              size={20}
+                              label={presentation.name}
+                            />
+                            <span className="min-w-0 flex-1 truncate">
+                              <SelectValue />
+                            </span>
+                          </SelectTrigger>
+                          <SelectPopup>
+                            {personas.map((prompt) => (
+                              <SelectItem key={prompt.id} value={prompt.id}>
+                                {prompt.name}
+                              </SelectItem>
+                            ))}
+                          </SelectPopup>
+                        </Select>
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <span
+                          id={`${id}-models-label`}
+                          className="text-xs font-medium text-muted-foreground"
+                        >
+                          {t.discussions.model}
+                        </span>
+                        <div
+                          role="group"
+                          aria-labelledby={`${id}-models-label`}
+                          className="flex max-h-52 flex-col gap-0.25 overflow-y-auto rounded-compact-row bg-well-raised p-1 shadow-input-well"
+                        >
+                          {entries.map((instance) => {
+                            const supported =
+                              support.data?.instances.find(
+                                (item) => item.instanceId === instance.instanceId,
+                              )?.supported === true;
+                            const models = options.get(instance.instanceId) ?? [];
+                            if (!supported)
+                              return (
+                                <button
+                                  key={instance.instanceId}
+                                  type="button"
+                                  disabled
+                                  className="flex h-7.5 shrink-0 items-center gap-2 rounded-tag px-2.5 text-left text-secondary-copy-large text-fg-disabled disabled:cursor-not-allowed"
+                                >
+                                  <span className="min-w-0 flex-1 truncate">
+                                    {instance.displayName}
+                                  </span>
+                                  <span className="shrink-0 text-xs">
+                                    {support.data
+                                      ? t.discussions.unsupported
+                                      : t.discussions.loadingModels}
+                                  </span>
+                                </button>
+                              );
                             return (
-                              <button
+                              <div
                                 key={instance.instanceId}
-                                type="button"
-                                disabled
-                                className="flex h-7.5 shrink-0 items-center gap-2 rounded-tag px-2.5 text-left text-secondary-copy-large text-fg-disabled disabled:cursor-not-allowed"
+                                role="group"
+                                aria-label={instance.displayName}
+                                className="discussion-draft-model-group shrink-0"
                               >
-                                <span className="min-w-0 flex-1 truncate">
-                                  {instance.displayName}
-                                </span>
-                                <span className="shrink-0 text-xs">
-                                  {support.data
-                                    ? t.discussions.unsupported
-                                    : t.discussions.loadingModels}
-                                </span>
-                              </button>
+                                {models.length === 0 ? (
+                                  <p className="px-2 py-1.5 text-xs text-muted-foreground">
+                                    {instance.displayName} · {t.discussions.noModels}
+                                  </p>
+                                ) : (
+                                  models.map((option) => {
+                                    const selectable = canSelectDiscussionModel(
+                                      instance.instanceId,
+                                      support.data,
+                                      isProviderInstancePickerReady(instance) &&
+                                        !option.isUnavailable,
+                                    );
+                                    const selected =
+                                      seat.modelSelection.instanceId === instance.instanceId &&
+                                      seat.modelSelection.model === option.slug;
+                                    return (
+                                      <button
+                                        key={option.slug}
+                                        type="button"
+                                        disabled={!selectable}
+                                        aria-pressed={selected}
+                                        className="flex h-7.5 w-full items-center gap-2 rounded-tag px-2.5 text-left text-secondary-copy-large outline-none hover:bg-accent focus-visible:inset-shadow-focus aria-pressed:bg-accent aria-pressed:shadow-raise-tab disabled:cursor-not-allowed disabled:text-fg-disabled"
+                                        onClick={() => {
+                                          if (selectable && !selected)
+                                            replace(
+                                              changeDiscussionSeatModel(seats, index, {
+                                                instanceId: instance.instanceId,
+                                                model: option.slug,
+                                              }),
+                                            );
+                                        }}
+                                      >
+                                        <DiscussionProviderMark
+                                          driverKind={instance.driverKind}
+                                          size={13}
+                                        />
+                                        <span className="min-w-0 flex-1 truncate">
+                                          {instance.displayName} ·{" "}
+                                          {getTriggerDisplayModelName({
+                                            ...option,
+                                            subProvider:
+                                              instance.driverKind === "claudeAgent"
+                                                ? "Claude"
+                                                : option.subProvider,
+                                          })}
+                                        </span>
+                                        {selected ? (
+                                          <CheckIcon className="size-4 shrink-0" />
+                                        ) : null}
+                                      </button>
+                                    );
+                                  })
+                                )}
+                              </div>
                             );
-                          return (
-                            <div
-                              key={instance.instanceId}
-                              role="group"
-                              aria-label={instance.displayName}
-                              className="discussion-draft-model-group shrink-0"
-                            >
-                              {models.length === 0 ? (
-                                <p className="px-2 py-1.5 text-xs text-muted-foreground">
-                                  {instance.displayName} · {t.discussions.noModels}
-                                </p>
-                              ) : (
-                                models.map((option) => {
-                                  const selectable = canSelectDiscussionModel(
-                                    instance.instanceId,
-                                    support.data,
-                                    isProviderInstancePickerReady(instance) &&
-                                      !option.isUnavailable,
-                                  );
-                                  const selected =
-                                    seat.modelSelection.instanceId === instance.instanceId &&
-                                    seat.modelSelection.model === option.slug;
-                                  return (
-                                    <button
-                                      key={option.slug}
-                                      type="button"
-                                      disabled={!selectable}
-                                      aria-pressed={selected}
-                                      className="flex h-7.5 w-full items-center gap-2 rounded-tag px-2.5 text-left text-secondary-copy-large outline-none hover:bg-accent focus-visible:inset-shadow-focus aria-pressed:bg-accent aria-pressed:shadow-raise-tab disabled:cursor-not-allowed disabled:text-fg-disabled"
-                                      onClick={() => {
-                                        if (selectable && !selected)
-                                          replace(
-                                            changeDiscussionSeatModel(seats, index, {
-                                              instanceId: instance.instanceId,
-                                              model: option.slug,
-                                            }),
-                                          );
-                                      }}
-                                    >
-                                      <DiscussionProviderMark
-                                        driverKind={instance.driverKind}
-                                        size={13}
-                                      />
-                                      <span className="min-w-0 flex-1 truncate">
-                                        {instance.displayName} ·{" "}
-                                        {getTriggerDisplayModelName({
-                                          ...option,
-                                          subProvider:
-                                            instance.driverKind === "claudeAgent"
-                                              ? "Claude"
-                                              : option.subProvider,
-                                        })}
-                                      </span>
-                                      {selected ? <CheckIcon className="size-4 shrink-0" /> : null}
-                                    </button>
-                                  );
-                                })
-                              )}
-                            </div>
-                          );
-                        })}
+                          })}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </DiscussionSeatCard>
-              );
-            })}
-            <button
-              type="button"
-              disabled={!personas[0] || !defaultModel || !!prompts.error || !!support.error}
-              className="discussion-draft-add flex h-41 w-31 shrink-0 flex-col items-center justify-center gap-2.5 rounded-card-large text-control font-semibold text-code-foreground outline-none hover:text-foreground focus-visible:inset-shadow-focus disabled:cursor-not-allowed disabled:opacity-45"
-              onClick={() => {
-                const persona = personas[0];
-                if (!persona || !defaultModel) return;
-                const id = `${prefix}:${identity.revision}:new`;
-                replace(
-                  addDiscussionSeat(seats, {
-                    personaPromptId: persona.id,
-                    modelSelection: defaultModel,
-                  }),
-                  [...identity.ids, id],
+                  </DiscussionSeatCard>
                 );
-                setOpenId(id);
-              }}
-            >
-              <span className="discussion-draft-add-icon flex size-11 items-center justify-center">
-                <PlusIcon className="size-4.5" />
-              </span>
-              {t.discussions.addSeat}
-            </button>
-          </div>
-        </SortableContext>
-        <DiscussionSeatDragOverlay ids={identity.ids} presentations={presentations} />
+              })}
+              <button
+                type="button"
+                disabled={!personas[0] || !defaultModel || !!prompts.error || !!support.error}
+                className="discussion-draft-add flex h-41 w-31 shrink-0 flex-col items-center justify-center gap-2.5 rounded-card-large text-control font-semibold text-code-foreground outline-none hover:text-foreground focus-visible:inset-shadow-focus disabled:cursor-not-allowed disabled:opacity-45"
+                onClick={() => {
+                  const persona = personas[0];
+                  if (!persona || !defaultModel) return;
+                  const id = `${prefix}:${identity.revision}:new`;
+                  replace(
+                    addDiscussionSeat(seats, {
+                      personaPromptId: persona.id,
+                      modelSelection: defaultModel,
+                    }),
+                    [...identity.ids, id],
+                  );
+                  setOpenId(id);
+                }}
+              >
+                <span className="discussion-draft-add-icon flex size-11 items-center justify-center">
+                  <PlusIcon className="size-4.5" />
+                </span>
+                {t.discussions.addSeat}
+              </button>
+            </div>
+          </SortableContext>
+        </SortableFlingContext>
+        <DiscussionSeatDragOverlay
+          ids={identity.ids}
+          presentations={presentations}
+          overlayRef={overlayRef}
+        />
       </DndContext>
     </section>
   );
@@ -475,18 +500,24 @@ function DiscussionSeatCard(props: {
   readonly onRemove: () => void;
   readonly children: ReactNode;
 }) {
+  const physicsSorting = useContext(SortableFlingContext) && isPhysicsEnabled();
   const {
     attributes,
     listeners,
     setNodeRef,
     setActivatorNodeRef,
     transform,
+    transition,
     isDragging,
     isSorting,
     activeIndex,
     overIndex,
     items,
-  } = useSortable({ id: props.id, transition: null });
+  } = useSortable({
+    id: props.id,
+    // The release spring owns layout compensation; keyboard sorting keeps dnd-kit defaults.
+    ...(physicsSorting ? { transition: null, animateLayoutChanges: () => false } : {}),
+  });
   const [hoverOpen, setHoverOpen] = useState(false);
   const index = discussionSeatPreviewIndex(props.index, activeIndex, overIndex, items.length);
   const { presentation } = props;
@@ -495,7 +526,8 @@ function DiscussionSeatCard(props: {
       <PreviewCard.Root open={hoverOpen && !props.open && !isSorting} onOpenChange={setHoverOpen}>
         <div
           ref={setNodeRef}
-          style={{ transform: CSS.Translate.toString(transform) }}
+          data-sortable-fling-id={props.id}
+          style={{ transform: CSS.Translate.toString(transform), transition }}
           className="relative flex shrink-0 items-center"
         >
           <div
@@ -653,14 +685,17 @@ function DiscussionSeatCard(props: {
  * Subscribes only this overlay to pointer movement; draft state is committed once on drop.
  * @param props.ids Stable identities in the original speaking order.
  * @param props.presentations Current catalog-backed seat labels and avatars in the same order.
+ * @param props.overlayRef Receives the positioned wrapper for release measurement, or null when hidden.
  * @returns A rotated, non-interactive card; cancellation has no effect on the draft.
  */
 function DiscussionSeatDragOverlay({
   ids,
   presentations,
+  overlayRef,
 }: {
   ids: readonly string[];
   presentations: readonly DiscussionSeatPresentation[];
+  overlayRef: RefObject<HTMLElement | null>;
 }) {
   const { active, over } = useDndContext();
   const from = active ? ids.indexOf(String(active.id)) : -1;
@@ -671,6 +706,10 @@ function DiscussionSeatDragOverlay({
     <DragOverlay dropAnimation={null} transition="">
       {presentation ? (
         <div
+          ref={(element) => {
+            // Measure the overlay's positioned wrapper, excluding the card's decorative rotation.
+            overlayRef.current = element?.parentElement ?? null;
+          }}
           aria-hidden="true"
           className="flex h-41 w-31 -rotate-3 cursor-grabbing flex-col rounded-card-large bg-discussion-draft-drag px-2 pt-2 pb-3 shadow-discussion-draft-drag"
         >

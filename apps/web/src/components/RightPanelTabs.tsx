@@ -46,7 +46,9 @@ import {
   type MouseEvent as ReactMouseEvent,
   type ReactElement,
   type ReactNode,
+  type RefObject,
   useCallback,
+  useContext,
   useEffect,
   useEffectEvent,
   useMemo,
@@ -55,6 +57,8 @@ import {
 } from "react";
 
 import { isElectron } from "~/env";
+import { SortableFlingContext, useSortableFling } from "~/hooks/useSortableFling";
+import { isPhysicsEnabled } from "~/lib/motion/preference";
 import type { DesktopPreviewOverlay } from "~/previewStateStore";
 import type { RightPanelSurface } from "~/rightPanelStore";
 import { cn } from "~/lib/utils";
@@ -838,50 +842,64 @@ function PullRequestSurfaceIcon({
  * and the order commits on drop.
  */
 function SortableTabList(props: {
+  containerRef: RefObject<HTMLElement | null>;
   surfaces: readonly RightPanelSurface[];
   onMove: ((surfaceId: string, toIndex: number) => void) | undefined;
   children: ReactNode;
 }) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  const fling = useSortableFling({ containerRef: props.containerRef });
+  const releaseFling = fling.onDragEnd;
   const surfaceIds = useMemo(() => props.surfaces.map((surface) => surface.id), [props.surfaces]);
   const { onMove, surfaces } = props;
   const handleDragEnd = useCallback(
-    ({ active, over }: DragEndEvent) => {
+    (event: DragEndEvent) => {
+      releaseFling(event);
+      const { active, over } = event;
       if (!over || active.id === over.id) return;
       const toIndex = surfaces.findIndex((surface) => surface.id === over.id);
       if (toIndex >= 0) onMove?.(String(active.id), toIndex);
     },
-    [onMove, surfaces],
+    [releaseFling, onMove, surfaces],
   );
   return (
     <DndContext
       sensors={sensors}
       collisionDetection={closestCenter}
       modifiers={TAB_DRAG_MODIFIERS}
+      onDragStart={fling.onDragStart}
+      onDragCancel={fling.onDragCancel}
       onDragEnd={handleDragEnd}
     >
-      <SortableContext items={surfaceIds} strategy={horizontalListSortingStrategy}>
-        {props.children}
-      </SortableContext>
+      <SortableFlingContext value={fling.physicsSorting}>
+        <SortableContext items={surfaceIds} strategy={horizontalListSortingStrategy}>
+          {props.children}
+        </SortableContext>
+      </SortableFlingContext>
     </DndContext>
   );
 }
 
+/** Keeps dnd-kit in charge during dragging and delegates pointer release layout to the parent. */
 function SortableTab({
   surfaceId,
   disabled,
   className,
   ...props
 }: ComponentProps<"div"> & { surfaceId: string; disabled: boolean }) {
+  const physicsSorting = useContext(SortableFlingContext) && isPhysicsEnabled();
   const { listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: surfaceId,
     disabled,
+    // Derived layout transforms would overwrite the parent's release FLIP after commit.
+    ...(physicsSorting ? { transition: null, animateLayoutChanges: () => false } : {}),
   });
   return (
     <div
       {...props}
       {...listeners}
       ref={setNodeRef}
+      data-sortable-fling-id={surfaceId}
       style={{ transform: CSS.Translate.toString(transform), transition }}
       className={cn(className, isDragging && "relative z-10")}
     />
@@ -1215,7 +1233,11 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
           data-right-panel-tab-list
         >
           <div className="flex h-full w-max min-w-full items-center gap-1">
-            <SortableTabList surfaces={props.surfaces} onMove={props.onMoveSurface}>
+            <SortableTabList
+              containerRef={tabListRef}
+              surfaces={props.surfaces}
+              onMove={props.onMoveSurface}
+            >
               {props.surfaces.map((surface) => {
                 const active = surface.id === props.activeSurfaceId;
                 const pending = props.pendingSurfaceIds.has(surface.id);

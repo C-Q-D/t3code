@@ -27,7 +27,9 @@ import {
   isLearned,
 } from "@t3tools/client-runtime/connection";
 import { GripVerticalIcon, PlusIcon, XIcon } from "lucide-react";
-import { useState } from "react";
+import { useContext, useRef, useState } from "react";
+import { SortableFlingContext, useSortableFling } from "~/hooks/useSortableFling";
+import { isPhysicsEnabled } from "~/lib/motion/preference";
 
 import { requestConfirmDialog } from "~/confirmDialog";
 import { environmentCatalog } from "~/connection/catalog";
@@ -51,6 +53,8 @@ export function EnvironmentRoutesList({
   readonly onAddRoute: () => void;
 }) {
   const saved = connectionRoutes(environment.entry);
+  const containerRef = useRef<HTMLOListElement>(null);
+  const fling = useSortableFling({ containerRef });
   const savedIds = saved.map((route) => connectionRouteId(route.target));
   // A dropped order shows until the catalog matches it, so the row does not
   // jump back while the reorder is being saved.
@@ -99,6 +103,7 @@ export function EnvironmentRoutesList({
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
+    fling.onDragEnd(event);
     if (event.over === null || event.active.id === event.over.id) return;
     const next = arrayMove(
       order,
@@ -118,26 +123,33 @@ export function EnvironmentRoutesList({
         collisionDetection={closestCenter}
         modifiers={[restrictToVerticalAxis, restrictToParentElement]}
         onDragEnd={handleDragEnd}
+        onDragStart={fling.onDragStart}
+        onDragCancel={fling.onDragCancel}
       >
-        <SortableContext items={order} strategy={verticalListSortingStrategy}>
-          <ol
-            aria-label={t.settings.environmentRoutesList.routesToPreferredFirst(environment.label)}
-          >
-            {routes.map((route, index) => (
-              <SortableRouteRow
-                key={connectionRouteId(route.target)}
-                route={route}
-                position={index + 1}
-                inUse={connectionRouteId(route.target) === activeRouteId}
-                // The last route goes with the machine; that is "Remove from
-                // this device", not a route action. A learned route would be
-                // learned again, so it is only reordered.
-                removable={routes.length > 1 && !isLearned(route)}
-                onRemove={() => void confirmRemove(route)}
-              />
-            ))}
-          </ol>
-        </SortableContext>
+        <SortableFlingContext value={fling.physicsSorting}>
+          <SortableContext items={order} strategy={verticalListSortingStrategy}>
+            <ol
+              ref={containerRef}
+              aria-label={t.settings.environmentRoutesList.routesToPreferredFirst(
+                environment.label,
+              )}
+            >
+              {routes.map((route, index) => (
+                <SortableRouteRow
+                  key={connectionRouteId(route.target)}
+                  route={route}
+                  position={index + 1}
+                  inUse={connectionRouteId(route.target) === activeRouteId}
+                  // The last route goes with the machine; that is "Remove from
+                  // this device", not a route action. A learned route would be
+                  // learned again, so it is only reordered.
+                  removable={routes.length > 1 && !isLearned(route)}
+                  onRemove={() => void confirmRemove(route)}
+                />
+              ))}
+            </ol>
+          </SortableContext>
+        </SortableFlingContext>
       </DndContext>
       <div className="-ml-1.5 pt-1">
         <Button size="xs" variant="ghost-muted" onClick={onAddRoute}>
@@ -149,6 +161,7 @@ export function EnvironmentRoutesList({
   );
 }
 
+/** Displays a route and retains keyboard sorting while pointer release uses the shared FLIP. */
 function SortableRouteRow({
   route,
   position,
@@ -163,6 +176,7 @@ function SortableRouteRow({
   readonly onRemove: () => void;
 }) {
   const id = connectionRouteId(route.target);
+  const physicsSorting = useContext(SortableFlingContext) && isPhysicsEnabled();
   const label = connectionRouteLabel(route);
   const address = connectionRouteAddress(route);
   const {
@@ -173,11 +187,16 @@ function SortableRouteRow({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id });
+  } = useSortable({
+    id,
+    // Disable derived layout offsets as well as CSS transitions while FLIP owns release.
+    ...(physicsSorting ? { transition: null, animateLayoutChanges: () => false } : {}),
+  });
 
   return (
     <li
       ref={setNodeRef}
+      data-sortable-fling-id={id}
       style={{ transform: CSS.Translate.toString(transform), transition }}
       className={cn(
         "flex items-center gap-2 py-2",
