@@ -59,11 +59,16 @@ describe("Today membership", () => {
     { name: "running", overrides: { runtime: runtime("running") }, working: ["old"], waiting: [] },
     {
       name: "approval",
-      overrides: { runtime: runtime("running"), hasPendingApprovals: true },
+      overrides: { runtime: null, hasPendingApprovals: true, hasPendingUserInput: false },
       working: [],
       waiting: ["old"],
     },
-    { name: "question", overrides: { hasPendingUserInput: true }, working: [], waiting: ["old"] },
+    {
+      name: "question",
+      overrides: { runtime: null, hasPendingApprovals: false, hasPendingUserInput: true },
+      working: [],
+      waiting: ["old"],
+    },
     {
       name: "idle background work",
       overrides: { runtime: runtime("idle") },
