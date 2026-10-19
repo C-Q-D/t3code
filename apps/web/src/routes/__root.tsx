@@ -61,6 +61,7 @@ import {
   toastManager,
 } from "../components/ui/toast";
 import { isElectron } from "../env";
+import { useBackgroundImage } from "../hooks/useBackgroundImage";
 import { applyAppearanceFontVariables } from "~/appearanceFonts";
 import { applyAppearanceContrast } from "~/appearanceContrast";
 import { useClientSettings } from "../hooks/useSettings";
@@ -326,8 +327,24 @@ function ContrastAppearanceSync() {
   return null;
 }
 
+/** Applies appearance variables without reducing the opacity of text or child controls. */
 function GlassAppearanceSync() {
   const glassOpacity = useClientSettings((settings) => settings.glassOpacity);
+  const { url, load } = useBackgroundImage();
+
+  useEffect(() => {
+    void load().catch((error: unknown) => {
+      console.error("Failed to load desktop background image", error);
+    });
+  }, [load]);
+
+  useEffect(() => {
+    // JSON string quoting keeps bundled data URLs and native relative URLs valid CSS strings.
+    document.documentElement.style.setProperty(
+      "--stone-background-image",
+      `url(${JSON.stringify(url)})`,
+    );
+  }, [url]);
 
   useEffect(() => {
     const style = document.documentElement.style;

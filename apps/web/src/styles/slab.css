@@ -1,7 +1,7 @@
 /*
- * F1：石纹资源与石墨石面；组件继续使用玻璃类，其他主题保留 index.css 的玻璃行为。
- * README.md · 设计令牌：640×640 石纹平铺，底座 #0b0b0c 上叠 rgba(0,0,0,.2)。
- * 工具类由窗口/侧边栏任务应用，本文件不改变布局，也不在石纹层上添加模糊。
+ * 石墨背景与石面；透明度只作用于背景层，不作用于文字。
+ * 浏览器保留不透明底色，Windows Electron 由原生窗口透出桌面。
+ * 其他主题保留现有石纹与 index.css 的玻璃行为。
  */
 /* 框架任务尚未引用这些类时也要打包石纹；此登记只生成 CSS，不应用到界面。 */
 @source inline("stone-base stone-sidebar");
@@ -20,6 +20,49 @@
     linear-gradient(var(--color-stone-sidebar-veil), var(--color-stone-sidebar-veil)),
     url("../assets/stone-8a.webp");
   background-repeat: repeat;
+}
+
+/* Platform classes are installed before React mounts, gated by isElectron in main.tsx. */
+html[data-theme-id="graphite"],
+html[data-theme-id="graphite"] body {
+  background: #0b0b0c;
+}
+
+html[data-theme-id="graphite"].electron-windows,
+html[data-theme-id="graphite"].electron-windows body {
+  background: transparent;
+}
+
+html[data-theme-id="graphite"] .stone-base {
+  isolation: isolate;
+  background: transparent;
+}
+
+/* A fixed image covers the viewport without tying image opacity to foreground content. */
+html[data-theme-id="graphite"] .stone-base::before,
+html[data-theme-id="graphite"] .stone-base::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+html[data-theme-id="graphite"] .stone-base::before {
+  z-index: -2;
+  background: var(--stone-background-image, url("../assets/dusk-ridges.svg")) center / cover
+    no-repeat;
+  opacity: var(--glass-opacity, 80%);
+}
+
+html[data-theme-id="graphite"] .stone-base::after {
+  z-index: -1;
+  background: var(--color-stone-dim);
+}
+
+/* Empty states and onboarding nest bases inside the shell; paint only the outer base. */
+html[data-theme-id="graphite"] .stone-base .stone-base::before,
+html[data-theme-id="graphite"] .stone-base .stone-base::after {
+  content: none;
 }
 
 @layer utilities {
