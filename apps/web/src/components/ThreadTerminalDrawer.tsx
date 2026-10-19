@@ -85,6 +85,9 @@ import {
 import { readLocalApi } from "~/localApi";
 import { confirmTerminalClose } from "~/lib/terminalCloseConfirm";
 import { useClientSettings } from "../hooks/useSettings";
+import { useResizeDrag } from "../hooks/useResizeDrag";
+import { isPhysicsEnabled } from "../lib/motion/preference";
+import { useTerminalUiStateStore } from "../terminalUiStateStore";
 import { useLocalStorage } from "../hooks/useLocalStorage";
 import { useAttachedTerminalSession, useKnownTerminalSessions } from "../state/terminalSessions";
 import { serverEnvironment } from "../state/server";
@@ -1522,40 +1525,110 @@ export default function ThreadTerminalDrawer({
     lastSyncedHeightRef.current = controlledDrawerHeight;
   }, [controlledDrawerHeight, threadId]);
 
-  const handleResizePointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0) return;
-    event.preventDefault();
-    event.currentTarget.setPointerCapture(event.pointerId);
-    didResizeDuringDragRef.current = false;
-    resizeStateRef.current = {
-      pointerId: event.pointerId,
-      startY: event.clientY,
-      startHeight: drawerHeightRef.current,
-      drawer: event.currentTarget.parentElement,
+  // Reuse the panel gesture owner for physical height; the legacy handlers below keep their timing.
+  const physicalResize = useResizeDrag<HTMLDivElement>((event) => {
+    if (!isPhysicsEnabled() || isPanel || !visible) return null;
+    const drawer = event.currentTarget.parentElement;
+    const startHeight = drawerHeightRef.current;
+    return {
+      width: startHeight,
+      edge: "top",
+      physics: {
+        min: MIN_DRAWER_HEIGHT,
+        get max() {
+          return maxDrawerHeight();
+        },
+        onFling() {
+          // This is the visibility toggle's close action, never the terminal-session close action.
+          useTerminalUiStateStore.getState().setTerminalOpen(threadRef, false);
+        },
+      },
+      resize(value) {
+        const bounded = clampDrawerHeight(value);
+        drawerHeightRef.current = bounded;
+        return bounded;
+      },
+      paint(value) {
+        drawer?.style.setProperty("height", `${value}px`);
+      },
+      finish(finalHeight, moved) {
+        if (!moved || finalHeight === startHeight) return;
+        setDrawerHeight(finalHeight);
+        syncHeight(finalHeight);
+        setResizeEpoch((value) => value + 1);
+      },
+      cleanup(committed) {
+        if (committed) return;
+        const restored = clampDrawerHeight(preferredDrawerHeightRef.current);
+        drawerHeightRef.current = restored;
+        drawer?.style.setProperty("height", `${restored}px`);
+      },
     };
-  }, []);
+  }, `${threadRef.environmentId}:${threadRef.threadId}:${visible}:${mode}`);
+  const {
+    refresh: refreshPhysicalResize,
+    onPointerDown: physicalPointerDown,
+    onPointerMove: physicalPointerMove,
+    onPointerUp: physicalPointerUp,
+    onPointerCancel: physicalPointerCancel,
+    onLostPointerCapture: physicalLostPointerCapture,
+  } = physicalResize;
+  useLayoutEffect(refreshPhysicalResize, [refreshPhysicalResize, windowMaxDrawerHeight]);
+
+  const handleResizePointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (isPhysicsEnabled()) {
+        physicalPointerDown(event);
+        return;
+      }
+      if (event.button !== 0) return;
+      event.preventDefault();
+      event.currentTarget.setPointerCapture(event.pointerId);
+      didResizeDuringDragRef.current = false;
+      resizeStateRef.current = {
+        pointerId: event.pointerId,
+        startY: event.clientY,
+        startHeight: drawerHeightRef.current,
+        drawer: event.currentTarget.parentElement,
+      };
+    },
+    [physicalPointerDown],
+  );
 
   // Writes the height straight to the drawer while dragging so the edge lands in
   // the pointer's frame; React state commits once on release.
-  const handleResizePointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    const resizeState = resizeStateRef.current;
-    if (!resizeState || resizeState.pointerId !== event.pointerId) return;
-    event.preventDefault();
-    const clampedHeight = clampDrawerHeight(
-      resizeState.startHeight + (resizeState.startY - event.clientY),
-    );
-    if (clampedHeight === drawerHeightRef.current) {
-      return;
-    }
-    didResizeDuringDragRef.current = true;
-    drawerHeightRef.current = clampedHeight;
-    resizeState.drawer?.style.setProperty("height", `${clampedHeight}px`);
-  }, []);
+  const handleResizePointerMove = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      const resizeState = resizeStateRef.current;
+      if (!resizeState) {
+        physicalPointerMove(event);
+        return;
+      }
+      if (resizeState.pointerId !== event.pointerId) return;
+      event.preventDefault();
+      const clampedHeight = clampDrawerHeight(
+        resizeState.startHeight + (resizeState.startY - event.clientY),
+      );
+      if (clampedHeight === drawerHeightRef.current) {
+        return;
+      }
+      didResizeDuringDragRef.current = true;
+      drawerHeightRef.current = clampedHeight;
+      resizeState.drawer?.style.setProperty("height", `${clampedHeight}px`);
+    },
+    [physicalPointerMove],
+  );
 
   const handleResizePointerEnd = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
       const resizeState = resizeStateRef.current;
-      if (!resizeState || resizeState.pointerId !== event.pointerId) return;
+      if (!resizeState) {
+        if (event.type === "pointerup") physicalPointerUp(event);
+        else if (event.type === "pointercancel") physicalPointerCancel(event);
+        else physicalLostPointerCapture(event);
+        return;
+      }
+      if (resizeState.pointerId !== event.pointerId) return;
       resizeStateRef.current = null;
       if (event.currentTarget.hasPointerCapture(event.pointerId)) {
         event.currentTarget.releasePointerCapture(event.pointerId);
@@ -1574,7 +1647,13 @@ export default function ThreadTerminalDrawer({
       syncHeight(drawerHeightRef.current);
       setResizeEpoch((value) => value + 1);
     },
-    [setDrawerHeight, syncHeight],
+    [
+      setDrawerHeight,
+      syncHeight,
+      physicalPointerUp,
+      physicalPointerCancel,
+      physicalLostPointerCapture,
+    ],
   );
 
   useEffect(() => {

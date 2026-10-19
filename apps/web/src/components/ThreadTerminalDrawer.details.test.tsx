@@ -7,6 +7,9 @@ import { act, StrictMode, type ComponentProps } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
 import { selectThreadPanelVisibility, useRightPanelStore } from "../rightPanelStore";
+import { setPhysicsEnabled } from "../lib/motion/preference";
+import { activeJobs } from "../lib/motion/loop";
+import { useTerminalUiStateStore, selectThreadTerminalUiState } from "../terminalUiStateStore";
 import ThreadTerminalDrawer from "./ThreadTerminalDrawer";
 
 /** Full session module shape retained while replacing only the server-backed grant hook. */
@@ -71,6 +74,8 @@ async function renderDrawer(visible: boolean, ref = thread, mode: "drawer" | "pa
 }
 
 beforeEach(() => {
+  setPhysicsEnabled(false);
+  useTerminalUiStateStore.setState({ terminalUiStateByThreadKey: {} });
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   useRightPanelStore.setState({ threadPanelVisibilityByThreadKey: {} });
   container = document.createElement("div");
@@ -82,6 +87,8 @@ afterEach(async () => {
   await act(async () => root.unmount());
   container.remove();
   useRightPanelStore.setState({ threadPanelVisibilityByThreadKey: {} });
+  setPhysicsEnabled(false);
+  useTerminalUiStateStore.setState({ terminalUiStateByThreadKey: {} });
   vi.unstubAllGlobals();
 });
 
@@ -146,4 +153,106 @@ it("allows temporary manual expansion but restores the opening snapshot on close
 it("does not collapse details for the right-side terminal panel", async () => {
   await renderDrawer(true, thread, "panel");
   expect(visibility()).toEqual({ inlineOpen: true, popoverOpen: false });
+});
+
+/** Send a browser-shaped pointer event with a deterministic sampling time. */
+async function resizePointer(handle: HTMLElement, type: string, y: number, time: number) {
+  const event = new MouseEvent(type, { clientY: y, bubbles: true, cancelable: true, button: 0 });
+  Object.defineProperties(event, { pointerId: { value: 1 }, timeStamp: { value: time } });
+  await act(() => handle.dispatchEvent(event));
+}
+
+/** Provide capture and a manually advanced frame queue while exercising the actual drawer DOM. */
+function drawerGesture() {
+  const drawer = container.querySelector<HTMLElement>("[data-thread-terminal-drawer]")!;
+  const handle = drawer.firstElementChild as HTMLElement;
+  let captured = false;
+  Object.assign(handle, {
+    setPointerCapture: () => {
+      captured = true;
+    },
+    hasPointerCapture: () => captured,
+    releasePointerCapture: () => {
+      captured = false;
+    },
+  });
+  const frames = new Map<number, FrameRequestCallback>();
+  let nextId = 0;
+  vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+    frames.set(++nextId, callback);
+    return nextId;
+  });
+  vi.stubGlobal("cancelAnimationFrame", (id: number) => frames.delete(id));
+  return {
+    drawer,
+    handle,
+    async step(time: number) {
+      const pending = [...frames.values()];
+      frames.clear();
+      await act(() => pending.forEach((callback) => callback(time)));
+    },
+  };
+}
+
+it("hides the drawer on a downward fling while retaining its sessions and saved height", async () => {
+  setPhysicsEnabled(true);
+  useTerminalUiStateStore
+    .getState()
+    .ensureTerminal(thread, "keep-session", { open: true, active: true });
+  const before = selectThreadTerminalUiState(
+    useTerminalUiStateStore.getState().terminalUiStateByThreadKey,
+    thread,
+  );
+  await renderDrawer(true);
+  const { drawer, handle } = drawerGesture();
+  await resizePointer(handle, "pointerdown", 100, 0);
+  await resizePointer(handle, "pointermove", 230, 40);
+  await resizePointer(handle, "pointerup", 240, 50);
+  const after = selectThreadTerminalUiState(
+    useTerminalUiStateStore.getState().terminalUiStateByThreadKey,
+    thread,
+  );
+  expect(after.terminalOpen).toBe(false);
+  expect(after.terminalIds).toEqual(["keep-session"]);
+  expect(after.terminalHeight).toBe(before.terminalHeight);
+  expect(drawer.style.height).toBe("300px");
+});
+
+it("compresses a slow downward overshoot and returns to 180px without hiding", async () => {
+  setPhysicsEnabled(true);
+  useTerminalUiStateStore.getState().setTerminalOpen(thread, true);
+  await renderDrawer(true);
+  const gesture = drawerGesture();
+  await resizePointer(gesture.handle, "pointerdown", 100, 0);
+  await resizePointer(gesture.handle, "pointermove", 320, 1000);
+  await gesture.step(16);
+  expect(parseFloat(gesture.drawer.style.height)).toBeCloseTo(139.06976744186048, 6);
+  await resizePointer(gesture.handle, "pointerup", 320, 1100);
+  expect(activeJobs()).toBe(1);
+  for (let time = 32; activeJobs() && time < 3000; time += 16) await gesture.step(time);
+  expect(activeJobs()).toBe(0);
+  expect(gesture.drawer.style.height).toBe("180px");
+  expect(
+    selectThreadTerminalUiState(
+      useTerminalUiStateStore.getState().terminalUiStateByThreadKey,
+      thread,
+    ).terminalOpen,
+  ).toBe(true);
+});
+
+it("keeps the existing hard-clamped drawer drag when physics is disabled", async () => {
+  useTerminalUiStateStore.getState().setTerminalOpen(thread, true);
+  await renderDrawer(true);
+  const { drawer, handle } = drawerGesture();
+  await resizePointer(handle, "pointerdown", 100, 0);
+  await resizePointer(handle, "pointermove", 320, 30);
+  expect(drawer.style.height).toBe("180px");
+  await resizePointer(handle, "pointerup", 320, 40);
+  expect(activeJobs()).toBe(0);
+  expect(
+    selectThreadTerminalUiState(
+      useTerminalUiStateStore.getState().terminalUiStateByThreadKey,
+      thread,
+    ).terminalOpen,
+  ).toBe(true);
 });

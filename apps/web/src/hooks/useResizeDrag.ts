@@ -8,10 +8,10 @@ import { Spring } from "../lib/motion/spring";
 import { VelocityTracker } from "../lib/motion/velocity";
 import { shouldCollapsePanel } from "../lib/motion/panelFling";
 
-/** A horizontal sizing transaction. Physical bounds are CSS pixels; velocity follows increasing size. */
+/** An edge sizing transaction (width, or height for a top edge). Physical bounds are CSS pixels; velocity follows increasing size. */
 interface ResizeSession {
   width: number;
-  edge: "left" | "right";
+  edge: "left" | "right" | "top";
   resize: (width: number) => number;
   finish: (width: number, moved: boolean) => void;
   /** Paints a transient size without persisting or clamping it. */
@@ -26,8 +26,8 @@ interface ActiveResize<T extends HTMLElement> {
   session: ResizeSession;
   target: T;
   pointerId: number;
-  startX: number;
-  pendingX: number;
+  startPosition: number;
+  pendingPosition: number;
   origin: number;
   width: number;
   visual: number;
@@ -52,7 +52,8 @@ export function useResizeDrag<T extends HTMLElement>(
     const active = drag.current;
     if (!active || active.settling) return;
     const { session } = active;
-    const delta = (active.pendingX - active.startX) * (session.edge === "left" ? -1 : 1);
+    const delta =
+      (active.pendingPosition - active.startPosition) * (session.edge === "right" ? 1 : -1);
     active.moved ||= Math.abs(delta) > 2;
     const raw = active.origin + delta;
     active.width = session.resize(raw);
@@ -104,7 +105,7 @@ export function useResizeDrag<T extends HTMLElement>(
       if (!active.settling) flush();
       const bounds = active.physical && isPhysicsEnabled() ? active.session.physics : undefined;
       const velocity =
-        active.tracker.velocity(active.time).x * (active.session.edge === "left" ? -1 : 1);
+        active.tracker.velocity(active.time).x * (active.session.edge === "right" ? 1 : -1);
       if (
         bounds &&
         allowFling &&
@@ -115,7 +116,7 @@ export function useResizeDrag<T extends HTMLElement>(
         bounds.onFling();
         return;
       }
-      if (bounds && active.visual !== active.width) {
+      if (bounds && (active.visual < bounds.min || active.visual > bounds.max)) {
         if (active.settling) return;
         active.settling = true;
         release(active);
@@ -166,8 +167,8 @@ export function useResizeDrag<T extends HTMLElement>(
     event.preventDefault();
     active.time = event.timeStamp;
     if (usePosition) {
-      active.pendingX = event.clientX;
-      active.tracker.add(event.clientX, 0, event.timeStamp);
+      active.pendingPosition = active.session.edge === "top" ? event.clientY : event.clientX;
+      active.tracker.add(active.pendingPosition, 0, event.timeStamp);
     }
     finish(true, usePosition);
   };
@@ -208,13 +209,14 @@ export function useResizeDrag<T extends HTMLElement>(
         origin = boundary + excess / (0.55 * (1 - Math.abs(excess) / rubberPx));
       }
       const tracker = new VelocityTracker();
-      tracker.add(event.clientX, 0, event.timeStamp);
+      const position = session.edge === "top" ? event.clientY : event.clientX;
+      tracker.add(position, 0, event.timeStamp);
       drag.current = {
         session,
         target: event.currentTarget,
         pointerId: event.pointerId,
-        startX: event.clientX,
-        pendingX: event.clientX,
+        startPosition: position,
+        pendingPosition: position,
         origin,
         width: caught?.width ?? session.width,
         visual,
@@ -225,17 +227,17 @@ export function useResizeDrag<T extends HTMLElement>(
         physical,
         settling: false,
       };
-      document.body.style.cursor = "col-resize";
+      document.body.style.cursor = session.edge === "top" ? "row-resize" : "col-resize";
       document.body.style.userSelect = "none";
     },
     onPointerMove(event: PointerEvent<T>) {
       const active = drag.current;
       if (!active || active.settling || active.pointerId !== event.pointerId) return;
       event.preventDefault();
-      active.pendingX = event.clientX;
+      active.pendingPosition = active.session.edge === "top" ? event.clientY : event.clientX;
       active.time = event.timeStamp;
-      active.tracker.add(event.clientX, 0, event.timeStamp);
-      active.moved ||= Math.abs(event.clientX - active.startX) > 2;
+      active.tracker.add(active.pendingPosition, 0, event.timeStamp);
+      active.moved ||= Math.abs(active.pendingPosition - active.startPosition) > 2;
       if (active.frame !== null) return;
       active.frame = requestAnimationFrame(() => {
         active.frame = null;

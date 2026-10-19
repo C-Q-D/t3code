@@ -19,6 +19,7 @@ const WidthSchema = Schema.Finite;
  */
 export const RESIZABLE_WIDTH_PROPERTY = "--resizable-width";
 
+/** Width persistence, bounds in CSS pixels, handle orientation and optional host collapse action. */
 export interface UseResizableWidthOptions {
   /** localStorage key the persisted width is stored under. */
   readonly storageKey: string;
@@ -35,6 +36,7 @@ export interface UseResizableWidthOptions {
   readonly onCollapse?: (() => void) | undefined;
 }
 
+/** Pointer lifecycle handlers installed on the panel resize edge. */
 export interface ResizableWidthHandlers {
   readonly onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void;
   readonly onPointerMove: (event: ReactPointerEvent<HTMLElement>) => void;
@@ -51,7 +53,7 @@ export interface ResizableWidthHandlers {
  * During a drag the hook writes `RESIZABLE_WIDTH_PROPERTY` on the handle's
  * parent, so the panel follows the cursor in the same frame without
  * re-rendering the owner. `width` state and localStorage commit once when the
- * user lifts the pointer or the drag is interrupted.
+ * bounded gesture ends (after any physical rebound); abandoned physical gestures do not persist.
  */
 export function useResizableWidth(options: UseResizableWidthOptions): {
   readonly width: number;
