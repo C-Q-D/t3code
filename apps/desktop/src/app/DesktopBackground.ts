@@ -19,10 +19,11 @@ export class InvalidBackgroundImage extends Schema.TaggedError<InvalidBackground
 // Pick, clear and get share a permit so concurrent IPC calls cannot leave two images.
 const access = Semaphore.makeUnsafe(1);
 
-/** Copies a selected file into stateDir/background and removes previous images.
+/** Atomically publishes a selected file into stateDir/background, then removes previous images.
  * @param stateDir Desktop-owned state root, never the renderer's selected directory.
  * @param sourcePath Selected PNG/JPEG/WebP file; extension matching is case insensitive.
  * @returns Content-addressed relative URL. Invalid extensions and filesystem errors propagate.
+ * Write or rename failure preserves the previous image; temporary cleanup failures are surfaced.
  */
 export const saveBackgroundImage = (stateDir: string, sourcePath: string) =>
   access.withPermits(1)(
@@ -36,12 +37,21 @@ export const saveBackgroundImage = (stateDir: string, sourcePath: string) =>
         });
       }
       const contents = yield* fs.readFile(sourcePath);
-      const digest = yield* (yield* Crypto.Crypto).digest("SHA-256", contents);
+      const crypto = yield* Crypto.Crypto;
+      const digest = yield* crypto.digest("SHA-256", contents);
       const filename = `${Buffer.from(digest).toString("hex").slice(0, 16)}.${extension}`;
       const directory = path.join(stateDir, "background");
       yield* fs.makeDirectory(directory, { recursive: true });
-      // Publish the new content before removing the old image, so read failures preserve the selection.
-      yield* fs.writeFile(path.join(directory, filename), contents);
+      const temporaryPath = path.join(directory, `.${yield* crypto.randomUUIDv4()}.tmp`);
+      // Queries and the protocol reject this temporary name. Same-directory rename publishes
+      // only a completed write, including when the final filename already holds the old image.
+      yield* fs
+        .writeFile(temporaryPath, contents)
+        .pipe(
+          Effect.andThen(fs.rename(temporaryPath, path.join(directory, filename))),
+          Effect.ensuring(fs.remove(temporaryPath, { force: true }).pipe(Effect.orDie)),
+          Effect.uninterruptible,
+        );
       for (const entry of yield* fs.readDirectory(directory)) {
         if (entry !== filename) yield* fs.remove(path.join(directory, entry));
       }
