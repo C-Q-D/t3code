@@ -1375,7 +1375,7 @@ describe("searchSidebarThreads", () => {
 
 describe("filterSidebarProjectScopeItems", () => {
   const items = [
-    { value: "all", label: "All projects" },
+    { value: "all", label: "Today" },
     { value: "alpha", label: "Alpha workspace" },
     { value: "beta", label: "Beta tools" },
   ] as const;
@@ -1393,7 +1393,7 @@ describe("filterSidebarProjectScopeItems", () => {
   });
 
   it("hides the default row while filtering", () => {
-    expect(filter("all")).toEqual([]);
+    expect(filter("today")).toEqual([]);
   });
 
   it("returns matching projects in source order and supports no-match results", () => {

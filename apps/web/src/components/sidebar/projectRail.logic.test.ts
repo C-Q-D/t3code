@@ -32,7 +32,7 @@ const groups = buildSidebarProjectSnapshots({
 describe("project rail scope", () => {
   it("reopens all project choices after leaving a searched popup for project settings", () => {
     const items = [
-      { value: "all", label: "All projects" },
+      { value: "all", label: "Today" },
       { value: "alpha", label: "Alpha" },
       { value: "beta", label: "Beta" },
     ];

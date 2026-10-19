@@ -322,13 +322,13 @@ describe("buildThreadActionMenuItems", () => {
     ).toMatchObject({ label: "Filter by Beta Project", icon: "folder-tree" });
   });
 
-  it("offers the way back to all projects once the list is scoped", () => {
+  it("offers the way back to Today once the list is scoped", () => {
     const items = buildThreadActionMenuItems({
       ...baseState,
       projectFilter: { label: "Beta Project", isActive: true },
     });
     const filterIndex = items.findIndex((candidate) => candidate.id === "filter-by-project");
-    expect(items[filterIndex]).toMatchObject({ label: "Show all projects", icon: "folder-tree" });
+    expect(items[filterIndex]).toMatchObject({ label: "Show Today", icon: "folder-tree" });
     expect(items[filterIndex - 1]?.id).toBe("mark-unread");
     expect(items[filterIndex + 1]?.id).toBe("auto-settle");
   });
