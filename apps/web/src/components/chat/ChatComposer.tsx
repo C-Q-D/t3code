@@ -432,6 +432,7 @@ const COMPOSER_RESTING_TRANSITION_CLEANUP_BUFFER_MS = 50;
 const COMPOSER_RESTING_TRANSITION_EASING = "cubic-bezier(0.32, 0.72, 0, 1)";
 const COMPOSER_RESTING_CONTROLS_ARRIVAL_DRIFT_PX = 4;
 
+/** Retarget measured resting geometry, preserving spring momentum only in physics mode. */
 function useComposerRestingTransition(
   isCollapsed: boolean,
   isResting: boolean,
@@ -439,6 +440,7 @@ function useComposerRestingTransition(
   onOverlayHeightChange: (height: number) => void,
   animationsActive: boolean,
   animationDurationMs: number,
+  physics: boolean,
 ) {
   const elementRef = useRef<HTMLDivElement>(null);
   const isCollapsedRef = useRef(isCollapsed);
@@ -462,6 +464,7 @@ function useComposerRestingTransition(
     surfaceBottomInset: null,
   });
   const animationRef = useRef<Animation | null>(null);
+  const springTransitionRef = useRef<{ timeline: SpringTimeline; travelPx: number } | null>(null);
   const animationTargetHeightRef = useRef<number | null>(null);
   const contentAnimationsRef = useRef<Animation[]>([]);
   const stateChangeAnimationsRef = useRef<Animation[]>([]);
@@ -547,6 +550,10 @@ function useComposerRestingTransition(
       const interruptedStripHeight =
         animationRef.current && modelStrip ? modelStrip.getBoundingClientRect().height : null;
       const interruptedAnimation = animationRef.current;
+      const interruptedSpring = interruptedAnimation ? springTransitionRef.current : null;
+      const now = performance.now();
+      const interruptedVelocity = interruptedSpring?.timeline.at(now).velocity ?? 0;
+      springTransitionRef.current = null;
       const interruptedPromptTop = interruptedAnimation
         ? (prompt?.getBoundingClientRect().top ?? null)
         : null;
@@ -620,12 +627,31 @@ function useComposerRestingTransition(
         previousHeight !== null &&
         Math.abs(previousHeight - nextHeight) >= 0.5
       ) {
+        const initialVelocity = interruptedSpring
+          ? composerRestingVelocity(
+              interruptedVelocity,
+              interruptedSpring.travelPx,
+              nextHeight - previousHeight,
+            )
+          : 0;
+        const curve = physics ? springToLinear(TOKENS.settle, { initialVelocity }) : null;
         const remainingDuration =
           typeof interruptedDuration === "number" && interruptedCurrentTime !== null
             ? Math.max(1, interruptedDuration - interruptedCurrentTime)
             : animationDurationMs;
-        const duration =
-          interruptedHeight !== null && !targetChanged ? remainingDuration : animationDurationMs;
+        const duration = curve
+          ? curve.durationMs
+          : interruptedHeight !== null && !targetChanged
+            ? remainingDuration
+            : animationDurationMs;
+        const easing = curve?.easing ?? COMPOSER_RESTING_TRANSITION_EASING;
+        if (physics) {
+          // Signed travel converts normalized momentum back to the same physical px/s.
+          springTransitionRef.current = {
+            timeline: new SpringTimeline(TOKENS.settle, now, initialVelocity),
+            travelPx: nextHeight - previousHeight,
+          };
+        }
         element.style.overflow = "clip";
         if (modelStrip) {
           // The model controls cross the input's lower edge on their way to the strip.
@@ -692,7 +718,7 @@ function useComposerRestingTransition(
           shell?.setAttribute("data-model-strip-transition", "true");
           stripAnimation = modelStrip.animate(
             [{ height: `${fromHeight}px` }, { height: `${toHeight}px` }],
-            { duration, easing: COMPOSER_RESTING_TRANSITION_EASING, fill: "both" },
+            { duration, easing, fill: "both" },
           );
         }
 
@@ -700,7 +726,7 @@ function useComposerRestingTransition(
           [{ height: `${previousHeight}px` }, { height: `${nextHeight}px` }],
           {
             duration,
-            easing: COMPOSER_RESTING_TRANSITION_EASING,
+            easing,
             fill: "both",
           },
         );
@@ -739,7 +765,7 @@ function useComposerRestingTransition(
               [{ transform: `translate(${offsetX}px, ${offset}px)` }, { transform: "none" }],
               {
                 duration,
-                easing: COMPOSER_RESTING_TRANSITION_EASING,
+                easing,
               },
             ),
           );
@@ -785,7 +811,7 @@ function useComposerRestingTransition(
                 ],
                 {
                   duration,
-                  easing: COMPOSER_RESTING_TRANSITION_EASING,
+                  easing,
                 },
               ),
             );
@@ -858,6 +884,7 @@ function useComposerRestingTransition(
             }
           }
           animationRef.current = null;
+          springTransitionRef.current = null;
           animationTargetHeightRef.current = null;
           contentAnimationsRef.current = [];
           stateChangeAnimationsRef.current = [];
@@ -891,6 +918,7 @@ function useComposerRestingTransition(
     },
     [
       animationDurationMs,
+      physics,
       animationsActive,
       clearTransitionStyles,
       onOverlayHeightChange,
@@ -1058,6 +1086,10 @@ import { searchProviderSkills } from "../../providerSkillSearch";
 import { useDelayedStatus } from "../../hooks/useDelayedStatus";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { usePanelAnimationSettings } from "../../panelAnimations";
+import { SpringTimeline } from "../../lib/motion/springTimeline";
+import { springToLinear } from "../../lib/motion/springToLinear";
+import { TOKENS } from "../../lib/motion/tokens";
+import { composerRestingVelocity } from "./composerRestingSpring";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { readEnvironmentScope } from "../../state/session";
 import { serverEnvironment } from "../../state/server";
@@ -5334,8 +5366,11 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         ) : null}
       </div>
     ) : null;
-  const { active: panelAnimationsActive, durationMs: panelAnimationDurationMs } =
-    usePanelAnimationSettings();
+  const {
+    active: panelAnimationsActive,
+    durationMs: panelAnimationDurationMs,
+    physics,
+  } = usePanelAnimationSettings();
   const composerMainSurfaceRef = useComposerRestingTransition(
     composerControlsCollapsed,
     isComposerResting,
@@ -5343,6 +5378,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     onComposerOverlayHeightChange,
     panelAnimationsActive,
     panelAnimationDurationMs,
+    physics,
   );
   const canTrackComposerScrollGesture =
     routeKind === "server" && activeThreadId !== null && !isMobileViewport;
