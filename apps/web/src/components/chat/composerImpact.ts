@@ -11,6 +11,26 @@ import { isPhysicsEnabled, onPhysicsChange } from "../../lib/motion/preference";
 import { Spring } from "../../lib/motion/spring";
 import { TOKENS } from "../../lib/motion/tokens";
 
+const surfaceLayoutTransforms = new WeakMap<HTMLElement, string>();
+
+/**
+ * Run synchronous resting measurements without this receiver's impact transform on surface.
+ * Descendant rectangles then share layout coordinates, including any current WAAPI height.
+ * Restore the exact visual transform before paint, even if measure throws; never stop its springs.
+ * Unmanaged surfaces (including legacy mode) execute measure unchanged and return its result.
+ */
+export function withComposerImpactLayout<T>(surface: HTMLElement, measure: () => T): T {
+  const layoutTransform = surfaceLayoutTransforms.get(surface);
+  if (layoutTransform === undefined) return measure();
+  const visualTransform = surface.style.transform;
+  surface.style.transform = layoutTransform;
+  try {
+    return measure();
+  } finally {
+    surface.style.transform = visualTransform;
+  }
+}
+
 /**
  * Convert finite K4 px/s velocities to translation and scale velocities for a CSS pixel surface.
  * Impacts below 40 px/s or surfaces with no area return zero impulses; visible impacts compress
@@ -62,6 +82,7 @@ export function attachComposerImpact(
   const surface = form.querySelector<HTMLElement>("[data-chat-composer-main-surface]");
   if (!isPhysicsEnabled() || !surface) return { dispose() {}, shake() {} };
   const originalSurfaceTransform = surface.style.transform;
+  surfaceLayoutTransforms.set(surface, originalSurfaceTransform);
   const originalFormTransform = form.style.transform;
   const x = new Spring({ token: TOKENS.jolt });
   const y = new Spring({ token: TOKENS.jolt });
@@ -159,6 +180,7 @@ export function attachComposerImpact(
     for (const neighbor of neighbors) clearOffset(neighbor);
     neighbors.clear();
     surface.style.transform = originalSurfaceTransform;
+    surfaceLayoutTransforms.delete(surface);
     form.style.transform = originalFormTransform;
   };
   unsubscribe = onPhysicsChange((enabled) => {
