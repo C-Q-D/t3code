@@ -16,11 +16,16 @@ import { isPreviewAvailableFor } from "../browser/previewRuntime";
 import { usePrimaryEnvironmentId } from "../state/environments";
 import { useEnvironmentScope } from "../state/session";
 import { selectProjectGroupingSettings } from "../logicalProject";
-import { buildSidebarProjectSnapshots } from "../sidebarProjectGrouping";
+import {
+  buildSidebarProjectSnapshots,
+  resolveSidebarProjectScopeKey,
+} from "../sidebarProjectGrouping";
+import { resolveSidebarNewThreadDestination } from "../components/Sidebar.logic";
+import { useUiStateStore } from "../uiStateStore";
 import { dispatchPreviewAction } from "../components/preview/previewActionBus";
 import { useHandleNewThread } from "../hooks/useHandleNewThread";
 import { useScratchProject } from "../hooks/useScratchProject";
-import { startNewThreadFromContext } from "../lib/chatThreadActions";
+import { resolveThreadActionProjectRef, startNewThreadFromContext } from "../lib/chatThreadActions";
 import { isPreviewFocused } from "../lib/previewFocus";
 import { isTerminalFocused } from "../lib/terminalFocus";
 import { isEditableFocused } from "../lib/editableFocus";
@@ -49,15 +54,26 @@ function ChatRouteGlobalShortcuts() {
   const projects = useProjects();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const { scratchEnvironmentId, startScratchThread } = useScratchProject();
-  const projectGroupCount = useMemo(
+  const projectGroups = useMemo(
     () =>
       buildSidebarProjectSnapshots({
         projects,
+        groupScratchProjects: true,
         settings: projectGroupingSettings,
         primaryEnvironmentId,
         resolveEnvironmentLabel: () => null,
-      }).length,
+      }),
     [primaryEnvironmentId, projectGroupingSettings, projects],
+  );
+  const persistedProjectScopeKey = useUiStateStore((state) => state.sidebarProjectScopeKey);
+  const projectScopeKey = useMemo(
+    () =>
+      resolveSidebarProjectScopeKey({
+        groups: projectGroups,
+        key: persistedProjectScopeKey,
+        settings: projectGroupingSettings,
+      }),
+    [persistedProjectScopeKey, projectGroups, projectGroupingSettings],
   );
   const terminalOpen = useTerminalUiStateStore((state) =>
     routeThreadRef
@@ -131,19 +147,38 @@ function ChatRouteGlobalShortcuts() {
       if (command === "chat.new") {
         event.preventDefault();
         event.stopPropagation();
-        // The default sidebar routes creation through the command palette
-        // whenever there is a real choice to make; the legacy sidebar (and
-        // single-project setups) keep the immediate contextual create.
-        if (!legacySidebarEnabled && projectGroupCount > 1) {
-          openCommandPalette({ open: "new-thread-in" });
-          return;
-        }
-        void startNewThreadFromContext({
+        const context = {
           activeDraftThread,
           activeThread: activeThread ?? undefined,
           defaultProjectRef,
           handleNewThread,
+        };
+        // Legacy creation stays contextual; the default sidebar shares its rail policy.
+        if (legacySidebarEnabled) {
+          void startNewThreadFromContext(context);
+          return;
+        }
+        const destination = resolveSidebarNewThreadDestination({
+          shiftKey: false,
+          groups: projectGroups,
+          scopeKey: projectScopeKey,
+          preferredProjectRef: resolveThreadActionProjectRef(context),
+          scratchEnvironmentId,
         });
+        switch (destination.kind) {
+          case "context":
+            void startNewThreadFromContext(context);
+            break;
+          case "project":
+            void handleNewThread(destination.projectRef);
+            break;
+          case "scratch":
+            void startScratchThread(destination.environmentId);
+            break;
+          case "picker":
+            openCommandPalette({ open: "new-thread-in" });
+            break;
+        }
         return;
       }
 
@@ -206,7 +241,8 @@ function ChatRouteGlobalShortcuts() {
     defaultProjectRef,
     previewOpen,
     primaryEnvironmentId,
-    projectGroupCount,
+    projectGroups,
+    projectScopeKey,
     routeThreadRef,
     scratchEnvironmentId,
     selectedThreadKeysSize,

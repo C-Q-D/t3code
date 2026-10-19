@@ -34,6 +34,10 @@ export const sidebar: Messages["sidebar"] = {
     searchAriaLabel: "搜索对话",
     clearSearchAriaLabel: "清除对话搜索",
     newThreadWithShortcut: (shortcut: string) => `新建对话（${shortcut}）`,
+    newThreadInNamedProjectWithShortcut: (name: string, shortcut: string | null | undefined) =>
+      `在 ${name} 中新建对话${shortcut ? `（${shortcut}）` : ""}`,
+    newThreadWithoutProjectWithShortcut: (shortcut: string | null | undefined) =>
+      `新建无项目对话${shortcut ? `（${shortcut}）` : ""}`,
     newThreadInProjectTooltip: (shortcut: string | null | undefined) =>
       `在当前项目中新建对话：Shift+点击${shortcut ? `（${shortcut}）` : ""}`,
   },

@@ -144,10 +144,11 @@ import {
 } from "../threadSelectionStore";
 import { useAcknowledgeThreadWoke, useThreadActions } from "../hooks/useThreadActions";
 import { useHandleNewThread } from "../hooks/useHandleNewThread";
+import { useScratchProject } from "../hooks/useScratchProject";
 import { useTerminalFocus } from "../hooks/useTerminalFocus";
 import { isCommandPaletteOpen, openCommandPalette } from "../commandPaletteBus";
 import { registerSettleAndAdvance } from "../settleAndAdvance";
-import { startNewThreadFromContext } from "../lib/chatThreadActions";
+import { resolveThreadActionProjectRef, startNewThreadFromContext } from "../lib/chatThreadActions";
 import { useClientSettings } from "../hooks/useSettings";
 import { useCopyToClipboard } from "../hooks/useCopyToClipboard";
 import { useNowMinute } from "../hooks/useNowMinute";
@@ -212,7 +213,7 @@ import {
   resolveThreadLastVisitedAt,
   searchSidebarThreads,
   sidebarSearchTextSegments,
-  shouldCreateNewThreadInCurrentProject,
+  resolveSidebarNewThreadDestination,
   shouldNavigateAfterThreadPark,
   sidebarListItemId,
   sidebarMarkerId,
@@ -2461,6 +2462,7 @@ export default function Sidebar() {
     },
   });
   const newThreadContext = useHandleNewThread();
+  const { scratchEnvironmentId, startScratchThread } = useScratchProject();
   const openAddProjectCommandPalette = useCallback(
     () => openCommandPalette({ open: "add-project" }),
     [],
@@ -4929,39 +4931,51 @@ export default function Sidebar() {
     updateThreadJumpHintsVisibility(shouldShowJumpHintsNow);
   }, [shouldShowJumpHintsNow, updateThreadJumpHintsVisibility]);
 
-  // New thread defaults to the project you're in (active thread's project,
-  // falling back to the top project) — same resolution the command palette
-  // uses. The command palette already offers a "New thread in..." submenu
-  // for multi-project setups.
+  // Honor the rail scope while sharing physical target selection with the picker.
   const handleNewThreadClick = useCallback(
     (event?: ReactMouseEvent) => {
-      // One project: nothing to pick, create immediately. Shift+click creates
-      // directly in the current project even with several projects, skipping
-      // the palette picker.
-      if (shouldCreateNewThreadInCurrentProject(event?.shiftKey ?? false, projectGroups.length)) {
-        if (isMobile) setOpenMobile(false);
-        void startNewThreadFromContext({
-          activeDraftThread: newThreadContext.activeDraftThread,
-          activeThread: newThreadContext.activeThread ?? undefined,
-          defaultProjectRef: newThreadContext.defaultProjectRef,
-          handleNewThread: newThreadContext.handleNewThread,
-        });
-        return;
-      }
+      const context = {
+        ...newThreadContext,
+        activeThread: newThreadContext.activeThread ?? undefined,
+      };
+      const destination = resolveSidebarNewThreadDestination({
+        shiftKey: event?.shiftKey ?? false,
+        groups: projectGroups,
+        scopeKey: projectScopeKey,
+        preferredProjectRef: resolveThreadActionProjectRef(context),
+        scratchEnvironmentId,
+      });
       if (isMobile) setOpenMobile(false);
-      openCommandPalette({ open: "new-thread-in" });
+      switch (destination.kind) {
+        case "context":
+          void startNewThreadFromContext(context);
+          break;
+        case "project":
+          void newThreadContext.handleNewThread(destination.projectRef);
+          break;
+        case "scratch":
+          void startScratchThread(destination.environmentId);
+          break;
+        case "picker":
+          openCommandPalette({ open: "new-thread-in" });
+          break;
+      }
     },
-    [isMobile, newThreadContext, projectGroups.length, setOpenMobile],
+    [
+      isMobile,
+      newThreadContext,
+      projectGroups,
+      projectScopeKey,
+      scratchEnvironmentId,
+      setOpenMobile,
+      startScratchThread,
+    ],
   );
 
-  // The button mirrors chat.new: in multi-project setups both route through
-  // the command palette's "New thread in..." picker, and in single-project
-  // setups both create immediately. In multi-project setups the label is only
-  // the picker's shortcut: falling back to chat.newLocal would advertise the
-  // same shortcut for both the picker and direct create. In single-project
-  // setups both commands create directly, so chat.newLocal is a valid
-  // fallback. The second tooltip line (multi-project only) advertises
-  // shift+click and its keyboard twin chat.newLocal for direct create.
+  // The button and chat.new share the scope-aware destination policy. Shift+click
+  // and chat.newLocal keep contextual creation even when another group is selected.
+  // The label retains its single-group shortcut fallback; the second tooltip line
+  // retains the multi-group hint for contextual creation.
   const newThreadShortcutLabel =
     shortcutLabelForCommand(keybindings, "chat.new") ??
     (projectGroups.length <= 1 ? shortcutLabelForCommand(keybindings, "chat.newLocal") : undefined);
@@ -4997,6 +5011,7 @@ export default function Sidebar() {
               onNewThread={handleNewThreadClick}
               newThreadDisabled={projects.length === 0}
               newThreadShortcutLabel={newThreadShortcutLabel}
+              scopedProjectGroup={scopedProjectGroup}
               newThreadInProjectShortcutLabel={newThreadInProjectShortcutLabel}
               showNewThreadInProjectHint={projectGroups.length > 1}
               searchInputRef={threadSearchInputRef}

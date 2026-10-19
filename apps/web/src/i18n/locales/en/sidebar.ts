@@ -32,6 +32,10 @@ export const sidebar = {
     searchAriaLabel: "Search threads",
     clearSearchAriaLabel: "Clear thread search",
     newThreadWithShortcut: (shortcut: string) => `New thread (${shortcut})`,
+    newThreadInNamedProjectWithShortcut: (name: string, shortcut: string | null | undefined) =>
+      `New thread in ${name}${shortcut ? ` (${shortcut})` : ""}`,
+    newThreadWithoutProjectWithShortcut: (shortcut: string | null | undefined) =>
+      `New thread without a project${shortcut ? ` (${shortcut})` : ""}`,
     newThreadInProjectTooltip: (shortcut: string | null | undefined) =>
       `New thread in current project: Shift+click${shortcut ? ` (${shortcut})` : ""}`,
   },
