@@ -13,6 +13,7 @@ import { PullRequestGlyph } from "../pullRequest/pullRequestIcons";
 import { scopedThreadKey, scopeThreadRef } from "@t3tools/client-runtime/environment";
 import {
   deriveWorkflowGroups,
+  isTerminalSubagentStatus,
   projectedSubagentsToRuntime,
   type RuntimeSubagent,
 } from "@t3tools/client-runtime/state/subagentRuntime";
@@ -36,6 +37,7 @@ import {
   type EnvironmentId,
   type OrchestrationV2Subagent,
   type OrchestrationV2ThreadShell,
+  type ServerProvider,
   type ThreadId,
 } from "@t3tools/contracts";
 import { deriveSubagentElapsedMs } from "@t3tools/shared/orchestrationTiming";
@@ -68,6 +70,13 @@ import { useAtomCommand } from "../../state/use-atom-command";
 import { AgentElapsed } from "./AgentElapsed";
 import { ThreadRelationshipIcon, threadRelationshipStatusLabel } from "./ThreadRelationshipIcon";
 import { ThreadLineageWorkflowRow } from "./ThreadLineageWorkflowRow";
+import {
+  formatSubagentModelText,
+  resolveSubagentModelSummary,
+  SubagentAvatar,
+  subagentDetailLine,
+} from "./SubagentPresentation";
+import { cn } from "~/lib/utils";
 
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "../ui/menu";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
@@ -207,6 +216,52 @@ function relationshipThreadTitle(input: {
 }): string {
   if (!input.isSubagent) return input.title;
   return formatSubagentDisplayTitle(input.title);
+}
+
+/**
+ * Second line of a child's lineage row: its model while it works, otherwise its outcome.
+ * @param props The child's live status, model and output; statusLabel is the lineage wording for it.
+ * @returns One truncated line; failed children read in the error color.
+ */
+function SubagentRowSubtitle(props: {
+  readonly agent: Pick<RuntimeSubagent, "status" | "model" | "result" | "error" | "progress"> &
+    Pick<OrchestrationV2Subagent, "providerInstanceId" | "origin" | "modelSelection">;
+  readonly statusLabel: string;
+  readonly provider: ServerProvider | undefined;
+  readonly providers: ReadonlyArray<ServerProvider> | undefined;
+}) {
+  const { agent } = props;
+  const working = agent.status === "pending" || agent.status === "running";
+  const modelText = working
+    ? formatSubagentModelText(
+        resolveSubagentModelSummary({
+          model: agent.model,
+          providerInstanceId: agent.providerInstanceId,
+          origin: agent.origin,
+          modelSelection: agent.modelSelection,
+          provider: props.provider,
+          providers: props.providers,
+        }),
+      )
+    : null;
+  const detail = isTerminalSubagentStatus(agent.status)
+    ? subagentDetailLine({
+        status: agent.status,
+        result: agent.result ?? agent.error,
+        progress: agent.progress,
+      })
+    : null;
+  return (
+    <span
+      className={cn(
+        "truncate text-meta-large leading-4",
+        agent.status === "failed" ? "text-error" : "text-muted-foreground",
+        modelText !== null && "font-mono",
+      )}
+    >
+      {modelText ?? (detail ? `${props.statusLabel} · ${detail}` : props.statusLabel)}
+    </span>
+  );
 }
 
 /**
@@ -442,10 +497,13 @@ export function ThreadRelationshipsPanel(props: {
   return (
     <ThreadDetailsSection
       headingId="thread-details-lineage-heading"
-      title={
-        runningCount > 0
-          ? t.chat.relationships.lineageRunning(runningCount)
-          : t.chat.relationships.lineage
+      title={t.chat.relationships.lineage}
+      titleAccessory={
+        runningCount > 0 ? (
+          <Badge variant="info" data-lineage-running-count>
+            {t.chat.relationships.runningCount(runningCount)}
+          </Badge>
+        ) : null
       }
       data-thread-relationships-panel
       actions={
@@ -542,10 +600,13 @@ export function ThreadRelationshipsPanel(props: {
               const relationshipHint = node?.missing
                 ? t.chat.relationships.thisRelatedThreadIsUnavailable
                 : t.chat.relationships.openRelated(relationship);
+              // A plain child (not a workflow) gets the two-line agent row; forks, parents
+              // and workflow headers keep the single-line pill.
+              const agentRow = agent !== undefined && workflowGroup === undefined && !isMergeTarget;
               const RelationshipPopup = agent ? ThreadHoverCardPopup : TooltipPopup;
               const relationshipTooltip = agent ? (
                 <SubagentTooltipContent
-                  pixelIconName={pixelIconName}
+                  opensThread={node?.missing !== true}
                   title={threadTitle}
                   model={agent.model}
                   providerInstanceId={agent.providerInstanceId}
@@ -566,7 +627,34 @@ export function ThreadRelationshipsPanel(props: {
               ) : (
                 relationshipHint
               );
-              const relationshipContent = (
+              const relationshipContent = agentRow ? (
+                <>
+                  <SubagentAvatar
+                    size="sm"
+                    pixelIconName={pixelIconName}
+                    status={agent.status}
+                    ringClassName="ring-card group-hover:ring-secondary"
+                  />
+                  <span className="flex min-w-0 flex-1 flex-col text-left">
+                    <span className="truncate text-sm font-medium leading-5 text-foreground/85">
+                      {threadTitle}
+                    </span>
+                    <SubagentRowSubtitle
+                      agent={agent}
+                      statusLabel={threadRelationshipStatusLabel(rowStatus)}
+                      provider={provider}
+                      providers={providers}
+                    />
+                  </span>
+                  {deriveSubagentElapsedMs(agent, 0) !== null ? (
+                    <span
+                      className={`shrink-0 font-mono text-2xs font-normal tabular-nums text-muted-foreground ${trailingVisibilityClass}`}
+                    >
+                      <AgentElapsed agent={agent} compact />
+                    </span>
+                  ) : null}
+                </>
+              ) : (
                 <>
                   <ThreadRelationshipIcon
                     pixelIconName={isSubagent && !isParent ? pixelIconName : undefined}
@@ -612,7 +700,7 @@ export function ThreadRelationshipsPanel(props: {
                       <ThreadDetailsControl
                         size="sm"
                         variant="ghost"
-                        part={workflowGroup ? "primary" : "row"}
+                        part={workflowGroup ? "primary" : agentRow ? "agent" : "row"}
                         disabled={node?.missing === true}
                         onClick={() => openThread(threadId)}
                       />
@@ -647,7 +735,11 @@ export function ThreadRelationshipsPanel(props: {
               return (
                 <li
                   key={threadId}
-                  className="group relative flex h-9.5 items-center rounded-full bg-thread-details-well shadow-well-control"
+                  className={
+                    agentRow
+                      ? "group relative flex min-h-11 items-center rounded-lg"
+                      : "group relative flex h-9.5 items-center rounded-full bg-thread-details-well shadow-well-control"
+                  }
                 >
                   {isMergeTarget ? (
                     <div className={THREAD_DETAILS_PANEL_SPLIT_GROUP_CLASS}>

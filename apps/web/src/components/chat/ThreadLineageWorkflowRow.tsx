@@ -109,7 +109,7 @@ function WorkflowMemberRow({
         </TooltipTrigger>
         <ThreadHoverCardPopup side="left">
           <SubagentTooltipContent
-            pixelIconName={pixelIconName}
+            opensThread={canOpen}
             title={member.title}
             model={member.model}
             providerInstanceId={providerInstanceId}

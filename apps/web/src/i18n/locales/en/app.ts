@@ -21,6 +21,12 @@ export const app = {
   subagent: {
     worktree: "Worktree",
     project: "Project",
+    workspace: "Workspace",
+    model: "Model",
+    elapsed: "Elapsed",
+    currentActivity: "Current activity",
+    result: "Result",
+    openHint: "Click to open the subagent chat",
     status: {
       idle: "idle",
       pending: "pending",

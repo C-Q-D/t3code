@@ -787,8 +787,8 @@ export const chat: Messages["chat"] = {
     completeARunInThisForkBefore: "请先在此分支中完成一次运行，再合并回去",
     mergeThisConversationBackIntoItsSource: "将此对话合并回源对话",
     stopSubagent: "停止子 Agent",
-    /** Formats the running related agent count. */
-    lineageRunning: (count) => `对话关系 · ${count}个运行中`,
+    /** Formats the running related agent count shown beside the Lineage heading. */
+    runningCount: (count) => `${count} 运行中`,
     /** Names the related thread role to open. */
     openRelated: (relationship) => `在此聊天中打开${relationship}`,
     /** Names the parent conversation to merge back into. */

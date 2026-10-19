@@ -35,6 +35,10 @@ import type { TimestampFormat } from "@t3tools/contracts/settings";
 import {
   ArrowRightLeftIcon,
   ArrowRightIcon,
+  CheckIcon,
+  ChevronRightIcon,
+  CircleXIcon,
+  TerminalIcon,
   GitForkIcon,
   MessageSquareIcon,
   CircleStopIcon,
@@ -51,9 +55,16 @@ import { cn } from "~/lib/utils";
 import { TimelineSystemDivider } from "./TimelineSystemDivider";
 import { Button, InlineButton } from "../ui/button";
 import { T3Wordmark } from "../T3Wordmark";
-import { PixelIcon } from "../icons/PixelIcon";
-import type { PixelIconName } from "../icons/pixelSprites";
 import { getSubagentPixelIconName } from "../icons/subagentPixelIcon";
+import { isTerminalSubagentStatus } from "@t3tools/client-runtime/state/subagentRuntime";
+import {
+  formatSubagentModelText,
+  resolveSubagentModelSummary,
+  SubagentAvatar,
+  subagentDetailLine,
+  SubagentStatusLabel,
+  subagentStatusVisual,
+} from "./SubagentPresentation";
 
 const LIFECYCLE_TYPES = new Set<OrchestrationV2TurnItem["type"]>([
   "run_interrupt_request",
@@ -229,92 +240,12 @@ export function V2LifecycleRow(props: {
   return null;
 }
 
-/**
- * In-flight states all present as Working, the way the agents fleet view did:
- * detail belongs in the activity line, and a waiting or queued subagent is
- * still the fleet doing its job. Only settled states differentiate. Idle reads
- * as settled rather than in progress, since a resting child looks done unless
- * resumed.
- */
-const STATUS_VISUALS: Record<
-  OrchestrationV2TurnItem["status"],
-  { dotClass: string; label: string }
-> = {
-  pending: { dotClass: "bg-info", label: t.chat.timeline.queued },
-  running: { dotClass: "bg-info", label: t.chat.timeline.running },
-  waiting: { dotClass: "bg-info", label: t.chat.timeline.waiting },
-  idle: { dotClass: "bg-muted-foreground/50", label: t.chat.timeline.idleResumable },
-  completed: { dotClass: "bg-success", label: t.chat.timeline.completed },
-  failed: { dotClass: "bg-destructive", label: t.chat.timeline.failed },
-  cancelled: { dotClass: "bg-muted-foreground/60", label: t.chat.timeline.stopped },
-  interrupted: { dotClass: "bg-muted-foreground/60", label: t.chat.timeline.stopped },
-};
-
-function subagentStatusVisual(status: OrchestrationV2TurnItem["status"]) {
-  return STATUS_VISUALS[status];
-}
-
-const SETTLED_SUBAGENT_STATUSES = new Set<OrchestrationV2TurnItem["status"]>([
-  "completed",
-  "failed",
-  "cancelled",
-  "interrupted",
-]);
-
-/** The server's placeholder when a child ends without output; the status dot already says it. */
-const GENERIC_CHILD_END = /^Child task ended with status\b/i;
-
-/** One line of a markdown result: drop list bullets, code ticks, and link targets. */
-function plainDetail(text: string): string {
-  return text
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
-    .replace(/`/g, "")
-    .replace(/^[ \t]*[-*][ \t]+/gm, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 function isoOrNull(value: DateTime.Utc | null | undefined): string | null {
   return value ? DateTime.formatIso(value) : null;
 }
 
 export function SubagentElapsed({ agent }: { agent: Parameters<typeof AgentElapsed>[0]["agent"] }) {
   return <AgentElapsed agent={agent} />;
-}
-
-/** Child character with the agents panel's status dot; rings let a header stack overlap. */
-export function SubagentAvatar({
-  pixelIconName = "subagent",
-  status,
-  className,
-}: {
-  driver?: ProviderDriverKind | undefined;
-  provider?: ServerProvider | undefined;
-  /** Computed from run/parent groups in the loaded projection, never the visible row order. */
-  pixelIconName?: PixelIconName | undefined;
-  /** Omitted inside an overlapped stack, where a covered dot would only add noise. */
-  status?: OrchestrationV2TurnItem["status"] | undefined;
-  className?: string;
-}) {
-  return (
-    <span
-      aria-hidden
-      className={cn(
-        "relative inline-flex size-6 shrink-0 items-center justify-center rounded-full border border-border/70 bg-muted ring-2 ring-background",
-        className,
-      )}
-    >
-      <PixelIcon name={pixelIconName} className="size-3.5" />
-      {status ? (
-        <span
-          className={cn(
-            "absolute -right-px -bottom-px size-2 rounded-full ring-2 ring-background",
-            subagentStatusVisual(status).dotClass,
-          )}
-        />
-      ) : null}
-    </span>
-  );
 }
 
 /** The status a notification reported, frozen at the time it arrived. */
@@ -426,15 +357,33 @@ function SubagentTimelineLink(props: {
   );
   const threadId = props.threadId;
   const liveStatus = agent?.status ?? props.status;
-  const status = props.event ? props.event.status : liveStatus;
+  // A notification's "updated" outcome has no status of its own; it borrows the live colors.
+  const status = (props.event ? props.event.status : null) ?? liveStatus;
   const statusLabel = props.event?.label ?? subagentStatusVisual(liveStatus).label;
-  const result = (agent?.result ?? props.result)?.trim();
-  const progress = (agent?.progress ?? props.progress)?.trim();
-  const settled = SETTLED_SUBAGENT_STATUSES.has(status ?? liveStatus);
-  const rawDetail = settled ? result || progress : progress || result;
-  const detail =
-    rawDetail && !GENERIC_CHILD_END.test(rawDetail) ? plainDetail(rawDetail) || null : null;
+  const settled = isTerminalSubagentStatus(status);
+  const detail = subagentDetailLine({
+    status,
+    result: agent?.result ?? props.result,
+    progress: agent?.progress ?? props.progress,
+  });
   const failed = status === "failed";
+  const DetailIcon = failed
+    ? CircleXIcon
+    : status === "completed"
+      ? CheckIcon
+      : settled
+        ? null
+        : TerminalIcon;
+  const modelText = formatSubagentModelText(
+    resolveSubagentModelSummary({
+      model: agent?.model ?? null,
+      providerInstanceId: props.providerInstanceId,
+      origin: props.origin,
+      modelSelection: agent?.modelSelection,
+      provider: props.provider,
+      providers: props.providers,
+    }),
+  );
   const timing = {
     status: liveStatus,
     startedAt: isoOrNull(agent?.startedAt ?? props.startedAt),
@@ -442,49 +391,56 @@ function SubagentTimelineLink(props: {
   };
   const content = (
     <>
-      <span className="min-w-0 flex-1">
-        <span className="flex items-baseline gap-2">
-          <span className="min-w-0 truncate text-secondary-copy-large text-fg-detail">
+      <SubagentAvatar
+        pixelIconName={pixelIconName}
+        status={status}
+        ringClassName="ring-timeline-agent-well group-hover/subagent:ring-timeline-log-hover"
+      />
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="flex min-w-0 items-baseline gap-2">
+          <span className="min-w-0 truncate text-secondary-copy-large font-medium text-fg-detail">
             {props.title}
           </span>
+          {modelText !== null ? (
+            <span className="max-w-1/2 shrink-0 truncate font-mono text-meta-large text-muted-foreground">
+              {modelText}
+            </span>
+          ) : null}
         </span>
-        {/* Progress/result previews are existing content; D1's empty-preview state stays one line. */}
         {detail !== null ? (
           <span
             className={cn(
-              "block truncate text-meta-large",
+              "flex min-w-0 items-center gap-1.5 text-meta-large",
               failed ? "text-error" : "text-muted-foreground",
             )}
           >
+            {DetailIcon ? <DetailIcon aria-hidden className="size-3 shrink-0" /> : null}
             {detail.includes("/") && !detail.includes(" ") ? (
-              <MiddleTruncate value={detail} showTitle={false} className="flex" />
+              <span className="flex min-w-0 font-mono">
+                <MiddleTruncate value={detail} showTitle={false} className="flex" />
+              </span>
             ) : (
-              <span className="block truncate">{detail}</span>
+              <span className={cn("min-w-0 truncate", !settled && "font-mono")}>{detail}</span>
             )}
           </span>
         ) : null}
       </span>
-      <span className="shrink-0 text-secondary-copy text-muted-foreground tabular-nums">
-        {props.event ? props.event.timestamp : <SubagentElapsed agent={timing} />}
+      <span className="flex shrink-0 flex-col items-end gap-0.5">
+        <SubagentStatusLabel status={status} label={statusLabel} />
+        <span className="font-mono text-meta-large text-muted-foreground tabular-nums">
+          {props.event ? props.event.timestamp : <SubagentElapsed agent={timing} />}
+        </span>
       </span>
-      <span
-        className={cn(
-          "flex h-5 shrink-0 items-center rounded-tag px-2.25 text-meta-large font-semibold shadow-tag",
-          status === "failed"
-            ? "bg-error-surface text-error-foreground"
-            : status === "completed"
-              ? "bg-secondary text-success-foreground"
-              : settled
-                ? "bg-secondary text-secondary-label"
-                : "bg-update-surface text-update-foreground",
-        )}
-      >
-        {statusLabel}
-      </span>
+      {threadId !== null ? (
+        <ChevronRightIcon
+          aria-hidden
+          className="size-4 shrink-0 text-placeholder group-hover/subagent:text-foreground"
+        />
+      ) : null}
     </>
   );
   const className =
-    "group/subagent flex h-9.5 w-full min-w-0 items-center gap-2 rounded-compact-row bg-timeline-agent-well ps-3 pe-1.5 text-left shadow-timeline-file";
+    "group/subagent flex w-full min-w-0 items-center gap-3 rounded-compact-row bg-timeline-agent-well py-2 ps-2.5 pe-3 text-left shadow-timeline-file";
   return (
     <Tooltip>
       <TooltipTrigger
@@ -511,10 +467,10 @@ function SubagentTimelineLink(props: {
           )
         }
       />
-      <ThreadHoverCardPopup>
+      {/* Below and start-aligned, so the card stays readable while its hover card is open. */}
+      <ThreadHoverCardPopup side="bottom" align="start">
         <SubagentTimelineTooltip
           {...props}
-          pixelIconName={pixelIconName}
           elapsed={agent ? <AgentElapsed agent={projectedSubagentsToRuntime([agent])[0]!} /> : null}
           model={agent?.model ?? null}
           modelSelection={agent?.modelSelection}
@@ -529,13 +485,12 @@ function SubagentTimelineLink(props: {
 
 /**
  * Adds available parent/child workspace metadata to the shared subagent hover card.
- * @param props Timeline identity, model, timing, and state, plus the same pixel character as the row.
- * Parent/child projects may be unavailable; a null child thread ID omits child workspace metadata.
+ * @param props Timeline identity, model, timing, and state. Parent/child projects may be
+ * unavailable; a null child thread ID omits child workspace metadata and the open hint.
  * @returns Tooltip content using live thread/project shells without changing navigation or provider state.
  */
 function SubagentTimelineTooltip(
   props: Parameters<typeof SubagentTimelineLink>[0] & {
-    pixelIconName: PixelIconName;
     model: string | null;
     modelSelection: OrchestrationV2Subagent["modelSelection"];
     elapsed: ReactNode;
@@ -552,7 +507,6 @@ function SubagentTimelineTooltip(
   const childProject = useProject(child ? scopeProjectRef(environmentId, child.projectId) : null);
   return (
     <SubagentTooltipContent
-      pixelIconName={props.pixelIconName}
       title={formatSubagentDisplayTitle(child?.title ?? props.title)}
       model={props.model}
       providerInstanceId={props.providerInstanceId}
@@ -569,6 +523,7 @@ function SubagentTimelineTooltip(
       childThread={child}
       parentProject={parentProject ?? undefined}
       childProject={childProject ?? undefined}
+      opensThread={props.threadId !== null}
     />
   );
 }

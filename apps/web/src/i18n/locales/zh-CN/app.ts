@@ -19,6 +19,12 @@ export const app: Messages["app"] = {
   subagent: {
     worktree: "worktree",
     project: "项目",
+    workspace: "工作区",
+    model: "模型",
+    elapsed: "用时",
+    currentActivity: "当前活动",
+    result: "结果",
+    openHint: "点击打开子 Agent 对话",
     status: {
       idle: "空闲",
       pending: "等待中",

@@ -7,6 +7,8 @@ export const THREAD_DETAILS_PANEL_ROW_CONTENT_CLASS = "gap-2 px-3.5 text-left";
 export const THREAD_DETAILS_PANEL_LABEL_CLASS = "min-w-0 overflow-x-clip overflow-y-visible";
 const CONTROL = `h-9.5 min-w-0 rounded-full border-0 ${THREAD_DETAILS_PANEL_ROW_CONTENT_CLASS} text-secondary-copy-large font-semibold text-foreground`;
 export const THREAD_DETAILS_PANEL_ROW_CLASS = `${CONTROL} w-full justify-start ${ROW_SURFACE}`;
+/** A child agent's two-line lineage row: flat until hovered, sized for a 26px avatar tile. */
+export const THREAD_DETAILS_PANEL_AGENT_ROW_CLASS = `min-h-11 w-full min-w-0 justify-start gap-2.5 rounded-lg border-0 py-1 ps-2 pe-3 text-left whitespace-normal text-foreground ${ROW_SURFACE}`;
 export const THREAD_DETAILS_PANEL_SELECT_ROW_CLASS = `${CONTROL} w-full justify-start bg-thread-details-well shadow-well-control pe-2 [&_[data-slot=select-icon]]:ms-auto [&_[data-slot=select-icon]]:flex [&_[data-slot=select-icon]]:shrink-0`;
 export const THREAD_DETAILS_PANEL_LOCKED_ROW_CLASS = `${CONTROL} flex w-full items-center justify-start bg-thread-details-well shadow-well-control`;
 export const THREAD_DETAILS_PANEL_ICON_CLASS = "size-3.5 shrink-0";

@@ -6,6 +6,7 @@ import type { ComponentProps } from "react";
 import { cn } from "~/lib/utils";
 import { Button } from "../ui/button";
 import {
+  THREAD_DETAILS_PANEL_AGENT_ROW_CLASS,
   THREAD_DETAILS_PANEL_ROW_CLASS,
   THREAD_DETAILS_PANEL_SELECT_ROW_CLASS,
   THREAD_DETAILS_PANEL_SPLIT_PRIMARY_CLASS,
@@ -19,6 +20,7 @@ import { ChevronDownIcon } from "lucide-react";
 
 const parts = {
   row: THREAD_DETAILS_PANEL_ROW_CLASS,
+  agent: THREAD_DETAILS_PANEL_AGENT_ROW_CLASS,
   link: "h-auto w-fit border-0 bg-transparent p-0 -mt-1 text-secondary-copy-medium font-semibold text-code-foreground underline decoration-border underline-offset-3",
   select: THREAD_DETAILS_PANEL_SELECT_ROW_CLASS,
   context: `${THREAD_DETAILS_PANEL_SELECT_ROW_CLASS} disabled:bg-thread-details-well disabled:text-foreground disabled:shadow-well-control`,

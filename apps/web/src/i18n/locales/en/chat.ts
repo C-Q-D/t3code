@@ -828,8 +828,8 @@ export const chat = {
     completeARunInThisForkBefore: "Complete a run in this fork before merging it back",
     mergeThisConversationBackIntoItsSource: "Merge this conversation back into its source",
     stopSubagent: "Stop subagent",
-    /** Formats the running related agent count. */
-    lineageRunning: (count: number): string => `Lineage · ${count} running`,
+    /** Formats the running related agent count shown beside the Lineage heading. */
+    runningCount: (count: number): string => `${count} running`,
     /** Names the related thread role to open. */
     openRelated: (relationship: string): string =>
       `Open ${relationship.toLowerCase()} in this chat`,
