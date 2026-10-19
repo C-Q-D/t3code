@@ -51,6 +51,8 @@ html[data-theme-id="graphite"] .stone-base::before {
   z-index: -2;
   background: var(--stone-background-image, url("../assets/dusk-ridges.svg")) center / cover
     no-repeat;
+  /* Fill image alpha before applying layer opacity, so 100% also makes transparent PNGs opaque. */
+  background-color: var(--background);
   opacity: var(--glass-opacity, 80%);
 }
 
