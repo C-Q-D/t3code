@@ -385,7 +385,9 @@ export function QueuedRunsControl({
                   onClick={() => setExpanded(true)}
                 >
                   <ListOrderedIcon className="size-3.25" aria-hidden="true" />
-                  <span ref={collapsedCountRef}>{t.chat.queue.count(items.length)}</span>
+                  <span ref={index === 0 ? collapsedCountRef : undefined}>
+                    {t.chat.queue.count(items.length)}
+                  </span>
                 </button>
               ) : null}
               {canReorder && rowRunId !== null && rowServerIndex !== null ? (

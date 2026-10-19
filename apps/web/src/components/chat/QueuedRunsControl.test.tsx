@@ -41,6 +41,8 @@ vi.mock("../../assets/assetUrls", () => ({
     resources.map((resource) => `https://assets.test/${resource.attachmentId}`),
 }));
 
+import { setPhysicsEnabled } from "../../lib/motion/preference";
+import { installTestRaf } from "../../lib/motion/testRaf";
 import { QueuedRunsControl } from "./QueuedRunsControl";
 import { ComposerPrimaryActions } from "./ComposerPrimaryActions";
 import { ComposerSubmissionStateContext } from "./composerSubmissionState";
@@ -66,6 +68,7 @@ afterEach(async () => {
   root = undefined;
   container?.remove();
   container = undefined;
+  setPhysicsEnabled(false);
   vi.unstubAllGlobals();
 });
 
@@ -127,6 +130,59 @@ describe("QueuedRunsControl attachments and edit mode", () => {
         ],
       },
     ],
+  });
+
+  it("pops only the visible collapsed count when a second message arrives", async () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    const clock = installTestRaf();
+    setPhysicsEnabled(true);
+    state.projection = { projection: { messages: [] } };
+    state.workflow = workflowWithAttachment();
+    container = document.createElement("div");
+    document.body.append(container);
+    root = createRoot(container);
+    const renderQueue = () =>
+      root?.render(
+        <QueuedRunsControl
+          environmentId={"environment:test" as never}
+          threadId={"thread:test" as never}
+          optimisticMessages={[]}
+          editingRunId={null}
+          onEditQueuedRun={() => undefined}
+          onCancelEdit={() => undefined}
+        />,
+      );
+    await act(async () => renderQueue());
+    await act(async () =>
+      container!
+        .querySelector<HTMLButtonElement>('button[aria-label="Collapse queued messages"]')!
+        .click(),
+    );
+    state.projection = { projection: { messages: [] } };
+    const workflow = workflowWithAttachment();
+    state.workflow = {
+      ...workflow,
+      queuedRuns: [
+        ...workflow.queuedRuns,
+        {
+          run: { id: "run:second", userMessageId: "message:second" },
+          text: "Second message",
+          attachments: [],
+        },
+      ],
+    };
+    await act(async () => renderQueue());
+    clock.advance(0);
+    const visible = container.querySelector<HTMLSpanElement>(
+      'li:not(.hidden) button[aria-label="Expand queued messages"] > span',
+    )!;
+    const hidden = container.querySelector<HTMLSpanElement>(
+      'li.hidden button[aria-label="Expand queued messages"] > span',
+    )!;
+    expect(visible).not.toBeNull();
+    expect(hidden).not.toBeNull();
+    expect(visible.style.transform).toMatch(/^scale\(1\.\d+\)$/);
+    expect(hidden.style.transform).toBe("");
   });
 
   it("expands the queue when edit is chosen from the collapsed row", async () => {
