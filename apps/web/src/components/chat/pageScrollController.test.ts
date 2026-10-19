@@ -43,6 +43,7 @@ class TestClock {
     },
   };
 
+  /** Return the number of queued animation callbacks without advancing the clock. */
   get pendingFrames() {
     return this.animationFrames.size;
   }
