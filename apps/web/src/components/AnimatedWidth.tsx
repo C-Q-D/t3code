@@ -1,8 +1,10 @@
+/** Keeps inline content measurable while its outer width transitions between values. */
 import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
 
 import { observeResize } from "~/lib/observeResize";
 import { cn } from "~/lib/utils";
 
+/** Animate children to their observed width; className controls the outer inline container. */
 export function AnimatedWidth({
   children,
   className,
@@ -26,7 +28,7 @@ export function AnimatedWidth({
     <span
       data-slot="animated-width"
       className={cn(
-        "inline-block overflow-hidden transition-[width] duration-150 ease-out motion-reduce:transition-none",
+        "inline-block overflow-hidden transition-[width] legacy:duration-150 legacy:ease-out legacy:motion-reduce:transition-none physics:duration-(--motion-settle-duration) physics:ease-(--ease-settle)",
         className,
       )}
       style={width === null ? undefined : { width }}

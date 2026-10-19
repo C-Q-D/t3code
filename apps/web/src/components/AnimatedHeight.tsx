@@ -1,10 +1,14 @@
+/** Measures content height and clips only while its size transition is active. */
 "use client";
 
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { observeResize } from "../lib/observeResize";
+import { usePhysicsMotion } from "../hooks/usePhysicsMotion";
+import { MOTION_SETTLE_DURATION_MS } from "../lib/motion/springToLinear";
 
 const HEIGHT_TRANSITION_FALLBACK_MS = 250;
 
+/** Animate children to their measured height; holdHeight retains the previous size during loading. */
 export function AnimatedHeight({
   children,
   holdHeight = false,
@@ -13,6 +17,7 @@ export function AnimatedHeight({
   /** Retain the previous content height while a replacement is loading. */
   readonly holdHeight?: boolean;
 }) {
+  const { enabled: physics } = usePhysicsMotion();
   const contentRef = useRef<HTMLDivElement>(null);
   const [heightState, setHeightState] = useState<{
     readonly height: number | null;
@@ -21,13 +26,17 @@ export function AnimatedHeight({
 
   useEffect(() => {
     if (!heightState.isClipping) return;
-    const timeoutId = window.setTimeout(() => {
-      setHeightState((currentState) =>
-        currentState.isClipping ? { ...currentState, isClipping: false } : currentState,
-      );
-    }, HEIGHT_TRANSITION_FALLBACK_MS);
+    // Keep the existing 50ms guard beyond the chosen curve before uncovering content.
+    const timeoutId = window.setTimeout(
+      () => {
+        setHeightState((currentState) =>
+          currentState.isClipping ? { ...currentState, isClipping: false } : currentState,
+        );
+      },
+      physics ? MOTION_SETTLE_DURATION_MS + 50 : HEIGHT_TRANSITION_FALLBACK_MS,
+    );
     return () => window.clearTimeout(timeoutId);
-  }, [heightState.height, heightState.isClipping]);
+  }, [heightState.height, heightState.isClipping, physics]);
 
   useLayoutEffect(() => {
     if (holdHeight) return;
@@ -80,7 +89,7 @@ export function AnimatedHeight({
   return (
     <div
       data-slot="animated-height"
-      className="transition-[height] duration-200 ease-out motion-reduce:transition-none [overflow-clip-margin:2px]"
+      className="transition-[height] legacy:duration-200 legacy:ease-out legacy:motion-reduce:transition-none physics:duration-(--motion-settle-duration) physics:ease-(--ease-settle) [overflow-clip-margin:2px]"
       style={
         heightState.height === null
           ? undefined

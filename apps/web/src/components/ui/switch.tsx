@@ -40,7 +40,7 @@ function Switch({
     >
       <SwitchPrimitive.Thumb
         className={cn(
-          "pointer-events-none block h-(--switch-thumb) w-[calc(var(--switch-thumb)+var(--switch-press-extra))] shrink-0 rounded-full bg-fg-control-disabled shadow-switch-thumb group-not-data-disabled/switch:group-hover/switch:bg-placeholder group-not-data-disabled/switch:group-active/switch:bg-placeholder group-not-data-disabled/switch:group-active/switch:shadow-none group-focus-visible/switch:shadow-none data-disabled:shadow-none",
+          "pointer-events-none block physics:transition-[translate] physics:duration-(--motion-snap-duration) physics:ease-(--ease-snap) h-(--switch-thumb) w-[calc(var(--switch-thumb)+var(--switch-press-extra))] shrink-0 rounded-full bg-fg-control-disabled shadow-switch-thumb group-not-data-disabled/switch:group-hover/switch:bg-placeholder group-not-data-disabled/switch:group-active/switch:bg-placeholder group-not-data-disabled/switch:group-active/switch:shadow-none group-focus-visible/switch:shadow-none data-disabled:shadow-none",
           !mixed &&
             "data-checked:translate-x-[calc(var(--switch-travel)-var(--switch-press-extra))] data-checked:bg-message-action-foreground data-checked:shadow-switch-thumb-on group-not-data-disabled/switch:group-hover/switch:data-checked:bg-message-action-foreground group-not-data-disabled/switch:group-hover/switch:data-checked:shadow-none group-not-data-disabled/switch:group-active/switch:data-checked:bg-message-action-foreground group-not-data-disabled/switch:group-active/switch:data-checked:shadow-none data-checked:data-disabled:shadow-none data-checked:group-focus-visible/switch:shadow-none",
           mixed &&

@@ -163,7 +163,12 @@ export function ColorSaturationValuePlane({
         </label>
       ))}
       <span
-        className="pointer-events-none absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_0_0_1px_rgb(0_0_0/0.4)]"
+        className={cn(
+          "pointer-events-none absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_0_0_1px_rgb(0_0_0/0.4)]",
+          // Inline legacy transitions remain unchanged; only keyboard steps override timing.
+          thumbTransition &&
+            "physics:duration-(--color-thumb-motion-duration)! physics:ease-(--color-thumb-motion-ease)!",
+        )}
         style={{
           left: `calc(${value.s} * (100% - 0.75rem) + 0.375rem)`,
           top: `calc(${1 - value.v} * (100% - 0.75rem) + 0.375rem)`,
@@ -215,7 +220,12 @@ export function ColorHueSlider({
         className="h-2.5 w-full rounded-full bg-[linear-gradient(to_right,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)] shadow-[inset_0_0_0_1px_rgb(0_0_0_/_12%)]"
       />
       <span
-        className="pointer-events-none absolute top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_0_0_1px_rgb(0_0_0/0.4)]"
+        className={cn(
+          "pointer-events-none absolute top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_0_0_1px_rgb(0_0_0/0.4)]",
+          // Inline legacy transitions remain unchanged; only keyboard steps override timing.
+          thumbTransition &&
+            "physics:duration-(--color-thumb-motion-duration)! physics:ease-(--color-thumb-motion-ease)!",
+        )}
         style={{
           left: `calc(${value / 360} * (100% - 1rem) + 0.5rem)`,
           backgroundColor: `hsl(${value} 100% 50%)`,

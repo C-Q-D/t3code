@@ -669,7 +669,7 @@ function Toasts({ position, stack }: { position: ToastPosition; stack?: "stone" 
                   : undefined
               }
               className={cn(
-                "dropdown-glass absolute z-[calc(9999-var(--toast-index))] w-full overflow-visible select-none rounded-overlay text-foreground text-shadow-stone [transition:transform_.5s_cubic-bezier(.22,1,.36,1),opacity_.5s,height_.15s]",
+                "dropdown-glass absolute z-[calc(9999-var(--toast-index))] w-full overflow-visible select-none rounded-overlay text-foreground text-shadow-stone legacy:[transition:transform_.5s_cubic-bezier(.22,1,.36,1),opacity_.5s,height_.15s] physics:transition-[transform,opacity,height] physics:duration-(--toast-motion-duration) physics:ease-(--toast-motion-ease) physics:data-ending-style:data-swipe-direction:duration-(--toast-exit-motion-duration) physics:data-ending-style:data-swipe-direction:ease-(--toast-exit-motion-ease)",
                 // Base positioning using data-position
                 "data-[position*=right]:right-0 data-[position*=right]:left-auto",
                 "data-[position*=left]:right-auto data-[position*=left]:left-0",
@@ -829,7 +829,7 @@ function AnchoredToasts() {
                 <Toast.Root
                   data-appearance={toast.data?.appearance}
                   className={cn(
-                    "dropdown-glass relative overflow-visible rounded-overlay text-foreground text-shadow-stone transition-[scale,opacity] data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0",
+                    "dropdown-glass relative overflow-visible rounded-overlay text-foreground text-shadow-stone transition-[scale,opacity] physics:transition-[width,height,scale,opacity] physics:duration-(--popup-motion-duration) physics:ease-(--popup-motion-ease) data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0",
                   )}
                   data-slot="toast-popup"
                   toast={toast}

@@ -10,6 +10,12 @@
   --dialog-motion-ease: var(--ease-settle), linear, var(--ease-settle);
   --sheet-motion-duration: 120ms, var(--motion-settle-duration);
   --sheet-motion-ease: linear, var(--ease-settle);
+  --toast-motion-duration: var(--motion-settle-duration), 120ms, var(--motion-settle-duration);
+  --toast-motion-ease: var(--ease-settle), linear, var(--ease-settle);
+  --toast-exit-motion-duration: var(--motion-fling-duration), 120ms, var(--motion-settle-duration);
+  --toast-exit-motion-ease: var(--ease-fling), linear, var(--ease-settle);
+  --color-thumb-motion-duration: var(--motion-snap-duration), var(--motion-snap-duration), 80ms;
+  --color-thumb-motion-ease: var(--ease-snap), var(--ease-snap), linear;
 }
 
 /* Preserve caller-supplied inline sheet timing in legacy mode. Physics must also
@@ -359,7 +365,8 @@ body:has([data-onboarding-route]) [data-titlebar-brand] {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  [data-stack="stone"][data-position]:not([data-slot="toast-viewport"]) {
+  :where(:root:not([data-physics="on"]))
+    [data-stack="stone"][data-position]:not([data-slot="toast-viewport"]) {
     transition: none;
   }
 }
