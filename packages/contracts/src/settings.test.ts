@@ -24,6 +24,24 @@ const decodeServerSettingsPatch = Schema.decodeUnknownSync(ServerSettingsPatch);
 const encodeServerSettings = Schema.encodeSync(ServerSettings);
 const decodeClaudeSettings = Schema.decodeUnknownSync(ClaudeSettings);
 
+describe("ClientSettings physics motion", () => {
+  it("defaults to on when no preference is saved", () => {
+    expect(decodeClientSettings({})).toHaveProperty("physicsMotion", "on");
+  });
+
+  it.each(["on", "system", "off"])("preserves the %s preference", (physicsMotion) => {
+    expect(decodeClientSettingsPatch({ physicsMotion })).toEqual({ physicsMotion });
+    expect(encodeClientSettings(decodeClientSettings({ physicsMotion }))).toMatchObject({
+      physicsMotion,
+    });
+  });
+
+  it.each(["fast", true, 1])("rejects unsupported preference %s", (physicsMotion) => {
+    expect(() => decodeClientSettingsPatch({ physicsMotion })).toThrow();
+    expect(() => decodeClientSettings({ physicsMotion })).toThrow();
+  });
+});
+
 describe("ServerSettings response streaming", () => {
   it("defaults to paragraph buffering", () => {
     expect(decodeServerSettings({}).responseStreamingMode).toBe("paragraph");

@@ -122,6 +122,11 @@ export const PanelAnimationDurationMs = Schema.Int.check(
 );
 export type PanelAnimationDurationMs = typeof PanelAnimationDurationMs.Type;
 const DEFAULT_PANEL_ANIMATION_DURATION_MS: PanelAnimationDurationMs = 0;
+/** Local motion preference: explicit on overrides reduced motion; system follows it. */
+export const PhysicsMotionMode = Schema.Literals(["on", "system", "off"]);
+/** Persisted client preference, independent of the legacy panel duration. */
+export type PhysicsMotionMode = typeof PhysicsMotionMode.Type;
+export const DEFAULT_PHYSICS_MOTION_MODE: PhysicsMotionMode = "on";
 /**
  * Font size preferences, in CSS pixels. The ranges are deliberately narrow:
  * the interface size scales every rem-based dimension in the app, so the
@@ -337,6 +342,9 @@ export const ClientSettingsSchema = Schema.Struct({
   // layout work on every frame, which is noticeable on lower-power clients.
   panelAnimationDurationMs: PanelAnimationDurationMs.pipe(
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_PANEL_ANIMATION_DURATION_MS)),
+  ),
+  physicsMotion: PhysicsMotionMode.pipe(
+    Schema.withDecodingDefault(Effect.succeed(DEFAULT_PHYSICS_MOTION_MODE)),
   ),
   browserDefaultViewport: PreviewViewportSetting.pipe(
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_BROWSER_VIEWPORT)),
@@ -1698,6 +1706,7 @@ export const ClientSettingsPatch = Schema.Struct({
   loadBalancingWeights: Schema.optionalKey(LoadBalancingWeights),
   appearanceContrast: Schema.optionalKey(AppearanceContrast),
   panelAnimationDurationMs: Schema.optionalKey(PanelAnimationDurationMs),
+  physicsMotion: Schema.optionalKey(PhysicsMotionMode),
   browserDefaultViewport: Schema.optionalKey(PreviewViewportSetting),
   browserDefaultZoomFactor: Schema.optionalKey(PreviewZoomFactor),
   browserDefaultAppearance: Schema.optionalKey(PreviewAppearancePreference),
