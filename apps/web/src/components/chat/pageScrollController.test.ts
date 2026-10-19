@@ -1,6 +1,8 @@
 /** Keyboard scrolling contracts, using injected frame time without a browser or real sleeps. */
-import { afterEach, beforeEach, describe, expect, test } from "vite-plus/test";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
 
+import { activeJobs, onLoop, run } from "../../lib/motion/loop";
+import { installTestRaf } from "../../lib/motion/testRaf";
 import { setPhysicsEnabled } from "../../lib/motion/preference";
 
 import {
@@ -14,24 +16,22 @@ import {
   PAGE_SCROLL_MAX_MULTIPLIER,
 } from "./pageScrollController";
 
+afterEach(() => {
+  setPhysicsEnabled(false);
+  vi.unstubAllGlobals();
+});
+
 /** Deterministic timer and frame queues shared by both scrolling modes. */
 class TestClock {
   private currentTime = 0;
   private nextHandle = 1;
-  private animationFrames = new Map<number, FrameRequestCallback>();
+  private frames = installTestRaf();
   private timeouts = new Map<number, { at: number; callback: () => void }>();
 
   readonly env = {
     now: () => this.currentTime,
-    requestAnimationFrame: (callback: FrameRequestCallback) => {
-      const handle = this.nextHandle;
-      this.nextHandle += 1;
-      this.animationFrames.set(handle, callback);
-      return handle;
-    },
-    cancelAnimationFrame: (handle: number) => {
-      this.animationFrames.delete(handle);
-    },
+    requestAnimationFrame: (callback: FrameRequestCallback) => this.frames.request(callback),
+    cancelAnimationFrame: (handle: number) => cancelAnimationFrame(handle),
     setTimeout: (callback: () => void, delay: number) => {
       const handle = this.nextHandle;
       this.nextHandle += 1;
@@ -45,7 +45,7 @@ class TestClock {
 
   /** Return the number of queued animation callbacks without advancing the clock. */
   get pendingFrames() {
-    return this.animationFrames.size;
+    return this.frames.pending.size;
   }
 
   /** Advance milliseconds and flush due timers before each frame, like the browser boundary. */
@@ -55,10 +55,11 @@ class TestClock {
     while (this.currentTime < target) {
       this.currentTime = Math.min(target, this.currentTime + frameMs);
       this.flushTimeouts();
-      this.flushAnimationFrames();
+      this.frames.advance(this.currentTime);
     }
   }
 
+  /** Run all due timers, including timers made due by callbacks, without advancing time. */
   private flushTimeouts() {
     let hasDueTimeouts = true;
     while (hasDueTimeouts) {
@@ -73,19 +74,6 @@ class TestClock {
         timeout.callback();
         hasDueTimeouts = true;
       }
-    }
-  }
-
-  private flushAnimationFrames() {
-    if (this.animationFrames.size === 0) {
-      return;
-    }
-
-    const frames = [...this.animationFrames.values()];
-    this.animationFrames.clear();
-
-    for (const callback of frames) {
-      callback(this.currentTime);
     }
   }
 }
@@ -315,6 +303,48 @@ describe.each([false, true])("createPageScrollController physics=%s", (physics) 
 describe("physical page targets", () => {
   beforeEach(() => setPhysicsEnabled(true));
   afterEach(() => setPhysicsEnabled(false));
+
+  test.each(["natural rest", "disable", "dispose"])(
+    "shares one frame with other motion and cleans up on %s",
+    (ending) => {
+      const clock = new TestClock();
+      const counts: number[] = [];
+      const unsubscribe = onLoop((count) => counts.push(count));
+      const container = {
+        clientHeight: 600,
+        scrollHeight: 10000,
+        scrollTop: 0,
+        getBoundingClientRect: () => ({ height: 600 }),
+      };
+      const controller = createPageScrollController({
+        getContainer: () => container,
+        getScrollPaddingBottomPx: () => 24,
+        env: clock.env,
+      });
+      const cancelOther = run(() => false);
+      try {
+        controller.handleKeyDown("PageDown");
+        controller.handleKeyUp("PageDown");
+        expect(activeJobs()).toBe(2);
+        expect(counts.at(-1)).toBe(2);
+        expect(clock.pendingFrames).toBe(1);
+        clock.advanceBy(16);
+        expect(container.scrollTop).toBeGreaterThan(0);
+        expect(activeJobs()).toBe(1);
+        expect(clock.pendingFrames).toBe(1);
+        if (ending === "disable") setPhysicsEnabled(false);
+        else if (ending === "dispose") controller.dispose();
+        else clock.advanceBy(2000);
+        expect(activeJobs()).toBe(0);
+        expect(counts.at(-1)).toBe(0);
+        expect(clock.pendingFrames).toBe(0);
+      } finally {
+        controller.dispose();
+        cancelOther();
+        unsubscribe();
+      }
+    },
+  );
 
   test("zero page distance never registers a frame", () => {
     const clock = new TestClock();

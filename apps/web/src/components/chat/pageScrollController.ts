@@ -1,4 +1,5 @@
 /** Page-key scrolling owns a single physical target, with the original timed path when disabled. */
+import { run } from "../../lib/motion/loop";
 import { isPhysicsEnabled, onPhysicsChange } from "../../lib/motion/preference";
 import { Spring } from "../../lib/motion/spring";
 import { TOKENS } from "../../lib/motion/tokens";
@@ -153,7 +154,8 @@ function easeInOut(progress: number): number {
 
 /**
  * Own page-key scrolling until release or disposal; getContainer supplies the current timeline.
- * Padding is in CSS pixels, onScrollStart fires once per press, and env owns time and cancellation.
+ * Padding is in CSS pixels and onScrollStart fires once per press. env supplies time and legacy
+ * scheduling; physical frames and elapsed seconds come from the shared motion loop.
  * A physical release settles smoothly; dispose cancels all work without moving the container.
  */
 export function createPageScrollController({
@@ -275,31 +277,30 @@ export function createPageScrollController({
     spring: new Spring({ token: TOKENS.settle, precision: 0.1 }),
     container: null as PageScrollContainer | null,
     key: null as PageScrollKey | null,
-    frame: 0,
-    lastTime: 0,
+    cancelJob: null as (() => void) | null,
     holdAt: 0,
     unsubscribe: null as (() => void) | null,
   };
 
   const stopPhysical = () => {
-    if (physical.frame) env.cancelAnimationFrame(physical.frame);
-    physical.frame = 0;
+    physical.cancelJob?.();
+    physical.cancelJob = null;
     physical.key = null;
     physical.container = null;
     physical.unsubscribe?.();
     physical.unsubscribe = null;
   };
 
-  const physicalStep = (now: number) => {
-    physical.frame = 0;
+  const physicalStep = (dt: number) => {
+    const now = env.now();
     const container = physical.container;
     if (!container || getContainer() !== container || readPageScrollDistance(container) <= 0) {
       stopPhysical();
-      return;
+      return false;
     }
     const max = Math.max(0, container.scrollHeight - container.clientHeight);
     const clamp = (value: number) => Math.max(0, Math.min(max, value));
-    const elapsedMs = Math.max(0, Math.min(50, now - physical.lastTime));
+    const elapsedMs = dt * 1000;
     if (physical.key && now > physical.holdAt) {
       const holdMs = Math.min(elapsedMs, now - physical.holdAt);
       physical.spring.target +=
@@ -310,10 +311,9 @@ export function createPageScrollController({
           pageScrollDistancePx: readPageScrollDistance(container),
         });
     }
-    physical.lastTime = now;
     physical.spring.target = clamp(physical.spring.target);
     const distance = physical.spring.target - physical.spring.value;
-    let moving = physical.spring.step(elapsedMs / 1000);
+    let moving = physical.spring.step(dt);
     // Finite integration steps can cross a braking target even with critical damping.
     if (distance * (physical.spring.target - physical.spring.value) <= 0) {
       physical.spring.jump(physical.spring.target);
@@ -327,9 +327,9 @@ export function createPageScrollController({
     container.scrollTop = atBoundary ? physical.spring.value : value;
     if (atBoundary || (!moving && physical.key === null)) {
       stopPhysical();
-      return;
+      return false;
     }
-    physical.frame = env.requestAnimationFrame(physicalStep);
+    return true;
   };
 
   const startPhysical = (key: PageScrollKey, container: PageScrollContainer) => {
@@ -351,12 +351,11 @@ export function createPageScrollController({
       Math.min(max, physical.spring.target + readPageScrollDistance(container) * getDirection(key)),
     );
     onScrollStart?.(key);
-    if (!physical.frame) {
-      physical.lastTime = env.now();
+    if (!physical.cancelJob) {
       physical.unsubscribe = onPhysicsChange((enabled) => {
         if (!enabled) stopPhysical();
       });
-      physical.frame = env.requestAnimationFrame(physicalStep);
+      physical.cancelJob = run(physicalStep);
     }
   };
 
