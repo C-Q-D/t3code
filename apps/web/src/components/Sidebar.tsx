@@ -36,7 +36,6 @@ import {
   type Modifier,
 } from "@dnd-kit/core";
 import { SortableContext, useSortable } from "@dnd-kit/sortable";
-import { restrictToFirstScrollableAncestor, restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { CSS } from "@dnd-kit/utilities";
 import {
   canSnooze,
@@ -242,7 +241,7 @@ import { resolveLocalCheckoutBranchMismatch } from "./BranchToolbar.logic";
 import {
   createSidebarCollisionDetection,
   createSidebarSortingStrategy,
-  restrictBelowSidebarLabel,
+  restrictSidebarDrag,
 } from "./Sidebar.drag";
 import { SidebarDragLifecycle, SidebarPointerSensor } from "./Sidebar.pointer";
 import { createSidebarListMotion } from "./Sidebar.motion";
@@ -3518,7 +3517,7 @@ export default function Sidebar() {
   const threadListRef = useRef<HTMLUListElement | null>(null);
   const dragLabelOffsetRef = useRef(0);
   const restrictBelowPins = useCallback<Modifier>(
-    (args) => restrictBelowSidebarLabel(args, dragLabelOffsetRef.current),
+    (args) => restrictSidebarDrag(args, dragLabelOffsetRef.current),
     [],
   );
   const listMotionRef = useRef<ReturnType<typeof createSidebarListMotion> | null>(null);
@@ -3545,15 +3544,18 @@ export default function Sidebar() {
   const dragTargetSection = isContextDrag ? null : (dragState?.targetSection ?? null);
   const dragSensorRef = useRef<SidebarPointerSensor | null>(null);
   const contextDragKeyRef = useRef<string | null>(null);
-  const finishThreadDrag = useCallback((started: boolean) => {
-    dragSensorRef.current = null;
-    contextDragKeyRef.current = null;
-    endThreadContextDrag();
-    if (started) {
-      listMotionRef.current?.release();
-      setDragState(null);
-    }
-  }, []);
+  const finishThreadDrag = useCallback(
+    (started: boolean, velocity?: { x: number; y: number }, row?: HTMLElement | null) => {
+      dragSensorRef.current = null;
+      contextDragKeyRef.current = null;
+      endThreadContextDrag();
+      if (started) {
+        listMotionRef.current?.release(velocity, row);
+        setDragState(null);
+      }
+    },
+    [],
+  );
   const attachDragSensor = useCallback((sensor: SidebarPointerSensor) => {
     dragSensorRef.current = sensor;
   }, []);
@@ -5148,7 +5150,7 @@ export default function Sidebar() {
         sensors={dndSensors}
         autoScroll={!isContextDrag}
         collisionDetection={dndCollisionDetection}
-        modifiers={[restrictToVerticalAxis, restrictBelowPins, restrictToFirstScrollableAncestor]}
+        modifiers={[restrictBelowPins]}
         onDragStart={handleThreadDragStart}
         onDragOver={handleThreadDragOver}
         onDragEnd={handleThreadDragEnd}

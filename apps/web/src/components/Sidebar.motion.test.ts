@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
+/** Release momentum, legacy animations and visual-only edge elasticity on measured rows. */
 import { createSidebarListMotion } from "./Sidebar.motion";
+import { readOffset, offsetOf } from "../lib/motion/elementOffset";
+import { setPhysicsEnabled } from "../lib/motion/preference";
+import { installTestRaf } from "../lib/motion/testRaf";
+import { createSidebarCollisionDetection, restrictSidebarDrag } from "./Sidebar.drag";
+import type { Modifier } from "@dnd-kit/core";
+import { Spring } from "../lib/motion/spring";
 
 class TestAnimation {
   progress: number | null = 0;
@@ -37,7 +44,12 @@ class TestRow {
     public offsetHeight = 82,
   ) {}
   getBoundingClientRect() {
-    return { top: this.offsetTop + this.dragTranslate, height: this.offsetHeight };
+    const offset = readOffset(this as unknown as HTMLElement);
+    return {
+      left: this.offsetLeft + offset.x,
+      top: this.offsetTop + this.dragTranslate + offset.y,
+      height: this.offsetHeight,
+    };
   }
   setAttribute(name: string, value: string) {
     this.removeAttribute(name);
@@ -102,9 +114,109 @@ function expectMove(row: TestRow, offset: number) {
 }
 
 beforeEach(() => vi.stubGlobal("HTMLElement", TestRow));
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  setPhysicsEnabled(false);
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 describe("sidebar list motion", () => {
+  it("compresses edge travel once while collision ranking stays at the hard boundary", () => {
+    setPhysicsEnabled(true);
+    const rect = (top: number, height: number) => ({
+      top,
+      bottom: top + height,
+      height,
+      left: 0,
+      right: 100,
+      width: 100,
+    });
+    const active = {
+      id: "source",
+      data: { current: {} },
+      rect: { current: { initial: rect(100, 40), translated: null } },
+    };
+    const args: Parameters<Modifier>[0] = {
+      active,
+      activatorEvent: null,
+      activeNodeRect: rect(100, 40),
+      draggingNodeRect: rect(100, 40),
+      containerNodeRect: rect(0, 500),
+      overlayNodeRect: null,
+      over: null,
+      scrollableAncestors: [],
+      scrollableAncestorRects: [rect(0, 500)],
+      windowRect: null,
+      transform: { x: 0, y: 460, scaleX: 1, scaleY: 1 },
+    };
+    const small = restrictSidebarDrag(args, 32).y;
+    const large = restrictSidebarDrag({ ...args, transform: { ...args.transform, y: 560 } }, 32).y;
+    expect(small).toBeGreaterThan(360);
+    expect(large).toBeGreaterThan(small);
+    expect(large - small).toBeLessThan(small - 360);
+    expect(large).toBeLessThan(860);
+    const detector = createSidebarCollisionDetection(() => true);
+    const targets = [rect(460, 40), rect(540, 40)];
+    const collisions = detector({
+      active,
+      collisionRect: rect(100 + large, 40),
+      pointerCoordinates: { x: 20, y: 680 },
+      droppableRects: new Map([
+        ["last", targets[0]!],
+        ["past-edge", targets[1]!],
+      ]),
+      droppableContainers: targets.map((target, i) => ({
+        id: i === 0 ? "last" : "past-edge",
+        key: String(i),
+        disabled: false,
+        data: { current: {} },
+        node: { current: null },
+        rect: { current: target },
+      })),
+    });
+    expect(collisions[0]?.id).toBe("last");
+    const top = restrictSidebarDrag({ ...args, transform: { ...args.transform, y: -168 } }, 32).y;
+    expect(top).toBeLessThan(-68);
+    expect(top).toBeGreaterThan(-168);
+    setPhysicsEnabled(false);
+    expect(restrictSidebarDrag(args, 32).y).toBe(360);
+    expect(restrictSidebarDrag({ ...args, transform: { ...args.transform, y: -168 } }, 32).y).toBe(
+      -68,
+    );
+  });
+  it("hands release momentum to a fling spring while peers settle even with reduced motion", () => {
+    installTestRaf();
+    setPhysicsEnabled(true);
+    const [a, b, c] = [new TestRow("a"), new TestRow("b"), new TestRow("c")];
+    const { motion, layout, media } = fixture([a, b, c]);
+    motion.update(true);
+    media.matches = true;
+    const useToken = vi.spyOn(Spring.prototype, "use");
+    a.dragTranslate = 130;
+    c.dragTranslate = 16;
+    motion.release({ x: 0, y: 600 }, a as unknown as HTMLElement);
+    layout([b, a, c]);
+    a.dragTranslate = c.dragTranslate = 0;
+    motion.update(true);
+    expect(a.style.transform).toBe("translate(0.00px, 47.00px)");
+    const source = offsetOf(a as unknown as HTMLElement);
+    const peer = offsetOf(c as unknown as HTMLElement);
+    expect(source.y.velocity).toBe(600);
+    expect(peer.y.velocity).toBe(0);
+    expect(
+      useToken.mock.calls.findLast((_, index) => useToken.mock.contexts[index] === source.y),
+    ).toEqual([{ response: 0.46, damping: 0.8 }]);
+    expect(
+      useToken.mock.calls.findLast((_, index) => useToken.mock.contexts[index] === peer.y),
+    ).toEqual([{ response: 0.4, damping: 1 }]);
+    // One real integration step distinguishes fling damping from settle.
+    source.y.step(0.016);
+    peer.y.step(0.016);
+    expect(source.y.value).toBeGreaterThan(50);
+    expect(peer.y.value).toBeLessThan(16);
+    expect(a.animate).not.toHaveBeenCalled();
+    motion.dispose();
+  });
   it("moves a retained Active row into Settled with its displaced peers", () => {
     const pinnedHeader = new TestRow("Pinned", 0);
     const pinned = new TestRow("pin");

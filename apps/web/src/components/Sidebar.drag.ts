@@ -1,6 +1,9 @@
 /** Sidebar drag hit testing and measured layout projection; lifecycle commands belong to Sidebar. */
 import { closestCenter, type CollisionDetection, type Modifier } from "@dnd-kit/core";
 import { verticalListSortingStrategy, type SortingStrategy } from "@dnd-kit/sortable";
+import { restrictToFirstScrollableAncestor, restrictToVerticalAxis } from "@dnd-kit/modifiers";
+import { isPhysicsEnabled } from "../lib/motion/preference";
+import { rubber } from "../lib/motion/project";
 import {
   resolveSidebarDropTarget,
   sidebarListItemId,
@@ -12,6 +15,27 @@ import {
 
 const stationary = { x: 0, y: 0, scaleX: 1, scaleY: 1 };
 const hidden = { ...stationary, scaleY: 0 };
+const elasticOffsets = new WeakMap<object, { visual: number; pointer: number }>();
+/** Compose the original bounds, then compress the total rejected travel once for display.
+ * Offset is Pins clearance in CSS pixels. Collision detection removes this visual-only stretch.
+ */
+export function restrictSidebarDrag(args: Parameters<Modifier>[0], offset: number) {
+  const vertical = restrictToVerticalAxis(args);
+  const below = restrictBelowSidebarLabel({ ...args, transform: vertical }, offset);
+  const clipped = restrictToFirstScrollableAncestor({ ...args, transform: below });
+  if (!isPhysicsEnabled()) {
+    if (args.active) elasticOffsets.delete(args.active);
+    return clipped;
+  }
+  const excess = vertical.y - clipped.y;
+  const dimension = Math.max(
+    1,
+    args.scrollableAncestorRects[0]?.height ?? args.containerNodeRect?.height ?? 1,
+  );
+  const visual = rubber(excess, dimension);
+  if (args.active) elasticOffsets.set(args.active, { visual, pointer: excess });
+  return { ...clipped, y: clipped.y + visual };
+}
 type ThreadItem = Extract<SidebarListItem, { kind: "thread" }>;
 type Layout = Parameters<SortingStrategy>[0];
 const isShelfHeader = (item: SidebarListItem | undefined) =>
@@ -45,6 +69,22 @@ export function createSidebarCollisionDetection(
   let previousPointerY = options.activationY;
   let boundarySection: "pinned" | "active" | undefined;
   return (args) => {
+    const elastic = isPhysicsEnabled() ? elasticOffsets.get(args.active) : undefined;
+    if (elastic) {
+      // dnd-kit feeds the visual rectangle back into collision detection. Remove
+      // stretch here so a decorative overshoot cannot cross a semantic boundary.
+      args = {
+        ...args,
+        collisionRect: {
+          ...args.collisionRect,
+          top: args.collisionRect.top - elastic.visual,
+          bottom: args.collisionRect.bottom - elastic.visual,
+        },
+        pointerCoordinates: args.pointerCoordinates
+          ? { ...args.pointerCoordinates, y: args.pointerCoordinates.y - elastic.pointer }
+          : null,
+      };
+    }
     let collisions = closestCenter(args);
     const pointer = args.pointerCoordinates;
     const items = options.items;

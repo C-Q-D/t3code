@@ -1,4 +1,8 @@
+/** Owns sidebar pointer lifetime and release velocity; modifiers own elastic bounds. */
 import { useLayoutEffect, type PointerEvent as ReactPointerEvent } from "react";
+import { VelocityTracker } from "../lib/motion/velocity";
+import type { Point } from "../lib/motion/project";
+import { isPhysicsEnabled } from "../lib/motion/preference";
 import { type SensorProps } from "@dnd-kit/core";
 import { getOwnerDocument, getWindow } from "@dnd-kit/utilities";
 
@@ -11,11 +15,11 @@ export function SidebarDragLifecycle({ onUnmount }: { onUnmount: () => void }) {
 type Options = {
   distance: number;
   onAttach: (sensor: SidebarPointerSensor) => void;
-  onFinish: (started: boolean) => void;
+  onFinish: (started: boolean, velocity?: Point, row?: HTMLElement | null) => void;
   /** Return true to claim the move: the sort gesture then ignores this pointer position. */
   onMove?: (point: { x: number; y: number }) => boolean;
   /** Return true when the release was consumed elsewhere, so the sort is cancelled. */
-  onDrop?: (point: { x: number; y: number }) => boolean;
+  onDrop?: (point: Point, velocity?: Point) => boolean;
 };
 
 /** A sidebar gesture ends on release, cancellation, or loss of its window.
@@ -33,6 +37,7 @@ export class SidebarPointerSensor {
   private readonly pointer: PointerEvent;
   private readonly document: Document;
   private readonly window: Window;
+  private readonly velocity = new VelocityTracker();
 
   // The settle sweep constructs this sensor directly, outside dnd-kit, so it
   // takes only the props the gesture reads.
@@ -40,6 +45,7 @@ export class SidebarPointerSensor {
     this.pointer = props.event as PointerEvent;
     this.document = getOwnerDocument(this.pointer.target);
     this.window = getWindow(this.pointer.target);
+    this.velocity.add(this.pointer.clientX, this.pointer.clientY);
     this.document.addEventListener("pointermove", this.move, { passive: false, capture: true });
     this.document.addEventListener("pointerup", this.end, { capture: true });
     this.document.addEventListener("pointercancel", this.pointerCancel, { capture: true });
@@ -69,10 +75,11 @@ export class SidebarPointerSensor {
   private move = (event: PointerEvent) => {
     if (this.phase === "finished" || event.pointerId !== this.pointer.pointerId) return;
     const coordinates = { x: event.clientX, y: event.clientY };
+    this.velocity.add(coordinates.x, coordinates.y);
     // Desktop can report buttons=0 on the final move before pointerup. Let an
     // active context drag drop there before cancelling the sidebar sort.
     if ((event.buttons & 1) === 0) {
-      if (this.phase === "dragging") this.props.options.onDrop?.(coordinates);
+      if (this.phase === "dragging") this.drop(coordinates);
       return this.cancel();
     }
     if (this.phase === "pending") {
@@ -107,8 +114,7 @@ export class SidebarPointerSensor {
   private end = (event: PointerEvent) => {
     if (event.pointerId !== this.pointer.pointerId) return;
     const dropped =
-      this.phase === "dragging" &&
-      this.props.options.onDrop?.({ x: event.clientX, y: event.clientY }) === true;
+      this.phase === "dragging" && this.drop({ x: event.clientX, y: event.clientY }) === true;
     this.finish(dropped);
   };
   private pointerCancel = (event: PointerEvent) => {
@@ -121,6 +127,13 @@ export class SidebarPointerSensor {
     if (this.document.hidden) this.cancel();
   };
   cancel = () => this.finish(true);
+
+  /** Deliver momentum only in physics mode; legacy callbacks keep their original argument shape. */
+  private drop(point: Point) {
+    return isPhysicsEnabled()
+      ? this.props.options.onDrop?.(point, this.velocity.velocity())
+      : this.props.options.onDrop?.(point);
+  }
 
   private finish(cancelled: boolean) {
     if (this.phase === "finished") return;
@@ -147,7 +160,18 @@ export class SidebarPointerSensor {
     try {
       // Release the sidebar preview before dnd-kit clears its transforms.
       // Its public end/cancel event can be omitted before its first layout.
-      this.props.options.onFinish(!aborted);
+      const target = this.pointer.target;
+      const row =
+        target && target instanceof Element
+          ? target.closest<HTMLElement>("li[data-thread-item]")
+          : null;
+      if (isPhysicsEnabled())
+        this.props.options.onFinish(
+          !aborted,
+          cancelled ? { x: 0, y: 0 } : this.velocity.velocity(),
+          row,
+        );
+      else this.props.options.onFinish(!aborted);
     } finally {
       if (aborted) this.props.onAbort(this.props.active);
       if (cancelled) this.props.onCancel();

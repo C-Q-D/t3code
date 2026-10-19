@@ -1,3 +1,9 @@
+/** Owns list transforms between gestures; dnd-kit owns them while the sensor is active. */
+import { clearOffset, flip, readOffset } from "../lib/motion/elementOffset";
+import { isPhysicsEnabled } from "../lib/motion/preference";
+import { tokenFor, type Point } from "../lib/motion/project";
+import { TOKENS } from "../lib/motion/tokens";
+
 const motionTiming = { duration: 150, easing: "ease-out" };
 // Rows normally ride their displaced neighbour's travel. Absent a moving
 // neighbour, a row still travels on its own, clamped so a tall card does not
@@ -32,18 +38,25 @@ export function createSidebarListMotion(parent: HTMLUListElement) {
   // Visual tops at drag release, relative to the list, so the release
   // commit can glide every row from where dnd-kit left it into its slot.
   let released: Map<HTMLElement, number> | null = null;
+  let releaseVelocity: Point = { x: 0, y: 0 };
+  let releasedNode: HTMLElement | null = null;
+  const physical = new Set<HTMLElement>();
 
   const remainingOffset = (node: HTMLElement) => {
     const current = running.get(node);
     const run = current ? current.offset * (1 - progress(current.animation)) : 0;
     const entry = entering.get(node);
     const enter = entry ? entry.travel * (1 - progress(entry.animation)) : 0;
-    return run + enter;
+    return run + enter + readOffset(node).y;
   };
   const clearFades = () => {
     for (const entry of entering.values()) entry.animation.cancel();
     for (const animation of exiting.values()) animation.cancel();
-    for (const node of exiting.keys()) node.remove();
+    for (const node of exiting.keys()) {
+      clearOffset(node);
+      physical.delete(node);
+      node.remove();
+    }
     entering.clear();
     exiting.clear();
   };
@@ -82,16 +95,26 @@ export function createSidebarListMotion(parent: HTMLUListElement) {
     const entry = entering.get(node);
     const entryProgress = entry ? progress(entry.animation) : 1;
     const animation = clone.animate(
-      [
-        { opacity: entryProgress, transform: "translateY(0px)" },
-        { opacity: 0, transform: `translateY(${travel}px)` },
-      ],
+      isPhysicsEnabled()
+        ? [{ opacity: entryProgress }, { opacity: 0 }]
+        : [
+            { opacity: entryProgress, transform: "translateY(0px)" },
+            { opacity: 0, transform: `translateY(${travel}px)` },
+          ],
       motionTiming,
     );
+    if (isPhysicsEnabled()) {
+      const rect = clone.getBoundingClientRect();
+      clone.style.top = `${position.top + remainingOffset(node) + travel}px`;
+      flip(clone, rect);
+      physical.add(clone);
+    }
     exiting.set(clone, animation);
     animation.addEventListener(
       "finish",
       () => {
+        clearOffset(clone);
+        physical.delete(clone);
         clone.remove();
         exiting.delete(clone);
       },
@@ -106,14 +129,28 @@ export function createSidebarListMotion(parent: HTMLUListElement) {
   const suspend = () => {
     for (const node of running.keys()) cancel(node);
     clearFades();
+    for (const node of physical) clearOffset(node);
+    physical.clear();
     positions = null;
     released = null;
+    releasedNode = null;
   };
-  const move = (node: HTMLElement, offset: number) => {
+  const move = (node: HTMLElement, offset: number, velocity?: Point) => {
     cancel(node);
     const entry = entering.get(node);
     // The newer transform supersedes entry travel; its original opacity keeps fading.
     if (entry) entry.travel = 0;
+    if (isPhysicsEnabled()) {
+      const rect = node.getBoundingClientRect();
+      flip(
+        node,
+        { left: rect.left, top: rect.top - readOffset(node).y + offset },
+        velocity ? tokenFor(velocity.y) : TOKENS.settle,
+        velocity,
+      );
+      physical.add(node);
+      return;
+    }
     if (offset === 0 && !entry) return;
     const animation = node.animate(
       [{ transform: `translateY(${offset}px)` }, { transform: "translateY(0px)" }],
@@ -157,7 +194,7 @@ export function createSidebarListMotion(parent: HTMLUListElement) {
       const shouldAnimate =
         animate &&
         positions !== null &&
-        !reducedMotion?.matches &&
+        !(!isPhysicsEnabled() && reducedMotion?.matches) &&
         fadeCount <= MAX_FADED_ROWS_PER_UPDATE;
       const movedDelta = new Map<HTMLElement, number>();
       const nextOrder = [...next.keys()];
@@ -201,6 +238,12 @@ export function createSidebarListMotion(parent: HTMLUListElement) {
       for (const node of running.keys()) {
         if (!shouldAnimate || !next.has(node)) cancel(node);
       }
+      for (const node of physical) {
+        if ((!shouldAnimate || !next.has(node)) && !exiting.has(node)) {
+          clearOffset(node);
+          physical.delete(node);
+        }
+      }
       if (shouldAnimate) {
         for (const [index, node] of nextOrder.entries()) {
           const position = next.get(node)!;
@@ -210,13 +253,16 @@ export function createSidebarListMotion(parent: HTMLUListElement) {
               const delta = ridingDelta(nextOrder, index, (n) => positions!.has(n));
               const travel = delta === undefined ? -rowTravel(position.height) : delta;
               const animation = node.animate(
-                [
-                  { opacity: 0, transform: `translateY(${travel}px)` },
-                  { opacity: 1, transform: "translateY(0px)" },
-                ],
+                isPhysicsEnabled()
+                  ? [{ opacity: 0 }, { opacity: 1 }]
+                  : [
+                      { opacity: 0, transform: `translateY(${travel}px)` },
+                      { opacity: 1, transform: "translateY(0px)" },
+                    ],
                 motionTiming,
               );
-              entering.set(node, { animation, travel });
+              entering.set(node, { animation, travel: isPhysicsEnabled() ? 0 : travel });
+              if (isPhysicsEnabled()) move(node, travel);
               animation.addEventListener(
                 "finish",
                 () => {
@@ -234,22 +280,28 @@ export function createSidebarListMotion(parent: HTMLUListElement) {
         }
       }
       if (released !== null) {
-        if (!reducedMotion?.matches) {
+        if (!(!isPhysicsEnabled() && reducedMotion?.matches)) {
           for (const [node, position] of next) {
             const top = released.get(node);
-            if (top !== undefined) move(node, top - position.top);
+            if (top !== undefined)
+              move(node, top - position.top, node === releasedNode ? releaseVelocity : undefined);
           }
         }
         released = null;
+        releasedNode = null;
       }
       positions = next;
     },
     /** Called on drag release, before the commit that clears dnd-kit's
      * transforms. Takes every row's visual top, including the lifted row
      * under the pointer and the peers holding the label gaps open, so the
-     * next update glides each of them into its committed slot. */
-    release() {
+     * next update glides each of them into its committed slot.
+     * velocity is viewport px/s; node is the lifted list row, or null for legacy callers.
+     * Only that row inherits momentum; displaced peers use settle without an impulse. */
+    release(velocity: Point = { x: 0, y: 0 }, node: HTMLElement | null = null) {
       suspend();
+      releaseVelocity = velocity;
+      releasedNode = node;
       const origin = parent.getBoundingClientRect().top;
       released = new Map(
         Array.from(parent.children)
