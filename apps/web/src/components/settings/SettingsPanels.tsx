@@ -2,6 +2,7 @@
 import { SettingsGroup } from "./SettingsGroup";
 import { LanguageSetting } from "./LanguageSetting";
 import { t } from "~/i18n";
+import { usePhysicsMotion } from "~/hooks/usePhysicsMotion";
 import { SNOOZE_UI_ENABLED } from "~/snoozeUi";
 import { useScopedSettingsWriteAllowed } from "./useScopedSettings";
 import { Spinner } from "~/components/ui/spinner";
@@ -1231,8 +1232,7 @@ export function AppearanceSettingsPanel() {
   const panelAnimationDurationRatio =
     (settings.panelAnimationDurationMs - MIN_PANEL_ANIMATION_DURATION_MS) /
     (MAX_PANEL_ANIMATION_DURATION_MS - MIN_PANEL_ANIMATION_DURATION_MS);
-  // T3 will use L0's usePhysicsMotion to respect reduced motion in system mode.
-  const physicsMotionEnabled = settings.physicsMotion !== "off";
+  const { enabled: physicsMotionEnabled } = usePhysicsMotion();
   const panelAnimationDurationSliderStyle = {
     "--settings-slider-progress": `${panelAnimationDurationRatio * 100}%`,
     "--settings-slider-fill-offset": `${0.5 - panelAnimationDurationRatio}rem`,

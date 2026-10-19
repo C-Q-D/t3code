@@ -1,4 +1,6 @@
+/** Mounts renderer-wide providers and services independently of route lifetimes. */
 import { RouterProvider } from "@tanstack/react-router";
+import { PhysicsMotionRoot } from "./components/PhysicsMotionRoot";
 
 import { BrowserProfileReporter } from "./browser/BrowserProfileReporter";
 import { ElectronBrowserHost } from "./browser/ElectronBrowserHost";
@@ -14,6 +16,7 @@ import type { AppRouter } from "./router";
 export function AppRoot({ router }: { readonly router: AppRouter }) {
   return (
     <AppAtomRegistryProvider>
+      <PhysicsMotionRoot />
       <RouterProvider router={router} />
       <ElectronBrowserHost />
       <BrowserProfileReporter />

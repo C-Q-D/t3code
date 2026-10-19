@@ -151,7 +151,7 @@ function PreviewPanelShellFrame(
         isInline && props.standalone && open && !maximized && "ms-(--frame-slab-gap)",
         collapsible &&
           !props.standalone &&
-          "[[data-panel-animations=true]_&]:transition-[width] [[data-panel-animations=true]_&]:duration-(--panel-animation-duration) [[data-panel-animations=true]_&]:ease-out",
+          "[[data-panel-animations=true]_&]:transition-[width] [[data-panel-animations=true]_&]:duration-(--panel-animation-duration) [[data-panel-animations=true]_&]:ease-(--panel-animation-easing)",
         collapsible &&
           !props.standalone &&
           open &&

@@ -295,8 +295,11 @@ function ProjectProjectionRetention() {
 export function AppSidebarLayout({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const legacySidebarEnabled = useLegacySidebarEnabled();
-  const { active: panelAnimationsActive, durationMs: panelAnimationDurationMs } =
-    usePanelAnimationSettings();
+  const {
+    active: panelAnimationsActive,
+    durationMs: panelAnimationDurationMs,
+    easing: panelAnimationEasing,
+  } = usePanelAnimationSettings();
   // Settings routes show the settings nav in place of whichever thread
   // sidebar is active.
   // Seeds server-side visited tracking from this browser's localStorage the
@@ -350,6 +353,7 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
   const sidebarProviderStyle = {
     "--sidebar-width": `${clampThreadSidebarWidth(sidebarWidth, sidebarMinimumWidth, sidebarMaximumWidth)}px`,
     "--panel-animation-duration": `${panelAnimationDurationMs}ms`,
+    "--panel-animation-easing": panelAnimationEasing,
     ...windowControlsInsetStyle,
   } as CSSProperties;
 

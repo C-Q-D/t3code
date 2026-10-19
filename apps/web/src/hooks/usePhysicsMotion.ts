@@ -1,5 +1,6 @@
 /** Read client preference and hydration without publishing global state during render. */
-import { resolvePhysicsMotion, type PhysicsMotionMode } from "../lib/motion/preference";
+import type { PhysicsMotionMode } from "@t3tools/contracts/settings";
+import { resolvePhysicsMotion } from "../lib/motion/preference";
 import { useMediaQuery } from "./useMediaQuery";
 import { useClientSettings, useClientSettingsHydrated } from "./useSettings";
 

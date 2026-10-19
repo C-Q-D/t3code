@@ -119,7 +119,7 @@ html[data-theme-id="graphite"] [data-frame-main] {
   [data-app-shell][data-panel-animations="true"] .window-frame-workspace > [data-variant="frame"] {
     transition:
       display var(--panel-animation-duration) allow-discrete,
-      margin-inline-start var(--panel-animation-duration) ease-out;
+      margin-inline-start var(--panel-animation-duration) var(--panel-animation-easing);
   }
 
   @starting-style {
@@ -147,10 +147,15 @@ html[data-theme-id="graphite"] [data-frame-main] {
   /* The hook normally closes the animation gate too; this covers a preference
      change immediately, including a transition already running in the renderer. */
   @media (prefers-reduced-motion: reduce) {
-    [data-app-shell][data-panel-animations="true"]
+    :root:not([data-physics="on"])
+      [data-app-shell][data-panel-animations="true"]
       .window-frame-workspace:has(> [data-variant="frame"][data-collapsible="offcanvas"]),
-    [data-app-shell][data-panel-animations="true"] .window-frame-workspace > [data-variant="frame"],
-    [data-app-shell][data-panel-animations="true"]
+    :root:not([data-physics="on"])
+      [data-app-shell][data-panel-animations="true"]
+      .window-frame-workspace
+      > [data-variant="frame"],
+    :root:not([data-physics="on"])
+      [data-app-shell][data-panel-animations="true"]
       .window-frame-workspace
       > [data-variant="frame"]
       > [data-slot] {
@@ -271,8 +276,8 @@ html[data-theme-id="graphite"] [data-frame-main] {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .frame-sidebar-drawer-backdrop,
-  .frame-sidebar-drawer {
+  :root:not([data-physics="on"]) .frame-sidebar-drawer-backdrop,
+  :root:not([data-physics="on"]) .frame-sidebar-drawer {
     transition: none;
     transform: none;
   }

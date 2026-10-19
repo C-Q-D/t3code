@@ -3,10 +3,12 @@ import { t } from "~/i18n";
 import { type CSSProperties, useState } from "react";
 
 import { cn } from "~/lib/utils";
+import { usePhysicsMotion } from "~/hooks/usePhysicsMotion";
 
-/** Shows panel travel using the configured duration in milliseconds, including zero and reduced motion. */
+/** Previews the effective physics curve or legacy duration in milliseconds after a user click. */
 export function PanelAnimationsPreview({ durationMs }: { durationMs: number }) {
   const [panelsOpen, setPanelsOpen] = useState(true);
+  const { enabled: physics } = usePhysicsMotion();
   return (
     <button
       type="button"
@@ -14,7 +16,12 @@ export function PanelAnimationsPreview({ durationMs }: { durationMs: number }) {
       aria-label={t.settings.panelAnimationsPreview.replayPanelAnimationPreview}
       aria-pressed={panelsOpen}
       onClick={() => setPanelsOpen((open) => !open)}
-      style={{ "--preview-duration": `${durationMs}ms` } as CSSProperties}
+      style={
+        {
+          "--preview-duration": physics ? "var(--motion-settle-duration)" : `${durationMs}ms`,
+          "--preview-easing": physics ? "var(--ease-settle)" : "ease-out",
+        } as CSSProperties
+      }
     >
       <span aria-hidden className="absolute top-2 left-3 font-mono text-meta text-placeholder">
         {t.settings.appearance.preview}
@@ -23,7 +30,8 @@ export function PanelAnimationsPreview({ durationMs }: { durationMs: number }) {
       <span
         aria-hidden
         className={cn(
-          "settings-motion-panel absolute top-2 right-2.5 bottom-2 rounded-settings-motion-panel bg-secondary shadow-settings-motion-panel transition-transform duration-(--preview-duration) ease-out motion-reduce:transition-none",
+          "settings-motion-panel absolute top-2 right-2.5 bottom-2 rounded-settings-motion-panel bg-secondary shadow-settings-motion-panel transition-transform duration-(--preview-duration) ease-(--preview-easing)",
+          !physics && "motion-reduce:transition-none",
           panelsOpen ? "translate-x-0" : "translate-x-full",
         )}
       />

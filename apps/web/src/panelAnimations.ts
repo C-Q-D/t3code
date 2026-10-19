@@ -1,8 +1,11 @@
+/** Resolves panel motion preferences and suppresses transitions while route state is restored. */
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { type PanelAnimationDurationMs } from "@t3tools/contracts/settings";
 
 import { useMediaQuery } from "./hooks/useMediaQuery";
 import { useClientSettings } from "./hooks/useSettings";
+import { usePhysicsMotion } from "./hooks/usePhysicsMotion";
+import { MOTION_SETTLE_DURATION_MS } from "./lib/motion/springToLinear";
 
 const PanelAnimationSuppressionContext = createContext(false);
 
@@ -31,14 +34,23 @@ export function usePanelNavigationSuppression(navigationKey: string): boolean {
   return suppressed;
 }
 
+/** Returns panel timing and permission; navigation suppression applies to both motion modes. */
 export function usePanelAnimationSettings(): {
   active: boolean;
   durationMs: PanelAnimationDurationMs;
+  physics: boolean;
+  easing: string;
 } {
   const durationMs = useClientSettings((settings) => settings.panelAnimationDurationMs);
   const prefersReducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   const suppressed = useContext(PanelAnimationSuppressionContext);
-  return { active: durationMs > 0 && !prefersReducedMotion && !suppressed, durationMs };
+  const { enabled: physics } = usePhysicsMotion();
+  return {
+    active: physics ? !suppressed : durationMs > 0 && !prefersReducedMotion && !suppressed,
+    durationMs: physics ? MOTION_SETTLE_DURATION_MS : durationMs,
+    physics,
+    easing: physics ? "var(--ease-settle)" : "ease-out",
+  };
 }
 
 /** Keeps closing panel content mounted until its opt-in transition ends. */
