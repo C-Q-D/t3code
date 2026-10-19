@@ -47,7 +47,7 @@ and worktree while you stay in the new thread composer. This requires a Git proj
 
 Pin a thread from its menu to keep it above your active work.
 
-On web and desktop, unpinning, settling, snoozing, and archiving a thread each show
+On web and desktop, unpinning, settling, and archiving a thread each show
 a notification with **Undo** for five seconds. Undo restores the thread's previous
 state, including its pinned position, and reopens an archived thread you were
 viewing. Discarding an unsent draft from the sidebar works the same way: Undo brings
@@ -62,18 +62,17 @@ files directly; see [Attach files](./composer.md#attach-files).
 On web and desktop, pinning or unpinning a thread keeps the sidebar at your current
 scroll position instead of following the thread to its new place in the list.
 
-Pinning does not prevent automatic settlement. Settling a thread removes its pin.
+Pinned threads are never settled automatically. Settling a thread yourself removes its pin.
 
 On web and desktop, drag a thread between sections to change its state. Drag a thread up into
 the pinned section to pin it at the spot you drop it; drag a pinned thread down into the active
 list to unpin it. Dragging a thread onto the **Settled** header settles it, and dragging a settled
-thread into the active list un-settles it. A snoozed thread can be dragged out of the snoozed
-shelf, which wakes it, but threads cannot be dragged into the shelf because snoozing needs a wake
-time. Dragging a pinned thread out of the pinned section does not ask for unpin confirmation.
+thread into the active list un-settles it. Dragging a pinned thread out of the pinned section
+does not ask for unpin confirmation.
 Pinned and active boundary labels appear only while dragging, without moving the rows. The
 other rows slide aside to show where the thread will land. When you cross into another section,
 the dragged thread shows the action the drop performs, with its icon: **Pin**, **Unpin**,
-**Settle**, **Un-settle**, or **Wake**. Its status and hover actions hide during the drag. A pinned
+**Settle**, or **Un-settle**. Its status and hover actions hide during the drag. A pinned
 thread keeps its pin only while it stays in the pinned section; once it leaves, the badge takes
 over. Reordering within the same section shows no badge. When there are no pins, drag to the top
 edge to pin a thread. Section labels stay readable for the whole drag, and the section the
@@ -90,7 +89,7 @@ or **Settled** to drag a parked thread back into either live section. Each drop 
 saves the order, so it survives a refresh and appears on your other connected devices.
 
 On web and desktop, the list also animates section changes made with thread actions such as
-**Pin**, **Settle**, and **Snooze**. These transitions respect your system's reduced-motion
+**Pin** and **Settle**. These transitions respect your system's reduced-motion
 preference. While dragging, rows follow the insertion gap without replaying a second transition
 after the drop.
 
@@ -124,6 +123,16 @@ device keeps its own choice.
 While this is on, the active list is ordered by when each thread last came back to you, so you
 cannot drag or move threads within it. Your saved order returns when you turn it off.
 
+## See today's work
+
+On web and desktop, the top button of the project rail opens **Today**: threads from
+every project that you sent a message to since local midnight. **AI replying** lists
+threads the agent is still working on, including ones waiting for background work to
+wake them. **Needs you** lists the rest, including threads waiting for an approval or
+answer. Each day starts fresh at midnight; a thread that is still running or waiting
+for you stays until it finishes. Leaving Today only hides a thread from this view.
+Right-click the button to choose a single project instead.
+
 ## Settle finished work
 
 Choose **Settle thread** from its menu to move finished work out of the active list
@@ -143,7 +152,7 @@ closes when the command succeeds and stays open when it fails.
 
 On web and desktop, press a thread's **Settle** button and drag up or down to
 settle every thread in that section between it and the one you release on.
-The **Un-settle** and **Wake** buttons work the same way in their sections.
+The **Un-settle** button works the same way in the settled list.
 Press `Escape` while dragging to cancel.
 
 By default, environments settle inactive threads after three days and settle
@@ -156,8 +165,8 @@ finished background work or a pull request watch starts on its own does not.
 
 To keep one thread out of the settled shelf no matter how long it sits idle, open its menu,
 choose **Auto-settle behavior**, and pick **Disabled**. The current option is checked. Pick
-**Enabled** to return to the usual rules. Manual settle, snooze, and archive still work while it
-is disabled.
+**Enabled** to return to the usual rules. Manual settle and archive still work while it is
+disabled.
 
 Change these rules in **Settings → General** on web and desktop, or **Settings → Thread behavior** on mobile.
 They continue to run when your apps are closed. On web and desktop, choose an environment at the
@@ -207,7 +216,7 @@ The environment must be running when the reset arrives; it resumes overdue
 continuations after a restart. Sending a new message, archiving, or settling the
 thread prevents a pending continuation from starting.
 
-Choose **Snooze until reset** to hide the thread until its allowance returns.
+On mobile, choose **Snooze until reset** to hide the thread until its allowance returns.
 Snooze and auto-resume are independent: snooze alone wakes the thread without
 sending a message; enabling both wakes and continues it. **Wake now** cancels
 the snooze. Enable **Snooze limited threads** in thread behavior settings to
@@ -227,7 +236,10 @@ finishes; the call's own result shows its status.
 
 ## Snooze until later
 
-Choose **Snooze → Custom…** from a thread's menu to pick a date and time in your
-local time zone, or a duration in minutes, hours, or days. Durations start when
-you confirm; one day means 24 hours. On web and desktop, you can also snooze
-several selected threads together. Choose **Wake thread** to bring a thread back early.
+Snooze is available on mobile. Web and desktop do not show snooze controls, and a
+thread snoozed elsewhere appears there as an active thread.
+
+On mobile, choose **Snooze → Custom…** from a thread's menu to pick a date and time
+in your local time zone, or a duration in minutes, hours, or days. Durations start
+when you confirm; one day means 24 hours. Choose **Wake thread** to bring a thread
+back early.
