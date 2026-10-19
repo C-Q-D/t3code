@@ -234,7 +234,9 @@ it("keeps native surface bounds aligned while the shell rebounds at the wall", a
   await act(async () => {
     renderer = create(<Harness />, {
       createNodeMock: (element) =>
-        element.props["data-browser-surface-slot"]
+        typeof element.props === "object" &&
+        element.props !== null &&
+        "data-browser-surface-slot" in element.props
           ? {
               // The browser's measured rect follows the transformed shell; the real slot owns remeasurement.
               getBoundingClientRect: () => displayedFrame(),
