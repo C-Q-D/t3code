@@ -5,7 +5,10 @@ import { type CSSProperties, useState } from "react";
 import { cn } from "~/lib/utils";
 import { usePhysicsMotion } from "~/hooks/usePhysicsMotion";
 
-/** Previews the effective physics curve or legacy duration in milliseconds after a user click. */
+/**
+ * Previews the physics curve or legacy duration in milliseconds after a user click.
+ * The legacy curve uses Tailwind's ease-out token, not the different CSS ease-out keyword.
+ */
 export function PanelAnimationsPreview({ durationMs }: { durationMs: number }) {
   const [panelsOpen, setPanelsOpen] = useState(true);
   const { enabled: physics } = usePhysicsMotion();
@@ -19,7 +22,7 @@ export function PanelAnimationsPreview({ durationMs }: { durationMs: number }) {
       style={
         {
           "--preview-duration": physics ? "var(--motion-settle-duration)" : `${durationMs}ms`,
-          "--preview-easing": physics ? "var(--ease-settle)" : "ease-out",
+          "--preview-easing": physics ? "var(--ease-settle)" : "var(--ease-out)",
         } as CSSProperties
       }
     >

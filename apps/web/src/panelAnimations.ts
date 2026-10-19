@@ -34,7 +34,11 @@ export function usePanelNavigationSuppression(navigationKey: string): boolean {
   return suppressed;
 }
 
-/** Returns panel timing and permission; navigation suppression applies to both motion modes. */
+/**
+ * Returns panel timing and permission; navigation suppression applies to both motion modes.
+ * Non-physics easing preserves Tailwind's ease-out token for utility-class consumers.
+ * Frame CSS owns its separate legacy CSS keyword curve and must not use this token.
+ */
 export function usePanelAnimationSettings(): {
   active: boolean;
   durationMs: PanelAnimationDurationMs;
@@ -49,7 +53,7 @@ export function usePanelAnimationSettings(): {
     active: physics ? !suppressed : durationMs > 0 && !prefersReducedMotion && !suppressed,
     durationMs: physics ? MOTION_SETTLE_DURATION_MS : durationMs,
     physics,
-    easing: physics ? "var(--ease-settle)" : "ease-out",
+    easing: physics ? "var(--ease-settle)" : "var(--ease-out)",
   };
 }
 

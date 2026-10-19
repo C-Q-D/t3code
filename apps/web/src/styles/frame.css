@@ -119,7 +119,16 @@ html[data-theme-id="graphite"] [data-frame-main] {
   [data-app-shell][data-panel-animations="true"] .window-frame-workspace > [data-variant="frame"] {
     transition:
       display var(--panel-animation-duration) allow-discrete,
-      margin-inline-start var(--panel-animation-duration) var(--panel-animation-easing);
+      margin-inline-start var(--panel-animation-duration) ease-out;
+  }
+
+  /* Frame motion used the CSS keyword, not Tailwind's ease-out token. Keep that
+     legacy curve and selector weight; only explicit physics changes its timing. */
+  :where(:root[data-physics="on"])
+    [data-app-shell][data-panel-animations="true"]
+    .window-frame-workspace
+    > [data-variant="frame"] {
+    transition-timing-function: ease, var(--ease-settle);
   }
 
   @starting-style {
@@ -147,14 +156,14 @@ html[data-theme-id="graphite"] [data-frame-main] {
   /* The hook normally closes the animation gate too; this covers a preference
      change immediately, including a transition already running in the renderer. */
   @media (prefers-reduced-motion: reduce) {
-    :root:not([data-physics="on"])
+    :where(:root:not([data-physics="on"]))
       [data-app-shell][data-panel-animations="true"]
       .window-frame-workspace:has(> [data-variant="frame"][data-collapsible="offcanvas"]),
-    :root:not([data-physics="on"])
+    :where(:root:not([data-physics="on"]))
       [data-app-shell][data-panel-animations="true"]
       .window-frame-workspace
       > [data-variant="frame"],
-    :root:not([data-physics="on"])
+    :where(:root:not([data-physics="on"]))
       [data-app-shell][data-panel-animations="true"]
       .window-frame-workspace
       > [data-variant="frame"]
@@ -276,8 +285,8 @@ html[data-theme-id="graphite"] [data-frame-main] {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :root:not([data-physics="on"]) .frame-sidebar-drawer-backdrop,
-  :root:not([data-physics="on"]) .frame-sidebar-drawer {
+  :where(:root:not([data-physics="on"])) .frame-sidebar-drawer-backdrop,
+  :where(:root:not([data-physics="on"])) .frame-sidebar-drawer {
     transition: none;
     transform: none;
   }

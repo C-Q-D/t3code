@@ -102,7 +102,7 @@ describe("usePanelAnimationSettings", () => {
         active,
         physics: false,
         durationMs: duration,
-        easing: "ease-out",
+        easing: "var(--ease-out)",
       });
     },
   );
