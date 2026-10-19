@@ -6,11 +6,19 @@ import type {
   ThreadRuntimeSummary,
 } from "@t3tools/client-runtime/state/models";
 import { makeThreadFixture } from "../../test-fixtures";
-import { buildTodayView, startOfLocalDay } from "./todayView.logic";
+import { buildTodayView, startOfLocalDay, readTodayTab } from "./todayView.logic";
 
 const now = new Date(2026, 9, 19, 12).getTime();
 const yesterday = new Date(2026, 9, 18, 23, 59).toISOString();
 const today = new Date(2026, 9, 19, 0, 1).toISOString();
+
+it("keeps Today selections separate from project tabs and defaults to waiting", () => {
+  expect(readTodayTab("working")).toBe("working");
+  expect(readTodayTab("waiting")).toBe("waiting");
+  expect(readTodayTab(null)).toBe("waiting");
+  expect(readTodayTab("settled")).toBe("waiting");
+  expect(readTodayTab("later")).toBe("waiting");
+});
 
 /** Build a shell with explicit membership inputs and otherwise ordinary thread defaults. */
 function thread(id: string, overrides: Partial<EnvironmentThreadShell> = {}) {

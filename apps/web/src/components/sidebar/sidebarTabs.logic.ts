@@ -126,7 +126,7 @@ export function resolveSidebarTabView<T>(input: {
 /** Number only the first nine rows of the selected view, using scoped keys from getThreadKey.
  * Search views number their flat results; keyboard handlers and hints must share this mapping. */
 export function sidebarTabJumpNumbers<T>(
-  view: SidebarTabView<T>,
+  view: Pick<SidebarTabView<T>, "rows">,
   getThreadKey: (thread: T) => string,
 ): ReadonlyMap<string, number> {
   return new Map(view.rows.slice(0, 9).map((thread, index) => [getThreadKey(thread), index + 1]));

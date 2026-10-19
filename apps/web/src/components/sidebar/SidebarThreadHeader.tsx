@@ -16,10 +16,15 @@ import { discussionNavigationState } from "../discussions/discussionNavigation.l
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { visibleSidebarTabs, type SidebarTab } from "./sidebarTabs.logic";
 import { sidebarTabDropId } from "./SidebarThreadDndContext";
+import type { TodayTab } from "./todayView.logic";
 
-/** Register a real header target; eligible pointer hits use the same appearance as hover. */
-function SidebarDropTab({ tab, count }: { tab: SidebarTab; count: number }) {
-  const { setNodeRef, isOver } = useDroppable({ id: sidebarTabDropId(tab) });
+/** Render an existing segment; only project lifecycle tabs accept drops and show drop hover. */
+function SidebarDropTab({ tab, count }: { tab: SidebarTab | TodayTab; count: number }) {
+  const today = tab === "working" || tab === "waiting";
+  const { setNodeRef, isOver } = useDroppable({
+    id: today ? `sidebar-today-tab:${tab}` : sidebarTabDropId(tab),
+    disabled: today,
+  });
   return (
     <Toggle
       ref={setNodeRef}
@@ -29,7 +34,7 @@ function SidebarDropTab({ tab, count }: { tab: SidebarTab; count: number }) {
         isOver && "bg-secondary text-foreground",
       )}
     >
-      {t.sidebar.tabs[tab]}
+      {today ? t.sidebar.today.tabs[tab] : t.sidebar.tabs[tab]}
       <span className="font-mono text-meta">{count}</span>
     </Toggle>
   );
@@ -42,6 +47,12 @@ export interface SidebarThreadHeaderProps {
   currentTab: SidebarTab;
   tabCounts: Readonly<Record<SidebarTab, number>>;
   onTabChange: (tab: SidebarTab) => void;
+  /** Present Today using the same segments, with independent selection and disabled drop targets. */
+  today?: {
+    currentTab: TodayTab;
+    counts: Readonly<Record<TodayTab, number>>;
+    onTabChange: (tab: TodayTab) => void;
+  } | null;
   onOpenDiscussions: () => void;
   /** Receives the click so Shift+click can skip the project picker. */
   onNewThread: (event: ReactMouseEvent) => void;
@@ -68,6 +79,7 @@ export function SidebarThreadHeader({
   currentTab,
   tabCounts,
   onTabChange,
+  today,
   onOpenDiscussions,
   onNewThread,
   newThreadDisabled,
@@ -205,19 +217,24 @@ export function SidebarThreadHeader({
         </div>
       ) : (
         // Base UI supplies roving keyboard focus; this feature owns B1's 36px track and 30px items.
-        <ToggleGroup<SidebarTab>
+        <ToggleGroup<SidebarTab | TodayTab>
           aria-label={t.sidebar.tabs.ariaLabel}
-          value={[currentTab]}
+          value={[today?.currentTab ?? currentTab]}
           onValueChange={(values) => {
             const tab = values[0];
             // Clicking the current segment must not leave the list without a selected shelf.
-            if (tab) onTabChange(tab);
+            if (tab === "working" || tab === "waiting") today?.onTabChange(tab);
+            else if (tab) onTabChange(tab);
           }}
           className="mb-1.5 flex h-9 rounded-full bg-sidebar-control-surface p-0.75 text-secondary-copy-medium shadow-well-control"
         >
-          {visibleSidebarTabs().map((tab) => (
-            <SidebarDropTab key={tab} tab={tab} count={tabCounts[tab]} />
-          ))}
+          {today
+            ? (["working", "waiting"] as const).map((tab) => (
+                <SidebarDropTab key={tab} tab={tab} count={today.counts[tab]} />
+              ))
+            : visibleSidebarTabs().map((tab) => (
+                <SidebarDropTab key={tab} tab={tab} count={tabCounts[tab]} />
+              ))}
         </ToggleGroup>
       )}
     </div>

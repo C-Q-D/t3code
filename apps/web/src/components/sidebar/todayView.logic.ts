@@ -9,6 +9,15 @@ import {
   sortWorkingThreadsBySend,
 } from "@t3tools/client-runtime/state/thread-inbox";
 
+/** Today selections are separate from project lifecycle tabs and cannot be drop targets. */
+export type TodayTab = "working" | "waiting";
+export const TODAY_TAB_STORAGE_KEY = "t3code:sidebar-today-tab";
+
+/** Decode a raw Today preference; invalid and missing values open the user's waiting inbox. */
+export function readTodayTab(storedValue: string | null | undefined): TodayTab {
+  return storedValue === "working" ? "working" : "waiting";
+}
+
 /** Return local midnight in epoch milliseconds for the supplied clock value. */
 export function startOfLocalDay(now: number): number {
   const midnight = new Date(now);

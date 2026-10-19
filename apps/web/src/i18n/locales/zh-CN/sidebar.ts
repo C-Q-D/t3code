@@ -214,6 +214,10 @@ export const sidebar: Messages["sidebar"] = {
     searchingHint: "正在搜索对话消息…",
     empty: "未找到对话",
   },
+  today: {
+    tabs: { working: "AI 回复中", waiting: "等你处理" },
+    empty: { working: "今天没有正在回复的 AI。", waiting: "今天没有需要你处理的对话。" },
+  },
   tabs: {
     ariaLabel: "对话状态",
     active: "活跃",

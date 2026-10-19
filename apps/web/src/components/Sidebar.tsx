@@ -272,6 +272,12 @@ import { SidebarContent, useSidebar } from "./ui/sidebar";
 import { SidebarChromeFooter } from "./sidebar/SidebarChrome";
 import { SidebarThreadHeader } from "./sidebar/SidebarThreadHeader";
 import {
+  buildTodayView,
+  readTodayTab,
+  TODAY_TAB_STORAGE_KEY,
+  type TodayTab,
+} from "./sidebar/todayView.logic";
+import {
   SidebarThreadDndContext,
   type SidebarTabDropActions,
 } from "./sidebar/SidebarThreadDndContext";
@@ -2564,6 +2570,7 @@ export default function Sidebar() {
   // below, after the partition knows the boundary); the partition reads a
   // fresh clock whenever it recomputes.
   const [snoozeWakeTick, bumpSnoozeWakeTick] = useState(0);
+  const [todayTick, bumpTodayTick] = useState(0);
 
   // ProjectRail owns the picker; the list reads its shared persisted scope.
   // The selection lives in the persisted UI store next to the other sidebar
@@ -2580,6 +2587,18 @@ export default function Sidebar() {
       }),
     [persistedProjectScopeKey, projectGroups, projectGroupingSettings],
   );
+  const isTodayView = projectScopeKey === null;
+  useEffect(() => {
+    if (!isTodayView) return;
+    void todayTick;
+    // Advance the local calendar date rather than adding 24 hours across DST changes.
+    const midnight = new Date();
+    midnight.setDate(midnight.getDate() + 1);
+    midnight.setHours(0, 0, 0, 0);
+    const delayMs = Math.min(Math.max(0, midnight.getTime() - Date.now()) + 50, 2_147_483_647);
+    const id = window.setTimeout(() => bumpTodayTick((tick) => tick + 1), delayMs);
+    return () => window.clearTimeout(id);
+  }, [isTodayView, todayTick]);
   // Same-named projects on two machines are only told apart by where they
   // live, so rows on another machine carry its icon once the catalog spans
   // more than one environment; a single-machine catalog stays as it was.
@@ -2718,17 +2737,19 @@ export default function Sidebar() {
     snoozedThreads,
     settledThreads,
     snoozeNow,
+    todayRows,
   } = useMemo(() => {
     // Snooze classification uses a REAL clock, not the quantized minute:
     // wake times are second-precise and a woken thread must not linger on
     // the shelf for the rest of the minute. snoozeWakeTick re-runs this
     // memo exactly at the next wake boundary.
     void snoozeWakeTick;
+    void todayTick;
     const preciseNow = new Date().toISOString();
     // Subagent child threads live in the parent's Agents surface, not the
     // sidebar roster (v2 models them as real threads with lineage).
     const visible = filterSidebarV2VisibleThreads(threads, scopedProjectKeys);
-    inboxReturns.observe(workingShelfEnabled ? threads : null);
+    inboxReturns.observe(workingShelfEnabled || isTodayView ? threads : null);
     const pinned: EnvironmentThreadShell[] = [];
     const active: EnvironmentThreadShell[] = [];
     const working: EnvironmentThreadShell[] = [];
@@ -2798,6 +2819,9 @@ export default function Sidebar() {
       ? sortInboxThreadsByReturn(active, inboxReturns.returnedAt)
       : sortThreadsForSidebar(active);
     return {
+      todayRows: isTodayView
+        ? buildTodayView(visible, Date.parse(preciseNow), inboxReturns.returnedAt)
+        : { working: [], waiting: [] },
       pinnedThreads:
         optimisticDrop?.section !== "pinned" || optimisticDrop.order === null
           ? sortedPinned
@@ -2835,6 +2859,8 @@ export default function Sidebar() {
     snoozeWakeTick,
     threads,
     workingShelfEnabled,
+    isTodayView,
+    todayTick,
   ]);
 
   const threadSearchInputRef = useRef<HTMLInputElement>(null);
@@ -2915,6 +2941,28 @@ export default function Sidebar() {
       return readSidebarTab(null);
     }
   });
+  const [todayTab, setTodayTab] = useState(() => {
+    try {
+      return readTodayTab(window.localStorage.getItem(TODAY_TAB_STORAGE_KEY));
+    } catch (error) {
+      console.error("[SIDEBAR] Could not read the selected Today tab.", error);
+      return readTodayTab(null);
+    }
+  });
+  /** Persist Today separately so entering or leaving it preserves the project's lifecycle tab. */
+  const handleTodayTabChange = useCallback(
+    (tab: TodayTab) => {
+      clearSelection();
+      setTodayTab(tab);
+      try {
+        window.localStorage.setItem(TODAY_TAB_STORAGE_KEY, tab);
+      } catch (error) {
+        console.error("[SIDEBAR] Could not save the selected Today tab.", error);
+      }
+    },
+    [clearSelection],
+  );
+  const showDrafts = isTodayView ? todayTab === "waiting" : currentTab === "active";
   /** Select a shelf and persist its raw identifier; failed storage must not block navigation. */
   const handleSidebarTabChange = useCallback(
     (tab: SidebarTab) => {
@@ -2960,13 +3008,24 @@ export default function Sidebar() {
   );
   const sidebarView = useMemo(
     () =>
-      resolveSidebarTabView({
-        tabs: sidebarTabs,
-        currentTab,
-        searchQuery: threadSearchQuery,
-        searchResults: threadSearchResults,
-      }),
-    [sidebarTabs, currentTab, threadSearchQuery, threadSearchResults],
+      isTodayView && !isSearchingThreads
+        ? { mode: "today" as const, rows: todayRows[todayTab] }
+        : resolveSidebarTabView({
+            tabs: sidebarTabs,
+            currentTab,
+            searchQuery: threadSearchQuery,
+            searchResults: threadSearchResults,
+          }),
+    [
+      sidebarTabs,
+      currentTab,
+      threadSearchQuery,
+      threadSearchResults,
+      isTodayView,
+      isSearchingThreads,
+      todayRows,
+      todayTab,
+    ],
   );
   const orderedThreads = sidebarView.rows;
   const hiddenSettledCount = sidebarTabs.hiddenSettledCount;
@@ -3114,13 +3173,30 @@ export default function Sidebar() {
   const selectThreadSearchResult = useCallback(
     (thread: EnvironmentThreadShell) => {
       const threadRef = scopeThreadRef(thread.environmentId, thread.id);
-      handleSidebarTabChange(
-        resolveSidebarSearchResultTab({
-          threadKey: scopedThreadKey(threadRef),
-          snoozedThreadKeys,
-          settledThreadKeys,
-        }),
-      );
+      if (
+        isTodayView &&
+        (todayRows.working.includes(thread) || todayRows.waiting.includes(thread))
+      ) {
+        handleTodayTabChange(isSidebarThreadWorking(thread) ? "working" : "waiting");
+      } else {
+        // Older and settled search results need their project shelf to remain visible after search closes.
+        if (isTodayView) {
+          const group = projectGroups.find((candidate) =>
+            candidate.memberProjectRefs.some(
+              (ref) =>
+                ref.environmentId === thread.environmentId && ref.projectId === thread.projectId,
+            ),
+          );
+          if (group) setProjectScopeKey(group.projectKey);
+        }
+        handleSidebarTabChange(
+          resolveSidebarSearchResultTab({
+            threadKey: scopedThreadKey(threadRef),
+            snoozedThreadKeys,
+            settledThreadKeys,
+          }),
+        );
+      }
       clearThreadSearch();
       navigateToThread(threadRef);
     },
@@ -3130,6 +3206,11 @@ export default function Sidebar() {
       navigateToThread,
       snoozedThreadKeys,
       settledThreadKeys,
+      isTodayView,
+      todayRows,
+      handleTodayTabChange,
+      projectGroups,
+      setProjectScopeKey,
     ],
   );
   const handleThreadSearchKeyDown = useCallback(
@@ -3714,6 +3795,9 @@ export default function Sidebar() {
         key: scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)),
         section,
       }));
+    if (isTodayView) {
+      return rowsOf(todayRows[todayTab], todayTab === "working" ? "working" : "active");
+    }
     if (currentTab === "later") {
       return [
         { kind: "marker", marker: "snoozed-header" },
@@ -3740,7 +3824,16 @@ export default function Sidebar() {
           ]
         : []),
     ];
-  }, [currentTab, sidebarTabs, pinnedThreads, activeThreads, workingThreads]);
+  }, [
+    currentTab,
+    sidebarTabs,
+    pinnedThreads,
+    activeThreads,
+    workingThreads,
+    isTodayView,
+    todayRows,
+    todayTab,
+  ]);
   useEffect(() => {
     if (
       dragState !== null &&
@@ -3762,7 +3855,7 @@ export default function Sidebar() {
     [sidebarListItems],
   );
   const sidebarListHasRows =
-    orderedThreads.length + (currentTab === "active" ? visibleDraftSessionCount : 0) > 0;
+    orderedThreads.length + (showDrafts ? visibleDraftSessionCount : 0) > 0;
   useLayoutEffect(() => {
     // Drag release clears the baseline, so its commit cannot replay the
     // sortable preview; rows glide from their released positions instead.
@@ -3820,7 +3913,7 @@ export default function Sidebar() {
     () =>
       createSidebarSortingStrategy({
         items: sidebarListItems,
-        enabled: !isContextDrag && currentTab === "active",
+        enabled: !isTodayView && !isContextDrag && currentTab === "active",
         boundaryLabelHeight: SIDEBAR_DRAG_LABEL_HEIGHT,
         settledOrder: draggedSettledOrder,
         ...(draggedActiveOrder === undefined ? {} : { activeOrder: draggedActiveOrder }),
@@ -3835,6 +3928,7 @@ export default function Sidebar() {
       isContextDrag,
       routeThreadKey,
       currentTab,
+      isTodayView,
       settledVisibleCount,
       sidebarListItems,
       snoozedThreads.length,
@@ -4986,6 +5080,18 @@ export default function Sidebar() {
           className="min-h-full"
           fixedHeader={
             <SidebarThreadHeader
+              today={
+                isTodayView
+                  ? {
+                      currentTab: todayTab,
+                      counts: {
+                        working: todayRows.working.length,
+                        waiting: todayRows.waiting.length,
+                      },
+                      onTabChange: handleTodayTabChange,
+                    }
+                  : null
+              }
               currentTab={currentTab}
               tabCounts={sidebarTabs.counts}
               onTabChange={handleSidebarTabChange}
@@ -5265,6 +5371,7 @@ export default function Sidebar() {
                             contextDrag={isContextDrag}
                             environmentId={thread.environmentId}
                             disabled={
+                              isTodayView ||
                               renamingThreadKey === threadKey ||
                               section === "working" ||
                               !draggableThreadKeys.has(threadKey) ||
@@ -5276,20 +5383,19 @@ export default function Sidebar() {
                         );
                       };
                       const from = isContextDrag ? null : (dragState?.activeSection ?? null);
-                      const items: ReactNode[] =
-                        currentTab === "active"
-                          ? [
-                              <SidebarDraftBlock
-                                key="draft-sessions"
-                                projectByKey={projectByKey}
-                                projectDisplayNameByKey={projectDisplayNameByKey}
-                                scopedProjectKeys={scopedProjectKeys}
-                                routeDraftId={routeDraftIdForRows}
-                                onNavigateToDraft={navigateToDraft}
-                                onDraftContextMenu={handleDraftContextMenu}
-                              />,
-                            ]
-                          : [];
+                      const items: ReactNode[] = showDrafts
+                        ? [
+                            <SidebarDraftBlock
+                              key="draft-sessions"
+                              projectByKey={projectByKey}
+                              projectDisplayNameByKey={projectDisplayNameByKey}
+                              scopedProjectKeys={scopedProjectKeys}
+                              routeDraftId={routeDraftIdForRows}
+                              onNavigateToDraft={navigateToDraft}
+                              onDraftContextMenu={handleDraftContextMenu}
+                            />,
+                          ]
+                        : [];
                       for (const item of sidebarListItems) {
                         if (item.kind === "thread") {
                           items.push(renderThreadRow(threadByKey.get(item.key)!, item.section));
@@ -5353,7 +5459,7 @@ export default function Sidebar() {
                       }
                       return items;
                     })()}
-                    {currentTab === "settled" && hiddenSettledCount > 0 ? (
+                    {!isTodayView && currentTab === "settled" && hiddenSettledCount > 0 ? (
                       <li className="list-none">
                         <button
                           type="button"
@@ -5371,8 +5477,8 @@ export default function Sidebar() {
               </TooltipProvider>
             ) : null}
             {!isSearchingThreads &&
-            (currentTab !== "active" || visibleDraftSessionCount === 0) &&
-            sidebarTabs.counts[currentTab] === 0 ? (
+            (!showDrafts || visibleDraftSessionCount === 0) &&
+            orderedThreads.length === 0 ? (
               <div className="flex flex-col items-center gap-2.5 px-3 py-5 text-center text-secondary-copy-large text-secondary-label">
                 <span className="flex size-10 items-center justify-center rounded-compact-row shadow-well-control">
                   <MessagesSquareIcon aria-hidden className="size-4.5" />
@@ -5389,6 +5495,8 @@ export default function Sidebar() {
                       {t.sidebar.header.addProject}
                     </button>
                   </>
+                ) : isTodayView ? (
+                  t.sidebar.today.empty[todayTab]
                 ) : scopedProjectGroup ? (
                   t.sidebar.sections.projectEmpty(scopedProjectGroup.displayName)
                 ) : (

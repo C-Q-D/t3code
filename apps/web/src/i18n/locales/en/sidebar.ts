@@ -216,6 +216,13 @@ export const sidebar = {
     searchingHint: "Searching thread messages…",
     empty: "No threads found",
   },
+  today: {
+    tabs: { working: "AI replying", waiting: "Needs you" },
+    empty: {
+      working: "No AI replies in progress today.",
+      waiting: "No conversations need your attention today.",
+    },
+  },
   tabs: {
     ariaLabel: "Thread status",
     active: "Active",
