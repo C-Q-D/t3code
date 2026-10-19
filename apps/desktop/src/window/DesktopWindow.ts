@@ -293,6 +293,12 @@ function getWindowTitleBarOptions(
   };
 }
 
+/** Keeps native colors in sync with the theme without covering the Windows desktop.
+ * @param window Live window to update; destroyed windows are ignored.
+ * @param shouldUseDarkColors Whether native controls use the dark palette.
+ * @param platform Host OS; only Windows has a transparent main window.
+ * @returns An effect applying native colors; Electron failures remain defects.
+ */
 function syncWindowAppearance(
   window: Electron.BrowserWindow,
   shouldUseDarkColors: boolean,
@@ -303,7 +309,10 @@ function syncWindowAppearance(
       return;
     }
 
-    window.setBackgroundColor(getInitialWindowBackgroundColor(shouldUseDarkColors));
+    // Windows transparency must survive native theme updates; the renderer owns opacity.
+    window.setBackgroundColor(
+      platform === "win32" ? "#00000000" : getInitialWindowBackgroundColor(shouldUseDarkColors),
+    );
     const { titleBarOverlay } = getWindowTitleBarOptions(shouldUseDarkColors, platform);
     if (typeof titleBarOverlay === "object") {
       window.setTitleBarOverlay(titleBarOverlay);
@@ -422,7 +431,11 @@ export const make = Effect.gen(function* () {
       show: false,
       autoHideMenuBar: true,
       ...(environment.platform === "darwin" ? { disableAutoHideCursor: true } : {}),
-      backgroundColor: getInitialWindowBackgroundColor(shouldUseDarkColors),
+      ...(environment.platform === "win32" ? { transparent: true } : {}),
+      backgroundColor:
+        environment.platform === "win32"
+          ? "#00000000"
+          : getInitialWindowBackgroundColor(shouldUseDarkColors),
       ...iconOption,
       title: environment.displayName,
       ...getWindowTitleBarOptions(shouldUseDarkColors, environment.platform),

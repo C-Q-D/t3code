@@ -218,6 +218,7 @@ const desktopWindowBoundsEquivalence = Schema.toEquivalence(
 );
 
 function layerTest(input: {
+  readonly platform?: NodeJS.Platform;
   readonly window: Electron.BrowserWindow;
   readonly createCount: Ref.Ref<number>;
   readonly mainWindow: Ref.Ref<Option.Option<Electron.BrowserWindow>>;
@@ -304,7 +305,19 @@ function layerTest(input: {
           recordMetrics: () => Effect.void,
           shutdown: Effect.void,
         }),
-        layerDesktopEnvironment,
+        input.platform === undefined
+          ? layerDesktopEnvironment
+          : DesktopEnvironment.layer({ ...environmentInput, platform: input.platform }).pipe(
+              Layer.provide(
+                Layer.mergeAll(
+                  NodeServices.layer,
+                  DesktopConfig.layerTest({
+                    T3CODE_PORT: "3773",
+                    VITE_DEV_SERVER_URL: "http://127.0.0.1:5733",
+                  }),
+                ),
+              ),
+            ),
         layerDesktopAppSettings,
         layerDesktopClientSettings,
         layerDesktopServerExposure,
@@ -465,6 +478,42 @@ const captureOne = DesktopSnapShotId.make("11111111-1111-4111-8111-111111111111"
 const captureTwo = DesktopSnapShotId.make("22222222-2222-4222-8222-222222222222");
 
 describe("DesktopWindow", () => {
+  it.effect.each(["win32", "darwin", "linux"] as const)(
+    "preserves platform background through appearance sync: %s",
+    (platform) =>
+      Effect.gen(function* () {
+        const fake = makeFakeBrowserWindow();
+        const createdWindowOptions: Electron.BrowserWindowConstructorOptions[] = [];
+        const createCount = yield* Ref.make(0);
+        const mainWindow = yield* Ref.make<Option.Option<Electron.BrowserWindow>>(Option.none());
+        yield* Effect.gen(function* () {
+          const service = yield* DesktopWindow.DesktopWindow;
+          yield* service.handleBackendReady(new URL("http://127.0.0.1:3773"));
+          assert.equal(
+            createdWindowOptions[0]?.transparent,
+            platform === "win32" ? true : undefined,
+          );
+          assert.equal(
+            createdWindowOptions[0]?.backgroundColor,
+            platform === "win32" ? "#00000000" : "#ffffff",
+          );
+          yield* service.syncAppearance;
+          assert.deepEqual(vi.mocked(fake.window.setBackgroundColor).mock.calls.at(-1), [
+            platform === "win32" ? "#00000000" : "#ffffff",
+          ]);
+        }).pipe(
+          Effect.provide(
+            layerTest({
+              platform,
+              window: fake.window,
+              createCount,
+              mainWindow,
+              createdWindowOptions,
+            }),
+          ),
+        );
+      }),
+  );
   it.effect("shows native context menus for browser guests and sign-in popups", () =>
     Effect.gen(function* () {
       const host = makeFakeBrowserWindow();
