@@ -23,7 +23,8 @@ export function resolvePhysicsMotion({
 export function setPhysicsEnabled(value: boolean) {
   if (enabled === value) return;
   enabled = value;
-  for (const listener of [...listeners]) listener(value);
+  const snapshot = [...listeners];
+  for (const listener of snapshot) listener(value);
 }
 
 export function isPhysicsEnabled() {

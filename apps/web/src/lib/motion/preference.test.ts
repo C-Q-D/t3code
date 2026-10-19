@@ -1,5 +1,5 @@
 /** Truth-table coverage keeps explicit on separate from system accessibility preference. */
-import { afterEach, expect, it } from "vitest";
+import { afterEach, expect, it } from "vite-plus/test";
 import {
   isPhysicsEnabled,
   onPhysicsChange,

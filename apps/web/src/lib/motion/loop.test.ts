@@ -1,7 +1,7 @@
 /** Scheduling and hook ownership are tested against a fake browser clock, without sleeps. */
 import { act, createElement, useLayoutEffect } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
 import { activeJobs, onLoop, run } from "./loop";
 import { useMotionJob } from "./react";
 import { installTestRaf } from "./testRaf";

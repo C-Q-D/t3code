@@ -1,5 +1,5 @@
 /** Release velocity boundaries use fixed millisecond timestamps, never wall-clock sleeps. */
-import { expect, it } from "vitest";
+import { expect, it } from "vite-plus/test";
 import { VelocityTracker } from "./velocity";
 
 it("reports px/s from only the recent 80 ms", () => {

@@ -1,5 +1,5 @@
 /** Physical invariants independent of the spring's integration formula. */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { Spring } from "./spring";
 import { TOKENS } from "./tokens";
 

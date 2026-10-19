@@ -10,7 +10,8 @@ let inFrame = false;
 
 /** Notify observers of the current number of tasks, without creating a clock for observers alone. */
 function notify() {
-  for (const listener of [...listeners]) listener(jobs.size);
+  const snapshot = [...listeners];
+  for (const listener of snapshot) listener(jobs.size);
 }
 
 /** Request at most one frame, including when jobs register other jobs during a frame. */
@@ -25,7 +26,8 @@ function frame(now: number) {
   const dt = lastTime === null ? 1 / 60 : Math.min(0.05, Math.max(0, (now - lastTime) / 1000));
   lastTime = now;
   try {
-    for (const job of [...jobs]) {
+    const snapshot = [...jobs];
+    for (const job of snapshot) {
       if (!jobs.has(job)) continue;
       try {
         if (!job(dt)) jobs.delete(job);

@@ -1,5 +1,5 @@
 /** Projection expectations come from the motion contract and geometric fixtures. */
-import { expect, it } from "vitest";
+import { expect, it } from "vite-plus/test";
 import {
   clipToBounds,
   fieldStrength,

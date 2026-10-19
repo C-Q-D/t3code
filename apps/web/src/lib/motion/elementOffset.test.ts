@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 /** Observable transforms keep layout and impact channels independent; DOM layout is a boundary fixture. */
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
 import { flip, nudge, offsetOf, readOffset } from "./elementOffset";
 import { activeJobs } from "./loop";
 import { setPhysicsEnabled } from "./preference";

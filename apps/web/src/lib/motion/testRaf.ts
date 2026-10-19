@@ -1,5 +1,5 @@
 /** Test-only browser clock boundary; motion jobs and spring integration remain real. */
-import { vi } from "vitest";
+import { vi } from "vite-plus/test";
 
 /** Install a deterministic rAF queue; advance drains one browser frame at a supplied millisecond time. */
 export function installTestRaf() {
