@@ -19,6 +19,7 @@ import { useMotionJob } from "~/lib/motion/react";
 import { Spring } from "~/lib/motion/spring";
 import { DECEL } from "~/lib/motion/tokens";
 import { VelocityTracker } from "~/lib/motion/velocity";
+import { restoreFloatingOverflow } from "./floatingDragMotion";
 import { Popover, PopoverPopup, PopoverCreateHandle } from "../ui/popover";
 import {
   selectThreadPanelOpen,
@@ -47,6 +48,8 @@ const CARD_CONTROLS =
 
 /** Local pointer frame; only a completed drag is published to the persisted store. */
 interface CardDrag {
+  dragOrigin: { left: number; top: number };
+  offset: { x: number; y: number };
   tracker: VelocityTracker;
   gliding: boolean;
   threadKey: string;
@@ -335,9 +338,15 @@ export function ThreadDetailsCard({
     const element = event.currentTarget;
     const origin = interrupted?.latest ??
       floatingPosition ?? { left: placement.x, top: placement.y };
+    const offset = interrupted?.offset ?? { x: 0, y: 0 };
     const tracker = new VelocityTracker();
     tracker.add(event.clientX, event.clientY);
     dragRef.current = {
+      offset,
+      dragOrigin: {
+        left: origin.left + restoreFloatingOverflow(offset.x, canvas.container.width),
+        top: origin.top + restoreFloatingOverflow(offset.y, canvas.container.height),
+      },
       tracker,
       gliding: false,
       threadKey,
@@ -352,7 +361,7 @@ export function ThreadDetailsCard({
       pointerY: event.clientY,
       origin,
       latest: origin,
-      moved: false,
+      moved: interrupted !== null,
       element,
       userSelect: element.style.userSelect,
       transition: element.style.transition,
@@ -360,9 +369,10 @@ export function ThreadDetailsCard({
     element.setPointerCapture(event.pointerId);
     element.style.userSelect = "none";
     element.style.transition = "none";
+    if (interrupted) element.style.transform = `translate(${offset.x}px, ${offset.y}px)`;
     event.preventDefault();
   };
-  /** Updates only the DOM transform; current rendered dimensions keep all edges contained. */
+  /** Updates only the DOM transform; bounded placement and visual elastic overflow stay separate. */
   const moveDrag = (event: ReactPointerEvent<HTMLElement>) => {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId || !canvas) return;
@@ -372,13 +382,20 @@ export function ThreadDetailsCard({
     const dy = event.clientY - drag.pointerY;
     if (!drag.moved && Math.hypot(dx, dy) <= 3) return;
     drag.moved = true;
+    const raw = { left: drag.dragOrigin.left + dx, top: drag.dragOrigin.top + dy };
     drag.latest = resolveThreadDetailsCardPosition(
-      { side: "left", inset: drag.origin.left + dx, top: drag.origin.top + dy },
+      { side: "left", inset: raw.left, top: raw.top },
       canvas.container,
       drag.element.getBoundingClientRect(),
     );
+    drag.offset = isPhysicsEnabled()
+      ? {
+          x: rubber(raw.left - drag.latest.left, canvas.container.width),
+          y: rubber(raw.top - drag.latest.top, canvas.container.height),
+        }
+      : { x: 0, y: 0 };
     drag.element.dataset.dragging = "true";
-    drag.element.style.transform = `translate(${drag.latest.left - drag.origin.left}px, ${drag.latest.top - drag.origin.top}px)`;
+    drag.element.style.transform = `translate(${drag.latest.left - drag.origin.left + drag.offset.x}px, ${drag.latest.top - drag.origin.top + drag.offset.y}px)`;
     event.preventDefault();
   };
   /** Commits before removing the transform so the release cannot paint the old position. */
@@ -393,14 +410,23 @@ export function ThreadDetailsCard({
       drag.moved &&
       canvas &&
       isPhysicsEnabled() &&
-      Math.hypot(velocity.x, velocity.y) > 50
+      (Math.hypot(velocity.x, velocity.y) > 50 || Math.hypot(drag.offset.x, drag.offset.y) > 0)
     ) {
       drag.gliding = true;
       if (drag.element.hasPointerCapture(drag.pointerId))
         drag.element.releasePointerCapture(drag.pointerId);
-      const origin = drag.latest;
+      const origin = {
+        left: drag.latest.left + restoreFloatingOverflow(drag.offset.x, canvas.container.width),
+        top: drag.latest.top + restoreFloatingOverflow(drag.offset.y, canvas.container.height),
+      };
       let elapsed = 0;
-      let rebound: { x: Spring; y: Spring } | null = null;
+      let rebound: { x: Spring; y: Spring } | null =
+        Math.hypot(velocity.x, velocity.y) > 50
+          ? null
+          : {
+              x: new Spring({ value: drag.offset.x, target: 0 }),
+              y: new Spring({ value: drag.offset.y, target: 0 }),
+            };
       // Layout stays fixed until settling; only the bounded position is persisted.
       const finish = () => {
         dragRef.current = null;
@@ -419,6 +445,7 @@ export function ThreadDetailsCard({
         if (rebound) {
           const movingX = rebound.x.step(dt);
           const movingY = rebound.y.step(dt);
+          drag.offset = { x: rebound.x.value, y: rebound.y.value };
           drag.element.style.transform = `translate(${drag.latest.left - drag.origin.left + rebound.x.value}px, ${drag.latest.top - drag.origin.top + rebound.y.value}px)`;
           return movingX || movingY || finish();
         }
@@ -435,6 +462,7 @@ export function ThreadDetailsCard({
         );
         const x = rubber(requested.left - drag.latest.left, drag.containerWidth);
         const y = rubber(requested.top - drag.latest.top, drag.containerHeight);
+        drag.offset = { x, y };
         drag.element.style.transform = `translate(${drag.latest.left - drag.origin.left + x}px, ${drag.latest.top - drag.origin.top + y}px)`;
         if (elapsed >= 0.3)
           rebound = {

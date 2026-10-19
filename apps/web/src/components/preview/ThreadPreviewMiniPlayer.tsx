@@ -43,6 +43,7 @@ import { useMotionJob } from "~/lib/motion/react";
 import { Spring } from "~/lib/motion/spring";
 import { DECEL } from "~/lib/motion/tokens";
 import { VelocityTracker } from "~/lib/motion/velocity";
+import { restoreFloatingOverflow } from "../chat/floatingDragMotion";
 import { useThreadPreviewState } from "~/previewStateStore";
 import {
   type PreviewMiniPlayerSize,
@@ -73,6 +74,8 @@ import {
 
 /** Captures one pointer gesture and its latest local frame until shared layout is committed. */
 interface PointerGesture {
+  dragOrigin: { x: number; y: number };
+  offset: { x: number; y: number };
   readonly tracker: VelocityTracker;
   gliding: boolean;
   readonly pointerId: number;
@@ -448,14 +451,20 @@ function MiniPlayerShell({
     event: ReactPointerEvent<HTMLElement>,
     direction: BrowserViewportResizeDirection | null,
   ) => {
-    if (event.button !== 0 || !frame || !resolvePreviewFrame) return;
+    if (event.button !== 0 || !frame || !resolvePreviewFrame || !container) return;
     stop();
     const interrupted = gestureRef.current?.gliding ?? false;
     const current = gestureRef.current?.latest ?? frame;
+    const offset = gestureRef.current?.offset ?? { x: 0, y: 0 };
     const tracker = new VelocityTracker();
     tracker.add(event.clientX, event.clientY);
-    setOvershoot({ x: 0, y: 0 });
+    setOvershoot(offset);
     gestureRef.current = {
+      offset,
+      dragOrigin: {
+        x: current.x + restoreFloatingOverflow(offset.x, container.width),
+        y: current.y + restoreFloatingOverflow(offset.y, container.height),
+      },
       tracker,
       gliding: false,
       pointerId: event.pointerId,
@@ -485,6 +494,7 @@ function MiniPlayerShell({
     const delta = { x: event.clientX - gesture.pointerX, y: event.clientY - gesture.pointerY };
     if (!gesture.moved && Math.hypot(delta.x, delta.y) < HANDLE_TAP_SLOP_PX) return;
     gesture.moved = true;
+    const raw = { x: gesture.dragOrigin.x + delta.x, y: gesture.dragOrigin.y + delta.y };
     const requested =
       gesture.direction === null
         ? {
@@ -493,7 +503,7 @@ function MiniPlayerShell({
             // Match the baseline request: contain the drag before canvas avoidance.
             // Save this same request so enlarging the canvas cannot reveal pointer overshoot.
             ...clampPreviewMiniPlayerPosition(
-              { x: gesture.frame.x + delta.x, y: gesture.frame.y + delta.y },
+              raw,
               container,
               gesture.frame,
               NO_PREVIEW_MINI_PLAYER_OBSTACLES,
@@ -507,6 +517,14 @@ function MiniPlayerShell({
             container,
           });
     gesture.request = { x: requested.x, y: requested.y, width: requested.width };
+    gesture.offset =
+      isPhysicsEnabled() && gesture.direction === null
+        ? {
+            x: rubber(raw.x - requested.x, container.width),
+            y: rubber(raw.y - requested.y, container.height),
+          }
+        : { x: 0, y: 0 };
+    setOvershoot(gesture.offset);
     gesture.latest =
       gesture.resolveFrame({
         key: gesture.sourceKey,
@@ -528,14 +546,25 @@ function MiniPlayerShell({
         gesture.moved &&
         gesture.direction === null &&
         container &&
-        Math.hypot(velocity.x, velocity.y) > 50
+        (Math.hypot(velocity.x, velocity.y) > 50 ||
+          Math.hypot(gesture.offset.x, gesture.offset.y) > 0)
       ) {
         gesture.gliding = true;
         if (gesture.target.hasPointerCapture(gesture.pointerId))
           gesture.target.releasePointerCapture(gesture.pointerId);
-        const origin = gesture.request;
+        const origin = {
+          ...gesture.request,
+          x: gesture.request.x + restoreFloatingOverflow(gesture.offset.x, container.width),
+          y: gesture.request.y + restoreFloatingOverflow(gesture.offset.y, container.height),
+        };
         let elapsed = 0;
-        let rebound: { x: Spring; y: Spring } | null = null;
+        let rebound: { x: Spring; y: Spring } | null =
+          Math.hypot(velocity.x, velocity.y) > 50
+            ? null
+            : {
+                x: new Spring({ value: gesture.offset.x, target: 0 }),
+                y: new Spring({ value: gesture.offset.y, target: 0 }),
+              };
         // Keep elastic overflow visual-only: persisted intent must remain inside the canvas.
         start((dt) => {
           if (!isPhysicsEnabled()) {
@@ -547,7 +576,8 @@ function MiniPlayerShell({
           if (rebound) {
             const movingX = rebound.x.step(dt);
             const movingY = rebound.y.step(dt);
-            setOvershoot({ x: rebound.x.value, y: rebound.y.value });
+            gesture.offset = { x: rebound.x.value, y: rebound.y.value };
+            setOvershoot(gesture.offset);
             if (movingX || movingY) return true;
             commitGesture();
             setGestureFrame(null);
@@ -579,6 +609,7 @@ function MiniPlayerShell({
             y: rubber(requested.y - position.y, container.height),
           };
           setGestureFrame(gesture.latest);
+          gesture.offset = offset;
           setOvershoot(offset);
           if (elapsed >= 0.3)
             rebound = {
@@ -591,6 +622,7 @@ function MiniPlayerShell({
       }
     }
     commitGesture();
+    setOvershoot({ x: 0, y: 0 });
     setGestureFrame(null);
   };
 

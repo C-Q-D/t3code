@@ -135,6 +135,72 @@ it("takes over a gliding card without returning to its release point", async () 
   expect(Number.parseFloat(card().style.left)).toBeCloseTo(928 + offset);
 });
 
+/** Reads the visual x coordinate from layout plus the live gesture transform. */
+function visualCardLeft() {
+  return (
+    (Number.parseFloat(card().style.left) || 908) +
+    (Number.parseFloat(card().style.transform.slice("translate(".length)) || 0)
+  );
+}
+
+it.each([5, 25])("preserves elastic card position when grabbed after %s frames", async (frames) => {
+  setPhysicsEnabled(true);
+  const clock = installTestRaf();
+  let now = 0;
+  vi.spyOn(performance, "now").mockImplementation(() => now);
+  await renderCard();
+  await pointer(card(), "pointerdown", 950, 40);
+  now = 40;
+  await pointer(card(), "pointermove", 1050, 40);
+  await pointer(card(), "pointerup", 1050, 40);
+  await act(async () => {
+    for (let i = 0; i < frames; i++) clock.advance((now += 16));
+  });
+  const before = visualCardLeft();
+  expect(before).toBeGreaterThan(908);
+  await pointer(card(), "pointerdown", 1050, 40);
+  expect(Math.abs(visualCardLeft() - before)).toBeLessThanOrEqual(1);
+  expect(clock.pending.size).toBe(0);
+  await pointer(card(), "pointermove", 1040, 40);
+  expect(visualCardLeft()).toBeLessThan(before);
+  expect(visualCardLeft()).toBeGreaterThan(before - 10);
+  await pointer(card(), "pointermove", 1050, 40);
+  expect(Math.abs(visualCardLeft() - before)).toBeLessThanOrEqual(1);
+  now += 100;
+  await pointer(card(), "pointerup", 1050, 40);
+  expect(Math.abs(visualCardLeft() - before)).toBeLessThanOrEqual(1);
+  await act(async () => {
+    for (let i = 0; i < 120; i++) clock.advance((now += 16));
+  });
+  expect(visualCardLeft()).toBe(908);
+  expect(clock.pending.size).toBe(0);
+});
+
+it("stops a gliding card and saves within resized container bounds", async () => {
+  setPhysicsEnabled(true);
+  const clock = installTestRaf();
+  let now = 0;
+  vi.spyOn(performance, "now").mockImplementation(() => now);
+  await renderCard();
+  await pointer(card(), "pointerdown", 950, 40);
+  now = 40;
+  await pointer(card(), "pointermove", 1050, 40);
+  await pointer(card(), "pointerup", 1050, 40);
+  await act(async () => clock.advance((now += 16)));
+  expect(clock.pending.size).toBe(1);
+  await renderCard(1100);
+  expect(clock.pending.size).toBe(0);
+  expect(card().style.transform).toBe("");
+  expect(store.getState().placement).toEqual({ side: "right", inset: 12, top: 12 });
+  expect(card().style.left).toBe("808px");
+  const saved = store.getState().placement;
+  await act(async () => {
+    for (let i = 0; i < 120; i++) clock.advance((now += 16));
+  });
+  expect(store.getState().placement).toBe(saved);
+  expect(card().style.transform).toBe("");
+});
+
 /** Renders a measured canvas; width and search inset let tests exercise presentation changes. */
 async function renderCard(width = 1200, inset = 0) {
   await act(async () =>

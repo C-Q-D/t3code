@@ -258,6 +258,44 @@ it("keeps native surface bounds aligned while the shell rebounds at the wall", a
   );
 });
 
+it.each([5, 25])(
+  "preserves elastic preview position when grabbed after %s frames",
+  async (frames) => {
+    setPhysicsEnabled(true);
+    const clock = installTestRaf();
+    let now = 0;
+    vi.spyOn(performance, "now").mockImplementation(() => now);
+    await act(async () => {
+      renderer = create(<Harness />);
+    });
+    const { handle, event } = await movePointer(null, 400, 0, () => {
+      now = 40;
+    });
+    await act(async () => handle.props.onPointerUp(event));
+    await act(async () => {
+      for (let i = 0; i < frames; i++) clock.advance((now += 16));
+    });
+    const before = displayedFrame().x;
+    expect(before).toBeGreaterThan(628);
+    await act(async () => handle.props.onPointerDown(event));
+    expect(Math.abs(displayedFrame().x - before)).toBeLessThanOrEqual(1);
+    expect(clock.pending.size).toBe(0);
+    await act(async () => handle.props.onPointerMove({ ...event, clientX: 100 }));
+    expect(displayedFrame().x).toBeLessThan(before);
+    expect(displayedFrame().x).toBeGreaterThan(before - 10);
+    await act(async () => handle.props.onPointerMove(event));
+    expect(Math.abs(displayedFrame().x - before)).toBeLessThanOrEqual(1);
+    now += 100;
+    await act(async () => handle.props.onPointerUp(event));
+    expect(Math.abs(displayedFrame().x - before)).toBeLessThanOrEqual(1);
+    await act(async () => {
+      for (let i = 0; i < 120; i++) clock.advance((now += 16));
+    });
+    expect(displayedFrame().x).toBe(628);
+    expect(clock.pending.size).toBe(0);
+  },
+);
+
 it.each([
   { direction: null, dx: 50, dy: 30, width: 360, x: 150, y: 110 },
   { direction: "east", dx: 90, dy: 0, width: 450, x: 100, y: 80 },
