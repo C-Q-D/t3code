@@ -77,12 +77,12 @@ function PopoverPopup({
         // A panel's card already sits inside its own padding, so the panel can reach the edge.
         collisionPadding={variant === "panel" ? 0 : undefined}
         className={cn(
-          "h-(--positioner-height) w-(--positioner-width) max-w-(--available-width) transition-transform data-instant:transition-none",
+          "h-(--positioner-height) w-(--positioner-width) max-w-(--available-width) transition-transform physics:duration-(--motion-snap-duration) physics:ease-(--ease-snap) data-instant:transition-none",
           variant === "panel"
             ? // The card inside is the panel width, or the anchor less 12px per side; the viewport
               // pads it by --spacing(2) per side. Panels slide when their offset changes, e.g. to make
               // room for a bar below the header, even when opened from the keyboard (data-instant).
-              "z-(--z-sheet) w-[min(calc(var(--thread-details-panel-width)+--spacing(4)),calc(var(--anchor-width)---spacing(2)))] transition-[top] duration-150 ease-out data-instant:transition-[top] motion-reduce:transition-none motion-reduce:data-instant:transition-none"
+              "z-(--z-sheet) w-[min(calc(var(--thread-details-panel-width)+--spacing(4)),calc(var(--anchor-width)---spacing(2)))] transition-[top] legacy:duration-150 legacy:ease-out data-instant:transition-[top] legacy:motion-reduce:transition-none legacy:motion-reduce:data-instant:transition-none"
             : "z-[130]",
         )}
         data-slot="popover-positioner"
@@ -91,7 +91,7 @@ function PopoverPopup({
       >
         <PopoverPrimitive.Popup
           className={cn(
-            "relative flex h-(--popup-height,auto) w-(--popup-width,auto) origin-(--transform-origin) rounded-overlay text-popover-foreground outline-none transition-[width,height,scale,opacity] data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0",
+            "relative flex h-(--popup-height,auto) w-(--popup-width,auto) origin-(--transform-origin) rounded-overlay text-popover-foreground outline-none transition-[width,height,scale,opacity] physics:duration-(--popup-motion-duration) physics:ease-(--popup-motion-ease) data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0",
             variant !== "panel" && "dropdown-glass",
             tooltipStyle && "w-fit text-balance text-secondary-copy",
             width !== "auto" && ["max-w-[calc(100vw-2rem)]", popoverPopupWidthClassName[width]],

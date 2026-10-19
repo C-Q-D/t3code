@@ -150,7 +150,7 @@ function SelectPopup({
         sideOffset={sideOffset}
       >
         <SelectPrimitive.Popup
-          className="origin-(--transform-origin) rounded-overlay text-foreground outline-none"
+          className="origin-(--transform-origin) rounded-overlay text-foreground outline-none physics:transition-[width,height,scale,opacity] physics:data-starting-style:scale-98 physics:data-starting-style:opacity-0 physics:data-ending-style:scale-98 physics:data-ending-style:opacity-0 physics:duration-(--popup-motion-duration) physics:ease-(--popup-motion-ease)"
           data-slot="select-popup"
           {...props}
         >
