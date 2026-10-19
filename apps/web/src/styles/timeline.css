@@ -142,8 +142,8 @@
   --shadow-timeline-setup-key: 0 1.5px 0 #000;
   /* The scroll key floats over transcript text above the composer; a white halo keeps it findable. */
   --shadow-timeline-scroll:
-    inset 0 1px 0 rgba(255, 255, 255, 0.09), 0 0 0 1px rgba(255, 255, 255, 0.18),
-    0 0 16px 2px rgba(255, 255, 255, 0.2);
+    inset 0 1px 0 rgba(255, 255, 255, 0.09), 0 0 0 1px rgba(255, 255, 255, 0.24),
+    0 0 22px 4px rgba(255, 255, 255, 0.28);
   --radius-timeline-minimap-strip: 2px;
 }
 
