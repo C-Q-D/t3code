@@ -13,6 +13,12 @@ import type { ScopedThreadRef } from "@t3tools/contracts";
 import { scopedThreadKey } from "@t3tools/client-runtime/environment";
 import { ScrollArea } from "../ui/scroll-area";
 import { cn } from "../../lib/utils";
+import { isPhysicsEnabled } from "~/lib/motion/preference";
+import { project, rubber } from "~/lib/motion/project";
+import { useMotionJob } from "~/lib/motion/react";
+import { Spring } from "~/lib/motion/spring";
+import { DECEL } from "~/lib/motion/tokens";
+import { VelocityTracker } from "~/lib/motion/velocity";
 import { Popover, PopoverPopup, PopoverCreateHandle } from "../ui/popover";
 import {
   selectThreadPanelOpen,
@@ -41,6 +47,8 @@ const CARD_CONTROLS =
 
 /** Local pointer frame; only a completed drag is published to the persisted store. */
 interface CardDrag {
+  tracker: VelocityTracker;
+  gliding: boolean;
   threadKey: string;
   containerWidth: number;
   containerHeight: number;
@@ -132,6 +140,7 @@ export function ThreadDetailsCard({
   const threadKey = scopedThreadKey(threadRef);
   const savedPlacement = useThreadDetailsCardPlacementStore((state) => state.placement);
   const dragRef = useRef<CardDrag | null>(null);
+  const { start, stop } = useMotionJob();
   const [cardElement, setCardElement] = useState<HTMLElement | null>(null);
   const [cardSize, setCardSize] = useState({ width: 280, height: 0 });
   const preferredPlacement = canvas
@@ -231,6 +240,17 @@ export function ThreadDetailsCard({
     )
       return;
     dragRef.current = null;
+    stop();
+    if (drag.gliding && canvas) {
+      const position = resolveThreadDetailsCardPosition(
+        { side: "left", inset: drag.latest.left, top: drag.latest.top },
+        canvas.container,
+        cardSize,
+      );
+      useThreadDetailsCardPlacementStore
+        .getState()
+        .place(createThreadDetailsCardPlacement(position, cardSize.width, canvas.container.width));
+    }
     clearCardDrag(drag);
   });
   useLayoutEffect(
@@ -238,9 +258,10 @@ export function ThreadDetailsCard({
       const drag = dragRef.current;
       if (!drag || drag.element !== cardElement || drag.threadKey !== threadKey) return;
       dragRef.current = null;
+      stop();
       clearCardDrag(drag);
     },
-    [cardElement, threadKey],
+    [cardElement, threadKey, stop],
   );
   useLayoutEffect(() => () => reportDetailsCard?.(null), [reportDetailsCard]);
   useLayoutEffect(() => {
@@ -288,22 +309,44 @@ export function ThreadDetailsCard({
       event.button !== 0 ||
       event.pointerType !== "mouse" ||
       !event.isPrimary ||
-      dragRef.current ||
+      (dragRef.current && !dragRef.current.gliding) ||
       !placement ||
       !canvas
     )
       return;
     if (event.target instanceof Element && event.target.closest(CARD_CONTROLS)) return;
+    stop();
+    const interrupted = dragRef.current;
+    if (interrupted) {
+      dragRef.current = null;
+      flushSync(() =>
+        useThreadDetailsCardPlacementStore
+          .getState()
+          .place(
+            createThreadDetailsCardPlacement(
+              interrupted.latest,
+              cardSize.width,
+              canvas.container.width,
+            ),
+          ),
+      );
+      clearCardDrag(interrupted);
+    }
     const element = event.currentTarget;
-    const origin = floatingPosition ?? { left: placement.x, top: placement.y };
+    const origin = interrupted?.latest ??
+      floatingPosition ?? { left: placement.x, top: placement.y };
+    const tracker = new VelocityTracker();
+    tracker.add(event.clientX, event.clientY);
     dragRef.current = {
+      tracker,
+      gliding: false,
       threadKey,
       containerWidth: canvas.container.width,
       containerHeight: canvas.container.height,
       cardWidth: cardSize.width,
       cardHeight: cardSize.height,
       topInset,
-      placement: savedPlacement,
+      placement: useThreadDetailsCardPlacementStore.getState().placement,
       pointerId: event.pointerId,
       pointerX: event.clientX,
       pointerY: event.clientY,
@@ -323,6 +366,8 @@ export function ThreadDetailsCard({
   const moveDrag = (event: ReactPointerEvent<HTMLElement>) => {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId || !canvas) return;
+    if (drag.gliding) return;
+    drag.tracker.add(event.clientX, event.clientY);
     const dx = event.clientX - drag.pointerX;
     const dy = event.clientY - drag.pointerY;
     if (!drag.moved && Math.hypot(dx, dy) <= 3) return;
@@ -340,7 +385,66 @@ export function ThreadDetailsCard({
   const endDrag = (event: ReactPointerEvent<HTMLElement>) => {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
+    if (drag.gliding) return;
     if (event.type === "pointerup") moveDrag(event);
+    const velocity = drag.tracker.velocity();
+    if (
+      event.type === "pointerup" &&
+      drag.moved &&
+      canvas &&
+      isPhysicsEnabled() &&
+      Math.hypot(velocity.x, velocity.y) > 50
+    ) {
+      drag.gliding = true;
+      if (drag.element.hasPointerCapture(drag.pointerId))
+        drag.element.releasePointerCapture(drag.pointerId);
+      const origin = drag.latest;
+      let elapsed = 0;
+      let rebound: { x: Spring; y: Spring } | null = null;
+      // Layout stays fixed until settling; only the bounded position is persisted.
+      const finish = () => {
+        dragRef.current = null;
+        flushSync(() =>
+          useThreadDetailsCardPlacementStore
+            .getState()
+            .place(
+              createThreadDetailsCardPlacement(drag.latest, drag.cardWidth, drag.containerWidth),
+            ),
+        );
+        clearCardDrag(drag);
+        return false;
+      };
+      start((dt) => {
+        if (!isPhysicsEnabled()) return finish();
+        if (rebound) {
+          const movingX = rebound.x.step(dt);
+          const movingY = rebound.y.step(dt);
+          drag.element.style.transform = `translate(${drag.latest.left - drag.origin.left + rebound.x.value}px, ${drag.latest.top - drag.origin.top + rebound.y.value}px)`;
+          return movingX || movingY || finish();
+        }
+        elapsed = Math.min(0.3, elapsed + dt);
+        const fraction = (1 - DECEL.fast ** (elapsed * 1000)) / (1 - DECEL.fast ** 300);
+        const requested = {
+          left: origin.left + project(velocity.x, DECEL.fast) * fraction,
+          top: origin.top + project(velocity.y, DECEL.fast) * fraction,
+        };
+        drag.latest = resolveThreadDetailsCardPosition(
+          { side: "left", inset: requested.left, top: requested.top },
+          canvas.container,
+          { width: drag.cardWidth, height: drag.cardHeight },
+        );
+        const x = rubber(requested.left - drag.latest.left, drag.containerWidth);
+        const y = rubber(requested.top - drag.latest.top, drag.containerHeight);
+        drag.element.style.transform = `translate(${drag.latest.left - drag.origin.left + x}px, ${drag.latest.top - drag.origin.top + y}px)`;
+        if (elapsed >= 0.3)
+          rebound = {
+            x: new Spring({ value: x, target: 0 }),
+            y: new Spring({ value: y, target: 0 }),
+          };
+        return true;
+      });
+      return;
+    }
     dragRef.current = null;
     if (event.type === "pointerup" && drag.moved && canvas) {
       const next = createThreadDetailsCardPlacement(
@@ -406,6 +510,10 @@ export function ThreadDetailsCard({
             onLostPointerCapture={endDrag}
             onDoubleClick={(event) => {
               if (event.target instanceof Element && event.target.closest(CARD_CONTROLS)) return;
+              stop();
+              const drag = dragRef.current;
+              dragRef.current = null;
+              if (drag) clearCardDrag(drag);
               useThreadDetailsCardPlacementStore.getState().reset();
             }}
             aria-label={t.chat.details.threadDetails}

@@ -11,6 +11,8 @@ import { useThreadDetailsCardPlacementStore as store } from "../../threadDetails
 import { PopoverCreateHandle } from "../ui/popover";
 import { ChatCanvasContext } from "./ChatCanvasContext";
 import { ThreadDetailsCard } from "./ThreadDetailsCard";
+import { setPhysicsEnabled } from "~/lib/motion/preference";
+import { installTestRaf } from "~/lib/motion/testRaf";
 
 vi.mock("../ui/scroll-area", () => ({
   ScrollArea: ({ children }: { children: React.ReactNode }) => children,
@@ -38,6 +40,7 @@ const content = vi.fn(() => (
 const handle = PopoverCreateHandle();
 
 beforeEach(() => {
+  setPhysicsEnabled(false);
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   store.getState().reset();
   store.persist.clearStorage();
@@ -76,6 +79,7 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root.unmount());
   container.remove();
+  setPhysicsEnabled(false);
   store.getState().reset();
   store.persist.clearStorage();
   Reflect.deleteProperty(HTMLElement.prototype, "setPointerCapture");
@@ -83,6 +87,52 @@ afterEach(async () => {
   Reflect.deleteProperty(HTMLElement.prototype, "releasePointerCapture");
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+});
+
+it.each([true, false])("physics %s glides a released card only while enabled", async (enabled) => {
+  setPhysicsEnabled(enabled);
+  const clock = installTestRaf();
+  let now = 0;
+  vi.spyOn(performance, "now").mockImplementation(() => now);
+  await renderCard();
+  await pointer(card(), "pointerdown", 950, 40);
+  now = 40;
+  await pointer(card(), "pointermove", 650, 100);
+  await pointer(card(), "pointerup", 650, 100);
+  expect(store.getState().placement).toEqual(
+    enabled ? null : { side: "right", inset: 312, top: 72 },
+  );
+  await act(async () => {
+    for (now = 56; now < 2056; now += 16) clock.advance(now);
+  });
+  expect(store.getState().placement).not.toBeNull();
+  expect(Number.parseFloat(card().style.left)).toBeGreaterThanOrEqual(12);
+  expect(Number.parseFloat(card().style.left) + 280).toBeLessThanOrEqual(1200);
+  expect(Number.parseFloat(card().style.top) + 200).toBeLessThanOrEqual(800);
+  expect(Number.parseFloat(card().style.left)).toBe(enabled ? 12 : 608);
+  expect(clock.pending.size).toBe(0);
+});
+
+it("takes over a gliding card without returning to its release point", async () => {
+  setPhysicsEnabled(true);
+  const clock = installTestRaf();
+  let now = 0;
+  vi.spyOn(performance, "now").mockImplementation(() => now);
+  await renderCard();
+  await pointer(card(), "pointerdown", 950, 40);
+  now = 40;
+  await pointer(card(), "pointermove", 850, 40);
+  await pointer(card(), "pointerup", 850, 40);
+  await act(async () => clock.advance(56));
+  const offset = Number.parseFloat(card().style.transform.slice("translate(".length));
+  expect(offset).toBeLessThan(-100);
+  await pointer(card(), "pointerdown", 850, 40);
+  expect(clock.pending.size).toBe(0);
+  expect(Number.parseFloat(card().style.left)).toBeCloseTo(908 + offset);
+  now = 200;
+  await pointer(card(), "pointermove", 870, 40);
+  await pointer(card(), "pointerup", 870, 40);
+  expect(Number.parseFloat(card().style.left)).toBeCloseTo(928 + offset);
 });
 
 /** Renders a measured canvas; width and search inset let tests exercise presentation changes. */
