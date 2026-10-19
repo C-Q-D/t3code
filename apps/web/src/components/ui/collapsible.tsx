@@ -18,12 +18,17 @@ function CollapsibleTrigger({ className, ...props }: CollapsiblePrimitive.Trigge
   );
 }
 
+/**
+ * Render collapsible content with caller className and forwarded Base UI panel props.
+ * animate=false disables height travel; otherwise physics uses settle, while legacy
+ * keeps its 200ms transition and honors the system's reduced-motion preference.
+ */
 function CollapsiblePanel({
   className,
   animate = true,
   ...props
 }: CollapsiblePrimitive.Panel.Props & { animate?: boolean }) {
-  // Reuses the local shadcn/Base UI panel; skip height travel for reduced motion.
+  // Base UI supplies measured height and owns mounting and accessibility.
   // https://ui.shadcn.com/docs/components/base/collapsible
   return (
     <CollapsiblePrimitive.Panel

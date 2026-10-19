@@ -179,6 +179,12 @@ export function ColorSaturationValuePlane({
   );
 }
 
+/**
+ * Edit hue in degrees for label; onChange receives pointer or keyboard updates and
+ * onInteractionEnd flushes a completed drag. className controls the outer layout.
+ * Pointer movement stays immediate; physics springs keyboard position changes,
+ * while legacy keeps the 80ms linear transition. Color remains linear in both modes.
+ */
 export function ColorHueSlider({
   label,
   value,

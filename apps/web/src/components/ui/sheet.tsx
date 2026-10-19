@@ -15,6 +15,11 @@ const SheetPortal = SheetPrimitive.Portal;
 
 // Sheets are docked panels, not dialogs: their layer (--z-sheet) sits under dialogs that open
 // from inside them and under anything the app floats above panels.
+/**
+ * Render the sheet scrim with caller className/style and forwarded dismissal props.
+ * Physics fades linearly for 120ms; legacy keeps its 200ms default and caller timing,
+ * including the instant styles supplied by SheetPopup when its duration is zero.
+ */
 function SheetBackdrop({ className, ...props }: SheetPrimitive.Backdrop.Props) {
   return (
     <SheetPrimitive.Backdrop
