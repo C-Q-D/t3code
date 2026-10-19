@@ -1,3 +1,4 @@
+/** Verifies changed-setting labels and restore writes through the settings restore hook. */
 import { DEFAULT_UNIFIED_SETTINGS, type UnifiedSettings } from "@t3tools/contracts";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
@@ -69,6 +70,20 @@ beforeEach(() => {
 });
 
 describe("restoring V2 settings", () => {
+  it.each(["system", "off"] as const)(
+    "lists physics motion set to %s and restores it to on",
+    async (physicsMotion) => {
+      state.settings = { ...DEFAULT_UNIFIED_SETTINGS, physicsMotion };
+      hooks.beginRender();
+      const restore = useSettingsRestore();
+
+      expect(restore.changedSettingLabels).toEqual(["Physics motion"]);
+      await restore.restoreDefaults();
+
+      expect(state.update.mock.calls[0]?.[0]).toHaveProperty("physicsMotion", "on");
+    },
+  );
+
   it("keeps the hidden snooze preference out of restore labels and updates", async () => {
     snoozeUi.enabled = false;
     state.settings = {

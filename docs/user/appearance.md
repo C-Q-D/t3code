@@ -38,10 +38,15 @@ applies to the web and desktop clients.
 
 ## Motion
 
-The main sidebar, right panel, and terminal drawer open and close immediately by default. Move the
-**Panel animations** slider above 0 ms to add motion, up to 400 ms, unless reduced motion is enabled
-in your operating system. Moving between threads always snaps to the selected thread's panel state
-without replaying its transitions.
+In **Settings → Appearance → Motion**, choose a **Physics motion** mode: **On** (the default),
+**System**, or **Off**. **System** turns physics motion off when your operating system reduces
+motion. **Off** restores the standard panel animation behavior.
+
+The **Panel animations** slider only applies when physics motion is off. It is disabled while
+physics motion is on. At 0 ms, the main sidebar, right panel, and terminal drawer open and close
+immediately. Increase the duration up to 400 ms to add motion, unless your operating system reduces
+motion. Moving between threads always snaps to the selected thread's panel state without replaying
+its transitions.
 
 ## Custom themes
 

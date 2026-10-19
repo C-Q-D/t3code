@@ -220,10 +220,20 @@ export const settings: Messages["settings"] = {
       resetLabel: "聊天宽度",
       comfortableDefaultLabel: "舒适（默认）",
     },
+    physicsMotion: {
+      title: "物理动效",
+      description: "选择“跟随系统”时，系统开启减少动态会关闭物理动效。",
+      ariaLabel: "物理动效",
+      resetLabel: "物理动效",
+      on: "开启",
+      system: "跟随系统",
+      off: "关闭",
+    },
     panelAnimations: {
       title: "面板动画",
 
       description: "设置面板打开和关闭的速度。",
+      overriddenByPhysics: "物理动效开启时此时长不起作用",
       ariaLabel: "面板动画时长",
       resetLabel: "面板动画",
     },
@@ -947,11 +957,6 @@ export const settings: Messages["settings"] = {
     continue: "继续",
   },
   appearance: {
-    motionPresetsPreview: "档位仅预览；请用下方滑块调整时长。",
-    motionOff: "关闭",
-    motionFast: "快",
-    motionStandard: "标准",
-    motionSlow: "慢",
     preview: "预览",
     importTheme: "导入",
     newTheme: "新建",

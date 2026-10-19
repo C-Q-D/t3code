@@ -245,10 +245,20 @@ export const settings = {
       resetLabel: "chat width",
       comfortableDefaultLabel: "Comfortable (default)",
     },
+    physicsMotion: {
+      title: "Physics motion",
+      description: "System turns physics motion off when your operating system reduces motion.",
+      ariaLabel: "Physics motion",
+      resetLabel: "physics motion",
+      on: "On",
+      system: "System",
+      off: "Off",
+    },
     panelAnimations: {
       title: "Panel animations",
 
       description: "Set how fast panels open and close.",
+      overriddenByPhysics: "This duration has no effect while physics motion is on.",
       ariaLabel: "Panel animation duration",
       resetLabel: "panel animations",
     },
@@ -999,11 +1009,6 @@ export const settings = {
     continue: "Continue",
   },
   appearance: {
-    motionPresetsPreview: "Preset preview only; adjust the duration below.",
-    motionOff: "Off",
-    motionFast: "Fast",
-    motionStandard: "Standard",
-    motionSlow: "Slow",
     preview: "Preview",
     importTheme: "Import",
     newTheme: "New",

@@ -310,6 +310,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["wide full width column layout messages composer monitor"],
   },
   {
+    id: "physics-motion",
+    title: t.settings.rows.physicsMotion.title,
+    to: "/settings/appearance",
+    searchTerms: ["spring physics motion animation reduced"],
+  },
+  {
     id: "panel-animations",
     title: t.settings.rows.panelAnimations.title,
     to: "/settings/appearance",

@@ -538,6 +538,9 @@ export function useSettingsRestore(onRestored?: () => void) {
       ...(settings.panelAnimationDurationMs !== DEFAULT_UNIFIED_SETTINGS.panelAnimationDurationMs
         ? [t.settings.rows.panelAnimations.title]
         : []),
+      ...(settings.physicsMotion !== DEFAULT_UNIFIED_SETTINGS.physicsMotion
+        ? [t.settings.rows.physicsMotion.title]
+        : []),
       ...(settings.environmentIdentificationMode !==
       DEFAULT_UNIFIED_SETTINGS.environmentIdentificationMode
         ? [t.settings.rows.environmentIdentification.title]
@@ -703,6 +706,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       settings.fontSizeTerminal,
       settings.glassOpacity,
       settings.panelAnimationDurationMs,
+      settings.physicsMotion,
       settings.responseStreamingMode,
       settings.persistComposerContextStrip,
       settings.enableProviderUpdateChecks,
@@ -811,6 +815,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       environmentIdentificationMode: DEFAULT_UNIFIED_SETTINGS.environmentIdentificationMode,
       glassOpacity: DEFAULT_UNIFIED_SETTINGS.glassOpacity,
       panelAnimationDurationMs: DEFAULT_UNIFIED_SETTINGS.panelAnimationDurationMs,
+      physicsMotion: DEFAULT_UNIFIED_SETTINGS.physicsMotion,
       sidebarThreadPreviewCount: DEFAULT_UNIFIED_SETTINGS.sidebarThreadPreviewCount,
       sidebarProjectGroupingMode: DEFAULT_UNIFIED_SETTINGS.sidebarProjectGroupingMode,
       sidebarProjectSortOrder: DEFAULT_UNIFIED_SETTINGS.sidebarProjectSortOrder,
@@ -1226,6 +1231,8 @@ export function AppearanceSettingsPanel() {
   const panelAnimationDurationRatio =
     (settings.panelAnimationDurationMs - MIN_PANEL_ANIMATION_DURATION_MS) /
     (MAX_PANEL_ANIMATION_DURATION_MS - MIN_PANEL_ANIMATION_DURATION_MS);
+  // T3 will use L0's usePhysicsMotion to respect reduced motion in system mode.
+  const physicsMotionEnabled = settings.physicsMotion !== "off";
   const panelAnimationDurationSliderStyle = {
     "--settings-slider-progress": `${panelAnimationDurationRatio * 100}%`,
     "--settings-slider-fill-offset": `${0.5 - panelAnimationDurationRatio}rem`,
@@ -1484,30 +1491,52 @@ export function AppearanceSettingsPanel() {
       </SettingsSection>
       <SettingsSection id="motion" title={t.settings.sections.appearanceMotion}>
         <SettingsRow
+          {...searchableSetting("physics-motion")}
+          description={t.settings.rows.physicsMotion.description}
+          control={
+            <ToggleGroup
+              size="settings"
+              value={[settings.physicsMotion]}
+              aria-label={t.settings.rows.physicsMotion.ariaLabel}
+              onValueChange={(values) => {
+                const physicsMotion = values[0];
+                if (
+                  physicsMotion === "on" ||
+                  physicsMotion === "system" ||
+                  physicsMotion === "off"
+                ) {
+                  updateSettings({ physicsMotion });
+                }
+              }}
+            >
+              <ToggleGroupItem value="on">{t.settings.rows.physicsMotion.on}</ToggleGroupItem>
+              <ToggleGroupItem value="system">
+                {t.settings.rows.physicsMotion.system}
+              </ToggleGroupItem>
+              <ToggleGroupItem value="off">{t.settings.rows.physicsMotion.off}</ToggleGroupItem>
+            </ToggleGroup>
+          }
+          resetAction={
+            settings.physicsMotion !== DEFAULT_UNIFIED_SETTINGS.physicsMotion ? (
+              <SettingResetButton
+                label={t.settings.rows.physicsMotion.resetLabel}
+                onClick={() =>
+                  updateSettings({ physicsMotion: DEFAULT_UNIFIED_SETTINGS.physicsMotion })
+                }
+              />
+            ) : null
+          }
+        />
+        <SettingsRow
           {...searchableSetting("panel-animations")}
-          description={t.settings.rows.panelAnimations.description}
+          description={
+            physicsMotionEnabled
+              ? t.settings.rows.panelAnimations.overriddenByPhysics
+              : t.settings.rows.panelAnimations.description
+          }
           controlLayout="full"
           control={
             <div className="flex w-full flex-wrap items-center gap-4">
-              {/* M3 names presets but defines no durations; only the existing slider writes values. */}
-              <div className="flex flex-col gap-2">
-                <ToggleGroup
-                  size="settings"
-                  disabled
-                  value={[]}
-                  aria-label={t.settings.appearance.motionPresetsPreview}
-                >
-                  <ToggleGroupItem value="off">{t.settings.appearance.motionOff}</ToggleGroupItem>
-                  <ToggleGroupItem value="fast">{t.settings.appearance.motionFast}</ToggleGroupItem>
-                  <ToggleGroupItem value="standard">
-                    {t.settings.appearance.motionStandard}
-                  </ToggleGroupItem>
-                  <ToggleGroupItem value="slow">{t.settings.appearance.motionSlow}</ToggleGroupItem>
-                </ToggleGroup>
-                <span className="text-secondary-copy text-muted-foreground">
-                  {t.settings.appearance.motionPresetsPreview}
-                </span>
-              </div>
               <div className="min-w-40 flex-1">
                 <PanelAnimationsPreview durationMs={settings.panelAnimationDurationMs} />
               </div>
@@ -1520,7 +1549,8 @@ export function AppearanceSettingsPanel() {
                 </output>
                 <input
                   aria-label={t.settings.rows.panelAnimations.ariaLabel}
-                  className="settings-slider settings-appearance-slider min-w-0 flex-1"
+                  className="settings-slider settings-appearance-slider min-w-0 flex-1 disabled:cursor-not-allowed disabled:opacity-50 disabled:grayscale"
+                  disabled={physicsMotionEnabled}
                   id="panel-animation-duration"
                   max={MAX_PANEL_ANIMATION_DURATION_MS}
                   min={MIN_PANEL_ANIMATION_DURATION_MS}
