@@ -7,6 +7,11 @@ import { serializeComposerFileLink } from "@t3tools/shared/composerTrigger";
  */
 export const COMPOSER_MENTION_DRAG_TYPE = "application/x-t3code-composer-mention";
 
+/** Build insertion text from a serialized mention, retaining the separator before subsequent typing. */
+export function composerMentionInsertionText(mention: string): string {
+  return `${mention} `;
+}
+
 export function composerMentionFromTreePath(treePath: string): string | null {
   const relativePath = treePath.replace(/\/+$/, "");
   if (relativePath.length === 0) {
@@ -51,6 +56,11 @@ export interface ComposerMentionDragHandlers {
   onDrop(event: ComposerMentionDragEvent): void;
 }
 
+/**
+ * Create composer handlers that claim mention drags and insert their serialized text plus separator.
+ * @param host Editor insertion and drag-state callbacks; rejected insertion invokes its rejection callback.
+ * @returns Handlers that leave other payload types untouched and never focus the editor synchronously.
+ */
 export function makeComposerMentionDragHandlers(
   host: ComposerMentionDropHost,
 ): ComposerMentionDragHandlers {
@@ -90,7 +100,7 @@ export function makeComposerMentionDragHandlers(
       if (mention.length === 0) {
         return;
       }
-      if (!host.insertMentionAtEnd(`${mention} `)) {
+      if (!host.insertMentionAtEnd(composerMentionInsertionText(mention))) {
         host.onInsertRejected();
       }
     },

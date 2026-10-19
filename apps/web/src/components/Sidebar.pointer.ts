@@ -39,8 +39,12 @@ export class SidebarPointerSensor {
   private readonly window: Window;
   private readonly velocity = new VelocityTracker();
 
-  // The settle sweep constructs this sensor directly, outside dnd-kit, so it
-  // takes only the props the gesture reads.
+  /**
+   * Start sampling viewport pointer positions and own document/window listeners until finish.
+   * @param props Gesture event, activation distance and lifecycle callbacks; excludes unused
+   * dnd-kit context so the settle sweep can also construct this sensor directly.
+   * Registers listeners before onAttach and onPending expose the pending gesture.
+   */
   constructor(private readonly props: Omit<SensorProps<Options>, "activeNode" | "context">) {
     this.pointer = props.event as PointerEvent;
     this.document = getOwnerDocument(this.pointer.target);
@@ -139,6 +143,13 @@ export class SidebarPointerSensor {
       : this.props.options.onDrop?.(point);
   }
 
+  /**
+   * End once, removing gesture listeners before callbacks can unmount the list.
+   * @param cancelled Whether sorting was cancelled, including a claimed context drop.
+   * onFinish receives recent sampled velocity (zero on cancellation) before dnd-kit clears
+   * transforms; finally onAbort runs for pending gestures, then onCancel or onEnd.
+   * Click suppression stays owned until the release click or a fresh pointerdown clears it.
+   */
   private finish(cancelled: boolean) {
     if (this.phase === "finished") return;
     const aborted = this.phase === "pending";

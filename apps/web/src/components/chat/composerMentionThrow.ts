@@ -3,7 +3,11 @@ import { COMPOSER_MENTION_THROW_EVENT } from "../../lib/motion/composerThrow";
 import { isPhysicsEnabled, onPhysicsChange } from "../../lib/motion/preference";
 import { VelocityTracker } from "../../lib/motion/velocity";
 import type { Point } from "../../lib/motion/project";
-import { COMPOSER_MENTION_DRAG_TYPE, dataTransferHasComposerMention } from "./composerMentionDrag";
+import {
+  COMPOSER_MENTION_DRAG_TYPE,
+  dataTransferHasComposerMention,
+  composerMentionInsertionText,
+} from "./composerMentionDrag";
 import {
   findComposerThrowTarget,
   launchComposerThrow,
@@ -92,7 +96,11 @@ function drop(event: DragEvent) {
     label: text,
     target,
     onLand: (form) =>
-      form.dispatchEvent(new CustomEvent(COMPOSER_MENTION_THROW_EVENT, { detail: { text } })),
+      form.dispatchEvent(
+        new CustomEvent(COMPOSER_MENTION_THROW_EVENT, {
+          detail: { text: composerMentionInsertionText(text) },
+        }),
+      ),
   });
 }
 

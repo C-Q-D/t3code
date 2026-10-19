@@ -5,6 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
 import { ComposerThrowToken } from "./ComposerThrowToken";
 import { installComposerMentionThrow } from "./composerMentionThrow";
+import { makeComposerMentionDragHandlers } from "./composerMentionDrag";
 import { setPhysicsEnabled } from "../../lib/motion/preference";
 import { installTestRaf } from "../../lib/motion/testRaf";
 import { activeJobs } from "../../lib/motion/loop";
@@ -89,6 +90,24 @@ it.each([
 });
 
 it("claims a path hit before editor handlers and dispatches mention text only on landing", () => {
+  const inserted: string[] = [];
+  const legacyEvent = drag("drop", 100);
+  makeComposerMentionDragHandlers({
+    insertMentionAtEnd: (value) => {
+      inserted.push(value);
+      return true;
+    },
+    setDragActive: () => {},
+    onInsertRejected: () => {
+      throw new Error("mention insertion rejected");
+    },
+  }).onDrop({
+    dataTransfer: legacyEvent.dataTransfer,
+    nativeEvent: legacyEvent,
+    preventDefault: () => legacyEvent.preventDefault(),
+    stopPropagation: () => legacyEvent.stopPropagation(),
+  });
+  expect(inserted).toEqual(["[index.ts](src/index.ts) "]);
   aim();
   const editor = vi.fn();
   form.addEventListener("drop", editor);
@@ -100,7 +119,7 @@ it("claims a path hit before editor handlers and dispatches mention text only on
   act(() => clock.advance(0));
   expect(received).toEqual([]);
   settle();
-  expect(received).toEqual([{ text: "[index.ts](src/index.ts)" }]);
+  expect(received).toEqual(inserted.map((value) => ({ text: value })));
 });
 
 it("lets a missed drop reach its original recipient and inserts nothing", () => {
@@ -167,5 +186,5 @@ it("a regrabbed file uses pointer release and still inserts exactly once after l
   });
   expect(received).toEqual([]);
   settle();
-  expect(received).toEqual([{ text: "[index.ts](src/index.ts)" }]);
+  expect(received).toEqual([{ text: "[index.ts](src/index.ts) " }]);
 });

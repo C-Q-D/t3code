@@ -43,6 +43,7 @@ class TestRow {
     readonly name: string,
     public offsetHeight = 82,
   ) {}
+  /** Return viewport geometry from layout, drag translation and live spring offset without browser layout. */
   getBoundingClientRect() {
     const offset = readOffset(this as unknown as HTMLElement);
     return {
