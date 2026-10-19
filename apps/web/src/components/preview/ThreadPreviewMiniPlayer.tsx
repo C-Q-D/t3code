@@ -37,6 +37,12 @@ import { Button } from "~/components/ui/button";
 import { toastManager } from "~/components/ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
 import { cn } from "~/lib/utils";
+import { isPhysicsEnabled } from "~/lib/motion/preference";
+import { project, rubber } from "~/lib/motion/project";
+import { useMotionJob } from "~/lib/motion/react";
+import { Spring } from "~/lib/motion/spring";
+import { DECEL } from "~/lib/motion/tokens";
+import { VelocityTracker } from "~/lib/motion/velocity";
 import { useThreadPreviewState } from "~/previewStateStore";
 import {
   type PreviewMiniPlayerSize,
@@ -67,6 +73,8 @@ import {
 
 /** Captures one pointer gesture and its latest local frame until shared layout is committed. */
 interface PointerGesture {
+  readonly tracker: VelocityTracker;
+  gliding: boolean;
   readonly pointerId: number;
   readonly pointerX: number;
   readonly pointerY: number;
@@ -368,6 +376,8 @@ function MiniPlayerShell({
 }) {
   const canvas = useChatCanvas();
   const gestureRef = useRef<PointerGesture | null>(null);
+  const { start, stop } = useMotionJob();
+  const [overshoot, setOvershoot] = useState({ x: 0, y: 0 });
   // Only this shell rerenders while moving. Native slots need layoutVersion to
   // remeasure their transformed bounds; the chat canvas is updated on release.
   const [gestureFrame, setGestureFrame] = useState<PreviewMiniPlayerFrame | null>(null);
@@ -398,6 +408,7 @@ function MiniPlayerShell({
   // Both release and teardown consume the ref before writing, so capture loss
   // cannot submit twice and cleanup retains the gesture's original owner.
   const commitGesture = useCallback(() => {
+    stop();
     const gesture = gestureRef.current;
     if (!gesture) return;
     gestureRef.current = null;
@@ -409,7 +420,7 @@ function MiniPlayerShell({
     }
     if (gesture.target.hasPointerCapture(gesture.pointerId))
       gesture.target.releasePointerCapture(gesture.pointerId);
-  }, []);
+  }, [stop]);
   useLayoutEffect(
     () => () => {
       commitGesture();
@@ -429,6 +440,7 @@ function MiniPlayerShell({
     )
       return;
     commitGesture();
+    setOvershoot({ x: 0, y: 0 });
     setGestureFrame(null);
   }, [resolvePreviewFrame, sourceWidth, sourceHeight, commitGesture]);
 
@@ -437,15 +449,23 @@ function MiniPlayerShell({
     direction: BrowserViewportResizeDirection | null,
   ) => {
     if (event.button !== 0 || !frame || !resolvePreviewFrame) return;
+    stop();
+    const interrupted = gestureRef.current?.gliding ?? false;
+    const current = gestureRef.current?.latest ?? frame;
+    const tracker = new VelocityTracker();
+    tracker.add(event.clientX, event.clientY);
+    setOvershoot({ x: 0, y: 0 });
     gestureRef.current = {
+      tracker,
+      gliding: false,
       pointerId: event.pointerId,
       pointerX: event.clientX,
       pointerY: event.clientY,
-      frame,
+      frame: current,
       direction,
-      moved: false,
-      latest: frame,
-      request: { x: frame.x, y: frame.y, width: miniPlayer.width },
+      moved: interrupted,
+      latest: current,
+      request: { x: current.x, y: current.y, width: miniPlayer.width },
       threadRef,
       sourceKey,
       source: sourceSize,
@@ -460,6 +480,8 @@ function MiniPlayerShell({
   const handlePointerMove = (event: ReactPointerEvent<HTMLElement>) => {
     const gesture = gestureRef.current;
     if (!gesture || gesture.pointerId !== event.pointerId || !container) return;
+    if (gesture.gliding) return;
+    gesture.tracker.add(event.clientX, event.clientY);
     const delta = { x: event.clientX - gesture.pointerX, y: event.clientY - gesture.pointerY };
     if (!gesture.moved && Math.hypot(delta.x, delta.y) < HANDLE_TAP_SLOP_PX) return;
     gesture.moved = true;
@@ -498,6 +520,76 @@ function MiniPlayerShell({
   const endGesture = (event: ReactPointerEvent<HTMLElement>) => {
     const gesture = gestureRef.current;
     if (gesture?.pointerId !== event.pointerId) return;
+    if (gesture.gliding) return;
+    const velocity = gesture.tracker.velocity();
+    if (event.type === "pointerup") {
+      if (
+        isPhysicsEnabled() &&
+        gesture.moved &&
+        gesture.direction === null &&
+        container &&
+        Math.hypot(velocity.x, velocity.y) > 50
+      ) {
+        gesture.gliding = true;
+        if (gesture.target.hasPointerCapture(gesture.pointerId))
+          gesture.target.releasePointerCapture(gesture.pointerId);
+        const origin = gesture.request;
+        let elapsed = 0;
+        let rebound: { x: Spring; y: Spring } | null = null;
+        // Keep elastic overflow visual-only: persisted intent must remain inside the canvas.
+        start((dt) => {
+          if (!isPhysicsEnabled()) {
+            commitGesture();
+            setOvershoot({ x: 0, y: 0 });
+            setGestureFrame(null);
+            return false;
+          }
+          if (rebound) {
+            const movingX = rebound.x.step(dt);
+            const movingY = rebound.y.step(dt);
+            setOvershoot({ x: rebound.x.value, y: rebound.y.value });
+            if (movingX || movingY) return true;
+            commitGesture();
+            setGestureFrame(null);
+            return false;
+          }
+          elapsed = Math.min(0.3, elapsed + dt);
+          const fraction = (1 - DECEL.fast ** (elapsed * 1000)) / (1 - DECEL.fast ** 300);
+          const requested = {
+            x: origin.x + project(velocity.x, DECEL.fast) * fraction,
+            y: origin.y + project(velocity.y, DECEL.fast) * fraction,
+          };
+          const position = clampPreviewMiniPlayerPosition(
+            requested,
+            container,
+            gesture.latest,
+            NO_PREVIEW_MINI_PLAYER_OBSTACLES,
+          );
+          gesture.request = { ...position, width: origin.width };
+          gesture.latest =
+            gesture.resolveFrame({
+              key: gesture.sourceKey,
+              width: origin.width,
+              position,
+              source: gesture.source,
+              lastInteraction: "drag",
+            }) ?? gesture.latest;
+          const offset = {
+            x: rubber(requested.x - position.x, container.width),
+            y: rubber(requested.y - position.y, container.height),
+          };
+          setGestureFrame(gesture.latest);
+          setOvershoot(offset);
+          if (elapsed >= 0.3)
+            rebound = {
+              x: new Spring({ value: offset.x, target: 0 }),
+              y: new Spring({ value: offset.y, target: 0 }),
+            };
+          return true;
+        });
+        return;
+      }
+    }
     commitGesture();
     setGestureFrame(null);
   };
@@ -515,7 +607,7 @@ function MiniPlayerShell({
           <div
             className="ov4-preview-frame dropdown-glass absolute left-0 top-0 rounded-overlay-large"
             style={{
-              transform: `translate3d(${frame.x}px, ${frame.y}px, 0)`,
+              transform: `translate3d(${frame.x + overshoot.x}px, ${frame.y + overshoot.y}px, 0)`,
               width: frame.width,
               height: frame.height,
               borderRadius: cornerRadius?.(frame),
@@ -528,7 +620,7 @@ function MiniPlayerShell({
           <div
             className="ov4-preview-controls pointer-events-none absolute left-0 top-0"
             style={{
-              transform: `translate3d(${frame.x}px, ${frame.y}px, 0)`,
+              transform: `translate3d(${frame.x + overshoot.x}px, ${frame.y + overshoot.y}px, 0)`,
               width: frame.width,
               height: frame.height,
             }}

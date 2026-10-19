@@ -5,6 +5,8 @@ import { beforeEach, afterEach, expect, it, vi } from "vite-plus/test";
 import { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import { scopedThreadKey } from "@t3tools/client-runtime/environment";
 import { usePreviewMiniPlayerStore } from "~/previewMiniPlayerStore";
+import { setPhysicsEnabled } from "~/lib/motion/preference";
+import { installTestRaf } from "~/lib/motion/testRaf";
 import type { PreviewMiniPlayerObstacles } from "./previewMiniPlayerLayout";
 import { ChatCanvasContext } from "../chat/ChatCanvasContext";
 import { resolveChatCanvasLayout, type ChatCanvasPreview } from "../chat/chatCanvasLayout";
@@ -123,7 +125,7 @@ function displayedFrame() {
   };
 }
 /** Finds a real drag or resize handler and drives a captured pointer without a browser. */
-async function movePointer(direction: string | null, dx: number, dy: number) {
+async function movePointer(direction: string | null, dx: number, dy: number, advance = () => {}) {
   const handle = renderer!.root.findAll(
     (node) =>
       typeof node.type === "string" &&
@@ -133,6 +135,7 @@ async function movePointer(direction: string | null, dx: number, dy: number) {
         : node.props["data-preview-mini-player-resize"] === direction),
   )[0]!;
   const event = {
+    type: "pointerup",
     button: 0,
     pointerId: 7,
     clientX: 110,
@@ -146,12 +149,14 @@ async function movePointer(direction: string | null, dx: number, dy: number) {
     stopPropagation: vi.fn(),
   };
   await act(async () => handle.props.onPointerDown(event));
+  advance();
   await act(async () =>
     handle.props.onPointerMove({ ...event, clientX: 110 + dx, clientY: 90 + dy }),
   );
   return { handle, event };
 }
 beforeEach(() => {
+  setPhysicsEnabled(false);
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   usePreviewMiniPlayerStore.setState({ byThreadKey: {} });
   usePreviewMiniPlayerStore.getState().open(threadRef, { kind: "browser", tabId: "tab" });
@@ -162,8 +167,62 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => renderer?.unmount());
   renderer = undefined;
+  setPhysicsEnabled(false);
+  vi.restoreAllMocks();
   vi.clearAllMocks();
   vi.unstubAllGlobals();
+});
+
+it.each([true, false])("physics %s delays a fast release only while enabled", async (enabled) => {
+  setPhysicsEnabled(enabled);
+  const clock = installTestRaf();
+  let now = 0;
+  vi.spyOn(performance, "now").mockImplementation(() => now);
+  await act(async () => {
+    renderer = create(<Harness />);
+  });
+  const { handle, event } = await movePointer(null, 400, 0, () => {
+    now = 40;
+  });
+  await act(async () => handle.props.onPointerUp(event));
+  expect(usePreviewMiniPlayerStore.getState().byThreadKey[threadKey]!.position).toEqual(
+    enabled ? { x: 100, y: 80 } : { x: 500, y: 80 },
+  );
+  await act(async () => {
+    for (now = 56; now < 2056; now += 16) clock.advance(now);
+  });
+  const final = displayedFrame();
+  expect(final.x).toBeGreaterThanOrEqual(500);
+  expect(final.x + final.width).toBeLessThanOrEqual(1000);
+  expect(final.y + final.height).toBeLessThanOrEqual(700);
+  expect(clock.pending.size).toBe(0);
+  expect(usePreviewMiniPlayerStore.getState().byThreadKey[threadKey]!.position?.x).toBe(final.x);
+});
+
+it("takes over a gliding preview from its current position", async () => {
+  setPhysicsEnabled(true);
+  const clock = installTestRaf();
+  let now = 0;
+  vi.spyOn(performance, "now").mockImplementation(() => now);
+  await act(async () => {
+    renderer = create(<Harness />);
+  });
+  const { handle, event } = await movePointer(null, 50, 0, () => {
+    now = 40;
+  });
+  await act(async () => handle.props.onPointerUp(event));
+  await act(async () => clock.advance(56));
+  const flying = displayedFrame();
+  expect(flying.x).toBeGreaterThan(150);
+  await act(async () => handle.props.onPointerDown(event));
+  expect(clock.pending.size).toBe(0);
+  await act(async () => handle.props.onPointerMove({ ...event, clientX: 130 }));
+  expect(displayedFrame().x).toBeCloseTo(flying.x + 20);
+  now = 200;
+  await act(async () => handle.props.onPointerUp(event));
+  expect(usePreviewMiniPlayerStore.getState().byThreadKey[threadKey]!.position?.x).toBeCloseTo(
+    flying.x + 20,
+  );
 });
 
 it.each([
