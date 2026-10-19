@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { useContext, useId, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
 
+import { useCountPop } from "../../hooks/useCountPop";
 import { useAssetUrls } from "../../assets/assetUrls";
 import { threadEnvironment } from "../../state/threads";
 import { useThreadProjection } from "../../state/entities";
@@ -248,6 +249,11 @@ export function QueuedRunsControl({
     },
   }));
 
+  const expandedCountRef = useRef<HTMLSpanElement>(null);
+  const collapsedCountRef = useRef<HTMLSpanElement>(null);
+  useCountPop(expandedCountRef, items.length);
+  useCountPop(collapsedCountRef, items.length);
+
   if (items.length === 0) return null;
 
   const remove = async (runId: RunId) => {
@@ -286,7 +292,9 @@ export function QueuedRunsControl({
           onClick={() => setExpanded((value) => !value)}
         >
           <ListOrderedIcon className="size-3.5" aria-hidden="true" />
-          <span className="flex-1">{t.chat.queue.count(items.length)}</span>
+          <span ref={expandedCountRef} className="flex-1 origin-left">
+            {t.chat.queue.count(items.length)}
+          </span>
           <span className="flex size-7 items-center justify-center rounded-composer-queue-toggle text-secondary-label hover:bg-secondary">
             <ChevronDownIcon className="size-3.75" aria-hidden="true" />
           </span>
@@ -377,7 +385,7 @@ export function QueuedRunsControl({
                   onClick={() => setExpanded(true)}
                 >
                   <ListOrderedIcon className="size-3.25" aria-hidden="true" />
-                  {t.chat.queue.count(items.length)}
+                  <span ref={collapsedCountRef}>{t.chat.queue.count(items.length)}</span>
                 </button>
               ) : null}
               {canReorder && rowRunId !== null && rowServerIndex !== null ? (

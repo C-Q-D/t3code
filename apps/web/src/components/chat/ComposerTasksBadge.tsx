@@ -1,9 +1,10 @@
 /** Shows provider task progress and its disclosure list; task updates remain caller-owned. */
 import { t } from "~/i18n";
 import { CircleCheckIcon, CircleDotIcon, CircleIcon, ListTodoIcon } from "lucide-react";
-import { memo, type ComponentProps } from "react";
+import { memo, useRef, type ComponentProps } from "react";
 
 import { formatDuration } from "../../session-logic";
+import { useCountPop } from "../../hooks/useCountPop";
 import { cn } from "~/lib/utils";
 import { ComposerBanner } from "./ComposerBanner";
 
@@ -39,6 +40,8 @@ function keyedTaskSteps(steps: readonly ComposerTaskStep[]) {
 
 /** U1 keeps the pill compact; the disclosure label still announces the current step. */
 function TaskSummary({ progress }: { readonly progress: ComposerTasksProgress }) {
+  const countRef = useRef<HTMLSpanElement>(null);
+  useCountPop(countRef, progress.completedSteps);
   return (
     <>
       <ComposerBanner.Icon>
@@ -49,6 +52,7 @@ function TaskSummary({ progress }: { readonly progress: ComposerTasksProgress })
       </ComposerBanner.Content>
       <ComposerBanner.Actions>
         <ComposerBanner.Count
+          ref={countRef}
           className={progress.completedSteps >= progress.totalSteps ? "text-success" : undefined}
           data-composer-task-progress="true"
         >

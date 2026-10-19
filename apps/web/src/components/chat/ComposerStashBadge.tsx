@@ -1,7 +1,9 @@
+/** Stash count feedback and the existing save fade share the same badge. */
 import { t } from "~/i18n";
 import { BookmarkIcon } from "lucide-react";
-import { memo } from "react";
+import { memo, useRef } from "react";
 
+import { useCountPop } from "../../hooks/useCountPop";
 import { cn } from "~/lib/utils";
 import { ComposerBanner } from "./ComposerBanner";
 
@@ -20,9 +22,12 @@ export const ComposerStashBadge = memo(function ComposerStashBadge(props: {
   pulsing: boolean;
   onToggleMenu: () => void;
 }) {
+  const countRef = useRef<HTMLSpanElement>(null);
+  useCountPop(countRef, props.count);
   if (props.count === 0) return null;
   const count = (
     <ComposerBanner.Count
+      ref={countRef}
       key={props.pulseKey}
       className={cn(
         props.pulsing
