@@ -13,7 +13,42 @@ export interface OffsetState {
   iy: Spring;
   running: boolean;
 }
-const offsets = new WeakMap<Element, OffsetState>();
+/** Internal ownership handles stay out of the public spring state contract. */
+interface ManagedOffsetState extends OffsetState {
+  style: CSSStyleDeclaration;
+  cancel: (() => void) | undefined;
+  unsubscribe: (() => void) | undefined;
+}
+const offsets = new WeakMap<Element, ManagedOffsetState>();
+
+/**
+ * Stop this element's task and preference subscription, zero both spring groups, and return
+ * their last summed CSS pixel offset (zero when no state exists). Does not write transform.
+ * The caller must immediately use the returned offset in its own transform or call clearOffset.
+ */
+export function stopOffset(el: Element): Point {
+  const offset = readOffset(el);
+  const state = offsets.get(el);
+  if (!state) return offset;
+  const cancel = state.cancel;
+  state.cancel = undefined;
+  state.unsubscribe?.();
+  state.unsubscribe = undefined;
+  state.running = false;
+  state.x.jump(0);
+  state.y.jump(0);
+  state.ix.jump(0);
+  state.iy.jump(0);
+  cancel?.();
+  return offset;
+}
+
+/** Stop the element and clear this module's transform to an empty string; unknown elements are untouched. */
+export function clearOffset(el: Element): void {
+  stopOffset(el);
+  const state = offsets.get(el);
+  if (state) state.style.transform = "";
+}
 
 /** Return persistent springs, starting their task only when physics is enabled; element must own transform. */
 export function offsetOf(el: HTMLElement): OffsetState {
@@ -25,22 +60,18 @@ export function offsetOf(el: HTMLElement): OffsetState {
       ix: new Spring({ token: TOKENS.jolt }),
       iy: new Spring({ token: TOKENS.jolt }),
       running: false,
+      style: el.style,
+      cancel: undefined,
+      unsubscribe: undefined,
     };
     offsets.set(el, state);
   }
   const current = state;
   if (!current.running && isPhysicsEnabled()) {
     current.running = true;
-    const unsubscribe = onPhysicsChange((enabled) => {
+    current.unsubscribe = onPhysicsChange((enabled) => {
       if (enabled) return;
-      cancel();
-      unsubscribe();
-      current.running = false;
-      current.x.jump(0);
-      current.y.jump(0);
-      current.ix.jump(0);
-      current.iy.jump(0);
-      el.style.transform = "";
+      clearOffset(el);
     });
     const cancel = run((dt) => {
       // Step every channel; short-circuiting would freeze the remaining channels.
@@ -53,9 +84,16 @@ export function offsetOf(el: HTMLElement): OffsetState {
         ? `translate(${(current.x.value + current.ix.value).toFixed(2)}px, ${(current.y.value + current.iy.value).toFixed(2)}px)`
         : "";
       current.running = moving;
-      if (!moving) unsubscribe();
+      if (!moving) {
+        current.unsubscribe?.();
+        current.unsubscribe = undefined;
+        current.cancel = undefined;
+      }
       return moving;
     });
+    // Registration observers can stop motion synchronously before run returns its handle.
+    if (current.running) current.cancel = cancel;
+    else cancel();
   }
   return current;
 }

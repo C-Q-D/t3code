@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 /** Observable transforms keep layout and impact channels independent; DOM layout is a boundary fixture. */
 import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
-import { flip, nudge, offsetOf, readOffset } from "./elementOffset";
+import { clearOffset, flip, nudge, offsetOf, readOffset, stopOffset } from "./elementOffset";
 import { activeJobs } from "./loop";
 import { setPhysicsEnabled } from "./preference";
 import { installTestRaf } from "./testRaf";
@@ -75,4 +75,70 @@ it("release injects velocity and turning physics off cancels active offsets", ()
   expect(el.style.transform).toBe("");
   expect(readOffset(el)).toEqual({ x: 0, y: 0 });
   expect(clock.pending.size).toBe(0);
+});
+
+it("stop hands off the last offset without writing or stopping another element", () => {
+  const el = element();
+  const other = element();
+  flip(el, { left: 0, top: 40 });
+  nudge(el, 200, -120);
+  nudge(other, 100, 0);
+  clock.advance(0);
+  const before = readOffset(el);
+  const painted = paintedOffset(el);
+  const transform = el.style.transform;
+  const returned = stopOffset(el);
+  expect(returned).toEqual(before);
+  expect(returned.x).toBeCloseTo(painted.x, 2);
+  expect(returned.y).toBeCloseTo(painted.y, 2);
+  expect(el.style.transform).toBe(transform);
+  expect(activeJobs()).toBe(1);
+  expect(readOffset(el)).toEqual({ x: 0, y: 0 });
+  el.style.transform = "translate(12px, 34px)";
+  clock.advance(16);
+  setPhysicsEnabled(false);
+  expect(el.style.transform).toBe("translate(12px, 34px)");
+  expect(activeJobs()).toBe(0);
+});
+
+it("clear removes the transform and the pending task", () => {
+  const el = element();
+  flip(el, { left: 0, top: 0 });
+  clock.advance(0);
+  expect(el.style.transform).not.toBe("");
+  clearOffset(el);
+  expect(el.style.transform).toBe("");
+  expect(activeJobs()).toBe(0);
+  expect(clock.pending.size).toBe(0);
+  clock.advance(16);
+  expect(el.style.transform).toBe("");
+});
+
+it.each(["flip", "nudge"] as const)("%s restarts from zero after stopping", (kind) => {
+  const el = element();
+  const fresh = element();
+  flip(el, { left: 0, top: 40 });
+  nudge(el, 200, -120);
+  clock.advance(0);
+  stopOffset(el);
+  // The new drag owner completes the handoff before requesting another animation.
+  el.style.transform = "";
+  const start =
+    kind === "flip"
+      ? (node: HTMLElement) => flip(node, { left: 50, top: 70 })
+      : (node: HTMLElement) => nudge(node, -100, 80);
+  start(el);
+  start(fresh);
+  clock.advance(16);
+  expect(readOffset(el)).toEqual(readOffset(fresh));
+  expect(el.style.transform).toBe(fresh.style.transform);
+  expect(activeJobs()).toBe(2);
+});
+
+it("stopping an unknown element returns zero without scheduling or changing its transform", () => {
+  const el = element();
+  el.style.transform = "scale(2)";
+  expect(stopOffset(el)).toEqual({ x: 0, y: 0 });
+  expect(el.style.transform).toBe("scale(2)");
+  expect(clock.request).not.toHaveBeenCalled();
 });
