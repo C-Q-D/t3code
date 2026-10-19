@@ -511,7 +511,6 @@ export const chat = {
     you: "You",
     queued: "Queued",
     steer: "Steer",
-    queuedBehindTheActiveTurn: "Queued behind the active turn",
     originallyQueuedThenPromotedToSteerThe:
       "Originally queued, then promoted to steer the active turn",
     steeredTheActiveTurn: "Steered the active turn",

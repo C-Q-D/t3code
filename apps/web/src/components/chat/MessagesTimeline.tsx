@@ -2325,8 +2325,10 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
     (attachment) => !isImageAttachment(attachment) && !isFileAttachment(attachment),
   );
   const userMessage = resolveUserMessagePresentation(row.message);
+  // A timeline message has already been sent, so only steering stays worth marking;
+  // messages still waiting in the queue show in the composer's queue panel instead.
   const intentMarker =
-    row.message.inputIntent && row.message.inputIntent !== "turn_start"
+    row.message.inputIntent === "steer" || row.message.inputIntent === "promoted_queued_to_steer"
       ? row.message.inputIntent
       : null;
   const itemStatus = row.projectedItem?.item.status;
@@ -2695,32 +2697,12 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
   );
 }
 
-/**
- * Renders the marker identifying a non-null user input intent.
- * @param props - Required intent discriminator; null and undefined are not accepted.
- * @returns The intent marker element; never null.
- */
+/** Renders the steer marker on a sent user message; the tooltip says whether it began queued. */
 function UserMessageIntentMarker({
   intent,
 }: {
-  readonly intent: NonNullable<ChatMessage["inputIntent"]>;
+  readonly intent: "steer" | "promoted_queued_to_steer";
 }) {
-  const presentation =
-    intent === "queued_turn"
-      ? {
-          label: t.chat.timeline.queued,
-          icon: null,
-        }
-      : intent === "promoted_queued_to_steer"
-        ? {
-            label: t.chat.timeline.steer,
-            icon: Redo2Icon,
-          }
-        : {
-            label: t.chat.timeline.steer,
-            icon: Redo2Icon,
-          };
-  const IntentIcon = presentation.icon;
   return (
     <Tooltip>
       <TooltipTrigger
@@ -2731,15 +2713,13 @@ function UserMessageIntentMarker({
           />
         }
       >
-        {IntentIcon ? <IntentIcon aria-hidden="true" className="size-3" /> : null}
-        {presentation.label}
+        <Redo2Icon aria-hidden="true" className="size-3" />
+        {t.chat.timeline.steer}
       </TooltipTrigger>
       <TooltipPopup side="top">
-        {intent === "queued_turn"
-          ? t.chat.timeline.queuedBehindTheActiveTurn
-          : intent === "promoted_queued_to_steer"
-            ? t.chat.timeline.originallyQueuedThenPromotedToSteerThe
-            : t.chat.timeline.steeredTheActiveTurn}
+        {intent === "promoted_queued_to_steer"
+          ? t.chat.timeline.originallyQueuedThenPromotedToSteerThe
+          : t.chat.timeline.steeredTheActiveTurn}
       </TooltipPopup>
     </Tooltip>
   );
