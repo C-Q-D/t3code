@@ -11,7 +11,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
-import { useLocation, useNavigate, useParams } from "@tanstack/react-router";
+import { useLocation, useNavigate, useParams, useRouterState } from "@tanstack/react-router";
 
 import { isElectron } from "../env";
 import { getLocalStorageItem, removeLocalStorageItem } from "../hooks/useLocalStorage";
@@ -38,7 +38,7 @@ import {
 } from "../rightPanelLayout";
 import { selectThreadTerminalUiState, useTerminalUiStateStore } from "../terminalUiStateStore";
 import { resolveThreadRouteRef, resolveThreadRouteTarget } from "../threadRoutes";
-import { isMacPlatform } from "../lib/utils";
+import { cn, isMacPlatform } from "../lib/utils";
 import { primaryServerKeybindingsAtom } from "../state/server";
 import { useEnvironmentIdentificationMode, useLegacySidebarEnabled } from "../hooks/useSettings";
 import {
@@ -301,7 +301,12 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
   // sidebar is active.
   // Seeds server-side visited tracking from this browser's localStorage the
   useThreadVisitedMigration();
-  const pathname = useLocation({ select: (location) => location.pathname });
+  // Wait for the outlet's transition to finish before replacing navigation.
+  // The requested URL and matches can advance while settings is still mounted;
+  // measuring the thread sidebar then would also lay out that outgoing page.
+  const pathname = useRouterState({
+    select: (state) => (state.resolvedLocation ?? state.location).pathname,
+  });
   const chatOwnsSlabs = useParams({
     strict: false,
     select: (params) => resolveThreadRouteTarget(params) !== null,
@@ -441,25 +446,22 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
                 <SidebarRail onDoubleClick={resetSidebarWidth} />
               </Sidebar>
               <div className="window-frame-main flex min-h-0 min-w-0 flex-col">
-                {chatOwnsSlabs ? (
-                  <div
-                    className="relative flex min-h-0 min-w-0 flex-1 flex-col"
-                    data-frame-main="chat"
-                  >
-                    {children}
-                  </div>
-                ) : (
-                  <Slab
-                    tone="card"
-                    radius="slab"
-                    elevation="slab-frame"
-                    className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
-                    render={<div className="stone-frame-card" />}
-                    data-frame-main=""
-                  >
-                    {children}
-                  </Slab>
-                )}
+                {/* Keep the outlet under one component type across navigation;
+                    changing div/Slab would remount the route subtree. Chat owns
+                    its surfaces, so its enclosing slab has no visual variants. */}
+                <Slab
+                  tone={chatOwnsSlabs ? null : "card"}
+                  radius={chatOwnsSlabs ? null : "slab"}
+                  elevation={chatOwnsSlabs ? null : "slab-frame"}
+                  className={cn(
+                    "relative flex min-h-0 min-w-0 flex-1 flex-col",
+                    !chatOwnsSlabs && "overflow-hidden",
+                  )}
+                  render={<div className={chatOwnsSlabs ? undefined : "stone-frame-card"} />}
+                  data-frame-main={chatOwnsSlabs ? "chat" : ""}
+                >
+                  {children}
+                </Slab>
                 {pathname.startsWith("/discussions/") &&
                 !shouldUseDiscussionPanelSheet(viewportWidth) ? (
                   <TitlebarSlotOutlet name="panel" />

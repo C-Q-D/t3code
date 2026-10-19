@@ -8,23 +8,31 @@ import {
 
 const palette: Readonly<Record<string, string>> = PIXEL_PALETTE;
 
-// Build the shared artwork once rather than recreating thousands of rectangles on route renders.
-const symbols = PIXEL_ICON_NAMES.map((name) => (
-  <symbol
-    id={getPixelIconSymbolId(name)}
-    key={name}
-    viewBox="0 0 16 16"
-    shapeRendering="crispEdges"
-  >
-    {PIXEL_SPRITES[name].flatMap((row, y) =>
+// Fixed-color artwork does not need document styles. An SVG image keeps the
+// original pixel rectangles (including fractional-scale rasterization) without
+// thousands of live nodes and their <use> shadow copies participating in style
+// recalculation on navigation. Encode once; repeated icons share the image URL.
+const symbols = PIXEL_ICON_NAMES.map((name) => {
+  const pixels = PIXEL_SPRITES[name]
+    .flatMap((row, y) =>
       Array.from(row, (pixel, x) => {
         const color = palette[pixel];
-        const pixelId = `${name}-${x}-${y}`;
-        return color ? <rect key={pixelId} x={x} y={y} width={1} height={1} fill={color} /> : null;
+        return color ? `<rect x="${x}" y="${y}" width="1" height="1" fill="${color}"/>` : "";
       }),
-    )}
-  </symbol>
-));
+    )
+    .join("");
+  const source = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" shape-rendering="crispEdges">${pixels}</svg>`;
+  return (
+    <symbol
+      id={getPixelIconSymbolId(name)}
+      key={name}
+      viewBox="0 0 16 16"
+      shapeRendering="crispEdges"
+    >
+      <image width={16} height={16} href={`data:image/svg+xml,${encodeURIComponent(source)}`} />
+    </symbol>
+  );
+});
 
 /**
  * Mount once at the app root so all routes and portals can resolve pixel icon references.

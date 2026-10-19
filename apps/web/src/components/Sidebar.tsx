@@ -3375,7 +3375,8 @@ export default function Sidebar() {
     threadListRef.current = node;
     listMotionRef.current?.dispose();
     listMotionRef.current = node === null ? null : createSidebarListMotion(node);
-    listMotionRef.current?.update(false);
+    // The layout effect below captures the initial positions after the commit.
+    // Measuring here forces layout midway through mount, then repeats it there.
   }, []);
 
   // Hold the chosen section and order until every key write arrives. This
