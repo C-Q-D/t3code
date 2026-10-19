@@ -76,7 +76,7 @@ function receiver() {
     () => {},
   );
   dispose = controller.dispose;
-  return { form, surface, text: () => text };
+  return { form, surface, text: () => text, shake: controller.shake };
 }
 
 it("receives a mention through K4 and removes the listener on disposal", () => {
@@ -130,5 +130,20 @@ it("leans only while the form is a drag target and returns to rest", async () =>
   await Promise.resolve();
   for (let frame = 91; frame <= 180; frame++) clock.advance((frame * 1000) / 60);
   expect(host.form.style.transform).toBe("");
+  expect(activeJobs()).toBe(0);
+});
+
+it("injects a positive 420 px/s jolt and cancels it when physics turns off", () => {
+  const host = receiver();
+  host.shake();
+  clock.advance(0);
+  const offset = Number(host.surface.style.transform.match(/translate\(([^p]+)/)?.[1]);
+  // The specified jolt token integrated for one 60 Hz frame moves about 6 px.
+  expect(offset).toBeGreaterThan(6);
+  expect(offset).toBeLessThan(6.5);
+  setPhysicsEnabled(false);
+  expect(host.surface.style.transform).toBe("");
+  expect(activeJobs()).toBe(0);
+  host.shake();
   expect(activeJobs()).toBe(0);
 });

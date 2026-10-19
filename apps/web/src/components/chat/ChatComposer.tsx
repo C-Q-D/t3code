@@ -842,7 +842,7 @@ function useComposerRestingTransition(
                   duration: nextIsCollapsed ? duration : duration / 2,
                   delay: nextIsCollapsed ? 0 : duration / 2,
                   fill: "backwards",
-                  easing: COMPOSER_RESTING_TRANSITION_EASING,
+                  easing,
                 },
               ),
             );
@@ -1091,6 +1091,7 @@ import { springToLinear } from "../../lib/motion/springToLinear";
 import { TOKENS } from "../../lib/motion/tokens";
 import { composerRestingVelocity } from "./composerRestingSpring";
 import { attachComposerImpact } from "./composerImpact";
+import { shouldJoltComposer } from "./composerValidationMotion";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { readEnvironmentScope } from "../../state/session";
 import { serverEnvironment } from "../../state/server";
@@ -2463,6 +2464,15 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   });
   const attachmentInputRef = useRef<HTMLInputElement>(null);
   const composerFormRef = useRef<HTMLFormElement>(null);
+  const composerImpactRef = useRef<ReturnType<typeof attachComposerImpact> | null>(null);
+  const previousValidationMessageRef = useRef<string | null>(null);
+  const shakeComposer = useCallback((message: string | null, rejected = false) => {
+    if (shouldJoltComposer(previousValidationMessageRef.current, message, rejected)) {
+      composerImpactRef.current?.shake();
+    }
+    // Record explicit rejections synchronously so the ensuing alert render cannot jolt twice.
+    previousValidationMessageRef.current = message;
+  }, []);
   const composerSurfaceRef = useRef<HTMLDivElement>(null);
   const providerInputRejectedRef = useRef(false);
   const composerSelectLockRef = useRef(false);
@@ -4322,6 +4332,9 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         },
       });
       setComposerSubmissionError(submission.validationMessage);
+      if (submission.validationMessage !== null) {
+        shakeComposer(submission.validationMessage, true);
+      }
       if (!submission.didDispatch) return;
       onTypingGuardSend();
       if (shouldBlurMobileComposerOnSubmit()) {
@@ -4342,6 +4355,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       phase,
       promptRef,
       shouldBlurMobileComposerOnSubmit,
+      shakeComposer,
     ],
   );
   const handleSubmitMessage = useCallback(
@@ -6288,12 +6302,18 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     [expandMobileComposer, insertComposerText, isComposerCollapsedMobile],
   );
 
+  const insertThrownMentionRef = useRef(insertComposerTextAtEnd);
+  useLayoutEffect(() => {
+    insertThrownMentionRef.current = insertComposerTextAtEnd;
+  }, [insertComposerTextAtEnd]);
+
   useEffect(() => {
     const form = composerFormRef.current;
     if (!physics || !form) return;
     const impact = attachComposerImpact(
       form,
-      (text) => insertComposerTextAtEnd(text, { ensureLeadingBoundary: true }),
+      // Inserting changes editor callbacks; keep the impact alive across that render.
+      (text) => insertThrownMentionRef.current(text, { ensureLeadingBoundary: true }),
       () => {
         toastManager.add({
           type: "error",
@@ -6302,8 +6322,16 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         });
       },
     );
-    return impact.dispose;
-  }, [physics, insertComposerTextAtEnd]);
+    composerImpactRef.current = impact;
+    return () => {
+      impact.dispose();
+      composerImpactRef.current = null;
+    };
+  }, [physics]);
+
+  useEffect(() => {
+    shakeComposer(providerInputSubmissionError ?? composerSubmissionError);
+  }, [providerInputSubmissionError, composerSubmissionError, shakeComposer]);
 
   // Context produced by other panels (diff comments, preview picks) asks the store to place
   // its chip; while this composer is mounted for the draft, that means the caret.
@@ -6713,6 +6741,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         });
         providerInputRejectedRef.current = validationMessage !== null;
         setProviderInputSubmissionError(validationMessage);
+        if (validationMessage !== null) shakeComposer(validationMessage, true);
         return validationMessage === null;
       },
     }),
@@ -6727,6 +6756,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       insertComposerDraftTerminalContext,
       insertComposerText,
       insertComposerTextAtEnd,
+      shakeComposer,
       promptRef,
       composerImagesRef,
       composerFilesRef,

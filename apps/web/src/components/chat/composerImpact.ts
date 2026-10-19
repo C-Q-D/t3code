@@ -11,7 +11,11 @@ import { isPhysicsEnabled, onPhysicsChange } from "../../lib/motion/preference";
 import { Spring } from "../../lib/motion/spring";
 import { TOKENS } from "../../lib/motion/tokens";
 
-/** Convert viewport impact velocity to bounded surface impulses; dimensions are CSS pixels. */
+/**
+ * Convert finite K4 px/s velocities to translation and scale velocities for a CSS pixel surface.
+ * Impacts below 40 px/s or surfaces with no area return zero impulses; visible impacts compress
+ * by 3.5–10 px. The event boundary validates the numeric fields before calling this function.
+ */
 export function composerImpactParameters(
   detail: ComposerImpactDetail,
   width: number,
@@ -33,7 +37,7 @@ export function composerImpactParameters(
   };
 }
 
-/** Return a neighboring label's px/s impulse at a viewport x coordinate. */
+/** Return a label's px/s impulse at centerX (viewport CSS pixels), falling to zero at 260 px. */
 export function composerNeighborImpulse(detail: ComposerImpactDetail, centerX: number) {
   const dx = centerX - detail.atX;
   const falloff = Math.max(0, 1 - Math.abs(dx) / 260);
@@ -44,14 +48,19 @@ export function composerNeighborImpulse(detail: ComposerImpactDetail, centerX: n
   };
 }
 
-/** Attach K4 listeners to a form; insertion retains the existing editor path and rejection UX. */
+/**
+ * Attach K4 listeners to a mounted form and own its surface/form transforms until disposal.
+ * insert accepts mention text and reports whether the existing editor path accepted it;
+ * reject presents the existing rejection UX. Disabled physics installs no listeners.
+ * Returned shake adds a +420 px/s horizontal impulse; dispose removes listeners, jobs and styles.
+ */
 export function attachComposerImpact(
   form: HTMLFormElement,
   insert: (text: string) => boolean,
   reject: () => void,
 ) {
   const surface = form.querySelector<HTMLElement>("[data-chat-composer-main-surface]");
-  if (!isPhysicsEnabled() || !surface) return { dispose() {} };
+  if (!isPhysicsEnabled() || !surface) return { dispose() {}, shake() {} };
   const originalSurfaceTransform = surface.style.transform;
   const originalFormTransform = form.style.transform;
   const x = new Spring({ token: TOKENS.jolt });
@@ -156,5 +165,12 @@ export function attachComposerImpact(
     if (!enabled) dispose();
   });
   updatePull();
-  return { dispose };
+  return {
+    dispose,
+    shake() {
+      if (disposed || !isPhysicsEnabled()) return;
+      x.velocity += 420;
+      start();
+    },
+  };
 }
