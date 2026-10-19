@@ -7,6 +7,7 @@ import { scopedThreadKey } from "@t3tools/client-runtime/environment";
 import { usePreviewMiniPlayerStore } from "~/previewMiniPlayerStore";
 import { setPhysicsEnabled } from "~/lib/motion/preference";
 import { installTestRaf } from "~/lib/motion/testRaf";
+import { useBrowserSurfaceStore } from "~/browser/browserSurfaceStore";
 import type { PreviewMiniPlayerObstacles } from "./previewMiniPlayerLayout";
 import { ChatCanvasContext } from "../chat/ChatCanvasContext";
 import { resolveChatCanvasLayout, type ChatCanvasPreview } from "../chat/chatCanvasLayout";
@@ -28,10 +29,8 @@ vi.mock("~/browser/browserRecording", () => ({
   useActiveBrowserRecordingTabIds: () => new Set(),
   findActiveBrowserRecordingRuntimeTabId: () => null,
 }));
-vi.mock("~/browser/browserSurfaceStore", () => ({ useBrowserSurfaceStore: () => null }));
 vi.mock("~/browser/previewRuntimeTabId", () => ({ previewRuntimeTabId: () => "runtime-tab" }));
 vi.mock("~/browser/previewRuntime", () => ({ useRendersServerTabNatively: () => true }));
-vi.mock("~/browser/BrowserSurfaceSlot", () => ({ BrowserSurfaceSlot: "surface-slot" }));
 vi.mock("~/browser/ServerBrowserSurface", () => ({ ServerBrowserSurface: "server-surface" }));
 vi.mock("~/browser/serverPictureInPicture", () => ({
   useServerPictureInPictureKey: () => null,
@@ -222,6 +221,38 @@ it("takes over a gliding preview from its current position", async () => {
   await act(async () => handle.props.onPointerUp(event));
   expect(usePreviewMiniPlayerStore.getState().byThreadKey[threadKey]!.position?.x).toBeCloseTo(
     flying.x + 20,
+  );
+});
+
+it("keeps native surface bounds aligned while the shell rebounds at the wall", async () => {
+  setPhysicsEnabled(true);
+  const clock = installTestRaf();
+  let now = 0;
+  vi.spyOn(performance, "now").mockImplementation(() => now);
+  vi.stubGlobal("window", { addEventListener: vi.fn(), removeEventListener: vi.fn() });
+  vi.stubGlobal("document", { querySelectorAll: () => [] });
+  await act(async () => {
+    renderer = create(<Harness />, {
+      createNodeMock: (element) =>
+        element.props["data-browser-surface-slot"]
+          ? {
+              // The browser's measured rect follows the transformed shell; the real slot owns remeasurement.
+              getBoundingClientRect: () => displayedFrame(),
+              closest: () => null,
+            }
+          : null,
+    });
+  });
+  const { handle, event } = await movePointer(null, 400, 0, () => {
+    now = 40;
+  });
+  await act(async () => handle.props.onPointerUp(event));
+  await act(async () => clock.advance(56));
+  await act(async () => clock.advance(106));
+  const shell = displayedFrame();
+  expect(shell.x + shell.width).toBeGreaterThan(1000);
+  expect(useBrowserSurfaceStore.getState().byTabId["runtime-tab"]!.rect?.x).toBe(
+    Math.round(shell.x),
   );
 });
 

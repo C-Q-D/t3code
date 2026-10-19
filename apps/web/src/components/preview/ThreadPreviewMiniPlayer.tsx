@@ -614,7 +614,8 @@ function MiniPlayerShell({
             }}
           >
             <div className="absolute inset-x-1.5 bottom-1.5 top-8.5 rounded-compact-row bg-code shadow-well-control">
-              {children(frame)}
+              {/* Native slots must remeasure even when only the elastic offset changes. */}
+              {children({ ...frame, x: frame.x + overshoot.x, y: frame.y + overshoot.y })}
             </div>
           </div>
           <div
