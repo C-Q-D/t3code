@@ -1,3 +1,4 @@
+/** Persists bounded panel widths while painting transient pointer and spring positions locally. */
 import * as Schema from "effect/Schema";
 import {
   type PointerEvent as ReactPointerEvent,
@@ -30,6 +31,8 @@ export interface UseResizableWidthOptions {
    *   - "right" → panel grows rightward (left-anchored panels)
    */
   readonly edge: "left" | "right";
+  /** Collapse without replacing the last committed width. */
+  readonly onCollapse?: (() => void) | undefined;
 }
 
 export interface ResizableWidthHandlers {
@@ -82,10 +85,10 @@ export function useResizableWidth(options: UseResizableWidthOptions): {
   }
 
   const clampedWidth = clamp(widthState.width);
-  const latestOptions = useRef({ clamp, storageKey, width: clampedWidth });
+  const latestOptions = useRef({ clamp, storageKey, width: clampedWidth, minWidth, maxWidth });
   useLayoutEffect(() => {
-    latestOptions.current = { clamp, storageKey, width: clampedWidth };
-  }, [clamp, clampedWidth, storageKey]);
+    latestOptions.current = { clamp, storageKey, width: clampedWidth, minWidth, maxWidth };
+  }, [clamp, clampedWidth, storageKey, minWidth, maxWidth]);
 
   const { refresh, ...handlers } = useResizeDrag<HTMLElement>((event) => {
     const host = event.currentTarget.parentElement;
@@ -95,6 +98,18 @@ export function useResizableWidth(options: UseResizableWidthOptions): {
     return {
       width: clampedWidth,
       edge,
+      physics: {
+        get min() {
+          return latestOptions.current.minWidth;
+        },
+        get max() {
+          return latestOptions.current.maxWidth;
+        },
+        onFling: options.onCollapse,
+      },
+      paint(value) {
+        host?.style.setProperty(RESIZABLE_WIDTH_PROPERTY, `${value}px`);
+      },
       resize(value) {
         const nextWidth = latestOptions.current.clamp(value);
         host?.style.setProperty(RESIZABLE_WIDTH_PROPERTY, `${nextWidth}px`);

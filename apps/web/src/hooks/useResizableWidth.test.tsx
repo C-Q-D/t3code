@@ -1,6 +1,10 @@
+/** Exercises resize gestures through their visible width and persisted result. */
 import { act, useLayoutEffect, type PointerEvent } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
+
+import { setPhysicsEnabled } from "../lib/motion/preference";
+import { activeJobs } from "../lib/motion/loop";
 
 import { RESIZABLE_WIDTH_PROPERTY, useResizableWidth } from "./useResizableWidth";
 
@@ -37,11 +41,12 @@ const cancelAnimationFrame = vi.fn();
 let events: EventTarget;
 let frame: FrameRequestCallback | undefined;
 
-function pointer(clientX = 100) {
+function pointer(clientX = 100, timeStamp = 0) {
   return {
     button: 0,
     pointerId: 1,
     clientX,
+    timeStamp,
     currentTarget: target,
     preventDefault() {},
     stopPropagation() {},
@@ -52,10 +57,12 @@ function Panel({
   edge = "left",
   maxWidth = 800,
   storageKey = "test-panel-width",
+  onCollapse,
 }: {
   edge?: "left" | "right";
   maxWidth?: number;
   storageKey?: string;
+  onCollapse?: () => void;
 }) {
   const resize = useResizableWidth({
     storageKey,
@@ -63,6 +70,7 @@ function Panel({
     minWidth: 200,
     maxWidth,
     edge,
+    onCollapse,
   });
   useLayoutEffect(() => {
     result = resize;
@@ -71,6 +79,7 @@ function Panel({
 }
 
 beforeEach(async () => {
+  setPhysicsEnabled(false);
   savedWidths.clear();
   hostStyle.clear();
   captured = false;
@@ -97,6 +106,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await act(() => renderer.unmount());
+  setPhysicsEnabled(false);
   vi.unstubAllGlobals();
   vi.clearAllMocks();
 });
@@ -251,5 +261,105 @@ describe("panel width storage changes", () => {
     expect(setItem).not.toHaveBeenCalled();
     await act(() => renderer.update(<Panel />));
     expect(result.width).toBe(400);
+  });
+});
+
+/** Consume the fake animation clock until the real motion loop releases its job. */
+async function settleFrames() {
+  let time = 0;
+  while (activeJobs() > 0 && time < 3000) {
+    time += 16;
+    await act(() => frame?.(time));
+  }
+  expect(activeJobs()).toBe(0);
+}
+
+describe("physical panel resizing", () => {
+  it.each([
+    [400, 159.06976744186048, 200],
+    [-400, 840.9302325581396, 800],
+  ])(
+    "compresses overshoot at pointer %s and commits only after returning to the boundary",
+    async (position, visual, boundary) => {
+      setPhysicsEnabled(true);
+      await act(() => {
+        result.handlers.onPointerDown(pointer(100, 0));
+        result.handlers.onPointerMove(pointer(position, 1000));
+      });
+      await act(() => frame?.(0));
+      expect(parseFloat(hostStyle.get(RESIZABLE_WIDTH_PROPERTY)!)).toBeCloseTo(visual, 6);
+      await act(() => result.handlers.onPointerUp(pointer(position, 1100)));
+      expect(setItem).not.toHaveBeenCalled();
+      expect(activeJobs()).toBe(1);
+      await settleFrames();
+      expect(hostStyle.get(RESIZABLE_WIDTH_PROPERTY)).toBe(`${boundary}px`);
+      expect(result.width).toBe(boundary);
+      expect(setItem).toHaveBeenCalledExactlyOnceWith("test-panel-width", String(boundary));
+    },
+  );
+
+  it("collapses a quick inward throw without replacing the saved width", async () => {
+    setPhysicsEnabled(true);
+    const collapse = vi.fn();
+    await act(() => renderer.update(<Panel onCollapse={collapse} />));
+    await act(() => {
+      result.handlers.onPointerDown(pointer(100, 0));
+      result.handlers.onPointerMove(pointer(250, 50));
+      result.handlers.onPointerUp(pointer(260, 60));
+    });
+    expect(collapse).toHaveBeenCalledOnce();
+    expect(setItem).not.toHaveBeenCalled();
+    expect(result.width).toBe(400);
+    expect(hostStyle.get(RESIZABLE_WIDTH_PROPERTY)).toBe("400px");
+  });
+
+  it("keeps a slow inward drag open and returns its overshoot", async () => {
+    setPhysicsEnabled(true);
+    const collapse = vi.fn();
+    await act(() => renderer.update(<Panel onCollapse={collapse} />));
+    await act(() => {
+      result.handlers.onPointerDown(pointer(100, 0));
+      result.handlers.onPointerMove(pointer(500, 1000));
+      result.handlers.onPointerUp(pointer(500, 1100));
+    });
+    expect(collapse).not.toHaveBeenCalled();
+    expect(activeJobs()).toBe(1);
+    await settleFrames();
+    expect(result.width).toBe(200);
+  });
+
+  it("takes over the current rebound position without a jump or stale commit", async () => {
+    setPhysicsEnabled(true);
+    await act(() => {
+      result.handlers.onPointerDown(pointer(100, 0));
+      result.handlers.onPointerUp(pointer(-400, 1000));
+    });
+    expect(activeJobs()).toBe(1);
+    await act(() => frame?.(16));
+    const caught = parseFloat(hostStyle.get(RESIZABLE_WIDTH_PROPERTY)!);
+    await act(() => result.handlers.onPointerDown(pointer(100, 1200)));
+    expect(activeJobs()).toBe(0);
+    expect(parseFloat(hostStyle.get(RESIZABLE_WIDTH_PROPERTY)!)).toBe(caught);
+    await act(() => {
+      result.handlers.onPointerMove(pointer(110, 1300));
+    });
+    await act(() => frame?.(32));
+    expect(parseFloat(hostStyle.get(RESIZABLE_WIDTH_PROPERTY)!)).toBeLessThan(caught);
+    expect(parseFloat(hostStyle.get(RESIZABLE_WIDTH_PROPERTY)!)).toBeGreaterThan(800);
+    await act(() => result.handlers.onPointerUp(pointer(110, 1400)));
+    await settleFrames();
+    expect(setItem).toHaveBeenCalledExactlyOnceWith("test-panel-width", "800");
+  });
+
+  it("retains hard bounds and never collapses with physics disabled", async () => {
+    const collapse = vi.fn();
+    await act(() => renderer.update(<Panel onCollapse={collapse} />));
+    await act(() => {
+      result.handlers.onPointerDown(pointer(100, 0));
+      result.handlers.onPointerUp(pointer(500, 20));
+    });
+    expect(result.width).toBe(200);
+    expect(collapse).not.toHaveBeenCalled();
+    expect(activeJobs()).toBe(0);
   });
 });
