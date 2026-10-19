@@ -1,3 +1,4 @@
+/** Routes desktop origins to bundled/dev assets and isolated user background files. */
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -11,6 +12,7 @@ import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
 
 import * as Electron from "electron";
+import { BACKGROUND_FILENAME, BACKGROUND_URL_PREFIX } from "../app/DesktopBackground.ts";
 
 export const DESKTOP_HOST = "app";
 const DESKTOP_PRODUCTION_SCHEME = "t3code";
@@ -52,10 +54,10 @@ export class ElectronProtocolUnregistrationError extends Schema.TaggedError<Elec
   }
 }
 
-// The scheme either proxies to a dev server (`targetOrigin`) or serves the
-// built client from disk (`assetDirectory`).
+/** Routes ordinary assets to Vite or the bundle; stateDir owns reserved background files. */
 export type DesktopProtocolRegistrationInput = {
   readonly scheme: string;
+  readonly stateDir: string;
   readonly clerkFrontendApiHostname: string | undefined;
 } & ({ readonly targetOrigin: URL } | { readonly assetDirectory: string });
 
@@ -254,6 +256,41 @@ const serveDesktopAsset = Effect.fn("desktop.protocol.serveAsset")(function* (
   });
 });
 
+/** Serves only content-addressed direct child files from the background directory.
+ * @param request Native protocol request; only GET and HEAD are supported.
+ * @param stateDir Desktop state root, independent of the asset/proxy target.
+ * @param pathname Raw reserved pathname; encoded separators are rejected, never decoded.
+ * @returns Image response or 404 for invalid/missing files; filesystem read failures become 404.
+ */
+const serveBackground = Effect.fn("desktop.protocol.serveBackground")(function* (
+  request: Request,
+  stateDir: string,
+  pathname: string,
+) {
+  if (new URL(request.url).host !== DESKTOP_HOST) return new Response(null, { status: 404 });
+  if (request.method !== "GET" && request.method !== "HEAD")
+    return new Response(null, { status: 405 });
+  const filename = pathname.slice(BACKGROUND_URL_PREFIX.length);
+  if (!BACKGROUND_FILENAME.test(filename)) return new Response(null, { status: 404 });
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const directory = path.join(stateDir, "background");
+  const root = yield* fs.realPath(directory).pipe(Effect.orElseSucceed(() => null));
+  const file = yield* fs
+    .realPath(path.join(directory, filename))
+    .pipe(Effect.orElseSucceed(() => null));
+  // A symlink must not turn an otherwise valid direct-child filename into an outside read.
+  if (root === null || file === null || path.dirname(file) !== root)
+    return new Response(null, { status: 404 });
+  const contents = yield* fs.readFile(file).pipe(Effect.orElseSucceed(() => null));
+  if (contents === null) return new Response(null, { status: 404 });
+  return new Response(request.method === "HEAD" ? null : new Uint8Array(contents), {
+    headers: {
+      "content-type": Option.getOrElse(Mime.getType(filename), () => "application/octet-stream"),
+    },
+  });
+});
+
 /** @public Service construction is part of the canonical Effect module API. */
 export const make = Effect.gen(function* () {
   const registered = yield* Ref.make(false);
@@ -270,6 +307,14 @@ export const make = Effect.gen(function* () {
         Effect.try({
           try: () => {
             Electron.protocol.handle(input.scheme, async (request) => {
+              // Inspect before URL normalization can erase traversal segments.
+              const pathname = request.url.match(/^[^:]+:\/\/[^/]+([^?#]*)/)?.[1] ?? "";
+              if (pathname.startsWith(BACKGROUND_URL_PREFIX)) {
+                return withContentSecurityPolicy(
+                  await runPromise(serveBackground(request, input.stateDir, pathname)),
+                  contentSecurityPolicy,
+                );
+              }
               if ("assetDirectory" in input) {
                 return withContentSecurityPolicy(
                   await runPromise(serveDesktopAsset(request, input.assetDirectory)),

@@ -30,6 +30,72 @@ describe("ElectronProtocol", () => {
     unhandleMock.mockReset();
   });
 
+  it.effect.each(["t3code", "t3code-dev"])("serves isolated backgrounds for %s", (scheme) =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const root = yield* fs.makeTempDirectoryScoped();
+      yield* fs.makeDirectory(`${root}/background`);
+      yield* fs.writeFileString(`${root}/background/ba7816bf8f01cfea.png`, "png bytes");
+      yield* fs.writeFileString(`${root}/background/ba7816bf8f01cfea.jpg`, "jpg bytes");
+      yield* fs.writeFileString(`${root}/background/ba7816bf8f01cfea.jpeg`, "jpeg bytes");
+      yield* fs.writeFileString(`${root}/background/ba7816bf8f01cfea.webp`, "webp bytes");
+      yield* fs.writeFileString(`${root}/secret.png`, "outside");
+      yield* fs.writeFileString(`${root}/index.html`, "wrong SPA fallback");
+      netFetchMock.mockImplementation(() => Promise.resolve(new Response("wrong dev proxy")));
+      let handler: (request: Request) => Promise<Response>;
+      handleMock.mockImplementation((_scheme, next) => {
+        handler = next;
+      });
+      const protocol = yield* ElectronProtocol.ElectronProtocol;
+      yield* protocol.registerDesktopProtocol({
+        scheme,
+        stateDir: root,
+        clerkFrontendApiHostname: undefined,
+        ...(scheme === "t3code"
+          ? { assetDirectory: root }
+          : { targetOrigin: new URL("http://localhost:5733") }),
+      });
+      const request = (suffix: string, init?: RequestInit) =>
+        Effect.promise(() =>
+          handler(new Request(`${scheme}://app/__t3/background/${suffix}`, init)),
+        );
+      const png = yield* request("ba7816bf8f01cfea.png");
+      assert.equal(png.status, 200);
+      assert.equal(png.headers.get("content-type"), "image/png");
+      assert.equal(yield* Effect.promise(() => png.text()), "png bytes");
+      assert.equal(
+        (yield* request("ba7816bf8f01cfea.jpg")).headers.get("content-type"),
+        "image/jpeg",
+      );
+      assert.equal(
+        (yield* request("ba7816bf8f01cfea.jpeg")).headers.get("content-type"),
+        "image/jpeg",
+      );
+      assert.equal(
+        (yield* request("ba7816bf8f01cfea.webp")).headers.get("content-type"),
+        "image/webp",
+      );
+      assert.equal((yield* request("0000000000000000.png")).status, 404);
+      assert.equal((yield* request("..%2fsecret.png")).status, 404);
+      // Electron supplies the native URL string; preserve dot segments that Request would normalize.
+      const traversal = new Request(`${scheme}://app/__t3/background/placeholder`);
+      Object.defineProperty(traversal, "url", {
+        value: `${scheme}://app/__t3/background/../secret.png`,
+      });
+      assert.equal((yield* Effect.promise(() => handler(traversal))).status, 404);
+      assert.equal((yield* request("..%5csecret.png")).status, 404);
+      assert.equal((yield* request("/secret.png")).status, 404);
+      assert.equal((yield* request("C:%5csecret.png")).status, 404);
+      assert.equal((yield* request("%252e%252e%252fsecret.png")).status, 404);
+      assert.equal((yield* request("%invalid")).status, 404);
+      assert.equal((yield* request("ba7816bf8f01cfea.png", { method: "POST" })).status, 405);
+      const head = yield* request("ba7816bf8f01cfea.png", { method: "HEAD" });
+      assert.equal(head.status, 200);
+      assert.equal(yield* Effect.promise(() => head.text()), "");
+      assert.equal(netFetchMock.mock.calls.length, 0);
+    }).pipe(Effect.provide(Layer.merge(layerProtocol, NodeServices.layer)), Effect.scoped),
+  );
+
   it.effect("serves the bundled client from disk without a backend", () =>
     Effect.gen(function* () {
       const fileSystem = yield* FileSystem.FileSystem;
@@ -43,6 +109,7 @@ describe("ElectronProtocol", () => {
       const protocol = yield* ElectronProtocol.ElectronProtocol;
       yield* protocol.registerDesktopProtocol({
         scheme: "t3code",
+        stateDir: "/unused",
         assetDirectory: directory,
         clerkFrontendApiHostname: undefined,
       });
@@ -83,6 +150,7 @@ describe("ElectronProtocol", () => {
           const protocol = yield* ElectronProtocol.ElectronProtocol;
           yield* protocol.registerDesktopProtocol({
             scheme: "t3code-dev",
+            stateDir: "/unused",
             targetOrigin: new URL("http://127.0.0.1:3773/"),
             clerkFrontendApiHostname: "clerk.t3.codes",
           });
@@ -146,6 +214,7 @@ describe("ElectronProtocol", () => {
           const protocol = yield* ElectronProtocol.ElectronProtocol;
           yield* protocol.registerDesktopProtocol({
             scheme: "t3code",
+            stateDir: "/unused",
             targetOrigin: new URL("http://127.0.0.1:3773/"),
             clerkFrontendApiHostname: undefined,
           });
@@ -173,6 +242,7 @@ describe("ElectronProtocol", () => {
           const protocol = yield* ElectronProtocol.ElectronProtocol;
           yield* protocol.registerDesktopProtocol({
             scheme: "t3code-dev",
+            stateDir: "/unused",
             targetOrigin: new URL("http://127.0.0.1:5733/"),
             clerkFrontendApiHostname: undefined,
           });
@@ -206,6 +276,7 @@ describe("ElectronProtocol", () => {
           const protocol = yield* ElectronProtocol.ElectronProtocol;
           yield* protocol.registerDesktopProtocol({
             scheme: "t3code-dev",
+            stateDir: "/unused",
             targetOrigin: new URL("http://127.0.0.1:5733/"),
             clerkFrontendApiHostname: undefined,
           });
@@ -244,6 +315,7 @@ describe("ElectronProtocol", () => {
       const error = yield* Effect.scoped(
         protocol.registerDesktopProtocol({
           scheme: "t3code-dev",
+          stateDir: "/unused",
           targetOrigin: new URL("http://127.0.0.1:3773/"),
           clerkFrontendApiHostname: undefined,
         }),
@@ -268,6 +340,7 @@ describe("ElectronProtocol", () => {
         Effect.scoped(
           protocol.registerDesktopProtocol({
             scheme: "t3code",
+            stateDir: "/unused",
             targetOrigin: new URL("http://127.0.0.1:3773/"),
             clerkFrontendApiHostname: undefined,
           }),
@@ -288,6 +361,7 @@ describe("ElectronProtocol", () => {
   it("keeps executable sources host-restricted while allowing runtime network resources", () => {
     const policy = ElectronProtocol.makeDesktopContentSecurityPolicy({
       scheme: "t3code",
+      stateDir: "/unused",
       targetOrigin: new URL("http://127.0.0.1:3773/"),
       clerkFrontendApiHostname: "clerk.t3.codes",
     });
