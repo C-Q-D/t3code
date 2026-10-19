@@ -436,6 +436,22 @@ export function resolveSidebarLastReply(
   return null;
 }
 
+/**
+ * Renders the detail popup used by SidebarThreadRow on hover or keyboard focus.
+ * Shows the title, Started time and available Last reply state, followed by optional
+ * project, environment, branch/mismatch, model/provider, handoff, terminal and error
+ * rows; supported pull requests appear in the footer. Times use the client clock setting.
+ * @param props Row-owned inputs derived from the thread shell, project/environment
+ * metadata, provider registry, branch comparison and terminal state. `thread` supplies
+ * creation and latest-run timestamps, provider history, errors and pull requests.
+ * `project` supplies the favicon; nullable display labels omit their respective rows.
+ * `environmentMachine` selects the machine icon. `providerEntry`, the instance map,
+ * `modelInstanceId`, `modelLabel` and `showInstanceBadge` describe the resolved model
+ * and provider presentation. Nullable `branchMismatch` and `terminalStatus` control
+ * their detail rows; `terminalProcessCount` supplies the terminal summary count.
+ * @returns A read-only hover card; absent reply data omits Last reply, while an active
+ * run without a completion time shows Replying. This component does not mutate threads.
+ */
 function SidebarThreadTooltip({
   thread,
   project,
