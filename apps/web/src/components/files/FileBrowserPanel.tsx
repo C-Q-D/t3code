@@ -11,7 +11,10 @@ import { serializeComposerFileLink } from "@t3tools/shared/composerTrigger";
 import { ChevronsDownUp, ChevronsUpDown } from "lucide";
 import { Search } from "lucide-react";
 import { Input as SearchInput } from "@base-ui/react/input";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { usePhysicsMotion } from "~/hooks/usePhysicsMotion";
+import { ComposerThrowToken, type ThrowChannel } from "../chat/ComposerThrowToken";
+import { installComposerMentionThrow } from "../chat/composerMentionThrow";
 
 import { Button } from "~/components/ui/button";
 import { MorphIcon } from "~/components/MorphIcon";
@@ -115,6 +118,9 @@ export default function FileBrowserPanel({
   workspaceMutationId,
 }: FileBrowserPanelProps) {
   const { resolvedTheme } = useTheme();
+  const { enabled: physics } = usePhysicsMotion();
+  const throwId = useId();
+  const throwChannel: ThrowChannel = `mention:${throwId}`;
   const composerRef = useComposerHandleContext();
   const fileContextMenu = useFileContextMenu(environmentId);
   const {
@@ -511,6 +517,17 @@ export default function FileBrowserPanel({
       panel.removeEventListener("dragend", handleDragEnd);
     };
   }, [dragMention]);
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (!physics || !panel) return;
+    const throws = installComposerMentionThrow(throwChannel);
+    // Bubble after the tree's row handler, which may install its own drag image.
+    panel.addEventListener("dragstart", throws.start);
+    return () => {
+      panel.removeEventListener("dragstart", throws.start);
+      throws.dispose();
+    };
+  }, [physics, throwChannel]);
 
   return (
     <div
@@ -518,6 +535,7 @@ export default function FileBrowserPanel({
       className="flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 rounded-files-well bg-files-tree px-1.5 py-2 shadow-files-tree"
       data-file-browser-panel={`${environmentId}:${cwd}`}
     >
+      <ComposerThrowToken channel={throwChannel} />
       <div className="flex h-7.5 shrink-0 items-center gap-0.5" data-surface-subheader>
         <FileSearchField
           name="project-files-search"

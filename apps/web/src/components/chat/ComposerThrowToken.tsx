@@ -10,7 +10,7 @@ import { TOKENS } from "../../lib/motion/tokens";
 import { VelocityTracker } from "../../lib/motion/velocity";
 
 /** Each surface owns its channel's portals and cancels them on unmount. */
-type ThrowChannel = "thread" | "mention";
+export type ThrowChannel = "thread" | "mention" | `mention:${string}`;
 /** Viewport CSS pixel geometry and a landing callback which must not insert before arrival. */
 interface ThrowInput {
   channel: ThrowChannel;
