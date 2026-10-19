@@ -1,5 +1,5 @@
+/** Exercises real sortable seats, release springs and listener ownership with offline catalogs and deterministic layout/time. */
 // @vitest-environment jsdom
-/** Exercises real release springs and listener ownership; only browser layout and time are fixtures. */
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import { act, useLayoutEffect, useRef } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -9,6 +9,28 @@ import { activeJobs } from "~/lib/motion/loop";
 import { setPhysicsEnabled } from "~/lib/motion/preference";
 import { installTestRaf } from "~/lib/motion/testRaf";
 import { useSortableFling } from "./useSortableFling";
+import { DiscussionSeats } from "~/components/discussions/DiscussionSeats";
+import { DiscussionPromptId, EnvironmentId, ProviderInstanceId } from "@t3tools/contracts";
+
+// Supply an offline catalog at the environment boundary; the seat UI and dnd-kit remain real.
+vi.mock(import("~/state/server"), async (importOriginal) => {
+  const original = await importOriginal();
+  const { Atom, AsyncResult } = await import("effect/reactivity");
+  const providers = Atom.make([]);
+  const settings = Atom.make(null);
+  const prompts = Atom.make(AsyncResult.success({ prompts: [] }));
+  const support = Atom.make(AsyncResult.initial());
+  return {
+    ...original,
+    serverEnvironment: {
+      ...original.serverEnvironment,
+      providersValueAtom: () => providers,
+      settingsValueAtom: () => settings,
+      discussionPromptsLive: () => prompts,
+      discussionProviderSupport: () => support,
+    },
+  };
+});
 
 let root: Root;
 let host: HTMLDivElement;
@@ -114,6 +136,7 @@ afterEach(async () => {
   host.remove();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 it("injects release velocity into the active FLIP and settles displaced neighbors", async () => {
@@ -180,3 +203,96 @@ it("removes sampling on cancel and clears owned jobs on unmount", async () => {
   expect(activeJobs()).toBe(0);
   expect(clock.pending.size).toBe(0);
 });
+
+it.each(["end", "unmount"])("removes the exact document sampler on drag %s", async (exit) => {
+  const add = vi.spyOn(document, "addEventListener");
+  const remove = vi.spyOn(document, "removeEventListener");
+  await drag();
+  const registration = add.mock.calls.find(([type]) => type === "pointermove");
+  expect(registration).toBeDefined();
+  if (exit === "end") await release();
+  else await act(() => root.render(null));
+  expect(remove).toHaveBeenCalledWith("pointermove", registration![1]);
+});
+
+it.each(["disabled", "keyboard"])(
+  "keeps real discussion sortable nodes transition-free during %s sorting",
+  async (mode) => {
+    vi.useFakeTimers();
+    setPhysicsEnabled(mode !== "disabled");
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      const index = Array.from(host.querySelectorAll("[data-sortable-fling-id]")).indexOf(this);
+      return new DOMRect(Math.max(index, 0) * 146, 0, 124, 164);
+    });
+    const seats = [
+      {
+        personaPromptId: DiscussionPromptId.make("architect"),
+        modelSelection: { instanceId: ProviderInstanceId.make("claude"), model: "opus" },
+      },
+      {
+        personaPromptId: DiscussionPromptId.make("opponent"),
+        modelSelection: { instanceId: ProviderInstanceId.make("claude"), model: "opus" },
+      },
+    ];
+    await act(() =>
+      root.render(
+        <DiscussionSeats
+          environmentId={EnvironmentId.make("test")}
+          projectId={null}
+          seats={seats}
+          onChange={() => undefined}
+        />,
+      ),
+    );
+    const first = host.querySelector<HTMLElement>("[data-sortable-fling-id]")!;
+    const handle = first.querySelector<HTMLButtonElement>("button[aria-describedby]")!;
+    expect(handle).not.toBeNull();
+    if (mode === "keyboard") {
+      await act(() => {
+        handle.focus();
+        handle.dispatchEvent(
+          new KeyboardEvent("keydown", {
+            code: "Space",
+            key: " ",
+            bubbles: true,
+            cancelable: true,
+          }),
+        );
+      });
+    } else {
+      const down = new MouseEvent("pointerdown", {
+        clientX: 10,
+        clientY: 10,
+        button: 0,
+        bubbles: true,
+      });
+      Object.defineProperty(down, "isPrimary", { value: true });
+      await act(() => handle.dispatchEvent(down));
+      await act(() =>
+        document.dispatchEvent(
+          new MouseEvent("pointermove", { clientX: 30, clientY: 10, bubbles: true }),
+        ),
+      );
+    }
+    // Attach the keyboard sensor's deferred listener before checking and cancelling the drag.
+    await act(() => vi.runOnlyPendingTimersAsync());
+    try {
+      // Confirm the real sensor reached sorting, so an idle node cannot make this pass.
+      expect(host.querySelector("[data-discussion-seat][data-placeholder]")).not.toBeNull();
+      expect(
+        Array.from(host.querySelectorAll<HTMLElement>("[data-sortable-fling-id]")).map(
+          (element) => element.style.transition,
+        ),
+      ).toEqual(["", ""]);
+    } finally {
+      await act(() =>
+        document.dispatchEvent(
+          new KeyboardEvent("keydown", { code: "Escape", key: "Escape", bubbles: true }),
+        ),
+      );
+      await act(() => vi.runOnlyPendingTimersAsync());
+    }
+  },
+);

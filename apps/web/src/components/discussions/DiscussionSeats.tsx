@@ -507,7 +507,6 @@ function DiscussionSeatCard(props: {
     setNodeRef,
     setActivatorNodeRef,
     transform,
-    transition,
     isDragging,
     isSorting,
     activeIndex,
@@ -515,8 +514,9 @@ function DiscussionSeatCard(props: {
     items,
   } = useSortable({
     id: props.id,
-    // The release spring owns layout compensation; keyboard sorting keeps dnd-kit defaults.
-    ...(physicsSorting ? { transition: null, animateLayoutChanges: () => false } : {}),
+    transition: null,
+    // Keep seats transition-free on every input path; pointer physics owns layout compensation.
+    ...(physicsSorting ? { animateLayoutChanges: () => false } : {}),
   });
   const [hoverOpen, setHoverOpen] = useState(false);
   const index = discussionSeatPreviewIndex(props.index, activeIndex, overIndex, items.length);
@@ -527,7 +527,7 @@ function DiscussionSeatCard(props: {
         <div
           ref={setNodeRef}
           data-sortable-fling-id={props.id}
-          style={{ transform: CSS.Translate.toString(transform), transition }}
+          style={{ transform: CSS.Translate.toString(transform) }}
           className="relative flex shrink-0 items-center"
         >
           <div
