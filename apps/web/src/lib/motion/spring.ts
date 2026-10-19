@@ -39,6 +39,11 @@ export class Spring {
     return this;
   }
 
+  /**
+   * Return whether position error is < precision and absolute velocity is < precision * 20.
+   * This only checks rest conditions; it does not snap to the target or change velocity.
+   * Callers use this result to end motion tasks.
+   */
   get isSettled() {
     return (
       Math.abs(this.value - this.target) < this.precision &&
