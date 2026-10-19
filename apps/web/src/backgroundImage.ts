@@ -1,13 +1,13 @@
 /** Shares the local desktop background selection; browsers always use the bundled image. */
 import { createStore } from "zustand/vanilla";
+import type { DesktopBridge } from "@t3tools/contracts";
 import defaultBackgroundUrl from "./assets/dusk-ridges.svg";
 
-/** Optional C1 bridge methods, kept local until the desktop contract is integrated. */
-export interface BackgroundImageBridge {
-  getBackgroundImage?: () => Promise<string | null>;
-  pickBackgroundImage?: () => Promise<string | null>;
-  clearBackgroundImage?: () => Promise<void>;
-}
+/** Keeps the store dependency limited to background methods while inheriting the desktop contract. */
+export type BackgroundImageBridge = Pick<
+  DesktopBridge,
+  "getBackgroundImage" | "pickBackgroundImage" | "clearBackgroundImage"
+>;
 
 export { defaultBackgroundUrl };
 
