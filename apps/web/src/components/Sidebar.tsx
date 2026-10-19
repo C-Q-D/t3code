@@ -209,6 +209,7 @@ import {
   planSidebarThreadDrop,
   resolveAdjacentThreadId,
   resolveSidebarSweepKeys,
+  sidebarSweepScopes,
   resolveSidebarDropTarget,
   resolveSidebarDropVerb,
   resolveSidebarThreadSection,
@@ -3629,8 +3630,14 @@ export default function Sidebar() {
   }, [activeThreads, pinnedThreads, settledThreads, snoozedThreads, workingThreads]);
   const sectionByThreadKeyRef = useRef(sectionByThreadKey);
   sectionByThreadKeyRef.current = sectionByThreadKey;
-  // Drag a row action to apply it to the armed rows in the same section.
-  // Staying in one section keeps an overshoot from changing neighboring
+  const sweepScopes = useMemo(
+    () => sidebarSweepScopes(sectionByThreadKey, isTodayView ? todayTab : null, orderedThreadKeys),
+    [sectionByThreadKey, isTodayView, todayTab, orderedThreadKeys],
+  );
+  const sweepScopesRef = useRef(sweepScopes);
+  sweepScopesRef.current = sweepScopes;
+  // Drag a row action within its project section or visible Today tab.
+  // Staying in one scope keeps an overshoot from changing neighboring
   // sections, whose boundaries may be hidden outside a row drag. The sweep
   // runs on the row drag's sensor and ref, so unmounting the list cancels it.
   const [actionSweep, setActionSweep] = useState<{
@@ -3640,14 +3647,15 @@ export default function Sidebar() {
   const startActionSweep = useCallback(
     (threadRef: ScopedThreadRef, action: SidebarSweepAction, event: PointerEvent) => {
       const originKey = scopedThreadKey(threadRef);
-      const originSection = sectionByThreadKeyRef.current.get(originKey);
+      const originScope = sweepScopesRef.current.get(originKey);
       const canApply = (key: string) => {
         const thread = threadByKeyRef.current.get(key);
         const capabilities =
           thread && serverConfigs.get(thread.environmentId)?.environment.capabilities;
         return (
           thread !== undefined &&
-          sectionByThreadKeyRef.current.get(key) === originSection &&
+          originScope !== undefined &&
+          sweepScopesRef.current.get(key) === originScope &&
           (action === "unsnooze"
             ? capabilities?.threadSnooze === true
             : capabilities?.threadSettlement === true)
@@ -3678,7 +3686,8 @@ export default function Sidebar() {
           sweepTo(threadListRef.current && sidebarThreadKeyAtY(threadListRef.current, y)),
         // Also runs after a press that never moved. Nothing is swept then,
         // and the button's own click applies its action. Rows that changed
-        // section mid-gesture, say pinned from another device, are skipped.
+        // scope mid-gesture are skipped: lifecycle section in project mode,
+        // visible Today tab in Today mode, regardless of pinning.
         onEnd: () => {
           const keys = sweptKeys.filter(canApply);
           if (action === "settle") {

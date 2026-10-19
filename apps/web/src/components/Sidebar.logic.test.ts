@@ -38,6 +38,7 @@ import {
   prepareSidebarProjectsForGrouping,
   resolveProjectStatusIndicator,
   resolveSidebarSweepKeys,
+  sidebarSweepScopes,
   resolveSidebarStageBadgeLabel,
   resolveSidebarThreadSection,
   resolveSidebarRowAccessibility,
@@ -2311,6 +2312,41 @@ describe("sortPinnedThreadsForSidebar", () => {
 });
 
 describe("resolveSidebarSweepKeys", () => {
+  it.each([
+    { origin: "a", expected: ["a", "b", "c"] },
+    { origin: "b", expected: ["b", "c"] },
+  ])("sweeps mixed ordinary and pinned Today rows from $origin", ({ origin, expected }) => {
+    const sections = new Map<string, SidebarSection>([
+      ["a", "active"],
+      ["b", "pinned"],
+      ["c", "active"],
+    ]);
+    const scopes = sidebarSweepScopes(sections, "waiting", ["a", "b", "c"]);
+    const eligible = (key: string) => scopes.get(key) === scopes.get(origin);
+    expect(resolveSidebarSweepKeys(["a", "b", "c"], origin, "c", eligible)).toEqual(expected);
+  });
+
+  it("keeps project section boundaries and excludes rows leaving the current Today tab", () => {
+    const sections = new Map<string, SidebarSection>([
+      ["a", "active"],
+      ["b", "pinned"],
+      ["c", "active"],
+    ]);
+    const project = sidebarSweepScopes(sections, null, ["a", "b", "c"]);
+    expect(
+      resolveSidebarSweepKeys(
+        ["a", "b", "c"],
+        "a",
+        "c",
+        (key) => project.get(key) === project.get("a"),
+      ),
+    ).toEqual(["a", "c"]);
+    const pickup = sidebarSweepScopes(sections, "waiting", ["a", "b", "c"]).get("a");
+    const release = sidebarSweepScopes(sections, "waiting", ["a", "c"]);
+    expect(release.get("b")).toBeUndefined();
+    const switched = sidebarSweepScopes(sections, "working", ["a", "b", "c"]);
+    expect(switched.get("a")).not.toBe(pickup);
+  });
   const ordered = ["a", "b", "c", "d", "blocked"];
   const canSettle = (key: string) => key !== "blocked";
 

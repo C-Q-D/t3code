@@ -350,6 +350,19 @@ export function resolveSidebarSweepKeys(
   return orderedKeys.slice(Math.min(origin, target), Math.max(origin, target) + 1).filter(canApply);
 }
 
+/** Map current visible rows to sweep scopes. Project mode retains lifecycle sections;
+ * Today uses its selected tab, so hidden pinning does not split a visible sweep.
+ * Missing rows have no scope; callers re-read this map at release to reject rows that moved. */
+export function sidebarSweepScopes(
+  sections: ReadonlyMap<string, SidebarSection>,
+  todayTab: "working" | "waiting" | null,
+  visibleKeys: readonly string[],
+): ReadonlyMap<string, string> {
+  return todayTab === null
+    ? sections
+    : new Map(visibleKeys.map((key) => [key, `today-${todayTab}`]));
+}
+
 /** The thread row at a pointer height, clamped to the rows visible in the
     sidebar's scroll viewport. A gap between rows resolves to the row above
     it. Rows carry their key in data-thread-item, which departing motion
