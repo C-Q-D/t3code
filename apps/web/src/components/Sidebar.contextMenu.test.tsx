@@ -21,6 +21,8 @@ import {
 } from "./threadActionMenu.logic";
 
 const resolutions: Array<{ thread: string; action: ThreadActionMenuId | null }> = [];
+// Retain interaction coverage for the reversible, enabled snooze UI.
+vi.mock("../snoozeUi", () => ({ SNOOZE_UI_ENABLED: true }));
 const dispatched: Array<{ thread: string; action: ThreadActionMenuId }> = [];
 let root: Root;
 let container: HTMLDivElement;

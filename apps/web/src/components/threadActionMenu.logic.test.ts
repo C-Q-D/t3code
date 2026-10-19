@@ -1,5 +1,15 @@
 /** Verifies shared thread menu order, capabilities and permission availability without rendering UI. */
-import { describe, expect, it } from "vite-plus/test";
+import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
+
+const snoozeUi = vi.hoisted(() => ({ enabled: true }));
+vi.mock("../snoozeUi", () => ({
+  get SNOOZE_UI_ENABLED() {
+    return snoozeUi.enabled;
+  },
+}));
+beforeEach(() => {
+  snoozeUi.enabled = true;
+});
 
 import {
   buildDraftActionMenuItems,
@@ -43,6 +53,22 @@ function allIds(state: ThreadActionMenuState): string[] {
 }
 
 describe("buildSidebarThreadActionMenuItems", () => {
+  it.each([false, true])(
+    "omits snooze and wake with the UI disabled (snoozed: %s)",
+    (isSnoozed) => {
+      snoozeUi.enabled = false;
+      const state = { ...baseState, isSnoozed, hasDraft: false };
+      expect(buildSidebarThreadActionMenuItems(state).map((item) => item.id)).not.toEqual(
+        expect.arrayContaining(["snooze"]),
+      );
+      expect(buildSidebarThreadActionMenuItems(state).map((item) => item.id)).not.toContain(
+        "unsnooze",
+      );
+      expect(allIds(state)).not.toContain("snooze");
+      expect(allIds(state)).not.toContain("unsnooze");
+      expect(allIds(state)).not.toContain("snooze:custom");
+    },
+  );
   it.each([false, true])("shows discard only with user draft content (%s)", (hasDraft) => {
     const items = buildSidebarThreadActionMenuItems({ ...baseState, hasDraft });
     expect(items.some((item) => item.id === "discard-draft")).toBe(hasDraft);

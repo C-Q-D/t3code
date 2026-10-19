@@ -14,6 +14,7 @@ import { useThreadSelectionStore } from "~/threadSelectionStore";
 import { useEnvironmentsWithScope } from "~/state/session";
 import type { SidebarThreadSummary } from "~/types";
 import { t } from "~/i18n";
+import { SNOOZE_UI_ENABLED } from "~/snoozeUi";
 import { cn } from "~/lib/utils";
 import { useNowMinute } from "~/hooks/useNowMinute";
 import { Tooltip, TooltipPopup, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
@@ -107,17 +108,19 @@ export const SidebarBulkActions = memo(function SidebarBulkActions(props: Sideba
             <CheckIcon aria-hidden className="size-3.5 shrink-0" strokeWidth={2.25} />
             <span className="truncate">{settle.label}</span>
           </button>
-          <button
-            type="button"
-            disabled={!snooze || snooze.disabled}
-            onClick={(event) => runAction(event.currentTarget, "snooze")}
-            className="sidebar-bulk-action min-w-0 flex-6"
-          >
-            <AlarmClockIcon aria-hidden className="size-3.5 shrink-0" strokeWidth={1.75} />
-            <span className="truncate">
-              {snooze?.label ?? t.sidebar.bulk.snooze(model.threadKeys.length)}
-            </span>
-          </button>
+          {SNOOZE_UI_ENABLED ? (
+            <button
+              type="button"
+              disabled={!snooze || snooze.disabled}
+              onClick={(event) => runAction(event.currentTarget, "snooze")}
+              className="sidebar-bulk-action min-w-0 flex-6"
+            >
+              <AlarmClockIcon aria-hidden className="size-3.5 shrink-0" strokeWidth={1.75} />
+              <span className="truncate">
+                {snooze?.label ?? t.sidebar.bulk.snooze(model.threadKeys.length)}
+              </span>
+            </button>
+          ) : null}
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger

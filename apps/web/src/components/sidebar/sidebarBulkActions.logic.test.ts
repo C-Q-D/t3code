@@ -1,11 +1,21 @@
 /** Protects the shared slab/native-menu action set, counts and mixed-environment availability. */
-import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import { installMessages } from "~/i18n";
 import { en } from "~/i18n/locales/en";
 import { messages as zhCN } from "~/i18n/locales/zh-CN";
 import { makeThreadFixture } from "~/test-fixtures";
 import { buildSidebarBulkActionModel } from "./sidebarBulkActions.logic";
+
+const snoozeUi = vi.hoisted(() => ({ enabled: true }));
+vi.mock("~/snoozeUi", () => ({
+  get SNOOZE_UI_ENABLED() {
+    return snoozeUi.enabled;
+  },
+}));
+beforeEach(() => {
+  snoozeUi.enabled = true;
+});
 
 const local = EnvironmentId.make("local");
 const remote = EnvironmentId.make("remote");
@@ -34,6 +44,16 @@ beforeEach(() => installMessages("en", en));
 afterEach(() => installMessages("zh-CN", zhCN));
 
 describe("shared sidebar bulk actions", () => {
+  it("omits snooze from an eligible selection when the UI is disabled", () => {
+    snoozeUi.enabled = false;
+    const model = buildSidebarBulkActionModel(base);
+    expect(model.items.map((item) => item.id)).toEqual([
+      "settle",
+      "regenerate-title",
+      "mark-unread",
+      "delete",
+    ]);
+  });
   it("counts only rendered selected rows and keeps their action targets in selection order", () => {
     const model = buildSidebarBulkActionModel({
       ...base,

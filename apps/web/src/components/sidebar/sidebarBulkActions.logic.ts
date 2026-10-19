@@ -2,6 +2,7 @@
 import type { ContextMenuItem, EnvironmentId } from "@t3tools/contracts";
 import { canSnooze, type SnoozePreset } from "@t3tools/client-runtime/state/thread-settled";
 import { t } from "~/i18n";
+import { SNOOZE_UI_ENABLED } from "~/snoozeUi";
 import type { SidebarThreadSummary } from "~/types";
 import {
   buildBulkTitleRegenerationContextMenuItem,
@@ -30,10 +31,13 @@ export function buildSidebarBulkActionModel(input: {
   const selectedThreads = threadKeys.map((key) => input.threadByKey.get(key)!);
   const count = threadKeys.length;
   const settlingThreads = selectedThreads.filter((thread) => thread.settledOverride !== "settled");
-  const canSnoozeSelection = selectedThreads.every(
-    (thread) =>
-      input.supports(thread.environmentId, "threadSnooze") && canSnooze(thread, { now: input.now }),
-  );
+  const canSnoozeSelection =
+    SNOOZE_UI_ENABLED &&
+    selectedThreads.every(
+      (thread) =>
+        input.supports(thread.environmentId, "threadSnooze") &&
+        canSnooze(thread, { now: input.now }),
+    );
   const titleRegenerationThreads = selectedThreads.filter((thread) =>
     input.supports(thread.environmentId, "threadTitleRegeneration"),
   );

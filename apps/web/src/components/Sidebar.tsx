@@ -1,5 +1,6 @@
 /** Renders project and thread navigation and dispatches scoped menu actions; server services own export IO. */
 import { t } from "~/i18n";
+import { SNOOZE_UI_ENABLED } from "../snoozeUi";
 import { ContextMenu } from "@base-ui/react/context-menu";
 import { serverEnvironment } from "../state/server";
 import { useAtomCommand } from "../state/use-atom-command";
@@ -1280,6 +1281,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
   const lastVisitedDate = lastVisitedAt === undefined ? null : parseTimestampDate(lastVisitedAt);
   const wokeAtDate = props.wokeAt === null ? null : parseTimestampDate(props.wokeAt);
   const isWoke =
+    SNOOZE_UI_ENABLED &&
     wokeAtDate !== null &&
     (lastVisitedDate === null || lastVisitedDate < wokeAtDate) &&
     thread.settledOverride !== "settled";
@@ -1521,6 +1523,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
   // Snooze is offered only where it can succeed: capability-gated and never
   // on blocked-on-you work or queued turns (the server rejects both).
   const showSnoozeButton =
+    SNOOZE_UI_ENABLED &&
     canOperateThread &&
     props.snoozeSupported &&
     canSnooze(thread, { now: new Date().toISOString() });
@@ -1913,7 +1916,9 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
             ) : (
               <>
                 <span className="ml-auto inline-flex shrink-0 items-center gap-1 text-secondary-copy tabular-nums text-muted-foreground">
-                  {variantAction === "unsnooze" && props.snoozeWakeLabelText !== null ? (
+                  {SNOOZE_UI_ENABLED &&
+                  variantAction === "unsnooze" &&
+                  props.snoozeWakeLabelText !== null ? (
                     <span className="inline-flex items-center gap-1 font-mono text-info">
                       <AlarmClockIcon aria-hidden className="size-3" />
                       {props.snoozeWakeLabelText}
@@ -1928,7 +1933,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                 </span>
                 {canOperateThread &&
                 (variantAction === "unsnooze"
-                  ? props.snoozeSupported
+                  ? SNOOZE_UI_ENABLED && props.snoozeSupported
                   : props.settlementSupported) ? (
                   <Tooltip>
                     <TooltipTrigger
@@ -5343,7 +5348,9 @@ export default function Sidebar() {
                               actionSweep?.keys.has(threadKey) ? actionSweep.action : null
                             }
                             snoozeWakeLabelText={
-                              section === "snoozed" && thread.snoozedUntil != null
+                              SNOOZE_UI_ENABLED &&
+                              section === "snoozed" &&
+                              thread.snoozedUntil != null
                                 ? snoozeWakeLabel(thread.snoozedUntil, {
                                     now: new Date().toISOString(),
                                   })

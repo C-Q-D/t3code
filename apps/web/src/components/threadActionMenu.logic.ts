@@ -1,5 +1,6 @@
 /** Builds shared thread menus and permission availability; action execution belongs in the calling surface. */
 import { t } from "~/i18n";
+import { SNOOZE_UI_ENABLED } from "../snoozeUi";
 import type { ContextMenuItem } from "@t3tools/contracts";
 import type { SnoozePreset } from "@t3tools/client-runtime/state/thread-settled";
 
@@ -179,7 +180,7 @@ export function buildThreadActionMenuItems(
             : { id: "settle" as const, label: t.common.threadActions.settle, icon: "circle-check" },
         ]
       : []),
-    ...(state.supports.snooze
+    ...(SNOOZE_UI_ENABLED && state.supports.snooze
       ? [
           state.isSnoozed
             ? { id: "unsnooze" as const, label: t.common.threadActions.wake, icon: "clock" }
@@ -351,16 +352,20 @@ export function buildSidebarThreadActionMenuItems(
     command("mark-unread"),
     { ...command(state.isPinned ? "unpin" : "pin", state.supports.pinning), separatorBefore: true },
     command(state.isSettled ? "unsettle" : "settle", state.supports.settlement),
-    {
-      id: "unsnooze",
-      label: t.sidebar.actions.wake,
-      icon: "clock",
-      disabled: !state.canOperate || !state.supports.snooze || !state.isSnoozed,
-    },
-    {
-      ...command("snooze", state.supports.snooze && !state.isSnoozed),
-      label: t.sidebar.actions.snooze,
-    },
+    ...(SNOOZE_UI_ENABLED
+      ? [
+          {
+            id: "unsnooze" as const,
+            label: t.sidebar.actions.wake,
+            icon: "clock",
+            disabled: !state.canOperate || !state.supports.snooze || !state.isSnoozed,
+          },
+          {
+            ...command("snooze", state.supports.snooze && !state.isSnoozed),
+            label: t.sidebar.actions.snooze,
+          },
+        ]
+      : []),
     { id: "copy-path", label: t.sidebar.actions.copyPath, icon: "folder", separatorBefore: true },
     {
       id: "copy-branch",
