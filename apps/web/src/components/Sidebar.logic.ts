@@ -10,7 +10,17 @@ import {
 } from "@t3tools/client-runtime/state/runtime";
 import { defaultAnimateLayoutChanges, type AnimateLayoutChanges } from "@dnd-kit/sortable";
 import { threadSearchMatchKey } from "@t3tools/client-runtime/state/thread-search";
-import type { ContextMenuItem, EnvironmentId, ThreadId } from "@t3tools/contracts";
+import type {
+  ContextMenuItem,
+  EnvironmentId,
+  ScopedProjectRef,
+  ThreadId,
+} from "@t3tools/contracts";
+import { scopeProjectRef } from "@t3tools/client-runtime/environment";
+import {
+  resolveSidebarProjectTarget,
+  type SidebarProjectSnapshot,
+} from "../sidebarProjectGrouping";
 import type { SidebarProjectSortOrder, SidebarThreadSortOrder } from "@t3tools/contracts/settings";
 import type { AsyncResult } from "effect/reactivity";
 import { planPinnedReorder } from "@t3tools/client-runtime/state/thread-sort";
@@ -899,6 +909,46 @@ export function shouldCreateNewThreadInCurrentProject(
   projectGroupCount: number,
 ): boolean {
   return shiftKey || projectGroupCount <= 1;
+}
+
+/** A creation destination shared by the sidebar button and the new-thread shortcut. */
+export type SidebarNewThreadDestination =
+  | { kind: "context" }
+  | { kind: "project"; projectRef: ScopedProjectRef }
+  | { kind: "scratch"; environmentId: EnvironmentId }
+  | { kind: "picker" };
+
+/**
+ * Resolves creation without side effects so the button and shortcut use the same policy.
+ * `shiftKey` overrides the scope; `groups` must include merged scratch groups.
+ * `scopeKey` is already resolved by resolveSidebarProjectScopeKey; null means all projects.
+ * `preferredProjectRef` is the current thread's project, or null when absent.
+ * `scratchEnvironmentId` validates a target machine, returning null when unavailable.
+ * Missing or unusable scoped targets fall back to the all-projects creation rule.
+ */
+export function resolveSidebarNewThreadDestination(input: {
+  shiftKey: boolean;
+  groups: readonly SidebarProjectSnapshot[];
+  scopeKey: string | null;
+  preferredProjectRef: ScopedProjectRef | null;
+  scratchEnvironmentId: (environmentId: EnvironmentId) => EnvironmentId | null;
+}): SidebarNewThreadDestination {
+  if (input.shiftKey) return { kind: "context" };
+
+  const group = input.groups.find((candidate) => candidate.projectKey === input.scopeKey);
+  const target = group ? resolveSidebarProjectTarget(group, input.preferredProjectRef) : null;
+  if (group && target) {
+    if (group.isScratch) {
+      const environmentId = input.scratchEnvironmentId(target.environmentId);
+      if (environmentId !== null) return { kind: "scratch", environmentId };
+    } else {
+      return { kind: "project", projectRef: scopeProjectRef(target.environmentId, target.id) };
+    }
+  }
+
+  return shouldCreateNewThreadInCurrentProject(input.shiftKey, input.groups.length)
+    ? { kind: "context" }
+    : { kind: "picker" };
 }
 
 export function orderItemsByPreferredIds<TItem, TId>(input: {

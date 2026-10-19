@@ -1,3 +1,4 @@
+/** Groups physical projects for sidebar scopes and shared project-target selection. */
 import type { EnvironmentId, ScopedProjectRef } from "@t3tools/contracts";
 import {
   buildProjectGroups,
@@ -181,6 +182,40 @@ export function buildSidebarProjectSnapshots(input: {
   });
 }
 
+/**
+ * Selects a physical target so picker and scoped creation cannot drift apart.
+ * `group` supplies members and its representative; `preferredProjectRef` may be null.
+ * Prefers the exact member, then its machine, then the representative, then the first
+ * member. Returns null for an empty group; it never selects outside the group.
+ */
+export function resolveSidebarProjectTarget(
+  group: SidebarProjectSnapshot,
+  preferredProjectRef: ScopedProjectRef | null,
+): SidebarProjectGroupMember | null {
+  const preferredProject = preferredProjectRef
+    ? (group.memberProjects.find(
+        (project) =>
+          project.environmentId === preferredProjectRef.environmentId &&
+          project.id === preferredProjectRef.projectId,
+      ) ??
+      group.memberProjects.find(
+        (project) => project.environmentId === preferredProjectRef.environmentId,
+      ))
+    : null;
+  return (
+    preferredProject ??
+    group.memberProjects.find(
+      (project) => project.environmentId === group.environmentId && project.id === group.id,
+    ) ??
+    group.memberProjects[0] ??
+    null
+  );
+}
+
+/**
+ * Builds nonempty picker entries from `groups`, selecting targets with the shared policy.
+ * `preferredProjectRef` may be null; its containing group moves first, preserving other order.
+ */
 export function buildSidebarProjectPickerEntries(input: {
   groups: ReadonlyArray<SidebarProjectSnapshot>;
   preferredProjectRef: ScopedProjectRef | null;
@@ -194,22 +229,7 @@ export function buildSidebarProjectPickerEntries(input: {
             projectRef.projectId === preferredProjectRef.projectId,
         )
       : false;
-    const preferredProject = preferredProjectRef
-      ? (group.memberProjects.find(
-          (project) =>
-            project.environmentId === preferredProjectRef.environmentId &&
-            project.id === preferredProjectRef.projectId,
-        ) ??
-        group.memberProjects.find(
-          (project) => project.environmentId === preferredProjectRef.environmentId,
-        ))
-      : null;
-    const targetProject =
-      preferredProject ??
-      group.memberProjects.find(
-        (project) => project.environmentId === group.environmentId && project.id === group.id,
-      ) ??
-      group.memberProjects[0];
+    const targetProject = resolveSidebarProjectTarget(group, preferredProjectRef);
     if (!targetProject) return [];
 
     return [{ group, targetProject, isPreferred }];

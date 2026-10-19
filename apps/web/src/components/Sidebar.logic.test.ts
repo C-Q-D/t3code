@@ -33,6 +33,7 @@ import {
   orderItemsByPreferredIds,
   pinOrderKeyBetween,
   resolveAdjacentThreadId,
+  resolveSidebarNewThreadDestination,
   resolveProjectStatusIndicator,
   resolveSidebarSweepKeys,
   resolveSidebarStageBadgeLabel,
@@ -86,8 +87,152 @@ import {
   type Thread,
 } from "../types";
 import { makeThreadFixture, type ThreadFixtureOverrides } from "../test-fixtures";
+import type { SidebarProjectSnapshot } from "../sidebarProjectGrouping";
 
 const localEnvironmentId = EnvironmentId.make("environment-local");
+
+describe("resolveSidebarNewThreadDestination", () => {
+  const remoteEnvironmentId = EnvironmentId.make("environment-remote");
+  const first = {
+    ...makeProject({ id: ProjectId.make("first") }),
+    physicalProjectKey: "first",
+    environmentLabel: null,
+  };
+  const representative = {
+    ...first,
+    id: ProjectId.make("representative"),
+    environmentId: remoteEnvironmentId,
+    physicalProjectKey: "representative",
+  };
+  const preferred = { ...first, id: ProjectId.make("preferred"), physicalProjectKey: "preferred" };
+  const group: SidebarProjectSnapshot = {
+    ...representative,
+    projectKey: "selected",
+    displayName: "Selected",
+    groupedProjectCount: 3,
+    environmentPresence: "mixed",
+    allRemoteMembersAreDesktopLocal: false,
+    allRemoteMembersAreWsl: false,
+    memberProjects: [first, representative, preferred],
+    memberProjectRefs: [
+      { environmentId: localEnvironmentId, projectId: first.id },
+      { environmentId: remoteEnvironmentId, projectId: representative.id },
+      { environmentId: localEnvironmentId, projectId: preferred.id },
+    ],
+    remoteEnvironmentLabels: [],
+  };
+  const otherGroup = { ...group, projectKey: "other" };
+  const input = {
+    shiftKey: false,
+    groups: [group, otherGroup],
+    scopeKey: "selected",
+    preferredProjectRef: null,
+    scratchEnvironmentId: (environmentId: EnvironmentId) => environmentId,
+  };
+
+  it("lets Shift override an active project scope", () => {
+    expect(resolveSidebarNewThreadDestination({ ...input, shiftKey: true })).toEqual({
+      kind: "context",
+    });
+  });
+
+  it.each([
+    { name: "zero groups", groups: [], scopeKey: null, expected: { kind: "context" } },
+    { name: "one group", groups: [group], scopeKey: null, expected: { kind: "context" } },
+    {
+      name: "two groups",
+      groups: [group, otherGroup],
+      scopeKey: null,
+      expected: { kind: "picker" },
+    },
+    {
+      name: "missing scope",
+      groups: [group, otherGroup],
+      scopeKey: "missing",
+      expected: { kind: "picker" },
+    },
+  ])("uses the all-projects rule for $name", ({ groups, scopeKey, expected }) => {
+    expect(resolveSidebarNewThreadDestination({ ...input, groups, scopeKey })).toEqual(expected);
+  });
+
+  it.each([
+    {
+      name: "exact preferred member before another member on the same machine",
+      preferredProjectRef: {
+        environmentId: localEnvironmentId,
+        projectId: ProjectId.make("preferred"),
+      },
+      expected: { environmentId: localEnvironmentId, projectId: ProjectId.make("preferred") },
+    },
+    {
+      name: "same-machine member for a different preferred project",
+      preferredProjectRef: {
+        environmentId: localEnvironmentId,
+        projectId: ProjectId.make("outside"),
+      },
+      expected: { environmentId: localEnvironmentId, projectId: ProjectId.make("first") },
+    },
+    {
+      name: "representative rather than first member without a preference",
+      preferredProjectRef: null,
+      expected: { environmentId: remoteEnvironmentId, projectId: ProjectId.make("representative") },
+    },
+  ])("creates in the $name", ({ preferredProjectRef, expected }) => {
+    expect(resolveSidebarNewThreadDestination({ ...input, preferredProjectRef })).toEqual({
+      kind: "project",
+      projectRef: expected,
+    });
+  });
+
+  it("falls back to the first member when the representative is absent", () => {
+    expect(
+      resolveSidebarNewThreadDestination({
+        ...input,
+        groups: [{ ...group, id: ProjectId.make("absent") }, otherGroup],
+      }),
+    ).toEqual({
+      kind: "project",
+      projectRef: { environmentId: localEnvironmentId, projectId: ProjectId.make("first") },
+    });
+  });
+
+  it("creates scratch on the selected member's machine", () => {
+    expect(
+      resolveSidebarNewThreadDestination({
+        ...input,
+        groups: [{ ...group, isScratch: true }, otherGroup],
+        preferredProjectRef: {
+          environmentId: localEnvironmentId,
+          projectId: ProjectId.make("preferred"),
+        },
+        scratchEnvironmentId: (environmentId) =>
+          environmentId === localEnvironmentId ? environmentId : null,
+      }),
+    ).toEqual({ kind: "scratch", environmentId: localEnvironmentId });
+  });
+
+  it("opens the picker when the scoped scratch machine is unavailable", () => {
+    expect(
+      resolveSidebarNewThreadDestination({
+        ...input,
+        groups: [{ ...group, isScratch: true }, otherGroup],
+        scratchEnvironmentId: () => null,
+      }),
+    ).toEqual({ kind: "picker" });
+  });
+
+  it.each([
+    { name: "ordinary", scopedGroup: group },
+    { name: "scratch", scopedGroup: { ...group, isScratch: true as const } },
+  ])("falls back when a scoped $name group has no members", ({ scopedGroup }) => {
+    expect(
+      resolveSidebarNewThreadDestination({
+        ...input,
+        groups: [{ ...scopedGroup, memberProjects: [], memberProjectRefs: [] }, otherGroup],
+      }),
+    ).toEqual({ kind: "picker" });
+  });
+});
 
 describe("sidebarSearchTextSegments", () => {
   it("marks repeated literal hits with ASCII case folding while preserving Chinese text and offsets", () => {
