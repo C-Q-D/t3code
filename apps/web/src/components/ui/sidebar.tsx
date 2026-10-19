@@ -504,8 +504,13 @@ function SidebarRail({
     suppressClickRef.current = false;
     const side = sidebarInstance?.side ?? "left";
     if (!open) {
-      if (!isPhysicsEnabled()) return null;
-      // Collapsed rails measure outward travel without changing the remembered open width.
+      if (
+        !isPhysicsEnabled() ||
+        event.currentTarget.closest("[data-slot='sidebar']")?.getAttribute("data-collapsible") !==
+          "icon"
+      )
+        return null;
+      // Only visible icon rails probe outward travel; offcanvas rails leave native scrollbars unobstructed.
       return {
         width: 0,
         physicalInteraction: true,

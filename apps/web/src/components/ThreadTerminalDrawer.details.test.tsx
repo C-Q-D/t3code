@@ -256,3 +256,32 @@ it("keeps the existing hard-clamped drawer drag when physics is disabled", async
     ).terminalOpen,
   ).toBe(true);
 });
+
+it("hides a minimum-height drawer after twelve downward 8ms moves", async () => {
+  setPhysicsEnabled(true);
+  useTerminalUiStateStore.getState().setTerminalOpen(thread, true);
+  await act(() =>
+    root.render(
+      <ThreadTerminalDrawer
+        {...drawerProps}
+        height={180}
+        threadRef={thread}
+        threadId={thread.threadId}
+        visible
+      />,
+    ),
+  );
+  const gesture = drawerGesture();
+  await resizePointer(gesture.handle, "pointerdown", 583, 0);
+  for (let step = 1; step <= 12; step++) {
+    await resizePointer(gesture.handle, "pointermove", 583 + (160 * step) / 12, 8 * step);
+    await gesture.step(8 * step);
+  }
+  await resizePointer(gesture.handle, "pointerup", 743, 96.28);
+  expect(
+    selectThreadTerminalUiState(
+      useTerminalUiStateStore.getState().terminalUiStateByThreadKey,
+      thread,
+    ).terminalOpen,
+  ).toBe(false);
+});

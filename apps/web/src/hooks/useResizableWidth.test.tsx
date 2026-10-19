@@ -383,15 +383,21 @@ function RailState() {
 }
 
 /** Mount a real rail with local geometry and persistence, avoiding layout-dependent DOM measurements. */
-async function mountRail(open = false, side: "left" | "right" = "left") {
+async function mountRail(
+  open = false,
+  side: "left" | "right" = "left",
+  initialWidth = 400,
+  collapsible: "icon" | "offcanvas" = "icon",
+  minWidth = 200,
+) {
   vi.stubGlobal("cookieStore", { set: vi.fn().mockResolvedValue(undefined) });
   await act(() =>
     renderer.update(
       <SidebarProvider defaultOpen={open}>
         <Sidebar
           side={side}
-          collapsible="icon"
-          resizable={{ minWidth: 200, maxWidth: 800, storageKey: "rail-width" }}
+          collapsible={collapsible}
+          resizable={{ minWidth, maxWidth: 800, storageKey: "rail-width" }}
         >
           <SidebarRail />
           <RailState />
@@ -403,8 +409,8 @@ async function mountRail(open = false, side: "left" | "right" = "left") {
     setProperty: (key: string, value: string) => hostStyle.set(key, value),
     removeProperty: (key: string) => hostStyle.delete(key),
   };
-  const container = { style: widthStyle, getBoundingClientRect: () => ({ width: 400 }) };
-  const sidebar = { querySelector: () => container };
+  const container = { style: widthStyle, getBoundingClientRect: () => ({ width: initialWidth }) };
+  const sidebar = { querySelector: () => container, getAttribute: () => collapsible };
   const rail = {
     ...target,
     setAttribute() {},
@@ -505,3 +511,27 @@ it.each(["blur", "cancel", "lost capture"])(
     expect(setItem).not.toHaveBeenCalled();
   },
 );
+
+it("collapses a rail fling starting at minimum width with twelve 8ms moves", async () => {
+  setPhysicsEnabled(true);
+  const rail = await mountRail(true, "left", 244, "offcanvas", 244);
+  await act(() => rail.handle().props.onPointerDown(rail.event(336, 0)));
+  for (let step = 1; step <= 12; step++) {
+    await act(() => rail.handle().props.onPointerMove(rail.event(336 - 15 * step, 8 * step)));
+    await act(() => frame?.(8 * step));
+  }
+  await act(() => rail.handle().props.onPointerUp(rail.event(156, 96.27)));
+  expect(rail.open()).toBe("false");
+  expect(setItem).not.toHaveBeenCalled();
+});
+
+it("does not start a collapsed offcanvas drag-out session", async () => {
+  setPhysicsEnabled(true);
+  const rail = await mountRail(false, "left", 400, "offcanvas");
+  await act(() => rail.handle().props.onPointerDown(rail.event(0, 0)));
+  await act(() => rail.handle().props.onPointerMove(rail.event(40, 100)));
+  await act(() => rail.handle().props.onPointerUp(rail.event(40, 110)));
+  expect(rail.open()).toBe("false");
+  await act(() => rail.handle().props.onClick({ defaultPrevented: false }));
+  expect(rail.open()).toBe("true");
+});
