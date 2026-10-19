@@ -293,7 +293,7 @@ export function createPageScrollController({
   const physicalStep = (now: number) => {
     physical.frame = 0;
     const container = physical.container;
-    if (!container || getContainer() !== container) {
+    if (!container || getContainer() !== container || readPageScrollDistance(container) <= 0) {
       stopPhysical();
       return;
     }
@@ -333,6 +333,10 @@ export function createPageScrollController({
   };
 
   const startPhysical = (key: PageScrollKey, container: PageScrollContainer) => {
+    if (readPageScrollDistance(container) <= 0) {
+      stopPhysical();
+      return;
+    }
     if (physical.key === key) return;
     if (physical.container !== container) {
       stopPhysical();

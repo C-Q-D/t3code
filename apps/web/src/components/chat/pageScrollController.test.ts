@@ -315,6 +315,55 @@ describe("physical page targets", () => {
   beforeEach(() => setPhysicsEnabled(true));
   afterEach(() => setPhysicsEnabled(false));
 
+  test("zero page distance never registers a frame", () => {
+    const clock = new TestClock();
+    const container = {
+      clientHeight: 60,
+      scrollHeight: 10000,
+      scrollTop: 500,
+      getBoundingClientRect: () => ({ height: 60 }),
+    };
+    const controller = createPageScrollController({
+      getContainer: () => container,
+      getScrollPaddingBottomPx: () => 24,
+      env: clock.env,
+    });
+    controller.handleKeyDown("PageDown");
+    expect(clock.pendingFrames).toBe(0);
+    clock.advanceBy(1000);
+    expect(container.scrollTop).toBe(500);
+    expect(clock.pendingFrames).toBe(0);
+    controller.dispose();
+  });
+
+  test("layout reducing page distance to zero releases the running task", () => {
+    const clock = new TestClock();
+    let height = 600;
+    const container = {
+      clientHeight: 600,
+      scrollHeight: 10000,
+      scrollTop: 500,
+      getBoundingClientRect: () => ({ height }),
+    };
+    const controller = createPageScrollController({
+      getContainer: () => container,
+      getScrollPaddingBottomPx: () => 24,
+      env: clock.env,
+    });
+    controller.handleKeyDown("PageDown");
+    clock.advanceBy(200);
+    expect(container.scrollTop).toBeGreaterThan(500);
+    expect(clock.pendingFrames).toBe(1);
+    height = 50;
+    container.clientHeight = 50;
+    const atResize = container.scrollTop;
+    clock.advanceBy(16);
+    expect(clock.pendingFrames).toBe(0);
+    clock.advanceBy(1000);
+    expect(container.scrollTop).toBe(atResize);
+    controller.dispose();
+  });
+
   test("two PageDown taps accumulate targets without resetting velocity", () => {
     const clock = new TestClock();
     const container = {
