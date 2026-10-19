@@ -1,4 +1,7 @@
-import { describe, expect, test } from "vite-plus/test";
+/** Keyboard scrolling contracts, using injected frame time without a browser or real sleeps. */
+import { afterEach, beforeEach, describe, expect, test } from "vite-plus/test";
+
+import { setPhysicsEnabled } from "../../lib/motion/preference";
 
 import {
   createPageScrollController,
@@ -11,6 +14,7 @@ import {
   PAGE_SCROLL_MAX_MULTIPLIER,
 } from "./pageScrollController";
 
+/** Deterministic timer and frame queues shared by both scrolling modes. */
 class TestClock {
   private currentTime = 0;
   private nextHandle = 1;
@@ -39,6 +43,11 @@ class TestClock {
     },
   };
 
+  get pendingFrames() {
+    return this.animationFrames.size;
+  }
+
+  /** Advance milliseconds and flush due timers before each frame, like the browser boundary. */
   advanceBy(ms: number, frameMs = 16) {
     const target = this.currentTime + ms;
 
@@ -80,7 +89,9 @@ class TestClock {
   }
 }
 
-describe("page scroll helpers", () => {
+describe.each([false, true])("page scroll helpers physics=%s", (physics) => {
+  beforeEach(() => setPhysicsEnabled(physics));
+  afterEach(() => setPhysicsEnabled(false));
   const composerPageScrollEvent = (
     overrides: Partial<Parameters<typeof getTimelinePageScrollKey>[0]> = {},
   ) => ({
@@ -173,7 +184,9 @@ describe("page scroll helpers", () => {
   });
 });
 
-describe("createPageScrollController", () => {
+describe.each([false, true])("createPageScrollController physics=%s", (physics) => {
+  beforeEach(() => setPhysicsEnabled(physics));
+  afterEach(() => setPhysicsEnabled(false));
   test("keeps a single page scroll when the key is tapped", () => {
     const clock = new TestClock();
     const container = {
@@ -190,7 +203,7 @@ describe("createPageScrollController", () => {
 
     controller.handleKeyDown("PageDown");
     controller.handleKeyUp("PageDown");
-    clock.advanceBy(PAGE_SCROLL_ANIMATION_MS);
+    clock.advanceBy(physics ? 2000 : PAGE_SCROLL_ANIMATION_MS);
 
     expect(container.scrollTop).toBeCloseTo(
       getPageScrollDistancePx({
@@ -224,9 +237,29 @@ describe("createPageScrollController", () => {
 
     const stoppedAt = container.scrollTop;
     controller.handleKeyUp("PageDown");
-    clock.advanceBy(250);
-
-    expect(container.scrollTop).toBe(stoppedAt);
+    if (physics) {
+      const positions = Array.from({ length: 125 }, () => {
+        clock.advanceBy(16);
+        return container.scrollTop;
+      });
+      const distances = positions.map(
+        (position, index) => position - (positions[index - 1] ?? stoppedAt),
+      );
+      expect(positions[0]).toBeGreaterThan(stoppedAt);
+      expect(
+        positions.every((position, index) => position >= (positions[index - 1] ?? stoppedAt)),
+      ).toBe(true);
+      expect(
+        distances.every((distance, index) => distance <= (distances[index - 1] ?? Infinity) + 0.01),
+      ).toBe(true);
+      expect(positions.at(-1)! - stoppedAt).toBeLessThan(540);
+      expect(positions.at(-1)).toBe(positions.at(-2));
+      expect(clock.pendingFrames).toBe(0);
+    } else {
+      clock.advanceBy(250);
+      expect(container.scrollTop).toBe(stoppedAt);
+    }
+    controller.dispose();
   });
 
   test("notifies once when a page scroll starts", () => {
@@ -275,5 +308,101 @@ describe("createPageScrollController", () => {
 
     expect(started).toEqual([]);
     expect(container.scrollTop).toBe(1_199.5);
+  });
+});
+
+describe("physical page targets", () => {
+  beforeEach(() => setPhysicsEnabled(true));
+  afterEach(() => setPhysicsEnabled(false));
+
+  test("two PageDown taps accumulate targets without resetting velocity", () => {
+    const clock = new TestClock();
+    const container = {
+      clientHeight: 600,
+      scrollHeight: 10000,
+      scrollTop: 0,
+      getBoundingClientRect: () => ({ height: 600 }),
+    };
+    const controller = createPageScrollController({
+      getContainer: () => container,
+      getScrollPaddingBottomPx: () => 24,
+      env: clock.env,
+    });
+    controller.handleKeyDown("PageDown");
+    controller.handleKeyUp("PageDown");
+    clock.advanceBy(80);
+    const before = container.scrollTop;
+    clock.advanceBy(16);
+    const previousDistance = container.scrollTop - before;
+    const atSecondPress = container.scrollTop;
+    controller.handleKeyDown("PageDown");
+    controller.handleKeyUp("PageDown");
+    clock.advanceBy(16);
+    expect(container.scrollTop - atSecondPress).toBeGreaterThan(previousDistance * 0.8);
+    clock.advanceBy(2000);
+    expect(container.scrollTop).toBe(1080);
+    expect(clock.pendingFrames).toBe(0);
+    controller.dispose();
+  });
+
+  test.each<["PageDown" | "PageUp", number, number, number]>([
+    ["PageDown", 0, 9400, 1],
+    ["PageUp", 9400, 0, -1],
+  ])("%s holds move every frame then sleep at the boundary", (key, from, boundary, direction) => {
+    const clock = new TestClock();
+    const container = {
+      clientHeight: 600,
+      scrollHeight: 10000,
+      scrollTop: from,
+      getBoundingClientRect: () => ({ height: 600 }),
+    };
+    const controller = createPageScrollController({
+      getContainer: () => container,
+      getScrollPaddingBottomPx: () => 24,
+      env: clock.env,
+    });
+    controller.handleKeyDown(key);
+    const positions = Array.from({ length: 40 }, () => {
+      clock.advanceBy(16);
+      return container.scrollTop;
+    });
+    expect(
+      positions.every(
+        (position, index) => (position - (positions[index - 1] ?? from)) * direction > 0,
+      ),
+    ).toBe(true);
+    clock.advanceBy(5000);
+    expect(container.scrollTop).toBe(boundary);
+    expect(clock.pendingFrames).toBe(0);
+    controller.dispose();
+  });
+
+  test("disable and disposal cancel pending physical work without a late scroll", () => {
+    const clock = new TestClock();
+    const container = {
+      clientHeight: 600,
+      scrollHeight: 10000,
+      scrollTop: 0,
+      getBoundingClientRect: () => ({ height: 600 }),
+    };
+    const controller = createPageScrollController({
+      getContainer: () => container,
+      getScrollPaddingBottomPx: () => 24,
+      env: clock.env,
+    });
+    controller.handleKeyDown("PageDown");
+    clock.advanceBy(32);
+    const atDisable = container.scrollTop;
+    setPhysicsEnabled(false);
+    expect(clock.pendingFrames).toBe(0);
+    clock.advanceBy(1000);
+    expect(container.scrollTop).toBe(atDisable);
+    setPhysicsEnabled(true);
+    controller.handleKeyDown("PageDown");
+    expect(clock.pendingFrames).toBe(1);
+    controller.dispose();
+    expect(clock.pendingFrames).toBe(0);
+    clock.advanceBy(1000);
+    expect(container.scrollTop).toBe(atDisable);
   });
 });
