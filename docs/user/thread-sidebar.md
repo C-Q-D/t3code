@@ -45,7 +45,9 @@ and worktree while you stay in the new thread composer. This requires a Git proj
 
 ## Pin and reorder threads
 
-Pin a thread from its menu to keep it above your active work.
+Pin a thread from its menu to keep it above your active work. Pinned sections, dragging, and
+manual order described below apply when a single project is selected in the project rail;
+**Today** has its own order (see [See today's work](#see-todays-work)).
 
 On web and desktop, unpinning, settling, and archiving a thread each show
 a notification with **Undo** for five seconds. Undo restores the thread's previous
@@ -131,7 +133,10 @@ threads the agent is still working on, including ones waiting for background wor
 wake them. **Needs you** lists the rest, including threads waiting for an approval or
 answer. Each day starts fresh at midnight; a thread that is still running or waiting
 for you stays until it finishes. Leaving Today only hides a thread from this view.
-Right-click the button to choose a single project instead.
+**AI replying** lists the thread you last sent work to first, and **Needs you** lists the
+thread that most recently came back to you first. Pinned threads mix in with the rest, and
+threads cannot be dragged to reorder or change state here. Right-click the button to choose
+a single project instead.
 
 ## Settle finished work
 
