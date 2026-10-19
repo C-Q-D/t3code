@@ -49,7 +49,7 @@ export class SidebarPointerSensor {
     this.pointer = props.event as PointerEvent;
     this.document = getOwnerDocument(this.pointer.target);
     this.window = getWindow(this.pointer.target);
-    this.velocity.add(this.pointer.clientX, this.pointer.clientY);
+    this.velocity.addPointerEvent(this.pointer);
     this.document.addEventListener("pointermove", this.move, { passive: false, capture: true });
     this.document.addEventListener("pointerup", this.end, { capture: true });
     this.document.addEventListener("pointercancel", this.pointerCancel, { capture: true });
@@ -83,11 +83,11 @@ export class SidebarPointerSensor {
   private move = (event: PointerEvent) => {
     if (this.phase === "finished" || event.pointerId !== this.pointer.pointerId) return;
     const coordinates = { x: event.clientX, y: event.clientY };
-    this.velocity.add(coordinates.x, coordinates.y);
+    this.velocity.addPointerEvent(event);
     // Desktop can report buttons=0 on the final move before pointerup. Let an
     // active context drag drop there before cancelling the sidebar sort.
     if ((event.buttons & 1) === 0) {
-      if (this.phase === "dragging") this.drop(coordinates);
+      if (this.phase === "dragging") this.drop(coordinates, event.timeStamp);
       return this.cancel();
     }
     if (this.phase === "pending") {
@@ -121,9 +121,11 @@ export class SidebarPointerSensor {
 
   private end = (event: PointerEvent) => {
     if (event.pointerId !== this.pointer.pointerId) return;
+    this.velocity.addPointerEvent(event);
     const dropped =
-      this.phase === "dragging" && this.drop({ x: event.clientX, y: event.clientY }) === true;
-    this.finish(dropped);
+      this.phase === "dragging" &&
+      this.drop({ x: event.clientX, y: event.clientY }, event.timeStamp) === true;
+    this.finish(dropped, event.timeStamp);
   };
   private pointerCancel = (event: PointerEvent) => {
     if (event.pointerId === this.pointer.pointerId) this.cancel();
@@ -136,21 +138,22 @@ export class SidebarPointerSensor {
   };
   cancel = () => this.finish(true);
 
-  /** Deliver momentum only in physics mode; legacy callbacks keep their original argument shape. */
-  private drop(point: Point) {
+  /** Deliver momentum at event time (ms) only in physics mode; legacy callbacks retain their shape. */
+  private drop(point: Point, time: number) {
     return isPhysicsEnabled()
-      ? this.props.options.onDrop?.(point, this.velocity.velocity())
+      ? this.props.options.onDrop?.(point, this.velocity.velocity(time))
       : this.props.options.onDrop?.(point);
   }
 
   /**
    * End once, removing gesture listeners before callbacks can unmount the list.
    * @param cancelled Whether sorting was cancelled, including a claimed context drop.
+   * @param time Release event time in ms; cancellation needs no sampling time because it sends zero.
    * onFinish receives recent sampled velocity (zero on cancellation) before dnd-kit clears
    * transforms; finally onAbort runs for pending gestures, then onCancel or onEnd.
    * Click suppression stays owned until the release click or a fresh pointerdown clears it.
    */
-  private finish(cancelled: boolean) {
+  private finish(cancelled: boolean, time?: number) {
     if (this.phase === "finished") return;
     const aborted = this.phase === "pending";
     this.phase = "finished";
@@ -183,7 +186,7 @@ export class SidebarPointerSensor {
       if (isPhysicsEnabled())
         this.props.options.onFinish(
           !aborted,
-          cancelled ? { x: 0, y: 0 } : this.velocity.velocity(),
+          cancelled ? { x: 0, y: 0 } : this.velocity.velocity(time),
           row,
         );
       else this.props.options.onFinish(!aborted);

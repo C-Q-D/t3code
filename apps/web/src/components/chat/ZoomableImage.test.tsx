@@ -76,7 +76,11 @@ afterEach(async () => {
 async function pointer(type: string, x: number) {
   await act(async () => {
     const event = new MouseEvent(type, { bubbles: true, clientX: x, clientY: 150, button: 0 });
-    Object.defineProperties(event, { pointerId: { value: 1 }, pointerType: { value: "mouse" } });
+    Object.defineProperties(event, {
+      timeStamp: { value: performance.now() },
+      pointerId: { value: 1 },
+      pointerType: { value: "mouse" },
+    });
     viewport.dispatchEvent(event);
   });
 }

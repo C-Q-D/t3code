@@ -166,7 +166,7 @@ export function launchComposerThrow(input: ThrowInput): () => void {
       releaseReservation();
       target = null;
       const tracker = new VelocityTracker();
-      tracker.add(event.clientX, event.clientY);
+      tracker.addPointerEvent(event);
       const grabOffset = { x: x.value - event.clientX, y: y.value - event.clientY };
       if (element) element.style.opacity = "1";
       const move = (next: PointerEvent) => {
@@ -174,13 +174,14 @@ export function launchComposerThrow(input: ThrowInput): () => void {
         next.preventDefault();
         x.jump(next.clientX + grabOffset.x);
         y.jump(next.clientY + grabOffset.y);
-        tracker.add(next.clientX, next.clientY);
+        tracker.addPointerEvent(next);
         paint();
       };
       const finish = (next: PointerEvent) => {
         if (next.pointerId !== event.pointerId) return;
         detachPointer();
-        incoming = tracker.velocity();
+        tracker.addPointerEvent(next);
+        incoming = tracker.velocity(next.timeStamp);
         target = findComposerThrowTarget({ x: next.clientX, y: next.clientY }, incoming);
         releaseReservation = target ? reserveComposerThrowTarget(target) : () => {};
         x.velocity = incoming.x;

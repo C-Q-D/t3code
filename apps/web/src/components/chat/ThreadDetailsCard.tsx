@@ -340,7 +340,7 @@ export function ThreadDetailsCard({
       floatingPosition ?? { left: placement.x, top: placement.y };
     const offset = interrupted?.offset ?? { x: 0, y: 0 };
     const tracker = new VelocityTracker();
-    tracker.add(event.clientX, event.clientY);
+    tracker.addPointerEvent(event);
     dragRef.current = {
       offset,
       dragOrigin: {
@@ -377,7 +377,7 @@ export function ThreadDetailsCard({
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId || !canvas) return;
     if (drag.gliding) return;
-    drag.tracker.add(event.clientX, event.clientY);
+    drag.tracker.addPointerEvent(event);
     const dx = event.clientX - drag.pointerX;
     const dy = event.clientY - drag.pointerY;
     if (!drag.moved && Math.hypot(dx, dy) <= 3) return;
@@ -404,7 +404,7 @@ export function ThreadDetailsCard({
     if (!drag || drag.pointerId !== event.pointerId) return;
     if (drag.gliding) return;
     if (event.type === "pointerup") moveDrag(event);
-    const velocity = drag.tracker.velocity();
+    const velocity = drag.tracker.velocity(event.timeStamp);
     if (
       event.type === "pointerup" &&
       drag.moved &&

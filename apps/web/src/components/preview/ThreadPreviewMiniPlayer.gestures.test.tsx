@@ -135,6 +135,9 @@ async function movePointer(direction: string | null, dx: number, dy: number, adv
   )[0]!;
   const event = {
     type: "pointerup",
+    get timeStamp() {
+      return performance.now();
+    },
     button: 0,
     pointerId: 7,
     clientX: 110,
@@ -149,9 +152,9 @@ async function movePointer(direction: string | null, dx: number, dy: number, adv
   };
   await act(async () => handle.props.onPointerDown(event));
   advance();
-  await act(async () =>
-    handle.props.onPointerMove({ ...event, clientX: 110 + dx, clientY: 90 + dy }),
-  );
+  event.clientX += dx;
+  event.clientY += dy;
+  await act(async () => handle.props.onPointerMove(event));
   return { handle, event };
 }
 beforeEach(() => {
@@ -215,7 +218,7 @@ it("takes over a gliding preview from its current position", async () => {
   expect(flying.x).toBeGreaterThan(150);
   await act(async () => handle.props.onPointerDown(event));
   expect(clock.pending.size).toBe(0);
-  await act(async () => handle.props.onPointerMove({ ...event, clientX: 130 }));
+  await act(async () => handle.props.onPointerMove({ ...event, clientX: event.clientX + 20 }));
   expect(displayedFrame().x).toBeCloseTo(flying.x + 20);
   now = 200;
   await act(async () => handle.props.onPointerUp(event));
@@ -280,7 +283,7 @@ it.each([5, 25])(
     await act(async () => handle.props.onPointerDown(event));
     expect(Math.abs(displayedFrame().x - before)).toBeLessThanOrEqual(1);
     expect(clock.pending.size).toBe(0);
-    await act(async () => handle.props.onPointerMove({ ...event, clientX: 100 }));
+    await act(async () => handle.props.onPointerMove({ ...event, clientX: event.clientX - 10 }));
     expect(displayedFrame().x).toBeLessThan(before);
     expect(displayedFrame().x).toBeGreaterThan(before - 10);
     await act(async () => handle.props.onPointerMove(event));

@@ -329,7 +329,7 @@ export function ZoomableImage({
           )
             return;
           const tracker = new VelocityTracker();
-          tracker.add(event.clientX, event.clientY);
+          tracker.addPointerEvent(event);
           dragRef.current = {
             tracker,
             pointerId: event.pointerId,
@@ -344,7 +344,7 @@ export function ZoomableImage({
         onPointerMove={(event) => {
           const drag = dragRef.current;
           if (!drag || drag.pointerId !== event.pointerId) return;
-          drag.tracker.add(event.clientX, event.clientY);
+          drag.tracker.addPointerEvent(event);
           if (Math.hypot(event.clientX - drag.x, event.clientY - drag.y) > 4) {
             suppressClickRef.current = true;
           }
@@ -355,7 +355,8 @@ export function ZoomableImage({
           const drag = dragRef.current;
           if (drag?.pointerId !== event.pointerId) return;
           const viewport = event.currentTarget;
-          const velocity = drag.tracker.velocity();
+          drag.tracker.addPointerEvent(event);
+          const velocity = drag.tracker.velocity(event.timeStamp);
           dragRef.current = null;
           if (event.currentTarget.hasPointerCapture(event.pointerId)) {
             event.currentTarget.releasePointerCapture(event.pointerId);

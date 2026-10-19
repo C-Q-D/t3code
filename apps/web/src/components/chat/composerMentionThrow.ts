@@ -35,12 +35,19 @@ function clearSession() {
   session = null;
 }
 
-/** Begin velocity tracking at a viewport point; native drag data may be unreadable until drop. */
-function beginSession(owner: symbol, channel: ThrowChannel, point: Point): MentionSession {
+/** Track the native drag's viewport point and event time; its data may be unreadable until drop. */
+function beginSession(owner: symbol, channel: ThrowChannel, event: DragEvent): MentionSession {
   clearSession();
   const tracker = new VelocityTracker();
-  tracker.add(point.x, point.y);
-  session = { owner, channel, origin: point, tracker, preview: null, image: null };
+  tracker.addPointerEvent(event);
+  session = {
+    owner,
+    channel,
+    origin: { x: event.clientX, y: event.clientY },
+    tracker,
+    preview: null,
+    image: null,
+  };
   return session;
 }
 
@@ -57,9 +64,9 @@ function dragover(event: DragEvent) {
   const point = { x: event.clientX, y: event.clientY };
   if (!session) {
     const owner = owners.entries().next().value;
-    if (owner) beginSession(owner[0], owner[1], point);
+    if (owner) beginSession(owner[0], owner[1], event);
   }
-  session?.tracker.add(point.x, point.y);
+  session?.tracker.addPointerEvent(event);
   if (session?.preview)
     session.preview.style.transform = `translate(${point.x + 12}px, ${point.y + 12}px)`;
 }
@@ -78,7 +85,8 @@ function drop(event: DragEvent) {
     return;
   }
   const point = { x: event.clientX, y: event.clientY };
-  const velocity = session?.tracker.velocity() ?? { x: 0, y: 0 };
+  session?.tracker.addPointerEvent(event);
+  const velocity = session?.tracker.velocity(event.timeStamp) ?? { x: 0, y: 0 };
   const target = findComposerThrowTarget(point, velocity);
   const channel = session?.channel ?? owners.values().next().value;
   const origin = session?.origin ?? point;
@@ -143,7 +151,7 @@ export function installComposerMentionThrow(channel: ThrowChannel = "mention") {
       if (!dataTransferHasComposerMention(event.dataTransfer.types)) return;
       const text = event.dataTransfer.getData(COMPOSER_MENTION_DRAG_TYPE);
       if (!text) return;
-      const current = beginSession(owner, channel, { x: event.clientX, y: event.clientY });
+      const current = beginSession(owner, channel, event);
       // The installed tree exposes native DataTransfer. Set our image after its
       // row handler so the library cannot overwrite the transparent image.
       const image = document.createElement("canvas");

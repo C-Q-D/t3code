@@ -457,7 +457,7 @@ function MiniPlayerShell({
     const current = gestureRef.current?.latest ?? frame;
     const offset = gestureRef.current?.offset ?? { x: 0, y: 0 };
     const tracker = new VelocityTracker();
-    tracker.add(event.clientX, event.clientY);
+    tracker.addPointerEvent(event);
     setOvershoot(offset);
     gestureRef.current = {
       offset,
@@ -490,7 +490,7 @@ function MiniPlayerShell({
     const gesture = gestureRef.current;
     if (!gesture || gesture.pointerId !== event.pointerId || !container) return;
     if (gesture.gliding) return;
-    gesture.tracker.add(event.clientX, event.clientY);
+    gesture.tracker.addPointerEvent(event);
     const delta = { x: event.clientX - gesture.pointerX, y: event.clientY - gesture.pointerY };
     if (!gesture.moved && Math.hypot(delta.x, delta.y) < HANDLE_TAP_SLOP_PX) return;
     gesture.moved = true;
@@ -539,7 +539,8 @@ function MiniPlayerShell({
     const gesture = gestureRef.current;
     if (gesture?.pointerId !== event.pointerId) return;
     if (gesture.gliding) return;
-    const velocity = gesture.tracker.velocity();
+    gesture.tracker.addPointerEvent(event);
+    const velocity = gesture.tracker.velocity(event.timeStamp);
     if (event.type === "pointerup") {
       if (
         isPhysicsEnabled() &&

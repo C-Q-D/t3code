@@ -245,6 +245,7 @@ async function pointer(target: Element, type: string, x: number, y: number) {
       button: 0,
     });
     Object.defineProperties(event, {
+      timeStamp: { value: performance.now() },
       pointerId: { value: 1 },
       pointerType: { value: "mouse" },
       isPrimary: { value: true },

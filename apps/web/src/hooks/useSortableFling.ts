@@ -35,6 +35,7 @@ export function useSortableFling({
   const [physicsSorting, setPhysicsSorting] = useState(false);
   const [, renderRelease] = useReducer((value: number) => value + 1, 0);
   const tracker = useRef(new VelocityTracker());
+  const releaseTime = useRef<number | undefined>(undefined);
   const listening = useRef<(() => void) | null>(null);
   const owned = useRef(new Set<HTMLElement>());
   const pending = useRef<{
@@ -67,21 +68,26 @@ export function useSortableFling({
       if (!enabled || !containerRef.current) return;
       const document = containerRef.current.ownerDocument;
       const sample = (event: PointerEvent) => {
-        tracker.current.add(event.clientX, event.clientY);
+        tracker.current.addPointerEvent(event);
       };
       tracker.current.reset();
+      releaseTime.current = undefined;
       if ("clientX" in event.activatorEvent && "clientY" in event.activatorEvent) {
-        tracker.current.add(
-          Number(event.activatorEvent.clientX),
-          Number(event.activatorEvent.clientY),
-        );
+        tracker.current.addPointerEvent(event.activatorEvent as PointerEvent);
       }
+      // dnd-kit omits the release event; window capture samples it before the sensor ends the drag.
+      const release = (event: PointerEvent) => {
+        sample(event);
+        releaseTime.current = event.timeStamp;
+      };
       document.addEventListener("pointermove", sample);
+      document.defaultView?.addEventListener("pointerup", release, true);
       const unsubscribe = onPhysicsChange((enabled) => {
         if (!enabled) onDragCancel();
       });
       listening.current = () => {
         document.removeEventListener("pointermove", sample);
+        document.defaultView?.removeEventListener("pointerup", release, true);
         unsubscribe();
       };
     },
@@ -91,7 +97,7 @@ export function useSortableFling({
   const onDragEnd = useCallback(
     (event: DragEndEvent) => {
       if (!listening.current || !isPhysicsEnabled()) return;
-      const velocity = tracker.current.velocity();
+      const velocity = tracker.current.velocity(releaseTime.current);
       stopListening();
       const rects = new Map<string, DOMRect>();
       for (const element of containerRef.current?.querySelectorAll<HTMLElement>(

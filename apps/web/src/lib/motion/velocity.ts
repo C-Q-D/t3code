@@ -1,5 +1,11 @@
 /** Pointer velocity from a recent window, excluding a stationary release. */
 
+/** Native or React-wrapped viewport samples; timestamps use the performance clock in milliseconds. */
+type PointerSample = Pick<PointerEvent, "clientX" | "clientY" | "timeStamp"> & {
+  getCoalescedEvents?: () => readonly Pick<PointerEvent, "clientX" | "clientY" | "timeStamp">[];
+  nativeEvent?: PointerSample;
+};
+
 /** Records CSS pixel coordinates with monotonic millisecond timestamps. */
 export class VelocityTracker {
   private samples: { x: number; y: number; time: number }[] = [];
@@ -8,6 +14,18 @@ export class VelocityTracker {
   reset() {
     this.samples = [];
     this.lastMovedAt = -Infinity;
+  }
+
+  /** Record native coalesced samples (or the event itself), so dispatch delays cannot erase momentum.
+   * Accepts React wrappers and mouse/drag events without coalescing. Query release velocity with
+   * the release event's timeStamp after adding it; unchanged release points remain stationary.
+   */
+  addPointerEvent(event: PointerSample) {
+    const native = event.nativeEvent ?? event;
+    const samples = native.getCoalescedEvents?.();
+    for (const sample of samples?.length ? samples : [native]) {
+      this.add(sample.clientX, sample.clientY, sample.timeStamp);
+    }
   }
 
   /** Add a point at time (performance.now by default); unchanged points do not count as movement. */

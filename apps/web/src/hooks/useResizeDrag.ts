@@ -110,7 +110,8 @@ export function useResizeDrag<T extends HTMLElement>(
       if (!active.settling) flush();
       const bounds = active.physical && isPhysicsEnabled() ? active.session.physics : undefined;
       const velocity =
-        active.tracker.velocity(active.time).x * (active.session.edge === "right" ? 1 : -1);
+        active.tracker.velocity(active.time)[active.session.edge === "top" ? "y" : "x"] *
+        (active.session.edge === "right" ? 1 : -1);
       if (
         bounds &&
         allowFling &&
@@ -175,7 +176,7 @@ export function useResizeDrag<T extends HTMLElement>(
     active.time = event.timeStamp;
     if (usePosition) {
       active.pendingPosition = active.session.edge === "top" ? event.clientY : event.clientX;
-      active.tracker.add(active.pendingPosition, 0, event.timeStamp);
+      active.tracker.addPointerEvent(event);
     }
     finish(usePosition || !active.physical, usePosition);
   };
@@ -213,7 +214,7 @@ export function useResizeDrag<T extends HTMLElement>(
         (session.physicalInteraction === true || session.physics !== undefined);
       const tracker = new VelocityTracker();
       const position = session.edge === "top" ? event.clientY : event.clientX;
-      tracker.add(position, 0, event.timeStamp);
+      tracker.addPointerEvent(event);
       drag.current = {
         session,
         target: event.currentTarget,
@@ -240,7 +241,7 @@ export function useResizeDrag<T extends HTMLElement>(
       event.preventDefault();
       active.pendingPosition = active.session.edge === "top" ? event.clientY : event.clientX;
       active.time = event.timeStamp;
-      active.tracker.add(active.pendingPosition, 0, event.timeStamp);
+      active.tracker.addPointerEvent(event);
       active.moved ||= Math.abs(active.pendingPosition - active.startPosition) > 2;
       if (active.frame !== null) return;
       active.frame = requestAnimationFrame(() => {

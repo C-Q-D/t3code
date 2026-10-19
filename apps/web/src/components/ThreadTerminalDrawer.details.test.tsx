@@ -285,3 +285,50 @@ it("hides a minimum-height drawer after twelve downward 8ms moves", async () => 
     ).terminalOpen,
   ).toBe(false);
 });
+
+it.each([1, 200])(
+  "handles a minimum-height coalesced fling with %i ms release pause",
+  async (pause) => {
+    setPhysicsEnabled(true);
+    useTerminalUiStateStore.getState().setTerminalOpen(thread, true);
+    await act(() =>
+      root.render(
+        <ThreadTerminalDrawer
+          {...drawerProps}
+          height={180}
+          threadRef={thread}
+          threadId={thread.threadId}
+          visible
+        />,
+      ),
+    );
+    const gesture = drawerGesture();
+    await resizePointer(gesture.handle, "pointerdown", 583, 0);
+    const move = new MouseEvent("pointermove", {
+      clientY: 743,
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+    });
+    Object.defineProperties(move, {
+      pointerId: { value: 1 },
+      timeStamp: { value: 96 },
+      getCoalescedEvents: {
+        value: () =>
+          Array.from({ length: 12 }, (_, i) => ({
+            clientX: 0,
+            clientY: 583 + (160 * (i + 1)) / 12,
+            timeStamp: 8 * (i + 1),
+          })),
+      },
+    });
+    await act(() => gesture.handle.dispatchEvent(move));
+    await resizePointer(gesture.handle, "pointerup", 743, 96 + pause);
+    expect(
+      selectThreadTerminalUiState(
+        useTerminalUiStateStore.getState().terminalUiStateByThreadKey,
+        thread,
+      ).terminalOpen,
+    ).toBe(pause !== 1);
+  },
+);

@@ -74,10 +74,12 @@ function Harness({ reversed = false, overlay = false }: { reversed?: boolean; ov
 
 /** A real sensor event envelope; the hook owns only release animation, not order persistence. */
 function startEvent(keyboard = false): DragStartEvent {
+  const activatorEvent = keyboard
+    ? new KeyboardEvent("keydown", { key: " " })
+    : new MouseEvent("pointerdown", { clientX: 0, clientY: 0 });
+  Object.defineProperty(activatorEvent, "timeStamp", { value: now });
   return {
-    activatorEvent: keyboard
-      ? new KeyboardEvent("keydown", { key: " " })
-      : new MouseEvent("pointerdown", { clientX: 0, clientY: 0 }),
+    activatorEvent,
     active: {
       id: "a",
       data: { current: {} },
@@ -100,12 +102,17 @@ function endEvent(): DragEndEvent {
 async function drag(keyboard = false) {
   await act(() => handlers.onDragStart(startEvent(keyboard)));
   now = 40;
-  document.dispatchEvent(new MouseEvent("pointermove", { clientX: 40, clientY: 0 }));
+  const move = new MouseEvent("pointermove", { clientX: 40, clientY: 0 });
+  Object.defineProperty(move, "timeStamp", { value: now });
+  document.dispatchEvent(move);
 }
 
 /** Snapshot before the consumer commits the new order in the same React batch. */
 async function release(overlay = false) {
   await act(() => {
+    const up = new MouseEvent("pointerup", { clientX: 40, clientY: 0, bubbles: true });
+    Object.defineProperty(up, "timeStamp", { value: now });
+    document.dispatchEvent(up);
     handlers.onDragEnd(endEvent());
     released = true;
     root.render(<Harness reversed overlay={overlay} />);

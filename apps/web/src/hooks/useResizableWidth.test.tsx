@@ -535,3 +535,25 @@ it("does not start a collapsed offcanvas drag-out session", async () => {
   await act(() => rail.handle().props.onClick({ defaultPrevented: false }));
   expect(rail.open()).toBe("true");
 });
+
+it.each([1, 200])(
+  "handles a minimum-width coalesced fling with %i ms release pause",
+  async (pause) => {
+    setPhysicsEnabled(true);
+    const rail = await mountRail(true, "left", 244, "offcanvas", 244);
+    await act(() => rail.handle().props.onPointerDown(rail.event(336, 0)));
+    const move = rail.event(156, 96);
+    const nativeEvent = {
+      ...move,
+      getCoalescedEvents: () =>
+        Array.from({ length: 12 }, (_, i) => ({
+          clientX: 336 - 15 * (i + 1),
+          clientY: 0,
+          timeStamp: 8 * (i + 1),
+        })),
+    };
+    await act(() => rail.handle().props.onPointerMove({ ...move, nativeEvent }));
+    await act(() => rail.handle().props.onPointerUp(rail.event(156, 96 + pause)));
+    expect(rail.open()).toBe(pause === 1 ? "false" : "true");
+  },
+);

@@ -21,7 +21,7 @@ const text = "[index.ts](src/index.ts)";
 
 /** Native DataTransfer boundary fixture; browsers expose types during dragover and data on drop. */
 function drag(type: string, x: number, types = [mentionType]) {
-  return Object.assign(
+  const event = Object.assign(
     new MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: 250 }),
     {
       dataTransfer: {
@@ -32,6 +32,8 @@ function drag(type: string, x: number, types = [mentionType]) {
       },
     },
   );
+  Object.defineProperty(event, "timeStamp", { value: time });
+  return event;
 }
 
 beforeEach(() => {
