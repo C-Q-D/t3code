@@ -3,6 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { reactHookHarness as hooks } from "../../test/reactHookHarness";
 
+const snoozeUi = vi.hoisted(() => ({ enabled: true }));
+vi.mock("~/snoozeUi", () => ({
+  get SNOOZE_UI_ENABLED() {
+    return snoozeUi.enabled;
+  },
+}));
+
 const state = vi.hoisted(() => ({
   settings: null as UnifiedSettings | null,
   update: vi.fn(),
@@ -54,6 +61,7 @@ vi.mock("../../localApi", async (importOriginal) => ({
 import { useSettingsRestore } from "./SettingsPanels";
 
 beforeEach(() => {
+  snoozeUi.enabled = true;
   hooks.reset();
   vi.clearAllMocks();
   state.settings = { ...DEFAULT_UNIFIED_SETTINGS };
@@ -61,6 +69,20 @@ beforeEach(() => {
 });
 
 describe("restoring V2 settings", () => {
+  it("keeps the hidden snooze preference out of restore labels and updates", async () => {
+    snoozeUi.enabled = false;
+    state.settings = {
+      ...DEFAULT_UNIFIED_SETTINGS,
+      snoozeLimitedThreads: true,
+      autoResumeLimitedThreads: true,
+    };
+    hooks.beginRender();
+    const restore = useSettingsRestore();
+    expect(restore.changedSettingLabels).toEqual(["Auto-resume limited threads"]);
+    await restore.restoreDefaults();
+    expect(state.update.mock.calls[0]?.[0]).not.toHaveProperty("snoozeLimitedThreads");
+    expect(state.update.mock.calls[0]?.[0].autoResumeLimitedThreads).toBe(false);
+  });
   it.each([
     ["persistComposerContextStrip", "Composer context"],
     ["autoResumeLimitedThreads", "Auto-resume limited threads"],

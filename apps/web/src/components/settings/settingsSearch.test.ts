@@ -99,6 +99,15 @@ describe("translated settings catalog", () => {
 });
 
 describe("searchSettings", () => {
+  it("does not offer the hidden snooze setting in search or the catalog", () => {
+    expect(SETTINGS_SEARCH_ITEMS.map((item) => item.id)).not.toContain("snooze-limited-threads");
+    expect(searchSettings("usage quota").map((item) => item.id)).not.toContain(
+      "snooze-limited-threads",
+    );
+    expect(searchSettings("usage quota").map((item) => item.id)).toContain(
+      "auto-resume-limited-threads",
+    );
+  });
   it.each(["t3-connect", "hold-webhooks-while-offline", "publish-agent-activity"] as const)(
     "targets the independent T3 Connect row for %s",
     (id) => {

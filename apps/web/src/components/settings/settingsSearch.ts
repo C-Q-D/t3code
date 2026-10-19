@@ -1,6 +1,7 @@
 /** Indexes localized settings for navigation and search; panels own controls and persistence commands. */
 import { en } from "~/i18n/locales/en";
 import { t } from "~/i18n";
+import { SNOOZE_UI_ENABLED } from "~/snoozeUi";
 import { HOSTED_APP_CHANNEL } from "~/branding";
 import { isElectron } from "~/env";
 import { isMacPlatform, isWindowsPlatform, normalizeSearchText } from "~/lib/utils";
@@ -375,12 +376,16 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/general",
     searchTerms: ["sort projects sidebar manual created recent"],
   },
-  {
-    id: "snooze-limited-threads",
-    title: t.settings.rows.snoozeLimitedThreads.title,
-    to: "/settings/general",
-    searchTerms: ["usage quota rate limit reset wake recover continue"],
-  },
+  ...(SNOOZE_UI_ENABLED
+    ? [
+        {
+          id: "snooze-limited-threads",
+          title: t.settings.rows.snoozeLimitedThreads.title,
+          to: "/settings/general",
+          searchTerms: ["usage quota rate limit reset wake recover continue"],
+        } as const,
+      ]
+    : []),
   {
     id: "auto-resume-limited-threads",
     title: t.settings.rows.autoResumeLimitedThreads.title,

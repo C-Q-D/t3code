@@ -506,6 +506,7 @@ import { ThreadStatusLine } from "./chat/ThreadStatusLine";
 import { TimelineBannerAction, TimelineStatusBanners } from "./chat/TimelineStatusBanners";
 import { partitionTimelineBanners } from "./chat/timelineBannerRouting.logic";
 import { formatRelativeTimeLabel, formatRelativeTimeUntilLabel } from "../timestampFormat";
+import { SNOOZE_UI_ENABLED } from "../snoozeUi";
 import { ComposerSurface } from "./chat/ComposerSurface";
 import { resolveThreadSyncPhase } from "../threadSync";
 import {
@@ -7234,6 +7235,7 @@ export default function ChatView(props: ChatViewProps) {
   const supportsPinning = serverConfig?.environment.capabilities.threadPinning === true;
   const activeThreadPinned = supportsPinning && activeThreadShell?.pinnedAt != null;
   const activeThreadSnoozed =
+    SNOOZE_UI_ENABLED &&
     activeThreadShell !== null &&
     supportsSnooze &&
     effectiveSnoozed(activeThreadShell, { now: new Date().toISOString() });
@@ -7268,6 +7270,7 @@ export default function ChatView(props: ChatViewProps) {
     activeThreadLocalVisitedAt,
   );
   const activeThreadWokeVisible = useMemo(() => {
+    if (!SNOOZE_UI_ENABLED) return false;
     if (activeThreadWokeAt === null) return false;
     if (activeThreadShell?.settledOverride === "settled") return false;
     const wokeAtMs = Date.parse(activeThreadWokeAt);

@@ -1,5 +1,6 @@
 /** Displays usage limit recovery scheduling and its existing actions. */
 import { t } from "~/i18n";
+import { SNOOZE_UI_ENABLED } from "~/snoozeUi";
 import {
   type OrchestrationV2LimitRecovery,
   type OrchestrationV2LimitRecoveryUpdate,
@@ -125,7 +126,7 @@ function RecoveryActions({ runId, resetAt, recovery, snoozedUntil, onChange }: R
               : t.chat.limitRecovery.resumeAtReset}
         </Button>
       </div>
-      {!snoozed ? (
+      {SNOOZE_UI_ENABLED && !snoozed ? (
         <div className="flex min-w-0 items-center">
           <Button
             size="toolbar"

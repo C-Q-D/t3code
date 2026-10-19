@@ -2,6 +2,7 @@
 import { SettingsGroup } from "./SettingsGroup";
 import { LanguageSetting } from "./LanguageSetting";
 import { t } from "~/i18n";
+import { SNOOZE_UI_ENABLED } from "~/snoozeUi";
 import { useScopedSettingsWriteAllowed } from "./useScopedSettings";
 import { Spinner } from "~/components/ui/spinner";
 import { AutoSettleDaysInput } from "./AutoSettleDaysInput";
@@ -574,7 +575,8 @@ export function useSettingsRestore(onRestored?: () => void) {
       ...(settings.autoResumeLimitedThreads !== DEFAULT_UNIFIED_SETTINGS.autoResumeLimitedThreads
         ? [t.settings.rows.autoResumeLimitedThreads.title]
         : []),
-      ...(settings.snoozeLimitedThreads !== DEFAULT_UNIFIED_SETTINGS.snoozeLimitedThreads
+      ...(SNOOZE_UI_ENABLED &&
+      settings.snoozeLimitedThreads !== DEFAULT_UNIFIED_SETTINGS.snoozeLimitedThreads
         ? [t.settings.rows.snoozeLimitedThreads.title]
         : []),
       ...(settings.wordWrap !== DEFAULT_UNIFIED_SETTINGS.wordWrap
@@ -816,7 +818,10 @@ export function useSettingsRestore(onRestored?: () => void) {
       sidebarAutoSettleAfterDays: DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleAfterDays,
       sidebarAutoSettleOnMerge: DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleOnMerge,
       autoResumeLimitedThreads: DEFAULT_UNIFIED_SETTINGS.autoResumeLimitedThreads,
-      snoozeLimitedThreads: DEFAULT_UNIFIED_SETTINGS.snoozeLimitedThreads,
+      // Hidden controls must not be silently reset by the visible settings confirmation.
+      ...(SNOOZE_UI_ENABLED
+        ? { snoozeLimitedThreads: DEFAULT_UNIFIED_SETTINGS.snoozeLimitedThreads }
+        : {}),
       responseStreamingMode: DEFAULT_UNIFIED_SETTINGS.responseStreamingMode,
       enableProviderUpdateChecks: DEFAULT_UNIFIED_SETTINGS.enableProviderUpdateChecks,
       continueThreadsAfterServerUpdate: DEFAULT_UNIFIED_SETTINGS.continueThreadsAfterServerUpdate,
@@ -2448,22 +2453,24 @@ export function GeneralSettingsPanel() {
           <DefaultModelSetting title={t.settings.rows.defaultModel.title} />
           <DefaultPermissionsSetting controlSize="settings" />
         </SettingsSearchTarget>
-        <SettingsRow
-          serverScoped
-          {...searchableSetting("snooze-limited-threads")}
-          description={t.settings.rows.snoozeLimitedThreads.description}
-          settingKeys={["snoozeLimitedThreads"]}
-          control={
-            <ScopedSwitch
-              settingKeys={["snoozeLimitedThreads"]}
-              checked={settings.snoozeLimitedThreads}
-              onCheckedChange={(checked) =>
-                updateSettings({ snoozeLimitedThreads: Boolean(checked) })
-              }
-              aria-label={t.settings.rows.snoozeLimitedThreads.ariaLabel}
-            />
-          }
-        />
+        {SNOOZE_UI_ENABLED ? (
+          <SettingsRow
+            serverScoped
+            {...searchableSetting("snooze-limited-threads")}
+            description={t.settings.rows.snoozeLimitedThreads.description}
+            settingKeys={["snoozeLimitedThreads"]}
+            control={
+              <ScopedSwitch
+                settingKeys={["snoozeLimitedThreads"]}
+                checked={settings.snoozeLimitedThreads}
+                onCheckedChange={(checked) =>
+                  updateSettings({ snoozeLimitedThreads: Boolean(checked) })
+                }
+                aria-label={t.settings.rows.snoozeLimitedThreads.ariaLabel}
+              />
+            }
+          />
+        ) : null}
 
         <SettingsRow
           serverScoped
