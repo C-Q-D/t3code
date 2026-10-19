@@ -12,7 +12,6 @@ import {
 
 import { t } from "~/i18n";
 import { cn } from "~/lib/utils";
-import type { SidebarProjectSnapshot } from "~/sidebarProjectGrouping";
 import { discussionNavigationState } from "../discussions/discussionNavigation.logic";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import type { SidebarTab } from "./sidebarTabs.logic";
@@ -48,8 +47,8 @@ export interface SidebarThreadHeaderProps {
   onNewThread: (event: ReactMouseEvent) => void;
   newThreadDisabled: boolean;
   newThreadShortcutLabel: string | null | undefined;
-  /** Resolved rail scope; absent or null means all projects. Only presentation fields are needed. */
-  scopedProjectGroup?: Pick<SidebarProjectSnapshot, "displayName" | "isScratch"> | null;
+  /** Copy derived from the ordinary-click destination; absent uses the unscoped label. */
+  newThreadTooltipLabel?: string;
   newThreadInProjectShortcutLabel: string | null | undefined;
   /** Shift+click only matters once there is more than one project to pick. */
   showNewThreadInProjectHint: boolean;
@@ -73,7 +72,7 @@ export function SidebarThreadHeader({
   onNewThread,
   newThreadDisabled,
   newThreadShortcutLabel,
-  scopedProjectGroup,
+  newThreadTooltipLabel,
   newThreadInProjectShortcutLabel,
   showNewThreadInProjectHint,
   searchInputRef,
@@ -90,16 +89,11 @@ export function SidebarThreadHeader({
   const discussions = discussionNavigationState(hasProjects, pathname);
   // Narrowing the query can remove the active option before its index resets.
   const activeResultExists = resultsVisible && activeSearchResultIndex < searchResultCount;
-  const newThreadLabel = scopedProjectGroup
-    ? scopedProjectGroup.isScratch
-      ? t.sidebar.header.newThreadWithoutProjectWithShortcut(newThreadShortcutLabel)
-      : t.sidebar.header.newThreadInNamedProjectWithShortcut(
-          scopedProjectGroup.displayName,
-          newThreadShortcutLabel,
-        )
-    : newThreadShortcutLabel
+  const newThreadLabel =
+    newThreadTooltipLabel ??
+    (newThreadShortcutLabel
       ? t.sidebar.header.newThreadWithShortcut(newThreadShortcutLabel)
-      : t.sidebar.header.newThread;
+      : t.sidebar.header.newThread);
 
   return (
     <div className="relative z-1 min-w-0 px-3 pt-3">

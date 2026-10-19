@@ -34,7 +34,9 @@ import {
   toSortableTimestamp,
   type ThreadSortInput,
 } from "../lib/threadSort";
-import type { SidebarThreadSummary, Thread } from "../types";
+import type { Project, SidebarThreadSummary, Thread } from "../types";
+import { getProjectOrderKey } from "../logicalProject";
+import { legacyProjectCwdPreferenceKey } from "../uiStateStore";
 import { cn, normalizeSearchText } from "../lib/utils";
 import { isLatestRunSettled } from "../session-logic";
 import { resolveServerBackedAppStageLabel } from "../branding.logic";
@@ -906,6 +908,45 @@ export type SidebarNewThreadDestination =
   | { kind: "project"; projectRef: ScopedProjectRef }
   | { kind: "scratch"; environmentId: EnvironmentId }
   | { kind: "picker" };
+
+/**
+ * Formats the tooltip from the ordinary-click `destination`, without rechecking availability.
+ * `group` supplies the scoped display name or is null for all projects; `shortcut` may be absent.
+ * Returns localized directional copy only for resolved project or scratch creation.
+ */
+export function resolveSidebarNewThreadTooltip(
+  destination: SidebarNewThreadDestination,
+  group: Pick<SidebarProjectSnapshot, "displayName"> | null,
+  shortcut: string | null | undefined,
+): string {
+  if (destination.kind === "scratch")
+    return t.sidebar.header.newThreadWithoutProjectWithShortcut(shortcut);
+  if (destination.kind === "project" && group)
+    return t.sidebar.header.newThreadInNamedProjectWithShortcut(group.displayName, shortcut);
+  return shortcut ? t.sidebar.header.newThreadWithShortcut(shortcut) : t.sidebar.header.newThread;
+}
+
+/**
+ * Prepares `projects` for grouping so button and shortcut use the same member priority.
+ * Only manual `sortOrder` applies persisted `projectOrder` keys, including legacy cwd keys.
+ * Returns the original list for other modes; manual ordering never mutates the input.
+ */
+export function prepareSidebarProjectsForGrouping(
+  projects: readonly Project[],
+  sortOrder: SidebarProjectSortOrder,
+  projectOrder: readonly string[],
+): readonly Project[] {
+  if (sortOrder !== "manual") return projects;
+  return orderItemsByPreferredIds({
+    items: projects,
+    preferredIds: projectOrder,
+    getId: getProjectOrderKey,
+    getPreferenceIds: (project) => [
+      getProjectOrderKey(project),
+      legacyProjectCwdPreferenceKey(project.workspaceRoot),
+    ],
+  });
+}
 
 /**
  * Resolves creation without side effects so the button and shortcut use the same policy.

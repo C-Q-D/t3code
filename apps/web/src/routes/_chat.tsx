@@ -20,7 +20,10 @@ import {
   buildSidebarProjectSnapshots,
   resolveSidebarProjectScopeKey,
 } from "../sidebarProjectGrouping";
-import { resolveSidebarNewThreadDestination } from "../components/Sidebar.logic";
+import {
+  prepareSidebarProjectsForGrouping,
+  resolveSidebarNewThreadDestination,
+} from "../components/Sidebar.logic";
 import { useUiStateStore } from "../uiStateStore";
 import { dispatchPreviewAction } from "../components/preview/previewActionBus";
 import { useHandleNewThread } from "../hooks/useHandleNewThread";
@@ -51,19 +54,31 @@ function ChatRouteGlobalShortcuts() {
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
   const legacySidebarEnabled = useLegacySidebarEnabled();
   const projectGroupingSettings = useClientSettings(selectProjectGroupingSettings);
+  const sidebarProjectSortOrder = useClientSettings((state) => state.sidebarProjectSortOrder);
+  const projectOrder = useUiStateStore((state) => state.projectOrder);
   const projects = useProjects();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const { scratchEnvironmentId, startScratchThread } = useScratchProject();
   const projectGroups = useMemo(
     () =>
       buildSidebarProjectSnapshots({
-        projects,
+        projects: prepareSidebarProjectsForGrouping(
+          projects,
+          sidebarProjectSortOrder,
+          projectOrder,
+        ),
         groupScratchProjects: true,
         settings: projectGroupingSettings,
         primaryEnvironmentId,
         resolveEnvironmentLabel: () => null,
       }),
-    [primaryEnvironmentId, projectGroupingSettings, projects],
+    [
+      primaryEnvironmentId,
+      projectGroupingSettings,
+      projects,
+      sidebarProjectSortOrder,
+      projectOrder,
+    ],
   );
   const persistedProjectScopeKey = useUiStateStore((state) => state.sidebarProjectScopeKey);
   const projectScopeKey = useMemo(

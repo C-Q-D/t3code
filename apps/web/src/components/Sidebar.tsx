@@ -129,7 +129,7 @@ import { isMacPlatform } from "~/lib/utils";
 import { useOpenPrLink } from "../lib/openPullRequestLink";
 import { readLocalApi } from "../localApi";
 import { useSidebarPendingFileDropStore } from "../sidebarPendingFileDropStore";
-import { getProjectOrderKey, selectProjectGroupingSettings } from "../logicalProject";
+import { selectProjectGroupingSettings } from "../logicalProject";
 import {
   buildSidebarProjectSnapshots,
   projectGroupsSpanEnvironments,
@@ -137,7 +137,7 @@ import {
   getSidebarProjectSettingsKey,
   type SidebarProjectSnapshot,
 } from "../sidebarProjectGrouping";
-import { legacyProjectCwdPreferenceKey, useUiStateStore } from "../uiStateStore";
+import { useUiStateStore } from "../uiStateStore";
 import {
   getThreadKeysToDeselectAfterDelete,
   useThreadSelectionStore,
@@ -214,6 +214,8 @@ import {
   searchSidebarThreads,
   sidebarSearchTextSegments,
   resolveSidebarNewThreadDestination,
+  resolveSidebarNewThreadTooltip,
+  prepareSidebarProjectsForGrouping,
   shouldNavigateAfterThreadPark,
   sidebarListItemId,
   sidebarMarkerId,
@@ -2504,35 +2506,19 @@ export default function Sidebar() {
   );
   const environmentMachineById = useEnvironmentMachines();
   const orderedProjects = useMemo(
-    () =>
-      orderItemsByPreferredIds({
-        items: projects,
-        preferredIds: projectOrder,
-        getId: getProjectOrderKey,
-        getPreferenceIds: (project) => [
-          getProjectOrderKey(project),
-          legacyProjectCwdPreferenceKey(project.workspaceRoot),
-        ],
-      }),
-    [projectOrder, projects],
+    () => prepareSidebarProjectsForGrouping(projects, sidebarProjectSortOrder, projectOrder),
+    [projectOrder, projects, sidebarProjectSortOrder],
   );
   const unsortedProjectGroups = useMemo(
     () =>
       buildSidebarProjectSnapshots({
-        projects: sidebarProjectSortOrder === "manual" ? orderedProjects : projects,
+        projects: orderedProjects,
         groupScratchProjects: true,
         settings: projectGroupingSettings,
         primaryEnvironmentId,
         resolveEnvironmentLabel: (environmentId) => environmentLabelById.get(environmentId) ?? null,
       }),
-    [
-      environmentLabelById,
-      orderedProjects,
-      primaryEnvironmentId,
-      projectGroupingSettings,
-      projects,
-      sidebarProjectSortOrder,
-    ],
+    [environmentLabelById, orderedProjects, primaryEnvironmentId, projectGroupingSettings],
   );
   const projectGroups = useMemo(
     () => sortSidebarV2ProjectGroups(unsortedProjectGroups, threads, sidebarProjectSortOrder),
@@ -4932,19 +4918,23 @@ export default function Sidebar() {
   }, [shouldShowJumpHintsNow, updateThreadJumpHintsVisibility]);
 
   // Honor the rail scope while sharing physical target selection with the picker.
+  const newThreadDestination = resolveSidebarNewThreadDestination({
+    shiftKey: false,
+    groups: projectGroups,
+    scopeKey: projectScopeKey,
+    preferredProjectRef: resolveThreadActionProjectRef({
+      ...newThreadContext,
+      activeThread: newThreadContext.activeThread ?? undefined,
+    }),
+    scratchEnvironmentId,
+  });
   const handleNewThreadClick = useCallback(
     (event?: ReactMouseEvent) => {
       const context = {
         ...newThreadContext,
         activeThread: newThreadContext.activeThread ?? undefined,
       };
-      const destination = resolveSidebarNewThreadDestination({
-        shiftKey: event?.shiftKey ?? false,
-        groups: projectGroups,
-        scopeKey: projectScopeKey,
-        preferredProjectRef: resolveThreadActionProjectRef(context),
-        scratchEnvironmentId,
-      });
+      const destination = event?.shiftKey ? { kind: "context" as const } : newThreadDestination;
       if (isMobile) setOpenMobile(false);
       switch (destination.kind) {
         case "context":
@@ -4961,15 +4951,7 @@ export default function Sidebar() {
           break;
       }
     },
-    [
-      isMobile,
-      newThreadContext,
-      projectGroups,
-      projectScopeKey,
-      scratchEnvironmentId,
-      setOpenMobile,
-      startScratchThread,
-    ],
+    [isMobile, newThreadContext, newThreadDestination, setOpenMobile, startScratchThread],
   );
 
   // The button and chat.new share the scope-aware destination policy. Shift+click
@@ -5011,7 +4993,11 @@ export default function Sidebar() {
               onNewThread={handleNewThreadClick}
               newThreadDisabled={projects.length === 0}
               newThreadShortcutLabel={newThreadShortcutLabel}
-              scopedProjectGroup={scopedProjectGroup}
+              newThreadTooltipLabel={resolveSidebarNewThreadTooltip(
+                newThreadDestination,
+                scopedProjectGroup,
+                newThreadShortcutLabel,
+              )}
               newThreadInProjectShortcutLabel={newThreadInProjectShortcutLabel}
               showNewThreadInProjectHint={projectGroups.length > 1}
               searchInputRef={threadSearchInputRef}

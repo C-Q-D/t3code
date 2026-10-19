@@ -34,6 +34,8 @@ import {
   pinOrderKeyBetween,
   resolveAdjacentThreadId,
   resolveSidebarNewThreadDestination,
+  resolveSidebarNewThreadTooltip,
+  prepareSidebarProjectsForGrouping,
   resolveProjectStatusIndicator,
   resolveSidebarSweepKeys,
   resolveSidebarStageBadgeLabel,
@@ -86,7 +88,11 @@ import {
   type Thread,
 } from "../types";
 import { makeThreadFixture, type ThreadFixtureOverrides } from "../test-fixtures";
-import type { SidebarProjectSnapshot } from "../sidebarProjectGrouping";
+import {
+  buildSidebarProjectSnapshots,
+  type SidebarProjectSnapshot,
+} from "../sidebarProjectGrouping";
+import { getProjectOrderKey } from "../logicalProject";
 
 const localEnvironmentId = EnvironmentId.make("environment-local");
 
@@ -128,6 +134,55 @@ describe("resolveSidebarNewThreadDestination", () => {
     preferredProjectRef: null,
     scratchEnvironmentId: (environmentId: EnvironmentId) => environmentId,
   };
+
+  it.each([
+    {
+      name: "ordinary",
+      scopedGroup: group,
+      available: true,
+      expected: "New thread in Selected (Ctrl+N)",
+    },
+    {
+      name: "scratch",
+      scopedGroup: { ...group, isScratch: true as const },
+      available: true,
+      expected: "New thread without a project (Ctrl+N)",
+    },
+    {
+      name: "unavailable scratch",
+      scopedGroup: { ...group, isScratch: true as const },
+      available: false,
+      expected: "New thread (Ctrl+N)",
+    },
+    {
+      name: "empty ordinary",
+      scopedGroup: { ...group, memberProjects: [], memberProjectRefs: [] },
+      available: true,
+      expected: "New thread (Ctrl+N)",
+    },
+    {
+      name: "empty scratch",
+      scopedGroup: {
+        ...group,
+        isScratch: true as const,
+        memberProjects: [],
+        memberProjectRefs: [],
+      },
+      available: true,
+      expected: "New thread (Ctrl+N)",
+    },
+  ])(
+    "tooltip follows the resolved destination for $name",
+    ({ scopedGroup, available, expected }) => {
+      installMessages("en", en);
+      const destination = resolveSidebarNewThreadDestination({
+        ...input,
+        groups: [scopedGroup, otherGroup],
+        scratchEnvironmentId: (environmentId) => (available ? environmentId : null),
+      });
+      expect(resolveSidebarNewThreadTooltip(destination, scopedGroup, "Ctrl+N")).toBe(expected);
+    },
+  );
 
   it("lets Shift override an active project scope", () => {
     expect(resolveSidebarNewThreadDestination({ ...input, shiftKey: true })).toEqual({
@@ -230,6 +285,53 @@ describe("resolveSidebarNewThreadDestination", () => {
         groups: [{ ...scopedGroup, memberProjects: [], memberProjectRefs: [] }, otherGroup],
       }),
     ).toEqual({ kind: "picker" });
+  });
+});
+
+describe("prepareSidebarProjectsForGrouping", () => {
+  const repositoryIdentity = {
+    canonicalKey: "github.com/example/shared",
+    locator: {
+      source: "git-remote" as const,
+      remoteName: "origin",
+      remoteUrl: "https://github.com/example/shared.git",
+    },
+  };
+  const a = makeProject({ id: ProjectId.make("A"), workspaceRoot: "/a", repositoryIdentity });
+  const b = makeProject({ id: ProjectId.make("B"), workspaceRoot: "/b", repositoryIdentity });
+  const c = makeProject({ id: ProjectId.make("C"), workspaceRoot: "/c" });
+
+  it.each([
+    { sortOrder: "manual" as const, expected: "B" },
+    { sortOrder: "updated_at" as const, expected: "A" },
+    { sortOrder: "created_at" as const, expected: "A" },
+  ])("keeps button and shortcut targets consistent for $sortOrder", ({ sortOrder, expected }) => {
+    const projects = prepareSidebarProjectsForGrouping([a, b, c], sortOrder, [
+      getProjectOrderKey(b),
+      getProjectOrderKey(a),
+    ]);
+    const groups = buildSidebarProjectSnapshots({
+      projects,
+      groupScratchProjects: true,
+      settings: { sidebarProjectGroupingMode: "repository", sidebarProjectGroupingOverrides: {} },
+      primaryEnvironmentId: localEnvironmentId,
+      resolveEnvironmentLabel: () => null,
+    });
+    const group = groups.find((candidate) =>
+      candidate.memberProjects.some((member) => member.id === a.id),
+    );
+    expect(
+      resolveSidebarNewThreadDestination({
+        shiftKey: false,
+        groups,
+        scopeKey: group!.projectKey,
+        preferredProjectRef: { environmentId: localEnvironmentId, projectId: ProjectId.make("C") },
+        scratchEnvironmentId: (environmentId) => environmentId,
+      }),
+    ).toEqual({
+      kind: "project",
+      projectRef: { environmentId: localEnvironmentId, projectId: expected },
+    });
   });
 });
 
