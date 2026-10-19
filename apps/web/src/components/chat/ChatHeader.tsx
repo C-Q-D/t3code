@@ -28,6 +28,7 @@ import {
   PencilIcon,
   PinIcon,
   PinOffIcon,
+  PlusIcon,
   RefreshCwIcon,
   SettingsIcon,
   TimerIcon,
@@ -500,7 +501,7 @@ export const ChatHeader = memo(function ChatHeader({
                       type="button"
                       aria-label={t.chat.header.newThread(activeProjectName)}
                       onClick={onNewThreadInProject}
-                      className="inline-flex h-8 min-w-0 max-w-full cursor-pointer items-center gap-2 rounded-full bg-popover pr-3 pl-1.5 text-control font-semibold text-chat-project-label shadow-raise-xs-control outline-none focus-visible:inset-shadow-focus"
+                      className="inline-flex h-8 min-w-0 max-w-full cursor-pointer items-center gap-2 rounded-full bg-popover pr-3 pl-1.5 text-control font-semibold text-chat-project-label shadow-raise-xs-control outline-none hover:bg-chat-title-hover focus-visible:inset-shadow-focus"
                     />
                   }
                 >
@@ -511,6 +512,12 @@ export const ChatHeader = memo(function ChatHeader({
                   <WorkspaceBreadcrumbText className="max-w-40">
                     {activeProjectName}
                   </WorkspaceBreadcrumbText>
+                  <span
+                    aria-hidden
+                    className="flex size-4.5 shrink-0 items-center justify-center rounded-full bg-secondary text-chat-project-label"
+                  >
+                    <PlusIcon className="size-3" strokeWidth={2.5} />
+                  </span>
                 </TooltipTrigger>
                 <TooltipPopup side="top">{t.chat.header.newThread(activeProjectName)}</TooltipPopup>
               </Tooltip>
