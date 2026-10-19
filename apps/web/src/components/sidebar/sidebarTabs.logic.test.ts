@@ -1,7 +1,8 @@
 /** Tests the 8a tab contracts with ordered shelf fixtures, without React or browser storage. */
-import { describe, expect, it } from "vite-plus/test";
+import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import {
   buildSidebarTabs,
+  visibleSidebarTabs,
   nextSidebarSettledVisibleCount,
   readSidebarTab,
   resolveSidebarSearchResultTab,
@@ -12,6 +13,34 @@ import {
   type SidebarTab,
   type SidebarTabShelves,
 } from "./sidebarTabs.logic";
+
+const snoozeFlag = vi.hoisted(() => ({ SNOOZE_UI_ENABLED: true }));
+vi.mock("../../snoozeUi", () => snoozeFlag);
+beforeEach(() => {
+  snoozeFlag.SNOOZE_UI_ENABLED = true;
+});
+
+describe("fork without snooze UI", () => {
+  beforeEach(() => {
+    snoozeFlag.SNOOZE_UI_ENABLED = false;
+  });
+  it("migrates a stored Later selection to Active and exposes only Active and Settled", async () => {
+    const actual = await vi.importActual<typeof import("../../snoozeUi")>("../../snoozeUi");
+    expect(actual.SNOOZE_UI_ENABLED).toBe(false);
+    expect(readSidebarTab("later")).toBe("active");
+    expect(visibleSidebarTabs()).toEqual(["active", "settled"]);
+  });
+  it("rejects Later drops and reveals externally snoozed search results in Active", () => {
+    expect(resolveSidebarTabDropIntent("active", "later")).toBeNull();
+    expect(
+      resolveSidebarSearchResultTab({
+        threadKey: "external",
+        snoozedThreadKeys: new Set(["external"]),
+        settledThreadKeys: new Set(),
+      }),
+    ).toBe("active");
+  });
+});
 
 /** Supply disjoint ordered shelves; overrides expose only fields relevant to each contract. */
 function shelves(overrides: Partial<SidebarTabShelves<string>> = {}): SidebarTabShelves<string> {

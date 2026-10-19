@@ -1,5 +1,6 @@
 /** Derives sidebar visibility, ordering and actions from environment-scoped thread state. */
 import { t } from "~/i18n";
+import { SNOOZE_UI_ENABLED } from "../snoozeUi";
 import { resolveThreadWorkingStartedAt } from "@t3tools/client-runtime/state/models";
 import { backgroundWorkHoldsCompletion } from "@t3tools/shared/orchestrationV2PendingBackgroundWork";
 import { threadPullRequestSearchTerms } from "@t3tools/shared/threadPullRequests";
@@ -185,14 +186,14 @@ export const animateSidebarLayoutChanges: AnimateLayoutChanges = (args) =>
 
 export type SidebarSection = "pinned" | "active" | "working" | "snoozed" | "settled";
 
-/** Resolve the shelf a visible thread belongs to. Snooze is temporary and
- * wins until its wake boundary; settlement then wins over a stale pin. */
+/** Resolve the shelf a visible thread belongs to. When its UI is enabled, snooze
+ * wins until its wake boundary; otherwise settlement wins over a stale pin. */
 export function resolveSidebarThreadSection(input: {
   readonly snoozed: boolean;
   readonly settled: boolean;
   readonly pinned: boolean;
 }): SidebarSection {
-  if (input.snoozed) return "snoozed";
+  if (SNOOZE_UI_ENABLED && input.snoozed) return "snoozed";
   if (input.settled) return "settled";
   if (input.pinned) return "pinned";
   return "active";

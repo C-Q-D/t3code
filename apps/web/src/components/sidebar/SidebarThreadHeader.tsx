@@ -14,7 +14,7 @@ import { t } from "~/i18n";
 import { cn } from "~/lib/utils";
 import { discussionNavigationState } from "../discussions/discussionNavigation.logic";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
-import type { SidebarTab } from "./sidebarTabs.logic";
+import { visibleSidebarTabs, type SidebarTab } from "./sidebarTabs.logic";
 import { sidebarTabDropId } from "./SidebarThreadDndContext";
 
 /** Register a real header target; eligible pointer hits use the same appearance as hover. */
@@ -215,7 +215,7 @@ export function SidebarThreadHeader({
           }}
           className="mb-1.5 flex h-9 rounded-full bg-sidebar-control-surface p-0.75 text-secondary-copy-medium shadow-well-control"
         >
-          {(["active", "later", "settled"] as const).map((tab) => (
+          {visibleSidebarTabs().map((tab) => (
             <SidebarDropTab key={tab} tab={tab} count={tabCounts[tab]} />
           ))}
         </ToggleGroup>

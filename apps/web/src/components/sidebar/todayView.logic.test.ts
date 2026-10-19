@@ -86,9 +86,10 @@ describe("Today membership", () => {
   });
 
   it("falls back to the legacy message timestamp only when the authored field is absent", () => {
+    const { latestUserAuthoredMessageAt: _authoredAt, ...legacy } = thread("legacy");
     const rows = buildTodayView(
       [
-        thread("legacy", { latestUserAuthoredMessageAt: undefined }),
+        legacy,
         thread("no-user-message", { latestUserAuthoredMessageAt: null }),
         thread("background-message", { latestUserAuthoredMessageAt: yesterday }),
       ],

@@ -424,12 +424,18 @@ describe("resolveSidebarThreadSection", () => {
     );
   });
 
-  it("keeps lifecycle shelves authoritative over a stale pin", () => {
+  it("ignores snooze while preserving settlement over a stale pin", () => {
     expect(resolveSidebarThreadSection({ snoozed: true, settled: true, pinned: true })).toBe(
-      "snoozed",
+      "settled",
     );
     expect(resolveSidebarThreadSection({ snoozed: false, settled: true, pinned: true })).toBe(
       "settled",
+    );
+    expect(resolveSidebarThreadSection({ snoozed: true, settled: false, pinned: true })).toBe(
+      "pinned",
+    );
+    expect(resolveSidebarThreadSection({ snoozed: true, settled: false, pinned: false })).toBe(
+      "active",
     );
   });
 });

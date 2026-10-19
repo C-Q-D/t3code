@@ -1,5 +1,6 @@
 /** Pure sidebar tab projections and storage codecs; rendering, search and I/O belong to callers. */
 import type { SidebarSection } from "../Sidebar.logic";
+import { SNOOZE_UI_ENABLED } from "../../snoozeUi";
 
 /** Persisted tab identifiers, independent of translated labels. */
 export type SidebarTab = "active" | "later" | "settled";
@@ -7,6 +8,11 @@ export type SidebarTab = "active" | "later" | "settled";
 export const SIDEBAR_TAB_STORAGE_KEY = "t3code:sidebar-tab";
 export const SIDEBAR_SETTLED_INITIAL_COUNT = 10;
 export const SIDEBAR_SETTLED_PAGE_COUNT = 25;
+
+/** Keep the project header and available lifecycle destinations aligned with the fork switch. */
+export function visibleSidebarTabs(): readonly SidebarTab[] {
+  return SNOOZE_UI_ENABLED ? ["active", "later", "settled"] : ["active", "settled"];
+}
 
 /** Already sorted, disjoint shelves from Sidebar's capability-aware classification.
  * Working is empty when its beta is disabled; ordinary rows then remain in activeThreads. */
@@ -35,7 +41,9 @@ export type SidebarTabDropIntent = "settle" | "open-snooze-menu" | "unsnooze" | 
 
 /** Decode a raw localStorage value; absent or invalid values select Active. No I/O. */
 export function readSidebarTab(storedValue: string | null | undefined): SidebarTab {
-  return storedValue === "later" || storedValue === "settled" ? storedValue : "active";
+  return (SNOOZE_UI_ENABLED && storedValue === "later") || storedValue === "settled"
+    ? storedValue
+    : "active";
 }
 
 /** Produce the exact localStorage write entry for a tab. The caller owns I/O and errors. */
@@ -51,7 +59,7 @@ export function resolveSidebarSearchResultTab(input: {
   readonly snoozedThreadKeys: ReadonlySet<string>;
   readonly settledThreadKeys: ReadonlySet<string>;
 }): SidebarTab {
-  if (input.snoozedThreadKeys.has(input.threadKey)) return "later";
+  if (SNOOZE_UI_ENABLED && input.snoozedThreadKeys.has(input.threadKey)) return "later";
   if (input.settledThreadKeys.has(input.threadKey)) return "settled";
   return "active";
 }
@@ -130,7 +138,7 @@ export function resolveSidebarTabDropIntent(
   sourceSection: SidebarSection,
   targetTab: SidebarTab,
 ): SidebarTabDropIntent {
-  if (targetTab === "later") return "open-snooze-menu";
+  if (targetTab === "later") return SNOOZE_UI_ENABLED ? "open-snooze-menu" : null;
   if (targetTab === "settled") return sourceSection === "settled" ? null : "settle";
   if (sourceSection === "snoozed") return "unsnooze";
   if (sourceSection === "settled") return "unsettle";
