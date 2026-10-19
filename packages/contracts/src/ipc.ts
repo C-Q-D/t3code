@@ -1,3 +1,4 @@
+/** Defines the typed desktop IPC bridge and its serializable request/response contracts. */
 import * as Schema from "effect/Schema";
 
 import { SnapShotSource } from "./chatAttachment.ts";
@@ -1209,6 +1210,12 @@ export interface DesktopBridge {
   pickFolder: (options?: PickFolderOptions) => Promise<string | null>;
   /** Optional while older desktop shells can host a newer web client. */
   pickProjectFavicon?: (initialPath?: string) => Promise<string | null>;
+  /** Select and copy a local image; returns its same-origin URL, or null on cancellation. */
+  pickBackgroundImage?: () => Promise<string | null>;
+  /** Delete the selected local background; filesystem failures reject the promise. */
+  clearBackgroundImage?: () => Promise<void>;
+  /** Return the selected background's same-origin URL, or null if none is stored. */
+  getBackgroundImage?: () => Promise<string | null>;
   /**
    * Multi-select JSON file picker that opens in the VS Code extensions
    * directory when one exists. Optional: older desktop builds lack it, and

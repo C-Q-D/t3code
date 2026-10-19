@@ -1,3 +1,4 @@
+/** Verifies desktop protocol routing, isolated background reads and proxy behavior. */
 import { assert, describe, it } from "@effect/vitest";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";

@@ -1,3 +1,4 @@
+/** Verifies native window IPC behavior with isolated platform services and files. */
 import * as DesktopUiLocale from "../../i18n/DesktopUiLocale.ts";
 import { assert, describe, it } from "@effect/vitest";
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -26,11 +27,16 @@ import * as DesktopBackendPool from "../../backend/DesktopBackendPool.ts";
 import * as ElectronDialog from "../../electron/ElectronDialog.ts";
 import * as ElectronWindow from "../../electron/ElectronWindow.ts";
 import * as DesktopAppSettings from "../../settings/DesktopAppSettings.ts";
+import * as DesktopEnvironment from "../../app/DesktopEnvironment.ts";
+import * as DesktopConfig from "../../app/DesktopConfig.ts";
 import {
   getLocalEnvironmentBootstraps,
   getWindowFullscreenState,
   pasteAsText,
   pickProjectFavicon,
+  pickBackgroundImage,
+  clearBackgroundImage,
+  getBackgroundImage,
   probeRemoteEditors,
 } from "./window.ts";
 
@@ -255,6 +261,88 @@ describe("pasteAsText", () => {
         ),
       );
     },
+  );
+});
+
+describe("background image IPC", () => {
+  /** Uses the real environment resolver with an isolated home instead of partial service values. */
+  const backgroundEnvironment = (root: string) =>
+    DesktopEnvironment.layer({
+      dirname: root,
+      homeDirectory: root,
+      platform: "win32",
+      processArch: "x64",
+      appVersion: "1.0.0",
+      appPath: root,
+      isPackaged: false,
+      resourcesPath: root,
+      runningUnderArm64Translation: false,
+    }).pipe(
+      Layer.provide(
+        Layer.mergeAll(NodeServices.layer, DesktopConfig.layerTest({ T3CODE_HOME: root })),
+      ),
+    );
+  it.effect("selects, reads and clears the copied background", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const root = yield* fs.makeTempDirectoryScoped();
+      yield* fs.writeFileString(`${root}/image.PNG`, "abc");
+      yield* Effect.gen(function* () {
+        assert.isNull(yield* getBackgroundImage.handler(undefined));
+        assert.equal(
+          yield* pickBackgroundImage.handler(undefined),
+          "/__t3/background/ba7816bf8f01cfea.png",
+        );
+        yield* fs.remove(`${root}/image.PNG`);
+        assert.equal(
+          yield* getBackgroundImage.handler(undefined),
+          "/__t3/background/ba7816bf8f01cfea.png",
+        );
+        assert.equal(
+          yield* fs.readFileString(`${root}/userdata/background/ba7816bf8f01cfea.png`),
+          "abc",
+        );
+        yield* clearBackgroundImage.handler(undefined);
+        assert.isNull(yield* getBackgroundImage.handler(undefined));
+        assert.deepEqual(yield* fs.readDirectory(`${root}/userdata/background`), []);
+      }).pipe(
+        Effect.provide(
+          Layer.mergeAll(
+            DesktopUiLocale.layerTest(),
+            backgroundEnvironment(root),
+            Layer.mock(ElectronDialog.ElectronDialog)({
+              pickFiles: () => Effect.succeed([`${root}/image.PNG`]),
+            }),
+            Layer.mock(ElectronWindow.ElectronWindow)({ focusedMainOrFirst: Effect.succeedNone }),
+          ),
+        ),
+      );
+    }).pipe(Effect.provide(NodeServices.layer), Effect.scoped),
+  );
+
+  it.effect("returns null on cancellation and preserves the current background", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const root = yield* fs.makeTempDirectoryScoped();
+      yield* fs.makeDirectory(`${root}/userdata/background`, { recursive: true });
+      yield* fs.writeFileString(`${root}/userdata/background/ba7816bf8f01cfea.png`, "abc");
+      yield* Effect.gen(function* () {
+        assert.isNull(yield* pickBackgroundImage.handler(undefined));
+        assert.equal(
+          yield* getBackgroundImage.handler(undefined),
+          "/__t3/background/ba7816bf8f01cfea.png",
+        );
+      }).pipe(
+        Effect.provide(
+          Layer.mergeAll(
+            DesktopUiLocale.layerTest(),
+            backgroundEnvironment(root),
+            Layer.mock(ElectronDialog.ElectronDialog)({ pickFiles: () => Effect.succeed([]) }),
+            Layer.mock(ElectronWindow.ElectronWindow)({ focusedMainOrFirst: Effect.succeedNone }),
+          ),
+        ),
+      );
+    }).pipe(Effect.provide(NodeServices.layer), Effect.scoped),
   );
 });
 

@@ -1,3 +1,4 @@
+/** Verifies desktop window lifecycle, appearance and persisted native state. */
 import * as DesktopUiLocale from "../i18n/DesktopUiLocale.ts";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, it } from "@effect/vitest";
@@ -219,6 +220,7 @@ const desktopWindowBoundsEquivalence = Schema.toEquivalence(
 
 function layerTest(input: {
   readonly platform?: NodeJS.Platform;
+  readonly darkColors?: Ref.Ref<boolean>;
   readonly window: Electron.BrowserWindow;
   readonly createCount: Ref.Ref<number>;
   readonly mainWindow: Ref.Ref<Option.Option<Electron.BrowserWindow>>;
@@ -340,7 +342,13 @@ function layerTest(input: {
               input.copiedTexts?.push(text);
             }),
         } satisfies ElectronShell.ElectronShell["Service"]),
-        layerElectronTheme,
+        input.darkColors === undefined
+          ? layerElectronTheme
+          : Layer.succeed(ElectronTheme.ElectronTheme, {
+              shouldUseDarkColors: Ref.get(input.darkColors),
+              setSource: () => Effect.void,
+              onUpdated: () => Effect.void,
+            }),
         layerElectronWindow,
         Layer.mock(PreviewPasskeys.PreviewPasskeys)({
           bridgeEnabled: false,
@@ -484,6 +492,7 @@ describe("DesktopWindow", () => {
       Effect.gen(function* () {
         const fake = makeFakeBrowserWindow();
         const createdWindowOptions: Electron.BrowserWindowConstructorOptions[] = [];
+        const darkColors = yield* Ref.make(false);
         const createCount = yield* Ref.make(0);
         const mainWindow = yield* Ref.make<Option.Option<Electron.BrowserWindow>>(Option.none());
         yield* Effect.gen(function* () {
@@ -501,10 +510,16 @@ describe("DesktopWindow", () => {
           assert.deepEqual(vi.mocked(fake.window.setBackgroundColor).mock.calls.at(-1), [
             platform === "win32" ? "#00000000" : "#ffffff",
           ]);
+          yield* Ref.set(darkColors, true);
+          yield* service.syncAppearance;
+          assert.deepEqual(vi.mocked(fake.window.setBackgroundColor).mock.calls.at(-1), [
+            platform === "win32" ? "#00000000" : "#0a0a0a",
+          ]);
         }).pipe(
           Effect.provide(
             layerTest({
               platform,
+              darkColors,
               window: fake.window,
               createCount,
               mainWindow,

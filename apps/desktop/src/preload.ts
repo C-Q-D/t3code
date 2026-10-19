@@ -1,3 +1,4 @@
+/** Exposes typed native desktop operations to the isolated renderer context. */
 import type {
   DesktopBridge,
   DesktopPreviewOpenLinkEvent,
@@ -190,6 +191,11 @@ contextBridge.exposeInMainWorld("desktopBridge", {
   pickProjectFavicon: (initialPath) =>
     ipcRenderer.invoke(IpcChannels.PICK_PROJECT_FAVICON_CHANNEL, initialPath),
   pickThemeFiles: () => ipcRenderer.invoke(IpcChannels.PICK_THEME_FILES_CHANNEL, undefined),
+  pickBackgroundImage: () =>
+    ipcRenderer.invoke(IpcChannels.PICK_BACKGROUND_IMAGE_CHANNEL, undefined),
+  clearBackgroundImage: () =>
+    ipcRenderer.invoke(IpcChannels.CLEAR_BACKGROUND_IMAGE_CHANNEL, undefined),
+  getBackgroundImage: () => ipcRenderer.invoke(IpcChannels.GET_BACKGROUND_IMAGE_CHANNEL, undefined),
   setUiLocalePreference: (preference) =>
     ipcRenderer.invoke(IpcChannels.SET_UI_LOCALE_PREFERENCE_CHANNEL, preference),
   setTheme: (theme) => ipcRenderer.invoke(IpcChannels.SET_THEME_CHANNEL, theme),

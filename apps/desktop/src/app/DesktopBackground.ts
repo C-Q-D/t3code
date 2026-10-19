@@ -1,5 +1,5 @@
 /** Stores the single user-selected background independently of application settings. */
-import { createHash } from "node:crypto";
+import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
@@ -36,7 +36,8 @@ export const saveBackgroundImage = (stateDir: string, sourcePath: string) =>
         });
       }
       const contents = yield* fs.readFile(sourcePath);
-      const filename = `${createHash("sha256").update(contents).digest("hex").slice(0, 16)}.${extension}`;
+      const digest = yield* (yield* Crypto.Crypto).digest("SHA-256", contents);
+      const filename = `${Buffer.from(digest).toString("hex").slice(0, 16)}.${extension}`;
       const directory = path.join(stateDir, "background");
       yield* fs.makeDirectory(directory, { recursive: true });
       // Publish the new content before removing the old image, so read failures preserve the selection.

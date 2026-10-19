@@ -28,6 +28,7 @@ import * as DesktopBackendConfiguration from "../../backend/DesktopBackendConfig
 import * as DesktopBackendPool from "../../backend/DesktopBackendPool.ts";
 import * as DesktopLocalEnvironmentAuth from "../../backend/DesktopLocalEnvironmentAuth.ts";
 import * as DesktopEnvironment from "../../app/DesktopEnvironment.ts";
+import * as DesktopBackground from "../../app/DesktopBackground.ts";
 import * as DesktopAppSettings from "../../settings/DesktopAppSettings.ts";
 import * as DesktopWslBackend from "../../wsl/DesktopWslBackend.ts";
 import * as DesktopWslEnvironment from "../../wsl/DesktopWslEnvironment.ts";
@@ -278,6 +279,51 @@ export const pickProjectFavicon = DesktopIpc.makeIpcMethod({
       ],
     });
     return paths[0] ?? null;
+  }),
+});
+
+/** Selects one local background; cancellation preserves the existing stored image. */
+export const pickBackgroundImage = DesktopIpc.makeIpcMethod({
+  channel: IpcChannels.PICK_BACKGROUND_IMAGE_CHANNEL,
+  payload: Schema.Undefined,
+  result: Schema.NullOr(Schema.String),
+  handler: Effect.fn("desktop.ipc.window.pickBackgroundImage")(function* () {
+    const dialog = yield* ElectronDialog.ElectronDialog;
+    const windows = yield* ElectronWindow.ElectronWindow;
+    const environment = yield* DesktopEnvironment.DesktopEnvironment;
+    const messages = yield* (yield* DesktopUiLocale.DesktopUiLocale).messages;
+    const paths = yield* dialog.pickFiles({
+      owner: yield* windows.focusedMainOrFirst,
+      defaultPath: Option.none(),
+      multiple: false,
+      filters: [
+        { name: messages.filters.images, extensions: DesktopBackground.BACKGROUND_EXTENSIONS },
+      ],
+    });
+    if (paths[0] === undefined) return null;
+    return yield* DesktopBackground.saveBackgroundImage(environment.stateDir, paths[0]);
+  }),
+});
+
+/** Clears the local background without changing synchronized client settings. */
+export const clearBackgroundImage = DesktopIpc.makeIpcMethod({
+  channel: IpcChannels.CLEAR_BACKGROUND_IMAGE_CHANNEL,
+  payload: Schema.Undefined,
+  result: Schema.Void,
+  handler: Effect.fn("desktop.ipc.window.clearBackgroundImage")(function* () {
+    const environment = yield* DesktopEnvironment.DesktopEnvironment;
+    yield* DesktopBackground.clearBackgroundImage(environment.stateDir);
+  }),
+});
+
+/** Returns the local background URL, or null when no file is selected. */
+export const getBackgroundImage = DesktopIpc.makeIpcMethod({
+  channel: IpcChannels.GET_BACKGROUND_IMAGE_CHANNEL,
+  payload: Schema.Undefined,
+  result: Schema.NullOr(Schema.String),
+  handler: Effect.fn("desktop.ipc.window.getBackgroundImage")(function* () {
+    const environment = yield* DesktopEnvironment.DesktopEnvironment;
+    return yield* DesktopBackground.getBackgroundImage(environment.stateDir);
   }),
 });
 
