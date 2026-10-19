@@ -3,7 +3,7 @@
  * 浏览器保留不透明底色，Windows Electron 由原生窗口透出桌面。
  * 其他主题保留现有石纹与 index.css 的玻璃行为。
  */
-/* 框架任务尚未引用这些类时也要打包石纹；此登记只生成 CSS，不应用到界面。 */
+/* Keep the base and sidebar utilities available to route shells. */
 @source inline("stone-base stone-sidebar");
 
 @utility stone-base {
@@ -65,6 +65,10 @@ html[data-theme-id="graphite"] .stone-base .stone-base::after {
   content: none;
 }
 
+html[data-theme-id="graphite"] .stone-sidebar {
+  background: color-mix(in srgb, var(--sidebar) var(--glass-opacity), transparent);
+}
+
 @layer utilities {
   html[data-theme-id="graphite"]
     :is(.surface-glass, .alert-glass, .dialog-glass, .dialog-backdrop, .dropdown-glass) {
@@ -74,14 +78,8 @@ html[data-theme-id="graphite"] .stone-base .stone-base::after {
   }
 
   html[data-theme-id="graphite"] :is(.surface-glass, .alert-glass, .dialog-glass, .dropdown-glass) {
-    /* __root.tsx 写入百分数；80% 以上混黑为零，0% 时混黑 50%，始终保持不透明。
-     * 同层且更具体的 important 背景覆盖原 alert-glass 和无 backdrop-filter 时的兜底。 */
-    --stone-black-mix: clamp(0%, calc((80% - var(--glass-opacity, 80%)) * 0.625), 50%);
-    background: color-mix(
-      in srgb,
-      var(--stone-surface-color, var(--surface-raised)),
-      var(--color-black) var(--stone-black-mix)
-    ) !important;
+    /* Floating controls and inner cards stay solid; match the existing important fallback layer. */
+    background: var(--stone-surface-color, var(--surface-raised)) !important;
   }
 
   /* 规范-8a.dc.html · G1：实心凸起面 #28282c；页面按画板选择自己的层级阴影。 */

@@ -100,6 +100,11 @@
     url("../assets/stone-8a.webp");
 }
 
+/* Plans are inner cards, so their readability does not depend on the window opacity. */
+html[data-theme-id="graphite"] .timeline-plan {
+  background: var(--popover);
+}
+
 .chat-markdown .timeline-markdown-table table {
   @apply text-control;
 }

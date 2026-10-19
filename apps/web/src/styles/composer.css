@@ -60,6 +60,27 @@
   --chat-composer-outline: var(--border);
 }
 
+@layer utilities {
+  /* Only the input shell is translucent; attached banners and inner controls stay solid. */
+  html[data-theme-id="graphite"] .surface-glass[data-chat-composer-main-surface] {
+    background: color-mix(
+      in srgb,
+      var(--chat-composer-glass-surface) var(--glass-opacity),
+      transparent
+    ) !important;
+  }
+}
+
+html[data-theme-id="graphite"] [data-slot="composer-context-strip"]::before {
+  background: color-mix(
+    in srgb,
+    var(--chat-composer-glass-surface) var(--glass-opacity),
+    transparent
+  );
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
 /* StyleM / E1: white keys keep their icons dark instead of inheriting F8 category hues. */
 @utility composer-primary-key {
   --lucide-hue-override: currentColor;

@@ -252,10 +252,10 @@
  * | StyleM 系统按钮实际留白 | 138px | var(--frame-system-buttons-width) | StyleM-8a.dc.html · 整窗 |
  * | README 系统按钮留白范围上限 | 140px | var(--frame-system-buttons-max-width) | README.md · 窗口框架 |
  *
- * 材质合同：README.md · 设计令牌 / StyleM-8a.dc.html · 整窗：
- * #0b0b0c 底座（bg-background）+ stone-8a.png 平铺 + rgba(0,0,0,.2)（bg-stone-dim）。
- * 石纹文件与合成工具类由 F1.2 在 slab.css 接入；本次不引用尚未交付的资源。
- * 纹理覆色只登记颜色，不能拿 bg-stone-*-veil 代替完整材质；层叠和玻璃行为由 F1.2 实现。
+ * 石墨材质合同：slab.css 绘制背景图 + rgba(0,0,0,.2)（bg-stone-dim）。
+ * Windows Electron 根背景透明；其他宿主以 #0b0b0c 兜底。
+ * 背景图与主要石板使用 --glass-opacity；浮层、内卡与代码块保持实心。
+ * 石纹覆色仍供其他主题使用；石墨右面板仅复用覆色 RGB，替换 alpha，不铺石纹。
  * G1 受限、离线文字 #a8461a 与 H5/StyleM 侧边栏标签 #8a3510 分用途保留；
  * 通用 warning 采用 README W7 的 #e8dcc0 / #7a5000，通用 error 采用 #f0cfc9 / #6e1d14。
  * 选中用 2px；具体控件的 1.5px 选中例外用 inset-shadow-selected-control，焦点用 inset-shadow-focus。

@@ -18,6 +18,17 @@
   background-repeat: repeat;
 }
 
+/* Paint the main slab once; nested layout canvases must not hide its transparent fill. */
+html[data-theme-id="graphite"] .stone-frame-card,
+html[data-theme-id="graphite"] [data-frame-main="chat"]:not(:has([data-chat-workspace])) {
+  background: color-mix(in srgb, var(--card) var(--glass-opacity), transparent);
+}
+
+html[data-theme-id="graphite"] .chat-message-canvas,
+html[data-theme-id="graphite"] [data-timeline-loading] {
+  background: transparent;
+}
+
 /* Both rows use the WCO-aware titlebar height; never subtract a second baseline. */
 .window-frame-shell {
   --workspace-topbar-height: max(

@@ -340,6 +340,11 @@
   background-repeat: repeat;
 }
 
+/* Preserve the panel veil's RGB while replacing its fixed alpha with the shared preference. */
+html[data-theme-id="graphite"] .stone-panel {
+  background: rgb(from var(--color-stone-panel-veil) r g b / var(--glass-opacity));
+}
+
 /* PN1.3 · Panel8a.dc.html / 其余屏-1 K2: browser viewport, address well,
    and the Agent cursor label. Movement remains the only cursor transition. */
 @theme {

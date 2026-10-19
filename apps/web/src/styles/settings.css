@@ -42,6 +42,11 @@
   background-repeat: repeat;
 }
 
+/* Settings groups are inner cards, not another translucent window slab. */
+html[data-theme-id="graphite"] .stone-settings-group {
+  background: var(--popover);
+}
+
 /* Only panels wrapping a whole settings card need exterior paint. Keep clipping
    through the shared 200ms height transition, then reveal the unchanged shadow.
    Closing restores clipping immediately, including interrupted opening motion. */
