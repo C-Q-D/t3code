@@ -224,9 +224,32 @@ export function ProjectRail() {
         }}
       >
         <ComboboxTrigger
+          // Base UI opens on mousedown; reserve opening for the explicit context-menu gestures.
+          onMouseDown={(event) => event.preventBaseUIHandler()}
+          onClick={(event) => {
+            event.preventBaseUIHandler();
+            suppressScopeChange.current = true;
+            dispatchPicker({ type: "open-changed", open: false });
+            setScope(null);
+            if (onUtilityPage) void navigateToMainApp();
+          }}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            suppressScopeChange.current = false;
+            dispatchPicker({ type: "open-changed", open: true });
+          }}
+          onKeyDown={(event) => {
+            event.preventBaseUIHandler();
+            if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
+              event.preventDefault();
+              suppressScopeChange.current = false;
+              dispatchPicker({ type: "open-changed", open: true });
+            }
+          }}
+          onKeyUp={(event) => event.preventBaseUIHandler()}
           render={
             <ProjectRailKey
-              label={t.sidebar.projects.all}
+              label={t.sidebar.projects.todayTooltip}
               className={cn(
                 "bg-popover text-foreground shadow-raise-new-thread",
                 selection.key === null && "inset-shadow-selected",

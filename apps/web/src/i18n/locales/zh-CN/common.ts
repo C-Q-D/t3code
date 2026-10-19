@@ -29,7 +29,7 @@ export const common: Messages["common"] = {
     regeneratingTitle: "正在重新生成…",
     regenerateTitle: "重新生成标题",
     markUnread: "标为未读",
-    showAllProjects: "显示全部项目",
+    showAllProjects: "显示今日",
     /** Formats the filterByProject message from the supplied label. */
     filterByProject: (label) => `按 ${label} 筛选`,
     autoSettle: "自动完结行为",

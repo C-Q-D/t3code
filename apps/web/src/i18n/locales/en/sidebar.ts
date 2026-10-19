@@ -149,7 +149,8 @@ export const sidebar = {
   },
   projects: {
     title: "Projects",
-    all: "All projects",
+    all: "Today",
+    todayTooltip: "Today (right-click to choose a project)",
     empty: "No projects yet",
     settings: "Project settings",
     rename: "Rename project",

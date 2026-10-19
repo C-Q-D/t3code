@@ -31,7 +31,7 @@ export const common = {
     regeneratingTitle: "Regenerating…",
     regenerateTitle: "Regenerate title",
     markUnread: "Mark unread",
-    showAllProjects: "Show all projects",
+    showAllProjects: "Show Today",
     /** Formats the filterByProject message from the supplied label. */
     filterByProject: (label: string) => `Filter by ${label}`,
     autoSettle: "Auto-settle behavior",

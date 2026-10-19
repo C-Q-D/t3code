@@ -149,7 +149,8 @@ export const sidebar: Messages["sidebar"] = {
   },
   projects: {
     title: "项目",
-    all: "全部项目",
+    all: "今日",
+    todayTooltip: "今日（右键选择项目）",
     empty: "还没有项目",
     settings: "项目设置",
     rename: "重命名项目",

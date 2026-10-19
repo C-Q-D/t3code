@@ -2590,15 +2590,21 @@ export default function Sidebar() {
   const isTodayView = projectScopeKey === null;
   useEffect(() => {
     if (!isTodayView) return;
-    void todayTick;
-    // Advance the local calendar date rather than adding 24 hours across DST changes.
-    const midnight = new Date();
-    midnight.setDate(midnight.getDate() + 1);
-    midnight.setHours(0, 0, 0, 0);
-    const delayMs = Math.min(Math.max(0, midnight.getTime() - Date.now()) + 50, 2_147_483_647);
-    const id = window.setTimeout(() => bumpTodayTick((tick) => tick + 1), delayMs);
+    let id: number;
+    const armMidnight = () => {
+      // Advance the local calendar date rather than adding 24 hours across DST changes.
+      const midnight = new Date();
+      midnight.setDate(midnight.getDate() + 1);
+      midnight.setHours(0, 0, 0, 0);
+      const delayMs = Math.min(Math.max(0, midnight.getTime() - Date.now()) + 50, 2_147_483_647);
+      id = window.setTimeout(() => {
+        bumpTodayTick((tick) => tick + 1);
+        armMidnight();
+      }, delayMs);
+    };
+    armMidnight();
     return () => window.clearTimeout(id);
-  }, [isTodayView, todayTick]);
+  }, [isTodayView]);
   // Same-named projects on two machines are only told apart by where they
   // live, so rows on another machine carry its icon once the catalog spans
   // more than one environment; a single-machine catalog stays as it was.
