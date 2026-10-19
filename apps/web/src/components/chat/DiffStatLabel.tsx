@@ -1,6 +1,7 @@
 /** Displays added and deleted line counts for a diff. */
 import { t } from "~/i18n";
-import { memo } from "react";
+import { memo, useRef } from "react";
+import { useAnimatedNumber } from "../../hooks/useAnimatedNumber";
 import { cn } from "~/lib/utils";
 
 export function hasNonZeroStat(stat: { additions: number; deletions: number }): boolean {
@@ -29,6 +30,18 @@ export const DiffStatLabel = memo(function DiffStatLabel(props: {
   layout?: "aligned" | "inline";
 }) {
   const { additions, deletions, className, showParentheses = false, layout = "aligned" } = props;
+  const addedRef = useRef<HTMLSpanElement>(null);
+  const deletedRef = useRef<HTMLSpanElement>(null);
+  useAnimatedNumber(
+    addedRef,
+    additions,
+    (value) => `+${formatCompactDiffCount(Math.round(value))}`,
+  );
+  useAnimatedNumber(
+    deletedRef,
+    deletions,
+    (value) => `-${formatCompactDiffCount(Math.round(value))}`,
+  );
   return (
     <>
       {showParentheses && <span className="text-muted-foreground/70">(</span>}
@@ -42,10 +55,10 @@ export const DiffStatLabel = memo(function DiffStatLabel(props: {
           className,
         )}
       >
-        <span aria-hidden="true" className="font-mono text-diff-addition">
+        <span ref={addedRef} aria-hidden="true" className="font-mono text-diff-addition">
           +{formatCompactDiffCount(additions)}
         </span>
-        <span aria-hidden="true" className="font-mono text-diff-deletion">
+        <span ref={deletedRef} aria-hidden="true" className="font-mono text-diff-deletion">
           -{formatCompactDiffCount(deletions)}
         </span>
       </span>

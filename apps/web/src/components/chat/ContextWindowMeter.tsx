@@ -1,4 +1,5 @@
 /** Presents compact context usage while retaining detailed usage and compaction in a popover. */
+import { useAnimatedNumber } from "../../hooks/useAnimatedNumber";
 import { t } from "~/i18n";
 import { Button } from "../ui/button";
 import { type ContextWindowSnapshot, formatContextWindowTokens } from "~/lib/contextWindow";
@@ -10,7 +11,7 @@ import {
 import { Minimize2Icon } from "lucide-react";
 import { composerFloatingLayerProps } from "./composerEventScope";
 import { cn } from "~/lib/utils";
-import { memo, useMemo } from "react";
+import { memo, useMemo, useRef } from "react";
 import type { UsageLimitsReport } from "@t3tools/contracts";
 import { contextWindowUsageAccounts } from "./ContextWindowUsage.logic";
 import { ensureLocalApi } from "../../localApi";
@@ -52,6 +53,14 @@ export function ContextWindowMeter(props: {
   } = props;
   const usedPercentage = formatPercentage(usage.usedPercentage);
   const normalizedPercentage = Math.max(0, Math.min(100, usage.usedPercentage ?? 0));
+  const numberRef = useRef<HTMLSpanElement>(null);
+  const fillRef = useRef<HTMLSpanElement>(null);
+  useAnimatedNumber(
+    numberRef,
+    usage.usedPercentage,
+    (value) => formatPercentage(value) ?? "—",
+    fillRef,
+  );
   const totalProcessedTokens = usage.totalProcessedTokens ?? null;
   const showTotalProcessed = totalProcessedTokens !== null && totalProcessedTokens > 0;
   const isOverloaded = normalizedPercentage > 90;
@@ -79,14 +88,17 @@ export function ContextWindowMeter(props: {
               className="flex h-1.5 w-13 shrink-0 overflow-hidden rounded-full bg-composer-context-track shadow-well-progress"
             >
               <span
+                ref={fillRef}
                 className={cn(
-                  "h-full rounded-full",
+                  "h-full w-full origin-left rounded-full",
                   isOverloaded ? "bg-error" : "bg-composer-context-fill",
                 )}
-                style={{ width: `${normalizedPercentage}%` }}
+                style={{ transform: `scaleX(${normalizedPercentage / 100})` }}
               />
             </span>
-            <span className="tabular-nums">{usedPercentage ?? "—"}</span>
+            <span ref={numberRef} aria-hidden="true" className="tabular-nums">
+              {usedPercentage ?? "—"}
+            </span>
           </button>
         }
       />

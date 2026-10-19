@@ -20,8 +20,9 @@ import {
   remainingPercent,
 } from "@t3tools/shared/usageLimits";
 import { GaugeIcon, TrendingDownIcon, TrendingUpIcon } from "lucide-react";
-import { Fragment, type ReactNode, useState } from "react";
+import { Fragment, type ReactNode, useState, useRef } from "react";
 
+import { useAnimatedNumber } from "../../hooks/useAnimatedNumber";
 import { usePrimarySettings } from "../../hooks/useSettings";
 import { environmentPresentations } from "../../state/presentation";
 import { useEnvironmentScope, readEnvironmentScope } from "../../state/session";
@@ -138,8 +139,7 @@ function WindowBar({
       <TooltipPopup side="top">
         <div className="flex flex-col gap-0.5">
           <span className="text-foreground">
-            {remaining}
-            {t.tools.usage.percentLeft}
+            <RemainingQuota value={remaining} />
             {timeLeft !== null ? t.tools.usage.timeLeftSuffix(timeLeft) : ""}
           </span>
           {timeLeft !== null ? (
@@ -155,6 +155,20 @@ function WindowBar({
         </div>
       </TooltipPopup>
     </Tooltip>
+  );
+}
+
+/** Animate the visible remaining quota; the accessible label always uses the current quota. */
+function RemainingQuota({ value }: { value: number }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useAnimatedNumber(ref, value, (current) => `${Math.round(current)}${t.tools.usage.percentLeft}`);
+  return (
+    <span role="img" aria-label={`${value}${t.tools.usage.percentLeft}`}>
+      <span ref={ref} aria-hidden>
+        {value}
+        {t.tools.usage.percentLeft}
+      </span>
+    </span>
   );
 }
 
@@ -190,8 +204,7 @@ export function LimitWindows({
             <span className="flex min-w-0 items-center gap-2 text-xs">
               <span className="truncate text-muted-foreground">{window.label}</span>
               <span className="ms-auto shrink-0 font-medium text-foreground tabular-nums">
-                {remainingPercent(window)}
-                {t.tools.usage.percentLeft}
+                <RemainingQuota value={remainingPercent(window)} />
               </span>
             </span>
             <WindowBar color={color} window={window} now={now} />
