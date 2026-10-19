@@ -63,6 +63,10 @@ export const sidebar = {
     remoteDescription: (labels: string) => `Remote environment: ${labels}`,
   },
   thread: {
+    started: "Started",
+    lastReply: "Last reply",
+    replying: "Replying",
+    replyTime: (timestamp: string, relative: string) => `${timestamp} (${relative})`,
     attachContext: "Attach",
     dropContextHint: "Release to attach this conversation as context",
     exportTranscriptSuccess: "Conversation exported",

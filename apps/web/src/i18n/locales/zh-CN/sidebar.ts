@@ -65,6 +65,10 @@ export const sidebar: Messages["sidebar"] = {
     remoteDescription: (labels: string) => `远程环境：${labels}`,
   },
   thread: {
+    started: "开始",
+    lastReply: "最后回复",
+    replying: "回复中",
+    replyTime: (timestamp: string, relative: string) => `${timestamp}（${relative}）`,
     attachContext: "附加",
     dropContextHint: "松开，把这个对话作为上下文附加",
     exportTranscriptSuccess: "会话记录已导出",

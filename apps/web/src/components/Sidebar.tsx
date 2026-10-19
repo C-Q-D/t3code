@@ -178,7 +178,11 @@ import {
   resolveThreadRouteTarget,
 } from "../threadRoutes";
 import { compactSidebarTimeLabel } from "./Sidebar.logic";
-import { formatRelativeTimeLabel, parseTimestampDate } from "../timestampFormat";
+import {
+  formatChatTimestampTooltip,
+  formatRelativeTimeLabel,
+  parseTimestampDate,
+} from "../timestampFormat";
 import type { SidebarThreadSummary } from "../types";
 import { isScratchProject } from "@t3tools/client-runtime/state/projects";
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
@@ -416,6 +420,21 @@ function SidebarProviderStack(props: {
   );
 }
 
+/**
+ * Selects the hover card's last-reply state without treating an active run as a reply.
+ * @param run Latest run summary, or null when the thread has never run.
+ * @returns A completed timestamp, a replying state, or null when neither is available.
+ */
+export function resolveSidebarLastReply(
+  run: Pick<NonNullable<SidebarThreadSummary["latestRun"]>, "completedAt" | "status"> | null,
+) {
+  if (run?.completedAt) return { status: "completed" as const, completedAt: run.completedAt };
+  if (run && ["preparing", "queued", "starting", "running", "waiting"].includes(run.status)) {
+    return { status: "replying" as const };
+  }
+  return null;
+}
+
 function SidebarThreadTooltip({
   thread,
   project,
@@ -449,6 +468,8 @@ function SidebarThreadTooltip({
   terminalProcessCount: number;
 }) {
   const driverKind = providerEntry?.driverKind ?? null;
+  const timestampFormat = useClientSettings((settings) => settings.timestampFormat);
+  const lastReply = resolveSidebarLastReply(thread.latestRun);
   const previousProviderNames = thread.providerInstanceHistory
     .filter((instanceId) => instanceId !== modelInstanceId)
     .map((instanceId) => providerEntryByInstanceId.get(instanceId)?.displayName ?? instanceId);
@@ -465,6 +486,27 @@ function SidebarThreadTooltip({
           ) : null
         }
       >
+        <div className="flex min-w-0 items-center gap-2">
+          <AlarmClockIcon aria-hidden className="size-3 shrink-0 stroke-muted-foreground" />
+          <div className="min-w-0 text-foreground/75">
+            {t.sidebar.thread.started}{" "}
+            {formatChatTimestampTooltip(thread.createdAt, timestampFormat)}
+          </div>
+        </div>
+        {lastReply ? (
+          <div className="flex min-w-0 items-center gap-2">
+            <MessagesSquareIcon aria-hidden className="size-3 shrink-0 stroke-muted-foreground" />
+            <div className="min-w-0 text-foreground/75">
+              {t.sidebar.thread.lastReply}{" "}
+              {lastReply.status === "replying"
+                ? t.sidebar.thread.replying
+                : t.sidebar.thread.replyTime(
+                    formatChatTimestampTooltip(lastReply.completedAt, timestampFormat),
+                    formatRelativeTimeLabel(lastReply.completedAt),
+                  )}
+            </div>
+          </div>
+        ) : null}
         {projectDisplayName ? (
           <div className="flex min-w-0 items-center gap-2">
             {project ? <ProjectFavicon project={project} className="size-3 shrink-0" /> : null}
