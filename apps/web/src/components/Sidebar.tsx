@@ -17,7 +17,7 @@ import {
 import { ThreadContextDragGhost } from "./chat/ThreadContextDragGhost";
 import { ThreadMenuItems } from "./chat/ChatHeader";
 import {
-  dropThreadContext,
+  throwThreadContext,
   endThreadContextDrag,
   moveThreadContextDrag as moveThreadContextDragGhost,
 } from "./chat/threadContextDrag";
@@ -3599,9 +3599,9 @@ export default function Sidebar() {
     [contextDragThreads, pointerOutsideThreadList],
   );
   const dropThreadContextDrag = useCallback(
-    (point: { x: number; y: number }) => {
+    (point: { x: number; y: number }, velocity = { x: 0, y: 0 }) => {
       if (!pointerOutsideThreadList(point)) return false;
-      dropThreadContext(point, contextDragThreads());
+      throwThreadContext(point, velocity, contextDragThreads(), dragSensorRef.current?.origin);
       // Releasing outside the list never reorders, whether or not a composer took the drop.
       return true;
     },

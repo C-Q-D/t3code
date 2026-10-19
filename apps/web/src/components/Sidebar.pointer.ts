@@ -61,6 +61,10 @@ export class SidebarPointerSensor {
   }
 
   private coordinates = () => ({ x: this.pointer.clientX, y: this.pointer.clientY });
+  /** Original viewport pickup point; missed throws return here rather than the list exit point. */
+  get origin(): Point {
+    return this.coordinates();
+  }
   private preventDefault = (event: Event) => event.preventDefault();
   private clearClickSuppression = () => {
     this.document.removeEventListener("click", this.suppressClick, { capture: true });
