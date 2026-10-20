@@ -6,7 +6,7 @@
   "scripts": {
     "build:ghostty-wasm": "bash scripts/build-libghostty-wasm.sh",
     "dev": "vp dev",
-    "build": "vp build",
+    "build": "vp build && node scripts/check-css-has.ts",
     "preview": "vp preview",
     "typecheck": "tsc-rs --noEmit",
     "test": "vp test run --passWithNoTests --project unit"
