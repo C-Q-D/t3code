@@ -1,13 +1,17 @@
+/** Composes banner surfaces and locally registered row slots without inspecting the DOM. */
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
 import { ChevronDownIcon, XIcon } from "lucide-react";
 import type { ComponentProps } from "react";
 
 import { cn } from "~/lib/utils";
+import { createPresenceRegistry } from "~/lib/presenceRegistry";
 import { Button } from "../ui/button";
 import { ScrollArea } from "../ui/scroll-area";
 
 export type ComposerBannerVariant = "default" | "error" | "info" | "success" | "warning";
+
+const BannerRowRegistry = createPresenceRegistry<"icon" | "actions">();
 
 const surfaceColors = cn(
   "[--chat-composer-attached-surface:var(--chat-composer-glass-surface,var(--card))]",
@@ -195,10 +199,11 @@ function Row({
 }: useRender.ComponentProps<"div"> & {
   layout?: "inline" | "wrap-actions" | "approval";
 }) {
+  const { counts, onChange } = BannerRowRegistry.usePresence();
   const rowProps = {
     className: cn(
       "group/banner-row grid min-h-(--composer-banner-icon-column) w-full min-w-0 grid-cols-[var(--composer-banner-icon-column)_minmax(0,1fr)_auto] items-center gap-x-1 text-start",
-      "not-has-[>[data-slot=composer-banner-actions]]:grid-cols-[var(--composer-banner-icon-column)_minmax(0,1fr)]",
+      "data-[has-actions=false]:grid-cols-[var(--composer-banner-icon-column)_minmax(0,1fr)]",
       "[&:is(button)]:cursor-pointer [&:is(button)]:rounded-md [&:is(button)]:focus-visible:outline-2 [&:is(button)]:focus-visible:-outline-offset-2 [&:is(button)]:focus-visible:outline-ring",
       // Actions share the title row while the title fits and move below it otherwise.
       // The content's max width keeps it beside the icon, so a long title truncates instead of wrapping.
@@ -209,15 +214,20 @@ function Row({
     ),
     "data-composer-banner-row": "true",
     "data-composer-banner-layout": layout,
+    "data-has-icon": (counts.icon ?? 0) > 0 ? "true" : "false",
+    "data-has-actions": (counts.actions ?? 0) > 0 ? "true" : "false",
   };
-  return useRender({
+  const row = useRender({
     defaultTagName: "div",
     render,
     props: mergeProps<"div">(rowProps, props),
   });
+  return <BannerRowRegistry.Provider onChange={onChange}>{row}</BannerRowRegistry.Provider>;
 }
 
+/** Registers the icon slot with the nearest row until it unmounts. */
 function Icon({ className, ...props }: ComponentProps<"span">) {
+  BannerRowRegistry.useRegister("icon");
   return (
     <span
       aria-hidden
@@ -239,8 +249,8 @@ function Content({ className, ...props }: ComponentProps<"span">) {
       className={cn(
         "col-start-2 row-start-1 flex min-w-0 items-center gap-1 *:data-[slot=composer-banner-separator]:mx-0",
         "@max-[560px]:group-data-[composer-banner-layout=approval]/banner-row:col-end-4",
-        "group-not-has-[>[data-slot=composer-banner-icon]]/banner-row:col-[1/3] group-not-has-[>[data-slot=composer-banner-icon]]/banner-row:ps-2 sm:group-not-has-[>[data-slot=composer-banner-icon]]/banner-row:ps-1.5",
-        "group-not-has-[>[data-slot=composer-banner-icon],>[data-slot=composer-banner-actions]]/banner-row:pe-2 sm:group-not-has-[>[data-slot=composer-banner-icon],>[data-slot=composer-banner-actions]]/banner-row:pe-1.5",
+        "group-data-[has-icon=false]/banner-row:col-[1/3] group-data-[has-icon=false]/banner-row:ps-2 sm:group-data-[has-icon=false]/banner-row:ps-1.5",
+        "group-data-[has-icon=false]/banner-row:group-data-[has-actions=false]/banner-row:pe-2 sm:group-data-[has-icon=false]/banner-row:group-data-[has-actions=false]/banner-row:pe-1.5",
         className,
       )}
       {...props}
@@ -260,7 +270,9 @@ function Separator() {
   );
 }
 
+/** Registers the actions slot with the nearest row until it unmounts. */
 function Actions({ className, ...props }: ComponentProps<"span">) {
+  BannerRowRegistry.useRegister("actions");
   return (
     <span
       data-slot="composer-banner-actions"
