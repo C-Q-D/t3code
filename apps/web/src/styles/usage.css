@@ -396,3 +396,254 @@ html[data-theme-id="graphite"] .usage-chart-surface {
   height: 15px;
   background: linear-gradient(rgb(255 255 255 / 35%), transparent);
 }
+
+/* L3: Hero header and recessed metric strip follow the approved graphite material. */
+.usage-lux-hero {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 10px;
+  padding: 22px 24px 16px;
+  overflow: hidden;
+  border-radius: var(--radius-card-large);
+  background-color: var(--popover);
+  box-shadow: var(--shadow-usage-card);
+}
+
+.usage-lux-hero::before {
+  position: absolute;
+  top: 0;
+  right: 28px;
+  left: 28px;
+  height: 1px;
+  content: "";
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgb(255 168 128 / 65%) 28%,
+    rgb(255 255 255 / 75%) 62%,
+    transparent
+  );
+}
+
+.usage-lux-hero::after {
+  position: absolute;
+  z-index: -1;
+  right: 6%;
+  bottom: -30%;
+  left: 6%;
+  height: 62%;
+  content: "";
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 100%, rgb(255 140 100 / 10%), transparent 70%);
+}
+
+.usage-lux-hero-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px;
+  min-width: 0;
+}
+
+.usage-lux-total {
+  max-width: 100%;
+  font-size: clamp(40px, 5vw, 64px);
+  line-height: 1;
+  letter-spacing: -0.5px;
+  overflow-wrap: anywhere;
+  color: transparent;
+  background: linear-gradient(180deg, #fff 0%, #ecebe7 42%, #a5a2a8 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  filter: drop-shadow(0 2px 0 rgb(0 0 0 / 75%)) drop-shadow(0 12px 20px rgb(0 0 0 / 50%));
+}
+
+.usage-lux-hero-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 6px;
+}
+
+.usage-lux-range {
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+.usage-lux-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+.usage-lux-stats b {
+  color: var(--foreground);
+  font-weight: 500;
+}
+
+.usage-lux-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin-left: auto;
+  padding-bottom: 8px;
+}
+
+.usage-lux-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px 3px 7px;
+  border-radius: 10px;
+  color: var(--foreground);
+  background: rgb(0 0 0 / 28%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 5%);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-lux-legend-swatch {
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+  border-radius: 3px;
+  box-shadow: 0 0 8px currentColor;
+}
+
+.usage-lux-strip {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #131315, #0f0f11);
+  box-shadow:
+    inset 2px 3px 6px rgb(0 0 0 / 70%),
+    inset -1px -1px 0 rgb(255 255 255 / 5%),
+    0 1px 0 rgb(255 255 255 / 4%);
+}
+
+.usage-lux-cell {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 118px;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 16px 10px;
+}
+
+.usage-lux-cell + .usage-lux-cell::before {
+  position: absolute;
+  top: 14px;
+  bottom: 14px;
+  left: 0;
+  width: 2px;
+  content: "";
+  background: linear-gradient(90deg, rgb(0 0 0 / 75%) 50%, rgb(255 255 255 / 5.5%) 50%);
+}
+
+.usage-lux-kpi-label {
+  font-size: 11.5px;
+  color: #a5a5ad;
+}
+.usage-lux-kpi-content {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+.usage-lux-kpi-value {
+  font-family: var(--font-mono);
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #e8e8ea;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.usage-lux-kpi-detail {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: #a5a5ad;
+  font-variant-numeric: tabular-nums;
+}
+.usage-lux-sparkline {
+  display: block;
+  width: 100%;
+  height: 22px;
+  margin-top: auto;
+  padding-top: 4px;
+  overflow: visible;
+  color: #c4c4ca;
+}
+.usage-lux-sparkline polyline {
+  filter: drop-shadow(0 0 3px currentColor);
+}
+.usage-lux-saving {
+  background: radial-gradient(ellipse 90% 80% at 30% 0%, rgb(60 220 170 / 10%), transparent 70%);
+}
+.usage-lux-saving .usage-lux-kpi-value {
+  color: var(--color-usage-split-input);
+  text-shadow: 0 0 18px rgb(60 220 170 / 40%);
+}
+.usage-lux-cost {
+  background: radial-gradient(ellipse 90% 80% at 30% 0%, rgb(255 150 110 / 9%), transparent 70%);
+}
+.usage-lux-cost .usage-lux-kpi-value {
+  color: #ffd9c6;
+  text-shadow: 0 0 18px rgb(255 140 100 / 30%);
+}
+.usage-lux-cost .usage-lux-sparkline {
+  color: #ff9c72;
+}
+.usage-lux-kpi-placeholder {
+  display: block;
+  width: 70%;
+  height: 28px;
+  margin-block: 2px;
+  border-radius: 4px;
+  background: rgb(255 255 255 / 8%);
+}
+.usage-lux-detail-placeholder {
+  display: block;
+  width: 55%;
+  height: 12px;
+  border-radius: 3px;
+  background: rgb(255 255 255 / 5%);
+}
+
+@media (max-width: 1000px) {
+  .usage-lux-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .usage-lux-cell:nth-of-type(4)::before {
+    display: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .usage-lux-total {
+    color: CanvasText;
+    background: none;
+    filter: none;
+  }
+  .usage-lux-strip,
+  .usage-lux-hero {
+    outline: 1px solid CanvasText;
+  }
+  .usage-lux-kpi-value,
+  .usage-lux-kpi-label,
+  .usage-lux-kpi-detail {
+    color: CanvasText;
+  }
+}

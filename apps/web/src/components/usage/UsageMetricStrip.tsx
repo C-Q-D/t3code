@@ -1,11 +1,12 @@
-/** Displays usage totals with a matching loading footprint. */
+/** Presents six real usage totals; only tokens and cost have period series. */
 import { t } from "~/i18n";
-import type { JSX } from "react";
+import { useId, type JSX } from "react";
 import type { MergedUsage } from "@t3tools/shared/usageMerge";
 import type { UsageChartMetric } from "./UsageProviderChart";
 import { cn } from "../../lib/utils";
-import { formatTokens, formatUsd } from "@t3tools/shared/usageFormat";
-import { Skeleton } from "../ui/skeleton";
+import { formatTokens, formatUsd, formatPercent } from "@t3tools/shared/usageFormat";
+import { buildMetricSeries, summarizeColumns } from "./usageChart.logic";
+import { UsageAnimatedValue, useUsageEntrance } from "./UsagePresentationMotion";
 
 /** The displayed window and metric remain available for the metric strip presentation. */
 export interface UsageMetricStripProps {
@@ -16,104 +17,180 @@ export interface UsageMetricStripProps {
   readonly hours: readonly string[];
   readonly resolution: "day" | "hour";
 }
-/** Renders existing totals from merged usage; loading keeps stale values visibly muted. */
-export function UsageMetricStrip({ merged, loading }: UsageMetricStripProps): JSX.Element {
-  return (
-    <section className="flex flex-col gap-2">
-      <h2 className="sr-only">{t.tools.usage.totals}</h2>
-      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
-        <Metric
-          loading={loading}
-          label={t.tools.usage.processedTokens}
-          value={formatTokens(merged.totalTokens)}
-        />
-        <Metric
-          loading={loading}
-          label={t.tools.usage.cachedInput}
-          value={formatTokens(merged.cachedInputTokens)}
-        />
-        <Metric
-          loading={loading}
-          label={t.tools.usage.uncachedInput}
-          value={formatTokens(merged.uncachedInputTokens)}
-        />
-        <Metric
-          loading={loading}
-          label={t.tools.usage.output}
-          value={formatTokens(merged.outputTokens)}
-        />
-        <Metric
-          loading={loading}
-          label={t.tools.usage.cacheSavings}
-          value={formatUsd(merged.costQuality.cacheSavingsUsd)}
-        />
-        <Metric loading={loading} label={t.tools.usage.cost} value={formatUsd(merged.costUsd)} />
-      </div>
-    </section>
+
+/** Renders the already-filtered merged totals; missing periods stay in both sparkline denominators. */
+export function UsageMetricStrip({
+  merged,
+  loading,
+  days,
+  hours,
+  resolution,
+}: UsageMetricStripProps): JSX.Element {
+  const entranceRef = useUsageEntrance(0.045);
+  const hourly = resolution === "hour";
+  const series = buildMetricSeries(
+    hourly ? hours : days,
+    hourly
+      ? new Map(merged.hourly.map((entry) => [entry.hourStart, entry]))
+      : new Map(merged.daily.map((entry) => [entry.day, entry])),
+    merged.providers.map((entry) => entry.provider),
   );
-}
-/** Reserves the totals footprint until the first usage response arrives. */
-export function UsageMetricStripSkeleton(): JSX.Element {
+  const averageCost = summarizeColumns(series.cost.map((total) => ({ total }))).average;
+  // Cache writes are misses, matching the model detail's input-based cache hit rate.
+  const input = merged.cachedInputTokens + merged.uncachedInputTokens + merged.cacheCreationTokens;
+  const hitRate = input > 0 ? formatPercent(merged.cachedInputTokens / input) : "—";
+  const outputShare =
+    merged.totalTokens > 0 ? formatPercent(merged.outputTokens / merged.totalTokens, 2) : "—";
+  const savingsRatio =
+    merged.costUsd > 0 ? (merged.costQuality.cacheSavingsUsd / merged.costUsd).toFixed(1) : "—";
   return (
-    <section className="flex flex-col gap-2">
+    <section ref={entranceRef} className="usage-lux-strip" aria-busy={loading}>
       <h2 className="sr-only">{t.tools.usage.totals}</h2>
-      <MetricSkeletons
-        labels={[
-          t.tools.usage.processedTokens,
-          t.tools.usage.cachedInput,
-          t.tools.usage.uncachedInput,
-          t.tools.usage.output,
-          t.tools.usage.cacheSavings,
-          t.tools.usage.cost,
-        ]}
+      <Metric
+        loading={loading}
+        label={t.tools.usage.processedTokens}
+        value={merged.totalTokens}
+        format={formatTokens}
+        detail={t.tools.usage.allTokens}
+        series={series.tokens}
+      />
+      <Metric
+        loading={loading}
+        label={t.tools.usage.cachedInput}
+        value={merged.cachedInputTokens}
+        format={formatTokens}
+        detail={t.tools.usage.cacheHitDetail(hitRate)}
+      />
+      <Metric
+        loading={loading}
+        label={t.tools.usage.uncachedInput}
+        value={merged.uncachedInputTokens}
+        format={formatTokens}
+        detail={t.tools.usage.cacheMissDetail}
+      />
+      <Metric
+        loading={loading}
+        label={t.tools.usage.output}
+        value={merged.outputTokens}
+        format={formatTokens}
+        detail={t.tools.usage.outputShareDetail(outputShare)}
+      />
+      <Metric
+        loading={loading}
+        label={t.tools.usage.cacheSavings}
+        value={merged.costQuality.cacheSavingsUsd}
+        format={formatUsd}
+        detail={t.tools.usage.savingsMultipleDetail(savingsRatio)}
+        tone="save"
+      />
+      <Metric
+        loading={loading}
+        label={t.tools.usage.cost}
+        value={merged.costUsd}
+        format={formatUsd}
+        detail={`${hourly ? t.tools.usage.averagePerHour : t.tools.usage.averagePerDay} ${formatUsd(averageCost)}`}
+        tone="cost"
+        series={series.cost}
       />
     </section>
   );
 }
-/** Shows one live total in M1's recessed well; loading mutes incoming figures without replacing their value. */
+
+/** Reserves the same six-cell recessed strip, without a perpetual loading animation. */
+export function UsageMetricStripSkeleton(): JSX.Element {
+  const labels = [
+    t.tools.usage.processedTokens,
+    t.tools.usage.cachedInput,
+    t.tools.usage.uncachedInput,
+    t.tools.usage.output,
+    t.tools.usage.cacheSavings,
+    t.tools.usage.cost,
+  ];
+  return (
+    <section className="usage-lux-strip" aria-busy="true">
+      <h2 className="sr-only">{t.tools.usage.totals}</h2>
+      {labels.map((label) => (
+        <div key={label} className="usage-lux-cell">
+          <span className="usage-lux-kpi-label">{label}</span>
+          <span className="usage-lux-kpi-placeholder" aria-hidden />
+          <span className="usage-lux-detail-placeholder" aria-hidden />
+        </div>
+      ))}
+    </section>
+  );
+}
+
+/** Displays one total with a stable final readout; only the two real period metrics receive series. */
 function Metric({
   label,
   value,
+  format,
   loading,
+  detail,
+  series,
+  tone,
 }: {
   readonly label: string;
-  readonly value: string;
+  readonly value: number;
+  readonly format: (value: number) => string;
   readonly loading: boolean;
+  readonly detail: string;
+  readonly series?: readonly number[];
+  readonly tone?: "save" | "cost";
 }) {
   return (
-    <div className="flex min-w-0 flex-col gap-1 rounded-usage-total bg-usage-total-well px-3.5 py-3 shadow-usage-total">
-      <span className="whitespace-nowrap text-secondary-copy text-secondary-label">{label}</span>
-      <span
-        className={cn(
-          "font-mono text-card-title leading-normal font-medium text-foreground tabular-nums",
-          figureClass(loading),
-        )}
-      >
-        {value}
-      </span>
+    <div
+      className={cn(
+        "usage-lux-cell",
+        tone === "save" && "usage-lux-saving",
+        tone === "cost" && "usage-lux-cost",
+      )}
+    >
+      <span className="usage-lux-kpi-label">{label}</span>
+      <div className={cn("usage-lux-kpi-content", loading && "opacity-40")}>
+        <UsageAnimatedValue className="usage-lux-kpi-value" value={value} format={format} />
+        <span className="usage-lux-kpi-detail">{detail}</span>
+        {series && <UsageSparkline values={series} />}
+      </div>
     </div>
   );
 }
 
-/** Holds the same six-well footprint for the supplied localized labels before usage data arrives. */
-function MetricSkeletons({ labels }: { readonly labels: readonly string[] }) {
+/** Draws nonnegative ordered values on a shared 22px baseline; empty series draw nothing and one value spans the cell. */
+function UsageSparkline({ values }: { readonly values: readonly number[] }) {
+  const id = useId();
+  const max = Math.max(0, ...values);
+  const points = values.map((value, index) => {
+    const x = values.length <= 1 ? 0 : (index / (values.length - 1)) * 100;
+    const y = max > 0 ? 21 - (value / max) * 19 : 21;
+    return `${x},${y}`;
+  });
+  if (values.length === 1) points.push(`100,${max > 0 ? 2 : 21}`);
   return (
-    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
-      {labels.map((label) => (
-        <div
-          key={label}
-          className="flex min-w-0 flex-col gap-1 rounded-usage-total bg-usage-total-well px-3.5 py-3 shadow-usage-total"
-        >
-          <span className="whitespace-nowrap text-secondary-copy text-secondary-label">
-            {label}
-          </span>
-          <Skeleton className="h-6 w-16" />
-        </div>
-      ))}
-    </div>
+    <svg
+      className="usage-lux-sparkline"
+      viewBox="0 0 100 22"
+      preserveAspectRatio="none"
+      aria-hidden
+    >
+      <defs>
+        <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="currentColor" stopOpacity=".28" />
+          <stop offset="1" stopColor="currentColor" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      {values.length > 0 && (
+        <>
+          <polygon points={`0,22 ${points.join(" ")} 100,22`} fill={`url(#${id})`} />
+          <polyline
+            points={points.join(" ")}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.2"
+            vectorEffect="non-scaling-stroke"
+          />
+        </>
+      )}
+    </svg>
   );
-}
-/** Keeps existing values visible while their provider is refreshing. */
-function figureClass(loading: boolean) {
-  return cn("transition-opacity", loading && "opacity-40 delay-150");
 }

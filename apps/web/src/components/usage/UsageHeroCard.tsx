@@ -12,6 +12,8 @@ import { InlineButton } from "../ui/button";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
 import { UsageProviderChart } from "./UsageProviderChart";
 import { PROVIDER_PRESENTATION } from "./usageProviders";
+import { buildMetricSeries, summarizeColumns } from "./usageChart.logic";
+import { UsageAnimatedValue, useUsageEntrance } from "./UsagePresentationMotion";
 
 /** Inputs describe the displayed window, which may lag the selected range while loading. */
 export interface UsageHeroCardProps {
@@ -47,7 +49,17 @@ export function UsageHeroCard({
   referenceTime,
   windowLabel,
 }: UsageHeroCardProps): JSX.Element {
+  const entranceRef = useUsageEntrance(0);
   const shownHourly = resolution === "hour";
+  const format = metric === "cost" ? formatUsd : formatTokens;
+  const series = buildMetricSeries(
+    shownHourly ? hours : days,
+    shownHourly
+      ? new Map(merged.hourly.map((entry) => [entry.hourStart, entry]))
+      : new Map(merged.daily.map((entry) => [entry.day, entry])),
+    activeProviders,
+  );
+  const stats = summarizeColumns(series[metric].map((total) => ({ total })));
   const isProviderLoading = (provider: UsageProviderKind) =>
     loading.everyProvider || loading.providers.has(provider);
   const chartLoadingProviders = useMemo(
@@ -60,19 +72,30 @@ export function UsageHeroCard({
     [activeProviders, loading.everyProvider, loading.providers],
   );
   return (
-    <section className="usage-chart-surface flex flex-col gap-3.5 rounded-card-large bg-surface-raised px-5 pt-4.5 pb-4 shadow-usage-chart">
-      <div className="flex flex-wrap items-baseline gap-3.5">
-        <span
+    <section ref={entranceRef} className="usage-chart-surface usage-lux-hero">
+      <div className="usage-lux-hero-header">
+        <UsageAnimatedValue
+          value={stats.total}
+          format={format}
           className={cn(
-            "font-serif text-usage-total font-bold tabular-nums",
+            "usage-lux-total font-serif font-bold tabular-nums",
             figureClass(loading.partial),
           )}
-        >
-          {metric === "cost" ? formatUsd(merged.costUsd) : formatTokens(merged.totalTokens)}
-        </span>
-        <span className="text-secondary-copy-large text-secondary-label" aria-label={windowLabel}>
-          {shownHourly ? t.tools.usage.past24h : t.tools.usage.pastDays(days.length)}
-        </span>
+        />
+        <div className={cn("usage-lux-hero-meta", figureClass(loading.partial))}>
+          <span className="usage-lux-range" aria-label={windowLabel}>
+            {shownHourly ? t.tools.usage.past24h : t.tools.usage.pastDays(days.length)}
+          </span>
+          <div className="usage-lux-stats">
+            <span>
+              {shownHourly ? t.tools.usage.averagePerHour : t.tools.usage.averagePerDay}{" "}
+              <b>{format(stats.average)}</b>
+            </span>
+            <span>
+              {t.tools.usage.activePeriods(stats.activeCount, stats.columnCount, shownHourly)}
+            </span>
+          </div>
+        </div>
         <span className="sr-only">
           {formatCount(merged.sessions)}
           {t.tools.usage.sessionsSuffix}
@@ -93,37 +116,44 @@ export function UsageHeroCard({
             </PopoverPopup>
           </Popover>
         ) : null}
-        <div className="ml-auto flex flex-wrap items-center gap-3.5">
-          {activeProviders.map((provider) => {
-            const totals = merged.providers.find((entry) => entry.provider === provider);
-            const share = metric === "cost" ? (totals?.costShare ?? 0) : (totals?.tokenShare ?? 0);
-            const providerLoading = isProviderLoading(provider);
-            const awaitingData = providerLoading && !providersWithData.includes(provider);
-            return (
-              <span
-                key={provider}
-                className={cn(
-                  "flex items-center gap-1.5 text-secondary-copy text-code-foreground",
-                  provider === "claude" && "-order-1",
-                  figureClass(providerLoading),
-                )}
-              >
+        <div className="usage-lux-legend">
+          {activeProviders
+            .filter((provider) => provider !== "cursor")
+            .map((provider) => {
+              const totals = merged.providers.find((entry) => entry.provider === provider);
+              const share =
+                metric === "cost" ? (totals?.costShare ?? 0) : (totals?.tokenShare ?? 0);
+              const providerLoading = isProviderLoading(provider);
+              const awaitingData = providerLoading && !providersWithData.includes(provider);
+              return (
                 <span
-                  aria-hidden
-                  className="size-2.5 shrink-0 rounded-usage-swatch"
-                  style={{ backgroundColor: PROVIDER_PRESENTATION[provider].color }}
-                />
-                {PROVIDER_PRESENTATION[provider].label} {awaitingData ? "—" : formatPercent(share)}
-                <span className="sr-only">
-                  {t.tools.usage.sessionCount(
-                    totals?.sessions ?? 0,
-                    formatCount(totals?.sessions ?? 0),
-                  )}{" "}
-                  · {formatUsd(totals?.costUsd ?? 0)} · {formatTokens(totals?.totalTokens ?? 0)}
+                  key={provider}
+                  className={cn(
+                    "usage-lux-legend-item",
+                    provider === "claude" && "-order-1",
+                    figureClass(providerLoading),
+                  )}
+                >
+                  <span
+                    aria-hidden
+                    className="usage-lux-legend-swatch"
+                    style={{
+                      backgroundColor: PROVIDER_PRESENTATION[provider].color,
+                      color: PROVIDER_PRESENTATION[provider].color,
+                    }}
+                  />
+                  {PROVIDER_PRESENTATION[provider].label}{" "}
+                  {awaitingData ? "—" : formatPercent(share)}
+                  <span className="sr-only">
+                    {t.tools.usage.sessionCount(
+                      totals?.sessions ?? 0,
+                      formatCount(totals?.sessions ?? 0),
+                    )}{" "}
+                    · {formatUsd(totals?.costUsd ?? 0)} · {formatTokens(totals?.totalTokens ?? 0)}
+                  </span>
                 </span>
-              </span>
-            );
-          })}
+              );
+            })}
         </div>
       </div>
       <UsageProviderChart
