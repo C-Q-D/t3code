@@ -1592,7 +1592,6 @@ export function AppearanceSettingsPanel() {
       </SettingsSection>
 
       <TypographySection />
-      <LanguageSetting size="settings" />
     </SettingsPageContainer>
   );
 }

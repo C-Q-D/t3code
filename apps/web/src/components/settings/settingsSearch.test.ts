@@ -87,11 +87,13 @@ describe("translated settings catalog", () => {
     const { installMessages: install } = await import("~/i18n");
     install("zh-CN", messages);
     const { searchSettings: search } = await import("./settingsSearch");
-    expect(search("语言")[0]).toMatchObject({
-      id: "language",
-      title: "语言",
-      to: "/settings/appearance",
-    });
+    expect(search("语言")).toEqual([
+      expect.objectContaining({
+        id: "language",
+        title: "语言",
+        to: "/settings/general",
+      }),
+    ]);
     expect(search("english").map((item) => item.id)).toContain("language");
     expect(search("chinese").map((item) => item.id)).toContain("language");
     expect(search("时间格式")[0]).toMatchObject({ id: "time-format", title: "时间格式" });

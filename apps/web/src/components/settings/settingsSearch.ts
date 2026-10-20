@@ -457,7 +457,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "language",
     title: t.settings.rows.language.title,
-    to: "/settings/appearance",
+    to: "/settings/general",
     searchTerms: ["language locale display english chinese 中文 简体中文 system"],
   },
   {

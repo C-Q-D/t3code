@@ -12,7 +12,7 @@ import { toastManager } from "../ui/toast";
 import { SettingResetButton, SettingsRow, SettingsSection } from "./settingsLayout";
 import { searchableSetting } from "./settingsSearch";
 
-/** Edits device-local language; size selects the General capsule or the existing appearance-page control. Saving and resetting still reload after persistence. */
+/** Edits device-local language in General settings. Saving and resetting reload after persistence. */
 export function LanguageSetting({ size = "sm" }: { size?: "sm" | "settings" } = {}) {
   const preference = readLocalePreference();
 
