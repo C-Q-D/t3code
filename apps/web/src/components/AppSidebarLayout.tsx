@@ -13,6 +13,7 @@ import {
 } from "react";
 import { useLocation, useNavigate, useParams, useRouterState } from "@tanstack/react-router";
 
+import { createPresenceRegistry } from "../lib/presenceRegistry";
 import { isElectron } from "../env";
 import { getLocalStorageItem, removeLocalStorageItem } from "../hooks/useLocalStorage";
 import {
@@ -75,6 +76,33 @@ import {
 } from "./frame/frameGeometry";
 
 const MACOS_TRAFFIC_LIGHTS_LEFT_INSET = "var(--desktop-window-controls-inset, 90px)";
+
+/** ChatView registers its mounted workspace with the nearest main slab. */
+export const ChatWorkspaceRegistry = createPresenceRegistry<"workspace">();
+
+/** Keeps route mount counts local while preserving the same slab across route transitions. */
+function MainSlab({ children, chatOwnsSlabs }: { children: ReactNode; chatOwnsSlabs: boolean }) {
+  const { counts, onChange } = ChatWorkspaceRegistry.usePresence();
+  return (
+    <ChatWorkspaceRegistry.Provider onChange={onChange}>
+      <Slab
+        tone={chatOwnsSlabs ? null : "card"}
+        radius={chatOwnsSlabs ? null : "slab"}
+        elevation={chatOwnsSlabs ? null : "slab-frame"}
+        glow={!chatOwnsSlabs}
+        className={cn(
+          "relative flex min-h-0 min-w-0 flex-1 flex-col",
+          !chatOwnsSlabs && "overflow-hidden",
+        )}
+        render={<div className={chatOwnsSlabs ? undefined : "stone-frame-card"} />}
+        data-chat-workspace-mounted={(counts.workspace ?? 0) > 0 ? "true" : "false"}
+        data-frame-main={chatOwnsSlabs ? "chat" : ""}
+      >
+        {children}
+      </Slab>
+    </ChatWorkspaceRegistry.Provider>
+  );
+}
 
 /** Exposes the sidebar's inline layout; mobile drawer state never reserves a grid track. */
 function FrameWorkspace({ children }: { children: ReactNode }) {
@@ -484,20 +512,7 @@ function AppShell({ children }: { children: ReactNode }) {
               {/* Keep the outlet under one component type across navigation;
                     changing div/Slab would remount the route subtree. Chat owns
                     its surfaces, so its enclosing slab has no visual variants. */}
-              <Slab
-                tone={chatOwnsSlabs ? null : "card"}
-                radius={chatOwnsSlabs ? null : "slab"}
-                elevation={chatOwnsSlabs ? null : "slab-frame"}
-                glow={!chatOwnsSlabs}
-                className={cn(
-                  "relative flex min-h-0 min-w-0 flex-1 flex-col",
-                  !chatOwnsSlabs && "overflow-hidden",
-                )}
-                render={<div className={chatOwnsSlabs ? undefined : "stone-frame-card"} />}
-                data-frame-main={chatOwnsSlabs ? "chat" : ""}
-              >
-                {children}
-              </Slab>
+              <MainSlab chatOwnsSlabs={chatOwnsSlabs}>{children}</MainSlab>
               {pathname.startsWith("/discussions/") &&
               !shouldUseDiscussionPanelSheet(viewportWidth) ? (
                 <TitlebarSlotOutlet name="panel" />

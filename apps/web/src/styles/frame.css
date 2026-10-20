@@ -20,7 +20,7 @@
 
 /* Paint the main slab once; nested layout canvases must not hide its transparent fill. */
 html[data-theme-id="graphite"] .stone-frame-card,
-html[data-theme-id="graphite"] [data-frame-main="chat"]:not(:has([data-chat-workspace])) {
+html[data-theme-id="graphite"] [data-frame-main="chat"][data-chat-workspace-mounted="false"] {
   background: color-mix(in srgb, var(--card) var(--glass-opacity), transparent);
 }
 
@@ -313,7 +313,7 @@ html[data-theme-id="graphite"] [data-frame-main] {
 
 /* ThreadRouteView can be waiting for a thread before ChatView mounts.
    Preserve its existing empty main slab until chat takes ownership. */
-[data-frame-main="chat"]:not(:has([data-chat-workspace])) {
+[data-frame-main="chat"][data-chat-workspace-mounted="false"] {
   @apply stone-frame-card rounded-slab bg-card shadow-slab-frame;
 }
 

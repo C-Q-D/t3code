@@ -1,5 +1,6 @@
 /** Composes the web chat workspace and its client actions; provider protocol and prompts keep their original values. */
 import { t } from "~/i18n";
+import { ChatWorkspaceRegistry } from "./AppSidebarLayout";
 import { ThreadFind, ThreadFindCanvas, type ThreadFindControls } from "./chat/ThreadFindProvider";
 import { THREAD_FIND_BAR_RESERVED_HEIGHT } from "./chat/ThreadFindBar";
 import { TimelineScrollToBottomButton } from "./chat/TimelineScrollToBottomButton";
@@ -1520,6 +1521,7 @@ function releaseChatTimelineAnchor<T extends { readonly messageId: MessageId | n
 const retryingWorkspacePreparationRunIds = new Set<RunId>();
 
 export default function ChatView(props: ChatViewProps) {
+  ChatWorkspaceRegistry.useRegister("workspace");
   const {
     environmentId,
     threadId,
