@@ -5,6 +5,7 @@ import { t } from "~/i18n";
 
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { XIcon } from "lucide-react";
+import { createPresenceRegistry } from "~/lib/presenceRegistry";
 import { cn } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
 import {
@@ -19,6 +20,8 @@ import { ScrollArea } from "~/components/ui/scroll-area";
 const Dialog = DialogPrimitive.Root;
 
 const DialogPortal = DialogPrimitive.Portal;
+
+const DialogPresence = createPresenceRegistry<"header" | "footer">();
 
 function DialogTrigger(props: DialogPrimitive.Trigger.Props) {
   return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />;
@@ -59,7 +62,7 @@ function DialogViewport({ className, ...props }: DialogPrimitive.Viewport.Props)
   );
 }
 
-/** Renders dialog children with the requested variant and layout; showCloseButton controls its accessible dismiss action and remaining props go to the dialog primitive. */
+/** Renders dialog children with the requested variant and layout; showCloseButton controls its accessible dismiss action and remaining props go to the dialog primitive. Slot counts stay in this wrapper so header/footer changes update spacing before paint. */
 function DialogPopup({
   className,
   size,
@@ -75,48 +78,54 @@ function DialogPopup({
   size?: "default" | "wide" | "compact";
   variant?: "default" | "media";
 }) {
+  const { counts, onChange } = DialogPresence.usePresence();
   return (
-    <DialogPortal>
-      {/* Media opens from inside other overlays (a composer chip, a popover), so it sits above them. */}
-      <DialogBackdrop className={variant === "media" ? "z-[60]" : undefined} variant={variant} />
-      <DialogViewport
-        className={cn(
-          bottomStickOnMobile && "max-sm:grid-rows-[1fr_auto] max-sm:p-0 max-sm:pt-12",
-          variant === "media" &&
-            "z-[60] grid-rows-1 place-items-center px-4 py-6 [-webkit-app-region:no-drag]",
-        )}
-      >
-        <DialogPrimitive.Popup
+    <DialogPresence.Provider onChange={onChange}>
+      <DialogPortal>
+        {/* Media opens from inside other overlays (a composer chip, a popover), so it sits above them. */}
+        <DialogBackdrop className={variant === "media" ? "z-[60]" : undefined} variant={variant} />
+        <DialogViewport
           className={cn(
-            variant === "media" ? DIALOG_MEDIA_POPUP_CLASS : DIALOG_POPUP_CLASS,
-            "row-start-2 text-popover-foreground",
-            variant === "default" && "max-h-full",
-            bottomStickOnMobile && DIALOG_MOBILE_SHEET_CLASS,
-            size === "wide" && "max-w-110",
-            size === "compact" && "max-w-100",
-            className,
+            bottomStickOnMobile && "max-sm:grid-rows-[1fr_auto] max-sm:p-0 max-sm:pt-12",
+            variant === "media" &&
+              "z-[60] grid-rows-1 place-items-center px-4 py-6 [-webkit-app-region:no-drag]",
           )}
-          data-slot="dialog-popup"
-          {...props}
         >
-          {children}
-          {showCloseButton && (
-            <DialogPrimitive.Close
-              aria-label={t.app.actions.close}
-              className="absolute end-2 top-2"
-              render={<Button size="icon" variant="ghost" />}
-            >
-              <XIcon />
-            </DialogPrimitive.Close>
-          )}
-        </DialogPrimitive.Popup>
-      </DialogViewport>
-    </DialogPortal>
+          <DialogPrimitive.Popup
+            className={cn(
+              variant === "media" ? DIALOG_MEDIA_POPUP_CLASS : DIALOG_POPUP_CLASS,
+              "row-start-2 text-popover-foreground",
+              variant === "default" && "max-h-full",
+              bottomStickOnMobile && DIALOG_MOBILE_SHEET_CLASS,
+              size === "wide" && "max-w-110",
+              size === "compact" && "max-w-100",
+              className,
+            )}
+            data-slot="dialog-popup"
+            {...props}
+            data-has-header={String((counts.header ?? 0) > 0)}
+            data-has-footer={String((counts.footer ?? 0) > 0)}
+          >
+            {children}
+            {showCloseButton && (
+              <DialogPrimitive.Close
+                aria-label={t.app.actions.close}
+                className="absolute end-2 top-2"
+                render={<Button size="icon" variant="ghost" />}
+              >
+                <XIcon />
+              </DialogPrimitive.Close>
+            )}
+          </DialogPrimitive.Popup>
+        </DialogViewport>
+      </DialogPortal>
+    </DialogPresence.Provider>
   );
 }
 
-/** Insets the title and optional description using the H4 shell spacing. */
+/** Insets the title and optional description using the H4 shell spacing and registers header presence for panel spacing. */
 function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
+  DialogPresence.useRegister("header");
   return (
     <div
       className={cn("flex min-w-0 flex-col gap-2.5 px-5.5 pt-5.5", className)}
@@ -126,7 +135,7 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-/** Aligns caller-ordered secondary and primary actions to the right; bare keeps a compact top gap. */
+/** Aligns caller-ordered secondary and primary actions to the right; bare keeps a compact top gap. Registers footer presence so panels can adjust their bottom inset. */
 function DialogFooter({
   className,
   variant = "default",
@@ -134,6 +143,7 @@ function DialogFooter({
 }: React.ComponentProps<"div"> & {
   variant?: "default" | "bare";
 }) {
+  DialogPresence.useRegister("footer");
   return (
     <div
       className={cn(
@@ -194,7 +204,7 @@ function DialogPanel({
     <ScrollArea scrollFade={scrollFade}>
       <div
         className={cn(
-          "space-y-4 p-5.5 in-[[data-slot=dialog-popup]:has([data-slot=dialog-header])]:pt-1 in-[[data-slot=dialog-popup]:has([data-slot=dialog-footer])]:pb-1",
+          "space-y-4 p-5.5 in-data-[has-header=true]:pt-1 in-data-[has-footer=true]:pb-1",
           className,
         )}
         data-slot="dialog-panel"
