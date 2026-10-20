@@ -1,5 +1,6 @@
 /** Windows caption buttons; native IPC owns window state and normal close handling. */
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import type { DesktopWindowAction } from "@t3tools/contracts";
 import { t } from "~/i18n";
 import { Tooltip, TooltipTrigger, TooltipPopup } from "../ui/tooltip";
@@ -17,7 +18,13 @@ export async function runWindowAction(action: DesktopWindowAction): Promise<void
 }
 
 /** Renders native-sized hit targets; maximized is the native state, never optimistic state. */
-export function WindowsWindowControls({ maximized }: { maximized: boolean }) {
+export function WindowsWindowControls({
+  maximized,
+  fullscreen,
+}: {
+  maximized: boolean;
+  fullscreen: boolean;
+}) {
   const [pending, setPending] = useState(false);
   /** Serializes a user's caption actions until the native request settles. */
   const run = async (action: DesktopWindowAction) => {
@@ -28,8 +35,14 @@ export function WindowsWindowControls({ maximized }: { maximized: boolean }) {
       setPending(false);
     }
   };
-  return (
-    <div className="windows-window-controls no-drag">
+  // Native captions remain usable over modal dialogs. A body portal keeps their
+  // replacement outside the shell's isolation and dialog scroll-lock padding.
+  return createPortal(
+    <div
+      className="windows-window-controls no-drag"
+      data-window-maximized={maximized ? "true" : "false"}
+      data-window-fullscreen={fullscreen ? "true" : "false"}
+    >
       <Tooltip>
         <TooltipTrigger
           render={<button type="button" />}
@@ -78,6 +91,7 @@ export function WindowsWindowControls({ maximized }: { maximized: boolean }) {
         </TooltipTrigger>
         <TooltipPopup>{t.common.windowControls.close}</TooltipPopup>
       </Tooltip>
-    </div>
+    </div>,
+    document.body,
   );
 }

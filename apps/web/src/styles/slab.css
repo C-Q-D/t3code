@@ -45,7 +45,9 @@ html[data-theme-id="graphite"] body {
 
 html[data-theme-id="graphite"].electron-windows,
 html[data-theme-id="graphite"].electron-windows body {
-  background: transparent;
+  /* Theme application writes an inline canvas color; the native alpha surface
+     must win over it so the shell gutter can actually reveal the desktop. */
+  background: transparent !important;
 }
 
 html[data-theme-id="graphite"] .stone-base {
@@ -151,7 +153,10 @@ html[data-theme-id="graphite"] .stone-sidebar {
 /* Windows graphite backgrounds follow the shell instead of the native viewport.
    Each layer clips its own paint; foreground opacity and portaled dialogs stay intact. */
 html[data-theme-id="graphite"].electron-windows .window-frame-shell {
-  position: relative;
+  /* Dialog scroll locking pads #root. Anchor chrome to the viewport so that
+     compensation cannot enlarge the right gutter or shift caption controls. */
+  position: fixed;
+  inset: 0;
 }
 
 html[data-theme-id="graphite"].electron-windows .window-frame-shell::before,

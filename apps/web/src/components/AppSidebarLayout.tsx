@@ -502,7 +502,9 @@ function AppShell({ children }: { children: ReactNode }) {
         data-window-maximized={isWindowMaximized ? "true" : "false"}
         data-window-fullscreen={isWindowFullscreen ? "true" : "false"}
       >
-        {isWindowsDesktop && <WindowsWindowControls maximized={isWindowMaximized} />}
+        {isWindowsDesktop && (
+          <WindowsWindowControls maximized={isWindowMaximized} fullscreen={isWindowFullscreen} />
+        )}
         <OnboardingShell
           className="grid! h-full! min-h-0! grid-cols-[minmax(0,1fr)] grid-rows-[var(--workspace-topbar-height)_minmax(0,1fr)]"
           data-app-shell=""
