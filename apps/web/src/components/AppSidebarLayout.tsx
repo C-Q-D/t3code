@@ -62,7 +62,11 @@ import {
 import { Sidebar, SidebarProvider, SidebarRail, SidebarTrigger, useSidebar } from "./ui/sidebar";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 import { WindowTitlebar } from "./frame/WindowTitlebar";
-import { TitlebarSlotProvider, TitlebarSlotOutlet } from "./frame/titlebarSlot";
+import {
+  TitlebarSlotProvider,
+  TitlebarSlotOutlet,
+  useTitlebarPanelLayout,
+} from "./frame/titlebarSlot";
 import { Slab } from "./ui/slab";
 import {
   resolveFrameGeometry,
@@ -307,6 +311,16 @@ function ProjectProjectionRetention() {
  */
 /** Frames routes with shared chrome; chat owns its slabs and discussion can portal a sibling panel. */
 export function AppSidebarLayout({ children }: { children: ReactNode }) {
+  return (
+    <TitlebarSlotProvider>
+      <AppShell>{children}</AppShell>
+    </TitlebarSlotProvider>
+  );
+}
+
+/** Reads route panel ownership below the titlebar provider and lays out the shared shell. */
+function AppShell({ children }: { children: ReactNode }) {
+  const { active: titlebarPanelActive } = useTitlebarPanelLayout();
   const navigate = useNavigate();
   const legacySidebarEnabled = useLegacySidebarEnabled();
   const {
@@ -410,88 +424,90 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
 
   return (
     <PanelAnimationSuppressionProvider value={panelAnimationsSuppressed}>
-      <TitlebarSlotProvider>
-        <div className="window-frame-shell stone-base h-dvh min-h-0">
-          <SidebarProvider
-            className="grid! h-full! min-h-0! grid-cols-[minmax(0,1fr)] grid-rows-[var(--workspace-topbar-height)_minmax(0,1fr)]"
-            data-app-shell=""
-            data-panel-animations={routePanelAnimationsActive ? "true" : "false"}
-            defaultOpen
-            style={sidebarProviderStyle}
-          >
-            <RightPanelSidebarVisibility sheet={shouldUseRightPanelSheet(viewportWidth)} />
-            <WindowTitlebar
-              sidebarControl={<SidebarControl />}
-              onLeadingWidthChange={setTitlebarLeadingWidth}
-            />
-            {/* Bound route heights to the space left by the titlebar, not their content. */}
-            <FrameWorkspace>
-              <ProjectProjectionRetention />
-              <div className="window-frame-projectbar" data-frame-projectbar="">
-                <ProjectRail />
-              </div>
-              <Sidebar
-                side="left"
-                variant="frame"
-                collapsible="offcanvas"
-                data-app-sidebar=""
-                role="navigation"
-                aria-label={isOnSettings ? t.sidebar.chrome.settings : t.sidebar.chrome.threads}
-                resizable={{
-                  maxWidth: sidebarMaximumWidth,
-                  minWidth: sidebarMinimumWidth,
-                  shouldAcceptWidth: ({ currentWidth, nextWidth, wrapper }) =>
-                    nextWidth <= currentWidth ||
-                    nextWidth <=
-                      resolveFrameSidebarMaximumWidth(
-                        wrapper.clientWidth,
-                        sidebarMinimumWidth,
-                        frame,
-                      ),
-                  storageKey: THREAD_SIDEBAR_WIDTH_STORAGE_KEY,
-                  onResize: setSidebarWidth,
-                }}
-                // The narrow-window sidebar is a sheet, portaled outside the provider's styles.
-                style={windowControlsInsetStyle}
-              >
-                {isOnSettings ? (
-                  <SettingsSidebarNav pathname={pathname} />
-                ) : legacySidebarEnabled ? (
-                  <LegacyThreadSidebar />
-                ) : (
-                  <ThreadSidebar />
-                )}
-                <SidebarRail onDoubleClick={resetSidebarWidth} />
-              </Sidebar>
-              <div className="window-frame-main flex min-h-0 min-w-0 flex-col">
-                {/* Keep the outlet under one component type across navigation;
+      <div className="window-frame-shell stone-base h-dvh min-h-0">
+        <SidebarProvider
+          className="grid! h-full! min-h-0! grid-cols-[minmax(0,1fr)] grid-rows-[var(--workspace-topbar-height)_minmax(0,1fr)]"
+          data-app-shell=""
+          data-titlebar-panel={titlebarPanelActive ? "true" : "false"}
+          data-panel-animations={routePanelAnimationsActive ? "true" : "false"}
+          defaultOpen
+          style={sidebarProviderStyle}
+        >
+          <RightPanelSidebarVisibility sheet={shouldUseRightPanelSheet(viewportWidth)} />
+          <WindowTitlebar
+            sidebarControl={<SidebarControl />}
+            onLeadingWidthChange={setTitlebarLeadingWidth}
+          />
+          {/* Bound route heights to the space left by the titlebar, not their content. */}
+          <FrameWorkspace>
+            <ProjectProjectionRetention />
+            <div className="window-frame-projectbar" data-frame-projectbar="">
+              <ProjectRail />
+            </div>
+            <Sidebar
+              side="left"
+              variant="frame"
+              collapsible="offcanvas"
+              data-app-sidebar=""
+              role="navigation"
+              aria-label={isOnSettings ? t.sidebar.chrome.settings : t.sidebar.chrome.threads}
+              resizable={{
+                maxWidth: sidebarMaximumWidth,
+                minWidth: sidebarMinimumWidth,
+                shouldAcceptWidth: ({ currentWidth, nextWidth, wrapper }) =>
+                  nextWidth <= currentWidth ||
+                  nextWidth <=
+                    resolveFrameSidebarMaximumWidth(
+                      wrapper.clientWidth,
+                      sidebarMinimumWidth,
+                      frame,
+                    ),
+                storageKey: THREAD_SIDEBAR_WIDTH_STORAGE_KEY,
+                onResize: setSidebarWidth,
+              }}
+              // The narrow-window sidebar is a sheet, portaled outside the provider's styles.
+              style={windowControlsInsetStyle}
+            >
+              {isOnSettings ? (
+                <SettingsSidebarNav pathname={pathname} />
+              ) : legacySidebarEnabled ? (
+                <LegacyThreadSidebar />
+              ) : (
+                <ThreadSidebar />
+              )}
+              <SidebarRail onDoubleClick={resetSidebarWidth} />
+            </Sidebar>
+            <div
+              className="window-frame-main flex min-h-0 min-w-0 flex-col"
+              data-titlebar-panel={titlebarPanelActive ? "true" : "false"}
+            >
+              {/* Keep the outlet under one component type across navigation;
                     changing div/Slab would remount the route subtree. Chat owns
                     its surfaces, so its enclosing slab has no visual variants. */}
-                <Slab
-                  tone={chatOwnsSlabs ? null : "card"}
-                  radius={chatOwnsSlabs ? null : "slab"}
-                  elevation={chatOwnsSlabs ? null : "slab-frame"}
-                  glow={!chatOwnsSlabs}
-                  className={cn(
-                    "relative flex min-h-0 min-w-0 flex-1 flex-col",
-                    !chatOwnsSlabs && "overflow-hidden",
-                  )}
-                  render={<div className={chatOwnsSlabs ? undefined : "stone-frame-card"} />}
-                  data-frame-main={chatOwnsSlabs ? "chat" : ""}
-                >
-                  {children}
-                </Slab>
-                {pathname.startsWith("/discussions/") &&
-                !shouldUseDiscussionPanelSheet(viewportWidth) ? (
-                  <TitlebarSlotOutlet name="panel" />
-                ) : null}
-              </div>
-              <NavigationHistoryShortcuts />
-              <MainAppLocationTracker />
-            </FrameWorkspace>
-          </SidebarProvider>
-        </div>
-      </TitlebarSlotProvider>
+              <Slab
+                tone={chatOwnsSlabs ? null : "card"}
+                radius={chatOwnsSlabs ? null : "slab"}
+                elevation={chatOwnsSlabs ? null : "slab-frame"}
+                glow={!chatOwnsSlabs}
+                className={cn(
+                  "relative flex min-h-0 min-w-0 flex-1 flex-col",
+                  !chatOwnsSlabs && "overflow-hidden",
+                )}
+                render={<div className={chatOwnsSlabs ? undefined : "stone-frame-card"} />}
+                data-frame-main={chatOwnsSlabs ? "chat" : ""}
+              >
+                {children}
+              </Slab>
+              {pathname.startsWith("/discussions/") &&
+              !shouldUseDiscussionPanelSheet(viewportWidth) ? (
+                <TitlebarSlotOutlet name="panel" />
+              ) : null}
+            </div>
+            <NavigationHistoryShortcuts />
+            <MainAppLocationTracker />
+          </FrameWorkspace>
+        </SidebarProvider>
+      </div>
     </PanelAnimationSuppressionProvider>
   );
 }
