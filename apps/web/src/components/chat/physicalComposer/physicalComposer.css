@@ -1,0 +1,4 @@
+/* Only flying graphemes are hidden. The editor still owns text, selection, caret and clipboard. */
+::highlight(physical-composer-glyph) {
+  color: transparent;
+}

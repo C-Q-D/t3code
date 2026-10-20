@@ -122,6 +122,9 @@ import { composerCodeBlockHighlight } from "./composerCodeBlockHighlight";
 import { importPastedComposerText } from "./composerInlineTokenPaste";
 import { didComposerSelectionChangeVisibly } from "./composerSelection";
 import type { ComposerDraftContextRecords } from "./composerContextPresentation";
+import { usePhysicalComposer } from "./chat/physicalComposer/PhysicalComposer";
+import { bindPhysicalRenderer, physicalTypingExtension } from "./chat/physicalComposer/editor";
+import "./chat/physicalComposer/physicalComposer.css";
 
 export interface ComposerPromptEditorHandle {
   focus: () => void;
@@ -839,7 +842,9 @@ const ComposerUndoGroupingExtension = Extension.create<
   },
 });
 
+/** Own the editor for one text mode; context motion decorates transactions without changing editing. */
 function ComposerPromptEditorTiptapInner(props: ComposerPromptEditorProps) {
+  const physicalRenderer = usePhysicalComposer();
   const {
     value,
     cursor,
@@ -1092,6 +1097,7 @@ function ComposerPromptEditorTiptapInner(props: ComposerPromptEditorProps) {
           ...(richText ? {} : { bold: false, italic: false, strike: false }),
         }),
         ComposerUndoGroupingExtension,
+        physicalTypingExtension(),
         ComposerMentionExtension,
         ComposerSkillExtension,
         ComposerCitationExtension,
@@ -1521,6 +1527,10 @@ function ComposerPromptEditorTiptapInner(props: ComposerPromptEditorProps) {
   useEffect(() => {
     editor?.setEditable(!disabled);
   }, [disabled, editor]);
+
+  useLayoutEffect(() => {
+    if (editor) return bindPhysicalRenderer(editor, physicalRenderer);
+  }, [editor, physicalRenderer]);
 
   useEffect(() => {
     editorHolder.current = editor;
