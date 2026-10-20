@@ -340,3 +340,78 @@ it.each(["partial insert", "initial paint", "frame step", "frame paint"])(
     expect(activeJobs()).toBe(0);
   },
 );
+
+it.each([
+  ["Backward", true],
+  ["Forward", true],
+  ["Backward", false],
+  ["Forward", false],
+] as const)(
+  "captures every visible word glyph for %s deletion (target ranges: %s)",
+  async (direction, targets) => {
+    editor.commands.setContent(`<p>${"a".repeat(60)}</p>`);
+    editor.commands.setTextSelection(direction === "Backward" ? 61 : 1);
+    const text = editor.view.dom.querySelector("p")!.firstChild!;
+    const remove = vi.spyOn(renderer, "remove");
+    const reads = vi.spyOn(Range.prototype, "getBoundingClientRect");
+    if (targets)
+      editor.view.dom.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: direction === "Backward" ? "Backspace" : "Delete",
+          bubbles: true,
+        }),
+      );
+    const event = new InputEvent("beforeinput", {
+      inputType: `deleteWord${direction}`,
+      bubbles: true,
+    });
+    if (targets)
+      Object.defineProperty(event, "getTargetRanges", {
+        value: () => [{ startContainer: text, startOffset: 0, endContainer: text, endOffset: 60 }],
+      });
+    editor.view.dom.dispatchEvent(event);
+    const beforeMutation = reads.mock.calls.length;
+    text.textContent = "";
+    editor.view.dom.dispatchEvent(
+      new InputEvent("input", { inputType: event.inputType, bubbles: true }),
+    );
+    await Promise.resolve();
+    expect(editor.getText()).toBe("");
+    expect(remove).toHaveBeenCalledOnce();
+    expect(remove.mock.calls[0]![0]).toHaveLength(60);
+    expect(reads.mock.calls.length).toBe(beforeMutation);
+  },
+);
+
+it("captures only visible glyphs when the native deletion target spans a long draft", async () => {
+  editor.commands.setContent(`<p>${"a".repeat(10_000)}</p>`);
+  editor.commands.setTextSelection(1);
+  vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue(new DOMRect(0, 0, 500, 80));
+  const reads = vi.spyOn(Range.prototype, "getBoundingClientRect").mockImplementation(function (
+    this: Range,
+  ) {
+    return new DOMRect(
+      (this.startOffset % 50) * 10,
+      (Math.floor(this.startOffset / 50) - 100) * 20,
+      10,
+      20,
+    );
+  });
+  const text = editor.view.dom.querySelector("p")!.firstChild!;
+  const remove = vi.spyOn(renderer, "remove");
+  const event = new InputEvent("beforeinput", { inputType: "deleteWordForward", bubbles: true });
+  Object.defineProperty(event, "getTargetRanges", {
+    value: () => [{ startContainer: text, startOffset: 0, endContainer: text, endOffset: 10_000 }],
+  });
+  editor.view.dom.dispatchEvent(event);
+  const beforeMutation = reads.mock.calls.length;
+  text.textContent = "";
+  editor.view.dom.dispatchEvent(
+    new InputEvent("input", { inputType: event.inputType, bubbles: true }),
+  );
+  await Promise.resolve();
+  expect(editor.getText()).toBe("");
+  expect(remove.mock.calls[0]![0]).toHaveLength(200);
+  expect(beforeMutation).toBeLessThanOrEqual(280);
+  expect(reads.mock.calls.length).toBe(beforeMutation);
+});

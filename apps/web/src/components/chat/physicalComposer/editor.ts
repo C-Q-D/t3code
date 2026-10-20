@@ -17,6 +17,7 @@ interface MeasuredGlyph extends GlyphSnapshot {
 }
 
 const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+const wordSegmenter = new Intl.Segmenter(undefined, { granularity: "word" });
 const renderers = new WeakMap<Editor, PhysicalComposerRenderer>();
 
 /** Bind a mounted React overlay to an existing editor; cleanup releases only that binding. */
@@ -213,6 +214,7 @@ function hideGlyphs(glyphs: MeasuredGlyph[]): GlyphSnapshot[] | null {
 class PhysicalTypingBridge {
   private intent = "";
   private intentVersion = 0;
+  private nativeDeletion = false;
   private removedBeforeInput: {
     doc: DocumentNode;
     from: number;
@@ -255,7 +257,20 @@ class PhysicalTypingBridge {
   /** Capture inputType before ProseMirror applies the browser edit. */
   private beforeInput = (event: InputEvent) => {
     this.remember(event.inputType, true);
-    this.captureDeletion();
+    this.nativeDeletion = true;
+    const targets = event.getTargetRanges?.() ?? [];
+    const intervals = targets.map((range) => ({
+      from: this.view.posAtDOM(range.startContainer, range.startOffset),
+      to: this.view.posAtDOM(range.endContainer, range.endOffset),
+    }));
+    this.captureDeletion(
+      intervals.length
+        ? {
+            from: Math.min(...intervals.map((range) => range.from)),
+            to: Math.max(...intervals.map((range) => range.to)),
+          }
+        : undefined,
+    );
     const version = this.intentVersion;
     queueMicrotask(() => {
       if (event.defaultPrevented && this.intentVersion === version) this.intent = "";
@@ -274,26 +289,54 @@ class PhysicalTypingBridge {
   };
 
   /** Freeze visible old glyph geometry before browser deletion invalidates DOM ranges. */
-  private captureDeletion() {
+  private captureDeletion(target?: { from: number; to: number }) {
     const renderer = this.renderer();
     if (!renderer || this.composing || !isPhysicsEnabled() || !this.intent.startsWith("delete")) {
       this.removedBeforeInput = null;
       return;
     }
-    const { from, to, empty } = this.view.state.selection;
+    const { from, to, empty, $from } = this.view.state.selection;
+    let start = target?.from ?? from;
+    let end = target?.to ?? to;
+    if (!target && empty) {
+      if (this.intent.startsWith("deleteWord")) {
+        const text = $from.parent.textBetween(0, $from.parent.content.size, "", "\uFFFC");
+        const words = wordSegmenter.segment(text);
+        const backward = this.intent.endsWith("Backward");
+        let offset = $from.parentOffset;
+        // Skip adjacent whitespace, then include the word/punctuation unit at the deletion edge.
+        while (backward ? offset > 0 : offset < text.length) {
+          const part = words.containing(backward ? offset - 1 : offset);
+          if (!part) break;
+          offset = backward ? part.index : part.index + part.segment.length;
+          if (part.segment.trim()) break;
+        }
+        if (backward) start = $from.start() + offset;
+        else end = $from.start() + offset;
+      } else {
+        start = Math.max(0, from - 32);
+        end = Math.min(this.view.state.doc.content.size, to + 32);
+      }
+    }
     const cached = this.removedBeforeInput;
-    if (cached?.doc === this.view.state.doc && cached.from === from && cached.to === to) return;
-    // Native word deletion can span more than one grapheme. Keep a bounded local candidate
-    // window; the committed transaction filters it to the actual removed interval.
+    if (cached?.doc === this.view.state.doc && cached.from <= start && cached.to >= end) return;
+    // Expand before DOM mutation, reusing overlapping geometry from the same keydown.
+    const reusable = cached?.doc === this.view.state.doc ? cached : null;
+    const glyphs = reusable
+      ? [
+          ...reusable.glyphs,
+          ...(start < reusable.from
+            ? measureGlyphs(this.view, renderer, start, reusable.from)
+            : []),
+          ...(end > reusable.to ? measureGlyphs(this.view, renderer, reusable.to, end) : []),
+        ]
+      : measureGlyphs(this.view, renderer, start, end);
     this.removedBeforeInput = {
       doc: this.view.state.doc,
-      from,
-      to,
-      glyphs: measureGlyphs(
-        this.view,
-        renderer,
-        empty ? Math.max(0, from - 32) : from,
-        empty ? Math.min(this.view.state.doc.content.size, to + 32) : to,
+      from: Math.min(start, reusable?.from ?? start),
+      to: Math.max(end, reusable?.to ?? end),
+      glyphs: [...new Map(glyphs.map((glyph) => [glyph.from, glyph])).values()].sort(
+        (a, b) => a.from - b.from,
       ),
     };
   }
@@ -301,11 +344,14 @@ class PhysicalTypingBridge {
   /** Cover desktop deletion paths that ProseMirror handles before native beforeinput fires. */
   private keyDown = (event: KeyboardEvent) => {
     if (event.isComposing) return;
+    this.nativeDeletion = false;
+    this.removedBeforeInput = null;
+    const unit = event.ctrlKey || event.altKey ? "Word" : "Content";
     this.remember(
       event.key === "Backspace"
-        ? "deleteContentBackward"
+        ? `delete${unit}Backward`
         : event.key === "Delete"
-          ? "deleteContentForward"
+          ? `delete${unit}Forward`
           : event.key === "Enter"
             ? "newline"
             : "",
@@ -410,11 +456,15 @@ class PhysicalTypingBridge {
     const before = this.view.state.doc;
     const diff = transaction.docChanged ? transactionDifference(transaction) : null;
     const deletion = this.intent.startsWith("delete");
-    const cached = this.removedBeforeInput?.doc === before ? this.removedBeforeInput.glyphs : null;
+    const cached = this.removedBeforeInput?.doc === before ? this.removedBeforeInput : null;
+    // Native observer transactions arrive after DOM mutation: never remeasure deleted nodes.
     const removed =
       renderer && diff && deletion && !this.composing && isPhysicsEnabled()
-        ? (cached?.filter((glyph) => glyph.to > diff.start && glyph.from < diff.oldEnd) ??
-          measureGlyphs(this.view, renderer, diff.start, diff.oldEnd))
+        ? cached && cached.from <= diff.start && cached.to >= diff.oldEnd
+          ? cached.glyphs.filter((glyph) => glyph.to > diff.start && glyph.from < diff.oldEnd)
+          : this.nativeDeletion
+            ? []
+            : measureGlyphs(this.view, renderer, diff.start, diff.oldEnd)
         : [];
     const continuing =
       renderer && this.intent === "insertText" && !this.composing
