@@ -114,7 +114,9 @@ export function UsagePage() {
     ),
   }));
   const metric = preferences.metric;
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  // Both manual actions keep the refresh control busy, but a quota-only check must not mute usage.
+  const [manualRefresh, setManualRefresh] = useState<"limits" | "usage" | null>(null);
+  const isRefreshing = manualRefresh !== null;
   const [limitsNow, setLimitsNow] = useState(() => Date.now());
   const refreshingRef = useRef(false);
   const [priceDialog, setPriceDialog] = useState<{ readonly model?: string } | null>(null);
@@ -139,7 +141,7 @@ export function UsagePage() {
   const merged = shown?.merged ?? answeredUsage;
   const shownWindow = shown?.window ?? window;
   const shownHourly = shownWindow.resolution === "hour";
-  const refreshingUsage = isRefreshing;
+  const refreshingUsage = manualRefresh === "usage";
   // Usage kept from another window is all old, so every figure stays muted.
   const showingKept = shown !== null && shown.window !== window;
   const loading = useMemo(() => {
@@ -251,10 +253,10 @@ export function UsagePage() {
   const refreshLimitsManually = () => {
     if (refreshingRef.current) return;
     refreshingRef.current = true;
-    setIsRefreshing(true);
+    setManualRefresh("limits");
     void refreshLimits().finally(() => {
       refreshingRef.current = false;
-      setIsRefreshing(false);
+      setManualRefresh(null);
     });
   };
   const onUsageKeyDown = useEffectEvent((event: KeyboardEvent) => {
@@ -296,13 +298,13 @@ export function UsagePage() {
       setWindowSelection({ days: windowDays, window: nextWindow });
     }
     refreshingRef.current = true;
-    setIsRefreshing(true);
+    setManualRefresh(canReadDiagnostics ? "usage" : "limits");
     void Promise.all([
       canReadDiagnostics ? refresh(nextWindow) : undefined,
       refreshLimits(),
     ]).finally(() => {
       refreshingRef.current = false;
-      setIsRefreshing(false);
+      setManualRefresh(null);
     });
   };
   const connectedLimitsEnvironments = [...presentations]

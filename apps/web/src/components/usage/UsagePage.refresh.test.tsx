@@ -48,7 +48,17 @@ vi.mock("../../state/usage", () => ({
       canReadDiagnostics: state.canReadDiagnostics,
       isConnected: presentation.connection.phase === "connected",
       error: null,
-      summary: null,
+      summary: state.showUsage
+        ? {
+            ...input,
+            contractVersion: USAGE_CONTRACT_VERSION,
+            readAt: "2026-09-11T12:00:00Z",
+            buckets: [],
+            sources: [],
+            pricing: { status: "fresh", source: "test", fetchedAt: null, knownModels: 1 },
+            scanDurationMs: 1,
+          }
+        : null,
     }));
     return {
       merged: mergeUsage([], USAGE_CONTRACT_VERSION),
@@ -110,6 +120,12 @@ vi.mock("../settings/providerDriverMeta", () => ({
 }));
 
 import { UsagePage } from "./UsagePage";
+import { UsageHeroCard } from "./UsageHeroCard";
+import { UsageMetricStrip } from "./UsageMetricStrip";
+import { UsageCompositionCard } from "./UsageCompositionCard";
+
+/** Replaces the DOM HTMLElement constructor in Node tests so window shortcuts can check for focused inputs without a browser. */
+class TestHTMLElement extends EventTarget {}
 
 let renderer: ReactTestRenderer;
 let environmentNumber = 0;
@@ -215,7 +231,7 @@ function pressUsageKey(key: string, modifiers: { ctrlKey?: boolean; shiftKey?: b
 }
 
 it("L refreshes limits and their countdown without refreshing usage or changing metric", async () => {
-  vi.stubGlobal("HTMLElement", class extends EventTarget {});
+  vi.stubGlobal("HTMLElement", TestHTMLElement);
   vi.stubGlobal("navigator", { platform: "Win32" });
   state.metric = "tokens";
   await act(() => {
@@ -236,8 +252,66 @@ it("L refreshes limits and their countdown without refreshing usage or changing 
   ).toEqual(["tokens"]);
 });
 
+it.each([
+  { action: "limits", usageLoading: false, status: "Ready", trigger: () => pressUsageKey("l") },
+  {
+    action: "button",
+    usageLoading: true,
+    status: "Refreshing…",
+    trigger: (onClick: () => void) => onClick(),
+  },
+])(
+  "keeps loaded usage state accurate during a pending $action refresh",
+  async ({ usageLoading, status, trigger }) => {
+    vi.stubGlobal("HTMLElement", TestHTMLElement);
+    vi.stubGlobal("navigator", { platform: "Win32" });
+    state.showUsage = true;
+    await act(() => {
+      renderer = create(<UsagePage />);
+    });
+    const button = () =>
+      renderer.root.findAll(
+        (node) => node.type === "button" && node.props["aria-label"] === "Refresh usage",
+      )[0]!;
+    expect(renderer.root.findByType(UsageHeroCard).props.loading.partial).toBe(false);
+    expect(
+      renderer.root.findAll((node) => node.type === "span" && node.children.includes("Ready")),
+    ).toHaveLength(1);
+    let finishRefresh!: () => void;
+    const pending = new Promise<undefined>((resolve) => {
+      finishRefresh = () => resolve(undefined);
+    });
+    state.refreshProviders.mockImplementationOnce(() => pending);
+    await act(() => trigger(button().props.onClick));
+    try {
+      expect(button().props["aria-busy"]).toBe(true);
+      expect(button().props.disabled).toBe(true);
+      expect(state.refreshProviders).toHaveBeenCalledTimes(2);
+      expect(renderer.root.findByType(UsageHeroCard).props.loading).toEqual({
+        partial: usageLoading,
+        everyProvider: usageLoading,
+        providers: new Set(),
+      });
+      expect(renderer.root.findByType(UsageMetricStrip).props.loading).toBe(usageLoading);
+      expect(renderer.root.findByType(UsageCompositionCard).props.loadingPartial).toBe(
+        usageLoading,
+      );
+      expect(
+        renderer.root.findAll((node) => node.type === "span" && node.children.includes(status)),
+      ).toHaveLength(1);
+    } finally {
+      await act(async () => {
+        finishRefresh();
+        await pending;
+      });
+    }
+    expect(button().props["aria-busy"]).toBe(false);
+    expect(renderer.root.findByType(UsageHeroCard).props.loading.partial).toBe(false);
+  },
+);
+
 it("keeps period shortcuts active during a limits refresh and blocks duplicate L requests", async () => {
-  vi.stubGlobal("HTMLElement", class extends EventTarget {});
+  vi.stubGlobal("HTMLElement", TestHTMLElement);
   vi.stubGlobal("navigator", { platform: "Win32" });
   await act(() => {
     renderer = create(<UsagePage />);

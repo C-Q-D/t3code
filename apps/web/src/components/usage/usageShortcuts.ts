@@ -4,6 +4,7 @@ import type { KeybindingCommand, ResolvedKeybindingsConfig } from "@t3tools/cont
 import type { UsageChartMetric } from "./UsageProviderChart";
 import { resolveShortcutCommand, type ShortcutEventLike } from "../../keybindings";
 
+/** Selectable usage chart metrics; subscription limits remain visible independently of this selection. */
 export type UsageMetric = UsageChartMetric;
 export const METRIC_OPTIONS = [
   { value: "cost", label: t.tools.usage.cost, command: "usage.cost" },
