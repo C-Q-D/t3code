@@ -5,10 +5,15 @@ import { cva, type VariantProps } from "class-variance-authority";
 import type * as React from "react";
 
 import { cn } from "~/lib/utils";
+import { createPresenceRegistry } from "~/lib/presenceRegistry";
 import { Input, type InputProps } from "~/components/ui/input";
 
+const inputGroupRegistry = createPresenceRegistry<
+  "disabled" | "invalid" | "inline-start" | "inline-end"
+>();
+
 const inputGroupVariants = cva(
-  "relative inline-flex w-full min-w-0 items-center rounded-[var(--control-radius)] border text-base text-foreground ring-ring/24 transition-shadow has-[input:focus-visible,textarea:focus-visible]:has-[input[aria-invalid],textarea[aria-invalid]]:border-destructive/64 has-[input:focus-visible,textarea:focus-visible]:has-[input[aria-invalid],textarea[aria-invalid]]:ring-destructive/16 has-[textarea]:h-auto has-data-[align=block-end]:h-auto has-data-[align=block-start]:h-auto has-data-[align=block-end]:flex-col has-data-[align=block-start]:flex-col has-[input:focus-visible,textarea:focus-visible]:border-ring has-[input[aria-invalid],textarea[aria-invalid]]:border-destructive/36 has-autofill:bg-foreground/4 has-[input:disabled,textarea:disabled]:opacity-64 has-[input:disabled,textarea:disabled,input:focus-visible,textarea:focus-visible,input[aria-invalid],textarea[aria-invalid]]:shadow-none has-[input:focus-visible,textarea:focus-visible]:ring-[3px] has-[input:focus-visible,textarea:focus-visible]:ring-inset sm:text-sm dark:has-autofill:bg-foreground/8 dark:has-[input[aria-invalid],textarea[aria-invalid]]:ring-destructive/24 has-data-[align=inline-start]:**:[[data-size=sm]_input]:ps-1.5 has-data-[align=inline-end]:**:[[data-size=sm]_input]:pe-1.5 *:[[data-slot=input-control],[data-slot=textarea-control]]:contents *:[[data-slot=input-control],[data-slot=textarea-control]]:before:hidden has-[[data-align=block-start],[data-align=block-end]]:**:[input]:h-auto has-data-[align=inline-start]:**:[input]:ps-2 has-data-[align=inline-end]:**:[input]:pe-2 has-data-[align=block-end]:**:[input]:pt-1.5 has-data-[align=block-start]:**:[input]:pb-1.5 **:[textarea]:min-h-20.5 **:[textarea]:resize-none **:[textarea]:py-[calc(--spacing(3)-1px)] **:[textarea]:max-sm:min-h-23.5 **:[textarea_button]:rounded-[calc(var(--control-radius)-1px)]",
+  "relative inline-flex w-full min-w-0 items-center rounded-[var(--control-radius)] border text-base text-foreground ring-ring/24 transition-shadow focus-within:data-[invalid=true]:border-destructive/64 focus-within:data-[invalid=true]:ring-destructive/16 focus-within:border-ring data-[invalid=true]:border-destructive/36 data-[disabled=true]:opacity-64 data-[disabled=true]:shadow-none focus-within:shadow-none data-[invalid=true]:shadow-none focus-within:ring-[3px] focus-within:ring-inset sm:text-sm dark:data-[invalid=true]:ring-destructive/24 data-[addon-inline-start=true]:**:[[data-size=sm]_input]:ps-1.5 data-[addon-inline-end=true]:**:[[data-size=sm]_input]:pe-1.5 data-[addon-inline-start=true]:**:[input]:ps-2 data-[addon-inline-end=true]:**:[input]:pe-2 *:data-[slot=input-control]:contents *:data-[slot=input-control]:before:hidden",
   {
     defaultVariants: {
       variant: "default",
@@ -21,81 +26,71 @@ const inputGroupVariants = cva(
       },
       variant: {
         default:
-          "border-input bg-background not-dark:bg-clip-padding shadow-xs/5 before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--control-radius)-1px)] not-has-[input:disabled,textarea:disabled]:not-has-[input:focus-visible,textarea:focus-visible]:not-has-[input[aria-invalid],textarea[aria-invalid]]:before:shadow-[0_1px_--theme(--color-black/4%)] dark:bg-input/32 dark:not-has-[input:disabled,textarea:disabled]:not-has-[input:focus-visible,textarea:focus-visible]:not-has-[input[aria-invalid],textarea[aria-invalid]]:before:shadow-[0_-1px_--theme(--color-white/6%)]",
+          "border-input bg-background not-dark:bg-clip-padding shadow-xs/5 before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--control-radius)-1px)] data-[disabled=false]:not-focus-within:data-[invalid=false]:before:shadow-[0_1px_--theme(--color-black/4%)] dark:bg-input/32 dark:data-[disabled=false]:not-focus-within:data-[invalid=false]:before:shadow-[0_-1px_--theme(--color-white/6%)]",
         // Glass surfaces can remove borders, so focus must use an independent inset shadow.
-        popover:
-          "dropdown-glass rounded-2xl focus-within:inset-shadow-focus has-[input:focus-visible,textarea:focus-visible]:ring-0",
+        popover: "dropdown-glass rounded-2xl focus-within:inset-shadow-focus focus-within:ring-0",
         ghost:
-          "border-transparent bg-transparent shadow-none hover:bg-muted/40 has-[input:focus-visible,textarea:focus-visible]:bg-background",
+          "border-transparent bg-transparent shadow-none hover:bg-muted/40 focus-within:bg-background",
       },
     },
   },
 );
 
-/** Keeps focus visible across the input and its interactive adornments. */
+/**
+ * Owns local control and addon registrations; callers keep input state in props.
+ * Focus within any slot lights the group ring, including a button added to an addon.
+ */
 function InputGroup({
   className,
   variant,
   size,
   ...props
 }: React.ComponentProps<"div"> & VariantProps<typeof inputGroupVariants>) {
+  const { counts, onChange } = inputGroupRegistry.usePresence();
   return (
-    <div
-      className={cn(inputGroupVariants({ variant, size }), className)}
-      data-slot="input-group"
-      role="group"
-      {...props}
-    />
+    <inputGroupRegistry.Provider onChange={onChange}>
+      <div
+        className={cn(inputGroupVariants({ variant, size }), className)}
+        data-disabled={(counts.disabled ?? 0) > 0 ? "true" : "false"}
+        data-invalid={(counts.invalid ?? 0) > 0 ? "true" : "false"}
+        data-addon-inline-start={(counts["inline-start"] ?? 0) > 0 ? "true" : "false"}
+        data-addon-inline-end={(counts["inline-end"] ?? 0) > 0 ? "true" : "false"}
+        data-slot="input-group"
+        role="group"
+        {...props}
+      />
+    </inputGroupRegistry.Provider>
   );
 }
 
 const inputGroupAddonVariants = cva(
-  "[&_svg]:-mx-0.5 flex h-auto cursor-text select-none items-center justify-center gap-2 leading-none [&>kbd]:rounded-[calc(var(--radius)-5px)] in-[[data-slot=input-group]:has([data-slot=input-control],[data-slot=textarea-control])]:[&_svg:not([class*='size-'])]:size-4.5 sm:in-[[data-slot=input-group]:has([data-slot=input-control],[data-slot=textarea-control])]:[&_svg:not([class*='size-'])]:size-4 not-has-[button]:**:[svg:not([class*='opacity-'])]:opacity-80",
+  "[&_svg]:-mx-0.5 flex h-auto cursor-text select-none items-center justify-center gap-2 leading-none [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 **:[svg:not([class*='opacity-'])]:opacity-80",
   {
     defaultVariants: {
       align: "inline-start",
     },
-    compoundVariants: [
-      // Pill groups curve too tightly for buttons pulled to the edge; keep them inset.
-      {
-        align: "inline-end",
-        inset: "pill",
-        className: "has-[>button]:me-0 pe-1 [[data-size=sm]+&]:pe-1 gap-0.5",
-      },
-      {
-        align: "inline-start",
-        inset: "pill",
-        className: "has-[>button]:ms-0 ps-1 [[data-size=sm]+&]:ps-1 gap-0.5",
-      },
-    ],
     variants: {
-      inset: {
-        default: null,
-        pill: "[&_button]:rounded-full",
-      },
       align: {
-        "block-end":
-          "order-last w-full justify-start px-[calc(--spacing(3)-1px)] pb-[calc(--spacing(3)-1px)] [.border-t]:pt-[calc(--spacing(3)-1px)] [[data-size=sm]+&]:px-[calc(--spacing(2.5)-1px)]",
-        "block-start":
-          "order-first w-full justify-start px-[calc(--spacing(3)-1px)] pt-[calc(--spacing(3)-1px)] [.border-b]:pb-[calc(--spacing(3)-1px)] [[data-size=sm]+&]:px-[calc(--spacing(2.5)-1px)]",
         "inline-end":
-          "has-[>:last-child[data-slot=badge]]:-me-1.5 has-[>button]:-me-2 order-last pe-[calc(--spacing(3)-1px)] has-[>kbd:last-child]:me-[-0.35rem] [[data-size=sm]+&]:pe-[calc(--spacing(2.5)-1px)]",
+          "order-last pe-[calc(--spacing(3)-1px)] [[data-size=sm]+&]:pe-[calc(--spacing(2.5)-1px)]",
         "inline-start":
-          "has-[>:last-child[data-slot=badge]]:-ms-1.5 has-[>button]:-ms-2 order-first ps-[calc(--spacing(3)-1px)] has-[>kbd:last-child]:ms-[-0.35rem] [[data-size=sm]+&]:ps-[calc(--spacing(2.5)-1px)]",
+          "order-first ps-[calc(--spacing(3)-1px)] [[data-size=sm]+&]:ps-[calc(--spacing(2.5)-1px)]",
       },
     },
   },
 );
 
+/** Registers the mounted inline slot and focuses its sibling input on non-interactive clicks. */
 function InputGroupAddon({
   className,
   align = "inline-start",
-  inset,
   ...props
 }: React.ComponentProps<"div"> & VariantProps<typeof inputGroupAddonVariants>) {
+  inputGroupRegistry.useRegister("inline-start", align === "inline-start");
+  inputGroupRegistry.useRegister("inline-end", align === "inline-end");
   return (
     <div
-      className={cn(inputGroupAddonVariants({ align, inset }), className)}
+      className={cn(inputGroupAddonVariants({ align }), className)}
       data-align={align}
       data-slot="input-group-addon"
       onMouseDown={(e) => {
@@ -118,7 +113,16 @@ function InputGroupAddon({
   );
 }
 
+/**
+ * Reports control attributes before paint; cleanup removes the registrations.
+ * Invalid styling preserves the existing attribute-presence condition, including aria-invalid=false.
+ */
 function InputGroupInput({ className, ...props }: InputProps) {
+  inputGroupRegistry.useRegister("disabled", !!props.disabled);
+  inputGroupRegistry.useRegister(
+    "invalid",
+    props["aria-invalid"] !== undefined && props["aria-invalid"] !== null,
+  );
   return <Input className={className} unstyled {...props} />;
 }
 
