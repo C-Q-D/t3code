@@ -39,7 +39,7 @@ import {
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
 import { mediaFileReference } from "@t3tools/client-runtime/media-reference";
-import { Copy, FolderTree, Globe2, Save, SquareArrowOutUpRight, WrapTextIcon } from "lucide-react";
+import { Copy, FolderTree, Globe2, SquareArrowOutUpRight, WrapTextIcon } from "lucide-react";
 import * as Schema from "effect/Schema";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -51,6 +51,7 @@ import { MediaActions, type MediaActionSource } from "~/components/media/MediaAc
 import { useRemoteOpenState } from "~/remoteOpen";
 import { useClientSettings, useUpdateClientSettings } from "~/hooks/useSettings";
 import { useTheme } from "~/hooks/useTheme";
+import { writeTextToClipboard } from "~/hooks/useCopyToClipboard";
 import { getLocalStorageItem, setLocalStorageItem, useLocalStorage } from "~/hooks/useLocalStorage";
 import { useWorkspaceMutationRefresh } from "~/hooks/useWorkspaceMutationRefresh";
 import { resolveDiffThemeName } from "~/lib/diffRendering";
@@ -1199,6 +1200,30 @@ export default function FilePreviewPanel({
     });
   };
 
+  const canCopyContents =
+    previewPath !== null &&
+    !isMedia &&
+    !isPdf &&
+    !file.isPending &&
+    !file.error &&
+    Boolean(file.data?.contents);
+  const handleCopyContents = async () => {
+    if (!canCopyContents || relativePath === null) return;
+    // Read at click time so an editor update in the same frame is included before React rerenders.
+    const contents =
+      getProjectFileContents(environmentId, cwd, relativePath) ?? file.data?.contents;
+    if (!contents) return;
+    try {
+      const copied = await writeTextToClipboard(contents);
+      toastManager.add({
+        type: copied ? "success" : "error",
+        title: copied ? t.tools.files.copied : t.tools.files.copyFailed,
+      });
+    } catch {
+      toastManager.add({ type: "error", title: t.tools.files.copyFailed });
+    }
+  };
+
   const handleOpenInBrowser = useCallback(() => {
     if (!canReadFiles || !canOperatePreview || !absolutePath || !environmentHttpBaseUrl) return;
     void (async () => {
@@ -1321,12 +1346,12 @@ export default function FilePreviewPanel({
                   <WrapTextIcon className="size-3.5" />
                 </FileSurfaceAction>
               ) : null}
-              {/* These workspace commands are visual placeholders: editing still autosaves. */}
-              <FileSurfaceAction label={t.tools.files.copyContents} disabled>
+              <FileSurfaceAction
+                label={t.tools.files.copyContents}
+                disabled={!canCopyContents}
+                onPress={() => void handleCopyContents()}
+              >
                 <Copy className="size-3.5" />
-              </FileSurfaceAction>
-              <FileSurfaceAction label={t.tools.files.save} disabled>
-                <Save className="size-3.5" />
               </FileSurfaceAction>
               <Menu>
                 <Tooltip>

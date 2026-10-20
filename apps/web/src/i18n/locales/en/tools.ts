@@ -871,6 +871,7 @@ export const tools = {
     copied: "Copied",
     copyPreview: "Copy preview",
     copyContents: "Copy contents",
+    copyFailed: "Unable to copy file contents",
     preparing: "Preparing file…",
     save: "Save file",
     removeDraft: "Remove from draft",

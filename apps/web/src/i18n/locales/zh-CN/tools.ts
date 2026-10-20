@@ -834,6 +834,7 @@ export const tools: Messages["tools"] = {
     copied: "已复制",
     copyPreview: "复制预览内容",
     copyContents: "复制内容",
+    copyFailed: "无法复制文件内容",
     preparing: "正在准备文件…",
     save: "保存文件",
     removeDraft: "从草稿中移除",

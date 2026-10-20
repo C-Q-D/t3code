@@ -9,12 +9,30 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import FilePreviewPanel from "./FilePreviewPanel";
+import { t } from "~/i18n";
 
 const settings = vi.hoisted(() => ({
   wordWrap: false,
   update: vi.fn<(patch: { wordWrap: boolean }) => void>(),
 }));
+const fileState = vi.hoisted(() => ({
+  data: { contents: "# Document\n\nPreview contents", truncated: false } as {
+    contents: string;
+    truncated: boolean;
+  } | null,
+  error: null as string | null,
+  isPending: false,
+  isNotFile: false,
+}));
+const clipboard = vi.hoisted(() => ({
+  writeText: vi.fn<(text: string) => Promise<void>>(),
+  toast: vi.fn(),
+}));
 
+vi.mock("~/components/ui/toast", () => ({
+  toastManager: { add: clipboard.toast },
+  stackedThreadToast: (value: unknown) => value,
+}));
 vi.mock("~/hooks/useSettings", () => ({
   useClientSettings: (select: (value: { wordWrap: boolean }) => unknown) => select(settings),
   useUpdateClientSettings: () => settings.update,
@@ -42,11 +60,8 @@ vi.mock("~/assets/assetUrls", () => ({
   useAssetUrlState: () => ({ _tag: "Success", url: "https://environment.test/document" }),
 }));
 vi.mock("./projectFilesQueryState", () => ({
-  useProjectFileQuery: () => ({
-    data: { contents: "# Document\n\nPreview contents", truncated: false },
-    error: null,
-    isNotFile: false,
-  }),
+  useProjectFileQuery: () => fileState,
+  getProjectFileContents: () => fileState.data?.contents,
 }));
 vi.mock("./useFileSaveCoordinator", () => ({
   useFileSaveCoordinator: () => ({ change: vi.fn() }),
@@ -74,7 +89,7 @@ vi.mock("~/components/ui/scroll-area", () => ({
   ScrollArea: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
 
-describe("workspace preview word wrap", () => {
+describe("workspace preview toolbar", () => {
   let host: HTMLDivElement;
   let root: Root;
 
@@ -83,6 +98,15 @@ describe("workspace preview word wrap", () => {
     localStorage.clear();
     localStorage.setItem("t3code.renderMarkdown", "true");
     settings.wordWrap = false;
+    fileState.data = { contents: "# Document\n\nPreview contents", truncated: false };
+    fileState.error = null;
+    fileState.isPending = false;
+    clipboard.writeText.mockReset().mockResolvedValue(undefined);
+    clipboard.toast.mockReset();
+    vi.stubGlobal(
+      "navigator",
+      Object.create(navigator, { clipboard: { value: { writeText: clipboard.writeText } } }),
+    );
     settings.update.mockReset().mockImplementation((patch) => {
       settings.wordWrap = patch.wordWrap;
     });
@@ -130,6 +154,64 @@ describe("workspace preview word wrap", () => {
     if (!button) throw new Error("Word wrap action was not rendered");
     return button;
   }
+
+  /** Finds a live command by its accessible name; clicking exercises its real disabled behavior. */
+  function copyButton(): HTMLButtonElement {
+    const button = host.querySelector<HTMLButtonElement>(
+      `button[aria-label="${t.tools.files.copyContents}"]`,
+    );
+    if (!button) throw new Error("Copy action was not rendered");
+    return button;
+  }
+
+  it("copies the current text after an update and reports success", async () => {
+    await openFile("README.md");
+    fileState.data = { contents: "Updated text\nwith a second line", truncated: false };
+    await openFile("README.md");
+    await act(() => copyButton().click());
+    expect(clipboard.writeText).toHaveBeenCalledExactlyOnceWith("Updated text\nwith a second line");
+    expect(clipboard.toast).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "success", title: t.tools.files.copied }),
+    );
+    expect(host.querySelector('button[aria-label="Save file"]')).toBeNull();
+  });
+
+  it("reports a clipboard failure without a success toast", async () => {
+    clipboard.writeText.mockRejectedValue(new Error("Clipboard denied"));
+    await openFile("README.md");
+    await act(() => copyButton().click());
+    expect(clipboard.toast).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ type: "error" }),
+    );
+  });
+
+  it.each([
+    { name: "loading", path: "README.md", contents: "Stale contents", pending: true, error: null },
+    {
+      name: "failed read",
+      path: "README.md",
+      contents: "Stale contents",
+      pending: false,
+      error: "Read failed",
+    },
+    { name: "binary", path: "data.bin", contents: null, pending: false, error: "Binary file" },
+    { name: "image", path: "image.png", contents: "Not text", pending: false, error: null },
+    { name: "empty text", path: "empty.txt", contents: "", pending: false, error: null },
+  ])(
+    "does not copy when $name has no available text",
+    async ({ path, contents, pending, error }) => {
+      await openFile("README.md");
+      expect(copyButton().disabled).toBe(false);
+      fileState.data = contents === null ? null : { contents, truncated: false };
+      fileState.isPending = pending;
+      fileState.error = error;
+      await openFile(path);
+      expect(copyButton().disabled).toBe(true);
+      await act(() => copyButton().click());
+      expect(clipboard.writeText).not.toHaveBeenCalled();
+      expect(clipboard.toast).not.toHaveBeenCalled();
+    },
+  );
 
   it.each(["README.md", "data.csv", "page.html", "document.pdf"])(
     "keeps word wrap disabled without writing settings in rendered %s",
