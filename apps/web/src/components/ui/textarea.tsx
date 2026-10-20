@@ -31,6 +31,9 @@ function Textarea({ className, size = "default", unstyled = false, ...props }: T
     props,
   );
 
+  // The fieldset ancestor rule also styles controls in its first legend as disabled.
+  // No current repository callers use that combination. If needed, use per-control
+  // disabled props instead of disabling the fieldset to preserve the legend exception.
   return (
     <span
       className={
