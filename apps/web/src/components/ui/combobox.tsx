@@ -169,7 +169,9 @@ function ComboboxTrigger({ className, children, ...props }: ComboboxPrimitive.Tr
 
 /**
  * Portal a glass list surface at an explicit anchor or the multi-select chip anchor.
- * Glass and content share Popup transition state; property order preserves the opacity timing.
+ * Merging glass into Popup keeps the settled appearance, but physics-on entry (120ms)
+ * now applies opacity once instead of multiplying two layers, and scales the material
+ * with the content from scale-98. This accepted motion difference keeps one glass surface.
  * Default to bottom/start with a 4px side offset; forward remaining props to Base UI's popup.
  */
 function ComboboxPopup({

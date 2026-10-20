@@ -107,7 +107,9 @@ function AutocompleteInput({
 
 /**
  * Portal a list surface at the supplied anchor; glass owns material and elevation.
- * Glass and content share Popup transition state; property order preserves the opacity timing.
+ * Merging glass into Popup keeps the settled appearance, but physics-on entry (120ms)
+ * now applies opacity once instead of multiplying two layers, and scales the material
+ * with the content from scale-98. This accepted motion difference keeps one glass surface.
  * Position defaults to bottom/start with a 4px side offset. Forward remaining props to Base UI's popup.
  */
 function AutocompletePopup({
