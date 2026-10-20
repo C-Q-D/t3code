@@ -1,3 +1,4 @@
+/** Collapses settings content with either an enclosing card or a separate card below its header. */
 import { SettingsGroup } from "./SettingsGroup";
 import { ChevronRightIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
@@ -59,7 +60,7 @@ export function FoldedSettingsSection({
               </h2>
               {control}
             </div>
-            <CollapsiblePanel>
+            <CollapsiblePanel surface="card">
               <SettingsGroup>{children}</SettingsGroup>
             </CollapsiblePanel>
           </div>
