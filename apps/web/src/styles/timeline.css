@@ -588,7 +588,7 @@ html[data-theme-id="graphite"] .chat-message-canvas [data-changed-files-state="t
 }
 
 /* Keep list props and header height stable when banners toggle; only suppress the visual fade. */
-.chat-banner-lane:has(.timeline-status-stack:not(:empty)) + div .topbar-scroll-fade {
+.chat-banner-lane + div[data-banners-visible="true"] .topbar-scroll-fade {
   mask-image: none;
   -webkit-mask-image: none;
 }

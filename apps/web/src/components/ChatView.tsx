@@ -7994,6 +7994,12 @@ export default function ChatView(props: ChatViewProps) {
     () => partitionTimelineBanners(chatBannerItems),
     [chatBannerItems],
   );
+  // Provider visibility already uses its banner's null predicate; errors require nonempty text.
+  const hasTimelineBanners =
+    visibleProviderStatus !== null ||
+    Boolean(timelineThreadError) ||
+    timelineBannerItems.length > 0 ||
+    (!paintOnlyDisplayedTimeline && threadStatusLine !== null);
 
   useEffect(() => {
     setPendingServerThreadEnvMode(null);
@@ -11520,7 +11526,10 @@ export default function ChatView(props: ChatViewProps) {
               </TimelineStatusBanners>
             </div>
             {/* Messages Wrapper */}
-            <div className="chat-message-canvas relative flex min-h-0 flex-1 flex-col bg-background">
+            <div
+              className="chat-message-canvas relative flex min-h-0 flex-1 flex-col bg-background"
+              data-banners-visible={hasTimelineBanners ? "true" : "false"}
+            >
               {/* Messages — LegendList handles virtualization and scrolling internally */}
               <MessagesTimeline
                 citationRequest={paintOnlyDisplayedTimeline ? null : citationRequest}
