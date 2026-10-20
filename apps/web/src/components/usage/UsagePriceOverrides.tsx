@@ -5,7 +5,7 @@ import { AuthSettingsWriteScope, type EnvironmentId, sessionGrantsScope } from "
 import { ChevronDownIcon, PlusIcon, RotateCcwIcon, XIcon } from "lucide-react";
 import * as Option from "effect/Option";
 import { AsyncResult, Atom } from "effect/reactivity";
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 
 import { cn } from "../../lib/utils";
 import { environmentPresentations } from "../../state/presentation";
@@ -639,7 +639,7 @@ export function UsagePriceOverrides({
   );
 }
 
-/** Read-only M1 price table for selected environments; every row opens the existing editor without writing settings. */
+/** Initially collapsed price summary; local expansion reveals the existing table and editor entry points without writing settings. */
 export function UsagePriceSummary({
   selectedEnvironmentIds,
   onEditModel,
@@ -647,6 +647,8 @@ export function UsagePriceSummary({
   readonly selectedEnvironmentIds: ReadonlySet<EnvironmentId> | null;
   readonly onEditModel: (model?: string) => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const bodyId = useId();
   const environments = useAtomValue(priceTargetsAtom);
   const selected = environments.filter(
     (environment) =>
@@ -655,89 +657,106 @@ export function UsagePriceSummary({
   const models = customPriceModels(selected);
   return (
     <section className="flex min-w-0 flex-col gap-2.5">
-      <div className="flex flex-wrap items-baseline gap-2.5">
-        <h2 className="font-serif text-plan-title font-bold">{t.tools.usage.customPrices}</h2>
+      <button
+        type="button"
+        className="usage-price-toggle"
+        aria-expanded={expanded}
+        aria-controls={bodyId}
+        onClick={() => setExpanded((previous) => !previous)}
+      >
+        <span className="font-serif text-plan-title font-bold">{t.tools.usage.customPrices}</span>
         <span className="text-secondary-copy text-muted-foreground">{t.tools.usage.priceUnit}</span>
-        <div className="ml-auto">
+        <span className="text-secondary-copy text-muted-foreground">
+          {models.length === 0
+            ? t.tools.usage.splitPricesUnset
+            : t.tools.usage.splitPricesCount(models.length)}
+        </span>
+        <span className="usage-price-toggle-action">
+          {expanded ? t.tools.usage.splitCollapse : t.tools.usage.splitExpand}
+          <ChevronDownIcon size={14} aria-hidden="true" />
+        </span>
+      </button>
+      <div id={bodyId} hidden={!expanded}>
+        <div className="mb-2 flex justify-end">
           <Button variant="ghost" size="compact" onClick={() => onEditModel()}>
             {t.tools.usage.modelPrices}
           </Button>
         </div>
-      </div>
-      <div className="min-w-0 overflow-x-auto rounded-card-row bg-usage-table-well shadow-usage-table">
-        <table className="w-full min-w-160 table-fixed text-secondary-copy-large">
-          <colgroup>
-            <col className="w-4/17" />
-            <col className="w-3/17" />
-            {PRICE_COLUMNS.map((field) => (
-              <col key={field.key} />
-            ))}
-          </colgroup>
-          <thead className="bg-usage-table-header">
-            <tr>
-              <th className="px-3.5 py-2.5 text-left font-bold">{t.tools.usage.modelId}</th>
-              <th className="px-3.5 py-2.5 text-left font-bold">{t.tools.usage.mapTo}</th>
+        <div className="min-w-0 overflow-x-auto rounded-card-row bg-usage-table-well shadow-usage-table">
+          <table className="w-full min-w-160 table-fixed text-secondary-copy-large">
+            <colgroup>
+              <col className="w-4/17" />
+              <col className="w-3/17" />
               {PRICE_COLUMNS.map((field) => (
-                <th key={field.key} className="px-3.5 py-2.5 text-right font-bold">
-                  {field.key === "inputCostPerMillionTokens"
-                    ? t.tools.usage.inputPrice
-                    : field.label}
-                </th>
+                <col key={field.key} />
               ))}
-            </tr>
-          </thead>
-          <tbody>
-            {models.length === 0 ? (
+            </colgroup>
+            <thead className="bg-usage-table-header">
               <tr>
-                <td colSpan={6} className="px-3.5 py-2.25 text-muted-foreground">
-                  {selected.some((target) => target.prices === null)
-                    ? t.tools.usage.somePricesUnavailable
-                    : t.tools.usage.noCustomPrices}
-                </td>
+                <th className="px-3.5 py-2.5 text-left font-bold">{t.tools.usage.modelId}</th>
+                <th className="px-3.5 py-2.5 text-left font-bold">{t.tools.usage.mapTo}</th>
+                {PRICE_COLUMNS.map((field) => (
+                  <th key={field.key} className="px-3.5 py-2.5 text-right font-bold">
+                    {field.key === "inputCostPerMillionTokens"
+                      ? t.tools.usage.inputPrice
+                      : field.label}
+                  </th>
+                ))}
               </tr>
-            ) : (
-              models.map((model) => {
-                const alias = usageAliasCell(selected, model);
-                return (
-                  <tr
-                    key={model}
-                    className="relative border-t border-usage-row-divider hover:bg-secondary focus-within:bg-secondary"
-                  >
-                    <td className="px-3.5 py-2.25 font-mono text-secondary-copy">
-                      <button
-                        type="button"
-                        className="block w-full truncate text-left outline-none after:absolute after:inset-0"
-                        onClick={() => onEditModel(model)}
-                      >
-                        {model}
-                      </button>
-                    </td>
-                    <td className="truncate px-3.5 py-2.25">
-                      {alias.value ||
-                        (alias.placeholder === t.tools.usage.none ? "—" : alias.placeholder)}
-                    </td>
-                    {PRICE_COLUMNS.map((field) => {
-                      const cell = usagePriceCell(selected, model, field.key);
-                      return (
-                        <td
-                          key={field.key}
-                          className="px-3.5 py-2.25 text-right font-mono text-secondary-copy tabular-nums"
+            </thead>
+            <tbody>
+              {models.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-3.5 py-2.25 text-muted-foreground">
+                    {selected.some((target) => target.prices === null)
+                      ? t.tools.usage.somePricesUnavailable
+                      : t.tools.usage.noCustomPrices}
+                  </td>
+                </tr>
+              ) : (
+                models.map((model) => {
+                  const alias = usageAliasCell(selected, model);
+                  return (
+                    <tr
+                      key={model}
+                      className="relative border-t border-usage-row-divider hover:bg-secondary focus-within:bg-secondary"
+                    >
+                      <td className="px-3.5 py-2.25 font-mono text-secondary-copy">
+                        <button
+                          type="button"
+                          className="block w-full truncate text-left outline-none after:absolute after:inset-0"
+                          onClick={() => onEditModel(model)}
                         >
-                          {cell.value !== ""
-                            ? Number(cell.value).toFixed(2)
-                            : cell.placeholder === t.tools.usage.mixed ||
-                                cell.placeholder === t.tools.usage.unavailable
-                              ? cell.placeholder
-                              : "—"}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+                          {model}
+                        </button>
+                      </td>
+                      <td className="truncate px-3.5 py-2.25">
+                        {alias.value ||
+                          (alias.placeholder === t.tools.usage.none ? "—" : alias.placeholder)}
+                      </td>
+                      {PRICE_COLUMNS.map((field) => {
+                        const cell = usagePriceCell(selected, model, field.key);
+                        return (
+                          <td
+                            key={field.key}
+                            className="px-3.5 py-2.25 text-right font-mono text-secondary-copy tabular-nums"
+                          >
+                            {cell.value !== ""
+                              ? Number(cell.value).toFixed(2)
+                              : cell.placeholder === t.tools.usage.mixed ||
+                                  cell.placeholder === t.tools.usage.unavailable
+                                ? cell.placeholder
+                                : "—"}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
   );

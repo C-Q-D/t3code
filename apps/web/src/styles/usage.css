@@ -319,3 +319,31 @@ html[data-theme-id="graphite"] .usage-chart-surface {
     padding: 18px;
   }
 }
+
+/* L5 locally controlled price disclosure. */
+.usage-price-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 0;
+  text-align: left;
+  cursor: pointer;
+}
+.usage-price-toggle:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+.usage-price-toggle-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.usage-price-toggle[aria-expanded="true"] .usage-price-toggle-action svg {
+  transform: rotate(180deg);
+}
