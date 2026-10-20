@@ -204,6 +204,26 @@ export function AddManagedCodexAccountDialog({
   );
 }
 
+/**
+ * Coordinates managed Codex installation, ChatGPT sign-in and account handoff,
+ * displaying query and command failures in the selected setup presentation.
+ *
+ * @param props.environmentId Environment that owns the provider and setup commands.
+ * @param props.instanceId Provider instance whose installation and auth state are observed.
+ * @param props.provider Latest provider snapshot; may be absent while loading.
+ * @param props.enabled Whether this provider is enabled for setup.
+ * @param props.readOnly Disables setup mutations when true; omitted permits editing.
+ * @param props.onModeChange Requests a switch to the existing CLI setup path.
+ * @param props.autoStart Requests one automatic setup attempt once prerequisites are ready.
+ * @param props.onAutoStartConsumed Notifies the caller when that automatic attempt starts.
+ * @param props.allowExistingCli Shows the existing CLI alternative when eligible; defaults to true.
+ * @param props.presentation Selects the welcome card for onboarding; otherwise renders settings rows.
+ * @param props.displayName Optional welcome title override, falling back to the provider name or Codex.
+ * @param props.onSignInCancelled Optional callback after the settings sign-in cancellation is requested.
+ * @returns Setup controls and status. Onboarding derives controlsStack from the
+ * rendered button branches: buttons stack on narrow screens, while status-only
+ * controls stay inline; the welcome card restores the row layout at the sm breakpoint.
+ */
 function ManagedCodexSetup({
   environmentId,
   instanceId,
