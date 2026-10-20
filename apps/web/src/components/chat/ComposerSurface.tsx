@@ -3,6 +3,8 @@ import type { ComponentProps } from "react";
 
 import { cn } from "~/lib/utils";
 import { createPresenceRegistry } from "~/lib/presenceRegistry";
+import { PhysicalComposer } from "./physicalComposer/PhysicalComposer";
+import "./physicalComposer/physicalComposer.css";
 
 /** Shares attached banner presence between the shell and its descendant surfaces. */
 export const ComposerShellRegistry = createPresenceRegistry<"attached">();
@@ -41,17 +43,17 @@ function Host({ className, ...props }: ComponentProps<"div">) {
   );
 }
 
-/** Paints the raised E1 input; surface-glass keeps the existing opacity preference. */
-function Main({ className, ...props }: ComponentProps<"div">) {
+/** Hosts the physical keycap surface while keeping editor, toolbar and throw-feedback geometry intact. */
+function Main({ className, children, ...props }: ComponentProps<"div">) {
   return (
     <div
       data-chat-composer-main-surface="true"
-      className={cn(
-        "surface-glass group relative z-10 rounded-composer shadow-raise-detail edge-glow",
-        className,
-      )}
+      data-physical-composer-surface=""
+      className={cn("group relative z-10 rounded-composer", className)}
       {...props}
-    />
+    >
+      <PhysicalComposer>{children}</PhysicalComposer>
+    </div>
   );
 }
 

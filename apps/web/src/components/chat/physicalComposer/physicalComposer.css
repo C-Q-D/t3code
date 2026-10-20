@@ -2,3 +2,25 @@
 ::highlight(physical-composer-glyph) {
   color: transparent;
 }
+
+/* The SVG owns the moving face and border. Keep the existing graphite opacity preference. */
+[data-physical-composer-surface] {
+  --physical-composer-ink: #16181d;
+  --physical-composer-face: color-mix(
+    in srgb,
+    var(--chat-composer-glass-surface, #28282c)
+      max(var(--glass-opacity, 100%), var(--chat-composer-min-opacity, 85%)),
+    transparent
+  );
+  --physical-composer-cap: #17181c;
+  box-shadow: 0 10px 18px rgb(22 24 29 / 12%);
+}
+
+html.dark [data-physical-composer-surface] {
+  --physical-composer-ink: #fff;
+}
+
+[data-physical-composer-surface] .composer-tiptap {
+  color: var(--physical-composer-ink);
+  caret-color: var(--physical-composer-ink);
+}

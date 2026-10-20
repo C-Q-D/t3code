@@ -123,10 +123,16 @@ import { importPastedComposerText } from "./composerInlineTokenPaste";
 import { didComposerSelectionChangeVisibly } from "./composerSelection";
 import type { ComposerDraftContextRecords } from "./composerContextPresentation";
 import { usePhysicalComposer } from "./chat/physicalComposer/PhysicalComposer";
-import { bindPhysicalRenderer, physicalTypingExtension } from "./chat/physicalComposer/editor";
+import {
+  bindPhysicalRenderer,
+  capturePhysicalSend,
+  physicalTypingExtension,
+} from "./chat/physicalComposer/editor";
 import "./chat/physicalComposer/physicalComposer.css";
 
 export interface ComposerPromptEditorHandle {
+  /** Capture visible text before submission; invoke the returned animation only after acceptance. */
+  capturePhysicalSend: () => (() => void) | null;
   focus: () => void;
   focusAt: (cursor: number) => void;
   focusAtEnd: () => void;
@@ -1723,6 +1729,7 @@ function ComposerPromptEditorTiptapInner(props: ComposerPromptEditorProps) {
   useImperativeHandle(
     editorRef,
     () => ({
+      capturePhysicalSend: () => (editor ? capturePhysicalSend(editor) : null),
       focus: () => {
         focusAt(snapshotRef.current.cursor);
       },

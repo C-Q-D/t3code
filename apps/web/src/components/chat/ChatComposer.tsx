@@ -3710,6 +3710,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         });
         return;
       }
+      const playPhysicalSend = composerEditorRef.current?.capturePhysicalSend();
       const submission = submitComposerDraft({
         prompt: promptRef.current,
         submissionTarget: activePendingProgress ? "pending-user-input" : "provider-turn",
@@ -3736,6 +3737,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         shakeComposer(submission.validationMessage, true);
       }
       if (!submission.didDispatch) return;
+      playPhysicalSend?.();
       onTypingGuardSend();
       if (shouldBlurMobileComposerOnSubmit()) {
         blurMobileComposerAfterSend();

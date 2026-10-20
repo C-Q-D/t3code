@@ -75,7 +75,93 @@ it("uses white dark-mode focus colors while leaving particle hues colored", asyn
   renderer.model.burst(100, 20, 1, 200, 0, 1);
   renderer.pulse(100);
   clock.advance(16);
-  expect(layer.querySelector<HTMLElement>("[data-physical-bit]")?.style.backgroundColor).not.toBe(
-    "rgb(255, 255, 255)",
+  expect(layer.querySelector<HTMLElement>("[data-physical-bit]")?.style.backgroundColor).toBe(
+    "rgb(137, 206, 240)",
   );
+});
+
+it("finishes a long send snapshot within 0.6 seconds while new typing can coexist", () => {
+  const snapshots = Array.from({ length: 30 }, (_, i) => ({
+    text: "字",
+    x: i * 12,
+    y: 20,
+    width: 12,
+    height: 20,
+    font: "16px sans-serif",
+  }));
+  renderer.send(snapshots);
+  expect(layer.querySelectorAll("[data-physical-send]")).toHaveLength(30);
+  renderer.insert(
+    [{ text: "新", x: 20, y: 20, width: 16, height: 20, font: "16px sans-serif" }],
+    new Set([0]),
+  );
+  expect(layer.querySelectorAll("[data-physical-send]")).toHaveLength(30);
+  expect(layer.textContent).toContain("新");
+  for (let time = 0; time <= 610; time += 10) clock.advance(time);
+  expect(layer.querySelectorAll("[data-physical-send]")).toHaveLength(0);
+});
+
+it("makes newline an edge-only wave and keeps short-send staggering at 30ms", () => {
+  renderer.wave();
+  expect(renderer.model.top.v.some((value) => value > 0)).toBe(true);
+  expect(renderer.model.bottom.v.some((value) => value > 0)).toBe(true);
+  expect(renderer.model.bits.some((bit) => bit.active)).toBe(false);
+  expect(layer.querySelectorAll("[data-physical-glyph]")).toHaveLength(0);
+  renderer.send(
+    ["a", "b"].map((text, i) => ({
+      text,
+      x: 20 + i * 10,
+      y: 20,
+      width: 10,
+      height: 20,
+      font: "16px sans-serif",
+    })),
+  );
+  expect(renderer.model.glyphs.map((glyph) => glyph.delay)).toEqual([0.0001, 0.0301]);
+  setPhysicsEnabled(false);
+  expect(layer.querySelectorAll("[data-physical-send]")).toHaveLength(0);
+  expect(activeJobs()).toBe(0);
+});
+
+it("keeps a newly measured falling glyph when auto-height delivers its resize notification", () => {
+  const surface = renderer.surface;
+  renderer.dispose();
+  let deliver: ResizeObserverCallback = () => {};
+  /** Browser resize delivery boundary; observeResize and the renderer remain real. */
+  class TestResizeObserver {
+    /** Capture the platform callback for explicit layout delivery. */
+    constructor(callback: ResizeObserverCallback) {
+      deliver = callback;
+    }
+    /** No native layout engine is present in jsdom. */
+    observe() {}
+    /** Release of an observed element has no platform resource in this fixture. */
+    unobserve() {}
+    /** End the fixture's platform subscription. */
+    disconnect() {}
+  }
+  vi.stubGlobal("ResizeObserver", TestResizeObserver);
+  const geometry = vi
+    .spyOn(surface, "getBoundingClientRect")
+    .mockReturnValue(new DOMRect(0, 0, 768, 110));
+  renderer = new PhysicalComposerRenderer(surface, layer);
+  renderer.insert(
+    [{ text: "字", x: 20, y: 45, width: 16, height: 20, font: "16px sans-serif" }],
+    new Set([0]),
+  );
+  deliver(
+    [
+      {
+        target: surface,
+        contentRect: new DOMRect(0, 0, 768, 110),
+        borderBoxSize: [],
+        contentBoxSize: [],
+        devicePixelContentBoxSize: [],
+      },
+    ],
+    new TestResizeObserver(deliver),
+  );
+  expect(layer.querySelectorAll("[data-physical-glyph]")).toHaveLength(1);
+  expect(renderer.model.glyphs[0]?.y).toBe(-15);
+  geometry.mockRestore();
 });

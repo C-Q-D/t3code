@@ -7,6 +7,7 @@ import type { EditorView } from "@tiptap/pm/view";
 import { isPhysicsEnabled } from "../../../lib/motion/preference";
 import { withComposerImpactLayout } from "../composerImpact";
 import type { GlyphSnapshot, PhysicalComposerRenderer } from "./renderer";
+import type { Glyph } from "./physics";
 
 /** A measured grapheme with ProseMirror offsets; atom nodes are never split into text shadows. */
 interface MeasuredGlyph extends GlyphSnapshot {
@@ -28,6 +29,16 @@ export function bindPhysicalRenderer(editor: Editor, renderer: PhysicalComposerR
       renderers.delete(editor);
     }
   };
+}
+
+/** Capture only visible text before dispatch; invoke the returned animation only after acceptance. */
+export function capturePhysicalSend(editor: Editor) {
+  const renderer = renderers.get(editor);
+  if (!renderer || !isPhysicsEnabled()) return null;
+  const snapshots = measureGlyphs(editor.view, renderer, 0, editor.state.doc.content.size).map(
+    ({ text, x, y, width, height, font }) => ({ text, x, y, width, height, font }),
+  );
+  return () => renderer.send(snapshots);
 }
 
 /** Locate a minimal changed document interval, including insertions before identical suffixes. */
@@ -137,6 +148,7 @@ function hideGlyphs(glyphs: MeasuredGlyph[]): GlyphSnapshot[] | null {
     highlight.add(glyph.range);
     return {
       ...glyph,
+      position: glyph.from,
       restore: () => {
         highlight.delete(glyph.range);
       },
@@ -148,6 +160,7 @@ function hideGlyphs(glyphs: MeasuredGlyph[]): GlyphSnapshot[] | null {
 class PhysicalTypingBridge {
   private intent = "";
   private intentVersion = 0;
+  private removedBeforeInput: { doc: DocumentNode; glyphs: MeasuredGlyph[] } | null = null;
   private composing = false;
   private compositionBase: DocumentNode | null = null;
   private compositionFrom = 0;
@@ -160,6 +173,7 @@ class PhysicalTypingBridge {
     private readonly renderer: () => PhysicalComposerRenderer | null,
   ) {
     view.dom.addEventListener("beforeinput", this.beforeInput, true);
+    view.dom.addEventListener("input", this.afterInput, true);
     view.dom.addEventListener("keydown", this.keyDown, true);
     view.dom.addEventListener("paste", this.paste, true);
     view.dom.addEventListener("compositionstart", this.compositionStart, true);
@@ -167,19 +181,54 @@ class PhysicalTypingBridge {
     view.dom.addEventListener("scroll", this.scroll, true);
   }
 
-  /** Keep intent only within the browser event turn, so a later store rewrite never becomes typing. */
-  private remember(intent: string) {
+  /** Record intent; native edits keep it through the DOM observer delivery after the input event. */
+  private remember(intent: string, native = false) {
     this.intent = intent;
     const version = ++this.intentVersion;
-    queueMicrotask(() => {
-      if (this.intentVersion === version) this.intent = "";
-    });
+    if (!native)
+      queueMicrotask(() => {
+        if (this.intentVersion === version) this.intent = "";
+      });
   }
 
   /** Capture inputType before ProseMirror applies the browser edit. */
   private beforeInput = (event: InputEvent) => {
-    this.remember(event.inputType);
+    this.remember(event.inputType, true);
+    this.captureDeletion();
+    const version = this.intentVersion;
+    queueMicrotask(() => {
+      if (event.defaultPrevented && this.intentVersion === version) this.intent = "";
+    });
   };
+
+  /** Release native intent after the mutation observer queued by the DOM edit has run. */
+  private afterInput = () => {
+    const version = this.intentVersion;
+    queueMicrotask(() => {
+      if (this.intentVersion === version) {
+        this.intent = "";
+        this.removedBeforeInput = null;
+      }
+    });
+  };
+
+  /** Freeze visible old glyph geometry before browser deletion invalidates DOM ranges. */
+  private captureDeletion() {
+    this.removedBeforeInput = null;
+    const renderer = this.renderer();
+    if (!renderer || this.composing || !isPhysicsEnabled() || !this.intent.startsWith("delete"))
+      return;
+    const { from, to, $from, $to, empty } = this.view.state.selection;
+    this.removedBeforeInput = {
+      doc: this.view.state.doc,
+      glyphs: measureGlyphs(
+        this.view,
+        renderer,
+        empty ? $from.start() : from,
+        empty ? $to.end() : to,
+      ),
+    };
+  }
 
   /** Cover desktop deletion paths that ProseMirror handles before native beforeinput fires. */
   private keyDown = (event: KeyboardEvent) => {
@@ -189,8 +238,11 @@ class PhysicalTypingBridge {
         ? "deleteContentBackward"
         : event.key === "Delete"
           ? "deleteContentForward"
-          : "",
+          : event.key === "Enter"
+            ? "newline"
+            : "",
     );
+    this.captureDeletion();
   };
 
   /** Tag paste before the existing application handler dispatches its transaction. */
@@ -237,7 +289,12 @@ class PhysicalTypingBridge {
   }
 
   /** Measure the changed text plus at most three graphemes per side, then hide only those shadows. */
-  private animateInsertion(renderer: PhysicalComposerRenderer, from: number, to: number) {
+  private animateInsertion(
+    renderer: PhysicalComposerRenderer,
+    from: number,
+    to: number,
+    continuing: ReadonlyMap<number, Glyph> = new Map(),
+  ) {
     const around = measureGlyphs(
       this.view,
       renderer,
@@ -250,7 +307,16 @@ class PhysicalTypingBridge {
       this.pulse(renderer, from);
       return;
     }
-    const visible = around.slice(Math.max(0, first - 3), last + 4);
+    const measured = new Map(
+      around.slice(Math.max(0, first - 3), last + 4).map((glyph) => [glyph.from, glyph]),
+    );
+    for (const position of continuing.keys()) {
+      if (!measured.has(position)) {
+        for (const glyph of measureGlyphs(this.view, renderer, position, position + 1))
+          measured.set(glyph.from, glyph);
+      }
+    }
+    const visible = [...measured.values()].sort((a, b) => a.from - b.from);
     const snapshots = hideGlyphs(visible);
     if (!snapshots) {
       this.pulse(renderer, from);
@@ -259,7 +325,7 @@ class PhysicalTypingBridge {
     const changed = new Set(
       visible.flatMap((glyph, index) => (glyph.to > from && glyph.from < to ? [index] : [])),
     );
-    renderer.insert(snapshots, changed);
+    renderer.insert(snapshots, changed, continuing);
   }
 
   /** Measure an insertion boundary under the impact-layout guard and pulse without hiding text. */
@@ -276,10 +342,19 @@ class PhysicalTypingBridge {
     const before = this.view.state.doc;
     const diff = transaction.docChanged ? transactionDifference(transaction) : null;
     const deletion = this.intent.startsWith("delete");
+    const cached = this.removedBeforeInput?.doc === before ? this.removedBeforeInput.glyphs : null;
     const removed =
       renderer && diff && deletion && !this.composing && isPhysicsEnabled()
-        ? measureGlyphs(this.view, renderer, diff.start, diff.oldEnd)
+        ? (cached?.filter((glyph) => glyph.to > diff.start && glyph.from < diff.oldEnd) ??
+          measureGlyphs(this.view, renderer, diff.start, diff.oldEnd))
         : [];
+    const continuing =
+      renderer && this.intent === "insertText" && !this.composing
+        ? renderer.captureMotion((position) => {
+            const mapped = transaction.mapping.mapResult(position, 1);
+            return mapped.deleted ? null : mapped.pos;
+          })
+        : new Map<number, Glyph>();
     if (transaction.docChanged) renderer?.clearGlyphs();
     next(transaction);
     if (!renderer || !diff || this.composing || !isPhysicsEnabled()) return;
@@ -289,6 +364,17 @@ class PhysicalTypingBridge {
     }
     if (deletion) {
       renderer.remove(removed);
+      this.intent = "";
+      this.removedBeforeInput = null;
+      return;
+    }
+    if (
+      this.intent === "newline" ||
+      this.intent === "insertParagraph" ||
+      this.intent === "insertLineBreak"
+    ) {
+      renderer.wave();
+      this.intent = "";
       return;
     }
     const finalDiff = transaction.doc.eq(this.view.state.doc)
@@ -308,7 +394,7 @@ class PhysicalTypingBridge {
       !inserted.includes("\uFFFC") &&
       inserted !== "\n"
     ) {
-      this.animateInsertion(renderer, finalDiff.newStart, finalDiff.newEnd);
+      this.animateInsertion(renderer, finalDiff.newStart, finalDiff.newEnd, continuing);
     } else this.pulse(renderer, finalDiff.newStart);
     this.intent = "";
   }
@@ -318,6 +404,7 @@ class PhysicalTypingBridge {
     this.disposed = true;
     this.renderer()?.clearGlyphs();
     this.view.dom.removeEventListener("beforeinput", this.beforeInput, true);
+    this.view.dom.removeEventListener("input", this.afterInput, true);
     this.view.dom.removeEventListener("keydown", this.keyDown, true);
     this.view.dom.removeEventListener("paste", this.paste, true);
     this.view.dom.removeEventListener("compositionstart", this.compositionStart, true);

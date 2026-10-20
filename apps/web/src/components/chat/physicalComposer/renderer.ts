@@ -20,6 +20,7 @@ export interface GlyphSnapshot {
   width: number;
   height: number;
   font: string;
+  position?: number;
   restore?: () => void;
 }
 
@@ -50,6 +51,7 @@ export class PhysicalComposerRenderer {
   private readonly gradient = svgElement("linearGradient");
   private readonly stops = Array.from({ length: 4 }, () => svgElement("stop"));
   private readonly glyphLayer = document.createElement("div");
+  private readonly sentLayer = document.createElement("div");
   private readonly particleLayer = document.createElement("div");
   private readonly particleNodes: HTMLSpanElement[] = [];
   private readonly thermometers = new Set<HTMLElement>();
@@ -80,6 +82,7 @@ export class PhysicalComposerRenderer {
       zIndex: "-1",
     });
     Object.assign(this.glyphLayer.style, { position: "absolute", inset: "0", zIndex: "2" });
+    Object.assign(this.sentLayer.style, { position: "absolute", inset: "0", zIndex: "2" });
     Object.assign(this.particleLayer.style, { position: "absolute", inset: "0", zIndex: "3" });
     const id = `physical-composer-gradient-${nextGradient++}`;
     this.gradient.id = id;
@@ -112,7 +115,7 @@ export class PhysicalComposerRenderer {
       this.particleNodes.push(node);
       this.particleLayer.append(node);
     }
-    layer.append(this.svg, this.glyphLayer, this.particleLayer);
+    layer.append(this.svg, this.glyphLayer, this.sentLayer, this.particleLayer);
     this.unsubscribe = onPhysicsChange((enabled) => {
       if (!enabled) this.stop();
     });
@@ -122,8 +125,10 @@ export class PhysicalComposerRenderer {
       attributeFilter: ["class"],
     });
     this.unobserveResize = observeResize(surface, () => {
-      this.clearGlyphs();
+      const previousWidth = this.model.width;
       this.measure();
+      // A width change can reflow old snapshots. Auto-height was already measured by insert().
+      if (previousWidth !== this.model.width) this.clearGlyphs();
       this.render();
     });
     surface.addEventListener("focusin", this.onFocus);
@@ -161,7 +166,11 @@ export class PhysicalComposerRenderer {
   };
 
   /** Animate visible inserted graphemes; neighbor snapshots receive only the landing impulse. */
-  insert(snapshots: GlyphSnapshot[], changed: ReadonlySet<number>) {
+  insert(
+    snapshots: GlyphSnapshot[],
+    changed: ReadonlySet<number>,
+    continuing: ReadonlyMap<number, Glyph> = new Map(),
+  ) {
     this.clearGlyphs();
     if (!isPhysicsEnabled() || this.disposed) {
       snapshots.forEach((snapshot) => snapshot.restore?.());
@@ -169,13 +178,19 @@ export class PhysicalComposerRenderer {
     }
     this.measure();
     for (const [index, snapshot] of snapshots.entries()) {
-      const glyph = createGlyph(
-        snapshot.x + snapshot.width / 2,
-        snapshot.y + snapshot.height,
-        this.model.config,
-      );
+      const previous =
+        snapshot.position === undefined ? undefined : continuing.get(snapshot.position);
+      const glyph =
+        previous ??
+        createGlyph(
+          snapshot.x + snapshot.width / 2,
+          snapshot.y + snapshot.height,
+          this.model.config,
+        );
+      glyph.x = snapshot.x + snapshot.width / 2;
+      glyph.yBase = snapshot.y + snapshot.height;
       if (changed.has(index)) glyph.r = (this.model.random() - 0.5) * 24 * this.model.config.wobble;
-      else {
+      else if (!previous) {
         glyph.y = 0;
         glyph.s = 1;
         glyph.landed = true;
@@ -184,6 +199,22 @@ export class PhysicalComposerRenderer {
     }
     this.model.warm(changed.size);
     this.start();
+  }
+
+  /** Preserve ongoing springs across a document edit; deleted positions return null and are omitted. */
+  captureMotion(mapPosition: (position: number) => number | null) {
+    const continuing = new Map<number, Glyph>();
+    for (const shadow of this.shadows) {
+      if (
+        shadow.sendDelay !== null ||
+        shadow.snapshot.position === undefined ||
+        glyphResting(shadow.glyph)
+      )
+        continue;
+      const next = mapPosition(shadow.snapshot.position);
+      if (next !== null) continuing.set(next, shadow.glyph);
+    }
+    return continuing;
   }
 
   /** Add a decorative glyph without ever moving or replacing the editor's text nodes. */
@@ -199,19 +230,28 @@ export class PhysicalComposerRenderer {
       font: snapshot.font,
       transformOrigin: "50% 100%",
     });
-    this.glyphLayer.append(node);
+    if (sendDelay !== null) {
+      node.dataset.physicalSend = "";
+      this.sentLayer.append(node);
+    } else this.glyphLayer.append(node);
     this.shadows.push({ node, glyph, snapshot, age: 0, sendDelay });
     this.model.glyphs.push(glyph);
   }
 
   /** Release all shadow ranges before document replacement, scrolling or a new measurement. */
-  clearGlyphs() {
-    for (const shadow of this.shadows) {
-      shadow.snapshot.restore?.();
-      shadow.node.remove();
+  clearGlyphs(includeSent = false) {
+    for (let index = this.shadows.length - 1; index >= 0; index--) {
+      if (includeSent || this.shadows[index]!.sendDelay === null) this.releaseShadow(index);
     }
-    this.shadows.length = 0;
-    this.model.glyphs.length = 0;
+  }
+
+  /** Release one shadow and its spring together, preserving index alignment for remaining glyphs. */
+  private releaseShadow(index: number) {
+    const shadow = this.shadows[index]!;
+    shadow.snapshot.restore?.();
+    shadow.node.remove();
+    this.shadows.splice(index, 1);
+    this.model.glyphs.splice(index, 1);
   }
 
   /** Clip text shadows to the editor's visible rectangle, in surface coordinates. */
@@ -250,6 +290,47 @@ export class PhysicalComposerRenderer {
     this.start();
   }
 
+  /** Animate a detached send snapshot; the caller retains sole ownership of actual submission. */
+  send(snapshots: GlyphSnapshot[]) {
+    if (!isPhysicsEnabled() || this.disposed) return;
+    this.clearGlyphs();
+    const ordered = [...snapshots].sort((a, b) => a.y - b.y || a.x - b.x);
+    const interval = ordered.length > 20 ? 0.349 / Math.max(1, ordered.length - 1) : 0.03;
+    ordered.forEach((snapshot, index) => {
+      const glyph = createGlyph(
+        snapshot.x + snapshot.width / 2,
+        snapshot.y + snapshot.height,
+        this.model.config,
+      );
+      glyph.y = 0;
+      glyph.s = 1;
+      glyph.landed = true;
+      glyph.delay = 0.0001 + index * interval;
+      glyph.pending = -240;
+      this.addShadow(snapshot, glyph, glyph.delay);
+      this.model.burst(
+        glyph.x,
+        glyph.yBase,
+        Math.round(3 * this.model.config.confetti),
+        null,
+        0,
+        1.15,
+      );
+    });
+    this.model.heat = Math.min(1, this.model.heat + 0.15 * this.model.config.heatPerKey);
+    this.wave();
+  }
+
+  /** Strike both edges from the left for newline and submission gestures. */
+  wave() {
+    if (!isPhysicsEnabled() || this.disposed) return;
+    this.measure();
+    const x = this.model.radius + 30;
+    this.model.impulse(this.model.top, x, 450 * this.model.config.wobble, 3);
+    this.model.impulse(this.model.bottom, x, 450 * this.model.config.wobble, 3);
+    this.start();
+  }
+
   /** Bind a toolbar fill element; updates use transform/opacity and cleanup leaves it static. */
   thermometer(element: HTMLElement) {
     this.thermometers.add(element);
@@ -265,6 +346,12 @@ export class PhysicalComposerRenderer {
     if (this.cancel) return;
     this.cancel = run((dt) => {
       this.model.step(Math.min(dt, 1 / 30));
+      for (let index = this.shadows.length - 1; index >= 0; index--) {
+        const shadow = this.shadows[index]!;
+        shadow.age += Math.min(dt, 1 / 30);
+        if (shadow.sendDelay !== null && shadow.age >= shadow.sendDelay + 0.25)
+          this.releaseShadow(index);
+      }
       if (this.model.glyphs.every(glyphResting)) this.clearGlyphs();
       if (this.model.resting()) {
         this.cancel = undefined;
@@ -310,9 +397,13 @@ export class PhysicalComposerRenderer {
       this.focused ? `url(#${this.gradient.id})` : this.dark ? "#555861" : "#D5DAE1",
     );
     this.face.setAttribute("stroke-width", this.focused ? "2" : "1");
-    for (const { node, glyph } of this.shadows) {
+    for (const { node, glyph, sendDelay, age } of this.shadows) {
       const stretch = squash(glyph.vy);
       node.style.color = this.dark ? "#FFFFFF" : "#16181D";
+      node.style.opacity =
+        sendDelay === null
+          ? "1"
+          : String(Math.min(1, Math.max(0, (sendDelay + 0.25 - age) / 0.17)));
       node.style.transform = `translateY(${glyph.y + this.model.ride(glyph.x)}px) rotate(${glyph.r}deg) scale(${glyph.s * (1 - stretch * 0.6)},${glyph.s * (1 + stretch)})`;
     }
     for (const [index, bit] of this.model.bits.entries()) {
@@ -335,7 +426,7 @@ export class PhysicalComposerRenderer {
   private stop() {
     this.cancel?.();
     this.cancel = undefined;
-    this.clearGlyphs();
+    this.clearGlyphs(true);
     this.model.reset();
     this.render();
   }

@@ -19,6 +19,7 @@ import { Spinner } from "../ui/spinner";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { ComposerSubmissionStateContext } from "./composerSubmissionState";
 import { getComposerSubmissionState } from "./composerSubmissionState.logic";
+import { ComposerThermometer } from "./physicalComposer/PhysicalComposer";
 import {
   alternateComposerDispatchAction,
   resolveComposerDispatchMode,
@@ -384,10 +385,13 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
   );
 
   const submit = (
-    <Tooltip key="submit">
-      <TooltipTrigger render={<span className="inline-flex" />}>{sendButton}</TooltipTrigger>
-      <TooltipPopup>{submitTooltip}</TooltipPopup>
-    </Tooltip>
+    <span className="inline-flex items-center gap-2">
+      <ComposerThermometer />
+      <Tooltip key="submit">
+        <TooltipTrigger render={<span className="inline-flex" />}>{sendButton}</TooltipTrigger>
+        <TooltipPopup>{submitTooltip}</TooltipPopup>
+      </Tooltip>
+    </span>
   );
   if (compactTokens === null) return submit;
 

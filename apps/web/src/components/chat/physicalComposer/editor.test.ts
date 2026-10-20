@@ -3,7 +3,7 @@
 import { Editor } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
-import { bindPhysicalRenderer, physicalTypingExtension } from "./editor";
+import { bindPhysicalRenderer, capturePhysicalSend, physicalTypingExtension } from "./editor";
 import { PhysicalComposerRenderer } from "./renderer";
 import { setPhysicsEnabled } from "../../../lib/motion/preference";
 import { installTestRaf } from "../../../lib/motion/testRaf";
@@ -13,11 +13,12 @@ let renderer: PhysicalComposerRenderer;
 let surface: HTMLDivElement;
 let layer: HTMLDivElement;
 let highlights: Map<string, Set<Range>>;
+let clock: ReturnType<typeof installTestRaf>;
 const originalRangeRect = Object.getOwnPropertyDescriptor(Range.prototype, "getBoundingClientRect");
 const originalRangeRects = Object.getOwnPropertyDescriptor(Range.prototype, "getClientRects");
 
 beforeEach(() => {
-  installTestRaf();
+  clock = installTestRaf();
   setPhysicsEnabled(true);
   highlights = new Map();
   vi.stubGlobal("CSS", { highlights });
@@ -169,4 +170,58 @@ it("lands an IME commit at its composition anchor beside identical text", async 
   expect(renderer.model.glyphs.filter((glyph) => glyph.y < 0).map((glyph) => glyph.x)).toEqual([
     45,
   ]);
+});
+
+it("keeps a sent snapshot independent from immediate editor clearing and the next input", () => {
+  const play = capturePhysicalSend(editor);
+  editor.commands.clearContent();
+  expect(editor.getText()).toBe("");
+  play?.();
+  input("insertText", "新", 1);
+  expect(editor.getText()).toBe("新");
+  expect(
+    [...layer.querySelectorAll("[data-physical-send]")].map((node) => node.textContent).join(""),
+  ).toBe("abcd");
+});
+
+it("keeps typing intent until ProseMirror observes the native DOM mutation", async () => {
+  editor.commands.setTextSelection(3);
+  editor.view.dom.dispatchEvent(
+    new InputEvent("beforeinput", { inputType: "insertText", data: "X", bubbles: true }),
+  );
+  const text = editor.view.dom.querySelector("p")!.firstChild!;
+  text.textContent = "abXcd";
+  editor.view.dom.dispatchEvent(
+    new InputEvent("input", { inputType: "insertText", data: "X", bubbles: true }),
+  );
+  await Promise.resolve();
+  expect(editor.getText()).toBe("abXcd");
+  expect(
+    [...layer.querySelectorAll("[data-physical-glyph]")].map((node) => node.textContent),
+  ).toContain("X");
+});
+
+it("captures the last deleted glyph before native DOM removal changes its range", async () => {
+  editor.commands.setTextSelection(5);
+  editor.view.dom.dispatchEvent(
+    new InputEvent("beforeinput", { inputType: "deleteContentBackward", bubbles: true }),
+  );
+  editor.view.dom.querySelector("p")!.firstChild!.textContent = "abc";
+  editor.view.dom.dispatchEvent(
+    new InputEvent("input", { inputType: "deleteContentBackward", bubbles: true }),
+  );
+  await Promise.resolve();
+  expect(editor.getText()).toBe("abc");
+  expect(renderer.model.bits.filter((bit) => bit.active)).toHaveLength(7);
+});
+
+it("keeps the previous falling glyph in motion when another character is typed", () => {
+  input("insertText", "X", 3);
+  clock.advance(16);
+  expect(renderer.model.glyphs.find((glyph) => glyph.x === 45)?.y).toBeLessThan(0);
+  input("insertText", "Y", 4);
+  expect(editor.getText()).toBe("abXYcd");
+  expect(renderer.model.glyphs.find((glyph) => glyph.x === 45)?.y).toBeLessThan(0);
+  for (let time = 32; time <= 640; time += 16) clock.advance(time);
+  expect(renderer.model.bits.filter((bit) => bit.active)).toHaveLength(6);
 });
