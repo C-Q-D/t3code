@@ -20,7 +20,7 @@ import * as NodeEvents from "node:events";
 import { vi } from "vite-plus/test";
 
 vi.mock("electron", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("electron")>()),
+  ...(await importOriginal<typeof Electron>()),
   session: {
     fromPartition: vi.fn(() => ({
       getUserAgent: vi.fn(() => "Mozilla/5.0 Electron/41.5.0 t3code/1.2.3"),
@@ -1382,6 +1382,34 @@ describe("DesktopWindow", () => {
             width: 1410,
             height: 930,
           },
+        ]);
+      }).pipe(Effect.provide(layer));
+    }),
+  );
+
+  it.effect("publishes Windows maximize, restore and fullscreen changes to the renderer", () =>
+    Effect.gen(function* () {
+      const fakeWindow = makeFakeBrowserWindow();
+      const createCount = yield* Ref.make(0);
+      const mainWindow = yield* Ref.make<Option.Option<Electron.BrowserWindow>>(Option.none());
+      const layer = layerTest({
+        window: fakeWindow.window,
+        createCount,
+        mainWindow,
+        platform: "win32",
+      });
+      yield* Effect.gen(function* () {
+        const desktopWindow = yield* DesktopWindow.DesktopWindow;
+        yield* desktopWindow.handleBackendReady(new URL("http://127.0.0.1:3773"));
+        fakeWindow.windowListeners.get("maximize")?.();
+        fakeWindow.windowListeners.get("unmaximize")?.();
+        fakeWindow.windowListeners.get("enter-full-screen")?.();
+        fakeWindow.windowListeners.get("leave-full-screen")?.();
+        assert.deepEqual(fakeWindow.send.mock.calls, [
+          ["desktop:window-maximized-state", true],
+          ["desktop:window-maximized-state", false],
+          [WINDOW_FULLSCREEN_STATE_CHANNEL, true],
+          [WINDOW_FULLSCREEN_STATE_CHANNEL, false],
         ]);
       }).pipe(Effect.provide(layer));
     }),

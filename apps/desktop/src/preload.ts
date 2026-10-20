@@ -258,6 +258,18 @@ contextBridge.exposeInMainWorld("desktopBridge", {
       ipcRenderer.removeListener(IpcChannels.QUIT_SHORTCUT_CHANNEL, wrappedListener);
     };
   },
+  getWindowMaximizedState: () =>
+    ipcRenderer.sendSync(IpcChannels.GET_WINDOW_MAXIMIZED_STATE_CHANNEL) === true,
+  onWindowMaximizedStateChange: (listener) => {
+    const wrappedListener = (_event: Electron.IpcRendererEvent, maximized: unknown) => {
+      if (typeof maximized !== "boolean") return;
+      listener(maximized);
+    };
+    ipcRenderer.on(IpcChannels.WINDOW_MAXIMIZED_STATE_CHANNEL, wrappedListener);
+    return () => {
+      ipcRenderer.removeListener(IpcChannels.WINDOW_MAXIMIZED_STATE_CHANNEL, wrappedListener);
+    };
+  },
   getWindowFullscreenState: () =>
     ipcRenderer.sendSync(IpcChannels.GET_WINDOW_FULLSCREEN_STATE_CHANNEL) === true,
   onWindowFullscreenStateChange: (listener) => {

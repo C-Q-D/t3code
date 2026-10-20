@@ -1252,6 +1252,8 @@ export interface DesktopBridge {
    * them.
    */
   onQuitShortcut?: (listener: (event: QuitShortcutHintEvent) => void) => () => void;
+  getWindowMaximizedState: () => boolean;
+  onWindowMaximizedStateChange: (listener: (maximized: boolean) => void) => () => void;
   getWindowFullscreenState: () => boolean;
   onWindowFullscreenStateChange: (listener: (fullscreen: boolean) => void) => () => void;
   getUpdateState: () => Promise<DesktopUpdateState>;

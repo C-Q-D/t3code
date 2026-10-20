@@ -415,10 +415,21 @@ function AppShell({ children }: { children: ReactNode }) {
   };
   const [isWindowFullscreen, setIsWindowFullscreen] = useState(() => {
     const getWindowFullscreenState = window.desktopBridge?.getWindowFullscreenState;
-    return isMacosDesktop && typeof getWindowFullscreenState === "function"
+    return isElectron && typeof getWindowFullscreenState === "function"
       ? getWindowFullscreenState()
       : false;
   });
+  const [isWindowMaximized, setIsWindowMaximized] = useState(() =>
+    isElectron ? (window.desktopBridge?.getWindowMaximizedState?.() ?? false) : false,
+  );
+  useEffect(() => {
+    if (!isElectron) return;
+    const bridge = window.desktopBridge;
+    if (!bridge?.getWindowMaximizedState || !bridge.onWindowMaximizedStateChange) return;
+    const unsubscribe = bridge.onWindowMaximizedStateChange(setIsWindowMaximized);
+    setIsWindowMaximized(bridge.getWindowMaximizedState());
+    return unsubscribe;
+  }, []);
   const windowControlsInsetStyle = (
     isMacosDesktop && !isWindowFullscreen
       ? { "--workspace-controls-left": MACOS_TRAFFIC_LIGHTS_LEFT_INSET }
@@ -432,7 +443,7 @@ function AppShell({ children }: { children: ReactNode }) {
   } as CSSProperties;
 
   useEffect(() => {
-    if (!isMacosDesktop) return;
+    if (!isElectron) return;
     const bridge = window.desktopBridge;
     if (!bridge) return;
     const { getWindowFullscreenState, onWindowFullscreenStateChange } = bridge;
@@ -446,7 +457,7 @@ function AppShell({ children }: { children: ReactNode }) {
     const unsubscribe = onWindowFullscreenStateChange(setIsWindowFullscreen);
     setIsWindowFullscreen(getWindowFullscreenState());
     return unsubscribe;
-  }, [isMacosDesktop]);
+  }, []);
 
   useEffect(() => {
     const onMenuAction = window.desktopBridge?.onMenuAction;
@@ -470,7 +481,11 @@ function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <PanelAnimationSuppressionProvider value={panelAnimationsSuppressed}>
-      <div className="window-frame-shell stone-base h-dvh min-h-0">
+      <div
+        className="window-frame-shell stone-base h-dvh min-h-0"
+        data-window-maximized={isWindowMaximized ? "true" : "false"}
+        data-window-fullscreen={isWindowFullscreen ? "true" : "false"}
+      >
         <OnboardingShell
           className="grid! h-full! min-h-0! grid-cols-[minmax(0,1fr)] grid-rows-[var(--workspace-topbar-height)_minmax(0,1fr)]"
           data-app-shell=""

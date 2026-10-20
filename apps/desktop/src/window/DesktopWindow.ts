@@ -27,6 +27,7 @@ import {
   SNAP_SHOT_EVENT_CHANNEL,
   TRACKPAD_SCROLL_END_CHANNEL,
   WINDOW_FULLSCREEN_STATE_CHANNEL,
+  WINDOW_MAXIMIZED_STATE_CHANNEL,
 } from "../ipc/channels.ts";
 import { PASSKEY_BRIDGE_ARGUMENT } from "../preview/GuestProtocol.ts";
 import * as PreviewManager from "../preview/Manager.ts";
@@ -730,18 +731,24 @@ export const make = Effect.gen(function* () {
     });
     window.on("resize", scheduleBoundsPersist);
     window.on("move", scheduleBoundsPersist);
-    window.on("maximize", scheduleBoundsPersist);
-    window.on("unmaximize", scheduleBoundsPersist);
+    window.on("maximize", () => {
+      scheduleBoundsPersist();
+      window.webContents.send(WINDOW_MAXIMIZED_STATE_CHANNEL, true);
+    });
+    window.on("unmaximize", () => {
+      scheduleBoundsPersist();
+      window.webContents.send(WINDOW_MAXIMIZED_STATE_CHANNEL, false);
+    });
     window.on("close", () => {
       runFork(flushBoundsPersist);
     });
 
-    if (environment.platform === "darwin") {
+    if (environment.platform === "darwin" || environment.platform === "win32") {
       window.on("enter-full-screen", () => {
         window.webContents.send(WINDOW_FULLSCREEN_STATE_CHANNEL, true);
       });
       window.on("leave-full-screen", () => {
-        syncMacosWindowButtons(window);
+        if (environment.platform === "darwin") syncMacosWindowButtons(window);
         window.webContents.send(WINDOW_FULLSCREEN_STATE_CHANNEL, false);
       });
     }

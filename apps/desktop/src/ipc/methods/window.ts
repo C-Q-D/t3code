@@ -83,6 +83,17 @@ export const getSystemLocale = DesktopIpc.makeSyncIpcMethod({
   }),
 });
 
+/** Reads native maximize state at renderer startup, including a restored maximized window. */
+export const getWindowMaximizedState = DesktopIpc.makeSyncIpcMethod({
+  channel: IpcChannels.GET_WINDOW_MAXIMIZED_STATE_CHANNEL,
+  result: Schema.Boolean,
+  handler: Effect.fn("desktop.ipc.window.getWindowMaximizedState")(function* () {
+    const electronWindow = yield* ElectronWindow.ElectronWindow;
+    const window = yield* electronWindow.currentMainOrFirst;
+    return Option.isSome(window) && window.value.isMaximized();
+  }),
+});
+
 export const getWindowFullscreenState = DesktopIpc.makeSyncIpcMethod({
   channel: IpcChannels.GET_WINDOW_FULLSCREEN_STATE_CHANNEL,
   result: Schema.Boolean,
