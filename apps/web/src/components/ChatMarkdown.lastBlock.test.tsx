@@ -6,12 +6,14 @@ import { EnvironmentId, type AuthEnvironmentScope } from "@t3tools/contracts";
 import { act, StrictMode, useLayoutEffect, type ComponentProps, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { expect, it, vi } from "vite-plus/test";
+import type * as Settings from "../hooks/useSettings";
+import type * as Session from "../state/session";
 import ChatMarkdown from "./ChatMarkdown";
 vi.mock("../hooks/useFileMetadata", () => ({ useFileMetadata: () => null }));
 vi.mock("@effect/atom-react", () => ({ useAtomValue: () => null }));
 vi.mock("../hooks/useTheme", () => ({ useTheme: () => ({ resolvedTheme: "dark" }) }));
 vi.mock("../hooks/useSettings", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../hooks/useSettings")>();
+  const actual = await importOriginal<typeof Settings>();
   const settings = actual.getClientSettings();
   return {
     ...actual,
@@ -36,7 +38,7 @@ vi.mock("./ui/tooltip", async () => {
 vi.mock("../state/use-atom-query-runner", () => ({ useAtomQueryRunner: () => vi.fn() }));
 vi.mock("../state/use-atom-command", () => ({ useAtomCommand: () => vi.fn() }));
 vi.mock("../state/session", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../state/session")>();
+  const actual = await importOriginal<typeof Session>();
   const { AuthStandardClientScopes } = await import("@t3tools/contracts");
   const grantedScopes = new Set<AuthEnvironmentScope>(AuthStandardClientScopes);
   const hasScope = (environmentId: EnvironmentId | null, scope: AuthEnvironmentScope) =>

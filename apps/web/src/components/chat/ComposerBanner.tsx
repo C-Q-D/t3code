@@ -268,6 +268,7 @@ function Icon({ className, ...props }: ComponentProps<"span">) {
   );
 }
 
+/** Places row content beside registered slots, reclaiming padding when icon or actions are absent. */
 function Content({ className, ...props }: ComponentProps<"span">) {
   return (
     <span

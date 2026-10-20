@@ -55,6 +55,7 @@ function Main({ className, ...props }: ComponentProps<"div">) {
   );
 }
 
+/** Extends the composer seam below its content, using Shell's attached-banner state for glass. */
 function ContextStrip({ className, ...props }: ComponentProps<"div">) {
   return (
     <div
