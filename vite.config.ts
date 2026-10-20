@@ -170,7 +170,7 @@ export default defineConfig({
       "t3code/no-raw-mcp-registration": "error",
       "t3code/no-test-in-loop": "error",
       "t3code/no-rpc-permission-bypass": ["error", { allowRawClientAccess: true }],
-      "t3code/no-unscoped-has": "error",
+      "t3code/no-has-selector": "error",
       "t3code/namespace-node-imports": "error",
       "t3code/prefer-catch-tags": "error",
       "t3code/require-centered-scroll-gutter": "error",

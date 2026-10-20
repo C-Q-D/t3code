@@ -12,7 +12,7 @@ import noRawMcpRegistration from "./rules/no-raw-mcp-registration.ts";
 import noRawResizeObserver from "./rules/no-raw-resize-observer.ts";
 import noTestInLoop from "./rules/no-test-in-loop.ts";
 import noRpcPermissionBypass from "./rules/no-rpc-permission-bypass.ts";
-import noUnscopedHas from "./rules/no-unscoped-has.ts";
+import noHasSelector from "./rules/no-has-selector.ts";
 import preferCatchTags from "./rules/prefer-catch-tags.ts";
 import requireCenteredScrollGutter from "./rules/require-centered-scroll-gutter.ts";
 import requireSuppressionReason from "./rules/require-suppression-reason.ts";
@@ -34,7 +34,7 @@ export default definePlugin({
     "no-raw-resize-observer": noRawResizeObserver,
     "no-test-in-loop": noTestInLoop,
     "no-rpc-permission-bypass": noRpcPermissionBypass,
-    "no-unscoped-has": noUnscopedHas,
+    "no-has-selector": noHasSelector,
     "prefer-catch-tags": preferCatchTags,
     "require-centered-scroll-gutter": requireCenteredScrollGutter,
     "require-suppression-reason": requireSuppressionReason,
