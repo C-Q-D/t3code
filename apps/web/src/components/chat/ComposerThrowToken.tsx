@@ -129,6 +129,12 @@ function createComposerThrow(input: ThrowInput, initialPointer?: PointerEvent): 
   let disposed = false;
   let fadeSeconds = 0;
   let returning = false;
+  let landed = false;
+  const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+  const stopReducedLanding = () => {
+    if (landed && reducedMotion?.matches) cancel();
+  };
+  reducedMotion?.addEventListener("change", stopReducedLanding);
 
   const paint = () => {
     if (element)
@@ -142,6 +148,7 @@ function createComposerThrow(input: ThrowInput, initialPointer?: PointerEvent): 
     stop();
     detachPointer();
     unsubscribe();
+    reducedMotion?.removeEventListener("change", stopReducedLanding);
     releaseReservation();
     flights = flights.filter((candidate) => candidate !== flight);
     publish();
@@ -155,6 +162,19 @@ function createComposerThrow(input: ThrowInput, initialPointer?: PointerEvent): 
     fadeSeconds = 0;
     if (element) element.style.opacity = "1";
     stop = run((dt) => {
+      if (landed) {
+        fadeSeconds += dt;
+        const progress = Math.min(1, fadeSeconds / 0.15);
+        if (element) {
+          element.style.transform =
+            `translate(${x.value + (x.target - x.value) * progress}px, ` +
+            `${y.value + (y.target - y.value) * progress}px) scale(${1 - 0.4 * progress})`;
+          element.style.opacity = String(1 - progress);
+        }
+        if (progress < 1) return true;
+        cancel();
+        return false;
+      }
       if (handoff) {
         handoff = false;
         paint();
@@ -186,14 +206,22 @@ function createComposerThrow(input: ThrowInput, initialPointer?: PointerEvent): 
       if (target) {
         const form = target;
         const atX = rect!.left + rect!.width / 2;
-        cancel();
+        // Insertion is immediate; only the already-caught preview lives for another 150ms.
+        landed = true;
+        releaseReservation();
+        detachPointer();
+        if (element) {
+          element.style.opacity = "1";
+          element.style.transform = `translate(${x.value}px, ${y.value}px) scale(1)`;
+        }
         input.onLand(form);
         form.dispatchEvent(
           new CustomEvent(COMPOSER_IMPACT_EVENT, {
             detail: { vx: incoming.x, vy: incoming.y, atX },
           }),
         );
-        return false;
+        if (!isPhysicsEnabled() || reducedMotion?.matches) cancel();
+        return !disposed;
       }
       // Opacity has a fixed 150 ms duration; it is not a physical coordinate.
       fadeSeconds += dt;
@@ -204,6 +232,10 @@ function createComposerThrow(input: ThrowInput, initialPointer?: PointerEvent): 
     });
   };
   const returnHome = () => {
+    if (landed) {
+      cancel();
+      return;
+    }
     if (disposed || returning) return;
     returning = true;
     detachPointer();
@@ -222,7 +254,7 @@ function createComposerThrow(input: ThrowInput, initialPointer?: PointerEvent): 
       paint();
     },
     grab(event) {
-      if (disposed || returning || event.button !== 0) return;
+      if (disposed || returning || landed || event.button !== 0) return;
       event.preventDefault();
       event.stopPropagation();
       stop();

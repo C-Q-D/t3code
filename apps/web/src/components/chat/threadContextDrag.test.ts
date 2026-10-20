@@ -90,7 +90,12 @@ it("inserts on arrival instead of hovering over the catch point while the spring
       clock.advance((frame * 1000) / 60);
       const token = document.querySelector<HTMLElement>("[data-composer-throw-token]");
       const match = token?.style.transform.match(/translate\(([-\d.]+)px, ([-\d.]+)px\)/);
-      if (match && Math.hypot(Number(match[1]) - 500, Number(match[2]) - 250) < 8)
+      // The caught card may fade after insertion; only waiting to insert is a hover delay.
+      if (
+        drops.length === 0 &&
+        match &&
+        Math.hypot(Number(match[1]) - 500, Number(match[2]) - 250) < 8
+      )
         framesHoveringAtCatchPoint++;
     }
   });

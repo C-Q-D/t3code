@@ -3,7 +3,11 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
-import { beginComposerThrowDrag, ComposerThrowToken } from "./ComposerThrowToken";
+import {
+  beginComposerThrowDrag,
+  ComposerThrowToken,
+  launchComposerThrow,
+} from "./ComposerThrowToken";
 import { activeJobs } from "../../lib/motion/loop";
 import { setPhysicsEnabled } from "../../lib/motion/preference";
 import { installTestRaf } from "../../lib/motion/testRaf";
@@ -243,3 +247,48 @@ it("rejects native dragstart during pickup and releases that guard after returni
   expect(onLand).not.toHaveBeenCalled();
   expect(document.querySelector("[data-composer-throw-token]")).toBeNull();
 });
+
+it.each(["mention", "thread"] as const)(
+  "%s inserts on the contact frame and shrinks away within 150ms without landing twice",
+  (channel) => {
+    act(() => root.render(createElement(ComposerThrowToken, { channel })));
+    const impact = vi.fn();
+    form.addEventListener("t3:composer-impact", impact);
+    act(() => {
+      launchComposerThrow({
+        channel,
+        label: "contact",
+        point: { x: 438, y: 218 },
+        velocity: { x: 0, y: 0 },
+        origin: { x: 0, y: 0 },
+        target: form,
+        onLand,
+      });
+    });
+    const token = document.querySelector<HTMLDivElement>("[data-composer-throw-token]")!;
+    Object.defineProperties(token, {
+      offsetWidth: { value: 100 },
+      offsetHeight: { value: 40 },
+    });
+    act(() => clock.advance(0));
+    expect(onLand).toHaveBeenCalledExactlyOnceWith(form);
+    expect(impact).toHaveBeenCalledTimes(1);
+    expect(token.isConnected).toBe(true);
+    expect(Number(token.style.opacity)).toBe(1);
+    act(() => clock.advance(50));
+    expect(token.isConnected).toBe(true);
+    expect(Number(token.style.opacity)).toBeCloseTo(2 / 3);
+    act(() => clock.advance(100));
+    expect(Number(token.style.opacity)).toBeCloseTo(1 / 3);
+    act(() => clock.advance(149));
+    expect(token.isConnected).toBe(true);
+    expect(Number(token.style.opacity)).toBeGreaterThan(0);
+    expect(Number(token.style.opacity)).toBeLessThan(0.01);
+    expect(token.style.transform).toMatch(/scale\(0\.60/);
+    act(() => clock.advance(150));
+    expect(token.isConnected).toBe(false);
+    expect(onLand).toHaveBeenCalledTimes(1);
+    expect(impact).toHaveBeenCalledTimes(1);
+    expect(activeJobs()).toBe(0);
+  },
+);
