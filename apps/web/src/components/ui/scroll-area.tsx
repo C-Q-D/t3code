@@ -1,8 +1,10 @@
+/** Owns scrollbars and optional edge fades; descendant focus tracking is only active for unpadded fades. */
 "use client";
 
 import { ScrollArea as ScrollAreaPrimitive } from "@base-ui/react/scroll-area";
 
 import { cn } from "~/lib/utils";
+import { useFocusVisibleWithin } from "~/hooks/useFocusVisibleWithin";
 
 function getVirtualizedScrollFadeClassName({ top, bottom }: { top: boolean; bottom: boolean }) {
   if (!top && !bottom) return undefined;
@@ -21,6 +23,7 @@ function getVirtualizedScrollFadeClassName({ top, bottom }: { top: boolean; bott
   );
 }
 
+/** For unpadded fades, keyboard-visible descendant focus removes the mask without changing pointer focus. */
 function ScrollArea({
   className,
   children,
@@ -45,6 +48,8 @@ function ScrollArea({
   /** Override Base UI's focusable viewport when focusable descendants provide scroll access. */
   viewportTabIndex?: number;
 }) {
+  const focusVisible = useFocusVisibleWithin();
+  const trackFocus = scrollFade && !scrollFadePadding;
   return (
     <ScrollAreaPrimitive.Root
       className={cn(
@@ -62,12 +67,16 @@ function ScrollArea({
           scrollFade &&
             "mask-t-from-[calc(100%-min(var(--fade-size),var(--scroll-area-overflow-y-start)))] mask-b-from-[calc(100%-min(var(--fade-size),var(--scroll-area-overflow-y-end)))] mask-l-from-[calc(100%-min(var(--fade-size),var(--scroll-area-overflow-x-start)))] mask-r-from-[calc(100%-min(var(--fade-size),var(--scroll-area-overflow-x-end)))] focus-visible:mask-none [--fade-size:1.5rem]",
           scrollFade && scrollFadePadding && "scroll-p-[var(--fade-size)]",
-          scrollFade && !scrollFadePadding && "has-focus-visible:mask-none",
+          trackFocus && "data-[focus-visible-within=true]:mask-none",
           scrollbarGutter && "scrollbar-gutter-stable",
           hideScrollbars &&
             "[-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         )}
         data-slot="scroll-area-viewport"
+        data-focus-visible-within={
+          trackFocus ? (focusVisible.active ? "true" : "false") : undefined
+        }
+        {...(trackFocus ? focusVisible.handlers : {})}
       >
         {children}
       </ScrollAreaPrimitive.Viewport>

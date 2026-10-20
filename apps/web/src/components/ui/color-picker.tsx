@@ -11,6 +11,7 @@ import {
 
 import type { HsvColor } from "../../lib/color";
 import { cn } from "../../lib/utils";
+import { useFocusVisibleWithin } from "~/hooks/useFocusVisibleWithin";
 
 function clamp(value: number) {
   return Math.min(1, Math.max(0, value));
@@ -64,7 +65,11 @@ type ColorControlProps<T> = {
   className?: string;
 };
 
-/** Edits saturation and brightness in value for the named color label. onChange receives the updated HSV color and onInteractionEnd marks gesture completion; variant and className control layout. */
+/**
+ * Edits saturation and brightness for label and preserves visible focus across both axis inputs.
+ * onChange receives the updated HSV color; onInteractionEnd marks gesture completion.
+ * variant and className control layout without changing pointer or keyboard handling.
+ */
 export function ColorSaturationValuePlane({
   label,
   value,
@@ -74,6 +79,7 @@ export function ColorSaturationValuePlane({
   variant = "inset",
 }: ColorControlProps<HsvColor> & { variant?: "inset" | "edge" }) {
   const instructionsId = useId();
+  const focusVisible = useFocusVisibleWithin();
   const saturationRef = useRef<HTMLInputElement>(null);
   const { handlers, thumbTransition } = useColorDrag(
     (event) => {
@@ -117,9 +123,11 @@ export function ColorSaturationValuePlane({
   return (
     <div
       aria-label={t.app.color.saturationAndBrightness(label)}
+      data-focus-visible-within={focusVisible.active ? "true" : "false"}
+      {...focusVisible.handlers}
       role="group"
       className={cn(
-        "relative cursor-crosshair touch-none overflow-hidden bg-[linear-gradient(to_top,#000,transparent),linear-gradient(to_right,#fff,transparent)] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-inset has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2 has-[:focus-visible]:ring-offset-popover",
+        "relative cursor-crosshair touch-none overflow-hidden bg-[linear-gradient(to_top,#000,transparent),linear-gradient(to_right,#fff,transparent)] data-[focus-visible-within=true]:ring-2 data-[focus-visible-within=true]:ring-inset data-[focus-visible-within=true]:ring-ring data-[focus-visible-within=true]:ring-offset-2 data-[focus-visible-within=true]:ring-offset-popover",
         variant === "edge" ? "h-36 rounded-none" : "h-32 rounded-lg",
         className,
       )}
