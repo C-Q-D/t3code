@@ -42,17 +42,13 @@ export function costPerMillionTokens(model: ModelTotals): number | null {
     : (model.costUsd / pricedTokens) * 1_000_000;
 }
 
-/** A neutral step between background and foreground, so mixes never borrow a provider's color. */
-const ink = (percent: number) =>
-  `color-mix(in oklab, var(--foreground) ${percent}%, var(--background))`;
-
-/** Adjacent segments stay above the 15 ΔE separation floor in both themes. */
+/** Category colors follow the shared usage palette rather than provider identity. */
 const TYPE_COLORS = {
-  input: ink(60),
-  cacheRead: ink(30),
-  cacheWrite: ink(72),
-  output: ink(100),
-  other: ink(44),
+  input: "var(--color-usage-split-input)",
+  cacheRead: "var(--color-usage-split-cache-read)",
+  cacheWrite: "var(--color-usage-split-cache-write)",
+  output: "var(--color-usage-split-output)",
+  other: "var(--color-usage-split-other)",
 };
 
 /** Converts the supplied category costs into labeled cost-share segments, retaining the existing ordering and treatment of other costs. */
@@ -92,11 +88,11 @@ export function tokenTypeSegments(
   ];
 }
 
-/** Speeds are ordered by price, so they brighten from standard to ultrafast. */
+/** Preserves request-speed categories used by model details, with the shared speed palette. */
 export function speedCostSegments(cost: SpeedCost): readonly ShareSegment[] {
   return [
-    { label: t.tools.usage.standard, value: cost.standard, color: ink(34) },
-    { label: t.tools.usage.fast, value: cost.fast, color: ink(66) },
-    { label: t.tools.usage.ultrafast, value: cost.ultrafast, color: ink(100) },
+    { label: t.tools.usage.standard, value: cost.standard, color: TYPE_COLORS.cacheRead },
+    { label: t.tools.usage.fast, value: cost.fast, color: "var(--color-usage-speed-mid)" },
+    { label: t.tools.usage.ultrafast, value: cost.ultrafast, color: TYPE_COLORS.cacheWrite },
   ];
 }
