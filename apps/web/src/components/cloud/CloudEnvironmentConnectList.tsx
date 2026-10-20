@@ -383,14 +383,18 @@ export function CloudEnvironmentConnectRows({
                   : (Option.getOrNull(error)?.message ??
                     t.account.cloud.unavailableStatus(notAdded));
     if (selection) {
+      const disabled = unsupported || connectingEnvironmentIds.has(environment.environmentId);
       return (
         <label
           key={environment.environmentId}
-          className="flex cursor-pointer items-center gap-3 rounded-lg border border-border bg-background px-3 py-2.5 has-disabled:cursor-default"
+          className={cn(
+            "flex cursor-pointer items-center gap-3 rounded-lg border border-border bg-background px-3 py-2.5",
+            disabled && "cursor-default",
+          )}
         >
           <Checkbox
             checked={!unsupported && selection.selectedIds.has(environment.environmentId)}
-            disabled={unsupported || connectingEnvironmentIds.has(environment.environmentId)}
+            disabled={disabled}
             onCheckedChange={async (checked) => {
               if (unsupported) return;
               selection.onChange(environment.environmentId, checked);

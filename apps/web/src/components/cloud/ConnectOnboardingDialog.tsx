@@ -400,7 +400,8 @@ function OnboardingToggleRow({
   return (
     <label
       className={cn(
-        "flex min-h-11 cursor-pointer items-center gap-2.5 rounded-ov5-row px-3 text-control has-disabled:cursor-default",
+        "flex min-h-11 cursor-pointer items-center gap-2.5 rounded-ov5-row px-3 text-control",
+        disabled && "cursor-default",
         checked ? "bg-accent inset-shadow-selected-control" : "bg-ov5-row",
       )}
     >

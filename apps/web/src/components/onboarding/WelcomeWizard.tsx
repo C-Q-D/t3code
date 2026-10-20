@@ -1803,7 +1803,7 @@ function ImportCandidateRow({
   return (
     <label
       className={cn(
-        "flex min-h-12.5 cursor-pointer items-center gap-2.5 rounded-ov5-row bg-ov5-row px-3 py-1.5 shadow-ov5-row hover:bg-secondary has-disabled:cursor-default",
+        "flex min-h-12.5 cursor-pointer items-center gap-2.5 rounded-ov5-row bg-ov5-row px-3 py-1.5 shadow-ov5-row hover:bg-secondary in-[fieldset:disabled]:cursor-default",
         nested && "pl-8",
       )}
     >
