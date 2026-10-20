@@ -76,6 +76,38 @@ function transactionDifference(transaction: Transaction) {
     ? { start, oldEnd, newStart, newEnd }
     : difference(transaction.before, transaction.doc);
 }
+
+/** Read one document range; callers bound the interval before requesting per-glyph geometry. */
+function glyphRange(view: EditorView, from: number, to: number) {
+  const a = view.domAtPos(from);
+  const b = view.domAtPos(to);
+  const range = document.createRange();
+  range.setStart(a.node, a.offset);
+  range.setEnd(b.node, b.offset);
+  return range;
+}
+
+/** Locate visible rows in a wrapped text run with logarithmic probes, before grapheme iteration. */
+function visibleTextBounds(view: EditorView, from: number, to: number, viewport: DOMRect) {
+  // Short local edits already have a bounded candidate interval.
+  if (to - from <= 128) return { from, to };
+  const lowerBound = (after: (rect: DOMRect) => boolean) => {
+    let low = from;
+    let high = to;
+    while (low < high) {
+      const middle = low + Math.floor((high - low) / 2);
+      const rect = glyphRange(view, middle, middle + 1).getBoundingClientRect();
+      if (after(rect)) high = middle;
+      else low = middle + 1;
+    }
+    return low;
+  };
+  return {
+    from: lowerBound((rect) => rect.bottom > viewport.top),
+    to: lowerBound((rect) => rect.top >= viewport.bottom),
+  };
+}
+
 /** Measure visible text graphemes in a document interval, in untransformed surface coordinates. */
 export function measureGlyphs(
   view: EditorView,
@@ -99,16 +131,32 @@ export function measureGlyphs(
       Math.max(0, from),
       Math.min(view.state.doc.content.size, to),
       (node, pos) => {
+        if (node.isBlock) {
+          const dom = view.nodeDOM(pos);
+          if (dom instanceof Element) {
+            const rect = dom.getBoundingClientRect();
+            if (rect.bottom <= viewport.top || rect.top >= viewport.bottom) return false;
+          }
+        }
         if (!node.isText || !node.text) return !node.isAtom;
-        for (const { segment, index } of segmenter.segment(node.text)) {
+        const bounds = visibleTextBounds(
+          view,
+          Math.max(pos, from),
+          Math.min(pos + node.text.length, to),
+          viewport,
+        );
+        // Segments.containing seeks directly to a Unicode boundary without enumerating the prefix.
+        const segments = segmenter.segment(node.text);
+        let offset = bounds.from - pos;
+        while (offset < bounds.to - pos) {
+          const part = segments.containing(offset);
+          if (!part) break;
+          const { segment, index } = part;
+          offset = index + segment.length;
           const start = pos + index;
           const end = start + segment.length;
           if (end <= from || start >= to) continue;
-          const a = view.domAtPos(start);
-          const b = view.domAtPos(end);
-          const range = document.createRange();
-          range.setStart(a.node, a.offset);
-          range.setEnd(b.node, b.offset);
+          const range = glyphRange(view, start, end);
           const rect = range.getBoundingClientRect();
           if (
             rect.width <= 0 ||
@@ -119,7 +167,10 @@ export function measureGlyphs(
             rect.left >= viewport.right
           )
             continue;
-          const parent = a.node instanceof Element ? a.node : a.node.parentElement;
+          const parent =
+            range.startContainer instanceof Element
+              ? range.startContainer
+              : range.startContainer.parentElement;
           const style = getComputedStyle(parent ?? view.dom);
           result.push({
             text: segment,
@@ -162,7 +213,12 @@ function hideGlyphs(glyphs: MeasuredGlyph[]): GlyphSnapshot[] | null {
 class PhysicalTypingBridge {
   private intent = "";
   private intentVersion = 0;
-  private removedBeforeInput: { doc: DocumentNode; glyphs: MeasuredGlyph[] } | null = null;
+  private removedBeforeInput: {
+    doc: DocumentNode;
+    from: number;
+    to: number;
+    glyphs: MeasuredGlyph[];
+  } | null = null;
   private composing = false;
   private compositionBase: DocumentNode | null = null;
   private compositionFrom = 0;
@@ -189,7 +245,10 @@ class PhysicalTypingBridge {
     const version = ++this.intentVersion;
     if (!native)
       queueMicrotask(() => {
-        if (this.intentVersion === version) this.intent = "";
+        if (this.intentVersion === version) {
+          this.intent = "";
+          this.removedBeforeInput = null;
+        }
       });
   }
 
@@ -216,18 +275,25 @@ class PhysicalTypingBridge {
 
   /** Freeze visible old glyph geometry before browser deletion invalidates DOM ranges. */
   private captureDeletion() {
-    this.removedBeforeInput = null;
     const renderer = this.renderer();
-    if (!renderer || this.composing || !isPhysicsEnabled() || !this.intent.startsWith("delete"))
+    if (!renderer || this.composing || !isPhysicsEnabled() || !this.intent.startsWith("delete")) {
+      this.removedBeforeInput = null;
       return;
-    const { from, to, $from, $to, empty } = this.view.state.selection;
+    }
+    const { from, to, empty } = this.view.state.selection;
+    const cached = this.removedBeforeInput;
+    if (cached?.doc === this.view.state.doc && cached.from === from && cached.to === to) return;
+    // Native word deletion can span more than one grapheme. Keep a bounded local candidate
+    // window; the committed transaction filters it to the actual removed interval.
     this.removedBeforeInput = {
       doc: this.view.state.doc,
+      from,
+      to,
       glyphs: measureGlyphs(
         this.view,
         renderer,
-        empty ? $from.start() : from,
-        empty ? $to.end() : to,
+        empty ? Math.max(0, from - 32) : from,
+        empty ? Math.min(this.view.state.doc.content.size, to + 32) : to,
       ),
     };
   }

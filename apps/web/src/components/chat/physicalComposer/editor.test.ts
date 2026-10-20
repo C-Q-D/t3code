@@ -246,3 +246,63 @@ it("keeps replacement text inside the visible clip when a selected draft shrinks
   expect(visibleBottom).toBeGreaterThanOrEqual(40);
   expect(visibleTop).toBeLessThan(40);
 });
+
+it.each([10_000, 100_000])(
+  "bounds deletion and send geometry for a %i character draft",
+  (length) => {
+    editor.commands.setContent(`<p>${"a".repeat(length)}</p>`);
+    editor.commands.setTextSelection(5001);
+    // A scrolled viewport contains exactly four rows of 50 glyphs, starting at offset 5000.
+    vi.spyOn(Range.prototype, "getBoundingClientRect").mockImplementation(function (this: Range) {
+      return new DOMRect(
+        (this.startOffset % 50) * 10,
+        (Math.floor(this.startOffset / 50) - 100) * 20,
+        10,
+        20,
+      );
+    });
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue(
+      new DOMRect(0, 0, 500, 80),
+    );
+    const reads = vi.spyOn(Range.prototype, "getBoundingClientRect");
+    editor.view.dom.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Backspace", bubbles: true }),
+    );
+    const keyReads = reads.mock.calls.length;
+    editor.view.dom.dispatchEvent(
+      new InputEvent("beforeinput", { inputType: "deleteContentBackward", bubbles: true }),
+    );
+    expect.soft(keyReads).toBeLessThanOrEqual(128);
+    expect.soft(reads.mock.calls.length).toBe(keyReads);
+    reads.mockClear();
+    const play = capturePhysicalSend(editor);
+    expect(reads.mock.calls.length).toBeLessThanOrEqual(280);
+    play?.();
+    expect(layer.querySelectorAll("[data-physical-send]")).toHaveLength(200);
+  },
+);
+
+it("does not iterate the full text node to segment a local insertion", () => {
+  editor.commands.setContent(`<p>${"a".repeat(10_000)}</p>`);
+  const segment = Intl.Segmenter.prototype.segment;
+  let visited = 0;
+  vi.spyOn(Intl.Segmenter.prototype, "segment").mockImplementation(function (
+    this: Intl.Segmenter,
+    text: string,
+  ) {
+    const result = segment.call(this, text);
+    const iterate = result[Symbol.iterator].bind(result);
+    result[Symbol.iterator] = function* () {
+      for (const item of iterate()) {
+        visited++;
+        yield item;
+      }
+      return undefined;
+    };
+    return result;
+  });
+  input("insertText", "X", 3);
+  expect(editor.getText().slice(0, 5)).toBe("aaXaa");
+  expect(visited).toBeLessThanOrEqual(32);
+  expect(layer.textContent).toContain("X");
+});
