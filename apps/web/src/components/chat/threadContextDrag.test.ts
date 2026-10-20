@@ -79,6 +79,25 @@ it("reserves a projected path hit and inserts exactly once only after the flight
   expect(form.hasAttribute("data-thread-context-over")).toBe(false);
 });
 
+it("inserts on arrival instead of hovering over the catch point while the spring settles", () => {
+  act(() => {
+    throwThreadContext({ x: 100, y: 250 }, { x: 1000, y: 0 }, threads);
+  });
+  // jsdom tokens have zero size, so the catch point is the composer centre (500, 250).
+  let framesHoveringAtCatchPoint = 0;
+  act(() => {
+    for (let frame = 0; frame < 600 && clock.pending.size; frame++) {
+      clock.advance((frame * 1000) / 60);
+      const token = document.querySelector<HTMLElement>("[data-composer-throw-token]");
+      const match = token?.style.transform.match(/translate\(([-\d.]+)px, ([-\d.]+)px\)/);
+      if (match && Math.hypot(Number(match[1]) - 500, Number(match[2]) - 250) < 8)
+        framesHoveringAtCatchPoint++;
+    }
+  });
+  expect(drops).toEqual([threads]);
+  expect(framesHoveringAtCatchPoint).toBeLessThanOrEqual(1);
+});
+
 it("returns a miss to its pickup point without inserting", () => {
   act(() => {
     moveThreadContextDrag({ x: 50, y: 50 }, { title: "Thread", count: 1 });

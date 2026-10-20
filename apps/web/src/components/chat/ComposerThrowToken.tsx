@@ -30,6 +30,8 @@ interface ThrowFlight {
   grab: (event: PointerEvent) => void;
   cancel: () => void;
 }
+/** Viewport CSS pixels from the catch point at which a flying token counts as caught. */
+const CONTACT_RADIUS_PX = 8;
 let nextId = 0;
 let flights: readonly ThrowFlight[] = [];
 const emptyFlights: readonly ThrowFlight[] = [];
@@ -127,7 +129,11 @@ export function launchComposerThrow(input: ThrowInput): () => void {
       const movingX = x.step(dt);
       const movingY = y.step(dt);
       paint();
-      if (movingX || movingY) return true;
+      // A caught token lands on contact: the fling spring's sub-pixel tail would otherwise
+      // keep it hovering over the composer for about half a second before inserting.
+      const arrived =
+        target !== null && Math.hypot(x.value - x.target, y.value - y.target) < CONTACT_RADIUS_PX;
+      if ((movingX || movingY) && !arrived) return true;
       if (target) {
         const form = target;
         const atX = rect!.left + rect!.width / 2;
