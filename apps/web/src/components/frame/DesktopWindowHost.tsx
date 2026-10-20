@@ -1,5 +1,13 @@
 /** Keeps native window state and caption actions alive outside route error boundaries. */
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { isElectron } from "../../env";
 import { isWindowsPlatform } from "../../lib/utils";
 import { WindowsWindowControls } from "./WindowsWindowControls";
@@ -32,11 +40,23 @@ export function DesktopWindowHost({ children }: { children: ReactNode }) {
       unsubscribeFullscreen?.();
     };
   }, []);
+  const state = useMemo(() => ({ maximized, fullscreen }), [maximized, fullscreen]);
+  useLayoutEffect(() => {
+    if (!isElectron || !isWindowsPlatform(navigator.platform)) return;
+    // Body portals must inherit the same frame geometry before the next paint.
+    const html = document.documentElement;
+    html.dataset.windowMaximized = String(maximized);
+    html.dataset.windowFullscreen = String(fullscreen);
+    return () => {
+      delete html.dataset.windowMaximized;
+      delete html.dataset.windowFullscreen;
+    };
+  }, [maximized, fullscreen]);
   return (
-    <WindowStateContext value={{ maximized, fullscreen }}>
+    <WindowStateContext value={state}>
       {children}
       {isElectron && isWindowsPlatform(navigator.platform) && (
-        <WindowsWindowControls maximized={maximized} fullscreen={fullscreen} />
+        <WindowsWindowControls maximized={maximized} />
       )}
     </WindowStateContext>
   );

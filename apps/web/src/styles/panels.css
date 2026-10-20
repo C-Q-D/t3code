@@ -312,6 +312,23 @@
   left: calc(var(--frame-padding-inline) + var(--frame-projectbar-width));
 }
 
+/* Body portals share the shell's native-window inset, including its project rail. */
+html[data-theme-id="graphite"].electron-windows .right-panel-overlay-region {
+  top: calc(
+    var(--workspace-topbar-height, var(--frame-titlebar-height)) + var(--window-frame-inset, 0px)
+  );
+  right: var(--window-frame-inset, 0px);
+  bottom: var(--window-frame-inset, 0px);
+  left: calc(
+    var(--frame-padding-inline) + var(--frame-projectbar-width) + var(--window-frame-inset, 0px)
+  );
+}
+
+html[data-theme-id="graphite"].electron-windows[data-window-maximized="false"][data-window-fullscreen="false"]
+  .right-panel-overlay-region {
+  clip-path: inset(0 round 0 0 var(--window-frame-radius) 0);
+}
+
 .right-panel-overlay-viewport {
   padding-right: var(--frame-padding-inline);
   padding-bottom: var(--frame-padding-bottom);

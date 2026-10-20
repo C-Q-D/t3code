@@ -37,20 +37,16 @@ html[data-theme-id="graphite"] [data-timeline-loading] {
   );
 }
 
-/* The portaled captions and shell share geometry even while a modal owns #root. */
-html[data-theme-id="graphite"].electron-windows
-  :is(
-    .window-frame-shell,
-    .windows-window-controls
-  )[data-window-maximized="false"][data-window-fullscreen="false"] {
+/* Body portals, captions and the shell inherit one native-state geometry. */
+html[data-theme-id="graphite"].electron-windows[data-window-maximized="false"][data-window-fullscreen="false"] {
   --window-frame-inset: 8px;
   --window-frame-radius: 12px;
 }
 
 /* Keep transparent native edges outside the visible graphite shell. Native resize
    hit testing still owns those pixels; do not turn the gutter into a drag region. */
-html[data-theme-id="graphite"].electron-windows
-  .window-frame-shell[data-window-maximized="false"][data-window-fullscreen="false"] {
+html[data-theme-id="graphite"].electron-windows[data-window-maximized="false"][data-window-fullscreen="false"]
+  .window-frame-shell {
   inset: var(--window-frame-inset);
   height: auto;
   border-radius: var(--window-frame-radius);
@@ -468,4 +464,75 @@ html.electron-windows .windows-window-controls svg {
   fill: none;
   stroke: currentColor;
   stroke-width: 1;
+}
+
+/* Full-viewport portals stay inside the transparent frame. Anchored popovers and
+   menus keep their measured coordinates; these selectors only cover edge surfaces. */
+html[data-theme-id="graphite"].electron-windows[data-window-maximized="false"][data-window-fullscreen="false"] {
+  :where(
+    [data-slot="dialog-backdrop"],
+    [data-slot="dialog-viewport"],
+    [data-slot="alert-dialog-backdrop"],
+    [data-slot="alert-dialog-viewport"],
+    [data-slot="sheet-backdrop"],
+    [data-slot="sheet-viewport"],
+    [data-slot="command-dialog-backdrop"],
+    [data-slot="command-dialog-viewport"],
+    [data-slot="onboarding-viewport"],
+    .dialog-backdrop:not(.right-panel-overlay-region),
+    .ov5-welcome-backdrop,
+    .discussion-diff-backdrop,
+    .discussion-diff-viewport
+  ) {
+    inset: var(--window-frame-inset);
+    border-radius: var(--window-frame-radius);
+    clip-path: inset(0 round var(--window-frame-radius));
+  }
+
+  :is(.ov5-welcome-backdrop, .ov5-welcome-viewport) {
+    top: calc(var(--workspace-topbar-height, 48px) + var(--window-frame-inset));
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+    clip-path: inset(0 round 0 0 var(--window-frame-radius) var(--window-frame-radius));
+  }
+
+  .ov5-welcome-backdrop::before,
+  .ov5-welcome-backdrop::after {
+    position: absolute;
+    border-radius: inherit;
+  }
+
+  /* Expanded MCP apps use a fixed popup rather than the dialog's relative track. */
+  [data-slot="dialog-popup"].fixed {
+    inset: var(--window-frame-inset);
+    width: calc(100dvw - 2 * var(--window-frame-inset));
+    height: calc(100dvh - 2 * var(--window-frame-inset));
+  }
+
+  [data-slot="toast-viewport"][data-position*="top"] {
+    top: calc(var(--toast-inset) + var(--toast-header-offset) + var(--window-frame-inset));
+  }
+  [data-slot="toast-viewport"][data-position*="bottom"] {
+    bottom: calc(var(--toast-inset) + var(--window-frame-inset));
+  }
+  [data-slot="toast-viewport"][data-position*="left"] {
+    left: calc(var(--toast-inset) + var(--window-frame-inset));
+  }
+  [data-slot="toast-viewport"][data-position*="right"] {
+    right: calc(var(--toast-inset) + var(--window-frame-inset));
+  }
+
+  /* Narrow desktop drawers carry inline reference geometry; offset only that
+     existing geometry, without changing sidebar layout or mobile styles. */
+  :is(.frame-sidebar-drawer-backdrop, .frame-sidebar-drawer-viewport) {
+    top: calc(48px + var(--window-frame-inset)) !important;
+    left: calc(68px + var(--window-frame-inset)) !important;
+    right: var(--window-frame-inset) !important;
+    bottom: var(--window-frame-inset) !important;
+  }
+  .frame-sidebar-drawer {
+    top: calc(52px + var(--window-frame-inset)) !important;
+    left: calc(76px + var(--window-frame-inset)) !important;
+    bottom: calc(20px + var(--window-frame-inset)) !important;
+  }
 }

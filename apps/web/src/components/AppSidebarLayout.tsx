@@ -417,7 +417,7 @@ function AppShell({ children }: { children: ReactNode }) {
     }
     setSidebarWidth(resolveFrameInitialSidebarWidth(null, viewportWidth, frame));
   };
-  const { maximized: isWindowMaximized, fullscreen: isWindowFullscreen } = useDesktopWindowState();
+  const { fullscreen: isWindowFullscreen } = useDesktopWindowState();
   const windowControlsInsetStyle = (
     isMacosDesktop && !isWindowFullscreen
       ? { "--workspace-controls-left": MACOS_TRAFFIC_LIGHTS_LEFT_INSET }
@@ -467,8 +467,6 @@ function AppShell({ children }: { children: ReactNode }) {
               }
             : undefined
         }
-        data-window-maximized={isWindowMaximized ? "true" : "false"}
-        data-window-fullscreen={isWindowFullscreen ? "true" : "false"}
       >
         <OnboardingShell
           className="grid! h-full! min-h-0! grid-cols-[minmax(0,1fr)] grid-rows-[var(--workspace-topbar-height)_minmax(0,1fr)]"

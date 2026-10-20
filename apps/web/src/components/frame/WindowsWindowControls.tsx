@@ -18,13 +18,7 @@ export async function runWindowAction(action: DesktopWindowAction): Promise<void
 }
 
 /** Renders native-sized hit targets; maximized is the native state, never optimistic state. */
-export function WindowsWindowControls({
-  maximized,
-  fullscreen,
-}: {
-  maximized: boolean;
-  fullscreen: boolean;
-}) {
+export function WindowsWindowControls({ maximized }: { maximized: boolean }) {
   const [pending, setPending] = useState(false);
   /** Serializes a user's caption actions until the native request settles. */
   const run = async (action: DesktopWindowAction) => {
@@ -38,11 +32,7 @@ export function WindowsWindowControls({
   // Native captions remain usable over modal dialogs. A body portal keeps their
   // replacement outside the shell's isolation and dialog scroll-lock padding.
   return createPortal(
-    <div
-      className="windows-window-controls no-drag"
-      data-window-maximized={maximized ? "true" : "false"}
-      data-window-fullscreen={fullscreen ? "true" : "false"}
-    >
+    <div className="windows-window-controls no-drag">
       <Tooltip>
         <TooltipTrigger
           render={<button type="button" />}

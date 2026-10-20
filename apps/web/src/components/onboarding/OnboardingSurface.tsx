@@ -60,6 +60,7 @@ export function OnboardingPopup({
         }
       />
       <DialogPrimitive.Viewport
+        data-slot="onboarding-viewport"
         className={cn(
           "fixed inset-0 z-50 flex items-center justify-center overflow-y-auto scrollbar-gutter-both p-5",
           welcome && "ov5-welcome-viewport",
