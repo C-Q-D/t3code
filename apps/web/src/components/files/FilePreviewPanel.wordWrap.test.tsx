@@ -164,6 +164,31 @@ describe("workspace preview toolbar", () => {
     return button;
   }
 
+  it("toggles the explorer from the header and restores its saved state after reopening", async () => {
+    await openFile("README.md");
+    const hide = host.querySelector<HTMLButtonElement>(
+      `button[aria-label="${t.tools.files.hideExplorer}"]`,
+    );
+    expect(hide).not.toBeNull();
+    expect(host.querySelector("aside")).not.toBeNull();
+    expect(hide!.getAttribute("aria-pressed")).toBe("true");
+    await act(() => hide!.click());
+    expect(host.querySelector("aside")).toBeNull();
+    expect(localStorage.getItem("t3code.fileExplorerOpen")).toBe("false");
+    await act(() => root.unmount());
+    root = createRoot(host);
+    await openFile("README.md");
+    expect(host.querySelector("aside")).toBeNull();
+    const show = host.querySelector<HTMLButtonElement>(
+      `button[aria-label="${t.tools.files.showExplorer}"]`,
+    );
+    expect(show).not.toBeNull();
+    expect(show!.getAttribute("aria-pressed")).toBe("false");
+    await act(() => show!.click());
+    expect(host.querySelector("aside")).not.toBeNull();
+    expect(localStorage.getItem("t3code.fileExplorerOpen")).toBe("true");
+  });
+
   it("copies the current text after an update and reports success", async () => {
     await openFile("README.md");
     fileState.data = { contents: "Updated text\nwith a second line", truncated: false };

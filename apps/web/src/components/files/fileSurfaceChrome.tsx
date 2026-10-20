@@ -68,7 +68,7 @@ export const FILE_LINK_REVEAL_UNSAFE_CSS = `
  * An icon-only header action with its label in a tooltip, the same control workspace files use.
  * A `pressed` action is a toggle and says so; a command (Copy, Save, Close) is a plain button,
  * because announcing it as an unpressed toggle tells a screen reader it has a state it has not.
- * Disabled design placeholders omit onPress; enabled actions supply their existing handler.
+ * Unavailable actions are disabled; enabled actions supply their existing handler.
  */
 export function FileSurfaceAction(props: {
   readonly label: string;

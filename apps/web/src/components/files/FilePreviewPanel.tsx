@@ -39,7 +39,7 @@ import {
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
 import { mediaFileReference } from "@t3tools/client-runtime/media-reference";
-import { Copy, FolderTree, Globe2, SquareArrowOutUpRight, WrapTextIcon } from "lucide-react";
+import { Copy, Globe2, PanelLeft, SquareArrowOutUpRight, WrapTextIcon } from "lucide-react";
 import * as Schema from "effect/Schema";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -81,7 +81,7 @@ import { FileBreadcrumbs } from "./FileBreadcrumbs";
 import { FileMarkdownPreview } from "./FileMarkdownPreview";
 import { FilePreviewModeControl } from "./FilePreviewModeControl";
 import { Button } from "~/components/ui/button";
-import { Menu, MenuItem, MenuCheckboxItem, MenuPopup, MenuTrigger } from "~/components/ui/menu";
+import { Menu, MenuItem, MenuPopup, MenuTrigger } from "~/components/ui/menu";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
 import {
   type FileCommentAnnotationEntry,
@@ -1302,6 +1302,15 @@ export default function FilePreviewPanel({
         >
           {relativePath && attachment === undefined ? (
             <div className={FILE_SURFACE_SUBHEADER_CLASS} data-surface-subheader>
+              {!isHostFile && previewPath !== null ? (
+                <FileSurfaceAction
+                  label={explorerOpen ? t.tools.files.hideExplorer : t.tools.files.showExplorer}
+                  pressed={explorerOpen}
+                  onPress={toggleExplorer}
+                >
+                  <PanelLeft className="size-3.5" />
+                </FileSurfaceAction>
+              ) : null}
               <ScrollArea
                 radius="none"
                 ref={breadcrumbRef}
@@ -1390,16 +1399,6 @@ export default function FilePreviewPanel({
                       <Globe2 />
                       {t.tools.files.openBrowser}
                     </MenuItem>
-                  ) : null}
-                  {!isHostFile && previewPath !== null ? (
-                    <MenuCheckboxItem
-                      density="compact"
-                      checked={explorerOpen}
-                      onCheckedChange={toggleExplorer}
-                    >
-                      <FolderTree />
-                      {explorerOpen ? t.tools.files.hideExplorer : t.tools.files.showExplorer}
-                    </MenuCheckboxItem>
                   ) : null}
                 </MenuPopup>
               </Menu>
