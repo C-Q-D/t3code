@@ -12,9 +12,7 @@ import { ChevronsDownUp, ChevronsUpDown } from "lucide";
 import { Search } from "lucide-react";
 import { Input as SearchInput } from "@base-ui/react/input";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { usePhysicsMotion } from "~/hooks/usePhysicsMotion";
 import { ComposerThrowToken, type ThrowChannel } from "../chat/ComposerThrowToken";
-import { installComposerMentionThrow } from "../chat/composerMentionThrow";
 
 import { Button } from "~/components/ui/button";
 import { MorphIcon } from "~/components/MorphIcon";
@@ -30,6 +28,7 @@ import { T3_PIERRE_ICONS } from "~/pierre-icons";
 import { FILE_TREE_APPEARANCE, FILE_TREE_ROW_HEIGHT } from "./fileTreeAppearance";
 
 import { createFileTreeDragMentionController } from "./fileTreeDragMention";
+import { installFileTreeDrag } from "./fileTreeDrag";
 import { areAllDirectoriesExpanded, setAllDirectoriesExpanded } from "./fileTreeExpansion";
 import { buildFileTreePathUpdates } from "./fileTreePathReconciliation";
 import { useDirectoryEntries } from "./useDirectoryEntries";
@@ -118,7 +117,6 @@ export default function FileBrowserPanel({
   workspaceMutationId,
 }: FileBrowserPanelProps) {
   const { resolvedTheme } = useTheme();
-  const { enabled: physics } = usePhysicsMotion();
   const throwId = useId();
   const throwChannel: ThrowChannel = `mention:${throwId}`;
   const composerRef = useComposerHandleContext();
@@ -493,12 +491,8 @@ export default function FileBrowserPanel({
     });
   }, [entryKinds, model, selectedPath, selectedPathRevealId]);
 
-  // Tag tree drags with the composer mention payload. The row is read from
-  // the composed event path (the tree's shadow root is open), so this does
-  // not depend on running after the tree's own dragstart handler; the drag
-  // data store is writable for every dragstart listener in the dispatch.
-  // The capture phase runs before the tree's own dragstart handler selects
-  // the dragged row, so the drag flag is up before that selection emits.
+  // Capture before the tree starts native drag state. The bridge reads rows through
+  // the open shadow root and owns selection suppression for both drag modes.
   const panelRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     treeModelRef.current = model;
@@ -508,26 +502,8 @@ export default function FileBrowserPanel({
     if (panel === null) {
       return;
     }
-    const handleDragStart = (event: DragEvent) => dragMention.handleDragStart(event);
-    const handleDragEnd = () => dragMention.handleDragEnd();
-    panel.addEventListener("dragstart", handleDragStart, true);
-    panel.addEventListener("dragend", handleDragEnd);
-    return () => {
-      panel.removeEventListener("dragstart", handleDragStart, true);
-      panel.removeEventListener("dragend", handleDragEnd);
-    };
-  }, [dragMention]);
-  useEffect(() => {
-    const panel = panelRef.current;
-    if (!physics || !panel) return;
-    const throws = installComposerMentionThrow(throwChannel);
-    // Bubble after the tree's row handler, which may install its own drag image.
-    panel.addEventListener("dragstart", throws.start);
-    return () => {
-      panel.removeEventListener("dragstart", throws.start);
-      throws.dispose();
-    };
-  }, [physics, throwChannel]);
+    return installFileTreeDrag(panel, dragMention, throwChannel);
+  }, [dragMention, throwChannel]);
 
   return (
     <div
