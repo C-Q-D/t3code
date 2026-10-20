@@ -24,24 +24,55 @@ export function WindowsWindowControls({ maximized }: { maximized: boolean }) {
   useLayoutEffect(() => {
     const controls = controlsRef.current;
     if (!controls?.showPopover) return;
-    // A page z-index cannot outrank MCP's top-layer popover. Keep the same
-    // caption host in that layer and raise it after an app enters the layer.
-    const onToggle = (event: Event) => {
+    let fullscreenApp: HTMLElement | null = null;
+    // A removed MCP frame does not deliver its closing toggle to document.
+    // Observe only while fullscreen, and inspect the tracked frame rather than
+    // querying the streaming conversation for every mutation.
+    const observer = new MutationObserver(() => {
       if (
-        event.target instanceof HTMLElement &&
-        event.target.matches("[data-mcp-app-fullscreen]") &&
-        "newState" in event &&
-        event.newState === "open"
+        fullscreenApp &&
+        (!fullscreenApp.isConnected || !fullscreenApp.hasAttribute("data-mcp-app-fullscreen"))
       ) {
-        controls.hidePopover();
-        controls.showPopover();
+        restorePageLayer();
+      }
+    });
+    /** Releases the top layer so Electron can collect the titlebar's drag region again. */
+    const restorePageLayer = () => {
+      observer.disconnect();
+      fullscreenApp = null;
+      if (controls.matches(":popover-open")) controls.hidePopover();
+      controls.removeAttribute("popover");
+    };
+    /** Raises captions above the one fullscreen MCP frame without remounting its buttons. */
+    const raiseAboveApp = (app: HTMLElement) => {
+      fullscreenApp = app;
+      controls.setAttribute("popover", "manual");
+      if (controls.matches(":popover-open")) controls.hidePopover();
+      controls.showPopover();
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["data-mcp-app-fullscreen"],
+      });
+    };
+    const onToggle = (event: Event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement) || target === controls) return;
+      if (target.hasAttribute("data-mcp-app-fullscreen") && target.matches(":popover-open")) {
+        raiseAboveApp(target);
+      } else if (target === fullscreenApp) {
+        restorePageLayer();
       }
     };
-    controls.showPopover();
     document.addEventListener("toggle", onToggle, true);
+    const existingApp = document.querySelector<HTMLElement>(
+      "[data-mcp-app-fullscreen]:popover-open",
+    );
+    if (existingApp) raiseAboveApp(existingApp);
     return () => {
       document.removeEventListener("toggle", onToggle, true);
-      if (controls.matches(":popover-open")) controls.hidePopover();
+      restorePageLayer();
     };
   }, []);
   /** Serializes a user's caption actions until the native request settles. */
@@ -56,7 +87,7 @@ export function WindowsWindowControls({ maximized }: { maximized: boolean }) {
   // Native captions remain usable over modal dialogs. A body portal keeps their
   // replacement outside the shell's isolation and dialog scroll-lock padding.
   return createPortal(
-    <div ref={controlsRef} popover="manual" className="windows-window-controls no-drag">
+    <div ref={controlsRef} className="windows-window-controls no-drag">
       <Tooltip>
         <TooltipTrigger
           render={<button type="button" />}
