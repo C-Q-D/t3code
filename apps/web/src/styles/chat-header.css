@@ -103,12 +103,16 @@ html[data-theme-id] .chat-panel-layout-controls button[aria-pressed]:disabled {
   text-box: normal;
 }
 
-/* Only blank surfaces inherit grab. Hovering a control removes it from the entire
-   ancestor chain, preserving native and component cursors without overriding them.
-   Keep these exclusions in sync with CARD_CONTROLS in ThreadDetailsCard.tsx. */
-[data-thread-details-panel="inline"]:not(
-  :has(
-    :is(
+/* Blank surfaces inherit grab; controls reset that inheritance in the components
+   layer so their own utility cursors still win. Keep the list in sync with
+   CARD_CONTROLS in ThreadDetailsCard.tsx. */
+[data-thread-details-panel="inline"] {
+  cursor: grab;
+}
+
+@layer components {
+  [data-thread-details-panel="inline"]
+    :where(
       button,
       a,
       input,
@@ -135,10 +139,9 @@ html[data-theme-id] .chat-panel-layout-controls button[aria-pressed]:disabled {
       [role="scrollbar"],
       [contenteditable]:not([contenteditable="false"]),
       [data-slot="scroll-area-scrollbar"]
-    ):hover
-  )
-) {
-  cursor: grab;
+    ) {
+    cursor: auto;
+  }
 }
 
 [data-thread-details-panel="inline"][data-dragging="true"],

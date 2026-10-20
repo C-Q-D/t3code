@@ -42,7 +42,7 @@ import {
   type ThreadDetailsCardPlacement,
 } from "../../threadDetailsCardPlacementStore";
 
-// Keep in sync with the blank-surface cursor exclusions in chat-header.css.
+// Keep in sync with the control cursor reset in chat-header.css; these targets cannot start a card drag.
 const CARD_CONTROLS =
   'button, a, input, textarea, select, option, label, summary, [role="button"], [role="link"], [role="textbox"], [role="combobox"], [role="checkbox"], [role="radio"], [role="switch"], [role="slider"], [role="spinbutton"], [role="tab"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="option"], [role="treeitem"], [role="scrollbar"], [contenteditable]:not([contenteditable="false"]), [data-slot="scroll-area-scrollbar"]';
 
