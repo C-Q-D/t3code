@@ -32,7 +32,9 @@
 }
 
 html[data-theme-id="graphite"] {
-  --edge-glow: inset 0 0 0 1px rgba(255, 255, 255, 0.18), 0 0 10px rgba(255, 255, 255, 0.08);
+  --edge-glow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09), 0 0 0 1px rgba(255, 255, 255, 0.24),
+    0 0 22px 4px rgba(255, 255, 255, 0.28);
 }
 
 /* Platform classes are installed before React mounts, gated by isElectron in main.tsx. */
