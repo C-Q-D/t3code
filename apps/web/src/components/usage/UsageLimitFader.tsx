@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, type ReactNode } from "react";
 import { usePhysicsMotion } from "../../hooks/usePhysicsMotion";
 import { useMotionJob } from "../../lib/motion/react";
+import { useAnimatedNumber } from "../../hooks/useAnimatedNumber";
 import { FaderMotion } from "./UsageLimitFader.motion";
 
 /** Render quota in percent; label contains the complete accessible name and reset time. */
@@ -116,8 +117,33 @@ export function UsageLimitFader({
         />
       </div>
       {children}
-      <span className="usage-fader-remaining">{remainingPercent}%</span>
+      <FaderPercentage value={remainingPercent} />
       <span className="usage-fader-reset">{resetLabel || "\u00a0"}</span>
     </div>
+  );
+}
+
+/** Format the authoritative remainder; dragging never changes the displayed quota. */
+function formatPercentage(value: number) {
+  return `${Math.round(value)}%`;
+}
+
+/** Animate refreshed quota with the shared numeric hook; initial and reduced-motion values are immediate. */
+export function FaderPercentage({
+  value,
+  shared = false,
+}: {
+  readonly value: number;
+  readonly shared?: boolean;
+}) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useAnimatedNumber(ref, value, formatPercentage);
+  return (
+    <span
+      ref={ref}
+      className={shared ? "usage-fader-shared-number font-serif" : "usage-fader-remaining"}
+    >
+      {formatPercentage(value)}
+    </span>
   );
 }

@@ -106,7 +106,7 @@ function AccountAvatar({
  * is one, else a two-letter chip. The address itself is revealed on demand in
  * the segment's popover.
  */
-function AccountName({
+export function AccountName({
   account,
   className,
 }: {
@@ -142,7 +142,7 @@ function Row({ label, children }: { readonly label: string; readonly children: R
  * the email on request, reset time and share of the pool it restores, and the
  * reset-credit action. Opens on hover for a glance, on click to act.
  */
-function SegmentPopover({
+export function SegmentPopover({
   account,
   window,
   reset,

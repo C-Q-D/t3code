@@ -637,6 +637,11 @@ export const tools = {
     outputShareDetail: (percent: string) => `${percent} of tokens`,
     savingsMultipleDetail: (multiple: string) => `≈ ${multiple}× cost`,
     chartPeak: (period: string, value: string) => `Peak ${period} · ${value}`,
+    faderSharedRemaining: "Shared remaining",
+    faderResetCount: (count: number) => `Reset ×${count}`,
+    faderSharedAccounts: (window: string, count: number) => `${window} · ${count} shared accounts`,
+    faderSummary: (name: string, remaining: number, reset: string) =>
+      `${name}: ${remaining}% remaining${reset ? `, resets ${reset}` : ""}`,
     providerCount: (count: number) => `${count} providers`,
     connecting: "Connecting…",
     allProviders: "All usage sources",

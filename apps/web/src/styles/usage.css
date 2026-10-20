@@ -743,3 +743,119 @@ html[data-theme-id="graphite"] .usage-chart-surface {
   color: var(--muted-foreground);
   white-space: nowrap;
 }
+
+/* L2 provider cards and account controls. */
+.usage-fader-cards {
+  display: grid;
+  gap: 10px;
+}
+.usage-fader-card-row {
+  display: grid;
+  gap: 10px;
+  align-items: stretch;
+}
+.usage-fader-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px 12px 11px;
+  border-radius: 14px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-usage-card);
+}
+.usage-fader-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+.usage-fader-header h3 {
+  font-weight: 600;
+}
+.usage-fader-subtitle {
+  min-height: 16px;
+  overflow-wrap: anywhere;
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+.usage-fader-credit {
+  margin-left: auto;
+  white-space: nowrap;
+  font-size: 11px;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 4px;
+}
+.usage-fader-credit:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.usage-fader-groups {
+  display: flex;
+  gap: 12px;
+  flex: 1;
+  align-items: stretch;
+}
+.usage-fader-group {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.usage-fader-group-heading {
+  min-height: 42px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.usage-fader-shared-number {
+  color: var(--foreground);
+  font-size: 24px;
+  line-height: 0.9;
+  margin-right: 4px;
+}
+.usage-fader-controls {
+  display: flex;
+  justify-content: space-around;
+  align-items: flex-start;
+  gap: 2px;
+}
+.usage-fader-name {
+  font-size: 10.5px;
+  color: var(--muted-foreground);
+  min-height: 24px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  text-underline-offset: 3px;
+}
+.usage-fader-name:hover,
+.usage-fader-name[aria-pressed="true"] {
+  color: var(--foreground);
+  text-decoration: underline dotted;
+}
+.usage-fader-name:focus-visible,
+.usage-fader-credit:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+.usage-fader-description,
+.usage-fader-status {
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.usage-fader-description {
+  margin-top: 8px;
+}
+.usage-fader-status:empty {
+  display: none;
+}
+.usage-fader-account-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+}

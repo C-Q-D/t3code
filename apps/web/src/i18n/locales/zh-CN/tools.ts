@@ -613,6 +613,11 @@ export const tools: Messages["tools"] = {
     outputShareDetail: (percent: string) => `占 ${percent}`,
     savingsMultipleDetail: (multiple: string) => `≈ 费用的 ${multiple} 倍`,
     chartPeak: (period: string, value: string) => `峰值 ${period} · ${value}`,
+    faderSharedRemaining: "共享剩余",
+    faderResetCount: (count: number) => `重置 ×${count}`,
+    faderSharedAccounts: (window: string, count: number) => `${window} · ${count} 个账户共享`,
+    faderSummary: (name: string, remaining: number, reset: string) =>
+      `${name}：剩余 ${remaining}%${reset ? `，重置时间 ${reset}` : ""}`,
     providerCount: (count: number) => `${count} 个用量来源`,
     connecting: "正在连接…",
     allProviders: "所有用量来源",

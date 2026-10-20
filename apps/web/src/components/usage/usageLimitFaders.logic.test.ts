@@ -1,5 +1,5 @@
 /** Guards the requested account/window layout, independent of visual markup. */
-import type { ServerProviderUsageWindow } from "@t3tools/contracts";
+import { ProviderDriverKind, type ServerProviderUsageWindow } from "@t3tools/contracts";
 import { collectLimitPools, type LimitAccount } from "@t3tools/shared/usageLimits";
 import { expect, it } from "vite-plus/test";
 import { limitFaderGroups } from "./usageLimitFaders.logic";
@@ -28,7 +28,7 @@ const monthly: ServerProviderUsageWindow = {
 function account(key: string, windows: readonly ServerProviderUsageWindow[]): LimitAccount {
   return {
     key,
-    driver: "codex",
+    driver: ProviderDriverKind.make("codex"),
     displayName: key,
     email: undefined,
     plan: undefined,
@@ -105,7 +105,7 @@ it("uses Cursor display order and excludes its redundant total window", () => {
     { ...monthly, id: "totalPercentUsed" },
     { ...monthly, id: "autoPercentUsed" },
   ]);
-  const result = groups([{ ...source, driver: "cursor" }]);
+  const result = groups([{ ...source, driver: ProviderDriverKind.make("cursor") }]);
   expect(result.map((group) => group.window.id)).toEqual(["autoPercentUsed", "apiPercentUsed"]);
   expect(result.map((group) => group.faders.length)).toEqual([1, 1]);
 });
