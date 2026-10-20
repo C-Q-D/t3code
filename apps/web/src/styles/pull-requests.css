@@ -75,7 +75,7 @@
 
 /* A running action must stay reachable after the pointer leaves the row. */
 @utility pr-list-actions {
-  &:has([data-pull-request-action-pending="true"]) {
+  &[data-pull-request-action-pending="true"] {
     display: flex;
   }
 }
@@ -111,9 +111,4 @@
 @utility pr-list-row-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-
-  /* Host capabilities can exist without an action for this row; an empty group reserves nothing. */
-  & > .pr-list-actions:not(:has(button)) {
-    display: none;
-  }
 }

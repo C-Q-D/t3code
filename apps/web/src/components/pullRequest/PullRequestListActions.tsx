@@ -5,6 +5,7 @@ import { XIcon } from "lucide-react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 
 import { t } from "~/i18n";
+import { cn } from "~/lib/utils";
 import { pullRequestEnvironment } from "~/state/pullRequests";
 import { useUiStateStore } from "~/uiStateStore";
 import { Button } from "../ui/button";
@@ -22,7 +23,7 @@ import {
 /**
  * Show L4's 26px hover close control; speed mode keeps every existing supported action.
  * @param props Host capabilities, current row and callbacks used by the existing list action flow.
- * @returns Available actions; merge resolution and writes remain in the shared action hooks.
+ * @returns The action tray, or null when this mode offers no actions; shared hooks own writes.
  */
 export function PullRequestListActions({
   entry,
@@ -72,17 +73,24 @@ export function PullRequestListActions({
     },
   });
   const busy = actionPending || closing || sweeping;
-  const actions = pullRequestQuickActions(entry, hostActions);
+  const actions = pullRequestQuickActions(entry, hostActions).filter(
+    (action) => speedMode || busy || action === "close",
+  );
+  if (actions.length === 0) return null;
   return (
     <div
-      className="flex items-center gap-1"
-      role="group"
-      aria-label={t.git.pullRequest.quickActions(entry.number)}
+      className={cn(
+        "pr-list-actions col-start-2 row-start-1 ml-1.5 mr-2 mt-2 hidden self-start rounded-full bg-secondary group-hover/pr-page-row:flex group-focus-within/pr-page-row:flex",
+        speedMode && "flex mt-1.25",
+      )}
       data-pull-request-action-pending={busy}
     >
-      {actions
-        .filter((action) => speedMode || busy || action === "close")
-        .map((action) => {
+      <div
+        className="flex items-center gap-1"
+        role="group"
+        aria-label={t.git.pullRequest.quickActions(entry.number)}
+      >
+        {actions.map((action) => {
           const { label, Icon } = LIST_ACTIONS[action];
           const props = {
             disabled: !canWrite || busy || (action === "merge" && entry.stack !== undefined),
@@ -126,6 +134,7 @@ export function PullRequestListActions({
             </Tooltip>
           );
         })}
+      </div>
     </div>
   );
 }

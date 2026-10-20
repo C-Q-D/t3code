@@ -289,22 +289,15 @@ function PullRequestRowImpl({
         ) : null}
       </button>
       {hostActions.size > 0 ? (
-        <div
-          className={cn(
-            "pr-list-actions col-start-2 row-start-1 ml-1.5 mr-2 mt-2 hidden self-start rounded-full bg-secondary group-hover/pr-page-row:flex group-focus-within/pr-page-row:flex",
-            speedMode && "flex mt-1.25",
-          )}
-        >
-          <PullRequestListActions
-            entry={entry}
-            hostActions={hostActions}
-            speedMode={speedMode}
-            onActed={onActed}
-            closing={closing}
-            sweeping={sweeping}
-            {...(onCloseSweepStart ? { onCloseSweepStart } : {})}
-          />
-        </div>
+        <PullRequestListActions
+          entry={entry}
+          hostActions={hostActions}
+          speedMode={speedMode}
+          onActed={onActed}
+          closing={closing}
+          sweeping={sweeping}
+          {...(onCloseSweepStart ? { onCloseSweepStart } : {})}
+        />
       ) : null}
     </div>
   );

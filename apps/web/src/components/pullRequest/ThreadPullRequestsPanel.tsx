@@ -142,6 +142,7 @@ function LinkRow({
 }) {
   const openPrLink = useOpenPrLink(threadRef);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [actionPending, setActionPending] = useState(false);
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const menuAnchor = useMemo(
     () =>
@@ -348,6 +349,7 @@ function LinkRow({
           entry={actionEntry}
           hostActions={linkHostActions}
           visible={speedMode}
+          onPendingChange={setActionPending}
         />
       ) : null}
       {/* Keep the existing menu reachable by hover or keyboard without covering the watch action. */}
@@ -359,7 +361,7 @@ function LinkRow({
           "pointer-events-none opacity-0 group-hover/pr-row:pointer-events-auto group-hover/pr-row:opacity-100",
           "group-focus-within/pr-row:pointer-events-auto group-focus-within/pr-row:opacity-100",
           menuOpen && "pointer-events-auto opacity-100",
-          "group-has-[[data-pull-request-action-pending=true]]/pr-row:hidden",
+          actionPending && "hidden",
           speedMode && hasQuickActions && "hidden",
         )}
       >

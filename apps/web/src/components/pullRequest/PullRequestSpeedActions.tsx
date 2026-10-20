@@ -1,5 +1,6 @@
 /** Owns pull request speed actions on the web pull-request surface; host data and agent context remain unchanged. */
 import { t } from "~/i18n";
+import { useLayoutEffect } from "react";
 import { useAtomValue } from "@effect/atom-react";
 import type { PullRequestAction } from "@t3tools/contracts";
 import { pullRequestEnvironment } from "~/state/pullRequests";
@@ -37,6 +38,7 @@ export function PullRequestSpeedActions<Entry extends PullRequestSpeedActionEntr
   closing = false,
   sweeping = false,
   onCloseSweepStart,
+  onPendingChange,
 }: {
   entry: Entry;
   /** What the row's host can do; actions it cannot are not offered. */
@@ -46,6 +48,8 @@ export function PullRequestSpeedActions<Entry extends PullRequestSpeedActionEntr
   closing?: boolean;
   sweeping?: boolean;
   onCloseSweepStart?: (entry: Entry, event: PointerEvent) => void;
+  /** Reports rendered pending actions before paint; clears the report on unmount. */
+  onPendingChange?: (pending: boolean) => void;
 }) {
   const canWrite = useAtomValue(
     pullRequestEnvironment.runAction.permissionAtom(entry.environmentId),
@@ -80,6 +84,11 @@ export function PullRequestSpeedActions<Entry extends PullRequestSpeedActionEntr
   });
   const actions = pullRequestQuickActions(entry, hostActions);
   const busy = actionPending || closing || sweeping;
+  const pending = actions.length > 0 && (actionPending || closing);
+  useLayoutEffect(() => {
+    onPendingChange?.(pending);
+    return () => onPendingChange?.(false);
+  }, [onPendingChange, pending]);
   if (actions.length === 0) return null;
   return (
     <div
@@ -87,7 +96,7 @@ export function PullRequestSpeedActions<Entry extends PullRequestSpeedActionEntr
       style={{ display: visible || busy ? "flex" : "none" }}
       role="group"
       aria-label={t.git.pullRequest.quickActions(entry.number)}
-      data-pull-request-action-pending={actionPending || closing}
+      data-pull-request-action-pending={pending}
     >
       {actions.map((action) => {
         const label = ACTIONS[action].label;
