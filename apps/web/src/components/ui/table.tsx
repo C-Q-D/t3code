@@ -1,3 +1,4 @@
+/** Shared usage-table layout; rows and cells keep uniform spacing for their supplied content. */
 import * as React from "react";
 
 import { cn } from "~/lib/utils";
@@ -28,12 +29,13 @@ function TableBody({ className, ...props }: React.ComponentProps<"tbody">) {
   );
 }
 
+/** Applies hover and explicit selected-row styling without inspecting cell controls. */
 function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
   return (
     <tr
       data-slot="table-row"
       className={cn(
-        "border-b transition-colors hover:bg-muted/50 has-aria-expanded:bg-muted/50 data-[state=selected]:bg-muted",
+        "border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted",
         className,
       )}
       {...props}
@@ -41,12 +43,13 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
   );
 }
 
+/** Renders a column header with the shared cell spacing. */
 function TableHead({ className, ...props }: React.ComponentProps<"th">) {
   return (
     <th
       data-slot="table-head"
       className={cn(
-        "h-10 px-2 text-left align-middle font-medium whitespace-nowrap text-foreground [&:has([role=checkbox])]:pr-0",
+        "h-10 px-2 text-left align-middle font-medium whitespace-nowrap text-foreground",
         className,
       )}
       {...props}
@@ -54,11 +57,12 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
   );
 }
 
+/** Renders a data cell with the shared cell spacing. */
 function TableCell({ className, ...props }: React.ComponentProps<"td">) {
   return (
     <td
       data-slot="table-cell"
-      className={cn("p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0", className)}
+      className={cn("p-2 align-middle whitespace-nowrap", className)}
       {...props}
     />
   );

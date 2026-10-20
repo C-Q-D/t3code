@@ -27,12 +27,12 @@ const alertVariants = cva("relative rounded-xl border px-3.5 py-3 text-card-fore
       warning:
         "border-warning/32 bg-warning-surface text-warning-foreground [&_[data-slot=alert-description]]:text-warning-foreground/80 [&_svg]:text-warning",
       // W7 solid sand notice, shared by Markdown callouts and status banners.
-      sand: "rounded-notice border-0 bg-warning-surface px-3.5 py-2.5 text-body leading-callout text-warning-foreground shadow-notice-sand text-shadow-none [--lucide-hue-override:currentColor] [&>div]:items-start [&>div]:gap-2.5 [&>div>div:has(>svg)]:mt-0.75 [&>div>div:has(>svg)]:size-4 [&>div>div:has(>[data-slot=alert-title])]:block [&_[data-slot=alert-title]]:inline [&_[data-slot=alert-title]]:font-bold [&_[data-slot=alert-title]]:text-status-warning-foreground [&_[data-slot=alert-description]]:inline [&_[data-slot=alert-description]]:text-inherit [&>div>div>svg]:text-warning",
+      sand: "rounded-notice border-0 bg-warning-surface px-3.5 py-2.5 text-body leading-callout text-warning-foreground shadow-notice-sand text-shadow-none [--lucide-hue-override:currentColor] [&>div]:items-start [&>div]:gap-2.5 [&_[data-slot=alert-icon]]:mt-0.75 [&_[data-slot=alert-icon]]:size-4 [&_[data-slot=alert-content]]:block [&_[data-slot=alert-title]]:inline [&_[data-slot=alert-title]]:font-bold [&_[data-slot=alert-title]]:text-status-warning-foreground [&_[data-slot=alert-description]]:inline [&_[data-slot=alert-description]]:text-inherit [&>div>div>svg]:text-warning",
     },
     size: {
       // 补充屏-1 T2 / W7: 44px status bars use 16px corners and 15px leading icons.
       "status-bar":
-        "min-h-11 rounded-overlay py-1.5 pr-1.5 pl-3.5 text-secondary-copy-large leading-5 [&>div]:min-h-8 [&>div]:items-center [&>div]:gap-2.5 [&>div]:pt-0 [&>div>div:has(>svg)]:mt-0 [&>div>div:has(>svg)]:size-3.75 [&>div>div>svg]:size-3.75 [&>div>div:has(>[data-slot=alert-action])]:h-auto [&>div>div:has(>[data-slot=alert-action])]:self-center",
+        "min-h-11 rounded-overlay py-1.5 pr-1.5 pl-3.5 text-secondary-copy-large leading-5 [&>div]:min-h-8 [&>div]:items-center [&>div]:gap-2.5 [&>div]:pt-0 [&_[data-slot=alert-icon]]:mt-0 [&_[data-slot=alert-icon]]:size-3.75 [&>div>div>svg]:size-3.75 [&_[data-slot=alert-actions]]:h-auto [&_[data-slot=alert-actions]]:self-center",
     },
   },
 });
@@ -107,6 +107,7 @@ function Alert({
       >
         {icon.length > 0 && (
           <div
+            data-slot="alert-icon"
             className={cn(
               "flex shrink-0 items-center justify-center",
               controlAlignment === "first-line"
@@ -118,10 +119,13 @@ function Alert({
           </div>
         )}
         {content.length > 0 && (
-          <div className="flex min-w-0 flex-1 flex-col gap-0.5">{content}</div>
+          <div data-slot="alert-content" className="flex min-w-0 flex-1 flex-col gap-0.5">
+            {content}
+          </div>
         )}
         {action.length > 0 && (
           <div
+            data-slot="alert-actions"
             className={cn(
               "flex shrink-0 items-center",
               controlAlignment === "first-line" ? "h-lh self-start" : "self-center",

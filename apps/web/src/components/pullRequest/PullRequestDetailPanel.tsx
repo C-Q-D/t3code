@@ -1650,7 +1650,7 @@ export function PullRequestDetailPanel({
   const checkoutControl =
     context === "page" ? (
       <Menu>
-        <Group variant="split" aria-label={t.git.pullRequest.checkOutThisPullRequest}>
+        <Group variant="split" leadingIcon aria-label={t.git.pullRequest.checkOutThisPullRequest}>
           <MenuTrigger
             disabled={handoff !== null || checkoutRoot === null}
             render={
@@ -2204,7 +2204,7 @@ export function PullRequestDetailPanel({
               ) : null}
               <div className="flex flex-wrap items-center gap-1.5">
                 <Menu>
-                  <Group variant="split" aria-label={t.git.pullRequest.merge}>
+                  <Group variant="split" leadingIcon={false} aria-label={t.git.pullRequest.merge}>
                     <Button
                       variant="default"
                       disabled={actionPending || !headerActions.merge}
