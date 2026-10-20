@@ -101,6 +101,12 @@ function Command({
   );
 }
 
+/**
+ * Renders the shared palette search input and forwards input props, including placeholder and ref.
+ * CommandDialogPopup owns paletteMode and viewport geometry; this input does not select a mode.
+ * CommandPaletteContent uses it outside graphite command mode, whose search well owns its input.
+ * The input is the focusable child, so focus-within suppresses its outer ring while editing.
+ */
 function CommandInput({
   className,
   placeholder,
