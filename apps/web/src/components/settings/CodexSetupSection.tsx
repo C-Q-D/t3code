@@ -40,6 +40,7 @@ import { SettingsRow } from "./settingsLayout";
 import { AddCodexAccountDialog } from "./AddCodexAccountDialog";
 import { getOnboardingProviderState } from "../../onboarding/providerReadiness.logic";
 import { getProviderSummary } from "./providerStatus";
+import { cn } from "../../lib/utils";
 
 const noop = () => undefined;
 
@@ -69,6 +70,7 @@ export function CodexSetupSection(props: CodexSetupSectionProps) {
   const content =
     props.mode === "existing" && props.presentation === "onboarding" ? (
       <CodexWelcomeCard
+        controlsStack={!existingReady && !existingChecking && !existingAuthenticated}
         title={props.displayName || props.provider?.displayName || "Codex"}
         description={
           existingReady ? (
@@ -130,6 +132,7 @@ export function CodexSetupSection(props: CodexSetupSectionProps) {
     ) : props.mode === "existing" ? null : props.provider?.setup === undefined ? (
       props.presentation === "onboarding" ? (
         <CodexWelcomeCard
+          controlsStack
           title={props.displayName || props.provider?.displayName || "Codex"}
           description={<CodexSignInDescription />}
           control={
@@ -784,6 +787,7 @@ function ManagedCodexSetup({
       <>
         {accountPicker}
         <CodexWelcomeCard
+          controlsStack={!authenticated || busy || (authActive && !finishingSignIn)}
           title={displayName || provider?.displayName || "Codex"}
           description={
             installActive ? (
@@ -1140,12 +1144,15 @@ function CodexWelcomeCard({
   description,
   control,
   secondaryControl,
+  controlsStack = false,
   children,
 }: {
   readonly title: string;
   readonly description: ReactNode;
   readonly control?: ReactNode;
   readonly secondaryControl?: ReactNode;
+  /** Stack button controls on narrow screens; status-only controls stay inline. */
+  readonly controlsStack?: boolean;
   readonly children?: ReactNode;
 }) {
   const footer = Children.toArray(children);
@@ -1158,7 +1165,14 @@ function CodexWelcomeCard({
           <div className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{description}</div>
         </div>
         {control || secondaryControl ? (
-          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 has-[button]:w-full has-[button]:flex-col-reverse has-[button]:items-end sm:has-[button]:w-auto sm:has-[button]:flex-row sm:has-[button]:items-center">
+          <div
+            className={cn(
+              "flex shrink-0 flex-wrap justify-end gap-2",
+              controlsStack
+                ? "w-full flex-col-reverse items-end sm:w-auto sm:flex-row sm:items-center"
+                : "items-center",
+            )}
+          >
             {secondaryControl}
             {control}
           </div>
