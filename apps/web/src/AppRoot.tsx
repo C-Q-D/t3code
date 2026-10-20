@@ -1,5 +1,6 @@
 /** Mounts renderer-wide providers and services independently of route lifetimes. */
 import { RouterProvider } from "@tanstack/react-router";
+import { DesktopWindowHost } from "./components/frame/DesktopWindowHost";
 import { PhysicsMotionRoot } from "./components/PhysicsMotionRoot";
 
 import { BrowserProfileReporter } from "./browser/BrowserProfileReporter";
@@ -17,7 +18,9 @@ export function AppRoot({ router }: { readonly router: AppRouter }) {
   return (
     <AppAtomRegistryProvider>
       <PhysicsMotionRoot />
-      <RouterProvider router={router} />
+      <DesktopWindowHost>
+        <RouterProvider router={router} />
+      </DesktopWindowHost>
       <ElectronBrowserHost />
       <BrowserProfileReporter />
       <QuitHoldOverlay />

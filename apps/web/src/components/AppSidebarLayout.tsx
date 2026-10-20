@@ -15,7 +15,8 @@ import {
 import { useLocation, useNavigate, useParams, useRouterState } from "@tanstack/react-router";
 
 import { createPresenceRegistry } from "../lib/presenceRegistry";
-import { WindowsWindowControls, runWindowAction } from "./frame/WindowsWindowControls";
+import { useDesktopWindowState } from "./frame/DesktopWindowHost";
+import { runWindowAction } from "./frame/WindowsWindowControls";
 import { isWindowsPlatform } from "../lib/utils";
 import { isElectron } from "../env";
 import { getLocalStorageItem, removeLocalStorageItem } from "../hooks/useLocalStorage";
@@ -416,23 +417,7 @@ function AppShell({ children }: { children: ReactNode }) {
     }
     setSidebarWidth(resolveFrameInitialSidebarWidth(null, viewportWidth, frame));
   };
-  const [isWindowFullscreen, setIsWindowFullscreen] = useState(() => {
-    const getWindowFullscreenState = window.desktopBridge?.getWindowFullscreenState;
-    return isElectron && typeof getWindowFullscreenState === "function"
-      ? getWindowFullscreenState()
-      : false;
-  });
-  const [isWindowMaximized, setIsWindowMaximized] = useState(() =>
-    isElectron ? (window.desktopBridge?.getWindowMaximizedState?.() ?? false) : false,
-  );
-  useEffect(() => {
-    if (!isElectron) return;
-    const bridge = window.desktopBridge;
-    if (!bridge?.getWindowMaximizedState || !bridge.onWindowMaximizedStateChange) return;
-    const unsubscribe = bridge.onWindowMaximizedStateChange(setIsWindowMaximized);
-    setIsWindowMaximized(bridge.getWindowMaximizedState());
-    return unsubscribe;
-  }, []);
+  const { maximized: isWindowMaximized, fullscreen: isWindowFullscreen } = useDesktopWindowState();
   const windowControlsInsetStyle = (
     isMacosDesktop && !isWindowFullscreen
       ? { "--workspace-controls-left": MACOS_TRAFFIC_LIGHTS_LEFT_INSET }
@@ -444,23 +429,6 @@ function AppShell({ children }: { children: ReactNode }) {
     "--panel-animation-easing": panelAnimationEasing,
     ...windowControlsInsetStyle,
   } as CSSProperties;
-
-  useEffect(() => {
-    if (!isElectron) return;
-    const bridge = window.desktopBridge;
-    if (!bridge) return;
-    const { getWindowFullscreenState, onWindowFullscreenStateChange } = bridge;
-    if (
-      typeof getWindowFullscreenState !== "function" ||
-      typeof onWindowFullscreenStateChange !== "function"
-    ) {
-      return;
-    }
-
-    const unsubscribe = onWindowFullscreenStateChange(setIsWindowFullscreen);
-    setIsWindowFullscreen(getWindowFullscreenState());
-    return unsubscribe;
-  }, []);
 
   useEffect(() => {
     const onMenuAction = window.desktopBridge?.onMenuAction;
@@ -502,9 +470,6 @@ function AppShell({ children }: { children: ReactNode }) {
         data-window-maximized={isWindowMaximized ? "true" : "false"}
         data-window-fullscreen={isWindowFullscreen ? "true" : "false"}
       >
-        {isWindowsDesktop && (
-          <WindowsWindowControls maximized={isWindowMaximized} fullscreen={isWindowFullscreen} />
-        )}
         <OnboardingShell
           className="grid! h-full! min-h-0! grid-cols-[minmax(0,1fr)] grid-rows-[var(--workspace-topbar-height)_minmax(0,1fr)]"
           data-app-shell=""
