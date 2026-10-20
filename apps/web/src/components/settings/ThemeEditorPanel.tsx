@@ -1263,7 +1263,7 @@ export function ThemeEditorPanel({
               </Button>
             }
           />
-          <TooltipPopup data-theme-editor-panel="">
+          <TooltipPopup layer="theme-editor" data-theme-editor-panel="">
             {isInspecting
               ? t.settings.themeEditor.cancelAndClearTheSelection
               : t.settings.themeEditor.pickAColorFromTheApp}

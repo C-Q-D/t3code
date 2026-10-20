@@ -125,7 +125,11 @@ function CustomSnoozeDialog() {
                           })}
                           <CalendarIcon className="size-4 text-muted-foreground" />
                         </PopoverTrigger>
-                        <PopoverPopup align="start" aria-label={t.app.snooze.chooseDate}>
+                        <PopoverPopup
+                          align="start"
+                          padding="calendar"
+                          aria-label={t.app.snooze.chooseDate}
+                        >
                           <Calendar
                             mode="single"
                             required

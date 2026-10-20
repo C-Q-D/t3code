@@ -28,7 +28,7 @@
 }
 
 /* A5 leaves fourteen pixels per side; the shared panel viewport supplies eight of them. */
-[data-slot="popover-positioner"]:has([data-thread-details-panel="popover"]) {
+[data-slot="popover-positioner"][data-layer="thread-details"] {
   width: min(
     calc(var(--thread-details-panel-width) + --spacing(4)),
     calc(var(--anchor-width) - --spacing(3))

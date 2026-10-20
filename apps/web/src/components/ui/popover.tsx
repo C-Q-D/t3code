@@ -31,11 +31,16 @@ const popoverPopupWidthClassName = {
 const popoverViewportPaddingClassName = {
   default: "py-4 [--viewport-inline-padding:--spacing(4)]",
   compact: "py-2 [--viewport-inline-padding:--spacing(3)]",
+  // Calendar overrides the visible inset; keep the previous default viewport sizing token.
+  calendar: "p-2 [--viewport-inline-padding:--spacing(4)]",
   // Rounded to the popup so edge-to-edge content clips to its corners.
   none: "rounded-overlay py-0 [--viewport-inline-padding:0px]",
 } as const;
 
-/** Render a raised overlay, or a frameless panel whose children own their surface. */
+/**
+ * Render a raised overlay, or a frameless panel whose children own their surface.
+ * layer selects positioner styling across portals; calendar padding keeps the date picker inset.
+ */
 function PopoverPopup({
   children,
   className,
@@ -50,6 +55,7 @@ function PopoverPopup({
   tooltipStyle = false,
   keepMounted = false,
   anchor,
+  layer,
   ...props
 }: PopoverPrimitive.Popup.Props & {
   padding?: keyof typeof popoverViewportPaddingClassName;
@@ -63,6 +69,7 @@ function PopoverPopup({
   keepMounted?: PopoverPrimitive.Portal.Props["keepMounted"];
   anchor?: PopoverPrimitive.Positioner.Props["anchor"];
   width?: keyof typeof popoverPopupWidthClassName;
+  layer?: "theme-editor" | "thread-details";
 }) {
   // Viewport rekeys its children when the active trigger clears on close. Persistent
   // single-trigger forms need a stable container to retain drafts and submit guards.
@@ -86,6 +93,7 @@ function PopoverPopup({
             : "z-[130]",
         )}
         data-slot="popover-positioner"
+        data-layer={layer}
         side={side}
         sideOffset={sideOffset}
       >
@@ -104,7 +112,7 @@ function PopoverPopup({
         >
           <Viewport
             className={cn(
-              "relative size-full max-h-(--available-height) overflow-clip px-(--viewport-inline-padding) has-data-[slot=calendar]:p-2 data-instant:transition-none **:data-current:data-ending-style:opacity-0 **:data-current:data-starting-style:opacity-0 **:data-previous:data-ending-style:opacity-0 **:data-previous:data-starting-style:opacity-0 **:data-current:w-[calc(var(--popup-width)-2*var(--viewport-inline-padding)-2px)] **:data-previous:w-[calc(var(--popup-width)-2*var(--viewport-inline-padding)-2px)] **:data-current:opacity-100 **:data-previous:opacity-100 **:data-current:transition-opacity **:data-previous:transition-opacity",
+              "relative size-full max-h-(--available-height) overflow-clip px-(--viewport-inline-padding) data-instant:transition-none **:data-current:data-ending-style:opacity-0 **:data-current:data-starting-style:opacity-0 **:data-previous:data-ending-style:opacity-0 **:data-previous:data-starting-style:opacity-0 **:data-current:w-[calc(var(--popup-width)-2*var(--viewport-inline-padding)-2px)] **:data-previous:w-[calc(var(--popup-width)-2*var(--viewport-inline-padding)-2px)] **:data-current:opacity-100 **:data-previous:opacity-100 **:data-current:transition-opacity **:data-previous:transition-opacity",
               tooltipStyle && padding === "default"
                 ? "py-1 [--viewport-inline-padding:--spacing(2)]"
                 : popoverViewportPaddingClassName[padding],

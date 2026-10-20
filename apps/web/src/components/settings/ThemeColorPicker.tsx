@@ -271,6 +271,7 @@ function ThemeColorPicker({
         <TooltipPopup side="top">{t.settings.themeColorPicker.chooseColor(label)}</TooltipPopup>
       </Tooltip>
       <PopoverPopup
+        layer="theme-editor"
         align="end"
         padding="none"
         data-theme-editor-panel=""

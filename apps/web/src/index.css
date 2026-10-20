@@ -1361,8 +1361,8 @@ html[data-theme-token-probe] *::after {
   pointer-events: none;
 }
 
-[data-slot="popover-positioner"]:has([data-theme-editor-panel]),
-[data-slot="tooltip-positioner"]:has([data-theme-editor-panel]) {
+[data-slot="popover-positioner"][data-layer="theme-editor"],
+[data-slot="tooltip-positioner"][data-layer="theme-editor"] {
   z-index: 120;
 }
 

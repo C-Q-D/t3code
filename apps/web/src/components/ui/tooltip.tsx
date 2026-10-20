@@ -111,6 +111,7 @@ function TooltipPositioner(props: TooltipPrimitive.Positioner.Props) {
  * Displays caller-owned content in the H5 bubble; glass surfaces remain owned by
  * dropdown-glass so the shared surface setting also applies to these tooltips.
  * Positioning props pass through to Base UI; code keeps its wider monospace layout.
+ * layer selects the portal positioner's application stacking rules when provided.
  */
 function TooltipPopup({
   className,
@@ -120,6 +121,7 @@ function TooltipPopup({
   variant = "default",
   anchor,
   children,
+  layer,
   ...props
 }: TooltipPrimitive.Popup.Props & {
   align?: TooltipPrimitive.Positioner.Props["align"];
@@ -128,10 +130,17 @@ function TooltipPopup({
   /** `code` renders monospace content that breaks anywhere, for paths and commands. */
   variant?: "default" | "glass" | "code";
   anchor?: TooltipPrimitive.Positioner.Props["anchor"];
+  layer?: "theme-editor" | "thread-details";
 }) {
   return (
     <TooltipPrimitive.Portal>
-      <TooltipPositioner align={align} anchor={anchor} side={side} sideOffset={sideOffset}>
+      <TooltipPositioner
+        align={align}
+        anchor={anchor}
+        side={side}
+        sideOffset={sideOffset}
+        data-layer={layer}
+      >
         <TooltipPrimitive.Popup
           className={cn(
             "relative flex h-(--popup-height,auto) w-(--popup-width,auto) origin-(--transform-origin) text-balance rounded-tag font-sans text-secondary-copy-medium font-semibold text-shadow-none transition-[width,height,scale,opacity] physics:duration-(--popup-motion-duration) physics:ease-(--popup-motion-ease) physics:data-instant:duration-0 data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0 data-instant:duration-0",

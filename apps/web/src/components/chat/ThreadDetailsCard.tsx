@@ -571,6 +571,7 @@ export function ThreadDetailsCard({
         ) : null
       ) : (
         <PopoverPopup
+          layer="thread-details"
           anchor={anchor}
           align="end"
           // The shared panel viewport adds eight pixels around the A5 card.
