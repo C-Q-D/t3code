@@ -17,13 +17,21 @@ type InputProps = Omit<InputPrimitive.Props & React.RefAttributes<HTMLInputEleme
   nativeInput?: boolean;
 };
 
-/** Derives wrapper state from control defaults and caller overrides, without reading the DOM. */
+/**
+ * Derives wrapper disabled/invalid states from resolved control defaults and caller props.
+ * Explicit false, null, and undefined replace defaults, matching mergeProps for these attributes.
+ * Invalid colors require true; invalidPresent separately preserves attribute-existence styling.
+ */
 function getInputControlState(
-  defaults: Pick<React.ComponentProps<"input">, "disabled">,
-  overrides: Pick<React.ComponentProps<"input">, "disabled">,
+  defaults: Pick<React.ComponentProps<"input">, "disabled" | "aria-invalid">,
+  overrides: Pick<React.ComponentProps<"input">, "disabled" | "aria-invalid">,
 ) {
   const effective = { ...defaults, ...overrides };
-  return { disabled: Boolean(effective.disabled) };
+  return {
+    disabled: Boolean(effective.disabled),
+    invalid: effective["aria-invalid"] === true || effective["aria-invalid"] === "true",
+    invalidPresent: effective["aria-invalid"] != null,
+  };
 }
 
 /** Renders a pill input; numeric size values still set the native character width. */
@@ -35,7 +43,11 @@ function Input({
   nativeInput = false,
   ...props
 }: InputProps) {
-  const { disabled: fieldDisabled } = useFieldRootContext();
+  const { disabled: fieldDisabled, validation } = useFieldRootContext();
+  const { invalid } = getInputControlState(
+    nativeInput ? {} : validation.getInputValidationProps(),
+    props,
+  );
   // Native compositions already receive resolved props from their owning Base UI control.
   const disabled = props.disabled || (!nativeInput && fieldDisabled);
   const inputClassName = cn(
@@ -95,9 +107,7 @@ function Input({
         ) || undefined
       }
       data-disabled={disabled ? "true" : "false"}
-      data-invalid={
-        props["aria-invalid"] === true || props["aria-invalid"] === "true" ? "true" : "false"
-      }
+      data-invalid={invalid ? "true" : "false"}
       data-size={size}
       data-slot="input-control"
     >

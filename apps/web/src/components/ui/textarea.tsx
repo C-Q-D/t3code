@@ -24,9 +24,12 @@ type TextareaProps = React.ComponentProps<"textarea"> & {
  * the attribute to exist, including false, grammar, and spelling values.
  */
 function Textarea({ className, size = "default", unstyled = false, ...props }: TextareaProps) {
-  const { disabled: fieldDisabled } = useFieldRootContext();
+  const { disabled: fieldDisabled, validation } = useFieldRootContext();
   // Field.Control supplies this default; the native merge lets explicit false/null override it.
-  const { disabled } = getInputControlState({ disabled: fieldDisabled || false }, props);
+  const { disabled, invalid, invalidPresent } = getInputControlState(
+    { disabled: fieldDisabled || false, ...validation.getInputValidationProps() },
+    props,
+  );
 
   return (
     <span
@@ -40,10 +43,8 @@ function Textarea({ className, size = "default", unstyled = false, ...props }: T
         ) || undefined
       }
       data-disabled={disabled ? "true" : "false"}
-      data-invalid={
-        props["aria-invalid"] === true || props["aria-invalid"] === "true" ? "true" : "false"
-      }
-      data-invalid-present={props["aria-invalid"] != null ? "true" : "false"}
+      data-invalid={invalid ? "true" : "false"}
+      data-invalid-present={invalidPresent ? "true" : "false"}
       data-size={size}
       data-slot="textarea-control"
     >
