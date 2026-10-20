@@ -11413,6 +11413,7 @@ export default function ChatView(props: ChatViewProps) {
         tone="card"
         radius="slab"
         elevation="slab-frame"
+        glow
         render={<div className="stone-frame-card" />}
         className={cn(
           "relative flex min-h-0 min-w-0 flex-col overflow-hidden",

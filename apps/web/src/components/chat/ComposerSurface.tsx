@@ -39,7 +39,7 @@ function Main({ className, ...props }: ComponentProps<"div">) {
     <div
       data-chat-composer-main-surface="true"
       className={cn(
-        "surface-glass group relative z-10 rounded-composer shadow-raise-detail",
+        "surface-glass group relative z-10 rounded-composer shadow-raise-detail edge-glow",
         className,
       )}
       {...props}

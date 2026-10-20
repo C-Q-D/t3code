@@ -183,6 +183,7 @@ function PreviewPanelShellFrame(
           tone="card"
           radius="slab"
           elevation="slab-frame"
+          glow
           className="h-full min-h-0 overflow-hidden"
           render={<div className="stone-panel" />}
         >

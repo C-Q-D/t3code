@@ -139,7 +139,7 @@ html[data-theme-id="graphite"] [data-composer-banner-surface]::before {
     }
 
     .composer-notices-toggle {
-      @apply flex h-10 w-full items-center gap-2.5 rounded-composer-notice border-0 bg-composer-notice py-0 pr-1.5 pl-3 text-secondary-copy-large leading-composer-banner text-composer-notice-label shadow-composer-notice;
+      @apply flex h-10 w-full items-center gap-2.5 rounded-composer-notice border-0 bg-composer-notice py-0 pr-1.5 pl-3 text-secondary-copy-large leading-composer-banner text-composer-notice-label shadow-composer-notice edge-glow;
     }
 
     .composer-notices-toggle > svg {
@@ -155,7 +155,7 @@ html[data-theme-id="graphite"] [data-composer-banner-surface]::before {
     }
 
     .composer-notice.surface-glass {
-      @apply rounded-composer-notice py-1.5 pr-1.5 pl-3 text-secondary-copy-large leading-composer-banner text-foreground shadow-composer-notice;
+      @apply rounded-composer-notice py-1.5 pr-1.5 pl-3 text-secondary-copy-large leading-composer-banner text-foreground shadow-composer-notice edge-glow;
       --composer-banner-icon-column: --spacing(3.5);
       --stone-surface-color: var(--color-composer-notice);
     }

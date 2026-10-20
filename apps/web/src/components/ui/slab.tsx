@@ -44,12 +44,17 @@ const slabVariants = cva("", {
       true: "inset-shadow-selected",
       false: "",
     },
+    glow: {
+      true: "edge-glow",
+      false: "",
+    },
   },
   defaultVariants: {
     tone: "card",
     elevation: "slab",
     radius: "slab",
     selected: false,
+    glow: false,
   },
 });
 
@@ -57,6 +62,8 @@ const slabVariants = cva("", {
  * Visual options follow the 8a token contract; native div props and refs pass through.
  * Overlay tone delegates its background and elevation to surface-glass, ignoring elevation.
  * Selected adds only a visual circle; callers supply any applicable ARIA selection state.
+ * Glow adds the theme's white edge light on top of the elevation shadow; themes without
+ * an edge light leave it invisible, and it has no effect without an elevation.
  */
 interface SlabProps extends useRender.ComponentProps<"div">, VariantProps<typeof slabVariants> {}
 
@@ -66,7 +73,7 @@ interface SlabProps extends useRender.ComponentProps<"div">, VariantProps<typeof
  * Use render to replace the div; callers own layout, semantics, and interactive states.
  * @returns The default div or replacement element with merged props and a slab data-slot.
  */
-function Slab({ className, tone, elevation, radius, selected, render, ...props }: SlabProps) {
+function Slab({ className, tone, elevation, radius, selected, glow, render, ...props }: SlabProps) {
   const defaultProps = {
     // The shared glass utility owns overlay opacity and shadows; a second shadow
     // here would override that treatment instead of composing another layer.
@@ -76,6 +83,7 @@ function Slab({ className, tone, elevation, radius, selected, render, ...props }
         elevation: tone === "overlay" ? null : elevation,
         radius,
         selected,
+        glow,
       }),
       className,
     ),

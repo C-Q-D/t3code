@@ -457,6 +457,7 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
                   tone={chatOwnsSlabs ? null : "card"}
                   radius={chatOwnsSlabs ? null : "slab"}
                   elevation={chatOwnsSlabs ? null : "slab-frame"}
+                  glow={!chatOwnsSlabs}
                   className={cn(
                     "relative flex min-h-0 min-w-0 flex-1 flex-col",
                     !chatOwnsSlabs && "overflow-hidden",

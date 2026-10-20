@@ -22,6 +22,19 @@
   background-repeat: repeat;
 }
 
+/*
+ * 卡片边缘白光：占用 Tailwind 阴影合成中的 ring-offset 槽，叠在元素自己的层级阴影之上，
+ * 所以只对带 shadow-* 的元素生效。只有石墨主题给 --edge-glow 赋值，其他主题不可见。
+ * 静态阴影只在重绘时画一次，不引入持续动画。
+ */
+@utility edge-glow {
+  --tw-ring-offset-shadow: var(--edge-glow, 0 0 #0000);
+}
+
+html[data-theme-id="graphite"] {
+  --edge-glow: inset 0 0 0 1px rgba(255, 255, 255, 0.18), 0 0 10px rgba(255, 255, 255, 0.08);
+}
+
 /* Platform classes are installed before React mounts, gated by isElectron in main.tsx. */
 html[data-theme-id="graphite"],
 html[data-theme-id="graphite"] body {
