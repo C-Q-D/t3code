@@ -2204,7 +2204,10 @@ export default function GitActionsControl({
                 placeholder={t.git.actions.leaveEmptyToAutoGenerate}
               />
             </label>
-            <label className="ov1-script-option">
+            <label
+              className="ov1-script-option"
+              data-disabled={!canChangeThreadBranch ? "" : undefined}
+            >
               <span className="relative flex shrink-0">
                 <input
                   type="checkbox"

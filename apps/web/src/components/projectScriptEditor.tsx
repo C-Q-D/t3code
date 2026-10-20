@@ -196,6 +196,7 @@ export function ProjectScriptEditorDialog({
   const isOpen = request !== null;
   const isEditing = request?.scriptId != null;
   const isSaving = request !== null && savingRequest === request;
+  const editorDisabled = isSaving || !canEditActions;
 
   // A save completion must not affect a replacement request or an unmounted editor.
   useLayoutEffect(
@@ -345,7 +346,7 @@ export function ProjectScriptEditorDialog({
           </DialogHeader>
           <DialogPanel>
             <form id={formId} onSubmit={submit}>
-              <fieldset className="space-y-3.5" disabled={isSaving || !canEditActions}>
+              <fieldset className="space-y-3.5" disabled={editorDisabled}>
                 <div className="ov1-script-identity">
                   <div className="min-w-0 space-y-1.5">
                     <label className="ov1-field-label" htmlFor="script-name">
@@ -363,7 +364,10 @@ export function ProjectScriptEditorDialog({
                     <label className="ov1-field-label" htmlFor="script-keybinding">
                       {t.app.scripts.keybinding}
                     </label>
-                    <div className="ov1-shortcut-input">
+                    <div
+                      className="ov1-shortcut-input"
+                      data-disabled={editorDisabled || !canWriteSettings ? "" : undefined}
+                    >
                       <input
                         className="ov1-shortcut-capture"
                         disabled={!canWriteSettings}
@@ -443,7 +447,10 @@ export function ProjectScriptEditorDialog({
                   <p className="sr-only">{t.app.scripts.previewHint}</p>
                 </div>
                 <div className="space-y-2">
-                  <label className="ov1-script-option">
+                  <label
+                    className="ov1-script-option"
+                    data-disabled={editorDisabled ? "" : undefined}
+                  >
                     <span className="relative flex size-4 shrink-0">
                       <input
                         className="ov1-checkbox peer"
@@ -460,7 +467,10 @@ export function ProjectScriptEditorDialog({
                     </span>
                     <span>{t.app.scripts.runOnCreate}</span>
                   </label>
-                  <label className="ov1-script-option">
+                  <label
+                    className="ov1-script-option"
+                    data-disabled={editorDisabled || !runOnWorktreeCreate ? "" : undefined}
+                  >
                     <span className="relative flex size-4 shrink-0">
                       <input
                         className="ov1-checkbox peer"
@@ -478,7 +488,10 @@ export function ProjectScriptEditorDialog({
                     </span>
                     <span>{t.app.scripts.waitBeforeAgent}</span>
                   </label>
-                  <label className="ov1-script-option">
+                  <label
+                    className="ov1-script-option"
+                    data-disabled={editorDisabled ? "" : undefined}
+                  >
                     <span className="relative flex size-4 shrink-0">
                       <input
                         className="ov1-checkbox peer"
@@ -495,7 +508,12 @@ export function ProjectScriptEditorDialog({
                     </span>
                     <span>{t.app.scripts.runOnSettle}</span>
                   </label>
-                  <label className="ov1-script-option">
+                  <label
+                    className="ov1-script-option"
+                    data-disabled={
+                      editorDisabled || previewUrl.trim().length === 0 ? "" : undefined
+                    }
+                  >
                     <span className="relative flex size-4 shrink-0">
                       <input
                         className="ov1-checkbox peer"
@@ -524,7 +542,7 @@ export function ProjectScriptEditorDialog({
                 type="button"
                 variant="destructive-outline"
                 className="mr-auto"
-                disabled={isSaving || !canEditActions}
+                disabled={editorDisabled}
                 onClick={() => setDeleteConfirmOpen(true)}
               >
                 {t.common.threadActions.delete}
@@ -533,12 +551,7 @@ export function ProjectScriptEditorDialog({
             <Button type="button" variant="outline" size="dialog-action" onClick={close}>
               {t.common.confirm.cancel}
             </Button>
-            <Button
-              size="dialog-action-wide"
-              form={formId}
-              type="submit"
-              disabled={isSaving || !canEditActions}
-            >
+            <Button size="dialog-action-wide" form={formId} type="submit" disabled={editorDisabled}>
               {isSaving ? t.app.actions.saving : t.app.scripts.saveAction}
             </Button>
           </DialogFooter>
@@ -557,7 +570,7 @@ export function ProjectScriptEditorDialog({
             </AlertDialogClose>
             <Button
               variant="destructive"
-              disabled={isSaving || !canEditActions}
+              disabled={editorDisabled}
               onClick={() => {
                 if (!request?.scriptId) return;
                 if (!readEnvironmentScope(environmentId, editScope)) {

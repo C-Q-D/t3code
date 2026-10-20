@@ -2687,7 +2687,11 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
           <DialogPanel>
             <fieldset className="grid gap-2.5" aria-label={t.sidebar.grouping.ruleAriaLabel}>
               {(["inherit", "repository", "repository_path", "separate"] as const).map((mode) => (
-                <label key={mode} className="ov1-grouping-option">
+                <label
+                  key={mode}
+                  className="ov1-grouping-option"
+                  data-checked={projectGroupingSelection === mode ? "" : undefined}
+                >
                   <input
                     type="radio"
                     name="project-grouping"

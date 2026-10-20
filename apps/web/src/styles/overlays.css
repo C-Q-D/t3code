@@ -168,7 +168,7 @@
   field-sizing: content;
 }
 .ov1-script-option {
-  @apply flex cursor-pointer items-center gap-2.5 text-control text-foreground has-disabled:cursor-default has-disabled:opacity-60;
+  @apply flex cursor-pointer items-center gap-2.5 text-control text-foreground data-disabled:cursor-default data-disabled:opacity-60;
 }
 .ov1-checkbox {
   @apply m-0 size-4 cursor-pointer appearance-none rounded-ov1-checkbox bg-transparent shadow-outline-control outline-none checked:bg-primary checked:shadow-none focus-visible:inset-shadow-focus disabled:cursor-default;
@@ -192,7 +192,7 @@
 
 /* R1 shortcut keycaps overlay the unchanged capture input; focus stays on the input. */
 .ov1-shortcut-input {
-  @apply relative rounded-full bg-input shadow-well-track focus-within:inset-shadow-focus has-disabled:opacity-40;
+  @apply relative rounded-full bg-input shadow-well-track focus-within:inset-shadow-focus data-disabled:opacity-40;
 }
 .ov1-shortcut-capture {
   @apply h-9.5 w-full min-w-0 rounded-full bg-transparent px-2.5 text-control text-transparent caret-transparent outline-none placeholder:text-placeholder;
@@ -207,10 +207,10 @@
 /* R1 feature surfaces reuse OV1.1 option geometry and the shared focus/selection rings. */
 .ov1-grouping-option {
   @apply flex cursor-pointer gap-2.5 rounded-ov1-option bg-ov1-option-surface px-3 py-2.5 text-control text-foreground;
-  &:has(input:checked) {
+  &[data-checked] {
     @apply bg-ov1-option-selected inset-shadow-selected-control;
   }
-  &:has(input:checked) > span > span:first-child {
+  &[data-checked] > span > span:first-child {
     @apply font-bold;
   }
 }
