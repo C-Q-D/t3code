@@ -65,13 +65,13 @@ it("keeps the same 180 particle DOM nodes through repeated bursts and disable", 
   expect([...layer.querySelectorAll("[data-physical-bit]")]).toEqual(slots);
 });
 
-it("uses white dark-mode focus colors while leaving particle hues colored", async () => {
+it("keeps rainbow focus colors in dark mode while particle hues stay colored", async () => {
   renderer.surface.dispatchEvent(new FocusEvent("focusin"));
   const stop = layer.querySelector("stop")!;
   expect(stop.getAttribute("stop-color")).toBe("hsl(200, 70%, 72%)");
   document.documentElement.classList.add("dark");
   await Promise.resolve();
-  expect(stop.getAttribute("stop-color")).toBe("#FFFFFF");
+  expect(stop.getAttribute("stop-color")).toBe("hsl(200, 70%, 72%)");
   renderer.model.burst(100, 20, 1, 200, 0, 1);
   renderer.pulse(100);
   clock.advance(16);

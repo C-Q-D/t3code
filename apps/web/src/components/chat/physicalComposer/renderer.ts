@@ -89,8 +89,19 @@ export class PhysicalComposerRenderer {
       stop.setAttribute("offset", String(i / 3));
       this.gradient.append(stop);
     });
+    // Soft rainbow halo: the blurred stroke paints only while the model renders, never at rest.
+    const blur = svgElement("filter");
+    blur.id = `${id}-halo`;
+    blur.setAttribute("x", "-20%");
+    blur.setAttribute("y", "-40%");
+    blur.setAttribute("width", "140%");
+    blur.setAttribute("height", "180%");
+    const gaussian = svgElement("feGaussianBlur");
+    gaussian.setAttribute("stdDeviation", "5");
+    blur.append(gaussian);
     const defs = svgElement("defs");
-    defs.append(this.gradient);
+    defs.append(this.gradient, blur);
+    this.glow.setAttribute("filter", `url(#${blur.id})`);
     this.glow.setAttribute("fill", "none");
     this.glow.setAttribute("stroke", `url(#${id})`);
     this.glow.setAttribute("stroke-linejoin", "round");
@@ -397,14 +408,15 @@ export class PhysicalComposerRenderer {
       "fill",
       this.dark ? "var(--physical-composer-face, #24262C)" : "#FFFFFF",
     );
+    // Both themes use the rainbow focus stroke and halo; only the face and ink follow the theme.
     this.stops.forEach((stop, i) =>
-      stop.setAttribute(
-        "stop-color",
-        this.dark ? "#FFFFFF" : `hsl(${Math.round((hue + i * 90) % 360)}, 70%, 72%)`,
-      ),
+      stop.setAttribute("stop-color", `hsl(${Math.round((hue + i * 90) % 360)}, 70%, 72%)`),
     );
-    this.glow.setAttribute("stroke-opacity", String(Math.max(this.focused ? 0.12 : 0, heat * 0.3)));
-    this.glow.setAttribute("stroke-width", String(4 + heat * 6));
+    this.glow.setAttribute(
+      "stroke-opacity",
+      String(Math.min(0.85, (this.focused ? 0.45 : 0) + heat * 0.4)),
+    );
+    this.glow.setAttribute("stroke-width", String(8 + heat * 8));
     this.face.setAttribute(
       "stroke",
       this.focused ? `url(#${this.gradient.id})` : this.dark ? "#555861" : "#D5DAE1",
