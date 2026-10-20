@@ -11,7 +11,10 @@ import { ScrollArea } from "~/components/ui/scroll-area";
 
 const Autocomplete = AutocompletePrimitive.Root;
 
-/** Compose the input and optional addons; forward Base UI input props and caller events unchanged. */
+/**
+ * Composes the input and addons from Base UI's resolved props, including inherited disabled state.
+ * Native input props and refs stay on Input; the surrounding div only owns layout and opacity.
+ */
 function AutocompleteInput({
   className,
   showTrigger = false,
@@ -29,57 +32,68 @@ function AutocompleteInput({
   const sizeValue = (size ?? "default") as "sm" | "default" | "lg" | number;
 
   return (
-    <div className="relative not-has-[>*.w-full]:w-fit w-full text-foreground has-disabled:opacity-64">
-      {startAddon && (
+    <AutocompletePrimitive.Input
+      className={cn(
+        startAddon &&
+          "data-[size=sm]:*:data-[slot=autocomplete-input]:ps-[calc(--spacing(7.5)-1px)] *:data-[slot=autocomplete-input]:ps-[calc(--spacing(8.5)-1px)] sm:data-[size=sm]:*:data-[slot=autocomplete-input]:ps-[calc(--spacing(7)-1px)] sm:*:data-[slot=autocomplete-input]:ps-[calc(--spacing(8)-1px)]",
+        (showTrigger || showClear) &&
+          (sizeValue === "sm"
+            ? "*:data-[slot=autocomplete-input]:pe-6.5"
+            : "*:data-[slot=autocomplete-input]:pe-7"),
+        className,
+      )}
+      data-slot="autocomplete-input"
+      render={(inputProps, state) => (
         <div
-          aria-hidden="true"
-          className="[&_svg]:-mx-0.5 pointer-events-none has-[button]:pointer-events-auto absolute inset-y-0 start-px z-10 flex items-center ps-[calc(--spacing(3)-1px)] opacity-80 has-[+[data-size=sm]]:ps-[calc(--spacing(2.5)-1px)] [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4"
-          data-slot="autocomplete-start-addon"
+          className="relative w-full text-foreground data-[disabled=true]:opacity-64"
+          data-disabled={state.disabled ? "true" : "false"}
         >
-          {startAddon}
+          {startAddon && (
+            <div
+              aria-hidden="true"
+              className={cn(
+                "[&_svg]:-mx-0.5 pointer-events-none absolute inset-y-0 start-px z-10 flex items-center ps-[calc(--spacing(3)-1px)] opacity-80 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4",
+                sizeValue === "sm" && "ps-[calc(--spacing(2.5)-1px)]",
+              )}
+              data-slot="autocomplete-start-addon"
+            >
+              {startAddon}
+            </div>
+          )}
+          <Input {...inputProps} nativeInput size={sizeValue} />
+          {showTrigger && (
+            <AutocompleteTrigger
+              className={cn(
+                "-translate-y-1/2 absolute top-1/2 inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md border border-transparent opacity-80 outline-none transition-colors pointer-coarse:after:absolute pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11 hover:opacity-100 sm:size-7 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+                showClear && "hidden",
+                sizeValue === "sm" ? "end-0" : "end-0.5",
+              )}
+            >
+              <AutocompletePrimitive.Icon data-slot="autocomplete-icon">
+                <ChevronsUpDownIcon />
+              </AutocompletePrimitive.Icon>
+            </AutocompleteTrigger>
+          )}
+          {showClear && (
+            <AutocompleteClear
+              className={cn(
+                "-translate-y-1/2 absolute top-1/2 inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md border border-transparent opacity-80 outline-none transition-colors pointer-coarse:after:absolute pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11 hover:opacity-100 sm:size-7 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+                sizeValue === "sm" ? "end-0" : "end-0.5",
+              )}
+            >
+              <XIcon />
+            </AutocompleteClear>
+          )}
         </div>
       )}
-      <AutocompletePrimitive.Input
-        className={cn(
-          startAddon &&
-            "data-[size=sm]:*:data-[slot=autocomplete-input]:ps-[calc(--spacing(7.5)-1px)] *:data-[slot=autocomplete-input]:ps-[calc(--spacing(8.5)-1px)] sm:data-[size=sm]:*:data-[slot=autocomplete-input]:ps-[calc(--spacing(7)-1px)] sm:*:data-[slot=autocomplete-input]:ps-[calc(--spacing(8)-1px)]",
-          sizeValue === "sm"
-            ? "has-[+[data-slot=autocomplete-trigger],+[data-slot=autocomplete-clear]]:*:data-[slot=autocomplete-input]:pe-6.5"
-            : "has-[+[data-slot=autocomplete-trigger],+[data-slot=autocomplete-clear]]:*:data-[slot=autocomplete-input]:pe-7",
-          className,
-        )}
-        data-slot="autocomplete-input"
-        render={<Input nativeInput size={sizeValue} />}
-        {...props}
-      />
-      {showTrigger && (
-        <AutocompleteTrigger
-          className={cn(
-            "-translate-y-1/2 absolute top-1/2 inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md border border-transparent opacity-80 outline-none transition-colors pointer-coarse:after:absolute pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11 hover:opacity-100 has-[+[data-slot=autocomplete-clear]]:hidden sm:size-7 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
-            sizeValue === "sm" ? "end-0" : "end-0.5",
-          )}
-        >
-          <AutocompletePrimitive.Icon data-slot="autocomplete-icon">
-            <ChevronsUpDownIcon />
-          </AutocompletePrimitive.Icon>
-        </AutocompleteTrigger>
-      )}
-      {showClear && (
-        <AutocompleteClear
-          className={cn(
-            "-translate-y-1/2 absolute top-1/2 inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md border border-transparent opacity-80 outline-none transition-colors pointer-coarse:after:absolute pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11 hover:opacity-100 has-[+[data-slot=autocomplete-clear]]:hidden sm:size-7 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
-            sizeValue === "sm" ? "end-0" : "end-0.5",
-          )}
-        >
-          <XIcon />
-        </AutocompleteClear>
-      )}
-    </div>
+      {...props}
+    />
   );
 }
 
 /**
  * Portal a list surface at the supplied anchor; glass owns material and elevation.
+ * Glass and content share Popup transition state; property order preserves the opacity timing.
  * Position defaults to bottom/start with a 4px side offset. Forward remaining props to Base UI's popup.
  */
 function AutocompletePopup({
@@ -109,20 +123,16 @@ function AutocompletePopup({
         side={side}
         sideOffset={sideOffset}
       >
-        <span
+        <AutocompletePrimitive.Popup
           className={cn(
-            "dropdown-glass relative flex max-h-full min-w-(--anchor-width) max-w-(--available-width) origin-(--transform-origin) rounded-overlay transition-[scale,opacity] physics:duration-120 physics:ease-linear physics:has-data-starting-style:opacity-0 physics:has-data-ending-style:opacity-0",
+            "dropdown-glass relative min-w-(--anchor-width) max-w-(--available-width) origin-(--transform-origin) transition-[scale,opacity] flex max-h-[min(var(--available-height),23rem)] flex-1 flex-col physics:origin-(--transform-origin) physics:transition-[width,height,scale,opacity] physics:data-starting-style:scale-98 physics:data-starting-style:opacity-0 physics:data-ending-style:scale-98 physics:data-ending-style:opacity-0 physics:duration-(--popup-motion-duration) physics:ease-(--popup-motion-ease) rounded-overlay text-foreground",
             className,
           )}
+          data-slot="autocomplete-popup"
+          {...props}
         >
-          <AutocompletePrimitive.Popup
-            className="flex max-h-[min(var(--available-height),23rem)] flex-1 flex-col physics:origin-(--transform-origin) physics:transition-[width,height,scale,opacity] physics:data-starting-style:scale-98 physics:data-starting-style:opacity-0 physics:data-ending-style:scale-98 physics:data-ending-style:opacity-0 physics:duration-(--popup-motion-duration) physics:ease-(--popup-motion-ease) rounded-overlay text-foreground"
-            data-slot="autocomplete-popup"
-            {...props}
-          >
-            {children}
-          </AutocompletePrimitive.Popup>
-        </span>
+          {children}
+        </AutocompletePrimitive.Popup>
       </AutocompletePrimitive.Positioner>
     </AutocompletePrimitive.Portal>
   );
