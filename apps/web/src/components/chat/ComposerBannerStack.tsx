@@ -6,7 +6,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } f
 import { cn } from "~/lib/utils";
 import { Button } from "../ui/button";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
-import { ComposerBanner, type ComposerBannerVariant } from "./ComposerBanner";
+import { BannerDockRegistry, ComposerBanner, type ComposerBannerVariant } from "./ComposerBanner";
 import { observeResize } from "~/lib/observeResize";
 
 // Match the duration-220 exit transition before removing a dismissed notice.
@@ -355,6 +355,7 @@ function ComposerBannerStackAlert({
   readonly exiting: boolean;
   readonly onDismissRequest: () => void;
 }) {
+  BannerDockRegistry.useRegister("notice");
   if ("content" in item) {
     return (
       <ComposerBanner.Root

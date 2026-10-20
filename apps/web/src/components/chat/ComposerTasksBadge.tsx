@@ -6,7 +6,7 @@ import { memo, useRef, type ComponentProps } from "react";
 import { formatDuration } from "../../session-logic";
 import { useCountPop } from "../../hooks/useCountPop";
 import { cn } from "~/lib/utils";
-import { ComposerBanner } from "./ComposerBanner";
+import { BannerDockRegistry, ComposerBanner } from "./ComposerBanner";
 
 /** Provider-supplied task summary; completed and total counts are displayed unchanged. */
 export interface ComposerTasksProgress {
@@ -76,7 +76,9 @@ export const ComposerTasksBadge = memo(function ComposerTasksBadge({
   readonly progress: ComposerTasksProgress;
   readonly steps: readonly ComposerTaskStep[];
 }) {
-  if (progress.totalSteps <= 0) return null;
+  const present = progress.totalSteps > 0;
+  BannerDockRegistry.useRegister("tasks", present);
+  if (!present) return null;
 
   const row = (
     <ComposerBanner.Row

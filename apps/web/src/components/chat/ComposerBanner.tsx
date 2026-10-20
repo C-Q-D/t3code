@@ -13,7 +13,8 @@ import { ComposerShellRegistry } from "./ComposerSurface";
 export type ComposerBannerVariant = "default" | "error" | "info" | "success" | "warning";
 
 const BannerRowRegistry = createPresenceRegistry<"icon" | "actions">();
-const BannerDockRegistry = createPresenceRegistry<"attached" | "notice" | "tasks">();
+/** Tracks actual surfaces, notices, and task badges within the nearest Dock. */
+export const BannerDockRegistry = createPresenceRegistry<"attached" | "notice" | "tasks">();
 
 /** Lets the nearest composer stack account for mounted shoulder tabs. */
 export const ComposerShoulderRegistry = createPresenceRegistry<"shoulder">();
@@ -114,20 +115,11 @@ function Peek({
   );
 }
 
-/** Registers typed content with the Dock; standalone attachments expose their own presence. */
-function Attachment({
-  className,
-  "data-composer-attachment": kind,
-  ...props
-}: ComponentProps<"div"> & { "data-composer-attachment"?: "notice" | "tasks" }) {
-  BannerDockRegistry.useRegister("notice", kind === "notice");
-  BannerDockRegistry.useRegister("tasks", kind === "tasks");
+/** Positions attached content without assuming that its children render a notice or badge. */
+function Attachment({ className, ...props }: ComponentProps<"div">) {
   return (
     <div
       data-slot="composer-banner-attachment"
-      data-composer-attachment={kind}
-      data-has-notice={kind === "notice" ? "true" : "false"}
-      data-has-tasks={kind === "tasks" ? "true" : "false"}
       className={cn(
         "mx-auto -mb-[calc(1rem+1px)] w-[calc(100%-2*var(--chat-composer-drawer-inset))]",
         // Adjacent attachments share their outline, including notices outside the form.
