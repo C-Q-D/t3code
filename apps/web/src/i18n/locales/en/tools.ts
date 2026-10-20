@@ -935,6 +935,10 @@ export const tools = {
     openWith: "Open with",
     openFailed: "Could not open file",
     revealFailed: "Unable to reveal file",
+    copyAbsolutePath: "Copy absolute path",
+    copyRelativePath: "Copy relative path",
+    pathCopied: "Path copied",
+    copyPathFailed: "Failed to copy path",
 
     /** Formats display text from label supplied by the caller. */
     browseFolder: (label: string) => `Browse ${label}`,

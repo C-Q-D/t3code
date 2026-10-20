@@ -898,6 +898,10 @@ export const tools: Messages["tools"] = {
     openWith: "打开方式",
     openFailed: "无法打开文件",
     revealFailed: "无法定位文件",
+    copyAbsolutePath: "复制绝对路径",
+    copyRelativePath: "复制相对路径",
+    pathCopied: "已复制路径",
+    copyPathFailed: "复制路径失败",
 
     /** Formats display text from label supplied by the caller. */
     browseFolder: (label) => `浏览 ${label}`,
