@@ -1521,7 +1521,6 @@ function releaseChatTimelineAnchor<T extends { readonly messageId: MessageId | n
 const retryingWorkspacePreparationRunIds = new Set<RunId>();
 
 export default function ChatView(props: ChatViewProps) {
-  ChatWorkspaceRegistry.useRegister("workspace");
   const {
     environmentId,
     threadId,
@@ -11121,6 +11120,9 @@ export default function ChatView(props: ChatViewProps) {
     consumePendingFileDrop,
     pendingSidebarFileDrops,
   ]);
+
+  // Register only the branch that renders the workspace root, not the empty-state shell.
+  ChatWorkspaceRegistry.useRegister("workspace", Boolean(activeThread));
 
   // Empty state: no active thread
   if (!activeThread) {
