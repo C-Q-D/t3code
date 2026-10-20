@@ -14,6 +14,7 @@ import { getSubagentPixelIconName } from "../icons/subagentPixelIcon";
 import { ThreadHoverCardPopup } from "../ThreadHoverCard";
 import { ThreadRelationshipIcon } from "./ThreadRelationshipIcon";
 import { cn } from "../../lib/utils";
+import { createPresenceRegistry } from "../../lib/presenceRegistry";
 import { ThreadDetailsControl } from "./ThreadDetailsControl";
 import { CollapsibleSectionHeader, SectionHeaderStatus } from "../ui/collapsible-section-header";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
@@ -21,6 +22,9 @@ import {
   THREAD_DETAILS_PANEL_SPLIT_GROUP_CLASS,
   THREAD_DETAILS_PANEL_SPLIT_SEPARATOR_CLASS,
 } from "./threadDetailsPanelStyles";
+
+/** Registers expanded workflow trees with their nearest lineage list. */
+export const threadLineageWorkflowRegistry = createPresenceRegistry<"expanded">();
 
 /**
  * Wall clock for the phase: its members run in parallel, so the span from the
@@ -158,13 +162,13 @@ export function ThreadLineageWorkflowRow({
   readonly stopDisabled: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
+  threadLineageWorkflowRegistry.useRegister("expanded", expanded);
   // The running phase opens itself until the user picks a side for it.
   const [phaseOpen, setPhaseOpen] = useState<ReadonlyMap<number, boolean>>(() => new Map());
   const label = group.workflow.workflowName ?? group.workflow.title;
   const phases = group.phases.filter((phase) => phase.members.length > 0);
   return (
-    // The flag lets the lineage list trade its compact height for the open tree.
-    <li className="group" data-workflow-expanded={expanded ? "" : undefined}>
+    <li className="group">
       <div className={cn("relative", THREAD_DETAILS_PANEL_SPLIT_GROUP_CLASS)}>
         {header}
         {onStop ? (

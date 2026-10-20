@@ -69,7 +69,10 @@ import { orchestrationEnvironment } from "../../state/orchestration";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { AgentElapsed } from "./AgentElapsed";
 import { ThreadRelationshipIcon, threadRelationshipStatusLabel } from "./ThreadRelationshipIcon";
-import { ThreadLineageWorkflowRow } from "./ThreadLineageWorkflowRow";
+import {
+  ThreadLineageWorkflowRow,
+  threadLineageWorkflowRegistry,
+} from "./ThreadLineageWorkflowRow";
 import {
   formatSubagentModelText,
   resolveSubagentModelSummary,
@@ -113,6 +116,8 @@ export function ThreadLineageRowList(props: {
   readonly onShowMore: () => void;
   readonly children: ReactNode;
 }) {
+  const { counts, onChange } = threadLineageWorkflowRegistry.usePresence();
+  const workflowExpanded = (counts.expanded ?? 0) > 0;
   return (
     <>
       {/*
@@ -127,9 +132,12 @@ export function ThreadLineageRowList(props: {
       */}
       <ul
         aria-label={t.chat.relationships.relatedThreads}
-        className="m-0 max-h-[13.5rem] list-none overflow-y-auto overscroll-contain p-0 has-data-workflow-expanded:max-h-[min(28rem,55dvh)]"
+        data-workflow-expanded={workflowExpanded}
+        className="m-0 max-h-[13.5rem] list-none overflow-y-auto overscroll-contain p-0 data-[workflow-expanded=true]:max-h-[min(28rem,55dvh)]"
       >
-        {props.children}
+        <threadLineageWorkflowRegistry.Provider onChange={onChange}>
+          {props.children}
+        </threadLineageWorkflowRegistry.Provider>
       </ul>
       {props.hiddenCount > 0 ? (
         <button
