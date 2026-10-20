@@ -1,6 +1,9 @@
-// @vitest-environment jsdom
-/** Verifies focus transitions at the hook's container boundary. */
+/**
+ * Verifies focus transitions at the hook's DOM container boundary.
+ * @vitest-environment jsdom
+ */
 import { act } from "react";
+import { createPortal } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
 
@@ -9,6 +12,7 @@ import { useFocusVisibleWithin } from "./useFocusVisibleWithin";
 let container: HTMLDivElement;
 let root: Root;
 let focusVisible: boolean;
+let portalContainer: HTMLDivElement;
 
 /** Renders two descendants and an outside control to exercise the container boundary. */
 function Probe() {
@@ -19,6 +23,7 @@ function Probe() {
       <div data-active={String(active)} {...handlers}>
         <button id="first">first</button>
         <button id="second">second</button>
+        {createPortal(<button id="portal">portal</button>, portalContainer)}
       </div>
     </>
   );
@@ -40,12 +45,16 @@ beforeEach(() => {
     return selector === ":focus-visible" ? focusVisible : matches.call(this, selector);
   });
   container = document.createElement("div");
+  portalContainer = document.createElement("div");
+  document.body.append(container, portalContainer);
   root = createRoot(container);
   act(() => root.render(<Probe />));
 });
 
 afterEach(() => {
   act(() => root.unmount());
+  container.remove();
+  portalContainer.remove();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -75,4 +84,20 @@ it("clears keyboard highlighting when a descendant receives mouse focus", () => 
   focusVisible = false;
   focusEvent("second", "focusin", "first");
   expect(container.querySelector("[data-active]")?.getAttribute("data-active")).toBe("false");
+});
+
+it("stays inactive in an external child portal and reactivates on DOM reentry", () => {
+  const first = container.querySelector<HTMLButtonElement>("#first")!;
+  const portalButton = portalContainer.querySelector<HTMLButtonElement>("#portal")!;
+  const wrapper = container.querySelector("[data-active]")!;
+
+  act(() => first.focus());
+  expect(wrapper.getAttribute("data-active")).toBe("true");
+  act(() => portalButton.focus());
+  expect(document.activeElement).toBe(portalButton);
+  expect(wrapper.contains(document.activeElement)).toBe(false);
+  expect(wrapper.getAttribute("data-active")).toBe("false");
+  act(() => first.focus());
+  expect(document.activeElement).toBe(first);
+  expect(wrapper.getAttribute("data-active")).toBe("true");
 });
