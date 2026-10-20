@@ -12,7 +12,6 @@
       max(var(--glass-opacity, 100%), var(--chat-composer-min-opacity, 85%)),
     transparent
   );
-  --physical-composer-cap: #17181c;
   box-shadow: 0 10px 18px rgb(22 24 29 / 12%);
 }
 

@@ -46,7 +46,6 @@ export class PhysicalComposerRenderer {
   readonly model: TypingPhysics;
   private readonly svg = svgElement("svg");
   private readonly face = svgElement("path");
-  private readonly cap = svgElement("path");
   private readonly glow = svgElement("path");
   private readonly gradient = svgElement("linearGradient");
   private readonly stops = Array.from({ length: 4 }, () => svgElement("stop"));
@@ -96,9 +95,8 @@ export class PhysicalComposerRenderer {
     this.glow.setAttribute("fill", "none");
     this.glow.setAttribute("stroke", `url(#${id})`);
     this.glow.setAttribute("stroke-linejoin", "round");
-    this.cap.setAttribute("transform", "translate(0 6)");
     this.face.setAttribute("stroke-linejoin", "round");
-    this.svg.append(defs, this.glow, this.cap, this.face);
+    this.svg.append(defs, this.glow, this.face);
     for (let i = 0; i < 180; i++) {
       const node = document.createElement("span");
       node.dataset.physicalBit = "";
@@ -408,8 +406,7 @@ export class PhysicalComposerRenderer {
   private render() {
     const { heat, hue } = this.model;
     const path = this.path();
-    for (const edge of [this.glow, this.cap, this.face]) edge.setAttribute("d", path);
-    this.cap.setAttribute("fill", this.dark ? "var(--physical-composer-cap, #25272D)" : "#C3C9D3");
+    for (const edge of [this.glow, this.face]) edge.setAttribute("d", path);
     this.face.setAttribute(
       "fill",
       this.dark ? "var(--physical-composer-face, #24262C)" : "#FFFFFF",

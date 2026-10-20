@@ -146,8 +146,8 @@
  * | 选中标签与分段滑块 | inset 0 1px 0 rgba(255,255,255,0.09), 0 1.5px 0 #09090a | shadow-raise-tab | 规范-8a.dc.html · H1 |
  * | 规范浮起层 | inset 0 1.5px 0 rgba(255,255,255,0.095), inset 0 -2px 0 rgba(0,0,0,0.66), 0 0 0 1px rgba(0,0,0,0.484), 0 3px 0 #09090a, 0 5px 2px rgba(0,0,0,0.484), 16px 26px 34px -8px rgba(0,0,0,0.748) | shadow-raise-l-spec | 规范-8a.dc.html · G1 |
  * | 规范石板层 | inset 0 1.5px 0 rgba(255,255,255,0.095), inset 1.5px 0 0 rgba(255,255,255,0.055), inset 0 -2px 0 rgba(0,0,0,0.704), 0 0 0 1px rgba(0,0,0,0.55), 0 4px 0 #060607, 0 6px 2px rgba(0,0,0,0.55), 18px 28px 36px -8px rgba(0,0,0,0.792) | shadow-slab-spec | 规范-8a.dc.html · G1 |
- * | 整窗石板（左右侧边与远投影） | inset 0 1.5px 0 rgba(255,255,255,0.095), inset 1.5px 0 0 rgba(255,255,255,0.055), inset 0 -2px 0 rgba(0,0,0,0.704), inset -1.5px 0 0 rgba(0,0,0,0.44), 0 0 0 1px rgba(0,0,0,0.55), 0 6px 2px rgba(0,0,0,0.3), 18px 28px 36px -8px rgba(0,0,0,0.4), 40px 64px 90px -24px rgba(0,0,0,0.33) | shadow-slab-frame | 按用户反馈减弱，原值见 StyleM-8a.dc.html · 整窗 |
- * | 整窗详情卡 | inset 0 1.5px 0 rgba(255,255,255,0.095), inset 0 -2px 0 rgba(0,0,0,0.66), 0 0 0 1px rgba(0,0,0,0.484), 0 3px 0 #09090a, 0 5px 2px rgba(0,0,0,0.484), 16px 26px 34px -8px rgba(0,0,0,0.748), 36px 60px 80px -24px rgba(0,0,0,0.572) | shadow-raise-detail | StyleM-8a.dc.html · 整窗 |
+ * | 整窗石板（高光与轮廓） | inset 0 1.5px 0 rgba(255,255,255,0.095), inset 1.5px 0 0 rgba(255,255,255,0.055), inset -1.5px 0 0 rgba(0,0,0,0.44), 0 0 0 1px rgba(0,0,0,0.55) | shadow-slab-frame | 大面板保留侧边层次，不绘制底部厚度与远投影 |
+ * | 整窗详情卡（高光与轮廓） | inset 0 1.5px 0 rgba(255,255,255,0.095), 0 0 0 1px rgba(0,0,0,0.484) | shadow-raise-detail | 大面板不绘制底部厚度与远投影 |
  * | 菜单弹层 | inset 0 1.5px 0 rgba(255,255,255,0.095), 0 0 0 1px rgba(0,0,0,0.5), 0 3px 0 #09090a, 16px 26px 34px -8px rgba(0,0,0,0.75) | shadow-overlay | 规范-8a.dc.html · H2 |
  * | 整窗弹层远投影 | inset 0 1.5px 0 rgba(255,255,255,0.095), 0 0 0 1px rgba(0,0,0,0.5), 0 3px 0 #09090a, 16px 26px 34px -8px rgba(0,0,0,0.75), 36px 60px 80px -24px rgba(0,0,0,0.6) | shadow-overlay-frame | StyleM-8a.dc.html · 整窗 |
  * | Toast 浮层 | inset 0 1.5px 0 rgba(255,255,255,0.095), 0 0 0 1px rgba(0,0,0,0.5), 0 3px 0 #09090a, 12px 20px 28px -8px rgba(0,0,0,0.8) | shadow-toast | 规范-8a.dc.html · H3 |
@@ -471,18 +471,13 @@
     inset 0 -2px 0 rgba(0, 0, 0, 0.704), 0 0 0 1px rgba(0, 0, 0, 0.55), 0 4px 0 #060607,
     0 6px 2px rgba(0, 0, 0, 0.55), 18px 28px 36px -8px rgba(0, 0, 0, 0.792);
 
-  /* 按用户反馈减弱，原值见 StyleM-8a.dc.html · 整窗；整窗石板（左右侧边与远投影）：inset 0 1.5px 0 rgba(255,255,255,0.095), inset 1.5px 0 0 rgba(255,255,255,0.055), inset 0 -2px 0 rgba(0,0,0,0.704), inset -1.5px 0 0 rgba(0,0,0,0.44), 0 0 0 1px rgba(0,0,0,0.55), 0 6px 2px rgba(0,0,0,0.3), 18px 28px 36px -8px rgba(0,0,0,0.4), 40px 64px 90px -24px rgba(0,0,0,0.33)。 */
+  /* 大面板只保留高光和细轮廓，避免向下的阴影在窗口底边累积成黑带。 */
   --shadow-slab-frame:
     inset 0 1.5px 0 rgba(255, 255, 255, 0.095), inset 1.5px 0 0 rgba(255, 255, 255, 0.055),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.704), inset -1.5px 0 0 rgba(0, 0, 0, 0.44),
-    0 0 0 1px rgba(0, 0, 0, 0.55), 0 6px 2px rgba(0, 0, 0, 0.3),
-    18px 28px 36px -8px rgba(0, 0, 0, 0.4), 40px 64px 90px -24px rgba(0, 0, 0, 0.33);
+    inset -1.5px 0 0 rgba(0, 0, 0, 0.44), 0 0 0 1px rgba(0, 0, 0, 0.55);
 
-  /* StyleM-8a.dc.html · 整窗；整窗详情卡：inset 0 1.5px 0 rgba(255,255,255,0.095), inset 0 -2px 0 rgba(0,0,0,0.66), 0 0 0 1px rgba(0,0,0,0.484), 0 3px 0 #09090a, 0 5px 2px rgba(0,0,0,0.484), 16px 26px 34px -8px rgba(0,0,0,0.748), 36px 60px 80px -24px rgba(0,0,0,0.572)。 */
-  --shadow-raise-detail:
-    inset 0 1.5px 0 rgba(255, 255, 255, 0.095), inset 0 -2px 0 rgba(0, 0, 0, 0.66),
-    0 0 0 1px rgba(0, 0, 0, 0.484), 0 3px 0 #09090a, 0 5px 2px rgba(0, 0, 0, 0.484),
-    16px 26px 34px -8px rgba(0, 0, 0, 0.748), 36px 60px 80px -24px rgba(0, 0, 0, 0.572);
+  /* 整窗详情卡与大面板一致；按钮和菜单继续使用各自的立体阴影。 */
+  --shadow-raise-detail: inset 0 1.5px 0 rgba(255, 255, 255, 0.095), 0 0 0 1px rgba(0, 0, 0, 0.484);
 
   /* 规范-8a.dc.html · H2；菜单弹层：inset 0 1.5px 0 rgba(255,255,255,0.095), 0 0 0 1px rgba(0,0,0,0.5), 0 3px 0 #09090a, 16px 26px 34px -8px rgba(0,0,0,0.75)。 */
   --shadow-overlay:

@@ -43,7 +43,7 @@ function Host({ className, ...props }: ComponentProps<"div">) {
   );
 }
 
-/** Hosts the physical keycap surface while keeping editor, toolbar and throw-feedback geometry intact. */
+/** Hosts the physical input surface while keeping editor, toolbar and throw-feedback geometry intact. */
 function Main({ className, children, ...props }: ComponentProps<"div">) {
   return (
     <div
