@@ -91,6 +91,7 @@ import React, {
   useCallback,
   memo,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -2209,6 +2210,13 @@ const CHAT_MARKDOWN_LITERAL_HTML_REHYPE_PLUGINS = [rehypeHeadingIds] satisfies N
   ReactMarkdownOptions["rehypePlugins"]
 >;
 
+/** Records the last root element after Markdown transforms; text nodes do not affect last-child. */
+function rehypeLastBlock(lastBlock: React.RefObject<string | null>) {
+  return (tree: HeadingHastNode) => {
+    lastBlock.current = tree.children?.findLast((node) => node.type === "element")?.tagName ?? null;
+  };
+}
+
 function MarkdownExternalLinkContent({
   host,
   plainText,
@@ -3836,6 +3844,25 @@ function ChatMarkdown({
     ],
     [extraRemarkPlugins, incrementalParsing, lineBreaks],
   );
+  const lastBlockRef = useRef<string | null>(null);
+  const rehypePlugins = useMemo(
+    () =>
+      [
+        ...(parseRawHtml
+          ? CHAT_MARKDOWN_RENDER_REHYPE_PLUGINS
+          : CHAT_MARKDOWN_LITERAL_HTML_REHYPE_PLUGINS),
+        [rehypeLastBlock, lastBlockRef],
+      ] satisfies NonNullable<ReactMarkdownOptions["rehypePlugins"]>,
+    [parseRawHtml],
+  );
+  // The child parser fills the ref during render; publish after commit, before the cursor paints.
+  useLayoutEffect(() => {
+    if (lastBlockRef.current === null) {
+      markdownRef.current?.removeAttribute("data-last-block");
+    } else {
+      markdownRef.current?.setAttribute("data-last-block", lastBlockRef.current);
+    }
+  });
 
   // react-markdown converts unparsed HTML nodes to text when skipHtml is false.
   // Keep that behavior explicit because literal mode depends on escaping the
@@ -3858,11 +3885,7 @@ function ChatMarkdown({
         <ChatMarkdownRendererContext value={componentState}>
           <ReactMarkdown
             remarkPlugins={remarkPlugins}
-            rehypePlugins={
-              parseRawHtml
-                ? CHAT_MARKDOWN_RENDER_REHYPE_PLUGINS
-                : CHAT_MARKDOWN_LITERAL_HTML_REHYPE_PLUGINS
-            }
+            rehypePlugins={rehypePlugins}
             skipHtml={false}
             components={CHAT_MARKDOWN_COMPONENTS}
             urlTransform={markdownUrlTransform}

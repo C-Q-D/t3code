@@ -266,7 +266,7 @@
   margin-left: var(--spacing);
 }
 
-[data-discussion-live] .chat-markdown:has(> p:last-child)::after {
+[data-discussion-live] .chat-markdown[data-last-block="p"]::after {
   display: none;
 }
 
