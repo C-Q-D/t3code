@@ -53,7 +53,6 @@ export class PhysicalComposerRenderer {
   private readonly sentLayer = document.createElement("div");
   private readonly particleLayer = document.createElement("div");
   private readonly particleNodes: HTMLSpanElement[] = [];
-  private readonly thermometers = new Set<HTMLElement>();
   private readonly shadows: Shadow[] = [];
   private cancel: (() => void) | undefined;
   private readonly unsubscribe: () => void;
@@ -335,15 +334,6 @@ export class PhysicalComposerRenderer {
     this.start();
   }
 
-  /** Bind a toolbar fill element; updates use transform/opacity and cleanup leaves it static. */
-  thermometer(element: HTMLElement) {
-    this.thermometers.add(element);
-    this.render();
-    return () => {
-      this.thermometers.delete(element);
-    };
-  }
-
   /** Start one shared-loop job only after an input event has created work. */
   private start() {
     try {
@@ -386,10 +376,6 @@ export class PhysicalComposerRenderer {
     this.clearGlyphs(true);
     this.model.reset();
     for (const node of this.particleNodes) node.style.opacity = "0";
-    for (const fill of this.thermometers) {
-      fill.style.transform = "scaleY(0.06)";
-      fill.style.opacity = "0.4";
-    }
   }
 
   /** Build rounded geometry using exactly 40 nodes on each horizontal edge. */
@@ -442,11 +428,6 @@ export class PhysicalComposerRenderer {
       node.style.backgroundColor = `hsl(${Math.round(bit.hue)}, 78%, 74%)`;
       node.style.transform = `translate(${bit.x}px,${bit.y}px) rotate(${bit.r}deg) scale(${bit.s},${bit.s * Math.cos(bit.f)})`;
     }
-    for (const fill of this.thermometers) {
-      fill.style.transform = `scaleY(${0.06 + heat * 0.94})`;
-      fill.style.opacity = String(0.4 + heat * 0.6);
-      fill.style.background = `linear-gradient(0deg,hsl(${Math.round(hue)},70%,70%),hsl(${Math.round((hue + 120) % 360)},70%,70%))`;
-    }
   }
 
   /** Cancel immediately when global permission changes, restoring every hidden glyph. */
@@ -467,7 +448,6 @@ export class PhysicalComposerRenderer {
     this.unobserveResize();
     this.surface.removeEventListener("focusin", this.onFocus);
     this.surface.removeEventListener("focusout", this.onBlur);
-    this.thermometers.clear();
     this.layer.replaceChildren();
   }
 }

@@ -69,38 +69,3 @@ export function PhysicalComposer({
     </PhysicalContext.Provider>
   );
 }
-
-/** Decorative heat strip for placement immediately before the send action. */
-export function ComposerThermometer() {
-  const renderer = usePhysicalComposer();
-  const fill = useRef<HTMLSpanElement>(null);
-  useEffect(() => {
-    if (renderer && fill.current) return renderer.thermometer(fill.current);
-  }, [renderer]);
-  return (
-    <span
-      aria-hidden="true"
-      style={{
-        display: "inline-block",
-        position: "relative",
-        width: 5,
-        height: 26,
-        overflow: "hidden",
-        borderRadius: 3,
-        background: "var(--border)",
-        flexShrink: 0,
-      }}
-    >
-      <span
-        ref={fill}
-        style={{
-          position: "absolute",
-          inset: 0,
-          transformOrigin: "bottom",
-          transform: "scaleY(0.06)",
-          opacity: 0.4,
-        }}
-      />
-    </span>
-  );
-}
