@@ -15,6 +15,9 @@ export type ComposerBannerVariant = "default" | "error" | "info" | "success" | "
 const BannerRowRegistry = createPresenceRegistry<"icon" | "actions">();
 const BannerDockRegistry = createPresenceRegistry<"attached">();
 
+/** Lets the nearest composer stack account for mounted shoulder tabs. */
+export const ComposerShoulderRegistry = createPresenceRegistry<"shoulder">();
+
 const surfaceColors = cn(
   "[--chat-composer-attached-surface:var(--chat-composer-glass-surface,var(--card))]",
   "dark:[--chat-composer-attached-surface:var(--chat-composer-glass-surface,var(--surface-raised))]",
@@ -155,21 +158,26 @@ function Column({ className, ...props }: ComponentProps<"div">) {
   );
 }
 
+/** Paints a banner and registers optional shoulder-tab spacing with the enclosing stack. */
 function Root({
   className,
+  shoulderTab = false,
   density = "default",
   placement = "attached",
   variant = "default",
   width = "fill",
   ...props
 }: ComponentProps<"div"> & {
+  shoulderTab?: boolean;
   density?: "default" | "comfortable" | "spacious";
   placement?: "attached" | "floating";
   variant?: ComposerBannerVariant;
   width?: "fill" | "content";
 }) {
+  ComposerShoulderRegistry.useRegister("shoulder", shoulderTab);
   return (
     <Surface
+      data-composer-shoulder-tab={shoulderTab || undefined}
       className={cn(
         "min-w-0 px-1 py-(--composer-banner-padding-block) after:block after:h-(--chat-composer-attachment-overlap) text-xs/4 [--composer-banner-icon-column:--spacing(7)] [--composer-banner-padding-block:--spacing(1)] sm:[--composer-banner-icon-column:--spacing(6)]",
         density === "comfortable" && "[--composer-banner-padding-block:--spacing(1.25)]",

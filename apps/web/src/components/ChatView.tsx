@@ -509,6 +509,7 @@ import { partitionTimelineBanners } from "./chat/timelineBannerRouting.logic";
 import { formatRelativeTimeLabel, formatRelativeTimeUntilLabel } from "../timestampFormat";
 import { SNOOZE_UI_ENABLED } from "../snoozeUi";
 import { ComposerSurface } from "./chat/ComposerSurface";
+import { ComposerShoulderRegistry } from "./chat/ComposerBanner";
 import { resolveThreadSyncPhase } from "../threadSync";
 import {
   hasAvailableCompactionProvider,
@@ -1519,6 +1520,22 @@ function releaseChatTimelineAnchor<T extends { readonly messageId: MessageId | n
 
 /** Runs with a workspace preparation retry in flight, across ChatView instances. */
 const retryingWorkspacePreparationRunIds = new Set<RunId>();
+
+/** Keeps shoulder-tab presence local so tab mounts do not rerender the chat workspace. */
+function ComposerStack({ children }: { children: React.ReactNode }) {
+  const { counts, onChange } = ComposerShoulderRegistry.usePresence();
+  return (
+    <ComposerShoulderRegistry.Provider onChange={onChange}>
+      <div
+        data-chat-composer-stack="true"
+        data-has-shoulder-tab={(counts.shoulder ?? 0) > 0 ? "true" : "false"}
+        className="group/composer-stack pointer-events-auto relative z-10 mx-auto w-full max-w-composer"
+      >
+        {children}
+      </div>
+    </ComposerShoulderRegistry.Provider>
+  );
+}
 
 export default function ChatView(props: ChatViewProps) {
   const {
@@ -11643,14 +11660,11 @@ export default function ChatView(props: ChatViewProps) {
                 ref={draftHeroTransition.transitionGroupRef}
                 className="chat-composer-lane w-full"
               >
-                <div
-                  data-chat-composer-stack="true"
-                  className="group/composer-stack pointer-events-auto relative z-10 mx-auto w-full max-w-composer"
-                >
+                <ComposerStack>
                   {isDraftHeroState ? (
                     <div className="absolute inset-x-0 bottom-full">
                       <div
-                        className="pb-7.5 group-has-data-[composer-shoulder-tab]/composer-stack:pb-0"
+                        className="pb-7.5 group-data-[has-shoulder-tab=true]/composer-stack:pb-0"
                         style={
                           forceExpandedMobileComposer
                             ? { viewTransitionName: MOBILE_DRAFT_HEADLINE_VIEW_TRANSITION_NAME }
@@ -11944,7 +11958,7 @@ export default function ChatView(props: ChatViewProps) {
                       className="h-[calc(env(safe-area-inset-bottom)+1rem)] sm:h-[calc(env(safe-area-inset-bottom)+1.25rem)]"
                     />
                   </div>
-                </div>
+                </ComposerStack>
               </div>
             </div>
 

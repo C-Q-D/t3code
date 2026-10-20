@@ -99,11 +99,7 @@ export const ComposerTasksBadge = memo(function ComposerTasksBadge({
   return placement === "inline" ? (
     row
   ) : (
-    <ComposerBanner.Root
-      density="comfortable"
-      data-composer-shoulder-tab
-      className="composer-tasks-tab"
-    >
+    <ComposerBanner.Root density="comfortable" shoulderTab className="composer-tasks-tab">
       {row}
     </ComposerBanner.Root>
   );
