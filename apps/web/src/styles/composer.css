@@ -517,7 +517,7 @@ html[data-theme-id="graphite"] [data-composer-banner-surface]::before {
       @apply -translate-y-4.25;
     }
 
-    .composer-stash-row:has([data-stash-restore]:focus-visible) {
+    .composer-stash-row [data-stash-restore]:focus-visible::before {
       @apply inset-shadow-focus;
     }
   }
