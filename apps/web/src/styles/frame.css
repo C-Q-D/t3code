@@ -416,6 +416,16 @@ html.electron-windows .windows-window-controls {
   border-top-right-radius: var(--window-frame-radius, 0px);
   overflow: clip;
   -webkit-app-region: no-drag;
+  /* Reset the native popover box; only the three caption hit targets occupy it. */
+  left: auto;
+  bottom: auto;
+  width: max-content;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 html.electron-windows .windows-window-controls button {
@@ -502,13 +512,6 @@ html[data-theme-id="graphite"].electron-windows[data-window-maximized="false"][d
     border-radius: inherit;
   }
 
-  /* Expanded MCP apps use a fixed popup rather than the dialog's relative track. */
-  [data-slot="dialog-popup"].fixed {
-    inset: var(--window-frame-inset);
-    width: calc(100dvw - 2 * var(--window-frame-inset));
-    height: calc(100dvh - 2 * var(--window-frame-inset));
-  }
-
   [data-slot="toast-viewport"][data-position*="top"] {
     top: calc(var(--toast-inset) + var(--toast-header-offset) + var(--window-frame-inset));
   }
@@ -535,4 +538,24 @@ html[data-theme-id="graphite"].electron-windows[data-window-maximized="false"][d
     left: calc(76px + var(--window-frame-inset)) !important;
     bottom: calc(20px + var(--window-frame-inset)) !important;
   }
+}
+
+/* MCP expands its existing iframe host with showPopover(), not a Dialog popup.
+   Native window state supplies 8px in ordinary mode and falls back to zero. */
+html[data-theme-id="graphite"].electron-windows [data-mcp-app-fullscreen] {
+  inset: var(--window-frame-inset, 0px);
+  width: calc(100dvw - 2 * var(--window-frame-inset, 0px));
+  height: calc(100dvh - 2 * var(--window-frame-inset, 0px));
+  border-radius: var(--window-frame-radius, 0px);
+}
+
+/* Expanded apps must leave the caption row's hit targets and exit action apart. */
+html.electron-windows [data-mcp-app-fullscreen] > [data-mcp-app-header] {
+  height: var(--workspace-topbar-height);
+  padding-right: 150px;
+}
+
+html.electron-windows .windows-window-controls::backdrop {
+  background: transparent;
+  pointer-events: none;
 }

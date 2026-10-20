@@ -1,5 +1,5 @@
 /** Windows caption buttons; native IPC owns window state and normal close handling. */
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { DesktopWindowAction } from "@t3tools/contracts";
 import { t } from "~/i18n";
@@ -20,6 +20,30 @@ export async function runWindowAction(action: DesktopWindowAction): Promise<void
 /** Renders native-sized hit targets; maximized is the native state, never optimistic state. */
 export function WindowsWindowControls({ maximized }: { maximized: boolean }) {
   const [pending, setPending] = useState(false);
+  const controlsRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const controls = controlsRef.current;
+    if (!controls?.showPopover) return;
+    // A page z-index cannot outrank MCP's top-layer popover. Keep the same
+    // caption host in that layer and raise it after an app enters the layer.
+    const onToggle = (event: Event) => {
+      if (
+        event.target instanceof HTMLElement &&
+        event.target.matches("[data-mcp-app-fullscreen]") &&
+        "newState" in event &&
+        event.newState === "open"
+      ) {
+        controls.hidePopover();
+        controls.showPopover();
+      }
+    };
+    controls.showPopover();
+    document.addEventListener("toggle", onToggle, true);
+    return () => {
+      document.removeEventListener("toggle", onToggle, true);
+      if (controls.matches(":popover-open")) controls.hidePopover();
+    };
+  }, []);
   /** Serializes a user's caption actions until the native request settles. */
   const run = async (action: DesktopWindowAction) => {
     setPending(true);
@@ -32,7 +56,7 @@ export function WindowsWindowControls({ maximized }: { maximized: boolean }) {
   // Native captions remain usable over modal dialogs. A body portal keeps their
   // replacement outside the shell's isolation and dialog scroll-lock padding.
   return createPortal(
-    <div className="windows-window-controls no-drag">
+    <div ref={controlsRef} popover="manual" className="windows-window-controls no-drag">
       <Tooltip>
         <TooltipTrigger
           render={<button type="button" />}

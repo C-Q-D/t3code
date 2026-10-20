@@ -219,6 +219,9 @@ export function McpAppFrame(props: {
     if (displayMode !== "fullscreen") return;
     const leave = () => setDisplayMode("inline");
     const onFocus = (event: FocusEvent) => {
+      // Caption actions change the native window, not the app's display mode.
+      if (event.target instanceof Element && event.target.closest(".windows-window-controls"))
+        return;
       if (event.target instanceof Node && !boxRef.current?.contains(event.target)) leave();
     };
     const onKey = (event: KeyboardEvent) => {
@@ -521,7 +524,10 @@ export function McpAppFrame(props: {
           )}
         >
           {fullscreen ? (
-            <div className="flex h-10 shrink-0 items-center justify-between border-border border-b px-3 text-sm">
+            <div
+              data-mcp-app-header=""
+              className="flex h-10 shrink-0 items-center justify-between border-border border-b px-3 text-sm"
+            >
               <span className="truncate">{app.server}</span>
               <Button
                 aria-label={t.chat.mcpApp.exitFullscreen}
