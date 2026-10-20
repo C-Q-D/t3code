@@ -72,6 +72,20 @@ import {
 
 const MACOS_TRAFFIC_LIGHTS_LEFT_INSET = "var(--desktop-window-controls-inset, 90px)";
 
+/** Exposes the sidebar's inline layout; mobile drawer state never reserves a grid track. */
+function FrameWorkspace({ children }: { children: ReactNode }) {
+  const { isMobile, state } = useSidebar();
+  return (
+    <div
+      className="window-frame-workspace grid min-h-0 min-w-0"
+      data-sidebar-inline={!isMobile ? "true" : "false"}
+      data-sidebar-collapsed={state === "collapsed" ? "true" : "false"}
+    >
+      {children}
+    </div>
+  );
+}
+
 /**
  * Owns the temporary sidebar session above keyed ChatViews so switching an open
  * panel between conversations does not capture its already-collapsed state.
@@ -411,7 +425,7 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
               onLeadingWidthChange={setTitlebarLeadingWidth}
             />
             {/* Bound route heights to the space left by the titlebar, not their content. */}
-            <div className="window-frame-workspace grid min-h-0 min-w-0">
+            <FrameWorkspace>
               <ProjectProjectionRetention />
               <div className="window-frame-projectbar" data-frame-projectbar="">
                 <ProjectRail />
@@ -474,7 +488,7 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
               </div>
               <NavigationHistoryShortcuts />
               <MainAppLocationTracker />
-            </div>
+            </FrameWorkspace>
           </SidebarProvider>
         </div>
       </TitlebarSlotProvider>

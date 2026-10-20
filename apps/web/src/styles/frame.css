@@ -72,18 +72,18 @@ html[data-theme-id="graphite"] [data-frame-main] {
 /* Keep the existing 768px sheet breakpoint until FR3 replaces it. max-content
    follows sidebar-gap's drag width, without restyling the entire app each frame. */
 @media (min-width: 768px) {
-  .window-frame-workspace:has(> [data-variant="frame"]) {
+  .window-frame-workspace[data-sidebar-inline="true"] {
     grid-template-columns: var(--frame-projectbar-width) max-content minmax(0, 1fr);
     /* Put the first gutter on the collapsing sidebar and the second on main.
        Main's gutter remains when the sidebar disappears, without a 16px jump. */
     column-gap: 0;
   }
 
-  .window-frame-workspace:has(> [data-variant="frame"][data-collapsible="offcanvas"]) {
+  .window-frame-workspace[data-sidebar-inline="true"][data-sidebar-collapsed="true"] {
     grid-template-columns: var(--frame-projectbar-width) minmax(0, 1fr);
   }
 
-  .window-frame-workspace:has(> [data-variant="frame"]) > .window-frame-main {
+  .window-frame-workspace[data-sidebar-inline="true"] > .window-frame-main {
     margin-inline-start: var(--frame-slab-gap);
   }
 
@@ -123,7 +123,7 @@ html[data-theme-id="graphite"] [data-frame-main] {
      stays rendered through exit; the track list changes only when exit finishes.
      On entry the three tracks return immediately while starting-style seeds zero width. */
   [data-app-shell][data-panel-animations="true"]
-    .window-frame-workspace:has(> [data-variant="frame"][data-collapsible="offcanvas"]) {
+    .window-frame-workspace[data-sidebar-inline="true"][data-sidebar-collapsed="true"] {
     transition: grid-template-columns var(--panel-animation-duration) step-end allow-discrete;
   }
 
@@ -169,7 +169,7 @@ html[data-theme-id="graphite"] [data-frame-main] {
   @media (prefers-reduced-motion: reduce) {
     :where(:root:not([data-physics="on"]))
       [data-app-shell][data-panel-animations="true"]
-      .window-frame-workspace:has(> [data-variant="frame"][data-collapsible="offcanvas"]),
+      .window-frame-workspace[data-sidebar-inline="true"][data-sidebar-collapsed="true"],
     :where(:root:not([data-physics="on"]))
       [data-app-shell][data-panel-animations="true"]
       .window-frame-workspace
