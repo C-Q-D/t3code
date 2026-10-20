@@ -131,8 +131,8 @@ html[data-theme-id="graphite"] [data-composer-banner-surface]::before {
     /* U1 rows span the input width and sit above it, without the legacy attachment overlap. */
     [data-chat-composer-form]
       > [data-slot="composer-banner-attachment"]:is(
-        [data-composer-attachment="notice"],
-        [data-composer-attachment="tasks"]
+        [data-has-notice="true"],
+        [data-has-tasks="true"]
       ) {
       @apply mb-2 w-full;
     }
