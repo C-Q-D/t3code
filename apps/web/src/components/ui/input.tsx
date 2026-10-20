@@ -17,6 +17,15 @@ type InputProps = Omit<InputPrimitive.Props & React.RefAttributes<HTMLInputEleme
   nativeInput?: boolean;
 };
 
+/** Derives wrapper state from control defaults and caller overrides, without reading the DOM. */
+function getInputControlState(
+  defaults: Pick<React.ComponentProps<"input">, "disabled">,
+  overrides: Pick<React.ComponentProps<"input">, "disabled">,
+) {
+  const effective = { ...defaults, ...overrides };
+  return { disabled: Boolean(effective.disabled) };
+}
+
 /** Renders a pill input; numeric size values still set the native character width. */
 function Input({
   className,
@@ -97,4 +106,4 @@ function Input({
   );
 }
 
-export { Input, type InputProps };
+export { Input, getInputControlState, type InputProps };

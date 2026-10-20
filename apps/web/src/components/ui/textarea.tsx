@@ -8,6 +8,7 @@ import type * as React from "react";
 import { useFieldRootContext } from "@base-ui/react/internals/field-root-context";
 
 import { cn } from "~/lib/utils";
+import { getInputControlState } from "~/components/ui/input";
 
 /** Native textarea props plus reusable editor geometry. */
 type TextareaProps = React.ComponentProps<"textarea"> & {
@@ -24,7 +25,8 @@ type TextareaProps = React.ComponentProps<"textarea"> & {
  */
 function Textarea({ className, size = "default", unstyled = false, ...props }: TextareaProps) {
   const { disabled: fieldDisabled } = useFieldRootContext();
-  const disabled = fieldDisabled || props.disabled;
+  // Field.Control supplies this default; the native merge lets explicit false/null override it.
+  const { disabled } = getInputControlState({ disabled: fieldDisabled || false }, props);
 
   return (
     <span
@@ -59,7 +61,6 @@ function Textarea({ className, size = "default", unstyled = false, ...props }: T
             )}
             data-slot="textarea"
             {...mergeProps(defaultProps, props)}
-            disabled={disabled}
           />
         )}
       />
