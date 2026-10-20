@@ -875,6 +875,7 @@ export function MarkdownCodeBlockFrame({
   fenceTitle,
   theme,
   wrapped = true,
+  diagramRendered = false,
   title,
   actions,
   headerProps,
@@ -885,6 +886,8 @@ export function MarkdownCodeBlockFrame({
   fenceTitle: string | null;
   theme: "light" | "dark";
   wrapped?: boolean;
+  /** Whether a committed Mermaid diagram can handle the header's expand action. */
+  diagramRendered?: boolean;
   /** Replaces the language title, as the composer does with its language picker. */
   title?: React.ReactNode;
   actions?: React.ReactNode;
@@ -905,6 +908,7 @@ export function MarkdownCodeBlockFrame({
       }
       data-language={language}
       data-wrap={wrapped ? "true" : "false"}
+      data-diagram-rendered={mermaidTimeline ? (diagramRendered ? "true" : "false") : undefined}
     >
       <div
         {...headerProps}
@@ -1017,6 +1021,7 @@ function MarkdownCodeBlock({
   leadingActions,
   canWrap = true,
   diagram = false,
+  diagramRendered = false,
   children,
 }: {
   code: string;
@@ -1029,6 +1034,8 @@ function MarkdownCodeBlock({
   canWrap?: boolean;
   /** Renders content instead of code, with actions below it like tables. */
   diagram?: boolean;
+  /** Forwards the Mermaid renderer's committed availability to its frame. */
+  diagramRendered?: boolean;
   children: ReactNode;
 }) {
   const inTimeline = use(MarkdownTimelineContext);
@@ -1125,6 +1132,7 @@ function MarkdownCodeBlock({
       return (
         <MarkdownCodeBlockFrame
           language={language}
+          diagramRendered={diagramRendered}
           fenceTitle={fenceTitle}
           theme={theme}
           headerProps={THREAD_FIND_IGNORE_PROPS}
@@ -1251,6 +1259,7 @@ function MarkdownMermaidCodeBlock({
   children: ReactNode;
 }) {
   const [showCode, setShowCode] = useState(false);
+  const [diagramRendered, setDiagramRendered] = useState(false);
   const timeline = use(MarkdownTimelineContext);
   const diagramRef = useRef<HTMLDivElement>(null);
   const searching = use(MarkdownFindContext);
@@ -1267,6 +1276,7 @@ function MarkdownMermaidCodeBlock({
       isStreaming={isStreaming}
       canWrap={!showDiagram}
       diagram={showDiagram}
+      diagramRendered={showDiagram && diagramRendered}
       leadingActions={
         isStreaming ? null : timeline ? (
           <>
@@ -1359,6 +1369,7 @@ function MarkdownMermaidCodeBlock({
             >
               <MermaidDiagram
                 source={code}
+                onRenderStateChange={setDiagramRendered}
                 theme={theme}
                 onExpand={onExpand}
                 presentation={timeline ? "timeline" : undefined}

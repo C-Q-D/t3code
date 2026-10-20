@@ -2,7 +2,7 @@
 import { t } from "~/i18n";
 import DOMPurify from "dompurify";
 import type { Mermaid } from "mermaid";
-import { use, useState } from "react";
+import { use, useLayoutEffect, useState } from "react";
 
 import { Button } from "../ui/button";
 
@@ -171,21 +171,28 @@ function mermaidImageUrl(svg: string): string {
   return expandedImageUrl;
 }
 
-/** Suspends until the diagram renders; failures show the parser message above the source. */
+/** Suspends until rendered; reports committed availability and clears it when hidden or unmounted. */
 export function MermaidDiagram({
   source,
   theme,
   onExpand,
   presentation,
+  onRenderStateChange,
 }: {
   source: string;
   theme: "light" | "dark";
   onExpand: (imageUrl: string) => void;
   /** Timeline changes typography only; source/theme remain the render cache key. */
   presentation?: "timeline" | undefined;
+  /** Receives true only while the expandable diagram is committed, before paint. */
+  onRenderStateChange?: (rendered: boolean) => void;
 }) {
   const [, setAttempt] = useState(0);
   const result = use(mermaidRenderPromise(source.trim(), theme));
+  useLayoutEffect(() => {
+    onRenderStateChange?.(result.status === "rendered");
+    return () => onRenderStateChange?.(false);
+  }, [onRenderStateChange, result.status]);
 
   if (result.status === "error") {
     return (

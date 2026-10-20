@@ -536,8 +536,8 @@ html[data-theme-id="graphite"] .chat-message-canvas [data-changed-files-state="t
     inset 2px 3px 6px rgba(0, 0, 0, 0.75), inset -1px -1px 0 rgba(255, 255, 255, 0.06);
 }
 
-/* The header action delegates to the rendered diagram; no render-state effect or cache key is added. */
-.timeline-mermaid-frame:not(:has([data-mermaid-expand])) .timeline-mermaid-expand {
+/* The header action is available only while its target diagram is committed. */
+.timeline-mermaid-frame[data-diagram-rendered="false"] .timeline-mermaid-expand {
   display: none;
 }
 
