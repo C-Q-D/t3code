@@ -147,3 +147,15 @@ html[data-theme-id="graphite"] .stone-sidebar {
     --stone-surface-color: color-mix(in srgb, var(--success) 4%, var(--surface-raised));
   }
 }
+
+/* Windows graphite backgrounds follow the shell instead of the native viewport.
+   Each layer clips its own paint; foreground opacity and portaled dialogs stay intact. */
+html[data-theme-id="graphite"].electron-windows .window-frame-shell {
+  position: relative;
+}
+
+html[data-theme-id="graphite"].electron-windows .window-frame-shell::before,
+html[data-theme-id="graphite"].electron-windows .window-frame-shell::after {
+  position: absolute;
+  border-radius: inherit;
+}
