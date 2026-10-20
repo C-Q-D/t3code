@@ -292,3 +292,81 @@ it.each(["mention", "thread"] as const)(
     expect(activeJobs()).toBe(0);
   },
 );
+
+/** Supply the browser preference boundary; changes use real DOM event delivery. */
+function installReducedMotion(matches: boolean) {
+  const preference = Object.assign(new EventTarget(), { matches });
+  vi.stubGlobal("matchMedia", (query: string) => {
+    if (query !== "(prefers-reduced-motion: reduce)") throw new Error(`Unexpected query: ${query}`);
+    return preference;
+  });
+  return preference;
+}
+
+/** Launch at the catch point so the first clock frame is contact, with insertion still owned by production. */
+function launchAtContact() {
+  const impact = vi.fn();
+  form.addEventListener("t3:composer-impact", impact);
+  act(() => {
+    launchComposerThrow({
+      channel: "mention",
+      label: "contact",
+      point: { x: 438, y: 218 },
+      velocity: { x: 0, y: 0 },
+      origin: { x: 0, y: 0 },
+      target: form,
+      onLand,
+    });
+  });
+  const token = document.querySelector<HTMLDivElement>("[data-composer-throw-token]")!;
+  Object.defineProperties(token, {
+    offsetWidth: { value: 100 },
+    offsetHeight: { value: 40 },
+  });
+  return { token, impact };
+}
+
+it("removes the token on contact without a landing fade when reduced motion is already enabled", () => {
+  installReducedMotion(true);
+  const { token, impact } = launchAtContact();
+  expect(token.isConnected).toBe(true);
+  expect(onLand).not.toHaveBeenCalled();
+  act(() => clock.advance(0));
+  expect(onLand).toHaveBeenCalledExactlyOnceWith(form);
+  expect(impact).toHaveBeenCalledTimes(1);
+  expect(token.isConnected).toBe(false);
+  expect(activeJobs()).toBe(0);
+  expect(clock.pending.size).toBe(0);
+  act(() => clock.advance(50));
+  expect(onLand).toHaveBeenCalledTimes(1);
+  expect(impact).toHaveBeenCalledTimes(1);
+});
+
+it.each([
+  {
+    name: "enabling reduced motion",
+    change: (preference: EventTarget & { matches: boolean }) => {
+      preference.matches = true;
+      preference.dispatchEvent(new Event("change"));
+    },
+  },
+  { name: "disabling physics", change: () => setPhysicsEnabled(false) },
+])("stops an active landing fade immediately when $name", ({ change }) => {
+  const preference = installReducedMotion(false);
+  const { token, impact } = launchAtContact();
+  act(() => clock.advance(0));
+  expect(onLand).toHaveBeenCalledExactlyOnceWith(form);
+  expect(impact).toHaveBeenCalledTimes(1);
+  act(() => clock.advance(50));
+  expect(token.isConnected).toBe(true);
+  expect(Number(token.style.opacity)).toBeCloseTo(2 / 3);
+  expect(activeJobs()).toBe(1);
+  // No further animation frame is needed to remove the card after the preference changes.
+  act(() => change(preference));
+  expect(token.isConnected).toBe(false);
+  expect(activeJobs()).toBe(0);
+  expect(clock.pending.size).toBe(0);
+  act(() => clock.advance(100));
+  expect(onLand).toHaveBeenCalledExactlyOnceWith(form);
+  expect(impact).toHaveBeenCalledTimes(1);
+});
