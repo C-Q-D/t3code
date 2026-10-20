@@ -1,5 +1,7 @@
-// @vitest-environment jsdom
-/** Checks the slot-count contract through a wrapper's rendered attributes. */
+/**
+ * Checks the slot-count contract through a wrapper's rendered attributes.
+ * @vitest-environment jsdom
+ */
 import { act, StrictMode, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
