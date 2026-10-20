@@ -1328,11 +1328,16 @@ function ScheduledTaskEditorDialog({
                       {WEEKDAY_ORDER.map((day) => (
                         <label
                           key={day}
-                          className="relative flex size-8.5 cursor-pointer items-center justify-center rounded-full bg-input text-secondary-copy-medium font-bold text-secondary-label shadow-input-well has-checked:bg-primary has-checked:text-primary-foreground has-checked:shadow-primary-edge has-focus-visible:inset-shadow-focus has-disabled:cursor-not-allowed has-disabled:opacity-40"
+                          className={cn(
+                            "relative flex size-8.5 cursor-pointer items-center justify-center rounded-full text-secondary-copy-medium font-bold in-[fieldset:disabled]:cursor-not-allowed in-[fieldset:disabled]:opacity-40",
+                            draft.weekdays.has(day)
+                              ? "bg-primary text-primary-foreground shadow-primary-edge"
+                              : "bg-input text-secondary-label shadow-input-well",
+                          )}
                         >
                           <input
                             type="checkbox"
-                            className="sr-only"
+                            className="peer sr-only"
                             aria-label={WEEKDAY_LABELS[day]}
                             checked={draft.weekdays.has(day)}
                             onChange={(event) => {
@@ -1345,6 +1350,10 @@ function ScheduledTaskEditorDialog({
                                 return { ...current, weekdays };
                               });
                             }}
+                          />
+                          <span
+                            aria-hidden="true"
+                            className="pointer-events-none absolute inset-0 rounded-full peer-focus-visible:inset-shadow-focus"
                           />
                           {WEEKDAY_SHORT[day]}
                         </label>
@@ -1386,7 +1395,10 @@ function ScheduledTaskEditorDialog({
                 {(["worktree", "root", "existing_worktree"] as const).map((mode) => (
                   <label
                     key={mode}
-                    className="relative flex min-h-9 cursor-pointer items-center gap-2.5 rounded-compact-row px-3 text-control text-code-foreground has-checked:bg-accent has-checked:inset-shadow-selected-control has-focus-visible:inset-shadow-focus has-disabled:cursor-not-allowed has-disabled:opacity-40"
+                    className={cn(
+                      "relative flex min-h-9 cursor-pointer items-center gap-2.5 rounded-compact-row px-3 text-control text-code-foreground in-[fieldset:disabled]:cursor-not-allowed in-[fieldset:disabled]:opacity-40",
+                      draft.workspaceMode === mode && "bg-accent inset-shadow-selected-control",
+                    )}
                   >
                     <input
                       type="radio"
@@ -1395,6 +1407,10 @@ function ScheduledTaskEditorDialog({
                       checked={draft.workspaceMode === mode}
                       onChange={() => setDraft((current) => ({ ...current, workspaceMode: mode }))}
                       className="peer sr-only"
+                    />
+                    <span
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-0 rounded-compact-row peer-focus-visible:inset-shadow-focus"
                     />
                     <span
                       aria-hidden="true"
