@@ -91,6 +91,8 @@ export function measureGlyphs(
       viewport.top - origin.top,
       viewport.right - origin.left,
       viewport.bottom - origin.top,
+      origin.width,
+      origin.height,
     );
     const result: MeasuredGlyph[] = [];
     view.state.doc.nodesBetween(

@@ -225,3 +225,24 @@ it("keeps the previous falling glyph in motion when another character is typed",
   for (let time = 32; time <= 640; time += 16) clock.advance(time);
   expect(renderer.model.bits.filter((bit) => bit.active)).toHaveLength(6);
 });
+
+it("keeps replacement text inside the visible clip when a selected draft shrinks", () => {
+  let height = 200;
+  vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+    return this === editor.view.dom ? new DOMRect(0, 10, 768, 40) : new DOMRect(0, 0, 768, height);
+  });
+  renderer.pulse(20);
+  height = 80;
+  editor.commands.setTextSelection({ from: 1, to: 5 });
+  input("insertText", "X", 1, 5);
+  const shadow = layer.querySelector<HTMLElement>("[data-physical-glyph]")!;
+  const inset = shadow.parentElement!.style.clipPath.match(/[\d.]+/g)!.map(Number);
+  const visibleTop = inset[0]!;
+  const visibleBottom = 80 - inset[2]!;
+  expect(editor.getText()).toBe("X");
+  expect(highlights.get("physical-composer-glyph")?.size).toBe(1);
+  // The 20px glyph at y=20 must still intersect the post-edit viewport while falling.
+  expect(visibleBottom).toBeGreaterThan(visibleTop);
+  expect(visibleBottom).toBeGreaterThanOrEqual(40);
+  expect(visibleTop).toBeLessThan(40);
+});

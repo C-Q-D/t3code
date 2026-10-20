@@ -255,8 +255,8 @@ export class PhysicalComposerRenderer {
   }
 
   /** Clip text shadows to the editor's visible rectangle, in surface coordinates. */
-  clip(left: number, top: number, right: number, bottom: number) {
-    this.glyphLayer.style.clipPath = `inset(${top}px ${Math.max(0, this.model.width - right)}px ${Math.max(0, this.model.height - bottom)}px ${left}px)`;
+  clip(left: number, top: number, right: number, bottom: number, width: number, height: number) {
+    this.glyphLayer.style.clipPath = `inset(${top}px ${Math.max(0, width - right)}px ${Math.max(0, height - bottom)}px ${left}px)`;
   }
 
   /** Shatter deleted visible graphemes and pull the edges upward at their old positions. */
