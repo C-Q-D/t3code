@@ -45,8 +45,8 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "./tooltip";
 
 /** Optional notification context and presentation; omitted appearance retains the standard H3 card. */
 export type ThreadToastData = {
-  /** L4 compact error card; leaves default notifications unchanged. */
-  appearance?: "error-stripe";
+  /** Opt-in compact error or keybindings warning card; omitted uses the default notification. */
+  appearance?: "error-stripe" | "keybindings-warning";
   threadRef?: ScopedThreadRef | null;
   threadId?: ThreadId | null;
   leadingIcon?: ReactNode;
@@ -374,6 +374,7 @@ function ToastBodyContent({
           )}
         >
           <div
+            data-slot="toast-title-row"
             className={cn(
               "flex min-w-0 items-center gap-2.5",
               toastType === "loading" && "min-h-7",
@@ -748,7 +749,7 @@ function Toasts({ position, stack }: { position: ToastPosition; stack?: "stone" 
                 dismissAfterVisibleMs={toast.data?.dismissAfterVisibleMs}
                 toastId={toast.id}
               />
-              <div className={toastCornerDismissClass}>
+              <div className={toastCornerDismissClass} data-slot="toast-close-corner">
                 <button
                   aria-label={t.app.notifications.dismiss}
                   className={toastCornerOrbClass}

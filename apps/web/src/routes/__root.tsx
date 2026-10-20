@@ -612,6 +612,7 @@ function EventRouter({
       stackedThreadToast({
         type: "warning",
         title: t.account.routes.invalidKeybindings,
+        data: { appearance: "keybindings-warning" },
         description: (
           <KeybindingsConfigWarning
             message={decision.message}

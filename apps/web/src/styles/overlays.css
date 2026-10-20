@@ -421,24 +421,24 @@
 
 /* The warning stays in the existing Toast stack. Flatten its generic title/icon
    wrappers so the feature owns one V4 row without a second surface or title. */
-.dropdown-glass:has(.ov4-keybindings-warning) {
+.dropdown-glass[data-appearance="keybindings-warning"] {
   --popover: var(--color-ov4-warning-surface);
   --shadow-overlay: var(--shadow-ov4-warning);
   text-shadow: none;
 }
 /* Use the stack's width and retain V4's sand edge only on the front card;
    collapsed back cards keep OV2's stone surfaces and shadows. */
-.dropdown-glass[data-stack="stone"][data-stack-layer="0"]:has(.ov4-keybindings-warning) {
+.dropdown-glass[data-stack="stone"][data-stack-layer="0"][data-appearance="keybindings-warning"] {
   box-shadow: var(--shadow-ov4-warning);
 }
-.dropdown-glass:has(.ov4-keybindings-warning) [data-slot="toast-icon"],
-.dropdown-glass:has(.ov4-keybindings-warning) div:has(> [data-slot="toast-title"]) {
+.dropdown-glass[data-appearance="keybindings-warning"] [data-slot="toast-icon"],
+.dropdown-glass[data-appearance="keybindings-warning"] [data-slot="toast-title-row"] {
   display: none;
 }
-.dropdown-glass:has(.ov4-keybindings-warning) > div:has(.ov4-keybindings-warning) {
+.dropdown-glass[data-appearance="keybindings-warning"] > [data-slot="toast-content"] {
   padding: 0;
 }
-.dropdown-glass:has(.ov4-keybindings-warning) [data-slot="toast-description"] {
+.dropdown-glass[data-appearance="keybindings-warning"] [data-slot="toast-description"] {
   overflow: visible;
   white-space: normal;
 }
@@ -450,7 +450,7 @@
 }
 /* Keep dismissal inside the card so neither the stack count nor an expanded
    neighbor can cover it; the warning row reserves space for the recovery action. */
-.dropdown-glass:has(.ov4-keybindings-warning) > div:has(> [data-slot="toast-close"]) {
+.dropdown-glass[data-appearance="keybindings-warning"] > [data-slot="toast-close-corner"] {
   top: --spacing(3);
   right: --spacing(2);
 }
