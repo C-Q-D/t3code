@@ -46,9 +46,21 @@ function frame(now: number) {
 
 /** Register a job once by function identity; return cancellation, also cancelling an idle pending frame. */
 export function run(job: MotionJob) {
+  const alreadyRegistered = jobs.has(job);
   jobs.add(job);
-  schedule();
-  notify();
+  try {
+    schedule();
+    notify();
+  } catch (error) {
+    // No cancellation handle reached the caller, so registration must roll back here.
+    if (!alreadyRegistered) jobs.delete(job);
+    if (!jobs.size) {
+      if (frameId !== null) cancelAnimationFrame(frameId);
+      frameId = null;
+      lastTime = null;
+    }
+    throw error;
+  }
   return () => {
     if (!jobs.delete(job)) return;
     if (!jobs.size) {

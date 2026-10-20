@@ -90,6 +90,21 @@ it("a failed job is removed while other work remains scheduled", () => {
   expect(activeJobs()).toBe(0);
 });
 
+it("rolls back a job when requesting its first frame fails", () => {
+  const job = vi.fn(() => false);
+  clock.request.mockImplementationOnce(() => {
+    throw new Error("frame unavailable");
+  });
+  expect(() => run(job)).toThrow("frame unavailable");
+  // Register the same identity again so even the broken implementation can be cleaned up.
+  const countAfterFailure = activeJobs();
+  cleanup.push(run(job));
+  expect(countAfterFailure).toBe(0);
+  clock.advance(16);
+  expect(job).toHaveBeenCalledOnce();
+  expect(activeJobs()).toBe(0);
+});
+
 it("useMotionJob replaces active work and unmount cancels the final frame", () => {
   let controls: ReturnType<typeof useMotionJob> | undefined;
   /** Capture the hook after commit so the test exercises effect cleanup, not render side effects. */

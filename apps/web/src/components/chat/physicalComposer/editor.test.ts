@@ -7,6 +7,7 @@ import { bindPhysicalRenderer, capturePhysicalSend, physicalTypingExtension } fr
 import { PhysicalComposerRenderer } from "./renderer";
 import { setPhysicsEnabled } from "../../../lib/motion/preference";
 import { installTestRaf } from "../../../lib/motion/testRaf";
+import { activeJobs } from "../../../lib/motion/loop";
 
 let editor: Editor;
 let renderer: PhysicalComposerRenderer;
@@ -306,3 +307,36 @@ it("does not iterate the full text node to segment a local insertion", () => {
   expect(visited).toBeLessThanOrEqual(32);
   expect(layer.textContent).toContain("X");
 });
+
+it.each(["partial insert", "initial paint", "frame step", "frame paint"])(
+  "restores hidden text and restarts after a failed %s",
+  (failure) => {
+    const error = new Error(`injected ${failure}`);
+    const fail = () => {
+      throw error;
+    };
+    if (failure === "partial insert")
+      vi.spyOn(renderer.model, "random").mockImplementationOnce(fail);
+    if (failure === "initial paint")
+      vi.spyOn(SVGElement.prototype, "setAttribute").mockImplementationOnce(fail);
+    if (failure.startsWith("frame")) {
+      input("insertText", "X", 3);
+      expect(highlights.get("physical-composer-glyph")?.size).toBeGreaterThan(0);
+      if (failure === "frame step") vi.spyOn(renderer.model, "step").mockImplementationOnce(fail);
+      else vi.spyOn(SVGElement.prototype, "setAttribute").mockImplementationOnce(fail);
+      expect(() => clock.advance(16)).toThrow(error);
+    } else expect(() => input("insertText", "X", 3)).toThrow(error);
+    expect.soft(highlights.get("physical-composer-glyph")?.size ?? 0).toBe(0);
+    expect.soft(layer.querySelectorAll("[data-physical-glyph]")).toHaveLength(0);
+    expect.soft(activeJobs()).toBe(0);
+    renderer.pulse(30);
+    expect.soft(activeJobs()).toBe(1);
+    input("insertText", "Y", 4);
+    expect(editor.getText()).toBe("abXYcd");
+    expect(layer.textContent).toContain("Y");
+    expect(highlights.get("physical-composer-glyph")?.size).toBeGreaterThan(0);
+    for (let time = 32; time < 20_000; time += 16) clock.advance(time);
+    expect(highlights.get("physical-composer-glyph")?.size ?? 0).toBe(0);
+    expect(activeJobs()).toBe(0);
+  },
+);

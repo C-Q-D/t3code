@@ -171,34 +171,40 @@ export class PhysicalComposerRenderer {
     changed: ReadonlySet<number>,
     continuing: ReadonlyMap<number, Glyph> = new Map(),
   ) {
-    this.clearGlyphs();
-    if (!isPhysicsEnabled() || this.disposed) {
-      snapshots.forEach((snapshot) => snapshot.restore?.());
-      return;
-    }
-    this.measure();
-    for (const [index, snapshot] of snapshots.entries()) {
-      const previous =
-        snapshot.position === undefined ? undefined : continuing.get(snapshot.position);
-      const glyph =
-        previous ??
-        createGlyph(
-          snapshot.x + snapshot.width / 2,
-          snapshot.y + snapshot.height,
-          this.model.config,
-        );
-      glyph.x = snapshot.x + snapshot.width / 2;
-      glyph.yBase = snapshot.y + snapshot.height;
-      if (changed.has(index)) glyph.r = (this.model.random() - 0.5) * 24 * this.model.config.wobble;
-      else if (!previous) {
-        glyph.y = 0;
-        glyph.s = 1;
-        glyph.landed = true;
+    try {
+      this.clearGlyphs();
+      if (!isPhysicsEnabled() || this.disposed) {
+        snapshots.forEach((snapshot) => snapshot.restore?.());
+        return;
       }
-      this.addShadow(snapshot, glyph);
+      this.measure();
+      for (const [index, snapshot] of snapshots.entries()) {
+        const previous =
+          snapshot.position === undefined ? undefined : continuing.get(snapshot.position);
+        const glyph =
+          previous ??
+          createGlyph(
+            snapshot.x + snapshot.width / 2,
+            snapshot.y + snapshot.height,
+            this.model.config,
+          );
+        glyph.x = snapshot.x + snapshot.width / 2;
+        glyph.yBase = snapshot.y + snapshot.height;
+        if (changed.has(index))
+          glyph.r = (this.model.random() - 0.5) * 24 * this.model.config.wobble;
+        else if (!previous) {
+          glyph.y = 0;
+          glyph.s = 1;
+          glyph.landed = true;
+        }
+        this.addShadow(snapshot, glyph);
+      }
+      this.model.warm(changed.size);
+      this.start();
+    } catch (error) {
+      this.recover(snapshots);
+      throw error;
     }
-    this.model.warm(changed.size);
-    this.start();
   }
 
   /** Preserve ongoing springs across a document edit; deleted positions return null and are omitted. */
@@ -342,26 +348,50 @@ export class PhysicalComposerRenderer {
 
   /** Start one shared-loop job only after an input event has created work. */
   private start() {
-    this.render();
-    if (this.cancel) return;
-    this.cancel = run((dt) => {
-      this.model.step(Math.min(dt, 1 / 30));
-      for (let index = this.shadows.length - 1; index >= 0; index--) {
-        const shadow = this.shadows[index]!;
-        shadow.age += Math.min(dt, 1 / 30);
-        if (shadow.sendDelay !== null && shadow.age >= shadow.sendDelay + 0.25)
-          this.releaseShadow(index);
-      }
-      if (this.model.glyphs.every(glyphResting)) this.clearGlyphs();
-      if (this.model.resting()) {
-        this.cancel = undefined;
-        this.model.reset();
-        this.render();
-        return false;
-      }
+    try {
       this.render();
-      return true;
-    });
+      if (this.cancel) return;
+      this.cancel = run((dt) => {
+        try {
+          this.model.step(Math.min(dt, 1 / 30));
+          for (let index = this.shadows.length - 1; index >= 0; index--) {
+            const shadow = this.shadows[index]!;
+            shadow.age += Math.min(dt, 1 / 30);
+            if (shadow.sendDelay !== null && shadow.age >= shadow.sendDelay + 0.25)
+              this.releaseShadow(index);
+          }
+          if (this.model.glyphs.every(glyphResting)) this.clearGlyphs();
+          if (this.model.resting()) {
+            this.cancel = undefined;
+            this.model.reset();
+            this.render();
+            return false;
+          }
+          this.render();
+          return true;
+        } catch (error) {
+          this.recover();
+          throw error;
+        }
+      });
+    } catch (error) {
+      this.recover();
+      throw error;
+    }
+  }
+
+  /** Restore even snapshots not yet owned by a shadow; avoid repainting the failed rendering path. */
+  private recover(pending: readonly GlyphSnapshot[] = []) {
+    this.cancel?.();
+    this.cancel = undefined;
+    for (const snapshot of pending) snapshot.restore?.();
+    this.clearGlyphs(true);
+    this.model.reset();
+    for (const node of this.particleNodes) node.style.opacity = "0";
+    for (const fill of this.thermometers) {
+      fill.style.transform = "scaleY(0.06)";
+      fill.style.opacity = "0.4";
+    }
   }
 
   /** Build rounded geometry using exactly 40 nodes on each horizontal edge. */
