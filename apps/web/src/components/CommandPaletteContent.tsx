@@ -114,6 +114,7 @@ export function CommandPaletteContent({
           <div className="pn5-results relative min-h-0 overflow-hidden">{children}</div>
         ) : (
           <CommandPanel
+            footer
             className={
               panelSize === "fill"
                 ? "flex min-h-0 flex-1 flex-col"

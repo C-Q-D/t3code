@@ -51,19 +51,24 @@ function CommandDialogViewport({ className, ...props }: CommandDialogPrimitive.V
   );
 }
 
-/** Keep dialog positioning and dismissal while using H2 corners and the shared glass material. */
+/**
+ * Keep dialog positioning and dismissal while using H2 corners and the shared glass material.
+ * paletteMode scopes viewport geometry across the portal; omitted mode keeps default geometry.
+ */
 function CommandDialogPopup({
   className,
   children,
   onBackdropPointerDown,
+  paletteMode,
   ...props
 }: CommandDialogPrimitive.Popup.Props & {
   onBackdropPointerDown?: React.PointerEventHandler<HTMLDivElement>;
+  paletteMode?: "command" | "files" | "content";
 }) {
   return (
     <CommandDialogPortal>
       <CommandDialogBackdrop onPointerDown={onBackdropPointerDown} />
-      <CommandDialogViewport>
+      <CommandDialogViewport data-palette-mode={paletteMode}>
         <CommandDialogPrimitive.Popup
           className={cn(
             DIALOG_POPUP_CLASS,
@@ -106,7 +111,7 @@ function CommandInput({
       <AutocompleteInput
         autoFocus
         className={cn(
-          "border-transparent! bg-transparent! shadow-none before:hidden has-focus-visible:ring-0 placeholder:text-placeholder *:data-[slot=autocomplete-input]:ps-9! sm:*:data-[slot=autocomplete-input]:ps-[calc(var(--command-shell-inset)+1.5rem)]!",
+          "border-transparent! bg-transparent! shadow-none before:hidden focus-within:ring-0 placeholder:text-placeholder *:data-[slot=autocomplete-input]:ps-9! sm:*:data-[slot=autocomplete-input]:ps-[calc(var(--command-shell-inset)+1.5rem)]!",
           className,
         )}
         placeholder={placeholder}
@@ -156,14 +161,20 @@ function CommandListHeading({
 }
 
 /**
- * Clip command results to H2 corners; round the bottom only when no command footer follows.
+ * Clip command results to H2 corners; footer=true leaves bottom rounding to the following footer.
+ * With no footer prop, round all corners.
  * Forward div props and className. This container does not own navigation or scrolling.
  */
-function CommandPanel({ className, ...props }: React.ComponentProps<"div">) {
+function CommandPanel({
+  className,
+  footer = false,
+  ...props
+}: React.ComponentProps<"div"> & { footer?: boolean }) {
   return (
     <div
       className={cn(
-        "relative min-h-0 overflow-hidden rounded-t-overlay not-has-[+[data-slot=command-footer]]:rounded-b-overlay **:data-[slot=scroll-area-scrollbar]:mt-2 [touch-action:pan-y]",
+        "relative min-h-0 overflow-hidden rounded-t-overlay **:data-[slot=scroll-area-scrollbar]:mt-2 [touch-action:pan-y]",
+        !footer && "rounded-b-overlay",
         className,
       )}
       {...props}

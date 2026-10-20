@@ -18,7 +18,7 @@
 }
 
 /* Base UI portals the viewport outside the feature subtree; scope its geometry to command mode. */
-[data-slot="command-dialog-viewport"]:has([data-palette-mode="command"]) {
+[data-slot="command-dialog-viewport"][data-palette-mode="command"] {
   @apply pt-21 pb-4;
 }
 [data-command-palette][data-palette-mode="command"] {

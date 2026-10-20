@@ -584,6 +584,7 @@ function CommandPaletteDialog(props: {
       className={cn("overflow-hidden", props.mode === "content" && "h-105")}
       data-command-palette="true"
       data-palette-mode={props.mode}
+      paletteMode={props.mode}
       data-testid="command-palette"
       finalFocus={() => {
         composerHandleRef?.current?.focusAtEnd();
