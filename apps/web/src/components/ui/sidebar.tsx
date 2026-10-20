@@ -424,6 +424,7 @@ function Sidebar({
               tone="sidebar"
               radius="slab"
               elevation="slab-frame"
+              glow
               className="stone-sidebar flex h-full min-h-0 w-full flex-col overflow-hidden"
               data-sidebar="sidebar"
               data-slot="sidebar-inner"
