@@ -13,19 +13,25 @@ type TextareaProps = React.ComponentProps<"textarea"> & {
   unstyled?: boolean;
 };
 
-/** Render the input well without owning draft state or keyboard submission. */
+/**
+ * Renders the input well without owning draft state or keyboard submission.
+ * The textarea is the only focusable descendant and shows focus-visible for both
+ * pointer and keyboard focus, so focus-within preserves its focus styling.
+ */
 function Textarea({ className, size = "default", unstyled = false, ...props }: TextareaProps) {
   return (
     <span
       className={
         cn(
           !unstyled &&
-            "relative inline-flex w-full rounded-lg border border-input bg-background not-dark:bg-clip-padding text-base text-foreground shadow-xs/5 ring-ring/24 transition-shadow before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)] has-focus-visible:has-aria-invalid:border-destructive/64 has-focus-visible:has-aria-invalid:ring-destructive/16 has-aria-invalid:border-destructive/36 has-focus-visible:border-ring has-disabled:opacity-64 has-[:disabled,:focus-visible,[aria-invalid]]:shadow-none has-focus-visible:ring-[3px] has-focus-visible:ring-inset not-has-disabled:has-not-focus-visible:not-has-aria-invalid:before:shadow-[0_1px_--theme(--color-black/4%)] sm:text-sm dark:bg-input/32 dark:has-aria-invalid:ring-destructive/24 dark:not-has-disabled:has-not-focus-visible:not-has-aria-invalid:before:shadow-[0_-1px_--theme(--color-white/6%)]",
+            "relative inline-flex w-full rounded-lg border border-input bg-background not-dark:bg-clip-padding text-base text-foreground shadow-xs/5 ring-ring/24 transition-shadow before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)] focus-within:data-[invalid=true]:border-destructive/64 focus-within:data-[invalid=true]:ring-destructive/16 data-[invalid=true]:border-destructive/36 focus-within:border-ring data-[disabled=true]:opacity-64 data-[disabled=true]:shadow-none focus-within:shadow-none data-[invalid=true]:shadow-none focus-within:ring-[3px] focus-within:ring-inset data-[disabled=false]:not-focus-within:data-[invalid=false]:before:shadow-[0_1px_--theme(--color-black/4%)] sm:text-sm dark:bg-input/32 dark:data-[invalid=true]:ring-destructive/24 dark:data-[disabled=false]:not-focus-within:data-[invalid=false]:before:shadow-[0_-1px_--theme(--color-white/6%)]",
           size === "review" &&
-            "rounded-tag border-0 bg-input text-control sm:text-control shadow-well-track before:shadow-none has-focus-visible:shadow-well-track has-focus-visible:inset-shadow-focus has-focus-visible:ring-0 dark:bg-input",
+            "rounded-tag border-0 bg-input text-control sm:text-control shadow-well-track before:shadow-none focus-within:shadow-well-track focus-within:inset-shadow-focus focus-within:ring-0 dark:bg-input",
           className,
         ) || undefined
       }
+      data-disabled={props.disabled ? "true" : "false"}
+      data-invalid={props["aria-invalid"] && props["aria-invalid"] !== "false" ? "true" : "false"}
       data-size={size}
       data-slot="textarea-control"
     >

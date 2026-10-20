@@ -75,11 +75,13 @@ function Input({
       className={
         cn(
           !unstyled &&
-            "relative inline-flex w-full rounded-full border-0 bg-input text-foreground shadow-well-control transition-shadow not-has-disabled:not-focus-within:hover:bg-well-surface not-has-disabled:not-focus-within:hover:shadow-well-hover focus-within:bg-input focus-within:shadow-input-focus-depth focus-within:inset-shadow-focus has-[input:active]:bg-input has-[input:active]:shadow-well-editing has-aria-invalid:shadow-outline-danger has-disabled:bg-input-disabled has-disabled:text-fg-icon-disabled has-disabled:shadow-input-disabled-edge",
+            "relative inline-flex w-full rounded-full border-0 bg-input text-foreground shadow-well-control transition-shadow data-[disabled=false]:not-focus-within:hover:bg-well-surface data-[disabled=false]:not-focus-within:hover:shadow-well-hover focus-within:bg-input focus-within:shadow-input-focus-depth focus-within:inset-shadow-focus active:bg-input active:shadow-well-editing data-[invalid=true]:shadow-outline-danger data-[disabled=true]:bg-input-disabled data-[disabled=true]:text-fg-icon-disabled data-[disabled=true]:shadow-input-disabled-edge",
           font === "mono" && "font-mono tabular-nums",
           className,
         ) || undefined
       }
+      data-disabled={props.disabled ? "true" : "false"}
+      data-invalid={props["aria-invalid"] && props["aria-invalid"] !== "false" ? "true" : "false"}
       data-size={size}
       data-slot="input-control"
     >
