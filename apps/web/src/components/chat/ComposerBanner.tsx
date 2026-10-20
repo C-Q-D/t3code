@@ -8,10 +8,12 @@ import { cn } from "~/lib/utils";
 import { createPresenceRegistry } from "~/lib/presenceRegistry";
 import { Button } from "../ui/button";
 import { ScrollArea } from "../ui/scroll-area";
+import { ComposerShellRegistry } from "./ComposerSurface";
 
 export type ComposerBannerVariant = "default" | "error" | "info" | "success" | "warning";
 
 const BannerRowRegistry = createPresenceRegistry<"icon" | "actions">();
+const BannerDockRegistry = createPresenceRegistry<"attached">();
 
 const surfaceColors = cn(
   "[--chat-composer-attached-surface:var(--chat-composer-glass-surface,var(--card))]",
@@ -47,6 +49,8 @@ function Surface({
   placement?: "attached" | "floating";
   variant?: ComposerBannerVariant;
 }) {
+  BannerDockRegistry.useRegister("attached", placement === "attached");
+  ComposerShellRegistry.useRegister("attached", placement === "attached");
   return (
     <div
       data-composer-banner-surface={placement}
@@ -123,15 +127,17 @@ function Attachment({ className, ...props }: ComponentProps<"div">) {
   );
 }
 
+/** Hides the attachment only while no attached surface is registered inside it. */
 function Dock({ className, ...props }: ComponentProps<"div">) {
+  const { counts, onChange } = BannerDockRegistry.usePresence();
   return (
-    <Attachment
-      className={cn(
-        "flex items-end gap-1 not-has-data-[composer-banner-surface=attached]:hidden",
-        className,
-      )}
-      {...props}
-    />
+    <BannerDockRegistry.Provider onChange={onChange}>
+      <Attachment
+        data-empty={(counts.attached ?? 0) === 0 ? "true" : "false"}
+        className={cn("flex items-end gap-1 data-[empty=true]:hidden", className)}
+        {...props}
+      />
+    </BannerDockRegistry.Provider>
   );
 }
 
