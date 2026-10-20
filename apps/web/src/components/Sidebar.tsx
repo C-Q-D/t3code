@@ -1,5 +1,6 @@
 /** Renders project and thread navigation and dispatches scoped menu actions; server services own export IO. */
 import { t } from "~/i18n";
+import { useFocusVisibleWithin } from "../hooks/useFocusVisibleWithin";
 import { SNOOZE_UI_ENABLED } from "../snoozeUi";
 import { ContextMenu } from "@base-ui/react/context-menu";
 import { serverEnvironment } from "../state/server";
@@ -848,6 +849,7 @@ const SidebarDraftRow = memo(function SidebarDraftRow(props: {
   onContextMenu: (draftId: DraftId, position: { x: number; y: number }) => void;
 }) {
   const { composer, draftId, onContextMenu, onDiscard, onNavigate } = props;
+  const focusVisibleWithin = useFocusVisibleWithin();
   const promptPreview =
     replaceComposerContextReferences(composer.prompt, (occurrence) => occurrence.label)
       .trim()
@@ -909,6 +911,8 @@ const SidebarDraftRow = memo(function SidebarDraftRow(props: {
         aria-label={accessibility.label}
         aria-current={accessibility.current}
         data-testid="sidebar-draft-row"
+        data-focus-visible-within={focusVisibleWithin.active}
+        {...focusVisibleWithin.handlers}
         className={cn(
           "group/sidebar-row relative w-full cursor-pointer rounded-card-row text-left text-sidebar-foreground outline-none select-none focus-visible:inset-shadow-focus",
           props.isActive ? "bg-sidebar-row-active shadow-raise-m" : draftSurfaceClassName,
@@ -935,7 +939,7 @@ const SidebarDraftRow = memo(function SidebarDraftRow(props: {
                       type="button"
                       aria-label={t.sidebar.thread.discardDraft}
                       onClick={handleDiscard}
-                      className="-my-1.5 -mr-1.5 hidden h-7.5 w-7 cursor-pointer items-center justify-center rounded-full bg-secondary text-foreground shadow-raise-xs-control outline-none hover:bg-accent focus-visible:inset-shadow-focus group-hover/sidebar-row:inline-flex group-focus-visible/sidebar-row:inline-flex group-has-[:focus-visible]/sidebar-row:inline-flex"
+                      className="-my-1.5 -mr-1.5 hidden h-7.5 w-7 cursor-pointer items-center justify-center rounded-full bg-secondary text-foreground shadow-raise-xs-control outline-none hover:bg-accent focus-visible:inset-shadow-focus group-hover/sidebar-row:inline-flex group-focus-visible/sidebar-row:inline-flex group-data-[focus-visible-within=true]/sidebar-row:inline-flex"
                     >
                       <XIcon className="size-3.5" />
                     </button>
@@ -1233,6 +1237,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
     if (!canOperateThread && isRenaming) onCancelRename();
   }, [canOperateThread, isRenaming, onCancelRename]);
   const { leaseLiveStatus, rowRef } = useSidebarRowSubscriptionLease(props.isActive);
+  const focusVisibleWithin = useFocusVisibleWithin();
   const isRegeneratingTitle = thread.titleRegeneration != null;
   const localLastVisitedAt = useUiStateStore((state) => state.threadLastVisitedAtById[threadKey]);
   const lastVisitedAt = resolveThreadLastVisitedAt(thread.lastVisitedAt, localLastVisitedAt);
@@ -1810,7 +1815,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
   const hoverActions = showHoverActions ? (
     <span
       className={cn(
-        "-my-1.5 -mr-1.5 hidden shrink-0 items-center gap-1 group-hover/sidebar-row:inline-flex group-focus-visible/sidebar-row:inline-flex group-has-[:focus-visible]/sidebar-row:inline-flex",
+        "-my-1.5 -mr-1.5 hidden shrink-0 items-center gap-1 group-hover/sidebar-row:inline-flex group-focus-visible/sidebar-row:inline-flex group-data-[focus-visible-within=true]/sidebar-row:inline-flex",
         snoozeMenuOpen && "inline-flex",
       )}
     >
@@ -1894,6 +1899,8 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                 aria-current={accessibility.current}
                 data-testid="sidebar-row-slim"
                 data-sidebar-thread-row="slim"
+                data-focus-visible-within={focusVisibleWithin.active}
+                {...focusVisibleWithin.handlers}
                 aria-busy={isRegeneratingTitle || undefined}
                 className={cn(
                   rowSurfaceClassName,
@@ -1972,7 +1979,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                                 : handleSettleClick
                           }
                           onPointerDown={handleActionPointerDown}
-                          className="-mr-1.5 hidden size-7 shrink-0 cursor-pointer items-center justify-center rounded-sidebar-quick-action bg-accent text-foreground shadow-raise-tab outline-none group-hover/sidebar-row:inline-flex group-focus-visible/sidebar-row:inline-flex group-has-[:focus-visible]/sidebar-row:inline-flex focus-visible:inset-shadow-focus"
+                          className="-mr-1.5 hidden size-7 shrink-0 cursor-pointer items-center justify-center rounded-sidebar-quick-action bg-accent text-foreground shadow-raise-tab outline-none group-hover/sidebar-row:inline-flex group-focus-visible/sidebar-row:inline-flex group-data-[focus-visible-within=true]/sidebar-row:inline-flex focus-visible:inset-shadow-focus"
                         />
                       }
                     >
@@ -2024,6 +2031,8 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
               aria-current={accessibility.current}
               data-testid="sidebar-row-card"
               data-sidebar-thread-row="card"
+              data-focus-visible-within={focusVisibleWithin.active}
+              {...focusVisibleWithin.handlers}
               aria-busy={isRegeneratingTitle || undefined}
               className={cn(
                 rowSurfaceClassName,
@@ -2055,7 +2064,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                     "ml-auto inline-flex shrink-0 items-center tabular-nums",
                     showHoverActions &&
                       !isWokeStatus &&
-                      "group-hover/sidebar-row:hidden group-focus-visible/sidebar-row:hidden group-has-[:focus-visible]/sidebar-row:hidden",
+                      "group-hover/sidebar-row:hidden group-focus-visible/sidebar-row:hidden group-data-[focus-visible-within=true]/sidebar-row:hidden",
                     snoozeMenuOpen && "hidden",
                   )}
                 >
