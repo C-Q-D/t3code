@@ -6,9 +6,18 @@ import { Combobox as ComboboxPrimitive } from "@base-ui/react/combobox";
 import { ChevronsUpDownIcon, SearchIcon, XIcon } from "lucide-react";
 import * as React from "react";
 
+import { createPresenceRegistry } from "~/lib/presenceRegistry";
 import { cn } from "~/lib/utils";
 import { Input } from "~/components/ui/input";
 import { ScrollArea } from "~/components/ui/scroll-area";
+
+const clearPresence = createPresenceRegistry<"clear">();
+
+/** Registers only the button Base UI actually mounts, including its exit transition. */
+function MountedClearButton(props: React.ComponentProps<"button">) {
+  clearPresence.useRegister("clear");
+  return <button {...props} />;
+}
 
 const ComboboxContext = React.createContext<{
   chipsRef: React.RefObject<Element | null> | null;
@@ -51,74 +60,82 @@ function ComboboxInput({
   unstyled?: boolean;
   ref?: React.Ref<HTMLInputElement>;
 }) {
+  const { counts, onChange } = clearPresence.usePresence();
+  const clearMounted = (counts.clear ?? 0) > 0;
   const sizeValue = (size ?? "default") as "sm" | "default" | "lg" | number;
 
   return (
-    <ComboboxPrimitive.Input
-      className={cn(
-        startAddon &&
-          "data-[size=sm]:*:data-[slot=combobox-input]:ps-[calc(--spacing(7.5)-1px)] *:data-[slot=combobox-input]:ps-[calc(--spacing(8.5)-1px)] sm:data-[size=sm]:*:data-[slot=combobox-input]:ps-[calc(--spacing(7)-1px)] sm:*:data-[slot=combobox-input]:ps-[calc(--spacing(8)-1px)]",
-        (showTrigger || showClear) &&
-          (sizeValue === "sm"
-            ? "*:data-[slot=combobox-input]:pe-6.5"
-            : "*:data-[slot=combobox-input]:pe-7"),
-        className,
-      )}
-      data-slot="combobox-input"
-      render={(inputProps, state) => (
-        <div
-          className={cn(
-            "relative text-foreground data-[disabled=true]:opacity-64",
-            unstyled ? "w-fit" : "w-full",
-          )}
-          data-disabled={state.disabled ? "true" : "false"}
-        >
-          {startAddon && (
-            <div
-              aria-hidden="true"
+    <clearPresence.Provider onChange={onChange}>
+      <ComboboxPrimitive.Input
+        className={cn(
+          startAddon &&
+            "data-[size=sm]:*:data-[slot=combobox-input]:ps-[calc(--spacing(7.5)-1px)] *:data-[slot=combobox-input]:ps-[calc(--spacing(8.5)-1px)] sm:data-[size=sm]:*:data-[slot=combobox-input]:ps-[calc(--spacing(7)-1px)] sm:*:data-[slot=combobox-input]:ps-[calc(--spacing(8)-1px)]",
+          (showTrigger || clearMounted) &&
+            (sizeValue === "sm"
+              ? "*:data-[slot=combobox-input]:pe-6.5"
+              : "*:data-[slot=combobox-input]:pe-7"),
+          className,
+        )}
+        data-slot="combobox-input"
+        render={(inputProps, state) => (
+          <div
+            className={cn(
+              "relative text-foreground data-[disabled=true]:opacity-64",
+              unstyled ? "w-fit" : "w-full",
+            )}
+            data-disabled={state.disabled ? "true" : "false"}
+          >
+            {startAddon && (
+              <div
+                aria-hidden="true"
+                className={cn(
+                  "[&_svg]:-mx-0.5 pointer-events-none absolute inset-y-0 start-px z-10 flex items-center ps-[calc(--spacing(3)-1px)] opacity-80 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4",
+                  sizeValue === "sm" && "ps-[calc(--spacing(2.5)-1px)]",
+                )}
+                data-slot="combobox-start-addon"
+              >
+                {startAddon}
+              </div>
+            )}
+            <Input
+              {...inputProps}
               className={cn(
-                "[&_svg]:-mx-0.5 pointer-events-none absolute inset-y-0 start-px z-10 flex items-center ps-[calc(--spacing(3)-1px)] opacity-80 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4",
-                sizeValue === "sm" && "ps-[calc(--spacing(2.5)-1px)]",
+                unstyled && "rounded-none bg-transparent text-sm",
+                inputProps.className,
               )}
-              data-slot="combobox-start-addon"
-            >
-              {startAddon}
-            </div>
-          )}
-          <Input
-            {...inputProps}
-            className={cn(unstyled && "rounded-none bg-transparent text-sm", inputProps.className)}
-            nativeInput
-            size={sizeValue}
-            unstyled={unstyled}
-          />
-          {showTrigger && (
-            <ComboboxTrigger
-              className={cn(
-                "-translate-y-1/2 absolute top-1/2 inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md border border-transparent opacity-80 outline-none transition-opacity pointer-coarse:after:absolute pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11 hover:opacity-100 sm:size-7 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
-                showClear && "hidden",
-                sizeValue === "sm" ? "end-0" : "end-0.5",
-              )}
-            >
-              <ComboboxPrimitive.Icon data-slot="combobox-icon">
-                <ChevronsUpDownIcon />
-              </ComboboxPrimitive.Icon>
-            </ComboboxTrigger>
-          )}
-          {showClear && (
-            <ComboboxClear
-              className={cn(
-                "-translate-y-1/2 absolute top-1/2 inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md border border-transparent opacity-80 outline-none transition-opacity pointer-coarse:after:absolute pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11 hover:opacity-100 sm:size-7 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
-                sizeValue === "sm" ? "end-0" : "end-0.5",
-              )}
-            >
-              <XIcon />
-            </ComboboxClear>
-          )}
-        </div>
-      )}
-      {...props}
-    />
+              nativeInput
+              size={sizeValue}
+              unstyled={unstyled}
+            />
+            {showTrigger && (
+              <ComboboxTrigger
+                className={cn(
+                  "-translate-y-1/2 absolute top-1/2 inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md border border-transparent opacity-80 outline-none transition-opacity pointer-coarse:after:absolute pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11 hover:opacity-100 sm:size-7 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+                  clearMounted && "hidden",
+                  sizeValue === "sm" ? "end-0" : "end-0.5",
+                )}
+              >
+                <ComboboxPrimitive.Icon data-slot="combobox-icon">
+                  <ChevronsUpDownIcon />
+                </ComboboxPrimitive.Icon>
+              </ComboboxTrigger>
+            )}
+            {showClear && (
+              <ComboboxClear
+                render={<MountedClearButton />}
+                className={cn(
+                  "-translate-y-1/2 absolute top-1/2 inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md border border-transparent opacity-80 outline-none transition-opacity pointer-coarse:after:absolute pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11 hover:opacity-100 sm:size-7 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+                  sizeValue === "sm" ? "end-0" : "end-0.5",
+                )}
+              >
+                <XIcon />
+              </ComboboxClear>
+            )}
+          </div>
+        )}
+        {...props}
+      />
+    </clearPresence.Provider>
   );
 }
 

@@ -5,9 +5,18 @@
 import { Autocomplete as AutocompletePrimitive } from "@base-ui/react/autocomplete";
 import { ChevronsUpDownIcon, XIcon } from "lucide-react";
 
+import { createPresenceRegistry } from "~/lib/presenceRegistry";
 import { cn } from "~/lib/utils";
 import { Input } from "~/components/ui/input";
 import { ScrollArea } from "~/components/ui/scroll-area";
+
+const clearPresence = createPresenceRegistry<"clear">();
+
+/** Registers only the button Base UI actually mounts, including its exit transition. */
+function MountedClearButton(props: React.ComponentProps<"button">) {
+  clearPresence.useRegister("clear");
+  return <button {...props} />;
+}
 
 const Autocomplete = AutocompletePrimitive.Root;
 
@@ -29,65 +38,70 @@ function AutocompleteInput({
   size?: "sm" | "default" | "lg" | number;
   ref?: React.Ref<HTMLInputElement>;
 }) {
+  const { counts, onChange } = clearPresence.usePresence();
+  const clearMounted = (counts.clear ?? 0) > 0;
   const sizeValue = (size ?? "default") as "sm" | "default" | "lg" | number;
 
   return (
-    <AutocompletePrimitive.Input
-      className={cn(
-        startAddon &&
-          "data-[size=sm]:*:data-[slot=autocomplete-input]:ps-[calc(--spacing(7.5)-1px)] *:data-[slot=autocomplete-input]:ps-[calc(--spacing(8.5)-1px)] sm:data-[size=sm]:*:data-[slot=autocomplete-input]:ps-[calc(--spacing(7)-1px)] sm:*:data-[slot=autocomplete-input]:ps-[calc(--spacing(8)-1px)]",
-        (showTrigger || showClear) &&
-          (sizeValue === "sm"
-            ? "*:data-[slot=autocomplete-input]:pe-6.5"
-            : "*:data-[slot=autocomplete-input]:pe-7"),
-        className,
-      )}
-      data-slot="autocomplete-input"
-      render={(inputProps, state) => (
-        <div
-          className="relative w-full text-foreground data-[disabled=true]:opacity-64"
-          data-disabled={state.disabled ? "true" : "false"}
-        >
-          {startAddon && (
-            <div
-              aria-hidden="true"
-              className={cn(
-                "[&_svg]:-mx-0.5 pointer-events-none absolute inset-y-0 start-px z-10 flex items-center ps-[calc(--spacing(3)-1px)] opacity-80 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4",
-                sizeValue === "sm" && "ps-[calc(--spacing(2.5)-1px)]",
-              )}
-              data-slot="autocomplete-start-addon"
-            >
-              {startAddon}
-            </div>
-          )}
-          <Input {...inputProps} nativeInput size={sizeValue} />
-          {showTrigger && (
-            <AutocompleteTrigger
-              className={cn(
-                "-translate-y-1/2 absolute top-1/2 inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md border border-transparent opacity-80 outline-none transition-colors pointer-coarse:after:absolute pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11 hover:opacity-100 sm:size-7 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
-                showClear && "hidden",
-                sizeValue === "sm" ? "end-0" : "end-0.5",
-              )}
-            >
-              <AutocompletePrimitive.Icon data-slot="autocomplete-icon">
-                <ChevronsUpDownIcon />
-              </AutocompletePrimitive.Icon>
-            </AutocompleteTrigger>
-          )}
-          {showClear && (
-            <AutocompleteClear
-              className={cn(
-                "-translate-y-1/2 absolute top-1/2 inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md border border-transparent opacity-80 outline-none transition-colors pointer-coarse:after:absolute pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11 hover:opacity-100 sm:size-7 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
-                sizeValue === "sm" ? "end-0" : "end-0.5",
-              )}
-            >
-              <XIcon />
-            </AutocompleteClear>
-          )}
-        </div>
-      )}
-      {...props}
-    />
+    <clearPresence.Provider onChange={onChange}>
+      <AutocompletePrimitive.Input
+        className={cn(
+          startAddon &&
+            "data-[size=sm]:*:data-[slot=autocomplete-input]:ps-[calc(--spacing(7.5)-1px)] *:data-[slot=autocomplete-input]:ps-[calc(--spacing(8.5)-1px)] sm:data-[size=sm]:*:data-[slot=autocomplete-input]:ps-[calc(--spacing(7)-1px)] sm:*:data-[slot=autocomplete-input]:ps-[calc(--spacing(8)-1px)]",
+          (showTrigger || clearMounted) &&
+            (sizeValue === "sm"
+              ? "*:data-[slot=autocomplete-input]:pe-6.5"
+              : "*:data-[slot=autocomplete-input]:pe-7"),
+          className,
+        )}
+        data-slot="autocomplete-input"
+        render={(inputProps, state) => (
+          <div
+            className="relative w-full text-foreground data-[disabled=true]:opacity-64"
+            data-disabled={state.disabled ? "true" : "false"}
+          >
+            {startAddon && (
+              <div
+                aria-hidden="true"
+                className={cn(
+                  "[&_svg]:-mx-0.5 pointer-events-none absolute inset-y-0 start-px z-10 flex items-center ps-[calc(--spacing(3)-1px)] opacity-80 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4",
+                  sizeValue === "sm" && "ps-[calc(--spacing(2.5)-1px)]",
+                )}
+                data-slot="autocomplete-start-addon"
+              >
+                {startAddon}
+              </div>
+            )}
+            <Input {...inputProps} nativeInput size={sizeValue} />
+            {showTrigger && (
+              <AutocompleteTrigger
+                className={cn(
+                  "-translate-y-1/2 absolute top-1/2 inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md border border-transparent opacity-80 outline-none transition-colors pointer-coarse:after:absolute pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11 hover:opacity-100 sm:size-7 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+                  clearMounted && "hidden",
+                  sizeValue === "sm" ? "end-0" : "end-0.5",
+                )}
+              >
+                <AutocompletePrimitive.Icon data-slot="autocomplete-icon">
+                  <ChevronsUpDownIcon />
+                </AutocompletePrimitive.Icon>
+              </AutocompleteTrigger>
+            )}
+            {showClear && (
+              <AutocompleteClear
+                render={<MountedClearButton />}
+                className={cn(
+                  "-translate-y-1/2 absolute top-1/2 inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md border border-transparent opacity-80 outline-none transition-colors pointer-coarse:after:absolute pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11 hover:opacity-100 sm:size-7 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+                  sizeValue === "sm" ? "end-0" : "end-0.5",
+                )}
+              >
+                <XIcon />
+              </AutocompleteClear>
+            )}
+          </div>
+        )}
+        {...props}
+      />
+    </clearPresence.Provider>
   );
 }
 
