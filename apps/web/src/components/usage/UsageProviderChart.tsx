@@ -14,7 +14,8 @@ import {
 } from "@t3tools/shared/usageFormat";
 import { cn } from "~/lib/utils";
 import { PROVIDER_ORDER, PROVIDER_PRESENTATION } from "./usageProviders";
-import { bandShare, chartScale } from "./usageChart.logic";
+import { chartScale } from "./usageChart.logic";
+import { UsageChartBars } from "./UsageChartBars";
 import { observeResize } from "~/lib/observeResize";
 
 const NONE_LOADING: ReadonlySet<UsageProviderKind> = new Set();
@@ -179,10 +180,7 @@ export function UsageProviderChart({
     <div className="flex flex-col gap-3.5">
       <div
         ref={plotRef}
-        className={cn(
-          "relative flex h-50 items-end border-b border-usage-chart-baseline px-1.5 shadow-usage-baseline",
-          periods.length <= 7 ? "gap-4.5" : "gap-0.5",
-        )}
+        className="relative"
         role="img"
         aria-label={t.tools.usage.chartLabel(resolution === "hour", metric === "tokens")}
         onMouseMove={handleMove}
@@ -191,31 +189,14 @@ export function UsageProviderChart({
           setHoverIndex(null);
         }}
       >
-        {columns.map((column, index) => (
-          <div
-            key={periods[index]}
-            className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1.5"
-          >
-            <span className="font-mono text-meta text-muted-foreground tabular-nums">
-              {periods.length <= 7 ? format(column.total) : null}
-            </span>
-            <div
-              className="flex w-full max-w-17 shrink-0 flex-col-reverse overflow-hidden rounded-t-usage-bar rounded-b-usage-swatch shadow-usage-bar"
-              style={{ height: scale.max === 0 ? 0 : `${(column.total / scale.max) * 150}px` }}
-            >
-              {column.bands.toReversed().map((band) => (
-                <div
-                  key={band.provider}
-                  className={cn("min-h-0", loadingProviders.has(band.provider) && "opacity-40")}
-                  style={{
-                    flexGrow: bandShare(band.value, column.total),
-                    backgroundColor: PROVIDER_PRESENTATION[band.provider].color,
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-        ))}
+        <UsageChartBars
+          columns={columns}
+          periods={periods}
+          scale={scale}
+          loadingProviders={loadingProviders}
+          format={format}
+          formatPeriod={formatPeriod}
+        />
         {hoveredPeriod === undefined ? null : (
           <div
             ref={tooltipRef}

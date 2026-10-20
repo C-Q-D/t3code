@@ -627,6 +627,7 @@ export const tools = {
     splitPricesCount: (count: number) => `${count} configured`,
     splitExpand: "Expand",
     splitCollapse: "Collapse",
+    chartPeak: (period: string, value: string) => `Peak ${period} · ${value}`,
     providerCount: (count: number) => `${count} providers`,
     connecting: "Connecting…",
     allProviders: "All usage sources",

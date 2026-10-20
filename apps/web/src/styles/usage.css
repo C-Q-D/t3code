@@ -347,3 +347,52 @@ html[data-theme-id="graphite"] .usage-chart-surface {
 .usage-price-toggle[aria-expanded="true"] .usage-price-toggle-action svg {
   transform: rotate(180deg);
 }
+
+/* L3: Lux chart uses one SVG stack for its bars, glow and reflection. */
+.usage-lux-bars {
+  --usage-lux-light: #fff;
+  --usage-lux-dark: #000;
+  position: relative;
+  min-width: 0;
+  height: 344px;
+  pointer-events: none;
+}
+
+.usage-lux-bars svg {
+  display: block;
+  overflow: visible;
+}
+.usage-lux-tick {
+  fill: var(--muted-foreground);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-lux-peak {
+  position: absolute;
+  display: flex;
+  max-width: 100%;
+  flex-direction: column;
+  align-items: center;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  white-space: nowrap;
+  color: var(--foreground);
+}
+
+.usage-lux-peak span {
+  padding: 4px 9px;
+  border-radius: 8px;
+  background: var(--popover);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 9%),
+    0 3px 8px rgb(0 0 0 / 30%);
+}
+
+.usage-lux-peak i {
+  width: 1px;
+  height: 15px;
+  background: linear-gradient(rgb(255 255 255 / 35%), transparent);
+}

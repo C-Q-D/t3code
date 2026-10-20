@@ -603,6 +603,7 @@ export const tools: Messages["tools"] = {
     splitPricesCount: (count: number) => `已设置 ${count} 个`,
     splitExpand: "展开",
     splitCollapse: "收起",
+    chartPeak: (period: string, value: string) => `峰值 ${period} · ${value}`,
     providerCount: (count: number) => `${count} 个用量来源`,
     connecting: "正在连接…",
     allProviders: "所有用量来源",
