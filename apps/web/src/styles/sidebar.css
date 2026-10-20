@@ -48,7 +48,7 @@
   @apply absolute inset-x-0 top-0 bottom-0.75 rounded-card-row bg-sidebar-control-surface shadow-well-track outline-1 outline-dashed outline-border -outline-offset-1;
 }
 
-.sidebar-drag-source:has([data-sidebar-thread-row="slim"])::before {
+.sidebar-drag-source[data-sidebar-drag-variant="slim"]::before {
   @apply bottom-0.25 rounded-compact-row;
 }
 

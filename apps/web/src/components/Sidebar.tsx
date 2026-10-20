@@ -1877,6 +1877,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
     return (
       <li
         data-thread-item={threadKey}
+        data-sidebar-drag-variant={variant}
         data-dragging={sortable?.isDragging || undefined}
         {...sortableRootProps}
         {...(fileDropHandlers ?? {})}
@@ -2006,6 +2007,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
   return (
     <li
       data-thread-item={threadKey}
+      data-sidebar-drag-variant={variant}
       data-dragging={sortable?.isDragging || undefined}
       {...sortableRootProps}
       {...(fileDropHandlers ?? {})}
