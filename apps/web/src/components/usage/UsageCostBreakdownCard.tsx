@@ -1,15 +1,16 @@
-/** Displays token categories and speed cost from the selected usage window. */
-import { t } from "~/i18n";
-import type { JSX } from "react";
+/** Cost/token composition card; preserves the page's loading and empty-data contract. */
+import { useLayoutEffect, useRef, type JSX } from "react";
 import type { MergedUsage } from "@t3tools/shared/usageMerge";
+import { t } from "~/i18n";
+import { usePhysicsMotion } from "~/hooks/usePhysicsMotion";
+import { useMotionJob } from "~/lib/motion/react";
+import { Spring } from "~/lib/motion/spring";
+import { TOKENS } from "~/lib/motion/tokens";
 import type { UsageChartMetric } from "./UsageProviderChart";
-import { cn } from "../../lib/utils";
-import { formatUsd } from "@t3tools/shared/usageFormat";
-import { UsageShareBar } from "./UsageShareBar";
-import { SpeedPremium } from "./UsageModelDialog";
-import { costTypeSegments, tokenTypeSegments, speedCostSegments } from "./usageBreakdown";
+import { costTypeSegments, tokenTypeSegments } from "./usageBreakdown";
+import { ringSegments, speedBreakdown } from "./usageCostBreakdown.logic";
 import { UsageCostRing } from "./UsageCostRing";
-import { ringSegments } from "./usageCostBreakdown.logic";
+import { UsageSpeedGauge } from "./UsageSpeedGauge";
 
 /** Category and speed totals follow the page metric and loading state. */
 export interface UsageCostBreakdownCardProps {
@@ -17,37 +18,55 @@ export interface UsageCostBreakdownCardProps {
   readonly merged: MergedUsage;
   readonly loading: boolean;
 }
-/** Returns no section when there are no processed tokens. */
-export function UsageCostBreakdownCard({
-  metric,
-  merged,
-  loading,
-}: UsageCostBreakdownCardProps): JSX.Element | null {
-  if (merged.totalTokens === 0) return null;
+
+/** Returns no card without processed tokens; otherwise mounts one entrance animation. */
+export function UsageCostBreakdownCard(props: UsageCostBreakdownCardProps): JSX.Element | null {
+  return props.merged.totalTokens === 0 ? null : <CostBreakdownContent {...props} />;
+}
+
+/** Owns entrance separately so an initially empty dataset animates on first appearance. */
+function CostBreakdownContent({ metric, merged, loading }: UsageCostBreakdownCardProps) {
+  const card = useRef<HTMLElement>(null);
+  const entrance = useRef<Spring | null>(null);
+  const { enabled } = usePhysicsMotion();
+  const { start, stop } = useMotionJob();
+  useLayoutEffect(() => {
+    const spring =
+      entrance.current ??
+      new Spring({ value: enabled ? 0 : 1, target: 1, token: TOKENS.settle, precision: 0.001 });
+    entrance.current = spring;
+    const paint = () => {
+      if (!card.current) return;
+      card.current.style.opacity = String(Math.max(0, Math.min(1, spring.value)));
+      card.current.style.transform = `translateY(${18 * (1 - spring.value)}px)`;
+    };
+    if (!enabled) spring.jump(1);
+    paint();
+    if (!enabled || spring.isSettled) return stop;
+    start((dt) => {
+      const moving = spring.step(dt);
+      paint();
+      return moving;
+    });
+    return stop;
+  }, [enabled, start, stop]);
+  const speed = speedBreakdown(merged.speedCost);
+  const showSpeed = metric === "cost" && speed.showSpeed;
+  const segments = ringSegments(
+    metric === "tokens" ? tokenTypeSegments(merged) : costTypeSegments(merged.categoryCost),
+  );
   return (
-    <section className={cn("grid gap-x-12 gap-y-8 lg:grid-cols-2", figureClass(loading))}>
-      {metric === "tokens" ? (
-        <UsageCostRing metric={metric} segments={ringSegments(tokenTypeSegments(merged))} />
-      ) : (
-        <>
-          <UsageCostRing
-            metric={metric}
-            segments={ringSegments(costTypeSegments(merged.categoryCost))}
-          />
-          {merged.speedCost.fast + merged.speedCost.ultrafast > 0 ? (
-            <UsageShareBar
-              label={t.tools.usage.costBySpeed}
-              segments={speedCostSegments(merged.speedCost)}
-              format={formatUsd}
-              aside={<SpeedPremium premiumUsd={merged.speedCost.premium} />}
-            />
-          ) : null}
-        </>
-      )}
+    <section ref={card} className="usage-cost-card" aria-busy={loading}>
+      <div className="usage-cost-columns" data-speed={showSpeed} data-loading={loading}>
+        <div className="usage-cost-types">
+          <div className="usage-cost-heading">
+            <h3>{t.tools.usage.splitTitle}</h3>
+            <p>{metric === "cost" ? t.tools.usage.splitCostHint : t.tools.usage.splitTokenHint}</p>
+          </div>
+          <UsageCostRing metric={metric} segments={segments} />
+        </div>
+        {showSpeed ? <UsageSpeedGauge speed={speed} /> : null}
+      </div>
     </section>
   );
-}
-/** Keeps existing values visible while their provider is refreshing. */
-function figureClass(loading: boolean) {
-  return cn("transition-opacity", loading && "opacity-40 delay-150");
 }

@@ -178,3 +178,144 @@ html[data-theme-id="graphite"] .usage-chart-surface {
     align-self: center;
   }
 }
+
+/* L5 cost card, speed gauge and standard-price comparison. */
+.usage-cost-card {
+  min-width: 0;
+  padding: 22px 24px;
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: var(--shadow-usage-card);
+}
+.usage-cost-columns {
+  display: grid;
+  gap: 24px;
+}
+.usage-cost-columns[data-loading="true"] {
+  opacity: 0.4;
+}
+.usage-cost-types,
+.usage-speed-section {
+  min-width: 0;
+}
+.usage-cost-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 12px;
+  margin-bottom: 12px;
+}
+.usage-cost-heading h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+.usage-cost-heading p {
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.usage-speed-section {
+  position: relative;
+}
+.usage-speed-layout {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.usage-speed-gauge {
+  flex: 0 0 250px;
+  overflow: visible;
+  color: var(--foreground);
+}
+.usage-speed-labels {
+  font-size: 10.5px;
+  fill: var(--muted-foreground);
+}
+.usage-speed-value {
+  font-size: 26px;
+  font-weight: 700;
+  fill: var(--foreground);
+}
+.usage-speed-stats {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+}
+.usage-speed-stats > p {
+  margin-bottom: 12px;
+  color: var(--muted-foreground);
+}
+.usage-speed-row {
+  display: grid;
+  grid-template-columns: 6px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+}
+.usage-speed-row b {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.usage-speed-row[data-premium="true"] {
+  color: var(--color-usage-split-cache-write);
+}
+.usage-speed-comparison {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 12px;
+  box-shadow: 0 -1px 0 color-mix(in srgb, var(--foreground) 5%, transparent);
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.usage-speed-comparison b {
+  color: var(--foreground);
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+.usage-speed-comparison > span {
+  margin-left: auto;
+  padding: 3px 7px;
+  border-radius: 5px;
+  color: var(--color-usage-split-input);
+  background: color-mix(in srgb, var(--color-usage-split-input) 8%, transparent);
+}
+@media (min-width: 1200px) {
+  .usage-cost-columns[data-speed="true"] {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 40px;
+  }
+  .usage-cost-columns[data-speed="true"] .usage-speed-section::before {
+    content: "";
+    position: absolute;
+    left: -20px;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: color-mix(in srgb, var(--foreground) 7%, transparent);
+    box-shadow: 1px 0 0 color-mix(in srgb, var(--background) 80%, transparent);
+  }
+}
+@media (max-width: 1199px) {
+  .usage-cost-columns[data-speed="true"] .usage-speed-section {
+    padding-top: 20px;
+    box-shadow: 0 -1px 0 color-mix(in srgb, var(--foreground) 7%, transparent);
+  }
+}
+@media (max-width: 560px) {
+  .usage-speed-layout {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .usage-speed-gauge {
+    align-self: center;
+    flex-basis: auto;
+  }
+  .usage-cost-card {
+    padding: 18px;
+  }
+}
