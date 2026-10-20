@@ -4,6 +4,13 @@ import type { PullRequestState } from "@t3tools/contracts";
 const monthNameFormatter = new Intl.DateTimeFormat("en-US", { month: "long" });
 
 export const common = {
+  windowControls: {
+    minimize: "Minimize window",
+    maximize: "Maximize window",
+    restore: "Restore window",
+    close: "Close window",
+    failed: "Could not control the window",
+  },
   system: "System default",
   resetToDefault: "Reset to default",
   /** Builds the accessible reset action name for a setting's UI label. */

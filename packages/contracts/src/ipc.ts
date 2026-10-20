@@ -95,6 +95,11 @@ export const DesktopUpdateStatusSchema = Schema.Literals([
   "error",
 ]);
 export const DesktopRuntimeArchSchema = Schema.Literals(["arm64", "x64", "other"]);
+/** Native caption actions; close retains the application's close/quit interception. */
+export const DesktopWindowActionSchema = Schema.Literals(["minimize", "toggle-maximize", "close"]);
+/** One caption action sent to the main window; transport errors reject the bridge promise. */
+export type DesktopWindowAction = typeof DesktopWindowActionSchema.Type;
+
 export const DesktopThemeSchema = Schema.Literals(["light", "dark", "system"]);
 export const DesktopUpdateChannelSchema = Schema.Literals(["latest", "nightly"]);
 export const DesktopAppStageLabelSchema = Schema.Literals(["Alpha", "Dev", "Nightly"]);
@@ -1129,6 +1134,7 @@ export const UiLocalePreferenceSchema = Schema.Literals(["system", "en", "zh-CN"
 export type UiLocalePreference = typeof UiLocalePreferenceSchema.Type;
 
 export interface DesktopBridge {
+  controlWindow: (action: DesktopWindowAction) => Promise<void>;
   /** Reports the local preference; optional when a newer web client uses an older shell. */
   setUiLocalePreference?: (preference: UiLocalePreference) => Promise<void>;
   getAppBranding: () => DesktopAppBranding | null;

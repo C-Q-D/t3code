@@ -32,6 +32,7 @@ import * as DesktopConfig from "../../app/DesktopConfig.ts";
 import {
   getLocalEnvironmentBootstraps,
   getWindowFullscreenState,
+  controlWindow,
   pasteAsText,
   pickProjectFavicon,
   pickBackgroundImage,
@@ -202,6 +203,67 @@ describe("getLocalEnvironmentBootstraps", () => {
       assert.deepEqual(result, []);
     }).pipe(Effect.provide(bootstrapsLayer([stoppedInstance])));
   });
+});
+
+describe("controlWindow", () => {
+  it.effect(
+    "minimizes, toggles maximize both ways, and closes through the normal close path",
+    () => {
+      let maximized = false;
+      let minimized = false;
+      let closed = false;
+      const window = {
+        isDestroyed: () => false,
+        isFullScreen: () => false,
+        isMaximized: () => maximized,
+        minimize: () => {
+          minimized = true;
+        },
+        maximize: () => {
+          maximized = true;
+        },
+        unmaximize: () => {
+          maximized = false;
+        },
+        close: () => {
+          closed = true;
+        },
+      } as Electron.BrowserWindow;
+      return Effect.gen(function* () {
+        yield* controlWindow.handler("minimize");
+        assert.isTrue(minimized);
+        yield* controlWindow.handler("toggle-maximize");
+        assert.isTrue(maximized);
+        yield* controlWindow.handler("toggle-maximize");
+        assert.isFalse(maximized);
+        yield* controlWindow.handler("close");
+        assert.isTrue(closed);
+      }).pipe(
+        Effect.provide(
+          Layer.mock(ElectronWindow.ElectronWindow)({
+            main: Effect.succeedSome(window),
+          }),
+        ),
+      );
+    },
+  );
+
+  it.effect("ignores a late action after the main window has closed", () =>
+    controlWindow
+      .handler("close")
+      .pipe(
+        Effect.provide(Layer.mock(ElectronWindow.ElectronWindow)({ main: Effect.succeedNone })),
+      ),
+  );
+
+  it.effect("rejects actions outside the caption-button contract", () =>
+    Effect.gen(function* () {
+      const result = yield* Effect.exit(controlWindow.handler("destroy"));
+      assert.equal(result._tag, "Failure");
+    }).pipe(
+      Effect.provide(Layer.mock(ElectronWindow.ElectronWindow)({ main: Effect.succeedNone })),
+    ),
+  );
 });
 
 describe("getWindowFullscreenState", () => {

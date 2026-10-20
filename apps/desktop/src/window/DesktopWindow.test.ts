@@ -1387,6 +1387,32 @@ describe("DesktopWindow", () => {
     }),
   );
 
+  it.effect("uses renderer controls on Windows without enabling the native overlay", () =>
+    Effect.gen(function* () {
+      const fakeWindow = makeFakeBrowserWindow();
+      const createCount = yield* Ref.make(0);
+      const mainWindow = yield* Ref.make<Option.Option<Electron.BrowserWindow>>(Option.none());
+      const options: Electron.BrowserWindowConstructorOptions[] = [];
+      yield* Effect.gen(function* () {
+        const desktopWindow = yield* DesktopWindow.DesktopWindow;
+        yield* desktopWindow.handleBackendReady(new URL("http://127.0.0.1:3773"));
+        assert.equal(options[0]?.titleBarStyle, "hidden");
+        assert.equal(options[0]?.titleBarOverlay, false);
+        assert.equal(options[0]?.transparent, true);
+      }).pipe(
+        Effect.provide(
+          layerTest({
+            window: fakeWindow.window,
+            createCount,
+            mainWindow,
+            platform: "win32",
+            createdWindowOptions: options,
+          }),
+        ),
+      );
+    }),
+  );
+
   it.effect("publishes Windows maximize, restore and fullscreen changes to the renderer", () =>
     Effect.gen(function* () {
       const fakeWindow = makeFakeBrowserWindow();

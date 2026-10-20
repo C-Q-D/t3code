@@ -2,6 +2,13 @@
 import type { Messages } from "../en";
 
 export const common: Messages["common"] = {
+  windowControls: {
+    minimize: "最小化窗口",
+    maximize: "最大化窗口",
+    restore: "还原窗口",
+    close: "关闭窗口",
+    failed: "窗口操作失败",
+  },
   system: "系统默认",
   resetToDefault: "恢复默认值",
   /** Builds a complete Chinese reset action name from the setting's UI label. */

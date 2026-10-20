@@ -131,3 +131,5 @@ export const TAKE_LEGACY_LOCAL_STORAGE_CHANNEL = "desktop:take-legacy-local-stor
 export const COMPLETE_LEGACY_LOCAL_STORAGE_CHANNEL = "desktop:complete-legacy-local-storage";
 
 export const SET_UI_LOCALE_PREFERENCE_CHANNEL = "desktop:set-ui-locale-preference";
+
+export const CONTROL_WINDOW_CHANNEL = "desktop:control-window";

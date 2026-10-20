@@ -391,3 +391,71 @@ html[data-theme-id="graphite"] [data-frame-main] {
 .window-titlebar[data-discussion-layout="compact"] [data-discussion-project] {
   display: none;
 }
+
+/* WCO cannot be disabled at runtime in Electron 44. Windows uses these native-sized
+   controls for every theme. Reserve the same space in titlebar-owning side panels. */
+html.electron-windows .window-frame-shell {
+  position: relative;
+  --workspace-native-controls-inset: 150px;
+  --workspace-controls-right: 150px;
+}
+
+html.electron-windows .windows-window-controls {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 50;
+  display: flex;
+  height: var(--workspace-topbar-height);
+  border-top-right-radius: inherit;
+  overflow: clip;
+  -webkit-app-region: no-drag;
+}
+
+html.electron-windows .windows-window-controls button {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--foreground);
+  -webkit-app-region: no-drag;
+}
+
+html.electron-windows .windows-window-controls button:hover {
+  background: color-mix(in srgb, var(--foreground) 10%, transparent);
+}
+
+html.electron-windows .windows-window-controls button:active {
+  background: color-mix(in srgb, var(--foreground) 18%, transparent);
+}
+
+html.electron-windows .windows-window-controls button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -3px;
+}
+
+html.electron-windows .windows-window-controls button:disabled {
+  opacity: 0.5;
+}
+
+html.electron-windows .windows-window-controls [data-window-close]:hover {
+  background: #c42b1c;
+  color: #fff;
+}
+
+html.electron-windows .windows-window-controls [data-window-close]:active {
+  background: #a92318;
+  color: #fff;
+}
+
+html.electron-windows .windows-window-controls svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+}

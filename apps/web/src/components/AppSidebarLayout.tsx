@@ -15,6 +15,8 @@ import {
 import { useLocation, useNavigate, useParams, useRouterState } from "@tanstack/react-router";
 
 import { createPresenceRegistry } from "../lib/presenceRegistry";
+import { WindowsWindowControls, runWindowAction } from "./frame/WindowsWindowControls";
+import { isWindowsPlatform } from "../lib/utils";
 import { isElectron } from "../env";
 import { getLocalStorageItem, removeLocalStorageItem } from "../hooks/useLocalStorage";
 import {
@@ -391,6 +393,7 @@ function AppShell({ children }: { children: ReactNode }) {
   const panelAnimationsSuppressed = usePanelNavigationSuppression(pathname);
   const routePanelAnimationsActive = panelAnimationsActive && !panelAnimationsSuppressed;
   const isOnSettings = pathname === "/settings" || pathname.startsWith("/settings/");
+  const isWindowsDesktop = isElectron && isWindowsPlatform(navigator.platform);
   const isMacosDesktop = isElectron && isMacPlatform(navigator.platform);
   const [sidebarWidth, setSidebarWidth] = useState(readInitialThreadSidebarWidth);
   // Subscribed rather than read once: the clamp must track live window size,
@@ -482,10 +485,24 @@ function AppShell({ children }: { children: ReactNode }) {
   return (
     <PanelAnimationSuppressionProvider value={panelAnimationsSuppressed}>
       <div
-        className="window-frame-shell stone-base h-dvh min-h-0"
+        className={cn("window-frame-shell stone-base h-dvh min-h-0", isWindowsDesktop && "wco")}
+        onDoubleClick={
+          isWindowsDesktop
+            ? (event) => {
+                // Native drag regions retain OS handling; this covers DOM-delivered doubles.
+                const target = event.target;
+                if (!(target instanceof Element) || !target.closest("[data-window-titlebar]"))
+                  return;
+                if (target.closest(".no-drag, button, a, input, select, textarea, [role=button]"))
+                  return;
+                void runWindowAction("toggle-maximize");
+              }
+            : undefined
+        }
         data-window-maximized={isWindowMaximized ? "true" : "false"}
         data-window-fullscreen={isWindowFullscreen ? "true" : "false"}
       >
+        {isWindowsDesktop && <WindowsWindowControls maximized={isWindowMaximized} />}
         <OnboardingShell
           className="grid! h-full! min-h-0! grid-cols-[minmax(0,1fr)] grid-rows-[var(--workspace-topbar-height)_minmax(0,1fr)]"
           data-app-shell=""

@@ -258,6 +258,7 @@ contextBridge.exposeInMainWorld("desktopBridge", {
       ipcRenderer.removeListener(IpcChannels.QUIT_SHORTCUT_CHANNEL, wrappedListener);
     };
   },
+  controlWindow: (action) => ipcRenderer.invoke(IpcChannels.CONTROL_WINDOW_CHANNEL, action),
   getWindowMaximizedState: () =>
     ipcRenderer.sendSync(IpcChannels.GET_WINDOW_MAXIMIZED_STATE_CHANNEL) === true,
   onWindowMaximizedStateChange: (listener) => {

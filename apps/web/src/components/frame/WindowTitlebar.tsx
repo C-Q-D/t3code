@@ -1,4 +1,4 @@
-/** Owns window chrome geometry; routes supply content and Electron owns system buttons. */
+/** Owns window chrome geometry; routes supply content and the shell reserves caption controls. */
 import { useCallback, useRef, type ReactNode } from "react";
 
 import { t } from "~/i18n";

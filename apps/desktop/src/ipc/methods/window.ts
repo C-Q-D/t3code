@@ -5,6 +5,7 @@ import {
   DesktopAppBrandingSchema,
   DesktopEnvironmentBootstrapSchema,
   DesktopThemeSchema,
+  DesktopWindowActionSchema,
   EDITORS,
   EditorId,
   PickedThemeFileSchema,
@@ -80,6 +81,31 @@ export const getSystemLocale = DesktopIpc.makeSyncIpcMethod({
   handler: Effect.fn("desktop.ipc.window.getSystemLocale")(function* () {
     const electronApp = yield* ElectronApp.ElectronApp;
     return yield* electronApp.systemLocale;
+  }),
+});
+
+/** Runs a caption action against the main window; no retry or forced destruction. */
+export const controlWindow = DesktopIpc.makeIpcMethod({
+  channel: IpcChannels.CONTROL_WINDOW_CHANNEL,
+  payload: DesktopWindowActionSchema,
+  result: Schema.Void,
+  handler: Effect.fn("desktop.ipc.window.controlWindow")(function* (action) {
+    const electronWindow = yield* ElectronWindow.ElectronWindow;
+    const window = yield* electronWindow.main;
+    if (Option.isNone(window) || window.value.isDestroyed()) return;
+    const nativeWindow = window.value;
+    switch (action) {
+      case "minimize":
+        nativeWindow.minimize();
+        break;
+      case "toggle-maximize":
+        if (nativeWindow.isMaximized()) nativeWindow.unmaximize();
+        else nativeWindow.maximize();
+        break;
+      case "close":
+        nativeWindow.close();
+        break;
+    }
   }),
 });
 

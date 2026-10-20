@@ -270,6 +270,11 @@ export function concealPendingQuitWindow(
   window.setOpacity(0);
 }
 
+/** Selects native chrome at creation; Windows captions are rendered by the web shell.
+ * @param shouldUseDarkColors Whether Linux native caption symbols use the dark palette.
+ * @param platform Host OS; macOS keeps traffic lights and Windows disables WCO.
+ * @returns Creation options also used by appearance updates; no runtime overlay toggle.
+ */
 function getWindowTitleBarOptions(
   shouldUseDarkColors: boolean,
   platform: NodeJS.Platform,
@@ -283,6 +288,10 @@ function getWindowTitleBarOptions(
       },
     };
   }
+
+  // Electron 44 cannot disable WCO after creation. All Windows themes use the
+  // renderer caption controls, so switching themes never leaves duplicate controls.
+  if (platform === "win32") return { titleBarStyle: "hidden", titleBarOverlay: false };
 
   return {
     titleBarStyle: "hidden",
