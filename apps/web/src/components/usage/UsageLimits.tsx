@@ -12,6 +12,7 @@ import {
 } from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
 import {
+  collectLimitAccounts,
   elapsedShare,
   formatDuration,
   formatResetsIn,
@@ -368,6 +369,15 @@ export function UsageLimitsSection({
   readonly now: number;
   readonly cursorPrompt?: ReactNode;
 }) {
+  const selected = useLimitPresentations(selectedEnvironmentIds, hiddenProviders);
+  return <UsageLimitsPooled presentations={selected} now={now} cursorPrompt={cursorPrompt} />;
+}
+
+/** Filters selected environments and hidden drivers consistently for pooled limits and extras. */
+export function useLimitPresentations(
+  selectedEnvironmentIds: ReadonlySet<EnvironmentId> | null,
+  hiddenProviders: ReadonlySet<UsageProviderKind>,
+): Parameters<typeof collectLimitAccounts>[0] {
   const presentations = useAtomValue(environmentPresentations.presentationsAtom);
   const hiddenDrivers = new Set<ServerProvider["driver"]>(
     [...hiddenProviders].map((provider) => PROVIDER_PRESENTATION[provider].driverKind),
@@ -401,5 +411,5 @@ export function UsageLimitsSection({
       ];
     }),
   );
-  return <UsageLimitsPooled presentations={selected} now={now} cursorPrompt={cursorPrompt} />;
+  return selected;
 }

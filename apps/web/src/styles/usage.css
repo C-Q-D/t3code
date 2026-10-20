@@ -1,6 +1,19 @@
 /* U1: UsagePage8a.dc.html, imported by 其余屏-3.dc.html M1. Fixed provider colors are brand colors. */
 /* Brand variables are referenced by runtime styles, so retain them without utility-class consumers. */
 @theme static {
+  --color-usage-split-input: #b8efc8;
+  --color-usage-split-cache-read: #9fd6ff;
+  --color-usage-split-cache-write: #ffb3c1;
+  --color-usage-split-output: #f4f4f6;
+  --color-usage-split-other: #1c1c20;
+  --color-usage-speed-mid: #cfc8f6;
+  --color-usage-fader-codex: #f4f4f6;
+  --color-usage-fader-claude: #ffb08a;
+  --shadow-usage-card:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.095), 0 0 0 1px rgba(0, 0, 0, 0.484), 0 3px 0 #09090a,
+    10px 16px 24px -8px rgba(0, 0, 0, 0.7);
+  --shadow-usage-well:
+    inset 1.5px 2px 3px rgba(0, 0, 0, 0.6), inset -1px -1px 0 rgba(255, 255, 255, 0.04);
   --color-usage-claude: #d97757;
   --color-usage-codex: #e8e8ea;
   --color-usage-total-well: #151517;

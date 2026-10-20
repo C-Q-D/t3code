@@ -14,7 +14,8 @@ import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
 const state = vi.hoisted(() => ({
   presentations: new Map(),
   refreshProviders: vi.fn(async () => undefined),
-  metric: "limits",
+  metric: "cost",
+  canReadDiagnostics: true,
   windowDays: 30,
   showUsage: false,
   shownWindow: null as UsageSummaryInput | null,
@@ -44,7 +45,7 @@ vi.mock("../../state/usage", () => ({
       environmentId,
       label: presentation.entry.target.label,
       isPending: false,
-      canReadDiagnostics: true,
+      canReadDiagnostics: state.canReadDiagnostics,
       isConnected: presentation.connection.phase === "connected",
       error: null,
       summary: null,
@@ -117,7 +118,8 @@ beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-09-11T12:00:00Z"));
   environmentNumber += 1;
-  state.metric = "limits";
+  state.metric = "cost";
+  state.canReadDiagnostics = true;
   state.windowDays = 30;
   state.showUsage = false;
   state.shownWindow = null;
@@ -181,7 +183,7 @@ it.each([0, 1])(
     vi.mocked(Date.now).mockReturnValue(Date.parse("2026-09-11T12:30:00Z"));
     await act(async () => {
       renderer.root
-        .findAllByProps({ "aria-label": "Refresh limits" })
+        .findAllByProps({ "aria-label": "Refresh usage" })
         .filter((node) => node.type === "button")
         .at(buttonIndex)!
         .props.onClick();
@@ -199,56 +201,113 @@ it.each([0, 1])(
   },
 );
 
-it("uses the current time when returning to limits from tokens", async () => {
+/** Dispatches the actual page shortcut without a focused input or popup. */
+function pressUsageKey(key: string, modifiers: { ctrlKey?: boolean; shiftKey?: boolean } = {}) {
+  const event = Object.assign(new Event("keydown", { cancelable: true }), {
+    key,
+    ctrlKey: false,
+    metaKey: false,
+    altKey: false,
+    shiftKey: false,
+    ...modifiers,
+  });
+  window.dispatchEvent(event);
+}
+
+it("L refreshes limits and their countdown without refreshing usage or changing metric", async () => {
+  vi.stubGlobal("HTMLElement", class extends EventTarget {});
+  vi.stubGlobal("navigator", { platform: "Win32" });
+  state.metric = "tokens";
   await act(() => {
     renderer = create(<UsagePage />);
   });
-  const selectMetric = (metric: string) => {
-    renderer.root
-      .findAll((node) => node.type === "div" && node.props["aria-label"] === "Usage metric")[0]!
-      .props.onValueChange([metric]);
-  };
-  await act(() => selectMetric("tokens"));
+  state.refreshProviders.mockClear();
   vi.mocked(Date.now).mockReturnValue(Date.parse("2026-09-11T13:00:00Z"));
-  await act(() => selectMetric("limits"));
+  await act(() => pressUsageKey("l"));
+  expect(state.refreshProviders).toHaveBeenCalledTimes(1);
+  expect(state.refresh).not.toHaveBeenCalled();
   expect(
     JSON.stringify(renderer.toJSON(), (key, value) => (key === "props" ? undefined : value)),
   ).toContain("in 1h 0m");
+  expect(
+    renderer.root.findAll(
+      (node) => node.type === "div" && node.props["aria-label"] === "Usage metric",
+    )[0]!.props.value,
+  ).toEqual(["tokens"]);
+});
+
+it("keeps period shortcuts active during a limits refresh and blocks duplicate L requests", async () => {
+  vi.stubGlobal("HTMLElement", class extends EventTarget {});
+  vi.stubGlobal("navigator", { platform: "Win32" });
+  await act(() => {
+    renderer = create(<UsagePage />);
+  });
+  state.refreshProviders.mockClear();
+  let finishRefresh!: () => void;
+  const pending = new Promise<undefined>((resolve) => {
+    finishRefresh = () => resolve(undefined);
+  });
+  state.refreshProviders.mockImplementationOnce(() => pending);
+  await act(() => pressUsageKey("l"));
+  try {
+    await act(() => pressUsageKey("l"));
+    await act(() => pressUsageKey("2", { ctrlKey: true, shiftKey: true }));
+    expect(state.refreshProviders).toHaveBeenCalledTimes(1);
+    expect(
+      renderer.root.findAll(
+        (node) => node.type === "div" && node.props["aria-label"] === "Usage period",
+      )[0]!.props.value,
+    ).toEqual(["7"]);
+  } finally {
+    await act(async () => {
+      finishRefresh();
+      await pending;
+    });
+  }
+});
+
+it("refreshes once on opening the page and suppresses rapid remounts until five minutes", async () => {
+  await act(() => {
+    renderer = create(
+      <StrictMode>
+        <UsagePage />
+      </StrictMode>,
+    );
+  });
+  expect(state.refreshProviders).toHaveBeenCalledTimes(1);
+  await act(() => renderer.unmount());
+  await act(() => {
+    renderer = create(
+      <StrictMode>
+        <UsagePage />
+      </StrictMode>,
+    );
+  });
+  expect(state.refreshProviders).toHaveBeenCalledTimes(1);
+  await act(() => renderer.unmount());
+  vi.mocked(Date.now).mockReturnValue(Date.parse("2026-09-11T12:05:00Z"));
+  await act(() => {
+    renderer = create(<UsagePage />);
+  });
   expect(state.refreshProviders).toHaveBeenCalledTimes(2);
 });
 
-it("refreshes once on opening Limits and suppresses rapid returns and remounts", async () => {
-  state.metric = "tokens";
+it("renders and refreshes limits without diagnostics permission or a usage response", async () => {
+  state.canReadDiagnostics = false;
   await act(() => {
-    renderer = create(
-      <StrictMode>
-        <UsagePage />
-      </StrictMode>,
-    );
+    renderer = create(<UsagePage />);
   });
-  expect(state.refreshProviders).not.toHaveBeenCalled();
-  const selectMetric = (metric: string) =>
-    renderer.root
-      .findAll((node) => node.type === "div" && node.props["aria-label"] === "Usage metric")[0]!
-      .props.onValueChange([metric]);
-  await act(() => selectMetric("limits"));
+  expect(
+    JSON.stringify(renderer.toJSON(), (key, value) => (key === "props" ? undefined : value)),
+  ).toContain("in 2h 0m");
   expect(state.refreshProviders).toHaveBeenCalledTimes(1);
-  await act(() => selectMetric("tokens"));
-  await act(() => selectMetric("limits"));
-  await act(() => renderer.unmount());
-  state.metric = "limits";
-  await act(() => {
-    renderer = create(
-      <StrictMode>
-        <UsagePage />
-      </StrictMode>,
-    );
-  });
-  expect(state.refreshProviders).toHaveBeenCalledTimes(1);
-  await act(() => selectMetric("tokens"));
-  vi.mocked(Date.now).mockReturnValue(Date.parse("2026-09-11T12:05:00Z"));
-  await act(() => selectMetric("limits"));
+  const button = renderer.root.findAll(
+    (node) => node.type === "button" && node.props["aria-label"] === "Refresh usage",
+  )[0]!;
+  expect(button.props.disabled).toBe(false);
+  await act(() => button.props.onClick());
   expect(state.refreshProviders).toHaveBeenCalledTimes(2);
+  expect(state.refresh).not.toHaveBeenCalled();
 });
 
 it("waits for connection and refreshes new environments during a slow refresh", async () => {
@@ -276,7 +335,7 @@ it("waits for connection and refreshes new environments during a slow refresh", 
   await act(() => finishRefresh());
 });
 
-it.each(["limits", "cost", "tokens"])(
+it.each(["cost", "tokens"])(
   "keeps %s refresh busy until the already-running automatic check settles",
   async (metric) => {
     state.metric = metric;
@@ -291,9 +350,7 @@ it.each(["limits", "cost", "tokens"])(
     });
     const button = () =>
       renderer.root.findAll(
-        (node) =>
-          node.type === "button" &&
-          node.props["aria-label"] === (metric === "limits" ? "Refresh limits" : "Refresh usage"),
+        (node) => node.type === "button" && node.props["aria-label"] === "Refresh usage",
       )[0]!;
     expect(state.refreshProviders).toHaveBeenCalledTimes(1);
     await act(() => button().props.onClick());
