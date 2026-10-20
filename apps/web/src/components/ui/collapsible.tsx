@@ -1,3 +1,4 @@
+/** Shared collapsible slots; Base UI owns visibility and measured transition height. */
 "use client";
 
 import { Collapsible as CollapsiblePrimitive } from "@base-ui/react/collapsible";
@@ -22,12 +23,14 @@ function CollapsibleTrigger({ className, ...props }: CollapsiblePrimitive.Trigge
  * Render collapsible content with caller className and forwarded Base UI panel props.
  * animate=false disables height travel; otherwise physics uses settle, while legacy
  * keeps its 200ms transition and honors the system's reduced-motion preference.
+ * surface="card" lets settings reveal a whole card's exterior shadow after opening.
  */
 function CollapsiblePanel({
   className,
   animate = true,
+  surface,
   ...props
-}: CollapsiblePrimitive.Panel.Props & { animate?: boolean }) {
+}: CollapsiblePrimitive.Panel.Props & { animate?: boolean; surface?: "card" }) {
   // Base UI supplies measured height and owns mounting and accessibility.
   // https://ui.shadcn.com/docs/components/base/collapsible
   return (
@@ -39,6 +42,7 @@ function CollapsiblePanel({
         className,
       )}
       data-slot="collapsible-panel"
+      data-panel-surface={surface}
       {...props}
     />
   );

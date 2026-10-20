@@ -2164,7 +2164,7 @@ function LegacyFeaturesSection() {
           </h2>
           <ChevronRightIcon className="size-4 text-muted-foreground transition-transform duration-200 group-data-panel-open:rotate-90" />
         </CollapsibleTrigger>
-        <CollapsiblePanel>
+        <CollapsiblePanel surface="card">
           <SettingsGroup>
             <SettingsRow
               {...searchableSetting("legacy-plan-mode")}
