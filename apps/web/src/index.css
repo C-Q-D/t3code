@@ -1,4 +1,9 @@
 @import "tailwindcss";
+/* Test fixture class strings must not generate production CSS. */
+@source not "./**/*.test.{ts,tsx}";
+@source not "./**/*.bench.{ts,tsx}";
+@source not "./test-fixtures.ts";
+@source not "./lib/motion/testRaf.ts";
 @import "./styles/motion.css";
 @import "./styles/tokens.css";
 @import "./styles/fonts.css";
