@@ -527,7 +527,9 @@ export function UsagePage() {
                       timeZone={shownWindow.timeZone}
                       onSelectModel={setSelectedModelKey}
                     />
-                    <UsageResourceCard />
+                    <div className="min-w-0 flex-1 empty:hidden">
+                      <UsageResourceCard />
+                    </div>
                   </div>
                   <UsageCostBreakdownCard
                     metric={metric}
