@@ -44,7 +44,8 @@ export function DeviceControlsRail(props: {
   controls: DeviceControls;
   screenshotPending: boolean;
   onScreenshot: () => void;
-  toolsOpen: boolean;
+  /** Closed drawer, category-only drawer, or drawer with at least one expanded category. */
+  tools: "closed" | "open" | "expanded";
   onTools: () => void;
   onFloat: () => void;
   onClose: () => void;
@@ -59,7 +60,7 @@ export function DeviceControlsRail(props: {
   const viewGroupId = useId();
   return (
     <>
-      <div className="device-workspace-toolbar">
+      <div className="device-workspace-toolbar" data-tools={props.tools}>
         <div className="device-workspace-picker">{props.devicePicker}</div>
         <fieldset className="device-view-selector" disabled={!view.streaming}>
           <legend className="sr-only">{t.tools.device.device}</legend>
@@ -214,7 +215,7 @@ export function DeviceControlsRail(props: {
               <MoreHorizontal />
             </MenuTrigger>
             <MenuPopup side={popupSide} align="end">
-              <MenuCheckboxItem checked={props.toolsOpen} onCheckedChange={props.onTools}>
+              <MenuCheckboxItem checked={props.tools !== "closed"} onCheckedChange={props.onTools}>
                 {t.tools.device.tools}
               </MenuCheckboxItem>
               <MenuItem

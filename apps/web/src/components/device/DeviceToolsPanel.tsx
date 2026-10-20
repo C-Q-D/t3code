@@ -3,7 +3,7 @@ import { t } from "~/i18n";
 import type { DeviceHubAccess } from "@t3tools/client-runtime/state/deviceHubAccess";
 import type { DevicePermission, DeviceSummary, DeviceTextSize } from "@t3tools/contracts";
 import { ChevronDown, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState, type ReactNode } from "react";
 
 import { Button } from "~/components/ui/button";
 import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "~/components/ui/collapsible";
@@ -19,8 +19,39 @@ import { Spinner } from "~/components/ui/spinner";
 import { Switch } from "~/components/ui/switch";
 import { Toggle, ToggleGroup } from "~/components/ui/toggle-group";
 import { cn } from "~/lib/utils";
+import { createPresenceRegistry } from "~/lib/presenceRegistry";
 import type { DeviceControls } from "./useDeviceControls";
 import { type DeviceEventLogEntry, subscribeDeviceEventLog } from "./deviceHubApi";
+
+const deviceToolRegistry = createPresenceRegistry<"expanded">();
+
+/**
+ * Counts expanded categories locally and reports drawer width state before paint.
+ * Unmounting resets the workspace report so reopening starts at the compact width.
+ */
+function DeviceToolsDrawer(props: {
+  readonly children: ReactNode;
+  readonly className: string | undefined;
+  readonly onExpandedChange: (expanded: boolean) => void;
+}) {
+  const { counts, onChange } = deviceToolRegistry.usePresence();
+  const expanded = (counts.expanded ?? 0) > 0;
+  const { onExpandedChange } = props;
+  useLayoutEffect(() => {
+    onExpandedChange(expanded);
+    return () => onExpandedChange(false);
+  }, [expanded, onExpandedChange]);
+  return (
+    <deviceToolRegistry.Provider onChange={onChange}>
+      <div
+        className={cn("device-tools flex min-h-0 flex-col text-sm", props.className)}
+        data-expanded={expanded}
+      >
+        {props.children}
+      </div>
+    </deviceToolRegistry.Provider>
+  );
+}
 
 const TEXT_SIZES: ReadonlyArray<{ value: DeviceTextSize; label: string }> = [
   { value: "small", label: t.tools.device.small },
@@ -92,6 +123,8 @@ export function DeviceToolsPanel(props: {
   readonly access: DeviceHubAccess | null;
   readonly axOverlay: boolean;
   readonly onAxOverlayChange: (enabled: boolean) => void;
+  /** Receives whether any rendered category is expanded; reset when the drawer unmounts. */
+  readonly onExpandedChange: (expanded: boolean) => void;
   readonly onClose: () => void;
   readonly className?: string;
 }) {
@@ -101,7 +134,7 @@ export function DeviceToolsPanel(props: {
   const isIos = device.platform === "ios";
 
   return (
-    <div className={cn("device-tools flex min-h-0 flex-col text-sm", props.className)}>
+    <DeviceToolsDrawer className={props.className} onExpandedChange={props.onExpandedChange}>
       <div className="flex h-9 shrink-0 items-center gap-2 border-b px-3">
         <span className="font-medium">{t.tools.device.toolsHeading}</span>
         {pending ? <Spinner size="sm" /> : null}
@@ -344,14 +377,19 @@ export function DeviceToolsPanel(props: {
           />
         </Section>
       </div>
-    </div>
+    </DeviceToolsDrawer>
   );
 }
 
 /** Collapsible tool category; children retain their state while the category is closed. */
 function Section(props: { readonly title: string; readonly children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  deviceToolRegistry.useRegister("expanded", open);
   return (
-    <details className="device-tool-section" data-device-tool-section>
+    <details
+      className="device-tool-section"
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
       <summary>{props.title}</summary>
       <div className="device-tool-content">{props.children}</div>
     </details>
@@ -652,6 +690,7 @@ function EventLogSection(props: {
 }) {
   const [open, setOpen] = useState(false);
   const [entries, setEntries] = useState<ReadonlyArray<DeviceEventLogEntry>>([]);
+  deviceToolRegistry.useRegister("expanded", open);
 
   useEffect(() => {
     if (!open) return;
@@ -671,7 +710,7 @@ function EventLogSection(props: {
   }, [open, props.access, props.device.id, props.device.platform]);
 
   return (
-    <Collapsible data-device-tool-section open={open} onOpenChange={setOpen}>
+    <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger className="flex w-full items-center gap-1.5 border-b px-3 py-2.5 text-left text-xs font-medium text-muted-foreground">
         {t.tools.device.eventLog}
         <ChevronDown

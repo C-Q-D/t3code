@@ -30,6 +30,7 @@ export function DeviceWorkspace(props: {
 }) {
   const [handle, setHandle] = useState<DeviceStreamHandle | null>(null);
   const [toolsOpen, setToolsOpen] = useState(true);
+  const [toolsExpanded, setToolsExpanded] = useState(false);
   const [axOverlay, setAxOverlay] = useState(false);
   const [screenshotPending, setScreenshotPending] = useState(false);
   const [screenshotError, setScreenshotError] = useState<string | null>(null);
@@ -111,7 +112,7 @@ export function DeviceWorkspace(props: {
                 controls={controls}
                 screenshotPending={screenshotPending}
                 onScreenshot={() => void saveScreenshot()}
-                toolsOpen={toolsOpen}
+                tools={toolsOpen ? (toolsExpanded ? "expanded" : "open") : "closed"}
                 onTools={() => setToolsOpen(!toolsOpen)}
                 onFloat={props.onFloat}
                 onClose={props.onClose}
@@ -130,6 +131,7 @@ export function DeviceWorkspace(props: {
           access={access}
           axOverlay={axOverlay}
           onAxOverlayChange={setAxOverlay}
+          onExpandedChange={setToolsExpanded}
           onClose={() => setToolsOpen(false)}
           className="device-tools-drawer"
         />
