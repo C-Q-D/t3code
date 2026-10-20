@@ -87,7 +87,7 @@ interface ChatHeaderProps {
   activeThreadEnvironmentId: EnvironmentId;
   activeThreadId: ThreadId;
   activeThreadTitle: string;
-  /** Draft titlebars publish only the project capsule, without thread chrome. */
+  /** Draft titlebars show the project capsule and panel actions, without thread title chrome. */
   isServerThread: boolean;
   activeProject: EnvironmentProject | null;
   parentThreadLink: { threadId: ThreadId; title: string } | null;
@@ -638,9 +638,8 @@ export const ChatHeader = memo(function ChatHeader({
   );
   const slots = useTitlebarSlot({
     breadcrumb,
-    actions: isServerThread ? (
-      <div className="flex h-(--workspace-topbar-height) items-center">{actions}</div>
-    ) : null,
+    // Drafts keep the panel well too, so files and the terminal open before the first send.
+    actions: <div className="flex h-(--workspace-topbar-height) items-center">{actions}</div>,
   });
   return (
     <>

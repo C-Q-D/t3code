@@ -143,12 +143,14 @@ describe("chat titlebar interactions", () => {
     expect(container.querySelector('[data-titlebar-slot="actions"]')?.textContent).toBe("");
   });
 
-  it("shows only the project on a draft route and restores thread chrome when opening a thread", async () => {
+  it("shows the project and panel actions on a draft route and restores thread chrome when opening a thread", async () => {
     await renderRoute(true, false);
     expect(container.querySelector('[data-titlebar-slot="breadcrumb"]')?.textContent).toBe(
       "Project",
     );
-    expect(container.querySelector('[data-titlebar-slot="actions"]')?.textContent).toBe("");
+    expect(container.querySelector('[data-titlebar-slot="actions"]')?.textContent).toBe(
+      "Existing panel control",
+    );
     await renderRoute();
     expect(container.querySelector('[data-titlebar-slot="breadcrumb"]')?.textContent).toBe(
       "Original title",
