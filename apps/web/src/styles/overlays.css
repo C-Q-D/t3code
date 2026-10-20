@@ -109,12 +109,12 @@
 }
 
 /* Q1 chrome integration: retain the shell's native controls and brand, hide workspace-only controls. */
-body:has([data-onboarding-route]) [data-titlebar-sidebar-control],
-body:has([data-onboarding-route]) [data-titlebar-brand] > div,
-body:has([data-onboarding-route]) .window-titlebar-slot {
+[data-app-shell][data-onboarding-route="true"] [data-titlebar-sidebar-control],
+[data-app-shell][data-onboarding-route="true"] [data-titlebar-brand] > div,
+[data-app-shell][data-onboarding-route="true"] .window-titlebar-slot {
   display: none;
 }
-body:has([data-onboarding-route]) [data-titlebar-brand] {
+[data-app-shell][data-onboarding-route="true"] [data-titlebar-brand] {
   margin-left: 0;
 }
 

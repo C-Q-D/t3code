@@ -9,6 +9,7 @@ import {
   useState,
   useSyncExternalStore,
   type CSSProperties,
+  type ComponentProps,
   type ReactNode,
 } from "react";
 import { useLocation, useNavigate, useParams, useRouterState } from "@tanstack/react-router";
@@ -77,6 +78,23 @@ import {
 
 const MACOS_TRAFFIC_LIGHTS_LEFT_INSET = "var(--desktop-window-controls-inset, 90px)";
 
+/** Welcome routes register with the shell that owns their titlebar controls. */
+export const OnboardingRouteRegistry = createPresenceRegistry<"onboarding">();
+
+/** Holds onboarding presence next to the shell element, outside the layout's route state. */
+function OnboardingShell({ children, ...props }: ComponentProps<typeof SidebarProvider>) {
+  const { counts, onChange } = OnboardingRouteRegistry.usePresence();
+  return (
+    <OnboardingRouteRegistry.Provider onChange={onChange}>
+      <SidebarProvider
+        {...props}
+        data-onboarding-route={(counts.onboarding ?? 0) > 0 ? "true" : "false"}
+      >
+        {children}
+      </SidebarProvider>
+    </OnboardingRouteRegistry.Provider>
+  );
+}
 /** ChatView registers its mounted workspace with the nearest main slab. */
 export const ChatWorkspaceRegistry = createPresenceRegistry<"workspace">();
 
@@ -453,7 +471,7 @@ function AppShell({ children }: { children: ReactNode }) {
   return (
     <PanelAnimationSuppressionProvider value={panelAnimationsSuppressed}>
       <div className="window-frame-shell stone-base h-dvh min-h-0">
-        <SidebarProvider
+        <OnboardingShell
           className="grid! h-full! min-h-0! grid-cols-[minmax(0,1fr)] grid-rows-[var(--workspace-topbar-height)_minmax(0,1fr)]"
           data-app-shell=""
           data-titlebar-panel={titlebarPanelActive ? "true" : "false"}
@@ -521,7 +539,7 @@ function AppShell({ children }: { children: ReactNode }) {
             <NavigationHistoryShortcuts />
             <MainAppLocationTracker />
           </FrameWorkspace>
-        </SidebarProvider>
+        </OnboardingShell>
       </div>
     </PanelAnimationSuppressionProvider>
   );

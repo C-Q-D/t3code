@@ -5,6 +5,7 @@ import { EnvironmentId } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
 import * as Option from "effect/Option";
 
+import { OnboardingRouteRegistry } from "../components/AppSidebarLayout";
 import { WelcomeWizard } from "../components/onboarding/WelcomeWizard";
 import { useNewThreadHandler } from "../hooks/useHandleNewThread";
 
@@ -23,6 +24,7 @@ export const Route = createFileRoute("/welcome")({
 
 /** Resolves optional resumed agent setup and navigates only after completion succeeds. */
 function WelcomeRouteView() {
+  OnboardingRouteRegistry.useRegister("onboarding");
   const { authGateState } = Route.useRouteContext();
   const navigate = useNavigate();
   const hash = useLocation({ select: (location) => location.hash });
