@@ -1,5 +1,7 @@
-// @vitest-environment jsdom
-/** Protects confirmation focus behavior and the existing long-description layout contract. */
+/**
+ * Protects dialog slot presence, confirmation focus, and long-description layout.
+ * @vitest-environment jsdom
+ */
 import { act, createRef } from "react";
 import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -13,7 +15,52 @@ import {
   AlertDialogTitle,
   AlertDialogPopup,
 } from "./alert-dialog";
-import { Dialog, DialogTitle } from "./dialog";
+import { Dialog, DialogFooter, DialogHeader, DialogPopup, DialogTitle } from "./dialog";
+
+describe("dialog slot presence", () => {
+  it("updates header and footer attributes independently through removal and remount", async () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    const popupRef = createRef<HTMLDivElement>();
+    /** Renders real slots inside the open popup without replacing registration or Base UI. */
+    async function renderSlots(header: boolean, footer: boolean) {
+      await act(async () => {
+        root.render(
+          <Dialog open>
+            <DialogPopup ref={popupRef} initialFocus={false}>
+              <DialogTitle>Slot presence</DialogTitle>
+              {header && <DialogHeader>Header</DialogHeader>}
+              {footer && <DialogFooter>Footer</DialogFooter>}
+            </DialogPopup>
+          </Dialog>,
+        );
+      });
+    }
+    try {
+      await renderSlots(true, false);
+      expect(popupRef.current?.getAttribute("data-has-header")).toBe("true");
+      expect(popupRef.current?.getAttribute("data-has-footer")).toBe("false");
+
+      await renderSlots(false, true);
+      expect(popupRef.current?.getAttribute("data-has-header")).toBe("false");
+      expect(popupRef.current?.getAttribute("data-has-footer")).toBe("true");
+
+      await renderSlots(true, false);
+      expect(popupRef.current?.getAttribute("data-has-header")).toBe("true");
+      expect(popupRef.current?.getAttribute("data-has-footer")).toBe("false");
+
+      await renderSlots(true, true);
+      expect(popupRef.current?.getAttribute("data-has-header")).toBe("true");
+      expect(popupRef.current?.getAttribute("data-has-footer")).toBe("true");
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+      vi.unstubAllGlobals();
+    }
+  });
+});
 
 describe.each([
   { name: "dialog", Root: Dialog, Title: DialogTitle },
