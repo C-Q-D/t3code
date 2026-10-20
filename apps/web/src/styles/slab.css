@@ -1,6 +1,6 @@
 /*
  * 石墨背景与石面；透明度只作用于背景层，不作用于文字。
- * 浏览器保留不透明底色，Windows Electron 由原生窗口透出桌面。
+ * 浏览器保留不透明底色，Windows Electron 只在外壳边距透出桌面。
  * 其他主题保留现有石纹与 index.css 的玻璃行为。
  */
 /* Keep the base and sidebar utilities available to route shells. */
@@ -153,6 +153,8 @@ html[data-theme-id="graphite"] .stone-sidebar {
 /* Windows graphite backgrounds follow the shell instead of the native viewport.
    Each layer clips its own paint; foreground opacity and portaled dialogs stay intact. */
 html[data-theme-id="graphite"].electron-windows .window-frame-shell {
+  /* Replace the opaque canvas beneath the image without painting the native gutter. */
+  background-color: var(--app-chrome-background, var(--background));
   /* Dialog scroll locking pads #root. Anchor chrome to the viewport so that
      compensation cannot enlarge the right gutter or shift caption controls. */
   position: fixed;
