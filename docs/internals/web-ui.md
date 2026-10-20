@@ -27,6 +27,13 @@ the web English dictionary references those defaults directly, while other clien
 
 Style with Tailwind classes in the component that renders the element.
 
+`apps/web` forbids CSS `:has()`, including Tailwind `has-*` variants: virtual-list row insertion
+invalidates ancestor `:has()` checks in Blink, causing whole-page style recalculation and dropped frames.
+Use component-owned `data-*` attributes, `focus-within`, `peer`, or child-slot registration through
+[`presenceRegistry`](../../apps/web/src/lib/presenceRegistry.tsx); use
+[`useFocusVisibleWithin`](../../apps/web/src/hooks/useFocusVisibleWithin.ts) for keyboard-visible focus.
+The `t3code/no-has-selector` lint rule, CSS source test, and post-build CSS check enforce this constraint.
+
 - Global CSS, in [`index.css`](../../apps/web/src/index.css) or any other stylesheet, is only for
   what classes on the owning component can't express: generated Markdown or imperative DOM, custom
   elements and shadow roots, animations, runtime theme variables, and browser or Electron
