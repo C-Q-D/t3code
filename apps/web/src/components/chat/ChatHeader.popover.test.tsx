@@ -60,7 +60,7 @@ function DraftDetailsFixture() {
         onOpenThread={() => {}}
         onNewThreadInProject={() => {}}
         popoverAnchorRef={anchor}
-        actions={<button type="button">Hidden draft controls</button>}
+        actions={<button type="button">Draft panel controls</button>}
       />
       <ThreadDetailsCard
         anchor={anchor}
@@ -93,13 +93,16 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
-it("positions visible draft details when opened by keyboard without titlebar action buttons", async () => {
+it("positions visible draft details on the titlebar when opened by keyboard", async () => {
   await act(async () => root.render(<DraftDetailsFixture />));
   // jsdom has no layout engine; only supply the header geometry,
   // leaving reference selection and floating positioning unmocked.
   const header = container.querySelector("header")!;
   vi.spyOn(header, "getBoundingClientRect").mockReturnValue(new DOMRect(0, 0, 800, 48));
-  expect(container.querySelector('[data-titlebar-slot="actions"] button')).toBeNull();
+  // Drafts publish the panel well too; the keyboard path still anchors to the full titlebar.
+  expect(container.querySelector('[data-titlebar-slot="actions"] button')?.textContent).toBe(
+    "Draft panel controls",
+  );
   expect(document.querySelector('[role="dialog"]')).toBeNull();
   await act(async () =>
     window.dispatchEvent(
