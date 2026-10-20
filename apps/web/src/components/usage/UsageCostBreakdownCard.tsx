@@ -4,10 +4,12 @@ import type { JSX } from "react";
 import type { MergedUsage } from "@t3tools/shared/usageMerge";
 import type { UsageChartMetric } from "./UsageProviderChart";
 import { cn } from "../../lib/utils";
-import { formatUsd, formatTokens } from "@t3tools/shared/usageFormat";
+import { formatUsd } from "@t3tools/shared/usageFormat";
 import { UsageShareBar } from "./UsageShareBar";
 import { SpeedPremium } from "./UsageModelDialog";
 import { costTypeSegments, tokenTypeSegments, speedCostSegments } from "./usageBreakdown";
+import { UsageCostRing } from "./UsageCostRing";
+import { ringSegments } from "./usageCostBreakdown.logic";
 
 /** Category and speed totals follow the page metric and loading state. */
 export interface UsageCostBreakdownCardProps {
@@ -25,17 +27,12 @@ export function UsageCostBreakdownCard({
   return (
     <section className={cn("grid gap-x-12 gap-y-8 lg:grid-cols-2", figureClass(loading))}>
       {metric === "tokens" ? (
-        <UsageShareBar
-          label={t.tools.usage.tokensByType}
-          segments={tokenTypeSegments(merged)}
-          format={formatTokens}
-        />
+        <UsageCostRing metric={metric} segments={ringSegments(tokenTypeSegments(merged))} />
       ) : (
         <>
-          <UsageShareBar
-            label={t.tools.usage.costByType}
-            segments={costTypeSegments(merged.categoryCost)}
-            format={formatUsd}
+          <UsageCostRing
+            metric={metric}
+            segments={ringSegments(costTypeSegments(merged.categoryCost))}
           />
           {merged.speedCost.fast + merged.speedCost.ultrafast > 0 ? (
             <UsageShareBar

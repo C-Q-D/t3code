@@ -610,6 +610,7 @@ export const tools = {
       `Failed to load desktop preview configuration for environment "${environmentId}".`,
   },
   usage: {
+    splitCategoryCount: (count: number) => `${count} types`,
     providerCount: (count: number) => `${count} providers`,
     connecting: "Connecting…",
     allProviders: "All usage sources",

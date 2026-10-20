@@ -73,3 +73,108 @@ html[data-theme-id="graphite"] .usage-chart-surface {
 .usage-model-table col:nth-child(2) {
   width: calc((100% - --spacing(17.5)) / 2.6);
 }
+
+/* L5 category ring and linked breakdown list. */
+.usage-cost-ring-layout {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-width: 0;
+}
+.usage-cost-ring {
+  position: relative;
+  width: 184px;
+  height: 184px;
+  flex: 0 0 184px;
+}
+.usage-cost-ring svg {
+  overflow: visible;
+}
+.usage-cost-ring-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  pointer-events: none;
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+.usage-cost-ring-value {
+  color: var(--foreground);
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.usage-cost-ring-caption {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+}
+.usage-cost-category-list {
+  display: grid;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+.usage-cost-category-row {
+  display: grid;
+  grid-template-columns: 7px minmax(60px, auto) minmax(20px, 1fr) auto 40px;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 4px;
+  border-radius: 6px;
+  text-align: left;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+.usage-cost-category-row[data-active="true"] {
+  background: color-mix(in srgb, var(--foreground) 5%, transparent);
+  color: var(--foreground);
+}
+.usage-cost-category-row:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.usage-cost-dot {
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--split-color);
+  box-shadow: 0 0 8px var(--split-color);
+}
+.usage-cost-category-bar {
+  height: 3px;
+  background: color-mix(in srgb, var(--foreground) 4%, transparent);
+}
+.usage-cost-category-bar i {
+  display: block;
+  height: 100%;
+  background: var(--split-color);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--split-color) 55%, transparent);
+}
+.usage-cost-category-row b {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--foreground);
+  white-space: nowrap;
+}
+.usage-cost-category-percent {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+@media (max-width: 560px) {
+  .usage-cost-ring-layout {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .usage-cost-ring {
+    align-self: center;
+  }
+}

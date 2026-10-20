@@ -586,6 +586,7 @@ export const tools: Messages["tools"] = {
     configLoadFailed: (environmentId) => `无法加载环境“${environmentId}”的桌面预览配置。`,
   },
   usage: {
+    splitCategoryCount: (count: number) => `${count} 类`,
     providerCount: (count: number) => `${count} 个用量来源`,
     connecting: "正在连接…",
     allProviders: "所有用量来源",
