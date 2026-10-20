@@ -193,7 +193,7 @@ export const ComposerTasksDrawer = memo(function ComposerTasksDrawer({
   readonly onCollapse: () => void;
 }) {
   return (
-    <ComposerBanner.Attachment>
+    <ComposerBanner.Attachment data-composer-attachment="tasks">
       <ComposerBanner.Root className="composer-tasks-tab">
         <ComposerTasksContent {...props} expanded onToggle={onCollapse} />
       </ComposerBanner.Root>

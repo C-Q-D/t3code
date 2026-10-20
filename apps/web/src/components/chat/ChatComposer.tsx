@@ -5147,6 +5147,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         id: "composer-activity",
         variant: "default",
         priority: "activity",
+        ...(shownSyncPhase ? {} : { kind: "tasks" as const }),
         content: activityStackContent,
       }
     : null;
@@ -6466,7 +6467,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
             />
           ) : null}
           {showTasksTab ? (
-            <ComposerBanner.Attachment>
+            <ComposerBanner.Attachment data-composer-attachment="tasks">
               <ComposerTasksBadge
                 expanded={false}
                 onToggle={toggleTasksDrawer}

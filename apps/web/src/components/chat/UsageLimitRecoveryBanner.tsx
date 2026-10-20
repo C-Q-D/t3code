@@ -35,10 +35,11 @@ export function usageLimitRecoveryBannerItem(props: RecoveryProps): ComposerBann
     id: `usage-limit-recovery:${runId}`,
     variant: "warning",
     priority: "urgent",
+    kind: "limit-recovery",
     content: (
       <section
         role="alert"
-        className="timeline-limit-recovery surface-glass flex min-w-0 flex-col gap-2.5 rounded-card-surface p-3.5 text-secondary-copy-large text-foreground shadow-timeline-request-card"
+        className="surface-glass flex min-w-0 flex-col gap-2.5 rounded-card-surface p-3.5 text-secondary-copy-large text-foreground shadow-timeline-request-card"
       >
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <GaugeIcon className="size-4 shrink-0" aria-hidden />

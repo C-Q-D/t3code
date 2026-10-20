@@ -472,12 +472,12 @@ html[data-theme-id="graphite"] .chat-message-canvas [data-changed-files-state="t
 }
 
 /* The content slot retains stacking/attachment behavior; its T4 card owns the visible shell. */
-[data-slot="composer-banner"]:has(> .timeline-limit-recovery) {
+[data-slot="composer-banner"][data-composer-notice-kind="limit-recovery"] {
   @apply p-0;
 }
 
 /* Hide only the decoration; ::after reserves the attached overlap space against Attachment's negative margin. */
-[data-slot="composer-banner"]:has(> .timeline-limit-recovery)::before {
+[data-slot="composer-banner"][data-composer-notice-kind="limit-recovery"]::before {
   display: none;
 }
 

@@ -130,7 +130,10 @@ html[data-theme-id="graphite"] [data-composer-banner-surface]::before {
   html[data-theme-id="graphite"] {
     /* U1 rows span the input width and sit above it, without the legacy attachment overlap. */
     [data-chat-composer-form]
-      > [data-slot="composer-banner-attachment"]:has(.composer-notice, .composer-tasks-badge) {
+      > [data-slot="composer-banner-attachment"]:is(
+        [data-composer-attachment="notice"],
+        [data-composer-attachment="tasks"]
+      ) {
       @apply mb-2 w-full;
     }
 
@@ -224,12 +227,12 @@ html[data-theme-id="graphite"] [data-composer-banner-surface]::before {
     }
 
     /* The stack can host the same task disclosure instead of a standard notice row. */
-    .composer-notice.surface-glass:has(> .composer-tasks) {
+    .composer-notice.surface-glass[data-composer-notice-kind="tasks"] {
       @apply p-0 shadow-none;
       --stone-surface-color: transparent;
     }
 
-    [data-slot="composer-banner-attachment"]:has(> .composer-tasks-tab) {
+    [data-slot="composer-banner-attachment"][data-composer-attachment="tasks"] {
       @apply mb-2 w-full;
     }
 

@@ -32,7 +32,11 @@ export interface ComposerBannerStackItem {
 export type ComposerBannerStackContent = Pick<
   ComposerBannerStackItem,
   "id" | "variant" | "priority"
-> & { readonly content: ReactNode };
+> & {
+  readonly content: ReactNode;
+  /** Identifies custom surfaces whose padding is owned by their content. */
+  readonly kind?: "tasks" | "limit-recovery";
+};
 
 type ComposerBannerStackEntry = ComposerBannerStackItem | ComposerBannerStackContent;
 
@@ -230,6 +234,7 @@ export function ComposerBannerStack({ className, items, attachedAbove }: Compose
       ) : null}
       {attachedAbove}
       <ComposerBanner.Attachment
+        data-composer-attachment="notice"
         className={cn("composer-notice-attachment", className)}
         data-composer-banner-drawer="true"
         data-chat-composer-collapsed-controls="true"
@@ -358,6 +363,7 @@ function ComposerBannerStackAlert({
         variant={item.variant}
         className="composer-notice surface-glass"
         data-composer-notice-id={item.id}
+        data-composer-notice-kind={item.kind}
       >
         {item.content}
       </ComposerBanner.Root>
