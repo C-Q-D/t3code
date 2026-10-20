@@ -7,6 +7,7 @@ import { beginComposerThrowDrag, ComposerThrowToken } from "./ComposerThrowToken
 import { activeJobs } from "../../lib/motion/loop";
 import { setPhysicsEnabled } from "../../lib/motion/preference";
 import { installTestRaf } from "../../lib/motion/testRaf";
+import { Spring } from "../../lib/motion/spring";
 
 let clock: ReturnType<typeof installTestRaf>;
 let root: Root;
@@ -95,6 +96,7 @@ afterEach(() => {
     setPhysicsEnabled(false);
   });
   document.body.replaceChildren();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -108,6 +110,38 @@ it("paints every pointermove synchronously without advancing a frame or replacin
   expect(pose(token)).toMatchObject({ x: 90, y: 100 });
   expect(document.querySelector("[data-composer-throw-token]")).toBe(token);
   expect(onLand).not.toHaveBeenCalled();
+});
+
+it("advances pose springs by actual 144Hz intervals between pointer moves and restarts after rest", () => {
+  // Observe the real integrator without replacing it: both pose springs must receive elapsed
+  // frame time even when a move changes their targets between consecutive browser frames.
+  const step = vi.spyOn(Spring.prototype, "step");
+  const { token } = pickup();
+  document.dispatchEvent(pointer("pointermove", 70, 40, 20));
+  act(() => clock.advance(0));
+  document.dispatchEvent(pointer("pointermove", 90, 40, 26.944));
+  act(() => clock.advance(6.944));
+  document.dispatchEvent(pointer("pointermove", 110, 40, 33.888));
+  act(() => clock.advance(13.888));
+  document.dispatchEvent(pointer("pointermove", 130, 40, 40.832));
+  act(() => clock.advance(20.832));
+  expect(step.mock.calls.map(([dt]) => dt)).toEqual([
+    expect.closeTo(1 / 60, 10),
+    expect.closeTo(1 / 60, 10),
+    expect.closeTo(0.006944, 10),
+    expect.closeTo(0.006944, 10),
+    expect.closeTo(0.006944, 10),
+    expect.closeTo(0.006944, 10),
+    expect.closeTo(0.006944, 10),
+    expect.closeTo(0.006944, 10),
+  ]);
+  time = 20.832;
+  settle();
+  expect(pose(token)).toMatchObject({ tilt: 7, scale: 1.05 });
+  document.dispatchEvent(pointer("pointermove", 0, 40, 1000));
+  document.dispatchEvent(pointer("pointermove", -40, 40, 1020));
+  settle();
+  expect(pose(token)).toMatchObject({ tilt: -7, scale: 1.05 });
 });
 
 it.each([

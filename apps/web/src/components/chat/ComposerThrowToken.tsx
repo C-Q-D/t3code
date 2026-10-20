@@ -232,14 +232,20 @@ function createComposerThrow(input: ThrowInput, initialPointer?: PointerEvent): 
       const tracker = new VelocityTracker();
       tracker.addPointerEvent(event);
       const grabOffset = { x: x.value - event.clientX, y: y.value - event.clientY };
+      let poseRunning = false;
+      const stepPose = (dt: number) => {
+        const scaling = scale.step(dt);
+        const tilting = tilt.step(dt);
+        paint();
+        poseRunning = scaling || tilting;
+        return poseRunning;
+      };
       const animatePose = () => {
-        stop();
-        stop = run((dt) => {
-          const scaling = scale.step(dt);
-          const tilting = tilt.step(dt);
-          paint();
-          return scaling || tilting;
-        });
+        // Cancelling the last loop job resets its clock. Keep this task alive between moves
+        // so high-refresh frames retain their real elapsed time; restart only after rest.
+        if (poseRunning) return;
+        poseRunning = true;
+        stop = run(stepPose);
       };
       if (initialPointer) {
         scale.target = 1.05;
