@@ -86,7 +86,9 @@ function Input({
         ) || undefined
       }
       data-disabled={disabled ? "true" : "false"}
-      data-invalid={props["aria-invalid"] && props["aria-invalid"] !== "false" ? "true" : "false"}
+      data-invalid={
+        props["aria-invalid"] === true || props["aria-invalid"] === "true" ? "true" : "false"
+      }
       data-size={size}
       data-slot="input-control"
     >
