@@ -12,6 +12,7 @@ import {
   type ProviderUpdateSidebarPillView,
 } from "../ProviderUpdateLaunchNotification.logic";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { sidebarNoticeRegistry } from "./SidebarChrome";
 
 /** Return the latest ISO check timestamp, or undefined when there are no providers. */
 function latestProviderCheckedAt(
@@ -105,6 +106,8 @@ export function SidebarProviderUpdatePill() {
     return () => window.clearTimeout(timeoutId);
   }, [dismissAfterVisibleMs, exitingKey, startExit, viewKey]);
 
+  const visible = displayedView !== null;
+  sidebarNoticeRegistry.useRegister("provider", visible);
   if (!displayedView) {
     return null;
   }

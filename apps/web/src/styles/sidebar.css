@@ -73,7 +73,7 @@
 }
 
 /* V1's tray owns only update notices; undo remains outside it. */
-.sidebar-update-stack:has(.sidebar-update-pill, .sidebar-provider-update) {
+.sidebar-update-stack[data-has-pill="true"] {
   @apply flex flex-col gap-2 rounded-slab bg-sidebar p-2.5 shadow-slab;
 }
 

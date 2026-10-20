@@ -1,3 +1,4 @@
+/** Shows the latest reversible thread action and registers its visible footer slot. */
 import { t } from "~/i18n";
 import { useAtomValue } from "@effect/atom-react";
 
@@ -6,10 +7,13 @@ import { shortcutLabelForCommand } from "../../keybindings";
 import { primaryServerKeybindingsAtom } from "../../state/server";
 import { Alert, AlertDescription } from "../ui/alert";
 import { InlineButton } from "../ui/button";
+import { sidebarNoticeRegistry } from "./SidebarChrome";
 
+/** Keeps the footer visible while an undo notice is available. */
 export function SidebarThreadUndoNotice() {
   const notice = useThreadUndoNotice((state) => state.notice);
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
+  sidebarNoticeRegistry.useRegister("undo", notice !== null);
 
   if (!notice) return null;
   const shortcut = shortcutLabelForCommand(keybindings, "thread.undo");

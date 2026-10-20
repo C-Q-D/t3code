@@ -49,6 +49,7 @@ import {
 } from "./updateEverything.logic";
 import { useUpdateEverythingRun } from "./updateEverythingRun";
 import { type ReportLocalUpdateError, useUpdateEverything } from "./useUpdateEverything";
+import { sidebarNoticeRegistry } from "./SidebarChrome";
 
 type SidebarUpdatePopoverChangeDetails = Parameters<
   NonNullable<ComponentProps<typeof Popover>["onOpenChange"]>
@@ -132,6 +133,7 @@ function SidebarUpdateArchitectureWarningContent() {
   const state = useDesktopUpdateState();
   const visible = shouldShowArm64IntelBuildWarning(state);
   const description = state && visible ? getArm64IntelBuildWarningDescription(state) : null;
+  sidebarNoticeRegistry.useRegister("warning", visible && !!description);
 
   if (!visible || !description) return null;
 
@@ -415,9 +417,11 @@ function SidebarUpdateControl() {
     }
   }, [action, everything]);
 
-  if (state?.status === "disabled") return null;
   // Web has no local app to check, so it only shows the button for remote work.
-  if (!isElectron && !runsEverything && !isRunningEverything) return null;
+  const visible =
+    state?.status !== "disabled" && (isElectron || runsEverything || isRunningEverything);
+  sidebarNoticeRegistry.useRegister("pill", visible);
+  if (!visible) return null;
 
   const updateButton = (
     <button
