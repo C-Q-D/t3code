@@ -647,3 +647,99 @@ html[data-theme-id="graphite"] .usage-chart-surface {
     color: CanvasText;
   }
 }
+
+/* L2 quota fader: metal cap and a recessed, demand-driven meter. */
+.usage-fader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  flex: 1;
+}
+.usage-fader-slot {
+  position: relative;
+  width: 46px;
+  height: clamp(200px, 24vh, 240px);
+  margin: 12px 0 8px;
+  --fader-used: 0%;
+}
+.usage-fader-rail {
+  position: absolute;
+  left: 19px;
+  inset-block: 0;
+  width: 8px;
+  border-radius: 4px;
+  background: var(--input);
+  box-shadow: var(--shadow-usage-well);
+}
+.usage-fader-fill {
+  position: absolute;
+  left: 21px;
+  bottom: 0;
+  width: 4px;
+  height: var(--fader-used);
+  border-radius: 2px;
+  background: var(--fader-color);
+  box-shadow: 0 0 7px color-mix(in srgb, var(--fader-color) 35%, transparent);
+}
+.usage-fader-tick {
+  position: absolute;
+  left: 4px;
+  width: 9px;
+  height: 1px;
+  background: color-mix(in srgb, var(--foreground) 16%, transparent);
+}
+.usage-fader-tick[data-major="true"] {
+  left: 0;
+  width: 13px;
+  background: color-mix(in srgb, var(--foreground) 30%, transparent);
+}
+.usage-fader-cap {
+  position: absolute;
+  left: 8px;
+  bottom: var(--fader-used);
+  width: 30px;
+  height: 18px;
+  margin-bottom: -9px;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #f3f3f5, #b9b9c0 45%, #8d8d95 55%, #d6d6dc);
+  box-shadow:
+    0 0 0 1px #0009,
+    0 4px 6px #0009,
+    inset 0 1px 0 #fff;
+}
+.usage-fader-cap::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  top: 8px;
+  height: 2px;
+  background: #1b1b1e;
+  border-radius: 1px;
+}
+.usage-fader-cap[data-draggable="true"] {
+  cursor: grab;
+  touch-action: none;
+}
+.usage-fader-cap[data-draggable="true"]::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+}
+.usage-fader-cap[data-draggable="true"]:active {
+  cursor: grabbing;
+}
+.usage-fader-remaining {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.usage-fader-reset {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
