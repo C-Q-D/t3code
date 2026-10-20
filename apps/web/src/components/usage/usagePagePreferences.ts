@@ -1,3 +1,4 @@
+/** Persists usage filters and migrates the removed limits metric at the read boundary. */
 import { UsageProviderKind } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
 
@@ -10,22 +11,27 @@ const UsagePagePreferencesSchema = Schema.Struct({
   /** Providers filtered out of the page. Stored as hidden so new providers show by default. */
   hiddenProviders: Schema.optional(Schema.Array(UsageProviderKind)),
 });
-export type UsagePagePreferences = typeof UsagePagePreferencesSchema.Type;
+/** Current writable preferences exclude the retired metric; stored filters remain compatible. */
+export type UsagePagePreferences = Omit<typeof UsagePagePreferencesSchema.Type, "metric"> & {
+  readonly metric: "cost" | "tokens";
+};
 
-// Limits is what most people open the page for (how much subscription quota is
-// left, and when it resets), so it is the first-visit default; the last picked
-// tab sticks after that.
-const DEFAULT_PREFERENCES: UsagePagePreferences = { metric: "limits", windowDays: 30 };
+const DEFAULT_PREFERENCES: UsagePagePreferences = { metric: "cost", windowDays: 30 };
 
+/** Reads saved filters, migrating limits to cost; unavailable or invalid storage uses defaults. */
 export function readUsagePagePreferences(): UsagePagePreferences {
   try {
-    return getLocalStorageItem(STORAGE_KEY, UsagePagePreferencesSchema) ?? DEFAULT_PREFERENCES;
+    const stored = getLocalStorageItem(STORAGE_KEY, UsagePagePreferencesSchema);
+    return stored
+      ? { ...stored, metric: stored.metric === "limits" ? "cost" : stored.metric }
+      : DEFAULT_PREFERENCES;
   } catch (error) {
     console.error("Could not read Usage page preferences.", error);
     return DEFAULT_PREFERENCES;
   }
 }
 
+/** Saves current filters; storage failures are reported without breaking page interaction. */
 export function saveUsagePagePreferences(preferences: UsagePagePreferences): void {
   try {
     setLocalStorageItem(STORAGE_KEY, preferences, UsagePagePreferencesSchema);

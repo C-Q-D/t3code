@@ -26,6 +26,7 @@ describe("KeybindingsSettings.logic", () => {
     try {
       expect(commandLabel("composer.sendBackground")).toBe("输入框：在后台启动");
       expect(commandLabel("commandPalette.toggle")).toBe("命令面板：切换");
+      expect(commandLabel("usage.limits")).toBe("用量：刷新限额");
       expect(commandLabel("usage.cost")).toBe("用量：费用");
       expect(commandLabel("usage.period.week")).toBe("用量：周期：7天");
       expect(commandLabel("script.setup-db.run")).toBe("运行脚本：Setup Db");
@@ -97,6 +98,7 @@ describe("KeybindingsSettings.logic", () => {
     );
   });
   it("orders Usage bindings and command choices like the page", () => {
+    expect(commandLabel("usage.limits")).toBe("Usage: Refresh limits");
     const expected = [
       "usage.open",
       "usage.cost",

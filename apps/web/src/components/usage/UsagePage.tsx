@@ -133,7 +133,6 @@ export function UsagePage() {
     ),
   }));
   const metric = preferences.metric;
-  const showingLimits = metric === "limits";
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [limitsNow, setLimitsNow] = useState(() => Date.now());
   const refreshingRef = useRef(false);
@@ -160,7 +159,7 @@ export function UsagePage() {
   const merged = shown?.merged ?? answeredUsage;
   const shownWindow = shown?.window ?? window;
   const shownHourly = shownWindow.resolution === "hour";
-  const refreshingUsage = isRefreshing && !showingLimits;
+  const refreshingUsage = isRefreshing;
   // Usage kept from another window is all old, so every figure stays muted.
   const showingKept = shown !== null && shown.window !== window;
   const loading = useMemo(() => {
@@ -207,8 +206,7 @@ export function UsagePage() {
     (environment) => environment.canReadDiagnostics,
   );
   // Cost and token views also show quota cards once usage has answered.
-  const limitsVisible =
-    selectedEnvironments.length > 0 && (showingLimits || (shown !== null && canReadDiagnostics));
+  const limitsVisible = selectedEnvironments.length > 0 && shown !== null && canReadDiagnostics;
 
   const days = useMemo(
     () => enumerateDays(shownWindow.sinceDay, shownWindow.untilDay),
@@ -283,7 +281,6 @@ export function UsagePage() {
     });
   };
   const selectMetric = (nextMetric: UsageMetric) => {
-    if (nextMetric === "limits") setLimitsNow(Date.now());
     updatePreferences({ metric: nextMetric });
   };
   const refreshLimits = async (automatic = false, afterPending = false) => {
@@ -318,12 +315,13 @@ export function UsagePage() {
     const command = resolveUsageShortcut(event, keybindings);
     const metricOption = METRIC_OPTIONS.find((option) => option.command === command);
     const periodOption = WINDOW_OPTIONS.find((option) => option.command === command);
-    if (!metricOption && !periodOption) return;
+    if (!metricOption && !periodOption && command !== "usage.limits") return;
 
     event.preventDefault();
     event.stopPropagation();
     if (metricOption) selectMetric(metricOption.value);
-    if (periodOption && !showingLimits) selectWindow(periodOption.days);
+    if (periodOption) selectWindow(periodOption.days);
+    if (command === "usage.limits") refreshLimitsManually();
   });
 
   useEffect(() => {
@@ -331,18 +329,18 @@ export function UsagePage() {
     return () => globalThis.window.removeEventListener("keydown", onUsageKeyDown, true);
   }, []);
 
+  // Both entry points share the same lock so repeated shortcuts cannot overlap a refresh.
+  const refreshLimitsManually = () => {
+    if (refreshingRef.current) return;
+    refreshingRef.current = true;
+    setIsRefreshing(true);
+    void refreshLimits().finally(() => {
+      refreshingRef.current = false;
+      setIsRefreshing(false);
+    });
+  };
   const refreshWindow = () => {
     if (refreshingRef.current) return;
-
-    if (showingLimits) {
-      refreshingRef.current = true;
-      setIsRefreshing(true);
-      void refreshLimits().finally(() => {
-        refreshingRef.current = false;
-        setIsRefreshing(false);
-      });
-      return;
-    }
     const nextWindow = makeWindow(windowDays, undefined, isPast24Hours ? "hour" : "day");
     if (
       nextWindow.sinceDay !== window.sinceDay ||
@@ -401,7 +399,6 @@ export function UsagePage() {
         aria-label={t.tools.usage.usagePeriod}
         variant="segmented"
         value={[String(windowDays)]}
-        disabled={showingLimits}
         onValueChange={(next) => {
           const value = next[0];
           if (value) selectWindow(Number(value));
@@ -438,7 +435,7 @@ export function UsagePage() {
           selectedEnvironments={selectedEnvironments}
           selectedEnvironmentIds={selectedEnvironmentIds}
           onSelectionChange={setSelectedEnvironmentIds}
-          showUsageStatus={!showingLimits}
+          showUsageStatus={true}
           refreshing={refreshingUsage}
           isPartial={isPartial}
           duplicateSources={merged.duplicateSources}
@@ -448,9 +445,9 @@ export function UsagePage() {
         <div className="hidden xl:flex">
           <Button
             onClick={refreshWindow}
-            aria-label={showingLimits ? t.tools.usage.refreshLimits : t.tools.usage.refreshUsage}
+            aria-label={t.tools.usage.refreshUsage}
             aria-busy={isRefreshing}
-            disabled={isRefreshing || (!showingLimits && !canReadDiagnostics)}
+            disabled={isRefreshing || !canReadDiagnostics}
             size="icon-sm"
             variant="ghost"
           >
@@ -460,9 +457,9 @@ export function UsagePage() {
         <div className="flex xl:hidden">
           <Button
             onClick={refreshWindow}
-            aria-label={showingLimits ? t.tools.usage.refreshLimits : t.tools.usage.refreshUsage}
+            aria-label={t.tools.usage.refreshUsage}
             aria-busy={isRefreshing}
-            disabled={isRefreshing || (!showingLimits && !canReadDiagnostics)}
+            disabled={isRefreshing || !canReadDiagnostics}
             size="icon-sm"
             variant="ghost"
           >
@@ -486,26 +483,9 @@ export function UsagePage() {
             {selectedEnvironments.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 {environments.length === 0
-                  ? t.tools.usage.connectToView(showingLimits)
-                  : t.tools.usage.selectToView(showingLimits)}
+                  ? t.tools.usage.connectToView(false)
+                  : t.tools.usage.selectToView(false)}
               </p>
-            ) : showingLimits ? (
-              <UsageLimitsSection
-                selectedEnvironmentIds={selectedEnvironmentIds}
-                hiddenProviders={hiddenProviders}
-                now={limitsNow}
-                cursorPrompt={
-                  cursorAccessEnvironments.length > 0 ? (
-                    <CursorEnableLimits
-                      environments={cursorAccessEnvironments}
-                      onEnabled={() => {
-                        void refresh();
-                        void refreshLimits(false, true);
-                      }}
-                    />
-                  ) : null
-                }
-              />
             ) : shown === null ? (
               <UsageSkeleton />
             ) : !canReadDiagnostics ? (
@@ -927,7 +907,7 @@ export function UsagePage() {
           </WorkspacePageContainer>
         </ScrollArea>
       </div>
-      {selectedModel !== undefined && !showingLimits ? (
+      {selectedModel !== undefined ? (
         <UsageModelDialog
           model={selectedModel}
           environments={selectedEnvironments}

@@ -22,7 +22,9 @@ import { METRIC_OPTIONS, WINDOW_OPTIONS } from "../usage/usageShortcuts";
 const usageCommandOrder = new Map<KeybindingCommand, number>(
   [
     "usage.open" as const,
-    ...[...METRIC_OPTIONS, ...WINDOW_OPTIONS].map((option) => option.command),
+    ...METRIC_OPTIONS.map((option) => option.command),
+    "usage.limits" as const,
+    ...WINDOW_OPTIONS.map((option) => option.command),
   ].map((command, index) => [command, index]),
 );
 
@@ -385,6 +387,8 @@ export function commandLabel(command: KeybindingCommand): string {
   if (command === "thread.editQueuedMessage")
     return t.settings.keybindings.commandLabels.editQueuedMessage;
   if (command === "thread.copyReference") return t.settings.keybindings.commandLabels.copyReference;
+  if (command === "usage.limits")
+    return t.settings.keybindings.usageCommand(t.tools.usage.refreshLimits);
   const usageMetric = METRIC_OPTIONS.find((option) => option.command === command);
   if (usageMetric) return t.settings.keybindings.usageCommand(t.tools.usage[usageMetric.value]);
   const usagePeriod = WINDOW_OPTIONS.find((option) => option.command === command);

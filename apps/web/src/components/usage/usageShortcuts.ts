@@ -4,11 +4,10 @@ import type { KeybindingCommand, ResolvedKeybindingsConfig } from "@t3tools/cont
 import type { UsageChartMetric } from "./UsageProviderChart";
 import { resolveShortcutCommand, type ShortcutEventLike } from "../../keybindings";
 
-export type UsageMetric = UsageChartMetric | "limits";
+export type UsageMetric = UsageChartMetric;
 export const METRIC_OPTIONS = [
   { value: "cost", label: t.tools.usage.cost, command: "usage.cost" },
   { value: "tokens", label: t.tools.usage.tokens, command: "usage.tokens" },
-  { value: "limits", label: t.tools.usage.limits, command: "usage.limits" },
 ] as const satisfies readonly { value: UsageMetric; label: string; command: KeybindingCommand }[];
 
 export const WINDOW_OPTIONS = [
