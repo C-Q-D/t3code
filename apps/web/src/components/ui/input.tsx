@@ -4,6 +4,8 @@
 import { Input as InputPrimitive } from "@base-ui/react/input";
 import type * as React from "react";
 
+import { useFieldRootContext } from "@base-ui/react/internals/field-root-context";
+
 import { cn } from "~/lib/utils";
 
 /** Preserves native sizing and the unstyled composition path used by InputGroup. */
@@ -24,6 +26,9 @@ function Input({
   nativeInput = false,
   ...props
 }: InputProps) {
+  const { disabled: fieldDisabled } = useFieldRootContext();
+  // Native compositions already receive resolved props from their owning Base UI control.
+  const disabled = props.disabled || (!nativeInput && fieldDisabled);
   const inputClassName = cn(
     "h-9.5 w-full min-w-0 rounded-[inherit] bg-transparent px-3.5 text-control outline-none caret-message-action placeholder:text-placeholder [transition:background-color_5000000s_ease-in-out_0s]",
     !unstyled &&
@@ -75,12 +80,12 @@ function Input({
       className={
         cn(
           !unstyled &&
-            "relative inline-flex w-full rounded-full border-0 bg-input text-foreground shadow-well-control transition-shadow data-[disabled=false]:not-focus-within:hover:bg-well-surface data-[disabled=false]:not-focus-within:hover:shadow-well-hover focus-within:bg-input focus-within:shadow-input-focus-depth focus-within:inset-shadow-focus active:bg-input active:shadow-well-editing data-[invalid=true]:shadow-outline-danger data-[disabled=true]:bg-input-disabled data-[disabled=true]:text-fg-icon-disabled data-[disabled=true]:shadow-input-disabled-edge",
+            "relative inline-flex w-full rounded-full border-0 bg-input text-foreground shadow-well-control transition-shadow data-[disabled=false]:not-in-[fieldset:disabled]:not-focus-within:hover:bg-well-surface data-[disabled=false]:not-in-[fieldset:disabled]:not-focus-within:hover:shadow-well-hover focus-within:bg-input focus-within:shadow-input-focus-depth focus-within:inset-shadow-focus active:bg-input active:shadow-well-editing data-[invalid=true]:shadow-outline-danger data-[disabled=true]:bg-input-disabled in-[fieldset:disabled]:bg-input-disabled data-[disabled=true]:text-fg-icon-disabled in-[fieldset:disabled]:text-fg-icon-disabled data-[disabled=true]:shadow-input-disabled-edge in-[fieldset:disabled]:shadow-input-disabled-edge",
           font === "mono" && "font-mono tabular-nums",
           className,
         ) || undefined
       }
-      data-disabled={props.disabled ? "true" : "false"}
+      data-disabled={disabled ? "true" : "false"}
       data-invalid={props["aria-invalid"] && props["aria-invalid"] !== "false" ? "true" : "false"}
       data-size={size}
       data-slot="input-control"
