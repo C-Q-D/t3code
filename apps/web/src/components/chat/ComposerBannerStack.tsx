@@ -40,12 +40,12 @@ export type ComposerBannerStackContent = Pick<
 
 type ComposerBannerStackEntry = ComposerBannerStackItem | ComposerBannerStackContent;
 
-/** Orders activity first, urgent notices next, then ordinary notices; ties retain input order. */
+/** Orders urgent/warning notices first, activity next, then ordinary notices; ties retain input order. */
 function bannerPriority(item: ComposerBannerStackEntry) {
-  if (item.priority === "activity") {
+  if (item.priority === "urgent" || item.variant === "error" || item.variant === "warning") {
     return 0;
   }
-  if (item.priority === "urgent" || item.variant === "error" || item.variant === "warning") {
+  if (item.priority === "activity") {
     return 1;
   }
   return 2;
@@ -54,8 +54,6 @@ function bannerPriority(item: ComposerBannerStackEntry) {
 interface ComposerBannerStackProps {
   readonly className?: string;
   readonly items: ReadonlyArray<ComposerBannerStackEntry>;
-  /** Attachments that sit between the stacked notices and the front item, such as the queue.
-      The stacked notices peek above the whole column, never from between two attachments. */
   readonly attachedAbove?: ReactNode;
 }
 
@@ -82,9 +80,10 @@ export function ComposerBannerStack({ className, items, attachedAbove }: Compose
     };
   }, []);
 
-  useEffect(() => {
-    if (items.length < 2) setStackExpanded(false);
-  }, [items.length]);
+  // A stack that shrinks to one banner collapses, so the next stack starts collapsed.
+  if (items.length < 2 && stackExpanded) {
+    setStackExpanded(false);
+  }
 
   useLayoutEffect(() => {
     if (stackExpanded && pendingFocusRef.current === "notice") {
@@ -99,7 +98,6 @@ export function ComposerBannerStack({ className, items, attachedAbove }: Compose
     }
   }, [stackExpanded]);
 
-  // Activity stays attached. Urgency and severity only order the notices behind it.
   const orderedItems = items.toSorted((a, b) => bannerPriority(a) - bannerPriority(b));
   const frontItem = orderedItems[0];
   if (!frontItem) {
@@ -135,6 +133,7 @@ export function ComposerBannerStack({ className, items, attachedAbove }: Compose
       {hasStack ? (
         <div
           ref={noticesRef}
+          data-composer-banner-stack="true"
           data-chat-composer-collapsed-controls="true"
           className={cn("composer-notices relative z-20", stackExpanded && "z-50")}
           onPointerEnter={(event) => {
@@ -200,7 +199,9 @@ export function ComposerBannerStack({ className, items, attachedAbove }: Compose
             data-composer-banner-stack-expanded-items="true"
             className={cn("focus-visible:inset-shadow-focus", !stackExpanded && "hidden")}
           >
-            <div className="min-h-0 overflow-hidden">
+            {/* Clip only the collapsing axis: at fractional widths a horizontal clip
+                shaves the notice's right border. */}
+            <div className="min-h-0 overflow-y-clip">
               <div
                 className={cn(
                   "space-y-2 pb-2 transition-opacity duration-150 ease-out",
@@ -270,32 +271,46 @@ export function ComposerBannerStack({ className, items, attachedAbove }: Compose
   );
 }
 
-/** Keep full descriptions reachable only when their inline copy is clipped. */
-function NoticeDescription({ children }: { children: ReactNode }) {
-  const descriptionRef = useRef<HTMLSpanElement>(null);
+/** Makes clipped notice text recoverable while keeping description-only CSS off titles.
+ * @param children Full title or description content retained in the details popover.
+ * @param className Layout and truncation rules for the inline text.
+ * @param detailsLabel Accessible label for the overflow action.
+ * @param description Marks description text only; false by default for titles.
+ * @returns Inline text and an overflow action when measurement detects hidden content. */
+function NoticeText({
+  children,
+  className,
+  detailsLabel,
+  description = false,
+}: {
+  readonly children: ReactNode;
+  readonly className: string;
+  readonly detailsLabel: string;
+  readonly description?: boolean;
+}) {
+  const textRef = useRef<HTMLSpanElement>(null);
   const detailsRef = useRef<HTMLButtonElement>(null);
   const [showDetails, setShowDetails] = useState(false);
 
   useLayoutEffect(() => {
-    const description = descriptionRef.current;
-    if (!description) return;
+    const text = textRef.current;
+    if (!text) return;
     const measure = () => {
       // Ignore the space taken by the details button itself so it cannot
-      // sustain its own overflow after the description would otherwise fit.
+      // sustain its own overflow after the text would otherwise fit.
       const recoveredWidth = detailsRef.current ? detailsRef.current.offsetWidth + 4 : 0;
-      const hidden = getComputedStyle(description).position === "absolute";
+      const hidden = getComputedStyle(text).position === "absolute";
       setShowDetails(
         hidden ||
-          [description, ...description.querySelectorAll("*")].some(
+          [text, ...text.querySelectorAll("*")].some(
             (element) => element.scrollWidth > element.clientWidth + recoveredWidth,
           ),
       );
     };
     measure();
-    const stopObserving = observeResize(description, measure);
-    // A child can reveal new text without resizing its clipped box.
+    const stopObserving = observeResize(text, measure);
     const mutations = new MutationObserver(measure);
-    mutations.observe(description, { childList: true, subtree: true, characterData: true });
+    mutations.observe(text, { childList: true, subtree: true, characterData: true });
     return () => {
       stopObserving();
       mutations.disconnect();
@@ -305,9 +320,9 @@ function NoticeDescription({ children }: { children: ReactNode }) {
   return (
     <span className="contents">
       <span
-        ref={descriptionRef}
-        data-composer-notice-description="true"
-        className="w-0 min-w-0 grow truncate text-muted-foreground @max-[400px]:sr-only"
+        ref={textRef}
+        data-composer-notice-description={description ? "true" : undefined}
+        className={className}
       >
         {children}
       </span>
@@ -320,7 +335,7 @@ function NoticeDescription({ children }: { children: ReactNode }) {
                 ref={detailsRef}
                 size="icon-xs"
                 variant="ghost-muted"
-                aria-label={t.composer.bannerStack.showDetails}
+                aria-label={detailsLabel}
                 className="flex-none"
               />
             }
@@ -379,13 +394,26 @@ function ComposerBannerStackAlert({
       className="composer-notice surface-glass"
       data-composer-notice-id={item.id}
     >
-      <ComposerBanner.Row layout="wrap-actions">
+      <ComposerBanner.Row layout={item.priority === "activity" ? "inline" : "wrap-actions"}>
         <ComposerBanner.Icon className="h-(--composer-banner-icon-column) self-start">
           {item.icon}
         </ComposerBanner.Icon>
         <ComposerBanner.Content className="whitespace-nowrap">
-          <span className="min-w-0 truncate font-medium leading-7 sm:leading-6">{item.title}</span>
-          {item.description ? <NoticeDescription>{item.description}</NoticeDescription> : null}
+          <NoticeText
+            detailsLabel={t.composer.bannerStack.showTitleDetails}
+            className="min-w-0 truncate font-medium leading-7 sm:leading-6"
+          >
+            {item.title}
+          </NoticeText>
+          {item.description ? (
+            <NoticeText
+              description
+              detailsLabel={t.composer.bannerStack.showDetails}
+              className="w-0 min-w-0 grow truncate text-muted-foreground @max-[400px]:sr-only"
+            >
+              {item.description}
+            </NoticeText>
+          ) : null}
         </ComposerBanner.Content>
         {item.progress && item.progress.totalSteps > 0 ? (
           <span className="composer-goal-progress">

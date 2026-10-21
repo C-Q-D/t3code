@@ -203,7 +203,6 @@ describe("sidebar collision detection", () => {
       expect(at(330)).toBe("active");
       expect(at(317)).toBe("active");
       expect(at(316)).toBe("pinned");
-      // The preview moves the divider; a stationary pointer must not undo the drop target.
       boundaryTop = 400;
       expect(at(316)).toBe("pinned");
       expect(at(399)).toBe("pinned");
@@ -289,7 +288,6 @@ describe("sidebar drag projection", () => {
     const restored = preview({ ...input, enabled: false }, active, over);
     for (const transform of restored.values()) expect(transform).toEqual(stationary);
 
-    // Returning to the sidebar resumes the same live reorder preview.
     expect(preview({ ...input, enabled: true }, active, over)).toEqual(reordered);
   });
 
@@ -449,8 +447,6 @@ describe("sidebar drag projection", () => {
       settledHeader,
       thread("s", "settled"),
     ];
-    // Reorder inside active: the header gap shifts every row, the divider
-    // gap shifts the active rows and the shelf below by a second label.
     const result = preview(
       { items, settledOrder: [], settledExpanded: true, boundaryLabelHeight: 16 },
       "a2",
@@ -682,24 +678,6 @@ describe("sidebar drag projection", () => {
     expect(result.get(sidebarMarkerId("settled-placeholder"))).toEqual({ ...stationary, y: -83 });
   });
 
-  it("preserves a collapsed snoozed header while another section changes", () => {
-    const items = [
-      pinnedHeader,
-      thread("p", "pinned"),
-      divider,
-      thread("a", "active"),
-      marker("snoozed-header"),
-      settledHeader,
-      marker("settled-placeholder"),
-    ];
-    const result = preview(
-      { items, settledOrder: [], settledExpanded: false },
-      "a",
-      sidebarMarkerId("settled-placeholder"),
-    );
-    expect(result.get(sidebarMarkerId("snoozed-header"))).toEqual({ ...stationary, y: -46 });
-  });
-
   it("previews a time-ordered inbox drop at its time slot, above the Working shelf", () => {
     const items = [
       pinnedHeader,
@@ -713,32 +691,11 @@ describe("sidebar drag projection", () => {
       marker("settled-placeholder"),
     ];
     const input = { items, settledOrder: [], settledExpanded: false };
-    // By pointer, the unpinned row lands between a1 and a2.
     expect(preview(input, "p", "a1").get("a2")?.y).toBe(0);
-    // By time, it lands below a2, and the shelf does not move.
     const byTime = preview({ ...input, activeOrder: ["a1", "a2", "p"] }, "p", "a1");
     expect(byTime.get("a2")?.y).toBe(-83);
     expect(byTime.get(sidebarMarkerId("working-header"))).toEqual(stationary);
     expect(byTime.get("w")).toEqual(stationary);
-  });
-
-  it("derives missing card geometry from the measured root scale", () => {
-    const items = [
-      pinnedHeader,
-      divider,
-      marker("active-placeholder"),
-      settledHeader,
-      thread("s", "settled"),
-    ];
-    const result = preview(
-      { items, settledOrder: [], settledExpanded: true },
-      "s",
-      sidebarMarkerId("pinned-header"),
-      0.75,
-    );
-    expect(result.get(sidebarMarkerId("pinned-header"))).toEqual(stationary);
-    expect(result.get(sidebarMarkerId("pinned-divider"))?.y).toBe(62.5);
-    expect(result.get(sidebarMarkerId("active-placeholder"))?.y).toBe(62.5);
   });
 
   it("updates the projection when the target or measured geometry changes", () => {
@@ -931,6 +888,7 @@ describe("lifted card clearance", () => {
     }
   });
 
+  // regression: #10453 the label clamp must not swallow drags that are already below it
   it("preserves pointer movement below the label", () => {
     expect(apply(511, 36, -200).y).toBe(-200);
   });

@@ -71,7 +71,7 @@ vi.mock("../hooks/useSettings", async (original) => ({
         () => settings,
       ),
     ),
-  useUpdateClientSettings: () => (patch: ClientSettingsPatch) => {
+  updateClientSettings: (patch: ClientSettingsPatch) => {
     writes.push(patch);
     settings = { ...settings, ...patch };
     subscribers.forEach((listener) => listener());

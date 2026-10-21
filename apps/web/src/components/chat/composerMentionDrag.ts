@@ -1,11 +1,20 @@
+import { PullRequestContextMetadata } from "@t3tools/contracts";
 import { serializeComposerFileLink } from "@t3tools/shared/composerTrigger";
+import { Option, Schema } from "effect";
+
+export const COMPOSER_MENTION_DRAG_TYPE = "application/x-t3code-composer-mention";
 
 /**
- * Drag payload type carrying a serialized composer mention. Set on drags that
- * start in the workspace file tree so the composer can tell them apart from
- * OS file drags and plain text selections.
+ * Drag payload type carrying a pull request, as JSON `PullRequestContextMetadata`. Set on drags
+ * that start on a pull request row; the composer drops it as the same chip the `#` picker adds.
  */
-export const COMPOSER_MENTION_DRAG_TYPE = "application/x-t3code-composer-mention";
+export const COMPOSER_PULL_REQUEST_DRAG_TYPE = "application/x-t3code-pull-request";
+
+const PullRequestDragPayload = Schema.fromJsonString(PullRequestContextMetadata);
+const decodePullRequestPayload = Schema.decodeUnknownOption(PullRequestDragPayload);
+
+/** The `COMPOSER_PULL_REQUEST_DRAG_TYPE` data for a pull request row's drag. */
+export const encodePullRequestDragPayload = Schema.encodeSync(PullRequestDragPayload);
 
 /** Build insertion text from a serialized mention, retaining the separator before subsequent typing. */
 export function composerMentionInsertionText(mention: string): string {
@@ -21,7 +30,9 @@ export function composerMentionFromTreePath(treePath: string): string | null {
 }
 
 export function dataTransferHasComposerMention(types: ReadonlyArray<string>): boolean {
-  return types.includes(COMPOSER_MENTION_DRAG_TYPE);
+  return (
+    types.includes(COMPOSER_MENTION_DRAG_TYPE) || types.includes(COMPOSER_PULL_REQUEST_DRAG_TYPE)
+  );
 }
 
 export interface ComposerMentionDragTransfer {
@@ -38,14 +49,14 @@ export interface ComposerMentionDragEvent {
 }
 
 /**
- * What a mention drop is allowed to do to the composer. Deliberately narrow:
- * there is no way to focus the editor from here. Focusing it synchronously
- * during the drop makes the not-yet-reconciled editor sync its stale empty
- * state back over the inserted mention; the insert path already focuses on
- * the next frame, after the editor has caught up.
+ * Deliberately narrow: there is no way to focus the editor from here. Focusing
+ * it synchronously during the drop makes the not-yet-reconciled editor sync its
+ * stale empty state back over the inserted mention; the insert path already
+ * focuses on the next frame, after the editor has caught up.
  */
 export interface ComposerMentionDropHost {
   insertMentionAtEnd(text: string): boolean;
+  insertPullRequestAtEnd(pullRequest: PullRequestContextMetadata): boolean;
   setDragActive(active: boolean): void;
   onInsertRejected(): void;
 }
@@ -86,8 +97,8 @@ export function makeComposerMentionDragHandlers(
       if (!claim(event)) {
         return;
       }
-      // The tree constrains its drags to effectAllowed "move"; naming any
-      // other effect makes the browser cancel the drop without firing it.
+      // The tree constrains its drags to effectAllowed "move" (pull request links allow
+      // anything); naming any other effect makes the browser cancel the drop without firing it.
       event.dataTransfer.dropEffect = "move";
       host.setDragActive(true);
     },
@@ -96,6 +107,15 @@ export function makeComposerMentionDragHandlers(
         return;
       }
       host.setDragActive(false);
+      if (event.dataTransfer.types.includes(COMPOSER_PULL_REQUEST_DRAG_TYPE)) {
+        const pullRequest = decodePullRequestPayload(
+          event.dataTransfer.getData(COMPOSER_PULL_REQUEST_DRAG_TYPE),
+        );
+        if (Option.isSome(pullRequest) && !host.insertPullRequestAtEnd(pullRequest.value)) {
+          host.onInsertRejected();
+        }
+        return;
+      }
       const mention = event.dataTransfer.getData(COMPOSER_MENTION_DRAG_TYPE);
       if (mention.length === 0) {
         return;

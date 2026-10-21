@@ -1,8 +1,9 @@
 /** SVG view of the pure bubble solver; frame coordinates never enter React state. */
-import { useId, useLayoutEffect, useMemo, useRef, useState, type PointerEvent } from "react";
+import { useId, useLayoutEffect, useRef, useState, type PointerEvent } from "react";
 import type { ModelTotals } from "@t3tools/shared/usageMerge";
 import { formatPercent } from "@t3tools/shared/usageFormat";
 import { t } from "~/i18n";
+import { useStableCallback } from "../../hooks/useStableCallback";
 import { usePhysicsMotion } from "../../hooks/usePhysicsMotion";
 import { useMotionJob } from "../../lib/motion/react";
 import { observeResize } from "../../lib/observeResize";
@@ -53,6 +54,24 @@ function paintBubbles(svg: SVGSVGElement | null, nodes: readonly UsageBubble[]) 
   }
 }
 
+/** Derive visible shares from model totals and the selected metric; omit unknown cost shares.
+ */
+function modelShares(models: readonly ModelTotals[], metric: "cost" | "tokens") {
+  return models.flatMap((model) => {
+    const share = modelShare(model, metric);
+    return share === null
+      ? []
+      : [
+          {
+            key: `${model.provider}:${model.model}`,
+            label: model.model,
+            provider: model.provider,
+            share,
+          },
+        ];
+  });
+}
+
 /** Show model spheres, persistent member hints, and click/keyboard selection with optional dragging. */
 export function UsageBubbles({ models, metric, onSelectModel }: UsageBubblesProps) {
   const host = useRef<HTMLDivElement>(null);
@@ -65,31 +84,13 @@ export function UsageBubbles({ models, metric, onSelectModel }: UsageBubblesProp
   const { enabled } = usePhysicsMotion();
   const { start, stop } = useMotionJob();
   const id = useId().replaceAll(":", "");
-  const shares = useMemo(
-    () =>
-      models.flatMap((model) => {
-        const share = modelShare(model, metric);
-        return share === null
-          ? []
-          : [
-              {
-                key: `${model.provider}:${model.model}`,
-                label: model.model,
-                provider: model.provider,
-                share,
-              },
-            ];
-      }),
-    [metric, models],
-  );
-  const nodes = useMemo(() => createUsageBubbles(shares, width, 300), [shares, width]);
-  useLayoutEffect(() => cancelHintClose, []);
 
   /** Cancel the pending exit when the pointer reaches either the sphere or its detached hint. */
-  function cancelHintClose() {
+  const cancelHintClose = useStableCallback(() => {
     if (hintCloseTimer.current !== null) clearTimeout(hintCloseTimer.current);
     hintCloseTimer.current = null;
-  }
+  });
+  useLayoutEffect(() => cancelHintClose, [cancelHintClose]);
 
   /** Allow time to cross the gap to the scrollable hint without leaving a permanent overlay. */
   function scheduleHintClose() {
@@ -117,7 +118,7 @@ export function UsageBubbles({ models, metric, onSelectModel }: UsageBubblesProp
     drag.current = null;
     if (width <= 0) return;
     const physics = new UsageBubblePhysics(
-      createUsageBubbles(shares, width, 300, simulation.current?.nodes),
+      createUsageBubbles(modelShares(models, metric), width, 300, simulation.current?.nodes),
       width,
       300,
     );
@@ -135,7 +136,11 @@ export function UsageBubbles({ models, metric, onSelectModel }: UsageBubblesProp
       return moving;
     });
     return stop;
-  }, [shares, width, enabled, start, stop]);
+  }, [models, metric, width, enabled, start, stop, simulation, svg]);
+
+  // Keep render-only derivations after Hooks so their cache scope is not split by an effect.
+  const shares = modelShares(models, metric);
+  const nodes = createUsageBubbles(shares, width, 300);
 
   /** Restart the single graph job after input without rebuilding its nodes. */
   function wake() {

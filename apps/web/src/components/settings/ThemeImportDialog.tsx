@@ -2,7 +2,7 @@
 import { t } from "~/i18n";
 import { DownloadIcon } from "lucide-react";
 import type { ChangeEvent, DragEvent } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "../../lib/utils";
 import {
   getCustomThemes,
@@ -105,21 +105,29 @@ export function ThemeImportDialog({
   const [conflicts, setConflicts] = useState<ReadonlyArray<ThemeDefinition> | null>(null);
   const importRequestRef = useRef(0);
 
-  useEffect(() => {
-    importRequestRef.current += 1;
-    // Reset on close too: a dialog dismissed mid-drag would otherwise reopen
-    // still wearing the drop highlight.
+  const [renderedOpen, setRenderedOpen] = useState(open);
+  if (renderedOpen !== open) {
+    setRenderedOpen(open);
     setIsDropTarget(false);
+    if (open) {
+      setJson("");
+      setImportMode("json");
+      setFileName(null);
+      setError(null);
+      setIsReading(false);
+      setConflicts(null);
+    }
+  }
+  // A visibility change invalidates reads still in flight, including unmounts.
+  useEffect(() => {
     if (!open) return;
-    setJson("");
-    setImportMode("json");
-    setFileName(null);
-    setError(null);
-    setIsReading(false);
-    setConflicts(null);
+    importRequestRef.current += 1;
+    return () => {
+      importRequestRef.current += 1;
+    };
   }, [open]);
 
-  const readThemeFile = useCallback(async (file: ImportableThemeFile) => {
+  const readThemeFile = async (file: ImportableThemeFile) => {
     // Check the size first: reading a large file is what locks the UI, so it
     // never gets read at all.
     const oversized = describeOversizedThemeFile(file.size);
@@ -130,100 +138,96 @@ export function ThemeImportDialog({
 
     const requestId = ++importRequestRef.current;
     setIsReading(true);
-    try {
-      const fileText = await file.text();
-      if (requestId !== importRequestRef.current) return;
-      setJson(fileText);
-      setFileName(file.name);
-      setError(null);
-    } catch {
-      if (requestId !== importRequestRef.current) return;
-      setError(t.settings.themeImport.readFilePasteJsonBelowError);
-    } finally {
+    return await (async () => {
+      try {
+        const fileText = await file.text();
+        if (requestId !== importRequestRef.current) return;
+        setJson(fileText);
+        setFileName(file.name);
+        setError(null);
+      } catch {
+        if (requestId !== importRequestRef.current) return;
+        setError(t.settings.themeImport.readFilePasteJsonBelowError);
+      }
+    })().finally(() => {
       if (requestId === importRequestRef.current) setIsReading(false);
-    }
-  }, []);
+    });
+  };
 
   // Several files at once import as a batch: VS Code families pair their
   // light and dark variants, everything installs without activating, and the
   // single-file flow keeps filling the editor for review.
-  const readThemeBatch = useCallback(
-    async (files: ReadonlyArray<ImportableThemeFile>) => {
-      const requestId = ++importRequestRef.current;
-      setIsReading(true);
-      const failures: string[] = [];
-      const parsed: Array<{ theme: ThemeDefinition; sourceName: string }> = [];
-      try {
-        for (const file of files) {
-          const oversized = describeOversizedThemeFile(file.size);
-          if (oversized) {
-            failures.push(t.settings.themeImport.tooLarge(file.name));
-            continue;
-          }
-          try {
-            const value: unknown = JSON.parse(await file.text());
-            parsed.push({
-              sourceName: file.name,
-              theme: isVsCodeThemeFile(value) ? parseVsCodeThemeFile(value) : parseThemeFile(value),
-            });
-          } catch (cause) {
-            failures.push(
-              t.settings.themeImport.fileReadError(
-                file.name,
-                Boolean(cause instanceof Error),
-                cause instanceof Error ? cause.message : undefined,
-              ),
-            );
-          }
+  const readThemeBatch = async (files: ReadonlyArray<ImportableThemeFile>) => {
+    const requestId = ++importRequestRef.current;
+    setIsReading(true);
+    const failures: string[] = [];
+    const parsed: Array<{ theme: ThemeDefinition; sourceName: string }> = [];
+    return await (async () => {
+      for (const file of files) {
+        const oversized = describeOversizedThemeFile(file.size);
+        if (oversized) {
+          failures.push(t.settings.themeImport.tooLarge(file.name));
+          continue;
         }
-        if (requestId !== importRequestRef.current) return;
-        const installed: ThemeDefinition[] = [];
-        const conflicting: ThemeDefinition[] = [];
-        for (const theme of pairVsCodeThemes(resolveThemeLabelCollisions(parsed))) {
-          if (getCustomThemes().some((existing) => existing.id === theme.id)) {
-            conflicting.push(theme);
-            continue;
-          }
-          try {
-            installed.push(installCustomTheme(theme));
-          } catch (cause) {
-            failures.push(
-              t.settings.themeImport.installError(
-                theme.label,
-                Boolean(cause instanceof Error),
-                cause instanceof Error ? cause.message : undefined,
-              ),
-            );
-          }
+        try {
+          const value: unknown = JSON.parse(await file.text());
+          parsed.push({
+            sourceName: file.name,
+            theme: isVsCodeThemeFile(value) ? parseVsCodeThemeFile(value) : parseThemeFile(value),
+          });
+        } catch (cause) {
+          failures.push(
+            t.settings.themeImport.fileReadError(
+              file.name,
+              Boolean(cause instanceof Error),
+              cause instanceof Error ? cause.message : undefined,
+            ),
+          );
         }
-        if (installed.length > 0) onImportedMany(installed, { updated: false });
-        if (failures.length > 0) {
-          setError(failures.join(" — "));
-        } else if (conflicting.length > 0) {
-          setConflicts(conflicting);
-        } else if (installed.length > 0) {
-          onOpenChange(false);
-        }
-      } finally {
-        if (requestId === importRequestRef.current) setIsReading(false);
       }
-    },
-    [onImportedMany, onOpenChange],
-  );
+      if (requestId !== importRequestRef.current) return;
+      const installed: ThemeDefinition[] = [];
+      const conflicting: ThemeDefinition[] = [];
+      for (const theme of pairVsCodeThemes(resolveThemeLabelCollisions(parsed))) {
+        if (getCustomThemes().some((existing) => existing.id === theme.id)) {
+          conflicting.push(theme);
+          continue;
+        }
+        try {
+          installed.push(installCustomTheme(theme));
+        } catch (cause) {
+          failures.push(
+            t.settings.themeImport.installError(
+              theme.label,
+              Boolean(cause instanceof Error),
+              cause instanceof Error ? cause.message : undefined,
+            ),
+          );
+        }
+      }
+      if (installed.length > 0) onImportedMany(installed, { updated: false });
+      if (failures.length > 0) {
+        setError(failures.join(" — "));
+      } else if (conflicting.length > 0) {
+        setConflicts(conflicting);
+      } else if (installed.length > 0) {
+        onOpenChange(false);
+      }
+    })().finally(() => {
+      if (requestId === importRequestRef.current) setIsReading(false);
+    });
+  };
 
-  const readThemeFiles = useCallback(
-    (files: ReadonlyArray<ImportableThemeFile>) => {
-      if (files.length === 0) return;
-      if (files.length === 1) void readThemeFile(files[0]!);
-      else void readThemeBatch(files);
-    },
-    [readThemeBatch, readThemeFile],
-  );
+  const readThemeFiles = (files: ReadonlyArray<ImportableThemeFile>) => {
+    if (files.length === 0) return;
+    if (files.length === 1) void readThemeFile(files[0]!);
+    else void readThemeBatch(files);
+  };
 
   // On desktop the native picker opens in ~/.vscode/extensions (when it
   // exists) and reads the files in the main process; the browser input is
   // the fallback everywhere else.
-  const openFilePicker = useCallback(() => {
+  const openFilePicker = () => {
     const bridge = window.desktopBridge;
     if (bridge?.pickThemeFiles) {
       void bridge.pickThemeFiles().then((picked) => {
@@ -239,25 +243,19 @@ export function ThemeImportDialog({
       return;
     }
     fileInputRef.current?.click();
-  }, [readThemeFiles]);
+  };
 
-  const handleFileChange = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => {
-      const files = [...(event.currentTarget.files ?? [])];
-      event.currentTarget.value = "";
-      readThemeFiles(files);
-    },
-    [readThemeFiles],
-  );
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = [...(event.currentTarget.files ?? [])];
+    event.currentTarget.value = "";
+    readThemeFiles(files);
+  };
 
-  const handleDrop = useCallback(
-    (event: DragEvent<HTMLDivElement>) => {
-      event.preventDefault();
-      setIsDropTarget(false);
-      readThemeFiles([...event.dataTransfer.files]);
-    },
-    [readThemeFiles],
-  );
+  const handleDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsDropTarget(false);
+    readThemeFiles([...event.dataTransfer.files]);
+  };
 
   /** Copy of an already-installed theme under the source file's name when
    *  that differs (Dracula Soft), else the next free "Name (1)". */
@@ -291,48 +289,45 @@ export function ThemeImportDialog({
     throw new Error(t.settings.themeImport.tooManyCopiesOf(theme.label));
   };
 
-  const resolveConflicts = useCallback(
-    (mode: "update" | "copy") => {
-      if (!conflicts) return;
-      const resolved: ThemeDefinition[] = [];
-      const failures: string[] = [];
-      const preferredName =
-        conflicts.length === 1 && fileName
-          ? humanizeThemeName(fileName.replace(/\.[^.]+$/, ""))
-          : null;
-      for (const theme of conflicts) {
-        try {
-          const existingTheme =
-            mode === "update"
-              ? getCustomThemes().find((candidate) => candidate.id === theme.id)
-              : undefined;
-          const themeToUpdate = existingTheme?.collection
-            ? { ...theme, collection: existingTheme.collection }
-            : theme;
-          resolved.push(
-            mode === "update"
-              ? updateCustomTheme(themeToUpdate)
-              : installCustomTheme(versionedCopy(theme, preferredName)),
-          );
-        } catch (cause) {
-          failures.push(
-            t.settings.themeImport.conflictError(
-              theme.label,
-              Boolean(cause instanceof Error),
-              cause instanceof Error ? cause.message : undefined,
-            ),
-          );
-        }
+  const resolveConflicts = (mode: "update" | "copy") => {
+    if (!conflicts) return;
+    const resolved: ThemeDefinition[] = [];
+    const failures: string[] = [];
+    const preferredName =
+      conflicts.length === 1 && fileName
+        ? humanizeThemeName(fileName.replace(/\.[^.]+$/, ""))
+        : null;
+    for (const theme of conflicts) {
+      try {
+        const existingTheme =
+          mode === "update"
+            ? getCustomThemes().find((candidate) => candidate.id === theme.id)
+            : undefined;
+        const themeToUpdate = existingTheme?.collection
+          ? { ...theme, collection: existingTheme.collection }
+          : theme;
+        resolved.push(
+          mode === "update"
+            ? updateCustomTheme(themeToUpdate)
+            : installCustomTheme(versionedCopy(theme, preferredName)),
+        );
+      } catch (cause) {
+        failures.push(
+          t.settings.themeImport.conflictError(
+            theme.label,
+            Boolean(cause instanceof Error),
+            cause instanceof Error ? cause.message : undefined,
+          ),
+        );
       }
-      if (resolved.length > 0) onImportedMany(resolved, { updated: mode === "update" });
-      setConflicts(null);
-      if (failures.length > 0) setError(failures.join(" — "));
-      else onOpenChange(false);
-    },
-    [conflicts, fileName, onImportedMany, onOpenChange],
-  );
+    }
+    if (resolved.length > 0) onImportedMany(resolved, { updated: mode === "update" });
+    setConflicts(null);
+    if (failures.length > 0) setError(failures.join(" — "));
+    else onOpenChange(false);
+  };
 
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = () => {
     // Pasted text bypasses the file guard, so the same limit applies here.
     const oversized = describeOversizedThemeFile(json.length);
     if (oversized) {
@@ -369,7 +364,7 @@ export function ThemeImportDialog({
         cause instanceof Error ? cause.message : t.settings.themeImport.thatThemeFileIsInvalid,
       );
     }
-  }, [json, onImported, onOpenChange]);
+  };
 
   return (
     <Dialog

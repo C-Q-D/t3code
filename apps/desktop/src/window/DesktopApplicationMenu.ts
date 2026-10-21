@@ -112,8 +112,10 @@ const handleCheckForUpdatesMenuClick = Effect.gen(function* () {
     return;
   }
 
+  // The result dialogs need no main window. Opening one before the backend
+  // answers strands the renderer on a failed auth bootstrap.
   const desktopWindow = yield* DesktopWindow.DesktopWindow;
-  yield* desktopWindow.ensureMain;
+  yield* desktopWindow.activate;
   yield* checkForUpdatesFromMenu;
 }).pipe(Effect.withSpan("desktop.menu.handleCheckForUpdatesClick"));
 
@@ -156,8 +158,7 @@ export const make = Effect.gen(function* () {
     // Chromium already pastes as plain text for this chord, so the accelerator
     // needs nothing from the menu: the composer and the terminal each arm
     // themselves from the same keydown. Routing it through the renderer anyway
-    // lands a second, injected paste and doubles the text. Only a menu click,
-    // which produces no keystroke for them to see, needs that round trip.
+    // lands a second, injected paste and doubles the text.
     const pasteAsTextClick = (
       _item: Electron.MenuItem,
       _window: Electron.BaseWindow | undefined,
@@ -252,8 +253,7 @@ export const make = Effect.gen(function* () {
           /*
             Not the reload, DevTools or zoom roles: those act on the focused
             webContents, so with a browser page focused they reload or zoom
-            the guest page and the app UI appears stuck. These always target
-            the main window (see DesktopWindow.zoomMain).
+            the guest page and the app UI appears stuck.
           */
           { label: m.menu.reload, accelerator: "CmdOrCtrl+R", click: mainContentsClick("reload") },
           {
@@ -275,7 +275,37 @@ export const make = Effect.gen(function* () {
             visible: false,
             click: zoomClick("in"),
           },
+          ...(environment.platform === "darwin"
+            ? [
+                {
+                  label: m.menu.zoomIn,
+                  accelerator: "CmdOrCtrl+Shift+=",
+                  visible: false,
+                  click: zoomClick("in"),
+                },
+              ]
+            : []),
           { label: m.menu.zoomOut, accelerator: "CmdOrCtrl+-", click: zoomClick("out") },
+          // The numeric keypad sends its own key codes, so the number-row
+          // accelerators above never match it.
+          {
+            label: m.menu.actualSize,
+            accelerator: "CmdOrCtrl+num0",
+            visible: false,
+            click: zoomClick("reset"),
+          },
+          {
+            label: m.menu.zoomIn,
+            accelerator: "CmdOrCtrl+numadd",
+            visible: false,
+            click: zoomClick("in"),
+          },
+          {
+            label: m.menu.zoomOut,
+            accelerator: "CmdOrCtrl+numsub",
+            visible: false,
+            click: zoomClick("out"),
+          },
           { type: "separator" },
           roleItem("togglefullscreen"),
         ],

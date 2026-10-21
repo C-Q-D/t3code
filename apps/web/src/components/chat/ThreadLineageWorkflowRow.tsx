@@ -42,13 +42,11 @@ function phaseElapsed(phase: SubagentWorkflowGroup["phases"][number]) {
   const completedAt = running ? null : (instants("completedAt").at(-1) ?? null);
   return {
     status: running ? ("running" as const) : ("completed" as const),
-    // A settled phase whose members never reported an end has no span to show.
     startedAt: running || completedAt !== null ? startedAt : null,
     completedAt,
   };
 }
 
-/** Phase state for the header's label; the tone and member badges show it visually. */
 function phaseStatusLabel(phase: SubagentWorkflowGroup["phases"][number]) {
   if (phase.state === "running") return "running";
   if (phase.members.some((member) => member.status === "failed")) return "failed";
@@ -168,7 +166,7 @@ export function ThreadLineageWorkflowRow({
   const label = group.workflow.workflowName ?? group.workflow.title;
   const phases = group.phases.filter((phase) => phase.members.length > 0);
   return (
-    <li className="group">
+    <li className="group" data-workflow-expanded={expanded ? "" : undefined}>
       <div className={cn("relative", THREAD_DETAILS_PANEL_SPLIT_GROUP_CLASS)}>
         {header}
         {onStop ? (

@@ -1,5 +1,6 @@
 /** Edits notification mode; permission prompts and audio unlock remain prerequisites for saving. */
 import { t } from "~/i18n";
+import { settlePromise } from "@t3tools/client-runtime/state/runtime";
 import { useState } from "react";
 
 import {
@@ -44,17 +45,15 @@ export function NotificationSettings() {
                 return;
               }
               setRequesting(true);
-              try {
-                const permission = await Notification.requestPermission();
-                if (permission !== "granted") {
-                  setPermissionMessage(t.settings.notification.permissionHint);
-                  return;
-                }
-              } catch {
+              const permission = await settlePromise(() => Notification.requestPermission());
+              setRequesting(false);
+              if (permission._tag === "Failure") {
                 setPermissionMessage(t.settings.notification.unavailableHint);
                 return;
-              } finally {
-                setRequesting(false);
+              }
+              if (permission.value !== "granted") {
+                setPermissionMessage(t.settings.notification.permissionHint);
+                return;
               }
             }
             updateSettings({ notificationMode: value });

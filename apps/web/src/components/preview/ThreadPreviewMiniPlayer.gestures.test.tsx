@@ -1,5 +1,5 @@
+/** @vitest-environment jsdom */
 /** Exercises real preview persistence and canvas constraints across local gestures and remounts. */
-import { useMemo } from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { beforeEach, afterEach, expect, it, vi } from "vite-plus/test";
 import { EnvironmentId, ThreadId } from "@t3tools/contracts";
@@ -77,12 +77,9 @@ function Harness({
 }) {
   parentRenders++;
   const miniPlayer = usePreviewMiniPlayerStore((store) => store.byThreadKey[threadKey])!;
-  const resolvePreviewFrame = useMemo(
-    () => (preview: ChatCanvasPreview) =>
-      resolveChatCanvasLayout({ container: bounds, composerHeight, detailsCard, findBar, preview })
-        .frame,
-    [bounds, composerHeight, detailsCard, findBar],
-  );
+  const resolvePreviewFrame = (preview: ChatCanvasPreview) =>
+    resolveChatCanvasLayout({ container: bounds, composerHeight, detailsCard, findBar, preview })
+      .frame;
   const preview = { ...miniPlayer, key: "browser:tab", source, width: miniPlayer.width };
   return (
     <ChatCanvasContext
@@ -124,7 +121,13 @@ function displayedFrame() {
   };
 }
 /** Finds a real drag or resize handler and drives a captured pointer without a browser. */
-async function movePointer(direction: string | null, dx: number, dy: number, advance = () => {}) {
+async function movePointer(
+  direction: string | null,
+  dx: number,
+  dy: number,
+  advance = () => {},
+  readTime = () => 0,
+) {
   const handle = renderer!.root.findAll(
     (node) =>
       typeof node.type === "string" &&
@@ -136,7 +139,7 @@ async function movePointer(direction: string | null, dx: number, dy: number, adv
   const event = {
     type: "pointerup",
     get timeStamp() {
-      return performance.now();
+      return readTime();
     },
     button: 0,
     pointerId: 7,
@@ -183,9 +186,15 @@ it.each([true, false])("physics %s delays a fast release only while enabled", as
   await act(async () => {
     renderer = create(<Harness />);
   });
-  const { handle, event } = await movePointer(null, 400, 0, () => {
-    now = 40;
-  });
+  const { handle, event } = await movePointer(
+    null,
+    400,
+    0,
+    () => {
+      now = 40;
+    },
+    () => now,
+  );
   await act(async () => handle.props.onPointerUp(event));
   expect(usePreviewMiniPlayerStore.getState().byThreadKey[threadKey]!.position).toEqual(
     enabled ? { x: 100, y: 80 } : { x: 500, y: 80 },
@@ -209,9 +218,15 @@ it("takes over a gliding preview from its current position", async () => {
   await act(async () => {
     renderer = create(<Harness />);
   });
-  const { handle, event } = await movePointer(null, 50, 0, () => {
-    now = 40;
-  });
+  const { handle, event } = await movePointer(
+    null,
+    50,
+    0,
+    () => {
+      now = 40;
+    },
+    () => now,
+  );
   await act(async () => handle.props.onPointerUp(event));
   await act(async () => clock.advance(56));
   const flying = displayedFrame();
@@ -248,9 +263,15 @@ it("keeps native surface bounds aligned while the shell rebounds at the wall", a
           : null,
     });
   });
-  const { handle, event } = await movePointer(null, 400, 0, () => {
-    now = 40;
-  });
+  const { handle, event } = await movePointer(
+    null,
+    400,
+    0,
+    () => {
+      now = 40;
+    },
+    () => now,
+  );
   await act(async () => handle.props.onPointerUp(event));
   await act(async () => clock.advance(56));
   await act(async () => clock.advance(106));
@@ -271,9 +292,15 @@ it.each([5, 25])(
     await act(async () => {
       renderer = create(<Harness />);
     });
-    const { handle, event } = await movePointer(null, 400, 0, () => {
-      now = 40;
-    });
+    const { handle, event } = await movePointer(
+      null,
+      400,
+      0,
+      () => {
+        now = 40;
+      },
+      () => now,
+    );
     await act(async () => handle.props.onPointerUp(event));
     await act(async () => {
       for (let i = 0; i < frames; i++) clock.advance((now += 16));

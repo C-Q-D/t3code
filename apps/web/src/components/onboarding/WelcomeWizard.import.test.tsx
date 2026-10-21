@@ -56,8 +56,13 @@ vi.mock("../../hooks/useCopyToClipboard", () => ({
 }));
 vi.mock("../../cloud/publicConfig", () => ({ hasCloudPublicConfig: () => false }));
 vi.mock("../clerk/useT3ConnectAuthPrompt", () => ({ useT3ConnectAuthPrompt: vi.fn() }));
-vi.mock("../../onboarding/firstRun", () => ({
-  useCompleteOnboarding: () => state.completeOnboarding,
+vi.mock("../../hooks/useSettings", () => ({
+  ensureClientSettingsHydrated: vi.fn(),
+  persistClientSettingsUpdate: vi.fn(),
+}));
+vi.mock(import("../../onboarding/firstRun"), async (importOriginal) => ({
+  ...(await importOriginal()),
+  completeOnboarding: state.completeOnboarding,
 }));
 vi.mock("../../env", () => ({ isElectron: false }));
 vi.mock("../../state/environments", () => {
@@ -176,13 +181,14 @@ function setGrant(environmentId: EnvironmentId, allowed: boolean) {
   );
 }
 
+/** Build a project candidate for the supplied path; its fixed recent activity matches the test clock. */
 function candidate(path: string): AgentSessionProjectCandidate {
   return {
     path,
     title: path.split("/").at(-1)!,
     sources: ["codex"],
     threadCount: 10,
-    lastActiveAt: new Date(Date.now() - 60_000).toISOString(),
+    lastActiveAt: "2026-09-13T09:00:00.000Z",
     alreadyImported: false,
   };
 }
@@ -235,6 +241,7 @@ async function mountImport(remote = false) {
 }
 
 beforeEach(() => {
+  vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-09-13T09:01:00.000Z"));
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.stubGlobal("document", { activeElement: null, body: {}, getElementById: () => null });
   state.registry = AtomRegistry.make();
@@ -269,6 +276,7 @@ afterEach(async () => {
   renderer = undefined;
   state.registry?.dispose();
   state.sessions.clear();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 

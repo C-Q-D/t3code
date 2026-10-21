@@ -1,13 +1,24 @@
 /** Reveals thread search matches while preserving virtual-history positioning and overlay clearance. */
 import type { LegendListRef } from "@legendapp/list/react";
-import { useCallback, useEffect, useLayoutEffect, useRef, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, type RefObject } from "react";
 import type { ThreadFindMatch } from "./threadFind";
 import { useThreadFindHighlights } from "./threadFindHighlights";
 import { resolveThreadFindRevealBounds } from "./useThreadFindNavigation.logic";
 
 const FIND_MATCH_VIEW_MARGIN = 96;
 
-/** Materializes missing results and otherwise scrolls only enough to reveal the active text. */
+/** Reveals matches without losing the user's position when virtualized history materializes.
+ * @param container Timeline scroll viewport, or null before mount.
+ * @param query Current search text.
+ * @param match Selected occurrence, or null to clear positioning.
+ * @param navigationId Distinguishes repeated navigation to the same occurrence.
+ * @param rowIndex Target virtual row index.
+ * @param entries Ordered row identities used to detect history changes.
+ * @param listRef Virtualizer receiving scroll requests; may be unmounted.
+ * @param contentInsetEndAdjustment Bottom overlay clearance in CSS pixels.
+ * @param listReady Defers row positioning until virtual layout is usable.
+ * @param historyControls Optional paging state and load callback for older matches.
+ * @returns Nothing; synchronizes highlights and scroll position, and releases DOM listeners on cleanup. */
 export function useThreadFindNavigation({
   container,
   query,
@@ -105,8 +116,7 @@ export function useThreadFindNavigation({
 
     historyControls.onLoadEarlier(match.entryId);
   }, [entries, historyControls, listReady, match, matchKey, rowIndex]);
-  const reveal = useCallback(
-    (range: Range | null) => {
+  const reveal = ((range: Range | null) => {
       activeRangeRef.current = range;
       if (!matchKey) {
         positioningRef.current = null;
@@ -257,19 +267,7 @@ export function useThreadFindNavigation({
           revealRef.current(activeRangeRef.current);
         });
       }
-    },
-    [
-      container,
-      contentInsetEndAdjustment,
-      entries,
-      historyControls?.loading,
-      historyControls?.error,
-      listRef,
-      listReady,
-      matchKey,
-      rowIndex,
-    ],
-  );
+    });
 
   useLayoutEffect(() => {
     revealRef.current = reveal;

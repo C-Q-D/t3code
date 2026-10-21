@@ -117,6 +117,7 @@ export const PanelLayoutControls = memo(function PanelLayoutControls({
               pressed={rightPanelOpen}
               onPressedChange={onToggleRightPanel}
               aria-label={t.chat.panelLayout.toggleRightPanel}
+              data-right-panel-toggle
               disabled={!rightPanelAvailable}
             >
               <Columns3Icon className="size-4" strokeWidth={1.75} />

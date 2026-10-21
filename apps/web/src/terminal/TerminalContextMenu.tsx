@@ -1,7 +1,8 @@
 /** Pointer-positioned terminal menus; React owns dismissal and settles superseded selection requests. */
+import { useStableCallback } from "~/hooks/useStableCallback";
 import type { ContextMenuItem } from "@t3tools/contracts";
 import { ArrowDown, ClipboardPaste, Copy, MessageSquarePlus, ScanText } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Menu, MenuItem, MenuItemLabel, MenuPopup } from "~/components/ui/menu";
 import type { SelectionActionPoint } from "~/lib/selectionActions";
 
@@ -36,13 +37,13 @@ export function useTerminalContextMenu(getFocusTarget: () => HTMLElement | null)
   const [request, setRequest] = useState<TerminalMenuRequest | null>(null);
   const resolveRef = useRef<((action: TerminalContextMenuAction | null) => void) | null>(null);
   const actionElementRef = useRef<HTMLDivElement>(null);
-  const finish = useCallback((action: TerminalContextMenuAction | null = null) => {
+  const finish = useStableCallback((action: TerminalContextMenuAction | null = null) => {
     const resolve = resolveRef.current;
     resolveRef.current = null;
     setRequest(null);
     resolve?.(action);
-  }, []);
-  const present = useCallback(
+  });
+  const present = useStableCallback(
     (items: TerminalMenuRequest["items"], position: SelectionActionPoint) => {
       resolveRef.current?.(null);
       return new Promise<TerminalContextMenuAction | null>((resolve) => {
@@ -50,7 +51,6 @@ export function useTerminalContextMenu(getFocusTarget: () => HTMLElement | null)
         setRequest({ items, position });
       });
     },
-    [],
   );
   useEffect(
     () => () => {
@@ -60,16 +60,13 @@ export function useTerminalContextMenu(getFocusTarget: () => HTMLElement | null)
     },
     [],
   );
-  const anchor = useMemo(
-    () => ({
-      getBoundingClientRect: () =>
-        DOMRect.fromRect({
-          x: request?.position.x ?? 0,
-          y: request?.position.y ?? 0,
-        }),
-    }),
-    [request?.position],
-  );
+  const anchor = {
+    getBoundingClientRect: () =>
+      DOMRect.fromRect({
+        x: request?.position.x ?? 0,
+        y: request?.position.y ?? 0,
+      }),
+  };
 
   const menu = (
     <Menu

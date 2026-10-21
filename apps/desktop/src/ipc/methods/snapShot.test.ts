@@ -1,23 +1,22 @@
+import * as Cause from "effect/Cause";
+import * as Option from "effect/Option";
 import * as DesktopUiLocale from "../../i18n/DesktopUiLocale.ts";
 import { assert, describe, it } from "@effect/vitest";
-import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
 
 import * as ElectronWindow from "../../electron/ElectronWindow.ts";
 import * as ElectronDialog from "../../electron/ElectronDialog.ts";
 import * as DesktopSnapShot from "../../snapShot/DesktopSnapShot.ts";
 import {
-  checkSnapShotShortcut,
-  requestSnapShotPermissions,
   setupSnapShot,
+  checkSnapShotShortcut,
+  setSnapShotShortcutSuppressed,
+  setSnapShotAnimationDestination,
+  requestSnapShotPermissions,
   previewSnapShotConfig,
   applySnapShotConfig,
-  setSnapShotAnimationDestination,
-  setSnapShotShortcutSuppressed,
-  snapShotScreenFrame,
   snapShotRelativeFrame,
 } from "./snapShot.ts";
 
@@ -139,17 +138,6 @@ describe("window capture IPC", () => {
           } as unknown as ElectronDialog.ElectronDialog["Service"]),
         ),
       ),
-    );
-  });
-
-  it("converts renderer viewport coordinates from the content origin using the window zoom", () => {
-    assert.deepEqual(
-      snapShotScreenFrame(
-        { x: 12, y: 20, width: 208, height: 112 },
-        { x: 100, y: 80, width: 1_000, height: 700 },
-        1.25,
-      ),
-      { x: 115, y: 105, width: 260, height: 140 },
     );
   });
 

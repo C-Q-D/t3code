@@ -1,8 +1,8 @@
 /** Transfers sortable transforms from dnd-kit to release springs, then back on the next drag. */
+import { useStableCallback } from "~/hooks/useStableCallback";
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import {
   createContext,
-  useCallback,
   useLayoutEffect,
   useReducer,
   useRef,
@@ -44,78 +44,72 @@ export function useSortableFling({
     rects: Map<string, DOMRect>;
   } | null>(null);
 
-  const stopListening = useCallback(() => {
+  const stopListening = useStableCallback(() => {
     listening.current?.();
     listening.current = null;
-  }, []);
-  const clearMotion = useCallback(() => {
+  });
+  const clearMotion = useStableCallback(() => {
     for (const element of owned.current) clearOffset(element);
     owned.current.clear();
     pending.current = null;
-  }, []);
-  const onDragCancel = useCallback(() => {
+  });
+  const onDragCancel = useStableCallback(() => {
     stopListening();
     clearMotion();
-  }, [clearMotion, stopListening]);
+  });
 
-  const onDragStart = useCallback(
-    (event: DragStartEvent) => {
-      onDragCancel();
-      // A new sensor starts from clean layout coordinates, not the previous spring offset.
-      const pointer = event.activatorEvent.type === "pointerdown";
-      const enabled = pointer && isPhysicsEnabled();
-      setPhysicsSorting(enabled);
-      if (!enabled || !containerRef.current) return;
-      const document = containerRef.current.ownerDocument;
-      // Only the activating pointer owns this gesture's momentum and release clock.
-      const pointerId = (event.activatorEvent as PointerEvent).pointerId;
-      const sample = (event: PointerEvent) => {
-        if (event.pointerId !== pointerId) return;
-        tracker.current.addPointerEvent(event);
-      };
-      tracker.current.reset();
-      releaseTime.current = undefined;
-      if ("clientX" in event.activatorEvent && "clientY" in event.activatorEvent) {
-        tracker.current.addPointerEvent(event.activatorEvent as PointerEvent);
-      }
-      // dnd-kit omits the release event; window capture samples it before the sensor ends the drag.
-      const release = (event: PointerEvent) => {
-        if (event.pointerId !== pointerId) return;
-        sample(event);
-        releaseTime.current = event.timeStamp;
-      };
-      document.addEventListener("pointermove", sample);
-      document.defaultView?.addEventListener("pointerup", release, true);
-      const unsubscribe = onPhysicsChange((enabled) => {
-        if (!enabled) onDragCancel();
-      });
-      listening.current = () => {
-        document.removeEventListener("pointermove", sample);
-        document.defaultView?.removeEventListener("pointerup", release, true);
-        unsubscribe();
-      };
-    },
-    [containerRef, onDragCancel],
-  );
+  const onDragStart = useStableCallback((event: DragStartEvent) => {
+    onDragCancel();
+    // A new sensor starts from clean layout coordinates, not the previous spring offset.
+    const pointer = event.activatorEvent.type === "pointerdown";
+    const enabled = pointer && isPhysicsEnabled();
+    setPhysicsSorting(enabled);
+    if (!enabled || !containerRef.current) return;
+    const document = containerRef.current.ownerDocument;
+    // Only the activating pointer owns this gesture's momentum and release clock.
+    const pointerId = (event.activatorEvent as PointerEvent).pointerId;
+    const sample = (event: PointerEvent) => {
+      if (event.pointerId !== pointerId) return;
+      tracker.current.addPointerEvent(event);
+    };
+    tracker.current.reset();
+    releaseTime.current = undefined;
+    if ("clientX" in event.activatorEvent && "clientY" in event.activatorEvent) {
+      tracker.current.addPointerEvent(event.activatorEvent as PointerEvent);
+    }
+    // dnd-kit omits the release event; window capture samples it before the sensor ends the drag.
+    const release = (event: PointerEvent) => {
+      if (event.pointerId !== pointerId) return;
+      sample(event);
+      releaseTime.current = event.timeStamp;
+    };
+    document.addEventListener("pointermove", sample);
+    document.defaultView?.addEventListener("pointerup", release, true);
+    const unsubscribe = onPhysicsChange((enabled) => {
+      if (!enabled) onDragCancel();
+    });
+    listening.current = () => {
+      document.removeEventListener("pointermove", sample);
+      document.defaultView?.removeEventListener("pointerup", release, true);
+      unsubscribe();
+    };
+  });
 
-  const onDragEnd = useCallback(
-    (event: DragEndEvent) => {
-      if (!listening.current || !isPhysicsEnabled()) return;
-      const velocity = tracker.current.velocity(releaseTime.current);
-      stopListening();
-      const rects = new Map<string, DOMRect>();
-      for (const element of containerRef.current?.querySelectorAll<HTMLElement>(
-        "[data-sortable-fling-id]",
-      ) ?? []) {
-        const id = element.dataset.sortableFlingId!;
-        const source = id === String(event.active.id) ? (overlayRef?.current ?? element) : element;
-        rects.set(id, source.getBoundingClientRect());
-      }
-      pending.current = { activeId: String(event.active.id), velocity, rects };
-      renderRelease();
-    },
-    [containerRef, overlayRef, stopListening],
-  );
+  const onDragEnd = useStableCallback((event: DragEndEvent) => {
+    if (!listening.current || !isPhysicsEnabled()) return;
+    const velocity = tracker.current.velocity(releaseTime.current);
+    stopListening();
+    const rects = new Map<string, DOMRect>();
+    for (const element of containerRef.current?.querySelectorAll<HTMLElement>(
+      "[data-sortable-fling-id]",
+    ) ?? []) {
+      const id = element.dataset.sortableFlingId!;
+      const source = id === String(event.active.id) ? (overlayRef?.current ?? element) : element;
+      rects.set(id, source.getBoundingClientRect());
+    }
+    pending.current = { activeId: String(event.active.id), velocity, rects };
+    renderRelease();
+  });
 
   useLayoutEffect(() => {
     const release = pending.current;

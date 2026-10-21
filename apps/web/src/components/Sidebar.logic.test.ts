@@ -1,33 +1,37 @@
-/** Verifies sidebar presentation, visibility and user actions with controlled thread fixtures. */
+/** Verifies sidebar presentation, visibility and user actions with controlled thread fixtures.
+ * @vitest-environment jsdom
+ */
+// Unit tests use jsdom; test/render.tsx depends on the browser runner. The fixture owns cleanup.
+import { act, createElement } from "react";
+import { createRoot } from "react-dom/client";
+import { buildSidebarTabs } from "./sidebar/sidebarTabs.logic";
 import { installMessages } from "~/i18n";
 import { en } from "~/i18n/locales/en";
 import { messages as zhCN } from "~/i18n/locales/zh-CN";
 import { presentThreadShell } from "@t3tools/client-runtime/state/models";
 import * as DateTime from "effect/DateTime";
 import { deriveActiveWorkStartedAt } from "../session-logic.ts";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { defaultAnimateLayoutChanges, type AnimateLayoutChanges } from "@dnd-kit/sortable";
 import * as Cause from "effect/Cause";
 import { AsyncResult } from "effect/reactivity";
 import {
+  useThreadJumpHintVisibility,
+  sidebarThreadStatusLabel,
   animateSidebarLayoutChanges,
   compactSidebarTimeLabel,
   archiveSelectedThreadEntries,
   buildBulkTitleRegenerationContextMenuItem,
   buildBulkUnpinContextMenuItem,
   buildMultiSelectThreadContextMenuItems,
-  createThreadJumpHintVisibilityController,
   deleteSelectedThreadEntries,
   filterSidebarProjectScopeItems,
   filterSidebarV2VisibleThreads,
   formatWorkingDurationLabel,
   getFallbackThreadIdAfterDelete,
-  getProjectSortTimestamp,
-  getSidebarForkParentThreadId,
   getSidebarThreadIdsToPrewarm,
   hasUnseenCompletion,
   isContextMenuPointerDown,
-  isSidebarSubagentThread,
   isSidebarThreadWorking,
   isTrailingDoubleClick,
   orderItemsByPreferredIds,
@@ -39,20 +43,18 @@ import {
   resolveProjectStatusIndicator,
   resolveSidebarSweepKeys,
   sidebarSweepScopes,
-  resolveSidebarStageBadgeLabel,
   resolveSidebarThreadSection,
   resolveSidebarRowAccessibility,
+  resolveSidebarRowThreadId,
   resolveSidebarThreadStatus,
   resolveSidebarV2TopStatus,
   resolveThreadLastVisitedAt,
-  resolveThreadRowClassName,
   resolveThreadStatusPill,
   resolveWorkingStartedAt,
   pullRequestMatchesSearchQuery,
   searchSidebarThreads,
   sidebarSearchTextSegments,
   shouldClearThreadSelectionOnMouseDown,
-  shouldShowSidebarV2Duration,
   shouldRecedeSidebarThread,
   sortLogicalProjectsForSidebar,
   sortInboxThreadsByReturn,
@@ -64,14 +66,12 @@ import {
   sortScopedProjectsForSidebar,
   sortSidebarV2ProjectGroups,
   shouldNavigateAfterThreadPark,
-  THREAD_JUMP_HINT_SHOW_DELAY_MS,
   type SidebarListItem,
   type SidebarListMarker,
   type SidebarSection,
   resolveSidebarDropVerb,
 } from "./Sidebar.logic";
 import { threadSearchMatchKey } from "@t3tools/client-runtime/state/thread-search";
-import { sortSettledThreads } from "@t3tools/client-runtime/state/thread-sort";
 import {
   DiscussionId,
   DiscussionSeatId,
@@ -653,45 +653,47 @@ describe("buildMultiSelectThreadContextMenuItems", () => {
   });
 });
 
-describe("resolveSidebarStageBadgeLabel", () => {
-  it("returns Nightly for nightly primary server versions", () => {
-    expect(
-      resolveSidebarStageBadgeLabel({
-        primaryServerVersion: "0.0.28-nightly.20260616.12",
-        fallbackStageLabel: "Alpha",
-      }),
-    ).toBe("Nightly");
-  });
-
-  it("returns the fallback label for stable primary server versions", () => {
-    expect(
-      resolveSidebarStageBadgeLabel({
-        primaryServerVersion: "0.0.27",
-        fallbackStageLabel: "Alpha",
-      }),
-    ).toBe("Alpha");
-  });
-
-  it("returns the fallback label when the primary server version is missing", () => {
-    expect(
-      resolveSidebarStageBadgeLabel({
-        primaryServerVersion: null,
-        fallbackStageLabel: "Dev",
-      }),
-    ).toBe("Dev");
-  });
-
-  it("returns the fallback label for malformed nightly prerelease versions", () => {
-    expect(
-      resolveSidebarStageBadgeLabel({
-        primaryServerVersion: "0.0.28-nightly.20260616",
-        fallbackStageLabel: "Alpha",
-      }),
-    ).toBe("Alpha");
-  });
-});
-
 describe("sidebar thread lineage helpers", () => {
+  it("maps an open subagent to its nearest visible ancestor's sidebar row", () => {
+    const environmentId = EnvironmentId.make("environment-row");
+    const otherEnvironmentId = EnvironmentId.make("environment-other");
+    const subagentOf = (id: string, parentId: ThreadId, environment = environmentId) =>
+      makeThreadFixture({
+        id: ThreadId.make(id),
+        environmentId: environment,
+        lineage: {
+          rootThreadId: parentId,
+          parentThreadId: parentId,
+          relationshipToParent: "subagent",
+        },
+      });
+    const root = makeThreadFixture({ id: ThreadId.make("thread-root"), environmentId });
+    const fork = makeThreadFixture({
+      id: ThreadId.make("thread-fork"),
+      environmentId,
+      lineage: {
+        rootThreadId: root.id,
+        parentThreadId: root.id,
+        relationshipToParent: "fork",
+      },
+    });
+    const child = subagentOf("thread-child", root.id);
+    const grandchild = subagentOf("thread-grandchild", child.id);
+    const forkChild = subagentOf("thread-fork-child", fork.id);
+    const orphan = subagentOf("thread-orphan", ThreadId.make("thread-missing"));
+    const elsewhere = subagentOf("thread-elsewhere", root.id, otherEnvironmentId);
+    const threads = [root, fork, child, grandchild, forkChild, orphan, elsewhere];
+
+    expect(resolveSidebarRowThreadId(child.id, environmentId, threads)).toBe(root.id);
+    expect(resolveSidebarRowThreadId(grandchild.id, environmentId, threads)).toBe(root.id);
+    expect(resolveSidebarRowThreadId(forkChild.id, environmentId, threads)).toBe(fork.id);
+    expect(resolveSidebarRowThreadId(elsewhere.id, otherEnvironmentId, threads)).toBe(elsewhere.id);
+    expect(resolveSidebarRowThreadId(orphan.id, environmentId, threads)).toBe(orphan.id);
+    const loopA = subagentOf("thread-loop-a", ThreadId.make("thread-loop-b"));
+    const loopB = subagentOf("thread-loop-b", loopA.id);
+    expect(resolveSidebarRowThreadId(loopA.id, environmentId, [loopA, loopB])).toBe(loopA.id);
+  });
+
   it("keeps only top-level, unarchived threads in the Sidebar V2 project scope", () => {
     const parentId = ThreadId.make("thread-parent");
     const projectId = ProjectId.make("project-visible");
@@ -749,44 +751,6 @@ describe("sidebar thread lineage helpers", () => {
         new Set([`${environmentId}:${projectId}`]),
       ).map((thread) => thread.id),
     ).toEqual([parentId, fork.id]);
-  });
-
-  it("identifies subagent threads so the sidebar can hide them", () => {
-    const parentId = ThreadId.make("thread-parent");
-    const subagent = makeThreadFixture({
-      lineage: {
-        rootThreadId: parentId,
-        parentThreadId: parentId,
-        relationshipToParent: "subagent",
-      },
-    });
-
-    expect(isSidebarSubagentThread(subagent)).toBe(true);
-    expect(isSidebarSubagentThread(makeThreadFixture())).toBe(false);
-  });
-
-  it("resolves the parent thread for fork sidebar affordances", () => {
-    const parentId = ThreadId.make("thread-parent");
-    const fallbackParentId = ThreadId.make("thread-fallback-parent");
-    const runFork = makeThreadFixture({
-      forkedFrom: { type: "run", threadId: parentId, runId: "run-1" as never },
-      lineage: {
-        rootThreadId: parentId,
-        parentThreadId: fallbackParentId,
-        relationshipToParent: "fork",
-      },
-    });
-    const lineageFork = makeThreadFixture({
-      lineage: {
-        rootThreadId: parentId,
-        parentThreadId: fallbackParentId,
-        relationshipToParent: "fork",
-      },
-    });
-
-    expect(getSidebarForkParentThreadId(runFork)).toBe(parentId);
-    expect(getSidebarForkParentThreadId(lineageFork)).toBe(fallbackParentId);
-    expect(getSidebarForkParentThreadId(makeThreadFixture())).toBeNull();
   });
 });
 
@@ -890,68 +854,6 @@ describe("shouldRecedeSidebarThread", () => {
         isSelected: false,
       }),
     ).toBe(false);
-  });
-});
-
-describe("createThreadJumpHintVisibilityController", () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it("delays showing jump hints until the configured delay elapses", () => {
-    const visibilityChanges: boolean[] = [];
-    const controller = createThreadJumpHintVisibilityController({
-      delayMs: THREAD_JUMP_HINT_SHOW_DELAY_MS,
-      onVisibilityChange: (visible) => {
-        visibilityChanges.push(visible);
-      },
-    });
-
-    controller.sync(true);
-    vi.advanceTimersByTime(THREAD_JUMP_HINT_SHOW_DELAY_MS - 1);
-
-    expect(visibilityChanges).toEqual([]);
-
-    vi.advanceTimersByTime(1);
-
-    expect(visibilityChanges).toEqual([true]);
-  });
-
-  it("hides immediately when the modifiers are released", () => {
-    const visibilityChanges: boolean[] = [];
-    const controller = createThreadJumpHintVisibilityController({
-      delayMs: THREAD_JUMP_HINT_SHOW_DELAY_MS,
-      onVisibilityChange: (visible) => {
-        visibilityChanges.push(visible);
-      },
-    });
-
-    controller.sync(true);
-    vi.advanceTimersByTime(THREAD_JUMP_HINT_SHOW_DELAY_MS);
-    controller.sync(false);
-
-    expect(visibilityChanges).toEqual([true, false]);
-  });
-
-  it("cancels a pending reveal when the modifier is released early", () => {
-    const visibilityChanges: boolean[] = [];
-    const controller = createThreadJumpHintVisibilityController({
-      delayMs: THREAD_JUMP_HINT_SHOW_DELAY_MS,
-      onVisibilityChange: (visible) => {
-        visibilityChanges.push(visible);
-      },
-    });
-
-    controller.sync(true);
-    vi.advanceTimersByTime(Math.floor(THREAD_JUMP_HINT_SHOW_DELAY_MS / 2));
-    controller.sync(false);
-    vi.advanceTimersByTime(THREAD_JUMP_HINT_SHOW_DELAY_MS);
-
-    expect(visibilityChanges).toEqual([]);
   });
 });
 
@@ -1292,11 +1194,6 @@ describe("resolveSidebarThreadStatus", () => {
       "waiting",
     );
   });
-
-  it("keeps Waiting static while Working shows elapsed duration", () => {
-    expect(shouldShowSidebarV2Duration("waiting")).toBe(false);
-    expect(shouldShowSidebarV2Duration("working")).toBe(true);
-  });
 });
 
 describe("pullRequestMatchesSearchQuery", () => {
@@ -1500,6 +1397,69 @@ describe("formatWorkingDurationLabel", () => {
 });
 
 describe("resolveThreadStatusPill", () => {
+  it("drops the failed pill once the failure has been seen", () => {
+    expect(
+      resolveThreadStatusPill({
+        thread: {
+          ...baseThread,
+          interactionMode: "default",
+          latestRun: { ...makeLatestRun(), status: "failed" },
+          lastVisitedAt: "2026-03-09T10:06:00.000Z",
+          runtime: { ...baseThread.runtime, status: "failed", activeRunId: null },
+        },
+      }),
+    ).toBeNull();
+  });
+
+  it("shows failed, not plan ready, when a plan run proposed a plan and then failed", () => {
+    expect(
+      resolveThreadStatusPill({
+        thread: {
+          ...baseThread,
+          hasActionableProposedPlan: true,
+          latestRun: { ...makeLatestRun(), status: "failed" },
+          lastVisitedAt: "2026-03-09T10:04:00.000Z",
+          runtime: { ...baseThread.runtime, status: "failed", activeRunId: null },
+        },
+      }),
+    ).toMatchObject({ label: "Failed" });
+  });
+
+  it("shows failed, not completed, when the unseen run failed", () => {
+    expect(
+      resolveThreadStatusPill({
+        thread: {
+          ...baseThread,
+          interactionMode: "default",
+          latestRun: { ...makeLatestRun(), status: "failed" },
+          lastVisitedAt: "2026-03-09T10:04:00.000Z",
+          runtime: {
+            ...baseThread.runtime,
+            status: "failed",
+            activeRunId: null,
+            lastError: "Provider turn failed.",
+          },
+        },
+      }),
+    ).toMatchObject({ label: "Failed", pulse: false });
+  });
+
+  it("shows an active thread wait without a pulse and resumes Working when it ends", () => {
+    const blocked = { ...baseThread, blockedOnThreadWait: true };
+    expect(resolveSidebarThreadStatus(blocked)).toBe("waiting");
+    expect(resolveThreadStatusPill({ thread: blocked })).toMatchObject({
+      label: "Waiting",
+      pulse: false,
+    });
+
+    const resumed = { ...blocked, blockedOnThreadWait: false };
+    expect(resolveSidebarThreadStatus(resumed)).toBe("working");
+    expect(resolveThreadStatusPill({ thread: resumed })).toMatchObject({
+      label: "Working",
+      pulse: true,
+    });
+  });
+
   const baseThread = {
     hasActionableProposedPlan: false,
     hasPendingApprovals: false,
@@ -1992,59 +1952,6 @@ describe("sortProjectsForSidebar", () => {
       ProjectId.make("project-1"),
       ProjectId.make("project-2"),
     ]);
-  });
-
-  it.each(["updated_at", "created_at"] as const)(
-    "matches the per-comparison %s order on a shuffled list with ties",
-    (sortOrder) => {
-      const minute = (value: number) => `2026-03-09T10:0${value}:00.000Z`;
-      // (index * 7) % 24 scrambles the input order. Titles repeat, and
-      // projects 16-23 have no threads, so they use their own stamps.
-      const projects = Array.from({ length: 24 }, (_, index) => {
-        const n = (index * 7) % 24;
-        return makeProject({
-          id: ProjectId.make(`project-${n}`),
-          title: n % 2 === 0 ? "Alpha" : "Beta",
-          createdAt: minute(n % 3),
-          updatedAt: n % 5 === 0 ? "invalid" : minute(n % 2),
-        });
-      });
-      const threads = Array.from({ length: 48 }, (_, n) => ({
-        projectId: ProjectId.make(`project-${n % 16}`),
-        createdAt: minute(n % 6),
-        updatedAt: minute(n % 3),
-        latestUserMessageAt: n % 4 === 0 ? null : minute(n % 5),
-      }));
-      // The comparator this sort replaced: it walked each project's threads
-      // on every call.
-      const timestamp = (project: Project) =>
-        getProjectSortTimestamp(
-          project,
-          threads.filter((thread) => thread.projectId === project.id),
-          sortOrder,
-        );
-      const expected = projects.toSorted((left, right) => {
-        const rightTimestamp = timestamp(right);
-        const leftTimestamp = timestamp(left);
-        const byTimestamp =
-          rightTimestamp === leftTimestamp ? 0 : rightTimestamp > leftTimestamp ? 1 : -1;
-        return (
-          byTimestamp || left.title.localeCompare(right.title) || left.id.localeCompare(right.id)
-        );
-      });
-
-      expect(sortProjectsForSidebar(projects, threads, sortOrder)).toEqual(expected);
-    },
-  );
-
-  it("returns the project timestamp when no threads are present", () => {
-    const timestamp = getProjectSortTimestamp(
-      makeProject({ updatedAt: "2026-03-09T10:10:00.000Z" }),
-      [],
-      "updated_at",
-    );
-
-    expect(timestamp).toBe(Date.parse("2026-03-09T10:10:00.000Z"));
   });
 });
 
@@ -2662,5 +2569,161 @@ describe("compactSidebarTimeLabel localization", () => {
     installMessages("zh-CN", zhCN);
     expect(compactSidebarTimeLabel("3分钟 前")).toBe("3分钟");
     expect(compactSidebarTimeLabel("刚刚")).toBe("刚刚");
+  });
+});
+
+describe("sidebar failure localization", () => {
+  it("shows Failed in Chinese after installing Chinese messages", () => {
+    installMessages("zh-CN", zhCN);
+    try {
+      expect(sidebarThreadStatusLabel("Failed")).toBe("失败");
+    } finally {
+      installMessages("en", en);
+    }
+  });
+});
+
+describe("settled subagent navigation", () => {
+  it("retains an off-page parent when its subagent is open", () => {
+    const parents = Array.from({ length: 11 }, (_, index) =>
+      makeThreadFixture({
+        id: ThreadId.make(`parent-${index + 1}`),
+        environmentId: localEnvironmentId,
+        settledAt: "2026-03-09T10:05:00.000Z",
+      }),
+    );
+    const parent = parents[10]!;
+    const child = makeThreadFixture({
+      id: ThreadId.make("open-subagent"),
+      environmentId: localEnvironmentId,
+      lineage: {
+        rootThreadId: parent.id,
+        parentThreadId: parent.id,
+        relationshipToParent: "subagent",
+      },
+    });
+    const threads = [...parents, child];
+    const visible = filterSidebarV2VisibleThreads(threads, null);
+    const rowId = resolveSidebarRowThreadId(child.id, localEnvironmentId, threads);
+    const tabs = buildSidebarTabs(
+      {
+        pinnedThreads: [],
+        activeThreads: [],
+        workingThreads: [],
+        snoozedThreads: [],
+        settledThreads: visible,
+      },
+      {
+        getThreadKey: (thread) => `${thread.environmentId}:${thread.id}`,
+        routeThreadKey: `${localEnvironmentId}:${rowId}`,
+      },
+    );
+    expect(tabs.rowsByTab.settled.map((thread) => thread.id)).toEqual([
+      "parent-1",
+      "parent-2",
+      "parent-3",
+      "parent-4",
+      "parent-5",
+      "parent-6",
+      "parent-7",
+      "parent-8",
+      "parent-9",
+      "parent-10",
+      "parent-11",
+    ]);
+    expect(tabs.hiddenSettledCount).toBe(0);
+  });
+});
+
+/** Owns fixture resources during setup; transfers cleanup only after mounting succeeds, including when render or unmount throws. */
+async function mountJumpHints() {
+  await using cleanup = new AsyncDisposableStack();
+  const container = document.createElement("div");
+  let root: ReturnType<typeof createRoot> | undefined;
+  cleanup.defer(async () => {
+    try {
+      await act(async () => root?.unmount());
+    } finally {
+      try {
+        container.remove();
+      } finally {
+        try {
+          vi.useRealTimers();
+        } finally {
+          vi.unstubAllGlobals();
+        }
+      }
+    }
+  });
+  vi.useFakeTimers();
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  document.body.append(container);
+  root = createRoot(container);
+  /** Exposes the public hint state as visible text; modifier events exercise the hook without exporting its private controller. */
+  function HintProbe() {
+    const { showThreadJumpHints, updateThreadJumpHintsVisibility } = useThreadJumpHintVisibility();
+    return createElement(
+      "button",
+      {
+        onMouseDown: () => updateThreadJumpHintsVisibility(true),
+        onMouseUp: () => updateThreadJumpHintsVisibility(false),
+      },
+      showThreadJumpHints ? "Jump to thread 1" : "",
+    );
+  }
+  await act(async () => root?.render(createElement(HintProbe)));
+  const mountedCleanup = cleanup.move();
+  return {
+    container,
+    async press() {
+      await act(async () => {
+        container
+          .querySelector("button")!
+          .dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+      });
+    },
+    async release() {
+      await act(async () => {
+        container
+          .querySelector("button")!
+          .dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+      });
+    },
+    async advance(ms: number) {
+      await act(async () => {
+        vi.advanceTimersByTime(ms);
+      });
+    },
+    async [Symbol.asyncDispose]() {
+      await mountedCleanup.disposeAsync();
+    },
+  };
+}
+
+describe("useThreadJumpHintVisibility", () => {
+  it("shows shortcut hints only after holding the modifier for 200 ms", async () => {
+    await using hints = await mountJumpHints();
+    await hints.press();
+    expect(hints.container.textContent).toBe("");
+    await hints.advance(199);
+    expect(hints.container.textContent).toBe("");
+    await hints.advance(1);
+    expect(hints.container.textContent).toBe("Jump to thread 1");
+  });
+  it("hides visible shortcut hints immediately on modifier release", async () => {
+    await using hints = await mountJumpHints();
+    await hints.press();
+    await hints.advance(200);
+    expect(hints.container.textContent).toBe("Jump to thread 1");
+    await hints.release();
+    expect(hints.container.textContent).toBe("");
+  });
+  it("cancels pending hints when the modifier is released early", async () => {
+    await using hints = await mountJumpHints();
+    await hints.press();
+    await hints.advance(199);
+    await hints.release();
+    await hints.advance(201);
+    expect(hints.container.textContent).toBe("");
   });
 });

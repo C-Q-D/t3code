@@ -490,10 +490,11 @@ export const settings: Messages["settings"] = {
       title: "子模块",
     },
     startFromOrigin: {
-      title: "从origin开始",
-      description: "基于 origin 上最新的同名分支创建 worktree，而不是基于本地分支。",
-      resetLabel: "新 worktree 从 origin 开始",
-      ariaLabel: "默认从 origin 创建新 worktree",
+      title: "从远程分支开始",
+      description:
+        "使用基准分支所跟踪的远程分支的最新提交，即使两者名称不同。否则使用 origin 上的同名分支；若该远程分支不存在，则使用本地分支。",
+      resetLabel: "新工作树从远程分支开始",
+      ariaLabel: "默认从远程分支创建新工作树",
     },
     addProjectStartsIn: {
       title: "添加项目的起始位置",
@@ -827,7 +828,7 @@ export const settings: Messages["settings"] = {
     panelControls: "对话面板控件（设置页不可用）",
   },
   scopeSentence: {
-    applying: "作用于",
+    applying: "设置适用于",
     within: "中的",
     environmentAriaLabel: "环境范围",
     unavailableEnvironment: "环境不可用",
@@ -838,6 +839,10 @@ export const settings: Messages["settings"] = {
     unavailableProject: "项目不可用",
     allProjects: "全部项目",
     pickerAriaLabel: (scope: string, label: string) => `${scope}：${label}`,
+    on: "在",
+    across: "跨",
+    searchEnvironments: "搜索环境",
+    searchProjects: "搜索项目",
   },
   scopeNotice: {
     projectChanges: (project: string) => `你正在修改 ${project} 的设置，改动只对这个项目生效。`,
@@ -932,7 +937,7 @@ export const settings: Messages["settings"] = {
     diffWhitespaceLabel: "差异空白更改",
     contextWindowLabel: "上下文窗口指示器",
     newThreadModeLabel: "新对话模式",
-    startFromOriginLabel: "新 worktree 从 origin 开始",
+    startFromOriginLabel: "新工作树从远程分支开始",
     confirmTitle: "恢复默认设置？",
     confirmDescription: (labels: string) => `将重置：${labels}。`,
     themeError: "无法恢复主题设置",
@@ -1108,13 +1113,14 @@ export const settings: Messages["settings"] = {
       cpuTimeHint:
         "所选时间段内，T3服务端根进程及其后代进程的近似活跃CPU时间。仅在采样进程使用CPU时增加，时间窗口移动时移除旧样本。",
       samples: "样本",
-      samplesHint: "服务端保留在内存中的进程样本。服务端重启后重置。",
+      samplesHint: "服务器保留的内存进程采样。仅在诊断页打开时采样，服务器重启后清空。",
       interval: "间隔",
       processes: "进程",
       loading: "正在收集进程资源样本…",
       empty: "此时间段内未找到进程资源样本。",
       processAriaLabel: (root: boolean, name: string) => `${root ? "根" : "子"}进程 ${name}`,
       cpuHint: (average: string, peak: string) => `平均${average}%，峰值${peak}%`,
+      onDemand: "按需",
     },
     status: {
       checking: "正在检查",
@@ -1423,6 +1429,13 @@ export const settings: Messages["settings"] = {
       routeAddedHint: (label: string) => `${label} 的其他连接路径不可用时，会改用T3 Connect。`,
       fallbackHint: "此机器属于你的T3 Connect账号。可将其用作备用连接路径。",
       addRoute: "添加T3 Connect",
+      removedRelink: "此环境已从 T3 Connect 移除。开启后可重新连接。",
+      unreachable: "T3 Connect 已开启，但其他设备无法访问此环境。",
+      unchecked: "T3 Connect 已开启，尚未检查能否访问。",
+      outOfSync:
+        "T3 Connect 状态不同步。此环境目前只发布代理活动，其他设备无法连接。开启 T3 Connect 可修复此问题。",
+      removedRelinkCommand:
+        "此环境已从 T3 Connect 移除。请在主机上运行 `t3 connect link` 重新连接。",
     },
     network: {
       updateErrorDescription: "无法更新网络开放设置。",
@@ -1603,6 +1616,9 @@ export const settings: Messages["settings"] = {
       disabled: "任务已暂停",
       rate_limited: "已限流",
       expired: "已超时",
+      duplicate: "重复投递",
+      coalesced: "已合并",
+      filtered: "已过滤",
     },
     tasksHeading: "任务",
     newTask: "新建任务",
@@ -1638,6 +1654,9 @@ export const settings: Messages["settings"] = {
       empty: "暂无交付记录。",
       taskTitle: (title: string) => `请求记录·${title}`,
       missingFieldCount: (count: number) => `${count}个空占位符`,
+      scheduledRun: "待运行任务",
+      pendingWindowHint: "窗口结束后运行；目前尚未开始运行。",
+      openedWindow: "已开启窗口",
     },
     webhook: {
       urlHint: "保存后显示URL。",
@@ -1706,6 +1725,16 @@ export const settings: Messages["settings"] = {
       enabledHint: "禁用的任务仍会保存，但不会运行。",
       save: "保存任务",
       create: "创建任务",
+      replayKey: "重放键",
+      coalesceKey: "合并键",
+      coalesceWindow: "合并窗口",
+      templateOptional: "模板，可选",
+      coalesceWindowHint: "秒，10–3600",
+      dedupeHint:
+        "重放键会阻止 7 天内的重复投递。合并窗口从首次投递开始计时，窗口结束后只运行一次最新载荷。键为空时正常运行。",
+      invalidWebhook: "Webhook 设置无效",
+      invalidCoalesceWindow: "合并窗口必须是 10 到 3600 之间的整数秒。",
+      invalidDedupeKey: (label: string) => `${label}必须包含有效的请求占位符。`,
     },
   },
   resourceTelemetry: {
@@ -2783,6 +2812,7 @@ ${address}`
 
     sourceLabels: { Default: "默认", Custom: "自定义", Project: "项目" },
     booleanOperators: { and: "且", or: "或" },
+    connectToEdit: "连接环境后才能修改快捷键。",
   },
   loadBalancing: {
     prefer: "优先使用",
@@ -3195,6 +3225,7 @@ ${address}`
     addArgument: "添加参数",
     argument: (index1: string | number | boolean | null | undefined) => `参数 ${index1}`,
     removeArgument: (index1: string | number | boolean | null | undefined) => `移除参数 ${index1}`,
+    clearSecret: (label: string) => `清除${label}`,
   },
   providerSettings: {
     checked: "已检查 ",
@@ -3344,7 +3375,7 @@ ${address}`
     resetCheckoutUnavailableHint: "连接所选检出目录，或更新其环境，以重置此覆盖值。",
     connectEnvironmentsResetOverridesHint: "连接环境以重置这些覆盖值。",
     settingNotSaved: "设置未保存",
-    connectionChangeSettingsError: "此连接无权更改这些设置。",
+    connectionChangeSettingsError: "此连接没有修改这些设置的权限。",
     settingSavedOnSomeEnvironments: "设置已在部分环境中保存",
     couldNotUpdate: (
       value: string | number | boolean | null | undefined,
@@ -3597,6 +3628,7 @@ ${address}`
       "保存的浏览器捕获内容超过此天数后删除。旧捕获链接将无法打开。",
     deleteOldRotatedLogs: "删除旧轮转日志",
     deleteInactiveRotatedLogFilesHint: "不活跃的轮转日志文件超过此天数后删除。当前日志会保留。",
+    onEveryMachine: (counts: string) => `每台机器：${counts}`,
   },
   themeColorPicker: {
     chooseAColor: "选择颜色",

@@ -49,11 +49,12 @@ beforeEach(async () => {
       unobserve() {}
     },
   );
+  vi.spyOn(Date, "now").mockReturnValue(0);
   refresh.mockReset();
   assetState.mockReturnValue({
     _tag: "Success",
     url: "https://environment.test/original.html",
-    expiresAt: Date.now() + 60 * 60_000,
+    expiresAt: 3_600_000,
   });
   openLink.mockReset().mockResolvedValue(undefined);
   openChangeRequestLink.mockReset().mockReturnValue(false);
@@ -76,6 +77,7 @@ beforeEach(async () => {
 afterEach(async () => {
   await act(() => root.unmount());
   container.remove();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -174,6 +176,7 @@ it("offers only full screen and opens with a fresh URL while keeping the inline 
   )!;
   expandButton.focus();
   refresh.mockResolvedValue("https://environment.test/renewed.html");
+  vi.mocked(Date.now).mockReturnValue(3_600_000);
   await click("Open full screen");
   expect(refresh).toHaveBeenCalledOnce();
   expect(document.querySelector('[role="dialog"] iframe')?.getAttribute("src")).toContain(
@@ -217,6 +220,7 @@ it.each([null, new Error("Disconnected")])(
     await renderInline();
     if (failure === null) refresh.mockResolvedValue(null);
     else refresh.mockRejectedValue(failure);
+    vi.mocked(Date.now).mockReturnValue(3_600_000);
     await click("Open full screen");
     expect(document.querySelector('[role="dialog"]')).toBeNull();
     expect(showError).toHaveBeenCalledWith(

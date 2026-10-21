@@ -93,12 +93,12 @@ export const git: Messages["git"] = {
     mergeStackThrough: (number, base, count) =>
       `将 PR stack 合并到#${number}层并合入 ${base}（${count}个 PR）`,
     /** Reports the comment count to reveal and the total currently hidden. */
-    olderComments: (shown, hidden) => `显示${shown}条更早的评论（隐藏${hidden}条）`,
+    olderComments: (shown, hidden) => `显示${shown}条更早的讨论（隐藏${hidden}条）`,
     /** Reports the recent comment window size. */
-    recentComments: (count) => `仅显示${count}条最近评论`,
+    recentComments: (count) => `仅显示${count}条最近讨论`,
     /** Reports the number of recent comments available in a truncated conversation. */
     truncatedComments: (count) =>
-      `此讨论超过页面单次读取的范围。这里显示最近${count}条，请在托管平台查看其余内容。`,
+      `此讨论仅部分加载，已加载${count}条评论；请在托管平台查看其余内容。`,
     /** Reports open and linked pull request counts. */
     linkedRequestCounts: (open, linked) => `${open}个开放 · ${linked}个已关联`,
     /** Counts unnamed actors after named reaction actors. */
@@ -400,9 +400,9 @@ export const git: Messages["git"] = {
     couldNotOpenAThreadForTheCheckout: "无法为检出打开对话",
     couldNotPrepareThePullRequestCheckout: "无法准备 PR 检出",
     checkedOutButTheThreadStayedWhereItWas: "已检出，但对话仍留在原位置",
-    checkedOutButNotOnTheLatestCommits: "已检出，但未更新到最新提交",
+    checkedOutButNotOnTheLatestCommits: "已检出，但尚未确认处于最新提交",
     theCheckoutCouldNotBeMovedOntoThePullRequestSLatestCommitsSoTheCodeThereIsOlderThanTh:
-      "无法将检出更新到 PR 的最新提交，所以代码落后于 PR。未提交的工作或本地提交使其停留在当前版本。",
+      "无法确认此检出位于拉取请求的最新提交，代码可能不同。存在本地提交或未提交改动时，会保留检出的当前位置。",
     checkedOutHere: "已在此处检出",
     checkedOut: "已检出",
     thisRepositoryIsOnThePullRequestSBranchWithAThreadOpenOnIt:
@@ -746,6 +746,8 @@ export const git: Messages["git"] = {
     pullRequestsBreadcrumb: "PR 导航路径",
     filterByProvider: "按 Provider 筛选",
     refreshPullRequests: "刷新 PR",
+    summarizeReviewOptional: "总结评审（可选）",
+    summarizeReviewOrAddLines: "总结评审或添加行内评论",
   },
   actions: {
     ownerRepositoryPlaceholder: "所有者/仓库",
@@ -1011,10 +1013,10 @@ export const git: Messages["git"] = {
     showingRefs: (shown, total) => `显示${shown} / ${total}个分支`,
     searchRefs: "搜索分支…",
     noRefsFound: "未找到分支。",
-    startFromOrigin: "从origin开始",
-    startWorktreeFromOrigin: "从 origin 创建 worktree",
+    startFromOrigin: "从远端开始",
+    startWorktreeFromOrigin: "从远端创建 worktree",
     createsTheWorktreeFromTheLatestMatchingBranchOnOriginInsteadOfYourLocalBranch:
-      "使用 origin 上匹配分支的最新版本创建 worktree。",
+      "使用基准分支所跟踪的远端分支的最新提交，即使分支名称不同。否则使用 origin 上的同名分支；若远端分支不存在，则使用本地分支。",
     previousWorktree: "先前的 worktree",
     loadingRefs: "正在加载分支…",
     loadingMoreRefs: "正在加载更多分支…",

@@ -24,11 +24,18 @@ const target = {
 };
 
 vi.mock("~/hooks/useActiveProjectTarget", () => ({ useActiveProjectTarget: () => target }));
-vi.mock("~/hooks/useTheme", () => ({ useTheme: () => ({ resolvedTheme: "light" }) }));
+vi.mock("~/hooks/useTheme", () => ({
+  useTheme: () => ({ resolvedTheme: "light" }),
+  useRenderedAppearance: () => "light",
+}));
 vi.mock("~/rightPanelStore", () => ({
   useRightPanelStore: { getState: () => ({ openFile: state.openFile }) },
 }));
 vi.mock("~/state/session", () => ({ readEnvironmentScope: state.readScope }));
+const emptyMatches: never[] = [];
+const searchMatches = [
+  { resultIndex: 0, path: "src/index.ts", lineNumber: 3, lineContent: "match", matchRanges: [] },
+];
 vi.mock("~/state/queries", () => ({
   useProjectContentSearch: ({ query }: { query: string }) => ({
     canReadFiles: state.canReadFiles,
@@ -38,18 +45,7 @@ vi.mock("~/state/queries", () => ({
     hasQuery: query.length > 0,
     truncated: false,
     invalidRegex: false,
-    matches:
-      state.canReadFiles && query.length > 0
-        ? [
-            {
-              resultIndex: 0,
-              path: "src/index.ts",
-              lineNumber: 3,
-              lineContent: "match",
-              matchRanges: [],
-            },
-          ]
-        : [],
+    matches: state.canReadFiles && query.length > 0 ? searchMatches : emptyMatches,
   }),
 }));
 vi.mock("./ProjectContentSearchShell", () => ({ ProjectContentSearchShell: "section" }));

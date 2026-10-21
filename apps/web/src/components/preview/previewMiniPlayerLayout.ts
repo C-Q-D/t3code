@@ -22,11 +22,6 @@ const PREVIEW_MINI_PLAYER_MIN_SIZE = { width: 240, height: 150 } as const;
 
 export interface PreviewMiniPlayerFrame extends PreviewMiniPlayerPosition, PreviewMiniPlayerSize {}
 
-/**
- * The rendered size of what the floating player mirrors: the device viewport
- * when one is set, otherwise the size the webview had when it was floated
- * (`fittedSourceContent`), which the hosted webview keeps as its CSS viewport.
- */
 export function resolvePreviewMiniPlayerSourceSize(
   viewport: PreviewViewportSetting,
   fittedSourceContent: BrowserSurfaceContentPresentation | null,
@@ -40,12 +35,6 @@ export function resolvePreviewMiniPlayerSourceSize(
   };
 }
 
-/**
- * The device screen as the user sees it, so a rotated phone floats as a
- * landscape box. Before the stream reports its size the platform's usual phone
- * shape stands in, matching the stream view's own placeholder aspect; the
- * nominal width only keeps the source cap above any sensible player width.
- */
 export function resolveDeviceMiniPlayerSourceSize(
   platform: DevicePlatform,
   screen: DeviceScreenSize | null,
@@ -85,15 +74,8 @@ interface HorizontalSpan {
   readonly right: number;
 }
 
-/**
- * What the player keeps clear of, in container coordinates. Both are docked
- * to an edge, so each only reserves the columns it covers: the margins beside
- * the composer and the column left of the details card stay open all the way.
- */
 export interface PreviewMiniPlayerObstacles {
-  /** The composer stack docked to the bottom edge. */
   readonly composer: (HorizontalSpan & { readonly height: number }) | null;
-  /** The inline thread-details card docked to the top-right corner. */
   readonly detailsCard: (HorizontalSpan & { readonly bottom: number }) | null;
 }
 
@@ -106,7 +88,6 @@ const spanOf = (x: number, width: number): HorizontalSpan => ({ left: x, right: 
 
 const spansOverlap = (a: HorizontalSpan, b: HorizontalSpan) => a.left < b.right && a.right > b.left;
 
-/** The lowest row (before the edge gap) open to a player covering these columns. */
 function floorFor(
   span: HorizontalSpan,
   container: PreviewMiniPlayerSize,
@@ -118,18 +99,11 @@ function floorFor(
     : container.height;
 }
 
-/** The highest row (before the edge gap) open to a player covering these columns. */
 function ceilingFor(span: HorizontalSpan, obstacles: PreviewMiniPlayerObstacles): number {
   const { detailsCard } = obstacles;
   return detailsCard && spansOverlap(span, detailsCard) ? Math.max(0, detailsCard.bottom) : 0;
 }
 
-/**
- * The box a stored size is fitted into. A player with a position keeps the
- * rows its own columns have, so a tall frame parked beside the composer
- * survives the next layout pass; without one it takes the rows above the
- * composer, which every column has.
- */
 const availableArea = (
   container: PreviewMiniPlayerSize,
   obstacles: PreviewMiniPlayerObstacles,
@@ -210,16 +184,6 @@ const overlapsObstacle = (
   );
 };
 
-/**
- * Keeps the player inside the container and off the composer and details
- * card. An overlapping player is moved the shortest distance that leaves it
- * clear: vertically into the rows its own columns have open, or sideways to
- * the space beside an obstacle, so a drag slides along the composer into a
- * margin instead of stopping at its edge. When nothing leaves it clear it
- * keeps its columns and sits below the card; the composer is where the user
- * is typing, but a player under the card cannot be reached at all.
- * minimumX reserves room to the player's left without changing its size.
- */
 export function clampPreviewMiniPlayerPosition(
   position: PreviewMiniPlayerPosition,
   container: PreviewMiniPlayerSize,
@@ -230,7 +194,6 @@ export function clampPreviewMiniPlayerPosition(
   const inside = clampToContainer(position, container, player, minimumX);
   if (!overlapsObstacle(inside, player, container, obstacles)) return inside;
   const gap = PREVIEW_MINI_PLAYER_EDGE_GAP;
-  // The rows open to a player at this x, holding y as close to the drag as they allow.
   const fitRows = (x: number): PreviewMiniPlayerPosition => {
     const span = spanOf(x, player.width);
     return {
@@ -312,9 +275,6 @@ export function resolvePreviewMiniPlayerFrame(input: {
     source,
     availableArea(
       container,
-      // A stored player keeps its size under the details card — the card's
-      // ceiling is a placement concern, not a sizing one, and the clamp pass
-      // relocates the frame into columns the card leaves open.
       position && width ? { composer: obstacles.composer, detailsCard: null } : obstacles,
       reachablePosition && width ? spanOf(reachablePosition.x, containerSize.width) : null,
     ),
@@ -331,13 +291,6 @@ export function resolvePreviewMiniPlayerFrame(input: {
   return { ...clampPreviewMiniPlayerPosition(anchored, container, size, obstacles), ...size };
 }
 
-/**
- * Resizes from any edge or corner while holding the aspect ratio. The edge
- * opposite the dragged one stays anchored, so growth stops at the container
- * on that axis and the pointer keeps tracking the grabbed edge. On a plain edge
- * drag the perpendicular axis may use the whole container, and the player
- * shifts as needed to stay inside.
- */
 export function resizePreviewMiniPlayer(input: {
   readonly start: PreviewMiniPlayerFrame;
   readonly direction: BrowserViewportResizeDirection;
@@ -360,9 +313,6 @@ export function resizePreviewMiniPlayer(input: {
   const south = direction.includes("south");
   const right = start.x + start.width;
   const bottom = start.y + start.height;
-  // Growth stops where the player's current columns meet an obstacle, and a
-  // plain edge drag lets the free axis use everything those columns have. A
-  // wider player may reach new columns; the clamp below slides it clear.
   const span = spanOf(start.x, start.width);
   const floor = floorFor(span, container, obstacles);
   const ceiling = ceilingFor(span, obstacles);

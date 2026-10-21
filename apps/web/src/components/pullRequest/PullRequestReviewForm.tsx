@@ -126,12 +126,19 @@ export function PullRequestReviewForm({
   /**
    * Keep host-specific empty-body rules: Forgejo requires a change-request summary even with lines.
    * @param verdict Permitted review type being considered.
+   * @param summary Candidate text; an empty value determines whether the placeholder may say optional.
    * @returns Whether the current shared body and line comments meet the existing submission rule.
    */
-  const canSubmit = (verdict: PullRequestReviewVerdict) =>
+  const canSubmit = (verdict: PullRequestReviewVerdict, summary: string) =>
     verdict === "request-changes" && requestChangesSummaryRequired
-      ? body.trim().length > 0
-      : verdict === "approve" || body.trim().length > 0 || comments.length > 0;
+      ? summary.trim().length > 0
+      : verdict === "approve" || summary.trim().length > 0 || comments.length > 0;
+  const placeholder =
+    selectedVerdict === undefined || canSubmit(selectedVerdict.value, "")
+      ? t.git.pullRequest.summarizeReviewOptional
+      : selectedVerdict.value === "request-changes" && requestChangesSummaryRequired
+        ? t.git.pullRequest.summarizeYourReviewRequiredToRequestChanges
+        : t.git.pullRequest.summarizeReviewOrAddLines;
 
   return (
     <div className="surface-glass flex min-w-0 flex-col gap-2.5 rounded-card-row p-3 shadow-pr-review-card">
@@ -159,18 +166,16 @@ export function PullRequestReviewForm({
         ref={textareaRef}
         rows={2}
         value={body}
-        placeholder={
-          requestChangesSummaryRequired && verdicts.includes("request-changes")
-            ? t.git.pullRequest.summarizeYourReviewRequiredToRequestChanges
-            : t.git.diff.addAComment
-        }
+        placeholder={placeholder}
         aria-label={t.git.pullRequest.reviewSummary}
         onChange={(event) => setSummary(reviewKey, event.target.value)}
       />
       <div className="flex justify-end">
         <Button
           size="default"
-          disabled={pending || selectedVerdict === undefined || !canSubmit(selectedVerdict.value)}
+          disabled={
+            pending || selectedVerdict === undefined || !canSubmit(selectedVerdict.value, body)
+          }
           onClick={() => {
             if (selectedVerdict !== undefined) void submit(selectedVerdict);
           }}

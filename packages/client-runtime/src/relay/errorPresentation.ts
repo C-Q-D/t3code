@@ -50,6 +50,7 @@ export function relayProtectedErrorMessage(
         return messages.missingLink;
       }
       if (error.reason === "managed_endpoint_allocation_not_ready") return messages.tunnelSettingUp;
+      if (error.reason === "endpoint_provider_not_managed") return messages.activityOnlyLink;
       return messages.rejectedConnection(error.reason);
     case "RelayEnvironmentEndpointUnavailableError":
       return messages.endpointUnavailable(error.reason);
@@ -58,7 +59,7 @@ export function relayProtectedErrorMessage(
     case "RelayEnvironmentLinkFailedError":
       return messages.linkFailed(error.reason);
     case "RelayEnvironmentLinkUnavailableError":
-      return messages.linkUnavailable(error.reason);
+      return messages.linkUnavailable(error.reason, error.provisioningStage);
     case "RelayEnvironmentLinkLimitExceededError":
       return messages.linkLimit(error.maxTunnels);
     case "RelayAgentActivityPublishProofExpiredError":
@@ -96,9 +97,7 @@ export function relayRequestFailureDetail(
 // A host with a current build gets a new tunnel on its own within minutes of
 // coming back, which clears this reason. While it is still reported, the host
 // is either still off or running a build too old to do that.
-export const RELAY_TUNNEL_RELEASED_MESSAGE = englishRelayMessages.tunnelReleased;
 
-/** User-facing text for an offline status, or null when the relay gave no known reason. */
 export function relayOfflineReasonMessage(
   status: Pick<RelayEnvironmentStatusResponse, "offlineReason">,
   messages: RelayMessages = englishRelayMessages,

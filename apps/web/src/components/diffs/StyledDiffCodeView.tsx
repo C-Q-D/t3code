@@ -14,7 +14,6 @@ import { t } from "~/i18n";
 import { DIFF_SURFACE_THEME_UNSAFE_CSS } from "~/lib/diffRendering";
 import { DiffWorkerPoolProvider } from "../DiffWorkerPoolProvider";
 
-/** The app's diff stylesheet, shared by single-file renderers so their separators match. */
 export const DIFF_VIEW_UNSAFE_CSS = `${DIFF_SURFACE_THEME_UNSAFE_CSS}
 /* Pierre computes typography on the host, including standalone PR guide FileDiffs.
    Descendant variables cannot change the font size or line height inherited from it. */
@@ -22,6 +21,13 @@ export const DIFF_VIEW_UNSAFE_CSS = `${DIFF_SURFACE_THEME_UNSAFE_CSS}
   --diffs-font-size: var(--text-code-copy);
   --diffs-line-height: var(--text-code-copy--line-height);
 }
+/* A 1fr track's automatic minimum grows with the currently mounted lines. In split
+   wrap mode that shifts width between columns, rewraps rows and makes the virtualizer
+   repeatedly correct the scroll position. Keep both code columns at the same width. */
+[data-diff-type="split"][data-overflow="wrap"] {
+  --diffs-code-grid: var(--diffs-grid-number-column-width) minmax(0, 1fr);
+}
+
 :is(
   [data-line],
   [data-line-annotation],
@@ -273,16 +279,11 @@ type StyledDiffCodeViewProps<LAnnotation> = (
 ) & {
   readonly options?: StyledDiffCodeViewOptions<LAnnotation>;
   readonly viewerRef?: Ref<CodeViewHandle<LAnnotation, undefined>>;
-  /**
-   * Appended to the shared stylesheet inside the viewer's shadow root, for a surface that has
-   * to restyle chrome the viewer owns — such as replacing its per-file line counts.
-   */
   readonly unsafeCSSExtra?: string;
   /** H1 discussion chrome has taller headers; opt in without changing other diff surfaces. */
   readonly discussion?: boolean;
 };
 
-/** The shared web CodeView surface: app styling and virtualized geometry stay paired here. */
 export function StyledDiffCodeView<LAnnotation = undefined>({
   options,
   viewerRef,
@@ -326,8 +327,6 @@ export function StyledDiffCodeView<LAnnotation = undefined>({
           );
         }}
         {...(viewerRef ? { ref: viewerRef } : {})}
-        // The custom element itself is focusable for keyboard scrolling. Its native outline sits
-        // outside the panel clipping boundary; actual controls inside retain their own indicators.
         className={
           className
             ? `diff-render-surface pn3-code-view outline-none ${className}`

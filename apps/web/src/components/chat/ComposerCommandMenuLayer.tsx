@@ -35,10 +35,7 @@ export function ComposerCommandMenuLayer(props: {
 
   useLayoutEffect(() => {
     const anchor = props.anchor;
-    if (!anchor) {
-      setPosition(null);
-      return;
-    }
+    if (!anchor) return;
 
     const updatePosition = () => {
       const form = anchor.closest<HTMLElement>('[data-chat-composer-form="true"]');
@@ -93,7 +90,7 @@ export function ComposerCommandMenuLayer(props: {
     };
   }, [props.anchor]);
 
-  if (!position) return null;
+  if (!props.anchor || !position) return null;
 
   return createPortal(
     <div

@@ -1,14 +1,6 @@
 /** Routes publish titlebar content without moving it out of their React context. */
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useId,
-  useLayoutEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
+import { useStableCallback } from "~/hooks/useStableCallback";
+import { createContext, useContext, useId, useLayoutEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 /** Route-owned content; optional panel mounts beside the main slab only where the frame exposes it. */
@@ -59,29 +51,23 @@ export function TitlebarSlotProvider({ children }: { children: ReactNode }) {
     actions: [],
     panel: [],
   });
-  const setTarget = useCallback((name: SlotName, target: HTMLDivElement | null) => {
+  const setTarget = useStableCallback((name: SlotName, target: HTMLDivElement | null) => {
     setTargets((current) => (current[name] === target ? current : { ...current, [name]: target }));
-  }, []);
-  const register = useCallback((name: SlotName, owner: string) => {
+  });
+  const register = useStableCallback((name: SlotName, owner: string) => {
     setOwners((current) => ({ ...current, [name]: [...current[name], owner] }));
     return () =>
       setOwners((current) => ({ ...current, [name]: current[name].filter((id) => id !== owner) }));
-  }, []);
+  });
 
-  const value = useMemo(
-    () => ({ targets, owners, setTarget, register, compactPanel, setCompactPanel }),
-    [targets, owners, setTarget, register, compactPanel],
-  );
+  const value = { targets, owners, setTarget, register, compactPanel, setCompactPanel };
   return <TitlebarContext value={value}>{children}</TitlebarContext>;
 }
 
 /** Renders one no-drag destination; the shell mounts exactly one outlet per name. */
 export function TitlebarSlotOutlet({ name }: { name: keyof TitlebarSlotContent }) {
   const { setTarget } = useTitlebarContext();
-  const ref = useCallback(
-    (element: HTMLDivElement | null) => setTarget(name, element),
-    [name, setTarget],
-  );
+  const ref = (element: HTMLDivElement | null) => setTarget(name, element);
   return <div ref={ref} className="window-titlebar-slot no-drag" data-titlebar-slot={name} />;
 }
 

@@ -10,6 +10,7 @@ import { CalendarClockIcon, GaugeIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "../ui/button";
 import type { ComposerBannerStackContent } from "./ComposerBannerStack";
+import { toastManager } from "../ui/toast";
 
 /** Existing run-bound schedule and snooze settings; the caller owns persistence and grants. */
 type RecoveryProps = {
@@ -57,16 +58,15 @@ export function usageLimitRecoveryBannerItem(props: RecoveryProps): ComposerBann
 }
 
 /**
- * Renders automatic-resume and snooze controls and reports recovery-update failures inline.
+ * Renders automatic-resume and snooze controls and reports recovery-update failures through toasts.
  * @param props - Required runId and onChange callback, plus stoppedAt inherited from RecoveryProps.
  * resetAt, recovery, and snoozedUntil may be null; updates are ignored when resetAt is null.
  * onChange asynchronously persists the requested recovery settings.
- * @returns The recovery actions and any inline error; never null. Disables actions while an update
+ * @returns The recovery actions; never null. Disables actions while an update
  * is pending.
  */
 function RecoveryActions({ runId, resetAt, recovery, snoozedUntil, onChange }: RecoveryProps) {
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
     const delay = Date.parse(resetAt ?? "") - Math.max(nowMs, Date.now());
@@ -87,12 +87,15 @@ function RecoveryActions({ runId, resetAt, recovery, snoozedUntil, onChange }: R
   async function toggle(action: "resume" | "snooze") {
     if (resetAt === null) return;
     if (action === "snooze" && !snoozed && Date.parse(resetAt) <= Date.now()) {
-      setError(t.chat.limitRecovery.theResetTimeHasPassedRetryThe);
+      toastManager.add({
+        type: "error",
+        title: t.chat.limitRecovery.snoozeError,
+        description: t.chat.limitRecovery.theResetTimeHasPassedRetryThe,
+      });
       setNowMs(Date.now());
       return;
     }
     setPending(true);
-    setError(null);
     try {
       await onChange({
         runId,
@@ -100,12 +103,20 @@ function RecoveryActions({ runId, resetAt, recovery, snoozedUntil, onChange }: R
         ...(action === "resume" ? { autoResume: !scheduled } : { snooze: !snoozed }),
       });
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : t.chat.limitRecovery.couldNotChangeLimitRecovery,
-      );
+      toastManager.add({
+        type: "error",
+        title:
+          action === "resume"
+            ? t.chat.limitRecovery.autoResumeError
+            : t.chat.limitRecovery.snoozeError,
+        description:
+          cause instanceof Error ? cause.message : t.chat.limitRecovery.couldNotChangeLimitRecovery,
+      });
     }
     setPending(false);
   }
+  // Failures go to a toast: the actions column is auto-sized, so inline error
+  // text would widen it and crush the title.
   return (
     <div
       className="timeline-limit-actions flex flex-wrap items-center gap-1.5"
@@ -138,11 +149,6 @@ function RecoveryActions({ runId, resetAt, recovery, snoozedUntil, onChange }: R
             {pending ? t.chat.limitRecovery.saving : t.chat.limitRecovery.snoozeUntilReset}
           </Button>
         </div>
-      ) : null}
-      {error ? (
-        <p role="alert" className="order-3 basis-full text-secondary-copy text-error-foreground">
-          {error}
-        </p>
       ) : null}
     </div>
   );

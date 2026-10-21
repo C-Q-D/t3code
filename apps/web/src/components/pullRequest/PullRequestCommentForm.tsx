@@ -1,10 +1,6 @@
 /** Owns pull request comment form on the web pull-request surface; host data and agent context remain unchanged. */
 import { t } from "~/i18n";
 import { useAtomCommand } from "~/state/use-atom-command";
-/**
- * The comment half of the floating composer: a remark on the pull request itself, optionally
- * the one that closes or reopens it. The popover around it belongs to PullRequestComposer.
- */
 import type { EnvironmentId, PullRequestDetailView, PullRequestRef } from "@t3tools/contracts";
 import { SendIcon } from "lucide-react";
 import { useState, type RefObject } from "react";
@@ -15,6 +11,8 @@ import { Button } from "../ui/button";
 import { Textarea } from "../ui/textarea";
 import { toastManager } from "../ui/toast";
 import { PullRequestGlyph } from "./pullRequestIcons";
+import { pullRequestReviewKey } from "./pullRequestReviewStore";
+import { useInlineActionConfirm } from "./useInlineActionConfirm";
 
 /**
  * Renders pull request comment form from the supplied display data and callbacks.
@@ -48,6 +46,7 @@ export function PullRequestCommentForm({
   const postComment = useAtomCommand(pullRequestEnvironment.comment, {
     reportFailure: false,
   });
+  const inlineConfirm = useInlineActionConfirm(pullRequestReviewKey(reference));
   const followUpAction =
     detail.state === "open" &&
     detail.capabilities.actions.includes("close") &&
@@ -122,20 +121,34 @@ export function PullRequestCommentForm({
             size="xs"
             variant={followUpAction === "close" ? "destructive-outline" : "outline"}
             disabled={body.trim().length === 0 || submitting !== null || actionPending}
-            onClick={() => void submit(followUpAction)}
+            {...(followUpAction === "close"
+              ? inlineConfirm.props("close", () => void submit("close"))
+              : { onClick: () => void submit("reopen") })}
           >
             {followUpAction === "close" ? (
               <PullRequestGlyph.closed className="size-3.5" />
             ) : (
               <PullRequestGlyph.reopen className="size-3.5" />
             )}
-            {submitting === followUpAction
-              ? followUpAction === "close"
-                ? t.git.pullRequest.closing
-                : t.git.pullRequest.reopening
-              : followUpAction === "close"
-                ? t.git.pullRequest.closeWithComment
-                : t.git.pullRequest.reopenWithComment}
+            {followUpAction === "close" ? (
+              // The longest label holds the width, so the confirming click lands on the button.
+              <span className="inline-grid">
+                <span aria-hidden className="invisible col-start-1 row-start-1">
+                  {t.git.pullRequest.closeWithComment}
+                </span>
+                <span className="col-start-1 row-start-1">
+                  {submitting === "close"
+                    ? t.git.pullRequest.closing
+                    : inlineConfirm.isArmed("close")
+                      ? t.git.pullRequest.confirmClose
+                      : t.git.pullRequest.closeWithComment}
+                </span>
+              </span>
+            ) : submitting === "reopen" ? (
+              t.git.pullRequest.reopening
+            ) : (
+              t.git.pullRequest.reopenWithComment
+            )}
           </Button>
         )}
         <Button

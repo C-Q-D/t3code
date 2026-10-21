@@ -4,6 +4,7 @@ import { AuthOrchestrationOperateScope } from "@t3tools/contracts";
 import { ThreadDetailsControl } from "./ThreadDetailsControl";
 import type { EnvironmentId, ScopedThreadRef, ThreadPullRequestLink } from "@t3tools/contracts";
 import {
+  pullRequestListLines,
   resolveThreadPullRequestChains,
   threadPullRequestKeyOf,
   visibleThreadPullRequests,
@@ -18,7 +19,6 @@ import { threadEnvironment } from "~/state/threads";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { readEnvironmentScope, useEnvironmentScope } from "~/state/session";
 
-import { pullRequestListLines } from "../pullRequest/pullRequestListLines";
 import { MorphIcon } from "~/components/MorphIcon";
 import { linkedPullRequestSnapshotStatus, prStatusIndicator } from "../ThreadStatusIndicators";
 
@@ -143,8 +143,9 @@ export function ThreadDetailsPrRows({
   return (
     <>
       {currentRow}
-      {expanded
-        ? rest.map((link) => (
+      {expanded ? (
+        <div data-thread-details-pr-list className="flex flex-col">
+          {rest.map((link) => (
             <ThreadDetailsPrLinkRow
               key={threadPullRequestKeyOf(link)}
               environmentId={row.environmentId}
@@ -153,8 +154,9 @@ export function ThreadDetailsPrRows({
               onActed={row.onActed}
               {...watchProps(link)}
             />
-          ))
-        : null}
+          ))}
+        </div>
+      ) : null}
       <ThreadDetailsControl
         variant="ghost"
         size="sm"

@@ -1,5 +1,6 @@
 /** Keeps a single focusable discussion action surface mounted across titlebar layout changes. */
-import { useCallback, useLayoutEffect, useRef } from "react";
+import { useStableCallback } from "~/hooks/useStableCallback";
+import { useLayoutEffect, useRef } from "react";
 import { EllipsisIcon, PauseIcon, PlayIcon, Trash2Icon } from "lucide-react";
 import { t } from "~/i18n";
 import { useTitlebarPanelLayout } from "../frame/titlebarSlot";
@@ -31,11 +32,10 @@ export function DiscussionTitlebarActions({
   // outside this region and keep using Base UI's existing finalFocus handling.
   const hasControlFocus = useRef(false);
   const previousCompact = useRef(compact);
-  const returnFocus = useCallback(
+  const returnFocus = useStableCallback(
     () =>
       container.current?.querySelector<HTMLButtonElement>("button:not(:disabled)") ??
       container.current,
-    [],
   );
   useLayoutEffect(() => {
     const layoutChanged = previousCompact.current !== compact;

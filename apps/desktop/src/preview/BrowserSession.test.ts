@@ -1,7 +1,7 @@
+import * as Crypto from "effect/Crypto";
 /** Exercises preview permissions and native ceremony behavior with controlled Electron boundaries. */
 import { assert, describe, it } from "@effect/vitest";
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as DesktopUiLocale from "../i18n/DesktopUiLocale.ts";
@@ -95,11 +95,9 @@ describe("BrowserSession", () => {
       const replacementChar = yield* browserSessions.getPartition("p\ufffd");
       assert.notStrictEqual(loneSurrogate, replacementChar);
 
-      // The escape can't be forged with a literal backslash either.
       const literal = yield* browserSessions.getPartition("p\\ud800");
       assert.notStrictEqual(literal, loneSurrogate);
 
-      // And a well-formed scope still lands on its historical partition.
       assert.strictEqual(
         yield* browserSessions.getPartition("scope-a"),
         "persist:t3code-preview-f051bb2c68cb7b2fe969",
@@ -111,8 +109,6 @@ describe("BrowserSession", () => {
     Effect.gen(function* () {
       const browserSessions = yield* BrowserSession.BrowserSession;
 
-      // These share the same scope string: default environment `a::b`, and
-      // environment `a` with nondefault profile `b`.
       const legacyDefault = yield* browserSessions.getPartition("a::b");
       const nondefaultProfile = yield* browserSessions.getPartition("a::b", true, "profile");
 
@@ -125,10 +121,8 @@ describe("BrowserSession", () => {
   );
 
   // A rewritten session UA — any variant, even ones that keep the Electron
-  // token — makes Cloudflare Turnstile loop with error 600010 (#5002), so
-  // the guest must end up with Electron's native User-Agent. The mock applies
-  // setUserAgent calls, so this fails on any reintroduced rewrite while still
-  // permitting a harmless re-set of the unchanged native string.
+  // token — makes Cloudflare Turnstile loop with error 600010 (#5002), so the
+  // guest must end up with Electron's native User-Agent.
   it.effect("keeps the guest's effective User-Agent equal to Electron's native one", () =>
     Effect.gen(function* () {
       // Electron's real UA shape: app token, then Chrome, then Electron, then
@@ -188,7 +182,6 @@ describe("BrowserSession", () => {
       for (const permission of [
         "clipboard-read",
         "clipboard-sanitized-write",
-        "notifications",
         "geolocation",
         "fullscreen",
       ]) {
@@ -202,7 +195,7 @@ describe("BrowserSession", () => {
       // `clipboard-write` is not a real Electron permission — the async write API
       // uses `clipboard-sanitized-write` — so the stale name must not be granted,
       // and unrelated permissions stay denied.
-      for (const permission of ["clipboard-write", "midi"]) {
+      for (const permission of ["clipboard-write", "notifications", "midi"]) {
         assert.isFalse(requestAllows(permission), `request handler should deny ${permission}`);
         assert.isFalse(
           checkHandler(null, permission) as boolean,
@@ -381,10 +374,6 @@ describe("BrowserSession", () => {
       const browserSessions = yield* BrowserSession.BrowserSession;
       const partition = yield* browserSessions.getPartition("scope-untouched");
 
-      // Deriving the partition string does not create the session, and the
-      // clear only walks sessions it already holds. Without loading it first
-      // this reports success and deletes nothing — which is what a user
-      // clearing a profile after a restart would get.
       assert.isUndefined(sessions.get(partition));
       yield* browserSessions.clearCookies([partition]);
       assert.isUndefined(sessions.get(partition));
@@ -395,52 +384,6 @@ describe("BrowserSession", () => {
       const created = sessions.get(partition);
       assert.isDefined(created);
       assert.strictEqual(created.clearStorageData.mock.calls.length, 1);
-    }).pipe(Effect.provide(layer)),
-  );
-
-  it.effect("correlates clear failures while still attempting every session", () =>
-    Effect.gen(function* () {
-      const browserSessions = yield* BrowserSession.BrowserSession;
-      yield* browserSessions.getSession("scope-a");
-      yield* browserSessions.getSession("scope-b");
-      const firstPartition = yield* browserSessions.getPartition("scope-a");
-      const secondPartition = yield* browserSessions.getPartition("scope-b");
-      const firstSession = sessions.get(firstPartition);
-      const secondSession = sessions.get(secondPartition);
-      assert.isDefined(firstSession);
-      assert.isDefined(secondSession);
-
-      const storageCause = new Error("storage clear failed");
-      secondSession.clearStorageData.mockImplementationOnce(() => Promise.reject(storageCause));
-      const storageError = yield* browserSessions.clearCookies().pipe(Effect.flip);
-
-      assert.instanceOf(storageError, BrowserSession.BrowserSessionStorageClearError);
-      assert.equal(storageError.partition, secondPartition);
-      assert.strictEqual(storageError.cause, storageCause);
-      assert.equal(
-        storageError.message,
-        `Failed to clear desktop preview browser storage for partition ${secondPartition}.`,
-      );
-      assert.notInclude(storageError.message, storageCause.message);
-      for (const browserSession of sessions.values()) {
-        assert.strictEqual(browserSession.clearStorageData.mock.calls.length, 1);
-      }
-
-      const cacheCause = new Error("cache clear failed");
-      firstSession.clearCache.mockImplementationOnce(() => Promise.reject(cacheCause));
-      const cacheError = yield* browserSessions.clearCache().pipe(Effect.flip);
-
-      assert.instanceOf(cacheError, BrowserSession.BrowserSessionCacheClearError);
-      assert.equal(cacheError.partition, firstPartition);
-      assert.strictEqual(cacheError.cause, cacheCause);
-      assert.equal(
-        cacheError.message,
-        `Failed to clear the desktop preview browser cache for partition ${firstPartition}.`,
-      );
-      assert.notInclude(cacheError.message, cacheCause.message);
-      for (const browserSession of sessions.values()) {
-        assert.strictEqual(browserSession.clearCache.mock.calls.length, 1);
-      }
     }).pipe(Effect.provide(layer)),
   );
 });

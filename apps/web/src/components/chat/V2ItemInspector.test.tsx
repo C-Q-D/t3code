@@ -19,7 +19,10 @@ vi.mock("../../state/queries", () => ({
   useTurnItemDetail: () => ({ isPending: false, error: null }),
 }));
 vi.mock("../../state/v2ItemSupport", () => ({ useV2ItemSupport: () => ({}) }));
-vi.mock("../../hooks/useTheme", () => ({ useTheme: () => ({ resolvedTheme: "dark" }) }));
+vi.mock("../../hooks/useTheme", () => ({
+  useTheme: () => ({ resolvedTheme: "dark" }),
+  useRenderedAppearance: () => "dark",
+}));
 
 let host: HTMLDivElement;
 let root: Root;

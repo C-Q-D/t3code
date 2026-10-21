@@ -3,10 +3,6 @@ import { t } from "~/i18n";
 /** Cap for the per-thread "recently seen" URL list shown in the empty state. */
 export const PREVIEW_RECENT_URL_LIMIT = 10;
 
-/**
- * Common Chromium error codes mapped to a short human label. Used by the
- * unreachable view to drop the raw `ERR_*` code in favour of friendlier copy.
- */
 export const PREVIEW_ERROR_CODE_MESSAGES: Readonly<Record<string, string>> = Object.freeze({
   ERR_NAME_NOT_RESOLVED: t.tools.preview.dnsNotFound,
   ERR_NAME_RESOLUTION_FAILED: t.tools.preview.dnsNotFound,

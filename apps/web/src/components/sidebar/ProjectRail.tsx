@@ -12,7 +12,7 @@ import {
   SearchIcon,
   SettingsIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useReducer, useRef, type ComponentProps } from "react";
+import { useState, useEffect, useReducer, useRef, type ComponentProps } from "react";
 import { t } from "~/i18n";
 import { cn } from "~/lib/utils";
 import { openCommandPalette } from "../../commandPaletteBus";
@@ -121,7 +121,8 @@ export function ProjectRail() {
   const highlightedKey = useRef<string | null>(null);
   const suppressScopeChange = useRef(false);
   const filter = useComboboxFilter();
-  const groups = useMemo(() => {
+  // The compiler leaves this picker pipeline uncached; preserve grouping across query-only renders.
+  const calculateGroups = () => {
     const orderedProjects =
       sortOrder === "manual"
         ? orderItemsByPreferredIds({
@@ -146,37 +147,104 @@ export function ProjectRail() {
       threads,
       sortOrder,
     );
-  }, [identities, primaryEnvironmentId, projectOrder, projects, settings, sortOrder, threads]);
-  const selection = useMemo(
-    () =>
-      deriveProjectRailSelection({
-        groups,
-        key: persistedKey,
+  };
+  const [groupsCache, setGroupsCache] = useState(() => ({
+    inputs: [
+      identities,
+      primaryEnvironmentId,
+      projectOrder,
+      projects,
+      settings,
+      sortOrder,
+      threads,
+    ] as const,
+    value: calculateGroups(),
+  }));
+  let groups = groupsCache.value;
+  if (
+    !Object.is(groupsCache.inputs[0], identities) ||
+    !Object.is(groupsCache.inputs[1], primaryEnvironmentId) ||
+    !Object.is(groupsCache.inputs[2], projectOrder) ||
+    !Object.is(groupsCache.inputs[3], projects) ||
+    !Object.is(groupsCache.inputs[4], settings) ||
+    !Object.is(groupsCache.inputs[5], sortOrder) ||
+    !Object.is(groupsCache.inputs[6], threads)
+  ) {
+    groups = calculateGroups();
+    setGroupsCache({
+      inputs: [
+        identities,
+        primaryEnvironmentId,
+        projectOrder,
+        projects,
         settings,
-        canClearMissingScope: snapshotsReady && configsReady,
-      }),
-    [configsReady, groups, persistedKey, settings, snapshotsReady],
-  );
+        sortOrder,
+        threads,
+      ] as const,
+      value: groups,
+    });
+  }
+  const calculateSelection = () =>
+    deriveProjectRailSelection({
+      groups,
+      key: persistedKey,
+      settings,
+      canClearMissingScope: snapshotsReady && configsReady,
+    });
+  const [selectionCache, setSelectionCache] = useState(() => ({
+    inputs: [configsReady, groups, persistedKey, settings, snapshotsReady] as const,
+    value: calculateSelection(),
+  }));
+  let selection = selectionCache.value;
+  if (
+    !Object.is(selectionCache.inputs[0], configsReady) ||
+    !Object.is(selectionCache.inputs[1], groups) ||
+    !Object.is(selectionCache.inputs[2], persistedKey) ||
+    !Object.is(selectionCache.inputs[3], settings) ||
+    !Object.is(selectionCache.inputs[4], snapshotsReady)
+  ) {
+    selection = calculateSelection();
+    setSelectionCache({
+      inputs: [configsReady, groups, persistedKey, settings, snapshotsReady] as const,
+      value: selection,
+    });
+  }
   useEffect(() => {
     // Settings unmounts Sidebar, so the rail must also reconcile deleted scopes after all snapshots arrive.
     if (selection.key !== persistedKey) setScope(selection.key);
   }, [persistedKey, selection.key, setScope]);
-  const items = useMemo(
-    () => [
-      { value: "all", label: t.sidebar.projects.all },
-      ...groups.map((group) => ({ value: group.projectKey, label: group.displayName })),
-    ],
-    [groups],
-  );
-  const filteredItems = useMemo(
-    () =>
-      filterSidebarProjectScopeItems({
-        items,
-        query,
-        matches: (item, search) => filter.contains(item.label, search),
-      }),
-    [filter, items, query],
-  );
+  const calculateItems = () => [
+    { value: "all", label: t.sidebar.projects.all },
+    ...groups.map((group) => ({ value: group.projectKey, label: group.displayName })),
+  ];
+  const [itemsCache, setItemsCache] = useState(() => ({
+    inputs: [groups] as const,
+    value: calculateItems(),
+  }));
+  let items = itemsCache.value;
+  if (!Object.is(itemsCache.inputs[0], groups)) {
+    items = calculateItems();
+    setItemsCache({ inputs: [groups] as const, value: items });
+  }
+  const calculateFilteredItems = () =>
+    filterSidebarProjectScopeItems({
+      items,
+      query,
+      matches: (item, search) => filter.contains(item.label, search),
+    });
+  const [filteredItemsCache, setFilteredItemsCache] = useState(() => ({
+    inputs: [filter, items, query] as const,
+    value: calculateFilteredItems(),
+  }));
+  let filteredItems = filteredItemsCache.value;
+  if (
+    !Object.is(filteredItemsCache.inputs[0], filter) ||
+    !Object.is(filteredItemsCache.inputs[1], items) ||
+    !Object.is(filteredItemsCache.inputs[2], query)
+  ) {
+    filteredItems = calculateFilteredItems();
+    setFilteredItemsCache({ inputs: [filter, items, query] as const, value: filteredItems });
+  }
   const showEnvironments = projectGroupsSpanEnvironments(groups);
   const activeItem = items.find((item) => item.value === (selection.key ?? "all")) ?? null;
 

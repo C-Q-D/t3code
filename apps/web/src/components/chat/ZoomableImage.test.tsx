@@ -77,7 +77,7 @@ async function pointer(type: string, x: number) {
   await act(async () => {
     const event = new MouseEvent(type, { bubbles: true, clientX: x, clientY: 150, button: 0 });
     Object.defineProperties(event, {
-      timeStamp: { value: performance.now() },
+      timeStamp: { value: now },
       pointerId: { value: 1 },
       pointerType: { value: "mouse" },
     });

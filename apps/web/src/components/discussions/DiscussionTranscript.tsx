@@ -13,7 +13,7 @@ import { MemoizedDiscussionLiveRow } from "./DiscussionLiveRow";
 import { orderDiscussionEntries } from "./discussionLive.logic";
 import { discussionLiveWave } from "./discussionMotion.logic";
 import { Link } from "@tanstack/react-router";
-import { memo, useLayoutEffect, useMemo, useRef, type CSSProperties } from "react";
+import { useState, useLayoutEffect, useRef, type CSSProperties } from "react";
 import { CheckCheckIcon, ClockIcon, PauseIcon } from "lucide-react";
 import { cn } from "~/lib/utils";
 import { t } from "~/i18n";
@@ -81,13 +81,11 @@ type DiscussionEntryRowProps = DiscussionStatementHeading & {
  * @returns A 32px avatar beside a chat bubble; AI is left-aligned and user material is right-aligned.
  */
 function DiscussionEntryRow(props: DiscussionEntryRowProps) {
-  const { entry } = props;
+  const { entry, onOpenDiff } = props;
   // File selection can rerender this row without changing Markdown or its thread context.
-  const threadRef = useMemo(
-    () =>
-      props.threadId ? { environmentId: props.environmentId, threadId: props.threadId } : undefined,
-    [props.environmentId, props.threadId],
-  );
+  const threadRef = props.threadId
+    ? { environmentId: props.environmentId, threadId: props.threadId }
+    : undefined;
   if (entry.kind === "user")
     return (
       <div className="flex items-start gap-3">
@@ -194,7 +192,7 @@ function DiscussionEntryRow(props: DiscussionEntryRowProps) {
             selectedPath={props.selectedPath}
             onOpenFile={
               discussionFilesCanOpen(entry.id, entry.files)
-                ? (filePath) => props.onOpenDiff({ entryId: entry.id, filePath })
+                ? (filePath) => onOpenDiff({ entryId: entry.id, filePath })
                 : undefined
             }
           />
@@ -204,7 +202,7 @@ function DiscussionEntryRow(props: DiscussionEntryRowProps) {
   );
 }
 
-const MemoizedDiscussionEntryRow = memo(DiscussionEntryRow);
+const MemoizedDiscussionEntryRow = DiscussionEntryRow;
 
 /**
  * Shows the shared next assignment without rerendering when unrelated stream text grows.
@@ -245,7 +243,7 @@ function DiscussionNextRow(props: {
   );
 }
 
-const MemoizedDiscussionNextRow = memo(DiscussionNextRow);
+const MemoizedDiscussionNextRow = DiscussionNextRow;
 
 /**
  * Displays the discussion topic independently of subscription entries; receipts belong only to interjections.
@@ -265,7 +263,7 @@ function DiscussionTopicRow({ text }: { text: string }) {
   );
 }
 
-const MemoizedDiscussionTopicRow = memo(DiscussionTopicRow);
+const MemoizedDiscussionTopicRow = DiscussionTopicRow;
 
 /**
  * Reads the route's shared subscription atom and follows growth only while the reader is near the bottom.
@@ -295,11 +293,21 @@ export function DiscussionTranscript({
     serverEnvironment.discussionLive({ environmentId, input: { discussionId: discussion.id } }),
   );
   const entries = query.data?.entries ?? EMPTY_ENTRIES;
-  const orderedEntries = useMemo(() => orderDiscussionEntries(entries), [entries]);
+  // Preserve derived row inputs across stream-independent renders; the compiler does not cache this pipeline.
+  const calculateOrderedEntries = () => orderDiscussionEntries(entries);
+  const [orderedEntriesCache, setOrderedEntriesCache] = useState(() => ({
+    inputs: [entries] as const,
+    value: calculateOrderedEntries(),
+  }));
+  let orderedEntries = orderedEntriesCache.value;
+  if (!Object.is(orderedEntriesCache.inputs[0], entries)) {
+    orderedEntries = calculateOrderedEntries();
+    setOrderedEntriesCache({ inputs: [entries] as const, value: orderedEntries });
+  }
   const providers =
     useAtomValue(serverEnvironment.providersValueAtom(environmentId)) ?? EMPTY_SERVER_PROVIDERS;
   const settings = useEnvironmentSettings(environmentId);
-  const modelLabels = useMemo(() => {
+  const calculateModelLabels = () => {
     const instances = applyProviderInstanceSettings(
       deriveProviderInstanceEntries(providers),
       settings,
@@ -319,11 +327,37 @@ export function DiscussionTranscript({
         ?.find((option) => option.slug === seat.modelSelection.model);
       return discussionModelLabel(seat.modelSelection, instance, model);
     });
-  }, [discussion.projectId, discussion.seats, providers, settings]);
-  const items = useMemo(
-    () => discussionTranscriptItems(orderedEntries, discussion, t.discussions),
-    [orderedEntries, discussion],
-  );
+  };
+  const [modelLabelsCache, setModelLabelsCache] = useState(() => ({
+    inputs: [discussion.projectId, discussion.seats, providers, settings] as const,
+    value: calculateModelLabels(),
+  }));
+  let modelLabels = modelLabelsCache.value;
+  if (
+    !Object.is(modelLabelsCache.inputs[0], discussion.projectId) ||
+    !Object.is(modelLabelsCache.inputs[1], discussion.seats) ||
+    !Object.is(modelLabelsCache.inputs[2], providers) ||
+    !Object.is(modelLabelsCache.inputs[3], settings)
+  ) {
+    modelLabels = calculateModelLabels();
+    setModelLabelsCache({
+      inputs: [discussion.projectId, discussion.seats, providers, settings] as const,
+      value: modelLabels,
+    });
+  }
+  const calculateItems = () => discussionTranscriptItems(orderedEntries, discussion, t.discussions);
+  const [itemsCache, setItemsCache] = useState(() => ({
+    inputs: [orderedEntries, discussion] as const,
+    value: calculateItems(),
+  }));
+  let items = itemsCache.value;
+  if (
+    !Object.is(itemsCache.inputs[0], orderedEntries) ||
+    !Object.is(itemsCache.inputs[1], discussion)
+  ) {
+    items = calculateItems();
+    setItemsCache({ inputs: [orderedEntries, discussion] as const, value: items });
+  }
   const viewportRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const followsBottom = useRef(true);

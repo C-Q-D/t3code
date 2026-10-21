@@ -12,12 +12,13 @@ import {
   type AtomCommandResult,
 } from "@t3tools/client-runtime/state/runtime";
 import { scopeProjectRef, scopeThreadRef } from "@t3tools/client-runtime/environment";
+import { planProjectRemoval } from "@t3tools/client-runtime/state/projects";
 import { AsyncResult } from "effect/reactivity";
 import { type EnvironmentId, type ProjectIconOverride } from "@t3tools/contracts";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import * as Cause from "effect/Cause";
 import { InfoIcon, MonitorIcon, Trash2Icon } from "lucide-react";
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 
 import { useComposerDraftStore } from "../../composerDraftStore";
 import { releaseProjectDraftUploads } from "../../lib/composerDraftUploads";
@@ -33,8 +34,8 @@ import { ProjectFavicon } from "../ProjectFavicon";
 import { Alert, AlertDescription } from "../ui/alert";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { stackedThreadToast, toastManager } from "../ui/toast";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import {
   SettingResetButton,
   SettingsPageContainer,
@@ -55,11 +56,6 @@ const ProjectIconPickerDialog = lazy(() =>
     default: module.ProjectIconPickerDialog,
   })),
 );
-
-/** Identifies one physical project within its environment for removal bookkeeping. */
-function memberKey(member: { environmentId: string; id: string }): string {
-  return `${member.environmentId}:${member.id}`;
-}
 
 /** Keeps long overview values readable with both keyboard focus and pointer hover. */
 function ProjectOverviewValue({ value }: { value: string }) {
@@ -88,25 +84,24 @@ export function ProjectSettingsPanel({
   projectKey,
   environmentId = null,
   checkoutKey = null,
+  unavailable,
 }: {
   projectKey: string;
   environmentId?: EnvironmentId | null;
   checkoutKey?: string | null;
+  unavailable?: ReactNode;
 }) {
   const groups = useSettingsProjectGroups();
   const navigate = useNavigate({ from: "/settings" });
   const pathname = useLocation({ select: (location) => location.pathname });
 
   const selected = groups.find((group) => group.projectKey === projectKey) ?? null;
-  const members = useMemo(
-    () =>
-      selected?.memberProjects.filter(
-        (member) =>
-          (environmentId === null || member.environmentId === environmentId) &&
-          (checkoutKey === null || member.physicalProjectKey === checkoutKey),
-      ) ?? [],
-    [selected, environmentId, checkoutKey],
-  );
+  const members =
+    selected?.memberProjects.filter(
+      (member) =>
+        (environmentId === null || member.environmentId === environmentId) &&
+        (checkoutKey === null || member.physicalProjectKey === checkoutKey),
+    ) ?? [];
 
   // Remember the members of the last rendered group so a grouping-rule change
   // (which changes the group key) can follow the project to its new group.
@@ -126,8 +121,6 @@ export function ProjectSettingsPanel({
     };
   }, [selected, members, environmentId, checkoutKey]);
 
-  // A grouping-rule change replaces the group key mid-visit; follow the
-  // project to its new key instead of parking on the not-found state.
   useEffect(() => {
     if (members.length > 0) return;
     const last = lastSelectionRef.current;
@@ -153,6 +146,8 @@ export function ProjectSettingsPanel({
       });
     }
   }, [groups, navigate, pathname, projectKey, members.length, environmentId, checkoutKey]);
+
+  if ((!selected || members.length === 0) && unavailable != null) return unavailable;
 
   if (!selected) {
     return (
@@ -195,9 +190,8 @@ function ProjectDetail({
   const navigate = useNavigate({ from: "/settings" });
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const { environments } = useEnvironments();
-  const environmentById = useMemo(
-    () => new Map(environments.map((environment) => [environment.environmentId, environment])),
-    [environments],
+  const environmentById = new Map(
+    environments.map((environment) => [environment.environmentId, environment]),
   );
   const editableIds = useEnvironmentsWithScope(group.memberProjects, AuthOrchestrationOperateScope);
   const canEditGroup = group.memberProjects.every((member) =>
@@ -228,7 +222,7 @@ function ProjectDetail({
       ? window.desktopBridge?.pickProjectFavicon
       : undefined;
 
-  const reportFailure = useCallback((title: string, result: AtomCommandResult<void, unknown>) => {
+  const reportFailure = (title: string, result: AtomCommandResult<void, unknown>) => {
     if (result._tag !== "Failure" || isAtomCommandInterrupted(result)) return;
     const error = squashAtomCommandFailure(result);
     toastManager.add(
@@ -239,221 +233,202 @@ function ProjectDetail({
           error instanceof Error ? error.message : t.settings.archive.actionErrorDescription,
       }),
     );
-  }, []);
+  };
 
-  const checkProjectAccess = useCallback(
-    (members: ReadonlyArray<SidebarProjectGroupMember>, failureTitle: string) => {
-      const denied = members.find(
-        (member) => !readEnvironmentScope(member.environmentId, AuthOrchestrationOperateScope),
-      );
-      if (!denied) return null;
-      const result = AsyncResult.failure<void, Error>(
-        Cause.fail(
-          new Error(
-            t.settings.projectSettings.connectionChangeProjectsError(denied.environmentLabel),
-          ),
+  const checkProjectAccess = (
+    members: ReadonlyArray<SidebarProjectGroupMember>,
+    failureTitle: string,
+  ) => {
+    const denied = members.find(
+      (member) => !readEnvironmentScope(member.environmentId, AuthOrchestrationOperateScope),
+    );
+    if (!denied) return null;
+    const result = AsyncResult.failure<void, Error>(
+      Cause.fail(
+        new Error(
+          t.settings.projectSettings.connectionChangeProjectsError(denied.environmentLabel),
         ),
+      ),
+    );
+    reportFailure(failureTitle, result);
+    return result;
+  };
+
+  const updateAllMembers = async (
+    input: Partial<{
+      title: string;
+      faviconPath: string | null;
+      projectIcon: ProjectIconOverride | null;
+    }>,
+    failureTitle: string,
+  ): Promise<AtomCommandResult<void, unknown>> => {
+    const denied = checkProjectAccess(group.memberProjects, failureTitle);
+    if (denied) return denied;
+    const unavailable = group.memberProjects.find((member) => {
+      const environment = environmentById.get(member.environmentId);
+      return environment?.connection.phase !== "connected" || !environment.serverConfig;
+    });
+    if (unavailable) {
+      const error = new Error(
+        t.settings.projectSettings.connectAndTryAgain(unavailable.environmentLabel),
       );
+      const result: AtomCommandResult<void, unknown> = AsyncResult.failure(Cause.fail(error));
       reportFailure(failureTitle, result);
       return result;
-    },
-    [reportFailure],
-  );
-
-  // Group-shared fields live on each physical project record, so a
-  // group-level edit fans out to every member.
-  const updateAllMembers = useCallback(
-    async (
-      input: Partial<{
-        title: string;
-        faviconPath: string | null;
-        projectIcon: ProjectIconOverride | null;
-      }>,
-      failureTitle: string,
-    ): Promise<AtomCommandResult<void, unknown>> => {
-      const denied = checkProjectAccess(group.memberProjects, failureTitle);
-      if (denied) return denied;
-      const unavailable = group.memberProjects.find((member) => {
-        const environment = environmentById.get(member.environmentId);
-        return environment?.connection.phase !== "connected" || !environment.serverConfig;
-      });
-      if (unavailable) {
-        const error = new Error(
-          t.settings.projectSettings.connectAndTryAgain(unavailable.environmentLabel),
+    }
+    for (const member of group.memberProjects) {
+      const revoked = checkProjectAccess([member], failureTitle);
+      if (revoked) return revoked;
+      const result = mapAtomCommandResult(
+        await updateProject({
+          environmentId: member.environmentId,
+          input: { projectId: member.id, ...input },
+        }),
+        () => undefined,
+      );
+      if (result._tag === "Failure") {
+        reportFailure(
+          group.memberProjects.length > 1
+            ? t.settings.projectSettings.on(failureTitle, member.environmentLabel)
+            : failureTitle,
+          result,
         );
-        const result: AtomCommandResult<void, unknown> = AsyncResult.failure(Cause.fail(error));
-        reportFailure(failureTitle, result);
         return result;
       }
-      for (const member of group.memberProjects) {
-        const revoked = checkProjectAccess([member], failureTitle);
-        if (revoked) return revoked;
-        const result = mapAtomCommandResult(
-          await updateProject({
-            environmentId: member.environmentId,
-            input: { projectId: member.id, ...input },
-          }),
-          () => undefined,
-        );
-        if (result._tag === "Failure") {
-          // A partial fan-out is possible: earlier members already took the
-          // write. Name the environment so the user knows where it stopped.
-          reportFailure(
-            group.memberProjects.length > 1
-              ? t.settings.projectSettings.on(failureTitle, member.environmentLabel)
-              : failureTitle,
-            result,
-          );
-          return result;
-        }
-      }
-      return AsyncResult.success(undefined);
-    },
-    [checkProjectAccess, environmentById, group.memberProjects, reportFailure, updateProject],
-  );
+    }
+    return AsyncResult.success(undefined);
+  };
 
-  const renameGroup = useCallback(
-    async (nextTitle: string, wasEdited: boolean) => {
-      const title = nextTitle.trim();
-      if (!title) {
-        toastManager.add({
-          type: "warning",
-          title: t.settings.projectSettings.projectTitleCannotBeEmpty,
-        });
-        return;
-      }
-      if (
-        !projectGroupTitleNeedsUpdate(
-          group.memberProjects.map((member) => member.title),
-          title,
-          wasEdited,
-        )
-      ) {
-        return;
-      }
-      await updateAllMembers({ title }, t.settings.projectSettings.failedToRenameProject);
-    },
-    [group.memberProjects, updateAllMembers],
-  );
+  const renameGroup = async (nextTitle: string, wasEdited: boolean) => {
+    const title = nextTitle.trim();
+    if (!title) {
+      toastManager.add({
+        type: "warning",
+        title: t.settings.projectSettings.projectTitleCannotBeEmpty,
+      });
+      return;
+    }
+    if (
+      !projectGroupTitleNeedsUpdate(
+        group.memberProjects.map((member) => member.title),
+        title,
+        wasEdited,
+      )
+    ) {
+      return;
+    }
+    await updateAllMembers({ title }, t.settings.projectSettings.failedToRenameProject);
+  };
 
-  // ----- project icon -----
   const [faviconPickerOpen, setFaviconPickerOpen] = useComposerMenuState(!canEditGroup);
   const [iconPickerOpen, setIconPickerOpen] = useComposerMenuState(!canEditGroup);
   const [isSavingFavicon, setIsSavingFavicon] = useState(false);
   const savingFaviconRef = useRef(false);
-  const setProjectIcon = useCallback(
-    async (input: { faviconPath: string | null; projectIcon: ProjectIconOverride | null }) => {
-      if (savingFaviconRef.current) return;
-      savingFaviconRef.current = true;
-      setIsSavingFavicon(true);
-      try {
-        await updateAllMembers(input, t.settings.projectSettings.failedToUpdateProjectIcon);
-      } finally {
-        savingFaviconRef.current = false;
-        setIsSavingFavicon(false);
-      }
-    },
-    [updateAllMembers],
-  );
+  const setProjectIcon = async (input: {
+    faviconPath: string | null;
+    projectIcon: ProjectIconOverride | null;
+  }) => {
+    if (savingFaviconRef.current) return;
+    savingFaviconRef.current = true;
+    setIsSavingFavicon(true);
+    return await (async () => {
+      await updateAllMembers(input, t.settings.projectSettings.failedToUpdateProjectIcon);
+    })().finally(() => {
+      savingFaviconRef.current = false;
+      setIsSavingFavicon(false);
+    });
+  };
 
   const hasMultipleCheckouts = group.memberProjects.length > 1;
 
-  const removeMembers = useCallback(
-    async (members: ReadonlyArray<SidebarProjectGroupMember>) => {
-      if (checkProjectAccess(members, t.settings.projectSettings.failedToRemoveProject)) return;
-      const api = readLocalApi();
-      if (!api) return;
+  const removeMembers = async (members: ReadonlyArray<SidebarProjectGroupMember>) => {
+    if (checkProjectAccess(members, t.settings.projectSettings.failedToRemoveProject)) return;
+    const api = readLocalApi();
+    if (!api) return;
 
-      const memberKeys = new Set(members.map(memberKey));
-      const projectThreads = threads.filter((thread) =>
-        memberKeys.has(`${thread.environmentId}:${thread.projectId}`),
-      );
-      const isWholeGroup = members.length === group.memberProjects.length;
-      const targetKind = hasOtherMembers || !isWholeGroup ? "checkout" : "project";
-      const singleMember = members.length === 1 ? members[0]! : null;
-      const targetLabel = singleMember?.title ?? group.displayName;
-      const confirmed = await settlePromise(() =>
-        api.dialogs.confirm(
-          [
-            projectThreads.length > 0
-              ? t.settings.projectSettings.removeAndDeleteItsThread(
-                  targetKind,
-                  targetLabel,
-                  projectThreads.length,
-                  Boolean(projectThreads.length === 1),
-                )
-              : t.settings.projectSettings.remove(targetKind, targetLabel),
-            ...(singleMember
-              ? [
-                  t.settings.projectSettings.path(singleMember.workspaceRoot),
-                  ...(singleMember.environmentLabel
-                    ? [t.settings.projectSettings.environment(singleMember.environmentLabel)]
-                    : []),
-                ]
-              : [t.settings.projectSettings.thisRemovesGroupedProjectEntries(members.length)]),
-            ...(projectThreads.length > 0
-              ? [t.settings.projectSettings.permanentlyClearsConversationHistoryThreadsHint]
-              : [t.settings.projectSettings.permanentlyClearsAnyArchivedConversationHint]),
-            isWholeGroup && !hasOtherMembers
-              ? t.settings.projectSettings.removesProjectEntriesFilesDiskHint
-              : t.settings.projectSettings.otherEntriesGroupedProjectUnaffectedHint,
-            t.settings.projectSettings.thisActionCannotBeUndone,
-          ].join("\n"),
-          { variant: "destructive" },
-        ),
-      );
-      if (confirmed._tag === "Failure" || !confirmed.value) return;
-      if (checkProjectAccess(members, t.settings.projectSettings.failedToRemoveProject)) return;
-
-      const draftStore = useComposerDraftStore.getState();
-      for (const member of members) {
-        if (checkProjectAccess([member], t.settings.projectSettings.failedToRemoveProject)) return;
-        const memberThreads = projectThreads.filter(
-          (thread) =>
-            thread.environmentId === member.environmentId && thread.projectId === member.id,
-        );
-        const result = mapAtomCommandResult(
-          await deleteProject({
-            environmentId: member.environmentId,
-            input: {
-              projectId: member.id,
-              force: true,
-            },
-          }),
-          () => undefined,
-        );
-        if (result._tag === "Failure") {
-          reportFailure(t.settings.projectSettings.failedToRemove(member.title), result);
-          return;
-        }
-        const projectRef = scopeProjectRef(member.environmentId, member.id);
-        await waitForProjectRemoval(projectRef);
-        releaseProjectDraftUploads(
-          projectRef,
-          memberThreads.map((thread) => scopeThreadRef(thread.environmentId, thread.id)),
-        );
-        const projectDraftThread = draftStore.getDraftThreadByProjectRef(projectRef);
-        if (projectDraftThread) {
-          draftStore.clearDraftThread(projectDraftThread.draftId);
-        }
-        draftStore.clearProjectDraftThreadId(projectRef);
-      }
-
-      if (isWholeGroup && !hasOtherMembers) {
-        void navigate({ to: "/", replace: true });
-      }
-    },
-    [
-      checkProjectAccess,
-      deleteProject,
-      group.displayName,
-      group.memberProjects.length,
+    const { projectThreads, isWholeGroup, targetKind } = planProjectRemoval({
+      members,
+      groupMemberCount: group.memberProjects.length,
       hasOtherMembers,
-      navigate,
-      reportFailure,
+      displayName: group.displayName,
       threads,
-    ],
-  );
+    });
+    const singleMember = members.length === 1 ? members[0]! : null;
+    const targetLabel = singleMember?.title ?? group.displayName;
+    const confirmed = await settlePromise(() =>
+      api.dialogs.confirm(
+        [
+          projectThreads.length > 0
+            ? t.settings.projectSettings.removeAndDeleteItsThread(
+                targetKind,
+                targetLabel,
+                projectThreads.length,
+                Boolean(projectThreads.length === 1),
+              )
+            : t.settings.projectSettings.remove(targetKind, targetLabel),
+          ...(singleMember
+            ? [
+                t.settings.projectSettings.path(singleMember.workspaceRoot),
+                ...(singleMember.environmentLabel
+                  ? [t.settings.projectSettings.environment(singleMember.environmentLabel)]
+                  : []),
+              ]
+            : [t.settings.projectSettings.thisRemovesGroupedProjectEntries(members.length)]),
+          ...(projectThreads.length > 0
+            ? [t.settings.projectSettings.permanentlyClearsConversationHistoryThreadsHint]
+            : [t.settings.projectSettings.permanentlyClearsAnyArchivedConversationHint]),
+          isWholeGroup && !hasOtherMembers
+            ? t.settings.projectSettings.removesProjectEntriesFilesDiskHint
+            : t.settings.projectSettings.otherEntriesGroupedProjectUnaffectedHint,
+          t.settings.projectSettings.thisActionCannotBeUndone,
+        ].join("\n"),
+        { variant: "destructive" },
+      ),
+    );
+    if (confirmed._tag === "Failure" || !confirmed.value) return;
+    if (checkProjectAccess(members, t.settings.projectSettings.failedToRemoveProject)) return;
+
+    const draftStore = useComposerDraftStore.getState();
+    for (const member of members) {
+      if (checkProjectAccess([member], t.settings.projectSettings.failedToRemoveProject)) return;
+      const memberThreads = projectThreads.filter(
+        (thread) => thread.environmentId === member.environmentId && thread.projectId === member.id,
+      );
+      const result = mapAtomCommandResult(
+        await deleteProject({
+          environmentId: member.environmentId,
+          input: {
+            projectId: member.id,
+            force: true,
+          },
+        }),
+        () => undefined,
+      );
+      if (result._tag === "Failure") {
+        reportFailure(t.settings.projectSettings.failedToRemove(member.title), result);
+        return;
+      }
+      const projectRef = scopeProjectRef(member.environmentId, member.id);
+      await waitForProjectRemoval(projectRef);
+      releaseProjectDraftUploads(
+        projectRef,
+        memberThreads.map((thread) => scopeThreadRef(thread.environmentId, thread.id)),
+      );
+      const projectDraftThread = draftStore.getDraftThreadByProjectRef(projectRef);
+      if (projectDraftThread) {
+        draftStore.clearDraftThread(projectDraftThread.draftId);
+      }
+      draftStore.clearProjectDraftThreadId(projectRef);
+    }
+
+    if (isWholeGroup && !hasOtherMembers) {
+      void navigate({
+        to: "/settings/projects",
+        search: ({ machine }) => ({ project: undefined, machine, checkout: undefined }),
+        replace: true,
+      });
+    }
+  };
 
   const checkoutChoices = (
     <SettingsSection title={t.settings.projectSettings.checkouts}>

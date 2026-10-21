@@ -188,7 +188,7 @@ const decodePrompt = (row: PromptRow) =>
   });
 
 /** Decodes the ordered seat configuration through its schema before validating the whole template. */
-const decodeTemplate = (row: TemplateRow) =>
+const decodeTemplate = Effect.fn("DiscussionStore.decodeTemplate")((row: TemplateRow) =>
   Effect.gen(function* () {
     return yield* Schema.decodeUnknownEffect(DiscussionTemplate)({
       id: row.template_id,
@@ -198,10 +198,11 @@ const decodeTemplate = (row: TemplateRow) =>
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     });
-  });
+  }),
+);
 
 /** Restores snapshots; SQL NULL remains null instead of becoming a missing state. */
-const decodeDiscussion = (row: DiscussionRow) =>
+const decodeDiscussion = Effect.fn("DiscussionStore.decodeDiscussion")((row: DiscussionRow) =>
   Effect.gen(function* () {
     return yield* Schema.decodeUnknownEffect(Discussion)({
       id: row.discussion_id,
@@ -225,10 +226,11 @@ const decodeDiscussion = (row: DiscussionRow) =>
       updatedAt: row.updated_at,
       endedAt: row.ended_at,
     });
-  });
+  }),
+);
 
 /** Validates transcript data and maps nullable SQL identifiers back to optional contract fields. */
-const decodeEntry = (row: EntryRow) =>
+const decodeEntry = Effect.fn("DiscussionStore.decodeEntry")((row: EntryRow) =>
   Effect.gen(function* () {
     return yield* Schema.decodeUnknownEffect(DiscussionEntry)({
       id: row.entry_id,
@@ -253,10 +255,11 @@ const decodeEntry = (row: EntryRow) =>
       checkpointRef: row.checkpoint_ref,
       createdAt: row.created_at,
     });
-  });
+  }),
+);
 
 /** Encodes JSON columns using their contract codecs; provider model transformations must also run on writes. */
-const encodeDiscussion = (value: Discussion) =>
+const encodeDiscussion = Effect.fn("DiscussionStore.encodeDiscussion")((value: Discussion) =>
   Effect.gen(function* () {
     yield* Schema.encodeEffect(Discussion)(value);
     return {
@@ -276,7 +279,8 @@ const encodeDiscussion = (value: Discussion) =>
       updated_at: value.updatedAt,
       ended_at: value.endedAt,
     };
-  });
+  }),
+);
 
 /** Construction acquires only the application-owned SQL client; it never opens a database itself. */
 const make = Effect.gen(function* () {

@@ -35,9 +35,7 @@ export function limitFaderGroups(pool: LimitPool): readonly LimitFaderGroup[] {
   );
   const collapsed = count > 5;
   return windows.flatMap((window): LimitFaderGroup[] => {
-    const members = window.columns.flatMap((column) =>
-      column.window ? [{ account: column.account, window: column.window }] : [],
-    );
+    const members = window.columns.flatMap((column) => (column.window ? [column] : []));
     if (members.length === 0) return [];
     const key = `${window.kind}:${window.id}`;
     return [

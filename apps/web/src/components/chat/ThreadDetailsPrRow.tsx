@@ -6,6 +6,8 @@ import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import type { EnvironmentId, ProjectId, PullRequestRef } from "@t3tools/contracts";
 import { sourceControlRepositorySelector } from "@t3tools/shared/sourceControl";
 import { EyeIcon, FileDiffIcon, GitBranchIcon, TriangleAlertIcon } from "lucide-react";
+import { selectEnvironmentQueryData } from "@t3tools/client-runtime/state/runtime";
+import { AsyncResult } from "effect/reactivity";
 import { useState, type MouseEvent as ReactMouseEvent } from "react";
 
 import { useLiveRefresh } from "~/hooks/useLiveRefresh";
@@ -13,7 +15,11 @@ import { usePullRequestChecksRefresh } from "~/hooks/usePullRequestChecksRefresh
 import { cn } from "~/lib/utils";
 import { useServerConfigs } from "~/state/entities";
 import { pullRequestEnvironment } from "~/state/pullRequests";
-import { useEnvironmentQuery } from "~/state/query";
+import {
+  useEnvironmentQueryIsNewer,
+  useEnvironmentQueryRefresh,
+  useEnvironmentQuerySelector,
+} from "~/state/query";
 
 import {
   buildFixFindingsHandoff,
@@ -50,6 +56,10 @@ import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
+// A server without checks for this pull request answers null; polling it again finds nothing new.
+const isSettledWithoutChecks = (result: AsyncResult.AsyncResult<unknown, unknown>) =>
+  result._tag === "Success" && result.value === null;
+
 /**
  * Renders one pull-request row with status and permission-aware host actions.
  * @param props - Required environmentId, PR data, number, labels, and open callback. reference may
@@ -79,14 +89,11 @@ export function ThreadDetailsPrRow({
   number: number;
   reference?: Pick<PullRequestRef, "host" | "repository" | "number"> | null;
   status: PrStatusIndicator | null;
-  /** The thread's project, which is what the pull request is read through on the host. */
   project: EnvironmentProject | null;
   label: string;
   openAriaLabel: string;
   onOpen: (event: ReactMouseEvent<HTMLElement>) => void;
-  /** An action changed the pull request on the host, so the vcs status behind the row is stale. */
   onActed?: () => void;
-  /** Set while the server watches this pull request for the thread; stops the watch. */
   onStopWatching?: (() => void) | undefined;
   /** Starts the existing thread watch when supported and permitted by the destination server. */
   onStartWatching?: (() => void) | undefined;
@@ -105,37 +112,46 @@ export function ThreadDetailsPrRow({
           ? { projectId: project.id as ProjectId, repository, number }
           : null
       : null;
-  const detailQuery = useEnvironmentQuery(
+  const detailAtom =
     reference === null
       ? null
       : pullRequestEnvironment.detail({
           environmentId,
           input: { ...reference, allowStale: false },
-        }),
-  );
+        });
+  // Read the queries part by part: every poll publishes a new result (a new
+  // timestamp, `waiting` on and off) even when nothing in it changed.
+  const detailData = useEnvironmentQuerySelector(detailAtom, selectEnvironmentQueryData);
+  const detailQuery = useEnvironmentQueryRefresh(detailAtom);
   const supportsChecks =
     serverConfigs.get(environmentId)?.environment.capabilities.pullRequestChecks === true;
-  const checksQuery = useEnvironmentQuery(
-    supportsChecks && reference !== null && detailQuery.data !== null
+  const checksAtom =
+    supportsChecks && reference !== null && detailData !== null
       ? pullRequestEnvironment.checks({ environmentId, input: reference })
-      : null,
-  );
+      : null;
+  const checksData = useEnvironmentQuerySelector(checksAtom, selectEnvironmentQueryData);
+  const checksSettledEmpty = useEnvironmentQuerySelector(checksAtom, isSettledWithoutChecks);
+  const checksQuery = useEnvironmentQueryRefresh(checksAtom);
+  const checksAreNewer = useEnvironmentQueryIsNewer(checksAtom, detailAtom);
   const detail =
-    detailQuery.data === null
+    detailData === null
       ? null
-      : checksQuery.data !== null && checksQuery.dataUpdatedAt >= detailQuery.dataUpdatedAt
-        ? { ...detailQuery.data, ...checksQuery.data }
-        : detailQuery.data;
+      : checksData !== null && checksAreNewer
+        ? { ...detailData, ...checksData }
+        : detailData;
   const open = reference !== null && (detail?.state ?? pr?.state) === "open";
   const refreshKey = `${environmentId}:${project?.id}:${reference?.host}:${reference?.repository}:${number}`;
-  useLiveRefresh(detailQuery.isPending ? null : detailQuery.refresh, {
-    enabled: open,
-    key: `workspace-pr:${refreshKey}`,
-    intervalMs: 10 * 60_000,
-  });
+  useLiveRefresh(
+    () => {
+      if (!detailQuery.isPending()) detailQuery.refresh();
+    },
+    { enabled: open, key: `workspace-pr:${refreshKey}`, intervalMs: 10 * 60_000 },
+  );
   usePullRequestChecksRefresh({
-    refresh: checksQuery.isPending || detailQuery.isPending ? null : checksQuery.refresh,
-    enabled: open && supportsChecks && !(checksQuery.isSuccess && checksQuery.data === null),
+    refresh: () => {
+      if (!checksQuery.isPending() && !detailQuery.isPending()) checksQuery.refresh();
+    },
+    enabled: open && supportsChecks && !checksSettledEmpty,
     key: `workspace-pr-checks:${refreshKey}`,
     checks: detail?.checks ?? [],
   });
@@ -196,7 +212,6 @@ export function ThreadDetailsPrRow({
     );
   };
 
-  // Host details distinguish drafts; all panels share the same PR-state glyph.
   const statePresentation =
     detail === null
       ? null
@@ -304,6 +319,7 @@ export function ThreadDetailsPrRow({
                   className="h-auto w-auto"
                   aria-label={openAriaLabel}
                   onClick={onOpen}
+                  onAuxClick={onOpen}
                 />
               }
             >

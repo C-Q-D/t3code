@@ -2,7 +2,7 @@
  * Exercises detail-panel branch selection and change navigation through the real child controls.
  * @vitest-environment jsdom
  */
-import { EnvironmentId, ThreadId, type VcsRef } from "@t3tools/contracts";
+import { EnvironmentId, ProjectId, ThreadId, type VcsRef } from "@t3tools/contracts";
 import { act, type ComponentProps, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
@@ -31,7 +31,7 @@ vi.mock("@effect/atom-react", () => ({
   useAtomValue: (atom: unknown) => (atom === "vcs-state" ? { isRunning: false } : null),
 }));
 vi.mock("~/state/entities", () => ({
-  useThreadShell: () => ({
+  useQuietThreadShell: () => ({
     id: "thread",
     environmentId: "environment",
     projectId: "project",
@@ -148,6 +148,10 @@ async function render(overrides: Partial<ThreadDetailsPanelProps> = {}) {
         onPresentationChange={vi.fn()}
         environmentId={EnvironmentId.make("environment")}
         threadId={ThreadId.make("thread")}
+        projectId={ProjectId.make("project")}
+        worktreePath={null}
+        isServerThread
+        openInShortcutEnabled={false}
         activeProjectName="project"
         activeProjectScripts={undefined}
         preferredScriptId={null}

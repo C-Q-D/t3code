@@ -526,11 +526,11 @@ export const settings = {
       title: "Submodules",
     },
     startFromOrigin: {
-      title: "Start from origin",
+      title: "Start from remote",
       description:
-        "Creates the worktree from the latest matching branch on origin instead of your local branch.",
-      resetLabel: "new worktrees start from origin",
-      ariaLabel: "Start new worktrees from origin by default",
+        "Uses the latest commit of the base branch’s tracked remote branch, even if its name differs. Otherwise uses the same-named branch on origin. Uses your local branch if that remote branch is missing.",
+      resetLabel: "new worktrees start from remote",
+      ariaLabel: "Start new worktrees from remote by default",
     },
     addProjectStartsIn: {
       title: "Add project starts in",
@@ -877,7 +877,7 @@ export const settings = {
     panelControls: "Conversation panel controls (unavailable in settings)",
   },
   scopeSentence: {
-    applying: "Applies to",
+    applying: "Applying settings for",
     within: "in",
     environmentAriaLabel: "Environment scope",
     unavailableEnvironment: "Unavailable environment",
@@ -888,6 +888,10 @@ export const settings = {
     unavailableProject: "Unavailable project",
     allProjects: "All projects",
     pickerAriaLabel: (scope: string, label: string) => `${scope}: ${label}`,
+    on: "on",
+    across: "across",
+    searchEnvironments: "Search environments",
+    searchProjects: "Search projects",
   },
   scopeNotice: {
     projectChanges: (project: string) =>
@@ -984,7 +988,7 @@ export const settings = {
     diffWhitespaceLabel: "Diff whitespace changes",
     contextWindowLabel: "Context window indicator",
     newThreadModeLabel: "New thread mode",
-    startFromOriginLabel: "New worktrees start from origin",
+    startFromOriginLabel: "New worktrees start from remote",
     confirmTitle: "Restore default settings?",
     confirmDescription: (labels: string) => `This will reset: ${labels}.`,
     themeError: "Couldn’t restore theme settings",
@@ -1162,7 +1166,7 @@ export const settings = {
         "Approximate active CPU time for the T3 server root process and its descendants during the selected window. It grows only while sampled processes use CPU and older samples leave as the window moves.",
       samples: "Samples",
       samplesHint:
-        "In-memory process samples retained by the server. This resets when the server restarts.",
+        "In-memory process samples retained by the server. The server samples only while diagnostics is open, and this resets when the server restarts.",
       interval: "Interval",
       processes: "Processes",
       loading: "Collecting process resource samples...",
@@ -1170,6 +1174,7 @@ export const settings = {
       processAriaLabel: (root: boolean, name: string) =>
         `${root ? "Root" : "Child"} process ${name}`,
       cpuHint: (average: string, peak: string) => `Avg ${average}%, peak ${peak}%`,
+      onDemand: "On demand",
     },
     status: {
       checking: "Checking",
@@ -1493,6 +1498,13 @@ export const settings = {
         `${label} falls back to T3 Connect when its other routes are unreachable.`,
       fallbackHint: "This machine is on your T3 Connect account. Use it as a fallback route.",
       addRoute: "Add T3 Connect",
+      removedRelink: "This environment was removed from T3 Connect. Turn it on to link it again.",
+      unreachable: "T3 Connect is on, but other devices cannot reach this environment.",
+      unchecked: "T3 Connect is on. Reachability has not been checked yet.",
+      outOfSync:
+        "T3 Connect is out of sync. This environment is linked only to publish agent activity, so other devices cannot connect. Turn T3 Connect on to repair it.",
+      removedRelinkCommand:
+        "This environment was removed from T3 Connect. Run `t3 connect link` on the host to link it again.",
     },
     network: {
       updateErrorDescription: "Failed to update network exposure.",
@@ -1684,6 +1696,9 @@ export const settings = {
       disabled: "Task paused",
       rate_limited: "Rate limited",
       expired: "Too old",
+      duplicate: "Duplicate",
+      coalesced: "Coalesced",
+      filtered: "Filtered",
     } satisfies Record<ScheduledTaskWebhookDeliveryOutcome, string>,
     tasksHeading: "Tasks",
     newTask: "New task",
@@ -1719,6 +1734,9 @@ export const settings = {
       empty: "No delivery records yet.",
       taskTitle: (title: string) => `Deliveries · ${title}`,
       missingFieldCount: (count: number) => `${count} empty placeholder${count === 1 ? "" : "s"}`,
+      scheduledRun: "Scheduled run",
+      pendingWindowHint: "Run scheduled when the window closes; no run started yet.",
+      openedWindow: "Opened window",
     },
     webhook: {
       urlHint: "The URL appears after you save.",
@@ -1789,6 +1807,16 @@ export const settings = {
       enabledHint: "Disabled tasks stay saved but do not run.",
       save: "Save task",
       create: "Create task",
+      replayKey: "Replay key",
+      coalesceKey: "Coalesce key",
+      coalesceWindow: "Coalesce window",
+      templateOptional: "template, optional",
+      coalesceWindowHint: "seconds, 10–3600",
+      dedupeHint:
+        "Replay keys suppress repeat deliveries for 7 days. Coalescing runs the latest payload once when the window from the first delivery closes. Empty keys run normally.",
+      invalidWebhook: "Invalid webhook settings",
+      invalidCoalesceWindow: "Coalesce window must be whole seconds from 10 to 3600.",
+      invalidDedupeKey: (label: string) => `${label} must contain a valid request placeholder.`,
     },
   },
   resourceTelemetry: {
@@ -2909,6 +2937,7 @@ ${address}`
       string
     >,
     booleanOperators: { and: "and", or: "or" } satisfies Record<"and" | "or", string>,
+    connectToEdit: "Connect an environment to change keybindings.",
   },
   loadBalancing: {
     prefer: "Prefer",
@@ -3357,6 +3386,7 @@ ${address}`
     argument: (index1: string | number | boolean | null | undefined) => `Argument ${index1}`,
     removeArgument: (index1: string | number | boolean | null | undefined) =>
       `Remove argument ${index1}`,
+    clearSecret: (label: string) => `Clear ${label}`,
   },
   providerSettings: {
     checked: "Checked ",
@@ -3522,7 +3552,7 @@ ${address}`
       "Connect the selected checkouts, or update their environments, to reset this override.",
     connectEnvironmentsResetOverridesHint: "Connect the environments to reset these overrides.",
     settingNotSaved: "Setting not saved",
-    connectionChangeSettingsError: "This connection cannot change these settings.",
+    connectionChangeSettingsError: "This connection lacks permission to change these settings.",
     settingSavedOnSomeEnvironments: "Setting saved on some environments",
     couldNotUpdate: (
       value: string | number | boolean | null | undefined,
@@ -3796,6 +3826,7 @@ ${address}`
     deleteOldRotatedLogs: "Delete old rotated logs",
     deleteInactiveRotatedLogFilesHint:
       "Delete inactive rotated log files after this many days. Current logs are kept.",
+    onEveryMachine: (counts: string) => `${counts} on every machine`,
   },
   themeColorPicker: {
     chooseAColor: "Choose a color",

@@ -1,7 +1,6 @@
 /** Presents entry actions when the current workspace has no projects. */
 import { t } from "~/i18n";
 import { FolderOpenIcon, FolderPlusIcon } from "lucide-react";
-import { useCallback } from "react";
 
 import { openCommandPalette } from "../commandPaletteBus";
 import { isElectron } from "../env";
@@ -12,7 +11,6 @@ import { WorkspacePageHeader } from "./WorkspacePageHeader";
 
 /** Offers project creation and, when an eligible environment exists, starting a scratch conversation. */
 export function NoProjectsHero() {
-  const openAddProject = useCallback(() => openCommandPalette({ open: "add-project" }), []);
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const { scratchEnvironmentId, startScratchThread } = useScratchProject();
   const scratchTargetEnvironmentId = scratchEnvironmentId(primaryEnvironmentId);
@@ -32,7 +30,7 @@ export function NoProjectsHero() {
               <button
                 type="button"
                 className="ov3-action ov3-action-primary gap-1.5 pr-4 pl-3"
-                onClick={openAddProject}
+                onClick={() => openCommandPalette({ open: "add-project" })}
               >
                 <FolderPlusIcon className="size-3.75" aria-hidden="true" />
                 {t.sidebar.header.addProject}

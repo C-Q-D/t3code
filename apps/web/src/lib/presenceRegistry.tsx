@@ -1,7 +1,7 @@
 /** Tracks mounted slots locally so wrappers can style their presence without DOM queries. */
+import { useStableCallback } from "~/hooks/useStableCallback";
 import {
   createContext,
-  useCallback,
   useContext,
   useLayoutEffect,
   useRef,
@@ -35,17 +35,14 @@ export function createPresenceRegistry<Kind extends string>() {
     onChange: (counts: Record<Kind, number>) => void;
   }) {
     const counts = useRef({} as Record<Kind, number>);
-    const register = useCallback(
-      (kind: Kind) => {
-        counts.current = { ...counts.current, [kind]: (counts.current[kind] ?? 0) + 1 };
+    const register = useStableCallback((kind: Kind) => {
+      counts.current = { ...counts.current, [kind]: (counts.current[kind] ?? 0) + 1 };
+      onChange(counts.current);
+      return () => {
+        counts.current = { ...counts.current, [kind]: counts.current[kind] - 1 };
         onChange(counts.current);
-        return () => {
-          counts.current = { ...counts.current, [kind]: counts.current[kind] - 1 };
-          onChange(counts.current);
-        };
-      },
-      [onChange],
-    );
+      };
+    });
     return <Context.Provider value={register}>{children}</Context.Provider>;
   }
 

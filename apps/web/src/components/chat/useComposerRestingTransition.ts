@@ -1,5 +1,6 @@
 /** Owns resting geometry and WAAPI cleanup; imperative impact feedback remains a separate owner. */
-import { useCallback, useEffect, useLayoutEffect, useRef, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, type RefObject } from "react";
+import { useStableCallback } from "../../hooks/useStableCallback";
 import { observeResize } from "../../lib/observeResize";
 import { SpringTimeline } from "../../lib/motion/springTimeline";
 import { springToLinear } from "../../lib/motion/springToLinear";
@@ -59,7 +60,7 @@ export function useComposerRestingTransition(
   const transitionLayoutRequestRef = useRef(0);
   const hasCompletedInitialLayoutRef = useRef(false);
 
-  const clearOverlayPin = useCallback(() => {
+  const clearOverlayPin = useStableCallback(() => {
     // The overlay belongs to the chat view and outlives this composer, so it
     // is remembered from pin time rather than re-resolved through a ref that
     // React may already have detached during unmount.
@@ -69,9 +70,9 @@ export function useComposerRestingTransition(
     overlay?.style.removeProperty("display");
     overlay?.style.removeProperty("flex-direction");
     overlay?.style.removeProperty("justify-content");
-  }, []);
+  });
 
-  const clearTransitionStyles = useCallback(() => {
+  const clearTransitionStyles = useStableCallback(() => {
     const element = elementRef.current;
     const footer = element?.querySelector<HTMLElement>('[data-chat-composer-footer="true"]');
     element?.style.removeProperty("overflow");
@@ -103,421 +104,409 @@ export function useComposerRestingTransition(
       modelStrip?.style.removeProperty(property);
     }
     clearOverlayPin();
-  }, [clearOverlayPin]);
+  });
 
-  isCollapsedRef.current = isCollapsed;
+  // Publish committed geometry before the transition microtask and resize delivery.
+  useLayoutEffect(() => {
+    isCollapsedRef.current = isCollapsed;
+  }, [isCollapsed]);
 
-  const transitionToCurrentGeometry = useCallback(
-    (stateChanged: boolean) => {
-      const element = elementRef.current;
-      const surface = element?.querySelector<HTMLElement>('[data-chat-composer-surface="true"]');
-      if (!element || !surface) return;
+  const transitionToCurrentGeometry = (stateChanged: boolean) => {
+    const element = elementRef.current;
+    const surface = element?.querySelector<HTMLElement>('[data-chat-composer-surface="true"]');
+    if (!element || !surface) return;
 
-      return withComposerImpactLayout(element, () => {
-        const nextIsCollapsed = isCollapsedRef.current;
+    return withComposerImpactLayout(element, () => {
+      const nextIsCollapsed = isCollapsedRef.current;
 
-        const visibleTransitionElement = (selector: string) =>
-          Array.from(element.querySelectorAll<HTMLElement>(selector)).find(
-            (candidate) => candidate.getClientRects().length > 0,
-          ) ?? null;
-        const prompt = visibleTransitionElement(
-          '[data-composer-prompt-surface="true"], [data-chat-composer-transition-prompt="true"]',
-        );
-        const action = visibleTransitionElement('[data-chat-composer-transition-actions="true"]');
-        const footer = element.querySelector<HTMLElement>('[data-chat-composer-footer="true"]');
-        const continuousControls =
-          element.dataset.inlineRestingControls === "true" ||
-          element.dataset.modelOnlyStrip === "true";
-        const controls = nextIsCollapsed
-          ? restingControlsRef.current
-          : element.querySelector<HTMLElement>('[data-chat-composer-controls="left"]');
+      const visibleTransitionElement = (selector: string) =>
+        Array.from(element.querySelectorAll<HTMLElement>(selector)).find(
+          (candidate) => candidate.getClientRects().length > 0,
+        ) ?? null;
+      const prompt = visibleTransitionElement(
+        '[data-composer-prompt-surface="true"], [data-chat-composer-transition-prompt="true"]',
+      );
+      const action = visibleTransitionElement('[data-chat-composer-transition-actions="true"]');
+      const footer = element.querySelector<HTMLElement>('[data-chat-composer-footer="true"]');
+      const continuousControls =
+        element.dataset.inlineRestingControls === "true" ||
+        element.dataset.modelOnlyStrip === "true";
+      const controls = nextIsCollapsed
+        ? restingControlsRef.current
+        : element.querySelector<HTMLElement>('[data-chat-composer-controls="left"]');
 
-        const shell = element.closest<HTMLElement>('[data-slot="composer-shell"]');
-        const modelStrip = shell?.querySelector<HTMLElement>('[data-composer-model-strip="true"]');
-        const interruptedStripHeight =
-          animationRef.current && modelStrip ? modelStrip.getBoundingClientRect().height : null;
-        const interruptedAnimation = animationRef.current;
-        const interruptedSpring = interruptedAnimation ? springTransitionRef.current : null;
-        const now = performance.now();
-        const interruptedVelocity = interruptedSpring?.timeline.at(now).velocity ?? 0;
-        springTransitionRef.current = null;
-        const interruptedPromptTop = interruptedAnimation
-          ? (prompt?.getBoundingClientRect().top ?? null)
+      const shell = element.closest<HTMLElement>('[data-slot="composer-shell"]');
+      const modelStrip = shell?.querySelector<HTMLElement>('[data-composer-model-strip="true"]');
+      const interruptedStripHeight =
+        animationRef.current && modelStrip ? modelStrip.getBoundingClientRect().height : null;
+      const interruptedAnimation = animationRef.current;
+      const interruptedSpring = interruptedAnimation ? springTransitionRef.current : null;
+      const now = performance.now();
+      const interruptedVelocity = interruptedSpring?.timeline.at(now).velocity ?? 0;
+      springTransitionRef.current = null;
+      const interruptedPromptTop = interruptedAnimation
+        ? (prompt?.getBoundingClientRect().top ?? null)
+        : null;
+      const interruptedActionTop = interruptedAnimation
+        ? (action?.getBoundingClientRect().top ?? null)
+        : null;
+      const interruptedControlsLeft = interruptedAnimation
+        ? (controls?.getBoundingClientRect().left ?? null)
+        : null;
+      const interruptedControlsTop = interruptedAnimation
+        ? (controls?.getBoundingClientRect().top ?? null)
+        : null;
+      const interruptedHeight = interruptedAnimation
+        ? element.getBoundingClientRect().height
+        : null;
+      const interruptedTargetHeight = animationTargetHeightRef.current;
+      const interruptedCurrentTime =
+        typeof interruptedAnimation?.currentTime === "number"
+          ? interruptedAnimation.currentTime
           : null;
-        const interruptedActionTop = interruptedAnimation
-          ? (action?.getBoundingClientRect().top ?? null)
-          : null;
-        const interruptedControlsLeft = interruptedAnimation
-          ? (controls?.getBoundingClientRect().left ?? null)
-          : null;
-        const interruptedControlsTop = interruptedAnimation
-          ? (controls?.getBoundingClientRect().top ?? null)
-          : null;
-        const interruptedHeight = interruptedAnimation
-          ? element.getBoundingClientRect().height
-          : null;
-        const interruptedTargetHeight = animationTargetHeightRef.current;
-        const interruptedCurrentTime =
-          typeof interruptedAnimation?.currentTime === "number"
-            ? interruptedAnimation.currentTime
-            : null;
-        const interruptedDuration = interruptedAnimation?.effect?.getComputedTiming().duration;
-        if (transitionCleanupTimeoutRef.current !== null) {
-          window.clearTimeout(transitionCleanupTimeoutRef.current);
-          transitionCleanupTimeoutRef.current = null;
+      const interruptedDuration = interruptedAnimation?.effect?.getComputedTiming().duration;
+      if (transitionCleanupTimeoutRef.current !== null) {
+        window.clearTimeout(transitionCleanupTimeoutRef.current);
+        transitionCleanupTimeoutRef.current = null;
+      }
+      interruptedAnimation?.cancel();
+      animationRef.current = null;
+      for (const animation of contentAnimationsRef.current) animation.cancel();
+      contentAnimationsRef.current = [];
+      // The reveal and fade animations keep their own schedule across the
+      // body-resize re-entries that retarget the geometry mid-flight (every
+      // transition with a draft triggers one); cancelling them there would
+      // pop their subjects to full visibility at the start of the tween.
+      if (stateChanged) {
+        for (const animation of stateChangeAnimationsRef.current) animation.cancel();
+        stateChangeAnimationsRef.current = [];
+      }
+      clearTransitionStyles();
+
+      const nextRect = element.getBoundingClientRect();
+      const nextHeight = nextRect.height;
+      const nextModelStripHeight = modelStrip?.getBoundingClientRect().height ?? null;
+      // The chat view resize-observes the overlay to place the timeline
+      // inset, the scroll-to-end pill, and the mini player. Publishing the
+      // destination height here turns that feedback into one update instead
+      // of a ChatView re-render on every animation frame.
+      const overlay = element.closest<HTMLElement>('[data-chat-composer-overlay="true"]');
+      const overlayRect = overlay?.getBoundingClientRect();
+      const overlayHeight = overlayRect?.height ?? null;
+      if (overlayHeight !== null) {
+        onOverlayHeightChange(overlayHeight);
+      }
+      const nextPromptRect = prompt?.getBoundingClientRect() ?? null;
+      const nextPromptTop = nextPromptRect?.top ?? null;
+      const nextActionTop = action?.getBoundingClientRect().top ?? null;
+      const nextControlsRect = controls?.getBoundingClientRect() ?? null;
+      const nextControlsTop = nextControlsRect?.top ?? null;
+      const footerBottom = footer ? nextRect.bottom - footer.getBoundingClientRect().bottom : 1;
+      const previousHeight = interruptedHeight ?? previousHeightRef.current;
+      const targetChanged =
+        interruptedTargetHeight === null || Math.abs(interruptedTargetHeight - nextHeight) >= 0.5;
+      const shouldAnimate = shouldAnimateComposerRestingTransition({
+        hasCompletedInitialLayout: hasCompletedInitialLayoutRef.current,
+        stateChanged,
+        hasInterruptedAnimation: interruptedHeight !== null,
+      });
+
+      if (
+        shouldAnimate &&
+        animationsActive &&
+        previousHeight !== null &&
+        Math.abs(previousHeight - nextHeight) >= 0.5
+      ) {
+        const initialVelocity = interruptedSpring
+          ? composerRestingVelocity(
+              interruptedVelocity,
+              interruptedSpring.travelPx,
+              nextHeight - previousHeight,
+            )
+          : 0;
+        const curve = physics ? springToLinear(TOKENS.settle, { initialVelocity }) : null;
+        const remainingDuration =
+          typeof interruptedDuration === "number" && interruptedCurrentTime !== null
+            ? Math.max(1, interruptedDuration - interruptedCurrentTime)
+            : animationDurationMs;
+        const duration = curve
+          ? curve.durationMs
+          : interruptedHeight !== null && !targetChanged
+            ? remainingDuration
+            : animationDurationMs;
+        const easing = curve?.easing ?? COMPOSER_RESTING_TRANSITION_EASING;
+        if (physics) {
+          // Signed travel converts normalized momentum back to the same physical px/s.
+          springTransitionRef.current = {
+            timeline: new SpringTimeline(TOKENS.settle, now, initialVelocity),
+            travelPx: nextHeight - previousHeight,
+          };
         }
-        interruptedAnimation?.cancel();
-        animationRef.current = null;
-        for (const animation of contentAnimationsRef.current) animation.cancel();
-        contentAnimationsRef.current = [];
-        // The reveal and fade animations keep their own schedule across the
-        // body-resize re-entries that retarget the geometry mid-flight (every
-        // transition with a draft triggers one); cancelling them there would
-        // pop their subjects to full visibility at the start of the tween.
-        if (stateChanged) {
-          for (const animation of stateChangeAnimationsRef.current) animation.cancel();
-          stateChangeAnimationsRef.current = [];
-        }
-        clearTransitionStyles();
-
-        const nextRect = element.getBoundingClientRect();
-        const nextHeight = nextRect.height;
-        const nextModelStripHeight = modelStrip?.getBoundingClientRect().height ?? null;
-        // The chat view resize-observes the overlay to place the timeline
-        // inset, the scroll-to-end pill, and the mini player. Publishing the
-        // destination height here turns that feedback into one update instead
-        // of a ChatView re-render on every animation frame.
-        const overlay = element.closest<HTMLElement>('[data-chat-composer-overlay="true"]');
-        const overlayRect = overlay?.getBoundingClientRect();
-        const overlayHeight = overlayRect?.height ?? null;
-        if (overlayHeight !== null) {
-          onOverlayHeightChange(overlayHeight);
-        }
-        const nextPromptRect = prompt?.getBoundingClientRect() ?? null;
-        const nextPromptTop = nextPromptRect?.top ?? null;
-        const nextActionTop = action?.getBoundingClientRect().top ?? null;
-        const nextControlsRect = controls?.getBoundingClientRect() ?? null;
-        const nextControlsTop = nextControlsRect?.top ?? null;
-        const footerBottom = footer ? nextRect.bottom - footer.getBoundingClientRect().bottom : 1;
-        const previousHeight = interruptedHeight ?? previousHeightRef.current;
-        const targetChanged =
-          interruptedTargetHeight === null || Math.abs(interruptedTargetHeight - nextHeight) >= 0.5;
-        const shouldAnimate = shouldAnimateComposerRestingTransition({
-          hasCompletedInitialLayout: hasCompletedInitialLayoutRef.current,
-          stateChanged,
-          hasInterruptedAnimation: interruptedHeight !== null,
-        });
-
-        if (
-          shouldAnimate &&
-          animationsActive &&
-          previousHeight !== null &&
-          Math.abs(previousHeight - nextHeight) >= 0.5
-        ) {
-          const initialVelocity = interruptedSpring
-            ? composerRestingVelocity(
-                interruptedVelocity,
-                interruptedSpring.travelPx,
-                nextHeight - previousHeight,
-              )
-            : 0;
-          const curve = physics ? springToLinear(TOKENS.settle, { initialVelocity }) : null;
-          const remainingDuration =
-            typeof interruptedDuration === "number" && interruptedCurrentTime !== null
-              ? Math.max(1, interruptedDuration - interruptedCurrentTime)
-              : animationDurationMs;
-          const duration = curve
-            ? curve.durationMs
-            : interruptedHeight !== null && !targetChanged
-              ? remainingDuration
-              : animationDurationMs;
-          const easing = curve?.easing ?? COMPOSER_RESTING_TRANSITION_EASING;
-          if (physics) {
-            // Signed travel converts normalized momentum back to the same physical px/s.
-            springTransitionRef.current = {
-              timeline: new SpringTimeline(TOKENS.settle, now, initialVelocity),
-              travelPx: nextHeight - previousHeight,
-            };
-          }
-          element.style.overflow = "clip";
-          if (modelStrip) {
-            // The model controls cross the input's lower edge on their way to the strip.
-            const controlsClearance = Math.max(
-              nextModelStripHeight ?? 0,
-              previousModelStripHeightRef.current ?? 0,
-            );
-            element.style.overflowClipMargin = `${controlsClearance}px`;
-            element.style.clipPath = `inset(0 0 -${controlsClearance}px 0)`;
-          }
-          surface.style.height = "100%";
-
-          // Pinning the overlay at the destination height keeps the resize
-          // observer quiet for the tween; bottom alignment keeps the animating
-          // surface glued to the overlay's stable bottom edge. The pin lasts
-          // only for the tween so later attachment, thread, font, and viewport
-          // changes remain natural.
-          if (overlay && overlayHeight !== null) {
-            overlay.style.height = `${String(overlayHeight)}px`;
-            overlay.style.display = "flex";
-            overlay.style.flexDirection = "column";
-            overlay.style.justifyContent = "flex-end";
-            pinnedOverlayRef.current = overlay;
-          }
-
-          // Keep the footer attached to the stable bottom edge while the outer
-          // height changes. Its resting absolute layout otherwise spans the old
-          // height on collapse, while its expanded flow layout falls below the
-          // clipped surface on expansion.
-          if (footer) {
-            footer.style.position = "absolute";
-            footer.style.top = "auto";
-            footer.style.bottom = `${String(footerBottom)}px`;
-            footer.style.height = "3rem";
-            if (nextIsCollapsed) {
-              footer.style.left = "auto";
-              footer.style.right = "1px";
-            } else {
-              footer.style.left = "1px";
-              footer.style.right = "1px";
-            }
-          }
-
-          let stripAnimation: Animation | null = null;
-          if (modelStrip) {
-            const stripHeight = modelStrip.getBoundingClientRect().height;
-            const stripOverlap = -Number.parseFloat(getComputedStyle(modelStrip).marginTop);
-            const fromHeight =
-              interruptedStripHeight ??
-              (previousCollapsedRef.current
-                ? (previousModelStripHeightRef.current ?? stripHeight)
-                : stripOverlap);
-            const toHeight = nextIsCollapsed ? stripHeight : stripOverlap;
-            modelStrip.style.position = "relative";
-            modelStrip.style.top = "auto";
-            modelStrip.style.visibility = "visible";
-            modelStrip.style.minHeight = "0";
-            // Padding must not impose a 24px minimum on the 16px overlap endpoint.
-            // Keep the controls bottom-aligned while the strip retracts behind the input.
-            modelStrip.style.paddingTop = "0";
-            modelStrip.style.alignItems = "flex-end";
-            modelStrip.style.pointerEvents = "none";
-            modelStrip.style.zIndex = "20";
-            shell?.setAttribute("data-model-strip-transition", "true");
-            stripAnimation = modelStrip.animate(
-              [{ height: `${fromHeight}px` }, { height: `${toHeight}px` }],
-              { duration, easing, fill: "both" },
-            );
-          }
-
-          const animation = element.animate(
-            [{ height: `${previousHeight}px` }, { height: `${nextHeight}px` }],
-            {
-              duration,
-              easing,
-              fill: "both",
-            },
+        element.style.overflow = "clip";
+        if (modelStrip) {
+          // The model controls cross the input's lower edge on their way to the strip.
+          const controlsClearance = Math.max(
+            nextModelStripHeight ?? 0,
+            previousModelStripHeightRef.current ?? 0,
           );
-          animationRef.current = animation;
-          animationTargetHeightRef.current = nextHeight;
+          element.style.overflowClipMargin = `${controlsClearance}px`;
+          element.style.clipPath = `inset(0 0 -${controlsClearance}px 0)`;
+        }
+        surface.style.height = "100%";
 
-          const animatedRect = element.getBoundingClientRect();
-          const previousBottom =
-            overlayRect && previousContentOffsetsRef.current.surfaceBottomInset !== null
-              ? overlayRect.bottom - previousContentOffsetsRef.current.surfaceBottomInset
-              : animatedRect.bottom;
-          const bottomShift = previousBottom - animatedRect.bottom;
-          const previousPromptTop =
-            interruptedPromptTop ??
-            (previousContentOffsetsRef.current.promptFromTop === null
+        // Pinning the overlay at the destination height keeps the resize
+        // observer quiet for the tween; bottom alignment keeps the animating
+        // surface glued to the overlay's stable bottom edge. The pin lasts
+        // only for the tween so later attachment, thread, font, and viewport
+        // changes remain natural.
+        if (overlay && overlayHeight !== null) {
+          overlay.style.height = `${String(overlayHeight)}px`;
+          overlay.style.display = "flex";
+          overlay.style.flexDirection = "column";
+          overlay.style.justifyContent = "flex-end";
+          pinnedOverlayRef.current = overlay;
+        }
+
+        // Keep the footer attached to the stable bottom edge while the outer
+        // height changes. Its resting absolute layout otherwise spans the old
+        // height on collapse, while its expanded flow layout falls below the
+        // clipped surface on expansion.
+        if (footer) {
+          footer.style.position = "absolute";
+          footer.style.top = "auto";
+          footer.style.bottom = `${String(footerBottom)}px`;
+          footer.style.height = "3rem";
+          if (nextIsCollapsed) {
+            footer.style.left = "auto";
+            footer.style.right = "1px";
+          } else {
+            footer.style.left = "1px";
+            footer.style.right = "1px";
+          }
+        }
+
+        let stripAnimation: Animation | null = null;
+        if (modelStrip) {
+          const stripHeight = modelStrip.getBoundingClientRect().height;
+          const stripOverlap = -Number.parseFloat(getComputedStyle(modelStrip).marginTop);
+          const fromHeight =
+            interruptedStripHeight ??
+            (previousCollapsedRef.current
+              ? (previousModelStripHeightRef.current ?? stripHeight)
+              : stripOverlap);
+          const toHeight = nextIsCollapsed ? stripHeight : stripOverlap;
+          modelStrip.style.position = "relative";
+          modelStrip.style.top = "auto";
+          modelStrip.style.visibility = "visible";
+          modelStrip.style.minHeight = "0";
+          // Padding must not impose a 24px minimum on the 16px overlap endpoint.
+          // Keep the controls bottom-aligned while the strip retracts behind the input.
+          modelStrip.style.paddingTop = "0";
+          modelStrip.style.alignItems = "flex-end";
+          modelStrip.style.pointerEvents = "none";
+          modelStrip.style.zIndex = "20";
+          shell?.setAttribute("data-model-strip-transition", "true");
+          stripAnimation = modelStrip.animate(
+            [{ height: `${fromHeight}px` }, { height: `${toHeight}px` }],
+            { duration, easing, fill: "both" },
+          );
+        }
+
+        const animation = element.animate(
+          [{ height: `${previousHeight}px` }, { height: `${nextHeight}px` }],
+          {
+            duration,
+            easing,
+            fill: "both",
+          },
+        );
+        animationRef.current = animation;
+        animationTargetHeightRef.current = nextHeight;
+
+        const animatedRect = element.getBoundingClientRect();
+        const previousBottom =
+          overlayRect && previousContentOffsetsRef.current.surfaceBottomInset !== null
+            ? overlayRect.bottom - previousContentOffsetsRef.current.surfaceBottomInset
+            : animatedRect.bottom;
+        const bottomShift = previousBottom - animatedRect.bottom;
+        const previousPromptTop =
+          interruptedPromptTop ??
+          (previousContentOffsetsRef.current.promptFromTop === null
+            ? null
+            : animatedRect.top + bottomShift + previousContentOffsetsRef.current.promptFromTop);
+        const previousActionTop =
+          interruptedActionTop ??
+          (previousContentOffsetsRef.current.actionFromBottom === null
+            ? null
+            : previousBottom - previousContentOffsetsRef.current.actionFromBottom);
+        const contentAnimations: Animation[] = stripAnimation ? [stripAnimation] : [];
+        const animateContentPosition = (
+          content: HTMLElement | null,
+          previousTop: number | null,
+          previousLeft: number | null = null,
+        ) => {
+          if (!content || previousTop === null) return;
+          const rect = content.getBoundingClientRect();
+          const offset = previousTop - rect.top;
+          const offsetX = previousLeft === null ? 0 : previousLeft - rect.left;
+          if (Math.abs(offset) < 0.5 && Math.abs(offsetX) < 0.5) return;
+          contentAnimations.push(
+            content.animate(
+              [{ transform: `translate(${offsetX}px, ${offset}px)` }, { transform: "none" }],
+              {
+                duration,
+                easing,
+              },
+            ),
+          );
+        };
+        animateContentPosition(prompt, previousPromptTop);
+        animateContentPosition(action, previousActionTop);
+        if (continuousControls) {
+          const previousControlsTop =
+            interruptedControlsTop ??
+            (previousContentOffsetsRef.current.controlsFromBottom === null
               ? null
-              : animatedRect.top + bottomShift + previousContentOffsetsRef.current.promptFromTop);
-          const previousActionTop =
-            interruptedActionTop ??
-            (previousContentOffsetsRef.current.actionFromBottom === null
+              : previousBottom - previousContentOffsetsRef.current.controlsFromBottom);
+          const previousControlsLeft =
+            interruptedControlsLeft ??
+            (previousContentOffsetsRef.current.controlsFromLeft === null
               ? null
-              : previousBottom - previousContentOffsetsRef.current.actionFromBottom);
-          const contentAnimations: Animation[] = stripAnimation ? [stripAnimation] : [];
-          const animateContentPosition = (
-            content: HTMLElement | null,
-            previousTop: number | null,
-            previousLeft: number | null = null,
-          ) => {
-            if (!content || previousTop === null) return;
-            const rect = content.getBoundingClientRect();
-            const offset = previousTop - rect.top;
-            const offsetX = previousLeft === null ? 0 : previousLeft - rect.left;
-            if (Math.abs(offset) < 0.5 && Math.abs(offsetX) < 0.5) return;
-            contentAnimations.push(
-              content.animate(
-                [{ transform: `translate(${offsetX}px, ${offset}px)` }, { transform: "none" }],
+              : animatedRect.left + previousContentOffsetsRef.current.controlsFromLeft);
+          animateContentPosition(controls, previousControlsTop, previousControlsLeft);
+        }
+        contentAnimationsRef.current = contentAnimations;
+
+        if (stateChanged) {
+          const stateChangeAnimations: Animation[] = [];
+
+          // A prompt that gains lines on expansion would otherwise slide up
+          // from under the footer band as one block. Opening a bottom clip in
+          // step with the tween instead unfurls the extra lines beneath the
+          // rising first line, so no text crosses the returning controls.
+          const previousPromptHeight = previousContentOffsetsRef.current.promptHeight;
+          if (
+            !nextIsCollapsed &&
+            prompt &&
+            nextPromptRect &&
+            previousPromptHeight !== null &&
+            nextPromptRect.height - previousPromptHeight >= 0.5
+          ) {
+            const hiddenHeight = nextPromptRect.height - previousPromptHeight;
+            stateChangeAnimations.push(
+              prompt.animate(
+                [
+                  { clipPath: `inset(0 0 ${String(hiddenHeight)}px 0)` },
+                  { clipPath: "inset(0 0 0 0)" },
+                ],
                 {
                   duration,
                   easing,
                 },
               ),
             );
-          };
-          animateContentPosition(prompt, previousPromptTop);
-          animateContentPosition(action, previousActionTop);
-          if (continuousControls) {
-            const previousControlsTop =
-              interruptedControlsTop ??
-              (previousContentOffsetsRef.current.controlsFromBottom === null
-                ? null
-                : previousBottom - previousContentOffsetsRef.current.controlsFromBottom);
-            const previousControlsLeft =
-              interruptedControlsLeft ??
-              (previousContentOffsetsRef.current.controlsFromLeft === null
-                ? null
-                : animatedRect.left + previousContentOffsetsRef.current.controlsFromLeft);
-            animateContentPosition(controls, previousControlsTop, previousControlsLeft);
           }
-          contentAnimationsRef.current = contentAnimations;
 
-          if (stateChanged) {
-            const stateChangeAnimations: Animation[] = [];
-
-            // A prompt that gains lines on expansion would otherwise slide up
-            // from under the footer band as one block. Opening a bottom clip in
-            // step with the tween instead unfurls the extra lines beneath the
-            // rising first line, so no text crosses the returning controls.
-            const previousPromptHeight = previousContentOffsetsRef.current.promptHeight;
-            if (
-              !nextIsCollapsed &&
-              prompt &&
-              nextPromptRect &&
-              previousPromptHeight !== null &&
-              nextPromptRect.height - previousPromptHeight >= 0.5
-            ) {
-              const hiddenHeight = nextPromptRect.height - previousPromptHeight;
-              stateChangeAnimations.push(
-                prompt.animate(
-                  [
-                    { clipPath: `inset(0 0 ${String(hiddenHeight)}px 0)` },
-                    { clipPath: "inset(0 0 0 0)" },
-                  ],
-                  {
-                    duration,
-                    easing,
-                  },
-                ),
-              );
-            }
-
-            // The footer controls teleport between the composer footer and the
-            // context strip below it in a single commit. Fading the arriving
-            // cluster in along its direction of travel reads as one continuous
-            // move instead of a pop. Collapsing controls land in empty strip
-            // space and can appear immediately, but expanding controls return
-            // to the bottom row the prompt still occupies while the surface is
-            // short, so they stay hidden through the first half of the tween
-            // and fade in once the geometry has mostly settled.
-            const arrivingControls = nextIsCollapsed
-              ? restingControlsRef.current
-              : element.querySelector<HTMLElement>('[data-chat-composer-controls="left"]');
-            if (arrivingControls && !continuousControls) {
-              const drift = nextIsCollapsed
-                ? -COMPOSER_RESTING_CONTROLS_ARRIVAL_DRIFT_PX
-                : COMPOSER_RESTING_CONTROLS_ARRIVAL_DRIFT_PX;
-              stateChangeAnimations.push(
-                arrivingControls.animate(
-                  [
-                    { opacity: 0, transform: `translateY(${String(drift)}px)` },
-                    { opacity: 1, transform: "none" },
-                  ],
-                  {
-                    duration: nextIsCollapsed ? duration : duration / 2,
-                    delay: nextIsCollapsed ? 0 : duration / 2,
-                    fill: "backwards",
-                    easing,
-                  },
-                ),
-              );
-            }
-
-            const arrivingImagePreviews = nextIsCollapsed
-              ? Array.from(
-                  element.querySelectorAll<HTMLElement>(
-                    '[data-chat-composer-resting-images="true"]',
-                  ),
-                )
-              : Array.from(
-                  element.querySelectorAll<HTMLElement>(
-                    '[data-chat-composer-expanded-image="true"]',
-                  ),
-                );
-            for (const imagePreview of arrivingImagePreviews) {
-              stateChangeAnimations.push(
-                imagePreview.animate([{ opacity: 0 }, { opacity: 1 }], {
+          // The footer controls teleport between the composer footer and the
+          // context strip below it in a single commit. Fading the arriving
+          // cluster in along its direction of travel reads as one continuous
+          // move instead of a pop. Collapsing controls land in empty strip
+          // space and can appear immediately, but expanding controls return
+          // to the bottom row the prompt still occupies while the surface is
+          // short, so they stay hidden through the first half of the tween
+          // and fade in once the geometry has mostly settled.
+          const arrivingControls = nextIsCollapsed
+            ? restingControlsRef.current
+            : element.querySelector<HTMLElement>('[data-chat-composer-controls="left"]');
+          if (arrivingControls && !continuousControls) {
+            const drift = nextIsCollapsed
+              ? -COMPOSER_RESTING_CONTROLS_ARRIVAL_DRIFT_PX
+              : COMPOSER_RESTING_CONTROLS_ARRIVAL_DRIFT_PX;
+            stateChangeAnimations.push(
+              arrivingControls.animate(
+                [
+                  { opacity: 0, transform: `translateY(${String(drift)}px)` },
+                  { opacity: 1, transform: "none" },
+                ],
+                {
                   duration: nextIsCollapsed ? duration : duration / 2,
                   delay: nextIsCollapsed ? 0 : duration / 2,
                   fill: "backwards",
-                  easing: COMPOSER_RESTING_TRANSITION_EASING,
-                }),
-              );
-            }
-            stateChangeAnimationsRef.current = stateChangeAnimations;
+                  easing,
+                },
+              ),
+            );
           }
 
-          const finishTransition = (cancelAnimations: boolean) => {
-            if (animationRef.current !== animation) return;
-            if (transitionCleanupTimeoutRef.current !== null) {
-              window.clearTimeout(transitionCleanupTimeoutRef.current);
-              transitionCleanupTimeoutRef.current = null;
-            }
-            if (cancelAnimations) {
-              animation.cancel();
-              for (const contentAnimation of contentAnimationsRef.current) {
-                contentAnimation.cancel();
-              }
-              for (const stateChangeAnimation of stateChangeAnimationsRef.current) {
-                stateChangeAnimation.cancel();
-              }
-            }
-            animationRef.current = null;
-            springTransitionRef.current = null;
-            animationTargetHeightRef.current = null;
-            contentAnimationsRef.current = [];
-            stateChangeAnimationsRef.current = [];
-            animation.cancel();
-            stripAnimation?.cancel();
-            clearTransitionStyles();
-          };
-          void animation.finished.catch(() => undefined).then(() => finishTransition(false));
-          // A suspended document timeline can leave `finished` pending while
-          // these measurement styles remain active. Wall-clock cleanup makes
-          // the natural layout the eventual source of truth in that case.
-          transitionCleanupTimeoutRef.current = window.setTimeout(
-            () => finishTransition(true),
-            duration + COMPOSER_RESTING_TRANSITION_CLEANUP_BUFFER_MS,
-          );
-        } else {
-          animationTargetHeightRef.current = null;
+          const arrivingImagePreviews = nextIsCollapsed
+            ? Array.from(
+                element.querySelectorAll<HTMLElement>('[data-chat-composer-resting-images="true"]'),
+              )
+            : Array.from(
+                element.querySelectorAll<HTMLElement>('[data-chat-composer-expanded-image="true"]'),
+              );
+          for (const imagePreview of arrivingImagePreviews) {
+            stateChangeAnimations.push(
+              imagePreview.animate([{ opacity: 0 }, { opacity: 1 }], {
+                duration: nextIsCollapsed ? duration : duration / 2,
+                delay: nextIsCollapsed ? 0 : duration / 2,
+                fill: "backwards",
+                easing: COMPOSER_RESTING_TRANSITION_EASING,
+              }),
+            );
+          }
+          stateChangeAnimationsRef.current = stateChangeAnimations;
         }
 
-        previousCollapsedRef.current = nextIsCollapsed;
-        previousHeightRef.current = nextHeight;
-        previousModelStripHeightRef.current = nextModelStripHeight;
-        previousContentOffsetsRef.current = {
-          promptFromTop: nextPromptTop === null ? null : nextPromptTop - nextRect.top,
-          promptHeight: nextPromptRect?.height ?? null,
-          actionFromBottom: nextActionTop === null ? null : nextRect.bottom - nextActionTop,
-          controlsFromBottom: nextControlsTop === null ? null : nextRect.bottom - nextControlsTop,
-          controlsFromLeft:
-            nextControlsRect === null ? null : nextControlsRect.left - nextRect.left,
-          surfaceBottomInset: overlayRect ? overlayRect.bottom - nextRect.bottom : null,
+        const finishTransition = (cancelAnimations: boolean) => {
+          if (animationRef.current !== animation) return;
+          if (transitionCleanupTimeoutRef.current !== null) {
+            window.clearTimeout(transitionCleanupTimeoutRef.current);
+            transitionCleanupTimeoutRef.current = null;
+          }
+          if (cancelAnimations) {
+            animation.cancel();
+            for (const contentAnimation of contentAnimationsRef.current) {
+              contentAnimation.cancel();
+            }
+            for (const stateChangeAnimation of stateChangeAnimationsRef.current) {
+              stateChangeAnimation.cancel();
+            }
+          }
+          animationRef.current = null;
+          springTransitionRef.current = null;
+          animationTargetHeightRef.current = null;
+          contentAnimationsRef.current = [];
+          stateChangeAnimationsRef.current = [];
+          animation.cancel();
+          stripAnimation?.cancel();
+          clearTransitionStyles();
         };
-      });
-    },
-    [
-      animationDurationMs,
-      physics,
-      animationsActive,
-      clearTransitionStyles,
-      onOverlayHeightChange,
-      restingControlsRef,
-    ],
-  );
+        void animation.finished.catch(() => undefined).then(() => finishTransition(false));
+        // A suspended document timeline can leave `finished` pending while
+        // these measurement styles remain active. Wall-clock cleanup makes
+        // the natural layout the eventual source of truth in that case.
+        transitionCleanupTimeoutRef.current = window.setTimeout(
+          () => finishTransition(true),
+          duration + COMPOSER_RESTING_TRANSITION_CLEANUP_BUFFER_MS,
+        );
+      } else {
+        animationTargetHeightRef.current = null;
+      }
+
+      previousCollapsedRef.current = nextIsCollapsed;
+      previousHeightRef.current = nextHeight;
+      previousModelStripHeightRef.current = nextModelStripHeight;
+      previousContentOffsetsRef.current = {
+        promptFromTop: nextPromptTop === null ? null : nextPromptTop - nextRect.top,
+        promptHeight: nextPromptRect?.height ?? null,
+        actionFromBottom: nextActionTop === null ? null : nextRect.bottom - nextActionTop,
+        controlsFromBottom: nextControlsTop === null ? null : nextRect.bottom - nextControlsTop,
+        controlsFromLeft: nextControlsRect === null ? null : nextControlsRect.left - nextRect.left,
+        surfaceBottomInset: overlayRect ? overlayRect.bottom - nextRect.bottom : null,
+      };
+    });
+  };
 
   useLayoutEffect(() => {
     const requestId = transitionLayoutRequestRef.current + 1;

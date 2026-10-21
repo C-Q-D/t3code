@@ -5,7 +5,6 @@ import type { UsageProviderKind } from "@t3tools/contracts";
 import type { MergedUsage } from "@t3tools/shared/usageMerge";
 import type { UsageChartMetric } from "./UsageProviderChart";
 import { cn } from "../../lib/utils";
-import { useMemo } from "react";
 import { formatUsd, formatTokens, formatPercent, formatCount } from "@t3tools/shared/usageFormat";
 import { InfoIcon } from "lucide-react";
 import { InlineButton } from "../ui/button";
@@ -62,14 +61,8 @@ export function UsageHeroCard({
   const stats = summarizeColumns(series[metric].map((total) => ({ total })));
   const isProviderLoading = (provider: UsageProviderKind) =>
     loading.everyProvider || loading.providers.has(provider);
-  const chartLoadingProviders = useMemo(
-    () =>
-      new Set(
-        activeProviders.filter(
-          (provider) => loading.everyProvider || loading.providers.has(provider),
-        ),
-      ),
-    [activeProviders, loading.everyProvider, loading.providers],
+  const chartLoadingProviders = new Set(
+    activeProviders.filter((provider) => loading.everyProvider || loading.providers.has(provider)),
   );
   return (
     <section ref={entranceRef} className="usage-chart-surface usage-lux-hero">

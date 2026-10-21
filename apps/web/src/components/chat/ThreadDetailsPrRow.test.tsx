@@ -1,4 +1,5 @@
 /** Exercises PR merge confirmation and check counts; popup bodies are isolated from the row's actions. */
+import { AsyncResult } from "effect/reactivity";
 import { EnvironmentId, type PullRequestCheck } from "@t3tools/contracts";
 import { act, cloneElement, type ReactElement, type ReactNode } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
@@ -21,33 +22,33 @@ vi.mock("~/state/entities", () => ({ useServerConfigs: () => new Map() }));
 vi.mock("~/state/pullRequests", () => ({ pullRequestEnvironment: {} }));
 vi.mock("~/hooks/useLiveRefresh", () => ({ useLiveRefresh: () => {} }));
 vi.mock("~/state/query", () => ({
-  useEnvironmentQuery: () => ({
-    data: {
-      number: 1,
-      title: "Test PR",
-      url: "https://github.com/example/project/pull/1",
-      state: "open",
-      isDraft: false,
-      mergeability: state.mergeability,
-      headBranch: "feature",
-      baseBranch: "main",
-      changedFiles: 1,
-      additions: 1,
-      deletions: 0,
-      checks: [state.status, ...(state.extraStatus ? [state.extraStatus] : [])].map((status) => ({
-        name: `CI-${status}`,
-        status,
-        description: null,
-        url: null,
-      })),
-      capabilities: { actions: ["merge"], mergeMethods: ["merge"] },
-      viewerPermissions: { actions: ["merge"] },
-      mergeCapabilities: { merge: true, squash: false, rebase: false },
-    },
-    dataUpdatedAt: 1,
-    isPending: false,
-    refresh: vi.fn(),
-  }),
+  useEnvironmentQuerySelector: (_atom: unknown, select: (result: unknown) => unknown) =>
+    select(
+      AsyncResult.success({
+        number: 1,
+        title: "Test PR",
+        url: "https://github.com/example/project/pull/1",
+        state: "open",
+        isDraft: false,
+        mergeability: state.mergeability,
+        headBranch: "feature",
+        baseBranch: "main",
+        changedFiles: 1,
+        additions: 1,
+        deletions: 0,
+        checks: [state.status, ...(state.extraStatus ? [state.extraStatus] : [])].map((status) => ({
+          name: `CI-${status}`,
+          status,
+          description: null,
+          url: null,
+        })),
+        capabilities: { actions: ["merge"], mergeMethods: ["merge"] },
+        viewerPermissions: { actions: ["merge"] },
+        mergeCapabilities: { merge: true, squash: false, rebase: false },
+      }),
+    ),
+  useEnvironmentQueryIsNewer: () => false,
+  useEnvironmentQueryRefresh: () => ({ isPending: () => false, refresh: vi.fn() }),
 }));
 vi.mock("../pullRequest/usePullRequestActions", () => ({
   usePullRequestActionRunner: () => ({ actionPending: false, perform: state.perform }),
@@ -171,29 +172,32 @@ it("requires a new merge click after passing checks become pending and pass agai
 it.each<[PullRequestCheck["status"], PullRequestCheck["status"], string]>([
   ["success", "skipped", ""],
   ["failure", "cancelled", ""],
-  ["success", "action-required", ""],
+  ["success", "action-required", "1/2"],
   ["success", "pending", "1/2"],
   ["failure", "pending", "1/2"],
-])("shows a count only while checks run (%s, %s)", (status, extraStatus, count) => {
-  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-  state.status = status;
-  state.extraStatus = extraStatus;
-  act(() => {
-    renderer = create(
-      <ThreadDetailsPrRow
-        environmentId={EnvironmentId.make("environment")}
-        pr={null}
-        number={1}
-        status={null}
-        project={null}
-        label="Test PR"
-        openAriaLabel="Open PR"
-        onOpen={vi.fn()}
-      />,
-    );
-  });
-  const text = renderer.root
-    .findAllByType("span")
-    .map((span) => span.children.filter((child) => typeof child === "string").join(""));
-  expect(text.filter((value) => /^\d+\/\d+$/.test(value))).toEqual(count ? [count] : []);
-});
+])(
+  "shows completed check counts while checks are incomplete (%s, %s)",
+  (status, extraStatus, count) => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    state.status = status;
+    state.extraStatus = extraStatus;
+    act(() => {
+      renderer = create(
+        <ThreadDetailsPrRow
+          environmentId={EnvironmentId.make("environment")}
+          pr={null}
+          number={1}
+          status={null}
+          project={null}
+          label="Test PR"
+          openAriaLabel="Open PR"
+          onOpen={vi.fn()}
+        />,
+      );
+    });
+    const text = renderer.root
+      .findAllByType("span")
+      .map((span) => span.children.filter((child) => typeof child === "string").join(""));
+    expect(text.filter((value) => /^\d+\/\d+$/.test(value))).toEqual(count ? [count] : []);
+  },
+);

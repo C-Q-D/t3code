@@ -11,6 +11,7 @@ import {
   ProjectId,
   RunId,
   ThreadId,
+  type ServerProvider,
 } from "@t3tools/contracts";
 import {
   act,
@@ -134,8 +135,10 @@ vi.mock("@legendapp/list/react", async () => {
     onScroll?: () => void;
     ref?: Ref<LegendListRef>;
   }) => {
-    legendListTestState.data = props.data;
-    legendListTestState.onScroll = props.onScroll;
+    useLayoutEffect(() => {
+      legendListTestState.data = props.data;
+      legendListTestState.onScroll = props.onScroll;
+    }, [props.data, props.onScroll]);
     if (props.anchoredEndSpace) {
       props.anchoredEndSpace.onSizeChanged?.(240);
       props.anchoredEndSpace.onReady?.({ anchorIndex: props.anchoredEndSpace.anchorIndex });
@@ -230,8 +233,8 @@ function matchMedia() {
   };
 }
 
-let MessagesTimeline: typeof import("./MessagesTimeline").MessagesTimeline;
-let resolvePreviewAnnotationImage: typeof import("./MessagesTimeline").resolvePreviewAnnotationImage;
+// Load the module during collection; cold transforms must not consume the hook timeout.
+import { MessagesTimeline } from "./MessagesTimeline";
 
 const ElementStub = class ElementStub {};
 function stubDomGlobals() {
@@ -272,11 +275,9 @@ function stubDomGlobals() {
 }
 
 beforeEach(stubDomGlobals);
-// Cold transformation of the full chat dependency graph needs extra time on slower CI workers.
-beforeAll(async () => {
+beforeAll(() => {
   Object.defineProperty(window, "matchMedia", { value: matchMedia, configurable: true });
-  ({ MessagesTimeline, resolvePreviewAnnotationImage } = await import("./MessagesTimeline"));
-}, 120_000);
+});
 
 const ACTIVE_THREAD_ENVIRONMENT_ID = EnvironmentId.make("environment-local");
 const MESSAGE_CREATED_AT = "2026-03-17T19:12:28.000Z";
@@ -406,7 +407,6 @@ function buildProps() {
     listRef: createRef<LegendListRef | null>(),
     latestRun: null,
     turnDiffSummaries: [],
-    providerStatuses: [],
     runs: [],
     routeThreadKey: "environment-local:thread-1",
     onOpenTurnDiff: () => {},
@@ -427,6 +427,7 @@ function buildProps() {
     onAnchorReady: () => {},
     onAnchorSizeChanged: () => {},
     contentInsetEndAdjustment: 0,
+    emptyPlaceholderInset: 0,
     liveFollowEnabled: true,
     onIsAtEndChange: () => {},
     onManualNavigation: () => {},
@@ -839,13 +840,16 @@ describe("MessagesTimeline", () => {
     let navigateManually = () => {};
     function ChatProbe() {
       const [liveFollowEnabled, setLiveFollowEnabled] = useState(true);
-      navigateManually = () => setLiveFollowEnabled(false);
+      const stopFollowing = () => setLiveFollowEnabled(false);
+      useLayoutEffect(() => {
+        navigateManually = stopFollowing;
+      });
       return (
         <MessagesTimeline
           {...props}
           timelineEntries={[buildUserTimelineEntry("First prompt")]}
           liveFollowEnabled={liveFollowEnabled}
-          onManualNavigation={navigateManually}
+          onManualNavigation={stopFollowing}
         />
       );
     }
@@ -1874,7 +1878,7 @@ describe("MessagesTimeline", () => {
     expect(markup).toContain("yoo what&#x27;s");
     expect(markup).not.toContain("terminal_context");
     expect(markup).toContain("Show full message");
-  }, 20_000);
+  });
 
   it("renders chips for standalone element-pick context messages", () => {
     const markup = renderToStaticMarkup(
@@ -2015,6 +2019,12 @@ describe("MessagesTimeline", () => {
         skills: [],
       },
     ] as never;
+    // Use the environment catalog so endpoint labels resolve through the live selector.
+    const { Atom } = await import("effect/reactivity");
+    const { serverEnvironment } = await import("../../state/server");
+    using _providers = vi
+      .spyOn(serverEnvironment, "providersValueAtom")
+      .mockReturnValue(Atom.make<ReadonlyArray<ServerProvider> | null>(providerStatuses));
     const buildHandoffEntry = (item: Record<string, unknown>) => ({
       id: "handoff-1",
       kind: "event" as const,
@@ -2053,7 +2063,6 @@ describe("MessagesTimeline", () => {
     const markup = renderToStaticMarkup(
       <MessagesTimeline
         {...buildProps()}
-        providerStatuses={providerStatuses}
         timelineEntries={[
           buildHandoffEntry({
             fromProviderInstanceIds: ["codex_personal"],
@@ -2091,7 +2100,6 @@ describe("MessagesTimeline", () => {
     const legacyMarkup = renderToStaticMarkup(
       <MessagesTimeline
         {...buildProps()}
-        providerStatuses={providerStatuses}
         runs={legacyRuns}
         timelineEntries={[
           buildHandoffEntry({
@@ -2111,7 +2119,6 @@ describe("MessagesTimeline", () => {
     const bareMarkup = renderToStaticMarkup(
       <MessagesTimeline
         {...buildProps()}
-        providerStatuses={providerStatuses}
         timelineEntries={[
           buildHandoffEntry({
             fromProviderInstanceIds: ["codex_personal"],

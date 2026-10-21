@@ -17,7 +17,7 @@ import {
 } from "@t3tools/client-runtime/state/runtime";
 
 import { ThreadDetailsSection } from "./ThreadDetailsSection";
-import { relativeLabel, scheduleLabel } from "../settings/ScheduledTasksSettings";
+import { ScheduledRelativeLabel, scheduleLabel } from "../settings/ScheduledTasksSettings";
 import { useEnvironmentQuery } from "../../state/query";
 import { serverEnvironment } from "../../state/server";
 import { useAtomCommand } from "../../state/use-atom-command";
@@ -53,9 +53,7 @@ export function ThreadAutomationsPanel(props: {
   const boundTasks = (tasksQuery.data?.tasks ?? []).filter(
     (task) => task.threadId === props.threadId,
   );
-  // A load error must not look like "no automations" — this thread may have
-  // tasks whose controls would silently vanish. Only hide the section when we
-  // positively know there is nothing bound to it.
+
   if (tasksQuery.error === null && boundTasks.length === 0) return null;
 
   const reportFailure = (title: string, error: unknown) => {
@@ -127,14 +125,34 @@ export function ThreadAutomationsPanel(props: {
                   {task.title}
                 </span>
                 <span className="text-secondary-copy text-secondary-label">
-                  {task.enabled && task.nextRunAt != null
-                    ? t.chat.details.nextRunSuffix(relativeLabel(task.nextRunAt))
-                    : task.enabled
-                      ? ""
-                      : t.chat.details.pausedSuffix}
+                  {task.enabled && task.nextRunAt != null ? (
+                    <>
+                      {t.chat.details.nextRunSuffix("")}
+                      <ScheduledRelativeLabel value={task.nextRunAt} />
+                    </>
+                  ) : task.enabled ? (
+                    ""
+                  ) : (
+                    t.chat.details.pausedSuffix
+                  )}
                 </span>
               </TooltipTrigger>
-              <TooltipPopup>{scheduleLabel(task.schedule)}</TooltipPopup>
+              <TooltipPopup>
+                <p>{task.title}</p>
+                <p>
+                  {scheduleLabel(task.schedule)}
+                  {task.enabled && task.nextRunAt !== null ? (
+                    <>
+                      {t.chat.details.nextRunSuffix("")}
+                      <ScheduledRelativeLabel value={task.nextRunAt} />
+                    </>
+                  ) : task.enabled ? (
+                    ""
+                  ) : (
+                    t.chat.details.pausedSuffix
+                  )}
+                </p>
+              </TooltipPopup>
             </Tooltip>
             {/* Webhooks still require a payload; paused tasks resume through the enabled flag. */}
             {task.enabled && task.schedule.type !== "webhook" ? (

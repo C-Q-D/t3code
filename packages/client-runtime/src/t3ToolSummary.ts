@@ -23,7 +23,6 @@ interface ToolResult {
   readonly failed: boolean;
 }
 
-/** Reads the structured/JSON MCP result envelopes retained by the provider adapters. */
 function readResult(value: unknown, depth = 0): ToolResult {
   if (depth > 4) return { failed: false };
   if (typeof value === "string") {
@@ -62,7 +61,7 @@ function readResult(value: unknown, depth = 0): ToolResult {
 
 function readInput(value: unknown): Record<string, unknown> | undefined {
   const input = readResult(value).data;
-  // Cursor retains its MCP args envelope; other adapters retain the arguments directly.
+  // Historical Cursor items retain the MCP args envelope.
   return input && typeof input.toolName === "string" ? asRecord(input.args) : input;
 }
 
@@ -242,7 +241,58 @@ export function summarizeT3ToolCalls(
     case "read-pr-guide":
       label = messages.readReviewGuides(selected.length, succeeded);
       break;
-    default:
+    case "delegate":
+    case "thread-list":
+    case "thread-interrupt":
+    case "workflow-stop":
+    case "task-status":
+    case "task-cancel":
+    case "schedule-create":
+    case "schedule-list":
+    case "schedule-update":
+    case "schedule-delete":
+    case "schedule-run":
+    case "thread-configuration":
+    case "thread-configure":
+    case "thread-fork":
+    case "thread-merge":
+    case "thread-search":
+    case "thread-transfers":
+    case "thread-organize":
+    case "thread-update":
+    case "queue-list":
+    case "queue-read":
+    case "queue-edit":
+    case "queue-cancel":
+    case "queue-reorder":
+    case "queue-steer":
+    case "question-list":
+    case "question-read":
+    case "question-respond":
+    case "secret-request":
+    case "worktree-handoff":
+    case "worktree-list":
+    case "worktree-status":
+    case "project-list":
+    case "project-read":
+    case "project-create":
+    case "project-update":
+    case "project-delete":
+    case "project-clone":
+    case "environment-read":
+    case "environment-update":
+    case "attachment-prepare":
+    case "attachment-discard":
+    case "link-pr":
+    case "unlink-pr":
+    case "watch-pr":
+    case "unwatch-pr":
+    case "list-prs":
+    case "browser":
+    case "device":
+    case "html-preview":
+    case "html-render":
+    case "capabilities":
       label = messages.summary[action](count, succeeded);
   }
   return { label, failedCount };

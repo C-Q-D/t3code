@@ -5,7 +5,7 @@ import type { UsageProviderKind } from "@t3tools/contracts";
 import type { MergedUsage } from "@t3tools/shared/usageMerge";
 import type { UsageChartMetric } from "./UsageProviderChart";
 import { cn } from "../../lib/utils";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import type { DailyTotals, HourlyTotals } from "@t3tools/shared/usageMerge";
 import {
   formatUsd,
@@ -29,6 +29,7 @@ export interface UsageCompositionCardProps {
   readonly activeProviders: readonly UsageProviderKind[];
   readonly resolution: "day" | "hour";
   readonly timeZone: string;
+  readonly hour12?: boolean;
   /** key 为 `${provider}:${model}`，打开现有模型详情弹窗 */
   readonly onSelectModel: (key: string) => void;
 }
@@ -41,6 +42,7 @@ export function UsageCompositionCard({
   activeProviders,
   resolution,
   timeZone,
+  hour12,
   onSelectModel,
 }: UsageCompositionCardProps): JSX.Element {
   const [breakdown, setBreakdown] = useState<"model" | "time">("model");
@@ -48,17 +50,13 @@ export function UsageCompositionCard({
   const entranceRef = useUsageCardEntrance(0);
   const shownHourly = resolution === "hour";
   // Put the newest period first because ranges can contain ninety days.
-  const breakdownPeriods = useMemo<readonly (DailyTotals | HourlyTotals)[]>(
-    () => (shownHourly ? merged.hourly : merged.daily).toReversed(),
-    [shownHourly, merged.daily, merged.hourly],
-  );
-  const breakdownModels = useMemo(
-    () =>
-      breakdown === "model" && metric === "tokens"
-        ? sortModelsByTokens(merged.models)
-        : merged.models,
-    [breakdown, merged.models, metric],
-  );
+  const breakdownPeriods: readonly (DailyTotals | HourlyTotals)[] = (
+    shownHourly ? merged.hourly : merged.daily
+  ).toReversed();
+  const breakdownModels =
+    breakdown === "model" && metric === "tokens"
+      ? sortModelsByTokens(merged.models)
+      : merged.models;
   const timeValueColumnWidth = `${60 / (activeProviders.length + 2)}%`;
   return (
     <div ref={entranceRef} className="usage-composition-card">
@@ -231,7 +229,12 @@ export function UsageCompositionCard({
                   >
                     <td className="py-2 text-foreground">
                       {"hourStart" in period
-                        ? formatHourShort(period.hourStart, timeZone, t.chat.workLog.shared.usage)
+                        ? formatHourShort(
+                            period.hourStart,
+                            timeZone,
+                            t.chat.workLog.shared.usage,
+                            hour12,
+                          )
                         : formatDayShort(period.day, t.chat.workLog.shared.usage)}
                     </td>
                     {activeProviders.map((provider) => (

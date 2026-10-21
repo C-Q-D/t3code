@@ -1,5 +1,5 @@
 /** Owns the General settings inactivity-day stepper, preserving draft validation and scoped commits. */
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { MinusIcon, PlusIcon } from "lucide-react";
 import {
   MAX_SIDEBAR_AUTO_SETTLE_AFTER_DAYS,
@@ -27,9 +27,11 @@ export function AutoSettleDaysInput({
   // Local draft so the field can be emptied mid-edit; the setting only moves
   // on valid input and snaps back to the persisted value on blur.
   const [draft, setDraft] = useState(String(value));
-  useEffect(() => {
+  const [savedValue, setSavedValue] = useState(value);
+  if (savedValue !== value) {
+    setSavedValue(value);
     setDraft(String(value));
-  }, [value]);
+  }
   const decreased = stepAutoSettleDays(value, -1);
   const increased = stepAutoSettleDays(value, 1);
 

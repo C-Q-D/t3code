@@ -9,12 +9,14 @@ import { ContextChip, ContextChipLabel } from "./ContextChip";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 
 /**
- * Inline chip for an attached thread, in the composer and in sent messages. Prefers the
- * live title so a renamed thread never shows a stale label, and opens the thread on click.
+ * Preserves a stored thread title when the live shell is unavailable and marks cross-machine input as unreadable.
+ * @param props Stored thread reference/title, optional Markdown copy payload and unreadable state.
+ * @returns A navigable context chip with a tooltip explaining whether its thread can be read.
  */
 export function ThreadContextChip(props: {
   record: Pick<ThreadContextRecord, "environmentId" | "threadId" | "title">;
   copyMarkdown?: string;
+  unreadable?: boolean;
 }) {
   const { environmentId, threadId } = props.record;
   const shell = useThreadShell({ environmentId, threadId });
@@ -25,6 +27,7 @@ export function ThreadContextChip(props: {
         render={
           <ContextChip
             kind="thread"
+            {...(props.unreadable ? { state: "invalid" as const } : {})}
             render={<Link to="/$environmentId/$threadId" params={{ environmentId, threadId }} />}
             aria-label={t.app.thread.accessibleLabel(title)}
             data-markdown-copy={props.copyMarkdown}
@@ -35,7 +38,13 @@ export function ThreadContextChip(props: {
           </ContextChip>
         }
       />
-      <TooltipPopup side="top">{shell ? t.app.thread.open : t.app.thread.unavailable}</TooltipPopup>
+      <TooltipPopup side="top">
+        {props.unreadable
+          ? t.app.thread.unreadable
+          : shell
+            ? t.app.thread.open
+            : t.app.thread.unavailable}
+      </TooltipPopup>
     </Tooltip>
   );
 }

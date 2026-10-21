@@ -5,7 +5,6 @@ import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import { AsyncResult, Atom } from "effect/reactivity";
-import { useCallback } from "react";
 
 import { isLocalEnvironmentDisabled } from "../../localEnvironment";
 import { appAtomRegistry } from "../../rpc/atomRegistry";
@@ -28,9 +27,6 @@ function refreshPrimarySessionState(): void {
 /** Returns the primary environment session, loading/error state and refresh action; no primary target yields an empty session. */
 export function usePrimarySessionState() {
   const result = useAtomValue(primarySessionStateAtom);
-  const refresh = useCallback(() => {
-    refreshPrimarySessionState();
-  }, []);
   let error: string | null = null;
   if (result._tag === "Failure") {
     const cause = Cause.squash(result.cause);
@@ -40,6 +36,6 @@ export function usePrimarySessionState() {
     data: Option.getOrNull(AsyncResult.value(result)),
     error,
     isPending: result.waiting,
-    refresh,
+    refresh: refreshPrimarySessionState,
   };
 }

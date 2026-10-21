@@ -1,5 +1,5 @@
 /** Owns panel pointer capture, elastic sizing and finite rebound jobs; persistence belongs to callers. */
-import { type PointerEvent, useCallback, useEffect, useLayoutEffect, useRef } from "react";
+import { type PointerEvent, useEffect, useEffectEvent, useLayoutEffect, useRef } from "react";
 import { useMotionJob } from "../lib/motion/react";
 import { isPhysicsEnabled, onPhysicsChange } from "../lib/motion/preference";
 import { project, rubberClamp } from "../lib/motion/project";
@@ -21,6 +21,25 @@ interface ResizeSession {
   physics?: { min: number; max: number; rubberPx?: number; onFling?: (() => void) | undefined };
   /** Runs on every end; false means no width was committed. */
   cleanup?: (committed: boolean) => void;
+}
+
+/** Keep bounds live throughout a gesture; getter construction stays outside compiled Hooks.
+ * Readers return current CSS-pixel bounds; onFling is the optional collapse action.
+ */
+export function createResizePhysics(
+  readMin: () => number,
+  readMax: () => number,
+  onFling?: () => void,
+) {
+  return {
+    get min() {
+      return readMin();
+    },
+    get max() {
+      return readMax();
+    },
+    onFling,
+  };
 }
 
 /** Pointer and rebound share one owner so cancellation cannot commit an obsolete session. */
@@ -52,13 +71,13 @@ export function useResizeDrag<T extends HTMLElement>(
   const drag = useRef<ActiveResize<T> | null>(null);
   const { start: startMotion, stop: stopMotion } = useMotionJob();
 
-  const flush = useCallback(() => {
+  const flush = () => {
     const active = drag.current;
     if (!active || active.settling) return;
     const { session } = active;
     const delta =
       (active.pendingPosition - active.startPosition) * (session.edge === "right" ? 1 : -1);
-    active.moved ||= Math.abs(delta) > 2;
+    if (!active.moved) active.moved = Math.abs(delta) > 2;
     const raw = active.origin + delta;
     active.raw = raw;
     active.width = session.resize(raw);
@@ -72,9 +91,9 @@ export function useResizeDrag<T extends HTMLElement>(
           )
         : active.width;
     if (active.physical) session.paint?.(active.visual);
-  }, []);
+  };
 
-  const release = useCallback((active: ActiveResize<T>) => {
+  const release = (active: ActiveResize<T>) => {
     if (active.frame !== null) cancelAnimationFrame(active.frame);
     active.frame = null;
     try {
@@ -86,88 +105,85 @@ export function useResizeDrag<T extends HTMLElement>(
     }
     document.body.style.removeProperty("cursor");
     document.body.style.removeProperty("user-select");
-  }, []);
+  };
 
-  const complete = useCallback(
-    (active: ActiveResize<T>, commit: boolean) => {
-      drag.current = null;
-      active.stop?.();
+  const complete = (active: ActiveResize<T>, commit: boolean) => {
+    drag.current = null;
+    active.stop?.();
+    release(active);
+    active.session.cleanup?.(commit);
+    if (commit) active.session.finish(active.width, active.moved);
+  };
+
+  const finish = (commit = true, allowFling = false) => {
+    const active = drag.current;
+    if (!active) return;
+    if (!commit) {
+      complete(active, false);
+      return;
+    }
+    if (!active.settling) flush();
+    const bounds = active.physical && isPhysicsEnabled() ? active.session.physics : undefined;
+    const velocity =
+      active.tracker.velocity(active.time)[active.session.edge === "top" ? "y" : "x"] *
+      (active.session.edge === "right" ? 1 : -1);
+    if (
+      bounds &&
+      allowFling &&
+      bounds.onFling &&
+      shouldCollapsePanel(active.visual + project(velocity, DECEL.fast), velocity, bounds.min)
+    ) {
+      complete(active, false);
+      bounds.onFling();
+      return;
+    }
+    if (bounds && (active.visual < bounds.min || active.visual > bounds.max)) {
+      if (active.settling) return;
+      active.settling = true;
       release(active);
-      active.session.cleanup?.(commit);
-      if (commit) active.session.finish(active.width, active.moved);
-    },
-    [release],
-  );
+      const spring = new Spring({ value: active.raw, target: active.width, velocity });
+      active.stop = stopMotion;
+      startMotion((dt) => {
+        const moving = spring.step(dt);
+        active.raw = spring.value;
+        // Keep momentum in raw space: every painted value remains inside the elastic curve's range.
+        active.visual = rubberClamp(spring.value, bounds.min, bounds.max, bounds.rubberPx ?? 160);
+        active.session.paint?.(active.visual);
+        if (!moving) complete(active, true);
+        return moving;
+      });
+      return;
+    }
+    active.session.paint?.(active.width);
+    complete(active, true);
+  };
 
-  const finish = useCallback(
-    (commit = true, allowFling = false) => {
-      const active = drag.current;
-      if (!active) return;
-      if (!commit) {
-        complete(active, false);
-        return;
-      }
-      if (!active.settling) flush();
-      const bounds = active.physical && isPhysicsEnabled() ? active.session.physics : undefined;
-      const velocity =
-        active.tracker.velocity(active.time)[active.session.edge === "top" ? "y" : "x"] *
-        (active.session.edge === "right" ? 1 : -1);
-      if (
-        bounds &&
-        allowFling &&
-        bounds.onFling &&
-        shouldCollapsePanel(active.visual + project(velocity, DECEL.fast), velocity, bounds.min)
-      ) {
-        complete(active, false);
-        bounds.onFling();
-        return;
-      }
-      if (bounds && (active.visual < bounds.min || active.visual > bounds.max)) {
-        if (active.settling) return;
-        active.settling = true;
-        release(active);
-        const spring = new Spring({ value: active.raw, target: active.width, velocity });
-        active.stop = stopMotion;
-        startMotion((dt) => {
-          const moving = spring.step(dt);
-          active.raw = spring.value;
-          // Keep momentum in raw space: every painted value remains inside the elastic curve's range.
-          active.visual = rubberClamp(spring.value, bounds.min, bounds.max, bounds.rubberPx ?? 160);
-          active.session.paint?.(active.visual);
-          if (!moving) complete(active, true);
-          return moving;
-        });
-        return;
-      }
-      active.session.paint?.(active.width);
-      complete(active, true);
-    },
-    [complete, flush, release, startMotion, stopMotion],
-  );
+  // Effect cleanup must not cancel an active drag when render callbacks change.
+  const finishDrag = useEffectEvent((commit: boolean) => finish(commit));
 
   const previousResetKey = useRef(resetKey);
   useLayoutEffect(() => {
     if (previousResetKey.current !== resetKey) {
-      finish(false);
+      finishDrag(false);
       previousResetKey.current = resetKey;
     }
-  }, [finish, resetKey]);
+  }, [resetKey]);
 
   useEffect(() => {
     const onBlur = () => {
       // A blurred physical gesture is abandoned, never interpreted as a throw.
-      finish(!drag.current?.physical);
+      finishDrag(!drag.current?.physical);
     };
     const unsubscribe = onPhysicsChange((enabled) => {
-      if (!enabled) finish();
+      if (!enabled) finishDrag(true);
     });
     window.addEventListener("blur", onBlur);
     return () => {
       unsubscribe();
       window.removeEventListener("blur", onBlur);
-      finish(false);
+      finishDrag(false);
     };
-  }, [finish]);
+  }, []);
 
   const end = (event: PointerEvent<T>, usePosition: boolean) => {
     const active = drag.current;
@@ -181,12 +197,12 @@ export function useResizeDrag<T extends HTMLElement>(
     finish(usePosition || !active.physical, usePosition);
   };
 
-  const refresh = useCallback(() => {
+  const refresh = () => {
     const active = drag.current;
     // Geometry changes invalidate a rebound; restoring the owner's bounded size is immediate.
     if (active?.settling) complete(active, false);
     else flush();
-  }, [complete, flush]);
+  };
 
   return {
     refresh,
@@ -242,7 +258,7 @@ export function useResizeDrag<T extends HTMLElement>(
       active.pendingPosition = active.session.edge === "top" ? event.clientY : event.clientX;
       active.time = event.timeStamp;
       active.tracker.addPointerEvent(event);
-      active.moved ||= Math.abs(active.pendingPosition - active.startPosition) > 2;
+      if (!active.moved) active.moved = Math.abs(active.pendingPosition - active.startPosition) > 2;
       if (active.frame !== null) return;
       active.frame = requestAnimationFrame(() => {
         active.frame = null;

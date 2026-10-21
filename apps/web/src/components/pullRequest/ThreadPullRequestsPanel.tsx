@@ -1,3 +1,4 @@
+import { LegendList } from "@legendapp/list/react";
 /** Owns thread pull requests panel on the web pull-request surface; host data and agent context remain unchanged. */
 import { t } from "~/i18n";
 import type { ProjectId, ScopedThreadRef, ThreadPullRequestLink } from "@t3tools/contracts";
@@ -6,28 +7,33 @@ import {
   UNKNOWN_SOURCE_CONTROL_CLIENT,
 } from "@t3tools/client-runtime/source-control-clients";
 import {
+  type PullRequestListLine,
+  pullRequestListLines,
   resolveThreadPullRequestChains,
   visibleThreadPullRequests,
 } from "@t3tools/shared/threadPullRequests";
 import { ArrowUpRightIcon, EyeIcon, EyeOffIcon, LinkIcon, MoreHorizontalIcon } from "lucide-react";
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { memo, useState, type ReactNode } from "react";
 
+import {
+  COMPOSER_PULL_REQUEST_DRAG_TYPE,
+  encodePullRequestDragPayload,
+} from "~/components/chat/composerMentionDrag";
 import { writeTextToClipboard } from "~/hooks/useCopyToClipboard";
 import { findProjectForChangeRequest, useOpenPrLink } from "~/lib/openPullRequestLink";
 import { cn } from "~/lib/utils";
 import { useShortcutModifierState } from "~/shortcutModifierState";
 import { useProjects, useServerConfigs, useThreadShell } from "~/state/entities";
+import { PullRequestChangeBreakdownStat } from "./PullRequestChangeBreakdownStat";
 import { PullRequestsUnavailableState } from "./PullRequestsUnavailableState";
 import { threadEnvironment } from "~/state/threads";
 import { useAtomCommand } from "~/state/use-atom-command";
-import { formatRelativeTimeLabel } from "~/timestampFormat";
+import { RelativeTime } from "~/components/RelativeTime";
 import { Button } from "../ui/button";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "../ui/menu";
 import { MiddleTruncate } from "../ui/middle-truncate";
-import { ScrollArea } from "../ui/scroll-area";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { openLinkPullRequestDialog } from "./LinkPullRequestDialog";
-import { pullRequestListLines, type PullRequestListLine } from "./pullRequestListLines";
 import {
   PullRequestRowAuthor,
   PullRequestRowBranches,
@@ -85,7 +91,7 @@ function LinkedPullRequestLines({
         <span className="flex min-w-0 items-center gap-1.5 overflow-hidden">{meta}</span>
         {updatedAt ? (
           <span className="ml-auto shrink-0 tabular-nums">
-            {formatRelativeTimeLabel(updatedAt)}
+            <RelativeTime timestamp={updatedAt} />
           </span>
         ) : null}
       </span>
@@ -124,7 +130,7 @@ function ChecksGlyph({
  * watch callback means the environment does not support watching.
  * @returns A source-labelled row; the host remains authoritative for its watch and lifecycle state.
  */
-function LinkRow({
+function LinkRowImpl({
   line,
   threadRef,
   projectId,
@@ -137,25 +143,19 @@ function LinkRow({
   projectId: ProjectId | null;
   speedMode: boolean;
   onUnlink: (link: ThreadPullRequestLink) => void;
-  /** Null when the environment cannot watch pull requests. */
   onSetWatching: ((link: ThreadPullRequestLink, watching: boolean) => void) | null;
 }) {
   const openPrLink = useOpenPrLink(threadRef);
   const [menuOpen, setMenuOpen] = useState(false);
   const [actionPending, setActionPending] = useState(false);
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
-  const menuAnchor = useMemo(
-    () =>
-      menuPosition
-        ? { getBoundingClientRect: () => new DOMRect(menuPosition.x, menuPosition.y, 0, 0) }
-        : undefined,
-    [menuPosition],
-  );
+  const menuAnchor = menuPosition
+    ? { getBoundingClientRect: () => new DOMRect(menuPosition.x, menuPosition.y, 0, 0) }
+    : undefined;
   const { link, depth, stack } = line;
   const snapshot = link.snapshot;
   const open = snapshot === null || snapshot.state === "open";
   const watching = link.watch !== undefined;
-  // A link carries no host summary, so the host's own definition says what it can do.
   const linkHostActions = (
     sourceControlClients.findByChangeRequestUrl(link.url) ?? UNKNOWN_SOURCE_CONTROL_CLIENT
   ).changeRequestActions;
@@ -172,7 +172,6 @@ function LinkRow({
           ...(link.stack === null ? {} : { stack: link.stack }),
         }
       : null;
-  // Speed mode swaps the menu for quick actions only where a row has some to offer.
   const hasQuickActions =
     actionEntry !== null && pullRequestQuickActions(actionEntry, linkHostActions).length > 0;
   return (
@@ -209,6 +208,25 @@ function LinkRow({
       <a
         href={link.url}
         onClick={(event) => openPrLink(event, link.url, threadRef)}
+        // The link's own URL still rides along for drops outside the app; the composer takes
+        // this payload instead and adds the pull request as a context chip.
+        onDragStart={
+          snapshot === null
+            ? undefined
+            : (event) =>
+                event.dataTransfer.setData(
+                  COMPOSER_PULL_REQUEST_DRAG_TYPE,
+                  encodePullRequestDragPayload({
+                    number: link.number,
+                    title: snapshot.title,
+                    url: link.url,
+                    headBranch: snapshot.headBranch,
+                    baseBranch: snapshot.baseBranch,
+                    state: snapshot.state,
+                    isDraft: snapshot.isDraft,
+                  }),
+                )
+        }
         className="flex min-w-0 flex-1"
       >
         <LinkedPullRequestLines
@@ -236,7 +254,7 @@ function LinkRow({
                 #{link.number}
               </TooltipTrigger>
               <TooltipPopup>
-                {SOURCE_LABELS[link.source]} · {formatRelativeTimeLabel(link.linkedAt)}
+                {SOURCE_LABELS[link.source]} · <RelativeTime timestamp={link.linkedAt} />
               </TooltipPopup>
             </Tooltip>
           }
@@ -270,11 +288,26 @@ function LinkRow({
           }
           // Undrawn host metadata remains available beside the source, with no invented neutral state.
           status={
-            <PullRequestDiffStat
-              additions={snapshot?.additions ?? 0}
-              deletions={snapshot?.deletions ?? 0}
-              className="font-mono"
-            />
+            projectId === null ? (
+              <PullRequestDiffStat
+                additions={snapshot?.additions ?? 0}
+                deletions={snapshot?.deletions ?? 0}
+                className="font-mono"
+              />
+            ) : (
+              <PullRequestChangeBreakdownStat
+                environmentId={threadRef.environmentId}
+                reference={{
+                  projectId,
+                  host: link.host,
+                  repository: link.repository,
+                  number: link.number,
+                }}
+                additions={snapshot?.additions ?? 0}
+                deletions={snapshot?.deletions ?? 0}
+                className="font-mono"
+              />
+            )
           }
           meta={
             <>
@@ -307,8 +340,6 @@ function LinkRow({
               ) : null}
               {snapshot !== null ? (
                 <>
-                  {/* Cut in the middle: rows from one owner differ in the repository name at the
-                      end, which a tail cut would hide. */}
                   <Tooltip>
                     <TooltipTrigger render={<span className="flex min-w-0 max-w-32 font-mono" />}>
                       <MiddleTruncate value={link.repository} showTitle={false} />
@@ -417,6 +448,18 @@ function LinkRow({
   );
 }
 
+/** Memoized so a modifier key or a sync of one link re-renders only the rows that changed. */
+const LinkRow = memo(LinkRowImpl);
+
+function latestSyncedAt(links: ReadonlyArray<ThreadPullRequestLink>): string | null {
+  let latest: string | null = null;
+  for (const link of links) {
+    const at = link.snapshot?.syncedAt;
+    if (at !== undefined && (latest === null || at > latest)) latest = at;
+  }
+  return latest;
+}
+
 /**
  * Renders thread pull requests panel from the supplied display data and callbacks.
  * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
@@ -443,66 +486,52 @@ export function ThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThread
 function EnabledThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThreadRef }) {
   const thread = useThreadShell(threadRef);
   const projects = useProjects();
-  const environmentProjects = useMemo(
-    () =>
-      projects
-        .filter((project) => project.environmentId === threadRef.environmentId)
-        .toSorted((left, right) =>
-          left.id === thread?.projectId ? -1 : right.id === thread?.projectId ? 1 : 0,
-        ),
-    [projects, threadRef.environmentId, thread?.projectId],
-  );
+  const environmentProjects = projects
+    .filter((project) => project.environmentId === threadRef.environmentId)
+    .toSorted((left, right) =>
+      left.id === thread?.projectId ? -1 : right.id === thread?.projectId ? 1 : 0,
+    );
+  // LegendList re-renders its rows when `data` changes identity. `links` and values derived
+  // from it go through plain functions only here, before the next hook, so the compiler keeps
+  // `lines` in its own cache scope.
+  const links = visibleThreadPullRequests(thread?.pullRequests ?? []);
+  const lines = pullRequestListLines(resolveThreadPullRequestChains(links));
+  const openCount = links.filter(
+    (link) => link.snapshot === null || link.snapshot.state === "open",
+  ).length;
+  const lastSynced = latestSyncedAt(links);
+  const linkCount = links.length;
   const modifiers = useShortcutModifierState(true);
   const speedMode =
     modifiers.shiftKey && !modifiers.metaKey && !modifiers.ctrlKey && !modifiers.altKey;
-  const openLinkDialog = useCallback(() => openLinkPullRequestDialog(threadRef), [threadRef]);
+  const openLinkDialog = () => openLinkPullRequestDialog(threadRef);
   const unlink = useAtomCommand(threadEnvironment.unlinkPullRequest, { reportFailure: true });
   const watch = useAtomCommand(threadEnvironment.watchPullRequest, { reportFailure: true });
   const capabilities = useServerConfigs().get(threadRef.environmentId)?.environment.capabilities;
   const supportsWatch = capabilities?.threadPullRequestWatch === true;
-  const links = useMemo(() => visibleThreadPullRequests(thread?.pullRequests ?? []), [thread]);
-  const lines = useMemo(() => pullRequestListLines(resolveThreadPullRequestChains(links)), [links]);
-  const handleUnlink = useCallback(
-    (link: ThreadPullRequestLink) => {
-      void unlink({
-        environmentId: threadRef.environmentId,
-        input: {
-          threadId: threadRef.threadId,
-          host: link.host,
-          repository: link.repository,
-          number: link.number,
-        },
-      });
-    },
-    [threadRef, unlink],
-  );
-  const handleSetWatching = useCallback(
-    (link: ThreadPullRequestLink, watching: boolean) => {
-      void watch({
-        environmentId: threadRef.environmentId,
-        input: {
-          threadId: threadRef.threadId,
-          host: link.host,
-          repository: link.repository,
-          number: link.number,
-          watching,
-        },
-      });
-    },
-    [threadRef, watch],
-  );
-  const openCount = useMemo(
-    () => links.filter((link) => link.snapshot === null || link.snapshot.state === "open").length,
-    [links],
-  );
-  const lastSynced = useMemo(() => {
-    let latest: string | null = null;
-    for (const link of links) {
-      const at = link.snapshot?.syncedAt;
-      if (at !== undefined && (latest === null || at > latest)) latest = at;
-    }
-    return latest;
-  }, [links]);
+  const handleUnlink = (link: ThreadPullRequestLink) => {
+    void unlink({
+      environmentId: threadRef.environmentId,
+      input: {
+        threadId: threadRef.threadId,
+        host: link.host,
+        repository: link.repository,
+        number: link.number,
+      },
+    });
+  };
+  const handleSetWatching = (link: ThreadPullRequestLink, watching: boolean) => {
+    void watch({
+      environmentId: threadRef.environmentId,
+      input: {
+        threadId: threadRef.threadId,
+        host: link.host,
+        repository: link.repository,
+        number: link.number,
+        watching,
+      },
+    });
+  };
   const header = (
     <header className="flex h-9 shrink-0 items-center gap-2 px-1">
       <h2 className="min-w-0 flex-1 truncate font-serif text-pr-linked-heading font-bold">
@@ -515,7 +544,7 @@ function EnabledThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThread
     </header>
   );
 
-  if (links.length === 0) {
+  if (linkCount === 0) {
     return (
       <div className="flex h-full min-h-0 flex-col gap-1.5 px-3 pb-3">
         {header}
@@ -538,11 +567,21 @@ function EnabledThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThread
   return (
     <div className="flex h-full min-h-0 flex-col gap-1.5 px-3 pb-3">
       {header}
-      <ScrollArea className="min-h-0 flex-1">
-        <div className="flex flex-col gap-1.5">
-          {lines.map((line) => (
+      {/* Keep mounted rows bounded for threads with hundreds of linked pull requests. */}
+      <LegendList<PullRequestListLine>
+        data={lines}
+        keyExtractor={(line) => `${line.link.host}/${line.link.repository}#${line.link.number}`}
+        extraData={{
+          speedMode,
+          environmentProjects,
+          capabilities,
+          supportsWatch,
+          thread,
+          threadRef,
+        }}
+        renderItem={({ item: line }) => (
+          <div className="pb-1.5">
             <LinkRow
-              key={`${line.link.host}/${line.link.repository}#${line.link.number}`}
               line={line}
               threadRef={threadRef}
               projectId={
@@ -556,13 +595,21 @@ function EnabledThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThread
               onUnlink={handleUnlink}
               onSetWatching={supportsWatch ? handleSetWatching : null}
             />
-          ))}
-        </div>
-      </ScrollArea>
+          </div>
+        )}
+        estimatedItemSize={64}
+        drawDistance={440}
+        className="min-h-0 flex-1 overscroll-contain"
+      />
       <footer className="px-1 text-meta text-muted-foreground">
         <span>
           {t.git.pullRequest.linkedRequestCounts(openCount, links.length)}
-          {lastSynced ? t.git.pullRequest.syncedAt(formatRelativeTimeLabel(lastSynced)) : ""}
+          {lastSynced ? (
+            <>
+              {t.git.pullRequest.syncedAt("")}
+              <RelativeTime timestamp={lastSynced} />
+            </>
+          ) : null}
         </span>
       </footer>
     </div>

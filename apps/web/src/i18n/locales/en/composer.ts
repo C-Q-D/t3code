@@ -23,7 +23,7 @@ export const composer = {
       "The draft rejected this attachment (duplicate or attachment limit reached).",
     compressingToast: "Still compressing a pasted image.",
     compressingSendHint: "Send again once its thumbnail appears.",
-    importingToast: "Still bringing a pasted attachment into this message.",
+    importingToast: "Still bringing attached context into this message.",
     importingSendHint: "Send again once its chip resolves.",
     importingStashHint: "Stash again once its chip resolves.",
     /** Names the attachment whose preview can be opened. */
@@ -57,7 +57,7 @@ export const composer = {
     pasteAttachmentTooLargeToast: "Pasted text is too large to attach",
     pasteAttachmentTooLargeHint:
       "Reduce the clipboard contents or save a smaller excerpt as a file.",
-    remoteFolderToast: "Folders can't be dropped into remote environments",
+    remoteFolderToast: "Folders can only be referenced in the local desktop environment",
     /** Names the dropped folder whose local path could not be read. */
     folderPathErrorToast: (name: string) => `Couldn't get the path of "${name}"`,
     folderPathHint: "Type the folder path with @ instead.",
@@ -234,8 +234,8 @@ export const composer = {
   context: {
     addErrorToast: "Unable to add to chat",
     busyHint: "The composer is busy; try again once it is ready.",
-    wrongEnvironmentToast: "Use threads from this environment",
-    wrongEnvironmentHint: "The agent can only read threads on its own server.",
+    wrongEnvironmentToast: "Unable to read the dropped thread",
+    wrongEnvironmentHint: "Check that its environment is connected and up to date, then try again.",
     /** Combines a context kind display label with its content label. */
     chipAriaLabel: (kind: string, label: string) => `${kind}, ${label}`,
     uploadFailed: "upload failed",
@@ -257,6 +257,7 @@ export const composer = {
     /** Describes the PR state for display; null selects the generic pull request label. */
     pullRequestKind: (state: "open" | "draft" | "merged" | "closed" | null) =>
       state === null ? "Pull request" : `${state[0]!.toUpperCase()}${state.slice(1)} pull request`,
+    transcriptTooLargeHint: "This thread exceeds the attachment size limit. Try a shorter thread.",
   },
   placeholder: {
     customAnswer: "Write custom answer",
@@ -281,6 +282,7 @@ export const composer = {
     showDetails: "Show notice details",
     details: "Notice details",
     dismissWarning: "Dismiss warning",
+    showTitleDetails: "Show title details",
   },
   feedback: {
     clipboardLabel: "Codex feedback thread ID",
@@ -350,7 +352,7 @@ export const composer = {
   contextWindow: {
     /** Describes the token threshold at which automatic compaction starts. */
     compactAtHint: (threshold: number) =>
-      `Compacts automatically at ${threshold.toLocaleString("en-US")} tokens.`,
+      `Compacts automatically at about ${threshold.toLocaleString("en-US")} tokens.`,
     /** Names the model whose context compacts automatically. */
     modelAutoCompactHint: (model: string) =>
       `Context for ${model} compacts automatically when needed.`,

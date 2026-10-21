@@ -61,7 +61,6 @@ export interface SidebarThreadHeaderProps {
   /** Copy derived from the ordinary-click destination; absent uses the unscoped label. */
   newThreadTooltipLabel?: string;
   newThreadInProjectShortcutLabel: string | null | undefined;
-  /** Shift+click only matters once there is more than one project to pick. */
   showNewThreadInProjectHint: boolean;
   searchInputRef: RefObject<HTMLInputElement | null>;
   searchQuery: string;

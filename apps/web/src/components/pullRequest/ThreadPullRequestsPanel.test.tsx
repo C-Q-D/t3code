@@ -1,8 +1,20 @@
+/** @vitest-environment jsdom */
 /** Existing-behavior snapshot for watch gates and host updates; L2 adds visible sources and direct watch actions. */
 import { EnvironmentId, ProjectId, ThreadId, type ThreadPullRequestLink } from "@t3tools/contracts";
 import { act, type ReactElement, type ReactNode } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
+
+// The renderer has no layout; mount each virtual row to exercise its real actions.
+vi.mock("@legendapp/list/react", () => ({
+  LegendList: ({
+    data,
+    renderItem,
+  }: {
+    data: unknown[];
+    renderItem: (info: { item: unknown; index: number }) => ReactNode;
+  }) => data.map((item, index) => renderItem({ item, index })),
+}));
 
 const { watch, unlink, Wrapper, Trigger } = vi.hoisted(() => ({
   watch: vi.fn(),
@@ -150,7 +162,7 @@ it.each([false, true])(
     });
     expect(action(label)).toBeDefined();
     links = [{ ...link, ...(initiallyWatching ? {} : { watch: watching }) }];
-    act(() => renderer.update(<ThreadPullRequestsPanel threadRef={threadRef} />));
+    act(() => renderer.update(<ThreadPullRequestsPanel threadRef={{ ...threadRef }} />));
     expect(action(initiallyWatching ? "Watch for changes" : "Stop watching")).toBeDefined();
     expect(action(label)).toBeUndefined();
   },
@@ -191,7 +203,7 @@ it.each([
       true,
     );
     links = [];
-    act(() => renderer.update(<ThreadPullRequestsPanel threadRef={threadRef} />));
+    act(() => renderer.update(<ThreadPullRequestsPanel threadRef={{ ...threadRef }} />));
     expect(renderer.root.findAllByType("a").some((anchor) => anchor.props.href === link.url)).toBe(
       false,
     );

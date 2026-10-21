@@ -2,7 +2,7 @@
 import type { CodeViewDiffItem } from "@pierre/diffs";
 import type { CodeViewHandle } from "@pierre/diffs/react";
 import type { Discussion, EnvironmentId } from "@t3tools/contracts";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { XIcon, ChevronDownIcon, ChevronRightIcon } from "lucide-react";
 import { t } from "~/i18n";
 import { useTheme } from "~/hooks/useTheme";
@@ -83,7 +83,17 @@ export function DiscussionDiffPanel({
       )
     : t.discussions.title;
   const patch = query.data?.diff;
-  const parsed = useMemo(() => getRenderablePatch(patch), [patch]);
+  // Parsing and viewer collections must retain identity until their inputs change; compiler caching stops at the viewer boundary.
+  const calculateParsed = () => getRenderablePatch(patch);
+  const [parsedCache, setParsedCache] = useState(() => ({
+    inputs: [patch] as const,
+    value: calculateParsed(),
+  }));
+  let parsed = parsedCache.value;
+  if (!Object.is(parsedCache.inputs[0], patch)) {
+    parsed = calculateParsed();
+    setParsedCache({ inputs: [patch] as const, value: parsed });
+  }
   const view = discussionDiffContent(
     discussion.id,
     selection.entryId,
@@ -94,39 +104,52 @@ export function DiscussionDiffPanel({
   );
   const { resolvedTheme } = useTheme();
   const settings = useEnvironmentSettings(environmentId);
-  const options = useMemo(
-    () =>
-      ({
-        diffStyle: settings.diffLayout === "split" ? "split" : "unified",
-        lineDiffType: "none",
-        overflow: settings.wordWrap ? "wrap" : "scroll",
-        theme: resolveDiffThemeName(resolvedTheme),
-        preferredHighlighter: PREFERRED_HIGHLIGHTER,
-        themeType: resolvedTheme,
-        stickyHeaders: true,
-      }) satisfies StyledDiffCodeViewOptions<undefined>,
-    [settings.diffLayout, settings.wordWrap, resolvedTheme],
-  );
+  const options = {
+    diffStyle: settings.diffLayout === "split" ? "split" : "unified",
+    lineDiffType: "none",
+    overflow: settings.wordWrap ? "wrap" : "scroll",
+    theme: resolveDiffThemeName(resolvedTheme),
+    preferredHighlighter: PREFERRED_HIGHLIGHTER,
+    themeType: resolvedTheme,
+    stickyHeaders: true,
+  } satisfies StyledDiffCodeViewOptions<undefined>;
   const [viewer, setViewer] = useState<CodeViewHandle<undefined, undefined> | null>(null);
   const [foldState, setFoldState] = useState({ selection, ids: new Set<string>() });
   const files = parsed?.kind === "files" ? parsed.files : null;
   const selectedIndex = view.kind === "files" ? view.selectedIndex : -1;
-  const items = useMemo(
-    () =>
-      (files ?? []).map((fileDiff, index): CodeViewDiffItem<undefined> => ({
-        id: String(index),
-        type: "diff",
-        fileDiff,
-        collapsed:
-          foldState.ids.has(String(index)) &&
-          (foldState.selection === selection || index !== selectedIndex),
-      })),
-    [files, foldState, selection, selectedIndex],
-  );
-  const ready = useMemo(
-    () => items.filter((item) => !item.collapsed).map((item) => item.id),
-    [items],
-  );
+  const calculateItems = () =>
+    (files ?? []).map((fileDiff, index): CodeViewDiffItem<undefined> => ({
+      id: String(index),
+      type: "diff",
+      fileDiff,
+      collapsed:
+        foldState.ids.has(String(index)) &&
+        (foldState.selection === selection || index !== selectedIndex),
+    }));
+  const [itemsCache, setItemsCache] = useState(() => ({
+    inputs: [files, foldState, selection, selectedIndex] as const,
+    value: calculateItems(),
+  }));
+  let items = itemsCache.value;
+  if (
+    !Object.is(itemsCache.inputs[0], files) ||
+    !Object.is(itemsCache.inputs[1], foldState) ||
+    !Object.is(itemsCache.inputs[2], selection) ||
+    !Object.is(itemsCache.inputs[3], selectedIndex)
+  ) {
+    items = calculateItems();
+    setItemsCache({ inputs: [files, foldState, selection, selectedIndex] as const, value: items });
+  }
+  const calculateReady = () => items.filter((item) => !item.collapsed).map((item) => item.id);
+  const [readyCache, setReadyCache] = useState(() => ({
+    inputs: [items] as const,
+    value: calculateReady(),
+  }));
+  let ready = readyCache.value;
+  if (!Object.is(readyCache.inputs[0], items)) {
+    ready = calculateReady();
+    setReadyCache({ inputs: [items] as const, value: ready });
+  }
   const reveal = useCodeViewFileReveal(viewer, selection, ready);
   useEffect(() => {
     if (selectedIndex < 0) return;

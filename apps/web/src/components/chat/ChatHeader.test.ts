@@ -39,29 +39,8 @@ vi.mock("~/hooks/useThreadActionMenu", () => ({
   }),
 }));
 import { describe, expect, it } from "vite-plus/test";
-import { ChatHeader, resolveRenameCommit } from "./ChatHeader";
+import { ChatHeader } from "./ChatHeader";
 import { buildTitlebarThreadMenuItems } from "./ChatHeader.logic";
-
-describe("resolveRenameCommit", () => {
-  it("commits a trimmed changed title", () => {
-    expect(resolveRenameCommit({ title: "  New title ", originalTitle: "Old" })).toEqual({
-      action: "commit",
-      title: "New title",
-    });
-  });
-
-  it("rejects empty and whitespace-only titles", () => {
-    expect(resolveRenameCommit({ title: "   ", originalTitle: "Old" })).toEqual({
-      action: "reject-empty",
-    });
-  });
-
-  it("no-ops when the trimmed title is unchanged", () => {
-    expect(resolveRenameCommit({ title: " Old ", originalTitle: "Old" })).toEqual({
-      action: "noop",
-    });
-  });
-});
 
 describe("chat titlebar interactions", () => {
   let container: HTMLDivElement;
@@ -204,6 +183,26 @@ describe("chat titlebar interactions", () => {
     );
     expect(container.querySelector("input")).toBeNull();
     expect(commands.update).not.toHaveBeenCalled();
+    expect(container.querySelector('[data-titlebar-slot="breadcrumb"]')?.textContent).toBe(
+      "Original title",
+    );
+  });
+
+  it("does not save an unchanged title after trimming", async () => {
+    await renderRoute();
+    await act(async () =>
+      container
+        .querySelector('button[aria-haspopup="menu"]')!
+        .dispatchEvent(new MouseEvent("dblclick", { bubbles: true, detail: 2 })),
+    );
+    const input = container.querySelector("input")!;
+    input.value = " Original title ";
+    await act(async () =>
+      input.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" })),
+    );
+    expect(commands.update).not.toHaveBeenCalled();
+    expect(commands.toast).not.toHaveBeenCalled();
+    expect(container.querySelector("input")).toBeNull();
     expect(container.querySelector('[data-titlebar-slot="breadcrumb"]')?.textContent).toBe(
       "Original title",
     );

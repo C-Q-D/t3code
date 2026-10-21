@@ -81,8 +81,7 @@ export async function createRecordingCompositor(
   }
 }
 
-/** Keeps input timing and coordinates independent of native video frame delivery. */
-export class RecordingDecorations {
+class RecordingDecorations {
   private ring: {
     x: number;
     y: number;

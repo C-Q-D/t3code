@@ -65,8 +65,8 @@ export const ComposerPendingApprovalPanel = memo(function ComposerPendingApprova
         className={cn(
           "block max-h-20 w-full min-w-0 overflow-auto rounded-composer-panel-row bg-code px-4 py-3 text-code-copy leading-terminal text-foreground shadow-well-control outline-none focus-visible:inset-shadow-focus",
           approval.requestKind === "mcp-elicitation"
-            ? "whitespace-pre-wrap font-sans wrap-break-word"
-            : "whitespace-pre font-mono",
+            ? "max-h-20 whitespace-pre-wrap font-sans wrap-break-word"
+            : "max-h-20 whitespace-pre-wrap font-mono wrap-anywhere",
         )}
         data-approval-detail="complete"
         tabIndex={0}

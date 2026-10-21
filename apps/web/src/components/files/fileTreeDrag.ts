@@ -20,6 +20,7 @@ function rowFromEvent(event: Event): HTMLElement | undefined {
 
 /** Install capture handlers on one panel and release handlers on document/window.
  * controller owns selection and native payloads; channel identifies the mounted token portal.
+ * deselect releases each dragged path in the current tree model.
  * Returns an idempotent disposer. A cancelled native start retains the recorded pointer stream;
  * selection is cleared at release/cancellation, while the independent flight may finish later.
  */
@@ -27,6 +28,7 @@ export function installFileTreeDrag(
   panel: HTMLElement,
   controller: FileTreeDragMentionController,
   channel: ThrowChannel,
+  deselect: (treePath: string) => void,
 ): () => void {
   let pressed: { event: PointerEvent; path: string | null } | null = null;
   let pointerDrag = false;
@@ -35,7 +37,7 @@ export function installFileTreeDrag(
   let disposed = false;
 
   const finishPointer = () => {
-    if (pointerDrag) controller.handleDragEnd();
+    if (pointerDrag) controller.handleDragEnd(deselect);
     pointerDrag = false;
     pressed = null;
     cancelDrag = null;
@@ -57,7 +59,7 @@ export function installFileTreeDrag(
     const row = rowFromEvent(event);
     const text = event.dataTransfer?.getData(COMPOSER_MENTION_DRAG_TYPE);
     if (!row || !pressed || pressed.path !== row.getAttribute("data-item-path") || !text) {
-      controller.handleDragEnd();
+      controller.handleDragEnd(deselect);
       pressed = null;
       return;
     }
@@ -77,7 +79,7 @@ export function installFileTreeDrag(
     });
   };
   const dragend = () => {
-    if (!pointerDrag) controller.handleDragEnd();
+    if (!pointerDrag) controller.handleDragEnd(deselect);
   };
   const pointerend = (event: PointerEvent) => {
     if (pressed?.event.pointerId !== event.pointerId) return;
@@ -112,7 +114,7 @@ export function installFileTreeDrag(
     disposed = true;
     cancelDrag?.();
     finishPointer();
-    controller.handleDragEnd();
+    controller.handleDragEnd(deselect);
     unsubscribe();
     panel.removeEventListener("pointerdown", pointerdown, true);
     panel.removeEventListener("dragstart", dragstart, true);

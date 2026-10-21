@@ -1,5 +1,105 @@
 /** Verifies terminal output synchronization, menu availability, theme and selection contracts. */
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import { createElement, act, useLayoutEffect } from "react";
+import { create } from "react-test-renderer";
+import { EnvironmentId, ThreadId } from "@t3tools/contracts";
+import { setPhysicsEnabled } from "../lib/motion/preference";
+import { useTerminalDrawerResize } from "./ThreadTerminalDrawer";
+
+it("uses the current height budget throughout an active physical resize", async () => {
+  const painted = new Map<string, string>();
+  const drawerHeightRef = { current: 600 };
+  const oldCommit = vi.fn();
+  const newCommit = vi.fn();
+  const target = {
+    parentElement: {
+      style: { setProperty: (key: string, value: string) => painted.set(key, value) },
+    },
+    setPointerCapture: vi.fn(),
+    hasPointerCapture: () => true,
+    releasePointerCapture: vi.fn(),
+  };
+  const threadRef = { environmentId: EnvironmentId.make("test"), threadId: ThreadId.make("test") };
+  let handlers: ReturnType<typeof useTerminalDrawerResize>;
+  /** Publishes committed hook handlers while keeping the same mounted resize owner across budget changes. */
+  function Probe(props: { max: number; preferred: number; commit: (height: number) => void }) {
+    const nextHandlers = useTerminalDrawerResize({
+      drawerHeightRef,
+      maxDrawerHeight: props.max,
+      preferredDrawerHeight: props.preferred,
+      visible: true,
+      isPanel: false,
+      threadRef,
+      onCommit: props.commit,
+    });
+    useLayoutEffect(() => {
+      handlers = nextHandlers;
+    });
+    return null;
+  }
+  const pointer = (y: number) =>
+    ({
+      currentTarget: target,
+      button: 0,
+      pointerId: 1,
+      clientX: 0,
+      clientY: y,
+      timeStamp: 0,
+      preventDefault: vi.fn(),
+      stopPropagation: vi.fn(),
+    }) as unknown as Parameters<typeof handlers.onPointerDown>[0];
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  vi.stubGlobal("window", { addEventListener: vi.fn(), removeEventListener: vi.fn() });
+  vi.stubGlobal("document", { body: { style: { removeProperty: vi.fn() } } });
+  vi.stubGlobal(
+    "requestAnimationFrame",
+    vi.fn(() => 1),
+  );
+  vi.stubGlobal("cancelAnimationFrame", vi.fn());
+  setPhysicsEnabled(true);
+  let renderer: ReturnType<typeof create> | undefined;
+  try {
+    await act(async () => {
+      renderer = create(createElement(Probe, { max: 800, preferred: 600, commit: oldCommit }));
+    });
+    handlers!.onPointerDown(pointer(800));
+    handlers!.onPointerMove(pointer(700));
+    handlers!.refresh();
+    expect(painted.get("height")).toBe("700px");
+    await act(async () => {
+      renderer!.update(createElement(Probe, { max: 400, preferred: 300, commit: newCommit }));
+    });
+    handlers!.onPointerMove(pointer(650));
+    handlers!.refresh();
+    expect(drawerHeightRef.current).toBe(400);
+    // Elastic drawing may overshoot the new bound, but only within its 160px rubber range.
+    expect(Number.parseFloat(painted.get("height")!)).toBeGreaterThan(400);
+    expect(Number.parseFloat(painted.get("height")!)).toBeLessThan(560);
+    handlers!.onPointerCancel(pointer(650));
+    expect(painted.get("height")).toBe("300px");
+    expect(drawerHeightRef.current).toBe(300);
+    expect(oldCommit).not.toHaveBeenCalled();
+    expect(newCommit).not.toHaveBeenCalled();
+    drawerHeightRef.current = 600;
+    await act(async () => {
+      renderer!.update(createElement(Probe, { max: 800, preferred: 600, commit: oldCommit }));
+    });
+    handlers!.onPointerDown(pointer(800));
+    await act(async () => {
+      renderer!.update(createElement(Probe, { max: 400, preferred: 300, commit: newCommit }));
+    });
+    handlers!.onPointerMove(pointer(1000));
+    handlers!.refresh();
+    handlers!.onPointerUp(pointer(1000));
+    expect(painted.get("height")).toBe("400px");
+    expect(newCommit).toHaveBeenCalledExactlyOnceWith(400);
+    expect(oldCommit).not.toHaveBeenCalled();
+  } finally {
+    await act(async () => renderer?.unmount());
+    setPhysicsEnabled(false);
+    vi.unstubAllGlobals();
+  }
+});
 import {
   applyTerminalAttachStreamEvent,
   combineTerminalSessionState,

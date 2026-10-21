@@ -1,9 +1,8 @@
 /** Localized files presentation and existing interaction behavior. */
 import { t } from "~/i18n";
 import type { AssetResource, ProjectReadFileError, ScopedThreadRef } from "@t3tools/contracts";
-import { isAbsolutePath, workspaceRelativeFilePath } from "@t3tools/shared/path";
+import { isHostPath, workspaceRelativeFilePath } from "@t3tools/shared/path";
 
-/** Resolve workspace links before choosing between the explorer and a file preview. */
 export function resolveFilePreviewPath(path: string | null, cwd: string): string | null {
   if (path === null) return null;
   return path === "." || workspaceRelativeFilePath(path, cwd) === "." ? null : path;
@@ -11,7 +10,6 @@ export function resolveFilePreviewPath(path: string | null, cwd: string): string
 
 export const isMarkdownPreviewFile = (path: string): boolean => /\.(?:md|mdx)$/i.test(path);
 
-/** Describe existing failure codes without exposing the underlying platform cause. */
 export function filePreviewReadErrorMessage(error: ProjectReadFileError): string {
   switch (error.failure) {
     case "path_not_file":
@@ -23,7 +21,6 @@ export function filePreviewReadErrorMessage(error: ProjectReadFileError): string
     case "resolved_path_outside_root":
       return t.tools.files.resolvesOutside;
     case "operation_failed":
-      // A realpath failure can mean a missing path, permissions, or another I/O error.
       return error.operation === "realpath-workspace-root"
         ? t.tools.files.workspaceInaccessible
         : t.tools.files.fileInaccessible;
@@ -37,7 +34,7 @@ export function shouldShowFileExplorer(input: {
   readonly explorerOpen: boolean;
   readonly attachmentOpen: boolean;
 }): boolean {
-  if (input.attachmentOpen || (input.relativePath && isAbsolutePath(input.relativePath))) {
+  if (input.attachmentOpen || (input.relativePath && isHostPath(input.relativePath))) {
     return false;
   }
   return input.explorerOpen || input.relativePath === null;
@@ -60,10 +57,6 @@ export function setMarkdownTaskChecked(
   return `${markdown.slice(0, markerOffset + 1)}${checked ? "x" : " "}${markdown.slice(markerOffset + 2)}`;
 }
 
-/**
- * The asset for a file the panel shows. A draft has no thread on the server
- * yet, so it names its workspace root instead of a thread to resolve one from.
- */
 export function workspaceAssetResource(input: {
   readonly kind: "workspace-file" | "media-file";
   readonly threadRef: ScopedThreadRef;

@@ -24,7 +24,7 @@ export const composer: Messages["composer"] = {
     draftRejectedError: "草稿拒绝了此附件（重复或已达附件上限）。",
     compressingToast: "仍在压缩粘贴的图片。",
     compressingSendHint: "缩略图出现后请再次发送。",
-    importingToast: "仍在将粘贴的附件加入此消息。",
+    importingToast: "仍在将附加的上下文加入此消息。",
     importingSendHint: "标签加载完成后请再次发送。",
     importingStashHint: "标签加载完成后请再次暂存。",
     /** Names the attachment whose preview can be opened. */
@@ -56,7 +56,7 @@ export const composer: Messages["composer"] = {
     pasteMessageTooLargeHint: "请删除部分文本或附件，然后重新粘贴。",
     pasteAttachmentTooLargeToast: "粘贴的文本过大，无法附加",
     pasteAttachmentTooLargeHint: "请减少剪贴板内容，或将较小的片段另存为文件。",
-    remoteFolderToast: "不能将文件夹拖入远程环境",
+    remoteFolderToast: "只能在本地桌面环境中引用文件夹",
     /** Names the dropped folder whose local path could not be read. */
     folderPathErrorToast: (name: string) => `无法获取“${name}”的路径`,
     folderPathHint: "请改用 @ 输入文件夹路径。",
@@ -223,8 +223,8 @@ export const composer: Messages["composer"] = {
   context: {
     addErrorToast: "无法添加到聊天",
     busyHint: "输入框正忙，请在就绪后重试。",
-    wrongEnvironmentToast: "请使用此环境中的对话",
-    wrongEnvironmentHint: "Agent 只能读取其所在服务器上的对话。",
+    wrongEnvironmentToast: "无法读取拖入的对话",
+    wrongEnvironmentHint: "请确认其环境已连接且为最新版本，然后重试。",
     /** Combines a context kind display label with its content label. */
     chipAriaLabel: (kind: string, label: string) => `${kind}，${label}`,
     uploadFailed: "上传失败",
@@ -253,6 +253,7 @@ export const composer: Messages["composer"] = {
             : state === "merged"
               ? "已合并的 PR"
               : "已关闭的 PR",
+    transcriptTooLargeHint: "此对话超过附件大小限制，请尝试较短的对话。",
   },
   placeholder: {
     customAnswer: "填写自定义回答",
@@ -277,6 +278,7 @@ export const composer: Messages["composer"] = {
     showDetails: "显示通知详情",
     details: "通知详情",
     dismissWarning: "关闭警告",
+    showTitleDetails: "显示标题详情",
   },
   feedback: {
     clipboardLabel: "Codex反馈对话ID",
@@ -345,7 +347,7 @@ export const composer: Messages["composer"] = {
   contextWindow: {
     /** Describes the token threshold at which automatic compaction starts. */
     compactAtHint: (threshold: number) =>
-      `达到 ${threshold.toLocaleString("en-US")} 个 token 时自动压缩。`,
+      `达到约 ${threshold.toLocaleString("en-US")} 个 token 时自动压缩。`,
     /** Names the model whose context compacts automatically. */
     modelAutoCompactHint: (model: string) => `${model} 的上下文会在需要时自动压缩。`,
     autoCompactHint: "上下文会在需要时自动压缩。",

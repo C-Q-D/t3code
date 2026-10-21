@@ -3,7 +3,7 @@ import { t } from "~/i18n";
 import { type ResolvedKeybindingsConfig } from "@t3tools/contracts";
 import { LegendList, type LegendListRef } from "@legendapp/list/react";
 import { ChevronRightIcon, SearchXIcon } from "lucide-react";
-import { type RefObject, useCallback, useState } from "react";
+import { type ReactNode, type RefObject, useState } from "react";
 import { cn } from "~/lib/utils";
 import { shortcutLabelForCommand } from "../keybindings";
 import {
@@ -84,11 +84,6 @@ export function CommandPaletteResults(props: CommandPaletteResultsProps) {
   );
 }
 
-/**
- * Scrolls a keyboard highlight into view the way the unvirtualized list did:
- * nearest edge, clear of the scroll fade. Rows outside the rendered window
- * fall back to the list's own scrolling.
- */
 export function scrollCommandPaletteRowIntoView(list: LegendListRef | null, rowIndex: number) {
   const element = list?.getState?.().elementAtIndex(rowIndex);
   if (element instanceof HTMLElement) {
@@ -104,14 +99,14 @@ interface CommandPaletteVirtualizedResultsProps extends Omit<CommandPaletteResul
 }
 
 /**
- * Renders only the visible rows. The parent passes the flat item order to the
- * Command root as `items` with `virtualized`, scrolls keyboard highlights into
- * view through `listRef`, and runs Enter itself since the row may be unmounted.
+ * The parent passes the flat item order to the Command root as `items` with
+ * `virtualized`, scrolls keyboard highlights into view through `listRef`, and
+ * runs Enter itself since the row may be unmounted.
  */
 export function CommandPaletteVirtualizedResults(props: CommandPaletteVirtualizedResultsProps) {
   const { listRef } = props;
   const [scrollFade, setScrollFade] = useState({ top: false, bottom: false });
-  const updateScrollFade = useCallback(() => {
+  const updateScrollFade = () => {
     const scrollElement = listRef.current?.getScrollableNode?.();
     if (!(scrollElement instanceof HTMLElement)) return;
     const top = scrollElement.scrollTop > 1;
@@ -120,7 +115,7 @@ export function CommandPaletteVirtualizedResults(props: CommandPaletteVirtualize
     setScrollFade((current) =>
       current.top === top && current.bottom === bottom ? current : { top, bottom },
     );
-  }, [listRef]);
+  };
 
   if (props.rows.length === 0) {
     return <CommandPaletteEmptyState {...props} />;
@@ -165,6 +160,11 @@ export function CommandPaletteVirtualizedResults(props: CommandPaletteVirtualize
   );
 }
 
+/** Aligns icons to the first title line when a result also has a description or a content-match excerpt. */
+export function CommandPaletteTitleIcon(props: { children: ReactNode }) {
+  return <span className="flex h-5 shrink-0 items-center self-start pt-0.5">{props.children}</span>;
+}
+
 /**
  * Displays an unavailable result without registering a selectable command or execution handler.
  * @param props.item Action or submenu data whose title, icon, and optional metadata are displayed.
@@ -178,7 +178,7 @@ function DisabledCommandPaletteResultRow(props: {
       data-pn5-details={Boolean(props.item.description || props.item.threadContentMatch)}
       className="pn5-result flex min-h-8 select-none items-center gap-2 rounded-sm px-2 py-1.5 text-base opacity-64 sm:min-h-7 sm:text-sm"
     >
-      {props.item.icon}
+      <CommandPaletteTitleIcon>{props.item.icon}</CommandPaletteTitleIcon>
       {props.item.description || props.item.threadContentMatch ? (
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="flex min-w-0 items-center gap-1.5 text-sm text-foreground">
@@ -239,7 +239,7 @@ function CommandPaletteResultRow(props: {
         props.onExecuteItem(props.item);
       }}
     >
-      {props.item.icon}
+      <CommandPaletteTitleIcon>{props.item.icon}</CommandPaletteTitleIcon>
       {props.item.description || props.item.threadContentMatch ? (
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="flex min-w-0 items-center gap-1.5 text-sm text-foreground">

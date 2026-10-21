@@ -1,7 +1,7 @@
 /** Primary-environment resources with permission gating and foreground-only collection. */
 import { AuthDiagnosticsReadScope, type EnvironmentId } from "@t3tools/contracts";
 
-import { useMemo, type JSX } from "react";
+import { type JSX } from "react";
 import { t } from "~/i18n";
 
 import { formatBytes } from "../../lib/formatBytes";
@@ -50,11 +50,8 @@ function PrimaryUsageResources({
 }) {
   const { visible, telemetry, hostQuery, host, sample } = useUsageResourceData(environmentId);
   const entranceRef = useUsageCardEntrance(0.045);
-  const groups = useMemo(
-    () => groupUsageResources(sample.snapshot?.processes ?? []),
-    [sample.snapshot],
-  );
-  const frames = useMemo(() => usageCpuFrames(sample.history), [sample.history]);
+  const groups = groupUsageResources(sample.snapshot?.processes ?? []);
+  const frames = usageCpuFrames(sample.history);
   const cpuCount = host?.cpuCount ?? 0;
   const cpu = host?.cpuUtilization == null ? null : host.cpuUtilization * 100;
   const usedMemory = host ? host.totalMemoryBytes - host.availableMemoryBytes : null;

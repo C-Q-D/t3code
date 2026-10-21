@@ -1,5 +1,6 @@
 /** Decorative, draggable usage meter; account actions remain on the separate name button. */
-import { useCallback, useEffect, useRef, type ReactNode } from "react";
+import { useStableCallback } from "~/hooks/useStableCallback";
+import { useEffect, useRef, type ReactNode } from "react";
 import { usePhysicsMotion } from "../../hooks/usePhysicsMotion";
 import { useMotionJob } from "../../lib/motion/react";
 import { useAnimatedNumber } from "../../hooks/useAnimatedNumber";
@@ -28,10 +29,10 @@ export function UsageLimitFader({
   const pointer = useRef<{ id: number; bottom: number; height: number } | null>(null);
   const entered = useRef(false);
   const { start, stop } = useMotionJob();
-  const paint = useCallback((value: number) => {
+  const paint = useStableCallback((value: number) => {
     host.current?.style.setProperty("--fader-used", `${Math.max(0, Math.min(100, value))}%`);
-  }, []);
-  const animate = useCallback(() => {
+  });
+  const animate = useStableCallback(() => {
     start((dt) => {
       const current = motion.current;
       if (!current) return false;
@@ -39,7 +40,7 @@ export function UsageLimitFader({
       paint(current.spring.value);
       return moving;
     });
-  }, [paint, start]);
+  });
 
   useEffect(() => {
     const current = motion.current ?? new FaderMotion();

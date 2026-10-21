@@ -18,7 +18,6 @@ export const WINDOW_OPTIONS = [
   { days: 90, label: t.tools.usage.ninetyDays, command: "usage.period.quarter" },
 ] as const;
 
-/** Resolves page shortcuts without taking letters from fields or popup controls. */
 export function resolveUsageShortcut(
   event: ShortcutEventLike & { target: EventTarget | null },
   keybindings: ResolvedKeybindingsConfig,

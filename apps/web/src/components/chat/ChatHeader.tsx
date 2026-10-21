@@ -1,3 +1,4 @@
+import { useStableCallback } from "../../hooks/useStableCallback";
 /** Publishes the chat breadcrumb and its route-owned action menu into the window titlebar. */
 import { t } from "~/i18n";
 import {
@@ -36,9 +37,7 @@ import {
 } from "lucide-react";
 import {
   memo,
-  useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
   Fragment,
@@ -99,11 +98,7 @@ interface ChatHeaderProps {
   onOpenProjectSettings?: (() => void) | undefined;
 }
 
-/**
- * Rename commit rule shared with the sidebar's inline rename: trim, reject
- * empty (the caller toasts), and skip the mutation when nothing changed.
- */
-export function resolveRenameCommit(input: {
+function resolveRenameCommit(input: {
   readonly title: string;
   readonly originalTitle: string;
 }): { action: "commit"; title: string } | { action: "reject-empty" } | { action: "noop" } {
@@ -230,24 +225,20 @@ export const ChatHeader = memo(function ChatHeader({
   onNewThreadInProject,
   onOpenProjectSettings,
 }: ChatHeaderProps) {
-  const activeProjectName = activeProject?.title;
+  const activeProjectName = activeProject?.isScratch
+    ? t.chat.draftHero.noProject
+    : activeProject?.title;
   const activeProjectCwd = activeProject?.workspaceRoot ?? null;
   const interfaceFont = useClientSettings((settings) => settings.fontFamilySans);
   const [breadcrumbContainer, setBreadcrumbElement] = useState<HTMLDivElement | null>(null);
   // Keyboard-opened draft details have no action trigger. The persistent titlebar
   // supplies an anchor with usable width even while the actions slot is empty.
-  const setBreadcrumbContainer = useCallback(
-    (element: HTMLDivElement | null) => {
-      setBreadcrumbElement(element);
-      popoverAnchorRef.current = element?.closest<HTMLElement>("[data-window-titlebar]") ?? null;
-    },
-    [popoverAnchorRef],
-  );
+  const setBreadcrumbContainer = useStableCallback((element: HTMLDivElement | null) => {
+    setBreadcrumbElement(element);
+    popoverAnchorRef.current = element?.closest<HTMLElement>("[data-window-titlebar]") ?? null;
+  });
   const [collapseParentTitle, setCollapseParentTitle] = useState(false);
-  const activeThreadRef = useMemo(
-    () => scopeThreadRef(activeThreadEnvironmentId, activeThreadId),
-    [activeThreadEnvironmentId, activeThreadId],
-  );
+  const activeThreadRef = scopeThreadRef(activeThreadEnvironmentId, activeThreadId);
   const canOperateThread = useEnvironmentScope(
     activeThreadEnvironmentId,
     AuthOrchestrationOperateScope,
@@ -255,9 +246,6 @@ export const ChatHeader = memo(function ChatHeader({
   const updateThreadMetadata = useOrchestrationCommand(threadEnvironment.updateMetadata, {
     reportFailure: false,
   });
-  // Inline rename, keyed by thread: navigating away drops an in-progress
-  // rename instead of committing stale text. Cleared on thread change (not
-  // just hidden) so returning to the thread doesn't revive the old draft.
   const [renaming, setRenaming] = useState<{
     threadId: ThreadId;
     environmentId: EnvironmentId;
@@ -277,14 +265,10 @@ export const ChatHeader = memo(function ChatHeader({
     renaming.environmentId === activeThreadEnvironmentId
       ? renaming.title
       : null;
-  // Leaving rename swaps the input back for the title, which needs a fresh fit.
   const isRenamingTitle = renamingTitle !== null;
   useEffect(() => {
     const list = breadcrumbContainer?.querySelector("ol");
     if (!list || !parentThreadLink) return;
-    // Measure the untruncated labels, including a collapsed parent's hidden
-    // text, so expanding and collapsing never change the fit calculation.
-    // Width-capped labels (the project) never grow, so their overflow is skipped.
     const measure = () => {
       const gap = Number.parseFloat(getComputedStyle(list).columnGap) || 0;
       const width = Array.from(list.children).reduce(
@@ -315,6 +299,7 @@ export const ChatHeader = memo(function ChatHeader({
     };
   }, [
     breadcrumbContainer,
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- Title, font and rename changes resize the text without resizing the list.
     activeProjectName,
     activeThreadTitle,
     parentThreadLink,
@@ -323,7 +308,7 @@ export const ChatHeader = memo(function ChatHeader({
   ]);
   const renameCommittedRef = useRef(false);
   const restoreTitleFocusRef = useRef(false);
-  const startRename = useCallback(() => {
+  const startRename = useStableCallback(() => {
     if (
       !isServerThread ||
       !readEnvironmentScope(activeThreadEnvironmentId, AuthOrchestrationOperateScope)
@@ -335,77 +320,69 @@ export const ChatHeader = memo(function ChatHeader({
       threadId: activeThreadId,
       title: activeThreadTitle,
     });
-  }, [activeThreadEnvironmentId, activeThreadId, activeThreadTitle, isServerThread]);
-  const commitRename = useCallback(
-    (title: string) => {
-      setRenaming(null);
-      if (!readEnvironmentScope(activeThreadEnvironmentId, AuthOrchestrationOperateScope)) return;
-      const resolution = resolveRenameCommit({ title, originalTitle: activeThreadTitle });
-      if (resolution.action === "reject-empty") {
-        toastManager.add({ type: "warning", title: t.chat.header.emptyTitleError });
-        return;
+  });
+  const commitRename = useStableCallback((title: string) => {
+    setRenaming(null);
+    if (!readEnvironmentScope(activeThreadEnvironmentId, AuthOrchestrationOperateScope)) return;
+    const resolution = resolveRenameCommit({ title, originalTitle: activeThreadTitle });
+    if (resolution.action === "reject-empty") {
+      toastManager.add({ type: "warning", title: t.chat.header.emptyTitleError });
+      return;
+    }
+    if (resolution.action === "noop") return;
+    void updateThreadMetadata({
+      environmentId: activeThreadEnvironmentId,
+      input: { threadId: activeThreadId, title: resolution.title },
+    }).then((result) => {
+      if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
+        const error = squashAtomCommandFailure(result);
+        toastManager.add({
+          type: "error",
+          title: t.chat.header.renameError,
+          description: error instanceof Error ? error.message : t.chat.header.genericError,
+        });
       }
-      if (resolution.action === "noop") return;
-      void updateThreadMetadata({
-        environmentId: activeThreadEnvironmentId,
-        input: { threadId: activeThreadId, title: resolution.title },
-      }).then((result) => {
-        if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
-          const error = squashAtomCommandFailure(result);
-          toastManager.add({
-            type: "error",
-            title: t.chat.header.renameError,
-            description: error instanceof Error ? error.message : t.chat.header.genericError,
-          });
-        }
-      });
-    },
-    [activeThreadEnvironmentId, activeThreadId, activeThreadTitle, updateThreadMetadata],
-  );
+    });
+  });
   const [menuHandle] = useState(MenuCreateHandle);
   const [menu, setMenu] = useState<{
     items: readonly ContextMenuItem<ThreadActionMenuId>[];
     position: { x: number; y: number };
   } | null>(null);
   const menuResolutionRef = useRef<((action: ThreadActionMenuId | null) => void) | null>(null);
-  const finishMenu = useCallback((action: ThreadActionMenuId | null = null) => {
+  const finishMenu = useStableCallback((action: ThreadActionMenuId | null = null) => {
     const resolve = menuResolutionRef.current;
     menuResolutionRef.current = null;
     setMenu(null);
     resolve?.(action);
-  }, []);
-  const menuPresenter = useMemo(
-    () => ({
-      show: (
-        items: readonly ContextMenuItem<ThreadActionMenuId>[],
-        position: { x: number; y: number },
-      ) => {
-        finishMenu();
-        return new Promise<ThreadActionMenuId | null>((resolve) => {
-          menuResolutionRef.current = resolve;
-          setMenu({
-            items: buildTitlebarThreadMenuItems(items, {
-              "copy-path": t.chat.header.copyPath,
-              "copy-branch": t.chat.header.copyBranch,
-              "copy-thread-id": t.chat.header.copyThreadId,
-            }),
-            position,
-          });
+  });
+  const menuPresenter = (() => ({
+    show: (
+      items: readonly ContextMenuItem<ThreadActionMenuId>[],
+      position: { x: number; y: number },
+    ) => {
+      finishMenu();
+      return new Promise<ThreadActionMenuId | null>((resolve) => {
+        menuResolutionRef.current = resolve;
+        setMenu({
+          items: buildTitlebarThreadMenuItems(items, {
+            "copy-path": t.chat.header.copyPath,
+            "copy-branch": t.chat.header.copyBranch,
+            "copy-thread-id": t.chat.header.copyThreadId,
+          }),
+          position,
         });
-      },
-      close: () => finishMenu(),
-    }),
-    [finishMenu],
-  );
+      });
+    },
+    close: () => finishMenu(),
+  }))();
   // Resolve a pending selection on navigation so it cannot mutate the previous thread.
+  // oxlint-disable-next-line react/exhaustive-effect-dependencies -- Navigation must resolve the menu even when its stable close callback does not change.
   useEffect(() => () => finishMenu(), [activeThreadEnvironmentId, activeThreadId, finishMenu]);
-  const menuAnchor = useMemo(
-    () => ({
-      getBoundingClientRect: () =>
-        DOMRect.fromRect({ x: menu?.position.x ?? 0, y: menu?.position.y ?? 0 }),
-    }),
-    [menu?.position.x, menu?.position.y],
-  );
+  const menuAnchor = (() => ({
+    getBoundingClientRect: () =>
+      DOMRect.fromRect({ x: menu?.position.x ?? 0, y: menu?.position.y ?? 0 }),
+  }))();
   const { openMenu, closeMenu } = useThreadActionMenu({
     threadRef: isServerThread ? activeThreadRef : null,
     projectCwd: activeProjectCwd,
@@ -413,52 +390,43 @@ export const ChatHeader = memo(function ChatHeader({
     menuPresenter,
   });
   const titleButtonRef = useRef<HTMLButtonElement | null>(null);
-  const openTitleMenuNow = useCallback(() => {
+  const openTitleMenuNow = useStableCallback(() => {
     const rect = titleButtonRef.current?.getBoundingClientRect();
     if (!rect) return;
     openMenu({ x: rect.left, y: rect.bottom });
-  }, [openMenu]);
-  const openMenuFromTitle = useCallback(
-    (event: ReactMouseEvent<HTMLButtonElement>) => {
-      if (isTrailingDoubleClick(event.detail)) return;
-      if (menu) closeMenu();
-      else openTitleMenuNow();
-    },
-    [closeMenu, menu, openTitleMenuNow],
-  );
-  const handleTitleDoubleClick = useCallback(
-    (event: ReactMouseEvent) => {
-      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-      // The chevron is the explicit menu affordance; only the title text renames.
-      if ((event.target as HTMLElement).closest("[data-thread-title-chevron]") !== null) return;
-      closeMenu();
-      startRename();
-    },
-    [closeMenu, startRename],
-  );
-  const handleHeaderContextMenu = useCallback(
-    (event: ReactMouseEvent | MouseEvent) => {
-      if (renamingTitle !== null) return;
-      if (!isServerThread && onOpenProjectSettings === undefined) return;
-      event.preventDefault();
-      if (!isServerThread) {
-        void menuPresenter
-          .show(
-            [{ id: "project-settings", label: t.chat.header.projectSettings, icon: "settings" }],
-            {
-              x: event.clientX,
-              y: event.clientY,
-            },
-          )
-          .then((action) => {
-            if (action === "project-settings") onOpenProjectSettings?.();
-          });
-        return;
-      }
-      openMenu({ x: event.clientX, y: event.clientY });
-    },
-    [isServerThread, menuPresenter, onOpenProjectSettings, openMenu, renamingTitle],
-  );
+  });
+  const openMenuFromTitle = useStableCallback((event: ReactMouseEvent<HTMLButtonElement>) => {
+    if (isTrailingDoubleClick(event.detail)) return;
+    if (menu) closeMenu();
+    else openTitleMenuNow();
+  });
+  const handleTitleDoubleClick = useStableCallback((event: ReactMouseEvent) => {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    // The chevron is the explicit menu affordance; only the title text renames.
+    if ((event.target as HTMLElement).closest("[data-thread-title-chevron]") !== null) return;
+    closeMenu();
+    startRename();
+  });
+  const handleHeaderContextMenu = useStableCallback((event: ReactMouseEvent | MouseEvent) => {
+    if (renamingTitle !== null) return;
+    if (!isServerThread && onOpenProjectSettings === undefined) return;
+    event.preventDefault();
+    if (!isServerThread) {
+      void menuPresenter
+        .show(
+          [{ id: "project-settings", label: t.chat.header.projectSettings, icon: "settings" }],
+          {
+            x: event.clientX,
+            y: event.clientY,
+          },
+        )
+        .then((action) => {
+          if (action === "project-settings") onOpenProjectSettings?.();
+        });
+      return;
+    }
+    openMenu({ x: event.clientX, y: event.clientY });
+  });
   // Right-clicks from the title/project no-drag slots bubble to the titlebar.
   // Electron handles blank drag areas through the OS, as it did before the redesign.
   useEffect(() => {
@@ -467,21 +435,18 @@ export const ChatHeader = memo(function ChatHeader({
     titlebar.addEventListener("contextmenu", handleHeaderContextMenu);
     return () => titlebar.removeEventListener("contextmenu", handleHeaderContextMenu);
   }, [breadcrumbContainer, handleHeaderContextMenu]);
-  const handleRenameKeyDown = useCallback(
-    (event: ReactKeyboardEvent<HTMLInputElement>) => {
-      if (event.nativeEvent.isComposing || event.keyCode === 229) return;
-      if (event.key === "Enter") {
-        restoreTitleFocusRef.current = true;
-        renameCommittedRef.current = true;
-        commitRename(event.currentTarget.value);
-      } else if (event.key === "Escape") {
-        restoreTitleFocusRef.current = true;
-        renameCommittedRef.current = true;
-        setRenaming(null);
-      }
-    },
-    [commitRename],
-  );
+  const handleRenameKeyDown = useStableCallback((event: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+    if (event.key === "Enter") {
+      restoreTitleFocusRef.current = true;
+      renameCommittedRef.current = true;
+      commitRename(event.currentTarget.value);
+    } else if (event.key === "Escape") {
+      restoreTitleFocusRef.current = true;
+      renameCommittedRef.current = true;
+      setRenaming(null);
+    }
+  });
   const breadcrumb = (
     <div
       ref={setBreadcrumbContainer}

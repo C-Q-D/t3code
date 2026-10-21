@@ -9,7 +9,7 @@ import {
   RefreshCwIcon,
   Trash2Icon,
 } from "lucide-react";
-import { memo, useId, useMemo, useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { useThreadSelectionStore } from "~/threadSelectionStore";
 import { useEnvironmentsWithScope } from "~/state/session";
 import type { SidebarThreadSummary } from "~/types";
@@ -42,34 +42,58 @@ const moreActionIcons = {
  * Empty or stale-only selections render nothing. Grant changes update disabled states live;
  * the caller rechecks the selection, capabilities and permissions when an action executes.
  */
-export const SidebarBulkActions = memo(function SidebarBulkActions(props: SidebarBulkActionsProps) {
+export const SidebarBulkActions = function SidebarBulkActions(props: SidebarBulkActionsProps) {
   const selectedThreadKeys = useThreadSelectionStore((state) => state.selectedThreadKeys);
-  const selectedThreads = useMemo(
-    () =>
-      [...selectedThreadKeys].flatMap((key) => {
-        const thread = props.threadByKey.get(key);
-        return thread ? [thread] : [];
-      }),
-    [props.threadByKey, selectedThreadKeys],
-  );
+  const selectedThreads = [...selectedThreadKeys].flatMap((key) => {
+    const thread = props.threadByKey.get(key);
+    return thread ? [thread] : [];
+  });
   const permittedEnvironments = useEnvironmentsWithScope(
     selectedThreads,
     AuthOrchestrationOperateScope,
   );
   const nowMinute = useNowMinute();
-  const model = useMemo(
-    () =>
-      buildSidebarBulkActionModel({
+  // Expanding More must not rebuild the selection model; the compiler leaves this calculation uncached.
+  const calculateModel = () =>
+    buildSidebarBulkActionModel({
+      selectedThreadKeys,
+      threadByKey: props.threadByKey,
+      supports: props.supports,
+      canOperate: (threads) =>
+        threads.every((thread) => permittedEnvironments.has(thread.environmentId)),
+      now: `${nowMinute}:00.000Z`,
+      snoozePresets: [],
+    });
+  const [modelCache, setModelCache] = useState(() => ({
+    inputs: [
+      selectedThreadKeys,
+      props.threadByKey,
+      props.supports,
+      permittedEnvironments,
+      nowMinute,
+    ] as const,
+    value: calculateModel(),
+  }));
+  let model = modelCache.value;
+  if (
+    !Object.is(modelCache.inputs[0], selectedThreadKeys) ||
+    !Object.is(modelCache.inputs[1], props.threadByKey) ||
+    !Object.is(modelCache.inputs[2], props.supports) ||
+    !Object.is(modelCache.inputs[3], permittedEnvironments) ||
+    !Object.is(modelCache.inputs[4], nowMinute)
+  ) {
+    model = calculateModel();
+    setModelCache({
+      inputs: [
         selectedThreadKeys,
-        threadByKey: props.threadByKey,
-        supports: props.supports,
-        canOperate: (threads) =>
-          threads.every((thread) => permittedEnvironments.has(thread.environmentId)),
-        now: `${nowMinute}:00.000Z`,
-        snoozePresets: [],
-      }),
-    [selectedThreadKeys, props.threadByKey, props.supports, permittedEnvironments, nowMinute],
-  );
+        props.threadByKey,
+        props.supports,
+        permittedEnvironments,
+        nowMinute,
+      ] as const,
+      value: model,
+    });
+  }
   // A new selection starts collapsed, including when the previous selection was cleared elsewhere.
   const [expandedSelection, setExpandedSelection] = useState<ReadonlySet<string> | null>(null);
   const expanded = expandedSelection === selectedThreadKeys;
@@ -175,4 +199,4 @@ export const SidebarBulkActions = memo(function SidebarBulkActions(props: Sideba
       </div>
     </div>
   );
-});
+};

@@ -3,7 +3,7 @@
  * These are current behavior snapshots, not new requirements.
  * @vitest-environment jsdom
  */
-import { act, useState } from "react";
+import { act, useState, useRef } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vite-plus/test";
 import type { PromptStashEntry } from "../../promptStashStore";
@@ -31,14 +31,16 @@ const scrollDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 
 
 /** Makes restored text and remaining entries observable without mocking stash keyboard handling. */
 function StashHarness() {
+  const composerFormRef = useRef<HTMLFormElement>(null);
   const [entries, setEntries] = useState(ENTRIES);
   const [prompt, setPrompt] = useState("");
   const [open, setOpen] = useState(true);
   return (
-    <>
+    <form ref={composerFormRef}>
       <textarea aria-label="Draft" readOnly value={prompt} />
       {open && (
         <ComposerStashMenu
+          composerFormRef={composerFormRef}
           entries={entries}
           stashShortcutLabel="Ctrl+S"
           onRestore={(entry) => {
@@ -51,7 +53,7 @@ function StashHarness() {
           onClose={() => setOpen(false)}
         />
       )}
-    </>
+    </form>
   );
 }
 
@@ -97,9 +99,11 @@ it("restores the draft chosen with arrows while focus stays in the composer", as
 it("deletes the highlighted draft with Ctrl+Backspace without restoring it", async () => {
   await mountStash();
   await act(async () =>
-    window.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "Backspace", ctrlKey: true, bubbles: true }),
-    ),
+    container!
+      .querySelector("textarea")!
+      .dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Backspace", ctrlKey: true, bubbles: true }),
+      ),
   );
   expect(container!.querySelector("ul")?.textContent).not.toContain("First draft");
   expect(container!.querySelector("ul")?.textContent).toContain("Second draft");

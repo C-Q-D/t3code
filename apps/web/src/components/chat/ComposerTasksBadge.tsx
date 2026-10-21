@@ -13,6 +13,7 @@ export interface ComposerTasksProgress {
   readonly step: string;
   readonly completedSteps: number;
   readonly totalSteps: number;
+  readonly live: boolean;
 }
 
 /** One provider task and its optional measured duration in milliseconds. */
@@ -173,7 +174,7 @@ export const ComposerTasksContent = memo(function ComposerTasksContent({
                   >
                     {step.durationMs !== undefined
                       ? formatDuration(step.durationMs)
-                      : step.status === "inProgress"
+                      : step.status === "inProgress" && progress.live
                         ? t.composer.tasks.now
                         : null}
                   </span>

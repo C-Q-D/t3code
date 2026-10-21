@@ -98,12 +98,12 @@ export const git = {
       `Merge stack through #${number} into ${base} (${count} ${count === 1 ? "pull request" : "pull requests"})`,
     /** Reports the comment count to reveal and the total currently hidden. */
     olderComments: (shown: number, hidden: number) =>
-      `Show ${shown} older comment${hidden === 1 ? "" : "s"} (${hidden} hidden)`,
+      `Show ${shown} older conversation${hidden === 1 ? "" : "s"} (${hidden} hidden)`,
     /** Reports the recent comment window size. */
-    recentComments: (count: number) => `Show only ${count} recent comments`,
+    recentComments: (count: number) => `Show only ${count} recent conversations`,
     /** Reports the number of recent comments available in a truncated conversation. */
     truncatedComments: (count: number) =>
-      `This conversation is longer than this page reads in one go. The most recent ${count} are here; open it on the host to read the rest.`,
+      `This conversation is only partially loaded. ${count} comment${count === 1 ? " is" : "s are"} loaded; open it on the host to read the rest.`,
     /** Reports open and linked pull request counts. */
     linkedRequestCounts: (open: number, linked: number) => `${open} open · ${linked} linked`,
     /** Counts unnamed actors after named reaction actors. */
@@ -427,9 +427,9 @@ export const git = {
     couldNotOpenAThreadForTheCheckout: "Could not open a thread for the checkout",
     couldNotPrepareThePullRequestCheckout: "Could not prepare the pull request checkout",
     checkedOutButTheThreadStayedWhereItWas: "Checked out, but the thread stayed where it was",
-    checkedOutButNotOnTheLatestCommits: "Checked out, but not on the latest commits",
+    checkedOutButNotOnTheLatestCommits: "Checked out, but not confirmed on the latest commit",
     theCheckoutCouldNotBeMovedOntoThePullRequestSLatestCommitsSoTheCodeThereIsOlderThanTh:
-      "The checkout could not be moved onto the pull request's latest commits, so the code there is older than the pull request. Uncommitted work or local commits keep it where it is.",
+      "This checkout could not be confirmed at the pull request's latest commit, so its code may differ. Local commits or uncommitted work keep a checkout where it is.",
     checkedOutHere: "Checked out here",
     checkedOut: "Checked out",
     thisRepositoryIsOnThePullRequestSBranchWithAThreadOpenOnIt:
@@ -786,6 +786,8 @@ export const git = {
     pullRequestsBreadcrumb: "Pull requests breadcrumb",
     filterByProvider: "Filter by provider",
     refreshPullRequests: "Refresh pull requests",
+    summarizeReviewOptional: "Summarize your review (optional)",
+    summarizeReviewOrAddLines: "Summarize your review or add line comments",
   },
   actions: {
     ownerRepositoryPlaceholder: "owner/repo",
@@ -1065,10 +1067,10 @@ export const git = {
     showingRefs: (shown: number, total: number | undefined) => `Showing ${shown} of ${total} refs`,
     searchRefs: "Search refs...",
     noRefsFound: "No refs found.",
-    startFromOrigin: "Start from origin",
-    startWorktreeFromOrigin: "Start worktree from origin",
+    startFromOrigin: "Start from remote",
+    startWorktreeFromOrigin: "Start worktree from remote",
     createsTheWorktreeFromTheLatestMatchingBranchOnOriginInsteadOfYourLocalBranch:
-      "Creates the worktree from the latest matching branch on origin instead of your local branch.",
+      "Uses the latest commit of the base branch’s tracked remote branch, even if its name differs. Otherwise uses the same-named branch on origin. Uses your local branch if that remote branch is missing.",
     previousWorktree: "Previous worktree",
     loadingRefs: "Loading refs...",
     loadingMoreRefs: "Loading more refs...",

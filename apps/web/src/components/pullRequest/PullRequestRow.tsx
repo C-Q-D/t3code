@@ -28,12 +28,6 @@ import {
   PullRequestReviewDecisionGlyph,
 } from "./pullRequestPresentation";
 
-/**
- * Each slot past the first only appears once the meta line is wide enough to hold it, so a
- * narrow row shows one label and a "+N" while a wide one spreads out up to three. The "+N"
- * rides on whichever pill is the last visible one, and is hidden as soon as the next slot shows.
- */
-// Each slot's pill appears at a wider row, and its overflow count yields to the next slot.
 const LABEL_SLOTS = [
   { overflow: "@xl/pr-row-meta:hidden" },
   { overflow: "@3xl/pr-row-meta:hidden" },
@@ -106,21 +100,14 @@ function PullRequestRowImpl({
   entry: EnvironmentPullRequestEntry;
   selected: boolean;
   showProjectTitle: boolean;
-  /** Only when the list spans more than one host, where the repository alone is ambiguous. */
   showProvider: boolean;
-  /** Names the server this row was read from, where the list spans more than one. */
   environmentLabel?: string;
-  /**
-   * A search found this, but in something the row does not show — a description, a comment, a
-   * commit message. Saying so is the difference between a result and an apparently random row.
-   */
   matchedElsewhere?: boolean;
   /** Used by the list's shared visibility observer to defer optional line-count reads. */
   statsKey?: string;
   statsRef?: RefCallback<HTMLDivElement>;
   onSelect: (entry: PullRequestRowTarget) => void;
   speedMode: boolean;
-  /** What this row's host can do, which is what speed mode offers. */
   hostActions: ReadonlySet<PullRequestAction>;
   onActed: (result: PullRequestSpeedActionResult) => void;
   closing?: boolean;
@@ -303,9 +290,4 @@ function PullRequestRowImpl({
   );
 }
 
-/**
- * Memoized: the list re-renders on every keystroke of a search and every status poll, and a
- * row whose entry, selection and match state are unchanged has nothing new to say. Effective
- * because the route hands it a stable `onSelect`.
- */
 export const PullRequestRow = memo(PullRequestRowImpl);

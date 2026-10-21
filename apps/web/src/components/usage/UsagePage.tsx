@@ -14,7 +14,10 @@ import {
   MonitorIcon,
   SlidersHorizontalIcon,
 } from "lucide-react";
-import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { settlePromise } from "@t3tools/client-runtime/state/runtime";
+import * as AsyncResult from "effect/reactivity/AsyncResult";
+import * as Cause from "effect/Cause";
 import {
   cursorKeychainAccessEnvironments,
   refreshUsageLimits,
@@ -28,6 +31,8 @@ import {
 import { isCompatibleUsageContractVersion, type MergedUsage } from "@t3tools/shared/usageMerge";
 
 import { cn } from "../../lib/utils";
+import { usePrimarySettings } from "../../hooks/useSettings";
+import { resolveHour12 } from "../../timestampFormat";
 import { environmentPresentations } from "../../state/presentation";
 import { primaryServerKeybindingsAtom, serverEnvironment } from "../../state/server";
 import { isCommandPaletteOpen } from "../../commandPaletteBus";
@@ -92,11 +97,41 @@ function isUsageWindowDays(value: number): value is UsagePagePreferences["window
 
 const providerLabel = (provider: UsageProviderKind) => PROVIDER_PRESENTATION[provider].label;
 
+function usageLoading(
+  showingKept: boolean,
+  selectedEnvironments: Parameters<typeof usageLoadingState>[0],
+  refreshingUsage: boolean,
+  hiddenProviders: ReadonlySet<UsageProviderKind>,
+) {
+  if (showingKept) {
+    return { partial: true, everyProvider: true, providers: new Set<UsageProviderKind>() };
+  }
+  const state = usageLoadingState(selectedEnvironments, refreshingUsage);
+  const providers = new Set([...state.providers].filter((p) => !hiddenProviders.has(p)));
+  return {
+    partial: state.everyProvider || providers.size > 0,
+    everyProvider: state.everyProvider,
+    providers,
+  };
+}
+
+// Keep useUsage's identity key stable even if a future page edit prevents compilation.
+function useHiddenProviderSet(values: UsagePagePreferences["hiddenProviders"]) {
+  const [cached, setCached] = useState(() => ({ values, providers: new Set(values) }));
+  if (cached.values !== values) {
+    const next = { values, providers: new Set(values) };
+    setCached(next);
+    return next.providers;
+  }
+  return cached.providers;
+}
+
 /** Renders selected environments' usage, subscription limits and pricing controls; preserves persisted filter IDs while displaying localized labels. */
 export function UsagePage() {
   const [preferences, setPreferences] = useState(readUsagePagePreferences);
   useEscapeToGoBack();
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
+  const hour12 = usePrimarySettings((settings) => resolveHour12(settings.timestampFormat));
   const shortcutTitle = (
     option: (typeof METRIC_OPTIONS)[number] | (typeof WINDOW_OPTIONS)[number],
   ) => {
@@ -119,14 +154,11 @@ export function UsagePage() {
   const isRefreshing = manualRefresh !== null;
   const [limitsNow, setLimitsNow] = useState(() => Date.now());
   const refreshingRef = useRef(false);
-  const [priceDialog, setPriceDialog] = useState<{ readonly model?: string } | null>(null);
   const [selectedModelKey, setSelectedModelKey] = useState<string | null>(null);
+  const [priceDialog, setPriceDialog] = useState<{ readonly model?: string } | null>(null);
   const [selectedEnvironmentIds, setSelectedEnvironmentIds] =
     useState<ReadonlySet<EnvironmentId> | null>(null);
-  const hiddenProviders = useMemo(
-    () => new Set(preferences.hiddenProviders),
-    [preferences.hiddenProviders],
-  );
+  const hiddenProviders = useHiddenProviderSet(preferences.hiddenProviders);
   const { days: windowDays, window } = windowSelection;
   const isPast24Hours = windowDays === 1;
   const {
@@ -137,26 +169,13 @@ export function UsagePage() {
     isPartial,
     refresh,
   } = useUsage(window, selectedEnvironmentIds, hiddenProviders);
-  // Until a new window's first answer, the previous one stays on screen, muted.
   const merged = shown?.merged ?? answeredUsage;
   const shownWindow = shown?.window ?? window;
   const shownHourly = shownWindow.resolution === "hour";
   const refreshingUsage = manualRefresh === "usage";
   // Usage kept from another window is all old, so every figure stays muted.
   const showingKept = shown !== null && shown.window !== window;
-  const loading = useMemo(() => {
-    if (showingKept) {
-      return { partial: true, everyProvider: true, providers: new Set<UsageProviderKind>() };
-    }
-    const state = usageLoadingState(selectedEnvironments, refreshingUsage);
-    // A hidden provider still refreshing must not add its row or mute the totals.
-    const providers = new Set([...state.providers].filter((p) => !hiddenProviders.has(p)));
-    return {
-      partial: state.everyProvider || providers.size > 0,
-      everyProvider: state.everyProvider,
-      providers,
-    };
-  }, [showingKept, refreshingUsage, selectedEnvironments, hiddenProviders]);
+  const loading = usageLoading(showingKept, selectedEnvironments, refreshingUsage, hiddenProviders);
   const isProviderLoading = (provider: UsageProviderKind) =>
     loading.everyProvider || loading.providers.has(provider);
   const presentations = useAtomValue(environmentPresentations.presentationsAtom);
@@ -190,25 +209,14 @@ export function UsagePage() {
   // Subscription checks do not depend on diagnostics access or a usage response.
   const limitsVisible = selectedEnvironments.length > 0;
 
-  const days = useMemo(
-    () => enumerateDays(shownWindow.sinceDay, shownWindow.untilDay),
-    [shownWindow.sinceDay, shownWindow.untilDay],
-  );
-  const hours = useMemo(
-    () =>
-      shownWindow.sinceTime === undefined || shownWindow.untilTime === undefined
-        ? []
-        : enumerateHourStarts(shownWindow.sinceTime, shownWindow.untilTime),
-    [shownWindow.sinceTime, shownWindow.untilTime],
-  );
-  const providersWithData = useMemo(() => providersWithUsage(merged.providers), [merged.providers]);
-  // A provider still refreshing keeps its row and line before its usage lands.
-  const activeProviders = useMemo(
-    () =>
-      PROVIDER_ORDER.filter(
-        (provider) => providersWithData.includes(provider) || loading.providers.has(provider),
-      ),
-    [loading.providers, providersWithData],
+  const days = enumerateDays(shownWindow.sinceDay, shownWindow.untilDay);
+  const hours =
+    shownWindow.sinceTime === undefined || shownWindow.untilTime === undefined
+      ? []
+      : enumerateHourStarts(shownWindow.sinceTime, shownWindow.untilTime);
+  const providersWithData = providersWithUsage(merged.providers);
+  const activeProviders = PROVIDER_ORDER.filter(
+    (provider) => providersWithData.includes(provider) || loading.providers.has(provider),
   );
   const selectedModel =
     selectedModelKey === null
@@ -230,9 +238,10 @@ export function UsagePage() {
   const selectMetric = (nextMetric: UsageMetric) => {
     updatePreferences({ metric: nextMetric });
   };
-  const refreshLimits = async (automatic = false, afterPending = false) => {
-    try {
-      await Promise.all(
+  const refreshLimits = (automatic = false, afterPending = false) =>
+    // Settled so the timestamp still advances when a refresh throws.
+    settlePromise(() =>
+      Promise.all(
         Array.from(presentations, ([environmentId, presentation]) => {
           if (selectedEnvironmentIds !== null && !selectedEnvironmentIds.has(environmentId)) return;
           if (presentation.connection.phase === "connected" && presentation.serverConfig !== null) {
@@ -244,12 +253,11 @@ export function UsagePage() {
             );
           }
         }),
-      );
-    } finally {
+      ),
+    ).then((result) => {
       setLimitsNow(Date.now());
-    }
-  };
-  // Both entry points share the same lock so repeated shortcuts cannot overlap a refresh.
+      if (!AsyncResult.isSuccess(result)) throw Cause.squash(result.cause);
+    });
   const refreshLimitsManually = () => {
     if (refreshingRef.current) return;
     refreshingRef.current = true;
@@ -324,7 +332,6 @@ export function UsagePage() {
     if (limitsVisible && connectedLimitsEnvironments) autoRefreshLimits();
   }, [limitsVisible, connectedLimitsEnvironments]);
 
-  // Names the period on screen, which is the previous one until the new one answers.
   const windowLabel =
     shownHourly && shownWindow.sinceTime !== undefined && shownWindow.untilTime !== undefined
       ? t.tools.usage.dateRange(
@@ -332,11 +339,13 @@ export function UsagePage() {
             shownWindow.sinceTime,
             shownWindow.timeZone,
             t.chat.workLog.shared.usage,
+            hour12,
           ),
           formatDateTimeShort(
             shownWindow.untilTime,
             shownWindow.timeZone,
             t.chat.workLog.shared.usage,
+            hour12,
           ),
         )
       : t.tools.usage.dateRange(
@@ -528,6 +537,7 @@ export function UsagePage() {
                       activeProviders={activeProviders}
                       resolution={shownHourly ? "hour" : "day"}
                       timeZone={shownWindow.timeZone}
+                      hour12={hour12}
                       onSelectModel={setSelectedModelKey}
                     />
                     <div className="min-w-0 flex-1 empty:hidden">
@@ -560,6 +570,7 @@ export function UsagePage() {
             resolution: shownHourly ? "hour" : "day",
             timeZone: shownWindow.timeZone,
             referenceTime: shownWindow.untilTime,
+            hour12,
           }}
           onSetPrice={() => {
             setSelectedModelKey(null);
@@ -646,7 +657,6 @@ function UsageCoverageNotice({
   );
 }
 
-/** Environment selection, with each environment's scan status in the menu. */
 function UsageEnvironmentFilter({
   environments,
   selectedEnvironments,
@@ -787,7 +797,6 @@ function UsageEnvironmentFilter({
   );
 }
 
-/** Provider visibility shared by every tab. Stored as the hidden set. */
 function UsageProviderFilter({
   hiddenProviders,
   onChange,

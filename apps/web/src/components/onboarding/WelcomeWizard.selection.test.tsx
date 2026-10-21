@@ -58,8 +58,13 @@ vi.mock("../../hooks/useCopyToClipboard", () => ({
 }));
 vi.mock("../../cloud/publicConfig", () => ({ hasCloudPublicConfig: () => false }));
 vi.mock("../clerk/useT3ConnectAuthPrompt", () => ({ useT3ConnectAuthPrompt: vi.fn() }));
-vi.mock("../../onboarding/firstRun", () => ({
-  useCompleteOnboarding: () => state.completeOnboarding,
+vi.mock("../../hooks/useSettings", () => ({
+  ensureClientSettingsHydrated: vi.fn(),
+  persistClientSettingsUpdate: vi.fn(),
+}));
+vi.mock(import("../../onboarding/firstRun"), async (importOriginal) => ({
+  ...(await importOriginal()),
+  completeOnboarding: state.completeOnboarding,
 }));
 vi.mock("../../env", () => ({ isElectron: false }));
 vi.mock("../../state/environments", () => {

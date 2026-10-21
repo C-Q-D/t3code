@@ -21,3 +21,6 @@ export const THREAD_DETAILS_PANEL_SPLIT_PRIMARY_CLASS = `${CONTROL} flex-1 justi
 export const THREAD_DETAILS_PANEL_SPLIT_SECONDARY_CLASS = `${CONTROL} w-9.5 justify-center rounded-s-md px-0 ${RAISED_SURFACE}`;
 export const THREAD_DETAILS_PANEL_SPLIT_SEPARATOR_CLASS = "hidden";
 export const THREAD_DETAILS_PANEL_ACTION_CLASS = `${CONTROL} justify-center ${RAISED_SURFACE}`;
+
+export const THREAD_DETAILS_PANEL_SELECT_LABEL_CLASS = "flex h-full min-w-0 flex-1 items-center";
+export const THREAD_DETAILS_PANEL_SELECT_ICON_CLASS = "rounded-e-full";

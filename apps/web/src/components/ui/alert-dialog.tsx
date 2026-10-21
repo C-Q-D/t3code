@@ -2,7 +2,7 @@
 "use client";
 
 import { AlertDialog as AlertDialogPrimitive } from "@base-ui/react/alert-dialog";
-import { useCallback, useRef } from "react";
+import { useRef } from "react";
 
 import { cn } from "~/lib/utils";
 import {
@@ -10,8 +10,15 @@ import {
   DIALOG_MOBILE_SHEET_CLASS,
   DIALOG_POPUP_CLASS,
 } from "~/components/ui/dialog-styles";
+import { ControlledOpenContext, renderRetainedPopup } from "~/components/ui/dialog";
 
-const AlertDialog = AlertDialogPrimitive.Root;
+function AlertDialog<Payload>(props: AlertDialogPrimitive.Root.Props<Payload>) {
+  return (
+    <ControlledOpenContext value={props.open}>
+      <AlertDialogPrimitive.Root {...props} />
+    </ControlledOpenContext>
+  );
+}
 
 const AlertDialogPortal = AlertDialogPrimitive.Portal;
 
@@ -55,20 +62,17 @@ function AlertDialogPopup({
   portalContainer?: AlertDialogPrimitive.Portal.Props["container"];
 }) {
   const popupRef = useRef<HTMLDivElement | null>(null);
-  const setPopupRef = useCallback(
-    (element: HTMLDivElement | null) => {
-      popupRef.current = element;
-      const cleanup = typeof ref === "function" ? ref(element) : undefined;
-      if (ref && typeof ref !== "function") ref.current = element;
-      return () => {
-        popupRef.current = null;
-        if (typeof cleanup === "function") cleanup();
-        else if (typeof ref === "function") ref(null);
-        else if (ref) ref.current = null;
-      };
-    },
-    [ref],
-  );
+  const setPopupRef = (element: HTMLDivElement | null) => {
+    popupRef.current = element;
+    const cleanup = typeof ref === "function" ? ref(element) : undefined;
+    if (ref && typeof ref !== "function") ref.current = element;
+    return () => {
+      popupRef.current = null;
+      if (typeof cleanup === "function") cleanup();
+      else if (typeof ref === "function") ref(null);
+      else if (ref) ref.current = null;
+    };
+  };
 
   /** Returns the trailing available action, or true to delegate an empty footer to Base UI. */
   const focusPrimaryAction = () => {
@@ -114,6 +118,7 @@ function AlertDialogPopup({
           data-slot="alert-dialog-popup"
           ref={setPopupRef}
           initialFocus={initialFocus === undefined ? focusPrimaryAction : initialFocus}
+          render={renderRetainedPopup}
           {...props}
         />
       </AlertDialogViewport>
@@ -189,9 +194,6 @@ function AlertDialogDescription({
   return (
     <AlertDialogPrimitive.Description
       className={cn(
-        // A long description (say, the arguments of a tool call awaiting
-        // approval) scrolls in place instead of pushing the actions out of
-        // the popup, which the viewport already caps.
         "wrap-anywhere max-h-[min(24rem,60dvh)] min-h-0 overflow-y-auto overscroll-contain text-muted-foreground text-sm select-text",
         variant === "confirmation" && "text-body text-code-foreground",
         className,

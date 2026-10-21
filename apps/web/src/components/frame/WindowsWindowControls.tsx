@@ -78,11 +78,11 @@ export function WindowsWindowControls({ maximized }: { maximized: boolean }) {
   /** Serializes a user's caption actions until the native request settles. */
   const run = async (action: DesktopWindowAction) => {
     setPending(true);
-    try {
+    return await (async () => {
       await runWindowAction(action);
-    } finally {
+    })().finally(() => {
       setPending(false);
-    }
+    });
   };
   // Native captions remain usable over modal dialogs. A body portal keeps their
   // replacement outside the shell's isolation and dialog scroll-lock padding.

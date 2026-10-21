@@ -222,8 +222,10 @@ export const tools = {
       "Xcode is installed, but no iOS Simulator is available. Install a runtime in Xcode Settings → Components.",
     noAndroidRuntime:
       "The Android SDK is installed, but no virtual device exists. Create one in Android Studio → Device Manager.",
-    iosReady: "Xcode and iOS Simulator are available.",
-    androidReady: "The Android SDK and Emulator are available.",
+    iosReady: (host?: string) =>
+      `Xcode and iOS Simulator are available${host ? ` on ${host}` : ""}.`,
+    androidReady: (host?: string) =>
+      `The Android SDK and Emulator are available${host ? ` on ${host}` : ""}.`,
     setup: "Set up devices",
     setupHint: "Review what runs on this environment before using simulators and emulators.",
     hub: "Device hub",
@@ -376,6 +378,8 @@ export const tools = {
     rotateInControls: "Use Rotate in the control bar.",
     pushHeading: "Push",
     launchAppHeading: "Launch app",
+    androidDiscoveryIncomplete:
+      "The Android device list may be incomplete. Check the device host and try again.",
   },
   preview: {
     fileNotShown: "This file can’t be shown here",

@@ -22,6 +22,7 @@ const threadRef = {
   environmentId: EnvironmentId.make("drag-test"),
   threadId: ThreadId.make("thread"),
 };
+let now = 0;
 let container: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
 const report = vi.fn();
@@ -40,6 +41,7 @@ const content = vi.fn(() => (
 const handle = PopoverCreateHandle();
 
 beforeEach(() => {
+  now = 0;
   setPhysicsEnabled(false);
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   store.getState().reset();
@@ -92,7 +94,7 @@ afterEach(async () => {
 it.each([true, false])("physics %s glides a released card only while enabled", async (enabled) => {
   setPhysicsEnabled(enabled);
   const clock = installTestRaf();
-  let now = 0;
+  now = 0;
   vi.spyOn(performance, "now").mockImplementation(() => now);
   await renderCard();
   await pointer(card(), "pointerdown", 950, 40);
@@ -116,7 +118,7 @@ it.each([true, false])("physics %s glides a released card only while enabled", a
 it("takes over a gliding card without returning to its release point", async () => {
   setPhysicsEnabled(true);
   const clock = installTestRaf();
-  let now = 0;
+  now = 0;
   vi.spyOn(performance, "now").mockImplementation(() => now);
   await renderCard();
   await pointer(card(), "pointerdown", 950, 40);
@@ -146,7 +148,7 @@ function visualCardLeft() {
 it.each([5, 25])("preserves elastic card position when grabbed after %s frames", async (frames) => {
   setPhysicsEnabled(true);
   const clock = installTestRaf();
-  let now = 0;
+  now = 0;
   vi.spyOn(performance, "now").mockImplementation(() => now);
   await renderCard();
   await pointer(card(), "pointerdown", 950, 40);
@@ -179,7 +181,7 @@ it.each([5, 25])("preserves elastic card position when grabbed after %s frames",
 it("stops a gliding card and saves within resized container bounds", async () => {
   setPhysicsEnabled(true);
   const clock = installTestRaf();
-  let now = 0;
+  now = 0;
   vi.spyOn(performance, "now").mockImplementation(() => now);
   await renderCard();
   await pointer(card(), "pointerdown", 950, 40);
@@ -245,7 +247,7 @@ async function pointer(target: Element, type: string, x: number, y: number) {
       button: 0,
     });
     Object.defineProperties(event, {
-      timeStamp: { value: performance.now() },
+      timeStamp: { value: now },
       pointerId: { value: 1 },
       pointerType: { value: "mouse" },
       isPrimary: { value: true },

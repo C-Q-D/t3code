@@ -17,7 +17,7 @@ vi.mock("../ui/button", () => ({ Button: "button" }));
 vi.mock("../ui/toggle-group", () => ({ ToggleGroup: "div", Toggle: "button" }));
 vi.mock("./PullRequestCommentForm", () => ({ PullRequestCommentForm: () => null }));
 vi.mock("../ui/popover", async () => {
-  const { createContext, useContext, cloneElement, useMemo } = await import("react");
+  const { createContext, useContext, cloneElement } = await import("react");
   const context = createContext({ open: false, onOpenChange: (_open: boolean) => {} });
   return {
     Popover: ({
@@ -29,7 +29,7 @@ vi.mock("../ui/popover", async () => {
       onOpenChange: (open: boolean) => void;
       children: ReactNode;
     }) => {
-      const state = useMemo(() => ({ open, onOpenChange }), [open, onOpenChange]);
+      const state = { open, onOpenChange };
       return <context.Provider value={state}>{children}</context.Provider>;
     },
     PopoverTrigger: ({

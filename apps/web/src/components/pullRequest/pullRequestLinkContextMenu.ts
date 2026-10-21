@@ -13,7 +13,6 @@ import { toastManager } from "../ui/toast";
 
 export type PullRequestLinkContextMenuAction = "copy-link" | "open-external";
 
-/** Named for the host rather than "externally": the point is where you will land. */
 export const openOnHostLabel = (host: SourceControlClientDefinition): string =>
   host === UNKNOWN_SOURCE_CONTROL_CLIENT
     ? t.git.pullRequest.openOnHost
@@ -58,8 +57,6 @@ export async function showPullRequestLinkContextMenu({
   try {
     action = await api.contextMenu.show(pullRequestLinkContextMenuItems(openLabel), position);
   } catch {
-    // A menu that could not be shown has already cost the reader their right-click; there is
-    // nothing to say about it that a second popup would not make worse.
     return;
   }
   try {

@@ -5,7 +5,7 @@ import { resolveEnvironmentMachineKind } from "@t3tools/contracts";
 import {
   useClientSettings,
   useClientSettingsHydrated,
-  useUpdateClientSettings,
+  updateClientSettings,
 } from "~/hooks/useSettings";
 import type { EnvironmentPresentation } from "~/state/environments";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
@@ -22,8 +22,7 @@ const preferences = [
 
 type LoadPreference = (typeof preferences)[number]["value"];
 
-/** Snaps a saved weight (older builds stored a slider value) onto the four preferences. */
-export function loadPreferenceForWeight(weight: number | undefined): LoadPreference {
+function loadPreferenceForWeight(weight: number | undefined): LoadPreference {
   if (weight === undefined || weight === 50) return 50;
   if (weight === 0) return 0;
   return weight < 50 ? 25 : 100;
@@ -61,9 +60,11 @@ export function LoadBalancingSettings({
 }: {
   environments: ReadonlyArray<EnvironmentPresentation>;
 }) {
-  const settings = useClientSettings();
+  const settings = useClientSettings((current) => ({
+    loadBalancingEnabled: current.loadBalancingEnabled,
+    loadBalancingWeights: current.loadBalancingWeights,
+  }));
   const settingsHydrated = useClientSettingsHydrated();
-  const updateSettings = useUpdateClientSettings();
 
   if (environments.length < 2) return null;
 
@@ -83,7 +84,7 @@ export function LoadBalancingSettings({
           disabled={!settingsHydrated}
           onValueChange={(value) => {
             if (value !== "automatic" && value !== "off") return;
-            updateSettings({ loadBalancingEnabled: value === "automatic" });
+            updateClientSettings({ loadBalancingEnabled: value === "automatic" });
           }}
         >
           <SelectTrigger
@@ -124,7 +125,7 @@ export function LoadBalancingSettings({
               disabled={!settingsHydrated || !settings.loadBalancingEnabled}
               onValueChange={(value) => {
                 if (value === null) return;
-                updateSettings({
+                updateClientSettings({
                   loadBalancingWeights: {
                     ...settings.loadBalancingWeights,
                     [environment.environmentId]: value,

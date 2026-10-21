@@ -1,6 +1,7 @@
 import { t } from "~/i18n";
 import {
   isAtomCommandInterrupted,
+  settlePromise,
   squashAtomCommandFailure,
   type AtomCommandResult,
 } from "@t3tools/client-runtime/state/runtime";
@@ -35,7 +36,6 @@ interface ProviderSetupSectionProps {
   readonly onEnable: () => void;
 }
 
-/** Read the configured method from the instance config. Unknown values fall back to personal. */
 export function readAntigravityAuthMethod(config: unknown): AntigravityAuthMethod {
   const value =
     config !== null && typeof config === "object" && "authMethod" in config
@@ -46,12 +46,16 @@ export function readAntigravityAuthMethod(config: unknown): AntigravityAuthMetho
   );
 }
 
-/** Setup state belongs to the selected environment and is never saved in client settings. */
+/**
+ * Keeps Antigravity setup tied to the machine that owns the provider instead of the viewing client.
+ * @param props Setup target, provider state and enable action; readOnly suppresses mutation controls.
+ * @returns The environment identity and available setup actions, without starting setup during render.
+ */
 export function ProviderSetupSection(props: ProviderSetupSectionProps) {
   return (
     <section
       aria-label={t.settings.providerSetup.antigravitySetup}
-      className="@container/setup divide-y divide-border/50 text-xs"
+      className="@container/setup divide-y divide-border/50 text-xs [&_[data-slot=settings-row]]:rounded-none"
     >
       <SettingsRow
         className="@max-lg/setup:[&>div:first-child]:flex @max-lg/setup:[&>div:first-child]:items-stretch @max-lg/setup:[&>div:first-child]:gap-3"
@@ -96,6 +100,16 @@ export function ProviderSetupSection(props: ProviderSetupSectionProps) {
   );
 }
 
+/**
+ * Runs explicit Antigravity install/auth actions against one provider instance and reports command failures.
+ * @param props.environmentId RPC destination.
+ * @param props.environmentLabel Human-readable destination for feedback.
+ * @param props.instanceId Provider instance being configured.
+ * @param props.provider Live provider metadata used to determine supported operations.
+ * @param props.enabled Whether setup actions may run.
+ * @param props.binaryPath Configured executable path used by setup.
+ * @returns Setup controls backed by shared auth/install queries; command transport owns timeouts and no write is retried here.
+ */
 function ProviderSetupActions({
   environmentId,
   environmentLabel,
@@ -169,27 +183,24 @@ function ProviderSetupActions({
     pendingRef.current = true;
     setPendingLabel(label);
     setError(null);
-    try {
-      const result = await request();
-      if (result._tag === "Failure") {
-        if (!isAtomCommandInterrupted(result)) {
-          const failure = squashAtomCommandFailure(result);
-          setError(
-            failure instanceof Error
-              ? failure.message
-              : t.settings.providerSetup.providerSetupFailed,
-          );
-        }
-        return false;
-      }
-      return true;
-    } catch {
+    const settled = await settlePromise(request);
+    pendingRef.current = false;
+    setPendingLabel(null);
+    if (settled._tag === "Failure") {
       setError(t.settings.providerSetup.providerSetupFailedTryAgain);
       return false;
-    } finally {
-      pendingRef.current = false;
-      setPendingLabel(null);
     }
+    const result = settled.value;
+    if (result._tag === "Failure") {
+      if (!isAtomCommandInterrupted(result)) {
+        const failure = squashAtomCommandFailure(result);
+        setError(
+          failure instanceof Error ? failure.message : t.settings.providerSetup.providerSetupFailed,
+        );
+      }
+      return false;
+    }
+    return true;
   }
 
   async function removeRuntime() {
@@ -203,6 +214,10 @@ function ProviderSetupActions({
 
   return (
     <div className="divide-y divide-border/50">
+      {/* Keep the live region first so the last visible row is not followed by a sibling that adds its divider. */}
+      <p className="sr-only" role="status">
+        {pendingLabel ? `${pendingLabel}.` : null}
+      </p>
       <SettingsRow
         title={t.settings.providerSetup.runtime}
         className="@max-lg/setup:[&>div:first-child]:flex @max-lg/setup:[&>div:first-child]:items-stretch @max-lg/setup:[&>div:first-child]:gap-3"
@@ -232,7 +247,11 @@ function ProviderSetupActions({
               installation.totalBytes > 0 ? (
                 <progress
                   aria-label={t.settings.providerSetup.antigravityDownload}
-                  className="block h-1 w-full accent-foreground"
+                  // Forced-colors mode repaints the track and fill as Canvas, and
+                  // appearance:auto cannot bring the native widget back: the
+                  // preflight border reset marks every <progress> as author-styled,
+                  // so Chromium keeps its fallback paint. Use system colors instead.
+                  className="block h-1 w-full appearance-none overflow-hidden rounded-full bg-muted forced-colors:border [&::-moz-progress-bar]:rounded-full [&::-moz-progress-bar]:bg-primary forced-colors:[&::-moz-progress-bar]:bg-[Highlight] [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-bar]:bg-muted [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-primary forced-colors:[&::-webkit-progress-value]:bg-[Highlight]"
                   value={installation.downloadedBytes}
                   max={installation.totalBytes}
                 />
@@ -318,9 +337,6 @@ function ProviderSetupActions({
         readOnly={false}
       />
 
-      <p className="sr-only" role="status">
-        {pendingLabel ? `${pendingLabel}.` : null}
-      </p>
       {error || queryError ? (
         <div className="grid gap-2 px-3 py-3 sm:px-4">
           <p role="alert" className="text-destructive [overflow-wrap:anywhere]">

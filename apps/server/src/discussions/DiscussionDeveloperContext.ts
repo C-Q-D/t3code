@@ -19,7 +19,7 @@ export const layer = Layer.effect(
     const store = yield* DiscussionStore.DiscussionStore;
     const projections = yield* ProjectionStore.ProjectionStoreV2;
     return {
-      forThread: (threadId: ThreadId) =>
+      forThread: Effect.fn("DiscussionDeveloperContext.forThread")((threadId: ThreadId) =>
         Effect.gen(function* () {
           const shell = yield* projections.getThreadShell(threadId);
           if (!shell?.discussion) return [];
@@ -38,6 +38,7 @@ export const layer = Layer.effect(
             }).pipe(Effect.as([])),
           ),
         ),
+      ),
     };
   }),
 ).pipe(Layer.provide(DiscussionStore.layer));

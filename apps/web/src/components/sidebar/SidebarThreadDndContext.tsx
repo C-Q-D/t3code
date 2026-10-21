@@ -5,7 +5,7 @@ import {
   type CollisionDetection,
   type DragEndEvent,
 } from "@dnd-kit/core";
-import { useCallback, type ComponentProps } from "react";
+import { type ComponentProps } from "react";
 import type { SidebarSection } from "../Sidebar.logic";
 import {
   resolveSidebarTabDropIntent,
@@ -78,41 +78,35 @@ export function SidebarThreadDndContext({
   onDragEnd,
   ...props
 }: SidebarThreadDndContextProps) {
-  const detect = useCallback<CollisionDetection>(
-    (args) => {
-      const hits = pointerWithin({
-        ...args,
-        droppableContainers: args.droppableContainers.filter(
-          (container) => tabForDropId(container.id) !== null,
-        ),
-      });
-      const hit = hits[0];
-      if (hit) {
-        const tab = tabForDropId(hit.id)!;
-        return availableIntent(tabDrop.getSource(String(args.active.id)), tab) ? hits : [];
-      }
-      return collisionDetection({
-        ...args,
-        droppableContainers: args.droppableContainers.filter(
-          (container) => tabForDropId(container.id) === null,
-        ),
-      });
-    },
-    [collisionDetection, tabDrop],
-  );
-  const finish = useCallback(
-    (event: DragEndEvent) => {
-      const tab = tabForDropId(event.over?.id);
-      if (tab !== null && event.over) {
-        const key = String(event.active.id);
-        const intent = availableIntent(tabDrop.getSource(key), tab);
-        if (intent)
-          tabDrop.onDrop(key, intent, { x: event.over.rect.left, y: event.over.rect.bottom });
-        return;
-      }
-      onDragEnd?.(event);
-    },
-    [onDragEnd, tabDrop],
-  );
+  const detect = ((args) => {
+    const hits = pointerWithin({
+      ...args,
+      droppableContainers: args.droppableContainers.filter(
+        (container) => tabForDropId(container.id) !== null,
+      ),
+    });
+    const hit = hits[0];
+    if (hit) {
+      const tab = tabForDropId(hit.id)!;
+      return availableIntent(tabDrop.getSource(String(args.active.id)), tab) ? hits : [];
+    }
+    return collisionDetection({
+      ...args,
+      droppableContainers: args.droppableContainers.filter(
+        (container) => tabForDropId(container.id) === null,
+      ),
+    });
+  }) satisfies CollisionDetection;
+  const finish = (event: DragEndEvent) => {
+    const tab = tabForDropId(event.over?.id);
+    if (tab !== null && event.over) {
+      const key = String(event.active.id);
+      const intent = availableIntent(tabDrop.getSource(key), tab);
+      if (intent)
+        tabDrop.onDrop(key, intent, { x: event.over.rect.left, y: event.over.rect.bottom });
+      return;
+    }
+    onDragEnd?.(event);
+  };
   return <DndContext {...props} collisionDetection={detect} onDragEnd={finish} />;
 }

@@ -3,6 +3,7 @@ import { OrchestratorMcpFailure } from "@t3tools/contracts";
 import {
   HTML_RENDER_COLUMN_WIDTH,
   HTML_RENDER_LAYOUT_GUIDE,
+  HTML_RENDER_MAX_FIT_HEIGHT,
   HTML_RENDER_MAX_HEIGHT,
   HTML_RENDER_MAX_TITLE_LENGTH,
   HTML_RENDER_MIN_HEIGHT,
@@ -71,7 +72,6 @@ export const HtmlPreviewTool = Tool.make("html_preview", {
 
 // Read-only in the MCP sense: it shows a page in the caller's own thread and
 // touches no workspace, so plan mode and read-only sandboxes can use it.
-// Open-world, since the page may load remote resources, as in a preview.
 const HtmlRenderTool = Tool.make(HTML_RENDER_TOOL_NAME, {
   description: `Show a finished HTML page (chart, table, diagram, collage, mockup) inline in this thread at the point where you call this tool, directly below the text you just wrote. When the turn ends, the immediately preceding text stays visible with the page; other intermediate text folds into the work log. Write the sentence or paragraph the page explains, call html_render, then continue writing. Do not restate the page's content or say "see above" or "see below"; add only what the page doesn't say. Check with html_preview first; the reader cannot see previews. T3 fits the frame to the page's height at each reader's width, up to ${HTML_RENDER_MAX_HEIGHT} CSS pixels. Pass maxHeight only when you want a long page to scroll inside a shorter frame. The page can write to the clipboard after a reader click, so copy buttons work. ${PAGE_RULES} ${HTML_RENDER_LAYOUT_GUIDE} ${HTML_RENDER_THEME_GUIDE}`,
   parameters: Schema.Struct({

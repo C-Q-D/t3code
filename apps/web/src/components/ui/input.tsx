@@ -64,7 +64,6 @@ function Input({
     size === "md" && "h-8.5 px-3 text-secondary-copy-large",
     props.type === "search" &&
       "[&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-decoration]:appearance-none [&::-webkit-search-results-button]:appearance-none [&::-webkit-search-results-decoration]:appearance-none",
-    // Number fields are typed into; browser spin buttons crowd narrow fields and step by 1.
     props.type === "number" &&
       "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
     props.type === "file" &&

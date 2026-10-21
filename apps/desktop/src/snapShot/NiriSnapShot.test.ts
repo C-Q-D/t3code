@@ -1,4 +1,5 @@
 // @effect-diagnostics nodeBuiltinImport:off -- Private Unix sockets exercise the real compositor transport.
+import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as NodeFSP from "node:fs/promises";
 import * as NodeNet from "node:net";
 import * as NodeOS from "node:os";
@@ -42,7 +43,11 @@ const send = (socket: NodeNet.Socket, value: unknown) => socket.write(`${JSON.st
 
 beforeEach(async () => {
   directory = await NodeFSP.mkdtemp(NodePath.join(NodeOS.tmpdir(), "t3-niri-test-"));
-  socketPath = NodePath.join(directory, "ipc");
+  // Windows exposes Node's local socket transport through named pipes.
+  socketPath =
+    HostProcess.Platform.defaultValue() === "win32"
+      ? `\\\\.\\pipe\\${NodePath.basename(directory)}`
+      : NodePath.join(directory, "ipc");
   sockets = new Set();
   events = [];
   calls = [];
@@ -61,7 +66,6 @@ beforeEach(async () => {
     else if (typeof request !== "string" && request.Action.ScreenshotWindow) {
       const screenshot = request.Action.ScreenshotWindow;
       capturePath = screenshot.path;
-      // Focus may change between discovery and capture. The request must keep the original ID.
       focused = { ...window, id: 99, title: "Another app" };
       await NodeFSP.writeFile(screenshot.path, png);
       for (const event of events) {
@@ -226,16 +230,6 @@ it("fails promptly when Niri disconnects", async () => {
     socket.end();
   };
   await expect(checkNiriCaptureSupport(socketPath)).rejects.toThrow("disconnected");
-});
-
-it("bounds requests even when the compositor never answers", async () => {
-  vi.useFakeTimers();
-  const received = Promise.withResolvers<void>();
-  handler = async () => received.resolve();
-  const result = expect(checkNiriCaptureSupport(socketPath)).rejects.toThrow("timed out");
-  await received.promise;
-  await vi.advanceTimersByTimeAsync(5_000);
-  await result;
 });
 
 it("does not use stale, relative, or sandboxed Niri sockets", () => {

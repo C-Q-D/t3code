@@ -3,7 +3,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as SqlClient from "effect/sql/SqlClient";
 
-import { migrationEntries, runMigrations } from "../Migrations.ts";
+import { migrationManifest, runMigrations } from "../Migrations.ts";
 import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
 
 const layer = it.layer(Layer.mergeAll(NodeSqliteClient.layer({ filename: ":memory:" })));
@@ -12,8 +12,8 @@ layer("055_OrchestrationV2", (it) => {
   it.effect("keeps released migrations contiguous", () =>
     Effect.sync(() => {
       assert.deepStrictEqual(
-        migrationEntries.map(([id]) => id),
-        Array.from({ length: 67 }, (_, index) => index + 1),
+        migrationManifest.map(([id]) => id),
+        Array.from({ length: 72 }, (_, index) => index + 1),
       );
     }),
   );
@@ -39,6 +39,11 @@ layer("055_OrchestrationV2", (it) => {
         [65, "DiscussionEntryDispatchedEntrySeq"],
         [66, "PullRequestReviewGuides"],
         [67, "ThreadFailureLookupIndex"],
+        [68, "DropUnusedV1Projections"],
+        [69, "CanonicalizeThreadPullRequestLinks"],
+        [70, "CodexUsageNativeTurnIndex"],
+        [71, "RepairClientSettlementTimestamps"],
+        [72, "WebhookDedupe"],
       ]);
       assert.deepStrictEqual(yield* runMigrations(), []);
 
@@ -72,6 +77,11 @@ layer("055_OrchestrationV2", (it) => {
         { migration_id: 65, name: "DiscussionEntryDispatchedEntrySeq" },
         { migration_id: 66, name: "PullRequestReviewGuides" },
         { migration_id: 67, name: "ThreadFailureLookupIndex" },
+        { migration_id: 68, name: "DropUnusedV1Projections" },
+        { migration_id: 69, name: "CanonicalizeThreadPullRequestLinks" },
+        { migration_id: 70, name: "CodexUsageNativeTurnIndex" },
+        { migration_id: 71, name: "RepairClientSettlementTimestamps" },
+        { migration_id: 72, name: "WebhookDedupe" },
       ]);
 
       const tables = yield* sql<{ readonly name: string }>`

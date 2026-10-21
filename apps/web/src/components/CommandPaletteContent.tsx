@@ -10,7 +10,7 @@ import {
   SearchIcon,
   XIcon,
 } from "lucide-react";
-import { type ComponentProps, type ReactNode, useLayoutEffect, useRef } from "react";
+import { type ComponentProps, type ReactNode, useEffect, useRef } from "react";
 
 import { Command, CommandFooter, CommandInput, CommandPanel } from "./ui/command";
 import { Kbd, KbdGroup } from "./ui/kbd";
@@ -24,10 +24,6 @@ type CommandPaletteContentProps = Omit<ComponentProps<typeof Command>, "children
   readonly footerTrailing?: ReactNode;
   readonly inputAccessory?: ReactNode;
   readonly inputProps: ComponentProps<typeof CommandInput>;
-  /**
-   * How tall the results panel may grow: the palette's list, a taller file list, or the whole
-   * dialog body (for modes that lay out their own status and empty states).
-   */
   readonly panelSize?: "list" | "tall-list" | "fill";
   readonly showBackHint?: boolean;
   readonly testId?: string;
@@ -64,9 +60,11 @@ export function CommandPaletteContent({
 
   // Direct-open flows replace the initial palette view after the dialog has
   // already moved focus. Reclaim it when the replacement input mounts so
-  // typing cannot continue in the composer behind the modal.
-  useLayoutEffect(() => {
-    inputRef.current?.focus();
+  // typing cannot continue in the composer behind the modal. Defer until the
+  // dialog has recorded the previous focus target for restoration on close.
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => inputRef.current?.focus());
+    return () => cancelAnimationFrame(frame);
   }, []);
 
   return (
@@ -96,7 +94,7 @@ export function CommandPaletteContent({
                 </span>
               ) : null}
               <AutocompletePrimitive.Input
-                autoFocus
+                autoFocus={false}
                 ref={inputRef}
                 placeholder={inputProps.placeholder}
                 onKeyDown={inputProps.onKeyDown}
@@ -106,7 +104,7 @@ export function CommandPaletteContent({
               {!inputAccessory && shortcutLabel ? <Kbd>{shortcutLabel}</Kbd> : null}
             </div>
           ) : (
-            <CommandInput {...inputProps} ref={inputRef} />
+            <CommandInput autoFocus={false} {...inputProps} ref={inputRef} />
           )}
           {inputAccessory}
         </div>
@@ -114,13 +112,12 @@ export function CommandPaletteContent({
           <div className="pn5-results relative min-h-0 overflow-hidden">{children}</div>
         ) : (
           <CommandPanel
-            footer
             className={
               panelSize === "fill"
                 ? "flex min-h-0 flex-1 flex-col"
                 : panelSize === "tall-list"
                   ? "max-h-[min(34rem,76vh)]"
-                  : "max-h-[min(28rem,70vh)]"
+                  : "flex max-h-[min(28rem,70vh)] min-h-0 flex-col"
             }
           >
             {children}

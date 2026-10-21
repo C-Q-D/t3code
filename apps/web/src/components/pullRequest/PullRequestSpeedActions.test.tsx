@@ -5,6 +5,9 @@
  */
 import { EnvironmentId, ProjectId, type PullRequestAction } from "@t3tools/contracts";
 import { act } from "react";
+import * as Cause from "effect/Cause";
+import * as AsyncResult from "effect/reactivity/AsyncResult";
+import type { AtomCommandResult } from "@t3tools/client-runtime/state/runtime";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
 
@@ -17,7 +20,7 @@ vi.mock("~/state/pullRequests", async () => {
 });
 vi.mock("./usePullRequestActions", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./usePullRequestActions")>()),
-  // Closing needs no merge preference; retain the real runner's success/error/finally paths.
+  // Closing needs no merge preference; retain the real runner's success/error paths.
   usePullRequestDefaultMergeMethodResolver: () => () => undefined,
 }));
 vi.mock("../ui/toast", () => ({ toastManager: { add: vi.fn() } }));
@@ -44,13 +47,11 @@ const reportPending = vi.fn<(pending: boolean) => void>();
 
 /** Holds the command at its async boundary until a test supplies success or failure. */
 function deferredCommand() {
-  let resolve!: (result: { _tag: "Success"; value: undefined }) => void;
-  let reject!: (reason: Error) => void;
-  const promise = new Promise<{ _tag: "Success"; value: undefined }>((accept, decline) => {
+  let resolve!: (result: AtomCommandResult<undefined, Error>) => void;
+  const promise = new Promise<AtomCommandResult<undefined, Error>>((accept) => {
     resolve = accept;
-    reject = decline;
   });
-  return { promise, resolve, reject };
+  return { promise, resolve };
 }
 
 /** Renders the real component with a fixed callback; capability changes preserve its hook state. */
@@ -102,7 +103,7 @@ it("reports pending on start and clears it after a successful command", async ()
   expect(reportPending).toHaveBeenLastCalledWith(false);
   await startClose();
 
-  await act(async () => request.resolve({ _tag: "Success", value: undefined }));
+  await act(async () => request.resolve(AsyncResult.success(undefined)));
 
   expect(reportPending).toHaveBeenLastCalledWith(false);
   expect(container.querySelector<HTMLButtonElement>("button")?.disabled).toBe(false);
@@ -113,7 +114,9 @@ it("clears pending and re-enables the action after a failed command", async () =
   await renderActions();
   await startClose();
 
-  await act(async () => request.reject(new Error("Host rejected close")));
+  await act(async () =>
+    request.resolve(AsyncResult.failure(Cause.fail(new Error("Host rejected close")))),
+  );
 
   expect(reportPending).toHaveBeenLastCalledWith(false);
   expect(container.querySelector<HTMLButtonElement>("button")?.disabled).toBe(false);
@@ -131,7 +134,7 @@ it("renders nothing and clears the report when actions disappear during a pendin
   // Keep the request pending while capabilities return: the runner must still own the action.
   await renderActions();
   expect(reportPending).toHaveBeenLastCalledWith(true);
-  await act(async () => request.resolve({ _tag: "Success", value: undefined }));
+  await act(async () => request.resolve(AsyncResult.success(undefined)));
   expect(reportPending).toHaveBeenLastCalledWith(false);
 });
 
@@ -152,6 +155,6 @@ it("clears pending on unmount and cannot report it again when the command comple
 
   expect(reportPending).toHaveBeenLastCalledWith(false);
   reportPending.mockClear();
-  await act(async () => request.resolve({ _tag: "Success", value: undefined }));
+  await act(async () => request.resolve(AsyncResult.success(undefined)));
   expect(reportPending).not.toHaveBeenCalled();
 });

@@ -1,5 +1,5 @@
 /** Owns window chrome geometry; routes supply content and the shell reserves caption controls. */
-import { useCallback, useRef, type ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 
 import { t } from "~/i18n";
 import { useEnvironmentIdentificationMode } from "~/hooks/useSettings";
@@ -32,20 +32,17 @@ export function WindowTitlebar({
 }) {
   const { active: panelActive, compact, setCompact } = useTitlebarPanelLayout();
   const lastCompact = useRef<boolean | undefined>(undefined);
-  const observeHeader = useCallback(
-    (element: HTMLElement) => {
-      if (!panelActive) return;
-      return observeResize(element, ([entry]) => {
-        if (!entry) return;
-        const next = resolveDiscussionTitlebarLayout(entry.contentRect.width).compact;
-        // observeResize flushes synchronously; do not schedule React work within one layout region.
-        if (next === lastCompact.current) return;
-        lastCompact.current = next;
-        setCompact(next);
-      });
-    },
-    [panelActive, setCompact],
-  );
+  const observeHeader = (element: HTMLElement) => {
+    if (!panelActive) return;
+    return observeResize(element, ([entry]) => {
+      if (!entry) return;
+      const next = resolveDiscussionTitlebarLayout(entry.contentRect.width).compact;
+      // observeResize flushes synchronously; do not schedule React work within one layout region.
+      if (next === lastCompact.current) return;
+      lastCompact.current = next;
+      setCompact(next);
+    });
+  };
   const stageLabel = useEnvironmentStageLabel();
   const identificationMode = useEnvironmentIdentificationMode();
   const backdropVariant = resolveSidebarStageBackdropVariant(
@@ -56,16 +53,13 @@ export function WindowTitlebar({
     identificationMode === "pill" ? resolveEnvironmentIdentificationPillLabel(stageLabel) : null;
   // Observe the real control/brand/pill, not a hidden duplicate of the removed sidebar brand.
   // offsetLeft includes the titlebar gutter; the positioned header is the offset parent.
-  const observeLeadingWidth = useCallback(
-    (element: HTMLDivElement) =>
-      observeResize(element, ([entry]) => {
-        if (entry)
-          onLeadingWidthChange(
-            element.offsetLeft + (entry.borderBoxSize[0]?.inlineSize ?? element.offsetWidth),
-          );
-      }),
-    [onLeadingWidthChange],
-  );
+  const observeLeadingWidth = (element: HTMLDivElement) =>
+    observeResize(element, ([entry]) => {
+      if (entry)
+        onLeadingWidthChange(
+          element.offsetLeft + (entry.borderBoxSize[0]?.inlineSize ?? element.offsetWidth),
+        );
+    });
 
   return (
     <header

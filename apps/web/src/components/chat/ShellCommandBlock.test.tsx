@@ -7,7 +7,10 @@ import { createRoot } from "react-dom/client";
 import { expect, it, vi } from "vite-plus/test";
 import { ShellCommandBlock } from "./ShellCommandBlock";
 
-vi.mock("../../hooks/useTheme", () => ({ useTheme: () => ({ resolvedTheme: "dark" }) }));
+vi.mock("../../hooks/useTheme", () => ({
+  useTheme: () => ({ resolvedTheme: "dark" }),
+  useRenderedAppearance: () => "dark",
+}));
 
 it("reveals the full multiline command on keyboard focus without altering the command text", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);

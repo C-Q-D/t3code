@@ -1,13 +1,15 @@
-/** Links change requests by URL or number without changing host data. */
-import { t } from "~/i18n";
-import { pullRequestHostOf, type ScopedThreadRef } from "@t3tools/contracts";
-import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
-import { useAtomValue } from "@effect/atom-react";
-import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-
 import { parseChangeRequestUrl } from "~/lib/openPullRequestLink";
-import { parsePullRequestReference } from "~/pullRequestReference";
+import type { ScopedThreadRef } from "@t3tools/contracts";
+import {
+  parsePullRequestReference,
+  pullRequestLinkProject,
+} from "@t3tools/client-runtime/pull-request-link-input";
+import { useAtomValue } from "@effect/atom-react";
+import { settlePromise, squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
+import { useEffect, useRef, useState } from "react";
+import { t } from "~/i18n";
+import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
+
 import { useProjects, useThreadShell } from "~/state/entities";
 import { usePullRequestLinking } from "~/hooks/usePullRequestLinking";
 import { appAtomRegistry } from "~/rpc/atomRegistry";
@@ -39,12 +41,10 @@ export function openLinkPullRequestDialog(threadRef: ScopedThreadRef): void {
 interface LinkPullRequestDialogProps {
   open: boolean;
   threadRef: ScopedThreadRef;
-  /** The thread's own project: bare numbers resolve against its repository. */
   projectId: string | null;
   onOpenChange: (open: boolean) => void;
 }
 
-/** Mounted once per chat view; shows the dialog for whichever thread asked for it. */
 export function LinkPullRequestDialogHost() {
   const threadRef = useAtomValue(linkPullRequestDialogThreadAtom);
   const thread = useThreadShell(threadRef);
@@ -127,72 +127,53 @@ function LinkPullRequestDialog({
   const [dirty, setDirty] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const projects = useProjects();
-  const environmentProjects = useMemo(
-    () => projects.filter((project) => project.environmentId === threadRef.environmentId),
-    [projects, threadRef.environmentId],
+  const ownProject = pullRequestLinkProject(
+    projects.find(
+      (project) => project.environmentId === threadRef.environmentId && project.id === projectId,
+    )?.repositoryIdentity,
   );
-  const ownProject = useMemo(() => {
-    const project = environmentProjects.find((candidate) => candidate.id === projectId);
-    const identity = project?.repositoryIdentity;
-    if (!project || !identity) return null;
-    const repository =
-      identity.displayName ??
-      (identity.owner && identity.name ? `${identity.owner}/${identity.name}` : null);
-    if (repository === null) return null;
-    const definition = sourceControlClients.get(identity.provider ?? "unknown");
-    const host = pullRequestHostOf(identity, definition.kind);
-    return {
-      host,
-      repository,
-      webUrl: (number: number) =>
-        definition.changeRequestUrl({
-          host,
-          repository,
-          number,
-          remoteUrl: identity.locator.remoteUrl,
-          webUrl: identity.webUrl,
-        }),
-    };
-  }, [environmentProjects, projectId]);
   const linking = usePullRequestLinking(threadRef.environmentId);
   const [pending, setPending] = useState(false);
 
+  const [openSeen, setOpenSeen] = useState(open);
+  if (openSeen !== open) {
+    setOpenSeen(open);
+    if (open) {
+      setReference("");
+      setDirty(false);
+      setSubmitError(null);
+    }
+  }
   useEffect(() => {
     if (!open) return;
-    setReference("");
-    setDirty(false);
-    setSubmitError(null);
     const frame = window.requestAnimationFrame(() => inputRef.current?.focus());
     return () => window.cancelAnimationFrame(frame);
   }, [open]);
 
-  const resolved = useMemo(
-    () =>
-      resolveLinkPullRequestInput({
-        reference,
-        project: ownProject,
-        hasProject: (reference) => linking.canLink(reference.url),
-      }),
-    [linking, ownProject, reference],
-  );
+  const resolved = resolveLinkPullRequestInput({
+    reference,
+    project: ownProject,
+    hasProject: (reference) => linking.canLink(reference.url),
+  });
 
-  const submit = useCallback(async () => {
+  const submit = async () => {
     setDirty(true);
     if (resolved === null || "error" in resolved) return;
     setSubmitError(null);
     setPending(true);
-    try {
-      await linking.changeLink(threadRef, resolved.link.url, true);
-    } catch (error) {
+    const result = await settlePromise(() =>
+      linking.changeLink(threadRef, resolved.link.url, true),
+    );
+    setPending(false);
+    if (result._tag === "Failure") {
+      const error = squashAtomCommandFailure(result);
       setSubmitError(
         error instanceof Error ? error.message : t.git.pullRequest.couldNotLinkThePullRequest,
       );
       return;
-    } finally {
-      setPending(false);
     }
     onOpenChange(false);
-  }, [linking, onOpenChange, resolved, threadRef]);
+  };
 
   const validation = !dirty
     ? null

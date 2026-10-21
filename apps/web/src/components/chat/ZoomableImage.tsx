@@ -1,7 +1,7 @@
+import { useStableCallback } from "../../hooks/useStableCallback";
 /** Owns image zoom and scrolling; transient physics never change the saved image or zoom limits. */
 import { t } from "~/i18n";
 import {
-  useCallback,
   useEffect,
   useImperativeHandle,
   useLayoutEffect,
@@ -20,19 +20,42 @@ import { VelocityTracker } from "~/lib/motion/velocity";
 const MAX_ZOOM = 8;
 
 /** Keyboard panning shared with the gallery; false lets gallery navigation handle the key. */
+import {
+  onWindowControlsOverlayGeometryChange,
+  windowControlsOverlayHeight,
+} from "../../lib/windowControlsOverlay";
+
+import { AttachmentImage } from "../media/AttachmentImage";
+
+
+// The viewer lays out below the native caption strip so its controls never share a row with
+// the window buttons. ExpandedImageDialog and the media dialog viewport mirror this in CSS
+// through --native-titlebar-height.
+function readViewerSize() {
+  return { width: window.innerWidth, height: window.innerHeight - windowControlsOverlayHeight() };
+}
+
 export interface ZoomableImageHandle {
   pan: (key: string) => boolean;
 }
 
-/** Zooms around the pointer and keeps the whole image accessible by dragging or scrolling. */
+/** Keeps physical zoom and pan anchored to the image while respecting the window's usable viewport.
+ * @param src Asset URL consumed by the attachment image renderer.
+ * @param name Accessible image name.
+ * @param mimeType Optional media hint for format fallback.
+ * @param onError Reports image loading failure to the viewer owner.
+ * @param ref Optional imperative zoom/pan handle; motion jobs are released on unmount.
+ * @returns Scrollable image viewport; gestures change local transforms and scroll offsets. */
 export function ZoomableImage({
   src,
   name,
+  mimeType,
   onError,
   ref,
 }: {
   src: string;
   name: string;
+  mimeType?: string | undefined;
   onError: () => void;
   ref?: Ref<ZoomableImageHandle>;
 }) {
@@ -43,10 +66,7 @@ export function ZoomableImage({
   const wheelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const visualScale = useRef(1);
   const [naturalSize, setNaturalSize] = useState({ width: 0, height: 0 });
-  const [windowSize, setWindowSize] = useState(() => ({
-    width: window.innerWidth,
-    height: window.innerHeight,
-  }));
+  const [viewerSize, setViewerSize] = useState(readViewerSize);
   const [zoom, setZoom] = useState(1);
   const zoomRef = useRef(1);
   const anchorRef = useRef<{
@@ -67,25 +87,24 @@ export function ZoomableImage({
   } | null>(null);
   const suppressClickRef = useRef(false);
   const [dragging, setDragging] = useState(false);
-  const maxHeight = Math.max(1, Math.min(windowSize.height * 0.86, windowSize.height - 160));
+  const maxHeight = Math.max(1, Math.min(viewerSize.height * 0.86, viewerSize.height - 160));
   const fit = Math.min(
     1,
-    (windowSize.width * 0.92 - (windowSize.width >= 640 ? 96 : 0)) / (naturalSize.width || 1),
+    (viewerSize.width * 0.92 - (viewerSize.width >= 640 ? 96 : 0)) / (naturalSize.width || 1),
     maxHeight / (naturalSize.height || 1),
   );
   const width = naturalSize.width * fit * zoom;
   const height = naturalSize.height * fit * zoom;
 
   /** Cancel transient zoom work before a new gesture; DOM cleanup is owned by the next writer. */
-  const cancelZoom = useCallback(() => {
+  const cancelZoom = useStableCallback(() => {
     stopZoom();
     if (wheelTimer.current !== null) clearTimeout(wheelTimer.current);
     wheelTimer.current = null;
-  }, [stopZoom]);
+  });
 
   /** Return a dimensionless scale and CSS-pixel offsets to layout without changing the final scroll anchor. */
-  const settleZoom = useCallback(
-    (scale: number, x = 0, y = 0) => {
+  const settleZoom = useStableCallback((scale: number, x: number = 0, y: number = 0) => {
       const image = imageRef.current;
       if (!image) return;
       if (!isPhysicsEnabled()) {
@@ -107,13 +126,10 @@ export function ZoomableImage({
         if (!moving) image.style.transformOrigin = "";
         return moving;
       });
-    },
-    [startZoom],
-  );
+    });
 
   /** Compress relative zoom overflow around image-local CSS-pixel coordinates; settle after 150 ms of wheel rest. */
-  const showZoomOverflow = useCallback(
-    (overshoot: number, x: number, y: number) => {
+  const showZoomOverflow = useStableCallback((overshoot: number, x: number, y: number) => {
       const image = imageRef.current;
       if (!image) return;
       cancelZoom();
@@ -125,9 +141,7 @@ export function ZoomableImage({
         wheelTimer.current = null;
         settleZoom(scale);
       }, 150);
-    },
-    [cancelZoom, settleZoom],
-  );
+    });
 
   useEffect(() => () => cancelZoom(), [cancelZoom]);
 
@@ -167,8 +181,7 @@ export function ZoomableImage({
   );
 
   /** Update bounded layout zoom around a client point (viewport center by default); wheel input skips FLIP. */
-  const changeZoom = useCallback(
-    (next: number, point?: { x: number; y: number }, animate = true) => {
+  const changeZoom = useStableCallback((next: number, point?: { x: number; y: number }, animate = true) => {
       const viewport = viewportRef.current;
       const image = imageRef.current;
       const previous = zoomRef.current;
@@ -208,9 +221,7 @@ export function ZoomableImage({
       };
       zoomRef.current = clamped;
       setZoom(clamped);
-    },
-    [cancelZoom, showZoomOverflow, stopPan],
-  );
+    });
 
   useLayoutEffect(() => {
     const viewport = viewportRef.current;
@@ -241,11 +252,16 @@ export function ZoomableImage({
 
   useEffect(() => {
     const resize = () => {
-      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+      setViewerSize(readViewerSize());
       changeZoom(1);
     };
     window.addEventListener("resize", resize);
-    return () => window.removeEventListener("resize", resize);
+    // The caption strip can come and go around fullscreen without a matching resize event.
+    const stopOverlayListener = onWindowControlsOverlayGeometryChange(resize);
+    return () => {
+      window.removeEventListener("resize", resize);
+      stopOverlayListener();
+    };
   }, [changeZoom]);
 
   useEffect(() => {
@@ -391,7 +407,9 @@ export function ZoomableImage({
           setDragging(false);
         }}
       >
-        <img
+        <AttachmentImage
+          name={name}
+          mimeType={mimeType}
           ref={imageRef}
           src={src}
           alt={name}

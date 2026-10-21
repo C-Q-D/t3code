@@ -160,7 +160,6 @@ function ProviderFaderCard({ pool, now }: { readonly pool: LimitPool; readonly n
         ))}
       </div>
     ) : null;
-  let index = 0;
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <section className="usage-fader-card" style={{ "--fader-color": color } as CSSProperties}>
@@ -210,7 +209,10 @@ function ProviderFaderCard({ pool, now }: { readonly pool: LimitPool; readonly n
           ) : null}
         </div>
         <div className="usage-fader-groups">
-          {groups.map((group) => {
+          {groups.map((group, groupIndex) => {
+            const firstFaderIndex = groups
+              .slice(0, groupIndex)
+              .reduce((sum, previous) => sum + previous.faders.length, 0);
             const details = windowDetails(pool, group.window);
             const windowLabel = details?.label ?? group.window.label;
             return (
@@ -227,7 +229,7 @@ function ProviderFaderCard({ pool, now }: { readonly pool: LimitPool; readonly n
                   ) : null}
                 </div>
                 <div className="usage-fader-controls">
-                  {group.faders.map((fader) => {
+                  {group.faders.map((fader, faderIndex) => {
                     const account = fader.members[0]!.account;
                     const name =
                       fader.nameSource === "window" ? windowLabel : (account.displayName ?? label);
@@ -237,7 +239,7 @@ function ProviderFaderCard({ pool, now }: { readonly pool: LimitPool; readonly n
                         key={fader.key}
                         usedPercent={fader.usedPercent}
                         remainingPercent={fader.remainingPercent}
-                        index={index++}
+                        index={firstFaderIndex + faderIndex}
                         resetLabel={shortReset(reset, now)}
                         label={t.tools.usage.faderSummary(
                           fader.nameSource === "account" ? `${name} · ${windowLabel}` : name,

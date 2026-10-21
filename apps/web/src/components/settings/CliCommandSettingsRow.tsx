@@ -1,7 +1,7 @@
 /** Installs or removes the bundled desktop CLI launcher. */
 import { t } from "~/i18n";
 import type { DesktopCliCommandState } from "@t3tools/contracts";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Button } from "../ui/button";
 import { stackedThreadToast, toastManager } from "../ui/toast";
@@ -9,8 +9,8 @@ import { SettingsRow } from "./settingsLayout";
 import { searchableSetting } from "./settingsSearch";
 
 /**
- * Settings → `t3` command: puts the desktop app's bundled CLI on PATH, or takes
- * it off again. Hidden where the desktop build has no launcher to install.
+ * Uses the desktop bridge to install or remove the CLI shortcut and suppresses stale load results after unmount.
+ * @returns Installation controls, or the existing unavailable state without a bridge; explicit actions report failures and are not retried here.
  */
 export function CliCommandSettingsRow() {
   const bridge = typeof window === "undefined" ? undefined : window.desktopBridge?.cliCommand;
@@ -31,28 +31,25 @@ export function CliCommandSettingsRow() {
     };
   }, [bridge]);
 
-  const change = useCallback(
-    (action: "install" | "uninstall") => {
-      if (!bridge || pending) return;
-      setPending(true);
-      void bridge[action]()
-        .then(setState)
-        .catch((error: unknown) => {
-          toastManager.add(
-            stackedThreadToast({
-              type: "error",
-              title:
-                action === "install"
-                  ? t.settings.merge.cliInstallFailed
-                  : t.settings.merge.cliRemoveFailed,
-              description: error instanceof Error ? error.message : t.settings.merge.cliFailure,
-            }),
-          );
-        })
-        .finally(() => setPending(false));
-    },
-    [bridge, pending],
-  );
+  const change = (action: "install" | "uninstall") => {
+    if (!bridge || pending) return;
+    setPending(true);
+    void bridge[action]()
+      .then(setState)
+      .catch((error: unknown) => {
+        toastManager.add(
+          stackedThreadToast({
+            type: "error",
+            title:
+              action === "install"
+                ? t.settings.merge.cliInstallFailed
+                : t.settings.merge.cliRemoveFailed,
+            description: error instanceof Error ? error.message : t.settings.merge.cliFailure,
+          }),
+        );
+      })
+      .finally(() => setPending(false));
+  };
 
   if (!bridge || !state?.supported) return null;
   const installed = state.installedPath !== null;

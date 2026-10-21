@@ -103,7 +103,7 @@ export const ComposerPendingApprovalActions = memo(function ComposerPendingAppro
             >
               <ChevronDownIcon className="size-3.75" strokeWidth={2.25} />
             </MenuTrigger>
-            <MenuPopup {...composerFloatingLayerProps} side="top" align="end">
+            <MenuPopup {...composerFloatingLayerProps} side="top" align="end" width="content">
               {moreOptions.map((option) => {
                 const item = (
                   <MenuItem

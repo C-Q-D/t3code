@@ -1,57 +1,68 @@
 // @vitest-environment jsdom
 
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
 
 import {
-  areFontAdvancesMonospace,
   applyAppearanceFontVariables,
-  clampCodeFontSize,
-  clampInterfaceFontSize,
-  clampPromptFontSize,
   DEFAULT_CODE_FONT_STACK,
   DEFAULT_SANS_FONT_STACK,
   DEFAULT_SERIF_FONT_STACK,
   appearanceFontStack,
-  cssFontFamilies,
   resolveDefaultFamilyLabel,
   resolveTerminalFontPreference,
   resolveTerminalFontSizePreference,
 } from "./appearanceFonts";
 
-describe("areFontAdvancesMonospace", () => {
-  it("accepts a fixed advance and rejects any proportional glyph", () => {
-    expect(areFontAdvancesMonospace([10, 10, 10, 10])).toBe(true);
-    expect(areFontAdvancesMonospace([10, 10, 7, 10])).toBe(false);
-    expect(areFontAdvancesMonospace([10, 10.02])).toBe(false);
-  });
-
-  it("fails open when canvas metrics are unavailable", () => {
-    expect(areFontAdvancesMonospace([])).toBe(true);
-    expect(areFontAdvancesMonospace([Number.NaN, Number.NaN])).toBe(true);
+describe("isMonospaceFamily", () => {
+  it.each([
+    { widths: [10, 10, 10, 10, 10, 10, 10, 10], expected: true },
+    { widths: [10, 10, 7, 10, 10, 10, 10, 10], expected: false },
+    { widths: [10, 10.02, 10, 10, 10, 10, 10, 10], expected: false },
+    { widths: [0], expected: true },
+    { widths: [Number.NaN], expected: true },
+  ])("classifies canvas advances $widths as monospace=$expected", async ({ widths, expected }) => {
+    vi.resetModules();
+    let index = 0;
+    vi.stubGlobal("document", {
+      createElement: () => ({
+        getContext: () => ({
+          font: "",
+          measureText: () => ({ width: widths[index++ % widths.length]! }),
+        }),
+      }),
+    });
+    try {
+      const { isMonospaceFamily } = await import("./appearanceFonts");
+      expect(isMonospaceFamily("Probe Font")).toBe(expected);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 
-describe("cssFontFamilies", () => {
-  it("returns null for effectively empty input", () => {
-    expect(cssFontFamilies("")).toBeNull();
-    expect(cssFontFamilies("   ")).toBeNull();
-    expect(cssFontFamilies(" , , ")).toBeNull();
+describe("font list normalization through appearanceFontStack", () => {
+  it("uses the fallback for effectively empty input", () => {
+    expect(appearanceFontStack("", "fallback")).toBe("fallback");
+    expect(appearanceFontStack("   ", "fallback")).toBe("fallback");
+    expect(appearanceFontStack(" , , ", "fallback")).toBe("fallback");
   });
 
   it("quotes names with spaces and keeps single idents bare", () => {
-    expect(cssFontFamilies("Fira Code")).toBe('"Fira Code"');
-    expect(cssFontFamilies("monospace")).toBe("monospace");
-    expect(cssFontFamilies('"Comic Mono"')).toBe('"Comic Mono"');
+    expect(appearanceFontStack("Fira Code", "fallback")).toBe('"Fira Code", fallback');
+    expect(appearanceFontStack("monospace", "fallback")).toBe("monospace, fallback");
+    expect(appearanceFontStack('"Comic Mono"', "fallback")).toBe('"Comic Mono", fallback');
   });
 
   it("normalizes comma-separated lists and strips embedded quotes", () => {
-    expect(cssFontFamilies(" Fira Code , Menlo ")).toBe('"Fira Code", Menlo');
-    expect(cssFontFamilies('Bad"Name')).toBe('"BadName"');
+    expect(appearanceFontStack(" Fira Code , Menlo ", "fallback")).toBe(
+      '"Fira Code", Menlo, fallback',
+    );
+    expect(appearanceFontStack('Bad"Name', "fallback")).toBe('"BadName", fallback');
   });
 
   it("quotes names that are not single CSS idents", () => {
-    expect(cssFontFamilies("3270 Nerd Font")).toBe('"3270 Nerd Font"');
-    expect(cssFontFamilies("M+ 1m")).toBe('"M+ 1m"');
+    expect(appearanceFontStack("3270 Nerd Font", "fallback")).toBe('"3270 Nerd Font", fallback');
+    expect(appearanceFontStack("M+ 1m", "fallback")).toBe('"M+ 1m", fallback');
   });
 });
 
@@ -147,18 +158,28 @@ describe("resolveTerminalFontSizePreference", () => {
   });
 });
 
-describe("font size clamping", () => {
-  it("keeps sizes inside the ranges the UI can absorb", () => {
-    expect(clampInterfaceFontSize(16)).toBe(16);
-    expect(clampInterfaceFontSize(2)).toBe(12);
-    expect(clampInterfaceFontSize(96)).toBe(20);
-    expect(clampPromptFontSize(40)).toBe(20);
-    expect(clampCodeFontSize(1)).toBe(10);
-  });
-
-  it("rounds fractional values and falls back for unusable input", () => {
-    expect(clampCodeFontSize(13.4)).toBe(13);
-    expect(clampInterfaceFontSize(Number.NaN)).toBe(16);
-    expect(clampPromptFontSize(Number.POSITIVE_INFINITY)).toBe(14);
+describe("font size clamping through applied preferences", () => {
+  it.each([
+    { input: [16, 40, 1], expected: ["16px", "20px", "10px"] },
+    { input: [2, 14, 13], expected: ["12px", "14px", "13px"] },
+    { input: [96, 14, 13], expected: ["20px", "14px", "13px"] },
+    { input: [Number.NaN, Number.POSITIVE_INFINITY, 13.4], expected: ["16px", "14px", "13px"] },
+  ])("applies bounded sizes for $input", ({ input, expected }) => {
+    const root = document.createElement("div");
+    applyAppearanceFontVariables(root, {
+      sans: "",
+      code: "",
+      composer: "",
+      smoothing: false,
+      sizeInterface: input[0]!,
+      sizePrompt: input[1]!,
+      sizeCode: input[2]!,
+    });
+    expect([
+      root.style.fontSize,
+      root.style.getPropertyValue("--font-size-prompt"),
+      root.style.getPropertyValue("--font-size-code"),
+    ]).toEqual(expected);
+    expect(root.style.getPropertyValue("--diffs-font-size")).toBe(expected[2]);
   });
 });

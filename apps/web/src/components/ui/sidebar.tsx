@@ -22,7 +22,7 @@ import {
 } from "~/components/ui/sheet";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
 import { isPhysicsEnabled } from "~/lib/motion/preference";
-import { useResizeDrag } from "~/hooks/useResizeDrag";
+import { createResizePhysics, useResizeDrag } from "~/hooks/useResizeDrag";
 import { useMediaQuery } from "~/hooks/useMediaQuery";
 import { FRAME_NARROW_MEDIA_QUERY } from "~/frameBreakpoints";
 import { FRAME_SIDEBAR_DRAWER_GEOMETRY } from "~/components/frame/sidebarDrawerGeometry";
@@ -130,92 +130,67 @@ function SidebarProvider({
   const isMobile = useMediaQuery(FRAME_NARROW_MEDIA_QUERY);
   const [openMobile, setOpenMobile] = React.useState(false);
   const [mobileSheetMounted, setMobileSheetMounted] = React.useState(false);
-  const setMobileSheetElement = React.useCallback((element: HTMLDivElement | null) => {
+  const setMobileSheetElement = (element: HTMLDivElement | null) => {
     setMobileSheetMounted(element !== null);
-  }, []);
+  };
 
-  // This is the internal state of the sidebar.
-  // We use openProp and setOpenProp for control from outside the component.
   const [_open, _setOpen] = React.useState(defaultOpen);
   const open = openProp ?? _open;
-  const setOpenTemporarily = React.useCallback(
-    (value: boolean | ((value: boolean) => boolean)) => {
-      const openState = typeof value === "function" ? value(open) : value;
-      if (setOpenProp) {
-        setOpenProp(openState);
-      } else {
-        _setOpen(openState);
-      }
-    },
-    [setOpenProp, open],
-  );
-  const setOpen = React.useCallback(
-    async (value: boolean | ((value: boolean) => boolean)) => {
-      const openState = typeof value === "function" ? value(open) : value;
-      setOpenTemporarily(openState);
+  const setOpenTemporarily = (value: boolean | ((value: boolean) => boolean)) => {
+    const openState = typeof value === "function" ? value(open) : value;
+    if (setOpenProp) {
+      setOpenProp(openState);
+    } else {
+      _setOpen(openState);
+    }
+  };
+  const setOpen = async (value: boolean | ((value: boolean) => boolean)) => {
+    const openState = typeof value === "function" ? value(open) : value;
+    setOpenTemporarily(openState);
 
-      // This sets the cookie to keep the sidebar state.
-      await cookieStore.set({
-        expires: Date.now() + SIDEBAR_COOKIE_MAX_AGE * 1000,
-        name: SIDEBAR_COOKIE_NAME,
-        path: "/",
-        value: String(openState),
-      });
-    },
-    [setOpenTemporarily, open],
-  );
+    // This sets the cookie to keep the sidebar state.
+    await cookieStore.set({
+      expires: Date.now() + SIDEBAR_COOKIE_MAX_AGE * 1000,
+      name: SIDEBAR_COOKIE_NAME,
+      path: "/",
+      value: String(openState),
+    });
+  };
 
-  // Helper to toggle the sidebar.
-  const toggleSidebar = React.useCallback(() => {
+  const toggleSidebar = () => {
     return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open);
-  }, [isMobile, setOpen]);
+  };
 
-  // We add a state so that we can do data-state="expanded" or "collapsed".
-  // This makes it easier to style the sidebar with Tailwind classes.
   const state = resolveSidebarState({ isMobile, open, openMobile });
   const savedVisibility = React.useRef<{ open: boolean; openMobile: boolean } | null>(null);
 
-  const contextValue = React.useMemo<SidebarContextProps>(
-    () => ({
-      isMobile,
-      open,
-      openMobile,
-      mobileSheetMounted,
-      setMobileSheetElement,
-      setOpen,
-      setOpenTemporarily,
-      setOpenMobile,
-      state,
-      toggleSidebar,
-      saveSidebarState() {
-        // Preserve the first snapshot if a panel changes tabs while the sidebar is hidden.
-        savedVisibility.current ??= { open, openMobile };
-      },
-      restoreSidebarState() {
-        const saved = savedVisibility.current;
-        if (!saved) return;
-        savedVisibility.current = null;
-        if (saved.open !== open) setOpenTemporarily(saved.open);
-        setOpenMobile(saved.openMobile);
-      },
-    }),
-    [
-      state,
-      open,
-      setOpen,
-      setOpenTemporarily,
-      isMobile,
-      openMobile,
-      mobileSheetMounted,
-      setMobileSheetElement,
-      toggleSidebar,
-    ],
-  );
+  const contextValue: SidebarContextProps = (() => ({
+    isMobile,
+    open,
+    openMobile,
+    mobileSheetMounted,
+    setMobileSheetElement,
+    setOpen,
+    setOpenTemporarily,
+    setOpenMobile,
+    state,
+    toggleSidebar,
+    saveSidebarState() {
+      // Preserve the first snapshot if a panel changes tabs while the sidebar is hidden.
+      if (savedVisibility.current === null) savedVisibility.current = { open, openMobile };
+    },
+    restoreSidebarState() {
+      const saved = savedVisibility.current;
+      if (!saved) return;
+      savedVisibility.current = null;
+      if (saved.open !== open) setOpenTemporarily(saved.open);
+      setOpenMobile(saved.openMobile);
+    },
+  }))();
 
   return (
     <SidebarContext value={contextValue}>
       <div
-        // Inset layouts opt into bg-sidebar through className.
         className={cn(
           "group/sidebar-wrapper flex min-h-svh w-full",
           SIDEBAR_TITLEBAR_CONTROL_SIZE,
@@ -240,6 +215,30 @@ function SidebarProvider({
   );
 }
 
+/** Disables resizing for mobile sheets and non-collapsible layouts; absent bounds preserve the default minimum and an unbounded maximum. */
+function resolveSidebarResizable({
+  collapsible,
+  isMobile,
+  resizable,
+}: {
+  collapsible: "offcanvas" | "icon" | "none";
+  isMobile: boolean;
+  resizable: boolean | SidebarResizableOptions;
+}): SidebarResolvedResizableOptions | null {
+  if (isMobile || collapsible === "none" || !resizable) {
+    return null;
+  }
+
+  const options = typeof resizable === "boolean" ? {} : resizable;
+  return {
+    maxWidth: options.maxWidth ?? Number.POSITIVE_INFINITY,
+    minWidth: options.minWidth ?? SIDEBAR_RESIZE_DEFAULT_MIN_WIDTH,
+    storageKey: options.storageKey ?? null,
+    ...(options.onResize ? { onResize: options.onResize } : {}),
+    ...(options.shouldAcceptWidth ? { shouldAcceptWidth: options.shouldAcceptWidth } : {}),
+  };
+}
+
 /** Renders sidebar children with the requested side, variant, collapse behavior, and resizing support; mobile layouts use a sheet. */
 function Sidebar({
   side = "left",
@@ -256,24 +255,26 @@ function Sidebar({
   resizable?: boolean | SidebarResizableOptions;
 }) {
   const { isMobile, state, openMobile, setOpenMobile, setMobileSheetElement } = useSidebar();
-  const resolvedResizable = React.useMemo<SidebarResolvedResizableOptions | null>(() => {
-    if (isMobile || collapsible === "none" || !resizable) {
-      return null;
-    }
+  const desktopSidebarRef = React.useRef<HTMLDivElement>(null);
+  const offcanvasCollapsed = !isMobile && collapsible === "offcanvas" && state === "collapsed";
 
-    const options = typeof resizable === "boolean" ? {} : resizable;
-    return {
-      maxWidth: options.maxWidth ?? Number.POSITIVE_INFINITY,
-      minWidth: options.minWidth ?? SIDEBAR_RESIZE_DEFAULT_MIN_WIDTH,
-      storageKey: options.storageKey ?? null,
-      ...(options.onResize ? { onResize: options.onResize } : {}),
-      ...(options.shouldAcceptWidth ? { shouldAcceptWidth: options.shouldAcceptWidth } : {}),
-    };
-  }, [collapsible, isMobile, resizable]);
-  const instanceContextValue = React.useMemo<SidebarInstanceContextProps>(
-    () => ({ side, resizable: resolvedResizable }),
-    [resolvedResizable, side],
-  );
+  React.useLayoutEffect(() => {
+    const sidebar = desktopSidebarRef.current;
+    if (!sidebar) return;
+
+    // Transfer focus before inert causes the browser to clear the focused descendant.
+    if (offcanvasCollapsed && sidebar.contains(document.activeElement)) {
+      const wrapper = sidebar.closest('[data-slot="sidebar-wrapper"]');
+      const trigger = Array.from(
+        wrapper?.querySelectorAll<HTMLElement>('[data-sidebar="trigger"]') ?? [],
+      ).find((element) => !sidebar.contains(element));
+      trigger?.focus({ preventScroll: true });
+    }
+    sidebar.toggleAttribute("inert", offcanvasCollapsed);
+  }, [offcanvasCollapsed]);
+
+  const resolvedResizable = resolveSidebarResizable({ collapsible, isMobile, resizable });
+  const instanceContextValue: SidebarInstanceContextProps = { side, resizable: resolvedResizable };
 
   if (collapsible === "none") {
     return (
@@ -381,6 +382,7 @@ function Sidebar({
   return (
     <SidebarInstanceContext value={instanceContextValue}>
       <div
+        ref={desktopSidebarRef}
         className="group peer hidden text-sidebar-foreground md:block"
         data-collapsible={state === "collapsed" ? collapsible : ""}
         data-side={side}
@@ -388,7 +390,6 @@ function Sidebar({
         data-state={state}
         data-variant={variant}
       >
-        {/* This is what handles the sidebar gap on desktop */}
         <div
           className={cn(
             "relative w-(--sidebar-width) bg-transparent",
@@ -408,7 +409,6 @@ function Sidebar({
             side === "left"
               ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
               : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
-            // Adjust the padding for floating and inset variants.
             variant === "floating" || variant === "inset"
               ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]"
               : variant === "frame"
@@ -561,19 +561,15 @@ function SidebarRail({
     let acceptedFrame = true;
     return {
       width,
-      physics: {
-        get min() {
-          return latestResizable.current?.minWidth ?? resolvedResizable.minWidth;
-        },
-        get max() {
-          return latestResizable.current?.maxWidth ?? resolvedResizable.maxWidth;
-        },
-        onFling() {
+      physics: createResizePhysics(
+        () => latestResizable.current?.minWidth ?? resolvedResizable.minWidth,
+        () => latestResizable.current?.maxWidth ?? resolvedResizable.maxWidth,
+        () => {
           if (!acceptedFrame) return;
           suppressClickRef.current = true;
           setOpen(false);
         },
-      },
+      ),
       paint(value) {
         if (acceptedFrame) setTargetWidth(value);
       },
@@ -620,32 +616,27 @@ function SidebarRail({
         });
       },
     };
-    // Toggling the sidebar cancels a drag so the inline width never pins a
-    // collapsed sidebar open.
   }, String(open));
+  const refreshResize = React.useEffectEvent(() => resize.refresh());
   React.useLayoutEffect(() => {
     latestResizable.current = resolvedResizable;
-    // Bounds follow the window; keep an active drag's inline width inside them.
-    resize.refresh();
+    refreshResize();
   }, [resolvedResizable]);
 
-  const handleClick = React.useCallback(
-    (event: React.MouseEvent<HTMLButtonElement>) => {
-      onClick?.(event);
-      if (event.defaultPrevented) return;
-      if (suppressClickRef.current) {
-        suppressClickRef.current = false;
-        event.preventDefault();
-        return;
-      }
-      if (resolvedResizable && open) {
-        event.preventDefault();
-        return;
-      }
-      toggleSidebar();
-    },
-    [onClick, open, resolvedResizable, toggleSidebar],
-  );
+  const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    onClick?.(event);
+    if (event.defaultPrevented) return;
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
+      event.preventDefault();
+      return;
+    }
+    if (resolvedResizable && open) {
+      event.preventDefault();
+      return;
+    }
+    toggleSidebar();
+  };
 
   React.useLayoutEffect(() => {
     if (!resolvedResizable?.storageKey || typeof window === "undefined") return;
@@ -663,8 +654,6 @@ function SidebarRail({
     }
     if (storedWidth === null) return;
     const clampedWidth = clampSidebarWidth(storedWidth, resolvedResizable);
-    // Hydrate the CSS variable before the browser paints so a restored sidebar
-    // never flashes at the default width first.
     wrapper.style.setProperty("--sidebar-width", `${clampedWidth}px`);
     resolvedResizable.onResize?.(clampedWidth);
   }, [resolvedResizable]);
@@ -730,7 +719,6 @@ function SidebarRail({
   );
 }
 
-/** A bare search or rename field that sits in a row of sidebar chrome. */
 function SidebarInput({ className, ...props }: Omit<InputProps, "unstyled" | "variant">) {
   return (
     <Input
@@ -790,8 +778,6 @@ function SidebarContent({
   return (
     <>
       {fixedHeader ? <div className="w-full shrink-0">{fixedHeader}</div> : null}
-      {/* Rows take focus on click. Scroll padding would make the browser nudge
-          the list whenever a focused row sits under the fade. */}
       <ScrollArea
         hideScrollbars
         scrollFade
@@ -803,10 +789,7 @@ function SidebarContent({
         className="h-auto min-h-0 flex-1 [&>[data-slot=scroll-area-viewport]]:[--fade-size:0.75rem]"
       >
         <div
-          // Reordered rows must not pull the viewport to their new position.
           className={cn(
-            // Stacked groups share one inset between them instead of doubling
-            // it, including across the fixed header's boundary.
             "flex w-full min-w-0 flex-col [overflow-anchor:none] group-data-[collapsible=icon]:overflow-hidden [&>[data-sidebar=group]+[data-sidebar=group]]:pt-0",
             fixedHeader && "[&>[data-sidebar=group]:first-child]:pt-0",
             className,

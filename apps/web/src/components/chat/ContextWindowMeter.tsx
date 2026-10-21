@@ -11,7 +11,7 @@ import {
 import { Minimize2Icon } from "lucide-react";
 import { composerFloatingLayerProps } from "./composerEventScope";
 import { cn } from "~/lib/utils";
-import { memo, useMemo, useRef } from "react";
+import { useRef } from "react";
 import type { UsageLimitsReport } from "@t3tools/contracts";
 import { contextWindowUsageAccounts } from "./ContextWindowUsage.logic";
 import { ensureLocalApi } from "../../localApi";
@@ -194,12 +194,12 @@ export function ContextWindowMeter(props: {
 }
 
 /** Renders real quota windows only inside the open popup; management uses the banner's external-link path. */
-const ContextWindowUsageLimits = memo(function ContextWindowUsageLimits({
+const ContextWindowUsageLimits = function ContextWindowUsageLimits({
   report,
 }: {
   report: UsageLimitsReport | null | undefined;
 }) {
-  const accounts = useMemo(() => contextWindowUsageAccounts(report), [report]);
+  const accounts = contextWindowUsageAccounts(report);
   if (accounts.length === 0) return null;
   return (
     <>
@@ -267,7 +267,7 @@ const ContextWindowUsageLimits = memo(function ContextWindowUsageLimits({
       ))}
     </>
   );
-});
+};
 
 /** Holds the meter's footprint while a thread's activities are still loading. */
 export function ContextWindowMeterPlaceholder() {

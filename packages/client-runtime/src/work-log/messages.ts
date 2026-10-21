@@ -242,6 +242,8 @@ export const englishWorkLogMessages = {
   },
   toolActivity: englishToolActivityLabels,
   compactingContext: "Compacting context",
+  compactionFailed: "Context compaction failed",
+  compactionStopped: "Context compaction stopped",
   contextCompacted: "Context compacted",
   contextCompactedTokens: (before: string, after: string) =>
     `Context compacted ${before} → ${after} tokens`,

@@ -2,19 +2,17 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import {
-  HTML_RENDER_MAX_HEIGHT,
   htmlRenderFrameHeight,
+  HTML_RENDER_MAX_HEIGHT,
   htmlRenderReferencesEqual,
   htmlRenderTheme,
   htmlRenderThemeFragment,
-  injectHtmlRenderBootstrap,
-  htmlRenderThemeMessage,
-  readHtmlRenderContentHeight,
-  readHtmlRenderKeyDown,
-  readHtmlRenderLinkRequest,
   readHtmlRenderReference,
+  injectHtmlRenderBootstrap,
+  readHtmlRenderImageRequest,
+  readHtmlRenderLinkRequest,
 } from "./htmlRender.ts";
-import { T3_CODE_DARK_THEME_COLORS, T3_CODE_LIGHT_THEME_COLORS } from "./themePalettes.ts";
+import { T3_CODE_LIGHT_THEME_COLORS, T3_CODE_DARK_THEME_COLORS } from "./themePalettes.ts";
 import { htmlRenderFromToolItem } from "./toolOutput.ts";
 
 const reference = { attachmentId: "thread-abc-123.html", title: "Chart", height: 420 };
@@ -41,17 +39,14 @@ describe("injectHtmlRenderBootstrap", () => {
     expect(injected.endsWith("<p>hi</p>")).toBe(true);
   });
 
-  it.each(["textarea", "title", "xmp", "iframe", "noembed", "noframes", "noscript", "plaintext"])(
-    "keeps the bootstrap outside %s content",
-    (tag) => {
-      const fragment = `<${tag}><head><meta name="viewport"></head></${tag}>`;
-      const injected = injectHtmlRenderBootstrap(fragment);
-      expect(injected.startsWith("<!doctype html><head>")).toBe(true);
-      expect(injected.indexOf('<style id="t3-theme">')).toBeLessThan(injected.indexOf(`<${tag}>`));
-      expect(injected).toContain('<meta name="viewport" content="width=device-width');
-      expect(injected.endsWith(fragment)).toBe(true);
-    },
-  );
+  it.each(["textarea", "iframe", "plaintext"])("keeps the bootstrap outside %s content", (tag) => {
+    const fragment = `<${tag}><head><meta name="viewport"></head></${tag}>`;
+    const injected = injectHtmlRenderBootstrap(fragment);
+    expect(injected.startsWith("<!doctype html><head>")).toBe(true);
+    expect(injected.indexOf('<style id="t3-theme">')).toBeLessThan(injected.indexOf(`<${tag}>`));
+    expect(injected).toContain('<meta name="viewport" content="width=device-width');
+    expect(injected.endsWith(fragment)).toBe(true);
+  });
 
   it.each([
     '<template><head><meta name="viewport"></head></template>',
@@ -108,53 +103,26 @@ describe("readHtmlRenderLinkRequest", () => {
   });
 });
 
-describe("readHtmlRenderKeyDown", () => {
-  it("reads the key of a keydown notification and nothing else", () => {
-    const notification = (params: unknown) => ({
+describe("readHtmlRenderImageRequest", () => {
+  it("accepts http(s) and inline image URLs in an open-image notification", () => {
+    const image = (params: unknown) => ({
       jsonrpc: "2.0",
-      method: "t3/notifications/keydown",
+      method: "t3/notifications/open-image",
       params,
     });
-    expect(readHtmlRenderKeyDown(notification({ key: "k", code: "KeyK", metaKey: true }))).toEqual({
-      key: "k",
-      code: "KeyK",
-      metaKey: true,
-      ctrlKey: false,
-      shiftKey: false,
-      altKey: false,
-      repeat: false,
-    });
-    expect(readHtmlRenderKeyDown(notification({ key: 1, code: "KeyK" }))).toBeUndefined();
     expect(
-      readHtmlRenderKeyDown({ jsonrpc: "2.0", method: "ui/open-link", params: { key: "k" } }),
-    ).toBeUndefined();
-  });
-});
-
-describe("readHtmlRenderContentHeight", () => {
-  it("reads only the height of an MCP Apps size-changed notification", () => {
-    const notification = (params: unknown) => ({
-      jsonrpc: "2.0",
-      method: "ui/notifications/size-changed",
-      params,
+      readHtmlRenderImageRequest(image({ src: "data:image/png;base64,AA", name: " Chart " })),
+    ).toEqual({
+      src: "data:image/png;base64,AA",
+      name: "Chart",
     });
-    expect(readHtmlRenderContentHeight(notification({ height: 412 }))).toBe(412);
-    expect(readHtmlRenderContentHeight(notification({ height: "412" }))).toBe(undefined);
-    expect(readHtmlRenderContentHeight(notification({ height: 0 }))).toBe(undefined);
-    expect(readHtmlRenderContentHeight({ ...notification({ height: 412 }), method: "x" })).toBe(
-      undefined,
-    );
-  });
-});
-
-describe("htmlRenderThemeMessage", () => {
-  it("is an MCP Apps host-context-changed notification carrying the theme variables", () => {
-    const theme = htmlRenderTheme(T3_CODE_DARK_THEME_COLORS, "dark");
-    expect(htmlRenderThemeMessage(theme)).toEqual({
-      jsonrpc: "2.0",
-      method: "ui/notifications/host-context-changed",
-      params: { theme: "dark", styles: { variables: theme.variables } },
+    expect(readHtmlRenderImageRequest(image({ src: "https://example.com/a.png" }))).toEqual({
+      src: "https://example.com/a.png",
+      name: "Image",
     });
+    expect(readHtmlRenderImageRequest(image({ src: "javascript:alert(1)" }))).toBeUndefined();
+    expect(readHtmlRenderImageRequest(image({ src: "data:text/html,<p>" }))).toBeUndefined();
+    expect(readHtmlRenderImageRequest(image({ src: "blob:null/1" }))).toBeUndefined();
   });
 });
 

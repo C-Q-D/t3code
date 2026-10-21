@@ -1,8 +1,10 @@
 /** Localized usage presentation and existing interaction behavior. */
+import { usePrimarySettings } from "../../hooks/useSettings";
+import { resolveHour12 } from "../../timestampFormat";
 import { t } from "~/i18n";
 import { ProviderInstanceIcon } from "../chat/ProviderInstanceIcon";
 import type { UsageProviderKind } from "@t3tools/contracts";
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 
 import type { DailyTotals, HourlyTotals } from "@t3tools/shared/usageMerge";
 import {
@@ -36,6 +38,7 @@ interface UsageProviderChartProps {
   readonly referenceTime: string | undefined;
   readonly resolution: "day" | "hour";
   readonly timeZone: string;
+  readonly hour12?: boolean;
 }
 
 /** One period's provider values, shared by stacked bars and the hover readout. */
@@ -86,32 +89,28 @@ export function UsageProviderChart({
   referenceTime,
   resolution,
   timeZone,
+  hour12: requestedHour12,
 }: UsageProviderChartProps) {
+  const settingsHour12 = usePrimarySettings((settings) => resolveHour12(settings.timestampFormat));
+  const hour12 = requestedHour12 ?? settingsHour12;
   const periods = resolution === "hour" ? hours : days;
-  const byPeriod = useMemo(
-    () =>
-      resolution === "hour"
-        ? new Map(hourly.map((entry) => [entry.hourStart, entry]))
-        : new Map(daily.map((entry) => [entry.day, entry])),
-    [daily, hourly, resolution],
+  const totals: readonly (DailyTotals | HourlyTotals)[] = resolution === "hour" ? hourly : daily;
+  const byPeriod = new Map(
+    totals.map((entry) => ["hourStart" in entry ? entry.hourStart : entry.day, entry]),
   );
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const plotRef = useRef<HTMLDivElement | null>(null);
   const tooltipRef = useRef<HTMLDivElement | null>(null);
   const hoverPositionRef = useRef<{ x: number; y: number } | null>(null);
 
-  const columns = useMemo(
-    () =>
-      buildPeriodColumns(periods, byPeriod, metric).map((column) => {
-        const bands = column.bands.filter((band) => providers.includes(band.provider));
-        return { bands, total: bands.reduce((sum, band) => sum + band.value, 0) };
-      }),
-    [byPeriod, metric, periods, providers],
-  );
+  const columns = buildPeriodColumns(periods, byPeriod, metric).map((column) => {
+    const bands = column.bands.filter((band) => providers.includes(band.provider));
+    return { bands, total: bands.reduce((sum, band) => sum + band.value, 0) };
+  });
   const scale = chartScale(columns, loadingProviders);
   const format = metric === "tokens" ? formatTokens : formatUsd;
 
-  const positionTooltip = useCallback(() => {
+  const positionTooltip = () => {
     const plot = plotRef.current;
     const tooltip = tooltipRef.current;
     const hoverPosition = hoverPositionRef.current;
@@ -134,7 +133,7 @@ export function UsageProviderChart({
     const top = Math.min(Math.max(0, preferredTop), Math.max(0, plotHeight - tooltipHeight));
     plot.style.setProperty("--usage-tooltip-left", `${left}px`);
     plot.style.setProperty("--usage-tooltip-top", `${top}px`);
-  }, []);
+  };
 
   useLayoutEffect(() => {
     if (hoverIndex === null) return;
@@ -147,33 +146,36 @@ export function UsageProviderChart({
     return observeResize([plot, tooltip], positionTooltip);
   }, [hoverIndex, positionTooltip]);
 
-  const handleMove = useCallback(
-    (event: React.MouseEvent<HTMLDivElement>) => {
-      const plot = plotRef.current;
-      if (plot === null || periods.length === 0) return;
-      const bounds = plot.getBoundingClientRect();
-      if (bounds.width === 0) return;
-      const localX = Math.min(bounds.width, Math.max(0, event.clientX - bounds.left));
-      const localY = Math.min(bounds.height, Math.max(0, event.clientY - bounds.top));
-      const fraction = localX / bounds.width;
-      const index = Math.floor(fraction * periods.length);
-      hoverPositionRef.current = { x: localX, y: localY };
-      positionTooltip();
-      setHoverIndex(Math.min(periods.length - 1, Math.max(0, index)));
-    },
-    [periods.length, positionTooltip],
-  );
+  const handleMove = (event: React.MouseEvent<HTMLDivElement>) => {
+    const plot = plotRef.current;
+    if (plot === null || periods.length === 0) return;
+    const bounds = plot.getBoundingClientRect();
+    if (bounds.width === 0) return;
+    const localX = Math.min(bounds.width, Math.max(0, event.clientX - bounds.left));
+    const localY = Math.min(bounds.height, Math.max(0, event.clientY - bounds.top));
+    const fraction = localX / bounds.width;
+    const index = Math.floor(fraction * periods.length);
+    hoverPositionRef.current = { x: localX, y: localY };
+    positionTooltip();
+    setHoverIndex(Math.min(periods.length - 1, Math.max(0, index)));
+  };
 
   const hoveredPeriod = hoverIndex === null ? undefined : periods[hoverIndex];
   const hoveredColumn = hoverIndex === null ? undefined : columns[hoverIndex];
   const partial = providers.some((provider) => loadingProviders.has(provider));
   const formatPeriod = (period: string) =>
     resolution === "hour"
-      ? formatHourShort(period, timeZone, t.chat.workLog.shared.usage)
+      ? formatHourShort(period, timeZone, t.chat.workLog.shared.usage, hour12)
       : formatDayShort(period, t.chat.workLog.shared.usage);
   const formatTooltipPeriod = (period: string) =>
     resolution === "hour" && referenceTime !== undefined
-      ? formatRelativeHourShort(period, referenceTime, timeZone, t.chat.workLog.shared.usage)
+      ? formatRelativeHourShort(
+          period,
+          referenceTime,
+          timeZone,
+          t.chat.workLog.shared.usage,
+          hour12,
+        )
       : formatPeriod(period);
 
   return (

@@ -1,9 +1,9 @@
-import { desktopMessages } from "../i18n/desktopMessages.ts";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
-import * as Electron from "electron";
-import { MacPermissionHelper, macAppBundlePath } from "./MacPermissionHelper.ts";
-import type { SettingsWindow } from "./MacSettingsWindow.ts";
 import { MAC_PERMISSION_HELPER_CHANNEL } from "../ipc/channels.ts";
+import { desktopMessages } from "../i18n/desktopMessages.ts";
+import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
+import * as Electron from "electron";
+import { MacPermissionHelper } from "./MacPermissionHelper.ts";
+import type { SettingsWindow } from "./MacSettingsWindow.ts";
 
 const mocks = vi.hoisted(() => ({
   granted: false,
@@ -130,15 +130,15 @@ function send(action: string, trusted = true) {
   );
 }
 
-describe("macAppBundlePath", () => {
-  it("resolves bundles with spaces and refuses non-bundle executables", () => {
-    expect(macAppBundlePath("/Applications/T3 Code.app/Contents/MacOS/T3 Code")).toBe(
-      "/Applications/T3 Code.app",
-    );
-    expect(macAppBundlePath("/usr/local/bin/electron")).toBeUndefined();
-    expect(macAppBundlePath("/Applications/T3 Code.app/other/MacOS/T3 Code")).toBeUndefined();
-  });
-});
+it.each(["/usr/local/bin/electron", "/Applications/T3 Code.app/other/MacOS/T3 Code"])(
+  "does not open a permission helper for non-bundle executable %s",
+  async (executable) => {
+    using _path = vi.spyOn(Electron.app, "getPath").mockReturnValue(executable);
+    await open();
+    expect(windows).toHaveLength(0);
+    expect(mocks.showItemInFolder).not.toHaveBeenCalled();
+  },
+);
 it("drags the running app bundle only for the helper's own renderer", async () => {
   await open();
   send("drag", false);

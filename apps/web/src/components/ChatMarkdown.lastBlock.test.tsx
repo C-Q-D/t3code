@@ -10,8 +10,17 @@ import type * as Settings from "../hooks/useSettings";
 import type * as Session from "../state/session";
 import ChatMarkdown from "./ChatMarkdown";
 vi.mock("../hooks/useFileMetadata", () => ({ useFileMetadata: () => null }));
-vi.mock("@effect/atom-react", () => ({ useAtomValue: () => null }));
-vi.mock("../hooks/useTheme", () => ({ useTheme: () => ({ resolvedTheme: "dark" }) }));
+vi.mock("@effect/atom-react", () => ({
+  useAtomValue: () => ({
+    pullRequestsEnabled: false,
+    availableEditors: [],
+    revealInFileManagerLabel: "Reveal",
+  }),
+}));
+vi.mock("../hooks/useTheme", () => ({
+  useTheme: () => ({ resolvedTheme: "dark" }),
+  useRenderedAppearance: () => "dark",
+}));
 vi.mock("../hooks/useSettings", async (importOriginal) => {
   const actual = await importOriginal<typeof Settings>();
   const settings = actual.getClientSettings();

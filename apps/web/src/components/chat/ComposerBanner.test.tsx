@@ -16,7 +16,7 @@ function badge(totalSteps: number) {
       expanded={false}
       onToggle={() => {}}
       placement="inline"
-      progress={{ step: "Task", completedSteps: 0, totalSteps }}
+      progress={{ step: "Task", completedSteps: 0, totalSteps, live: true }}
       steps={[]}
     />
   );
@@ -31,7 +31,13 @@ it.each(["standard", "custom"] as const)(
     const root = createRoot(container);
     const notice =
       kind === "standard"
-        ? { id: "notice", variant: "info" as const, icon: null, title: "Notice" }
+        ? {
+            id: "notice",
+            variant: "info" as const,
+            icon: null,
+            title: "Notice",
+            description: "Description",
+          }
         : { id: "notice", variant: "info" as const, content: "Notice" };
     const content = (showNotice: boolean, total: number, outside = false) => (
       <>
@@ -61,6 +67,11 @@ it.each(["standard", "custom"] as const)(
         ["false", "false"],
       ]);
       await act(async () => root.render(content(true, 1)));
+      expect(
+        [...container.querySelectorAll("[data-composer-notice-description]")].map(
+          (node) => node.textContent,
+        ),
+      ).toEqual(kind === "standard" ? ["Description"] : []);
       expect(states()).toEqual([
         ["true", "true"],
         ["false", "false"],
@@ -104,7 +115,7 @@ it("does not register a zero-task drawer and clears presence when its badge beco
     <ComposerBanner.Dock>
       <ComposerTasksDrawer
         onCollapse={() => {}}
-        progress={{ step: "Task", completedSteps: 0, totalSteps }}
+        progress={{ step: "Task", completedSteps: 0, totalSteps, live: true }}
         steps={[]}
       />
     </ComposerBanner.Dock>

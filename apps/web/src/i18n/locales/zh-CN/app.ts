@@ -303,6 +303,7 @@ export const app: Messages["app"] = {
     undoSettleError: "撤销完结失败",
     loadingMessages: "正在加载消息...",
     syncingMessages: "正在同步消息...",
+    unreadable: "此对话位于另一台机器，当前机器上的代理无法读取。请移除它或切回原机器后发送。",
   },
   context: {
     /** Formats the message using label. */

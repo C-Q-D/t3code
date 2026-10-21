@@ -2,10 +2,8 @@
 import {
   createContext,
   useContext,
-  useEffect,
   useLayoutEffect,
-  useMemo,
-  useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import { isElectron } from "../../env";
@@ -19,28 +17,77 @@ export function useDesktopWindowState() {
   return useContext(WindowStateContext);
 }
 
+let maximizedSnapshot: boolean | undefined;
+let fullscreenSnapshot: boolean | undefined;
+const windowStateListeners = new Set<() => void>();
+let unsubscribeNativeWindowState: (() => void) | undefined;
+
+/** Reads the cached maximized flag, using synchronous IPC only for its first snapshot. */
+function readMaximized() {
+  return (maximizedSnapshot ??= isElectron
+    ? (window.desktopBridge?.getWindowMaximizedState?.() ?? false)
+    : false);
+}
+
+/** Reads the cached fullscreen flag, using synchronous IPC only for its first snapshot. */
+function readFullscreen() {
+  return (fullscreenSnapshot ??= isElectron
+    ? (window.desktopBridge?.getWindowFullscreenState?.() ?? false)
+    : false);
+}
+
+/** Supplies the non-native snapshot for server rendering. */
+function readServerState() {
+  return false;
+}
+
+/** Publishes the native event's maximized value before notifying snapshot readers. */
+function publishMaximized(value: boolean) {
+  if (maximizedSnapshot === value) return;
+  maximizedSnapshot = value;
+  windowStateListeners.forEach((listener) => listener());
+}
+
+/** Publishes the native event's fullscreen value before notifying snapshot readers. */
+function publishFullscreen(value: boolean) {
+  if (fullscreenSnapshot === value) return;
+  fullscreenSnapshot = value;
+  windowStateListeners.forEach((listener) => listener());
+}
+
+/**
+ * Notifies onChange after a native event or the post-subscription read changes either cached flag.
+ * The first subscriber attaches both native listeners, then reads once to close the mount gap.
+ * Returns a cancellation that releases native listeners and cached snapshots after the last reader leaves.
+ */
+function subscribeWindowState(onChange: () => void) {
+  windowStateListeners.add(onChange);
+  if (windowStateListeners.size === 1) {
+    const bridge = isElectron ? window.desktopBridge : undefined;
+    const stopMaximized = bridge?.onWindowMaximizedStateChange?.(publishMaximized);
+    const stopFullscreen = bridge?.onWindowFullscreenStateChange?.(publishFullscreen);
+    unsubscribeNativeWindowState = () => {
+      stopMaximized?.();
+      stopFullscreen?.();
+    };
+    publishMaximized(bridge?.getWindowMaximizedState?.() ?? false);
+    publishFullscreen(bridge?.getWindowFullscreenState?.() ?? false);
+  }
+  return () => {
+    windowStateListeners.delete(onChange);
+    if (windowStateListeners.size !== 0) return;
+    unsubscribeNativeWindowState?.();
+    unsubscribeNativeWindowState = undefined;
+    maximizedSnapshot = undefined;
+    fullscreenSnapshot = undefined;
+  };
+}
+
 /** Hosts routed children and persistent captions; native events remain authoritative. */
 export function DesktopWindowHost({ children }: { children: ReactNode }) {
-  const [maximized, setMaximized] = useState(() =>
-    isElectron ? (window.desktopBridge?.getWindowMaximizedState?.() ?? false) : false,
-  );
-  const [fullscreen, setFullscreen] = useState(() =>
-    isElectron ? (window.desktopBridge?.getWindowFullscreenState?.() ?? false) : false,
-  );
-  useEffect(() => {
-    if (!isElectron) return;
-    const bridge = window.desktopBridge;
-    const unsubscribeMaximized = bridge?.onWindowMaximizedStateChange?.(setMaximized);
-    const unsubscribeFullscreen = bridge?.onWindowFullscreenStateChange?.(setFullscreen);
-    // Subscribe before reading to close the mount-time event gap.
-    setMaximized(bridge?.getWindowMaximizedState?.() ?? false);
-    setFullscreen(bridge?.getWindowFullscreenState?.() ?? false);
-    return () => {
-      unsubscribeMaximized?.();
-      unsubscribeFullscreen?.();
-    };
-  }, []);
-  const state = useMemo(() => ({ maximized, fullscreen }), [maximized, fullscreen]);
+  const maximized = useSyncExternalStore(subscribeWindowState, readMaximized, readServerState);
+  const fullscreen = useSyncExternalStore(subscribeWindowState, readFullscreen, readServerState);
+  const state = { maximized, fullscreen };
   useLayoutEffect(() => {
     if (!isElectron || !isWindowsPlatform(navigator.platform)) return;
     // Body portals must inherit the same frame geometry before the next paint.

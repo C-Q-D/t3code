@@ -6,7 +6,6 @@ import {
   type RuntimeSubagent,
 } from "@t3tools/client-runtime/state/subagentRuntime";
 
-/** Summarize observed states without treating idle or missing agents as completed. */
 export function deriveAgentSpawnSummary({
   agents,
   agentCount,
@@ -24,7 +23,6 @@ export function deriveAgentSpawnSummary({
   ).length;
   const batches = agents.filter((agent) => agent.kind === "subagent_batch").length;
   const individuals = agentCount - batches;
-  // Workflow coordinators can keep running between dynamic member launches.
   const live =
     coordinatorStatus !== undefined ? !isTerminalSubagentStatus(coordinatorStatus) : working > 0;
   const subjects = [

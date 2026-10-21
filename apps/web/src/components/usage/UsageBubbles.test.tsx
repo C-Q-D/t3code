@@ -5,14 +5,16 @@ import { createRoot, type Root } from "react-dom/client";
 import type { ModelTotals } from "@t3tools/shared/usageMerge";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { useEscapeToGoBack } from "../../hooks/useNavigateBack";
+import { installTestRaf } from "../../lib/motion/testRaf";
 import { UsageBubbles } from "./UsageBubbles";
 
 vi.mock("@tanstack/react-router", () => ({
   useCanGoBack: () => true,
   useNavigate: () => vi.fn(),
 }));
+const motion = vi.hoisted(() => ({ enabled: false }));
 vi.mock("../../hooks/usePhysicsMotion", () => ({
-  usePhysicsMotion: () => ({ enabled: false }),
+  usePhysicsMotion: () => motion,
 }));
 
 /** Build priced models with explicit shares, independent of the bubble grouping implementation. */
@@ -47,6 +49,7 @@ describe("bubble hints", () => {
   let container: HTMLDivElement;
   let root: Root;
   beforeEach(() => {
+    motion.enabled = false;
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     vi.useFakeTimers();
     container = document.createElement("div");
@@ -113,5 +116,56 @@ describe("bubble hints", () => {
       vi.advanceTimersByTime(1000);
     });
     expect(container.querySelector('[role="tooltip"]')).toBeNull();
+  });
+
+  it("keeps a captured drag through focus hints and parent renders, then releases it", () => {
+    motion.enabled = true;
+    installTestRaf();
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(600);
+    const models = [model("main", 1)];
+    const onSelectModel = vi.fn();
+    act(() =>
+      root.render(<UsageBubbles models={models} metric="cost" onSelectModel={onSelectModel} />),
+    );
+    const svg = container.querySelector("svg")!;
+    vi.spyOn(svg, "getBoundingClientRect").mockReturnValue(new DOMRect(0, 0, 600, 300));
+    const bubble = container.querySelector<SVGGElement>('[data-bubble="codex:main"]')!;
+    let captured: number | null = null;
+    const releaseCapture = vi.fn((pointerId: number) => {
+      if (captured === pointerId) captured = null;
+    });
+    Object.assign(bubble, {
+      setPointerCapture: (pointerId: number) => {
+        captured = pointerId;
+      },
+      hasPointerCapture: (pointerId: number) => captured === pointerId,
+      releasePointerCapture: releaseCapture,
+    });
+    /** jsdom supplies mouse coordinates; add the stable pointer identity used by capture. */
+    const pointer = (type: string, x: number, y: number) => {
+      const event = new MouseEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+        clientX: x,
+        clientY: y,
+      });
+      Object.defineProperty(event, "pointerId", { value: 7 });
+      return event;
+    };
+    act(() => bubble.dispatchEvent(pointer("pointerdown", 300, 150)));
+    expect(captured).toBe(7);
+    expect(container.querySelector('[role="tooltip"]')?.textContent).toContain("main");
+    act(() =>
+      root.render(<UsageBubbles models={models} metric="cost" onSelectModel={onSelectModel} />),
+    );
+    act(() => bubble.dispatchEvent(pointer("pointermove", 360, 180)));
+    expect(bubble.getAttribute("transform")).toBe("translate(360 180)");
+    act(() => bubble.dispatchEvent(pointer("pointerup", 360, 180)));
+    expect(releaseCapture).toHaveBeenCalledExactlyOnceWith(7);
+    expect(captured).toBeNull();
+    expect(onSelectModel).not.toHaveBeenCalled();
+    act(() => bubble.dispatchEvent(pointer("pointermove", 420, 210)));
+    expect(bubble.getAttribute("transform")).toBe("translate(360 180)");
   });
 });

@@ -3,7 +3,7 @@
  * @vitest-environment jsdom
  */
 
-import { EnvironmentId, type AuthEnvironmentScope } from "@t3tools/contracts";
+import { EnvironmentId, ThreadId, type AuthEnvironmentScope } from "@t3tools/contracts";
 import { createRoot } from "react-dom/client";
 import { useThreadFindHighlights } from "./chat/threadFindHighlights";
 import { searchableMessageSegments } from "@t3tools/shared/threadFindText";
@@ -21,20 +21,33 @@ import { Button } from "./ui/button";
 import { setMarkdownTaskChecked } from "./files/filePreviewMode";
 import { ProposedPlanCard } from "./chat/ProposedPlanCard";
 
+const markdownSettings = vi.hoisted(() => ({ mathEnabled: false, remote: false, preview: false }));
+
 vi.mock("../hooks/useFileMetadata", () => ({ useFileMetadata: () => null }));
-vi.mock("@effect/atom-react", () => ({ useAtomValue: () => null }));
+vi.mock("@effect/atom-react", () => ({
+  useAtomValue: () => ({
+    pullRequestsEnabled: false,
+    availableEditors: [],
+    revealInFileManagerLabel: undefined,
+  }),
+}));
 vi.mock("./chat/MermaidDiagram", () => ({
   // Real Mermaid needs layout APIs jsdom lacks; a rendered diagram is an SVG.
   MermaidDiagram: () => <svg aria-label="Diagram" />,
 }));
-vi.mock("../hooks/useTheme", () => ({ useTheme: () => ({ resolvedTheme: "dark" }) }));
+vi.mock("../hooks/useTheme", () => ({
+  useTheme: () => ({ resolvedTheme: "dark" }),
+  useRenderedAppearance: () => "dark",
+}));
 vi.mock("../hooks/useSettings", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../hooks/useSettings")>();
   const settings = actual.getClientSettings();
   return {
     ...actual,
-    useClientSettings: (select?: (value: typeof settings) => unknown) =>
-      select ? select(settings) : settings,
+    useClientSettings: (select?: (value: typeof settings) => unknown) => {
+      const current = { ...settings, mathRenderingEnabled: markdownSettings.mathEnabled };
+      return select ? select(current) : current;
+    },
   };
 });
 vi.mock("./ui/tooltip", async () => {
@@ -72,7 +85,13 @@ vi.mock("../state/entities", () => ({
   useServerConfigs: () => new Map(),
 }));
 vi.mock("../remoteOpen", () => ({
-  useRemoteOpenResolution: () => ({ state: { mode: "local-exec" }, isResolved: true }),
+  useRemoteOpenResolution: () => ({
+    state: { mode: markdownSettings.remote ? "remote" : "local-exec" },
+    isResolved: true,
+  }),
+}));
+vi.mock("../browser/previewRuntime", () => ({
+  isPreviewAvailableFor: () => markdownSettings.preview,
 }));
 vi.mock("../editorPreferences", () => ({
   useOpenInPreferredEditor: () => vi.fn(),
@@ -87,7 +106,6 @@ vi.mock("~/lib/openPullRequestLink", () => ({
 
 import ChatMarkdown, {
   canUseMarkdownFileShellActions,
-  hasMarkdownFilePrimaryAction,
   shouldUseMarkdownFileBrowserPrimaryAction,
 } from "./ChatMarkdown";
 
@@ -501,7 +519,9 @@ describe("ChatMarkdown streaming", () => {
 
   it("edits the current task text and marker after reusing a renderer", async () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-    let renderer: ReactTestRenderer | undefined;
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
     let editedText: string | undefined;
     const message = (text: string) => (
       <ChatMarkdown
@@ -509,41 +529,22 @@ describe("ChatMarkdown streaming", () => {
         text={text}
         onTaskListChange={({ markerOffset, checked }) => {
           editedText = setMarkdownTaskChecked(text, markerOffset, checked);
-          renderer!.update(message(editedText));
+          root.render(message(editedText));
         }}
       />
     );
-
     try {
-      await act(async () => {
-        renderer = create(message("- [ ] First\n- [ ] Second"));
-      });
-      const mounted = renderer!;
-      const originalInput = mounted.root.findAllByType("input")[1]!;
-      await act(async () => {
-        mounted.update(message("- [ ] A longer first task\n- [ ] Second"));
-      });
-
-      const input = mounted.root.findAllByType("input")[1]!;
-      const listItem = mounted.root.findAllByType("li")[1]!;
-      const { onChange } = input.props as ComponentProps<"input">;
-      if (!onChange) throw new Error("Task checkbox has no edit handler");
-      await act(async () => {
-        onChange({
-          currentTarget: {
-            checked: true,
-            closest: () => ({
-              dataset: { taskMarkerOffset: String(listItem.props["data-task-marker-offset"]) },
-            }),
-          },
-        } as unknown as Parameters<typeof onChange>[0]);
-      });
-
+      await act(async () => root.render(message("- [ ] First\n- [ ] Second")));
+      const originalInput = container.querySelectorAll("input")[1]!;
+      await act(async () => root.render(message("- [ ] A longer first task\n- [ ] Second")));
+      const input = container.querySelectorAll("input")[1]!;
       expect(input).toBe(originalInput);
+      await act(async () => input.click());
       expect(editedText).toBe("- [ ] A longer first task\n- [x] Second");
-      expect(mounted.root.findAllByType("input")[1]!.props.checked).toBe(true);
+      expect(container.querySelectorAll("input")[1]!.checked).toBe(true);
     } finally {
-      await act(async () => renderer?.unmount());
+      await act(async () => root.unmount());
+      container.remove();
       vi.unstubAllGlobals();
     }
   });
@@ -570,40 +571,52 @@ describe("canUseMarkdownFileShellActions", () => {
   });
 });
 
-describe("hasMarkdownFilePrimaryAction", () => {
-  it("keeps the chip interactive when an editor, browser, or panel can open it", () => {
-    expect(
-      hasMarkdownFilePrimaryAction({
-        canOpenInEditor: true,
-        canOpenInBrowser: false,
-        canOpenInPanel: false,
-      }),
-    ).toBe(true);
-    expect(
-      hasMarkdownFilePrimaryAction({
-        canOpenInEditor: false,
-        canOpenInBrowser: true,
-        canOpenInPanel: false,
-      }),
-    ).toBe(true);
-    expect(
-      hasMarkdownFilePrimaryAction({
-        canOpenInEditor: false,
-        canOpenInBrowser: false,
-        canOpenInPanel: true,
-      }),
-    ).toBe(true);
-  });
-
-  it("removes the link affordance when no primary action can open the file", () => {
-    expect(
-      hasMarkdownFilePrimaryAction({
-        canOpenInEditor: false,
-        canOpenInBrowser: false,
-        canOpenInPanel: false,
-      }),
-    ).toBe(false);
-  });
+describe("Markdown file primary action availability", () => {
+  it.each(["editor", "panel", "browser", "none"] as const)(
+    "exposes the %s action through the rendered chip",
+    async (action) => {
+      vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+      markdownSettings.remote = action !== "editor";
+      markdownSettings.preview = action === "browser";
+      const container = document.createElement("div");
+      document.body.append(container);
+      const root = createRoot(container);
+      const environmentId = EnvironmentId.make("local");
+      const path = action === "browser" ? "/other/report.pdf" : "/tmp/project/src/main.ts";
+      try {
+        await act(async () =>
+          root.render(
+            <ChatMarkdown
+              cwd="/tmp/project"
+              text={`[Source](${path})`}
+              {...(action === "editor" ? { environmentId } : {})}
+              {...(action === "panel" || action === "browser"
+                ? { threadRef: { environmentId, threadId: ThreadId.make("file-actions") } }
+                : {})}
+            />,
+          ),
+        );
+        const chip = container.querySelector<HTMLAnchorElement | HTMLButtonElement>(
+          ".chat-markdown-file-link",
+        )!;
+        expect(chip.tagName).toBe(action === "none" ? "BUTTON" : "A");
+        if (action === "none") {
+          expect(chip.getAttribute("aria-haspopup")).toBe("menu");
+          expect(container.querySelector("a")).toBeNull();
+        } else {
+          expect(chip.getAttribute("href")).toBe(path);
+        }
+        chip.focus();
+        expect(document.activeElement).toBe(chip);
+      } finally {
+        await act(async () => root.unmount());
+        container.remove();
+        markdownSettings.remote = false;
+        markdownSettings.preview = false;
+        vi.unstubAllGlobals();
+      }
+    },
+  );
 });
 
 describe("ChatMarkdown skill chips", () => {
@@ -1248,13 +1261,18 @@ it.each([
     query: "Hidden needle",
     count: 1,
   },
-  { text: ARTIFACT_TEMPLATE_DIRECTIVE, query: "Hello World", count: 1, useTemplate: true },
-  { text: ARTIFACT_TEMPLATE_DIRECTIVE, query: "Document template", count: 1, useTemplate: true },
-  { text: ARTIFACT_TEMPLATE_DIRECTIVE, query: "World Document", count: 0, useTemplate: true },
-  { text: ARTIFACT_TEMPLATE_DIRECTIVE, query: "Use template", count: 0, useTemplate: true },
+  { text: ARTIFACT_TEMPLATE_DIRECTIVE, query: "Hello World", count: 1, templateEnabled: true },
+  {
+    text: ARTIFACT_TEMPLATE_DIRECTIVE,
+    query: "Document template",
+    count: 1,
+    templateEnabled: true,
+  },
+  { text: ARTIFACT_TEMPLATE_DIRECTIVE, query: "World Document", count: 0, templateEnabled: true },
+  { text: ARTIFACT_TEMPLATE_DIRECTIVE, query: "Use template", count: 0, templateEnabled: true },
 ])(
   "highlights the indexed occurrences of $query in $text",
-  async ({ text, query, count, lineBreaks, user, useTemplate }) => {
+  async ({ text, query, count, lineBreaks, user, templateEnabled }) => {
     const skills = [{ name: "test-t3-app", displayName: "T3 App Testing" }];
     const highlights = new Map<string, Set<Range>>();
     vi.stubGlobal(
@@ -1288,7 +1306,7 @@ it.each([
                 skills={skills}
                 lineBreaks={lineBreaks ?? false}
                 parseRawHtml={!user}
-                onUseArtifactTemplate={useTemplate ? () => undefined : undefined}
+                onUseArtifactTemplate={templateEnabled ? () => undefined : undefined}
               />
             </MarkdownFindContext>
           </div>
@@ -1624,3 +1642,122 @@ describe("D1 code-well actions", () => {
     }
   });
 });
+
+it("marks only table cells whose rendered subtree contains math, including updates", async () => {
+  markdownSettings.mathEnabled = true;
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  try {
+    await act(async () =>
+      root.render(
+        <ChatMarkdown
+          cwd={undefined}
+          text={"| Formula | Plain |\n| --- | --- |\n| **$x^2$** | ordinary |"}
+        />,
+      ),
+    );
+    const cells = container.querySelectorAll("td");
+    expect(cells[0]?.querySelector("[data-markdown-math]")).not.toBeNull();
+    expect(cells[0]?.getAttribute("data-has-markdown-math")).toBe("true");
+    expect(cells[1]?.hasAttribute("data-has-markdown-math")).toBe(false);
+    await act(async () =>
+      root.render(
+        <ChatMarkdown
+          cwd={undefined}
+          text={"| Formula | Plain |\n| --- | --- |\n| ordinary | $y$ |"}
+        />,
+      ),
+    );
+    expect(container.querySelectorAll("td")[0]?.hasAttribute("data-has-markdown-math")).toBe(false);
+    expect(container.querySelectorAll("td")[1]?.getAttribute("data-has-markdown-math")).toBe(
+      "true",
+    );
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+    vi.unstubAllGlobals();
+    markdownSettings.mathEnabled = false;
+  }
+});
+
+const htmlAsset = vi.hoisted(() => ({ refresh: vi.fn<() => Promise<string | null>>() }));
+vi.mock("../assets/assetUrls", () => ({
+  useAssetUrlState: () => ({
+    _tag: "Success",
+    url: "https://example.test/cached",
+    expiresAt: 1_000_000,
+    failed: false,
+  }),
+  useAssetUrlRefresh: () => htmlAsset.refresh,
+}));
+vi.mock("./files/BrowserDocumentFrame", () => ({
+  HtmlRenderDocument: ({ src }: { src: string }) => (
+    <iframe sandbox="" title="Inline HTML" src={src} />
+  ),
+}));
+vi.mock("./chat/HtmlRenderDialog", () => ({
+  HtmlRenderDialog: ({ src }: { src: string }) => (
+    <iframe sandbox="" title="Expanded HTML" src={src} />
+  ),
+}));
+
+it.each([
+  {
+    scenario: "valid cache",
+    now: 0,
+    refresh: () => Promise.resolve("https://example.test/new"),
+    expected: "https://example.test/cached",
+    requests: 0,
+  },
+  {
+    scenario: "near expiry",
+    now: 800_000,
+    refresh: () => Promise.resolve("https://example.test/new"),
+    expected: "https://example.test/new",
+    requests: 1,
+  },
+  {
+    scenario: "refresh failure",
+    now: 800_000,
+    refresh: () => Promise.reject(new Error("offline")),
+    expected: null,
+    requests: 1,
+  },
+])(
+  "opens HTML with $scenario without navigating the mounted document",
+  async ({ now, refresh, expected, requests }) => {
+    const { HtmlRenderFrame } = await import("./chat/HtmlRenderFrame");
+    using clock = vi.spyOn(Date, "now").mockReturnValue(0);
+    htmlAsset.refresh.mockReset().mockImplementation(refresh);
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    try {
+      await act(async () =>
+        root.render(
+          <HtmlRenderFrame
+            environmentId={EnvironmentId.make("env")}
+            htmlRender={{ attachmentId: "html", title: "Page" }}
+            threadRef={undefined}
+          />,
+        ),
+      );
+      const inline = container.querySelector('iframe[title="Inline HTML"]');
+      clock.mockReturnValue(now);
+      await act(async () => (container.querySelector("button") as HTMLButtonElement).click());
+      expect(htmlAsset.refresh).toHaveBeenCalledTimes(requests);
+      expect(
+        container.querySelector('iframe[title="Expanded HTML"]')?.getAttribute("src") ?? null,
+      ).toBe(expected);
+      expect(container.querySelector('iframe[title="Inline HTML"]')).toBe(inline);
+      expect(inline?.getAttribute("src")).toBe("https://example.test/cached");
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+      vi.unstubAllGlobals();
+    }
+  },
+);

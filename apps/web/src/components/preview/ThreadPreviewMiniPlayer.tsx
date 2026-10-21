@@ -1,6 +1,8 @@
 /** Localized preview UI and interactions; preserves user data, commands, and protocol values. */
-"use client";
+import { useStableCallback } from "~/hooks/useStableCallback";
 
+import { previewPdfAssetUrl } from "@t3tools/shared/preview";
+import { useEnvironmentHttpBaseUrl } from "~/state/environments";
 import { t } from "~/i18n";
 
 import { FILL_PREVIEW_VIEWPORT, type ScopedThreadRef } from "@t3tools/contracts";
@@ -8,7 +10,6 @@ import { GlobeIcon, PanelRightIcon, PictureInPicture2, XIcon } from "lucide-reac
 import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
-  useCallback,
   useLayoutEffect,
   useRef,
   useState,
@@ -33,6 +34,7 @@ import {
   supportsServerPictureInPicture,
   useServerPictureInPictureKey,
 } from "~/browser/serverPictureInPicture";
+import { useBrowserLayoutZoomFactor } from "~/browser/useBrowserLayoutZoomFactor";
 import { Button } from "~/components/ui/button";
 import { toastManager } from "~/components/ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
@@ -95,7 +97,6 @@ interface PointerGesture {
   readonly target: HTMLElement;
 }
 
-// A touch that travels less than this is a tap on the handle, not a drag.
 const HANDLE_TAP_SLOP_PX = 6;
 
 /** Identifies the owning thread and persisted floating preview state. */
@@ -119,7 +120,6 @@ const RESIZE_HANDLES: ReadonlyArray<{
   { direction: "southeast", className: "-bottom-2 -right-2 size-4 cursor-nwse-resize" },
 ];
 
-/** Floats the thread's browser tab or device stream over chat. */
 export function ThreadPreviewMiniPlayer({ threadRef, miniPlayer }: Props) {
   const { source } = miniPlayer;
   return source.kind === "browser" ? (
@@ -145,6 +145,7 @@ export function ThreadPreviewMiniPlayer({ threadRef, miniPlayer }: Props) {
  * @returns Floating preview UI, or null when the selected tab snapshot is missing.
  */
 function BrowserMiniPlayer({ threadRef, tabId, miniPlayer }: Props & { readonly tabId: string }) {
+  const httpBaseUrl = useEnvironmentHttpBaseUrl(threadRef.environmentId);
   const previewState = useThreadPreviewState(threadRef);
   const snapshot = previewState.sessions[tabId] ?? null;
   const runtimeTabId = previewRuntimeTabId(threadRef, previewState.serverEpoch, tabId);
@@ -153,6 +154,7 @@ function BrowserMiniPlayer({ threadRef, tabId, miniPlayer }: Props & { readonly 
     recordingTabIds.has(runtimeTabId) ||
     findActiveBrowserRecordingRuntimeTabId(threadRef, tabId) !== null;
   const desktopOverlay = previewState.desktopByTabId[tabId] ?? null;
+  const layoutZoomFactor = useBrowserLayoutZoomFactor(desktopOverlay?.zoomFactor ?? 1);
   const fittedSourceContent = useBrowserSurfaceStore(
     (state) => state.byTabId[runtimeTabId]?.fittedSourceContent ?? null,
   );
@@ -168,7 +170,7 @@ function BrowserMiniPlayer({ threadRef, tabId, miniPlayer }: Props & { readonly 
       : resolvePreviewMiniPlayerSourceSize(
           snapshot?.viewport ?? FILL_PREVIEW_VIEWPORT,
           fittedSourceContent,
-          desktopOverlay?.zoomFactor ?? 1,
+          layoutZoomFactor,
         );
 
   const openInPanel = () => {
@@ -202,8 +204,14 @@ function BrowserMiniPlayer({ threadRef, tabId, miniPlayer }: Props & { readonly 
   };
 
   if (!snapshot) return null;
+  const pdfUrl =
+    snapshot.navStatus._tag === "Success"
+      ? previewPdfAssetUrl(snapshot.navStatus.url, httpBaseUrl)
+      : null;
   const poppedOut = serverTab ? serverPictureInPicture : Boolean(desktopOverlay?.pictureInPicture);
-  const canPopOut = serverTab ? supportsServerPictureInPicture() : true;
+  const canPopOut = serverTab
+    ? poppedOut || (pdfUrl === null && supportsServerPictureInPicture())
+    : true;
 
   return (
     <MiniPlayerShell
@@ -251,6 +259,7 @@ function BrowserMiniPlayer({ threadRef, tabId, miniPlayer }: Props & { readonly 
               environmentId={threadRef.environmentId}
               threadId={threadRef.threadId}
               tabId={tabId}
+              pdfUrl={pdfUrl}
               visible
               followSize={false}
               controlPosition="bottom"
@@ -301,10 +310,8 @@ function DeviceMiniPlayer({
   const hostLabel =
     deviceState.hosts.find((host) => host.id === source.hostId)?.label ??
     t.tools.preview.deviceHost;
-  const cornerRadius = useCallback(
-    (player: PreviewMiniPlayerSize) => resolveDeviceMiniPlayerCornerRadius(source.platform, player),
-    [source.platform],
-  );
+  const cornerRadius = (player: PreviewMiniPlayerSize) =>
+    resolveDeviceMiniPlayerCornerRadius(source.platform, player);
 
   const openInPanel = () => {
     usePreviewMiniPlayerStore.getState().close(threadRef);
@@ -326,7 +333,6 @@ function DeviceMiniPlayer({
       cornerRadius={cornerRadius}
     >
       {() => (
-        // The stream is DOM, so it takes the band the browser's native webview would.
         <div
           className="pointer-events-auto absolute inset-0 overflow-hidden rounded-compact-row"
           style={{ zIndex: PREVIEW_MINI_PLAYER_WEBVIEW_Z_INDEX }}
@@ -410,7 +416,7 @@ function MiniPlayerShell({
   ]);
   // Both release and teardown consume the ref before writing, so capture loss
   // cannot submit twice and cleanup retains the gesture's original owner.
-  const commitGesture = useCallback(() => {
+  const commitGesture = useStableCallback(() => {
     stop();
     const gesture = gestureRef.current;
     if (!gesture) return;
@@ -423,7 +429,7 @@ function MiniPlayerShell({
     }
     if (gesture.target.hasPointerCapture(gesture.pointerId))
       gesture.target.releasePointerCapture(gesture.pointerId);
-  }, [stop]);
+  });
   useLayoutEffect(
     () => () => {
       commitGesture();

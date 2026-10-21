@@ -1,6 +1,8 @@
 /** Relay presentation defaults are separate from transport state and authentication. */
 export const englishRelayMessages = {
   tunnelSettingUp: "The environment's T3 Connect tunnel is still being set up.",
+  activityOnlyLink:
+    "This environment is linked only to publish agent activity, so it cannot accept connections. On that computer, open Settings > Connections and turn T3 Connect on.",
   gatewayTimeout:
     "Relay timed out before it finished the request (HTTP 504). Try again in a few minutes. If it keeps failing, copy the trace ID when you report it.",
   unexpectedStatus: (status: number) => `Relay returned an unexpected HTTP ${status}.`,
@@ -24,7 +26,10 @@ export const englishRelayMessages = {
     `Relay could not reach the environment endpoint (${reason}).`,
   endpointTimeout: "Relay timed out while contacting the environment endpoint.",
   linkFailed: (reason: string) => `Relay could not link the environment (${reason}).`,
-  linkUnavailable: (reason: string) => `Relay cannot provision the managed endpoint (${reason}).`,
+  linkUnavailable: (reason: string, provisioningStage?: string) =>
+    `Relay cannot provision the managed endpoint (${reason}).${
+      provisioningStage ? ` Failed stage: ${provisioningStage}.` : ""
+    }`,
   linkLimit: (maxTunnels: number) =>
     `Relay refused the link: this account already has its maximum of ${maxTunnels} managed tunnels. Unlink an environment to free one up.`,
   expiredActivityProof: "Relay rejected an expired agent activity publish proof.",

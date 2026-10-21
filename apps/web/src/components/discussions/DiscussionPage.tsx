@@ -11,7 +11,7 @@ import {
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
 import { Link, useNavigate, useRouter } from "@tanstack/react-router";
-import { useCallback, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { DiscussionTitlebarActions } from "./DiscussionTitlebarActions";
 import { DiscussionEndDialog } from "./DiscussionEndDialog";
 import { DiscussionDeleteDialog } from "./DiscussionDeleteDialog";
@@ -110,10 +110,7 @@ export function DiscussionPage({
   environmentId: EnvironmentId;
 }) {
   const [selectedDiff, setSelectedDiff] = useState<DiscussionDiffSelection | null>(null);
-  const openDiff = useCallback(
-    (selection: DiscussionDiffSelection) => setSelectedDiff(selection),
-    [],
-  );
+  const openDiff = (selection: DiscussionDiffSelection) => setSelectedDiff(selection);
   const useSheet = useMediaQuery(DISCUSSION_PANEL_OVERLAY_MEDIA_QUERY);
   const diffPanel = useTitlebarSlot({
     panel:

@@ -2,8 +2,9 @@ import { t } from "~/i18n";
 import { useState } from "react";
 import * as Option from "effect/Option";
 import type { SshDeviceHostConfig } from "@t3tools/contracts";
-import { CheckIcon, MonitorIcon, XIcon } from "lucide-react";
-import { Button } from "../ui/button";
+import { CheckIcon, ChevronDownIcon, MonitorIcon, XIcon } from "lucide-react";
+import { Button, InlineButton } from "../ui/button";
+import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "../ui/collapsible";
 import { Input } from "../ui/input";
 import { Spinner } from "../ui/spinner";
 import {
@@ -23,6 +24,16 @@ import {
   type DeviceHostCheckTarget,
 } from "./deviceHostConnectionChecks";
 
+/**
+ * Keeps modal chrome independent from per-keystroke SSH draft updates.
+ * @param props.host Initial SSH host config.
+ * @param props.isNew Selects create versus edit wording.
+ * @param props.targets Machines used for connection checks.
+ * @param props.busy Parent save lock.
+ * @param props.onSave Receives the validated host; parent owns persistence.
+ * @param props.onClose Closes the modal without saving.
+ * @returns A dialog shell with an isolated draft form.
+ */
 export function DeviceHostEditor({
   host,
   isNew,
@@ -38,13 +49,6 @@ export function DeviceHostEditor({
   onSave: (host: SshDeviceHostConfig) => void;
   onClose: () => void;
 }) {
-  const [draft, setDraft] = useState(host);
-  const { checks, testConnection } = useHostConnectionChecks(targets);
-  const results = checks[deviceHostConnectionKey(draft)];
-  const checking = Object.values(results ?? {}).some((check) => check.status === "pending");
-  const input = parseDeviceHostDraft({ ...draft, label: draft.label.trim() || draft.target });
-  const valid = Option.isSome(input);
-  const failed = Object.values(results ?? {}).filter((check) => check.status === "failed").length;
   return (
     <Dialog
       open
@@ -52,185 +56,264 @@ export function DeviceHostEditor({
         if (!open && !busy) onClose();
       }}
     >
-      <DialogPopup
-        showCloseButton={!busy}
-        render={
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (Option.isSome(input) && draft.label.trim() && !busy && !checking)
-                onSave(input.value);
-            }}
-          />
-        }
-      >
-        <DialogHeader>
-          <DialogTitle>
-            {isNew
-              ? t.settings.deviceHostEditor.addDeviceHost
-              : t.settings.deviceHostEditor.editDeviceHost}
-          </DialogTitle>
-          <DialogDescription>
-            {targets.length === 1
-              ? t.settings.deviceHostEditor.connectFrom(targets[0]?.label)
-              : t.settings.deviceHostEditor.connectFromSelectedEnvironments(targets.length)}{" "}
-            {t.settings.deviceHostEditor.hostsOnTheSameMachineAreSkipped}
-          </DialogDescription>
-        </DialogHeader>
-        <DialogPanel>
-          <label className="block space-y-1.5 text-sm">
-            <span>{t.settings.diagnostics.columns.name}</span>
-            <Input
-              autoFocus
-              required
-              value={draft.label}
-              disabled={busy}
-              onChange={(event) => setDraft({ ...draft, label: event.target.value })}
-              placeholder="Mac mini"
-            />
-          </label>
-          <label className="block space-y-1.5 text-sm">
-            <span>{t.settings.deviceHostEditor.sshTarget}</span>
-            <Input
-              required
-              value={draft.target}
-              disabled={busy}
-              onChange={(event) => setDraft({ ...draft, target: event.target.value })}
-              placeholder={t.settings.deviceHostEditor.userHostOrSshAlias}
-            />
-          </label>
-          <details
-            open={host.port !== undefined || host.identityFile !== undefined || undefined}
-            className="text-sm"
-          >
-            <summary className="cursor-pointer text-muted-foreground">
-              {t.settings.deviceHostEditor.sshOptions}
-            </summary>
-            <div className="mt-3 grid grid-cols-[minmax(0,1fr)_7rem] gap-3">
-              <label className="block space-y-1.5">
-                <span>{t.settings.deviceHostEditor.identityFile}</span>
-                <Input
-                  value={draft.identityFile ?? ""}
-                  disabled={busy}
-                  onChange={(event) => {
-                    const { identityFile: _, ...rest } = draft;
-                    setDraft(
-                      event.target.value ? { ...rest, identityFile: event.target.value } : rest,
-                    );
-                  }}
-                  placeholder={t.settings.deviceHostEditor.sshConfigDefault}
-                />
-              </label>
-              <label className="block space-y-1.5">
-                <span>{t.settings.connections.ssh.portLabel}</span>
-                <Input
-                  type="number"
-                  min={1}
-                  max={65535}
-                  value={draft.port ?? ""}
-                  disabled={busy}
-                  onChange={(event) => {
-                    const { port: _, ...rest } = draft;
-                    setDraft(
-                      event.target.value ? { ...rest, port: Number(event.target.value) } : rest,
-                    );
-                  }}
-                  placeholder={t.settings.connections.endpoints.default}
-                />
-              </label>
-            </div>
-            <p className="mt-2 text-xs text-muted-foreground">
-              {t.settings.deviceHostEditor.optionalResolvedSeparatelyEachEnvironmentHint}
-            </p>
-          </details>
-          <div className="rounded-lg border border-border/60">
-            <div className="flex items-center justify-between gap-3 px-3 py-2.5">
-              <p role="status" className="text-xs text-muted-foreground">
-                {checking
-                  ? t.settings.integrations.profiles.checkingEnvironments
-                  : results
-                    ? failed
-                      ? t.settings.deviceHostEditor.ofFailed(failed, targets.length)
-                      : t.settings.deviceHostEditor.connectionChecksPassed
-                    : t.settings.deviceHostEditor.checkAccessBeforeSaving}
-              </p>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                disabled={busy || checking || !valid}
-                onClick={() => {
-                  if (Option.isSome(input)) void testConnection(input.value);
-                }}
-              >
-                {checking ? <Spinner size="xs" /> : null}{" "}
-                {t.settings.deviceHostEditor.testConnection}
-              </Button>
-            </div>
-            {results ? (
-              <ul className="border-t border-border/60 divide-y divide-border/40">
-                {targets.map((target) => {
-                  const result = results[target.environmentId];
-                  if (!result) return null;
-                  return (
-                    <li key={target.environmentId} className="px-3 py-2.5 text-xs">
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="truncate font-medium">{target.label}</span>
-                        <span
-                          className={`flex shrink-0 items-center gap-1.5 ${result.status === "failed" ? "text-destructive" : "text-muted-foreground"}`}
-                        >
-                          {result.status === "pending" ? (
-                            <>
-                              <Spinner size="xs" /> {t.settings.deviceHostEditor.checking}
-                            </>
-                          ) : result.status === "local" ? (
-                            <>
-                              <MonitorIcon className="size-3" />{" "}
-                              {t.settings.deviceHostEditor.alreadyAvailableLocally}
-                            </>
-                          ) : result.status === "failed" ? (
-                            <>
-                              <XIcon className="size-3" /> {t.settings.deviceHostEditor.failed}
-                            </>
-                          ) : (
-                            <>
-                              <CheckIcon className="size-3" />{" "}
-                              {t.settings.deviceHostEditor.connected}
-                            </>
-                          )}
-                        </span>
-                      </div>
-                      {result.status === "connected" ? (
-                        <div className="mt-1.5">
-                          <DeviceHostAvailability platforms={result.platforms} />
-                        </div>
-                      ) : null}
-                      {result.status === "failed" ? (
-                        <details className="mt-1.5 text-muted-foreground">
-                          <summary className="cursor-pointer">
-                            {t.settings.deviceHostEditor.showError}
-                          </summary>
-                          <p className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-words">
-                            {result.error}
-                          </p>
-                        </details>
-                      ) : null}
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : null}
-          </div>
-        </DialogPanel>
-        <DialogFooter>
-          <Button type="button" variant="ghost" disabled={busy} onClick={onClose}>
-            {t.settings.actions.cancel}
-          </Button>
-          <Button type="submit" disabled={busy || checking || !valid || !draft.label.trim()}>
-            {busy ? <Spinner size="xs" /> : null} {t.settings.deviceHostEditor.saveHost}
-          </Button>
-        </DialogFooter>
+      {/* The form owns the draft so a keystroke re-renders it, not the dialog chrome. */}
+      <DialogPopup showCloseButton={!busy}>
+        <DeviceHostEditorForm
+          host={host}
+          isNew={isNew}
+          targets={targets}
+          busy={busy}
+          onSave={onSave}
+          onClose={onClose}
+        />
       </DialogPopup>
     </Dialog>
+  );
+}
+
+/**
+ * Keeps connection-check results tied to the edited SSH destination rather than a stale draft.
+ * @param props.host Initial host config copied into local draft state.
+ * @param props.isNew Whether this draft creates a host.
+ * @param props.targets Machines to test against.
+ * @param props.busy Parent save lock.
+ * @param props.onSave Receives the next host config after local validation.
+ * @param props.onClose Cancels editing; no settings are persisted by this form.
+ * @returns Draft fields and connection diagnostics; check transport is owned by useHostConnectionChecks.
+ */
+function DeviceHostEditorForm({
+  host,
+  isNew,
+  targets,
+  busy,
+  onSave,
+  onClose,
+}: {
+  host: SshDeviceHostConfig;
+  isNew: boolean;
+  targets: ReadonlyArray<DeviceHostCheckTarget>;
+  busy: boolean;
+  onSave: (host: SshDeviceHostConfig) => void;
+  onClose: () => void;
+}) {
+  const [draft, setDraft] = useState(host);
+  const [expandedChecks, setExpandedChecks] = useState<{ key: string; open: boolean } | null>(null);
+  const { checks, testConnection } = useHostConnectionChecks(targets);
+  const connectionKey = deviceHostConnectionKey(draft);
+  const results = checks[connectionKey];
+  const checking = Object.values(results ?? {}).some((check) => check.status === "pending");
+  const input = parseDeviceHostDraft({ ...draft, label: draft.label.trim() || draft.target });
+  const valid = Option.isSome(input);
+  const failed = Object.values(results ?? {}).filter((check) => check.status === "failed").length;
+  const checksOpen =
+    targets.length === 1 ||
+    (expandedChecks?.key === connectionKey ? expandedChecks.open : failed > 0);
+  const checkSummary = checking
+    ? t.settings.integrations.profiles.checkingEnvironments
+    : results
+      ? failed
+        ? t.settings.deviceHostEditor.ofFailed(failed, targets.length)
+        : t.settings.deviceHostEditor.connectionChecksPassed
+      : t.settings.deviceHostEditor.checkAccessBeforeSaving;
+  return (
+    <form
+      className="flex min-h-0 flex-col"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (Option.isSome(input) && draft.label.trim() && !busy && !checking) onSave(input.value);
+      }}
+    >
+      <DialogHeader>
+        <DialogTitle>
+          {isNew
+            ? t.settings.deviceHostEditor.addDeviceHost
+            : t.settings.deviceHostEditor.editDeviceHost}
+        </DialogTitle>
+        <DialogDescription>
+          {targets.length === 1
+            ? t.settings.deviceHostEditor.connectFrom(targets[0]?.label)
+            : t.settings.deviceHostEditor.connectFromSelectedEnvironments(targets.length)}{" "}
+          {t.settings.deviceHostEditor.hostsOnTheSameMachineAreSkipped}
+        </DialogDescription>
+      </DialogHeader>
+      <DialogPanel>
+        <label className="block space-y-1.5 text-sm">
+          <span>{t.settings.diagnostics.columns.name}</span>
+          <Input
+            autoFocus
+            required
+            value={draft.label}
+            disabled={busy}
+            onChange={(event) => {
+              const label = event.target.value;
+              setDraft((current) => ({ ...current, label }));
+            }}
+            placeholder="Mac mini"
+          />
+        </label>
+        <label className="block space-y-1.5 text-sm">
+          <span>{t.settings.deviceHostEditor.sshTarget}</span>
+          <Input
+            required
+            value={draft.target}
+            disabled={busy}
+            onChange={(event) => {
+              const target = event.target.value;
+              setDraft((current) => ({ ...current, target }));
+            }}
+            placeholder={t.settings.deviceHostEditor.userHostOrSshAlias}
+          />
+        </label>
+        <details
+          open={host.port !== undefined || host.identityFile !== undefined || undefined}
+          className="text-sm"
+        >
+          <summary className="cursor-pointer text-muted-foreground">
+            {t.settings.deviceHostEditor.sshOptions}
+          </summary>
+          <div className="mt-3 grid grid-cols-[minmax(0,1fr)_7rem] gap-3">
+            <label className="block space-y-1.5">
+              <span>{t.settings.deviceHostEditor.identityFile}</span>
+              <Input
+                value={draft.identityFile ?? ""}
+                disabled={busy}
+                onChange={(event) => {
+                  const identityFile = event.target.value;
+                  setDraft((current) => {
+                    const { identityFile: _, ...rest } = current;
+                    return identityFile ? { ...rest, identityFile } : rest;
+                  });
+                }}
+                placeholder={t.settings.deviceHostEditor.sshConfigDefault}
+              />
+            </label>
+            <label className="block space-y-1.5">
+              <span>{t.settings.connections.ssh.portLabel}</span>
+              <Input
+                type="number"
+                min={1}
+                max={65535}
+                value={draft.port ?? ""}
+                disabled={busy}
+                onChange={(event) => {
+                  const port = event.target.value;
+                  setDraft((current) => {
+                    const { port: _, ...rest } = current;
+                    return port ? { ...rest, port: Number(port) } : rest;
+                  });
+                }}
+                placeholder={t.settings.connections.endpoints.default}
+              />
+            </label>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {t.settings.deviceHostEditor.optionalResolvedSeparatelyEachEnvironmentHint}
+          </p>
+        </details>
+        <Collapsible
+          open={checksOpen}
+          onOpenChange={(open) => setExpandedChecks({ key: connectionKey, open })}
+          render={<div className="rounded-lg border border-border/60" />}
+        >
+          <div className="flex items-center justify-between gap-3 px-3 py-2.5">
+            {targets.length === 1 ? (
+              <p role="status" className="text-xs text-muted-foreground">
+                {checkSummary}
+              </p>
+            ) : (
+              <div className="min-w-0 text-xs [--inline-button-white-space:normal]">
+                <CollapsibleTrigger
+                  disabled={!results}
+                  aria-label={`${checkSummary}. Per-machine results`}
+                  render={<InlineButton tone="muted" />}
+                >
+                  <span role="status" className="text-left">
+                    {checkSummary}
+                  </span>
+                  {results ? (
+                    <ChevronDownIcon
+                      className={`size-3 shrink-0 ${checksOpen ? "rotate-180" : ""}`}
+                    />
+                  ) : null}
+                </CollapsibleTrigger>
+              </div>
+            )}
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={busy || checking || !valid}
+              onClick={() => {
+                if (Option.isSome(input)) void testConnection(input.value);
+              }}
+            >
+              {checking ? <Spinner size="xs" /> : null} {t.settings.deviceHostEditor.testConnection}
+            </Button>
+          </div>
+          {results ? (
+            <CollapsiblePanel
+              render={<ul className="border-t border-border/60 divide-y divide-border/40" />}
+            >
+              {targets.map((target) => {
+                const result = results[target.environmentId];
+                if (!result) return null;
+                return (
+                  <li key={target.environmentId} className="px-3 py-2.5 text-xs">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="truncate font-medium">{target.label}</span>
+                      <span
+                        className={`flex shrink-0 items-center gap-1.5 ${result.status === "failed" ? "text-destructive" : "text-muted-foreground"}`}
+                      >
+                        {result.status === "pending" ? (
+                          <>
+                            <Spinner size="xs" /> {t.settings.deviceHostEditor.checking}
+                          </>
+                        ) : result.status === "local" ? (
+                          <>
+                            <MonitorIcon className="size-3" />{" "}
+                            {t.settings.deviceHostEditor.alreadyAvailableLocally}
+                          </>
+                        ) : result.status === "failed" ? (
+                          <>
+                            <XIcon className="size-3" /> {t.settings.deviceHostEditor.failed}
+                          </>
+                        ) : (
+                          <>
+                            <CheckIcon className="size-3" /> {t.settings.deviceHostEditor.connected}
+                          </>
+                        )}
+                      </span>
+                    </div>
+                    {result.status === "connected" ? (
+                      <div className="mt-1.5">
+                        <DeviceHostAvailability platforms={result.platforms} />
+                      </div>
+                    ) : null}
+                    {result.status === "failed" ? (
+                      <details className="mt-1.5 text-muted-foreground">
+                        <summary className="cursor-pointer">
+                          {t.settings.deviceHostEditor.showError}
+                        </summary>
+                        <p className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-words">
+                          {result.error}
+                        </p>
+                      </details>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </CollapsiblePanel>
+          ) : null}
+        </Collapsible>
+      </DialogPanel>
+      <DialogFooter>
+        <Button type="button" variant="ghost" disabled={busy} onClick={onClose}>
+          {t.settings.actions.cancel}
+        </Button>
+        <Button type="submit" disabled={busy || checking || !valid || !draft.label.trim()}>
+          {busy ? <Spinner size="xs" /> : null} {t.settings.deviceHostEditor.saveHost}
+        </Button>
+      </DialogFooter>
+    </form>
   );
 }

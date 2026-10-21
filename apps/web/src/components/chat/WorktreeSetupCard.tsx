@@ -34,11 +34,8 @@ import { worktreeSetupPresentation } from "./WorktreeSetupCard.logic";
 /** Host-owned setup snapshot and actions; null callbacks remain unavailable. */
 interface WorktreeSetupCardProps {
   snapshot: WorktreeSetupSnapshot;
-  /** Interrupts the server-side bootstrap. Hidden once the setup has settled. */
   onCancel: (() => void) | null;
-  /** Restarts the same message in the project checkout instead of a worktree. */
   onWorkLocally: (() => void) | null;
-  /** Reveals the setup script terminal tab. Null when no script ran. */
   onOpenTerminal: (() => void) | null;
 }
 
@@ -51,10 +48,6 @@ function stageElapsedMs(stage: WorktreeSetupStage, nowMs: number): number | null
   return Math.max(0, end - start);
 }
 
-/**
- * Ticks once a second while any stage runs so elapsed labels stay live
- * without pushing a React commit through the timeline for every second.
- */
 function useNowWhile(active: boolean): number {
   const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
@@ -149,7 +142,6 @@ function SetupHeaderRow({
   );
 }
 
-/** One stage, rendered like a live work entry row. */
 function StageRow({
   stage,
   nowMs,
@@ -199,15 +191,9 @@ function StageRow({
   );
 }
 
-/** The server keeps this many trailing lines; the box is sized for exactly that. */
 const OUTPUT_TAIL_LINES = 4;
 const OUTPUT_TAIL_SLOTS = Array.from({ length: OUTPUT_TAIL_LINES }, (_, slot) => slot);
 
-/**
- * Fixed-height window onto the script's last lines. Rows never wrap and the
- * box never grows or shrinks, so streaming output cannot push the timeline
- * around while the script runs.
- */
 function OutputTail({ lines, failed }: { lines: ReadonlyArray<string>; failed: boolean }) {
   const rows = OUTPUT_TAIL_SLOTS.map((slot) => ({
     slot,
@@ -273,11 +259,6 @@ function SetupDetails({ snapshot }: { snapshot: WorktreeSetupSnapshot }) {
   );
 }
 
-/**
- * One-line summary of a settled setup under a live turn. A clean finish is
- * removed from the timeline altogether, so this only renders the outcomes
- * worth keeping: a failed script, a failed setup, or a cancelled one.
- */
 function CollapsedSummaryRow({
   snapshot,
   totalElapsed,
@@ -328,11 +309,6 @@ export function WorktreeSetupCard({
   onOpenTerminal,
   embedded = false,
 }: WorktreeSetupCardProps & {
-  /**
-   * The agent's turn is live and owns the "Working for" header. The stage
-   * list stays exactly where it was so the handoff never moves anything; a
-   * failed script that outlives the handoff collapses to a single row.
-   */
   embedded?: boolean;
 }) {
   const running = snapshot.phase === "running";
@@ -362,7 +338,6 @@ export function WorktreeSetupCard({
       ) : (
         <>
           <SetupHeaderRow snapshot={snapshot} totalElapsed={totalElapsed} onCancel={onCancel} />
-          {detailsOpen ? <SetupDetails snapshot={snapshot} /> : null}
           <div>
             {snapshot.stages.map((stage) => (
               <div key={stage.id}>
@@ -385,8 +360,6 @@ export function WorktreeSetupCard({
           {snapshot.error}
         </p>
       ) : null}
-
-      {collapsed && detailsOpen ? <SetupDetails snapshot={snapshot} /> : null}
 
       <div className="flex flex-wrap items-center gap-1.5">
         {showTerminal && onOpenTerminal ? (
@@ -412,6 +385,7 @@ export function WorktreeSetupCard({
           {t.chat.worktreeSetup.details}
         </Button>
       </div>
+      {detailsOpen ? <SetupDetails snapshot={snapshot} /> : null}
     </section>
   );
 }

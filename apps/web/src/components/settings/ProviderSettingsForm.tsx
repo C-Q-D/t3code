@@ -1,8 +1,7 @@
 /** Renders schema-defined provider fields; config defaults and secret handling remain schema-owned. */
-"use client";
 
 import { t } from "~/i18n";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import {
@@ -24,7 +23,6 @@ import { Switch } from "../ui/switch";
 import { Textarea } from "../ui/textarea";
 import type { ProviderClientDefinition } from "@t3tools/provider-core/client";
 
-/** What the form reads from a definition: an agent provider's, or a source control host's. */
 export type SettingsFormDefinition = Pick<ProviderClientDefinition, "settingsSchema"> & {
   readonly driverKind?: ProviderClientDefinition["driverKind"];
   /** Client-only presentation overrides keyed by schema field; never changes stored values. */
@@ -44,7 +42,7 @@ export interface ProviderSettingsFieldModel {
   /** Kept in the server's secret store: a saved value arrives as `SECRET_REDACTED` and never shows. */
   readonly secret?: boolean | undefined;
   readonly defaultBooleanValue?: boolean | undefined;
-  /** Choices for a `select` control. The first entry is the default. */
+
   readonly options?: ReadonlyArray<ProviderSettingsFormOption> | undefined;
 }
 
@@ -170,6 +168,21 @@ function commandArgumentsEqual(left: ReadonlyArray<string>, right: ReadonlyArray
 }
 
 /**
+ * Tolerates older or malformed provider blobs without passing non-string arguments to command previews.
+ * @param value Unknown provider config value; null or non-object values are allowed.
+ * @returns Only string command arguments in original order, or an empty array.
+ */
+function configuredCommandArgs(value: ProviderSettingsFormProps["value"]) {
+  const configured =
+    value !== null && typeof value === "object"
+      ? (value as Record<string, unknown>).commandArgs
+      : undefined;
+  return Array.isArray(configured)
+    ? configured.filter((argument): argument is string => typeof argument === "string")
+    : [];
+}
+
+/**
  * Edits local ACP arguments as literal rows; localized labels never alter argument values.
  * @param props Current configuration and callback receiving the updated configuration after
  * an argument is added, removed, or committed. The caller owns persistence and save errors.
@@ -179,15 +192,7 @@ function ProviderCommandArguments({
   value,
   onChange,
 }: Pick<ProviderSettingsFormProps, "value" | "onChange">) {
-  const args = useMemo(() => {
-    const configured =
-      value !== null && typeof value === "object"
-        ? (value as Record<string, unknown>).commandArgs
-        : undefined;
-    return Array.isArray(configured)
-      ? configured.filter((argument): argument is string => typeof argument === "string")
-      : [];
-  }, [value]);
+  const args = configuredCommandArgs(value);
   const [rows, setRows] = useState(() => args.map(makeCommandArgumentDraftRow));
   const rowsRef = useRef(rows);
   const previousArgsRef = useRef(args);
@@ -314,15 +319,10 @@ interface ProviderSettingsFormProps {
   readonly definition: SettingsFormDefinition;
   readonly value: unknown;
   readonly idPrefix: string;
-  /**
-   * `card` stacks label over control, `dialog` is the compact wizard layout,
-   * and `settings` renders the shared settings row treatment.
-   */
   readonly variant: "card" | "dialog" | "settings";
   readonly onChange: (nextConfig: Record<string, unknown> | undefined) => void;
 }
 
-/** Stores the default choice as an omitted key so unchanged configs stay small. */
 function ProviderSettingsSelect({
   field,
   value,
@@ -406,6 +406,8 @@ function ProviderSettingsFieldRow({
 
   if (variant === "settings") {
     const descriptionId = field.description ? `${inputId}-description` : undefined;
+    const secretConfigured =
+      field.secret === true && readProviderConfigString(value, field.key).length > 0;
     const control =
       field.control === "switch" ? (
         <Switch
@@ -438,15 +440,28 @@ function ProviderSettingsFieldRow({
           spellCheck={false}
         />
       ) : field.secret ? (
-        <SecretInput
-          id={inputId}
-          aria-describedby={descriptionId}
-          size="settings"
-          className="w-full max-w-full @min-[32rem]/settings-row:w-56"
-          configured={readProviderConfigString(value, field.key).length > 0}
-          value=""
-          onCommit={(next) => onChange(nextProviderConfigWithFieldValue(value, field, next))}
-        />
+        <div className="flex w-full min-w-0 items-center gap-2 @min-[32rem]/settings-row:w-56">
+          <SecretInput
+            id={inputId}
+            aria-describedby={descriptionId}
+            size="settings"
+            className="min-w-0 flex-1"
+            configured={secretConfigured}
+            value=""
+            onCommit={(next) => onChange(nextProviderConfigWithFieldValue(value, field, next))}
+          />
+          {secretConfigured ? (
+            <Button
+              type="button"
+              size="icon-sm"
+              variant="ghost-destructive"
+              onClick={() => onChange(nextProviderConfigWithFieldValue(value, field, ""))}
+              aria-label={t.settings.providerSettingsForm.clearSecret(field.label)}
+            >
+              <XIcon className="size-3.5" />
+            </Button>
+          ) : null}
+        </div>
       ) : (
         <DraftInput
           id={inputId}
@@ -582,10 +597,7 @@ export function ProviderSettingsForm({
   variant,
   onChange,
 }: ProviderSettingsFormProps) {
-  const fields = useMemo(
-    () => deriveProviderSettingsFields(definition, value),
-    [definition, value],
-  );
+  const fields = deriveProviderSettingsFields(definition, value);
   const isLocalAcp =
     definition.driverKind === "acpRegistry" &&
     readProviderConfigString(value, "source") === "local";

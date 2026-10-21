@@ -293,7 +293,7 @@ export const chat = {
     changeModelNewChat: "Start a new chat to change models",
     changeModelUnsupported:
       "This provider does not allow switching models after a conversation has started.",
-    rewindMessageUnavailable: "The message to rewind is no longer available.",
+    rewindMessageUnavailable: "The thread has changed. Select a message to rewind again.",
     rewindTimeout: "Timed out waiting for the thread to rewind.",
     noActiveThread: "No active thread",
     pickThread: "Pick a thread to continue",
@@ -353,6 +353,8 @@ export const chat = {
     /** Describes the previousBranch used by this thread and the currentBranch used on its next send. */
     branchMismatchHint: (previousBranch: string, currentBranch: string) =>
       `This thread last ran on ${previousBranch}. Sending will continue on ${currentBranch}.`,
+    showSubagent: (label: string) => `Show subagent ${label}`,
+    showSubagentAction: "Show",
   },
 
   rightPanel: {
@@ -450,6 +452,7 @@ export const chat = {
     pathCopiedToast: "Path copied",
     copyPathError: "Failed to copy path",
     modelWorktreeHint: "Each model starts in its own worktree.",
+    fromRemoteRef: (ref: string) => `From ${ref} (remote)`,
   },
   header: {
     /** Labels navigation to the named parent thread. */
@@ -641,7 +644,7 @@ export const chat = {
     unableToLinkPullRequest: "Unable to link pull request",
     unableToUnlinkPullRequest: "Unable to unlink pull request",
     theRequestFailed: "The request failed.",
-    mermaidFailedToLoad: "Mermaid failed to load.",
+    mermaidFailedToLoad: "The diagram renderer failed to load.",
     theDiagramCouldNotBeRendered: "The diagram could not be rendered.",
     expandDiagram: "Expand diagram",
     zoomIn: "Zoom in",
@@ -1025,6 +1028,8 @@ export const chat = {
     snoozeUntilReset: "Snooze until reset",
     /** Formats the existing localized reset date. */
     resets: (time: string): string => `Resets ${time}`,
+    snoozeError: "Could not snooze thread",
+    autoResumeError: "Could not change auto-resume",
   },
   subagents: {
     workflowFailed: "Workflow failed",

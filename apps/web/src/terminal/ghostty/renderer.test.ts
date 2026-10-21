@@ -2,12 +2,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import { GHOSTTY_CELL_WIDE, type GhosttyCell, type GhosttySnapshot } from "./core";
-import {
-  ghosttyTextRunEnd,
-  measureGhosttyCell,
-  renderGhosttySnapshot,
-  terminalGridSize,
-} from "./renderer";
+import { measureGhosttyCell, renderGhosttySnapshot, terminalGridSize } from "./renderer";
 
 const cell = (text: string, wide = 0): GhosttyCell => ({
   text,
@@ -58,7 +53,7 @@ describe("measureGhosttyCell", () => {
   });
 });
 
-describe("ghosttyTextRunEnd", () => {
+describe("wide text rendering", () => {
   it("includes wide spacer tails in the visual clip without rendering spaces", () => {
     const cells = [
       cell("界", GHOSTTY_CELL_WIDE.wide),
@@ -67,7 +62,44 @@ describe("ghosttyTextRunEnd", () => {
       cell("", GHOSTTY_CELL_WIDE.spacerTail),
       cell(""),
     ];
-    expect(ghosttyTextRunEnd(cells, 0, () => true)).toBe(4);
+    const text: unknown[][] = [];
+    const clips: number[][] = [];
+    const context = {
+      canvas: { width: 200, height: 40 },
+      beginPath() {},
+      clip() {},
+      fillRect() {},
+      resetTransform() {},
+      restore() {},
+      save() {},
+      rect: (...args: number[]) => clips.push(args),
+      fillText: (...args: unknown[]) => text.push(args),
+    } as unknown as CanvasRenderingContext2D;
+    renderGhosttySnapshot({
+      context,
+      snapshot: {
+        cols: 5,
+        rows: 1,
+        foreground: { r: 255, g: 255, b: 255 },
+        background: { r: 0, g: 0, b: 0 },
+        cursor: { r: 255, g: 255, b: 255 },
+        cursorX: -1,
+        cursorY: -1,
+        cursorVisible: false,
+        cursorBlinking: false,
+        cursorStyle: 1,
+        dirtyRows: new Set([0]),
+        rowData: [{ cells, text: "界🙂", isWrapContinuation: false, wrapsToNext: false }],
+      },
+      metrics: { width: 10, height: 20, baseline: 15 },
+      fontSize: 12,
+      fontFamily: "monospace",
+      padding: 4,
+      forceFull: false,
+      cursorOn: false,
+    });
+    expect(text).toEqual([["界🙂", 4, 19, 40]]);
+    expect(clips).toContainEqual([4, 4, 40, 20]);
   });
 });
 

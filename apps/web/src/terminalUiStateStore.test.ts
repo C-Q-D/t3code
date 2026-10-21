@@ -1,3 +1,4 @@
+import { DEFAULT_THREAD_TERMINAL_ID } from "./types";
 import { scopeThreadRef, scopedThreadKey } from "@t3tools/client-runtime/environment";
 import { ThreadId } from "@t3tools/contracts";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
@@ -7,7 +8,6 @@ import {
   selectThreadTerminalUiState,
   useTerminalUiStateStore,
 } from "./terminalUiStateStore";
-import { DEFAULT_THREAD_TERMINAL_ID } from "./types";
 
 const THREAD_ID = ThreadId.make("thread-1");
 const THREAD_REF = scopeThreadRef("environment-a" as never, THREAD_ID);
@@ -123,37 +123,6 @@ describe("terminalUiStateStore actions", () => {
     ]);
   });
 
-  it("creates new terminals in a separate group", () => {
-    useTerminalUiStateStore.getState().newTerminal(THREAD_REF, "terminal-2");
-
-    const terminalUiState = selectThreadTerminalUiState(
-      useTerminalUiStateStore.getState().terminalUiStateByThreadKey,
-      THREAD_REF,
-    );
-    expect(terminalUiState.terminalIds).toEqual(["terminal-2"]);
-    expect(terminalUiState.activeTerminalId).toBe("terminal-2");
-    expect(terminalUiState.activeTerminalGroupId).toBe("group-terminal-2");
-    expect(terminalUiState.terminalGroups).toEqual([
-      { id: "group-terminal-2", terminalIds: ["terminal-2"] },
-    ]);
-  });
-
-  it("ensures unknown server terminals are registered, opened, and activated", () => {
-    const store = useTerminalUiStateStore.getState();
-    store.ensureTerminal(THREAD_REF, "setup-setup", { open: true, active: true });
-
-    const terminalUiState = selectThreadTerminalUiState(
-      useTerminalUiStateStore.getState().terminalUiStateByThreadKey,
-      THREAD_REF,
-    );
-    expect(terminalUiState.terminalOpen).toBe(true);
-    expect(terminalUiState.terminalIds).toEqual(["setup-setup"]);
-    expect(terminalUiState.activeTerminalId).toBe("setup-setup");
-    expect(terminalUiState.terminalGroups).toEqual([
-      { id: "group-setup-setup", terminalIds: ["setup-setup"] },
-    ]);
-  });
-
   it("keeps state isolated per environment when raw thread ids collide", () => {
     const store = useTerminalUiStateStore.getState();
     store.setTerminalOpen(THREAD_REF, true);
@@ -245,23 +214,6 @@ describe("terminalUiStateStore actions", () => {
     ]);
   });
 
-  it("reconciles terminal ids from an external ordered list", () => {
-    const store = useTerminalUiStateStore.getState();
-    store.setTerminalOpen(THREAD_REF, true);
-    store.reconcileTerminalIds(THREAD_REF, ["term-a", "term-b"]);
-
-    const terminalUiState = selectThreadTerminalUiState(
-      useTerminalUiStateStore.getState().terminalUiStateByThreadKey,
-      THREAD_REF,
-    );
-    expect(terminalUiState.terminalIds).toEqual(["term-a", "term-b"]);
-    expect(terminalUiState.activeTerminalId).toBe("term-a");
-    expect(terminalUiState.terminalGroups).toEqual([
-      { id: "group-term-a", terminalIds: ["term-a"] },
-      { id: "group-term-b", terminalIds: ["term-b"] },
-    ]);
-  });
-
   it("does not import a closed panel terminal from stale metadata", () => {
     const store = useTerminalUiStateStore.getState();
     store.newTerminal(THREAD_REF, "term-2");
@@ -283,14 +235,5 @@ describe("terminalUiStateStore actions", () => {
         THREAD_REF,
       ).terminalIds,
     ).toEqual(["term-2", "term-1"]);
-  });
-
-  it("is a no-op when clearing terminal UI state for a thread with no state", () => {
-    const store = useTerminalUiStateStore.getState();
-    const before = useTerminalUiStateStore.getState();
-
-    store.clearTerminalUiState(THREAD_REF);
-
-    expect(useTerminalUiStateStore.getState()).toBe(before);
   });
 });

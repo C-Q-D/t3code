@@ -2,7 +2,6 @@
 import { t } from "~/i18n";
 import type { PullRequestReaction, PullRequestReactionContent } from "@t3tools/contracts";
 
-/** The picker's order, which is GitHub's: the two verdicts first, then the rest as it lists them. */
 export const PULL_REQUEST_REACTION_ORDER: ReadonlyArray<PullRequestReactionContent> = [
   "thumbs-up",
   "thumbs-down",
@@ -53,7 +52,6 @@ export function pullRequestReactionName(content: PullRequestReactionContent): st
   return t.git.pullRequest.reactionNames[REACTION_NAME[content]];
 }
 
-/** Past three names the sentence stops being readable and starts being a list. */
 const NAMED_ACTOR_LIMIT = 3;
 
 /**
@@ -106,11 +104,6 @@ export function pullRequestReactionTooltip(reaction: PullRequestReaction): strin
   );
 }
 
-/**
- * The list as it should be drawn while a reaction is still in flight. Reading a change request
- * back from the host takes seconds, and a pill that does not move until then reads as a press
- * that did nothing.
- */
 export function applyPendingPullRequestReactions(
   reactions: ReadonlyArray<PullRequestReaction>,
   pending: ReadonlyMap<PullRequestReactionContent, boolean>,

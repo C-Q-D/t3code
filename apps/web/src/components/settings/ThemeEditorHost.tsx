@@ -1,5 +1,5 @@
 import { t } from "~/i18n";
-import { lazy, Suspense, useCallback, useSyncExternalStore } from "react";
+import { lazy, Suspense, useSyncExternalStore } from "react";
 
 import { useTheme } from "../../hooks/useTheme";
 import {
@@ -42,54 +42,13 @@ export function ThemeEditorHost() {
   // The panel reports which path it actually took: a theme removed while its
   // editor is open resolves to null there, so the save becomes a create even
   // though the session still names it.
-  const handleSaved = useCallback(
-    (
-      savedTheme: ThemeDefinition,
-      { created, mergedAppearance }: { created: boolean; mergedAppearance?: ThemeAppearance },
-    ) => {
-      // A merge completed an existing theme's light/dark pair; activating the
-      // whole theme shows the new palette right away.
-      if (mergedAppearance) {
-        if (!setTheme(savedTheme.id)) {
-          toastManager.add(
-            stackedThreadToast({
-              type: "error",
-              title: t.settings.themeEditorHost.couldNotSaveYourTheme,
-              description: t.settings.themeEditorHost.browserStorageUnavailableChangeKeptHint,
-            }),
-          );
-          return false;
-        }
-        toastManager.add(
-          stackedThreadToast({
-            type: "success",
-            title: t.settings.themeEditorHost.updated(savedTheme.label),
-            description: t.settings.themeEditorHost.itsPaletteWasAdded(mergedAppearance),
-          }),
-        );
-        return true;
-      }
-      if (!created) {
-        // The edited theme may be showing through the base preference or either
-        // half of the mix; the preference itself is untouched (a setTheme here
-        // would clear the mix), the palette just needs re-applying.
-        const wasActive =
-          getThemeDefinition(theme)?.id === savedTheme.id ||
-          themeHalves?.light === savedTheme.id ||
-          themeHalves?.dark === savedTheme.id;
-        if (wasActive) refreshTheme();
-        toastManager.add(
-          stackedThreadToast({
-            type: "success",
-            title: t.settings.themeEditorHost.saved(savedTheme.label),
-            description: wasActive
-              ? t.settings.themeEditorHost.yourChangesAreNowActive
-              : t.settings.themeEditorHost.yourChangesAreSaved,
-          }),
-        );
-        return true;
-      }
-
+  const handleSaved = (
+    savedTheme: ThemeDefinition,
+    { created, mergedAppearance }: { created: boolean; mergedAppearance?: ThemeAppearance },
+  ) => {
+    // A merge completed an existing theme's light/dark pair; activating the
+    // whole theme shows the new palette right away.
+    if (mergedAppearance) {
       if (!setTheme(savedTheme.id)) {
         toastManager.add(
           stackedThreadToast({
@@ -103,14 +62,52 @@ export function ThemeEditorHost() {
       toastManager.add(
         stackedThreadToast({
           type: "success",
-          title: t.settings.themeEditorHost.created(savedTheme.label),
-          description: t.settings.themeEditorHost.itSNowActive,
+          title: t.settings.themeEditorHost.updated(savedTheme.label),
+          description: t.settings.themeEditorHost.itsPaletteWasAdded(mergedAppearance),
         }),
       );
       return true;
-    },
-    [refreshTheme, setTheme, theme, themeHalves],
-  );
+    }
+    if (!created) {
+      // The edited theme may be showing through the base preference or either
+      // half of the mix; the preference itself is untouched (a setTheme here
+      // would clear the mix), the palette just needs re-applying.
+      const wasActive =
+        getThemeDefinition(theme)?.id === savedTheme.id ||
+        themeHalves?.light === savedTheme.id ||
+        themeHalves?.dark === savedTheme.id;
+      if (wasActive) refreshTheme();
+      toastManager.add(
+        stackedThreadToast({
+          type: "success",
+          title: t.settings.themeEditorHost.saved(savedTheme.label),
+          description: wasActive
+            ? t.settings.themeEditorHost.yourChangesAreNowActive
+            : t.settings.themeEditorHost.yourChangesAreSaved,
+        }),
+      );
+      return true;
+    }
+
+    if (!setTheme(savedTheme.id)) {
+      toastManager.add(
+        stackedThreadToast({
+          type: "error",
+          title: t.settings.themeEditorHost.couldNotSaveYourTheme,
+          description: t.settings.themeEditorHost.browserStorageUnavailableChangeKeptHint,
+        }),
+      );
+      return false;
+    }
+    toastManager.add(
+      stackedThreadToast({
+        type: "success",
+        title: t.settings.themeEditorHost.created(savedTheme.label),
+        description: t.settings.themeEditorHost.itSNowActive,
+      }),
+    );
+    return true;
+  };
 
   if (!session) return null;
 

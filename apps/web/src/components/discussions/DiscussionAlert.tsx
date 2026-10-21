@@ -4,7 +4,6 @@ import type { Discussion, EnvironmentId } from "@t3tools/contracts";
 import { Link } from "@tanstack/react-router";
 import { Atom } from "effect/reactivity";
 import { CircleAlertIcon, InfoIcon, TriangleAlertIcon } from "lucide-react";
-import { useMemo } from "react";
 import { useEnvironmentSettings } from "~/hooks/useSettings";
 import { activeLocale, t } from "~/i18n";
 import { applyProviderInstanceSettings, deriveProviderInstanceEntries } from "~/providerInstances";
@@ -41,7 +40,7 @@ export function DiscussionAlert({
   const providers =
     useAtomValue(serverEnvironment.providersValueAtom(environmentId)) ?? EMPTY_SERVER_PROVIDERS;
   const settings = useEnvironmentSettings(environmentId);
-  const providerNames = useMemo(() => {
+  const providerNames = (() => {
     const instances = applyProviderInstanceSettings(
       deriveProviderInstanceEntries(providers),
       settings,
@@ -56,7 +55,7 @@ export function DiscussionAlert({
         ),
       ]),
     );
-  }, [discussion.projectId, discussion.seats, providers, settings]);
+  })();
   const view = discussionAlertView(
     discussion,
     requests,

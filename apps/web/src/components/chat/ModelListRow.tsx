@@ -7,7 +7,6 @@ import {
   getDisplayModelName,
   getProviderRowLabel,
   getTriggerDisplayModelLabel,
-  type ModelEsque,
 } from "./providerIconUtils";
 import { ComboboxItem } from "../ui/combobox";
 import { Button } from "../ui/button";
@@ -21,16 +20,12 @@ import { ProviderInstanceIcon } from "./ProviderInstanceIcon";
 /** Renders one virtualized model option; selection and persistence stay with the picker. */
 export const ModelListRow = memo(function ModelListRow(props: {
   index: number;
-  model: ModelEsque;
-  /** Instance the model belongs to — the routing key used in combobox values. */
+  slug: string;
+  name: string;
+  shortName?: string | undefined;
+  subProvider?: string | undefined;
   instanceId: ProviderInstanceId;
-  /** Driver kind of the instance — used for the provider icon glyph. */
   driverKind: ProviderDriverKind;
-  /**
-   * Display name to show in the secondary line (provider footer). Usually
-   * the instance's configured `displayName` so custom instances like
-   * "Codex Personal" render with their user-authored label.
-   */
   providerDisplayName: string;
   providerAccentColor?: string | undefined;
   acpRegistryAgentId?: string | undefined;
@@ -44,15 +39,21 @@ export const ModelListRow = memo(function ModelListRow(props: {
   unavailable?: boolean;
   jumpLabel?: string | null;
   disabledReason?: string | null;
-  onToggleFavorite: () => void;
+  onToggleFavorite: (instanceId: ProviderInstanceId, slug: string) => void;
 }) {
-  const providerLabel = getProviderRowLabel(props.providerDisplayName, props.model.subProvider);
+  const model = {
+    slug: props.slug,
+    name: props.name,
+    shortName: props.shortName,
+    subProvider: props.subProvider,
+  };
+  const providerLabel = getProviderRowLabel(props.providerDisplayName, props.subProvider);
 
   const row = (
     <ComboboxItem
       hideIndicator
       index={props.index}
-      value={modelPickerModelKey(props.instanceId, props.model.slug)}
+      value={modelPickerModelKey(props.instanceId, props.slug)}
       disabled={Boolean(props.disabledReason)}
       className={cn(
         "group relative w-full min-w-0 max-w-full cursor-pointer",
@@ -67,9 +68,9 @@ export const ModelListRow = memo(function ModelListRow(props: {
         <div className="flex min-w-0 items-center gap-2">
           <div className={cn("min-w-0 truncate", props.isSelected && "font-semibold")}>
             {props.useTriggerLabel
-              ? getTriggerDisplayModelLabel(props.model)
+              ? getTriggerDisplayModelLabel(model)
               : getDisplayModelName(
-                  props.model,
+                  model,
                   props.preferShortName ? { preferShortName: true } : undefined,
                 )}
           </div>
@@ -117,7 +118,7 @@ export const ModelListRow = memo(function ModelListRow(props: {
                 className="-mr-1 shrink-0"
                 onClick={(event) => {
                   event.stopPropagation();
-                  props.onToggleFavorite();
+                  props.onToggleFavorite(props.instanceId, props.slug);
                 }}
                 onKeyDown={(event) => {
                   event.stopPropagation();

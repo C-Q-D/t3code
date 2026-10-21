@@ -20,6 +20,24 @@ function createStorage(overrides: Partial<Storage> = {}): Storage {
   };
 }
 
+/** Expose the hook's public commands without mounting a client; effects are driven explicitly. */
+function mockThemeHook() {
+  vi.doMock("react", () => ({
+    useCallback: <A>(callback: A) => callback,
+    useEffect: () => undefined,
+    useSyncExternalStore: (_subscribe: unknown, snapshot: () => unknown) => snapshot(),
+  }));
+}
+
+/** Minimal DOM capabilities used by the public theme command and browser chrome sync. */
+function installThemeDocument() {
+  vi.stubGlobal("document", {
+    documentElement: { classList: { toggle: vi.fn(), add: vi.fn(), remove: vi.fn() } },
+    querySelector: () => null,
+  });
+  vi.stubGlobal("requestAnimationFrame", () => 0);
+}
+
 afterEach(() => {
   vi.doUnmock("react");
   vi.resetModules();
@@ -39,7 +57,7 @@ describe("Graphite theme migration", () => {
       if (key === "t3code:theme") throw cause;
       setItem(key, value);
     });
-    vi.stubGlobal("window", { localStorage: storage });
+    vi.stubGlobal("window", { localStorage: storage, matchMedia: () => ({ matches: false }) });
 
     const { readThemePreference, ThemeStorageError } = await import("./useTheme");
 
@@ -65,7 +83,7 @@ describe("Graphite theme migration", () => {
 
   it("initializes empty storage with Graphite and records the migration before first application", async () => {
     const storage = createStorage();
-    vi.stubGlobal("window", { localStorage: storage });
+    vi.stubGlobal("window", { localStorage: storage, matchMedia: () => ({ matches: false }) });
     const toggle = vi.fn(() => ({
       theme: storage.getItem("t3code:theme"),
       migrated: storage.getItem("t3code:theme-migrated-graphite"),
@@ -86,7 +104,7 @@ describe("Graphite theme migration", () => {
     storage.setItem("t3code:theme", "system");
     storage.setItem("t3code:theme-appearance-mode", "light");
     storage.setItem("t3code:theme-halves:v1", JSON.stringify({ light: "t3-chat" }));
-    vi.stubGlobal("window", { localStorage: storage });
+    vi.stubGlobal("window", { localStorage: storage, matchMedia: () => ({ matches: false }) });
     const toggle = vi.fn();
     vi.stubGlobal("document", { documentElement: { classList: { toggle } } });
 
@@ -102,7 +120,7 @@ describe("Graphite theme migration", () => {
   it("migrates an environment theme once and preserves its reselection across reloads", async () => {
     const storage = createStorage();
     storage.setItem("t3code:theme", "nightfall");
-    vi.stubGlobal("window", { localStorage: storage });
+    vi.stubGlobal("window", { localStorage: storage, matchMedia: () => ({ matches: false }) });
     vi.stubGlobal("document", { documentElement: { classList: { toggle: vi.fn() } } });
     const palette = await import("../themePalette");
     const nightfall = {
@@ -113,13 +131,15 @@ describe("Graphite theme migration", () => {
     };
     palette.setEnvironmentThemes([nightfall]);
 
-    const { readThemePreference, writeThemePreference } = await import("./useTheme");
+    mockThemeHook();
+    installThemeDocument();
+    const { readThemePreference, useTheme } = await import("./useTheme");
 
     expect(storage.getItem("t3code:theme")).toBe("graphite");
     expect(storage.getItem("t3code:theme-migrated-graphite")).toBe("true");
     expect(readThemePreference()).toBe("graphite");
 
-    writeThemePreference("nightfall");
+    expect(useTheme().setTheme("nightfall")).toBe(true);
     vi.resetModules();
     const reloadedPalette = await import("../themePalette");
     reloadedPalette.setEnvironmentThemes([nightfall]);
@@ -134,12 +154,14 @@ describe("Graphite theme migration", () => {
     const storage = createStorage();
     storage.setItem("t3code:theme", "ocean");
     storage.setItem("t3code:theme-migrated-graphite", "");
-    vi.stubGlobal("window", { localStorage: storage });
+    vi.stubGlobal("window", { localStorage: storage, matchMedia: () => ({ matches: false }) });
 
-    const { readThemePreference, writeThemePreference } = await import("./useTheme");
+    mockThemeHook();
+    installThemeDocument();
+    const { readThemePreference, useTheme } = await import("./useTheme");
 
     expect(readThemePreference()).toBe("ocean");
-    writeThemePreference("system");
+    expect(useTheme().setTheme("system")).toBe(true);
     expect(readThemePreference()).toBe("system");
     expect(storage.getItem("t3code:theme")).toBe("system");
     expect(storage.getItem("t3code:theme-migrated-graphite")).toBe("");
@@ -161,8 +183,9 @@ describe("theme failure handling", () => {
       }),
     });
 
-    const { readThemePreference, ThemeStorageError, writeThemePreference } =
-      await import("./useTheme");
+    mockThemeHook();
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { readThemePreference, ThemeStorageError, useTheme } = await import("./useTheme");
 
     try {
       readThemePreference();
@@ -176,18 +199,26 @@ describe("theme failure handling", () => {
       });
     }
 
-    try {
-      writeThemePreference("dark");
-      expect.unreachable("expected the theme write to fail");
-    } catch (error) {
-      expect(error).toBeInstanceOf(ThemeStorageError);
-      expect(error).toMatchObject({
+    // The public command reports failure and keeps private storage causes out of logs.
+    const storage = createStorage();
+    storage.setItem("t3code:theme-migrated-graphite", "true");
+    storage.setItem("t3code:theme", "ocean");
+    vi.spyOn(storage, "setItem").mockImplementation((key) => {
+      if (key === "t3code:theme") throw writeCause;
+    });
+    vi.stubGlobal("window", { localStorage: storage });
+    expect(useTheme().setTheme("dark")).toBe(false);
+    expect(storage.getItem("t3code:theme")).toBe("ocean");
+    expect(errorLog).toHaveBeenCalledWith(
+      "Failed to write theme preference for t3code:theme.",
+      expect.objectContaining({
         operation: "write",
         storageKey: "t3code:theme",
         theme: "dark",
-        cause: writeCause,
-      });
-    }
+        errorTag: "ThemeStorageError",
+      }),
+    );
+    expect(JSON.stringify(errorLog.mock.calls)).not.toContain(writeCause.message);
   });
 
   it("reads the persisted T3 Chat theme preference", async () => {
@@ -286,29 +317,20 @@ describe("theme failure handling", () => {
     unsubscribe?.();
   });
 
-  it("preserves desktop sync causes and retries after a failed cosmetic sync", async () => {
+  it("logs safe desktop sync errors and retries after a failed cosmetic sync", async () => {
     const cause = new Error("desktop IPC unavailable");
     const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
     const setTheme = vi.fn().mockRejectedValue(cause);
-    vi.stubGlobal("window", { desktopBridge: { setTheme } });
-
-    const { DesktopThemeSyncError, syncDesktopTheme, syncDesktopThemePreference } =
-      await import("./useTheme");
-
-    const error = await syncDesktopThemePreference({ setTheme }, "dark").then(
-      () => undefined,
-      (failure: unknown) => failure,
-    );
-    expect(error).toBeInstanceOf(DesktopThemeSyncError);
-    expect(error).toMatchObject({ theme: "dark", cause });
-
-    setTheme.mockClear();
-    syncDesktopTheme("dark");
-    await Promise.resolve();
-    await Promise.resolve();
-    syncDesktopTheme("dark");
-    await Promise.resolve();
-    await Promise.resolve();
+    const storage = createStorage();
+    storage.setItem("t3code:theme-migrated-graphite", "true");
+    storage.setItem("t3code:theme", "dark");
+    vi.stubGlobal("window", { localStorage: storage, desktopBridge: { setTheme } });
+    installThemeDocument();
+    mockThemeHook();
+    const { useTheme } = await import("./useTheme");
+    await vi.waitFor(() => expect(errorLog).toHaveBeenCalledTimes(1));
+    expect(useTheme().setTheme("dark")).toBe(true);
+    await vi.waitFor(() => expect(errorLog).toHaveBeenCalledTimes(2));
 
     expect(setTheme).toHaveBeenCalledTimes(2);
     expect(errorLog).toHaveBeenCalledWith(

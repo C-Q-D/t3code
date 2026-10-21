@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 /** Verifies Git control actions and localized hint icons without starting a client or provider. */
 import {
   AuthOrchestrationOperateScope,
@@ -7,8 +8,9 @@ import {
 } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
 import { AsyncResult } from "effect/reactivity";
-import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
-import { isValidElement, type ReactNode } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { act, createElement } from "react";
+import { create, type ReactTestRenderer } from "react-test-renderer";
 import { CloudUploadIcon, GitCommitIcon } from "lucide-react";
 import { installMessages } from "~/i18n";
 import { en } from "~/i18n/locales/en";
@@ -25,27 +27,15 @@ const state = vi.hoisted(() => ({
   commits: 0,
   metadataRequests: [] as { environmentId: string; branch: string }[],
   afterGitAction: undefined as (() => void) | undefined,
-  run: null as ((input: { action: "commit"; featureBranch?: boolean }) => Promise<void>) | null,
 }));
 
-vi.mock("react", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("react")>()),
-  useCallback: (callback: typeof state.run) => {
-    if (callback?.constructor.name === "AsyncFunction") state.run = callback;
-    return callback;
-  },
-  useMemo: (factory: () => unknown) => factory(),
-  useState: (initial: unknown) => [typeof initial === "function" ? initial() : initial, () => {}],
-  useRef: (current: unknown) => ({ current }),
-  useEffect: () => {},
-}));
 vi.mock("@effect/atom-react", () => ({
   useAtomValue: (atom: unknown) => (atom === "vcs-state" ? { isRunning: false } : null),
 }));
 vi.mock("~/state/entities", () => ({
   useThreadProjection: (ref: unknown) =>
     ref === null || state.detail === null ? null : { projection: { thread: state.detail } },
-  useThreadShell: () => state.shell,
+  useQuietThreadShell: () => state.shell,
 }));
 vi.mock("~/state/session", () => ({
   useEnvironmentScope: (environmentId: unknown, scope: string) =>
@@ -55,7 +45,7 @@ vi.mock("~/state/session", () => ({
 }));
 vi.mock("~/state/use-atom-command", () => ({ useAtomCommand: (command: unknown) => command }));
 vi.mock("~/state/server", () => ({ serverEnvironment: { configValueAtom: () => null } }));
-vi.mock("~/state/sourceControl", () => ({ sourceControlEnvironment: {} }));
+vi.mock("~/state/sourceControl", () => ({ sourceControlEnvironment: { discovery: () => null } }));
 vi.mock("~/state/vcs", () => ({
   vcsEnvironment: { status: () => null },
   vcsActionManager: { stateAtom: () => "vcs-state" },
@@ -81,8 +71,9 @@ vi.mock("~/state/threads", () => ({
 vi.mock("~/state/query", () => ({
   useEnvironmentQuery: () => ({
     data: {
+      sourceControlProviders: [],
       isRepo: true,
-      refName: "main",
+      refName: state.branch,
       isDefaultRef: false,
       hasPrimaryRemote: true,
       hasWorkingTreeChanges: true,
@@ -177,32 +168,32 @@ vi.mock("~/components/ui/toggle", () => ({ toggleVariants: () => "" }));
 vi.mock("./AnimatedHeight", () => ({ AnimatedHeight: "AnimatedHeight" }));
 
 import GitActionsControl from "./GitActionsControl";
+import { MenuItem, MenuItemLabel } from "./ui/menu";
+import { Button } from "./ui/button";
 
-/**
- * Finds the private icon renderer in the real control tree without adding a production export.
- * @param node React output to inspect, including child arrays and empty nodes.
- * @returns The icon renderer, or null when this tree contains no quick-action icon.
- */
-function findQuickActionIcon(
-  node: ReactNode,
-):
-  | ((props: { quickAction: GitQuickAction; SourceControlIcon: typeof GitCommitIcon }) => ReactNode)
-  | null {
-  if (Array.isArray(node)) {
-    for (const child of node) {
-      const found = findQuickActionIcon(child);
-      if (found) return found;
-    }
-    return null;
-  }
-  if (!isValidElement<{ children?: ReactNode }>(node)) return null;
-  if (typeof node.type === "function" && node.type.name === "GitQuickActionIcon") {
-    return node.type as (props: {
-      quickAction: GitQuickAction;
-      SourceControlIcon: typeof GitCommitIcon;
-    }) => ReactNode;
-  }
-  return findQuickActionIcon(node.props.children);
+const renderers: ReactTestRenderer[] = [];
+vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+afterEach(async () => {
+  await act(async () => {
+    for (const renderer of renderers.splice(0)) renderer.unmount();
+  });
+});
+
+/** Mounts the real control so its public dialog and click handlers own hook state. */
+function mountActions(active = true) {
+  let renderer!: ReactTestRenderer;
+  act(() => {
+    renderer = create(
+      createElement(GitActionsControl, {
+        gitCwd: "/repo",
+        activeThreadRef: active
+          ? { environmentId: EnvironmentId.make("environment"), threadId: ThreadId.make("thread") }
+          : null,
+      }),
+    );
+  });
+  renderers.push(renderer);
+  return renderer;
 }
 
 describe("localized disabled quick action icons", () => {
@@ -227,31 +218,64 @@ describe("localized disabled quick action icons", () => {
   ] as const)("keeps the %s icon for a Chinese hint label", (_name, status, expectedIcon) => {
     installMessages("zh-CN", messages);
     try {
-      const renderIcon = findQuickActionIcon(
-        GitActionsControl({ gitCwd: "/repo", activeThreadRef: null }),
-      );
+      const renderer = mountActions(false);
+      const renderIcon = renderer.root.findAll(
+        (node) => typeof node.type === "function" && node.type.name === "GitQuickActionIcon",
+      )[0]?.type as
+        | ((props: {
+            quickAction: GitQuickAction;
+            SourceControlIcon: typeof GitCommitIcon;
+          }) => ReturnType<typeof createElement>)
+        | undefined;
       expect(renderIcon).not.toBeNull();
-      const icon = renderIcon!({
-        quickAction: resolveQuickAction(status, false),
-        SourceControlIcon: GitCommitIcon,
+      let icon!: ReactTestRenderer;
+      act(() => {
+        icon = create(
+          createElement(renderIcon!, {
+            quickAction: resolveQuickAction(status, false),
+            SourceControlIcon: GitCommitIcon,
+          }),
+        );
       });
-      expect(isValidElement(icon) && icon.type).toBe(expectedIcon);
+      renderers.push(icon);
+      expect(icon.root.findAllByType(expectedIcon)).toHaveLength(1);
     } finally {
       installMessages("en", en);
     }
   });
 });
 
+/** Mount the configured Git controls and return a commit driver; featureBranch selects the dialog option. */
 function renderActions() {
-  GitActionsControl({
-    gitCwd: "/repo",
-    activeThreadRef: {
-      environmentId: EnvironmentId.make("environment"),
-      threadId: ThreadId.make("thread"),
-    },
-  });
-  if (!state.run) throw new Error("Git action missing");
-  return state.run;
+  const renderer = mountActions();
+  const commitItem = renderer.root
+    .findAll((node) => node.type === MenuItem)
+    .find(
+      (node) =>
+        node.findAll((child) => child.type === MenuItemLabel && child.children.includes("Commit"))
+          .length > 0,
+    );
+  expect(commitItem).toBeDefined();
+  act(() => commitItem!.props.onClick());
+  return async ({ featureBranch = false }: { action: "commit"; featureBranch?: boolean }) => {
+    await act(async () => {
+      renderer.root
+        .findAllByType("input")
+        .findLast(
+          (node) =>
+            node.props.type === "checkbox" && "checked" in node.props && "disabled" in node.props,
+        )!
+        .props.onChange({ target: { checked: featureBranch } });
+    });
+    const submit = renderer.root.findAll(
+      (node) =>
+        node.type === Button &&
+        node.props.size === "dialog-action-wide" &&
+        node.children.includes("Commit"),
+    )[0];
+    expect(submit).toBeDefined();
+    await act(async () => submit!.props.onClick());
+  };
 }
 
 describe("Git actions while thread details load", () => {
@@ -265,7 +289,6 @@ describe("Git actions while thread details load", () => {
     state.commits = 0;
     state.metadataRequests = [];
     state.afterGitAction = undefined;
-    state.run = null;
   });
 
   it("does not create a feature branch for a server thread without task permission", async () => {

@@ -9,7 +9,7 @@ import type {
 import { shouldPreserveAssistantLineBreaks } from "@t3tools/shared/markdownPipeline";
 import { Link } from "@tanstack/react-router";
 import { TerminalIcon } from "lucide-react";
-import { memo, useMemo, type CSSProperties } from "react";
+import { type CSSProperties } from "react";
 import { t } from "~/i18n";
 import { useThreadVisibleTurnItems } from "~/state/entities";
 import ChatMarkdown from "../ChatMarkdown";
@@ -43,7 +43,7 @@ function DiscussionLiveRow(props: DiscussionLiveRowProps) {
     environmentId: props.environmentId,
     threadId: props.threadId,
   });
-  const output = useMemo(() => discussionLiveContent(items, props.runId), [items, props.runId]);
+  const output = discussionLiveContent(items, props.runId);
   const stage = discussionLiveStage(props.phase, props.round, t.discussions);
   const color = discussionSeatColor(props.seatNumber).color;
   return (
@@ -105,4 +105,4 @@ function DiscussionLiveRow(props: DiscussionLiveRowProps) {
     </div>
   );
 }
-export const MemoizedDiscussionLiveRow = memo(DiscussionLiveRow);
+export const MemoizedDiscussionLiveRow = DiscussionLiveRow;

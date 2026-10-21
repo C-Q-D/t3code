@@ -90,7 +90,7 @@ function ChecksBody({
   return (
     <>
       <ScrollArea className="max-h-64">
-        <ul className="flex flex-col gap-0.5">
+        <ul className="flex flex-col gap-0.5 pr-2">
           {/* Keyed by position as well as by name: the host is the one that decides how many runs
           share a name, and a repeated key is a rendering fault rather than a wrong list. */}
           {visibleChecks.map((check, index) => (
@@ -127,7 +127,7 @@ function ChecksBody({
                 />
                 <TooltipPopup side="top">{check.description ?? check.name}</TooltipPopup>
               </Tooltip>
-              <span className="shrink-0 font-mono text-meta text-muted-foreground">
+              <span className="shrink-0 font-mono text-meta whitespace-nowrap text-muted-foreground">
                 {pullRequestCheckStatusLabel(check)}
               </span>
             </li>
@@ -169,20 +169,19 @@ export function PullRequestChecksPopover({
   render,
 }: {
   checksState: PullRequestChecksState;
-  /** The checks already in hand, for the detail header. Absent on a listing row. */
   checks?: ReadonlyArray<PullRequestCheck>;
   stale?: boolean;
   environmentId?: EnvironmentId;
   reference?: PullRequestRef;
-  /** Thread the popover sits beside; a listing row has none. */
   threadRef?: ScopedThreadRef | null;
   variant?: "icon" | "count";
   className?: string;
   render?: React.ReactElement;
 }) {
   const presentation = pullRequestChecksStatePresentation(checksState);
-  // Counts beat the rollup's own wording where they are known, the way GitHub's own header reads.
-  const runningCount = checks?.filter((check) => check.status === "pending").length ?? 0;
+  const incompleteCount =
+    checks?.filter((check) => check.status === "pending" || check.status === "action-required")
+      .length ?? 0;
   const failedCount =
     checks?.filter((check) => check.status === "failure" || check.status === "cancelled").length ??
     0;
@@ -215,9 +214,9 @@ export function PullRequestChecksPopover({
         <presentation.Icon aria-hidden className={cn("size-3.5", presentation.toneClassName)} />
         {variant === "count" ? (
           <>
-            {checks !== undefined && runningCount > 0 ? (
+            {checks !== undefined && incompleteCount > 0 ? (
               <span className="tabular-nums">
-                {runningCount}/{checks.length}
+                {checks.length - incompleteCount}/{checks.length}
               </span>
             ) : failedCount > 0 ? (
               <span className="tabular-nums">

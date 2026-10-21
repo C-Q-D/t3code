@@ -1,25 +1,22 @@
 /**
- * Exercises committed diagram availability through asynchronous rendering and teardown.
+ * Exercises diagram availability across lazy loading, mounting, errors, and teardown.
  * @vitest-environment jsdom
  */
 import { act, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { expect, it, vi } from "vite-plus/test";
-
 import { MermaidDiagram } from "./MermaidDiagram";
 
-const mermaid = vi.hoisted(() => ({ initialize: vi.fn(), render: vi.fn() }));
-vi.mock("mermaid", () => ({ default: mermaid }));
+const pele = vi.hoisted(() => ({ detectType: vi.fn(), load: vi.fn(), mount: vi.fn() }));
+vi.mock("pele/lazy", () => pele);
 
-/** Lets the test release a library render or await its start without timers. */
+/** Releases the external renderer's load without depending on timers or animation frames. */
 function deferred<T>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
-  let reject!: (reason: unknown) => void;
-  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
-    resolve = resolvePromise;
-    reject = rejectPromise;
+  const promise = new Promise<T>((complete) => {
+    resolve = complete;
   });
-  return { promise, resolve, reject };
+  return { promise, resolve };
 }
 
 it("reports availability only while a successful diagram is committed", async () => {
@@ -27,34 +24,48 @@ it("reports availability only while a successful diagram is committed", async ()
   const container = document.createElement("div");
   document.body.append(container);
   const root = createRoot(container);
-  const first = deferred<{ svg: string }>();
-  const second = deferred<{ svg: string }>();
+  const loading = deferred<void>();
   const started = deferred<void>();
-  const secondStarted = deferred<void>();
-  mermaid.render
-    .mockImplementationOnce(() => {
-      started.resolve();
-      return first.promise;
-    })
-    .mockImplementationOnce(() => {
-      secondStarted.resolve();
-      return second.promise;
-    });
-  let available = false;
-  const report = vi.fn((rendered: boolean) => {
-    available = rendered;
+  const mounts: Array<{ render: () => void; fail: () => void; destroy: ReturnType<typeof vi.fn> }> =
+    [];
+  pele.detectType.mockReturnValue("flowchart");
+  pele.load.mockImplementation(() => {
+    started.resolve();
+    return loading.promise;
   });
+  pele.mount.mockImplementation(
+    (
+      host: HTMLElement,
+      _source: string,
+      options: {
+        sanitize: (source: string) => Node;
+        onRender: () => void;
+        onError: (error: Error) => void;
+      },
+    ) => {
+      const mounted = {
+        render: () => {
+          host.replaceChildren(
+            options.sanitize(
+              '<svg xmlns="http://www.w3.org/2000/svg"><text fill="var(--pele-fg)">Ready</text></svg>',
+            ),
+          );
+          options.onRender();
+        },
+        fail: () => options.onError(new Error("Invalid diagram syntax")),
+        destroy: vi.fn(() => host.replaceChildren()),
+      };
+      mounts.push(mounted);
+      return mounted;
+    },
+  );
+  const report = vi.fn();
   const content = (source: string, showSource = false) => (
     <Suspense fallback={<p>Loading diagram</p>}>
       {showSource ? (
         <pre>{source}</pre>
       ) : (
-        <MermaidDiagram
-          source={source}
-          theme="light"
-          onExpand={() => {}}
-          onRenderStateChange={report}
-        />
+        <MermaidDiagram source={source} onExpand={() => {}} onRenderStateChange={report} />
       )}
     </Suspense>
   );
@@ -62,45 +73,45 @@ it("reports availability only while a successful diagram is committed", async ()
     await act(async () => root.render(content("graph TD; first-->second")));
     await started.promise;
     expect(container.textContent).toContain("Loading diagram");
-    expect(available).toBe(false);
     expect(report).not.toHaveBeenCalledWith(true);
-
     await act(async () => {
-      first.resolve({ svg: '<svg xmlns="http://www.w3.org/2000/svg"><text>Ready</text></svg>' });
-      await first.promise;
+      loading.resolve();
+      await loading.promise;
     });
+    expect(container.querySelector("svg")).toBeNull();
+    await act(async () => mounts.at(-1)!.render());
     expect(container.querySelector("svg")?.textContent).toBe("Ready");
+    expect(container.querySelector("text")?.getAttribute("fill")).toBe("var(--pele-fg)");
     expect(report).toHaveBeenLastCalledWith(true);
-    expect(available).toBe(true);
 
-    // The parent switches to source by unmounting the diagram.
     await act(async () => root.render(content("graph TD; first-->second", true)));
     expect(container.querySelector("svg")).toBeNull();
+    expect(mounts[0]!.destroy).toHaveBeenCalledOnce();
     expect(report).toHaveBeenLastCalledWith(false);
-    expect(available).toBe(false);
-
     await act(async () => root.render(content("graph TD; first-->second")));
-    expect(available).toBe(true);
+    await act(async () => mounts.at(-1)!.render());
+    expect(report).toHaveBeenLastCalledWith(true);
+
     await act(async () => root.render(content("invalid second diagram")));
-    await secondStarted.promise;
-    expect(container.textContent).toContain("Loading diagram");
-    expect(available).toBe(false);
-    await act(async () => {
-      second.reject(new Error("Invalid diagram syntax"));
-      await second.promise.catch(() => {});
-    });
+    expect(report).toHaveBeenLastCalledWith(false);
+    await act(async () => mounts.at(-1)!.fail());
     expect(container.textContent).toContain("Invalid diagram syntax");
     expect(report).toHaveBeenLastCalledWith(false);
-    expect(available).toBe(false);
+    expect(container.querySelector("button[data-mermaid-expand]")?.hasAttribute("hidden")).toBe(
+      true,
+    );
 
     await act(async () => root.render(content("graph TD; first-->second")));
-    expect(available).toBe(true);
-    await act(async () => root.unmount());
+    await act(async () => mounts.at(-1)!.render());
+    expect(container.querySelector("svg")?.textContent).toBe("Ready");
+    expect(report).toHaveBeenLastCalledWith(true);
+    await act(async () => root.render(null));
     expect(report).toHaveBeenLastCalledWith(false);
-    expect(available).toBe(false);
+    expect(mounts.at(-1)!.destroy).toHaveBeenCalledOnce();
   } finally {
     await act(async () => root.unmount());
     container.remove();
     vi.unstubAllGlobals();
+    vi.resetAllMocks();
   }
 });

@@ -1,3 +1,4 @@
+/** @vitest-environment jsdom */
 /** Verifies floating preview gestures commit shared layout only after interaction ends. */
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, expect, it, vi } from "vite-plus/test";

@@ -4,7 +4,6 @@ import type { EnvironmentId, DiscussionId, DiscussionSeatId } from "@t3tools/con
 import { Link } from "@tanstack/react-router";
 import { Atom } from "effect/reactivity";
 import { ArrowUpRightIcon, MessagesSquareIcon } from "lucide-react";
-import { useMemo } from "react";
 import { t } from "~/i18n";
 import { serverEnvironment } from "~/state/server";
 import type { ComposerBannerStackItem } from "../chat/ComposerBannerStack";
@@ -34,7 +33,7 @@ export function useDiscussionSeatBanner(
   const environmentId = ref?.environmentId;
   const discussionId = ref?.discussionId;
   const seatId = ref?.seatId;
-  const metadataAtom = useMemo(() => {
+  const metadataAtom = (() => {
     if (!environmentId || !discussionId || !seatId) return NO_SEAT_METADATA;
     let previous: DiscussionSeatBannerMetadata | null = null;
     return Atom.make((get) => {
@@ -51,7 +50,7 @@ export function useDiscussionSeatBanner(
       previous = next;
       return next;
     }).pipe(Atom.setIdleTTL(0));
-  }, [environmentId, discussionId, seatId]);
+  })();
   const metadata = useAtomValue(metadataAtom);
   const view = discussionSeatBannerView(ref, metadata, t.discussions);
   if (!view || !environmentId || !discussionId) return null;

@@ -48,6 +48,49 @@ function reportFailure(title: string, result: AtomCommandResult<unknown, unknown
   });
 }
 
+/**
+ * Rejects malformed JSON and non-string header values before submitting ACP provider configuration.
+ * @param text Header JSON, or blank text to omit headers.
+ * @returns A discriminated success with optional headers, or a localized error; validation does not throw.
+ */
+function parseProviderHeaders(
+  text: string,
+):
+  | { readonly ok: true; readonly headers: Record<string, string> | undefined }
+  | { readonly ok: false; readonly error: string } {
+  if (text.trim().length === 0) return { ok: true, headers: undefined };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch (error) {
+    return {
+      ok: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : t.settings.acpSessionManagement.headersMustBeValidJson,
+    };
+  }
+  if (
+    typeof parsed !== "object" ||
+    parsed === null ||
+    Array.isArray(parsed) ||
+    !Object.values(parsed).every((value) => typeof value === "string")
+  ) {
+    return { ok: false, error: t.settings.acpSessionManagement.headersMustJsonObjectStringError };
+  }
+  return { ok: true, headers: parsed as Record<string, string> };
+}
+
+/**
+ * Scopes ACP sessions and provider credentials to one machine and instance, with separate read/operate permissions.
+ * @param props.environmentId RPC destination.
+ * @param props.instanceId ACP provider instance to manage.
+ * @param props.provider Live provider metadata and capabilities.
+ * @param props.projects Projects available for session import.
+ * @param props.readOnly Prevents mutation controls even when the connection has operate permission.
+ * @returns Session/configuration controls; existing query cursors and command helpers own pagination, timeouts and errors.
+ */
 export function AcpSessionManagementSection(props: {
   readonly environmentId: EnvironmentId;
   readonly instanceId: ProviderInstanceId;
@@ -233,31 +276,16 @@ export function AcpSessionManagementSection(props: {
       return;
     const draft = providerDrafts[provider.providerId];
     if (draft === undefined || draft.apiType.length === 0 || draft.baseUrl.length === 0) return;
-    let headers: Record<string, string> | undefined;
-    if (draft.headers.trim().length > 0) {
-      try {
-        const parsed: unknown = JSON.parse(draft.headers);
-        if (
-          typeof parsed !== "object" ||
-          parsed === null ||
-          Array.isArray(parsed) ||
-          !Object.values(parsed).every((value) => typeof value === "string")
-        ) {
-          throw new Error(t.settings.acpSessionManagement.headersMustJsonObjectStringError);
-        }
-        headers = parsed as Record<string, string>;
-      } catch (error) {
-        toastManager.add({
-          type: "error",
-          title: t.settings.acpSessionManagement.invalidProviderHeaders,
-          description:
-            error instanceof Error
-              ? error.message
-              : t.settings.acpSessionManagement.headersMustBeValidJson,
-        });
-        return;
-      }
+    const parsedHeaders = parseProviderHeaders(draft.headers);
+    if (!parsedHeaders.ok) {
+      toastManager.add({
+        type: "error",
+        title: t.settings.acpSessionManagement.invalidProviderHeaders,
+        description: parsedHeaders.error,
+      });
+      return;
     }
+    const headers = parsedHeaders.headers;
     setSavingProviderId(provider.providerId);
     const result = await setProvider({
       environmentId: props.environmentId,

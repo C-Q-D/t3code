@@ -16,7 +16,7 @@ vi.mock("../../state/session", () => ({
 vi.mock("@effect/atom-react", () => ({ useAtomValue: () => state.allowed }));
 vi.mock("@tanstack/react-router", () => ({ useNavigate: () => state.navigate }));
 vi.mock("../settings/ScheduledTasksSettings", () => ({
-  relativeLabel: () => "later",
+  ScheduledRelativeLabel: () => "later",
   scheduleLabel: () => "daily",
 }));
 vi.mock("../../state/server", () => ({

@@ -321,6 +321,8 @@ export const app = {
     undoSettleError: "Failed to undo settle",
     loadingMessages: "Loading messages...",
     syncingMessages: "Syncing messages...",
+    unreadable:
+      "On another machine, so this machine's agent can't read it. Remove it or switch back to send.",
   },
   context: {
     /** Formats the message using label. */

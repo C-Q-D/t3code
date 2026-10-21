@@ -15,6 +15,8 @@ import {
   THREAD_DETAILS_PANEL_META_ACTION_CLASS,
   THREAD_DETAILS_PANEL_CHEVRON_CLASS,
   THREAD_DETAILS_PANEL_ACTION_CLASS,
+  THREAD_DETAILS_PANEL_SELECT_LABEL_CLASS,
+  THREAD_DETAILS_PANEL_SELECT_ICON_CLASS,
 } from "./threadDetailsPanelStyles";
 import { ChevronDownIcon } from "lucide-react";
 
@@ -81,8 +83,10 @@ export function ThreadDetailsControl({
         children:
           part === "select" || part === "context" ? (
             <>
-              {children}
-              <span data-slot="select-icon">
+              <span data-slot="select-label" className={THREAD_DETAILS_PANEL_SELECT_LABEL_CLASS}>
+                {children}
+              </span>
+              <span data-slot="select-icon" className={THREAD_DETAILS_PANEL_SELECT_ICON_CLASS}>
                 <ChevronDownIcon className={THREAD_DETAILS_PANEL_CHEVRON_CLASS} />
               </span>
             </>

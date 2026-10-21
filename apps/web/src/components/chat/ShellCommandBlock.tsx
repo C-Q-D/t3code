@@ -3,15 +3,13 @@ import {
   commandHighlightLanguage,
   withVisibleControlCharacters,
 } from "@t3tools/client-runtime/work-log/command-label";
-import { Suspense, use, useMemo } from "react";
+import { Suspense, use } from "react";
 
-import { useTheme } from "../../hooks/useTheme";
+import { useRenderedAppearance } from "../../hooks/useTheme";
 import { RenderErrorBoundary } from "../RenderErrorBoundary";
 import { HighlightedTokens } from "./HighlightedTokens";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
-// Shell words wrap as a unit, so `--exclude` or a quoted string is not split
-// at a hyphen; a word longer than the line still breaks anywhere.
 const WORD_CLASS_NAME = "inline-block max-w-full [overflow-wrap:anywhere]";
 
 // The shell parser loads with the first expanded command, not with the timeline.
@@ -23,7 +21,6 @@ function loadEmbeddedScripts() {
 
 /** Same layout as the highlighted version, so the grammar arriving never reflows the block. */
 function PlainWords({ code }: { code: string }) {
-  // split with a capture group alternates words (even) and whitespace (odd).
   return code.split(/(\s+)/u).map((part, index) =>
     index % 2 === 1 || part === "" ? (
       part
@@ -41,10 +38,7 @@ function HighlightedCommand({ code, theme }: { code: string; theme: "light" | "d
   const { embeddedScripts } = use(loadEmbeddedScripts());
   const language = commandHighlightLanguage(code);
   // Only shell syntax nests scripts; PowerShell's own grammar colors its strings.
-  const embedded = useMemo(
-    () => (language === "shellscript" ? embeddedScripts(code) : []),
-    [code, embeddedScripts, language],
-  );
+  const embedded = language === "shellscript" ? embeddedScripts(code) : [];
   return (
     <HighlightedTokens
       code={code}
@@ -69,7 +63,7 @@ export function ShellCommandBlock({
   command: string;
   presentation?: "timeline" | undefined;
 }) {
-  const { resolvedTheme } = useTheme();
+  const resolvedTheme = useRenderedAppearance();
   const code = withVisibleControlCharacters(command.trim());
   if (!code) return null;
   if (presentation === "timeline") {
@@ -89,7 +83,6 @@ export function ShellCommandBlock({
   }
   const plain = <PlainWords code={code} />;
   return (
-    // The tool body sets the monospace, pre-wrapped text this sits in.
     <div className="text-foreground/85">
       <RenderErrorBoundary fallback={plain} resetKeys={[code]}>
         <Suspense fallback={plain}>

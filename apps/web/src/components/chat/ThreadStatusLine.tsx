@@ -14,6 +14,8 @@ export const ThreadStatusLine = memo(function ThreadStatusLine(props: {
   readonly actionDisabled?: boolean;
   readonly emphasized?: boolean;
   readonly onAction: () => void;
+  // Set when the label reads the clock, so the line updates as time passes.
+  readonly clockMinute?: string;
 }) {
   return (
     <div data-chat-thread-status-line="true" className="pointer-events-auto">

@@ -90,6 +90,12 @@ reset time, and how much quota the reset restores to the shared pool. Accounts w
 credits also offer **Use reset**. Claude resets are unavailable when the server runs on macOS,
 where Claude keeps its login in Keychain.
 
+When a Claude or Codex account has no overall weekly quota left, its share of the session
+window shows 0% left. The next refill depends on both reset times: an exhausted session must
+also reset, and a partly spent session may only regain its unused portion when the week resets.
+Missing or stale reset times have no refill estimate; refresh to get a new reading. Claude's
+model-specific weekly allowances keep their reported values.
+
 The same account signed in on multiple environments, or also reported by a hub, counts once.
 Use the environment and usage source filters to choose which limits to see. Limits are independent
 of the time range and remain available without permission to read usage diagnostics.
@@ -107,9 +113,10 @@ providers shown in the limits section.
 
 OpenCode Go reports its session, weekly, and monthly allowance when OpenCode runs locally in
 the environment. T3 cannot report limits for external OpenCode servers because their credentials
-belong to the remote server. Limits need an OpenCode Go API key. A Console sign-in alone
-does not report them. Add your Go API key as `OPENCODE_API_KEY` in the OpenCode instance's
-**Environment variables**, then refresh provider status. Cursor reports
+belong to the remote server. Limits need an OpenCode Go API key, or an OpenCode Console connected
+in OpenCode with an API key. A Console browser sign-in alone does not report them. You can also add
+your Go API key as `OPENCODE_API_KEY` in the OpenCode instance's **Environment variables**, then
+refresh provider status. Cursor reports
 its monthly allowance, including separate Auto and API usage, using the CLI login or
 `CURSOR_AUTH_TOKEN`. On macOS, this includes the default Keychain login after you enable Cursor
 usage. Keychain login is used for limits only with Cursor's default API endpoint. If you configure

@@ -218,8 +218,8 @@ export const tools: Messages["tools"] = {
       "已安装 Xcode，但没有可用的 iOS Simulator。请在 Xcode Settings → Components 中安装运行时。",
     noAndroidRuntime:
       "已安装 Android SDK，但没有虚拟设备。请在 Android Studio → Device Manager 中创建一个。",
-    iosReady: "Xcode 和 iOS Simulator 可用。",
-    androidReady: "Android SDK 和 Emulator 可用。",
+    iosReady: (host?: string) => `${host ? `${host} 上的 ` : ""}Xcode 和 iOS Simulator 可用。`,
+    androidReady: (host?: string) => `${host ? `${host} 上的 ` : ""}Android SDK 和 Emulator 可用。`,
     setup: "设置设备",
     setupHint: "使用模拟器前，先查看此环境中运行的内容。",
     hub: "设备中心",
@@ -371,6 +371,7 @@ export const tools: Messages["tools"] = {
     rotateInControls: "请使用控制条中的旋转操作。",
     pushHeading: "推送",
     launchAppHeading: "启动应用",
+    androidDiscoveryIncomplete: "Android 设备列表可能不完整，请检查设备主机后重试。",
   },
   preview: {
     fileNotShown: "无法在此处显示该文件",

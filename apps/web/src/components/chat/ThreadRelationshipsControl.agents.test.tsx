@@ -22,10 +22,22 @@ const state = vi.hoisted(() => ({
   toast: vi.fn(),
 }));
 
+vi.mock("../../state/environments", () => ({
+  useEnvironmentProviders: () =>
+    new Map(
+      [...state.configs].map(([id, config]) => [
+        id,
+        (config as { providers: unknown[] }).providers,
+      ]),
+    ),
+}));
 vi.mock("@tanstack/react-router", () => ({ useNavigate: () => state.navigate }));
 vi.mock("../../state/entities", () => ({
   useThreadProjection: () => ({ projection: state.projection }),
-  useThreadShells: () => state.shells,
+  useThreadRelationshipShells: (ref: { environmentId: string }) =>
+    (state.shells as Array<{ environmentId: string; source: unknown }>)
+      .filter((shell) => shell.environmentId === ref.environmentId)
+      .map((shell) => shell.source),
   useProjects: () => state.projects,
   useServerConfigs: () => state.configs,
 }));
@@ -554,10 +566,7 @@ it.each([
     await act(async () => stopButton().props.onClick());
     expect(state.command).toHaveBeenCalledWith({
       environmentId: "test",
-      input:
-        origin === "provider_native"
-          ? { threadId: "parent", subagentId: "agent" }
-          : { threadId: "child" },
+      input: { threadId: "parent", subagentId: "agent" },
     });
     expect(state.navigate).not.toHaveBeenCalled();
 
@@ -593,7 +602,7 @@ it.each([
       expect(state.command).toHaveBeenCalledTimes(1);
       expect(state.command).toHaveBeenLastCalledWith({
         environmentId: "test",
-        input: { threadId: "child" },
+        input: { threadId: "parent", subagentId: "agent" },
       });
     }
     state.shells = [{ environmentId: "test", source: child }];

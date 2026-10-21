@@ -265,7 +265,7 @@ export const chat: Messages["chat"] = {
     switchProviderUnsupported: "此对话启动后不支持切换 Provider。",
     changeModelNewChat: "请新建对话以更改模型",
     changeModelUnsupported: "此 Provider 不允许在对话启动后切换模型。",
-    rewindMessageUnavailable: "要回退到的消息已不可用。",
+    rewindMessageUnavailable: "对话已变化。请重新选择要回退到的消息。",
     rewindTimeout: "等待对话回退超时。",
     noActiveThread: "没有活动对话",
     pickThread: "选择对话以继续",
@@ -322,6 +322,8 @@ export const chat: Messages["chat"] = {
     /** Describes the previousBranch used by this thread and the currentBranch used on its next send. */
     branchMismatchHint: (previousBranch, currentBranch) =>
       `此对话上次运行于 ${previousBranch}。发送后将在 ${currentBranch} 上继续。`,
+    showSubagent: (label) => `显示子 Agent ${label}`,
+    showSubagentAction: "显示",
   },
 
   rightPanel: {
@@ -418,6 +420,7 @@ export const chat: Messages["chat"] = {
     pathCopiedToast: "已复制路径",
     copyPathError: "复制路径失败",
     modelWorktreeHint: "每个模型都在独立的 worktree 中启动。",
+    fromRemoteRef: (ref) => `基于 ${ref}（远端）`,
   },
   header: {
     /** Labels navigation to the named parent thread. */
@@ -606,7 +609,7 @@ export const chat: Messages["chat"] = {
     unableToLinkPullRequest: "无法关联 PR",
     unableToUnlinkPullRequest: "无法取消关联 PR",
     theRequestFailed: "请求失败。",
-    mermaidFailedToLoad: "Mermaid加载失败。",
+    mermaidFailedToLoad: "图表渲染器加载失败。",
     theDiagramCouldNotBeRendered: "无法渲染图表。",
     expandDiagram: "展开图表",
     zoomIn: "放大",
@@ -976,6 +979,8 @@ export const chat: Messages["chat"] = {
     snoozeUntilReset: "暂停至重置",
     /** Formats the existing localized reset date. */
     resets: (time) => `重置时间：${time}`,
+    snoozeError: "无法稍后提醒此对话",
+    autoResumeError: "无法更改自动恢复设置",
   },
   subagents: {
     workflowFailed: "工作流失败",
@@ -1074,6 +1079,8 @@ export const chat: Messages["chat"] = {
       },
       relay: {
         tunnelSettingUp: "此环境的 T3 Connect 隧道仍在设置中。",
+        activityOnlyLink:
+          "此环境仅关联用于发布 Agent 活动，无法接受连接。请在那台计算机上打开设置 > 连接，并开启 T3 Connect。",
         gatewayTimeout: "中继请求超时（HTTP 504）。请稍后重试；若仍失败，请复制追踪编号用于反馈。",
         unexpectedStatus: (status) => `中继返回了意外的 HTTP ${status}。`,
         clockHint: "提示：请确认两台设备均已启用自动日期和时间，然后重试。",
@@ -1092,7 +1099,10 @@ export const chat: Messages["chat"] = {
         endpointUnavailable: (reason: string) => `中继无法访问环境端点（${reason}）。`,
         endpointTimeout: "中继联系环境端点超时。",
         linkFailed: (reason: string) => `中继无法关联环境（${reason}）。`,
-        linkUnavailable: (reason: string) => `中继无法配置托管端点（${reason}）。`,
+        linkUnavailable: (reason: string, provisioningStage?: string) =>
+          `中继无法配置托管端点（${reason}）。${
+            provisioningStage ? `失败阶段：${provisioningStage}。` : ""
+          }`,
         linkLimit: (maxTunnels: number) =>
           `中继拒绝关联：此账户已达到 ${maxTunnels} 个托管隧道的上限。请解除一个环境的关联以释放名额。`,
         expiredActivityProof: "中继拒绝了已过期的 Agent 活动发布证明。",
@@ -1396,6 +1406,8 @@ export const chat: Messages["chat"] = {
         skill: (name) => `Skill：${name}`,
       },
       compactingContext: "正在压缩上下文",
+      compactionFailed: "上下文压缩失败",
+      compactionStopped: "上下文压缩已停止",
       contextCompacted: "上下文已压缩",
       contextCompactedTokens: (before, after) => `上下文已压缩 ${before} → ${after} token`,
       thought: "思考",

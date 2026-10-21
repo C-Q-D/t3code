@@ -1,5 +1,8 @@
 import { englishRelayMessages } from "./messages.ts";
-import { RelayAuthInvalidError } from "@t3tools/contracts/relay";
+import {
+  RelayAuthInvalidError,
+  RelayEnvironmentLinkUnavailableError,
+} from "@t3tools/contracts/relay";
 import { describe, expect, it } from "@effect/vitest";
 
 import {
@@ -7,10 +10,31 @@ import {
   DPOP_RETRY_HINT,
   DPOP_UNKNOWN_HINT,
   relayProtectedErrorMessage,
+  relayRequestFailureDetail,
   relayOfflineReasonMessage,
 } from "./errorPresentation.ts";
 
 describe("relayProtectedErrorMessage", () => {
+  it.each([
+    [
+      "dns",
+      "Relay cannot provision the managed endpoint (managed_endpoint_provisioning_failed). Failed stage: dns.",
+    ],
+    [
+      undefined,
+      "Relay cannot provision the managed endpoint (managed_endpoint_provisioning_failed).",
+    ],
+  ] as const)("preserves provisioning detail for stage %s", (provisioningStage, expected) => {
+    const error = new RelayEnvironmentLinkUnavailableError({
+      code: "environment_link_unavailable",
+      reason: "managed_endpoint_provisioning_failed",
+      traceId: "trace-link",
+      ...(provisioningStage === undefined ? {} : { provisioningStage }),
+    });
+
+    expect(relayProtectedErrorMessage(error)).toBe(expected);
+  });
+
   it("presents clock skew as one possible cause when the relay omits the reason", () => {
     const error = new RelayAuthInvalidError({
       code: "auth_invalid",
@@ -46,15 +70,27 @@ describe("relayProtectedErrorMessage", () => {
       `Relay rejected the DPoP proof. ${DPOP_RETRY_HINT}`,
     );
   });
+});
 
-  it("preserves the existing message for other authentication failures", () => {
-    const error = new RelayAuthInvalidError({
-      code: "auth_invalid",
-      reason: "invalid_bearer",
-      traceId: "trace-1",
+describe("relayRequestFailureDetail", () => {
+  it.each([
+    [
+      "dns",
+      "Relay cannot provision the managed endpoint (managed_endpoint_provisioning_failed). Failed stage: dns.",
+    ],
+    [
+      undefined,
+      "Relay cannot provision the managed endpoint (managed_endpoint_provisioning_failed).",
+    ],
+  ] as const)("preserves provisioning detail for stage %s", (provisioningStage, expected) => {
+    const relayError = new RelayEnvironmentLinkUnavailableError({
+      code: "environment_link_unavailable",
+      reason: "managed_endpoint_provisioning_failed",
+      traceId: "trace-link",
+      ...(provisioningStage === undefined ? {} : { provisioningStage }),
     });
 
-    expect(relayProtectedErrorMessage(error)).toBe("Relay rejected the cloud session token.");
+    expect(relayRequestFailureDetail({ relayError, status: 503 })).toBe(expected);
   });
 });
 

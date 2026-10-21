@@ -128,8 +128,12 @@ export function DiscussionSeats({
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
-  const replace = (next: readonly DiscussionDraftSeat[], ids = identity.ids) => {
-    setIdentity({ seats: next, ids, revision: identity.revision + 1 });
+  const replace = (next: readonly DiscussionDraftSeat[], ids?: string[]) => {
+    setIdentity({
+      seats: next,
+      ids: ids === undefined ? identity.ids : ids,
+      revision: identity.revision + 1,
+    });
     onChange(next);
   };
   const presentations = seats.map((seat): DiscussionSeatPresentation => {

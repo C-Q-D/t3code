@@ -17,8 +17,6 @@ function PopoverTrigger({ className, children, ...props }: PopoverPrimitive.Trig
   );
 }
 
-// Popovers hold prose and forms, so a width is fixed rather than a minimum,
-// and every width is capped to the viewport.
 const popoverPopupWidthClassName = {
   auto: "",
   sm: "w-64",
@@ -26,8 +24,6 @@ const popoverPopupWidthClassName = {
   lg: "w-96",
 } as const;
 
-// The inset around the content. "compact" suits dense content (a list, a code excerpt, a
-// row of reactions); "none" is for content that draws its own frame edge to edge.
 const popoverViewportPaddingClassName = {
   default: "py-4 [--viewport-inline-padding:--spacing(4)]",
   compact: "py-2 [--viewport-inline-padding:--spacing(3)]",
@@ -56,6 +52,7 @@ function PopoverPopup({
   keepMounted = false,
   anchor,
   layer,
+  touchBackdrop = false,
   ...props
 }: PopoverPrimitive.Popup.Props & {
   padding?: keyof typeof popoverViewportPaddingClassName;
@@ -70,18 +67,27 @@ function PopoverPopup({
   anchor?: PopoverPrimitive.Positioner.Props["anchor"];
   width?: keyof typeof popoverPopupWidthClassName;
   layer?: "theme-editor" | "thread-details";
+  touchBackdrop?: boolean;
 }) {
   // Viewport rekeys its children when the active trigger clears on close. Persistent
   // single-trigger forms need a stable container to retain drafts and submit guards.
   const Viewport = keepMounted ? "div" : PopoverPrimitive.Viewport;
   return (
     <PopoverPrimitive.Portal keepMounted={keepMounted}>
+      {touchBackdrop ? (
+        // A non-modal popover closes on an outside tap and lets that tap reach the
+        // control under the finger. On touch screens the backdrop takes the tap, so
+        // tapping away only closes the popover, as it does for modal menus and selects.
+        <PopoverPrimitive.Backdrop
+          className="fixed inset-0 z-[130] hidden pointer-coarse:block"
+          data-slot="popover-backdrop"
+        />
+      ) : null}
       <PopoverPrimitive.Positioner
         align={align}
         alignOffset={alignOffset}
         anchor={anchor}
         collisionAvoidance={collisionAvoidance}
-        // A panel's card already sits inside its own padding, so the panel can reach the edge.
         collisionPadding={variant === "panel" ? 0 : undefined}
         className={cn(
           "h-(--positioner-height) w-(--positioner-width) max-w-(--available-width) transition-transform physics:duration-(--motion-snap-duration) physics:ease-(--ease-snap) data-instant:transition-none",

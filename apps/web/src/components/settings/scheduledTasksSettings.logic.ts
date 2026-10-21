@@ -1,6 +1,9 @@
 /** Pure scheduled-task scope, editor conversion and latest-run projection; no queries or mutations. */
+import { t } from "~/i18n";
+import { isWebhookDedupeTemplate } from "@t3tools/contracts";
 import {
   EnvironmentId,
+  MAX_WEBHOOK_DELIVERY_AGE_MINUTES,
   type ProjectId,
   ScheduledTaskId,
   type ScheduledTask,
@@ -10,7 +13,13 @@ import {
   type ProviderInteractionMode,
   type ServerSettings,
 } from "@t3tools/contracts";
-import { parseMaxDeliveryAge } from "@t3tools/client-runtime/scheduled-task-webhook";
+import {
+  parseMaxDeliveryAge,
+  parseWebhookFilterDrafts,
+  webhookFilterDrafts,
+  webhookFilterDraftsChanged,
+  type WebhookFilterDraft,
+} from "@t3tools/client-runtime/scheduled-task-webhook";
 
 import {
   resolveProjectSettings,
@@ -20,7 +29,6 @@ import type { ProviderInstanceEntry } from "../../providerInstances";
 
 import type { ResolvedSettingsScope } from "./settingsScope";
 
-/** Project IDs belong to an environment, including when a grouped project spans machines. */
 export function matchesScheduledTaskScope(
   scope: ResolvedSettingsScope,
   environmentId: EnvironmentId,
@@ -65,13 +73,11 @@ export interface DraftState {
   readonly startFromOrigin: boolean;
   readonly existingWorktreePath: string;
   readonly modelKey: string;
-  /** Not editable in the dialog, but preserved so editing an agent-created task keeps its modes. */
   readonly runtimeMode: RuntimeMode;
   readonly interactionMode: ProviderInteractionMode;
   /**
-   * The task's original model selection. The picker only edits
-   * `instanceId:model`; keeping the source object preserves provider options
-   * (reasoning, temperature, …) when the model itself is left unchanged.
+   * The picker only edits `instanceId:model`; keeping the source object preserves provider
+   * options (reasoning, temperature, …) when the model itself is left unchanged.
    */
   readonly baseModelSelection: ModelSelection | null;
   readonly signatureEnabled: boolean;
@@ -80,22 +86,87 @@ export interface DraftState {
   readonly signaturePrefix: string;
   /** Write-only: empty keeps the secret already stored on the server. */
   readonly signatureSecret: string;
-  /** Minutes as typed; empty runs every held request regardless of age. */
   readonly maxDeliveryAgeMinutes: string;
+  readonly replayKey: string;
+  readonly coalesceKey: string;
+  readonly coalesceWindowSeconds: string;
+  readonly filters: ReadonlyArray<WebhookFilterDraft>;
+  /** The filter rows the form opened with. */
+  readonly savedFilters: ReadonlyArray<WebhookFilterDraft>;
 }
 
-/** GitHub's signature settings, the most common sender. */
 export const WEBHOOK_SIGNATURE_DEFAULTS = {
   signatureHeader: "x-hub-signature-256",
   signatureEncoding: "hex",
   signaturePrefix: "sha256=",
 } as const;
 
-/** Null when the draft's webhook age limit is invalid; the caller reports it and does not save. */
+/**
+ * Validates webhook age and dedupe fields before any save command, leaving filter parsing to its dedicated validator.
+ * @param draft Editor values; non-webhook drafts produce no errors.
+ * @returns Localized title/description pairs. An invalid age stops further checks; otherwise all dedupe/window errors are returned.
+ */
+export function webhookDraftErrors(draft: DraftState) {
+  if (draft.scheduleMode !== "webhook") return [];
+  if (parseMaxDeliveryAge(draft.maxDeliveryAgeMinutes) === undefined)
+    return [
+      {
+        title: t.settings.scheduledTasks.editor.ageError,
+        description: t.settings.scheduledTasks.editor.ageErrorHint(
+          MAX_WEBHOOK_DELIVERY_AGE_MINUTES,
+        ),
+      },
+    ];
+  const errors: Array<{ title: string; description: string }> = [];
+  for (const [label, value] of [
+    [t.settings.scheduledTasks.editor.replayKey, draft.replayKey],
+    [t.settings.scheduledTasks.editor.coalesceKey, draft.coalesceKey],
+  ] as const) {
+    if (value.trim() && !isWebhookDedupeTemplate(value.trim()))
+      errors.push({
+        title: t.settings.scheduledTasks.editor.invalidWebhook,
+        description: t.settings.scheduledTasks.editor.invalidDedupeKey(label),
+      });
+  }
+  const window = draft.coalesceWindowSeconds.trim();
+  if (window && (!Number.isInteger(Number(window)) || Number(window) < 10 || Number(window) > 3600))
+    errors.push({
+      title: t.settings.scheduledTasks.editor.invalidWebhook,
+      description: t.settings.scheduledTasks.editor.invalidCoalesceWindow,
+    });
+  return errors;
+}
+
+export function webhookDeliveryLabel(delivery: {
+  readonly outcome: string;
+  readonly pendingWindow?: boolean | undefined;
+}) {
+  if (delivery.outcome === "accepted") return delivery.pendingWindow ? "Opened window" : "Ran";
+  const labels: Record<string, string> = {
+    dispatch_failed: "Run failed",
+    duplicate: "Duplicate",
+    coalesced: "Coalesced",
+    filtered: "Filtered",
+    rejected_signature: "Bad signature",
+    disabled: "Task paused",
+    rate_limited: "Rate limited",
+    expired: "Too old",
+  };
+  return labels[delivery.outcome] ?? delivery.outcome.replaceAll("_", " ");
+}
+
 export function scheduleFromDraft(draft: DraftState): ScheduledTaskUpsertSchedule | null {
   if (draft.scheduleMode === "webhook") {
+    if (webhookDraftErrors(draft).length > 0) return null;
     const maxDeliveryAgeMinutes = parseMaxDeliveryAge(draft.maxDeliveryAgeMinutes);
+    const replayKey = draft.replayKey.trim();
+    const coalesceKey = draft.coalesceKey.trim();
+    const coalesceWindowSeconds = draft.coalesceWindowSeconds.trim()
+      ? Number(draft.coalesceWindowSeconds)
+      : undefined;
     if (maxDeliveryAgeMinutes === undefined) return null;
+    const parsedFilters = parseWebhookFilterDrafts(draft.filters);
+    if (!("filters" in parsedFilters)) return null;
     const secret = draft.signatureSecret.trim();
     return {
       type: "webhook",
@@ -108,6 +179,19 @@ export function scheduleFromDraft(draft: DraftState): ScheduledTaskUpsertSchedul
           }
         : null,
       maxDeliveryAgeMinutes,
+      ...(replayKey || coalesceKey || coalesceWindowSeconds !== undefined
+        ? {
+            dedupe: {
+              ...(replayKey ? { replayKey } : {}),
+              ...(coalesceKey ? { coalesceKey } : {}),
+              ...(coalesceWindowSeconds === undefined ? {} : { coalesceWindowSeconds }),
+            },
+          }
+        : { dedupe: {} }),
+      // Only edited filters are sent; the server keeps the stored ones otherwise.
+      ...(webhookFilterDraftsChanged(draft.savedFilters, draft.filters)
+        ? { filters: parsedFilters.filters }
+        : {}),
     };
   }
   if (draft.scheduleMode === "interval") {
@@ -124,6 +208,7 @@ export function scheduleFromDraft(draft: DraftState): ScheduledTaskUpsertSchedul
 
 export function taskToDraft(task: ScheduledTask): DraftState {
   const schedule = task.schedule;
+  const filters = webhookFilterDrafts(schedule.type === "webhook" ? schedule.filters : undefined);
   const weekdays =
     schedule.type === "fixed_time" && schedule.weekdays && schedule.weekdays.length > 0
       ? new Set(schedule.weekdays)
@@ -164,14 +249,21 @@ export function taskToDraft(task: ScheduledTask): DraftState {
         }
       : { signatureEnabled: false, ...WEBHOOK_SIGNATURE_DEFAULTS }),
     signatureSecret: "",
+    replayKey: schedule.type === "webhook" ? (schedule.dedupe?.replayKey ?? "") : "",
+    coalesceKey: schedule.type === "webhook" ? (schedule.dedupe?.coalesceKey ?? "") : "",
+    coalesceWindowSeconds:
+      schedule.type === "webhook" && schedule.dedupe?.coalesceWindowSeconds !== undefined
+        ? String(schedule.dedupe.coalesceWindowSeconds)
+        : "",
     maxDeliveryAgeMinutes:
       schedule.type === "webhook" && schedule.maxDeliveryAgeMinutes != null
         ? String(schedule.maxDeliveryAgeMinutes)
         : "",
+    filters,
+    savedFilters: filters,
   };
 }
 
-/** Use configured defaults before the catalog's advertised default model. */
 export function scheduledTaskDefaultModel(
   settings: ServerSettings,
   project: (LegacyProjectSettingsFields & { readonly id: ProjectId }) | null,
@@ -243,4 +335,22 @@ export function scheduledTaskRunRecords(tasks: readonly ScheduledTask[]): Schedu
       if (right.runAt === null) return -1;
       return Date.parse(right.runAt) - Date.parse(left.runAt);
     });
+}
+
+/**
+ * Selects the editor's initial machine from connected candidates in display order.
+ * @param candidates Connected machines and their reactive create-command permissions.
+ * @param preferredId Scope's preferred machine, if one exists.
+ * @returns Preferred eligible machine ID, first eligible ID, or null to disable creation.
+ */
+export function scheduledTaskCreationEnvironment(
+  candidates: readonly { readonly environmentId: EnvironmentId; readonly canCreate: boolean }[],
+  preferredId: EnvironmentId | undefined,
+): EnvironmentId | null {
+  const eligible = candidates.filter((candidate) => candidate.canCreate);
+  return (
+    eligible.find((candidate) => candidate.environmentId === preferredId)?.environmentId ??
+    eligible[0]?.environmentId ??
+    null
+  );
 }

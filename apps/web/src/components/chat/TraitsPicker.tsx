@@ -3,6 +3,14 @@ import { PixelThinkIcon } from "../icons/PixelLucideIcon";
 import { Menu as MenuPrimitive } from "@base-ui/react/menu";
 import { t } from "~/i18n";
 import {
+  getDescriptorStringValue,
+  getPromptControlledTraits,
+  getTraitSelectChange,
+  replaceDescriptorCurrentValue,
+  REASONING_SELECT_DESCRIPTOR_IDS,
+  ULTRATHINK_PROMPT_PREFIX,
+} from "@t3tools/client-runtime/model-traits";
+import {
   type ModelSelection,
   type ProviderDriverKind,
   type ProviderInstanceId,
@@ -12,15 +20,13 @@ import {
   type ServerProviderModel,
 } from "@t3tools/contracts";
 import {
-  applyClaudePromptEffortPrefix,
   buildProviderOptionSelectionsFromDescriptors,
   getProviderOptionCurrentLabel,
   getProviderOptionCurrentValue,
   getProviderOptionDescriptors,
-  isClaudeUltrathinkPrompt,
   normalizeModelSlug,
 } from "@t3tools/shared/model";
-import { memo, useCallback } from "react";
+import { memo } from "react";
 import { Menu, MenuGroup, MenuPopup, MenuSeparator as MenuDivider, MenuTrigger } from "../ui/menu";
 import { useComposerDraftStore, DraftId } from "../../composerDraftStore";
 import { getProviderModelCapabilities } from "../../providerModels";
@@ -53,8 +59,7 @@ function savedOptionLabel(id: string): string {
   );
 }
 
-/** Read-only descriptors for saved values whose OpenCode model metadata is unavailable. */
-export function buildUnavailableModelOptionDescriptors(
+function buildUnavailableModelOptionDescriptors(
   selections: ProviderOptions | null | undefined,
 ): ReadonlyArray<ProviderOptionDescriptor> {
   return (selections ?? []).map((selection) =>
@@ -86,8 +91,6 @@ type TraitsPersistence =
       onModelOptionsChange: (nextOptions: ProviderOptions | undefined) => void;
     };
 
-const ULTRATHINK_PROMPT_PREFIX = "Ultrathink:\n";
-
 /** Identifies the provider default without dispatching a new selection. */
 function DefaultBadge() {
   return (
@@ -95,40 +98,6 @@ function DefaultBadge() {
       {t.composer.traits.default}
     </Badge>
   );
-}
-
-/** Replaces only the named descriptor's value, preserving every other provider option. */
-function replaceDescriptorCurrentValue(
-  descriptors: ReadonlyArray<ProviderOptionDescriptor>,
-  descriptorId: string,
-  currentValue: string | boolean | undefined,
-): ReadonlyArray<ProviderOptionDescriptor> {
-  return descriptors.map((descriptor) =>
-    descriptor.id !== descriptorId
-      ? descriptor
-      : descriptor.type === "boolean"
-        ? {
-            ...descriptor,
-            ...(typeof currentValue === "boolean" ? { currentValue } : {}),
-          }
-        : {
-            ...descriptor,
-            ...(typeof currentValue === "string" ? { currentValue } : {}),
-          },
-  );
-}
-
-/** Resolves a select value from saved/reported selection; null means no string value is known. */
-function getDescriptorStringValue(
-  descriptor: Extract<ProviderOptionDescriptor, { type: "select" }> | null,
-  selection?: ModelSelection | null,
-  reportedSelection?: ModelSelection | null,
-): string | null {
-  if (!descriptor) {
-    return null;
-  }
-  const value = getProviderOptionCurrentValue(descriptor, selection, reportedSelection);
-  return typeof value === "string" ? value : null;
 }
 
 /** Derives capability-backed controls and prompt effort locks without writing to the draft. */
@@ -172,15 +141,11 @@ function getSelectedTraits(
   const thinkingDescriptor =
     booleanDescriptors.find((descriptor) => descriptor.id === "thinking") ?? null;
 
-  // Prompt-controlled effort (e.g. ultrathink in prompt text)
-  const ultrathinkPromptControlled =
-    allowPromptInjectedEffort &&
-    (primarySelectDescriptor?.promptInjectedValues?.length ?? 0) > 0 &&
-    isClaudeUltrathinkPrompt(prompt);
-
-  // Check if "ultrathink" appears in the body text (not just our prefix)
-  const ultrathinkInBodyText =
-    ultrathinkPromptControlled && isClaudeUltrathinkPrompt(prompt.replace(/^Ultrathink:\s*/i, ""));
+  const { ultrathinkPromptControlled, ultrathinkInBodyText } = getPromptControlledTraits(
+    descriptors,
+    prompt,
+    allowPromptInjectedEffort,
+  );
   const effort =
     (ultrathinkPromptControlled
       ? "ultrathink"
@@ -257,6 +222,69 @@ function getTraitsSectionVisibility(input: {
   };
 }
 
+/**
+ * `modelOptions` must already carry the composer's implicit defaults (see
+ * `withImplicitFastModeDefault`) so the persisted selection matches what the
+ * picker would write.
+ */
+export function getReasoningTraitStep(input: {
+  provider: ProviderDriverKind;
+  instanceId: ProviderInstanceId;
+  model: string;
+  models: ReadonlyArray<ServerProviderModel>;
+  modelOptions: ProviderOptions | undefined;
+  reportedModelSelection: ModelSelection | null | undefined;
+  prompt: string;
+  planModeEnabled: boolean;
+  direction: 1 | -1;
+}) {
+  const selected = getSelectedTraits(
+    input.provider,
+    input.models,
+    input.model,
+    input.prompt,
+    input.modelOptions,
+    true,
+    input.planModeEnabled,
+  );
+  if (selected.modelIsUnavailable || selected.ultrathinkInBodyText) return null;
+  const descriptor = selected.selectDescriptors.find((entry) =>
+    REASONING_SELECT_DESCRIPTOR_IDS.has(entry.id),
+  );
+  if (!descriptor || descriptor.options.length < 2) return null;
+  const isPrimary = descriptor.id === selected.primarySelectDescriptor?.id;
+  const current =
+    isPrimary && selected.ultrathinkPromptControlled
+      ? "ultrathink"
+      : getDescriptorStringValue(
+          descriptor,
+          { instanceId: input.instanceId, model: input.model, options: input.modelOptions ?? [] },
+          input.reportedModelSelection,
+        );
+  const ordered = input.direction > 0 ? descriptor.options : descriptor.options.toReversed();
+  // A reported value outside the catalog, such as OpenCode's "default", steps
+  // from the catalog default, or from the end when there is none.
+  const position =
+    [current, getDescriptorStringValue(descriptor)]
+      .map((value) => ordered.findIndex((option) => option.id === value))
+      .find((index) => index >= 0) ?? -1;
+  for (const option of [
+    ...ordered.slice(position + 1),
+    ...ordered.slice(0, Math.max(position, 0)),
+  ]) {
+    const change = getTraitSelectChange(selected, descriptor, input.prompt, option.id);
+    if (!change) return null;
+    if ("modelOptions" in change) {
+      return change.modelOptions
+        ? { prompt: change.prompt, modelOptions: change.modelOptions }
+        : null;
+    }
+    // A slash command refuses the Ultrathink prefix, so skip that level.
+    if (change.prompt.startsWith(ULTRATHINK_PROMPT_PREFIX)) return change;
+  }
+  return null;
+}
+
 /** Returns whether this model has any available controls or saved read-only traits. */
 export function shouldRenderTraitsControls(input: {
   provider: ProviderDriverKind;
@@ -303,24 +331,30 @@ export const TraitsMenuContent = memo(function TraitsMenuContentImpl({
   const modelSelection =
     instanceId && model ? { instanceId, model, options: modelOptions ?? [] } : null;
   const setProviderModelOptions = useComposerDraftStore((store) => store.setProviderModelOptions);
-  const updateModelOptions = useCallback(
-    (nextOptions: ProviderOptions | undefined) => {
-      if ("onModelOptionsChange" in persistence) {
-        persistence.onModelOptionsChange(nextOptions);
-        return;
-      }
-      const threadTarget = persistence.threadRef ?? persistence.draftId;
-      if (!threadTarget) {
-        return;
-      }
-      setProviderModelOptions(threadTarget, provider, nextOptions, {
-        ...(instanceId ? { instanceId } : {}),
-        model,
-        persistSticky: true,
-      });
-    },
-    [instanceId, model, persistence, provider, setProviderModelOptions],
-  );
+  const updateModelOptions = (nextOptions: ProviderOptions | undefined) => {
+    if ("onModelOptionsChange" in persistence) {
+      persistence.onModelOptionsChange(nextOptions);
+      return;
+    }
+    const threadTarget = persistence.threadRef ?? persistence.draftId;
+    if (!threadTarget) {
+      return;
+    }
+    setProviderModelOptions(threadTarget, provider, nextOptions, {
+      ...(instanceId ? { instanceId } : {}),
+      model,
+      persistSticky: true,
+    });
+  };
+  const selected = getTraitsSectionVisibility({
+    provider,
+    models,
+    model,
+    prompt,
+    modelOptions,
+    allowPromptInjectedEffort,
+    planModeEnabled,
+  });
   const {
     descriptors,
     selectDescriptors,
@@ -330,15 +364,7 @@ export const TraitsMenuContent = memo(function TraitsMenuContentImpl({
     ultrathinkInBodyText,
     hasAnyControls,
     modelIsUnavailable,
-  } = getTraitsSectionVisibility({
-    provider,
-    models,
-    model,
-    prompt,
-    modelOptions,
-    allowPromptInjectedEffort,
-    planModeEnabled,
-  });
+  } = selected;
   const updateDescriptors = (nextDescriptors: ReadonlyArray<ProviderOptionDescriptor>) => {
     updateModelOptions(buildProviderOptionSelectionsFromDescriptors(nextDescriptors));
   };
@@ -347,21 +373,10 @@ export const TraitsMenuContent = memo(function TraitsMenuContentImpl({
     descriptor: Extract<ProviderOptionDescriptor, { type: "select" }>,
     value: string,
   ) => {
-    if (!value) return;
-    if (descriptor.promptInjectedValues?.includes(value)) {
-      const nextPrompt =
-        prompt.trim().length === 0
-          ? ULTRATHINK_PROMPT_PREFIX
-          : applyClaudePromptEffortPrefix(prompt, "ultrathink");
-      onPromptChange(nextPrompt);
-      return;
-    }
-    if (ultrathinkInBodyText && descriptor.id === primarySelectDescriptor?.id) return;
-    if (ultrathinkPromptControlled && descriptor.id === primarySelectDescriptor?.id) {
-      const stripped = prompt.replace(/^Ultrathink:\s*/i, "");
-      onPromptChange(stripped);
-    }
-    updateDescriptors(replaceDescriptorCurrentValue(descriptors, descriptor.id, value));
+    const change = getTraitSelectChange(selected, descriptor, prompt, value);
+    if (!change) return;
+    if (change.prompt !== prompt) onPromptChange(change.prompt);
+    if ("modelOptions" in change) updateModelOptions(change.modelOptions);
   };
 
   if (!hasAnyControls) {
@@ -696,8 +711,6 @@ export const TraitsPicker = memo(function TraitsPicker({
           }
         >
           {isCodexStyle ? (
-            // The label truncates itself; clipping the wrapper too would cut off
-            // the chevron, whose negative end margin overhangs the wrapper edge.
             <span
               className={cn(
                 "flex min-w-0 w-full items-center",

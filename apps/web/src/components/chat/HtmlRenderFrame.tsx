@@ -8,7 +8,7 @@ import {
   type HtmlRenderReference,
 } from "@t3tools/shared/htmlRender";
 import { CodeXmlIcon, Maximize2Icon } from "lucide-react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { useAssetUrlRefresh, useAssetUrlState } from "~/assets/assetUrls";
 
@@ -19,7 +19,6 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { HtmlRenderDialog } from "./HtmlRenderDialog";
 import { observeResize } from "~/lib/observeResize";
 
-// A frame may load its URL a little after mounting.
 const MIN_URL_LIFE_MS = 5 * 60_000;
 
 /**
@@ -35,8 +34,6 @@ export function HtmlRenderFrame(props: {
   readonly onFullscreenChange?: (fullscreen: boolean) => void;
 }) {
   const { attachmentId, title } = props.htmlRender;
-  // The frame takes the page's measured height at its own width, read before
-  // first paint so the reserved box is already the right size.
   const boxRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(HTML_RENDER_COLUMN_WIDTH);
   useLayoutEffect(() => {
@@ -52,20 +49,18 @@ export function HtmlRenderFrame(props: {
   const [contentHeight, setContentHeight] = useState<number>();
   const height = htmlRenderFrameHeight(props.htmlRender, width, contentHeight);
   const fileName = htmlRenderFileName(title);
-  const resource = useMemo(
-    () => ({
-      _tag: "attachment" as const,
-      attachmentId,
-      fileName,
-      mimeType: "text/html",
-      disposition: "inline" as const,
-    }),
-    [attachmentId, fileName],
-  );
+  const resource = {
+    _tag: "attachment" as const,
+    attachmentId,
+    fileName,
+    mimeType: "text/html",
+    disposition: "inline" as const,
+  };
   // A cached URL with life left is reused, so the browser's cache serves the
   // page again; one near expiry is minted afresh, since a frame cannot report a
-  // failed load. The page keeps its first URL for its lifetime.
+  // failed load.
   const [src, setSrc] = useState<string | null>(null);
+  const srcExpiresAt = useRef(0);
   const [expandedSrc, setExpandedSrc] = useState<string | null>(null);
   const { onFullscreenChange } = props;
   useEffect(() => {
@@ -91,6 +86,7 @@ export function HtmlRenderFrame(props: {
     }
     if (cachedUrl === null) return;
     if (cachedExpiresAt - Date.now() > MIN_URL_LIFE_MS) {
+      srcExpiresAt.current = cachedExpiresAt;
       setSrc(cachedUrl);
       return;
     }
@@ -121,6 +117,7 @@ export function HtmlRenderFrame(props: {
               threadRef={props.threadRef}
               className="block size-full"
               onContentHeight={setContentHeight}
+              onFullscreenChange={onFullscreenChange}
             />
             <div className="absolute end-2 top-2 flex gap-1 opacity-0 transition-opacity duration-150 focus-within:opacity-100 group-hover/html-render:opacity-100 pointer-coarse:opacity-100">
               <Tooltip>
@@ -131,7 +128,10 @@ export function HtmlRenderFrame(props: {
                       size="icon-xs"
                       variant="glass"
                       onClick={async () => {
-                        const url = await refresh().catch(() => null);
+                        const url =
+                          srcExpiresAt.current - Date.now() > MIN_URL_LIFE_MS
+                            ? src
+                            : await refresh().catch(() => null);
                         if (url !== null) setExpandedSrc(url);
                         else
                           toastManager.add({

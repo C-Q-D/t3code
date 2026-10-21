@@ -21,11 +21,6 @@ export function formatDesktopSshTarget(target: DesktopSshEnvironmentTarget): str
   return target.port ? `${authority}:${target.port}` : authority;
 }
 
-/**
- * How this client reaches a machine, printed first in every environment row so
- * T3 Connect, SSH, WSL, and plain remote links are told apart without a legend.
- * A machine with several routes names the one in use, or how many it has.
- */
 export function environmentTransportLabel(
   environment: EnvironmentPresentation,
   activeTarget: ConnectionTarget | null = null,
@@ -58,9 +53,17 @@ export function environmentTransportLabel(
 }
 
 /**
- * One machine in a grouped settings list: icon, name, a single subtitle line,
- * and controls on the right. Every environment list on the Connections page
- * uses this so the lists share one rhythm.
+ * Keeps disabled backend controls legible by dimming identity content rather than the entire row.
+ * @param props.kind Machine icon kind.
+ * @param props.label Primary machine name.
+ * @param props.subtitle Address or transport details.
+ * @param props.status Optional verified connection label.
+ * @param props.below Optional progress/content under the subtitle.
+ * @param props.detail Optional trailing detail content.
+ * @param props.dimmed Whether identity is muted; defaults to false.
+ * @param props.className Optional layout classes.
+ * @param props.children Row controls that must retain full contrast.
+ * @returns The shared Graphite environment row.
  */
 export function EnvironmentRow({
   kind,
@@ -80,20 +83,22 @@ export function EnvironmentRow({
   readonly status?: string | null;
   /** Extra content under the subtitle, such as update progress. */
   readonly below?: ReactNode;
-  /** Expanded content under the whole row, aligned with the label, such as its routes. */
   readonly detail?: ReactNode;
   readonly dimmed?: boolean;
   readonly className?: string;
   readonly children?: ReactNode;
 }) {
   return (
-    <div
-      className={cn("connections-environment-row grid min-h-12", dimmed && "opacity-60", className)}
-    >
-      <span className="flex size-8 items-center justify-center rounded-connections-icon bg-connections-well shadow-connections-icon">
+    <div className={cn("connections-environment-row grid min-h-12", className)}>
+      <span
+        className={cn(
+          "flex size-8 items-center justify-center rounded-connections-icon bg-connections-well shadow-connections-icon",
+          dimmed && "opacity-60",
+        )}
+      >
         <EnvironmentMachineIcon aria-hidden kind={kind} className="size-3.75" />
       </span>
-      <div className="min-w-0 space-y-0.25">
+      <div className={cn("min-w-0 space-y-0.25", dimmed && "opacity-60")}>
         <div className="flex min-w-0 items-center gap-2">
           <p className="truncate text-control font-semibold text-foreground">{label}</p>
           {status ? (

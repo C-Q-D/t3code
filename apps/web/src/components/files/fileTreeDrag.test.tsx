@@ -111,9 +111,7 @@ beforeEach(async () => {
   opened = [];
   panel = document.createElement("div");
   document.body.append(panel);
-  controller = createFileTreeDragMentionController({
-    deselect: (path) => tree.getItem(path)?.deselect(),
-  });
+  controller = createFileTreeDragMentionController({});
   tree = new FileTree({
     paths: ["app.ts", "docs/guide.md"],
     initialExpansion: "open",
@@ -137,7 +135,9 @@ beforeEach(async () => {
   document.body.append(form);
   root = createRoot(document.createElement("div"));
   act(() => root.render(createElement(ComposerThrowToken, { channel: "mention:files-test" })));
-  dispose = installFileTreeDrag(panel, controller, "mention:files-test");
+  dispose = installFileTreeDrag(panel, controller, "mention:files-test", (path) =>
+    tree.getItem(path)?.deselect(),
+  );
 });
 
 afterEach(() => {
@@ -220,6 +220,9 @@ it.each([false, true])(
       insertMentionAtEnd: (text) => {
         inserted.push(text);
         return true;
+      },
+      insertPullRequestAtEnd: () => {
+        throw new Error("unexpected pull request insertion during file drop");
       },
       setDragActive: () => {},
       onInsertRejected: () => {

@@ -31,15 +31,15 @@ export function CursorEnableButton({
   const [pending, setPending] = useState(false);
   const enable = async () => {
     setPending(true);
-    try {
+    return await (async () => {
       const result = await updateSettings({
         environmentId,
         input: { patch: { cursorKeychainUsageEnabled: true } },
       });
       if (result._tag === "Success") onEnabled();
-    } finally {
+    })().finally(() => {
       setPending(false);
-    }
+    });
   };
   const button = tooltip ? (
     <InlineButton

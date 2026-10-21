@@ -29,7 +29,10 @@ vi.mock("./SettingsScopeContext", () => ({
 vi.mock("./useScopedModelAvailability", () => ({
   useScopedModelDisabledReason: () => () => null,
 }));
-vi.mock("../../state/server", () => ({ EMPTY_SERVER_PROVIDERS: [] }));
+vi.mock(import("../../state/server"), async (importOriginal) => ({
+  ...(await importOriginal()),
+  EMPTY_SERVER_PROVIDERS: [],
+}));
 vi.mock("../../state/sourceControl", () => ({
   sourceControlEnvironment: { discovery: () => null },
 }));

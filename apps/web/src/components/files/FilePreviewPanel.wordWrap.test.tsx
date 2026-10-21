@@ -35,9 +35,12 @@ vi.mock("~/components/ui/toast", () => ({
 }));
 vi.mock("~/hooks/useSettings", () => ({
   useClientSettings: (select: (value: { wordWrap: boolean }) => unknown) => select(settings),
-  useUpdateClientSettings: () => settings.update,
+  updateClientSettings: (patch: { wordWrap: boolean }) => settings.update(patch),
 }));
-vi.mock("~/hooks/useTheme", () => ({ useTheme: () => ({ resolvedTheme: "dark" }) }));
+vi.mock("~/hooks/useTheme", () => ({
+  useTheme: () => ({ resolvedTheme: "dark" }),
+  useRenderedAppearance: () => "dark",
+}));
 vi.mock("~/hooks/useWorkspaceMutationRefresh", () => ({ useWorkspaceMutationRefresh: () => {} }));
 vi.mock("~/state/filesystem", () => ({
   useFilesystemReadAccess: () => ({ canReadFiles: true, isPending: false }),
@@ -51,7 +54,14 @@ vi.mock("~/remoteOpen", () => ({ useRemoteOpenState: () => ({ mode: "local-exec"
 vi.mock("~/browser/previewRuntime", () => ({ usePreviewAvailable: () => false }));
 vi.mock("~/browser/useOpenLink", () => ({ useOpenLink: () => vi.fn() }));
 vi.mock("~/lib/openPullRequestLink", () => ({ useOpenChangeRequestLink: () => vi.fn() }));
-vi.mock("~/state/server", () => ({ primaryServerKeybindingsAtom: {}, serverEnvironment: {} }));
+vi.mock("~/state/server", async () => {
+  const { Atom } = await import("effect/reactivity");
+  const config = Atom.make(null);
+  return {
+    primaryServerKeybindingsAtom: {},
+    serverEnvironment: { configValueAtom: () => config },
+  };
+});
 vi.mock("~/state/assets", () => ({ assetEnvironment: { createUrl: {} } }));
 vi.mock("~/state/preview", () => ({ previewEnvironment: { open: {} } }));
 vi.mock("~/state/use-atom-command", () => ({ useAtomCommand: () => vi.fn() }));
@@ -137,6 +147,9 @@ describe("workspace preview toolbar", () => {
           composerDraftTarget={threadRef}
           keybindings={[]}
           availableEditors={[]}
+          openInShortcutEnabled={false}
+          folderTrail={undefined}
+          onNavigateFolder={() => {}}
           revealLine={null}
           revealRequestId={0}
           onOpenFile={() => {}}

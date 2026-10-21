@@ -29,6 +29,7 @@ class TestClock {
   private timeouts = new Map<number, { at: number; callback: () => void }>();
 
   readonly env = {
+    prefersReducedMotion: () => false,
     now: () => this.currentTime,
     requestAnimationFrame: (callback: FrameRequestCallback) => this.frames.request(callback),
     cancelAnimationFrame: (handle: number) => cancelAnimationFrame(handle),

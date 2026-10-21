@@ -313,33 +313,35 @@ const make = Effect.gen(function* () {
     );
 
   /** Git captures and diffs use their existing timeout/retry policy; missing refs produce unknown statistics. */
-  const filesFor = (discussion: Discussion, entry: DiscussionEntry) =>
-    Effect.gen(function* () {
-      const pair = yield* checkpointPair(discussion, entry);
-      if (!pair) return null;
-      const diff = yield* domain(
-        checkpoints.diffCheckpoints({
-          cwd: pair.cwd,
-          fromCheckpointRef: pair.from,
-          toCheckpointRef: pair.to,
-          ignoreWhitespace: false,
-          format: "numstat",
-        }),
-      );
-      return parseTurnDiffFilesFromNumstat(diff).map(({ path, additions, deletions }) => ({
-        path,
-        additions,
-        deletions,
-      }));
-    }).pipe(
-      Effect.catch((cause) =>
-        Effect.logWarning("discussion checkpoint diff unavailable", {
-          discussionId: discussion.id,
-          entryId: entry.id,
-          cause,
-        }).pipe(Effect.as(null)),
+  const filesFor = Effect.fn("DiscussionService.filesFor")(
+    (discussion: Discussion, entry: DiscussionEntry) =>
+      Effect.gen(function* () {
+        const pair = yield* checkpointPair(discussion, entry);
+        if (!pair) return null;
+        const diff = yield* domain(
+          checkpoints.diffCheckpoints({
+            cwd: pair.cwd,
+            fromCheckpointRef: pair.from,
+            toCheckpointRef: pair.to,
+            ignoreWhitespace: false,
+            format: "numstat",
+          }),
+        );
+        return parseTurnDiffFilesFromNumstat(diff).map(({ path, additions, deletions }) => ({
+          path,
+          additions,
+          deletions,
+        }));
+      }).pipe(
+        Effect.catch((cause) =>
+          Effect.logWarning("discussion checkpoint diff unavailable", {
+            discussionId: discussion.id,
+            entryId: entry.id,
+            cause,
+          }).pipe(Effect.as(null)),
+        ),
       ),
-    );
+  );
 
   /** Reads the tracked run's durable capture outcome for this locked discussion; missing/error refs remain unknown. */
   const captureState = (discussion: Discussion, run: OrchestrationV2Run) =>
@@ -374,36 +376,38 @@ const make = Effect.gen(function* () {
    * @param entries Ordered transcript, consulted only by the legacy fallback.
    * @returns Assignment phase; legacy projection read failures propagate to the caller.
    */
-  const currentPhase = (discussion: Discussion, entries: ReadonlyArray<DiscussionEntry>) =>
-    Effect.gen(function* () {
-      if (discussion.cursor.phase !== undefined) return discussion.cursor.phase;
-      // Legacy snapshots alone need message/End inference; cursor.phase survives preparation failures.
-      if (!discussion.closing) return "regular" as const;
-      if (discussion.closing.phase === "summarizing") return "summarizing" as const;
-      const context = yield* projections.getThreadRecords(
-        discussion.seats[discussion.cursor.seatIndex]!.threadId,
-        ["runs", "messages"],
-      );
-      const run = context.runs.find((item) => item.id === discussion.cursor.runId);
-      const message = context.messages.find((item) => item.id === run?.userMessageId);
-      const endMarker = entries.findLast(
-        (item) => item.kind === "system" && item.text === "讨论到此",
-      );
-      // Only legacy inference reads the End marker seat owner. End assigns a final statement when paused
-      // or when an unfinished ordinary run became terminal before reactor bookkeeping. Its owner survives
-      // while capture is pending; active or successfully completed ordinary runs have no seat owner.
-      if (
-        endMarker?.seatId === discussion.seats[discussion.cursor.seatIndex]!.id &&
-        message?.text.endsWith(discussionBriefPhaseMarker("regular"))
-      )
-        return "final_round" as const;
-      for (const phase of ["regular", "final_round"] as const) {
-        if (message?.text.endsWith(discussionBriefPhaseMarker(phase))) return phase;
-      }
-      return endMarker && discussion.cursor.dispatchedEntrySeq >= endMarker.seq
-        ? ("final_round" as const)
-        : ("regular" as const);
-    });
+  const currentPhase = Effect.fn("DiscussionService.currentPhase")(
+    (discussion: Discussion, entries: ReadonlyArray<DiscussionEntry>) =>
+      Effect.gen(function* () {
+        if (discussion.cursor.phase !== undefined) return discussion.cursor.phase;
+        // Legacy snapshots alone need message/End inference; cursor.phase survives preparation failures.
+        if (!discussion.closing) return "regular" as const;
+        if (discussion.closing.phase === "summarizing") return "summarizing" as const;
+        const context = yield* projections.getThreadRecords(
+          discussion.seats[discussion.cursor.seatIndex]!.threadId,
+          ["runs", "messages"],
+        );
+        const run = context.runs.find((item) => item.id === discussion.cursor.runId);
+        const message = context.messages.find((item) => item.id === run?.userMessageId);
+        const endMarker = entries.findLast(
+          (item) => item.kind === "system" && item.text === "讨论到此",
+        );
+        // Only legacy inference reads the End marker seat owner. End assigns a final statement when paused
+        // or when an unfinished ordinary run became terminal before reactor bookkeeping. Its owner survives
+        // while capture is pending; active or successfully completed ordinary runs have no seat owner.
+        if (
+          endMarker?.seatId === discussion.seats[discussion.cursor.seatIndex]!.id &&
+          message?.text.endsWith(discussionBriefPhaseMarker("regular"))
+        )
+          return "final_round" as const;
+        for (const phase of ["regular", "final_round"] as const) {
+          if (message?.text.endsWith(discussionBriefPhaseMarker(phase))) return phase;
+        }
+        return endMarker && discussion.cursor.dispatchedEntrySeq >= endMarker.seq
+          ? ("final_round" as const)
+          : ("regular" as const);
+      }),
+  );
 
   /**
    * Writes a deterministic Markdown attachment for complete oversized material. No retries are scheduled:
@@ -657,47 +661,49 @@ const make = Effect.gen(function* () {
    * completed entry carries finalStatement: the cursor describes the next dispatch and may already
    * name final_round when a stopped ordinary run wins the race against its interrupt.
    */
-  const advance = (discussion: Discussion, entry: DiscussionEntry) =>
-    Effect.gen(function* () {
-      if (entry.kind === "summary")
-        return yield* save({ ...discussion, status: "ended", pause: null, endedAt: yield* now });
-      let seatIndex = (discussion.cursor.seatIndex + 1) % discussion.seats.length;
-      let phase: DiscussionBriefPhase = "regular";
-      let closing = discussion.closing;
-      if (closing) {
-        if (entry.finalStatement === true)
-          closing = { ...closing, remainingFinalSeatIds: closing.remainingFinalSeatIds.slice(1) };
-        const next = closing.remainingFinalSeatIds[0];
-        if (next !== undefined) {
-          seatIndex = discussion.seats.findIndex((seat) => seat.id === next);
-          phase = "final_round";
-        } else {
-          closing = { ...closing, phase: "summarizing" };
-          seatIndex = discussion.seats.findIndex((seat) => seat.id === closing!.summarizerSeatId);
-          phase = "summarizing";
+  const advance = Effect.fn("DiscussionService.advance")(
+    (discussion: Discussion, entry: DiscussionEntry) =>
+      Effect.gen(function* () {
+        if (entry.kind === "summary")
+          return yield* save({ ...discussion, status: "ended", pause: null, endedAt: yield* now });
+        let seatIndex = (discussion.cursor.seatIndex + 1) % discussion.seats.length;
+        let phase: DiscussionBriefPhase = "regular";
+        let closing = discussion.closing;
+        if (closing) {
+          if (entry.finalStatement === true)
+            closing = { ...closing, remainingFinalSeatIds: closing.remainingFinalSeatIds.slice(1) };
+          const next = closing.remainingFinalSeatIds[0];
+          if (next !== undefined) {
+            seatIndex = discussion.seats.findIndex((seat) => seat.id === next);
+            phase = "final_round";
+          } else {
+            closing = { ...closing, phase: "summarizing" };
+            seatIndex = discussion.seats.findIndex((seat) => seat.id === closing!.summarizerSeatId);
+            phase = "summarizing";
+          }
         }
-      }
-      // A stopped ordinary run completing after End must retry this seat without advancing its round.
-      const sameSeatFinalRetry =
-        closing !== null &&
-        entry.finalStatement !== true &&
-        discussion.cursor.phase === "final_round" &&
-        seatIndex === discussion.cursor.seatIndex;
-      const next = yield* save({
-        ...discussion,
-        closing,
-        cursor: {
-          ...discussion.cursor,
-          phase,
-          seatIndex,
-          round:
-            discussion.cursor.round +
-            (seatIndex === 0 && phase !== "summarizing" && !sameSeatFinalRetry ? 1 : 0),
-          runId: null,
-        },
-      });
-      return yield* dispatchSeat(next, phase);
-    });
+        // A stopped ordinary run completing after End must retry this seat without advancing its round.
+        const sameSeatFinalRetry =
+          closing !== null &&
+          entry.finalStatement !== true &&
+          discussion.cursor.phase === "final_round" &&
+          seatIndex === discussion.cursor.seatIndex;
+        const next = yield* save({
+          ...discussion,
+          closing,
+          cursor: {
+            ...discussion.cursor,
+            phase,
+            seatIndex,
+            round:
+              discussion.cursor.round +
+              (seatIndex === 0 && phase !== "summarizing" && !sameSeatFinalRetry ? 1 : 0),
+            runId: null,
+          },
+        });
+        return yield* dispatchSeat(next, phase);
+      }),
+  );
 
   /** Processes only the tracked run under its discussion lock; repeated terminal events never dispatch twice. */
   const onRun = (

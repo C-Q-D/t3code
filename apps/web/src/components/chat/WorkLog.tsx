@@ -36,7 +36,6 @@ export function WorkLogBlock({
   );
 }
 
-/** Expanded members align with the header and use the same compact row geometry. */
 export function WorkLogList({ children }: { children: ReactNode }) {
   return <div className="flex min-w-0 flex-col">{children}</div>;
 }
@@ -151,7 +150,6 @@ export function WorkLogRow({
   );
 }
 
-/** Distance from the end, in px, that still counts as reading the newest text. */
 const LIVE_EDGE_PX = 4;
 
 /**
@@ -168,7 +166,7 @@ export function WorkLogDetails({
 }: {
   children: ReactNode;
   kind?: "text" | "panel" | "media";
-  /** Keep streamed text in view. Scrolling up pauses this until the reader returns to the end. */
+
   followLive?: boolean;
 }) {
   const scrollerRef = useRef<HTMLDivElement>(null);

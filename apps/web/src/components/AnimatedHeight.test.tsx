@@ -87,9 +87,9 @@ it.each([
             )
           : content.getBoundingClientRect().height;
       const releases: number[] = [];
-      const startedAt = performance.now();
+      let elapsedMs = 0;
       const observer = new MutationObserver(() => {
-        if (visibleExtent() === 200) releases.push(performance.now() - startedAt);
+        if (visibleExtent() === 200) releases.push(elapsedMs);
       });
       observer.observe(viewport, { attributes: true, attributeFilter: ["style"] });
       try {
@@ -102,9 +102,11 @@ it.each([
           deliver(entries, {} as ResizeObserver);
         });
         expect(visibleExtent()).toBe(80);
-        await act(async () => vi.advanceTimersByTime(releaseAfterMs - 1));
+        elapsedMs = releaseAfterMs - 1;
+        await act(async () => vi.advanceTimersByTime(elapsedMs));
         expect(visibleExtent()).toBe(80);
         expect(releases).toEqual([]);
+        elapsedMs += 1;
         await act(async () => vi.advanceTimersByTime(1));
         expect(visibleExtent()).toBe(200);
         expect(releases).toEqual([releaseAfterMs]);

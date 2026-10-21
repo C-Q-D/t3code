@@ -107,7 +107,14 @@ vi.mock("./OnboardingSurface", () => ({
   ),
 }));
 vi.mock("../ui/scroll-area", () => ({ ScrollArea: "div" }));
-vi.mock("../../onboarding/firstRun", () => ({ useCompleteOnboarding: () => state.complete }));
+vi.mock("../../hooks/useSettings", () => ({
+  ensureClientSettingsHydrated: vi.fn(),
+  persistClientSettingsUpdate: vi.fn(),
+}));
+vi.mock(import("../../onboarding/firstRun"), async (importOriginal) => ({
+  ...(await importOriginal()),
+  completeOnboarding: state.complete,
+}));
 vi.mock("../../hooks/useTheme", () => ({ mountOnboardingTheme: () => undefined }));
 vi.mock("../../hooks/useLocalStorage", () => ({ useLocalStorage: () => [false, vi.fn()] }));
 vi.mock("../../hooks/useCopyToClipboard", () => ({
