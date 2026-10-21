@@ -90,6 +90,7 @@ import {
   scheduledTaskRunRecords,
   type ScheduledTaskRunRecord,
   scheduledTaskDefaultModel,
+  scheduledTaskModelSelection,
   scheduledTaskCreationEnvironment,
   taskToDraft,
   type DraftState,
@@ -100,6 +101,8 @@ import { Menu, MenuTrigger, MenuPopup, MenuItem, MenuSeparator } from "../ui/men
 import { ToggleGroup, Toggle } from "../ui/toggle-group";
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from "../ui/empty";
 import { ProviderModelPicker } from "../chat/ProviderModelPicker";
+import { TraitsPicker } from "../chat/TraitsPicker";
+import { createModelSelection } from "@t3tools/shared/model";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import {
@@ -1376,6 +1379,8 @@ function ScheduledTaskEditorForm({
   const activeInstanceId =
     activeSelection?.instanceId ?? firstInstance?.instanceId ?? ("" as ProviderInstanceId);
   const activeModel = activeSelection?.model ?? "";
+  const modelSelection = scheduledTaskModelSelection(activeSelection, draft.baseModelSelection);
+  const activeEntry = instanceEntries.find((entry) => entry.instanceId === activeInstanceId);
   const modelOptionsByInstance = getCustomModelOptionsByInstance(
     settings,
     providers,
@@ -1403,7 +1408,7 @@ function ScheduledTaskEditorForm({
       tasksQuery.data === null
     )
       return;
-    const selection = activeSelection;
+    const selection = modelSelection;
     if (
       !draft.title.trim() ||
       !draft.prompt.trim() ||
@@ -1456,12 +1461,6 @@ function ScheduledTaskEditorForm({
       );
       return;
     }
-    const modelSelection =
-      draft.baseModelSelection !== null &&
-      draft.baseModelSelection.instanceId === selection.instanceId &&
-      draft.baseModelSelection.model === selection.model
-        ? draft.baseModelSelection
-        : selection;
     const workspaceStrategy: OrchestrationV2ThreadLaunchWorkspaceStrategy =
       draft.workspaceMode === "root"
         ? { type: "root" }
@@ -1481,7 +1480,7 @@ function ScheduledTaskEditorForm({
       projectId: selectedProjectId as ProjectId,
       threadId: draft.threadId ? (draft.threadId as ThreadId) : null,
       workspaceStrategy,
-      modelSelection,
+      modelSelection: selection,
       runtimeMode: draft.runtimeMode,
       interactionMode: draft.interactionMode,
       creationSource: "web",
@@ -2023,7 +2022,7 @@ function ScheduledTaskEditorForm({
           </Field>
 
           <Field label={t.settings.scheduledTasks.editor.modelLabel}>
-            <div>
+            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
               <ProviderModelPicker
                 environmentId={environmentId}
                 disabled={saving || !connected}
@@ -2038,6 +2037,31 @@ function ScheduledTaskEditorForm({
                   setDraft((current) => ({ ...current, modelKey: `${instanceId}:${model}` }))
                 }
               />
+              {modelSelection && activeEntry ? (
+                <TraitsPicker
+                  provider={activeEntry.driverKind}
+                  models={activeEntry.models}
+                  model={modelSelection.model}
+                  prompt=""
+                  onPromptChange={() => {}}
+                  modelOptions={modelSelection.options ?? []}
+                  allowPromptInjectedEffort={false}
+                  planModeEnabled={draft.interactionMode === "plan"}
+                  triggerClassName={SETTINGS_PICKER_TRIGGER_CLASSNAME}
+                  onModelOptionsChange={(options) =>
+                    // Pin the shown model too: a default-model fallback has no modelKey yet.
+                    setDraft((current) => ({
+                      ...current,
+                      modelKey: `${modelSelection.instanceId}:${modelSelection.model}`,
+                      baseModelSelection: createModelSelection(
+                        modelSelection.instanceId,
+                        modelSelection.model,
+                        options,
+                      ),
+                    }))
+                  }
+                />
+              ) : null}
             </div>
           </Field>
 

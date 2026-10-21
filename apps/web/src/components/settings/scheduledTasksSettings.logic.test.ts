@@ -20,6 +20,7 @@ import { deriveProviderInstanceEntries } from "../../providerInstances";
 import {
   scheduledTaskCreationEnvironment,
   scheduledTaskDefaultModel,
+  scheduledTaskModelSelection,
   matchesScheduledTaskScope,
   scheduleFromDraft,
   taskToDraft,
@@ -326,6 +327,25 @@ it("rejects dedupe templates without a request placeholder", () => {
   const draft = taskToDraft({ ...legacyTask, schedule: { type: "webhook", signature: null } });
   expect(scheduleFromDraft({ ...draft, replayKey: "literal" })).toBeNull();
   expect(scheduleFromDraft({ ...draft, coalesceKey: "{{body.bad" })).toBeNull();
+});
+
+describe("scheduled task reasoning options", () => {
+  const claude = ProviderInstanceId.make("claudeAgent");
+  const codex = ProviderInstanceId.make("codex");
+  const saved = {
+    instanceId: claude,
+    model: "claude-opus-5-5",
+    options: [{ id: "effort", value: "high" }],
+  };
+  it("keeps the saved reasoning while the task stays on the same model", () => {
+    expect(
+      scheduledTaskModelSelection({ instanceId: claude, model: "claude-opus-5-5" }, saved),
+    ).toEqual(saved);
+  });
+  it("drops the previous model's reasoning after switching models", () => {
+    const switched = { instanceId: codex, model: "gpt-6.1-sol" };
+    expect(scheduledTaskModelSelection(switched, saved)).toEqual(switched);
+  });
 });
 
 describe("scheduled task creation destination", () => {

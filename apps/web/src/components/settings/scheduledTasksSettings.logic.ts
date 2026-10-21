@@ -76,8 +76,9 @@ export interface DraftState {
   readonly runtimeMode: RuntimeMode;
   readonly interactionMode: ProviderInteractionMode;
   /**
-   * The picker only edits `instanceId:model`; keeping the source object preserves provider
-   * options (reasoning, temperature, …) when the model itself is left unchanged.
+   * Carries provider options (reasoning, temperature, …) for one model: the saved task's
+   * selection, or the one the reasoning picker last wrote. The model picker only edits
+   * `instanceId:model`, so these options apply only while they name the picked model.
    */
   readonly baseModelSelection: ModelSelection | null;
   readonly signatureEnabled: boolean;
@@ -299,6 +300,25 @@ export function scheduledTaskDefaultModel(
   );
   const fallback = models.find(({ model }) => model.isDefault) ?? models[0];
   return fallback ? { instanceId: fallback.instanceId, model: fallback.model.slug } : null;
+}
+
+/**
+ * Resolves the model selection the task editor shows and saves.
+ * Option ids and values are model-specific, so `base` options are dropped once another model is
+ * picked; the run then uses that model's own defaults until reasoning is chosen again.
+ * @param active Model from the picker, or the default fallback; null when no provider is usable.
+ * @param base Selection whose options were saved or picked for one model; null when none.
+ * @returns `base` when it names the same instance and model as `active`, otherwise `active`;
+ * null when `active` is null.
+ */
+export function scheduledTaskModelSelection(
+  active: ModelSelection | null,
+  base: ModelSelection | null,
+): ModelSelection | null {
+  if (active === null) return null;
+  const sameModel =
+    base !== null && base.instanceId === active.instanceId && base.model === active.model;
+  return sameModel ? base : active;
 }
 
 /** A task's latest run, retaining its task identity for the optional webhook history dialog. */
