@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { useAtomValue } from "@effect/atom-react";
 import { EnvironmentId } from "@t3tools/contracts";
 import { Atom } from "effect/reactivity";
@@ -83,7 +84,7 @@ function UpdateEverythingDialogContent({
     ),
   );
   const running = stopped + continuing;
-  const threads = `${running} running ${running === 1 ? "thread" : "threads"}`;
+  const threads = t.sidebar.updateRunText.running(running);
 
   return (
     <>
@@ -95,21 +96,25 @@ function UpdateEverythingDialogContent({
         {running > 0 ? (
           <p className="pt-2 text-sm">
             {stopped === 0
-              ? `${threads} will be interrupted and can resume after the restart.`
+              ? t.sidebar.updateRunText.resumeAll(threads)
               : continuing === 0
-                ? `${threads} will be interrupted.`
-                : `${threads} will be interrupted. ${continuing} can resume after the restart.`}
+                ? t.sidebar.updateRunText.interrupt(threads)
+                : t.sidebar.updateRunText.resumeSome(threads, continuing)}
           </p>
         ) : null}
         {skipped.length > 0 ? (
           <p className="whitespace-pre-line pt-2 text-sm">
-            {skipped.map((machine) => `Skips ${machine.label}: ${machine.reason}`).join("\n")}
+            {skipped
+              .map((machine) => t.sidebar.updateRunText.skips(machine.label, machine.reason))
+              .join("\n")}
           </p>
         ) : null}
       </AlertDialogHeader>
       <AlertDialogFooter>
-        <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
-        <Button onClick={onConfirm}>Update</Button>
+        <AlertDialogClose render={<Button variant="outline" />}>
+          {t.common.confirm.cancel}
+        </AlertDialogClose>
+        <Button onClick={onConfirm}>{t.app.actions.update}</Button>
       </AlertDialogFooter>
     </>
   );

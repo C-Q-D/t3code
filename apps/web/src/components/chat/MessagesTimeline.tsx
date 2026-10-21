@@ -2103,7 +2103,7 @@ function ContextCompactionTimelineRow({
       <Minimize2Icon aria-hidden="true" className="size-3" />
       {row.tokenCounts ? (
         <>
-          Context compacted {row.tokenCounts.before}
+          {t.chat.timeline.contextCompacted} {row.tokenCounts.before}
           <ArrowRightIcon aria-hidden="true" className="size-3" />
           {row.tokenCounts.after} tokens
         </>
@@ -2561,7 +2561,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
             {promptLink !== null && (
               <MessageCopyButton
                 text={promptLink}
-                label="Copy prompt link"
+                label={t.chat.timelineUi.copyLink}
                 icon={LinkIconNode}
                 variant="ghost"
                 size="icon-md"

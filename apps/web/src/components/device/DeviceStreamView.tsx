@@ -396,7 +396,7 @@ export function DeviceStreamView(props: {
         tabIndex={0}
         role="application"
         aria-label={t.tools.device.screen(
-          props.platform === "ios" ? "iOS Simulator" : "Android Emulator",
+          props.platform === "ios" ? t.tools.deviceStreamUi.ios : t.tools.deviceStreamUi.android,
         )}
         onKeyDown={(event) => {
           if (event.target !== event.currentTarget) return;

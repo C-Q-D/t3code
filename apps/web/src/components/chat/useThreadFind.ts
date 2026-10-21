@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import type { InlineSkill } from "@t3tools/shared/inlineSkills";
 import type {
   OrchestrationV2ThreadProjection,
@@ -67,8 +68,8 @@ export function useThreadFind({
     if (!enabled) {
       toastManager.add({
         id: "thread-find-unavailable",
-        title: "Thread search is unavailable on this server.",
-        description: "Update the server to enable it.",
+        title: t.chat.threadFindUi.unavailable,
+        description: t.chat.threadFindUi.update,
       });
       return;
     }

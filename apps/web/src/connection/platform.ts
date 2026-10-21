@@ -280,7 +280,7 @@ export const prepareDesktopSshEnvironment = Effect.fn("web.connectionPlatform.ss
       if (descriptor.environmentId !== input.expectedEnvironmentId) {
         return yield* new ConnectionBlockedError({
           reason: "configuration",
-          detail: `That host reaches ${descriptor.label}, a different machine. Add it as its own environment instead.`,
+          detail: t.account.connection.differentHost(descriptor.label),
         });
       }
       const session = yield* Effect.tryPromise({

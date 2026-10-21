@@ -82,7 +82,9 @@ const ACTION_SUCCESS_LABELS: Record<PullRequestAction, string> = {
   "disable-auto-merge": t.git.pullRequest.autoMergeDisabled,
   revert: t.git.pullRequest.revertPullRequestOpened,
   "approve-workflows": t.git.pullRequest.workflowsApproved,
-  "delete-branch": "Branch deleted",
+  get "delete-branch"() {
+    return t.git.branchDeletionUi.deleted;
+  },
 };
 
 const ACTION_FAILURE_LABELS: Record<PullRequestAction, string> = {
@@ -96,7 +98,9 @@ const ACTION_FAILURE_LABELS: Record<PullRequestAction, string> = {
   "disable-auto-merge": t.git.pullRequest.couldNotDisableAutoMerge,
   revert: t.git.pullRequest.couldNotOpenARevertPullRequest,
   "approve-workflows": t.git.pullRequest.couldNotApproveWorkflows,
-  "delete-branch": "Could not delete this branch",
+  get "delete-branch"() {
+    return t.git.branchDeletionUi.failed;
+  },
 };
 
 const ACTION_FAILURE_HINTS: Record<PullRequestAction, string> = {
@@ -118,8 +122,9 @@ const ACTION_FAILURE_HINTS: Record<PullRequestAction, string> = {
   revert:
     t.git.pullRequest
       .theHostRefusedItCheckThatYouHaveWriteAccessAndThatThisPullRequestWasMergedOnTheHost,
-  "delete-branch":
-    "The host refused it. Check that you have write access to the source repository and that the branch has not moved since this page loaded.",
+  get "delete-branch"() {
+    return t.git.branchDeletionUi.refused;
+  },
   "approve-workflows":
     t.git.pullRequest
       .theHostRefusedItCheckThatYouHaveActionsWriteAccessAndThatTheseWorkflowRunsAreStillAwa,

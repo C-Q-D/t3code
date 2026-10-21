@@ -4190,4 +4190,262 @@ ${address}`
     chooseShortcut: "Choose shortcut",
   },
   customModelPreset: { fastMode: "Fast Mode", speed: "Speed" },
+  easHostsUi: {
+    savedToken: "the access token saved here",
+    environmentToken: "EXPO_TOKEN on the server",
+    serverLogin: "the server's eas login",
+    removeFailed: "EAS host not removed",
+    saveFailed: "EAS host not saved",
+    title: "EAS Simulator",
+    description:
+      "Run iOS Simulators in Expo's cloud from this environment. Sessions bill the Expo account until they stop, so each host limits how many run and for how long. Editing or removing a host stops its running sessions.",
+    add: "Add EAS host",
+    empty: "No EAS hosts.",
+    idleInvalid: "Idle minutes must be smaller than session minutes.",
+    limitsInvalid: "Give the host a label and limits within the ranges shown.",
+    editHost: "Edit EAS host",
+    credentialsHint:
+      "The environment's server signs in to Expo and starts the sessions. Without a token here it uses EXPO_TOKEN, then its eas login.",
+    name: "Name",
+    token: "Expo access token",
+    optional: "Optional",
+    clearToken: "Clear access token",
+    checking: "Checking the Expo account…",
+    checkFirst: "Check the Expo account before choosing a project.",
+    checkAccount: "Check account",
+    project: "EAS project",
+    threadProject: "From the thread's project",
+    billingHint:
+      "Sessions bill the project's Expo account. \"From the thread's project\" reads extra.eas.projectId from the project's app config.",
+    concurrent: "Sessions at once",
+    sessionMinutes: "Session minutes",
+    idleMinutes: "Idle minutes",
+    durationHint:
+      "Expo allows sessions of up to 40 minutes on free accounts and 115 on paid ones, and ends one after the idle minutes without activity, so idle minutes must be smaller than session minutes.",
+    restartHint: " Saving restarts this host, which stops its running sessions.",
+    save: "Save host",
+  },
+  browserSearchUi: {
+    custom: "Custom",
+    description: "What the address bar searches when you type something that isn't a URL.",
+    resetLabel: "search engine",
+    label: "Search engine",
+    customUrl: "Custom search URL",
+    templateHint: "Use %s where the search terms go.",
+    invalidUrl: "Enter an http or https URL containing %s. Searches use DuckDuckGo until then.",
+    prDescription:
+      "Clicking a pull request link opens it in T3 Code. Turn off to open pull request links like any other link, on GitHub or your git host.",
+    prResetLabel: "open pull requests in T3 Code",
+    prLabel: "Open pull requests in T3 Code",
+  },
+  conversationRenderingUi: {
+    math: "Render math",
+    keepPr: "Keep threads with a PR",
+    mathHint:
+      "Typeset LaTeX math, such as $x^2$ or \\[x^2\\], in messages and Markdown previews. The composer keeps TeX source editable.",
+    mathReset: "math rendering",
+    compactHint:
+      "Compact long idle Claude threads just before their prompt cache expires, so coming back costs less.",
+    compactReset: "compact idle Claude threads",
+    compact: "Compact idle Claude threads (beta)",
+    keepPrHint: "Inactivity does not settle threads with a pull request. Merge and close still do.",
+  },
+  storageCleanupUi: {
+    machine: "Machine",
+    project: "Project",
+    folder: "Folder",
+    thread: "Thread",
+    deleteSettled: "Delete settled worktrees",
+    offline: "Offline machines will not get this setting",
+    hint: "Remove worktrees this many days after their thread settles. Set 0 days to remove them at the next cleanup. Branches and thread history are kept.",
+  },
+  reviewGuideUi: {
+    description:
+      "Adds a Guide tab to pull requests: an agent writes a tour of the change, stop by stop, with the calls a maintainer should make.",
+    label: "Review guides",
+    modelDescription:
+      "Model that reads a pull request to write its review guide. It reads the change itself over many steps, so a stronger model helps. Off uses the source control writer model.",
+    connectFirst: "Connect an environment to choose its review guide model.",
+    model: "Review guide model",
+    mixed: "Mixed",
+    saveFailed: "Review guide model not saved",
+    separate: "Use a separate review guide model",
+    instructionsHint:
+      "Your preferences for review guides: what to show first, dwell on, or skip. The guide's format and coverage stay the same.",
+    instructionsReset: "review guide instructions",
+    instructions: "Review guide instructions",
+    placeholder:
+      "Show service interfaces before implementations. Skip test files unless they change behavior. Keep summaries to two sentences.",
+  },
+  easAccountText: {
+    /** Formats signedIn for display. */
+    signedIn: (account: string, source: string) => `Signed in as ${account} with ${source}.`,
+  },
+  databaseNoticeUi: {
+    command: "command",
+    database: "Database",
+    title: "Reclaim freed database space",
+    description:
+      "Old history is cleaned up automatically, but these databases still hold the freed space. Run the command on each machine to return it to disk; it pauses and restarts the background service. Quit the desktop app first if it hosts the environment.",
+  },
+  providerOverrideUi: {
+    project: "Project",
+    device: "Device",
+    origin: "Overridden for this project. Show where this value comes from",
+  },
+  databaseNoticeText: {
+    /** Formats space for display. */
+    space: (size: string, label: string) => `${size} GiB on ${label}`,
+  },
+  providerEnablementText: {
+    /** Formats label for display. */
+    label: (name: string) => `${name} enablement`,
+  },
+  mobileAppUi: {
+    apple: "iPhone and iPad",
+    description: "Connect to your server from your phone or tablet.",
+    scan: "Scan with your phone camera.",
+  },
+  diagnosisUi: {
+    failed: "Failed",
+    unchecked: "Not checked",
+    retrying: "retrying",
+    details: "Details",
+    target: "connection diagnostics",
+    copied: "Diagnostics copied",
+    copyFailed: "Could not copy diagnostics",
+    try: "What to try",
+    more: "More info",
+    retry: "Retry now",
+    copy: "Copy diagnostics",
+    direct: "Add direct route",
+  },
+  mobileAppText: {
+    /** Formats link for display. */
+    link: (store: string) => `${store} link`,
+    /** Formats open for display. */
+    open: (store: string) => `Open ${store}`,
+  },
+  diagnosisText: {
+    /** Formats retry for display. */
+    retry: (seconds: number) => `retrying in ${seconds}s`,
+    /** Formats attempt for display. */
+    attempt: (count: number) => `attempt ${count}`,
+  },
+  easLimitsUi: {
+    title: "EAS Simulator",
+  },
+  easLimitsText: {
+    /** Formats sessions for display. */
+    sessions: (count: number) => (count === 1 ? "1 session" : `${count} sessions`),
+    /** Formats limits for display. */
+    limits: (sessions: string, minutes: number, idle: number) =>
+      `Up to ${sessions} at once, each stopped after ${minutes} min or ${idle} idle min`,
+  },
+  searchNewUi: {
+    math: "Render math",
+    compact: "Compact idle Claude threads (beta)",
+    eas: "EAS device hosts",
+    search: "Search engine",
+    pr: "Open pull requests in T3 Code",
+    guides: "Review guides (beta)",
+    guideModel: "Review guide model",
+    guideInstructions: "Review guide instructions",
+    mathTerms: "latex tex katex equations formulas markdown",
+    compactTerms: "context compaction idle cache tokens usage summary beta experimental",
+    remoteTerms: "new worktrees start remote origin latest fetched branch local",
+    mobileTerms: "phone tablet iPhone iPad iOS Android App Store Google Play QR",
+    easTerms: "EAS Expo simulator ios android remote device hosts",
+    searchTerms: "address bar duckduckgo google bing brave kagi ecosia custom",
+    prTerms: "pr links github browser external click default pull request view panel",
+    guideTerms: "pull request pr guided review guide tour beta experimental",
+    modelTerms: "pull request pr guided review guide brief maintainer",
+    instructionTerms: "pull request pr guided review guide preferences taste prompt custom",
+    taskTerms: "webhook replay key coalesce scheduled task filters automation",
+  },
+  webhookFilterUi: {
+    filters: "Filters",
+    hint: "Run only when every filter matches. Other requests are logged as filtered. Separate “is one of” values with commas; a value can't contain a comma.",
+    add: "Add filter",
+    invalid: "Invalid filter",
+  },
+  connectionInfoUi: {
+    more: "More info",
+    trace: "trace ID",
+  },
+  scopeSearchUi: {
+    empty: "No matches found.",
+  },
+  webhookFilterText: {
+    /** Formats path for display. */
+    path: (index: number) => `Filter ${index} path`,
+    /** Formats remove for display. */
+    remove: (index: number) => `Remove filter ${index}`,
+    /** Formats test for display. */
+    test: (index: number) => `Filter ${index} test`,
+    /** Formats value for display. */
+    value: (index: number) => `Filter ${index} value`,
+  },
+  connectionInfoText: {
+    /** Formats fix for display. */
+    fix: (fix: string) => `Fix: ${fix}`,
+    /** Formats sshReady for display. */
+    sshReady: (label: string, alias: string) => `${label} can now be reached over SSH ${alias}.`,
+    /** Formats tunnelReady for display. */
+    tunnelReady: (alias: string) => `${alias} is ready over an SSH-managed tunnel.`,
+    /** Formats machineResults for display. */
+    machineResults: (summary: string) => `${summary}. Per-machine results`,
+  },
+  connectionStateUi: {
+    network: "Turn on Network access to detect Tailscale.",
+    downloading: "Downloading update",
+  },
+  deviceHostsUi: {
+    checking: "Checking connections",
+    unchecked: "Connection not checked",
+    checkingProgress: "Checking connections…",
+    available: "Connected or available locally on each listed machine",
+    test: "Test the connection to check access from each machine",
+    androidWarning: "The Android device list may be incomplete. Refresh devices to try again.",
+    from: "from",
+  },
+  projectEnvironmentsUi: {
+    all: "Show all environments",
+  },
+  inheritanceMachinesUi: {
+    same: "Same on all machines",
+  },
+  changedBrowserUi: {
+    search: "Search engine",
+    pr: "Open pull requests in T3 Code",
+  },
+  connectionStateText: {
+    /** Formats downloading for display. */
+    downloading: (version: string) => `Downloading update ${version}`,
+    /** Formats downloaded for display. */
+    downloaded: (version: string) => `Update ${version} downloaded`,
+    /** Formats available for display. */
+    available: (version: string) => `Update ${version} available`,
+    /** Formats machineDetails for display. */
+    machineDetails: (label: string) => `${label} machine details`,
+  },
+  deliveryOutcomeUi: {
+    duplicate: "Duplicate",
+    coalesced: "Coalesced",
+    filtered: "Filtered",
+    signature: "Bad signature",
+    paused: "Task paused",
+    limited: "Rate limited",
+    expired: "Too old",
+  },
+  signInUncheckedUi: {
+    installed: "Installed · Sign-in not checked",
+  },
+  hostCheckStatusUi: {
+    connected: "Connected",
+    retrying: "Retrying",
+  },
+  providerToggleUi: {
+    off: "Off",
+  },
 };

@@ -530,4 +530,113 @@ export const app = {
     repeatedAppearance: (appearance: string) =>
       `Theme variants must not repeat the base appearance "${appearance}".`,
   },
+  addMachineUi: {
+    chooseFolder: "Choose a folder on the other machine.",
+    failed: "Could not start the clone.",
+    title: "Add to another machine",
+    noFiles: "no files",
+    target: "Machine to add the project to",
+    unavailable: "No machine available",
+    protocolLabel: "Clone over",
+    protocol: "Clone protocol",
+    otherMachine: "the other machine",
+    copyIgnored: "Copy ignored files",
+    none: "None",
+    all: "All",
+    noIgnored: "No ignored files to copy.",
+    finding: "Finding ignored files…",
+    hint: "Files are copied after the clone finishes. Folders git ignores whole, like node_modules, are left out.",
+    starting: "Starting…",
+    overLimit: "Over 1 MB",
+    machine: "machine",
+  },
+  machineTransferText: {
+    /** Formats description for display. */
+    description: (name: string | undefined) =>
+      `Clone ${name} and bring the local files git does not track.`,
+    /** Formats files for display. */
+    files: (count: number) => `+ ${count} ${count === 1 ? "file" : "files"}`,
+    /** Formats folder for display. */
+    folder: (name: string) => `Folder on ${name}`,
+    /** Formats selected for display. */
+    selected: (count: number, total: number) => `${count} of ${total}`,
+    /** Formats truncated for display. */
+    truncated: (count: number) => `Showing the first ${count} files.`,
+    /** Formats clone for display. */
+    clone: (name: string) => `Clone to ${name}`,
+  },
+  promptLinkUi: {
+    openFailed: "T3 Code could not open a new thread.",
+    noMachine: "None of your machines can start a thread without a project right now.",
+    cannotClone:
+      "This machine cannot clone from a link. Update T3 Code on it, or clone the repository from the command palette.",
+    error: "An error occurred.",
+    missingProject: "The clone started, but its project did not appear.",
+    reopen: "Open this link again when the clone finishes.",
+    opening: "Opening the link...",
+    opened: "This link is open",
+    again: "Open it again",
+    cloneHint: "Clone it to work on it here, or start without a project.",
+    withoutProject: "Use without project",
+    checkoutHint:
+      "This puts the pull request's code in a new worktree and runs your project's setup script on it.",
+  },
+  promptLinkText: {
+    /** Formats providerFallback for display. */
+    providerFallback: (provider: string) =>
+      `The link asked for ${provider}, which is not set up here, so your default model is used.`,
+    /** Formats modelFallback for display. */
+    modelFallback: (model: string | null, provider: string) =>
+      `The link asked for ${model}, which ${provider} does not offer here, so its default model is used.`,
+    /** Formats cloning for display. */
+    cloning: (owner: string, name: string) => `Cloning ${owner}/${name}`,
+    /** Formats missing for display. */
+    missing: (name: string) => `You don't have ${name}`,
+    /** Formats clone for display. */
+    clone: (name: string) => `Clone ${name}`,
+    /** Formats checkout for display. */
+    checkout: (owner: string, name: string, number: number) =>
+      `Check out ${owner}/${name}#${number}?`,
+  },
+  desktopUpdateAvailabilityUi: {
+    unavailable: "Updates unavailable",
+  },
+  transferFailureUi: {
+    error: "An error occurred.",
+    large: "Too large to copy.",
+  },
+  transferFailureText: {
+    /** Formats failed for display. */
+    failed: (count: number, label: string) =>
+      `Could not copy ${count} ${count === 1 ? "file" : "files"} to ${label}`,
+  },
+  manualProviderUpdateText: {
+    /** Formats hint for display. */
+    hint: (labels: string, count: number) =>
+      `Update ${labels} with the app or tool that installed ${count === 1 ? "it" : "them"}.`,
+  },
+  linkedPromptUi: {
+    hidden: "This prompt had hidden characters, it may be malicious",
+    added: "Prompt added from a link",
+    read: "Read it before you send.",
+    ready: "Linked prompt ready",
+    replaceHint: "This thread already has a draft. Replace it with the linked prompt?",
+    replace: "Replace draft",
+  },
+  copyPromptLinkUi: {
+    copied: "Prompt link copied",
+    failed: "Could not copy the prompt link",
+    error: "An error occurred.",
+  },
+  linkedPromptText: {
+    /** Formats removed for display. */
+    removed: (count: number) =>
+      `T3 Code removed ${count} hidden character${count === 1 ? "" : "s"}. Read the prompt before you send it.`,
+  },
+  threadLinkUi: {
+    failed: "Could not open the linked prompt",
+  },
+  activationProjectUi: {
+    failed: "T3 Code could not add the project.",
+  },
 };

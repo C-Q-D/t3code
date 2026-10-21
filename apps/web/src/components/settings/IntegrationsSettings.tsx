@@ -713,7 +713,9 @@ const SEARCH_ENGINE_LABELS: Readonly<Record<BrowserSearchEngine, string>> = {
   brave: "Brave Search",
   kagi: "Kagi",
   ecosia: "Ecosia",
-  custom: "Custom",
+  get custom() {
+    return t.settings.browserSearchUi.custom;
+  },
 };
 
 function BrowserSearchEngineSetting() {
@@ -725,11 +727,11 @@ function BrowserSearchEngineSetting() {
     <>
       <SettingsRow
         {...searchableSetting("browser-search-engine")}
-        description="What the address bar searches when you type something that isn't a URL."
+        description={t.settings.browserSearchUi.description}
         resetAction={
           engine !== DEFAULT_BROWSER_SEARCH_ENGINE || customUrl !== "" ? (
             <SettingResetButton
-              label="search engine"
+              label={t.settings.browserSearchUi.resetLabel}
               onClick={() =>
                 updateSettings({
                   browserSearchEngine: DEFAULT_BROWSER_SEARCH_ENGINE,
@@ -749,7 +751,11 @@ function BrowserSearchEngineSetting() {
               }
             }}
           >
-            <SelectTrigger size="sm" className="w-full sm:w-40" aria-label="Search engine">
+            <SelectTrigger
+              size="sm"
+              className="w-full sm:w-40"
+              aria-label={t.settings.browserSearchUi.label}
+            >
               <SelectValue>{SEARCH_ENGINE_LABELS[engine]}</SelectValue>
             </SelectTrigger>
             <SelectPopup align="end" alignItemWithTrigger={false}>
@@ -764,19 +770,17 @@ function BrowserSearchEngineSetting() {
       />
       {engine === "custom" ? (
         <SettingsRow
-          title="Custom search URL"
-          description="Use %s where the search terms go."
+          title={t.settings.browserSearchUi.customUrl}
+          description={t.settings.browserSearchUi.templateHint}
           status={
-            isValidSearchUrlTemplate(customUrl)
-              ? undefined
-              : "Enter an http or https URL containing %s. Searches use DuckDuckGo until then."
+            isValidSearchUrlTemplate(customUrl) ? undefined : t.settings.browserSearchUi.invalidUrl
           }
           control={
             <DraftInput
               nativeInput
               size="sm"
               className="w-full sm:w-64"
-              aria-label="Custom search URL"
+              aria-label={t.settings.browserSearchUi.customUrl}
               placeholder="https://example.com/search?q=%s"
               autoCapitalize="none"
               spellCheck={false}
@@ -798,11 +802,11 @@ function PullRequestLinksOpenInAppSetting() {
   return (
     <SettingsRow
       {...searchableSetting("pull-request-links-open-in-app")}
-      description="Clicking a pull request link opens it in T3 Code. Turn off to open pull request links like any other link, on GitHub or your git host."
+      description={t.settings.browserSearchUi.prDescription}
       resetAction={
         openInApp ? null : (
           <SettingResetButton
-            label="open pull requests in T3 Code"
+            label={t.settings.browserSearchUi.prResetLabel}
             onClick={() => updateSettings({ pullRequestLinksOpenInApp: true })}
           />
         )
@@ -813,7 +817,7 @@ function PullRequestLinksOpenInAppSetting() {
           onCheckedChange={(checked) =>
             updateSettings({ pullRequestLinksOpenInApp: Boolean(checked) })
           }
-          aria-label="Open pull requests in T3 Code"
+          aria-label={t.settings.browserSearchUi.prLabel}
         />
       }
     />
@@ -1367,7 +1371,7 @@ function BrowserProfilesSetting({ disabled }: { readonly disabled: boolean }) {
             <MenuPopup align="end">
               <MenuItem
                 disabled={!settingsHydrated || atProfileLimit}
-                onClick={() => createProfile("New profile")}
+                onClick={() => createProfile(t.settings.browserImportWizard.newProfile)}
               >
                 {t.settings.integrations.profiles.blankProfile}
               </MenuItem>

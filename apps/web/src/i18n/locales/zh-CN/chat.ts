@@ -1483,4 +1483,64 @@ export const chat: Messages["chat"] = {
     /** Formats the changed file count with the English plural. */
     count: (count) => `已更改${count}个文件`,
   },
+  timelineUi: {
+    copyLink: "复制提示词链接",
+  },
+  machineThreadUi: {
+    copying: "正在复制文件",
+    unavailable: "此对话已不可用",
+    approval: "打开审批",
+    noMachine: "没有机器能够读取所有附加的对话。请在输入框中选择机器，或移除这些对话。",
+    owner: "所属机器",
+    otherMachine: "附加的对话位于另一台机器",
+    startFailed: "无法启动对话",
+  },
+  commandOutputUi: {
+    failed: "无法加载输出：",
+    earlier: "未显示更早的输出",
+  },
+  machineThreadText: {
+    /** Formats update for display. */
+    update: (failed: boolean, label: string) => `${failed ? "无法更新" : "正在更新"}${label}`,
+    /** Formats stranded for display. */
+    stranded: (title: string, owner: string) =>
+      `此机器的代理无法读取“${title}”。请移除该对话，或切回${owner}后发送。`,
+    /** Formats fork for display. */
+    fork: (title: string) => `${title}的分叉`,
+    /** Formats review for display. */
+    review: (label: string) => `审查：${label}`,
+  },
+  revertWarning: {
+    edits: "“同时还原文件”也会撤销你自己的编辑。",
+  },
+  projectHeading: {
+    inline: "想在",
+    heading: "想开发什么？",
+  },
+  workflowOpeningUi: {
+    started: "工作流已启动",
+    full: "显示完整脚本",
+  },
+  mathUi: {
+    display: "块级公式",
+    inline: "行内公式",
+    scrollDisplay: "滚动块级公式",
+    scrollInline: "滚动行内公式",
+  },
+  workflowOpeningText: {
+    /** Formats started for display. */
+    started: (title: string) => `工作流已启动：${title}`,
+    /** Formats phase for display. */
+    phase: (title: string) => `${title}阶段`,
+    /** Formats open for display. */
+    open: (title: string) => `打开${title}`,
+  },
+  remoteFileErrorText: {
+    /** Formats missing for display. */
+    missing: (label: string, path: string) => `在${label}的${path}位置找不到文件。`,
+  },
+  threadFindUi: {
+    unavailable: "此服务器不支持对话搜索。",
+    update: "更新服务器以启用此功能。",
+  },
 };

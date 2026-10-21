@@ -294,9 +294,13 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "math-rendering",
-    title: "Render math",
+    get title() {
+      return t.settings.searchNewUi.math;
+    },
     to: "/settings/appearance",
-    searchTerms: ["latex tex katex equations formulas markdown"],
+    get searchTerms() {
+      return [t.settings.searchNewUi.mathTerms];
+    },
   },
   {
     id: "panel-animations",
@@ -396,10 +400,14 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "compact-idle-threads",
-    title: "Compact idle Claude threads (beta)",
+    get title() {
+      return t.settings.searchNewUi.compact;
+    },
     to: "/settings/general",
     scope: "environment-defaults",
-    searchTerms: ["context compaction idle cache tokens usage summary beta experimental"],
+    get searchTerms() {
+      return [t.settings.searchNewUi.compactTerms];
+    },
   },
   {
     id: "auto-settle-merged-threads",
@@ -547,7 +555,9 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: t.settings.rows.startFromOrigin.title,
     to: "/settings/general",
     scope: "project-defaults",
-    searchTerms: ["new worktrees start remote origin latest fetched branch local"],
+    get searchTerms() {
+      return [t.settings.searchNewUi.remoteTerms];
+    },
   },
   {
     id: "add-project-starts-in",
@@ -617,9 +627,13 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "mobile-app",
-    title: "Mobile app",
+    get title() {
+      return t.app.mobile.title;
+    },
     to: "/settings/general",
-    searchTerms: ["phone tablet iPhone iPad iOS Android App Store Google Play QR"],
+    get searchTerms() {
+      return [t.settings.searchNewUi.mobileTerms];
+    },
   },
   {
     id: "privacy-policy",
@@ -757,18 +771,24 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "eas-device-hosts",
-    title: "EAS device hosts",
+    get title() {
+      return t.settings.searchNewUi.eas;
+    },
     to: "/settings/integrations",
     targetId: "eas-device-hosts",
     easHostsOnly: true,
-    searchTerms: ["EAS Expo simulator ios android remote device hosts"],
+    get searchTerms() {
+      return [t.settings.searchNewUi.easTerms];
+    },
   },
   {
     id: "scheduled-tasks",
     title: t.settings.scheduledTasks.tasksHeading,
     to: "/settings/scheduled-tasks",
     targetId: "scheduled-tasks",
-    searchTerms: ["webhook replay key coalesce scheduled task filters automation"],
+    get searchTerms() {
+      return [t.settings.searchNewUi.taskTerms];
+    },
   },
   {
     id: "agent-device-access",
@@ -846,15 +866,23 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "browser-search-engine",
-    title: "Search engine",
+    get title() {
+      return t.settings.searchNewUi.search;
+    },
     to: "/settings/integrations",
-    searchTerms: ["address bar duckduckgo google bing brave kagi ecosia custom"],
+    get searchTerms() {
+      return [t.settings.searchNewUi.searchTerms];
+    },
   },
   {
     id: "pull-request-links-open-in-app",
-    title: "Open pull requests in T3 Code",
+    get title() {
+      return t.settings.searchNewUi.pr;
+    },
     to: "/settings/integrations",
-    searchTerms: ["pr links github browser external click default pull request view panel"],
+    get searchTerms() {
+      return [t.settings.searchNewUi.prTerms];
+    },
   },
   {
     id: "browser-auto-show-floating-preview",
@@ -949,27 +977,39 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "review-guides",
-    title: "Review guides (beta)",
+    get title() {
+      return t.settings.searchNewUi.guides;
+    },
     to: "/settings/source-control",
-    searchTerms: ["pull request pr guided review guide tour beta experimental"],
+    get searchTerms() {
+      return [t.settings.searchNewUi.guideTerms];
+    },
     environmentOnly: true,
   },
   {
     id: "review-guide-model",
-    title: "Review guide model",
+    get title() {
+      return t.settings.searchNewUi.guideModel;
+    },
     to: "/settings/source-control",
     // Hidden until review guides are on, so a search lands on the switch that shows it.
     targetId: "review-guides",
-    searchTerms: ["pull request pr guided review guide brief maintainer"],
+    get searchTerms() {
+      return [t.settings.searchNewUi.modelTerms];
+    },
     environmentOnly: true,
     scope: "project-defaults",
   },
   {
     id: "review-guide-instructions",
-    title: "Review guide instructions",
+    get title() {
+      return t.settings.searchNewUi.guideInstructions;
+    },
     to: "/settings/source-control",
     targetId: "review-guides",
-    searchTerms: ["pull request pr guided review guide preferences taste prompt custom"],
+    get searchTerms() {
+      return [t.settings.searchNewUi.instructionTerms];
+    },
     environmentOnly: true,
     scope: "project-defaults",
   },

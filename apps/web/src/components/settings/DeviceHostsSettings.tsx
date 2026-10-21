@@ -366,10 +366,10 @@ function DeviceHostList({
                 label: failed.length
                   ? t.settings.connections.status.failed
                   : pending
-                    ? "Checking connections"
+                    ? t.settings.deviceHostsUi.checking
                     : ready
-                      ? "Connected"
-                      : "Connection not checked",
+                      ? t.settings.hostCheckStatusUi.connected
+                      : t.settings.deviceHostsUi.unchecked,
                 warning: failed.length > 0,
                 icon: failed.length ? (
                   <TriangleAlertIcon className="size-3.5" />
@@ -389,11 +389,11 @@ function DeviceHostList({
                     ))}
                   </div>
                 ) : pending ? (
-                  "Checking connections…"
+                  t.settings.deviceHostsUi.checkingProgress
                 ) : ready ? (
-                  "Connected or available locally on each listed machine"
+                  t.settings.deviceHostsUi.available
                 ) : (
-                  "Test the connection to check access from each machine"
+                  t.settings.deviceHostsUi.test
                 ),
               },
             ]
@@ -455,15 +455,14 @@ function DeviceHostList({
                 .map((result) => (
                   <p key={result.environmentId} role="status" className="mt-1 text-xs text-warning">
                     {compact ? `${result.label}: ` : ""}
-                    {result.status?.detail ??
-                      "The Android device list may be incomplete. Refresh devices to try again."}
+                    {result.status?.detail ?? t.settings.deviceHostsUi.androidWarning}
                   </p>
                 ))}
               {compact ? (
                 <Collapsible>
                   <div className="min-w-0 text-xs [--inline-button-white-space:normal]">
                     <CollapsibleTrigger
-                      aria-label={`${host.label} machine details`}
+                      aria-label={t.settings.connectionStateText.machineDetails(host.label)}
                       render={<InlineButton tone="muted" />}
                     >
                       <span className="line-clamp-1 break-all text-left">
@@ -583,8 +582,10 @@ function DeviceHostList({
                           retryHost(result.environmentId, result.host.id, result.environmentId)
                         }
                       >
-                        {retrying === result.environmentId ? "Retrying" : t.settings.actions.retry}{" "}
-                        from {result.label}
+                        {retrying === result.environmentId
+                          ? t.settings.hostCheckStatusUi.retrying
+                          : t.settings.actions.retry}{" "}
+                        {t.settings.deviceHostsUi.from} {result.label}
                         {result.address ? ` (${result.address})` : null}
                       </MenuItem>
                     ))

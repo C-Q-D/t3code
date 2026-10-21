@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import {
   type AdvertisedEndpoint,
   type AuthGrantScope,
@@ -63,8 +64,8 @@ export function missingTailscaleEndpointDescription(
   state: Pick<DesktopServerExposureState, "mode" | "tailscaleServeEnabled"> | null,
 ): string {
   return state && state.mode !== "network-accessible" && !state.tailscaleServeEnabled
-    ? "Turn on Network access to detect Tailscale."
-    : "Start Tailscale to set up HTTPS access through MagicDNS.";
+    ? t.settings.connectionStateUi.network
+    : t.settings.connections.tailscale.startHint;
 }
 
 export function isWslSettingsRowVisible(input: {
@@ -84,11 +85,11 @@ export function isWslSettingsRowVisible(input: {
  * keeps its label too. `state` is null outside the desktop app.
  */
 export function resolveLocalVersionStatusLabel(state: DesktopUpdateState | null): string {
-  if (!state) return "Up to date";
+  if (!state) return t.settings.connections.environment.upToDate;
   if (state.status === "downloading") {
     return state.availableVersion
-      ? `Downloading update ${state.availableVersion}`
-      : "Downloading update";
+      ? t.settings.connectionStateText.downloading(state.availableVersion)
+      : t.settings.connectionStateUi.downloading;
   }
   const action = resolveDesktopUpdateButtonAction(state);
   if (
@@ -97,14 +98,16 @@ export function resolveLocalVersionStatusLabel(state: DesktopUpdateState | null)
     (state.status === "checking" && state.downloadedVersion !== null)
   ) {
     const version = getDesktopUpdateDownloadedVersion(state);
-    return version ? `Update ${version} downloaded` : "Update downloaded";
+    return version
+      ? t.settings.connectionStateText.downloaded(version)
+      : t.common.desktopUpdate.downloadedToast;
   }
   if (action === "download") {
     return state.availableVersion
-      ? `Update ${state.availableVersion} available`
-      : "Update available";
+      ? t.settings.connectionStateText.available(state.availableVersion)
+      : t.sidebar.updates.available;
   }
-  return "Up to date";
+  return t.settings.connections.environment.upToDate;
 }
 
 export type QrEndpointOption = {

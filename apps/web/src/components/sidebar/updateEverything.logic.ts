@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import type { ServerUpdateState } from "@t3tools/client-runtime/state/server";
 import type { EnvironmentId, ServerConfig } from "@t3tools/contracts";
 import { cliReleaseChannelOf } from "@t3tools/shared/cliRelease";
@@ -84,25 +85,25 @@ export function collectServerUpdateTargets(
     const skip = (reason: string) =>
       skipped.push({ environmentId: machine.environmentId, label: machine.label, reason });
     if (config === null || !machine.connected) {
-      skip("not connected");
+      skip(t.sidebar.updateRunUi.notConnected);
       continue;
     }
     if (!machine.canMaintain) {
-      skip("no permission");
+      skip(t.sidebar.updateRunUi.noPermission);
       continue;
     }
     if (machine.updateState.status === "running") {
-      skip("already updating");
+      skip(t.sidebar.updateRunUi.alreadyUpdating);
       continue;
     }
     const selfUpdate = resolveServerSelfUpdateCapability(config);
     const desktopAppUpdate = supportsDesktopAppUpdate(config);
     if (selfUpdate === null) {
-      skip("needs a manual update");
+      skip(t.sidebar.updateRunUi.manual);
       continue;
     }
     if (selfUpdate === "desktop-managed" && !desktopAppUpdate) {
-      skip("needs a newer desktop app");
+      skip(t.sidebar.updateRunUi.newerDesktop);
       continue;
     }
     const serverVersion = config.environment.serverVersion;
@@ -110,7 +111,7 @@ export function collectServerUpdateTargets(
       selfUpdate !== "desktop-managed" &&
       cliReleaseChannelOf(serverVersion) !== cliReleaseChannelOf(targetVersion)
     ) {
-      skip(`on the ${cliReleaseChannelOf(serverVersion)} channel`);
+      skip(t.sidebar.updateRunText.channel(cliReleaseChannelOf(serverVersion)));
       continue;
     }
     targets.push({
@@ -210,9 +211,9 @@ const UPDATE_SLOW_AFTER_MS = 3 * 60 * 1000;
 
 export function formatUpdateElapsed(ms: number): string {
   const minutes = Math.floor(ms / 60_000);
-  if (minutes < 1) return "<1m";
-  if (minutes < 60) return `${minutes}m`;
-  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+  if (minutes < 1) return t.sidebar.updateStatusUi.lessMinute;
+  if (minutes < 60) return t.sidebar.updateRunText.minutes(minutes);
+  return t.sidebar.duration.hoursMinutes(Math.floor(minutes / 60), minutes % 60);
 }
 
 export interface UpdateRunMachineView {
@@ -242,10 +243,10 @@ export function describeUpdateCapsule(
 ): UpdateCapsuleView {
   if (run.phase === "countdown" && run.restartAt !== null) {
     const seconds = Math.max(0, Math.ceil((run.restartAt - now) / 1000));
-    return { tone: "default", label: `Restart in ${seconds}s`, action: "later" };
+    return { tone: "default", label: t.sidebar.updateRunText.restartIn(seconds), action: "later" };
   }
   if (run.phase === "installing") {
-    return { tone: "default", label: "Restarting…", action: null };
+    return { tone: "default", label: t.app.server.restarting, action: null };
   }
   const active = machines.filter(({ status }) => isActive(status) && status !== "waiting");
   const slowest = active.toSorted((a, b) => a.machine.startedAt - b.machine.startedAt)[0];
@@ -262,12 +263,16 @@ export function describeUpdateCapsule(
   }
   const done = machines.filter(({ status }) => status === "done").length;
   if (machines.some(({ status }) => isActive(status))) {
-    return { tone: "default", label: `${done} of ${machines.length} updated`, action: null };
+    return {
+      tone: "default",
+      label: t.sidebar.updateRunText.updatedCount(done, machines.length),
+      action: null,
+    };
   }
   if (local?.status === "downloading") {
     return {
       tone: "default",
-      label: `Downloading${local.percent === null ? "" : ` ${Math.floor(local.percent)}%`}`,
+      label: t.sidebar.updateRunText.downloading(local.percent),
       action: null,
     };
   }
@@ -275,20 +280,39 @@ export function describeUpdateCapsule(
   if (failed.length > 0) {
     return {
       tone: "failed",
-      label: failed.length === 1 ? `${failed[0]!.machine.label} failed` : `${failed.length} failed`,
+      label:
+        failed.length === 1
+          ? t.sidebar.updateRunText.failedMachine(failed[0]!.machine.label)
+          : t.sidebar.updateRunText.failedCount(failed.length),
       action: failed.some(({ machine }) => machine.server !== null) ? "retry" : "dismiss",
     };
   }
-  return { tone: "default", label: `${done} of ${machines.length} updated`, action: null };
+  return {
+    tone: "default",
+    label: t.sidebar.updateRunText.updatedCount(done, machines.length),
+    action: null,
+  };
 }
 
 export const RUN_STATUS_LABELS: Record<UpdateRunMachineStatus, string> = {
-  providers: "updating providers",
-  waiting: "waiting",
-  downloading: "downloading",
-  restarting: "restarting",
-  done: "done",
-  failed: "failed",
+  get providers() {
+    return t.sidebar.updateStatusUi.providers;
+  },
+  get waiting() {
+    return t.sidebar.updateStatusUi.waiting;
+  },
+  get downloading() {
+    return t.sidebar.updateStatusUi.downloading;
+  },
+  get restarting() {
+    return t.sidebar.updateStatusUi.restarting;
+  },
+  get done() {
+    return t.sidebar.updateStatusUi.done;
+  },
+  get failed() {
+    return t.sidebar.updateStatusUi.failed;
+  },
 };
 
 export interface UpdateEverythingResult {
@@ -317,7 +341,7 @@ export function collectUpdateEverythingResult(input: {
     updatedProviders: input.providers.filter((outcome) => outcome.status === "updated").length,
     restarting: [],
     failures: [
-      ...input.localFailures.map((failure) => `This app: ${failure}`),
+      ...input.localFailures.map((failure) => t.sidebar.updateRunText.appFailure(failure)),
       ...input.servers.flatMap(({ label, outcome }) =>
         outcome.status === "failed" ? [`${label}: ${outcome.message}`] : [],
       ),
@@ -335,7 +359,9 @@ export function getUpdateEverythingToastView(
   readonly description?: string;
 } | null {
   const parts = [
-    result.localVersion !== null && result.localVersion === appVersion ? "this app" : null,
+    result.localVersion !== null && result.localVersion === appVersion
+      ? t.sidebar.updateRunUi.thisApp
+      : null,
     countLabel(result.updatedServers, "server"),
     countLabel(result.updatedProviders, "provider"),
   ].filter((part) => part !== null);
@@ -343,19 +369,25 @@ export function getUpdateEverythingToastView(
     result.restarting.length === 0
       ? []
       : [
-          `${joinList(result.restarting)} ${result.restarting.length === 1 ? "is" : "are"} still restarting.`,
+          t.sidebar.updateRunText.stillRestarting(
+            joinList(result.restarting),
+            result.restarting.length,
+          ),
         ];
   if (result.failures.length === 0) {
     if (parts.length === 0) return null;
     return {
       type: "success",
-      title: `Updated ${joinList(parts)}`,
+      title: t.sidebar.updateRunText.updated(joinList(parts)),
       ...(restarting.length === 0 ? {} : { description: restarting.join("\n") }),
     };
   }
   return {
     type: "error",
-    title: parts.length === 0 ? "Update failed" : `Updated ${joinList(parts)}`,
+    title:
+      parts.length === 0
+        ? t.sidebar.updateRunUi.failed
+        : t.sidebar.updateRunText.updated(joinList(parts)),
     description: [...result.failures, ...restarting].join("\n"),
   };
 }
@@ -373,12 +405,11 @@ export interface UpdateEverythingPlan {
 }
 
 function countLabel(count: number, noun: string): string | null {
-  return count === 0 ? null : `${count} ${noun}${count === 1 ? "" : "s"}`;
+  return count === 0 ? null : t.sidebar.updateRunText.count(count, noun);
 }
 
 function joinList(parts: ReadonlyArray<string>): string {
-  if (parts.length <= 2) return parts.join(" and ");
-  return `${parts.slice(0, -1).join(", ")}, and ${parts.at(-1)}`;
+  return t.sidebar.updateRunText.list(parts);
 }
 
 export function describeUpdateEverything(plan: UpdateEverythingPlan): {
@@ -389,13 +420,15 @@ export function describeUpdateEverything(plan: UpdateEverythingPlan): {
     (count, machine) => count + machine.providers.length,
     0,
   );
-  const summary = `Update ${joinList(
-    [
-      plan.localVersion ? "this app" : null,
-      countLabel(plan.servers.length, "server"),
-      countLabel(providerCount, "provider"),
-    ].filter((part) => part !== null),
-  )}`;
+  const summary = t.sidebar.updateRunText.update(
+    joinList(
+      [
+        plan.localVersion ? t.sidebar.updateRunUi.thisApp : null,
+        countLabel(plan.servers.length, "server"),
+        countLabel(providerCount, "provider"),
+      ].filter((part) => part !== null),
+    ),
+  );
 
   const machines = new Map<EnvironmentId, { label: string; items: string[] }>();
   const itemsFor = (environmentId: EnvironmentId, label: string) => {
@@ -408,8 +441,8 @@ export function describeUpdateEverything(plan: UpdateEverythingPlan): {
   for (const server of plan.servers) {
     itemsFor(server.environmentId, server.serverLabel).push(
       server.selfUpdate === "desktop-managed"
-        ? "desktop app update"
-        : `server to ${server.targetVersion}`,
+        ? t.sidebar.updateRunUi.desktopUpdate
+        : t.sidebar.updateRunText.serverVersion(server.targetVersion),
     );
   }
   for (const machine of plan.providerMachines) {
@@ -419,7 +452,7 @@ export function describeUpdateEverything(plan: UpdateEverythingPlan): {
   return {
     summary,
     lines: [
-      ...(plan.localVersion ? [`This app: ${plan.localVersion}, restarts last`] : []),
+      ...(plan.localVersion ? [t.sidebar.updateRunText.appVersion(plan.localVersion)] : []),
       ...Array.from(machines.values(), ({ label, items }) => `${label}: ${items.join(", ")}`),
     ],
   };

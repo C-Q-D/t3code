@@ -501,4 +501,106 @@ export const app: Messages["app"] = {
     /** Formats the error using the supplied appearance. */
     repeatedAppearance: (appearance) => `主题变体不能重复基础外观 "${appearance}"。`,
   },
+  addMachineUi: {
+    chooseFolder: "请选择另一台机器上的文件夹。",
+    failed: "无法开始克隆。",
+    title: "添加到另一台机器",
+    noFiles: "没有文件",
+    target: "要添加项目的目标机器",
+    unavailable: "没有可用机器",
+    protocolLabel: "克隆方式",
+    protocol: "克隆协议",
+    otherMachine: "另一台机器",
+    copyIgnored: "复制被忽略的文件",
+    none: "全不选",
+    all: "全选",
+    noIgnored: "没有要复制的被忽略文件。",
+    finding: "正在查找被忽略的文件…",
+    hint: "克隆完成后复制文件。Git整体忽略的文件夹（如node_modules）不会复制。",
+    starting: "正在启动…",
+    overLimit: "超过1 MB",
+    machine: "机器",
+  },
+  machineTransferText: {
+    /** Formats description for display. */
+    description: (name: string | undefined) => `克隆${name}，并带上Git未跟踪的本地文件。`,
+    /** Formats files for display. */
+    files: (count: number) => `+ ${count}个文件`,
+    /** Formats folder for display. */
+    folder: (name: string) => `${name}上的文件夹`,
+    /** Formats selected for display. */
+    selected: (count: number, total: number) => `已选${count}个，共${total}个`,
+    /** Formats truncated for display. */
+    truncated: (count: number) => `显示前${count}个文件。`,
+    /** Formats clone for display. */
+    clone: (name: string) => `克隆到${name}`,
+  },
+  promptLinkUi: {
+    openFailed: "T3 Code无法打开新对话。",
+    noMachine: "目前没有机器能够启动不属于项目的对话。",
+    cannotClone: "此机器无法通过链接克隆。请更新其T3 Code，或从命令面板克隆仓库。",
+    error: "发生错误。",
+    missingProject: "已开始克隆，但项目未出现。",
+    reopen: "克隆完成后请重新打开此链接。",
+    opening: "正在打开链接…",
+    opened: "此链接已打开",
+    again: "重新打开",
+    cloneHint: "克隆项目以在此处理，或不使用项目直接开始。",
+    withoutProject: "不使用项目",
+    checkoutHint: "这会将拉取请求的代码放入新工作树，并在其中运行项目的设置脚本。",
+  },
+  promptLinkText: {
+    /** Formats providerFallback for display. */
+    providerFallback: (provider: string) =>
+      `链接指定了${provider}，但此处尚未配置，因此使用默认模型。`,
+    /** Formats modelFallback for display. */
+    modelFallback: (model: string | null, provider: string) =>
+      `链接指定了${model}，但此处的${provider}未提供该模型，因此使用其默认模型。`,
+    /** Formats cloning for display. */
+    cloning: (owner: string, name: string) => `正在克隆${owner}/${name}`,
+    /** Formats missing for display. */
+    missing: (name: string) => `尚未添加${name}`,
+    /** Formats clone for display. */
+    clone: (name: string) => `克隆${name}`,
+    /** Formats checkout for display. */
+    checkout: (owner: string, name: string, number: number) => `检出${owner}/${name}#${number}？`,
+  },
+  desktopUpdateAvailabilityUi: {
+    unavailable: "更新不可用",
+  },
+  transferFailureUi: {
+    error: "发生错误。",
+    large: "文件过大，无法复制。",
+  },
+  transferFailureText: {
+    /** Formats failed for display. */
+    failed: (count: number, label: string) => `无法将${count}个文件复制到${label}`,
+  },
+  manualProviderUpdateText: {
+    /** Formats hint for display. */
+    hint: (labels: string, _count: number) => `请使用安装${labels}的应用或工具进行更新。`,
+  },
+  linkedPromptUi: {
+    hidden: "此提示词含有隐藏字符，可能具有恶意",
+    added: "已从链接添加提示词",
+    read: "发送前请先阅读。",
+    ready: "链接中的提示词已就绪",
+    replaceHint: "此对话已有草稿。是否用链接中的提示词替换？",
+    replace: "替换草稿",
+  },
+  copyPromptLinkUi: {
+    copied: "已复制提示词链接",
+    failed: "无法复制提示词链接",
+    error: "发生错误。",
+  },
+  linkedPromptText: {
+    /** Formats removed for display. */
+    removed: (count: number) => `T3 Code已移除${count}个隐藏字符。发送前请先阅读提示词。`,
+  },
+  threadLinkUi: {
+    failed: "无法打开链接中的提示词",
+  },
+  activationProjectUi: {
+    failed: "T3 Code无法添加项目。",
+  },
 };

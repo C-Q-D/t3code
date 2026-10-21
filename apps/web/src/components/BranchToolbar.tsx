@@ -228,7 +228,7 @@ const RunContextSelector = memo(function RunContextSelector({
       <TooltipPopup>
         {isPanel
           ? forceNewWorktree
-            ? "Each model starts in its own worktree."
+            ? t.chat.branchToolbar.modelWorktreeHint
             : (workspacePath ?? workspaceLabel)
           : workspaceLabel}
       </TooltipPopup>

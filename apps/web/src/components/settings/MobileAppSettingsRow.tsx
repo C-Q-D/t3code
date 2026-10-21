@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { AndroidIcon, AppleIcon } from "../Icons";
 import { Button } from "../ui/button";
 import { Popover, PopoverPopup, PopoverTitle, PopoverTrigger } from "../ui/popover";
@@ -7,7 +8,9 @@ import { searchableSetting } from "./settingsSearch";
 
 const stores = [
   {
-    label: "iPhone and iPad",
+    get label() {
+      return t.settings.mobileAppUi.apple;
+    },
     store: "App Store",
     url: "https://apps.apple.com/us/app/t3-code-remote-claude-more/id6787819824",
     Icon: AppleIcon,
@@ -24,7 +27,7 @@ export function MobileAppSettingsRow() {
   return (
     <SettingsRow
       {...searchableSetting("mobile-app")}
-      description="Connect to your server from your phone or tablet."
+      description={t.settings.mobileAppUi.description}
       control={
         <div className="flex items-center gap-2">
           {stores.map(({ label, store, url, Icon }) => (
@@ -36,14 +39,14 @@ export function MobileAppSettingsRow() {
               <PopoverPopup align="end">
                 <div className="flex flex-col items-center gap-3">
                   <PopoverTitle>{store}</PopoverTitle>
-                  <p className="text-xs text-muted-foreground">Scan with your phone camera.</p>
+                  <p className="text-xs text-muted-foreground">{t.settings.mobileAppUi.scan}</p>
                   <div className="rounded-lg bg-white p-1.5">
                     <QRCodeSvg
                       value={url}
                       size={128}
                       level="M"
                       marginSize={1}
-                      title={`${store} link`}
+                      title={t.settings.mobileAppText.link(store)}
                     />
                   </div>
                   <Button
@@ -51,7 +54,7 @@ export function MobileAppSettingsRow() {
                     variant="outline"
                     render={<a href={url} target="_blank" rel="noreferrer noopener" />}
                   >
-                    Open {store}
+                    {t.settings.mobileAppText.open(store)}
                   </Button>
                 </div>
               </PopoverPopup>

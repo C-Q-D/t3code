@@ -512,8 +512,8 @@ function ProjectOverrideInheritance({
   readonly deviceEnabled: boolean;
 }) {
   const layers = [
-    { key: "project", label: "Project", enabled: projectEnabled, effective: true },
-    { key: "device", label: "Device", enabled: deviceEnabled, effective: false },
+    { key: "project", enabled: projectEnabled, effective: true },
+    { key: "device", enabled: deviceEnabled, effective: false },
   ];
   return (
     <Popover>
@@ -525,7 +525,7 @@ function ProjectOverrideInheritance({
                 <Button
                   size="icon-micro"
                   variant="ghost-muted"
-                  aria-label="Overridden for this project. Show where this value comes from"
+                  aria-label={t.settings.providerOverrideUi.origin}
                 />
               }
             />
@@ -533,7 +533,7 @@ function ProjectOverrideInheritance({
         >
           <LayersIcon className="size-3 text-primary" />
         </TooltipTrigger>
-        <TooltipPopup side="top">Overridden for this project</TooltipPopup>
+        <TooltipPopup side="top">{t.settings.layout.projectOverrideHint}</TooltipPopup>
       </Tooltip>
       <PopoverPopup align="end" width="md" padding="none">
         <ol role="list" className="px-3 py-2.5 text-sm">
@@ -551,7 +551,9 @@ function ProjectOverrideInheritance({
                   layer.effective ? "font-medium text-foreground" : "text-muted-foreground",
                 )}
               >
-                {layer.label}
+                {layer.key === "project"
+                  ? t.settings.providerOverrideUi.project
+                  : t.settings.providerOverrideUi.device}
               </span>
               <span
                 className={cn(
@@ -559,7 +561,7 @@ function ProjectOverrideInheritance({
                   layer.effective ? "text-foreground" : "text-muted-foreground",
                 )}
               >
-                {layer.enabled ? "On" : "Off"}
+                {layer.enabled ? t.settings.settingInheritance.on : t.settings.providerToggleUi.off}
                 {layer.effective ? (
                   <CheckIcon aria-hidden className="size-3.5 shrink-0 text-primary" />
                 ) : (
@@ -1073,7 +1075,7 @@ export function ProviderInstanceCard({
                     deviceEnabled={resolveProviderInstanceEnabled(instance)}
                   />
                   <SettingResetButton
-                    label={`${displayName} enablement`}
+                    label={t.settings.providerEnablementText.label(displayName)}
                     tooltip="Reset to the device setting"
                     disabled={readOnly || !canWriteSettings}
                     onClick={projectOverride.onReset}

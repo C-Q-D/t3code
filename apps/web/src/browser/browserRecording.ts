@@ -115,11 +115,7 @@ export class BrowserRecordingOperationError extends Schema.TaggedError<BrowserRe
       captureCause instanceof DOMException &&
       captureCause.name === "NotReadableError"
     ) {
-      return (
-        "Unable to start the preview video source. Make sure the capture host is unlocked " +
-        "and its display is on, then retry. " +
-        `${captureCause.name}: ${captureCause.message}`
-      );
+      return t.tools.recordingFailureText.source(captureCause.name, captureCause.message);
     }
     return t.tools.browser.recordingOperation(this.operation, this.tabId);
   }

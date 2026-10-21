@@ -288,7 +288,7 @@ export function useProjectFileQuery(
         ? null
         : canReadFiles
           ? isMissing && !optimisticFile
-            ? `'${relativePath}' does not exist.`
+            ? t.tools.missingProjectFileText.missing(relativePath)
             : errorMessage(cause)
           : (fileAccess.error ?? t.tools.files.cannotRead),
     isPending: isQueryEnabled && (fileAccess.isPending || result.waiting),

@@ -655,11 +655,11 @@ export function useSettingsRestore(onRestored?: () => void) {
       ? [t.settings.rows.agentBrowserAccess.title]
       : []),
     ...(settings.mathRenderingEnabled !== DEFAULT_UNIFIED_SETTINGS.mathRenderingEnabled
-      ? ["Render math"]
+      ? [t.settings.conversationRenderingUi.math]
       : []),
     ...(settings.sidebarAutoSettleKeepPullRequests !==
     DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleKeepPullRequests
-      ? ["Keep threads with a PR"]
+      ? [t.settings.conversationRenderingUi.keepPr]
       : []),
   ];
 
@@ -1449,11 +1449,11 @@ export function AppearanceSettingsPanel() {
         />
         <SettingsRow
           {...searchableSetting("math-rendering")}
-          description="Typeset LaTeX math, such as $x^2$ or \[x^2\], in messages and Markdown previews. The composer keeps TeX source editable."
+          description={t.settings.conversationRenderingUi.mathHint}
           resetAction={
             settings.mathRenderingEnabled !== DEFAULT_UNIFIED_SETTINGS.mathRenderingEnabled ? (
               <SettingResetButton
-                label="math rendering"
+                label={t.settings.conversationRenderingUi.mathReset}
                 onClick={() =>
                   updateSettings({
                     mathRenderingEnabled: DEFAULT_UNIFIED_SETTINGS.mathRenderingEnabled,
@@ -1468,7 +1468,7 @@ export function AppearanceSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ mathRenderingEnabled: Boolean(checked) })
               }
-              aria-label="Render math"
+              aria-label={t.settings.conversationRenderingUi.math}
             />
           }
         />
@@ -2460,11 +2460,11 @@ export function GeneralSettingsPanel() {
           serverScoped
           settingKeys={["compactIdleThreads"]}
           {...searchableSetting("compact-idle-threads")}
-          description="Compact long idle Claude threads just before their prompt cache expires, so coming back costs less."
+          description={t.settings.conversationRenderingUi.compactHint}
           resetAction={
             settings.compactIdleThreads !== DEFAULT_UNIFIED_SETTINGS.compactIdleThreads ? (
               <SettingResetButton
-                label="compact idle Claude threads"
+                label={t.settings.conversationRenderingUi.compactReset}
                 onClick={() =>
                   updateSettings({
                     compactIdleThreads: DEFAULT_UNIFIED_SETTINGS.compactIdleThreads,
@@ -2480,7 +2480,7 @@ export function GeneralSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ compactIdleThreads: Boolean(checked) })
               }
-              aria-label="Compact idle Claude threads (beta)"
+              aria-label={t.settings.conversationRenderingUi.compact}
             />
           }
         />
@@ -2566,8 +2566,8 @@ export function GeneralSettingsPanel() {
               <SettingsRow
                 serverScoped
                 settingKeys={["sidebarAutoSettleKeepPullRequests"]}
-                title="Keep threads with a PR"
-                description="Inactivity does not settle threads with a pull request. Merge and close still do."
+                title={t.settings.conversationRenderingUi.keepPr}
+                description={t.settings.conversationRenderingUi.keepPrHint}
                 control={
                   <ScopedSwitch
                     settingKeys={["sidebarAutoSettleKeepPullRequests"]}
@@ -2575,7 +2575,7 @@ export function GeneralSettingsPanel() {
                     onCheckedChange={(checked) =>
                       updateSettings({ sidebarAutoSettleKeepPullRequests: checked })
                     }
-                    aria-label="Keep threads with a PR"
+                    aria-label={t.settings.conversationRenderingUi.keepPr}
                   />
                 }
               />

@@ -757,7 +757,7 @@ export function ServerBrowserSurface(props: {
           <embed
             src={pdfUrl}
             type="application/pdf"
-            title="PDF document"
+            title={t.tools.browserDocumentUi.pdf}
             className="absolute inset-0 z-10 size-full border-0"
           />
         ) : null}

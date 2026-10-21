@@ -275,23 +275,23 @@ function CleanupResults({
                   {entry.reason}
                 </span>
                 <span className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 border-l border-border/60 pl-3">
-                  <span>Machine</span>
+                  <span>{t.settings.storageCleanupUi.machine}</span>
                   <span className="text-foreground/80">{environmentLabel}</span>
                   {entry.projectPath && (
                     <>
-                      <span>Project</span>
+                      <span>{t.settings.storageCleanupUi.project}</span>
                       <code className="text-foreground/80">{entry.projectPath}</code>
                     </>
                   )}
                   {entry.path && (
                     <>
-                      <span>Folder</span>
+                      <span>{t.settings.storageCleanupUi.folder}</span>
                       <code className="text-foreground/80">{entry.path}</code>
                     </>
                   )}
                   {entry.threadTitle && (
                     <>
-                      <span>Thread</span>
+                      <span>{t.settings.storageCleanupUi.thread}</span>
                       <span>{entry.threadTitle}</span>
                     </>
                   )}
@@ -587,20 +587,20 @@ export function StorageSettingsPanel() {
                   true,
               ) && (
                 <SettingsRow
-                  title="Delete settled worktrees"
+                  title={t.settings.storageCleanupUi.deleteSettled}
                   status={[
                     ruleStatus("worktreeSettledAfterDays"),
                     environments.length > connectedEnvironments.length
-                      ? "Offline machines will not get this setting"
+                      ? t.settings.storageCleanupUi.offline
                       : undefined,
                   ]
                     .filter(Boolean)
                     .join(". ")}
-                  description="Remove worktrees this many days after their thread settles. Set 0 days to remove them at the next cleanup. Branches and thread history are kept."
+                  description={t.settings.storageCleanupUi.hint}
                   serverScoped={!isProjectScope}
                   control={
                     <RetentionControl
-                      label="Delete settled worktrees"
+                      label={t.settings.storageCleanupUi.deleteSettled}
                       value={settings.worktreeSettledAfterDays}
                       minimum={0}
                       onChange={(worktreeSettledAfterDays) =>

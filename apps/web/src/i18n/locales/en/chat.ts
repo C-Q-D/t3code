@@ -1167,4 +1167,66 @@ export const chat = {
     /** Formats the changed file count with the English plural. */
     count: (count: number): string => `${count} changed file${count === 1 ? "" : "s"}`,
   },
+  timelineUi: {
+    copyLink: "Copy prompt link",
+  },
+  machineThreadUi: {
+    copying: "Copying files",
+    unavailable: "This thread is no longer available",
+    approval: "Open approval",
+    noMachine:
+      "No machine can read every attached thread. Choose a machine in the composer or remove the threads.",
+    owner: "its machine",
+    otherMachine: "Attached thread is on another machine",
+    startFailed: "Could not start thread",
+  },
+  commandOutputUi: {
+    failed: "Couldn't load output:",
+    earlier: "Earlier output not shown",
+  },
+  machineThreadText: {
+    /** Formats update for display. */
+    update: (failed: boolean, label: string) =>
+      `${failed ? "Could not update" : "Updating"} ${label}`,
+    /** Formats stranded for display. */
+    stranded: (title: string, owner: string) =>
+      `This machine's agent can't read "${title}". Remove it, or switch back to ${owner} to send.`,
+    /** Formats fork for display. */
+    fork: (title: string) => `${title} fork`,
+    /** Formats review for display. */
+    review: (label: string) => `Review: ${label}`,
+  },
+  revertWarning: {
+    edits: "“Revert files too” also undoes your own edits.",
+  },
+  projectHeading: {
+    inline: "What should we build in",
+    heading: "What should we build?",
+  },
+  workflowOpeningUi: {
+    started: "Workflow started",
+    full: "Show full script",
+  },
+  mathUi: {
+    display: "Display equation",
+    inline: "Inline equation",
+    scrollDisplay: "Scroll display equation",
+    scrollInline: "Scroll inline equation",
+  },
+  workflowOpeningText: {
+    /** Formats started for display. */
+    started: (title: string) => `Workflow started: ${title}`,
+    /** Formats phase for display. */
+    phase: (title: string) => `${title} phase`,
+    /** Formats open for display. */
+    open: (title: string) => `Open ${title}`,
+  },
+  remoteFileErrorText: {
+    /** Formats missing for display. */
+    missing: (label: string, path: string) => `The file was not found on ${label} at ${path}.`,
+  },
+  threadFindUi: {
+    unavailable: "Thread search is unavailable on this server.",
+    update: "Update the server to enable it.",
+  },
 };

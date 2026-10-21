@@ -1467,7 +1467,10 @@ function OpenCommandPaletteDialog(props: {
 
     for (const source of orderedSources) {
       const label = addProjectRemoteSourceLabel(source);
-      const title = source === "url" ? "Git URL" : t.tools.palette.providerRepository(label);
+      const title =
+        source === "url"
+          ? t.tools.promptCommandsUi.gitUrl
+          : t.tools.palette.providerRepository(label);
       const description =
         source === "url"
           ? t.tools.palette.cloneRemote
@@ -1574,7 +1577,11 @@ function OpenCommandPaletteDialog(props: {
   ): CommandPaletteActionItem => ({
     kind: "action",
     value,
-    searchTerms: [option.label, option.environmentId, option.isPrimary ? "this device" : ""],
+    searchTerms: [
+      option.label,
+      option.environmentId,
+      option.isPrimary ? t.tools.promptCommandsUi.device : "",
+    ],
     title: option.label,
     description: option.isConnected
       ? option.isPrimary
@@ -1730,7 +1737,7 @@ function OpenCommandPaletteDialog(props: {
       kind: "action",
       value: "action:copy-prompt-link",
       searchTerms: ["copy", "share", "prompt", "link"],
-      title: "Copy prompt link",
+      title: t.tools.promptCommandsUi.copy,
       icon: <LinkIcon className={ITEM_ICON_CLASS} />,
       run: () => copyPromptLink(plainPromptLink),
     });
@@ -1741,7 +1748,7 @@ function OpenCommandPaletteDialog(props: {
           kind: "action",
           value: "action:copy-prompt-link-with-context",
           searchTerms: ["copy", "share", "prompt", "link", "repository", "model"],
-          title: "Copy prompt link with repo and model",
+          title: t.tools.promptCommandsUi.copyContext,
           icon: <LinkIcon className={ITEM_ICON_CLASS} />,
           run: () => copyPromptLink(contextLink),
         });

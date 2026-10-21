@@ -101,11 +101,46 @@ const ANDROID_PERMISSIONS: ReadonlyArray<{ value: DevicePermission; label: strin
 ];
 
 const LOCATION_PRESETS = [
-  { label: "San Francisco", latitude: 37.7749, longitude: -122.4194 },
-  { label: "New York", latitude: 40.7128, longitude: -74.006 },
-  { label: "London", latitude: 51.5074, longitude: -0.1278 },
-  { label: "Stockholm", latitude: 59.3293, longitude: 18.0686 },
-  { label: "Tokyo", latitude: 35.6762, longitude: 139.6503 },
+  {
+    label: "San Francisco",
+    get displayLabel() {
+      return t.tools.deviceLocationsUi.sanFrancisco;
+    },
+    latitude: 37.7749,
+    longitude: -122.4194,
+  },
+  {
+    label: "New York",
+    get displayLabel() {
+      return t.tools.deviceLocationsUi.newYork;
+    },
+    latitude: 40.7128,
+    longitude: -74.006,
+  },
+  {
+    label: "London",
+    get displayLabel() {
+      return t.tools.deviceLocationsUi.london;
+    },
+    latitude: 51.5074,
+    longitude: -0.1278,
+  },
+  {
+    label: "Stockholm",
+    get displayLabel() {
+      return t.tools.deviceLocationsUi.stockholm;
+    },
+    latitude: 59.3293,
+    longitude: 18.0686,
+  },
+  {
+    label: "Tokyo",
+    get displayLabel() {
+      return t.tools.deviceLocationsUi.tokyo;
+    },
+    latitude: 35.6762,
+    longitude: 139.6503,
+  },
 ] as const;
 
 /**
@@ -572,7 +607,7 @@ function LocationSection(props: {
           <SelectPopup align="start" alignItemWithTrigger={false}>
             {LOCATION_PRESETS.map((preset) => (
               <SelectItem key={preset.label} value={preset.label}>
-                {preset.label}
+                {preset.displayLabel}
               </SelectItem>
             ))}
           </SelectPopup>

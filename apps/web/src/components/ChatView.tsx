@@ -1874,7 +1874,7 @@ export default function ChatView(props: ChatViewProps) {
       : activeProjectClone !== null && activeProjectClone.phase !== "done"
         ? t.chat.view.repositoryNotCloned
         : activeProjectFileCopy?.phase === "copying"
-          ? "Copying files"
+          ? t.chat.machineThreadUi.copying
           : null;
   const projectCloneBannerItem = (() => {
     if (activeProjectFileCopy?.phase === "failed" && activeProjectRef) {
@@ -2395,7 +2395,7 @@ export default function ChatView(props: ChatViewProps) {
         icon: <ComposerServerUpdateIcon status={serverUpdateState.status} />,
         title:
           updateInProgress || updateFailed ? (
-            `${updateFailed ? "Could not update" : "Updating"} ${versionMismatchServerLabel}`
+            t.chat.machineThreadText.update(updateFailed, versionMismatchServerLabel)
           ) : versionMismatch ? (
             <Tooltip>
               <TooltipTrigger
@@ -5304,7 +5304,7 @@ export default function ChatView(props: ChatViewProps) {
     }
     const shell = readThreadShell(threadRef);
     if (shell === null ? isEnvironmentLive() : shell.deletedAt != null) {
-      toastManager.add({ type: "info", title: "This thread is no longer available" });
+      toastManager.add({ type: "info", title: t.chat.machineThreadUi.unavailable });
       return;
     }
     void navigate({
@@ -5340,7 +5340,7 @@ export default function ChatView(props: ChatViewProps) {
       )),
       actions: (
         <Button size="xs" variant="ghost" onClick={() => onOpenRelatedThreadStable(first.id)}>
-          {first.hasPendingApprovals ? "Open approval" : t.chat.view.openQuestion}
+          {first.hasPendingApprovals ? t.chat.machineThreadUi.approval : t.chat.view.openQuestion}
         </Button>
       ),
     };
@@ -6162,7 +6162,7 @@ export default function ChatView(props: ChatViewProps) {
         sourceThreadId: input.sourceThreadId,
         targetThreadId,
         runId: input.runId,
-        title: `${activeThread.title} fork`,
+        title: t.chat.machineThreadText.fork(activeThread.title),
       },
     });
     if (result._tag === "Failure") {
@@ -6332,7 +6332,7 @@ export default function ChatView(props: ChatViewProps) {
                   (record) => record.environmentId === candidate.environmentId,
                 ),
               )
-            ? "No machine can read every attached thread. Choose a machine in the composer or remove the threads."
+            ? t.chat.machineThreadUi.noMachine
             : t.chat.view.noEligibleMachine,
       });
       return;
@@ -6423,12 +6423,13 @@ export default function ChatView(props: ChatViewProps) {
       environmentId,
     })[0];
     if (strandedThread) {
-      const owner = environmentById.get(strandedThread.environmentId)?.label ?? "its machine";
+      const owner =
+        environmentById.get(strandedThread.environmentId)?.label ?? t.chat.machineThreadUi.owner;
       toastManager.add(
         stackedThreadToast({
           type: "warning",
-          title: "Attached thread is on another machine",
-          description: `This machine's agent can't read "${strandedThread.title}". Remove it, or switch back to ${owner} to send.`,
+          title: t.chat.machineThreadUi.otherMachine,
+          description: t.chat.machineThreadText.stranded(strandedThread.title, owner),
         }),
       );
       return;
@@ -7172,7 +7173,9 @@ export default function ChatView(props: ChatViewProps) {
           ? formatTerminalContextLabel(composerTerminalContextsSnapshot[0])
           : undefined,
         composerReviewCommentsSnapshot[0]
-          ? `Review: ${reviewCommentContextLabel(composerReviewCommentsSnapshot[0])}`
+          ? t.chat.machineThreadText.review(
+              reviewCommentContextLabel(composerReviewCommentsSnapshot[0]),
+            )
           : undefined,
         composerPreviewAnnotationsSnapshot[0]
           ? previewAnnotationContextLabel(composerPreviewAnnotationsSnapshot[0])
@@ -7442,7 +7445,7 @@ export default function ChatView(props: ChatViewProps) {
               title:
                 submissionIntent === "background"
                   ? t.chat.view.backgroundTaskError
-                  : "Could not start thread",
+                  : t.chat.machineThreadUi.startFailed,
               description: error instanceof Error ? error.message : t.chat.view.sendMessageError,
               actionProps: {
                 children: t.chat.view.openDraft,

@@ -121,7 +121,7 @@ export function platformSetupStatus(state: DeviceServiceState, platform: DeviceP
     ready: true,
     message:
       remoteHost?.kind === "eas"
-        ? `${remoteHost.label} starts iOS Simulators in the cloud with EAS Simulator.`
+        ? t.tools.easDeviceSetupText.hint(remoteHost.label)
         : platform === "ios"
           ? t.tools.device.iosReady(remoteHost?.label)
           : t.tools.device.androidReady(remoteHost?.label),

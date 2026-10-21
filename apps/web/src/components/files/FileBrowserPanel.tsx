@@ -587,7 +587,7 @@ export default function FileBrowserPanel({
       {hasNoSearchMatches ? (
         ready && !isPending && !pathSearch.isPending && !error && !pathSearch.error ? (
           <div role="status" className="px-3 py-4 text-xs text-muted-foreground">
-            No matching files.
+            {t.tools.files.noMatches}
           </div>
         ) : null
       ) : (

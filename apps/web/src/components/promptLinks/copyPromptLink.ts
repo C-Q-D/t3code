@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import {
   type ModelSelection,
@@ -69,13 +70,13 @@ export function composerPromptLink(input: {
 export async function copyPromptLink(link: string): Promise<void> {
   try {
     if (!(await writeTextToClipboard(link))) return;
-    toastManager.add({ type: "success", title: "Prompt link copied" });
+    toastManager.add({ type: "success", title: t.app.copyPromptLinkUi.copied });
   } catch (error) {
     toastManager.add(
       stackedThreadToast({
         type: "error",
-        title: "Could not copy the prompt link",
-        description: error instanceof Error ? error.message : "An error occurred.",
+        title: t.app.copyPromptLinkUi.failed,
+        description: error instanceof Error ? error.message : t.app.copyPromptLinkUi.error,
       }),
     );
   }

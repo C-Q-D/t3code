@@ -215,7 +215,7 @@ export function RevertConfirmHost(props: {
         <AlertDialogHeader>
           <AlertDialogTitle>{t.chat.view.editFromHere}</AlertDialogTitle>
           <AlertDialogDescription variant="confirmation">
-            {t.chat.view.rewindDescription} “Revert files too” also undoes your own edits.
+            {t.chat.view.rewindDescription} {t.chat.revertWarning.edits}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter className="flex-wrap">

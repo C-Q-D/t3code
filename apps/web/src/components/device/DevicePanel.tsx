@@ -418,7 +418,7 @@ function DeviceNotice(props: {
         size="icon-xs"
         variant="ghost"
         aria-label={
-          props.tone === "warning" ? "Dismiss device warning" : t.tools.device.dismissError
+          props.tone === "warning" ? t.tools.deviceWarningUi.dismiss : t.tools.device.dismissError
         }
         onClick={props.onDismiss}
       >
@@ -433,7 +433,9 @@ function DeviceDiscoveryWarning(props: { readonly label: string; readonly detail
   if (dismissed) return null;
   return (
     <DeviceNotice tone="warning" onDismiss={() => setDismissed(true)}>
-      <p className="font-medium">Device discovery warning · {props.label}</p>
+      <p className="font-medium">
+        {t.tools.deviceWarningUi.discovery} {props.label}
+      </p>
       {props.detail}
     </DeviceNotice>
   );

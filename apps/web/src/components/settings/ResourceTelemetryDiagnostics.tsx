@@ -1209,8 +1209,11 @@ export function ResourceTelemetryDiagnostics({
       .catch((error: unknown) => {
         toastManager.add({
           type: "error",
-          title: `Could not send ${signal}`,
-          description: error instanceof Error ? error.message : `Failed to send ${signal}.`,
+          title: t.settings.resourceTelemetry.signal.sendError(signal),
+          description:
+            error instanceof Error
+              ? error.message
+              : t.settings.resourceTelemetry.signal.sendErrorDescription(signal),
         });
       })
       .finally(() => {

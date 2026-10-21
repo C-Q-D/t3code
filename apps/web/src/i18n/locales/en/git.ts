@@ -1075,4 +1075,144 @@ export const git = {
     loadingRefs: "Loading refs...",
     loadingMoreRefs: "Loading more refs...",
   },
+  guideStopUi: {
+    tradeoff: "A tradeoff to weigh",
+    contract: "A contract to check",
+    product: "A product call",
+    risk: "A risk to judge",
+    accessibility: "An accessibility call",
+    previous: "Previous stop",
+    next: "Next stop",
+    also: "Also in this stop",
+    files: "Files in this stop",
+    loading: "Loading the diff...",
+    missing: "This file is not in the loaded diff.",
+    questions: "Questions to consider",
+    ask: "Ask an agent:",
+    askStop: "Ask about this stop",
+    finish: "Finish review",
+  },
+  guideRailUi: {
+    closely: "Look closely",
+    label: "Review tour",
+  },
+  guideTourUi: {
+    failed: "The diff could not be loaded, so excerpts are missing:",
+    empty: "This change has no files to tour.",
+  },
+  guideProgressText: {
+    /** Formats stop for display. */
+    stop: (index: number, total: number) => `Stop ${index} of ${total}`,
+    /** Formats read for display. */
+    read: (count: number, total: number) => `${count} of ${total} read`,
+    /** Formats readStop for display. */
+    readStop: (index: number) => `Stop ${index}, read`,
+    /** Formats next for display. */
+    next: (title: string) => `Next: ${title}`,
+  },
+  breakdownUi: {
+    tests: "Tests",
+    mocks: "Mocks",
+    generated: "Generated",
+    docs: "Docs",
+    loading: "Loading breakdown",
+    total: "Total",
+  },
+  branchDeletionUi: {
+    failed: "Could not delete this branch",
+    refused:
+      "The host refused it. Check that you have write access to the source repository and that the branch has not moved since this page loaded.",
+    deleted: "Branch deleted",
+    deleting: "Deleting branch...",
+    delete: "Delete branch",
+    reconnect: "Reconnect to delete this branch",
+  },
+  diffUnavailableUi: {
+    retry: "Try again",
+    technical: "Technical details",
+  },
+  moreRepliesUi: {
+    more: "More replies",
+    host: "View on host",
+  },
+  guideExcerptUi: {
+    openCode: "Open in Code",
+    askLines: "Ask the agent about these lines…",
+    ask: "Ask agent",
+  },
+  branchDeletionText: {
+    /** Formats confirm for display. */
+    confirm: (branch: string) => `Delete branch ${branch}?`,
+    /** Formats hint for display. */
+    hint: (branch: string, repository: string) =>
+      `This deletes ${branch} from ${repository}. Local branches and worktrees are not changed.`,
+  },
+  diffViewText: {
+    /** Formats open for display. */
+    open: (provider: string) => `Open on ${provider}`,
+    /** Formats replies for display. */
+    replies: (count: number) =>
+      `${count.toLocaleString()} more ${count === 1 ? "reply" : "replies"}`,
+  },
+  guideExcerptText: {
+    /** Formats loading for display. */
+    loading: (path: string) => `Loading ${path}...`,
+    /** Formats missingLines for display. */
+    missingLines: (start: number, end: number) =>
+      ` lines ${start}-${end} are not in the loaded diff.`,
+    /** Formats shown for display. */
+    shown: (old: boolean, shown: number, total: number) =>
+      `${old ? "removed code, " : ""}showing ${shown} of ${total} diff lines`,
+    /** Formats open for display. */
+    open: (path: string) => `Open ${path} in Code`,
+  },
+  diffErrorUi: {
+    title: "Couldn't load the changes",
+  },
+  checkoutFailureUi: {
+    hint: "Check that the branch still exists and is not checked out elsewhere, then try again.",
+  },
+  diffErrorText: {
+    /** Formats limited for display. */
+    limited: (provider: string) => `${provider} rate limit reached`,
+    /** Formats limitedHint for display. */
+    limitedHint: (provider: string) =>
+      `${provider} is temporarily limiting requests, so this diff couldn't be loaded. Try again after the limit resets, or view the changes on ${provider}.`,
+    /** Formats hint for display. */
+    hint: (provider: string) =>
+      `The environment couldn't load this pull request's diff. Try again, or view the changes on ${provider}.`,
+  },
+  featureBranchText: {
+    /** Formats empty for display. */
+    empty: (branch: string) =>
+      `There are no changes to commit, so a feature branch can't be named. Create a branch yourself or continue on ${branch}.`,
+  },
+  guideNotesUi: {
+    title: "Notes on this stop",
+  },
+  guideRunUi: {
+    ready: "Review guide ready",
+    failed: "Review guide failed",
+    open: "Open guide",
+    startFailed: "Could not start a review guide",
+    hint: "Check the review guide model in Settings → Source Control.",
+  },
+  guideNotesText: {
+    /** Formats count for display. */
+    count: (count: number) => (count === 1 ? "1 note" : `${count} notes`),
+  },
+  guideTabUi: {
+    reading: "Reading the change...",
+    writing: "Writing a review guide",
+    empty: "No review guide yet",
+    progress:
+      "An agent is reading the change. A large one takes a few minutes. You can leave; you will be told when it is ready.",
+    description:
+      "A guide is a tour of the change: stops through the code in reading order, with the calls only a maintainer can make.",
+    write: "Write guide",
+    retry: "Try again",
+    rewriting: "Rewriting this guide. You will be told when the new one is ready.",
+    stale: "Written before the latest push.",
+    rewrite: "Rewrite",
+  },
 };

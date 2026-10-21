@@ -76,7 +76,7 @@ export function getProviderSummary(provider: ServerProvider | undefined) {
   }
   if (isAntigravitySignInUnchecked(provider)) {
     return {
-      headline: "Installed · Sign-in not checked",
+      headline: t.settings.signInUncheckedUi.installed,
       detail: provider.message ?? null,
     };
   }

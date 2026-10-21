@@ -1189,4 +1189,44 @@ export const tools = {
     loadTrampolineFailed: (status: number) =>
       `Unable to load the libghostty-vt PTY trampoline (${status})`,
   },
+  promptCommandsUi: {
+    copy: "Copy prompt link",
+    copyContext: "Copy prompt link with repo and model",
+    device: "this device",
+    gitUrl: "Git URL",
+  },
+  filePathUi: {
+    label: "File path",
+  },
+  browserDocumentUi: {
+    pdf: "PDF document",
+  },
+  deviceWarningUi: {
+    dismiss: "Dismiss device warning",
+    discovery: "Device discovery warning ·",
+  },
+  deviceStreamUi: {
+    ios: "iOS Simulator",
+    android: "Android Emulator",
+  },
+  deviceLocationsUi: {
+    london: "London",
+    stockholm: "Stockholm",
+    tokyo: "Tokyo",
+    sanFrancisco: "San Francisco",
+    newYork: "New York",
+  },
+  easDeviceSetupText: {
+    /** Formats hint for display. */
+    hint: (label: string) => `${label} starts iOS Simulators in the cloud with EAS Simulator.`,
+  },
+  recordingFailureText: {
+    /** Formats source for display. */
+    source: (name: string, message: string) =>
+      `Unable to start the preview video source. Make sure the capture host is unlocked and its display is on, then retry. ${name}: ${message}`,
+  },
+  missingProjectFileText: {
+    /** Formats missing for display. */
+    missing: (path: string | null) => `'${path}' does not exist.`,
+  },
 };

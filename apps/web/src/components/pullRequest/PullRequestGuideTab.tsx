@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 /** Renders the generated pull request guide with shared pixel artwork. */
 import { PixelSparkIcon } from "../icons/PixelLucideIcon";
 import type { EnvironmentId, PullRequestRef, PullRequestReviewGuideStop } from "@t3tools/contracts";
@@ -99,7 +100,7 @@ export function PullRequestGuideTab({
     canWrite ? (
       <Button size={size} variant="outline" disabled={running} onClick={() => void write()}>
         {running ? <Spinner /> : <PixelSparkIcon aria-hidden className="size-3.5" />}
-        {running ? "Reading the change..." : label}
+        {running ? t.git.guideTabUi.reading : label}
       </Button>
     ) : null;
 
@@ -114,16 +115,14 @@ export function PullRequestGuideTab({
     return (
       <div className="flex min-h-48 flex-col items-center justify-center gap-2 px-4 py-10 text-center">
         <p className="text-sm font-medium text-foreground">
-          {running ? "Writing a review guide" : "No review guide yet"}
+          {running ? t.git.guideTabUi.writing : t.git.guideTabUi.empty}
         </p>
         <p className="max-w-md text-xs text-muted-foreground">
           {failure ??
             query.error ??
-            (running
-              ? "An agent is reading the change. A large one takes a few minutes. You can leave; you will be told when it is ready."
-              : "A guide is a tour of the change: stops through the code in reading order, with the calls only a maintainer can make.")}
+            (running ? t.git.guideTabUi.progress : t.git.guideTabUi.description)}
         </p>
-        {writeButton(failure === null ? "Write guide" : "Try again", "sm")}
+        {writeButton(failure === null ? t.git.guideTabUi.write : t.git.guideTabUi.retry, "sm")}
       </div>
     );
   }
@@ -133,11 +132,11 @@ export function PullRequestGuideTab({
       <Alert variant={running ? "info" : "warning"}>
         {running ? <Spinner /> : <TriangleAlertIcon />}
         <AlertDescription>
-          {running
-            ? "Rewriting this guide. You will be told when the new one is ready."
-            : (failure ?? "Written before the latest push.")}
+          {running ? t.git.guideTabUi.rewriting : (failure ?? t.git.guideTabUi.stale)}
         </AlertDescription>
-        {!running && canWrite ? <AlertAction>{writeButton("Rewrite", "xs")}</AlertAction> : null}
+        {!running && canWrite ? (
+          <AlertAction>{writeButton(t.git.guideTabUi.rewrite, "xs")}</AlertAction>
+        ) : null}
       </Alert>
     ) : null;
 

@@ -154,7 +154,7 @@ export function getDesktopUpdateDisabledReason(
   state: Pick<DesktopUpdateState, "enabled" | "status" | "message"> | null,
 ): string | null {
   if (!state || (state.enabled && state.status !== "disabled")) return null;
-  return state.message?.trim() || "Automatic updates are not available in this build.";
+  return state.message?.trim() || t.sidebar.updates.unavailableHint;
 }
 
 export function getDesktopUpdateIdleTooltip(
@@ -162,6 +162,6 @@ export function getDesktopUpdateIdleTooltip(
 ) {
   const disabledReason = getDesktopUpdateDisabledReason(state);
   return disabledReason
-    ? { title: "Updates unavailable", detail: disabledReason }
-    : { title: "Check for updates", detail: null };
+    ? { title: t.app.desktopUpdateAvailabilityUi.unavailable, detail: disabledReason }
+    : { title: t.sidebar.updates.check, detail: null };
 }

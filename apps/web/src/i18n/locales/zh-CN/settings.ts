@@ -3990,4 +3990,269 @@ ${address}`
     chooseShortcut: "选择快捷键",
   },
   customModelPreset: { fastMode: "快速模式", speed: "速度" },
+  easHostsUi: {
+    savedToken: "此处保存的访问令牌",
+    environmentToken: "服务器上的EXPO_TOKEN",
+    serverLogin: "服务器的eas login",
+    removeFailed: "未能移除EAS主机",
+    saveFailed: "未能保存EAS主机",
+    title: "EAS模拟器",
+    description:
+      "从此环境在Expo云端运行iOS模拟器。会话停止前会向Expo账号计费，因此每台主机都会限制会话数量和时长。编辑或移除主机会停止其运行中的会话。",
+    add: "添加EAS主机",
+    empty: "没有EAS主机。",
+    idleInvalid: "空闲分钟数必须小于会话分钟数。",
+    limitsInvalid: "请填写主机名称，并将限制设在显示的范围内。",
+    editHost: "编辑EAS主机",
+    credentialsHint:
+      "此环境的服务器负责登录Expo并启动会话。此处未填写令牌时，先使用EXPO_TOKEN，再使用eas login。",
+    name: "名称",
+    token: "Expo访问令牌",
+    optional: "可选",
+    clearToken: "清除访问令牌",
+    checking: "正在检查Expo账号…",
+    checkFirst: "选择项目前请先检查Expo账号。",
+    checkAccount: "检查账号",
+    project: "EAS项目",
+    threadProject: "使用对话所属项目",
+    billingHint:
+      "会话向项目的Expo账号计费。“使用对话所属项目”会读取项目应用配置中的extra.eas.projectId。",
+    concurrent: "同时运行的会话数",
+    sessionMinutes: "会话分钟数",
+    idleMinutes: "空闲分钟数",
+    durationHint:
+      "Expo免费账号的会话最长40分钟，付费账号最长115分钟。达到空闲时限后会话会结束，因此空闲分钟数必须小于会话分钟数。",
+    restartHint: "保存会重启此主机，并停止其运行中的会话。",
+    save: "保存主机",
+  },
+  browserSearchUi: {
+    custom: "自定义",
+    description: "在地址栏输入非网址内容时使用的搜索引擎。",
+    resetLabel: "搜索引擎",
+    label: "搜索引擎",
+    customUrl: "自定义搜索网址",
+    templateHint: "用%s表示搜索词的位置。",
+    invalidUrl: "请输入包含%s的http或https网址。在此之前，搜索将使用DuckDuckGo。",
+    prDescription:
+      "点击拉取请求链接时在T3 Code中打开。关闭后，将像其他链接一样在GitHub或Git托管平台上打开。",
+    prResetLabel: "在T3 Code中打开拉取请求",
+    prLabel: "在T3 Code中打开拉取请求",
+  },
+  conversationRenderingUi: {
+    math: "渲染数学公式",
+    keepPr: "保留有关联PR的对话",
+    mathHint:
+      "在消息和Markdown预览中排版LaTeX数学公式，例如$x^2$或\\[x^2\\]。输入框中仍可编辑TeX源码。",
+    mathReset: "数学公式渲染",
+    compactHint: "在提示词缓存即将过期前压缩长时间空闲的Claude对话，降低返回对话时的费用。",
+    compactReset: "压缩空闲Claude对话",
+    compact: "压缩空闲Claude对话（测试版）",
+    keepPrHint: "有关联拉取请求的对话不会因闲置而结束。合并或关闭拉取请求仍会结束对话。",
+  },
+  storageCleanupUi: {
+    machine: "机器",
+    project: "项目",
+    folder: "文件夹",
+    thread: "对话",
+    deleteSettled: "删除已结束的工作树",
+    offline: "离线机器不会收到此设置",
+    hint: "对话结束指定天数后移除工作树。设为0天会在下次清理时移除。分支和对话历史会保留。",
+  },
+  reviewGuideUi: {
+    description: "为拉取请求添加“审阅指南”标签页：代理逐项说明改动，并指出维护者需要作出的判断。",
+    label: "审阅指南",
+    modelDescription:
+      "读取拉取请求并编写审阅指南的模型。它会分多步阅读改动，因此更强的模型更有帮助。关闭时使用源码控制写作模型。",
+    connectFirst: "连接环境后可选择其审阅指南模型。",
+    model: "审阅指南模型",
+    mixed: "混合",
+    saveFailed: "未能保存审阅指南模型",
+    separate: "使用独立的审阅指南模型",
+    instructionsHint:
+      "设置审阅指南偏好：优先展示、详细说明或跳过哪些内容。审阅指南的格式和覆盖范围保持不变。",
+    instructionsReset: "审阅指南指令",
+    instructions: "审阅指南指令",
+    placeholder:
+      "先展示服务接口，再展示实现。除非测试文件改变了行为，否则跳过。摘要保持在两句话以内。",
+  },
+  easAccountText: {
+    /** Formats signedIn for display. */
+    signedIn: (account: string, source: string) => `已通过${source}登录为${account}。`,
+  },
+  databaseNoticeUi: {
+    command: "命令",
+    database: "数据库",
+    title: "回收已释放的数据库空间",
+    description:
+      "旧历史会自动清理，但这些数据库仍占用已释放的空间。在每台机器上运行此命令可归还磁盘空间；命令会暂停并重启后台服务。如果环境由桌面应用托管，请先退出桌面应用。",
+  },
+  providerOverrideUi: {
+    project: "项目",
+    device: "设备",
+    origin: "已为此项目覆盖。查看此值的来源",
+  },
+  databaseNoticeText: {
+    /** Formats space for display. */
+    space: (size: string, label: string) => `${label}上有${size} GiB`,
+  },
+  providerEnablementText: {
+    /** Formats label for display. */
+    label: (name: string) => `${name}启用状态`,
+  },
+  mobileAppUi: {
+    apple: "iPhone和iPad",
+    description: "通过手机或平板连接服务器。",
+    scan: "用手机相机扫描。",
+  },
+  diagnosisUi: {
+    failed: "失败",
+    unchecked: "未检查",
+    retrying: "正在重试",
+    details: "详情",
+    target: "连接诊断",
+    copied: "已复制诊断信息",
+    copyFailed: "无法复制诊断信息",
+    try: "可尝试的操作",
+    more: "更多信息",
+    retry: "立即重试",
+    copy: "复制诊断信息",
+    direct: "添加直连路由",
+  },
+  mobileAppText: {
+    /** Formats link for display. */
+    link: (store: string) => `${store}链接`,
+    /** Formats open for display. */
+    open: (store: string) => `打开${store}`,
+  },
+  diagnosisText: {
+    /** Formats retry for display. */
+    retry: (seconds: number) => `${seconds}秒后重试`,
+    /** Formats attempt for display. */
+    attempt: (count: number) => `第${count}次尝试`,
+  },
+  easLimitsUi: {
+    title: "EAS模拟器",
+  },
+  easLimitsText: {
+    /** Formats sessions for display. */
+    sessions: (count: number) => `${count}个会话`,
+    /** Formats limits for display. */
+    limits: (sessions: string, minutes: number, idle: number) =>
+      `最多同时运行${sessions}，每个会话在${minutes}分钟后或空闲${idle}分钟后停止`,
+  },
+  searchNewUi: {
+    math: "渲染数学公式",
+    compact: "压缩空闲Claude对话（测试版）",
+    eas: "EAS设备主机",
+    search: "搜索引擎",
+    pr: "在T3 Code中打开拉取请求",
+    guides: "审阅指南（测试版）",
+    guideModel: "审阅指南模型",
+    guideInstructions: "审阅指南指令",
+    mathTerms: "latex tex katex equations formulas markdown 数学 公式 方程 渲染",
+    compactTerms:
+      "context compaction idle cache tokens usage summary beta experimental 上下文 压缩 空闲 缓存 用量 摘要 测试",
+    remoteTerms:
+      "new worktrees start remote origin latest fetched branch local 新建 工作树 远程 最新 获取 分支 本地",
+    mobileTerms:
+      "phone tablet iPhone iPad iOS Android App Store Google Play QR 手机 平板 移动 二维码",
+    easTerms: "EAS Expo simulator ios android remote device hosts 模拟器 远程 设备 主机",
+    searchTerms:
+      "address bar duckduckgo google bing brave kagi ecosia custom 地址栏 搜索 引擎 自定义",
+    prTerms:
+      "pr links github browser external click default pull request view panel 拉取请求 链接 浏览器 外部 默认 查看 面板",
+    guideTerms:
+      "pull request pr guided review guide tour beta experimental 拉取请求 审查 审阅指南 测试",
+    modelTerms:
+      "pull request pr guided review guide brief maintainer 拉取请求 审查 审阅指南 模型 维护者",
+    instructionTerms:
+      "pull request pr guided review guide preferences taste prompt custom 拉取请求 审查 审阅指南 偏好 提示词 自定义",
+    taskTerms:
+      "webhook replay key coalesce scheduled task filters automation 重放 合并 定时任务 过滤 自动化",
+  },
+  webhookFilterUi: {
+    filters: "过滤条件",
+    hint: "仅在所有过滤条件都匹配时运行。其他请求会记录为已过滤。“属于其中之一”的值用逗号分隔；值本身不能包含逗号。",
+    add: "添加过滤条件",
+    invalid: "过滤条件无效",
+  },
+  connectionInfoUi: {
+    more: "更多信息",
+    trace: "跟踪ID",
+  },
+  scopeSearchUi: {
+    empty: "没有匹配项。",
+  },
+  webhookFilterText: {
+    /** Formats path for display. */
+    path: (index: number) => `过滤条件${index}的路径`,
+    /** Formats remove for display. */
+    remove: (index: number) => `移除过滤条件${index}`,
+    /** Formats test for display. */
+    test: (index: number) => `过滤条件${index}的比较方式`,
+    /** Formats value for display. */
+    value: (index: number) => `过滤条件${index}的值`,
+  },
+  connectionInfoText: {
+    /** Formats fix for display. */
+    fix: (fix: string) => `修复方法：${fix}`,
+    /** Formats sshReady for display. */
+    sshReady: (label: string, alias: string) => `现在可通过SSH ${alias}连接${label}。`,
+    /** Formats tunnelReady for display. */
+    tunnelReady: (alias: string) => `${alias}已可通过SSH托管隧道连接。`,
+    /** Formats machineResults for display. */
+    machineResults: (summary: string) => `${summary}。各机器的结果`,
+  },
+  connectionStateUi: {
+    network: "开启网络访问以检测Tailscale。",
+    downloading: "正在下载更新",
+  },
+  deviceHostsUi: {
+    checking: "正在检查连接",
+    unchecked: "未检查连接",
+    checkingProgress: "正在检查连接…",
+    available: "已连接，或可在列出的每台机器上本地使用",
+    test: "测试连接以检查每台机器的访问情况",
+    androidWarning: "Android设备列表可能不完整。请刷新设备重试。",
+    from: "来自",
+  },
+  projectEnvironmentsUi: {
+    all: "显示所有环境",
+  },
+  inheritanceMachinesUi: {
+    same: "所有机器相同",
+  },
+  changedBrowserUi: {
+    search: "搜索引擎",
+    pr: "在T3 Code中打开拉取请求",
+  },
+  connectionStateText: {
+    /** Formats downloading for display. */
+    downloading: (version: string) => `正在下载更新${version}`,
+    /** Formats downloaded for display. */
+    downloaded: (version: string) => `更新${version}已下载`,
+    /** Formats available for display. */
+    available: (version: string) => `有可用更新${version}`,
+    /** Formats machineDetails for display. */
+    machineDetails: (label: string) => `${label}机器详情`,
+  },
+  deliveryOutcomeUi: {
+    duplicate: "重复",
+    coalesced: "已合并",
+    filtered: "已过滤",
+    signature: "签名无效",
+    paused: "任务已暂停",
+    limited: "已限流",
+    expired: "已过期",
+  },
+  signInUncheckedUi: {
+    installed: "已安装·未检查登录状态",
+  },
+  hostCheckStatusUi: {
+    connected: "已连接",
+    retrying: "正在重试",
+  },
+  providerToggleUi: {
+    off: "关闭",
+  },
 };

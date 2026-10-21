@@ -250,7 +250,7 @@ function describeInitialUpdates(input: {
         ? t.common.providerUpdate.settingsHint(formatProviderList(fromSettings))
         : null,
     manual.length > 0
-      ? `Update ${formatProviderList(manual)} with the app or tool that installed ${manual.length === 1 ? "it" : "them"}.`
+      ? t.app.manualProviderUpdateText.hint(formatProviderList(manual), manual.length)
       : null,
   ]
     .filter((sentence) => sentence !== null)

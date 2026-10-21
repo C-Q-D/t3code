@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import type {
   DiffLineAnnotation,
   FileDiffContentsLoader,
@@ -163,16 +164,16 @@ export function GuideExcerpt({
         />
       ) : loading ? (
         <p className="rounded-lg border border-border/60 px-3 py-2 text-xs text-muted-foreground">
-          Loading {excerpt.path}...
+          {t.git.guideExcerptText.loading(excerpt.path)}
         </p>
       ) : (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 px-3 py-2 text-xs text-muted-foreground">
           <span className="min-w-0 truncate">
-            <span className="font-mono text-foreground">{excerpt.path}</span> lines {excerpt.start}-
-            {excerpt.end} are not in the loaded diff.
+            <span className="font-mono text-foreground">{excerpt.path}</span>
+            {t.git.guideExcerptText.missingLines(excerpt.start, excerpt.end)}
           </span>
           <Button size="xs" variant="outline" onClick={() => onOpenFile(excerpt.path)}>
-            Open in Code
+            {t.git.guideExcerptUi.openCode}
           </Button>
         </div>
       )}
@@ -323,13 +324,15 @@ function ExcerptDiff({
                 rangeLabel={`${excerpt.path}:${getReviewPositionAnchor(draft.position).line}`}
                 text=""
                 placeholder={
-                  commenting.canComment ? "Add a comment…" : "Ask the agent about these lines…"
+                  commenting.canComment ? t.git.diff.addAComment : t.git.guideExcerptUi.askLines
                 }
-                submitLabel={commenting.canComment ? "Add to review" : "Ask agent"}
+                submitLabel={
+                  commenting.canComment ? t.git.pullRequest.addToReview : t.git.guideExcerptUi.ask
+                }
                 {...(commenting.canComment && onAskAgent !== null
                   ? {
                       secondaryAction: {
-                        label: "Ask agent",
+                        label: t.git.guideExcerptUi.ask,
                         onAction: (text: string) => askAgent(text),
                       },
                     }
@@ -355,13 +358,12 @@ function ExcerptDiff({
         renderHeaderMetadata={() => (
           <span className="flex items-center gap-2 text-xs text-muted-foreground">
             <span className="tabular-nums">
-              {excerpt.side === "old" ? "removed code, " : ""}showing {slice.shown} of {slice.total}{" "}
-              diff lines
+              {t.git.guideExcerptText.shown(excerpt.side === "old", slice.shown, slice.total)}
             </span>
             <Button
               size="icon-xs"
               variant="ghost-muted"
-              aria-label={`Open ${excerpt.path} in Code`}
+              aria-label={t.git.guideExcerptText.open(excerpt.path)}
               onClick={() => onOpenFile(excerpt.path)}
             >
               <ArrowUpRightIcon aria-hidden />

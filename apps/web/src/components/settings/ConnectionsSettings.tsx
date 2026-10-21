@@ -1543,7 +1543,7 @@ function SavedBackendListRow({
   const isRemoving = removingEnvironmentId === environmentId;
   const errorTraceId = environment.connection.traceId;
   const { copyToClipboard: copyTraceIdToClipboard } = useCopyToClipboard<{ traceId: string }>({
-    target: "trace ID",
+    target: t.settings.connectionInfoUi.trace,
     onCopy: ({ traceId }) => {
       toastManager.add({
         type: "success",
@@ -1949,7 +1949,11 @@ function ConfiguredCloudLinkRow({ canManageRelay }: { readonly canManageRelay: b
       formatConnectReachable(reachability)
     ) : reachability?.status === "unreachable" ? (
       <span className="block text-destructive">
-        {[reachability.reason, reachability.hint, `Fix: ${reachability.fix}`]
+        {[
+          reachability.reason,
+          reachability.hint,
+          t.settings.connectionInfoText.fix(reachability.fix),
+        ]
           .filter(Boolean)
           .join(" ")}{" "}
         <a
@@ -1958,7 +1962,7 @@ function ConfiguredCloudLinkRow({ canManageRelay }: { readonly canManageRelay: b
           rel="noreferrer"
           className="underline underline-offset-2"
         >
-          More info
+          {t.settings.connectionInfoUi.more}
         </a>
       </span>
     ) : null;
@@ -2712,8 +2716,8 @@ export function ConnectionsSettings() {
         ? t.settings.connections.environment.routeAddedToast
         : t.settings.connections.environment.connectedToast,
       description: routeTarget
-        ? `${routeTarget.label} can now be reached over SSH ${target.alias}.`
-        : `${target.alias} is ready over an SSH-managed tunnel.`,
+        ? t.settings.connectionInfoText.sshReady(routeTarget.label, target.alias)
+        : t.settings.connectionInfoText.tunnelReady(target.alias),
     });
     setIsAddingSavedBackend(false);
   };
@@ -3695,7 +3699,7 @@ export function ConnectionsSettings() {
                       environmentId={primaryEnvironmentId}
                       serverLabel={
                         primaryEnvironment
-                          ? `${primaryEnvironment.label} server`
+                          ? t.settings.connections.environment.serverLabel(primaryEnvironment.label)
                           : t.settings.connections.environment.server
                       }
                       selfUpdate={resolveServerSelfUpdateCapability(primaryServerConfig)}
@@ -3710,7 +3714,9 @@ export function ConnectionsSettings() {
                       label={
                         primaryServerUpdateState.status === "failed"
                           ? t.settings.connections.environment.retryUpdate
-                          : `Update to ${primaryVersionMismatch.clientVersion}`
+                          : t.settings.connections.environment.updateVersion(
+                              primaryVersionMismatch.clientVersion,
+                            )
                       }
                     />
                   ) : primaryServerUpdateState.status === "idle" && primaryServerConfig ? (

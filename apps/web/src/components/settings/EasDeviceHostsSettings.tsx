@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { useEffect, useEffectEvent, useId, useRef, useState } from "react";
 import * as Cause from "effect/Cause";
 import * as Option from "effect/Option";
@@ -40,11 +41,12 @@ import { SettingsRow } from "./settingsLayout";
 
 const FROM_THREAD_PROJECT = "thread-project";
 
-const CREDENTIAL_SOURCES: Record<DeviceEasAccount["credentialSource"], string> = {
-  settings: "the access token saved here",
-  env: "EXPO_TOKEN on the server",
-  "eas-login": "the server's eas login",
-};
+/** Reads the current dictionary on each call so labels follow language changes. */
+const credentialSources = (): Record<DeviceEasAccount["credentialSource"], string> => ({
+  settings: t.settings.easHostsUi.savedToken,
+  env: t.settings.easHostsUi.environmentToken,
+  "eas-login": t.settings.easHostsUi.serverLogin,
+});
 
 const failureMessage = (cause: Cause.Cause<unknown>) => {
   const error = Cause.squash(cause);
@@ -80,7 +82,7 @@ export function EasDeviceHostsSettings(props: { environmentId: EnvironmentId | n
     else
       toastManager.add({
         type: "error",
-        title: remove ? "EAS host not removed" : "EAS host not saved",
+        title: remove ? t.settings.easHostsUi.removeFailed : t.settings.easHostsUi.saveFailed,
         description: failureMessage(result.cause),
       });
   };
@@ -88,10 +90,10 @@ export function EasDeviceHostsSettings(props: { environmentId: EnvironmentId | n
   return (
     <SettingsRow
       id="eas-device-hosts"
-      title="EAS Simulator"
+      title={t.settings.easHostsUi.title}
       serverScoped
       settingKeys={["easDeviceHosts"]}
-      description="Run iOS Simulators in Expo's cloud from this environment. Sessions bill the Expo account until they stop, so each host limits how many run and for how long. Editing or removing a host stops its running sessions."
+      description={t.settings.easHostsUi.description}
       control={
         <Button
           size="sm"
@@ -99,13 +101,13 @@ export function EasDeviceHostsSettings(props: { environmentId: EnvironmentId | n
           disabled={disabled || editing !== null}
           onClick={() => setEditing({ host: newEasDeviceHost(randomUUID()), isNew: true })}
         >
-          <PlusIcon className="size-3.5" /> Add EAS host
+          <PlusIcon className="size-3.5" /> {t.settings.easHostsUi.add}
         </Button>
       }
     >
       <div className="pt-3 pb-2">
         {hosts.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No EAS hosts.</p>
+          <p className="text-sm text-muted-foreground">{t.settings.easHostsUi.empty}</p>
         ) : (
           <ul className="divide-y divide-border/40">
             {hosts.map((host) => (
@@ -123,7 +125,7 @@ export function EasDeviceHostsSettings(props: { environmentId: EnvironmentId | n
                     disabled={disabled}
                     onClick={() => setEditing({ host, isNew: false })}
                   >
-                    Edit
+                    {t.settings.actions.edit}
                   </Button>
                   <Button
                     size="sm"
@@ -131,7 +133,7 @@ export function EasDeviceHostsSettings(props: { environmentId: EnvironmentId | n
                     disabled={disabled}
                     onClick={() => void save(host, true)}
                   >
-                    Remove
+                    {t.settings.deviceHosts.remove}
                   </Button>
                 </div>
               </li>
@@ -187,8 +189,8 @@ function EasDeviceHostEditor(props: {
   const problem = valid
     ? null
     : draft.maxSessionMinutes > 0 && draft.idleMinutes >= draft.maxSessionMinutes
-      ? "Idle minutes must be smaller than session minutes."
-      : "Give the host a label and limits within the ranges shown.";
+      ? t.settings.easHostsUi.idleInvalid
+      : t.settings.easHostsUi.limitsInvalid;
   const apps = account.status === "signed-in" ? account.account.apps : [];
 
   // A check answers for the credential it was asked about: a later check or a
@@ -269,15 +271,14 @@ function EasDeviceHostEditor(props: {
           }}
         >
           <DialogHeader>
-            <DialogTitle>{props.isNew ? "Add EAS host" : "Edit EAS host"}</DialogTitle>
-            <DialogDescription>
-              The environment's server signs in to Expo and starts the sessions. Without a token
-              here it uses EXPO_TOKEN, then its eas login.
-            </DialogDescription>
+            <DialogTitle>
+              {props.isNew ? t.settings.easHostsUi.add : t.settings.easHostsUi.editHost}
+            </DialogTitle>
+            <DialogDescription>{t.settings.easHostsUi.credentialsHint}</DialogDescription>
           </DialogHeader>
           <DialogPanel>
             <label className="block space-y-1.5 text-sm">
-              <span>Name</span>
+              <span>{t.settings.easHostsUi.name}</span>
               <Input
                 autoFocus
                 required
@@ -291,7 +292,7 @@ function EasDeviceHostEditor(props: {
             </label>
             <div className="space-y-1.5 text-sm">
               <label htmlFor={tokenId} className="block">
-                Expo access token
+                {t.settings.easHostsUi.token}
               </label>
               <div className="flex items-center gap-2">
                 <SecretInput
@@ -300,7 +301,7 @@ function EasDeviceHostEditor(props: {
                   configured={token.kind === "saved"}
                   value={token.kind === "new" ? token.value : ""}
                   disabled={props.busy}
-                  placeholder="Optional"
+                  placeholder={t.settings.easHostsUi.optional}
                   onChange={(event) => {
                     const value = event.target.value;
                     // Emptying the field is not clearing the saved token; the
@@ -320,7 +321,7 @@ function EasDeviceHostEditor(props: {
                     type="button"
                     size="icon-sm"
                     variant="ghost-destructive"
-                    aria-label="Clear access token"
+                    aria-label={t.settings.easHostsUi.clearToken}
                     onClick={() => {
                       setToken({ kind: "cleared" });
                       resetAccount();
@@ -334,12 +335,15 @@ function EasDeviceHostEditor(props: {
             <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 px-3 py-2.5">
               <p role="status" className="min-w-0 text-xs text-muted-foreground">
                 {account.status === "signed-in"
-                  ? `Signed in as ${account.account.signedInAs} with ${CREDENTIAL_SOURCES[account.account.credentialSource]}.`
+                  ? t.settings.easAccountText.signedIn(
+                      account.account.signedInAs,
+                      credentialSources()[account.account.credentialSource],
+                    )
                   : account.status === "failed"
                     ? account.error
                     : account.status === "checking"
-                      ? "Checking the Expo account…"
-                      : "Check the Expo account before choosing a project."}
+                      ? t.settings.easHostsUi.checking
+                      : t.settings.easHostsUi.checkFirst}
               </p>
               <Button
                 type="button"
@@ -348,11 +352,12 @@ function EasDeviceHostEditor(props: {
                 disabled={props.busy || account.status === "checking"}
                 onClick={() => void checkAccount()}
               >
-                {account.status === "checking" ? <Spinner size="xs" /> : null} Check account
+                {account.status === "checking" ? <Spinner size="xs" /> : null}{" "}
+                {t.settings.easHostsUi.checkAccount}
               </Button>
             </div>
             <div className="space-y-1.5 text-sm">
-              <span>EAS project</span>
+              <span>{t.settings.easHostsUi.project}</span>
               <Select
                 value={draft.appId ?? FROM_THREAD_PROJECT}
                 disabled={props.busy}
@@ -364,17 +369,19 @@ function EasDeviceHostEditor(props: {
                   });
                 }}
               >
-                <SelectTrigger size="sm" aria-label="EAS project">
+                <SelectTrigger size="sm" aria-label={t.settings.easHostsUi.project}>
                   <SelectValue>
                     {(value: string) =>
                       value === FROM_THREAD_PROJECT
-                        ? "From the thread's project"
+                        ? t.settings.easHostsUi.threadProject
                         : (apps.find((app) => app.id === value)?.fullName ?? value)
                     }
                   </SelectValue>
                 </SelectTrigger>
                 <SelectPopup>
-                  <SelectItem value={FROM_THREAD_PROJECT}>From the thread's project</SelectItem>
+                  <SelectItem value={FROM_THREAD_PROJECT}>
+                    {t.settings.easHostsUi.threadProject}
+                  </SelectItem>
                   {draft.appId && !apps.some((app) => app.id === draft.appId) ? (
                     <SelectItem value={draft.appId}>{draft.appId}</SelectItem>
                   ) : null}
@@ -385,21 +392,16 @@ function EasDeviceHostEditor(props: {
                   ))}
                 </SelectPopup>
               </Select>
-              <p className="text-xs text-muted-foreground">
-                Sessions bill the project's Expo account. "From the thread's project" reads
-                extra.eas.projectId from the project's app config.
-              </p>
+              <p className="text-xs text-muted-foreground">{t.settings.easHostsUi.billingHint}</p>
             </div>
             <div className="grid grid-cols-3 gap-3 text-sm">
-              {limit("maxConcurrentSessions", "Sessions at once", 20)}
-              {limit("maxSessionMinutes", "Session minutes", 115)}
-              {limit("idleMinutes", "Idle minutes", 60)}
+              {limit("maxConcurrentSessions", t.settings.easHostsUi.concurrent, 20)}
+              {limit("maxSessionMinutes", t.settings.easHostsUi.sessionMinutes, 115)}
+              {limit("idleMinutes", t.settings.easHostsUi.idleMinutes, 60)}
             </div>
             <p className="text-xs text-muted-foreground">
-              Expo allows sessions of up to 40 minutes on free accounts and 115 on paid ones, and
-              ends one after the idle minutes without activity, so idle minutes must be smaller than
-              session minutes.
-              {props.isNew ? null : " Saving restarts this host, which stops its running sessions."}
+              {t.settings.easHostsUi.durationHint}
+              {props.isNew ? null : t.settings.easHostsUi.restartHint}
             </p>
             {problem === null ? null : (
               <p className="text-xs text-destructive" role="alert">
@@ -409,10 +411,10 @@ function EasDeviceHostEditor(props: {
           </DialogPanel>
           <DialogFooter>
             <Button type="button" variant="ghost" disabled={props.busy} onClick={props.onClose}>
-              Cancel
+              {t.settings.actions.cancel}
             </Button>
             <Button type="submit" disabled={props.busy || !valid}>
-              {props.busy ? <Spinner size="xs" /> : null} Save host
+              {props.busy ? <Spinner size="xs" /> : null} {t.settings.easHostsUi.save}
             </Button>
           </DialogFooter>
         </form>

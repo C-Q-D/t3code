@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { lazy, memo, Suspense } from "react";
 
 import { RenderErrorBoundary } from "../RenderErrorBoundary";
@@ -31,8 +32,8 @@ export const MarkdownMath = memo(function MarkdownMath(props: {
         props.focusable === false
           ? undefined
           : props.display
-            ? "Display equation"
-            : "Inline equation"
+            ? t.chat.mathUi.display
+            : t.chat.mathUi.inline
       }
     >
       <span
@@ -42,8 +43,8 @@ export const MarkdownMath = memo(function MarkdownMath(props: {
           props.focusable === false
             ? undefined
             : props.display
-              ? "Scroll display equation"
-              : "Scroll inline equation"
+              ? t.chat.mathUi.scrollDisplay
+              : t.chat.mathUi.scrollInline
         }
       >
         <span className={props.display ? "inline-block w-max min-w-full" : "inline-block w-max"}>

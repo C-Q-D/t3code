@@ -1326,10 +1326,7 @@ export function checkoutFailureDescription(failure: unknown): string {
       ? failure.detail
       : `${failure.detail} (${failure.reason})`
     : failure;
-  return readableFailure(
-    description,
-    "Check that the branch still exists and is not checked out elsewhere, then try again.",
-  );
+  return readableFailure(description, t.git.checkoutFailureUi.hint);
 }
 
 export function resolveBaseFreshness(detail: {

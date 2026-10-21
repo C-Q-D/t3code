@@ -345,7 +345,7 @@ function SidebarUpdateControl() {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Could not update everything",
+          title: t.sidebar.updateRunUi.everythingFailed,
           description: error instanceof Error ? error.message : t.sidebar.errors.unexpectedError,
         }),
       );

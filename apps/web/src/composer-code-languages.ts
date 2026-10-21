@@ -1,5 +1,11 @@
+import { t } from "~/i18n";
 export const CODE_BLOCK_LANGUAGES = [
-  { id: "", label: "Plain text" },
+  {
+    id: "",
+    get label() {
+      return t.chat.codeLanguage.plainText;
+    },
+  },
   { id: "bash", label: "Bash" },
   { id: "c", label: "C" },
   { id: "cpp", label: "C++" },

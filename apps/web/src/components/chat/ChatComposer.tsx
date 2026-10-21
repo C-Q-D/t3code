@@ -2590,7 +2590,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       (pendingThreadImportsRef.current.get(importTargetKey) ?? 0) > 0 &&
       countReservedAttachments() >= PROVIDER_SEND_TURN_MAX_ATTACHMENTS
     ) {
-      fail("The attachment limit has been reached.");
+      fail(t.composer.attachmentErrors.limit);
       return;
     }
     if (record.kind === "image") {
@@ -5284,8 +5284,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       if (!inserted) {
         toastManager.add({
           type: "error",
-          title: "Unable to add folder",
-          description: "The composer is busy; try again once it is ready.",
+          title: t.composer.attachmentErrors.folder,
+          description: t.composer.context.busyHint,
         });
         break;
       }
@@ -5403,7 +5403,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       pendingDraftWork.begin(targetKey);
       const loadingToast = toastManager.add({
         type: "loading",
-        title: "Loading thread context…",
+        title: t.composer.attachmentErrors.loadingThread,
         timeout: 0,
         data: { threadRef: routeThreadRef, hideCopyButton: true },
       });
@@ -5428,7 +5428,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
             if (activeThreadId) {
               setThreadError(
                 activeThreadId,
-                `You can attach up to ${PROVIDER_SEND_TURN_MAX_ATTACHMENTS} files per message.`,
+                t.composer.attachmentLimitText.maximum(PROVIDER_SEND_TURN_MAX_ATTACHMENTS),
               );
             }
           },
@@ -5487,8 +5487,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       if (!inserted) {
         toastManager.add({
           type: "error",
-          title: "Unable to add thread",
-          description: "The composer is busy; try again once it is ready.",
+          title: t.composer.attachmentErrors.thread,
+          description: t.composer.context.busyHint,
         });
         return;
       }

@@ -1021,4 +1021,138 @@ export const git: Messages["git"] = {
     loadingRefs: "正在加载分支…",
     loadingMoreRefs: "正在加载更多分支…",
   },
+  guideStopUi: {
+    tradeoff: "需要权衡的取舍",
+    contract: "需要核查的契约",
+    product: "需要作出的产品判断",
+    risk: "需要评估的风险",
+    accessibility: "需要作出的无障碍判断",
+    previous: "上一站",
+    next: "下一站",
+    also: "本站还包括",
+    files: "本站文件",
+    loading: "正在加载差异…",
+    missing: "已加载的差异中没有此文件。",
+    questions: "需要考虑的问题",
+    ask: "询问代理：",
+    askStop: "询问本站内容",
+    finish: "完成审查",
+  },
+  guideRailUi: {
+    closely: "仔细查看",
+    label: "审阅指南",
+  },
+  guideTourUi: {
+    failed: "无法加载差异，因此缺少摘录：",
+    empty: "此改动没有可供审阅指南讲解的文件。",
+  },
+  guideProgressText: {
+    /** Formats stop for display. */
+    stop: (index: number, total: number) => `第${index}站，共${total}站`,
+    /** Formats read for display. */
+    read: (count: number, total: number) => `已读${count}站，共${total}站`,
+    /** Formats readStop for display. */
+    readStop: (index: number) => `第${index}站，已读`,
+    /** Formats next for display. */
+    next: (title: string) => `下一站：${title}`,
+  },
+  breakdownUi: {
+    tests: "测试",
+    mocks: "模拟数据",
+    generated: "生成文件",
+    docs: "文档",
+    loading: "正在加载分类统计",
+    total: "合计",
+  },
+  branchDeletionUi: {
+    failed: "无法删除此分支",
+    refused: "托管平台拒绝了操作。请确认你对源仓库有写入权限，且分支自页面加载以来未发生变化。",
+    deleted: "分支已删除",
+    deleting: "正在删除分支…",
+    delete: "删除分支",
+    reconnect: "重新连接后可删除此分支",
+  },
+  diffUnavailableUi: {
+    retry: "重试",
+    technical: "技术详情",
+  },
+  moreRepliesUi: {
+    more: "更多回复",
+    host: "在托管平台查看",
+  },
+  guideExcerptUi: {
+    openCode: "在代码页打开",
+    askLines: "向代理询问这些行…",
+    ask: "询问代理",
+  },
+  branchDeletionText: {
+    /** Formats confirm for display. */
+    confirm: (branch: string) => `删除分支${branch}？`,
+    /** Formats hint for display. */
+    hint: (branch: string, repository: string) =>
+      `这会从${repository}删除${branch}。本地分支和工作树不受影响。`,
+  },
+  diffViewText: {
+    /** Formats open for display. */
+    open: (provider: string) => `在${provider}上打开`,
+    /** Formats replies for display. */
+    replies: (count: number) => `另有${count.toLocaleString()}条回复`,
+  },
+  guideExcerptText: {
+    /** Formats loading for display. */
+    loading: (path: string) => `正在加载${path}…`,
+    /** Formats missingLines for display. */
+    missingLines: (start: number, end: number) => `的第${start}—${end}行不在已加载的差异中。`,
+    /** Formats shown for display. */
+    shown: (old: boolean, shown: number, total: number) =>
+      `${old ? "已删除的代码，" : ""}显示${shown}行差异，共${total}行`,
+    /** Formats open for display. */
+    open: (path: string) => `在代码页打开${path}`,
+  },
+  diffErrorUi: {
+    title: "无法加载改动",
+  },
+  checkoutFailureUi: {
+    hint: "请确认分支仍然存在，且未在其他位置检出，然后重试。",
+  },
+  diffErrorText: {
+    /** Formats limited for display. */
+    limited: (provider: string) => `已达到${provider}的请求频率上限`,
+    /** Formats limitedHint for display. */
+    limitedHint: (provider: string) =>
+      `${provider}暂时限制了请求，无法加载此差异。请在限制重置后重试，或在${provider}查看改动。`,
+    /** Formats hint for display. */
+    hint: (provider: string) => `此环境无法加载拉取请求的差异。请重试，或在${provider}查看改动。`,
+  },
+  featureBranchText: {
+    /** Formats empty for display. */
+    empty: (branch: string) =>
+      `没有可提交的改动，无法为功能分支命名。请自行创建分支，或继续使用${branch}。`,
+  },
+  guideNotesUi: {
+    title: "本站注释",
+  },
+  guideRunUi: {
+    ready: "审阅指南已就绪",
+    failed: "审阅指南失败",
+    open: "打开审阅指南",
+    startFailed: "无法启动审阅指南",
+    hint: "请检查“设置→源码控制”中的审阅指南模型。",
+  },
+  guideNotesText: {
+    /** Formats count for display. */
+    count: (count: number) => `${count}条注释`,
+  },
+  guideTabUi: {
+    reading: "正在阅读改动…",
+    writing: "正在编写审阅指南",
+    empty: "尚无审阅指南",
+    progress: "代理正在阅读改动。较大的改动需要几分钟。你可以离开此页，完成后会收到通知。",
+    description: "审阅指南按阅读顺序逐站讲解代码改动，并指出需要维护者作出的判断。",
+    write: "编写审阅指南",
+    retry: "重试",
+    rewriting: "正在重写审阅指南。新审阅指南就绪后会通知你。",
+    stale: "此审阅指南编写于最近一次推送之前。",
+    rewrite: "重写",
+  },
 };

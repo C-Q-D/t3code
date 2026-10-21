@@ -208,7 +208,9 @@ const ACTION_FAILURE_LABELS: Record<PullRequestAction, string> = {
   "disable-auto-merge": t.git.pullRequest.couldNotTurnOffAutoMerge,
   revert: t.git.pullRequest.couldNotOpenARevertPullRequest,
   "approve-workflows": t.git.pullRequest.couldNotApproveWorkflows,
-  "delete-branch": "Could not delete this branch",
+  get "delete-branch"() {
+    return t.git.branchDeletionUi.failed;
+  },
 };
 
 const ACTION_FAILURE_HINTS: Record<PullRequestAction, string> = {
@@ -235,8 +237,9 @@ const ACTION_FAILURE_HINTS: Record<PullRequestAction, string> = {
   revert:
     t.git.pullRequest
       .theHostRefusedItCheckThatYouHaveWriteAccessAndThatThisPullRequestWasMergedOnTheHost,
-  "delete-branch":
-    "The host refused it. Check that you have write access to the source repository and that the branch has not moved since this page loaded.",
+  get "delete-branch"() {
+    return t.git.branchDeletionUi.refused;
+  },
   "approve-workflows":
     t.git.pullRequest
       .theHostRefusedItCheckThatYouHaveActionsWriteAccessAndThatTheseWorkflowRunsAreStillAwa,
@@ -1010,7 +1013,7 @@ export function PullRequestDetailPanel({
       toastManager.add({ type: "success", title: t.git.pullRequest.revertPullRequestOpened });
     }
     if (action === "delete-branch") {
-      toastManager.add({ type: "success", title: "Branch deleted" });
+      toastManager.add({ type: "success", title: t.git.branchDeletionUi.deleted });
     }
     if (pullRequestActionNeedsHostRefresh(action)) {
       void refreshFromHost();
@@ -1536,8 +1539,11 @@ export function PullRequestDetailPanel({
     if (detail === null) return;
     const confirmed = await readLocalApi()?.dialogs.confirm(
       [
-        `Delete branch ${detail.headBranch}?`,
-        `This deletes ${detail.headBranch} from ${detail.headRepositoryNameWithOwner ?? detail.repository}. Local branches and worktrees are not changed.`,
+        t.git.branchDeletionText.confirm(detail.headBranch),
+        t.git.branchDeletionText.hint(
+          detail.headBranch,
+          detail.headRepositoryNameWithOwner ?? detail.repository,
+        ),
       ].join("\n"),
       { variant: "destructive" },
     );
@@ -2376,13 +2382,13 @@ export function PullRequestDetailPanel({
                           <span className="flex min-w-0 flex-col">
                             <span>
                               {pendingAction === "delete-branch"
-                                ? "Deleting branch..."
-                                : "Delete branch"}
+                                ? t.git.branchDeletionUi.deleting
+                                : t.git.branchDeletionUi.delete}
                             </span>
                             <span className="truncate text-xs text-muted-foreground">
                               {environmentConnected
                                 ? detail.headBranch
-                                : "Reconnect to delete this branch"}
+                                : t.git.branchDeletionUi.reconnect}
                             </span>
                           </span>
                         </MenuItem>

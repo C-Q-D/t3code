@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { formatDiffCount } from "@t3tools/client-runtime/diff-count";
 import type { EnvironmentId, PullRequestChangeBreakdown, PullRequestRef } from "@t3tools/contracts";
 import { useState } from "react";
@@ -8,13 +9,15 @@ import { useEnvironmentQuery } from "~/state/query";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { PullRequestDiffStat } from "./pullRequestPresentation";
 
-const KIND_LABELS = {
-  code: "Code",
-  tests: "Tests",
-  mocks: "Mocks",
-  generated: "Generated",
-  docs: "Docs",
-} satisfies Record<keyof NonNullable<PullRequestChangeBreakdown>, string>;
+/** Reads the current dictionary on each call so labels follow language changes. */
+const kindLabels = () =>
+  ({
+    code: t.git.pullRequest.code,
+    tests: t.git.breakdownUi.tests,
+    mocks: t.git.breakdownUi.mocks,
+    generated: t.git.breakdownUi.generated,
+    docs: t.git.breakdownUi.docs,
+  }) satisfies Record<keyof NonNullable<PullRequestChangeBreakdown>, string>;
 
 type DiffTotals = { additions: number; deletions: number };
 
@@ -64,7 +67,7 @@ export function PullRequestChangeBreakdownStat({
           <ChangeBreakdownGrid breakdown={breakdown} total={{ additions, deletions }} />
         </TooltipPopup>
       ) : query.isPending ? (
-        <TooltipPopup side="bottom">Loading breakdown</TooltipPopup>
+        <TooltipPopup side="bottom">{t.git.breakdownUi.loading}</TooltipPopup>
       ) : null}
     </Tooltip>
   );
@@ -103,12 +106,12 @@ function ChangeBreakdownGrid({
 }) {
   return (
     <div className="grid grid-cols-[auto_auto_auto] justify-start gap-x-4 gap-y-1 py-0.5 font-mono tabular-nums">
-      {(Object.keys(KIND_LABELS) as Array<keyof typeof KIND_LABELS>).map((kind) => {
+      {(Object.keys(kindLabels()) as Array<keyof ReturnType<typeof kindLabels>>).map((kind) => {
         const { additions, deletions } = breakdown[kind];
         return additions === 0 && deletions === 0 ? null : (
           <BreakdownRow
             key={kind}
-            label={KIND_LABELS[kind]}
+            label={kindLabels()[kind]}
             additions={additions}
             deletions={deletions}
           />
@@ -117,7 +120,11 @@ function ChangeBreakdownGrid({
       {total ? (
         <>
           <div className="col-span-3 border-t border-border" />
-          <BreakdownRow label="Total" additions={total.additions} deletions={total.deletions} />
+          <BreakdownRow
+            label={t.git.breakdownUi.total}
+            additions={total.additions}
+            deletions={total.deletions}
+          />
         </>
       ) : null}
     </div>

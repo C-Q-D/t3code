@@ -330,4 +330,88 @@ export const sidebar: Messages["sidebar"] = {
     minutes: (minutes: number) => `${minutes}分钟`,
     now: "刚刚",
   },
+  updateRunUi: {
+    everythingFailed: "无法更新全部项目",
+    notConnected: "未连接",
+    noPermission: "没有权限",
+    alreadyUpdating: "正在更新",
+    manual: "需要手动更新",
+    newerDesktop: "需要更新版本的桌面应用",
+    failed: "更新失败",
+    desktopUpdate: "桌面应用更新",
+    thisApp: "此应用",
+    thisAppTitle: "此应用",
+    afterServers: "服务器重启后再重启",
+    later: "稍后",
+    restart: "重启以更新",
+    startFailed: "无法开始更新",
+    notApplied: "更新未生效",
+  },
+  updateRunText: {
+    /** Formats channel for display. */
+    channel: (channel: string) => `位于${channel}渠道`,
+    /** Formats restartIn for display. */
+    restartIn: (seconds: number) => `${seconds}秒后重启`,
+    /** Formats localRestartIn for display. */
+    localRestartIn: (seconds: number) => `${seconds}秒后重启`,
+    /** Formats updatedCount for display. */
+    updatedCount: (done: number, total: number) => `已更新${done}个，共${total}个`,
+    /** Formats downloading for display. */
+    downloading: (percent: number | null) =>
+      `正在下载${percent === null ? "" : ` ${Math.floor(percent)}%`}`,
+    /** Formats localDownloading for display. */
+    localDownloading: (percent: number | null) =>
+      `正在下载${percent === null ? "" : ` ${Math.floor(percent)}%`}`,
+    /** Formats failedMachine for display. */
+    failedMachine: (label: string) => `${label}更新失败`,
+    /** Formats failedCount for display. */
+    failedCount: (count: number) => `${count}个更新失败`,
+    /** Formats appFailure for display. */
+    appFailure: (failure: string) => `此应用：${failure}`,
+    /** Formats stillRestarting for display. */
+    stillRestarting: (labels: string, _count: number) => `${labels}仍在重启。`,
+    /** Formats updated for display. */
+    updated: (labels: string) => `已更新${labels}`,
+    /** Formats update for display. */
+    update: (labels: string) => `更新${labels}`,
+    /** Formats count for display. */
+    count: (count: number, noun: string) =>
+      `${count}个${noun === "server" ? "服务器" : "Provider"}`,
+    /** Formats list for display. */
+    list: (parts: ReadonlyArray<string>) => parts.join("、"),
+    /** Formats serverVersion for display. */
+    serverVersion: (version: string) => `服务器更新至${version}`,
+    /** Formats appVersion for display. */
+    appVersion: (version: string) => `此应用：${version}，最后重启`,
+    /** Formats running for display. */
+    running: (count: number) => `${count}个运行中的对话`,
+    /** Formats resumeAll for display. */
+    resumeAll: (threads: string) => `${threads}将被中断，重启后可以恢复。`,
+    /** Formats interrupt for display. */
+    interrupt: (threads: string) => `${threads}将被中断。`,
+    /** Formats resumeSome for display. */
+    resumeSome: (threads: string, count: number) =>
+      `${threads}将被中断。其中${count}个可以在重启后恢复。`,
+    /** Formats skips for display. */
+    skips: (label: string, reason: string) => `跳过${label}：${reason}`,
+    /** Formats timeout for display. */
+    timeout: (minutes: number) => `${minutes}分钟后仍未恢复`,
+    /** Formats notApplied for display. */
+    notApplied: (current: string, target: string) =>
+      `T3 Code仍为${current}。请通过更新按钮重新安装${target}。`,
+    /** Formats minutes for display. */
+    minutes: (count: number) => `${count}分钟`,
+  },
+  updateStatusUi: {
+    providers: "正在更新Provider",
+    waiting: "等待中",
+    downloading: "正在下载",
+    restarting: "正在重启",
+    done: "已完成",
+    failed: "失败",
+    lessMinute: "不足1分钟",
+  },
+  providerUpdateInterruptedUi: {
+    interrupted: "Provider更新已中断",
+  },
 };

@@ -423,4 +423,17 @@ export const composer: Messages["composer"] = {
     booleanLabel: (label: string, enabled: boolean) => `${label} ${enabled ? "开" : "关"}`,
     reasoning: "推理",
   },
+  attachmentErrors: {
+    limit: "已达到附件数量上限。",
+    folder: "无法添加文件夹",
+    loadingThread: "正在加载对话上下文…",
+    thread: "无法添加对话",
+  },
+  attachmentLimitText: {
+    /** Formats maximum for display. */
+    maximum: (count: number) => `每条消息最多可附加${count}个文件。`,
+  },
+  machineSelectorUi: {
+    add: "添加到另一台机器",
+  },
 };

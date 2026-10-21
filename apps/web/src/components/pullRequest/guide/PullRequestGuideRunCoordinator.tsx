@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { useNavigate } from "@tanstack/react-router";
 import { CircleAlertIcon, CircleCheckIcon } from "lucide-react";
 import { useEffect, useRef } from "react";
@@ -64,7 +65,7 @@ function GuideRunWatcher({ runKey, watch }: { runKey: string; watch: GuideRunWat
     const looking = document.visibilityState === "visible" && document.hasFocus();
     if (looking && store.shownKey === runKey) return;
 
-    const title = failure === null ? "Review guide ready" : "Review guide failed";
+    const title = failure === null ? t.git.guideRunUi.ready : t.git.guideRunUi.failed;
     const body = watch.title ?? `${watch.reference.repository} #${watch.reference.number}`;
     const open = () => {
       useGuideRunStore.getState().requestOpen(runKey);
@@ -101,7 +102,7 @@ function GuideRunWatcher({ runKey, watch }: { runKey: string; watch: GuideRunWat
             ),
         },
         actionProps: {
-          children: "Open guide",
+          children: t.git.guideRunUi.open,
           onClick: () => {
             toastManager.close(toastId);
             open();

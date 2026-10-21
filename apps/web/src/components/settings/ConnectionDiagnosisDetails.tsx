@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { useAtomValue } from "@effect/atom-react";
 import {
   AVAILABLE_CONNECTION_STATE,
@@ -60,7 +61,12 @@ export function ConnectionDiagnosisHeadline({
 }
 
 const HOP_MARK = { ok: "✓", failed: "✕", unchecked: "–" } as const;
-const HOP_NOTE = { ok: "", failed: "Failed", unchecked: "Not checked" } as const;
+/** Reads the current dictionary on each call so labels follow language changes. */
+const hopNote = () => ({
+  ok: "",
+  failed: t.settings.diagnosisUi.failed,
+  unchecked: t.settings.diagnosisUi.unchecked,
+});
 
 /** Ticks once per second, and only while a retry is scheduled, so the list around it does not re-render. */
 function RetryCountdown({ retryAt }: { readonly retryAt: number }) {
@@ -71,7 +77,9 @@ function RetryCountdown({ retryAt }: { readonly retryAt: number }) {
     return () => clearInterval(timer);
   }, [retryAt]);
   const seconds = Math.ceil((retryAt - now) / 1_000);
-  return <>{seconds > 0 ? `retrying in ${seconds}s` : "retrying"}</>;
+  return (
+    <>{seconds > 0 ? t.settings.diagnosisText.retry(seconds) : t.settings.diagnosisUi.retrying}</>
+  );
 }
 
 /** The collapsed failure: the full headline, then the retry state and a Details toggle. */
@@ -94,7 +102,7 @@ export function ConnectionDiagnosisSummary({
       <p className="flex flex-wrap items-center gap-1 text-muted-foreground">
         {retryAt !== null ? <RetryCountdown retryAt={retryAt} /> : null}
         {retryAt !== null && attempt > 0 ? <span aria-hidden>·</span> : null}
-        {attempt > 0 ? <span>attempt {attempt}</span> : null}
+        {attempt > 0 ? <span>{t.settings.diagnosisText.attempt(attempt)}</span> : null}
         {retryAt !== null || attempt > 0 ? <span aria-hidden>·</span> : null}
         <button
           type="button"
@@ -102,7 +110,7 @@ export function ConnectionDiagnosisSummary({
           onClick={onToggle}
           className="inline-flex items-center gap-0.5 rounded-sm outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring"
         >
-          Details
+          {t.settings.diagnosisUi.details}
           <ChevronRightIcon
             aria-hidden
             className={cn(
@@ -129,13 +137,13 @@ export function ConnectionDiagnosisPanel({
   readonly onAddRoute: (() => void) | null;
 }) {
   const { copyToClipboard } = useCopyToClipboard({
-    target: "connection diagnostics",
-    onCopy: () => toastManager.add({ type: "success", title: "Diagnostics copied" }),
+    target: t.settings.diagnosisUi.target,
+    onCopy: () => toastManager.add({ type: "success", title: t.settings.diagnosisUi.copied }),
     onError: (error) =>
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Could not copy diagnostics",
+          title: t.settings.diagnosisUi.copyFailed,
           description: error.message,
         }),
       ),
@@ -155,12 +163,12 @@ export function ConnectionDiagnosisPanel({
               {HOP_MARK[hop.result]}
             </span>
             <span className={cn(hop.result === "ok" && "text-foreground")}>{hop.label}</span>
-            <span>{HOP_NOTE[hop.result]}</span>
+            <span>{hopNote()[hop.result]}</span>
           </li>
         ))}
       </ol>
       <div>
-        <p className="font-medium text-foreground">What to try</p>
+        <p className="font-medium text-foreground">{t.settings.diagnosisUi.try}</p>
         <ol className="list-decimal pl-4 text-muted-foreground">
           {diagnosis.steps.map((step) => (
             <li key={step}>{step}</li>
@@ -173,7 +181,7 @@ export function ConnectionDiagnosisPanel({
             rel="noreferrer"
             className="text-muted-foreground underline underline-offset-2 hover:text-foreground"
           >
-            More info
+            {t.settings.diagnosisUi.more}
           </a>
         ) : null}
       </div>
@@ -187,7 +195,7 @@ export function ConnectionDiagnosisPanel({
       </dl>
       <div className="flex flex-wrap gap-2">
         <Button type="button" size="xs" variant="outline" onClick={onRetry}>
-          Retry now
+          {t.settings.diagnosisUi.retry}
         </Button>
         <Button
           type="button"
@@ -198,11 +206,11 @@ export function ConnectionDiagnosisPanel({
             copyToClipboard(text, undefined);
           }}
         >
-          Copy diagnostics
+          {t.settings.diagnosisUi.copy}
         </Button>
         {onAddRoute ? (
           <Button type="button" size="xs" variant="outline" onClick={onAddRoute}>
-            Add direct route
+            {t.settings.diagnosisUi.direct}
           </Button>
         ) : null}
       </div>

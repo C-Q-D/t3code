@@ -430,4 +430,17 @@ export const composer = {
     booleanLabel: (label: string, enabled: boolean) => `${label} ${enabled ? "On" : "Off"}`,
     reasoning: "Reasoning",
   },
+  attachmentErrors: {
+    limit: "The attachment limit has been reached.",
+    folder: "Unable to add folder",
+    loadingThread: "Loading thread context…",
+    thread: "Unable to add thread",
+  },
+  attachmentLimitText: {
+    /** Formats maximum for display. */
+    maximum: (count: number) => `You can attach up to ${count} files per message.`,
+  },
+  machineSelectorUi: {
+    add: "Add to another machine",
+  },
 };

@@ -487,7 +487,7 @@ export function resolveFeatureBranchUnavailableReason(input: {
   hasWorkingTreeChanges: boolean;
 }): string | null {
   if (input.hasWorkingTreeChanges) return null;
-  return `There are no changes to commit, so a feature branch can't be named. Create a branch yourself or continue on ${input.branchName}.`;
+  return t.git.featureBranchText.empty(input.branchName);
 }
 
 export function resolveThreadBranchUpdate(

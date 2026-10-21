@@ -1139,4 +1139,44 @@ export const tools: Messages["tools"] = {
     /** Formats display text from status supplied by the caller. */
     loadTrampolineFailed: (status) => `无法加载libghostty-vt PTY跳板（${status}）`,
   },
+  promptCommandsUi: {
+    copy: "复制提示词链接",
+    copyContext: "复制包含仓库和模型的提示词链接",
+    device: "此设备",
+    gitUrl: "Git网址",
+  },
+  filePathUi: {
+    label: "文件路径",
+  },
+  browserDocumentUi: {
+    pdf: "PDF文档",
+  },
+  deviceWarningUi: {
+    dismiss: "关闭设备警告",
+    discovery: "设备发现警告·",
+  },
+  deviceStreamUi: {
+    ios: "iOS模拟器",
+    android: "Android模拟器",
+  },
+  deviceLocationsUi: {
+    london: "伦敦",
+    stockholm: "斯德哥尔摩",
+    tokyo: "东京",
+    sanFrancisco: "旧金山",
+    newYork: "纽约",
+  },
+  easDeviceSetupText: {
+    /** Formats hint for display. */
+    hint: (label: string) => `${label}使用EAS Simulator在云端启动iOS模拟器。`,
+  },
+  recordingFailureText: {
+    /** Formats source for display. */
+    source: (name: string, message: string) =>
+      `无法启动预览视频源。请确认采集主机已解锁且显示器已开启，然后重试。${name}：${message}`,
+  },
+  missingProjectFileText: {
+    /** Formats missing for display. */
+    missing: (path: string | null) => `“${path}”不存在。`,
+  },
 };

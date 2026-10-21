@@ -336,4 +336,92 @@ export const sidebar = {
     minutes: (minutes: number) => `${minutes}m`,
     now: "now",
   },
+  updateRunUi: {
+    everythingFailed: "Could not update everything",
+    notConnected: "not connected",
+    noPermission: "no permission",
+    alreadyUpdating: "already updating",
+    manual: "needs a manual update",
+    newerDesktop: "needs a newer desktop app",
+    failed: "Update failed",
+    desktopUpdate: "desktop app update",
+    thisApp: "this app",
+    thisAppTitle: "This app",
+    afterServers: "restarts after the servers",
+    later: "Later",
+    restart: "Restart to update",
+    startFailed: "Could not start the update",
+    notApplied: "Update did not apply",
+  },
+  updateRunText: {
+    /** Formats channel for display. */
+    channel: (channel: string) => `on the ${channel} channel`,
+    /** Formats restartIn for display. */
+    restartIn: (seconds: number) => `Restart in ${seconds}s`,
+    /** Formats localRestartIn for display. */
+    localRestartIn: (seconds: number) => `restarts in ${seconds}s`,
+    /** Formats updatedCount for display. */
+    updatedCount: (done: number, total: number) => `${done} of ${total} updated`,
+    /** Formats downloading for display. */
+    downloading: (percent: number | null) =>
+      `Downloading${percent === null ? "" : ` ${Math.floor(percent)}%`}`,
+    /** Formats localDownloading for display. */
+    localDownloading: (percent: number | null) =>
+      `downloading${percent === null ? "" : ` ${Math.floor(percent)}%`}`,
+    /** Formats failedMachine for display. */
+    failedMachine: (label: string) => `${label} failed`,
+    /** Formats failedCount for display. */
+    failedCount: (count: number) => `${count} failed`,
+    /** Formats appFailure for display. */
+    appFailure: (failure: string) => `This app: ${failure}`,
+    /** Formats stillRestarting for display. */
+    stillRestarting: (labels: string, count: number) =>
+      `${labels} ${count === 1 ? "is" : "are"} still restarting.`,
+    /** Formats updated for display. */
+    updated: (labels: string) => `Updated ${labels}`,
+    /** Formats update for display. */
+    update: (labels: string) => `Update ${labels}`,
+    /** Formats count for display. */
+    count: (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`,
+    /** Formats list for display. */
+    list: (parts: ReadonlyArray<string>) =>
+      parts.length <= 2
+        ? parts.join(" and ")
+        : `${parts.slice(0, -1).join(", ")}, and ${parts.at(-1)}`,
+    /** Formats serverVersion for display. */
+    serverVersion: (version: string) => `server to ${version}`,
+    /** Formats appVersion for display. */
+    appVersion: (version: string) => `This app: ${version}, restarts last`,
+    /** Formats running for display. */
+    running: (count: number) => `${count} running ${count === 1 ? "thread" : "threads"}`,
+    /** Formats resumeAll for display. */
+    resumeAll: (threads: string) =>
+      `${threads} will be interrupted and can resume after the restart.`,
+    /** Formats interrupt for display. */
+    interrupt: (threads: string) => `${threads} will be interrupted.`,
+    /** Formats resumeSome for display. */
+    resumeSome: (threads: string, count: number) =>
+      `${threads} will be interrupted. ${count} can resume after the restart.`,
+    /** Formats skips for display. */
+    skips: (label: string, reason: string) => `Skips ${label}: ${reason}`,
+    /** Formats timeout for display. */
+    timeout: (minutes: number) => `Not back after ${minutes} minutes`,
+    /** Formats notApplied for display. */
+    notApplied: (current: string, target: string) =>
+      `T3 Code is still on ${current}. Install ${target} again from the update button.`,
+    /** Formats minutes for display. */
+    minutes: (count: number) => `${count}m`,
+  },
+  updateStatusUi: {
+    providers: "updating providers",
+    waiting: "waiting",
+    downloading: "downloading",
+    restarting: "restarting",
+    done: "done",
+    failed: "failed",
+    lessMinute: "<1m",
+  },
+  providerUpdateInterruptedUi: {
+    interrupted: "Provider update interrupted",
+  },
 };

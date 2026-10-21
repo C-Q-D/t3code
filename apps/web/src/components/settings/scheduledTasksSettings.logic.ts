@@ -141,16 +141,19 @@ export function webhookDeliveryLabel(delivery: {
   readonly outcome: string;
   readonly pendingWindow?: boolean | undefined;
 }) {
-  if (delivery.outcome === "accepted") return delivery.pendingWindow ? "Opened window" : "Ran";
+  if (delivery.outcome === "accepted")
+    return delivery.pendingWindow
+      ? t.settings.scheduledTasks.deliveries.openedWindow
+      : t.settings.scheduledTasks.runStatuses.succeeded;
   const labels: Record<string, string> = {
-    dispatch_failed: "Run failed",
-    duplicate: "Duplicate",
-    coalesced: "Coalesced",
-    filtered: "Filtered",
-    rejected_signature: "Bad signature",
-    disabled: "Task paused",
-    rate_limited: "Rate limited",
-    expired: "Too old",
+    dispatch_failed: t.settings.scheduledTasks.runStatuses.failed,
+    duplicate: t.settings.deliveryOutcomeUi.duplicate,
+    coalesced: t.settings.deliveryOutcomeUi.coalesced,
+    filtered: t.settings.deliveryOutcomeUi.filtered,
+    rejected_signature: t.settings.deliveryOutcomeUi.signature,
+    disabled: t.settings.deliveryOutcomeUi.paused,
+    rate_limited: t.settings.deliveryOutcomeUi.limited,
+    expired: t.settings.deliveryOutcomeUi.expired,
   };
   return labels[delivery.outcome] ?? delivery.outcome.replaceAll("_", " ");
 }
