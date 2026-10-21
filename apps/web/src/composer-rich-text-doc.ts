@@ -1362,7 +1362,21 @@ export function serializeSelection(doc: ProseMirrorNode, from: number, to: numbe
   return serializeEditorDoc(doc.type.create(null, content)).value;
 }
 
+// ProseMirror docs are immutable, so a doc's map never goes stale. One keystroke
+// fires both the update and selection-update handlers, and caret moves reuse
+// the doc, so caching keeps a long draft from being re-walked on each of them.
+const serializedDocMaps = new WeakMap<ProseMirrorNode, RichDocMap>();
+
+/** Returns a map shared by every caller serializing the same doc; callers must not mutate it. */
 export function serializeEditorDoc(doc: ProseMirrorNode): RichDocMap {
+  const cached = serializedDocMaps.get(doc);
+  if (cached) return cached;
+  const map = buildEditorDocMap(doc);
+  serializedDocMaps.set(doc, map);
+  return map;
+}
+
+function buildEditorDocMap(doc: ProseMirrorNode): RichDocMap {
   const acc: RichAccumulator = { runs: [], value: "", flat: 0, md: 0 };
   const blocks: ProseMirrorNode[] = [];
   doc.content.forEach((node) => {
