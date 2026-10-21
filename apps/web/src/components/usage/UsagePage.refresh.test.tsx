@@ -32,7 +32,10 @@ vi.mock("@tanstack/react-router", () => ({
 }));
 vi.mock("../../state/presentation", () => ({
   environmentPresentations: { presentationsAtom: null },
+  useEnvironmentPresentation: () => ({ presentation: null }),
 }));
+// These refresh scenarios do not grant live diagnostics; the real resource card stays unmounted.
+vi.mock("../../state/session", () => ({ useEnvironmentScope: () => false }));
 vi.mock("../../state/server", () => ({
   serverEnvironment: { refreshProviders: null },
   primaryServerKeybindingsAtom: "keybindings",
