@@ -1,6 +1,5 @@
 /** Shared-clock presentation for the hero and strip; no frame values enter React state. */
-import { useLayoutEffect, useRef, useState } from "react";
-import { useAnimatedNumber } from "~/hooks/useAnimatedNumber";
+import { useLayoutEffect, useRef } from "react";
 import { usePhysicsMotion } from "~/hooks/usePhysicsMotion";
 import { useMotionJob } from "~/lib/motion/react";
 import { Spring } from "~/lib/motion/spring";
@@ -46,8 +45,9 @@ export function useUsageEntrance(delaySeconds: number) {
 
 /**
  * Displays a finite value with the page formatter and an accessible final value.
- * One mount update seeds the existing number hook at zero; subsequent updates retain its spring.
- * Only this mount flag uses state, never the per-frame numeric value.
+ * A ref-owned spring starts at zero and retains position across target changes.
+ * Unlike the shared number hook's immediate mount, this entrance needs no React state update.
+ * Physics disabled writes the target immediately; unmount releases the shared-clock job.
  */
 export function UsageAnimatedValue({
   value,
@@ -59,9 +59,45 @@ export function UsageAnimatedValue({
   readonly className?: string;
 }) {
   const ref = useRef<HTMLSpanElement>(null);
-  const [mounted, setMounted] = useState(false);
-  useAnimatedNumber(ref, mounted ? value : 0, format);
-  useLayoutEffect(() => setMounted(true), []);
+  const springRef = useRef<Spring | null>(null);
+  const { enabled } = usePhysicsMotion();
+  const { start, stop } = useMotionJob();
+  useLayoutEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    if (!Number.isFinite(value)) {
+      springRef.current = null;
+      element.textContent = "—";
+      return stop;
+    }
+    // Sub-cent precision keeps small USD totals animated without rounding their final value.
+    const spring = springRef.current ?? new Spring({ token: TOKENS.snap, precision: 0.005 });
+    springRef.current = spring;
+    spring.target = value;
+    const direction = Math.sign(value - spring.value);
+    if (spring.velocity * direction < 0) spring.velocity = 0;
+    if (!enabled || direction === 0) {
+      spring.jump(value);
+      element.textContent = format(value);
+      return stop;
+    }
+    element.textContent = format(spring.value);
+    start((dt) => {
+      const previous = spring.value;
+      const moving = spring.step(dt);
+      // Numeric readouts must not overshoot or briefly move away after a target reversal.
+      if (!moving || (value - spring.value) * direction <= 0) {
+        spring.jump(value);
+        element.textContent = format(value);
+        return false;
+      }
+      spring.value =
+        direction > 0 ? Math.max(previous, spring.value) : Math.min(previous, spring.value);
+      element.textContent = format(spring.value);
+      return true;
+    });
+    return stop;
+  }, [value, format, enabled, start, stop]);
   return (
     <span className={className}>
       <span ref={ref} aria-hidden />
