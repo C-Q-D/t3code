@@ -77,6 +77,7 @@ export function UsageHeroCard({
         <UsageAnimatedValue
           value={stats.total}
           format={format}
+          unit={metric}
           className={cn(
             "usage-lux-total font-serif font-bold tabular-nums",
             figureClass(loading.partial),

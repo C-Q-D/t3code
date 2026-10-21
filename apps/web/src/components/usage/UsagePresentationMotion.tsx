@@ -4,6 +4,7 @@ import { usePhysicsMotion } from "~/hooks/usePhysicsMotion";
 import { useMotionJob } from "~/lib/motion/react";
 import { Spring } from "~/lib/motion/spring";
 import { TOKENS } from "~/lib/motion/tokens";
+import type { UsageChartMetric } from "./UsageProviderChart";
 
 /**
  * Returns the section ref for a one-time 18px spring entrance after delaySeconds.
@@ -48,18 +49,22 @@ export function useUsageEntrance(delaySeconds: number) {
  * A ref-owned spring starts at zero and retains position across target changes.
  * Unlike the shared number hook's immediate mount, this entrance needs no React state update.
  * Physics disabled writes the target immediately; unmount releases the shared-clock job.
+ * Changing optional unit jumps to the new value before paint; omitted unit means a fixed measure.
  */
 export function UsageAnimatedValue({
   value,
   format,
   className,
+  unit,
 }: {
   readonly value: number;
   readonly format: (value: number) => string;
   readonly className?: string;
+  readonly unit?: UsageChartMetric;
 }) {
   const ref = useRef<HTMLSpanElement>(null);
   const springRef = useRef<Spring | null>(null);
+  const unitRef = useRef(unit);
   const { enabled } = usePhysicsMotion();
   const { start, stop } = useMotionJob();
   useLayoutEffect(() => {
@@ -73,10 +78,13 @@ export function UsageAnimatedValue({
     // Sub-cent precision keeps small USD totals animated without rounding their final value.
     const spring = springRef.current ?? new Spring({ token: TOKENS.snap, precision: 0.005 });
     springRef.current = spring;
+    const unitChanged = unitRef.current !== unit;
+    unitRef.current = unit;
     spring.target = value;
     const direction = Math.sign(value - spring.value);
     if (spring.velocity * direction < 0) spring.velocity = 0;
-    if (!enabled || direction === 0) {
+    // A magnitude from the previous unit cannot be interpolated or painted in the new unit.
+    if (!enabled || unitChanged || direction === 0) {
       spring.jump(value);
       element.textContent = format(value);
       return stop;
@@ -97,7 +105,7 @@ export function UsageAnimatedValue({
       return true;
     });
     return stop;
-  }, [value, format, enabled, start, stop]);
+  }, [value, format, unit, enabled, start, stop]);
   return (
     <span className={className}>
       <span ref={ref} aria-hidden />

@@ -9,6 +9,10 @@ import { setPhysicsEnabled } from "~/lib/motion/preference";
 import { installTestRaf } from "~/lib/motion/testRaf";
 import { UsageChartBars } from "./UsageChartBars";
 import { UsageAnimatedValue, useUsageEntrance } from "./UsagePresentationMotion";
+import { USAGE_CONTRACT_VERSION } from "@t3tools/contracts";
+import { mergeUsage } from "@t3tools/shared/usageMerge";
+import { UsageHeroCard } from "./UsageHeroCard";
+import type { UsageChartMetric } from "./UsageProviderChart";
 
 // Replace settings hydration only. Preference notifications, springs and the scheduler remain real.
 vi.mock("~/hooks/usePhysicsMotion", async () => {
@@ -92,6 +96,65 @@ function expectIdle() {
   frames(5);
   expect(clock.request.mock.calls.length).toBe(requested);
 }
+
+/** Mount the real hero with one selected day; costs and tokens deliberately differ in scale. */
+function hero(metric: UsageChartMetric, costUsd = 10, totalTokens = 1_000_000) {
+  const day = "2026-08-01";
+  const merged = {
+    ...mergeUsage([], USAGE_CONTRACT_VERSION),
+    costUsd,
+    totalTokens,
+    daily: [
+      {
+        day,
+        costUsd,
+        totalTokens,
+        byProvider: new Map([["codex" as const, { costUsd, totalTokens }]]),
+      },
+    ],
+  };
+  return (
+    <UsageHeroCard
+      metric={metric}
+      merged={merged}
+      loading={{ partial: false, everyProvider: false, providers: new Set() }}
+      activeProviders={["codex"]}
+      providersWithData={["codex"]}
+      days={[day]}
+      hours={[]}
+      resolution="day"
+      timeZone="UTC"
+      referenceTime={undefined}
+      windowLabel={day}
+    />
+  );
+}
+
+it.each<[UsageChartMetric, UsageChartMetric, string, string, string]>([
+  ["tokens", "cost", "1M", "$10.00", "$20.00"],
+  ["cost", "tokens", "$10.00", "1M", "2M"],
+])(
+  "hero switches %s to %s immediately but still animates updates in the same unit",
+  (from, to, initial, switched, updated) => {
+    render(hero(from));
+    frames(180);
+    const read = () => host.querySelector('.usage-lux-total [aria-hidden="true"]')!.textContent;
+    expect(read()).toBe(initial);
+    render(hero(to));
+    // No frame has advanced: the old magnitude must never be formatted in the new unit.
+    expect(read()).toBe(switched);
+    frames(1);
+    expect(read()).toBe(switched);
+    render(hero(to, 20, 2_000_000));
+    expect(read()).toBe(switched);
+    frames(1);
+    expect(read()).not.toBe(switched);
+    expect(read()).not.toBe(updated);
+    frames(180);
+    expect(read()).toBe(updated);
+    expectIdle();
+  },
+);
 
 it("grows first-mount bars from zero to their exact scaled heights and releases the clock", () => {
   render(bars([40, 20]));
