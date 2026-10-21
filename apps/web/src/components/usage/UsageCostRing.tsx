@@ -33,7 +33,6 @@ export function UsageCostRing({
 }) {
   const id = useId();
   const svg = useRef<SVGSVGElement>(null);
-  const number = useRef<HTMLSpanElement>(null);
   const [hovered, setHovered] = useState<string | null>(null);
   const [focused, setFocused] = useState<string | null>(null);
   const active = hovered ?? focused;
@@ -46,12 +45,6 @@ export function UsageCostRing({
   const selected = segments.find((segment) => segment.color === active);
   const value = selected?.value ?? total;
   const format = metric === "cost" ? formatUsd : formatTokens;
-  useAnimatedNumber(
-    number,
-    metric === "cost" ? value * 100 : value,
-    metric === "cost" ? formatCents : formatTokens,
-  );
-
   useLayoutEffect(() => {
     const state = motion.current ?? {
       sweep: new Spring({
@@ -168,9 +161,7 @@ export function UsageCostRing({
         </svg>
         <div className="usage-cost-ring-center" aria-hidden="true">
           <span>{selected?.label ?? t.tools.usage.total}</span>
-          <span ref={number} className="usage-cost-ring-value font-serif">
-            {format(value)}
-          </span>
+          <RingValue key={metric} metric={metric} value={value} />
           <span className="usage-cost-ring-caption">
             {selected
               ? formatPercent(selected.fraction)
@@ -205,5 +196,26 @@ export function UsageCostRing({
         ))}
       </div>
     </div>
+  );
+}
+
+/** Owns one metric's numeric spring; remounting on unit changes prevents cents/token carryover. */
+function RingValue({
+  metric,
+  value,
+}: {
+  readonly metric: "cost" | "tokens";
+  readonly value: number;
+}) {
+  const number = useRef<HTMLSpanElement>(null);
+  useAnimatedNumber(
+    number,
+    metric === "cost" ? value * 100 : value,
+    metric === "cost" ? formatCents : formatTokens,
+  );
+  return (
+    <span ref={number} className="usage-cost-ring-value font-serif">
+      {metric === "cost" ? formatUsd(value) : formatTokens(value)}
+    </span>
   );
 }
