@@ -151,13 +151,13 @@ function PreviewPanelShellFrame(
         isInline ? (maximized ? "flex-1" : "shrink-0") : "w-full",
         isInline && !props.standalone && "border-l border-border",
         isInline && props.standalone && open && !maximized && "ms-(--frame-slab-gap)",
+        // The standalone slab animates too, so the chat slab gives way frame by frame
+        // instead of being squeezed the instant the panel mounts at full width.
         collapsible &&
-          !props.standalone &&
-          "[[data-panel-animations=true]_&]:transition-[width] [[data-panel-animations=true]_&]:duration-(--panel-animation-duration) [[data-panel-animations=true]_&]:ease-(--panel-animation-easing)",
+          "[[data-panel-animations=true]_&]:transition-[width,margin-inline-start] [[data-panel-animations=true]_&]:duration-(--panel-animation-duration) [[data-panel-animations=true]_&]:ease-(--panel-animation-easing)",
         collapsible &&
-          !props.standalone &&
           open &&
-          "[[data-panel-animations=true]_&]:starting:w-0!",
+          "[[data-panel-animations=true]_&]:starting:w-0! [[data-panel-animations=true]_&]:starting:ms-0!",
         collapsible && !open && "pointer-events-none",
         collapsible && !open && props.standalone && "invisible",
       )}

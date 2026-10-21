@@ -87,17 +87,16 @@ html[data-theme-id="graphite"] [data-frame-main] {
 }
 
 /* Keep the existing 768px sheet breakpoint until FR3 replaces it. max-content
-   follows sidebar-gap's drag width, without restyling the entire app each frame. */
+   follows sidebar-gap's drag width, without restyling the entire app each frame.
+   The three tracks stay while collapsed: the hidden sidebar leaves its track at 0,
+   so main follows the gap frame by frame on exit as well as entry. Swapping to a
+   two-track list cannot interpolate and froze the column until exit finished. */
 @media (min-width: 768px) {
   .window-frame-workspace[data-sidebar-inline="true"] {
     grid-template-columns: var(--frame-projectbar-width) max-content minmax(0, 1fr);
     /* Put the first gutter on the collapsing sidebar and the second on main.
        Main's gutter remains when the sidebar disappears, without a 16px jump. */
     column-gap: 0;
-  }
-
-  .window-frame-workspace[data-sidebar-inline="true"][data-sidebar-collapsed="true"] {
-    grid-template-columns: var(--frame-projectbar-width) minmax(0, 1fr);
   }
 
   .window-frame-workspace[data-sidebar-inline="true"] > .window-frame-main {
@@ -137,13 +136,8 @@ html[data-theme-id="graphite"] [data-frame-main] {
   }
 
   /* Reuse the gap's existing width transition and panel animation gate. Display
-     stays rendered through exit; the track list changes only when exit finishes.
-     On entry the three tracks return immediately while starting-style seeds zero width. */
-  [data-app-shell][data-panel-animations="true"]
-    .window-frame-workspace[data-sidebar-inline="true"][data-sidebar-collapsed="true"] {
-    transition: grid-template-columns var(--panel-animation-duration) step-end allow-discrete;
-  }
-
+     stays rendered through exit so the sidebar track shrinks with the gap; on
+     entry starting-style seeds zero width. */
   [data-app-shell][data-panel-animations="true"] .window-frame-workspace > [data-variant="frame"] {
     transition:
       display var(--panel-animation-duration) allow-discrete,
@@ -184,9 +178,6 @@ html[data-theme-id="graphite"] [data-frame-main] {
   /* The hook normally closes the animation gate too; this covers a preference
      change immediately, including a transition already running in the renderer. */
   @media (prefers-reduced-motion: reduce) {
-    :where(:root:not([data-physics="on"]))
-      [data-app-shell][data-panel-animations="true"]
-      .window-frame-workspace[data-sidebar-inline="true"][data-sidebar-collapsed="true"],
     :where(:root:not([data-physics="on"]))
       [data-app-shell][data-panel-animations="true"]
       .window-frame-workspace
