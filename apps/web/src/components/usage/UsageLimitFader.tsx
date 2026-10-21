@@ -44,6 +44,7 @@ export function UsageLimitFader({
   useEffect(() => {
     const current = motion.current ?? new FaderMotion();
     motion.current = current;
+    current.configure(enabled, usedPercent);
     if (!enabled) {
       stop();
       const active = pointer.current;
@@ -63,12 +64,11 @@ export function UsageLimitFader({
     return stop;
   }, [animate, enabled, index, paint, stop, usedPercent]);
 
-  const release = () => {
+  const release = (event: { type: string }) => {
     if (!pointer.current) return;
     pointer.current = null;
     if (!enabled) return;
-    motion.current?.release(usedPercent);
-    animate();
+    if (motion.current?.pointer(event.type, usedPercent)) animate();
   };
   return (
     <div className="usage-fader">
@@ -102,13 +102,17 @@ export function UsageLimitFader({
             const rect = host.current?.getBoundingClientRect();
             if (!rect || !motion.current) return;
             stop();
+            motion.current.pointer("pointerdown", usedPercent);
             pointer.current = { id: event.pointerId, bottom: rect.bottom, height: rect.height };
             event.currentTarget.setPointerCapture(event.pointerId);
           }}
           onPointerMove={(event) => {
             const drag = pointer.current;
             if (!enabled || !drag || drag.id !== event.pointerId || !motion.current) return;
-            motion.current.drag(((drag.bottom - event.clientY) / drag.height) * 100);
+            motion.current.pointer(
+              "pointermove",
+              ((drag.bottom - event.clientY) / drag.height) * 100,
+            );
             paint(motion.current.spring.value);
           }}
           onPointerUp={release}

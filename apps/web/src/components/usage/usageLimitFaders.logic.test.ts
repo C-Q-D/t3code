@@ -2,7 +2,7 @@
 import { ProviderDriverKind, type ServerProviderUsageWindow } from "@t3tools/contracts";
 import { collectLimitPools, type LimitAccount } from "@t3tools/shared/usageLimits";
 import { expect, it } from "vite-plus/test";
-import { limitFaderGroups } from "./usageLimitFaders.logic";
+import { limitFaderGroups, resetCreditAction, limitExtraCards } from "./usageLimitFaders.logic";
 
 const session: ServerProviderUsageWindow = {
   id: "session",
@@ -97,6 +97,7 @@ it("omits missing windows and keeps exactly five real samples uncollapsed", () =
     [["a", "b"], ["a", "b"], ["a"]],
   );
   expect(result[2]!.sharedRemaining).toBeNull();
+  expect(result.map((group) => group.showWindowTitle)).toEqual([true, true, true]);
 });
 
 it("uses Cursor display order and excludes its redundant total window", () => {
@@ -108,4 +109,52 @@ it("uses Cursor display order and excludes its redundant total window", () => {
   const result = groups([{ ...source, driver: ProviderDriverKind.make("cursor") }]);
   expect(result.map((group) => group.window.id)).toEqual(["autoPercentUsed", "apiPercentUsed"]);
   expect(result.map((group) => group.faders.length)).toEqual([1, 1]);
+});
+
+it.each([
+  { counts: [0, 0], expected: { kind: "hidden" } },
+  { counts: [0, 2], expected: { kind: "confirm", key: "b", count: 2 } },
+  { counts: [0, 2, 3], expected: { kind: "details", key: "b", count: 5 } },
+])("routes header reset credits for $counts", ({ counts, expected }) => {
+  const accounts = counts.map((count, index) => {
+    const source = account(["a", "b", "c"][index]!, [session]);
+    return { ...source, limits: { ...source.limits, resetCredits: { availableCount: count } } };
+  });
+  const action = resetCreditAction(accounts);
+  expect(
+    action.kind === "hidden"
+      ? action
+      : { kind: action.kind, key: action.account.key, count: action.count },
+  ).toEqual(expected);
+});
+
+it("merges the ChatGPT sharing destination and repeated notices without dropping other cards", () => {
+  expect(
+    limitExtraCards(
+      ["Read failed", "Read failed"],
+      ["desktop"],
+      [
+        { url: "https://chatgpt.com/#settings/Usage", label: "ChatGPT" },
+        { url: "https://example.com/usage", label: "Other" },
+      ],
+      { url: "https://chatgpt.com/#settings/Usage", label: "Shared usage" },
+    ),
+  ).toEqual([
+    { kind: "notice", notice: "Read failed" },
+    { kind: "cursor", environments: ["desktop"] },
+    { kind: "link", link: { url: "https://chatgpt.com/#settings/Usage", label: "Shared usage" } },
+    { kind: "link", link: { url: "https://example.com/usage", label: "Other" } },
+  ]);
+});
+
+it("returns no cards when all notice sources are empty", () => {
+  expect(limitExtraCards([], [], [], null)).toEqual([]);
+});
+
+it("keeps sharing reachable when no provider supplies an external link", () => {
+  expect(
+    limitExtraCards([], [], [], { url: "https://chatgpt.com/#settings/Usage", label: "Shared" }),
+  ).toEqual([
+    { kind: "link", link: { url: "https://chatgpt.com/#settings/Usage", label: "Shared" } },
+  ]);
 });

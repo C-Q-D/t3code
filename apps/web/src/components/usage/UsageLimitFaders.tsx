@@ -25,7 +25,7 @@ import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
 import { useLimitPresentations, useResetCredit, ResetCreditDialog } from "./UsageLimits";
 import { AccountName, SegmentPopover } from "./UsageLimitsPooled";
 import { UsageLimitFader, FaderPercentage } from "./UsageLimitFader";
-import { limitFaderGroups } from "./usageLimitFaders.logic";
+import { limitFaderGroups, resetCreditAction } from "./usageLimitFaders.logic";
 import { PROVIDER_PRESENTATION } from "./usageProviders";
 
 /** Selected environments and visible providers filter limits; now advances on refresh only. */
@@ -109,18 +109,13 @@ function ProviderFaderCard({ pool, now }: { readonly pool: LimitPool; readonly n
   const selection = selected && selectedWindow ? { ...selected, window: selectedWindow } : null;
   const [resetRequest, setResetRequest] = useState<{ key: string; sequence: number } | null>(null);
   const timestampFormat = usePrimarySettings((settings) => settings.timestampFormat);
-  const credited = pool.accounts.filter(
-    (account) => (account.limits.resetCredits?.availableCount ?? 0) > 0,
-  );
-  const firstCredit = credited[0];
+  const creditAction = resetCreditAction(pool.accounts);
+  const firstCredit = creditAction.kind === "hidden" ? undefined : creditAction.account;
   const canReset = useEnvironmentScope(
     firstCredit?.redeem?.environmentId ?? null,
     AuthProvidersManageScope,
   );
-  const credits = credited.reduce(
-    (sum, account) => sum + (account.limits.resetCredits?.availableCount ?? 0),
-    0,
-  );
+  const credits = creditAction.kind === "hidden" ? 0 : creditAction.count;
   const presentation = Object.values(PROVIDER_PRESENTATION).find(
     (entry) => entry.driverKind === pool.driver,
   );
@@ -139,7 +134,7 @@ function ProviderFaderCard({ pool, now }: { readonly pool: LimitPool; readonly n
     );
     if (!window) return;
     setSelection({ window, accountKey: firstCredit.key });
-    if (credited.length === 1) {
+    if (creditAction.kind === "confirm") {
       setOpen(false);
       setResetRequest((previous) => ({
         key: firstCredit.key,
@@ -175,7 +170,7 @@ function ProviderFaderCard({ pool, now }: { readonly pool: LimitPool; readonly n
           )}
           <h3>{label}</h3>
           {credits > 0 ? (
-            credited.length === 1 ? (
+            creditAction.kind === "confirm" ? (
               <button
                 type="button"
                 className="usage-fader-credit"
@@ -219,9 +214,9 @@ function ProviderFaderCard({ pool, now }: { readonly pool: LimitPool; readonly n
             return (
               <div className="usage-fader-group" key={`${group.window.kind}:${group.window.id}`}>
                 <div className="usage-fader-group-heading">
+                  {group.showWindowTitle ? <span>{windowLabel}</span> : null}
                   {group.sharedRemaining !== null ? (
                     <>
-                      <span>{windowLabel}</span>
                       <span>
                         <FaderPercentage value={group.sharedRemaining} shared />{" "}
                         {t.tools.usage.faderSharedRemaining}
@@ -243,7 +238,7 @@ function ProviderFaderCard({ pool, now }: { readonly pool: LimitPool; readonly n
                         index={index++}
                         resetLabel={shortReset(reset, now)}
                         label={t.tools.usage.faderSummary(
-                          name,
+                          fader.nameSource === "account" ? `${name} · ${windowLabel}` : name,
                           fader.remainingPercent,
                           reset === undefined
                             ? ""

@@ -3,6 +3,7 @@ import {
   displayLimitWindows,
   remainingPercent,
   type LimitPool,
+  type LimitAccount,
   type LimitPoolWindow,
 } from "@t3tools/shared/usageLimits";
 
@@ -21,6 +22,7 @@ export interface LimitFader {
 export interface LimitFaderGroup {
   readonly window: LimitPoolWindow;
   readonly sharedRemaining: number | null;
+  readonly showWindowTitle: boolean;
   readonly faders: readonly LimitFader[];
 }
 
@@ -41,6 +43,7 @@ export function limitFaderGroups(pool: LimitPool): readonly LimitFaderGroup[] {
     return [
       {
         window,
+        showWindowTitle: !collapsed && pool.accounts.length > 1,
         sharedRemaining: !collapsed && members.length > 1 ? window.remainingPercent : null,
         faders: collapsed
           ? [
@@ -66,4 +69,43 @@ export function limitFaderGroups(pool: LimitPool): readonly LimitFaderGroup[] {
       },
     ];
   });
+}
+
+/** Header action derived from credit-bearing accounts in card order; permissions remain execution-owned. */
+export function resetCreditAction(accounts: readonly LimitAccount[]) {
+  const credited = accounts.filter(
+    (account) => (account.limits.resetCredits?.availableCount ?? 0) > 0,
+  );
+  const account = credited[0];
+  if (!account) return { kind: "hidden" } as const;
+  const count = credited.reduce(
+    (sum, item) => sum + (item.limits.resetCredits?.availableCount ?? 0),
+    0,
+  );
+  return { kind: credited.length === 1 ? "confirm" : "details", account, count } as const;
+}
+
+/** Build notice cards in reading order, deduplicating messages and destinations; empty means no section. */
+export function limitExtraCards<C>(
+  notices: readonly string[],
+  cursorEnvironments: readonly C[],
+  links: readonly {
+    readonly url: string;
+    readonly label: string;
+    readonly message?: string | undefined;
+  }[],
+  sharedLink: { readonly url: string; readonly label: string } | null,
+) {
+  const destinations = new Map(links.map((link) => [link.url, link]));
+  if (sharedLink) {
+    const existing = destinations.get(sharedLink.url);
+    destinations.set(sharedLink.url, { ...existing, ...sharedLink });
+  }
+  return [
+    ...[...new Set(notices)].map((notice) => ({ kind: "notice", notice }) as const),
+    ...(cursorEnvironments.length
+      ? [{ kind: "cursor", environments: cursorEnvironments } as const]
+      : []),
+    ...[...destinations.values()].map((link) => ({ kind: "link", link }) as const),
+  ];
 }
