@@ -61,6 +61,7 @@ export function UsageBubbles({ models, metric, onSelectModel }: UsageBubblesProp
   const drag = useRef<BubbleDrag | null>(null);
   const [width, setWidth] = useState(0);
   const [hint, setHint] = useState<string | null>(null);
+  const hintCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { enabled } = usePhysicsMotion();
   const { start, stop } = useMotionJob();
   const id = useId().replaceAll(":", "");
@@ -82,6 +83,28 @@ export function UsageBubbles({ models, metric, onSelectModel }: UsageBubblesProp
     [metric, models],
   );
   const nodes = useMemo(() => createUsageBubbles(shares, width, 300), [shares, width]);
+  useLayoutEffect(() => cancelHintClose, []);
+
+  /** Cancel the pending exit when the pointer reaches either the sphere or its detached hint. */
+  function cancelHintClose() {
+    if (hintCloseTimer.current !== null) clearTimeout(hintCloseTimer.current);
+    hintCloseTimer.current = null;
+  }
+
+  /** Allow time to cross the gap to the scrollable hint without leaving a permanent overlay. */
+  function scheduleHintClose() {
+    cancelHintClose();
+    hintCloseTimer.current = setTimeout(() => {
+      hintCloseTimer.current = null;
+      setHint(null);
+    }, 300);
+  }
+
+  /** Opening either by focus or pointer cancels an earlier sphere's pending dismissal. */
+  function showHint(key: string) {
+    cancelHintClose();
+    setHint(key);
+  }
   useLayoutEffect(() => {
     const element = host.current;
     if (!element) return;
@@ -212,18 +235,22 @@ export function UsageBubbles({ models, metric, onSelectModel }: UsageBubblesProp
               aria-label={`${label}: ${formatPercent(node.share)}`}
               aria-describedby={hint === node.key ? `${id}-hint` : undefined}
               filter={`url(#${id}-shadow)`}
-              onFocus={() => setHint(node.key)}
-              onBlur={() => setHint(null)}
-              onPointerEnter={() => setHint(node.key)}
+              onFocus={() => showHint(node.key)}
+              onBlur={scheduleHintClose}
+              onPointerEnter={() => showHint(node.key)}
               onPointerLeave={() => {
-                if (!drag.current) setHint(null);
+                if (!drag.current) scheduleHintClose();
               }}
               onKeyDown={(event) => {
-                if (event.key === "Escape") setHint(null);
+                if (event.key === "Escape" && hinted) {
+                  event.preventDefault();
+                  cancelHintClose();
+                  setHint(null);
+                }
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
                   if (!node.members.length) onSelectModel(node.key);
-                  else setHint(node.key);
+                  else showHint(node.key);
                 }
               }}
               onClick={() => {
@@ -306,7 +333,8 @@ export function UsageBubbles({ models, metric, onSelectModel }: UsageBubblesProp
           id={`${id}-hint`}
           role="tooltip"
           className="usage-bubbles-hint"
-          onPointerLeave={() => setHint(null)}
+          onPointerEnter={cancelHintClose}
+          onPointerLeave={scheduleHintClose}
         >
           <strong>{name(hinted)}</strong>
           {(hinted.members.length ? hinted.members : [hinted]).map((member) => (
