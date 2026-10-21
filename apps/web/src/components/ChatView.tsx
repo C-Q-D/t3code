@@ -8153,7 +8153,10 @@ export default function ChatView(props: ChatViewProps) {
         glow
         render={<div className="stone-frame-card" />}
         className={cn(
-          "relative flex min-h-0 min-w-0 flex-col overflow-hidden",
+          // clip, not hidden: a hidden column is still a scroll container, so focusing the
+          // terminal or the editor's caret-follow scrolled it whenever decorations such as
+          // composer particles overflowed, and users could not scroll it back.
+          "relative flex min-h-0 min-w-0 flex-col overflow-clip",
           rightPanelMaximized ? "invisible w-0 flex-none" : "flex-1",
         )}
         data-chat-column-maximized-away={rightPanelMaximized ? "true" : "false"}

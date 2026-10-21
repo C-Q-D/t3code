@@ -65,6 +65,19 @@ it("keeps the same 180 particle DOM nodes through repeated bursts and disable", 
   expect([...layer.querySelectorAll("[data-physical-bit]")]).toEqual(slots);
 });
 
+it("parks particles that fell off the surface once they die", () => {
+  const slots = [...layer.querySelectorAll<HTMLElement>("[data-physical-bit]")];
+  // x = 2 is left of the landing floor, so these bits fall until their lifetime ends.
+  renderer.model.burst(2, 20, 12, 200, 0, 1);
+  renderer.pulse(2);
+  let time = 0;
+  for (; time < 500; time += 16) clock.advance(time);
+  expect(slots.some((slot) => slot.style.transform !== "")).toBe(true);
+  for (; time < 20_000; time += 16) clock.advance(time);
+  expect(activeJobs()).toBe(0);
+  expect(slots.every((slot) => slot.style.transform === "")).toBe(true);
+});
+
 it("keeps rainbow focus colors in dark mode while particle hues stay colored", async () => {
   renderer.surface.dispatchEvent(new FocusEvent("focusin"));
   const stop = layer.querySelector("stop")!;

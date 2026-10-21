@@ -386,7 +386,10 @@ export class PhysicalComposerRenderer {
     for (const snapshot of pending) snapshot.restore?.();
     this.clearGlyphs(true);
     this.model.reset();
-    for (const node of this.particleNodes) node.style.opacity = "0";
+    for (const node of this.particleNodes) {
+      node.style.opacity = "0";
+      node.style.transform = "";
+    }
   }
 
   /** Build rounded geometry using exactly 40 nodes on each horizontal edge. */
@@ -436,7 +439,12 @@ export class PhysicalComposerRenderer {
       node.style.opacity = bit.active
         ? String(Math.max(0, Math.min(1, (bit.life - bit.age) / 0.35)) * 0.85)
         : "0";
-      if (!bit.active) continue;
+      if (!bit.active) {
+        // Bits that fall off the surface die far below it; an invisible node left there
+        // still extends every ancestor's scrollable overflow, so park it at the origin.
+        if (node.style.transform) node.style.transform = "";
+        continue;
+      }
       node.style.backgroundColor = `hsl(${Math.round(bit.hue)}, 78%, 74%)`;
       node.style.transform = `translate(${bit.x}px,${bit.y}px) rotate(${bit.r}deg) scale(${bit.s},${bit.s * Math.cos(bit.f)})`;
     }
