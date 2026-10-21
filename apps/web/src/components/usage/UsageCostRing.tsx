@@ -105,7 +105,9 @@ export function UsageCostRing({
     <div
       className="usage-cost-ring-layout"
       onKeyDown={(event) => {
-        if (event.key === "Escape") {
+        if (event.key === "Escape" && active !== null) {
+          // Close local details first; a subsequent Escape can navigate back from the page.
+          event.preventDefault();
           setHovered(null);
           setFocused(null);
         }

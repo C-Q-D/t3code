@@ -6,9 +6,17 @@ import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
 import { activeJobs } from "~/lib/motion/loop";
 import { isPhysicsEnabled, onPhysicsChange, setPhysicsEnabled } from "~/lib/motion/preference";
 import { installTestRaf } from "~/lib/motion/testRaf";
+import { useEscapeToGoBack } from "~/hooks/useNavigateBack";
 import { UsageCostRing } from "./UsageCostRing";
 import { UsageSpeedGauge } from "./UsageSpeedGauge";
 import { ringSegments, speedBreakdown } from "./usageCostBreakdown.logic";
+
+const navigation = vi.hoisted(() => ({ back: vi.fn() }));
+// Keep the page Escape hook real; replace only the router destination boundary.
+vi.mock("@tanstack/react-router", () => ({
+  useCanGoBack: () => false,
+  useNavigate: () => navigation.back,
+}));
 
 // Replace only settings hydration; components, numeric hook, springs and scheduler remain real.
 vi.mock("~/hooks/usePhysicsMotion", () => ({
@@ -22,6 +30,7 @@ let root: Root;
 let clock: ReturnType<typeof installTestRaf>;
 let time: number;
 beforeEach(() => {
+  navigation.back.mockClear();
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   clock = installTestRaf();
   time = 0;
@@ -29,6 +38,42 @@ beforeEach(() => {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
+});
+
+/** Mounts the ring under the same Escape listener as the usage page. */
+function RingWithPageEscape() {
+  useEscapeToGoBack();
+  return <UsageCostRing metric="cost" segments={segments} />;
+}
+
+it("clears focused ring details on first Escape and navigates only on the second", () => {
+  act(() => root.render(<RingWithPageEscape />));
+  const row = host.querySelector("button")!;
+  act(() => row.focus());
+  frames(300);
+  expect(center()).toBe("$25.00");
+  expect(arcState().offset).toBeCloseTo(8, 5);
+  expect(navigation.back).not.toHaveBeenCalled();
+
+  act(() =>
+    row.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }),
+    ),
+  );
+  frames(300);
+  expect(center()).toBe("$100.00");
+  expect(arcState().offset).toBe(0);
+  expect(navigation.back).not.toHaveBeenCalled();
+  expect(document.activeElement).toBe(row);
+
+  act(() =>
+    row.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }),
+    ),
+  );
+  expect(navigation.back).toHaveBeenCalledExactlyOnceWith({ to: "/" });
+  expect(activeJobs()).toBe(0);
+  expect(clock.pending.size).toBe(0);
 });
 afterEach(() => {
   act(() => root.unmount());
