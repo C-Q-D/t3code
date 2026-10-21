@@ -642,6 +642,16 @@ export const tools = {
     faderSharedAccounts: (window: string, count: number) => `${window} · ${count} shared accounts`,
     faderSummary: (name: string, remaining: number, reset: string) =>
       `${name}: ${remaining}% remaining${reset ? `, resets ${reset}` : ""}`,
+    compositionTitle: "Model composition",
+    compositionByCost: "By cost",
+    compositionByTokens: "By tokens",
+    compositionView: "Composition view",
+    bubblesView: "Bubbles",
+    bubblesList: "List",
+    bubblesOther: "Other {count} models",
+    bubblesHelp:
+      "Area = share. Drag to throw bubbles; they push apart and settle. Models below 0.5% are grouped as “Other”.",
+    bubblesUnpriced: "Models with unknown cost are available in the list.",
     providerCount: (count: number) => `${count} providers`,
     connecting: "Connecting…",
     allProviders: "All usage sources",

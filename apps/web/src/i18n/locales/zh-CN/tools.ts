@@ -618,6 +618,16 @@ export const tools: Messages["tools"] = {
     faderSharedAccounts: (window: string, count: number) => `${window} · ${count} 个账户共享`,
     faderSummary: (name: string, remaining: number, reset: string) =>
       `${name}：剩余 ${remaining}%${reset ? `，重置时间 ${reset}` : ""}`,
+    compositionTitle: "模型构成",
+    compositionByCost: "按费用",
+    compositionByTokens: "按 token",
+    compositionView: "构成视图",
+    bubblesView: "气泡",
+    bubblesList: "列表",
+    bubblesOther: "其他 {count} 个",
+    bubblesHelp:
+      "面积 = 占比。拖动气泡可以甩开，松手后会互相推挤再停下。小于 0.5% 的合并为「其他」。",
+    bubblesUnpriced: "费用未知的模型请在列表中查看。",
     providerCount: (count: number) => `${count} 个用量来源`,
     connecting: "正在连接…",
     allProviders: "所有用量来源",

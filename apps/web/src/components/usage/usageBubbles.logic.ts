@@ -75,7 +75,7 @@ export function releaseUsageBubble(node: UsageBubble): void {
   }
 }
 
-/** Owns one simulation; step returns false once twenty consecutive steps are calm. */
+/** Owns one simulation; twenty calm steps or the six-second entrance deadline end its job. */
 export class UsageBubblePhysics {
   private calmSteps = 0;
   private ageSeconds = 0;
@@ -172,8 +172,9 @@ export class UsageBubblePhysics {
   settle(): void {
     this.drag = null;
     this.wake();
-    for (let step = 0; step < 600 && this.step(1 / 60); step++) {
-      // Use the same solver and stopping rule as the animated path.
+    for (let step = 0; step < 400; step++) {
+      // The reference's disabled-motion path resolves all 400 steps without painting.
+      this.step(1 / 60);
     }
   }
 }

@@ -17,6 +17,8 @@ import {
 import { Toggle, ToggleGroup } from "../ui/toggle-group";
 import { PROVIDER_PRESENTATION } from "./usageProviders";
 import { modelShare, sortModelsByTokens } from "./usageBreakdown";
+import { UsageBubbles } from "./UsageBubbles";
+import { useUsageCardEntrance } from "./useUsageCardEntrance";
 
 /** Breakdown data and the callback that opens the page-owned model dialog. */
 export interface UsageCompositionCardProps {
@@ -42,6 +44,8 @@ export function UsageCompositionCard({
   onSelectModel,
 }: UsageCompositionCardProps): JSX.Element {
   const [breakdown, setBreakdown] = useState<"model" | "time">("model");
+  const [view, setView] = useState<"bubbles" | "list">("bubbles");
+  const entranceRef = useUsageCardEntrance(0);
   const shownHourly = resolution === "hour";
   // Put the newest period first because ranges can contain ninety days.
   const breakdownPeriods = useMemo<readonly (DailyTotals | HourlyTotals)[]>(
@@ -57,36 +61,60 @@ export function UsageCompositionCard({
   );
   const timeValueColumnWidth = `${60 / (activeProviders.length + 2)}%`;
   return (
-    <div className="flex-[1.1] min-w-0 flex flex-col gap-4.5">
-      {" "}
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-sm font-medium text-foreground">{t.tools.usage.breakdown}</h2>
-        <ToggleGroup
-          aria-label={t.tools.usage.usageBreakdown}
-          variant="segmented"
-          value={[breakdown]}
-          onValueChange={(next) => {
-            const value = next[0];
-            if (value === "model" || value === "time") setBreakdown(value);
-          }}
-        >
-          {(
-            [
-              { value: "model", label: t.tools.usage.model },
-              {
-                value: "time",
-                label: shownHourly ? t.tools.usage.hour : t.tools.usage.day,
-              },
-            ] as const
-          ).map((option) => (
-            <Toggle key={option.value} value={option.value}>
-              {option.label}
-            </Toggle>
-          ))}
-        </ToggleGroup>
+    <div ref={entranceRef} className="usage-composition-card">
+      <div className="usage-l4-card-header">
+        <div>
+          <h2>{t.tools.usage.compositionTitle}</h2>
+          <p>
+            {metric === "cost"
+              ? t.tools.usage.compositionByCost
+              : t.tools.usage.compositionByTokens}
+          </p>
+        </div>
+        <div className="usage-l4-switches">
+          {view === "list" && (
+            <ToggleGroup
+              aria-label={t.tools.usage.usageBreakdown}
+              variant="segmented"
+              value={[breakdown]}
+              onValueChange={(next) => {
+                const value = next[0];
+                if (value === "model" || value === "time") setBreakdown(value);
+              }}
+            >
+              {(
+                [
+                  { value: "model", label: t.tools.usage.model },
+                  {
+                    value: "time",
+                    label: shownHourly ? t.tools.usage.hour : t.tools.usage.day,
+                  },
+                ] as const
+              ).map((option) => (
+                <Toggle key={option.value} value={option.value}>
+                  {option.label}
+                </Toggle>
+              ))}
+            </ToggleGroup>
+          )}
+          <ToggleGroup
+            aria-label={t.tools.usage.compositionView}
+            variant="segmented"
+            value={[view]}
+            onValueChange={(next) => {
+              const value = next[0];
+              if (value === "bubbles" || value === "list") setView(value);
+            }}
+          >
+            <Toggle value="bubbles">{t.tools.usage.bubblesView}</Toggle>
+            <Toggle value="list">{t.tools.usage.bubblesList}</Toggle>
+          </ToggleGroup>
+        </div>
       </div>
       <section className="flex min-w-0 flex-col gap-2.5">
-        {breakdown === "model" ? (
+        {view === "bubbles" ? (
+          <UsageBubbles models={merged.models} metric={metric} onSelectModel={onSelectModel} />
+        ) : breakdown === "model" ? (
           <div className="min-w-0 overflow-hidden rounded-card-row bg-usage-table-well shadow-usage-table">
             <table className="usage-model-table w-full table-fixed text-secondary-copy-large">
               <colgroup>
@@ -240,6 +268,14 @@ export function UsageCompositionCard({
           </table>
         )}
       </section>
+      {view === "bubbles" && (
+        <p className="usage-l4-note">
+          {t.tools.usage.bubblesHelp}
+          {metric === "cost" && merged.models.some((model) => modelShare(model, "cost") === null)
+            ? ` ${t.tools.usage.bubblesUnpriced}`
+            : ""}
+        </p>
+      )}
     </div>
   );
 }

@@ -905,3 +905,104 @@ html[data-theme-id="graphite"] .usage-chart-surface {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* L4 model composition and resource panels, matching the v3 graphite wells. */
+.usage-composition-card {
+  display: flex;
+  min-width: 0;
+  flex: 1.1;
+  flex-direction: column;
+  gap: 14px;
+}
+.usage-l4-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.usage-l4-card-header h2 {
+  font-size: 14px;
+  font-weight: 600;
+}
+.usage-l4-card-header p,
+.usage-l4-note {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  line-height: 1.6;
+}
+.usage-l4-switches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.usage-bubbles-field {
+  --usage-bubble-highlight: #fff;
+  --usage-bubble-shadow: #000;
+  --usage-bubble-edge: rgba(255, 255, 255, 0.14);
+  --usage-bubble-dark-text: #1a1a1d;
+  --usage-bubble-other: #72727a;
+  position: relative;
+  height: 300px;
+  border-radius: 14px;
+  background: var(--color-usage-total-well);
+  box-shadow: var(--shadow-usage-well);
+  touch-action: none;
+}
+.usage-bubbles-field > svg {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: inherit;
+}
+.usage-bubble {
+  cursor: pointer;
+  outline: none;
+}
+.usage-bubbles-field[data-motion="true"] .usage-bubble {
+  cursor: grab;
+}
+.usage-bubbles-field[data-motion="true"] .usage-bubble:active {
+  cursor: grabbing;
+}
+.usage-bubble:focus-visible circle:first-child {
+  stroke: var(--foreground);
+  stroke-width: 3px;
+}
+.usage-bubble text {
+  pointer-events: none;
+  user-select: none;
+}
+.usage-bubbles-hint {
+  position: absolute;
+  inset: auto 8px 8px auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: min(280px, calc(100% - 16px));
+  max-height: 180px;
+  overflow: auto;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--popover);
+  color: var(--popover-foreground);
+  box-shadow: var(--shadow-usage-card);
+  font-size: 11px;
+}
+.usage-bubbles-hint span {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  overflow-wrap: anywhere;
+}
+.usage-bubbles-hint b {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+.usage-bubbles-empty {
+  position: absolute;
+  inset: 45% 12px auto;
+  text-align: center;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
