@@ -55,11 +55,13 @@ export function UsageLimitFaders({
           <div
             className="usage-fader-card-row"
             key={pair[0]!.pool.driver}
+            // Width follows fader count, but never below the header's min-content,
+            // so a one-fader card keeps its name and reset button whole.
             style={{
               gridTemplateColumns: pair
                 .map(
                   ({ groups }) =>
-                    `minmax(0, ${groups.reduce((sum, group) => sum + group.faders.length, 0)}fr)`,
+                    `minmax(min-content, ${groups.reduce((sum, group) => sum + group.faders.length, 0)}fr)`,
                 )
                 .join(" "),
             }}

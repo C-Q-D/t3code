@@ -14,6 +14,12 @@ import { PROVIDER_ORDER, PROVIDER_PRESENTATION } from "./usageProviders";
 const BASELINE = 300;
 const PLOT_HEIGHT = 250;
 const REFLECTION_HEIGHT = 44;
+const TICK_FRACTIONS = [0.25, 0.5, 0.75, 1] as const;
+// Ticks are 10px tabular mono (~0.62em per glyph); bars stop short of this gutter so labels stay readable.
+const TICK_CHAR_WIDTH_PX = 6.2;
+const TICK_GUTTER_PADDING_PX = 10;
+// Half the widest peak label; keeps the label inside the plot instead of over the tick gutter.
+const PEAK_LABEL_HALF_WIDTH_PX = 90;
 
 /** Columns and scale are already filtered; labels retain the parent's locale and time zone. */
 interface UsageChartBarsProps {
@@ -46,10 +52,16 @@ export function UsageChartBars({
   const { enabled } = usePhysicsMotion();
   const { start, stop } = useMotionJob();
   const count = columns.length;
+  const tickGutter = scale.labeled
+    ? Math.max(...TICK_FRACTIONS.map((fraction) => format(scale.max * fraction).length)) *
+        TICK_CHAR_WIDTH_PX +
+      TICK_GUTTER_PADDING_PX
+    : 0;
+  const plotWidth = Math.max(0, width - tickGutter);
   const gap = count > 60 ? 2 : count > 20 ? 4 : count > 8 ? 8 : 14;
   // Clamp the gap on exceptionally narrow hosts so even long windows stay within the plot.
-  const actualGap = count > 1 ? Math.min(gap, width / (count * 2)) : 0;
-  const barWidth = count === 0 ? 0 : Math.max(0, (width - actualGap * (count - 1)) / count);
+  const actualGap = count > 1 ? Math.min(gap, plotWidth / (count * 2)) : 0;
+  const barWidth = count === 0 ? 0 : Math.max(0, (plotWidth - actualGap * (count - 1)) / count);
   const { peakIndex } = summarizeColumns(columns);
   const peak = peakIndex === null ? undefined : columns[peakIndex];
   const peakPeriod = peakIndex === null ? undefined : periods[peakIndex];
@@ -192,7 +204,7 @@ export function UsageChartBars({
             </clipPath>
           ))}
         </defs>
-        {[0.25, 0.5, 0.75, 1].map((fraction) => {
+        {TICK_FRACTIONS.map((fraction) => {
           const y = BASELINE - PLOT_HEIGHT * fraction + 0.5;
           return (
             <g key={fraction}>
@@ -265,7 +277,7 @@ export function UsageChartBars({
         <div
           className="usage-lux-peak"
           style={{
-            left: `clamp(90px, ${peakX}px, calc(100% - 90px))`,
+            left: `clamp(${PEAK_LABEL_HALF_WIDTH_PX}px, ${peakX}px, ${plotWidth - PEAK_LABEL_HALF_WIDTH_PX}px)`,
             top: Math.max(0, peakY - 38),
           }}
         >

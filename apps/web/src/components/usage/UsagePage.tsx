@@ -426,10 +426,11 @@ export function UsagePage() {
         <ScrollArea className="min-h-0 flex-1">
           <WorkspacePageContainer
             width="wide"
-            className="max-w-[1236px] gap-4.5 px-7 pt-6 pb-10 sm:px-7"
+            className="@container/usage-page max-w-[1236px] gap-4.5 px-7 pt-6 pb-10 sm:px-7"
           >
             {topbarContent}
-            <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_408px]">
+            {/* Columns follow the page width, not the viewport: the sidebar can take a third of a small window. */}
+            <div className="grid grid-cols-1 items-start gap-4 @4xl/usage-page:grid-cols-[minmax(0,1fr)_408px]">
               <div className="min-w-0">
                 {selectedEnvironments.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
@@ -518,7 +519,7 @@ export function UsagePage() {
                       {t.tools.usage.compositionSectionHint}
                     </p>
                   </div>
-                  <div className="flex flex-col gap-4 lg:flex-row">
+                  <div className="flex flex-col gap-4 @4xl/usage-page:flex-row">
                     <UsageCompositionCard
                       metric={metric}
                       merged={merged}
