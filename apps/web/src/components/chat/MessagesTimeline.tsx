@@ -1507,7 +1507,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
         className="flex h-full items-center justify-center ps-(--chat-lane-inset-start) pe-(--chat-lane-inset-end)"
         style={{ paddingBottom: emptyPlaceholderInset }}
       >
-        <div className="flex h-42.5 w-full flex-col items-center justify-center gap-2.5 rounded-card-surface bg-timeline-empty-surface text-secondary-copy-large text-secondary-label shadow-timeline-empty-well">
+        <div className="flex h-42.5 w-full max-w-composer flex-col items-center justify-center gap-2.5 rounded-card-surface bg-timeline-empty-surface text-secondary-copy-large text-secondary-label shadow-timeline-empty-well">
           <span className="flex size-11 items-center justify-center rounded-timeline-empty-icon shadow-timeline-empty-icon">
             <MessageSquareIcon className="size-5" strokeWidth={1.75} aria-hidden />
           </span>
