@@ -1,3 +1,4 @@
+/** Verifies page refresh routing, throttling, and date-sensitive quota presentation with fixed UTC dates. */
 import {
   EnvironmentId,
   ProviderInstanceId,
@@ -38,7 +39,12 @@ vi.mock("../../state/server", () => ({
 }));
 vi.mock("../../state/use-atom-command", () => ({ useAtomCommand: () => state.refreshProviders }));
 vi.mock("../../env", () => ({ isElectron: false }));
-vi.mock("../../hooks/useSettings", () => ({ usePrimarySettings: () => "24h" }));
+vi.mock("../../hooks/useSettings", () => ({
+  usePrimarySettings: () => "24h",
+  useClientSettings: (select: (settings: { physicsMotion: "off" }) => unknown) =>
+    select({ physicsMotion: "off" }),
+  useClientSettingsHydrated: () => true,
+}));
 vi.mock("../../state/usage", () => ({
   useUsage: (input: UsageSummaryInput, selectedIds: ReadonlySet<EnvironmentId> | null) => {
     const environments = [...state.presentations].map(([environmentId, presentation]) => ({
@@ -130,7 +136,13 @@ class TestHTMLElement extends EventTarget {}
 let renderer: ReactTestRenderer;
 let environmentNumber = 0;
 beforeEach(() => {
-  vi.stubGlobal("window", new EventTarget());
+  vi.stubEnv("TZ", "UTC");
+  vi.stubGlobal(
+    "window",
+    Object.assign(new EventTarget(), {
+      matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }),
+    }),
+  );
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-09-11T12:00:00Z"));
   environmentNumber += 1;
@@ -185,18 +197,20 @@ afterEach(async () => {
   await act(() => renderer?.unmount());
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
 
 it.each([0, 1])(
-  "refreshes the visible limits countdown with refresh button %i without switching tabs, even when quota is unchanged",
+  "refreshes the short reset date across midnight with refresh button %i without switching tabs",
   async (buttonIndex) => {
+    vi.mocked(Date.now).mockReturnValue(Date.parse("2026-09-10T23:30:00Z"));
     await act(() => {
       renderer = create(<UsagePage />);
     });
     expect(
       JSON.stringify(renderer.toJSON(), (key, value) => (key === "props" ? undefined : value)),
-    ).toContain("in 2h 0m");
-    vi.mocked(Date.now).mockReturnValue(Date.parse("2026-09-11T12:30:00Z"));
+    ).toContain("9/11");
+    vi.mocked(Date.now).mockReturnValue(Date.parse("2026-09-11T00:30:00Z"));
     await act(async () => {
       renderer.root
         .findAllByProps({ "aria-label": "Refresh usage" })
@@ -210,10 +224,10 @@ it.each([0, 1])(
     });
     expect(
       JSON.stringify(renderer.toJSON(), (key, value) => (key === "props" ? undefined : value)),
-    ).toContain("in 1h 30m");
+    ).toContain("14:00");
     expect(
       JSON.stringify(renderer.toJSON(), (key, value) => (key === "props" ? undefined : value)),
-    ).not.toContain("in 2h 0m");
+    ).not.toContain("9/11");
   },
 );
 
@@ -230,7 +244,7 @@ function pressUsageKey(key: string, modifiers: { ctrlKey?: boolean; shiftKey?: b
   window.dispatchEvent(event);
 }
 
-it("L refreshes limits and their countdown without refreshing usage or changing metric", async () => {
+it("L refreshes limits with the short reset time without refreshing usage or changing metric", async () => {
   vi.stubGlobal("HTMLElement", TestHTMLElement);
   vi.stubGlobal("navigator", { platform: "Win32" });
   state.metric = "tokens";
@@ -244,7 +258,7 @@ it("L refreshes limits and their countdown without refreshing usage or changing 
   expect(state.refresh).not.toHaveBeenCalled();
   expect(
     JSON.stringify(renderer.toJSON(), (key, value) => (key === "props" ? undefined : value)),
-  ).toContain("in 1h 0m");
+  ).toContain("14:00");
   expect(
     renderer.root.findAll(
       (node) => node.type === "div" && node.props["aria-label"] === "Usage metric",
@@ -373,7 +387,7 @@ it("renders and refreshes limits without diagnostics permission or a usage respo
   });
   expect(
     JSON.stringify(renderer.toJSON(), (key, value) => (key === "props" ? undefined : value)),
-  ).toContain("in 2h 0m");
+  ).toContain("14:00");
   expect(state.refreshProviders).toHaveBeenCalledTimes(1);
   const button = renderer.root.findAll(
     (node) => node.type === "button" && node.props["aria-label"] === "Refresh usage",
