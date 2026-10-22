@@ -13,6 +13,7 @@ import { TraitsMenu } from "./TraitsMenu";
 import { MenuTrigger, MenuPopup } from "../ui/menu";
 import { isPhysicsEnabled, setPhysicsEnabled } from "~/lib/motion/preference";
 import "../../index.css";
+import { applyThemePalette } from "../../themePalette";
 
 const models: ReadonlyArray<ServerProviderModel> = [
   {
@@ -42,9 +43,12 @@ const models: ReadonlyArray<ServerProviderModel> = [
  */
 function Harness({
   availableModels = models,
+  initialPrompt = "",
 }: {
   availableModels?: ReadonlyArray<ServerProviderModel>;
+  initialPrompt?: string;
 }) {
+  const [prompt, setPrompt] = useState(initialPrompt);
   const [options, setOptions] = useState<ReadonlyArray<ProviderOptionSelection>>();
   return (
     <TraitsMenu
@@ -58,8 +62,8 @@ function Harness({
           provider={ProviderDriverKind.make("claudeCode")}
           models={availableModels}
           model="custom-model"
-          prompt=""
-          onPromptChange={() => {}}
+          prompt={prompt}
+          onPromptChange={setPrompt}
           planModeEnabled
           modelOptions={options}
           onModelOptionsChange={setOptions}
@@ -292,3 +296,114 @@ it("flashes only on entering levels 4/5 and replaces or cancels the previous fla
     expect(flashes(indicator)).toHaveLength(0);
   });
 });
+
+/** Both persistence paths must drive the same visual feedback. */
+function switchModels(enabled = false): ReadonlyArray<ServerProviderModel> {
+  return [
+    {
+      ...models[0]!,
+      capabilities: {
+        optionDescriptors: [
+          {
+            id: "effort",
+            label: "Effort",
+            type: "select",
+            currentValue: "low",
+            promptInjectedValues: ["ultrathink"],
+            options: [
+              { id: "low", label: "Low" },
+              { id: "ultrathink", label: "Ultrathink" },
+            ],
+          },
+          { id: "thinking", label: "Thinking", type: "boolean", currentValue: enabled },
+        ],
+      },
+    },
+  ];
+}
+
+/** Restore document-wide preferences even when an assertion fails. */
+function switchSettings(dark: boolean, physics: boolean) {
+  const root = document.documentElement;
+  const theme = root.getAttribute("data-theme-id");
+  const motion = root.getAttribute("data-physics");
+  const wasDark = root.classList.contains("dark");
+  const wasEnabled = isPhysicsEnabled();
+  const oldStyle = root.getAttribute("style");
+  applyThemePalette("graphite", dark ? "dark" : "light");
+  root.setAttribute("data-theme-id", "graphite");
+  root.setAttribute("data-physics", physics ? "on" : "off");
+  root.classList.toggle("dark", dark);
+  setPhysicsEnabled(physics);
+  return {
+    [Symbol.dispose]() {
+      root.classList.toggle("dark", wasDark);
+      if (theme === null) root.removeAttribute("data-theme-id");
+      else root.setAttribute("data-theme-id", theme);
+      if (motion === null) root.removeAttribute("data-physics");
+      else root.setAttribute("data-physics", motion);
+      if (oldStyle === null) root.removeAttribute("style");
+      else root.setAttribute("style", oldStyle);
+      setPhysicsEnabled(wasEnabled);
+    },
+  };
+}
+
+it.each([false, true])("keeps switch aurora colors without motion (dark=%s)", async (dark) => {
+  using _settings = switchSettings(dark, false);
+  await using screen = await render(<Harness availableModels={switchModels()} />);
+  await screen.getByRole("button").click();
+  for (const name of ["Ultrathink", "Thinking"]) {
+    const row = page.getByRole("menuitemcheckbox", { name, exact: true });
+    const track = row.element().querySelector<HTMLElement>(".composer-trait-switch")!;
+    const off = getComputedStyle(track).backgroundImage;
+    await row.click();
+    await expect.element(row).toHaveAttribute("aria-checked", "true");
+    await vi.waitFor(() => {
+      const style = getComputedStyle(track);
+      expect(style.backgroundImage).toContain("linear-gradient");
+      expect(style.backgroundImage).not.toBe(off);
+      expect(style.boxShadow === "none").toBe(!dark);
+      const thumb = track.querySelector<HTMLElement>(".composer-trait-switch-thumb")!;
+      expect(
+        Math.abs(track.getBoundingClientRect().right - thumb.getBoundingClientRect().right - 2),
+      ).toBeLessThanOrEqual(1);
+      expect(track.getAnimations({ subtree: true })).toHaveLength(0);
+    });
+  }
+});
+
+it.each(["Ultrathink", "Thinking"])(
+  "runs one finite halo only on user enabling %s",
+  async (name) => {
+    using _settings = switchSettings(true, true);
+    await using screen = await render(
+      <Harness availableModels={switchModels(true)} initialPrompt="Ultrathink: " />,
+    );
+    await screen.getByRole("button").click();
+    using _clock = fakeTimers();
+    const row = page.getByRole("menuitemcheckbox", { name, exact: true });
+    await expect.element(row).toHaveAttribute("aria-checked", "true");
+    const halo = row.element().querySelector<HTMLElement>(".composer-trait-switch-halo");
+    expect(halo).not.toBeNull();
+    expect(halo!.getAnimations()).toHaveLength(0);
+    await row.click();
+    await expect.element(row).toHaveAttribute("aria-checked", "false");
+    expect(halo!.getAnimations()).toHaveLength(0);
+    await row.click();
+    await vi.waitFor(() => expect(halo!.getAnimations()).toHaveLength(1));
+    const animation = halo!.getAnimations()[0]!;
+    animation.pause();
+    expect(animation.effect!.getTiming()).toMatchObject({ duration: 650, iterations: 1 });
+    expect((animation.effect as KeyframeEffect).getKeyframes()[0]!.boxShadow).not.toBe(
+      (animation.effect as KeyframeEffect).getKeyframes().at(-1)!.boxShadow,
+    );
+    await row.click();
+    expect(animation.playState).toBe("idle");
+    await row.click();
+    const last = halo!.getAnimations()[0]!;
+    last.pause();
+    await screen.unmount();
+    expect(last.playState).toBe("idle");
+  },
+);

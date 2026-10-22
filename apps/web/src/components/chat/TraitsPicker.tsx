@@ -30,6 +30,7 @@ import { memo } from "react";
 import { MenuGroup, MenuPopup, MenuSeparator as MenuDivider, MenuTrigger } from "../ui/menu";
 import { TraitsMenu as Menu } from "./TraitsMenu";
 import { TraitSegments } from "./TraitSegments";
+import { TraitSwitchRow } from "./TraitSwitchRow";
 import { reasoningPaletteLevel } from "./reasoningPalette";
 import { useComposerDraftStore, DraftId } from "../../composerDraftStore";
 import { getProviderModelCapabilities } from "../../providerModels";
@@ -470,8 +471,9 @@ export const TraitsMenuContent = memo(function TraitsMenuContentImpl({
               ) : null}
               {descriptor.options.map((option) =>
                 descriptor.promptInjectedValues?.includes(option.id) ? (
-                  <MenuPrimitive.CheckboxItem
+                  <TraitSwitchRow
                     key={option.id}
+                    label={option.label}
                     className="composer-trait-switch-row mt-2.25"
                     checked={selectedValue === option.id}
                     disabled={ultrathinkInBodyText && descriptor.id === primarySelectDescriptor?.id}
@@ -485,13 +487,7 @@ export const TraitsMenuContent = memo(function TraitsMenuContentImpl({
                         onPromptChange(prompt.replace(/^Ultrathink:\s*/i, ""));
                       }
                     }}
-                  >
-                    <PixelThinkIcon className="size-3.5 shrink-0" aria-hidden="true" />
-                    <span className="min-w-0 flex-1">{option.label}</span>
-                    <span className="composer-trait-switch" aria-hidden="true">
-                      <span />
-                    </span>
-                  </MenuPrimitive.CheckboxItem>
+                  />
                 ) : null,
               )}
               {selectedOption?.description ? (
@@ -524,21 +520,16 @@ export const TraitsMenuContent = memo(function TraitsMenuContentImpl({
             </TraitSegments>
           </MenuGroup>
         ) : (
-          <MenuPrimitive.CheckboxItem
+          <TraitSwitchRow
             key={descriptor.id}
+            label={descriptor.label}
             className="composer-trait-switch-row"
             checked={descriptor.currentValue === true}
             closeOnClick
             onCheckedChange={(checked) =>
               updateDescriptors(replaceDescriptorCurrentValue(descriptors, descriptor.id, checked))
             }
-          >
-            <PixelThinkIcon className="size-3.5 shrink-0" aria-hidden="true" />
-            <span className="min-w-0 flex-1">{descriptor.label}</span>
-            <span className="composer-trait-switch" aria-hidden="true">
-              <span />
-            </span>
-          </MenuPrimitive.CheckboxItem>
+          />
         ),
       )}
     </div>
