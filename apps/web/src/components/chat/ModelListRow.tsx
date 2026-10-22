@@ -2,14 +2,14 @@
 import { t } from "~/i18n";
 import { type ProviderDriverKind, type ProviderInstanceId } from "@t3tools/contracts";
 import { memo } from "react";
-import { CheckIcon, StarIcon } from "lucide-react";
+import { CheckIcon } from "lucide-react";
 import {
   getDisplayModelName,
   getProviderRowLabel,
   getTriggerDisplayModelLabel,
 } from "./providerIconUtils";
 import { ComboboxItem } from "../ui/combobox";
-import { Button } from "../ui/button";
+import { ModelFavoriteButton } from "./ModelFavoriteButton";
 import { Badge } from "../ui/badge";
 import { Kbd } from "../ui/kbd";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
@@ -110,37 +110,12 @@ export const ModelListRow = memo(function ModelListRow(props: {
 
       <div className="flex shrink-0 items-center gap-1.5">
         {props.jumpLabel ? <Kbd>{props.jumpLabel}</Kbd> : null}
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                size="icon-xs"
-                variant="ghost-muted"
-                className="-mr-1 shrink-0"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  props.onToggleFavorite(props.instanceId, props.slug);
-                }}
-                onKeyDown={(event) => {
-                  event.stopPropagation();
-                }}
-                disabled={Boolean(props.disabledReason)}
-                aria-label={
-                  props.isFavorite
-                    ? t.composer.modelPicker.removeFavorite
-                    : t.composer.modelPicker.addFavorite
-                }
-              >
-                <StarIcon className={cn("size-3.5", props.isFavorite && "fill-current")} />
-              </Button>
-            }
-          />
-          <TooltipPopup side="top" align="center">
-            {props.isFavorite
-              ? t.composer.modelPicker.removeFavorite
-              : t.composer.modelPicker.addFavorite}
-          </TooltipPopup>
-        </Tooltip>
+        <ModelFavoriteButton
+          key={modelPickerModelKey(props.instanceId, props.slug)}
+          isFavorite={props.isFavorite}
+          disabled={Boolean(props.disabledReason)}
+          onToggle={() => props.onToggleFavorite(props.instanceId, props.slug)}
+        />
       </div>
     </ComboboxItem>
   );

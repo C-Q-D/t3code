@@ -342,6 +342,70 @@ html[data-theme-id="graphite"] [data-composer-banner-surface]::before {
 }
 
 /* 补充屏-2.dc.html · U3 checkbox and U4 segmented controls/switch. */
+@layer utilities {
+  .composer-model-picker {
+    [data-model-favorite] {
+      --model-favorite-green: #0b7f63;
+      --model-favorite-blue: #2563c9;
+      --model-favorite-purple: #6a3fc9;
+      --model-favorite-pink: #c23a8c;
+      --model-favorite-gold: #a8730c;
+      overflow: visible;
+      @variant dark {
+        --model-favorite-green: #8affcf;
+        --model-favorite-blue: #7cc0ff;
+        --model-favorite-purple: #c39bff;
+        --model-favorite-pink: #ff9ad6;
+        --model-favorite-gold: #ffe08a;
+      }
+    }
+
+    .composer-model-favorite-star {
+      transform-origin: center;
+      transform-box: fill-box;
+    }
+
+    [data-model-favorite="true"] .composer-model-favorite-star {
+      @variant dark {
+        filter: drop-shadow(0 0 4px rgba(195, 155, 255, 0.75));
+      }
+    }
+
+    .composer-model-favorite-particles {
+      pointer-events: none;
+      position: absolute;
+      inset: 0;
+    }
+
+    .composer-model-favorite-particle {
+      position: absolute;
+      top: calc(50% - 2px);
+      left: calc(50% - 2px);
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      opacity: 0;
+      background: var(--particle-color);
+      --particle-color: var(--model-favorite-green);
+      &:nth-child(2) {
+        --particle-color: var(--model-favorite-blue);
+      }
+      &:nth-child(3) {
+        --particle-color: var(--model-favorite-purple);
+      }
+      &:nth-child(4) {
+        --particle-color: var(--model-favorite-pink);
+      }
+      &:nth-child(5) {
+        --particle-color: var(--model-favorite-gold);
+      }
+      @variant dark {
+        box-shadow: 0 0 5px var(--particle-color);
+      }
+    }
+  }
+}
+
 @theme {
   --radius-composer-segment: 13px;
   --radius-composer-model-check: 5px;
