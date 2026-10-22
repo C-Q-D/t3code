@@ -30,6 +30,46 @@ import { useWebPageRuntimeStore } from "./webPageRuntimeStore";
 const saved = { id: "saved", name: "Saved", url: "https://example.com/" };
 const other = { id: "other", name: "Other", url: "https://other.example/" };
 
+it.each([
+  {
+    order: "name then URL",
+    first: { name: "New" },
+    second: { url: "https://new.example/" },
+    expected: { id: "saved", name: "New", url: "https://new.example/" },
+  },
+  {
+    order: "URL then name",
+    first: { url: "https://new.example/" },
+    second: { name: "New" },
+    expected: { id: "saved", name: "New", url: "https://new.example/" },
+  },
+  {
+    order: "URL then blank name",
+    first: { url: "https://new.example/" },
+    second: { name: "   " },
+    expected: { id: "saved", name: "new.example", url: "https://new.example/" },
+  },
+])("merges consecutive edits to the same page: $order", async ({ first, second, expected }) => {
+  using state = setup();
+  const apiRef = createRef<ReturnType<typeof useWebPages>>();
+  await using screen = await render(<Harness apiRef={apiRef} />);
+  await act(async () => {
+    state.hydration.resolve({ ...DEFAULT_CLIENT_SETTINGS, webPages: [saved] });
+    await ensureClientSettingsHydrated();
+  });
+  await expect.element(screen.getByText("ready")).toBeVisible();
+  await act(() => {
+    expect(apiRef.current!.update("saved", first)).toBe(true);
+    expect(apiRef.current!.update("saved", second)).toBe(true);
+  });
+  await vi.waitFor(() => {
+    expect(getClientSettings().webPages).toEqual([expected]);
+    expect(mocks.setClientSettings).toHaveBeenLastCalledWith(
+      expect.objectContaining({ webPages: [expected] }),
+    );
+  });
+});
+
 /** Exposes completion of the first disk write and releases it without timing-based waits. */
 function blockFirstSave() {
   let release!: () => void;

@@ -56,23 +56,34 @@ export function useWebPages() {
    * Updates an entry, retaining omitted fields and using a bounded hostname for a blank name.
    * Returns false before hydration, for a missing id, an invalid HTTP(S) URL, or failed entry
    * validation (name over 48 or URL over 2048 characters). Custom names are not truncated.
-   * Replacement uses the latest array at application time, preserving other queued edits; an id
-   * removed meanwhile is not recreated. An old render's unhydrated closure stays inactive, so
-   * callers must use the latest render's actions. Success means accepted, not yet saved to disk.
+   * Only explicitly supplied fields are merged into the latest entry at application time, so
+   * consecutive edits to different fields of the same entry do not overwrite each other. Blank
+   * names use the final effective URL. A removed id is not recreated; a final entry that fails
+   * validation silently discards this edit. An old render's unhydrated closure stays inactive,
+   * so callers must use the latest render's actions. Success means accepted, not yet saved to disk.
    */
   function update(id: string, patch: { name?: string; url?: string }): boolean {
     if (!hydrated) return false;
     const current = getClientSettings().webPages;
     const entry = current.find((candidate) => candidate.id === id);
     if (!entry) return false;
-    const url = patch.url === undefined ? entry.url : normalizeWebPageUrl(patch.url);
-    if (!url) return false;
+    const requestedUrl = patch.url === undefined ? undefined : normalizeWebPageUrl(patch.url);
+    if (requestedUrl === null) return false;
+    const requestedName = patch.name?.trim();
+    const url = requestedUrl ?? entry.url;
     const name =
-      patch.name === undefined ? entry.name : patch.name.trim() || defaultWebPageName(url);
-    const next = { ...entry, name, url };
-    if (!isWebPageEntry(next)) return false;
+      requestedName === undefined ? entry.name : requestedName || defaultWebPageName(url);
+    if (!isWebPageEntry({ ...entry, name, url })) return false;
     void persistClientSettingsUpdate((latest) => {
-      if (!latest.webPages.some((candidate) => candidate.id === id)) return latest;
+      const latestEntry = latest.webPages.find((candidate) => candidate.id === id);
+      if (!latestEntry) return latest;
+      const finalUrl = requestedUrl ?? latestEntry.url;
+      const finalName =
+        requestedName === undefined
+          ? latestEntry.name
+          : requestedName || defaultWebPageName(finalUrl);
+      const next = { ...latestEntry, name: finalName, url: finalUrl };
+      if (!isWebPageEntry(next)) return latest;
       return {
         ...latest,
         webPages: latest.webPages.map((candidate) => (candidate.id === id ? next : candidate)),
