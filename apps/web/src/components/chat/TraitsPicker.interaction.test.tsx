@@ -10,7 +10,10 @@ import {
   type ProviderOptionSelection,
   type ServerProviderModel,
 } from "@t3tools/contracts";
-import { Menu, MenuPopup, MenuTrigger } from "../ui/menu";
+import { MenuPopup, MenuTrigger } from "../ui/menu";
+import { TraitsMenu as Menu } from "./TraitsMenu";
+import { setPhysicsEnabled } from "~/lib/motion/preference";
+import { MOTION_SNAP_DURATION_MS } from "~/lib/motion/springToLinear";
 import { TraitsMenuContent } from "./TraitsPicker";
 
 const MODELS: ReadonlyArray<ServerProviderModel> = [
@@ -87,7 +90,27 @@ afterEach(async () => {
   root = undefined;
   container = undefined;
   vi.unstubAllGlobals();
+  vi.useRealTimers();
+  setPhysicsEnabled(false);
 });
+
+it.each(["Research", "Ultrathink", "Provider thinking"])(
+  "waits for snap before closing after selecting %s",
+  async (label) => {
+    await mountTraits();
+    vi.useFakeTimers();
+    setPhysicsEnabled(true);
+    const item = [...document.querySelectorAll<HTMLElement>('[role^="menuitem"]')].find((element) =>
+      element.textContent?.includes(label),
+    )!;
+    await act(async () => item.click());
+    expect(document.querySelector('[role="menu"]')).not.toBeNull();
+    await act(async () => vi.advanceTimersByTime(MOTION_SNAP_DURATION_MS - 1));
+    expect(document.querySelector('[role="menu"]')).not.toBeNull();
+    await act(async () => vi.advanceTimersByTime(1));
+    expect(document.querySelector('[role="menu"]')).toBeNull();
+  },
+);
 
 it("writes the provider's arbitrary option ID and closes after choosing a segment", async () => {
   await mountTraits();
@@ -134,4 +157,73 @@ it("toggles prompt-controlled effort without replacing the saved provider select
   await act(async () => enabled?.click());
   expect(container?.querySelector('[aria-label="Prompt"]')?.textContent).toBe("Investigate");
   expect(container?.querySelector("output")?.textContent).toBe("[]");
+});
+
+it.each(["Enter", " "])("delays keyboard selection with %j just like a click", async (key) => {
+  await mountTraits();
+  vi.useFakeTimers();
+  setPhysicsEnabled(true);
+  const research = [...document.querySelectorAll<HTMLElement>('[role="menuitemradio"]')].find(
+    (item) => item.textContent?.includes("Research"),
+  )!;
+  await act(async () => {
+    research.focus();
+    research.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+    research.dispatchEvent(new KeyboardEvent("keyup", { key, bubbles: true }));
+  });
+  expect(container?.querySelector("output")?.textContent).toContain('"research-provider-id"');
+  expect(document.querySelector('[role="menu"]')).not.toBeNull();
+  await act(async () => vi.advanceTimersByTime(MOTION_SNAP_DURATION_MS));
+  expect(document.querySelector('[role="menu"]')).toBeNull();
+});
+
+it("cancels an old close when Escape dismisses and the menu reopens", async () => {
+  await mountTraits();
+  vi.useFakeTimers();
+  setPhysicsEnabled(true);
+  const research = [...document.querySelectorAll<HTMLElement>('[role="menuitemradio"]')].find(
+    (item) => item.textContent?.includes("Research"),
+  )!;
+  await act(async () => research.click());
+  await act(async () => {
+    research.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  });
+  expect(document.querySelector('[role="menu"]')).toBeNull();
+  await act(async () => container?.querySelector<HTMLButtonElement>("button")?.click());
+  await act(async () => vi.advanceTimersByTime(MOTION_SNAP_DURATION_MS));
+  expect(document.querySelector('[role="menu"]')).not.toBeNull();
+});
+
+it("restarts the close delay after another selection", async () => {
+  await mountTraits();
+  vi.useFakeTimers();
+  setPhysicsEnabled(true);
+  const items = [...document.querySelectorAll<HTMLElement>('[role="menuitemradio"]')];
+  await act(async () => items.find((item) => item.textContent?.includes("Research"))!.click());
+  await act(async () => vi.advanceTimersByTime(MOTION_SNAP_DURATION_MS - 1));
+  await act(async () => items.find((item) => item.textContent?.includes("Balanced"))!.click());
+  await act(async () => vi.advanceTimersByTime(1));
+  expect(document.querySelector('[role="menu"]')).not.toBeNull();
+  await act(async () => vi.advanceTimersByTime(MOTION_SNAP_DURATION_MS - 1));
+  expect(document.querySelector('[role="menu"]')).toBeNull();
+});
+
+it("clears pending selection dismissal on unmount", async () => {
+  await mountTraits();
+  vi.useFakeTimers();
+  using schedule = vi.spyOn(globalThis, "setTimeout");
+  using cancel = vi.spyOn(globalThis, "clearTimeout");
+  setPhysicsEnabled(true);
+  const research = [...document.querySelectorAll<HTMLElement>('[role="menuitemradio"]')].find(
+    (item) => item.textContent?.includes("Research"),
+  )!;
+  await act(async () => research.click());
+  const callIndex = schedule.mock.calls.findIndex(
+    ([, duration]) => duration === MOTION_SNAP_DURATION_MS,
+  );
+  expect(callIndex).toBeGreaterThanOrEqual(0);
+  const closeTimer = schedule.mock.results[callIndex]!.value;
+  await act(async () => root?.unmount());
+  root = undefined;
+  expect(cancel).toHaveBeenCalledWith(closeTimer);
 });

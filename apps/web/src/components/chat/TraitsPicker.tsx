@@ -27,7 +27,9 @@ import {
   normalizeModelSlug,
 } from "@t3tools/shared/model";
 import { memo } from "react";
-import { Menu, MenuGroup, MenuPopup, MenuSeparator as MenuDivider, MenuTrigger } from "../ui/menu";
+import { MenuGroup, MenuPopup, MenuSeparator as MenuDivider, MenuTrigger } from "../ui/menu";
+import { TraitsMenu as Menu } from "./TraitsMenu";
+import { TraitSegments } from "./TraitSegments";
 import { useComposerDraftStore, DraftId } from "../../composerDraftStore";
 import { getProviderModelCapabilities } from "../../providerModels";
 import { cn } from "~/lib/utils";
@@ -432,7 +434,7 @@ export const TraitsMenuContent = memo(function TraitsMenuContentImpl({
               {descriptor.options.some(
                 (option) => !descriptor.promptInjectedValues?.includes(option.id),
               ) ? (
-                <MenuPrimitive.RadioGroup
+                <TraitSegments
                   aria-label={descriptor.label}
                   className="composer-trait-segments"
                   value={selectedValue}
@@ -449,8 +451,7 @@ export const TraitsMenuContent = memo(function TraitsMenuContentImpl({
                             ? `${t.composer.traits.default}${option.description ? ` · ${option.description}` : ""}`
                             : option.description
                         }
-                        // Base UI keeps radio menus open by default. Close on pick so
-                        // the traits menu behaves like the model picker.
+                        // The menu boundary delays dismissal only while physical feedback runs.
                         closeOnClick
                         disabled={
                           ultrathinkInBodyText && descriptor.id === primarySelectDescriptor?.id
@@ -460,7 +461,7 @@ export const TraitsMenuContent = memo(function TraitsMenuContentImpl({
                       </MenuPrimitive.RadioItem>
                     ),
                   )}
-                </MenuPrimitive.RadioGroup>
+                </TraitSegments>
               ) : null}
               {descriptor.options.map((option) =>
                 descriptor.promptInjectedValues?.includes(option.id) ? (
@@ -499,7 +500,7 @@ export const TraitsMenuContent = memo(function TraitsMenuContentImpl({
         descriptor.id === "fastMode" ? (
           <MenuGroup key={descriptor.id}>
             <div className="composer-trait-label">{descriptor.label}</div>
-            <MenuPrimitive.RadioGroup
+            <TraitSegments
               className="composer-trait-segments"
               aria-label={descriptor.label}
               value={descriptor.currentValue === true ? "on" : "off"}
@@ -515,7 +516,7 @@ export const TraitsMenuContent = memo(function TraitsMenuContentImpl({
               <MenuPrimitive.RadioItem value="off" className="composer-trait-segment" closeOnClick>
                 {t.composer.traits.normal}
               </MenuPrimitive.RadioItem>
-            </MenuPrimitive.RadioGroup>
+            </TraitSegments>
           </MenuGroup>
         ) : (
           <MenuPrimitive.CheckboxItem

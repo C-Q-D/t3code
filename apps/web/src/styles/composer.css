@@ -428,15 +428,19 @@ html[data-theme-id="graphite"] [data-composer-banner-surface]::before {
     }
 
     .composer-trait-segments {
-      @apply flex h-8 min-w-0 gap-0 rounded-full bg-input p-0.75 shadow-well-pressed;
+      @apply relative isolate flex h-8 min-w-0 gap-0 rounded-full bg-input p-0.75 shadow-well-pressed;
+    }
+
+    .composer-trait-indicator {
+      @apply pointer-events-none absolute inset-y-0.75 rounded-composer-segment bg-segmented-selected shadow-composer-option-selected;
     }
 
     .composer-trait-segment {
-      @apply flex min-w-0 flex-1 cursor-pointer items-center justify-center rounded-composer-segment px-1 text-secondary-copy-medium text-secondary-label outline-none;
+      @apply relative flex min-w-0 flex-1 cursor-pointer items-center justify-center rounded-composer-segment px-1 text-secondary-copy-medium text-secondary-label outline-none;
     }
 
     .composer-trait-segment[data-checked] {
-      @apply bg-segmented-selected font-bold text-foreground shadow-composer-option-selected;
+      @apply font-bold text-foreground;
     }
 
     .composer-trait-segment[data-highlighted] {
