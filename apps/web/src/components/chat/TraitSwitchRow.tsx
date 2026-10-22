@@ -3,6 +3,7 @@ import { Menu } from "@base-ui/react/menu";
 import { useEffect, useRef } from "react";
 import { PixelThinkIcon } from "../icons/PixelLucideIcon";
 import { isPhysicsEnabled, onPhysicsChange } from "~/lib/motion/preference";
+import { MOTION_SNAP_DURATION_MS } from "~/lib/motion/springToLinear";
 
 type TraitSwitchRowProps = Omit<Menu.CheckboxItem.Props, "children" | "checked"> & {
   label: string;
@@ -36,7 +37,7 @@ export function TraitSwitchRow({ label, checked, onCheckedChange, ...props }: Tr
               { boxShadow: style.getPropertyValue("--trait-switch-halo-from") },
               { boxShadow: style.getPropertyValue("--trait-switch-halo-to") },
             ],
-            { duration: 650, easing: "ease-out" },
+            { duration: MOTION_SNAP_DURATION_MS, easing: "ease-out" },
           );
         }
         onCheckedChange?.(next, details);

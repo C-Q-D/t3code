@@ -9,6 +9,7 @@ import {
 } from "@t3tools/contracts";
 import { fakeTimers, render } from "../../../test/render";
 import { captureAnimations } from "../../test/captureAnimations";
+import { MOTION_SNAP_DURATION_MS } from "~/lib/motion/springToLinear";
 import { TraitsMenuContent } from "./TraitsPicker";
 import { TraitsMenu } from "./TraitsMenu";
 import { MenuTrigger, MenuPopup } from "../ui/menu";
@@ -401,7 +402,10 @@ it.each(["Ultrathink", "Thinking"])(
     await vi.waitFor(() => expect(halo!.getAnimations()).toHaveLength(1));
     const animation = halo!.getAnimations()[0]!;
     expect(animation.playState).toBe("paused");
-    expect(animation.effect!.getTiming()).toMatchObject({ duration: 650, iterations: 1 });
+    expect(animation.effect!.getTiming()).toMatchObject({
+      duration: MOTION_SNAP_DURATION_MS,
+      iterations: 1,
+    });
     expect((animation.effect as KeyframeEffect).getKeyframes()[0]!.boxShadow).not.toBe(
       (animation.effect as KeyframeEffect).getKeyframes().at(-1)!.boxShadow,
     );
