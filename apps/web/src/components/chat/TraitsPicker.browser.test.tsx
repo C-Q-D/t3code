@@ -231,7 +231,7 @@ it.each([false, true])(
     expect(
       getComputedStyle(
         group.getByRole("menuitemradio", { name: "High" }).element().querySelector("span")!,
-      ).textShadow === "none",
+      ).filter === "none",
     ).toBe(!dark);
   },
 );
@@ -498,5 +498,54 @@ it.each(["Effort", "Fast Mode"])(
     await other.hover();
     await expect.element(other).toHaveAttribute("data-highlighted");
     expect(getComputedStyle(other.element()).backgroundColor).not.toBe("rgba(0, 0, 0, 0)");
+  },
+);
+it.each([4, 5])(
+  "keeps level %s glow outside text truncation while retaining ellipsis",
+  async (level) => {
+    using _settings = switchSettings(true, false);
+    const availableModels: ReadonlyArray<ServerProviderModel> = [
+      {
+        ...models[0]!,
+        capabilities: {
+          optionDescriptors: [
+            {
+              id: "effort",
+              label: "Effort",
+              type: "select",
+              currentValue: String(level),
+              options: Array.from({ length: 6 }, (_, index) => ({
+                id: String(index),
+                label: "Medium extended " + index,
+              })),
+            },
+          ],
+        },
+      },
+    ];
+    await using screen = await render(<Harness availableModels={availableModels} />);
+    await screen.getByRole("button").click();
+    const item = page
+      .getByRole("group", { name: "Effort", exact: true })
+      .element()
+      .querySelector<HTMLElement>("[data-checked]")!;
+    const labels = [...item.querySelectorAll<HTMLElement>("span")];
+    const glowing = labels.filter((element) => {
+      const style = getComputedStyle(element);
+      return style.textShadow !== "none" || style.filter.includes("drop-shadow");
+    });
+    expect(glowing.length).toBeGreaterThan(0);
+    for (const element of glowing) {
+      expect(getComputedStyle(element).overflowX).toBe("visible");
+      expect(getComputedStyle(element).overflowY).toBe("visible");
+    }
+    const truncated = labels.find(
+      (element) => getComputedStyle(element).textOverflow === "ellipsis",
+    )!;
+    expect(truncated).toBeDefined();
+    expect(truncated.scrollWidth).toBeGreaterThan(truncated.clientWidth);
+    expect(truncated.getBoundingClientRect().width).toBeLessThanOrEqual(
+      item.getBoundingClientRect().width,
+    );
   },
 );

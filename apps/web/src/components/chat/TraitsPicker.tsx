@@ -464,7 +464,9 @@ export const TraitsMenuContent = memo(function TraitsMenuContentImpl({
                         ultrathinkInBodyText && descriptor.id === primarySelectDescriptor?.id
                       }
                     >
-                      <span className="truncate">{option.label}</span>
+                      <span className="composer-trait-reasoning-label min-w-0 max-w-full">
+                        <span className="block truncate">{option.label}</span>
+                      </span>
                     </MenuPrimitive.RadioItem>
                   ))}
                 </TraitSegments>
