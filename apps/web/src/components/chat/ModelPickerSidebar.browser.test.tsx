@@ -152,3 +152,93 @@ it("animates selection once, then snaps layout changes and scrolling without rep
     expect(layer.getAnimations()).toHaveLength(0);
   });
 });
+
+it("preserves provider springs through icon DOM changes, including a selection batch", async () => {
+  using _settings = setup(true, true);
+  await using screen = await render(<Harness />);
+  using captured = captureAnimations();
+  const button = screen.getByRole("button", { name: "claudeCode", exact: true });
+  await button.click();
+  const layer = screen.container.querySelector<HTMLElement>("[data-model-picker-selection]")!;
+  await vi.waitFor(() => expect(layer.getAnimations()).toHaveLength(2));
+  const animations = [...captured.animations];
+  const bounds = button.element().getBoundingClientRect();
+  const decoration = document.createElement("span");
+  decoration.hidden = true;
+  await new Promise<void>((resolve) => {
+    const observer = new MutationObserver(() => {
+      observer.disconnect();
+      resolve();
+    });
+    observer.observe(button.element(), { childList: true });
+    button.element().append(decoration);
+  });
+  await vi.waitFor(() => {
+    expect(button.element().getBoundingClientRect().top).toBe(bounds.top);
+    expect(button.element().getBoundingClientRect().bottom).toBe(bounds.bottom);
+    expect(animations.map((animation) => animation.playState)).toEqual(["paused", "paused"]);
+    expect(layer.getAnimations()).toEqual(animations);
+  });
+  await new Promise<void>((resolve) => {
+    const observer = new MutationObserver(() => {
+      observer.disconnect();
+      resolve();
+    });
+    observer.observe(button.element(), { childList: true });
+    decoration.remove();
+  });
+  expect(animations.map((animation) => animation.playState)).toEqual(["paused", "paused"]);
+  await new Promise<void>((resolve) => {
+    const observer = new ResizeObserver(() => {
+      observer.disconnect();
+      resolve();
+    });
+    observer.observe(button.element());
+    (button.element() as HTMLElement).style.height = `${bounds.height + 0.5}px`;
+  });
+  expect(button.element().getBoundingClientRect().height - bounds.height).toBe(0.5);
+  expect(animations.map((animation) => animation.playState)).toEqual(["paused", "paused"]);
+  await new Promise<void>((resolve) => {
+    const observer = new ResizeObserver(() => {
+      observer.disconnect();
+      resolve();
+    });
+    observer.observe(button.element());
+    (button.element() as HTMLElement).style.height = `${bounds.height + 0.75}px`;
+  });
+  await vi.waitFor(() => {
+    expectAligned(screen.container);
+    expect(animations.map((animation) => animation.playState)).toEqual(["idle", "idle"]);
+    expect(captured.animations).toHaveLength(2);
+  });
+  const next = screen.getByRole("button", { name: "cursor", exact: true });
+  next.element().addEventListener(
+    "click",
+    () => {
+      next.element().append(decoration);
+    },
+    { once: true },
+  );
+  await next.click();
+  await vi.waitFor(() => {
+    expect(captured.animations).toHaveLength(4);
+    expect(layer.getAnimations()).toEqual(captured.animations.slice(2));
+    expect(captured.animations.slice(2).map((animation) => animation.playState)).toEqual([
+      "paused",
+      "paused",
+    ]);
+  });
+  const scroller = screen.container.querySelector<HTMLElement>(
+    "[data-model-picker-sidebar] > div",
+  )!;
+  scroller.scrollTop = 1;
+  await vi.waitFor(() => {
+    expect(scroller.scrollTop).toBe(1);
+    expectAligned(screen.container);
+    expect(captured.animations.slice(2).map((animation) => animation.playState)).toEqual([
+      "idle",
+      "idle",
+    ]);
+    expect(captured.animations).toHaveLength(4);
+  });
+});

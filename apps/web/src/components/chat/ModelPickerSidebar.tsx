@@ -66,24 +66,65 @@ export const ModelPickerSidebar = memo(function ModelPickerSidebar(props: {
     if (!content || !selection) return;
     const motion = createSpringIndicator(selection, content, "y");
     let hasSelection = false;
-    const align = (animate: boolean) => {
+    let previousButton: HTMLElement | null = null;
+    let previousTargets: { button: HTMLElement; top: number; bottom: number; inset: number }[] = [];
+    const align = (animate: boolean, onlyIfMoved = false) => {
       const button = content.querySelector<HTMLElement>('button[aria-pressed="true"]');
       selection.hidden = !button;
       if (!button) {
         hasSelection = false;
+        previousButton = null;
+        previousTargets = [];
         return;
       }
       // Rect differences retain fractional pixels and share the scrolling content's coordinate space.
       const bounds = content.getBoundingClientRect();
       const target = button.getBoundingClientRect();
+      const targets = Array.from(
+        content.querySelectorAll<HTMLElement>("[data-model-picker-provider] button"),
+        (candidate) => {
+          const rect = candidate.getBoundingClientRect();
+          return {
+            button: candidate,
+            top: rect.top - bounds.top,
+            bottom: rect.bottom - bounds.top,
+            inset: content.clientHeight - (rect.bottom - bounds.top),
+          };
+        },
+      );
+      const sameStructure =
+        targets.length === previousTargets.length &&
+        targets.every((entry, index) => entry.button === previousTargets[index]?.button);
+      // Remember every destination so an icon update batched with selection still permits motion.
+      // Retain near-equal measurements rather than accumulating ignored subpixel drift.
+      // Compare the edge as well as its inset: rounded content heights can mask a real edge move.
+      const stableTargets = targets.map((entry, index) => {
+        const previous = previousTargets[index];
+        return sameStructure &&
+          previous &&
+          Math.abs(entry.top - previous.top) <= 0.5 &&
+          Math.abs(entry.bottom - previous.bottom) <= 0.5 &&
+          Math.abs(entry.inset - previous.inset) <= 0.5
+          ? previous
+          : entry;
+      });
+      const index = targets.findIndex((entry) => entry.button === button);
+      const sameTarget = sameStructure && stableTargets[index] === previousTargets[index];
+      previousTargets = stableTargets;
       selection.style.left = `${target.left - bounds.left}px`;
       selection.style.right = `${bounds.right - target.right}px`;
       selection.style.setProperty(
         "--provider-selection-rail-gap",
         `${bounds.right - target.right}px`,
       );
-      motion.move([target.top - bounds.top, target.bottom - bounds.top], animate && hasSelection);
+      // Only observer notifications may be ignored; scrolling always lands on the selected button.
+      if (onlyIfMoved && sameTarget && previousButton === button) return;
+      motion.move(
+        [target.top - bounds.top, target.bottom - bounds.top],
+        animate && hasSelection && sameTarget,
+      );
       hasSelection = true;
+      previousButton = button;
     };
     align(false);
     let stopResize: (() => void) | undefined;
@@ -91,14 +132,17 @@ export const ModelPickerSidebar = memo(function ModelPickerSidebar(props: {
       stopResize?.();
       stopResize = observeResize(
         [content, ...content.querySelectorAll("[data-model-picker-provider] button")],
-        () => align(false),
+        () => align(false, true),
       );
     };
     observeSizes();
     const changes = new MutationObserver((records) => {
       const layoutChanged = records.some((record) => record.type === "childList");
       if (layoutChanged) observeSizes();
-      align(!layoutChanged);
+      align(
+        records.some((record) => record.type === "attributes"),
+        true,
+      );
     });
     changes.observe(content, {
       subtree: true,
