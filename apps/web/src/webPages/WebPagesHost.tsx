@@ -36,6 +36,8 @@ function DesktopWebPagesHost() {
     const nav = projectWebPageNav(state);
     if (nav) runtime.applyNav(id, nav);
     const favicon = projectWebPageFavicon(state);
+    // The icon belongs to the saved entry. Navigation or icons from another origin
+    // do not overwrite or clear it when the projection rejects the icon.
     if (favicon !== null) {
       runtime.applyFavicon(id, favicon);
       rememberWebPageFavicon(entry, favicon);

@@ -59,7 +59,13 @@ export function HostedWebPage({ entry }: { readonly entry: WebPageEntry }) {
           // Attachment may precede asynchronous tab creation in the main process.
           await lease.ready;
           if (disposed || webviewRef.current !== webview) return;
-          const webContentsId = webview.getWebContentsId();
+          let webContentsId: number;
+          try {
+            webContentsId = webview.getWebContentsId();
+          } catch {
+            // Electron throws before attachment; did-attach or dom-ready will retry registration.
+            return;
+          }
           if (Number.isInteger(webContentsId) && webContentsId > 0) {
             await bridge.registerWebview(runtimeTabId, webContentsId);
           }
@@ -88,6 +94,8 @@ export function HostedWebPage({ entry }: { readonly entry: WebPageEntry }) {
     webview.addEventListener("dom-ready", register);
     webview.addEventListener("render-process-gone", recover);
     webview.addEventListener("focus", dismissHostPopups);
+    // A fast guest may have emitted its attachment events before this effect installed listeners.
+    register();
     return () => {
       disposed = true;
       if (recoveryTimer !== null) clearTimeout(recoveryTimer);

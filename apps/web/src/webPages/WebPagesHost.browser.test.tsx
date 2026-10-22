@@ -6,6 +6,8 @@ import {
   type DesktopPreviewTabState,
 } from "@t3tools/contracts";
 import { describe, expect, it, vi } from "vite-plus/test";
+import { RegistryContext } from "@effect/atom-react";
+import { AtomRegistry } from "effect/reactivity";
 import { act, fakeTimers, render } from "../../test/render";
 
 const mocks = vi.hoisted(() => ({
@@ -38,7 +40,6 @@ import {
   ensureClientSettingsHydrated,
   updateClientSettings,
 } from "~/hooks/useSettings";
-import { AppAtomRegistryProvider } from "~/rpc/atomRegistry";
 import { useWebPageRuntimeStore } from "./webPageRuntimeStore";
 import {
   forgetWebPageSession,
@@ -85,11 +86,13 @@ function setup(): Disposable {
 /** Unmounts before draining lease-close timers, even when a browser assertion fails. */
 async function renderHost() {
   await using stack = new AsyncDisposableStack();
+  // Configuration caches must not let an earlier case satisfy this case's IPC assertions.
+  const registry = stack.adopt(AtomRegistry.make(), (value) => value.dispose());
   const screen = stack.use(
     await render(
-      <AppAtomRegistryProvider>
+      <RegistryContext.Provider value={registry}>
         <WebPagesHost />
-      </AppAtomRegistryProvider>,
+      </RegistryContext.Provider>,
     ),
   );
   stack.defer(async () => {
@@ -120,7 +123,46 @@ function desktopState(navStatus: DesktopPreviewTabState["navStatus"]): DesktopPr
   };
 }
 
+/** Supplies the Electron-only method before React installs effects; restores the browser prototype on disposal. */
+function stubGuestId(readId: () => number): Disposable {
+  const previous = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "getWebContentsId");
+  Object.defineProperty(HTMLElement.prototype, "getWebContentsId", {
+    configurable: true,
+    value: readId,
+  });
+  return {
+    [Symbol.dispose]() {
+      if (previous) Object.defineProperty(HTMLElement.prototype, "getWebContentsId", previous);
+      else Reflect.deleteProperty(HTMLElement.prototype, "getWebContentsId");
+    },
+  };
+}
+
 describe("WebPagesHost", () => {
+  it("registers an already attached guest after the lease becomes ready without an attachment event", async () => {
+    using _state = setup();
+    let finishCreation: (() => void) | undefined;
+    mocks.createTab.mockReturnValue(
+      new Promise<void>((resolve) => {
+        finishCreation = resolve;
+      }),
+    );
+    using _guest = stubGuestId(() => 73);
+    useWebPageRuntimeStore.getState().open(chat.id);
+    await using screen = await renderHost();
+    try {
+      await vi.waitFor(() => expect(screen.container.querySelectorAll("webview")).toHaveLength(1));
+      expect(mocks.createTab).toHaveBeenCalledOnce();
+      expect(mocks.registerWebview).not.toHaveBeenCalled();
+      await act(() => finishCreation!());
+      await vi.waitFor(() =>
+        expect(mocks.registerWebview).toHaveBeenCalledExactlyOnceWith("web-page:l2-chat", 73),
+      );
+    } finally {
+      finishCreation!();
+    }
+  });
+
   it("creates only opened saved pages, with local-only tabs and the personal partition", async () => {
     using _state = setup();
     rememberWebPageUrl(chat, "https://chatgpt.com/c/saved");
@@ -144,6 +186,47 @@ describe("WebPagesHost", () => {
     await vi.waitFor(() =>
       expect(mocks.registerWebview).toHaveBeenCalledWith("web-page:l2-chat", 42),
     );
+  });
+
+  it("ignores an unattached guest but reports a failed bridge registration", async () => {
+    using _state = setup();
+    const readId = vi.fn<() => number>(() => {
+      throw new Error("Guest is not attached");
+    });
+    using _guest = stubGuestId(readId);
+    using warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    useWebPageRuntimeStore.getState().open(chat.id);
+    await using screen = await renderHost();
+    await vi.waitFor(() => expect(readId).toHaveBeenCalled());
+    expect(warning).not.toHaveBeenCalled();
+    expect(mocks.registerWebview).not.toHaveBeenCalled();
+    readId.mockImplementation(() => 74);
+    const failure = new Error("IPC registration rejected");
+    mocks.registerWebview.mockRejectedValue(failure);
+    screen.container.querySelector("webview")!.dispatchEvent(new Event("dom-ready"));
+    await vi.waitFor(() =>
+      expect(warning).toHaveBeenCalledExactlyOnceWith(
+        "Failed to register personal page webview",
+        failure,
+      ),
+    );
+    expect(mocks.registerWebview).toHaveBeenCalledExactlyOnceWith("web-page:l2-chat", 74);
+  });
+
+  it("unmounts a deleted entry and releases its desktop tab while another page stays open", async () => {
+    using _state = setup();
+    useWebPageRuntimeStore.getState().open(chat.id);
+    useWebPageRuntimeStore.getState().open(deep.id);
+    await using screen = await renderHost();
+    await vi.waitFor(() => expect(screen.container.querySelectorAll("webview")).toHaveLength(2));
+    const survivor = screen.container.querySelector('[data-web-page-tab="web-page:l2-deep"]');
+    using _timers = fakeTimers();
+    await act(() => updateClientSettings({ webPages: [deep] }));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(screen.container.querySelector('[data-web-page-tab="web-page:l2-chat"]')).toBeNull();
+    expect(screen.container.querySelectorAll("webview")).toHaveLength(1);
+    expect(screen.container.querySelector("webview")).toBe(survivor);
+    expect(mocks.closeTab).toHaveBeenCalledExactlyOnceWith("web-page:l2-chat");
   });
 
   it("closes a paused page and recreates it at its last visited address", async () => {
@@ -235,10 +318,7 @@ describe("WebPagesHost", () => {
     await using screen = await renderHost();
     await vi.waitFor(() => expect(screen.container.querySelectorAll("webview")).toHaveLength(2));
     const before = [...screen.container.querySelectorAll("webview")];
-    expect(before.map((node) => node.getAttribute("data-web-page-tab"))).toEqual([
-      "web-page:l2-chat",
-      "web-page:l2-deep",
-    ]);
+    const chatGuest = screen.container.querySelector('[data-web-page-tab="web-page:l2-chat"]')!;
     const removed: Node[] = [];
     const observer = new MutationObserver((records) => {
       removed.push(...records.flatMap((record) => [...record.removedNodes]));
@@ -250,11 +330,11 @@ describe("WebPagesHost", () => {
           webPages: [{ ...chat, name: "Edited", url: "https://example.com/" }, deep],
         }),
       );
-      expect([...screen.container.querySelectorAll("webview")][0]).toBe(before[0]);
-      expect([...screen.container.querySelectorAll("webview")][1]).toBe(before[1]);
       removed.push(...observer.takeRecords().flatMap((record) => [...record.removedNodes]));
       expect(removed).toEqual([]);
-      expect(before[0]!.getAttribute("src")).toBe("https://chatgpt.com/");
+      expect([...screen.container.querySelectorAll("webview")][0]).toBe(before[0]);
+      expect([...screen.container.querySelectorAll("webview")][1]).toBe(before[1]);
+      expect(chatGuest.getAttribute("src")).toBe("https://chatgpt.com/");
       expect(mocks.onStateChange).toHaveBeenCalledTimes(1);
       expect(mocks.onOpenLink).toHaveBeenCalledTimes(1);
       await act(() =>
