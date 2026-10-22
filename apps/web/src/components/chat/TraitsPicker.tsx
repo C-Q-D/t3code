@@ -30,6 +30,7 @@ import { memo } from "react";
 import { MenuGroup, MenuPopup, MenuSeparator as MenuDivider, MenuTrigger } from "../ui/menu";
 import { TraitsMenu as Menu } from "./TraitsMenu";
 import { TraitSegments } from "./TraitSegments";
+import { reasoningPaletteLevel } from "./reasoningPalette";
 import { useComposerDraftStore, DraftId } from "../../composerDraftStore";
 import { getProviderModelCapabilities } from "../../providerModels";
 import { cn } from "~/lib/utils";
@@ -417,6 +418,9 @@ export const TraitsMenuContent = memo(function TraitsMenuContentImpl({
             ? "ultrathink"
             : (getDescriptorStringValue(descriptor, modelSelection, reportedModelSelection) ?? "");
         const selectedOption = descriptor.options.find((option) => option.id === selectedValue);
+        const visibleOptions = descriptor.options.filter(
+          (option) => !descriptor.promptInjectedValues?.includes(option.id),
+        );
 
         return (
           <div key={descriptor.id}>
@@ -431,36 +435,37 @@ export const TraitsMenuContent = memo(function TraitsMenuContentImpl({
                 </div>
               ) : null}
               {/* Keep menu semantics so arrow navigation and close-on-pick match the old rows. */}
-              {descriptor.options.some(
-                (option) => !descriptor.promptInjectedValues?.includes(option.id),
-              ) ? (
+              {visibleOptions.length > 0 ? (
                 <TraitSegments
                   aria-label={descriptor.label}
                   className="composer-trait-segments"
                   value={selectedValue}
                   onValueChange={(value) => handleSelectChange(descriptor, value)}
                 >
-                  {descriptor.options.map((option) =>
-                    descriptor.promptInjectedValues?.includes(option.id) ? null : (
-                      <MenuPrimitive.RadioItem
-                        key={option.id}
-                        value={option.id}
-                        className="composer-trait-segment"
-                        title={
-                          option.isDefault
-                            ? `${t.composer.traits.default}${option.description ? ` · ${option.description}` : ""}`
-                            : option.description
-                        }
-                        // The menu boundary delays dismissal only while physical feedback runs.
-                        closeOnClick
-                        disabled={
-                          ultrathinkInBodyText && descriptor.id === primarySelectDescriptor?.id
-                        }
-                      >
-                        <span className="truncate">{option.label}</span>
-                      </MenuPrimitive.RadioItem>
-                    ),
-                  )}
+                  {visibleOptions.map((option, index) => (
+                    <MenuPrimitive.RadioItem
+                      key={option.id}
+                      value={option.id}
+                      className="composer-trait-segment"
+                      data-reasoning-level={
+                        descriptor.id === primarySelectDescriptor?.id
+                          ? reasoningPaletteLevel(visibleOptions.length, index)
+                          : undefined
+                      }
+                      title={
+                        option.isDefault
+                          ? `${t.composer.traits.default}${option.description ? ` · ${option.description}` : ""}`
+                          : option.description
+                      }
+                      // The menu boundary delays dismissal only while physical feedback runs.
+                      closeOnClick
+                      disabled={
+                        ultrathinkInBodyText && descriptor.id === primarySelectDescriptor?.id
+                      }
+                    >
+                      <span className="truncate">{option.label}</span>
+                    </MenuPrimitive.RadioItem>
+                  ))}
                 </TraitSegments>
               ) : null}
               {descriptor.options.map((option) =>

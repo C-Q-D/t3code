@@ -3,8 +3,9 @@ import { Menu } from "@base-ui/react/menu";
 import { useLayoutEffect, useRef } from "react";
 import { createSpringIndicator } from "~/lib/motion/springIndicator";
 import { observeResize } from "~/lib/observeResize";
+import { isPhysicsEnabled, onPhysicsChange } from "~/lib/motion/preference";
 
-/** Follows the checked item, snapping on mount and layout changes and animating only selection. */
+/** Follows the checked item and its optional reasoning palette; only selection changes animate. */
 export function TraitSegments({ children, ...props }: Menu.RadioGroup.Props) {
   const groupRef = useRef<HTMLDivElement>(null);
   const indicatorRef = useRef<HTMLSpanElement>(null);
@@ -14,8 +15,33 @@ export function TraitSegments({ children, ...props }: Menu.RadioGroup.Props) {
     if (!group || !indicator) return;
     const motion = createSpringIndicator(indicator, group);
     let hasSelection = false;
+    let previousSelection: HTMLElement | null = null;
+    let flash: Animation | undefined;
+    const stopFlashOnDisable = onPhysicsChange((enabled) => {
+      if (!enabled) flash?.cancel();
+    });
     const align = (animate: boolean) => {
       const selected = group.querySelector<HTMLElement>(".composer-trait-segment[data-checked]");
+      const level = selected?.dataset.reasoningLevel;
+      if (level === undefined) delete indicator.dataset.reasoningLevel;
+      else if (indicator.dataset.reasoningLevel !== level) indicator.dataset.reasoningLevel = level;
+      if (selected !== previousSelection) {
+        flash?.cancel();
+        // Resize and initial alignment must not replay selection feedback.
+        if (
+          animate &&
+          isPhysicsEnabled() &&
+          level !== undefined &&
+          Number(level) >= 4 &&
+          typeof indicator.animate === "function"
+        ) {
+          flash = indicator.animate(
+            [{ filter: "brightness(1.8) saturate(1.4)" }, { filter: "none" }],
+            { duration: 520, easing: "ease-out" },
+          );
+        }
+        previousSelection = selected;
+      }
       indicator.hidden = !selected;
       if (!selected) {
         hasSelection = false;
@@ -38,6 +64,7 @@ export function TraitSegments({ children, ...props }: Menu.RadioGroup.Props) {
     };
     observeSizes();
     const selection = new MutationObserver((changes) => {
+      if (changes.every((change) => change.target === indicator)) return;
       const layoutChanged = changes.some((change) => change.type === "childList");
       if (layoutChanged) observeSizes();
       align(!layoutChanged);
@@ -46,12 +73,14 @@ export function TraitSegments({ children, ...props }: Menu.RadioGroup.Props) {
       subtree: true,
       childList: true,
       attributes: true,
-      attributeFilter: ["data-checked"],
+      attributeFilter: ["data-checked", "data-reasoning-level"],
     });
     return () => {
       selection.disconnect();
       stopResize?.();
       motion.dispose();
+      flash?.cancel();
+      stopFlashOnDisable();
     };
   }, []);
   return (

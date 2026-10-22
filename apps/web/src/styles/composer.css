@@ -443,6 +443,134 @@ html[data-theme-id="graphite"] [data-composer-banner-surface]::before {
       @apply font-bold text-foreground;
     }
 
+    .composer-trait-segments [data-reasoning-level] {
+      --reasoning-body: linear-gradient(var(--popover), var(--popover));
+      --reasoning-shadow: none;
+      --reasoning-text-shadow: none;
+      --reasoning-text-color: transparent;
+
+      &[data-reasoning-level="0"] {
+        --reasoning-border: linear-gradient(90deg, #c9ccd3, #c9ccd3);
+        --reasoning-text-color: #6b7280;
+        --reasoning-text: none;
+      }
+
+      &[data-reasoning-level="1"] {
+        --reasoning-border: linear-gradient(90deg, #0b7f63, #1a7fb0);
+        --reasoning-text: linear-gradient(90deg, #0b7f63, #1a7fb0);
+      }
+
+      &[data-reasoning-level="2"] {
+        --reasoning-border: linear-gradient(90deg, #0b7f63, #2563c9);
+        --reasoning-text: linear-gradient(90deg, #0b7f63, #2563c9);
+      }
+
+      &[data-reasoning-level="3"] {
+        --reasoning-border: linear-gradient(90deg, #0b7f63, #2563c9, #6a3fc9);
+        --reasoning-text: linear-gradient(90deg, #0b7f63, #2563c9, #6a3fc9);
+      }
+
+      &[data-reasoning-level="4"] {
+        --reasoning-border: linear-gradient(90deg, #0b7f63, #2563c9, #6a3fc9, #c23a8c);
+        --reasoning-text: linear-gradient(90deg, #0b7f63, #2563c9, #6a3fc9, #c23a8c);
+      }
+
+      &[data-reasoning-level="5"] {
+        --reasoning-border: linear-gradient(90deg, #0b7f63, #2563c9 33%, #6a3fc9 66%, #c23a8c);
+        --reasoning-body: var(--reasoning-border);
+        --reasoning-text-color: #fff;
+        --reasoning-text: none;
+      }
+
+      @variant dark {
+        --reasoning-shadow: inset 0 0 10px rgba(255, 255, 255, 0.04);
+
+        &[data-reasoning-level="0"] {
+          --reasoning-body: linear-gradient(#15161a, #15161a);
+          --reasoning-border: linear-gradient(90deg, #2b3a3d, #2d3242);
+          --reasoning-text-color: #8d98a6;
+        }
+
+        &[data-reasoning-level="1"] {
+          --reasoning-body: linear-gradient(#0d1a1c, #0d1a1c);
+          --reasoning-border: linear-gradient(90deg, #1fd1b0, #22b8d8);
+          --reasoning-shadow:
+            -5px 0 10px rgba(31, 209, 176, 0.35), 5px 0 10px rgba(34, 184, 216, 0.35),
+            inset 0 0 10px rgba(255, 255, 255, 0.04);
+          --reasoning-text: linear-gradient(90deg, #7ff5dc, #8fe3ff);
+          --reasoning-text-shadow: 0 0 8px rgba(40, 210, 200, 0.45);
+        }
+
+        &[data-reasoning-level="2"] {
+          --reasoning-body: linear-gradient(#0d1622, #0d1622);
+          --reasoning-border: linear-gradient(90deg, #1fe0a8, #2fb4ff 55%, #4f8cff);
+          --reasoning-shadow:
+            -6px 0 12px rgba(31, 224, 168, 0.4), 6px 0 12px rgba(79, 140, 255, 0.45),
+            inset 0 0 10px rgba(255, 255, 255, 0.04);
+          --reasoning-text: linear-gradient(90deg, #8affd8, #9fc8ff);
+          --reasoning-text-shadow: 0 0 8px rgba(60, 180, 255, 0.45);
+        }
+
+        &[data-reasoning-level="3"] {
+          --reasoning-body: linear-gradient(#110f26, #110f26);
+          --reasoning-border: linear-gradient(90deg, #2fe8b0, #4f8cff 50%, #a26bff);
+          --reasoning-shadow:
+            -6px 0 14px rgba(47, 232, 176, 0.45), 6px 0 14px rgba(162, 107, 255, 0.5),
+            0 0 18px rgba(79, 140, 255, 0.25), inset 0 0 10px rgba(255, 255, 255, 0.04);
+          --reasoning-text: linear-gradient(90deg, #9dffe0, #b9b0ff);
+          --reasoning-text-shadow: 0 0 8px rgba(120, 140, 255, 0.5);
+        }
+
+        &[data-reasoning-level="4"] {
+          --reasoning-body: linear-gradient(#170f28, #170f28);
+          --reasoning-border: linear-gradient(90deg, #4cf0b8, #6fa2ff 35%, #b38cff 70%, #ff6fd8);
+          --reasoning-shadow:
+            -7px 0 16px rgba(76, 240, 184, 0.55), 7px 0 16px rgba(255, 111, 216, 0.55),
+            0 0 22px rgba(179, 140, 255, 0.3), inset 0 0 10px rgba(255, 255, 255, 0.04);
+          --reasoning-text: linear-gradient(90deg, #b4ffe6, #d5c2ff 50%, #ffc0ee);
+          --reasoning-text-shadow: 0 0 8px rgba(200, 150, 255, 0.55);
+        }
+
+        &[data-reasoning-level="5"] {
+          --reasoning-body: linear-gradient(#1c0f2c, #1c0f2c);
+          --reasoning-border: linear-gradient(
+            90deg,
+            #8affcf,
+            #7cc0ff 30%,
+            #c39bff 60%,
+            #ff9ad6 85%,
+            #ffe08a
+          );
+          --reasoning-shadow:
+            0 0 6px rgba(255, 255, 255, 0.7), -8px 0 20px rgba(138, 255, 207, 0.7),
+            8px 0 20px rgba(255, 154, 214, 0.7), 0 0 36px rgba(195, 155, 255, 0.4),
+            inset 0 0 10px rgba(255, 255, 255, 0.18), inset 0 0 10px rgba(255, 255, 255, 0.04);
+          --reasoning-text-shadow: 0 0 6px #fff, 0 0 14px rgba(255, 154, 214, 0.9);
+        }
+      }
+    }
+
+    .composer-trait-indicator[data-reasoning-level] {
+      border: 1.5px solid transparent;
+      background:
+        var(--reasoning-body) padding-box,
+        var(--reasoning-border) border-box;
+      box-shadow: var(--reasoning-shadow);
+    }
+
+    .composer-trait-indicator[data-reasoning-level="5"] {
+      @variant light {
+        background: var(--reasoning-border) border-box;
+      }
+    }
+
+    .composer-trait-segment[data-reasoning-level][data-checked] > span {
+      color: var(--reasoning-text-color);
+      background: var(--reasoning-text);
+      background-clip: text;
+      text-shadow: var(--reasoning-text-shadow);
+    }
+
     .composer-trait-segment[data-highlighted] {
       @apply bg-accent;
     }
