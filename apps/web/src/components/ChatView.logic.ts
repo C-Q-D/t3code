@@ -284,8 +284,17 @@ export function resolveWorktreeSetupProgress(input: {
   };
 }
 
+/**
+ * Decides whether the chat shows the centered hero composer instead of the docked timeline.
+ * @param input.isLocalDraftThread - The route is a draft that has not reached the server yet.
+ * @param input.isLoadedServerThread - The route is a server thread whose detail has loaded, so
+ * an empty timeline means the thread really has no messages, e.g. after reverting to the start.
+ * @param input.draftHeroDockRequested - A foreground send already started docking the composer.
+ * @returns True while there is nothing in the thread to show above the composer.
+ */
 export function resolveDraftHeroState(input: {
   isLocalDraftThread: boolean;
+  isLoadedServerThread: boolean;
   hasTimelineEntries: boolean;
   isWorking: boolean;
   draftHeroDockRequested: boolean;
@@ -299,7 +308,7 @@ export function resolveDraftHeroState(input: {
     return true;
   }
   return (
-    input.isLocalDraftThread &&
+    (input.isLocalDraftThread || input.isLoadedServerThread) &&
     !input.hasTimelineEntries &&
     !input.isWorking &&
     !input.draftHeroDockRequested

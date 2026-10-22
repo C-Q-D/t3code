@@ -1,5 +1,6 @@
 import { findRecordedWorktreeSetup, mergeDirectPreviewAnnotation } from "./ChatView.logic";
 import { recallCheckoutIsRepo, rememberCheckoutIsRepo } from "./ChatView.logic";
+import { resolveDraftHeroState } from "./ChatView.logic";
 import { ProviderDriverKind, type ServerProvider } from "@t3tools/contracts";
 import { deriveProviderInstanceEntries } from "../providerInstances";
 import {
@@ -654,6 +655,32 @@ describe("resolveComposerProviderSelection", () => {
     });
 
     expect(selection.selectedProviderEntry).toBeUndefined();
+  });
+});
+
+describe("resolveDraftHeroState", () => {
+  const emptyIdleThread = {
+    isLocalDraftThread: false,
+    isLoadedServerThread: false,
+    hasTimelineEntries: false,
+    isWorking: false,
+    draftHeroDockRequested: false,
+    backgroundSubmissionPending: false,
+  };
+
+  it("brings the hero back for a loaded server thread with no messages, as after reverting to the start", () => {
+    expect(resolveDraftHeroState({ ...emptyIdleThread, isLoadedServerThread: true })).toBe(true);
+  });
+
+  it("keeps the hero away from a server thread whose detail is still loading", () => {
+    expect(resolveDraftHeroState(emptyIdleThread)).toBe(false);
+  });
+
+  it("docks a loaded server thread once it has messages, is working, or a send docked it", () => {
+    const loaded = { ...emptyIdleThread, isLoadedServerThread: true };
+    expect(resolveDraftHeroState({ ...loaded, hasTimelineEntries: true })).toBe(false);
+    expect(resolveDraftHeroState({ ...loaded, isWorking: true })).toBe(false);
+    expect(resolveDraftHeroState({ ...loaded, draftHeroDockRequested: true })).toBe(false);
   });
 });
 

@@ -413,7 +413,7 @@ import { environmentShell, useEnvironmentShellHasSnapshot } from "../state/shell
 import { ChatComposer, type ChatComposerHandle } from "./chat/ChatComposer";
 import { createPageScrollController, type PageScrollKey } from "./chat/pageScrollController";
 import { createUpwardScrollDetector, isTimelineScrollTarget } from "./chat/timelineScrollTarget";
-import { DraftHeroHeadline } from "./chat/DraftHeroHeadline";
+import { DraftHeroHeadline, ServerThreadHeroHeadline } from "./chat/DraftHeroHeadline";
 import { ExpandedImageDialogHost, openExpandedImagePreview } from "./chat/ExpandedImageDialog";
 import {
   BranchRestoreConfirmHost,
@@ -2977,8 +2977,15 @@ export default function ChatView(props: ChatViewProps) {
   const [dockedDraftHeroThreadKey, setDockedDraftHeroThreadKey] = useState<string | null>(null);
   const draftHeroDockRequested =
     activeThreadKey !== null && dockedDraftHeroThreadKey === activeThreadKey;
+  // Unlike a draft, a server thread keeps its key after a send docks the hero, so drop the
+  // request once the message is on screen; otherwise a later revert to an empty thread would
+  // never bring the hero back.
+  if (draftHeroDockRequested && timelineEntries.length > 0) {
+    setDockedDraftHeroThreadKey(null);
+  }
   const isDraftHeroState = resolveDraftHeroState({
     isLocalDraftThread,
+    isLoadedServerThread: isServerThread && serverProjection !== null,
     hasTimelineEntries: timelineEntries.length > 0,
     isWorking,
     draftHeroDockRequested,
@@ -8398,11 +8405,19 @@ export default function ChatView(props: ChatViewProps) {
                             : undefined
                         }
                       >
-                        <DraftHeroHeadline
-                          draftId={draftId}
-                          activeProjectRef={activeProjectRef}
-                          activeProjectTitle={activeProject?.title ?? null}
-                        />
+                        {isServerThread ? (
+                          <ServerThreadHeroHeadline
+                            projectTitle={
+                              activeProjectIsScratch ? null : (activeProject?.title ?? null)
+                            }
+                          />
+                        ) : (
+                          <DraftHeroHeadline
+                            draftId={draftId}
+                            activeProjectRef={activeProjectRef}
+                            activeProjectTitle={activeProject?.title ?? null}
+                          />
+                        )}
                       </div>
                     </div>
                   ) : null}

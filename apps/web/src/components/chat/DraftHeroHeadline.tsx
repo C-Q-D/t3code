@@ -1,4 +1,7 @@
-/** Renders the draft heading and inline project selection controls. */
+/**
+ * Renders the hero heading: the draft variant with inline project selection controls, and the
+ * static variant for a server thread with no messages, whose project can no longer change.
+ */
 import { t } from "~/i18n";
 import { Combobox as ComboboxPrimitive } from "@base-ui/react/combobox";
 import type { DraftId } from "~/composerDraftStore";
@@ -46,6 +49,9 @@ import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 // Action values stay distinct from the logical project keys used by real project rows.
 const ADD_PROJECT_VALUE = "add-project";
 const NO_PROJECT_VALUE = "no-project";
+
+const heroTitleClassName =
+  "flex w-full flex-wrap items-center justify-center gap-3 text-center font-serif text-new-chat-title font-semibold text-balance text-foreground tracking-chat-draft";
 
 // C1's raised 50px project choice is specific to the serif hero, rather than a shared button size.
 const projectTriggerClassName =
@@ -408,7 +414,7 @@ export function DraftHeroHeadline({
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col items-center gap-3.5">
-      <h1 className="flex w-full flex-wrap items-center justify-center gap-3 text-center font-serif text-new-chat-title font-semibold text-balance text-foreground tracking-chat-draft">
+      <h1 className={heroTitleClassName}>
         {isScratchDraft ? (
           <>{t.chat.draftHero.whatShouldWeWorkOn}</>
         ) : hasResolvedProject ? (
@@ -433,6 +439,29 @@ export function DraftHeroHeadline({
           {isScratchDraft ? projectSelector : orStartWithoutProject}
         </p>
       )}
+    </div>
+  );
+}
+
+/**
+ * Renders the hero heading for a server thread with no messages, such as one reverted to its
+ * start. The thread is already bound to its project, so the draft picker and the start-without-
+ * a-project action would act on a new draft instead and are left out.
+ * @param props - projectTitle names the thread's project, or is null for a no-project thread.
+ * @returns The static heading; never null.
+ */
+export function ServerThreadHeroHeadline({
+  projectTitle,
+}: {
+  readonly projectTitle: string | null;
+}) {
+  return (
+    <div className="mx-auto flex w-full max-w-5xl flex-col items-center gap-3.5">
+      <h1 className={heroTitleClassName}>
+        {projectTitle === null
+          ? t.chat.draftHero.whatShouldWeWorkOn
+          : t.chat.draftHero.buildIn(projectTitle)}
+      </h1>
     </div>
   );
 }
