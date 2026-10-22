@@ -56,7 +56,7 @@ import LegacyThreadSidebar from "./LegacySidebar";
 import { useThreadVisitedMigration } from "../hooks/useThreadVisitedMigration";
 import ThreadSidebar from "./Sidebar";
 import { SettingsSidebarNav } from "./settings/SettingsSidebarNav";
-import { MainAppLocationTracker } from "./sidebar/mainAppLocation";
+import { isWebPagesPage, MainAppLocationTracker } from "./sidebar/mainAppLocation";
 import { ProjectRail } from "./sidebar/ProjectRail";
 import { useSidebarStageBackdropVariant } from "./SidebarStageBackdrop";
 import { useProjects } from "../state/entities";
@@ -392,6 +392,7 @@ function AppShell({ children }: { children: ReactNode }) {
   const panelAnimationsSuppressed = usePanelNavigationSuppression(pathname);
   const routePanelAnimationsActive = panelAnimationsActive && !panelAnimationsSuppressed;
   const isOnSettings = pathname === "/settings" || pathname.startsWith("/settings/");
+  const isOnWebPages = isWebPagesPage(pathname);
   const isWindowsDesktop = isElectron && isWindowsPlatform(navigator.platform);
   const isMacosDesktop = isElectron && isMacPlatform(navigator.platform);
   const [sidebarWidth, setSidebarWidth] = useState(readInitialThreadSidebarWidth);
@@ -491,7 +492,13 @@ function AppShell({ children }: { children: ReactNode }) {
               collapsible="offcanvas"
               data-app-sidebar=""
               role="navigation"
-              aria-label={isOnSettings ? t.sidebar.chrome.settings : t.sidebar.chrome.threads}
+              aria-label={
+                isOnWebPages
+                  ? t.webPages.title
+                  : isOnSettings
+                    ? t.sidebar.chrome.settings
+                    : t.sidebar.chrome.threads
+              }
               resizable={{
                 maxWidth: sidebarMaximumWidth,
                 minWidth: sidebarMinimumWidth,
@@ -509,7 +516,9 @@ function AppShell({ children }: { children: ReactNode }) {
               // The narrow-window sidebar is a sheet, portaled outside the provider's styles.
               style={windowControlsInsetStyle}
             >
-              {isOnSettings ? (
+              {isOnWebPages ? (
+                <div className="p-4">{t.webPages.title}</div>
+              ) : isOnSettings ? (
                 <SettingsSidebarNav pathname={pathname} />
               ) : legacySidebarEnabled ? (
                 <LegacyThreadSidebar />

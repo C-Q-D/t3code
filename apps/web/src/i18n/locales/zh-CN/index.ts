@@ -10,6 +10,7 @@ import { tools } from "./tools";
 import { app } from "./app";
 import { account } from "./account";
 import { discussions } from "./discussions";
+import { webPages } from "./webPages";
 
 export const messages: Messages = {
   common,
@@ -22,4 +23,5 @@ export const messages: Messages = {
   app,
   account,
   discussions,
+  webPages,
 };

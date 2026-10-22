@@ -9,6 +9,7 @@ import { tools } from "./tools";
 import { app } from "./app";
 import { account } from "./account";
 import { discussions } from "./discussions";
+import { webPages } from "./webPages";
 
 export const en = {
   common,
@@ -21,6 +22,7 @@ export const en = {
   app,
   account,
   discussions,
+  webPages,
 };
 /** Dictionary structure with wide strings and typed interpolation functions. */
 export type Messages = typeof en;

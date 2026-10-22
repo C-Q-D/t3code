@@ -7,6 +7,7 @@ import {
   ChartNoAxesColumnIcon,
   CheckIcon,
   FolderIcon,
+  GlobeIcon,
   LayersIcon,
   PlusIcon,
   SearchIcon,
@@ -54,7 +55,7 @@ import {
   useComboboxFilter,
 } from "../ui/combobox";
 import { Tooltip, TooltipPopup, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
-import { isSidebarUtilityPage, useNavigateToMainApp } from "./mainAppLocation";
+import { isSidebarUtilityPage, isWebPagesPage, useNavigateToMainApp } from "./mainAppLocation";
 import {
   deriveProjectRailSelection,
   reduceProjectRailPickerState,
@@ -113,6 +114,7 @@ export function ProjectRail() {
   const navigateToMainApp = useNavigateToMainApp();
   const pathname = useLocation({ select: (location) => location.pathname });
   const onUtilityPage = isSidebarUtilityPage(pathname);
+  const onWebPagesPage = isWebPagesPage(pathname);
   const pullRequestsSupported = usePullRequestsSupported();
   const [{ open, query }, dispatchPicker] = useReducer(reduceProjectRailPickerState, {
     open: false,
@@ -304,7 +306,7 @@ export function ProjectRail() {
               suppressScopeChange.current = true;
               dispatchPicker({ type: "open-changed", open: false });
               setScope(null);
-              if (onUtilityPage) void navigateToMainApp();
+              if (onUtilityPage || onWebPagesPage) void navigateToMainApp();
             }}
             onContextMenu={(event) => {
               event.preventDefault();
@@ -423,6 +425,18 @@ export function ProjectRail() {
           className="my-0.5 h-0.25 w-4.5 shrink-0 bg-project-rail-divider shadow-project-rail-divider"
           aria-hidden
         />
+        <ProjectRailKey
+          label={t.webPages.title}
+          aria-current={onWebPagesPage ? "page" : undefined}
+          className={onWebPagesPage ? "bg-popover shadow-raise-new-thread" : undefined}
+          onClick={() => void navigate({ to: "/web" })}
+        >
+          <GlobeIcon className="size-4.5" strokeWidth={1.75} />
+        </ProjectRailKey>
+        <div
+          className="my-0.5 h-0.25 w-4.5 shrink-0 bg-project-rail-divider shadow-project-rail-divider"
+          aria-hidden
+        />
         <div className="project-rail-scroll flex min-h-0 w-full flex-col gap-2 overflow-y-auto px-1 pb-1">
           {groups.map((project) => (
             <ProjectRailKey
@@ -436,7 +450,10 @@ export function ProjectRail() {
                   ? "bg-popover shadow-raise-new-thread inset-shadow-selected"
                   : "bg-project-rail-idle shadow-well-project hover:inset-shadow-project-rail-hover",
               )}
-              onClick={() => setScope(toggleProjectRailScope(selection.key, project.projectKey))}
+              onClick={() => {
+                setScope(toggleProjectRailScope(selection.key, project.projectKey));
+                if (onWebPagesPage) void navigateToMainApp();
+              }}
             >
               <ProjectFavicon project={project} className="size-4.5" />
             </ProjectRailKey>
