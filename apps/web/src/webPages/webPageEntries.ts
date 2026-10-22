@@ -1,5 +1,5 @@
 /** Normalizes user-entered launch targets and filters saved entries without changing settings. */
-import type { WebPageEntry } from "@t3tools/contracts";
+import { WEB_PAGE_NAME_MAX_LENGTH, type WebPageEntry } from "@t3tools/contracts";
 
 /** Trims input and supplies HTTPS when no scheme is present; invalid or non-web URLs return null. */
 export function normalizeWebPageUrl(input: string): string | null {
@@ -20,9 +20,9 @@ export function normalizeWebPageUrl(input: string): string | null {
   }
 }
 
-/** Uses the hostname of a validated URL as a fallback label, omitting the common www prefix. */
+/** Uses a validated URL's hostname without www, bounded to the name limit so long hosts remain saveable. */
 export function defaultWebPageName(url: string): string {
-  return new URL(url).hostname.replace(/^www\./, "");
+  return new URL(url).hostname.replace(/^www\./, "").slice(0, WEB_PAGE_NAME_MAX_LENGTH);
 }
 
 /** Matches names and hostnames case-insensitively, preserving order and the array for an empty query. */

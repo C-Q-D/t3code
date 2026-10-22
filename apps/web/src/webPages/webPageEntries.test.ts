@@ -3,6 +3,9 @@ import { describe, expect, it } from "vite-plus/test";
 import { defaultWebPageName, filterWebPages, normalizeWebPageUrl } from "./webPageEntries";
 
 describe("web-page URLs", () => {
+  it("bounds the default name for a valid long hostname", () => {
+    expect(defaultWebPageName(`https://${"a".repeat(50)}.example/`)).toBe("a".repeat(48));
+  });
   it.each([
     ["chatgpt.com", "https://chatgpt.com/"],
     ["  http://localhost:3000/a b ", "http://localhost:3000/a%20b"],
