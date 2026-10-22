@@ -98,7 +98,7 @@ describe("web-page sessions", () => {
   );
 
   it("falls back when reading storage throws", () => {
-    using reads = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+    using _reads = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
       throw new Error("blocked");
     });
     expect(resolveWebPageStartUrl(entry)).toBe("https://chatgpt.com/");
@@ -115,7 +115,7 @@ describe("web-page sessions", () => {
         chat: { baseUrl: entry.url, lastUrl: "https://chatgpt.com/c/old", favicon: "old-icon" },
       }),
     );
-    using writes = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+    using _writes = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
       throw new Error("quota");
     });
     expect(() => rememberWebPageUrl(entry, "https://chatgpt.com/c/new")).not.toThrow();
