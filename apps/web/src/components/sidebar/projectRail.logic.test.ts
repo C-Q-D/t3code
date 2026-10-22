@@ -30,6 +30,18 @@ const groups = buildSidebarProjectSnapshots({
 });
 
 describe("project rail scope", () => {
+  it("selects projects directly from web pages and clears only for All projects", () => {
+    expect(toggleProjectRailScope("alpha", "alpha", true)).toBe("alpha");
+    expect(toggleProjectRailScope("alpha", "beta", true)).toBe("beta");
+    expect(toggleProjectRailScope("alpha", null, true)).toBeNull();
+    expect(toggleProjectRailScope(null, "alpha", true)).toBe("alpha");
+  });
+
+  it("retains toggle behavior in the code area and lets All projects clear it", () => {
+    expect(toggleProjectRailScope("alpha", "alpha", false)).toBeNull();
+    expect(toggleProjectRailScope("alpha", "beta", false)).toBe("beta");
+    expect(toggleProjectRailScope("alpha", null, false)).toBeNull();
+  });
   it("reopens all project choices after leaving a searched popup for project settings", () => {
     const items = [
       { value: "all", label: "Today" },

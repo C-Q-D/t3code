@@ -305,7 +305,7 @@ export function ProjectRail() {
               event.preventBaseUIHandler();
               suppressScopeChange.current = true;
               dispatchPicker({ type: "open-changed", open: false });
-              setScope(null);
+              setScope(toggleProjectRailScope(selection.key, null, onWebPagesPage));
               if (onUtilityPage || onWebPagesPage) void navigateToMainApp();
             }}
             onContextMenu={(event) => {
@@ -451,7 +451,7 @@ export function ProjectRail() {
                   : "bg-project-rail-idle shadow-well-project hover:inset-shadow-project-rail-hover",
               )}
               onClick={() => {
-                setScope(toggleProjectRailScope(selection.key, project.projectKey));
+                setScope(toggleProjectRailScope(selection.key, project.projectKey, onWebPagesPage));
                 if (onWebPagesPage) void navigateToMainApp();
               }}
             >

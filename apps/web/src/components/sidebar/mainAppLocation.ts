@@ -19,6 +19,10 @@ export function isWebPagesPage(pathname: string) {
   return pathname === "/web" || pathname.startsWith("/web/");
 }
 
+/**
+ * Utility and web routes must not replace the code location users expect to return to.
+ * A first visit directly to web pages leaves it unset, so returning falls back to `/`.
+ */
 export function MainAppLocationTracker() {
   const href = useLocation({
     select: (location) =>

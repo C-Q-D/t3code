@@ -41,10 +41,12 @@ export function deriveProjectRailSelection(
   return { key, project: input.groups.find((group) => group.projectKey === key) ?? null };
 }
 
-/** Return the next persisted scope after clicking a project; clicking it twice clears the filter. */
+/** Web-page navigation chooses a destination scope; only the code area toggles the current project off. */
 export function toggleProjectRailScope(
   currentKey: string | null,
-  clickedKey: string,
+  clickedKey: string | null,
+  fromWebPages = false,
 ): string | null {
+  if (clickedKey === null || fromWebPages) return clickedKey;
   return currentKey === clickedKey ? null : clickedKey;
 }
