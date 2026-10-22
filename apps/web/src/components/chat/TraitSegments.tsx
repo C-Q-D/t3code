@@ -113,7 +113,12 @@ export function TraitSegments({
   }, []);
   return (
     <Menu.RadioGroup {...props} ref={groupRef}>
-      <span ref={indicatorRef} className="composer-trait-indicator" aria-hidden="true">
+      <span
+        ref={indicatorRef}
+        className="composer-trait-indicator"
+        data-fast-mode-segment={fastMode || undefined}
+        aria-hidden="true"
+      >
         {fastMode ? <span ref={highlightRef} className="composer-trait-fast-highlight" /> : null}
       </span>
       {children}

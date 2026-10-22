@@ -744,7 +744,7 @@ html[data-theme-id="graphite"] [data-composer-banner-surface]::before {
       @apply mt-1 px-1 text-secondary-copy text-secondary-label;
     }
 
-    .composer-trait-indicator:has(> .composer-trait-fast-highlight) {
+    .composer-trait-indicator[data-fast-mode-segment] {
       overflow: hidden;
     }
 
