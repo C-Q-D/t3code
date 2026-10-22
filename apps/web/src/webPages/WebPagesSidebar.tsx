@@ -1,7 +1,7 @@
 /** Lists saved pages; row subscriptions keep background navigation out of sidebar rendering. */
 import type { WebPageEntry } from "@t3tools/contracts";
 import { MoreHorizontalIcon, PlusIcon, SearchIcon, XIcon } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Menu, MenuTrigger, MenuPopup, MenuItem } from "../components/ui/menu";
@@ -105,8 +105,18 @@ export function WebPagesSidebar() {
   const { entries, hydrated, add, update, remove } = useWebPages();
   const [query, setQuery] = useState("");
   const [editor, setEditor] = useState<{ entry?: WebPageEntry } | null>(null);
+  const pendingSelection = useRef<string | null>(null);
   const addButton = useRef<HTMLButtonElement>(null);
   const filtered = filterWebPages(entries, query);
+
+  useEffect(() => {
+    // Accepted writes can still fail; preserve the current surface until settings publish the entry.
+    const id = pendingSelection.current;
+    if (id !== null && entries.some((entry) => entry.id === id)) {
+      useWebPageRuntimeStore.getState().select(id);
+      pendingSelection.current = null;
+    }
+  }, [entries]);
 
   /** A cancelled or unavailable confirmation never removes saved settings or runtime state. */
   async function confirmRemove(entry: WebPageEntry) {
@@ -129,7 +139,7 @@ export function WebPagesSidebar() {
     if (!entry) {
       const created = add(input);
       if (!created) return false;
-      useWebPageRuntimeStore.getState().select(created.id);
+      pendingSelection.current = created.id;
       return true;
     }
     if (!update(entry.id, input)) return false;
