@@ -83,11 +83,16 @@ export function WebPagesPage() {
           </Alert>
         </div>
       ) : null}
-      <BrowserSurfaceSlot
-        tabId={webPageRuntimeTabId(entry.id)}
-        visible={true}
-        className="min-h-0 flex-1"
-      />
+      {/* The separate guest layer escapes card clipping and supports only a uniform radius;
+          inset it so its rounded panel cannot cover the outer card corners. */}
+      <div className="flex min-h-0 flex-1 p-2">
+        <BrowserSurfaceSlot
+          tabId={webPageRuntimeTabId(entry.id)}
+          visible={true}
+          cornerRadius={14}
+          className="min-h-0 flex-1"
+        />
+      </div>
     </div>
   );
 }
