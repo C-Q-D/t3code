@@ -24,7 +24,10 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
-import { ChevronRightIcon, GitForkIcon, SearchIcon } from "lucide-react";
+import { GitForkIcon, SearchIcon } from "lucide-react";
+import { ModelLegacyArrow } from "./ModelLegacyArrow";
+import { createModelPickerSpring } from "./modelPickerSpring";
+import { TOKENS } from "~/lib/motion/tokens";
 import { ModelListRow } from "./ModelListRow";
 import { ModelPickerSidebar } from "./ModelPickerSidebar";
 import { getProviderStatusMessage, hasProviderSetup } from "./ProviderStatusBanner";
@@ -264,6 +267,7 @@ function ModelPickerList({
   renderItem,
   highlightedKeyRef,
   alignHighlightRef,
+  prepareLegacyResizeRef,
 }: {
   listRef: RefObject<LegendListRef | null>;
   itemKeys: ReadonlyArray<string>;
@@ -271,15 +275,41 @@ function ModelPickerList({
   renderItem: (props: { item: string; index: number }) => ReactNode;
   highlightedKeyRef: RefObject<string | null>;
   alignHighlightRef: RefObject<((animate: boolean) => void) | null>;
+  prepareLegacyResizeRef: RefObject<(() => void) | null>;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const highlightRef = useRef<HTMLDivElement>(null);
+  const heightSpringRef = useRef<ReturnType<typeof createModelPickerSpring> | null>(null);
+  const pendingHeightRef = useRef<{ value: number; velocity: number } | null>(null);
+  useLayoutEffect(() => {
+    const motion = createModelPickerSpring(containerRef.current!, "height", TOKENS.settle);
+    heightSpringRef.current = motion;
+    prepareLegacyResizeRef.current = () => {
+      pendingHeightRef.current = motion.sample();
+    };
+    return () => {
+      prepareLegacyResizeRef.current = null;
+      heightSpringRef.current = null;
+      motion.dispose();
+    };
+  }, [prepareLegacyResizeRef]);
   const [showTopScrollFade, setShowTopScrollFade] = useState(false);
   const [showBottomScrollFade, setShowBottomScrollFade] = useState(false);
   const [contentSize, setContentSize] = useState(
     () => itemKeys.length * MODEL_LIST_ESTIMATED_ITEM_SIZE,
   );
   useLayoutEffect(() => listRef.current?.getState().listen("totalSize", setContentSize), [listRef]);
+  useLayoutEffect(() => {
+    const motion = heightSpringRef.current!;
+    if (!pendingHeightRef.current && !motion.isRunning()) return;
+    const from = motion.isRunning() ? motion.sample() : pendingHeightRef.current!;
+    pendingHeightRef.current = null;
+    const target = motion.measureTarget();
+    // Virtualized rows refine their estimates after mounting; retarget the same finite effect.
+    motion.move(target, from, true);
+    // Height changes alter the highlight's bottom inset; T6's resize observer deliberately snaps it.
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- totalSize commits the natural height before this measurement.
+  }, [contentSize]);
   const updateScrollFades = () => {
     const scrollElement = listRef.current?.getScrollableNode();
     if (!(scrollElement instanceof HTMLElement)) {
@@ -481,6 +511,8 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
   const pickerContentRef = useRef<HTMLDivElement>(null);
   const highlightedModelKeyRef = useRef<string | null>(null);
   const alignModelHighlightRef = useRef<((animate: boolean) => void) | null>(null);
+  const prepareLegacyResizeRef = useRef<(() => void) | null>(null);
+  const [selectionRequest, setSelectionRequest] = useState<{ key: string } | null>(null);
   const { favorites } = useEnvironmentModelPreferences(props.environmentId);
   const activeEntry = props.instanceEntries.find(
     (entry) => entry.instanceId === props.activeInstanceId,
@@ -578,6 +610,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
   }, [focusSearchInput]);
 
   const toggleLegacySection = (instanceId: ProviderInstanceId) => {
+    prepareLegacyResizeRef.current?.();
     setExpandedLegacyInstances((expanded) => {
       const next = new Set(expanded);
       if (next.has(instanceId)) {
@@ -608,6 +641,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
     const resolvedModel = resolveSelectableModel(entry.driverKind, modelSlug, options);
     if (resolvedModel) {
       if (additive && onToggleModel) {
+        setSelectionRequest({ key: modelPickerModelKey(instanceId, resolvedModel) });
         onToggleModel(instanceId, resolvedModel);
       } else {
         onInstanceModelChange(instanceId, resolvedModel);
@@ -864,6 +898,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
     modelJumpLabelByKey,
     activeModelKey,
     selectedModelKeySet,
+    selectionRequest,
   };
 
   const onWindowKeyDown = (event: globalThis.KeyboardEvent) => {
@@ -1052,6 +1087,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
               extraData={modelListExtraData}
               highlightedKeyRef={highlightedModelKeyRef}
               alignHighlightRef={alignModelHighlightRef}
+              prepareLegacyResizeRef={prepareLegacyResizeRef}
               renderItem={({ item: modelKey, index }) => {
                 if (legacySection?.key === modelKey) {
                   return (
@@ -1071,12 +1107,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
                           {t.composer.modelPicker.modelCount(legacySection.legacyModels.length)}
                         </div>
                       </div>
-                      <ChevronRightIcon
-                        className={cn(
-                          "size-4 transition-transform",
-                          legacySection.isExpanded && "rotate-90",
-                        )}
-                      />
+                      <ModelLegacyArrow expanded={legacySection.isExpanded} />
                     </ComboboxItem>
                   );
                 }
@@ -1101,6 +1132,9 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
                     acpRegistryAgentId={model.acpRegistryAgentId}
                     acpRegistryIconUrl={model.acpRegistryIconUrl}
                     isFavorite={favoritesSet.has(providerModelKey(model.instanceId, model.slug))}
+                    selectionRequest={
+                      selectionRequest?.key === modelKey ? selectionRequest : undefined
+                    }
                     isSelected={
                       selectedModelKeys !== undefined
                         ? selectedModelKeySet.has(modelKey)

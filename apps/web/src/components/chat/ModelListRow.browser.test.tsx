@@ -14,7 +14,13 @@ import { t } from "~/i18n";
 import "../../index.css";
 
 /** Keeps favorite writes local while real LegendList recycling changes the rows' identities. */
-function Harness({ favorites }: { favorites?: ReadonlySet<string> }) {
+function Harness({
+  favorites,
+  selected,
+}: {
+  favorites?: ReadonlySet<string>;
+  selected?: ReadonlySet<string>;
+}) {
   const [localFavorites, setLocalFavorites] = useState(new Set<string>());
   const current = favorites ?? localFavorites;
   const items = Array.from({ length: 80 }, (_, index) => `Model ${String(index).padStart(2, "0")}`);
@@ -24,7 +30,7 @@ function Harness({ favorites }: { favorites?: ReadonlySet<string> }) {
         <ComboboxListVirtualized>
           <LegendList
             data={items}
-            extraData={current}
+            extraData={{ current, selected }}
             estimatedItemSize={54}
             recycleItems
             style={{ height: 220 }}
@@ -38,7 +44,7 @@ function Harness({ favorites }: { favorites?: ReadonlySet<string> }) {
                 driverKind={ProviderDriverKind.make("codex")}
                 providerDisplayName="Codex"
                 isFavorite={current.has(item)}
-                isSelected={false}
+                isSelected={selected?.has(item) ?? false}
                 showProvider
                 onToggleFavorite={(_instance, slug) =>
                   setLocalFavorites((previous) => {
@@ -230,4 +236,48 @@ it("never replays saved, externally changed or recycled favorites", async () => 
     .toBeVisible();
   expect(captured.animations).toHaveLength(0);
   expect(screen.container.querySelector(".composer-model-favorite-particles")).toBeNull();
+});
+
+it("never animates initially selected, externally selected or recycled checks", async () => {
+  using _settings = setup(true, true);
+  using captured = captureAnimations();
+  await using screen = await render(<Harness selected={new Set(["Model 00", "Model 50"])} />);
+  const first = screen.getByRole("option", { name: /Model 00/ });
+  expect(first.element().querySelector<HTMLElement>(".composer-model-check")!.dataset.checked).toBe(
+    "true",
+  );
+  expect(captured.animations).toHaveLength(0);
+  await screen.rerender(<Harness selected={new Set(["Model 01", "Model 50"])} />);
+  expect(first.element().querySelector<HTMLElement>(".composer-model-check")!.dataset.checked).toBe(
+    "false",
+  );
+  expect(
+    screen
+      .getByRole("option", { name: /Model 01/ })
+      .element()
+      .querySelector<HTMLElement>(".composer-model-check")!.dataset.checked,
+  ).toBe("true");
+  expect(captured.animations).toHaveLength(0);
+  const rows = Array.from(screen.container.querySelectorAll('[role="option"]'));
+  const scroller = Array.from(
+    screen.getByRole("listbox").element().querySelectorAll<HTMLElement>("div"),
+  ).find(
+    (element) =>
+      element.scrollHeight > element.clientHeight && getComputedStyle(element).overflowY === "auto",
+  )!;
+  scroller.scrollTop = 2700;
+  const distant = screen.getByRole("option", { name: /Model 50/ });
+  await expect.element(distant).toBeInTheDocument();
+  await vi.waitFor(() => expect(first.query()).toBeNull());
+  expect(rows).toContain(distant.element());
+  expect(
+    distant.element().querySelector<HTMLElement>(".composer-model-check")!.dataset.checked,
+  ).toBe("true");
+  expect(captured.animations).toHaveLength(0);
+  scroller.scrollTop = 0;
+  await expect.element(first).toBeVisible();
+  expect(first.element().querySelector<HTMLElement>(".composer-model-check")!.dataset.checked).toBe(
+    "false",
+  );
+  expect(captured.animations).toHaveLength(0);
 });

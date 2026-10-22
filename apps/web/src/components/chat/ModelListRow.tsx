@@ -2,7 +2,7 @@
 import { t } from "~/i18n";
 import { type ProviderDriverKind, type ProviderInstanceId } from "@t3tools/contracts";
 import { memo } from "react";
-import { CheckIcon } from "lucide-react";
+import { ModelSelectionCheck } from "./ModelSelectionCheck";
 import {
   getDisplayModelName,
   getProviderRowLabel,
@@ -32,6 +32,7 @@ export const ModelListRow = memo(function ModelListRow(props: {
   acpRegistryIconUrl?: string | undefined;
   isFavorite: boolean;
   isSelected: boolean;
+  selectionRequest?: object | undefined;
   showProvider: boolean;
   preferShortName?: boolean;
   useTriggerLabel?: boolean;
@@ -62,9 +63,11 @@ export const ModelListRow = memo(function ModelListRow(props: {
           "data-disabled:pointer-events-auto data-disabled:cursor-not-allowed",
       )}
     >
-      <span className="composer-model-check" data-checked={props.isSelected} aria-hidden="true">
-        {props.isSelected ? <CheckIcon className="size-2.75" /> : null}
-      </span>
+      <ModelSelectionCheck
+        key={modelPickerModelKey(props.instanceId, props.slug)}
+        checked={props.isSelected}
+        request={props.selectionRequest}
+      />
       <div className={cn("min-w-0 flex-1 text-left", props.unavailable && "text-placeholder")}>
         <div className="flex min-w-0 items-center gap-2">
           <div className={cn("min-w-0 truncate", props.isSelected && "font-semibold")}>

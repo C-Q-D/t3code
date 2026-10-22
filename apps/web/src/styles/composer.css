@@ -536,12 +536,31 @@ html[data-theme-id="graphite"] [data-composer-banner-surface]::before {
     }
 
     .composer-model-check {
-      @apply flex size-4 shrink-0 items-center justify-center rounded-composer-model-check shadow-composer-model-check;
+      @apply relative flex size-4 shrink-0 items-center justify-center rounded-composer-model-check shadow-composer-model-check;
+      --model-check-halo-from: 0 0 0 0 rgb(11 127 99 / 65%), 0 0 0 0 rgb(194 58 140 / 55%);
+      --model-check-halo-to: 0 0 0 7px rgb(11 127 99 / 0%), 0 0 0 11px rgb(194 58 140 / 0%);
+      @variant dark {
+        --model-check-halo-from: 0 0 0 0 rgb(138 255 207 / 65%), 0 0 0 0 rgb(255 154 214 / 55%);
+        --model-check-halo-to: 0 0 0 7px rgb(138 255 207 / 0%), 0 0 0 11px rgb(255 154 214 / 0%);
+      }
     }
 
     .composer-model-check[data-checked="true"] {
-      @apply bg-primary text-primary-foreground shadow-none;
+      @apply shadow-none;
+      background: linear-gradient(90deg, #0b7f63, #2563c9 33%, #6a3fc9 66%, #c23a8c);
+      color: #18181b;
       --lucide-hue-override: currentColor;
+      @variant dark {
+        background: linear-gradient(90deg, #8affcf, #7cc0ff 33%, #c39bff 66%, #ff9ad6);
+        filter: drop-shadow(0 0 4px rgb(195 155 255 / 60%));
+      }
+    }
+
+    .composer-model-check-halo {
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      pointer-events: none;
     }
 
     .composer-model-worktree-note {
