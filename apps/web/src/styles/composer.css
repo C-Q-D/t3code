@@ -591,6 +591,57 @@ html[data-theme-id="graphite"] [data-composer-banner-surface]::before {
       @apply mt-1 px-1 text-secondary-copy text-secondary-label;
     }
 
+    .composer-trait-indicator:has(> .composer-trait-fast-highlight) {
+      overflow: hidden;
+    }
+
+    .composer-trait-indicator[data-fast-mode="on"] {
+      --fast-body: var(--popover);
+      --fast-border: linear-gradient(90deg, #0b7f63, #2563c9);
+      --fast-glow: none;
+      @variant dark {
+        --fast-body: #0d1a1c;
+        --fast-border: linear-gradient(90deg, #1fd1b0, #2fb4ff);
+        --fast-glow: -6px 0 14px rgba(31, 209, 176, 0.4), 6px 0 14px rgba(47, 180, 255, 0.4);
+      }
+      border: 1.5px solid transparent;
+      background:
+        linear-gradient(var(--fast-body), var(--fast-body)) padding-box,
+        var(--fast-border) border-box;
+      box-shadow: var(--fast-glow);
+    }
+
+    .composer-trait-segment[data-fast-mode="on"][data-checked] > span {
+      background: linear-gradient(90deg, #0b7f63, #2563c9);
+      background-clip: text;
+      color: transparent;
+      text-shadow: none;
+      @variant dark {
+        background-image: linear-gradient(90deg, #7ff5dc, #9fd8ff);
+        text-shadow: 0 0 8px rgba(40, 210, 220, 0.45);
+      }
+    }
+
+    .composer-trait-fast-highlight {
+      @apply pointer-events-none absolute inset-y-0 left-0;
+      width: 45%;
+      /* Rest outside the clip so neither initial render nor animation completion leaves a stripe. */
+      transform: translateX(-120%);
+      background: linear-gradient(
+        100deg,
+        rgba(11, 127, 99, 0),
+        rgba(11, 127, 99, 0.18),
+        rgba(11, 127, 99, 0)
+      );
+      @variant dark {
+        background: linear-gradient(
+          100deg,
+          rgba(170, 255, 240, 0),
+          rgba(170, 255, 240, 0.45),
+          rgba(170, 255, 240, 0)
+        );
+      }
+    }
     .composer-trait-switch-row {
       @apply flex min-h-5 cursor-pointer items-center gap-2.5 rounded-tag px-1 text-control font-semibold outline-none;
     }

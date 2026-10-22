@@ -504,6 +504,7 @@ export const TraitsMenuContent = memo(function TraitsMenuContentImpl({
             <TraitSegments
               className="composer-trait-segments"
               aria-label={descriptor.label}
+              fastMode
               value={descriptor.currentValue === true ? "on" : "off"}
               onValueChange={(value) =>
                 updateDescriptors(
@@ -511,8 +512,13 @@ export const TraitsMenuContent = memo(function TraitsMenuContentImpl({
                 )
               }
             >
-              <MenuPrimitive.RadioItem value="on" className="composer-trait-segment" closeOnClick>
-                {t.composer.traits.fast}
+              <MenuPrimitive.RadioItem
+                value="on"
+                data-fast-mode="on"
+                className="composer-trait-segment"
+                closeOnClick
+              >
+                <span>{t.composer.traits.fast}</span>
               </MenuPrimitive.RadioItem>
               <MenuPrimitive.RadioItem value="off" className="composer-trait-segment" closeOnClick>
                 {t.composer.traits.normal}

@@ -6,8 +6,13 @@ import { observeResize } from "~/lib/observeResize";
 import { isPhysicsEnabled, onPhysicsChange } from "~/lib/motion/preference";
 
 /** Follows the checked item and its optional reasoning palette; only selection changes animate. */
-export function TraitSegments({ children, ...props }: Menu.RadioGroup.Props) {
+export function TraitSegments({
+  children,
+  fastMode = false,
+  ...props
+}: Menu.RadioGroup.Props & { fastMode?: boolean }) {
   const groupRef = useRef<HTMLDivElement>(null);
+  const highlightRef = useRef<HTMLSpanElement>(null);
   const indicatorRef = useRef<HTMLSpanElement>(null);
   useLayoutEffect(() => {
     const group = groupRef.current;
@@ -17,16 +22,38 @@ export function TraitSegments({ children, ...props }: Menu.RadioGroup.Props) {
     let hasSelection = false;
     let previousSelection: HTMLElement | null = null;
     let flash: Animation | undefined;
+    let sweep: Animation | undefined;
     const stopFlashOnDisable = onPhysicsChange((enabled) => {
-      if (!enabled) flash?.cancel();
+      if (!enabled) {
+        flash?.cancel();
+        sweep?.cancel();
+      }
     });
     const align = (animate: boolean) => {
       const selected = group.querySelector<HTMLElement>(".composer-trait-segment[data-checked]");
       const level = selected?.dataset.reasoningLevel;
+      const fast = selected?.dataset.fastMode === "on";
+      if (fast) indicator.dataset.fastMode = "on";
+      else delete indicator.dataset.fastMode;
       if (level === undefined) delete indicator.dataset.reasoningLevel;
       else if (indicator.dataset.reasoningLevel !== level) indicator.dataset.reasoningLevel = level;
       if (selected !== previousSelection) {
         flash?.cancel();
+        sweep?.cancel();
+        const highlight = highlightRef.current;
+        // The clipped layer moves independently of the spring-driven indicator edges.
+        if (
+          animate &&
+          isPhysicsEnabled() &&
+          fast &&
+          highlight &&
+          typeof highlight.animate === "function"
+        ) {
+          sweep = highlight.animate(
+            [{ transform: "translateX(-120%)" }, { transform: "translateX(240%)" }],
+            { duration: 650, delay: 80 },
+          );
+        }
         // Resize and initial alignment must not replay selection feedback.
         if (
           animate &&
@@ -73,19 +100,22 @@ export function TraitSegments({ children, ...props }: Menu.RadioGroup.Props) {
       subtree: true,
       childList: true,
       attributes: true,
-      attributeFilter: ["data-checked", "data-reasoning-level"],
+      attributeFilter: ["data-checked", "data-reasoning-level", "data-fast-mode"],
     });
     return () => {
       selection.disconnect();
       stopResize?.();
       motion.dispose();
       flash?.cancel();
+      sweep?.cancel();
       stopFlashOnDisable();
     };
   }, []);
   return (
     <Menu.RadioGroup {...props} ref={groupRef}>
-      <span ref={indicatorRef} className="composer-trait-indicator" aria-hidden="true" />
+      <span ref={indicatorRef} className="composer-trait-indicator" aria-hidden="true">
+        {fastMode ? <span ref={highlightRef} className="composer-trait-fast-highlight" /> : null}
+      </span>
       {children}
     </Menu.RadioGroup>
   );

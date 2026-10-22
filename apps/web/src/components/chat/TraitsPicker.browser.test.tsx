@@ -407,3 +407,67 @@ it.each(["Ultrathink", "Thinking"])(
     expect(last.playState).toBe("idle");
   },
 );
+it.each([false, true])("colors only Fast Mode on without physics (dark=%s)", async (dark) => {
+  using _settings = switchSettings(dark, false);
+  await using screen = await render(<Harness />);
+  await screen.getByRole("button").click();
+  const group = page.getByRole("group", { name: "Fast Mode", exact: true });
+  const items = group.getByRole("menuitemradio");
+  const on = items.nth(0);
+  const off = items.nth(1);
+  const indicator = group.element().querySelector<HTMLElement>(".composer-trait-indicator")!;
+  expect(getComputedStyle(indicator).backgroundImage).toBe("none");
+  await on.click();
+  await vi.waitFor(() => {
+    expect(getComputedStyle(indicator).backgroundImage).toContain("linear-gradient");
+    expect(getComputedStyle(indicator).boxShadow === "none").toBe(!dark);
+    expect(getComputedStyle(on.element().querySelector("span")!).backgroundImage).toContain(
+      "linear-gradient",
+    );
+    expect(indicator.getAnimations({ subtree: true })).toHaveLength(0);
+  });
+  await off.click();
+  await vi.waitFor(() => expect(getComputedStyle(indicator).backgroundImage).toBe("none"));
+});
+
+it("sweeps once only when entering Fast Mode and cancels on leaving or unmount", async () => {
+  using _settings = switchSettings(true, true);
+  const availableModels: ReadonlyArray<ServerProviderModel> = [
+    {
+      ...models[0]!,
+      capabilities: {
+        optionDescriptors: [
+          { id: "fastMode", label: "Fast Mode", type: "boolean", currentValue: true },
+        ],
+      },
+    },
+  ];
+  await using screen = await render(<Harness availableModels={availableModels} />);
+  await screen.getByRole("button").click();
+  using _clock = fakeTimers();
+  const group = page.getByRole("group", { name: "Fast Mode", exact: true });
+  const on = group.getByRole("menuitemradio").nth(0);
+  const off = group.getByRole("menuitemradio").nth(1);
+  const indicator = group.element().querySelector<HTMLElement>(".composer-trait-indicator")!;
+  const highlight = indicator.querySelector<HTMLElement>(".composer-trait-fast-highlight");
+  expect(highlight).not.toBeNull();
+  expect(highlight!.getAnimations()).toHaveLength(0);
+  expect(getComputedStyle(indicator).overflowX).toBe("hidden");
+  await off.click();
+  await on.click();
+  await vi.waitFor(() => expect(highlight!.getAnimations()).toHaveLength(1));
+  const animation = highlight!.getAnimations()[0]!;
+  animation.pause();
+  expect(animation.effect!.getTiming()).toMatchObject({ duration: 650, delay: 80, iterations: 1 });
+  expect((animation.effect as KeyframeEffect).getKeyframes()[0]!.transform).not.toBe(
+    (animation.effect as KeyframeEffect).getKeyframes().at(-1)!.transform,
+  );
+  await off.click();
+  await vi.waitFor(() => expect(animation.playState).toBe("idle"));
+  await on.click();
+  await vi.waitFor(() => expect(highlight!.getAnimations()).toHaveLength(1));
+  const last = highlight!.getAnimations()[0]!;
+  last.pause();
+  await screen.unmount();
+  expect(last.playState).toBe("idle");
+});
