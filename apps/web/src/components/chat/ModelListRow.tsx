@@ -54,6 +54,7 @@ export const ModelListRow = memo(function ModelListRow(props: {
       hideIndicator
       index={props.index}
       value={modelPickerModelKey(props.instanceId, props.slug)}
+      data-model-picker-key={modelPickerModelKey(props.instanceId, props.slug)}
       disabled={Boolean(props.disabledReason)}
       className={cn(
         "group relative w-full min-w-0 max-w-full cursor-pointer",

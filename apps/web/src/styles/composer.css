@@ -429,6 +429,40 @@ html[data-theme-id="graphite"] [data-composer-banner-surface]::before {
       @apply mb-1.5 flex h-8.5 shrink-0 items-center gap-2 rounded-full bg-input px-3 text-control text-placeholder shadow-well-pressed;
     }
 
+    .composer-model-picker-highlight {
+      @apply pointer-events-none absolute -z-1 rounded-menu-row;
+      --model-highlight-body: var(--popover);
+      --model-highlight-border: linear-gradient(
+        90deg,
+        rgba(11, 127, 99, 0.5),
+        rgba(37, 99, 201, 0.45) 33%,
+        rgba(106, 63, 201, 0.45) 66%,
+        rgba(194, 58, 140, 0.5)
+      );
+      border: 1px solid transparent;
+      background:
+        linear-gradient(var(--model-highlight-body), var(--model-highlight-body)) padding-box,
+        var(--model-highlight-border) border-box;
+      @variant dark {
+        --model-highlight-body: #2a2733;
+        --model-highlight-border: linear-gradient(
+          90deg,
+          rgba(138, 255, 207, 0.5),
+          rgba(124, 192, 255, 0.45) 33%,
+          rgba(195, 155, 255, 0.45) 66%,
+          rgba(255, 154, 214, 0.5)
+        );
+        box-shadow:
+          -6px 0 14px rgba(138, 255, 207, 0.1),
+          6px 0 14px rgba(255, 154, 214, 0.1);
+      }
+    }
+
+    .composer-model-picker
+      [data-slot="combobox-item"]:is([data-selected], [data-highlighted], :hover, :active) {
+      background-color: transparent;
+    }
+
     .composer-model-search:focus-within {
       @apply inset-shadow-focus;
     }

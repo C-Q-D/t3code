@@ -50,6 +50,8 @@ import {
   useToggleEnvironmentModelFavorite,
 } from "~/hooks/useSettings";
 import { cn } from "~/lib/utils";
+import { createSpringIndicator } from "~/lib/motion/springIndicator";
+import { observeResize } from "~/lib/observeResize";
 import { getVirtualizedScrollFadeClassName } from "../ui/scroll-area";
 import { TooltipProvider } from "../ui/tooltip";
 import { InlineButton } from "../ui/button";
@@ -254,19 +256,24 @@ function ModelPickerProviderNotices({
   );
 }
 
-// Owns the list's measured height and scroll fades, which change on every scroll and
-// resize without touching the picker's model lists.
+/** Owns list geometry and a key-based highlight; scrolling never rebuilds the model catalogue. */
 function ModelPickerList({
   listRef,
   itemKeys,
   extraData,
   renderItem,
+  highlightedKeyRef,
+  alignHighlightRef,
 }: {
   listRef: RefObject<LegendListRef | null>;
   itemKeys: ReadonlyArray<string>;
   extraData: unknown;
   renderItem: (props: { item: string; index: number }) => ReactNode;
+  highlightedKeyRef: RefObject<string | null>;
+  alignHighlightRef: RefObject<((animate: boolean) => void) | null>;
 }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const highlightRef = useRef<HTMLDivElement>(null);
   const [showTopScrollFade, setShowTopScrollFade] = useState(false);
   const [showBottomScrollFade, setShowBottomScrollFade] = useState(false);
   const [contentSize, setContentSize] = useState(
@@ -285,6 +292,71 @@ function ModelPickerList({
 
   // Keyed by content: a new disabled-reason closure rebuilds an identical key array.
   const itemListKey = JSON.stringify(itemKeys);
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    const highlight = highlightRef.current;
+    if (!container || !highlight) return;
+    const motion = createSpringIndicator(highlight, container, "y");
+    let previousKey: string | null = null;
+    const align = (animate: boolean) => {
+      const key = highlightedKeyRef.current;
+      const row = Array.from(
+        container.querySelectorAll<HTMLElement>("[data-model-picker-key]"),
+      ).find((element) => element.dataset.modelPickerKey === key);
+      if (!row) {
+        // Recycled DOM nodes can represent another model; hide until this key is mounted again.
+        motion.move([0, 0], false);
+        highlight.hidden = true;
+        previousKey = null;
+        return;
+      }
+      // Repeated pointer events for the same key must not interrupt its in-flight spring.
+      if (animate && previousKey === key) return;
+      highlight.hidden = false;
+      const bounds = container.getBoundingClientRect();
+      const target = row.getBoundingClientRect();
+      highlight.style.left = `${target.left - bounds.left}px`;
+      highlight.style.right = `${bounds.right - target.right}px`;
+      motion.move(
+        [target.top - bounds.top, target.bottom - bounds.top],
+        animate && previousKey !== null && previousKey !== key,
+      );
+      previousKey = key;
+    };
+    alignHighlightRef.current = align;
+    align(false);
+    let stopResize: (() => void) | undefined;
+    const observeSizes = () => {
+      stopResize?.();
+      stopResize = observeResize(
+        [container, ...container.querySelectorAll("[data-model-picker-key]")],
+        () => align(false),
+      );
+    };
+    observeSizes();
+    const mutations = new MutationObserver((records) => {
+      const layoutChanges = records.filter((record) => record.target !== highlight);
+      if (layoutChanges.length === 0) return;
+      if (layoutChanges.some((record) => record.type === "childList")) observeSizes();
+      align(false);
+    });
+    mutations.observe(container, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ["style", "data-model-picker-key"],
+    });
+    const onScroll = () => align(false);
+    container.addEventListener("scroll", onScroll, { capture: true, passive: true });
+    return () => {
+      alignHighlightRef.current = null;
+      mutations.disconnect();
+      stopResize?.();
+      container.removeEventListener("scroll", onScroll, true);
+      motion.dispose();
+    };
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- Search/provider changes replace the key set and must start aligned without motion.
+  }, [itemListKey, highlightedKeyRef, alignHighlightRef]);
   // A new list starts from the top until the measurement below lands.
   const [fadesResetFor, setFadesResetFor] = useState(itemListKey);
   if (fadesResetFor !== itemListKey) {
@@ -308,11 +380,18 @@ function ModelPickerList({
 
   return (
     <div
-      className="relative min-h-0 overflow-hidden pr-px"
+      ref={containerRef}
+      className="relative isolate min-h-0 overflow-hidden pr-px"
       style={{
         height: itemKeys.length === 0 ? 0 : `calc(${contentSize}px + var(--spacing) * 5)`,
       }}
     >
+      <div
+        ref={highlightRef}
+        data-model-picker-highlight="true"
+        className="composer-model-picker-highlight pointer-events-none absolute -z-1 rounded-menu-row bg-accent"
+        aria-hidden="true"
+      />
       <ComboboxListVirtualized>
         <LegendList<string>
           ref={listRef}
@@ -386,6 +465,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
   const modelListRef = useRef<LegendListRef | null>(null);
   const pickerContentRef = useRef<HTMLDivElement>(null);
   const highlightedModelKeyRef = useRef<string | null>(null);
+  const alignModelHighlightRef = useRef<((animate: boolean) => void) | null>(null);
   const { favorites } = useEnvironmentModelPreferences(props.environmentId);
   const activeEntry = props.instanceEntries.find(
     (entry) => entry.instanceId === props.activeInstanceId,
@@ -852,6 +932,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
           value={onToggleModel ? [...selectedModelKeySet] : activeModelKey}
           onItemHighlighted={(modelKey, eventDetails) => {
             highlightedModelKeyRef.current = typeof modelKey === "string" ? modelKey : null;
+            alignModelHighlightRef.current?.(eventDetails.reason !== "none");
             if (eventDetails.reason === "keyboard" && eventDetails.index >= 0) {
               void modelListRef.current?.scrollIndexIntoView?.({
                 index: eventDetails.index,
@@ -954,6 +1035,8 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
               listRef={modelListRef}
               itemKeys={filteredItemKeys}
               extraData={modelListExtraData}
+              highlightedKeyRef={highlightedModelKeyRef}
+              alignHighlightRef={alignModelHighlightRef}
               renderItem={({ item: modelKey, index }) => {
                 if (legacySection?.key === modelKey) {
                   return (
@@ -961,6 +1044,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
                       hideIndicator
                       index={index}
                       value={modelKey}
+                      data-model-picker-key={modelKey}
                       aria-expanded={legacySection.isExpanded}
                       className="group w-full cursor-pointer"
                     >

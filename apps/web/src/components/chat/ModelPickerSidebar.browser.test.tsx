@@ -8,6 +8,7 @@ import { isPhysicsEnabled, setPhysicsEnabled } from "~/lib/motion/preference";
 import { ModelPickerSidebar } from "./ModelPickerSidebar";
 import { t } from "~/i18n";
 import { applyThemePalette } from "../../themePalette";
+import { captureAnimations } from "../../test/captureAnimations";
 import "../../index.css";
 
 /** Uses ready local providers so navigation exercises actual toolbar buttons without network data. */
@@ -96,6 +97,7 @@ it.each([false, true])(
   async (dark) => {
     using _settings = setup(dark);
     await using screen = await render(<Harness />);
+    using _animations = captureAnimations();
     await screen.getByRole("button", { name: "claudeCode", exact: true }).click();
     await vi.waitFor(() => {
       const layer = expectAligned(screen.container);
@@ -117,12 +119,13 @@ it("animates selection once, then snaps layout changes and scrolling without rep
   const layer = expectAligned(screen.container);
   expect(layer.getAnimations()).toHaveLength(0);
   using _clock = fakeTimers();
+  using _animations = captureAnimations();
   await screen.getByRole("button", { name: "claudeCode", exact: true }).click();
   await vi.waitFor(() => {
     const animations = layer.getAnimations();
     expect(animations).toHaveLength(2);
     for (const animation of animations) {
-      animation.pause();
+      expect(animation.playState).toBe("paused");
       const timing = animation.effect!.getTiming();
       expect(timing.iterations).toBe(1);
       expect(Number(timing.duration)).toBeGreaterThan(0);
