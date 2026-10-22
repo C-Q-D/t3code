@@ -10,6 +10,7 @@ export const WebPageId = TrimmedNonEmptyString.check(
   Schema.isMaxLength(64),
   Schema.isPattern(/^[^\p{Cc}]+$/u),
 );
+/** Stable saved-page identity shared by settings, session hints and runtime tabs. */
 export type WebPageId = typeof WebPageId.Type;
 
 export const WebPageName = TrimmedNonEmptyString.check(

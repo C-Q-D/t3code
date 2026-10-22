@@ -1,5 +1,7 @@
-// @vitest-environment jsdom
-/** Exercises session persistence through localStorage, including unavailable and corrupt storage. */
+/**
+ * Exercises session persistence through localStorage, including unavailable and corrupt storage.
+ * @vitest-environment jsdom
+ */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import {
   forgetWebPageSession,
