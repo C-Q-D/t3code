@@ -56,6 +56,7 @@ import LegacyThreadSidebar from "./LegacySidebar";
 import { useThreadVisitedMigration } from "../hooks/useThreadVisitedMigration";
 import ThreadSidebar from "./Sidebar";
 import { SettingsSidebarNav } from "./settings/SettingsSidebarNav";
+import { WebPagesSidebar } from "../webPages/WebPagesSidebar";
 import { isWebPagesPage, MainAppLocationTracker } from "./sidebar/mainAppLocation";
 import { ProjectRail } from "./sidebar/ProjectRail";
 import { useSidebarStageBackdropVariant } from "./SidebarStageBackdrop";
@@ -517,7 +518,7 @@ function AppShell({ children }: { children: ReactNode }) {
               style={windowControlsInsetStyle}
             >
               {isOnWebPages ? (
-                <div className="p-4">{t.webPages.title}</div>
+                <WebPagesSidebar />
               ) : isOnSettings ? (
                 <SettingsSidebarNav pathname={pathname} />
               ) : legacySidebarEnabled ? (
