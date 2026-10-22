@@ -2,6 +2,7 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useTitlebarSlot } from "../components/frame/titlebarSlot";
 import { t } from "../i18n";
+import { WebPagesPage } from "../webPages/WebPagesPage";
 
 export const Route = createFileRoute("/web")({
   beforeLoad: async ({ context }) => {
@@ -23,7 +24,7 @@ function WebPagesRoute() {
   return (
     <>
       {titlebar}
-      <div className="flex h-full min-h-0 flex-col">{t.webPages.title}</div>
+      <WebPagesPage />
     </>
   );
 }
