@@ -1703,6 +1703,54 @@ describe("PreviewManager", () => {
     ),
   );
 
+  effectIt.effect("keeps a personal webview out of the agent browser host", () =>
+    Effect.gen(function* () {
+      const host = yield* DesktopBrowserHost.DesktopBrowserHost;
+      const lines = yield* Queue.unbounded<string>();
+      yield* host.events.pipe(
+        Stream.runForEach((line) => Queue.offer(lines, new TextDecoder().decode(line))),
+        Effect.forkScoped,
+      );
+      const capturePage = vi.fn(async () => ({
+        toPNG: () => Buffer.from("png"),
+        toJPEG: () => Buffer.from("jpeg"),
+        getSize: () => ({ width: 100, height: 80 }),
+      }));
+      const personalGuest = Object.assign(makeTestPreviewWebContents(capturePage, 42), {
+        isDevToolsOpened: () => false,
+        getUserAgent: () => "Electron",
+      });
+      const serverGuest = Object.assign(makeTestPreviewWebContents(capturePage, 43), {
+        isDevToolsOpened: () => false,
+        getUserAgent: () => "Electron",
+      });
+      const manager = yield* PreviewManager.PreviewManager;
+      fromId.mockReturnValue(personalGuest);
+      yield* manager.createTab("web-page:personal");
+      yield* manager.registerWebview("web-page:personal", 42);
+
+      // A subsequent server attachment is a delivery barrier and a positive control:
+      // an unsubscribed stream cannot make the absence assertion pass.
+      fromId.mockReturnValue(serverGuest);
+      yield* manager.createTab("server-control", {
+        serverTab: { threadId: "control-thread", tabId: "control-tab" },
+      });
+      yield* manager.registerWebview("server-control", 43);
+      expect(JSON.parse(yield* Queue.take(lines))).toMatchObject({
+        type: "attached",
+        threadId: "control-thread",
+        tabId: "control-tab",
+      });
+      yield* manager.closeTab("web-page:personal");
+      yield* manager.closeTab("server-control");
+      expect(JSON.parse(yield* Queue.take(lines))).toMatchObject({
+        type: "detached",
+        threadId: "control-thread",
+        tabId: "control-tab",
+      });
+    }).pipe(Effect.provide(managerLayer()), Effect.scoped),
+  );
+
   effectIt.effect("tells the server when a tab it renders natively closes", () =>
     Effect.gen(function* () {
       const host = yield* DesktopBrowserHost.DesktopBrowserHost;
