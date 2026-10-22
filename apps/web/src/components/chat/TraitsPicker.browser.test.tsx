@@ -8,6 +8,7 @@ import {
   type ServerProviderModel,
 } from "@t3tools/contracts";
 import { fakeTimers, render } from "../../../test/render";
+import { captureAnimations } from "../../test/captureAnimations";
 import { TraitsMenuContent } from "./TraitsPicker";
 import { TraitsMenu } from "./TraitsMenu";
 import { MenuTrigger, MenuPopup } from "../ui/menu";
@@ -86,6 +87,7 @@ it.each(["Effort", "Fast Mode"])(
     };
     expect(isPhysicsEnabled()).toBe(false);
     await using screen = await render(<Harness />);
+    using _animations = captureAnimations();
     await screen.getByRole("button").click();
     const group = page.getByRole("group", { name: label, exact: true });
     const next = group
@@ -120,6 +122,7 @@ it("moves both edges with finite animations when physics is enabled", async () =
     },
   };
   await using screen = await render(<Harness />);
+  using _animations = captureAnimations();
   await screen.getByRole("button").click();
   const group = page.getByRole("group", { name: "Effort", exact: true });
   await expect.element(group).toBeVisible();
@@ -137,8 +140,8 @@ it("moves both edges with finite animations when physics is enabled", async () =
           animation.effect.getKeyframes().some((frame) => "left" in frame || "right" in frame),
       );
     expect(animations).toHaveLength(2);
-    animations[0]!.pause();
-    animations[1]!.pause();
+    expect(animations[0]!.playState).toBe("paused");
+    expect(animations[1]!.playState).toBe("paused");
     animations[0]!.currentTime = 80;
     animations[1]!.currentTime = 80;
     const moving = indicator.getBoundingClientRect();
@@ -198,6 +201,7 @@ it.each([false, true])(
     ];
     expect(isPhysicsEnabled()).toBe(false);
     await using screen = await render(<Harness availableModels={availableModels} />);
+    using _animations = captureAnimations();
     await screen.getByRole("button").click();
     const group = page.getByRole("group", { name: "Effort", exact: true });
     const indicator = group.element().querySelector<HTMLElement>(".composer-trait-indicator")!;
@@ -267,6 +271,7 @@ it("flashes only on entering levels 4/5 and replaces or cancels the previous fla
     },
   ];
   await using screen = await render(<Harness availableModels={availableModels} />);
+  using _animations = captureAnimations();
   await screen.getByRole("button").click();
   const group = page.getByRole("group", { name: "Effort", exact: true });
   const indicator = group.element().querySelector<HTMLElement>(".composer-trait-indicator")!;
@@ -275,7 +280,7 @@ it("flashes only on entering levels 4/5 and replaces or cancels the previous fla
   await group.getByRole("menuitemradio", { name: "Level 4" }).click();
   await vi.waitFor(() => expect(flashes(indicator)).toHaveLength(1));
   const first = flashes(indicator)[0]!;
-  first.pause();
+  expect(first.playState).toBe("paused");
   expect(first.effect!.getTiming()).toMatchObject({
     duration: 520,
     easing: "ease-out",
@@ -352,6 +357,7 @@ function switchSettings(dark: boolean, physics: boolean) {
 it.each([false, true])("keeps switch aurora colors without motion (dark=%s)", async (dark) => {
   using _settings = switchSettings(dark, false);
   await using screen = await render(<Harness availableModels={switchModels()} />);
+  using _animations = captureAnimations();
   await screen.getByRole("button").click();
   for (const name of ["Ultrathink", "Thinking"]) {
     const row = page.getByRole("menuitemcheckbox", { name, exact: true });
@@ -380,6 +386,7 @@ it.each(["Ultrathink", "Thinking"])(
     await using screen = await render(
       <Harness availableModels={switchModels(true)} initialPrompt="Ultrathink: " />,
     );
+    using _animations = captureAnimations();
     await screen.getByRole("button").click();
     using _clock = fakeTimers();
     const row = page.getByRole("menuitemcheckbox", { name, exact: true });
@@ -393,7 +400,7 @@ it.each(["Ultrathink", "Thinking"])(
     await row.click();
     await vi.waitFor(() => expect(halo!.getAnimations()).toHaveLength(1));
     const animation = halo!.getAnimations()[0]!;
-    animation.pause();
+    expect(animation.playState).toBe("paused");
     expect(animation.effect!.getTiming()).toMatchObject({ duration: 650, iterations: 1 });
     expect((animation.effect as KeyframeEffect).getKeyframes()[0]!.boxShadow).not.toBe(
       (animation.effect as KeyframeEffect).getKeyframes().at(-1)!.boxShadow,
@@ -402,7 +409,7 @@ it.each(["Ultrathink", "Thinking"])(
     expect(animation.playState).toBe("idle");
     await row.click();
     const last = halo!.getAnimations()[0]!;
-    last.pause();
+    expect(last.playState).toBe("paused");
     await screen.unmount();
     expect(last.playState).toBe("idle");
   },
@@ -410,6 +417,7 @@ it.each(["Ultrathink", "Thinking"])(
 it.each([false, true])("colors only Fast Mode on without physics (dark=%s)", async (dark) => {
   using _settings = switchSettings(dark, false);
   await using screen = await render(<Harness />);
+  using _animations = captureAnimations();
   await screen.getByRole("button").click();
   const group = page.getByRole("group", { name: "Fast Mode", exact: true });
   const items = group.getByRole("menuitemradio");
@@ -443,6 +451,7 @@ it("sweeps once only when entering Fast Mode and cancels on leaving or unmount",
     },
   ];
   await using screen = await render(<Harness availableModels={availableModels} />);
+  using _animations = captureAnimations();
   await screen.getByRole("button").click();
   using _clock = fakeTimers();
   const group = page.getByRole("group", { name: "Fast Mode", exact: true });
@@ -457,7 +466,7 @@ it("sweeps once only when entering Fast Mode and cancels on leaving or unmount",
   await on.click();
   await vi.waitFor(() => expect(highlight!.getAnimations()).toHaveLength(1));
   const animation = highlight!.getAnimations()[0]!;
-  animation.pause();
+  expect(animation.playState).toBe("paused");
   expect(animation.effect!.getTiming()).toMatchObject({ duration: 650, delay: 80, iterations: 1 });
   expect((animation.effect as KeyframeEffect).getKeyframes()[0]!.transform).not.toBe(
     (animation.effect as KeyframeEffect).getKeyframes().at(-1)!.transform,
@@ -467,7 +476,27 @@ it("sweeps once only when entering Fast Mode and cancels on leaving or unmount",
   await on.click();
   await vi.waitFor(() => expect(highlight!.getAnimations()).toHaveLength(1));
   const last = highlight!.getAnimations()[0]!;
-  last.pause();
+  expect(last.playState).toBe("paused");
   await screen.unmount();
   expect(last.playState).toBe("idle");
 });
+it.each(["Effort", "Fast Mode"])(
+  "keeps the selected surface visible while highlighted in %s",
+  async (name) => {
+    using _settings = switchSettings(false, false);
+    await using screen = await render(<Harness />);
+    using _animations = captureAnimations();
+    await screen.getByRole("button").click();
+    const group = page.getByRole("group", { name, exact: true });
+    const selected = group.getByRole("menuitemradio").nth(name === "Effort" ? 1 : 0);
+    await selected.click();
+    await selected.hover();
+    await expect.element(selected).toHaveAttribute("data-highlighted");
+    await expect.element(selected).toHaveAttribute("data-checked");
+    expect(getComputedStyle(selected.element()).backgroundColor).toBe("rgba(0, 0, 0, 0)");
+    const other = group.getByRole("menuitemradio").nth(name === "Effort" ? 0 : 1);
+    await other.hover();
+    await expect.element(other).toHaveAttribute("data-highlighted");
+    expect(getComputedStyle(other.element()).backgroundColor).not.toBe("rgba(0, 0, 0, 0)");
+  },
+);

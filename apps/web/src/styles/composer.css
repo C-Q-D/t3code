@@ -607,7 +607,7 @@ html[data-theme-id="graphite"] [data-composer-banner-surface]::before {
       text-shadow: var(--reasoning-text-shadow);
     }
 
-    .composer-trait-segment[data-highlighted] {
+    .composer-trait-segment[data-highlighted]:not([data-checked]) {
       @apply bg-accent;
     }
 
