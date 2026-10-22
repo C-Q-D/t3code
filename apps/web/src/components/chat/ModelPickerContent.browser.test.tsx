@@ -123,6 +123,78 @@ it.each([false, true])(
   },
 );
 
+/** Waits for delivery of a real DOM notification before checking that it preserved or canceled motion. */
+async function notifyLayout(row: HTMLElement, change: () => void) {
+  await new Promise<void>((resolve) => {
+    const observer = new MutationObserver(() => {
+      observer.disconnect();
+      resolve();
+    });
+    observer.observe(row, { attributes: true, childList: true });
+    change();
+  });
+}
+
+it("preserves in-flight springs for unchanged or subpixel layout but snaps real moves and scrolling", async () => {
+  using _settings = setup(true, true);
+  await using screen = await render(<Harness />);
+  using captured = captureAnimations();
+  await screen.getByRole("combobox").click();
+  await userEvent.keyboard("{ArrowDown}");
+  await vi.waitFor(() => expectAligned(screen.container));
+  await userEvent.keyboard("{ArrowDown}");
+  await vi.waitFor(() => expect(captured.animations).toHaveLength(2));
+  const row = screen.getByRole("option", { name: /Model 01/ }).element() as HTMLElement;
+  const layer = screen.container.querySelector<HTMLElement>("[data-model-picker-highlight]")!;
+  const animations = [...captured.animations];
+  const bounds = row.getBoundingClientRect();
+  await notifyLayout(row, () => {
+    const decoration = document.createElement("span");
+    decoration.hidden = true;
+    row.append(decoration);
+  });
+  await vi.waitFor(() => {
+    expect(row.getBoundingClientRect().top).toBe(bounds.top);
+    expect(row.getBoundingClientRect().bottom).toBe(bounds.bottom);
+    expect(animations.map((animation) => animation.playState)).toEqual(["paused", "paused"]);
+    expect(layer.getAnimations()).toEqual(animations);
+  });
+  await notifyLayout(row, () => {
+    row.style.transform = "translateY(0.5px)";
+  });
+  await vi.waitFor(() => {
+    expect(row.getBoundingClientRect().top - bounds.top).toBe(0.5);
+    expect(animations.map((animation) => animation.playState)).toEqual(["paused", "paused"]);
+    expect(captured.animations).toHaveLength(2);
+  });
+  await notifyLayout(row, () => {
+    row.style.transform = "translateY(0.75px)";
+  });
+  await vi.waitFor(() => {
+    expectAligned(screen.container);
+    expect(animations.map((animation) => animation.playState)).toEqual(["idle", "idle"]);
+    expect(captured.animations).toHaveLength(2);
+  });
+  await userEvent.keyboard("{ArrowDown}");
+  await vi.waitFor(() => expect(captured.animations).toHaveLength(4));
+  const scroller = Array.from(
+    screen.getByRole("listbox").element().querySelectorAll<HTMLElement>("div"),
+  ).find(
+    (element) =>
+      element.scrollHeight > element.clientHeight && getComputedStyle(element).overflowY === "auto",
+  )!;
+  scroller.scrollTop = 1;
+  await vi.waitFor(() => {
+    expect(scroller.scrollTop).toBe(1);
+    expectAligned(screen.container);
+    expect(captured.animations.slice(2).map((animation) => animation.playState)).toEqual([
+      "idle",
+      "idle",
+    ]);
+    expect(captured.animations).toHaveLength(4);
+  });
+});
+
 it("springs between keys but snaps scrolling, recycled rows and search changes", async () => {
   using _settings = setup(true, true);
   await using screen = await render(<Harness />);

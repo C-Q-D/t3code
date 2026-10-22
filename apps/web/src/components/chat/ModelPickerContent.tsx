@@ -298,7 +298,8 @@ function ModelPickerList({
     if (!container || !highlight) return;
     const motion = createSpringIndicator(highlight, container, "y");
     let previousKey: string | null = null;
-    const align = (animate: boolean) => {
+    let previousInsets: readonly [number, number] | null = null;
+    const align = (animate: boolean, onlyIfMoved = false) => {
       const key = highlightedKeyRef.current;
       const row = Array.from(
         container.querySelectorAll<HTMLElement>("[data-model-picker-key]"),
@@ -308,6 +309,7 @@ function ModelPickerList({
         motion.move([0, 0], false);
         highlight.hidden = true;
         previousKey = null;
+        previousInsets = null;
         return;
       }
       // Repeated pointer events for the same key must not interrupt its in-flight spring.
@@ -317,11 +319,24 @@ function ModelPickerList({
       const target = row.getBoundingClientRect();
       highlight.style.left = `${target.left - bounds.left}px`;
       highlight.style.right = `${bounds.right - target.right}px`;
+      const top = target.top - bounds.top;
+      const bottom = container.clientHeight - (target.bottom - bounds.top);
+      // Compare destination insets, not the spring's painted position. Only observers may skip;
+      // scrolling still forces alignment, and retaining the last target prevents subpixel drift.
+      if (
+        onlyIfMoved &&
+        previousKey === key &&
+        previousInsets &&
+        Math.abs(top - previousInsets[0]) <= 0.5 &&
+        Math.abs(bottom - previousInsets[1]) <= 0.5
+      )
+        return;
       motion.move(
-        [target.top - bounds.top, target.bottom - bounds.top],
+        [top, target.bottom - bounds.top],
         animate && previousKey !== null && previousKey !== key,
       );
       previousKey = key;
+      previousInsets = [top, bottom];
     };
     alignHighlightRef.current = align;
     align(false);
@@ -330,7 +345,7 @@ function ModelPickerList({
       stopResize?.();
       stopResize = observeResize(
         [container, ...container.querySelectorAll("[data-model-picker-key]")],
-        () => align(false),
+        () => align(false, true),
       );
     };
     observeSizes();
@@ -338,7 +353,7 @@ function ModelPickerList({
       const layoutChanges = records.filter((record) => record.target !== highlight);
       if (layoutChanges.length === 0) return;
       if (layoutChanges.some((record) => record.type === "childList")) observeSizes();
-      align(false);
+      align(false, true);
     });
     mutations.observe(container, {
       subtree: true,
