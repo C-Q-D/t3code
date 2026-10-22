@@ -138,7 +138,7 @@ An empty database is a bad test. Seed your worktree's `.t3` with a copy of real 
   });
   ```
 
-- Upon request, user-visible frontend changes should get one integrated pass in a real client: `test-t3-app` for web, `test-t3-mobile` for mobile. The primary agent does this once after integrating. Subagents do not launch their own dev servers. Ask permission before doing computer use or spinning up browsers.
+- Upon request, user-visible frontend changes should get one integrated pass in a real client: `test-t3-app` for web, `test-t3-mobile` for mobile. The primary agent does this once after integrating. Before integrating, the primary agent may also start the app in a subagent's worktree once that work comes back and take a few screenshots of the changed UI, so visual defects go back with the review fixes instead of surfacing only after integration. Subagents do not launch their own dev servers. Ask permission before doing computer use or spinning up browsers.
 
 For authorized mobile verification, a missing or outdated native client is a build step, not a blocker. Run `node scripts/mobile-native-client.ts ensure <ios|android> <device-id>` on the simulator host before starting Metro. It checks the local Expo fingerprint and builds/installs when needed. See `test-t3-mobile` for the full workflow.
 
