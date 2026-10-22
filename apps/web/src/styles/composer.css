@@ -382,11 +382,47 @@ html[data-theme-id="graphite"] [data-composer-banner-surface]::before {
     }
 
     .composer-model-picker [data-model-picker-provider] button[aria-pressed="true"] {
-      @apply bg-accent inset-shadow-selected-control;
+      @apply bg-transparent;
+    }
+
+    .composer-model-picker-selection {
+      @apply pointer-events-none absolute rounded-compact-row;
+      --provider-selection-body: var(--popover);
+      --provider-selection-border: linear-gradient(
+        135deg,
+        #0b7f63,
+        #2563c9 35%,
+        #6a3fc9 70%,
+        #c23a8c
+      );
+      border: 1.5px solid transparent;
+      background:
+        linear-gradient(var(--provider-selection-body), var(--provider-selection-body)) padding-box,
+        var(--provider-selection-border) border-box;
+      @variant dark {
+        --provider-selection-body: #1a1626;
+        --provider-selection-border: linear-gradient(
+          135deg,
+          #8affcf,
+          #7cc0ff 35%,
+          #c39bff 70%,
+          #ff9ad6
+        );
+        box-shadow:
+          -4px -2px 12px rgba(138, 255, 207, 0.35),
+          4px 2px 12px rgba(255, 154, 214, 0.35);
+      }
     }
 
     .composer-model-picker [data-model-picker-selected-indicator] {
-      @apply hidden;
+      @apply absolute top-1/2 h-5 w-0.75 -translate-y-1/2 rounded-l-full;
+      /* Compensate for the shared layer's border to keep the bar on the rail's outer edge. */
+      right: calc(-1 * var(--provider-selection-rail-gap) - 1.5px);
+      background: linear-gradient(180deg, #0b7f63, #2563c9 40%, #6a3fc9 75%, #c23a8c);
+      @variant dark {
+        background: linear-gradient(180deg, #8affcf, #7cc0ff 40%, #c39bff 75%, #ff9ad6);
+        box-shadow: -2px 0 8px rgba(195, 155, 255, 0.7);
+      }
     }
 
     .composer-model-search {

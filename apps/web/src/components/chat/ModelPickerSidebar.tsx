@@ -8,6 +8,8 @@ import { StarIcon } from "lucide-react";
 import { ProviderInstanceIcon } from "./ProviderInstanceIcon";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { cn } from "~/lib/utils";
+import { createSpringIndicator } from "~/lib/motion/springIndicator";
+import { observeResize } from "~/lib/observeResize";
 import {
   isProviderInstancePickerReady,
   shouldShowInstanceBadge,
@@ -32,8 +34,6 @@ function describeUnavailableInstance(entry: ProviderInstanceEntry): string {
   return t.composer.modelPicker.statusHint(label, kind, msg);
 }
 
-const SELECTED_INDICATOR_CLASS =
-  "pointer-events-none absolute -right-1 top-1/2 z-10 h-5 w-0.75 -translate-y-1/2 rounded-l-full bg-primary";
 const BADGE_BASE_CLASS =
   "pointer-events-none absolute -right-0.5 top-0.5 z-10 flex size-3.5 items-center justify-center rounded-full bg-transparent shadow-sm ";
 const NEW_BADGE_CLASS = `${BADGE_BASE_CLASS} text-update-foreground `;
@@ -41,6 +41,7 @@ const NEW_BADGE_CLASS = `${BADGE_BASE_CLASS} text-update-foreground `;
 const PICKER_TOOLTIP_SIDE = "left" as const;
 const PICKER_TOOLTIP_SIDE_OFFSET = 8;
 
+/** Keeps provider navigation controlled; the decorative layer follows selection without taking focus. */
 export const ModelPickerSidebar = memo(function ModelPickerSidebar(props: {
   selectedInstanceId: ProviderInstanceId | "favorites";
   onSelectInstance: (instanceId: ProviderInstanceId | "favorites") => void;
@@ -58,26 +59,64 @@ export const ModelPickerSidebar = memo(function ModelPickerSidebar(props: {
   const showFavorites = props.showFavorites ?? true;
   const [hoveredInstanceId, setHoveredInstanceId] = useState<ProviderInstanceId | null>(null);
   const sidebarContentRef = useRef<HTMLDivElement>(null);
-  const [selectedIndicatorTop, setSelectedIndicatorTop] = useState<number | null>(null);
+  const selectionRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const content = sidebarContentRef.current;
-    if (!content) {
-      return;
-    }
-    const selectedItem = Array.from(
-      content.querySelectorAll<HTMLElement>("[data-model-picker-provider]"),
-    ).find((item) => item.dataset.modelPickerProvider === props.selectedInstanceId);
-    if (!selectedItem) {
-      setSelectedIndicatorTop(null);
-      return;
-    }
-    setSelectedIndicatorTop(selectedItem.offsetTop + selectedItem.offsetHeight / 2 - 10);
-  }, [
-    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- Adding, removing or reordering providers moves the selected item, so the indicator re-measures.
-    props.instanceEntries,
-    props.selectedInstanceId,
-    showFavorites,
-  ]);
+    const selection = selectionRef.current;
+    if (!content || !selection) return;
+    const motion = createSpringIndicator(selection, content, "y");
+    let hasSelection = false;
+    const align = (animate: boolean) => {
+      const button = content.querySelector<HTMLElement>('button[aria-pressed="true"]');
+      selection.hidden = !button;
+      if (!button) {
+        hasSelection = false;
+        return;
+      }
+      // Rect differences retain fractional pixels and share the scrolling content's coordinate space.
+      const bounds = content.getBoundingClientRect();
+      const target = button.getBoundingClientRect();
+      selection.style.left = `${target.left - bounds.left}px`;
+      selection.style.right = `${bounds.right - target.right}px`;
+      selection.style.setProperty(
+        "--provider-selection-rail-gap",
+        `${bounds.right - target.right}px`,
+      );
+      motion.move([target.top - bounds.top, target.bottom - bounds.top], animate && hasSelection);
+      hasSelection = true;
+    };
+    align(false);
+    let stopResize: (() => void) | undefined;
+    const observeSizes = () => {
+      stopResize?.();
+      stopResize = observeResize(
+        [content, ...content.querySelectorAll("[data-model-picker-provider] button")],
+        () => align(false),
+      );
+    };
+    observeSizes();
+    const changes = new MutationObserver((records) => {
+      const layoutChanged = records.some((record) => record.type === "childList");
+      if (layoutChanged) observeSizes();
+      align(!layoutChanged);
+    });
+    changes.observe(content, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ["aria-pressed"],
+    });
+    // Scrolling during a spring lands on the target instead of leaving a moving marker behind.
+    const scroller = content.parentElement;
+    const onScroll = () => align(false);
+    scroller?.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      changes.disconnect();
+      stopResize?.();
+      scroller?.removeEventListener("scroll", onScroll);
+      motion.dispose();
+    };
+  }, []);
 
   return (
     <Toolbar.Root
@@ -96,16 +135,17 @@ export const ModelPickerSidebar = memo(function ModelPickerSidebar(props: {
     >
       <div className="h-full overflow-y-auto overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <div ref={sidebarContentRef} className="relative flex min-h-full flex-col gap-1 p-1">
-          {selectedIndicatorTop !== null ? (
+          <div
+            ref={selectionRef}
+            data-model-picker-selection="true"
+            className="composer-model-picker-selection pointer-events-none absolute rounded-md"
+            aria-hidden="true"
+          >
             <div
               data-model-picker-selected-indicator="true"
-              className={cn(
-                SELECTED_INDICATOR_CLASS,
-                "right-0 translate-y-0 transition-[top] duration-200 ease-out",
-              )}
-              style={{ top: selectedIndicatorTop }}
+              className="absolute right-[calc(-1*var(--provider-selection-rail-gap))] top-1/2 h-5 w-0.75 -translate-y-1/2 rounded-l-full bg-primary"
             />
-          ) : null}
+          </div>
           {showFavorites ? (
             <>
               <div className="relative w-full" data-model-picker-provider="favorites">
