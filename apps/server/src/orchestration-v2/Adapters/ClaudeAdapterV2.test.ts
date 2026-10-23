@@ -2690,10 +2690,15 @@ describe("ClaudeAdapterV2 background wake turns", () => {
       const opened: Array<ClaudeAdapterV2.ClaudeAgentSdkQueryOpenInput> = [];
       const offered: Array<SDKUserMessage> = [];
       const closed: Array<ClaudeAdapterV2.ClaudeAgentSdkQueryOpenInput> = [];
+      const mainClosed: Array<true> = [];
       const offeredSignal = yield* Deferred.make<void>();
       const harness = yield* makeWakeHarnessWithOptions({
         settings: options?.settings ?? AUTO_COMPACT_CLAUDE_SETTINGS,
         environment: { CLAUDE_CODE_PROMPT_CACHE_TTL: "1h", SIDE_QUERY_TEST: "inherited" },
+        close: () =>
+          Effect.sync(() => {
+            mainClosed.push(true);
+          }),
         sideQuery: (input) =>
           Effect.sync(() => {
             opened.push(input);
@@ -2730,7 +2735,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
         prompt: "Suggest the next user message.",
         purpose: "suggestion",
       };
-      return { ...harness, input, turnInput, opened, offered, closed, offeredSignal };
+      return { ...harness, input, turnInput, opened, offered, closed, mainClosed, offeredSignal };
     });
 
     it.effect.each(["full-access", "approval-required"] as const)(
@@ -3009,6 +3014,107 @@ describe("ClaudeAdapterV2 background wake turns", () => {
         assert.equal(result.failure?.class, "transport_error");
         assert.equal(result.text, "Run the tests.");
         assert.deepEqual(harness.closed, harness.opened);
+      }).pipe(Effect.provide(sideLayers)),
+    );
+
+    it.effect(
+      "keeps main events and live query unchanged after a separate side session closes",
+      () =>
+        Effect.gen(function* () {
+          const harness = yield* makeSideHarness();
+          yield* harness.runtime.startTurn(harness.turnInput);
+          yield* harness.offerAndWait(turnOneResult);
+          yield* Queue.take(harness.terminalReceipts);
+          const mainOptions = harness.getOpenedOptions();
+          const mainEvents = [...harness.events];
+          yield* harness.runtime.runSideQuery!(harness.input);
+          assert.lengthOf(harness.opened, 1);
+          assert.deepEqual(harness.closed, harness.opened);
+          assert.deepEqual(harness.mainClosed, []);
+          yield* harness.runtime.startTurn({
+            ...harness.turnInput,
+            attemptId: RunAttemptId.make("after-side"),
+            providerTurnOrdinal: 2,
+          });
+          // The next main event is a FIFO barrier for queued side events, without a quiet wait.
+          const isNextMainStart = (event: ProviderAdapter.ProviderAdapterV2Event) =>
+            event.type === "provider_turn.updated" &&
+            event.providerTurn.runAttemptId === "after-side";
+          yield* harness.until(() => harness.events.some(isNextMainStart));
+          assert.deepEqual(
+            harness.events.slice(mainEvents.length, harness.events.findIndex(isNextMainStart)),
+            [],
+            "side frames must not emit provider events",
+          );
+          assert.strictEqual(
+            harness.getOpenedOptions(),
+            mainOptions,
+            "the main query context must still be reusable",
+          );
+          assert.lengthOf(harness.processQueues, 1);
+          assert.lengthOf(harness.offeredMessages, 2);
+          yield* harness.offerAndWait(
+            makeResultFrame({ uuid: "after-side", result: "Main still works" }),
+          );
+          yield* Queue.take(harness.terminalReceipts);
+        }).pipe(Effect.provide(sideLayers)),
+    );
+
+    it.effect("does not mark a native thread as opened when only its side fork ran", () =>
+      Effect.gen(function* () {
+        const harness = yield* makeSideHarness();
+        yield* harness.runtime.runSideQuery!(harness.input);
+        assert.equal(harness.opened[0]!.options.resume, WAKE_NATIVE_SESSION);
+        yield* harness.runtime.startTurn(harness.turnInput);
+        assert.equal(harness.getOpenedOptions()!.sessionId, WAKE_NATIVE_SESSION);
+        assert.isUndefined(
+          harness.getOpenedOptions()!.resume,
+          "side queries must not add the parent to openedNativeThreads",
+        );
+        assert.deepEqual(harness.mainClosed, []);
+      }).pipe(Effect.provide(sideLayers)),
+    );
+
+    it.effect("closes only the side session when the caller's deadline interrupts it", () =>
+      Effect.gen(function* () {
+        const harness = yield* makeSideHarness({ messages: Stream.never });
+        yield* harness.runtime.startTurn(harness.turnInput);
+        yield* harness.offerAndWait(turnOneResult);
+        yield* Queue.take(harness.terminalReceipts);
+        const mainOptions = harness.getOpenedOptions();
+        const mainEvents = [...harness.events];
+        const fiber = yield* harness.runtime.runSideQuery!(harness.input).pipe(
+          Effect.timeout("45 seconds"),
+          Effect.forkScoped,
+        );
+        yield* Deferred.await(harness.offeredSignal);
+        yield* TestClock.adjust("45 seconds");
+        const exit = yield* Fiber.await(fiber);
+        assert.isTrue(Exit.isFailure(exit));
+        assert.lengthOf(harness.opened, 1);
+        assert.deepEqual(
+          harness.closed,
+          harness.opened,
+          "deadline must release the acquired side query",
+        );
+        assert.deepEqual(harness.mainClosed, []);
+        yield* harness.runtime.startTurn({
+          ...harness.turnInput,
+          attemptId: RunAttemptId.make("after-side-timeout"),
+          providerTurnOrdinal: 2,
+        });
+        // The next main event is a FIFO barrier for queued side events, without a quiet wait.
+        const isNextMainStart = (event: ProviderAdapter.ProviderAdapterV2Event) =>
+          event.type === "provider_turn.updated" &&
+          event.providerTurn.runAttemptId === "after-side-timeout";
+        yield* harness.until(() => harness.events.some(isNextMainStart));
+        assert.deepEqual(
+          harness.events.slice(mainEvents.length, harness.events.findIndex(isNextMainStart)),
+          [],
+          "side frames must not emit provider events",
+        );
+        assert.strictEqual(harness.getOpenedOptions(), mainOptions);
+        assert.lengthOf(harness.processQueues, 1);
       }).pipe(Effect.provide(sideLayers)),
     );
   });
