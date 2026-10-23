@@ -239,6 +239,7 @@ import * as UsageService from "./usage/UsageService.ts";
 import * as TraceDiagnostics from "./diagnostics/TraceDiagnostics.ts";
 import * as PullRequestService from "./pullRequest/PullRequestService.ts";
 import * as PullRequestReviewGuideService from "./pullRequest/PullRequestReviewGuideService.ts";
+import * as ComposerAssistService from "./composerAssist/ComposerAssistService.ts";
 import { listLinkedPullRequestThreads } from "./pullRequest/linkedThreads.ts";
 import { pullRequestSyncKey } from "./pullRequest/pullRequestSyncKey.ts";
 import * as SqlClient from "effect/sql/SqlClient";
@@ -1330,6 +1331,7 @@ export const layerWsRpc = (
       const secretRequests = yield* SecretRequests.SecretRequests;
       const pullRequests = yield* PullRequestService.PullRequestService;
       const reviewGuides = yield* PullRequestReviewGuideService.PullRequestReviewGuideService;
+      const composerAssist = yield* ComposerAssistService.ComposerAssistService;
       const pullRequestSync = yield* PullRequestSyncReactor.PullRequestSyncReactor;
       const deviceService = yield* DeviceService.DeviceService;
       const deviceHostContext =
@@ -2607,6 +2609,8 @@ export const layerWsRpc = (
           withPullRequestViewer(input, reviewGuides.get(input)),
         [WS_METHODS.pullRequestsGenerateReviewGuide]: (input) =>
           withPullRequestViewer(input, reviewGuides.generate(input)),
+        [WS_METHODS.composerSuggestNext]: (input) => composerAssist.suggestNext(input),
+        [WS_METHODS.composerOptimizePrompt]: (input) => composerAssist.optimizePrompt(input),
         [WS_METHODS.pullRequestsThreadComments]: (input) =>
           withPullRequestViewer(input, pullRequests.threadComments(input)),
         [WS_METHODS.pullRequestsDiffFileContents]: (input) =>
@@ -3326,6 +3330,7 @@ export const layer = Layer.unwrap(
     const pullRequests = yield* PullRequestService.PullRequestService;
     const discussions = yield* Discussions.DiscussionService;
     const reviewGuides = yield* PullRequestReviewGuideService.PullRequestReviewGuideService;
+    const composerAssist = yield* ComposerAssistService.ComposerAssistService;
     const sql = yield* SqlClient.SqlClient;
     return HttpRouter.add(
       "GET",
@@ -3416,6 +3421,9 @@ export const layer = Layer.unwrap(
               Layer.provide(Layer.succeed(Discussions.DiscussionService, discussions)),
               Layer.provide(OtlpEndpointCheck.layer),
               Layer.provide(ThreadTranscriptExport.layer),
+              Layer.provide(
+                Layer.succeed(ComposerAssistService.ComposerAssistService, composerAssist),
+              ),
               // Shared like the pull request service, so concurrent generations single-flight.
               Layer.provide(
                 Layer.succeed(

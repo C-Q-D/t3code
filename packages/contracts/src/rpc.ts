@@ -1,5 +1,12 @@
 /** Defines typed RPC methods, request groups and transport errors; contains no handlers. */
 import {
+  ComposerAssistError,
+  ComposerSuggestInput,
+  ComposerSuggestResult,
+  ComposerOptimizeInput,
+  ComposerOptimizeResult,
+} from "./composerAssist.ts";
+import {
   DiscussionError,
   DiscussionListInput,
   DiscussionListResult,
@@ -437,6 +444,8 @@ export const WS_METHODS = {
   mcpAppsUpdateModelContext: "mcpApps.updateModelContext",
 
   providerUploadFeedback: "provider.uploadFeedback",
+  composerSuggestNext: "composer.suggestNext",
+  composerOptimizePrompt: "composer.optimizePrompt",
   providerAuthStart: "provider.auth.start",
   providerConsumeResetCredit: "provider.consumeResetCredit",
   providerAuthComplete: "provider.auth.complete",
@@ -1394,6 +1403,18 @@ const WsProviderUploadFeedbackRpc = Rpc.make(WS_METHODS.providerUploadFeedback, 
   error: Schema.Union([ProviderUploadFeedbackError, EnvironmentAuthorizationError]),
 });
 
+const WsComposerSuggestNextRpc = Rpc.make(WS_METHODS.composerSuggestNext, {
+  payload: ComposerSuggestInput,
+  success: ComposerSuggestResult,
+  error: Schema.Union([ComposerAssistError, EnvironmentAuthorizationError]),
+});
+
+const WsComposerOptimizePromptRpc = Rpc.make(WS_METHODS.composerOptimizePrompt, {
+  payload: ComposerOptimizeInput,
+  success: ComposerOptimizeResult,
+  error: Schema.Union([ComposerAssistError, EnvironmentAuthorizationError]),
+});
+
 const WsSubscribeVcsStatusRpc = Rpc.make(WS_METHODS.subscribeVcsStatus, {
   payload: VcsStatusSubscriptionInput,
   success: VcsStatusStreamEvent,
@@ -2231,6 +2252,8 @@ export const WsRpcGroup = RpcGroup.make(
   WsMcpAppsReadResourceRpc,
   WsMcpAppsUpdateModelContextRpc,
   WsProviderUploadFeedbackRpc,
+  WsComposerSuggestNextRpc,
+  WsComposerOptimizePromptRpc,
   WsSubscribeVcsStatusRpc,
   WsSubscribeWorktreeSetupRpc,
   WsWorktreeSetupCancelRpc,
