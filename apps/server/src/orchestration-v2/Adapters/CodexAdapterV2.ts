@@ -6731,6 +6731,8 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
             const parentThreadId = yield* getNativeThreadId(query.providerThread);
             const mcpSession = yield* mcpSessions.read(query.threadId);
             const done = yield* Deferred.make<void>();
+            const queryScope = yield* Scope.Scope;
+            const attemptedTools: Array<string> = [];
             let text = "";
             let latestMessageId: string | undefined;
             let usage: ProviderAdapter.ProviderAdapterV2SideQueryUsage | null = null;
@@ -6749,10 +6751,33 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                   break;
                 }
                 case "item/started": {
-                  const { item } = yield* decodeSideItemStarted(payload).pipe(Effect.orDie);
+                  const { item, threadId, turnId } = yield* decodeSideItemStarted(payload).pipe(
+                    Effect.orDie,
+                  );
                   if (item.type === "agentMessage") {
                     latestMessageId = item.id;
                     text = item.text;
+                  } else if (
+                    item.type !== "reasoning" &&
+                    item.type !== "userMessage" &&
+                    item.type !== "contextCompaction"
+                  ) {
+                    attemptedTools.push(item.type);
+                    // Notifications and RPC replies share one reader. Awaiting the reply here
+                    // would deadlock it; enqueue the interrupt immediately in the query scope.
+                    yield* client.request("turn/interrupt", { threadId, turnId }).pipe(
+                      Effect.catch((cause) =>
+                        Effect.gen(function* () {
+                          stop = "error";
+                          failure = {
+                            class: "transport_error",
+                            detail: `Side-query interrupt failed: ${cause._tag}.`,
+                          };
+                          yield* Deferred.succeed(done, undefined);
+                        }),
+                      ),
+                      Effect.forkIn(queryScope, { startImmediately: true }),
+                    );
                   }
                   break;
                 }
@@ -6791,7 +6816,10 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                 }
                 case "turn/completed": {
                   const { turn } = yield* decodeSideTurnCompleted(payload).pipe(Effect.orDie);
-                  if (turn.status !== "completed") {
+                  if (attemptedTools.length > 0) {
+                    stop = "interrupted_on_tool";
+                    failure = null;
+                  } else if (turn.status !== "completed") {
                     stop = "error";
                     failure =
                       turn.error == null
@@ -6866,7 +6894,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
               text,
               model: fork.model,
               usage,
-              attemptedTools: [],
+              attemptedTools,
               stop,
               failure,
             } satisfies ProviderAdapter.ProviderAdapterV2SideQueryResult;

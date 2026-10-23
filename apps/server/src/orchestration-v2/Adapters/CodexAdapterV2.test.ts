@@ -1553,6 +1553,241 @@ describe("CodexAdapterV2 post-settle continuation", () => {
       ),
   );
 
+  /** Starts the parent with the same non-default inputs used by side-query protocol fixtures. */
+  const prepareSideQuery = Effect.fn("test.prepareSideQuery")(function* (
+    transcript: CodexReplay.CodexAppServerReplayTranscript,
+    onRequest: (method: string, params: unknown) => Effect.Effect<void>,
+    beforeEmitInbound?: NonNullable<CodexReplay.CodexAppServerReplayDriver["beforeEmitInbound"]>,
+  ) {
+    const harness = yield* makeCodexReplayHarness(
+      transcript,
+      undefined,
+      onRequest,
+      undefined,
+      beforeEmitInbound === undefined ? undefined : { beforeEmitInbound },
+    );
+    const queryInput = {
+      ...makeCodexTestTurnInput({
+        threadId: harness.threadId,
+        providerThread: harness.providerThread,
+        now: yield* DateTime.now,
+        attemptId: RunAttemptId.make("side-parent-attempt"),
+        text: "main prompt",
+      }),
+      modelSelection: {
+        ...CODEX_TEST_MODEL_SELECTION,
+        options: [{ id: "reasoningEffort", value: "high" }],
+      },
+      runtimePolicy: { ...CODEX_TEST_RUNTIME_POLICY, interactionMode: "plan" as const },
+      appContext: [{ key: "app", text: "app context" }],
+      developerContext: [{ key: "developer", text: "developer context" }],
+      prompt: "side prompt",
+      purpose: "suggestion" as const,
+    };
+    yield* harness.runtime.startTurn(queryInput);
+    yield* harness.firstTerminal;
+    return { harness, queryInput };
+  });
+
+  it.effect(
+    "side query interrupts every tool in arrival order and preserves text without main events",
+    () =>
+      Effect.gen(function* () {
+        const base = sideQueryTranscript("completed");
+        const sent: Array<{ method: string; params: unknown }> = [];
+        const transcript = {
+          ...base,
+          scenario: "side-tools",
+          entries: [
+            ...base.entries.slice(0, -3),
+            {
+              type: "emit_inbound",
+              frame: {
+                method: "item/started",
+                params: {
+                  threadId: "side-child",
+                  turnId: "side-turn",
+                  item: { type: "userMessage", id: "user", content: [] },
+                },
+              },
+            },
+            {
+              type: "emit_inbound",
+              frame: {
+                method: "item/started",
+                params: {
+                  threadId: "side-child",
+                  turnId: "side-turn",
+                  item: { type: "reasoning", id: "reason", summary: [], content: [] },
+                },
+              },
+            },
+            {
+              type: "emit_inbound",
+              frame: {
+                method: "item/started",
+                params: {
+                  threadId: "side-child",
+                  turnId: "side-turn",
+                  item: { type: "contextCompaction", id: "compact" },
+                },
+              },
+            },
+            {
+              type: "emit_inbound",
+              frame: {
+                method: "item/started",
+                params: {
+                  threadId: "side-child",
+                  turnId: "side-turn",
+                  item: {
+                    type: "mcpToolCall",
+                    id: "mcp",
+                    server: "external",
+                    tool: "write",
+                    status: "inProgress",
+                    arguments: {},
+                  },
+                },
+              },
+            },
+            {
+              type: "emit_inbound",
+              frame: {
+                method: "item/started",
+                params: {
+                  threadId: "side-child",
+                  turnId: "side-turn",
+                  item: {
+                    type: "commandExecution",
+                    id: "exec",
+                    command: "write",
+                    cwd: "/workspace",
+                    processId: null,
+                    source: "unifiedExecStartup",
+                    status: "inProgress",
+                    commandActions: [],
+                    aggregatedOutput: null,
+                    exitCode: null,
+                    durationMs: null,
+                  },
+                },
+              },
+            },
+            {
+              type: "emit_inbound",
+              frame: {
+                method: "turn/completed",
+                params: {
+                  threadId: "side-child",
+                  turn: makeCodexReplayTurn({ id: "side-turn", status: "interrupted" }),
+                },
+              },
+            },
+            {
+              type: "expect_outbound",
+              frame: {
+                id: 6,
+                method: "turn/interrupt",
+                params: { threadId: "side-child", turnId: "side-turn" },
+              },
+            },
+            { type: "emit_inbound", frame: { id: 6, result: {} } },
+            {
+              type: "expect_outbound",
+              frame: {
+                id: 7,
+                method: "turn/interrupt",
+                params: { threadId: "side-child", turnId: "side-turn" },
+              },
+            },
+            { type: "emit_inbound", frame: { id: 7, result: {} } },
+            {
+              type: "expect_outbound",
+              frame: { id: 8, method: "thread/unsubscribe", params: { threadId: "side-child" } },
+            },
+            { type: "emit_inbound", frame: { id: 8, result: { status: "unsubscribed" } } },
+          ] satisfies Array<CodexReplay.CodexAppServerReplayEntry>,
+        };
+        const { harness, queryInput } = yield* prepareSideQuery(transcript, (method, params) =>
+          Effect.sync(() => {
+            sent.push({ method, params });
+          }),
+        );
+        const eventsBefore = [...harness.events];
+        const result = yield* harness.runtime.runSideQuery!(queryInput);
+        assert.deepEqual(result, {
+          text: "final suggestion",
+          model: "gpt-5.4-resolved",
+          usage: { inputTokens: 120, cachedInputTokens: 97, outputTokens: 5 },
+          attemptedTools: ["mcpToolCall", "commandExecution"],
+          stop: "interrupted_on_tool",
+          failure: null,
+        });
+        assert.deepEqual(
+          sent.filter((entry) => entry.method === "turn/interrupt"),
+          [
+            { method: "turn/interrupt", params: { threadId: "side-child", turnId: "side-turn" } },
+            { method: "turn/interrupt", params: { threadId: "side-child", turnId: "side-turn" } },
+          ],
+        );
+        assert.deepEqual(harness.events, eventsBefore);
+        assert.deepEqual(sent.at(-1), {
+          method: "thread/unsubscribe",
+          params: { threadId: "side-child" },
+        });
+      }).pipe(
+        Effect.scoped,
+        Effect.provide(
+          Layer.mergeAll(IdAllocator.layer, McpProviderSessions.layer, NodeServices.layer),
+        ),
+      ),
+  );
+
+  it.effect("side query releases its fork when the caller deadline interrupts it", () =>
+    Effect.gen(function* () {
+      const ready = yield* Deferred.make<void>();
+      const sent: Array<{ method: string; params: unknown }> = [];
+      const base = sideQueryTranscript("completed");
+      const transcript = {
+        ...base,
+        scenario: "side-timeout",
+        entries: [...base.entries.slice(0, -3), ...base.entries.slice(-2)],
+      };
+      const { harness, queryInput } = yield* prepareSideQuery(
+        transcript,
+        (method, params) =>
+          Effect.sync(() => {
+            sent.push({ method, params });
+          }),
+        (entry) =>
+          Predicate.isObject(entry.frame) && entry.frame.method === "thread/tokenUsage/updated"
+            ? Deferred.succeed(ready, undefined).pipe(Effect.asVoid)
+            : Effect.void,
+      );
+      const eventsBefore = [...harness.events];
+      const pending = yield* harness.runtime.runSideQuery!(queryInput).pipe(
+        Effect.timeout("45 seconds"),
+        Effect.flip,
+        Effect.forkChild({ startImmediately: true }),
+      );
+      yield* Deferred.await(ready);
+      yield* TestClock.adjust("45 seconds");
+      const error = yield* Fiber.join(pending);
+      assert.equal(error._tag, "TimeoutError");
+      assert.deepEqual(sent.at(-1), {
+        method: "thread/unsubscribe",
+        params: { threadId: "side-child" },
+      });
+      assert.deepEqual(harness.events, eventsBefore);
+    }).pipe(
+      Effect.scoped,
+      Effect.provide(
+        Layer.mergeAll(IdAllocator.layer, McpProviderSessions.layer, NodeServices.layer),
+      ),
+    ),
+  );
+
   /** Builds usage notifications with the usable window reported by Codex, not its configured window. */
   const compactionUsageEntry = (
     turnId: string,
