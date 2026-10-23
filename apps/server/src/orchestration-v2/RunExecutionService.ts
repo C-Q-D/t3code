@@ -1560,22 +1560,11 @@ export const layer: Layer.Layer<
           }),
         );
         yield* touchMcpCredential;
-        const appContext = (yield* mcpAppModelContext
-          .forThread(input.run.threadId)
-          .pipe(
-            Effect.catch((cause) =>
-              Effect.logWarning("Failed to read MCP app model context.", { cause }).pipe(
-                Effect.as([]),
-              ),
-            ),
-          )).map((entry) => ({
-          // The item id alone is unique and needs no escaping; server and
-          // tool names are free text that would break the tag Codex wraps
-          // the context in.
-          key: `mcp_app_${entry.itemId.replace(/[^\w.-]/g, "_")}`,
-          text: entry.text,
-        }));
-        const developerContext = yield* threadDeveloperContext.forThread(input.run.threadId);
+        const { appContext, developerContext } = yield* readTurnContext(
+          input.run.threadId,
+          mcpAppModelContext,
+          threadDeveloperContext,
+        );
         const turnInput = {
           ...(developerContext.length === 0 ? {} : { developerContext }),
           appThread: input.appThread,
@@ -1720,3 +1709,26 @@ export function makeInterruptResultTurnItem(input: {
     message: "Run interrupted by user",
   };
 }
+
+/** Reads the same ordered context for main turns and side queries; MCP read failures warn and use no app entries. */
+export const readTurnContext = Effect.fn("RunExecutionService.readTurnContext")(function* (
+  threadId: ThreadId,
+  mcpAppModelContext: McpAppModelContext.McpAppModelContext["Service"],
+  threadDeveloperContext: typeof ThreadDeveloperContext.ThreadDeveloperContext.Service,
+) {
+  const appContext = (yield* mcpAppModelContext
+    .forThread(threadId)
+    .pipe(
+      Effect.catch((cause) =>
+        Effect.logWarning("Failed to read MCP app model context.", { cause }).pipe(Effect.as([])),
+      ),
+    )).map((entry) => ({
+    // The item id alone is unique and needs no escaping; server and
+    // tool names are free text that would break the tag Codex wraps
+    // the context in.
+    key: `mcp_app_${entry.itemId.replace(/[^\w.-]/g, "_")}`,
+    text: entry.text,
+  }));
+  const developerContext = yield* threadDeveloperContext.forThread(threadId);
+  return { appContext, developerContext };
+});

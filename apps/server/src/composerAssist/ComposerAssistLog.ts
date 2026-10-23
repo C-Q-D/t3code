@@ -2,6 +2,7 @@
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
 import * as Path from "effect/Path";
 import { makeAsyncRotatingFileSink } from "@t3tools/shared/logging";
 import * as ServerConfig from "../config.ts";
@@ -44,6 +45,8 @@ export class ComposerAssistLog extends Context.Service<
   }
 >()("t3/composerAssist/ComposerAssistLog") {}
 
+const encodeRecord = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
+
 const make = Effect.gen(function* () {
   const config = yield* ServerConfig.ServerConfig;
   const path = yield* Path.Path;
@@ -60,8 +63,9 @@ const make = Effect.gen(function* () {
         });
         return;
       }
+      const line = yield* encodeRecord(record).pipe(Effect.orDie);
       yield* sink.success
-        .write(`${JSON.stringify(record)}\n`)
+        .write(`${line}\n`)
         .pipe(
           Effect.catch((cause) =>
             Effect.logWarning("Failed to write composer diagnostics.", { cause }),

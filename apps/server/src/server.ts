@@ -51,6 +51,10 @@ import * as SqlitePersistence from "./persistence/Sqlite.ts";
 import * as PullRequestFilesViewed from "./persistence/PullRequestFilesViewed.ts";
 import * as PullRequestReviewGuides from "./persistence/PullRequestReviewGuides.ts";
 import * as PullRequestReviewGuideService from "./pullRequest/PullRequestReviewGuideService.ts";
+import * as ComposerAssistLog from "./composerAssist/ComposerAssistLog.ts";
+import * as ComposerRuntimePolicy from "./orchestration-v2/RuntimePolicy.ts";
+import * as ComposerMcpContext from "./mcpApps/McpAppModelContext.ts";
+import * as DiscussionDeveloperContext from "./discussions/DiscussionDeveloperContext.ts";
 import * as ComposerAssistService from "./composerAssist/ComposerAssistService.ts";
 import * as ServerLifecycleEvents from "./serverLifecycleEvents.ts";
 import * as AnalyticsService from "./telemetry/AnalyticsService.ts";
@@ -741,7 +745,19 @@ const layerMakeRoutes = Layer.mergeAll(
   Layer.provide(
     PullRequestReviewGuideService.layer.pipe(Layer.provide(PullRequestReviewGuides.layer)),
   ),
-  Layer.provide(ComposerAssistService.layer),
+  Layer.provide(
+    ComposerAssistService.layer.pipe(
+      Layer.provide(
+        Layer.mergeAll(
+          ComposerAssistLog.layer,
+          ComposerRuntimePolicy.layerFromProjectStore.pipe(Layer.provide(ProjectStore.layer)),
+          ComposerMcpContext.layer,
+          DiscussionDeveloperContext.layer.pipe(Layer.provide(ProjectionStoreV2.layer)),
+          ProjectionStoreV2.layer,
+        ),
+      ),
+    ),
+  ),
   // Both transports consume the same service instance, so caches single-flight across clients
   // and mutations observed on WebSocket invalidate patches subsequently read over HTTP.
   Layer.provide(layerPullRequestService),

@@ -46,12 +46,12 @@ it.effect("writes two complete metadata records without draft or suggestion bodi
       });
     }).pipe(
       Effect.provide(
-        ComposerAssistLog.layer.pipe(
-          Layer.provide(Layer.mock(ServerConfig.ServerConfig)({ stateDir })),
-        ),
+        ComposerAssistLog.layer.pipe(Layer.provide(ServerConfig.layerTest(stateDir, stateDir))),
       ),
     );
-    const content = yield* fs.readFileString(path.join(stateDir, "logs", "composer-assist.ndjson"));
+    const content = yield* fs.readFileString(
+      path.join(stateDir, "userdata", "logs", "composer-assist.ndjson"),
+    );
     assert.deepStrictEqual(
       content
         .trim()
