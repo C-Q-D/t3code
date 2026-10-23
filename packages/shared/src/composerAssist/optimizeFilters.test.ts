@@ -80,3 +80,15 @@ it.each([
 ])("still rejects changed wrapped targets: %j", (draft, raw) => {
   expect(checkOptimizedPrompt(raw, draft)).toBe("references_dropped");
 });
+
+it.each([
+  ['fix "/src/a.ts"', 'Please fix "/src/a.ts backup" and test'],
+  ["fix @file.ts", "Please fix @file.ts..bak and test"],
+  ["fix /src/a.ts", "Please fix /src/a.ts+backup and test"],
+])("rejects suffix impersonation of the full target: %j", (draft, raw) => {
+  expect(checkOptimizedPrompt(raw, draft)).toBe("references_dropped");
+});
+
+it("preserves a complete path in Chinese prose", () => {
+  expect(checkOptimizedPrompt("修复 /src/a.ts 并补测试", "fix /src/a.ts")).toBeNull();
+});

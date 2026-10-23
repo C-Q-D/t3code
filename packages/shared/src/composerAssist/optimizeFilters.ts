@@ -27,37 +27,42 @@ export function checkOptimizedPrompt(
   if (text === "") return "empty";
   if (text.replace(/\s+/g, " ") === draft.trim().replace(/\s+/g, " ")) return "unchanged";
   if (text.length > Math.max(2000, 3 * draft.length)) return "too_long";
-  // The web composer uses this same parser for t3-context links.
-  const contextReferences = collectComposerContextReferences(draft);
-  const outputContexts = new Set(
-    collectComposerContextReferences(text).map((entry) => entry.source),
-  );
-  if (contextReferences.some((entry) => !outputContexts.has(entry.source)))
+  const original = extractReferences(draft);
+  const rewritten = extractReferences(text);
+  if (
+    [...original.contexts].some((reference) => !rewritten.contexts.has(reference)) ||
+    [...original.targets].some((target) => !rewritten.targets.has(target)) ||
+    [...original.code].some((fragment) => !text.includes(fragment))
+  )
     return "references_dropped";
-  const plainDraft = replaceComposerContextReferences(draft, () => "");
-  const references = Array.from(
-    plainDraft.matchAll(
-      /(["'])((?:[A-Za-z]:[\\/]|\\\\|\/)[^\n]*?)\1|@[\p{L}\p{N}_./\\-]+|`+[^`]+`+|(?:[A-Za-z]:[\\/]|\\\\|(?<![\p{L}\p{N}:/])\/)[^\s`"'<>*~，。；：！？、（）【】(),:;!?[\]]+/gu,
-    ),
-    (match) => {
-      if (match[2] !== undefined) return match[2];
-      const target = match[0].replace(/[.,:;!?，。；：！？、]+$/, "");
-      // Underscores are valid filename characters unless paired with a leading Markdown wrapper.
-      const wrapper = plainDraft.slice(0, match.index).match(/_+$/)?.[0];
-      return wrapper && target.endsWith(wrapper) ? target.slice(0, -wrapper.length) : target;
-    },
-  );
-  if (references.some((reference) => !containsTarget(text, reference))) return "references_dropped";
   return null;
 }
 
-/** Code delimiters identify their own boundary; paths and mentions still reject longer targets. */
-function containsTarget(text: string, target: string): boolean {
-  if (target.startsWith("`")) return text.includes(target);
-  const escaped = target.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const continuation = String.raw`[\p{L}\p{N}_/\\-]|\.[\p{L}\p{N}_]`;
-  return new RegExp(
-    String.raw`(?<![\p{L}\p{N}_/\\@\x60])(?:(\*\*|\*|_|~~)${escaped}\1|${escaped})(?!${continuation}|\x60)`,
-    "u",
-  ).test(text);
+/** Extracts complete targets identically on both sides; normalization only removes outside wrappers. */
+function extractReferences(text: string) {
+  // The web composer uses this same parser for t3-context links.
+  const contexts = new Set(collectComposerContextReferences(text).map((entry) => entry.source));
+  const plain = replaceComposerContextReferences(text, () => "");
+  const targets = new Set<string>();
+  const code = new Set<string>();
+  // Quoted paths consume the whole quoted value. Bare directory segments may contain spaces.
+  // Ambiguous bare paths may overcapture prose: rejecting the rewrite preserves the draft,
+  // which is safer than accepting a different target. Never recover by substring matching.
+  for (const match of plain.matchAll(
+    /(["'])((?:[A-Za-z]:[\\/]|\\\\|\/)[^\n]*?)\1|`+[^`]+`+|@[\p{L}\p{N}_./\\-][^\s`"'<>*~，。；：！？、（）【】(),:;!?[\]]*|(?:[A-Za-z]:[\\/]|\\\\|(?<![\p{L}\p{N}:/])\/)(?:[^\r\n`"'<>*~，。；：！？、（）【】(),:;!?[\]]*[\\/])?[^\s`"'<>*~，。；：！？、（）【】(),:;!?[\]]+/gu,
+  )) {
+    if (match[0].startsWith("`")) {
+      code.add(match[0]);
+      continue;
+    }
+    if (match[2] !== undefined) {
+      targets.add(match[2]);
+      continue;
+    }
+    const target = match[0].replace(/[.,:;!?，。；：！？、]+$/, "");
+    // Underscores are filename characters unless paired with a leading Markdown wrapper.
+    const wrapper = plain.slice(0, match.index).match(/_+$/)?.[0];
+    targets.add(wrapper && target.endsWith(wrapper) ? target.slice(0, -wrapper.length) : target);
+  }
+  return { contexts, targets, code };
 }
