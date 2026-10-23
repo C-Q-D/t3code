@@ -3,11 +3,11 @@ import * as Schema from "effect/Schema";
 
 import { RunId, ThreadId, TrimmedNonEmptyString } from "./baseSchemas.ts";
 
-export const COMPOSER_ASSIST_SUPPORTED_DRIVERS = ["claudeAgent", "codex"] as const;
+const COMPOSER_ASSIST_SUPPORTED_DRIVERS = ["claudeAgent", "codex"] as const;
 export const COMPOSER_SUGGESTION_MIN_COMPLETED_RUNS = 2;
 export const COMPOSER_SUGGESTION_MAX_AGE_MS = 10 * 60_000;
-export const COMPOSER_CLAUDE_CACHE_TTL_FALLBACK_MS = 60 * 60_000;
-export const COMPOSER_CODEX_CACHE_IDLE_MS = 10 * 60_000;
+const COMPOSER_CLAUDE_CACHE_TTL_FALLBACK_MS = 60 * 60_000;
+const COMPOSER_CODEX_CACHE_IDLE_MS = 10 * 60_000;
 export const COMPOSER_OPTIMIZE_DRAFT_MAX_CHARS = 20_000;
 
 /** Returns whether the driver identifier supports session-forked composer assistance. */
