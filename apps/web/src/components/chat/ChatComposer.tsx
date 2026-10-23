@@ -2843,6 +2843,20 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   const isPathQueryActiveStable = useStableCallback(
     () => resolveActiveComposerTrigger().trigger?.kind === "path",
   );
+  const isCommandMenuActiveStable = useStableCallback(
+    () =>
+      !isLiteralPendingAnswer &&
+      (composerMenuOpenRef.current || resolveActiveComposerTrigger().trigger !== null),
+  );
+  const visibleNextMessageSuggestion =
+    !isComposerApprovalState &&
+    !activePendingProgress &&
+    !(showPlanFollowUpPrompt && activeProposedPlan) &&
+    !projectSelectionRequired &&
+    !showProviderUnavailable &&
+    phase !== "disconnected"
+      ? nextMessageSuggestion
+      : null;
 
   const insertComposerTextAtEnd: ChatComposerHandle["insertTextAtEnd"] = (text, options) => {
     const inserted = insertComposerText(text, "end", options);
@@ -3968,6 +3982,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     richTextEnabled={settings.composerRichTextEnabled}
                     literalText={isLiteralPendingAnswer}
                     isPathQueryActive={isPathQueryActiveStable}
+                    isCommandMenuActive={isCommandMenuActiveStable}
                     value={activePendingProgress ? activePendingProgress.customAnswer : prompt}
                     cursor={composerCursor}
                     contextRecords={composerContextRecords}
@@ -3995,10 +4010,10 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     onCitationDraftSave={saveCitationDraftToPromptStable}
                     onPaste={onComposerPasteStable}
                     suggestion={
-                      nextMessageSuggestion === null
+                      visibleNextMessageSuggestion === null
                         ? undefined
                         : {
-                            text: nextMessageSuggestion,
+                            text: visibleNextMessageSuggestion,
                             onAccept: acceptNextMessageSuggestion,
                           }
                     }

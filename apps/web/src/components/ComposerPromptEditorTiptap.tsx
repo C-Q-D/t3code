@@ -172,6 +172,8 @@ export interface ComposerPromptEditorProps {
   suggestionListId?: string | undefined;
   activeSuggestionId?: string | undefined;
   isPathQueryActive?: () => boolean;
+  /** Includes an open completion menu even while its items are loading. */
+  isCommandMenuActive?: () => boolean;
   containerClassName?: string;
   className?: string;
   placeholderClassName?: string;
@@ -1004,6 +1006,7 @@ function ComposerPromptEditorTiptapInner(
     suggestionListId,
     activeSuggestionId,
     isPathQueryActive,
+    isCommandMenuActive,
     containerClassName,
     className,
     placeholderClassName,
@@ -1034,6 +1037,12 @@ function ComposerPromptEditorTiptapInner(
   const onVisibleSelectionChangeRef = useRef(onVisibleSelectionChange);
   const onCommandKeyDownRef = useRef(onCommandKeyDown);
   const isPathQueryActiveRef = useRef(isPathQueryActive);
+  const suggestionRef = useRef(suggestion);
+  const isCommandMenuActiveRef = useRef(isCommandMenuActive);
+  useLayoutEffect(() => {
+    suggestionRef.current = suggestion;
+    isCommandMenuActiveRef.current = isCommandMenuActive;
+  }, [suggestion, isCommandMenuActive]);
   const buildFragmentRef = useRef(buildContextClipboardFragment);
   const importFragmentRef = useRef(importContextFragment);
   const latestValueRef = useRef(value);
@@ -1194,6 +1203,34 @@ function ComposerPromptEditorTiptapInner(
       editorProps: {
         attributes: editorAttributes,
         handleKeyDown: (view, event) => {
+          const prediction = suggestionRef.current;
+          if (
+            prediction &&
+            (event.key === "Tab" || event.key === "ArrowRight") &&
+            !event.isComposing &&
+            event.keyCode !== 229 &&
+            !view.composing &&
+            !event.shiftKey &&
+            !event.altKey &&
+            !event.metaKey &&
+            !event.ctrlKey &&
+            !selectionInOneCodeBlock(view.state) &&
+            !isCommandMenuActiveRef.current?.() &&
+            view.state.selection.empty &&
+            view.state.doc.childCount === 1 &&
+            view.state.doc.firstChild?.type.name === "paragraph" &&
+            view.state.doc.firstChild.content.size === 0 &&
+            editorRef.current?.isCaretOnVisualEdge("end")
+          ) {
+            event.preventDefault();
+            event.stopPropagation();
+            // Insert plain text in one transaction. Running the command-key
+            // handler here could turn an acceptance into a send or menu action.
+            const tr = view.state.tr.insertText(prediction.text);
+            view.dispatch(tr.setSelection(TextSelection.atEnd(tr.doc)).scrollIntoView());
+            prediction.onAccept();
+            return true;
+          }
           // In a right-to-left line the start is on the right.
           const backArrow = caretLineDirection(view.state) === "rtl" ? "ArrowRight" : "ArrowLeft";
           const boundary = event.metaKey

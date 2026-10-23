@@ -177,6 +177,10 @@ export function useComposerCommandKey(input: {
   };
 
   const onComposerCommandKey = (key: string, event: KeyboardEvent, isTaskItem = false) => {
+    // Some IMEs report only the legacy code; neither path may consume their Tab.
+    if ((key === "Tab" || key === "ArrowRight") && (event.isComposing || event.keyCode === 229)) {
+      return false;
+    }
     const submissionIntent = composerSubmissionIntentForKey({
       event,
       keybindings,
