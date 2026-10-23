@@ -479,6 +479,7 @@ it.each(["thread", "run", "draft"])(
     await expect.element(screen.getByLabelText("prediction")).toHaveTextContent("none");
     await screen.rerender(view(input));
     await expect.element(screen.getByLabelText("prediction")).toHaveTextContent("none");
+    expect(rpc.run).toHaveBeenCalledTimes(1);
   },
 );
 
@@ -521,4 +522,39 @@ it("keeps one deduplication record per thread after consecutive runs", async () 
 
   expect(records).toHaveLength(1);
   expect(records[0]?.size).toBe(1);
+});
+
+it("does not request again after a real unmount with the same registry", async () => {
+  const input = setup();
+  using _clock = vi.spyOn(Date, "now").mockReturnValue(1792749900000);
+  using resources = new DisposableStack();
+  const registry = resources.adopt(AtomRegistry.make(), (value) => value.dispose());
+  await using first = await render(
+    <RegistryContext.Provider value={registry}>
+      <Probe input={input} />
+    </RegistryContext.Provider>,
+  );
+  await expect.element(first.getByLabelText("prediction")).toHaveTextContent("跑一下测试");
+  await first.unmount();
+  await using second = await render(
+    <RegistryContext.Provider value={registry}>
+      <Probe input={input} />
+    </RegistryContext.Provider>,
+  );
+  await expect.element(second.getByLabelText("prediction")).toHaveTextContent("none");
+  expect(rpc.run).toHaveBeenCalledTimes(1);
+});
+
+it("requests only twice across thread A to B to A", async () => {
+  const input = setup();
+  using _clock = vi.spyOn(Date, "now").mockReturnValue(1792749900000);
+  await using screen = await render(view(input));
+  await expect.element(screen.getByLabelText("prediction")).toHaveTextContent("跑一下测试");
+  await screen.rerender(
+    view({ ...input, target: { ...target, threadId: ThreadId.make("thread-b") } }),
+  );
+  await expect.element(screen.getByLabelText("prediction")).toHaveTextContent("跑一下测试");
+  await screen.rerender(view(input));
+  await expect.element(screen.getByLabelText("prediction")).toHaveTextContent("none");
+  expect(rpc.run).toHaveBeenCalledTimes(2);
 });
