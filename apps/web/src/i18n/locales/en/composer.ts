@@ -2,6 +2,12 @@ import { englishApprovalMessages } from "@t3tools/client-runtime/work-log/messag
 
 /** English composer labels and messages; functions format display data only. */
 export const composer = {
+  assist: {
+    suggestion: {
+      /** Announces the prediction and its insert-only keyboard action. */
+      ariaDescription: (text: string) => `Suggestion: ${text}. Press Tab to insert`,
+    },
+  },
   mode: {
     planTooltip: "Plan mode. Click to return to normal build mode",
     buildTooltip: "Default mode. Click to enter plan mode",

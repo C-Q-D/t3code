@@ -2,6 +2,12 @@
 import type { Messages } from "../en";
 
 export const composer: Messages["composer"] = {
+  assist: {
+    suggestion: {
+      /** Announces the prediction and its insert-only keyboard action. */
+      ariaDescription: (text: string) => `建议：${text}。按 Tab 填入`,
+    },
+  },
   mode: {
     planTooltip: "计划模式，点击返回普通执行模式",
     buildTooltip: "默认模式，点击进入计划模式",

@@ -9,10 +9,14 @@ import {
 } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
 import { AsyncResult } from "effect/reactivity";
-import { StrictMode } from "react";
+import { StrictMode, createRef, useState } from "react";
+import { userEvent } from "vite-plus/test/browser";
 import { expect, it, vi } from "vite-plus/test";
 import { act, render } from "../../../test/render";
 import { useComposerSuggestion } from "./useComposerSuggestion";
+import { ComposerPromptEditor, type ComposerPromptEditorHandle } from "../ComposerPromptEditor";
+import { installMessages, t, activeLocale } from "../../i18n";
+import { messages as chineseMessages } from "../../i18n/locales/zh-CN";
 
 const rpc = vi.hoisted(() => ({ run: vi.fn() }));
 vi.mock(import("../../state/composerAssist"), async (original) => {
@@ -78,6 +82,82 @@ function view(input: Input) {
     </RegistryProvider>
   );
 }
+
+/** Uses the real editor so typing exercises draft invalidation and accessible placeholder updates. */
+function EditorProbe({ input }: { input: Input }) {
+  const [prompt, setPrompt] = useState("");
+  const { suggestion, accept } = useComposerSuggestion({
+    ...input,
+    composerEmpty: input.composerEmpty && prompt.length === 0,
+  });
+  return (
+    <ComposerPromptEditor
+      value={prompt}
+      cursor={prompt.length}
+      editorRef={createRef<ComposerPromptEditorHandle>()}
+      contextRecords={new Map()}
+      skills={[]}
+      disabled={false}
+      placeholder={suggestion ?? "默认占位"}
+      suggestion={suggestion === null ? undefined : { text: suggestion, onAccept: accept }}
+      onChange={setPrompt}
+      onPaste={() => {}}
+    />
+  );
+}
+
+/** Restores global locale after the test, including on assertion failure. */
+function chineseLocale() {
+  const previous = { locale: activeLocale, messages: t };
+  installMessages("zh-CN", chineseMessages);
+  return { [Symbol.dispose]: () => installMessages(previous.locale, previous.messages) };
+}
+
+it("shows the suggestion in the empty editor and retires it when the user types", async () => {
+  const input = setup();
+  using _locale = chineseLocale();
+  using _clock = vi.spyOn(Date, "now").mockReturnValue(1792749900000);
+  await using screen = await render(
+    <RegistryProvider>
+      <EditorProbe input={input} />
+    </RegistryProvider>,
+  );
+  const editor = screen.getByRole("textbox");
+  await expect.element(screen.getByText("跑一下测试", { exact: true })).toBeVisible();
+  await expect.element(editor).toHaveAttribute("aria-description", "建议：跑一下测试。按 Tab 填入");
+  await userEvent.click(editor);
+  await userEvent.keyboard("x");
+  await expect.element(editor).toHaveTextContent("x");
+  await expect.element(editor).toHaveAttribute("aria-placeholder", "默认占位");
+  await expect.element(editor).not.toHaveAttribute("aria-description");
+  await userEvent.keyboard("{Backspace}");
+  await expect.element(screen.getByText("默认占位", { exact: true })).toBeVisible();
+  expect(rpc.run).toHaveBeenCalledTimes(1);
+});
+
+it("restores the editor placeholder when a new run starts", async () => {
+  const input = setup();
+  using _locale = chineseLocale();
+  using _clock = vi.spyOn(Date, "now").mockReturnValue(1792749900000);
+  await using screen = await render(
+    <RegistryProvider>
+      <EditorProbe input={input} />
+    </RegistryProvider>,
+  );
+  await expect.element(screen.getByText("跑一下测试", { exact: true })).toBeVisible();
+  await screen.rerender(
+    <RegistryProvider>
+      <EditorProbe
+        input={{
+          ...input,
+          shell: { ...input.shell!, latestRunId: RunId.make("next"), status: "running" },
+        }}
+      />
+    </RegistryProvider>,
+  );
+  await expect.element(screen.getByText("默认占位", { exact: true })).toBeVisible();
+  await expect.element(screen.getByRole("textbox")).not.toHaveAttribute("aria-description");
+});
 
 it.each(["claudeAgent", "codex"])(
   "requests once when %s finishes and never retries the run",

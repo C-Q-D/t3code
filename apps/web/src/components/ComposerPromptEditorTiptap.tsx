@@ -166,6 +166,8 @@ export interface ComposerPromptEditorProps {
   skills: ReadonlyArray<ServerProviderSkill>;
   disabled: boolean;
   placeholder: string;
+  /** Prediction for an empty draft; acceptance retires it without sending. */
+  suggestion?: { text: string; onAccept: () => void } | undefined;
   ariaLabel?: string | undefined;
   suggestionListId?: string | undefined;
   activeSuggestionId?: string | undefined;
@@ -997,6 +999,7 @@ function ComposerPromptEditorTiptapInner(
     skills,
     disabled,
     placeholder,
+    suggestion,
     ariaLabel,
     suggestionListId,
     activeSuggestionId,
@@ -1161,6 +1164,9 @@ function ComposerPromptEditorTiptapInner(
     role: "textbox",
     "aria-multiline": "true",
     ...(ariaLabel ? { "aria-label": ariaLabel } : {}),
+    ...(suggestion
+      ? { "aria-description": t.composer.assist.suggestion.ariaDescription(suggestion.text) }
+      : {}),
     ...(disabled ? { "aria-readonly": "true" } : {}),
     ...(!disabled && suggestionListId
       ? {
