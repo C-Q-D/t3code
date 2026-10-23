@@ -988,25 +988,25 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   });
   const noProviderAvailable =
     selectedProviderEntry === undefined && multipleModelSelections === null;
-  const suggestionTarget = routeKind === "server" ? routeThreadRef : null;
-  const suggestionShell = props.activeThreadShell?.source ?? null;
-  // The selected picker may already point at a different provider. Side queries
-  // belong to the existing thread session, not the next message's selection.
-  const suggestionDriver =
+  const assistThreadTarget = routeKind === "server" ? routeThreadRef : null;
+  const assistThreadShell = props.activeThreadShell?.source ?? null;
+  // source owns the session provider (also copied onto the client shell),
+  // while the picker may select the next message's provider.
+  const assistThreadDriver =
     providerInstanceEntries.find(
-      (entry) => entry.instanceId === suggestionShell?.providerInstanceId,
+      (entry) => entry.instanceId === assistThreadShell?.providerInstanceId,
     )?.driverKind ?? "";
   const assistThreadMetadata = useComposerAssistThreadMetadata(
-    suggestionTarget,
+    assistThreadTarget,
     settings.composerSuggestionsEnabled,
     settings.composerPromptOptimizeEnabled,
-    suggestionDriver,
+    assistThreadDriver,
   );
   const { suggestion: nextMessageSuggestion, accept: acceptNextMessageSuggestion } =
     useComposerSuggestion({
-      target: suggestionTarget,
-      shell: suggestionShell,
-      driver: suggestionDriver,
+      target: assistThreadTarget,
+      shell: assistThreadShell,
+      driver: assistThreadDriver,
       enabled: settings.composerSuggestionsEnabled,
       connected: !isConnecting && phase !== "disconnected" && props.environmentUnavailable === null,
       composerEmpty:
@@ -3211,16 +3211,12 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     setIsComposerModelPickerOpen(true);
   };
   const openModelPickerStable = useStableCallback(openModelPicker);
-  const optimizeDriver =
-    providerInstanceEntries.find(
-      (entry) => entry.instanceId === props.activeThreadShell?.providerInstanceId,
-    )?.driverKind ?? "";
   const promptOptimizer = useComposerPromptOptimizer({
-    environmentId,
-    threadId: activeThreadId,
+    environmentId: assistThreadTarget?.environmentId ?? environmentId,
+    threadId: assistThreadTarget?.threadId ?? null,
     draftKey: composerTargetKey(composerDraftTarget),
     prompt,
-    driver: optimizeDriver,
+    driver: assistThreadDriver,
     enabled: settings.composerPromptOptimizeEnabled,
     running:
       phase === "running" ||
