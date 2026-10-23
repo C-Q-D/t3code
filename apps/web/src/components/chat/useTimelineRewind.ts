@@ -1,3 +1,5 @@
+/** Coordinates rewind and fork recovery, preserving drafts and attachment handoff on failures. */
+import { t } from "~/i18n";
 import type { EnvironmentThreadShell, ThreadStructure } from "@t3tools/client-runtime/state/shell";
 import type { ComposerThreadTarget } from "../../composerDraftStore";
 import type { ComposerHandleRef } from "../../composerHandleContext";
@@ -111,21 +113,18 @@ export function useTimelineRewind(input: TimelineRewindInput) {
     if (!message || message.role !== "user") return;
 
     if (!supportsConversationRollback) {
-      setThreadError(
-        activeThread.id,
-        "This provider does not support reverting conversation history. Start a new thread instead.",
-      );
+      setThreadError(activeThread.id, t.chat.view.revertHistoryUnsupported);
       return;
     }
     if (activeEnvironmentUnavailable && activeEnvironmentUnavailableLabel) {
       setThreadError(
         activeThread.id,
-        `Reconnect ${activeEnvironmentUnavailableLabel} before reverting checkpoints.`,
+        t.chat.view.reconnectBeforeReverting(activeEnvironmentUnavailableLabel),
       );
       return;
     }
     if (phase === "running" || isSendBusy || isConnecting) {
-      setThreadError(activeThread.id, "Interrupt the current turn before reverting checkpoints.");
+      setThreadError(activeThread.id, t.chat.view.interruptBeforeReverting);
       return;
     }
     if (restoreFiles === undefined) {
@@ -183,21 +182,19 @@ export function useTimelineRewind(input: TimelineRewindInput) {
     if (activeEnvironmentUnavailable && activeEnvironmentUnavailableLabel) {
       setThreadError(
         activeThread.id,
-        `Reconnect ${activeEnvironmentUnavailableLabel} before reverting checkpoints.`,
+        t.chat.view.reconnectBeforeReverting(activeEnvironmentUnavailableLabel),
       );
       return;
     }
     if (phase === "running" || isSendBusy || isConnecting) {
-      setThreadError(activeThread.id, "Interrupt the current turn before reverting checkpoints.");
+      setThreadError(activeThread.id, t.chat.view.interruptBeforeReverting);
       return;
     }
     const localApi = readLocalApi();
     const confirmed =
       localApi == null
-        ? window.confirm("Roll back this thread to the selected checkpoint?")
-        : await localApi.dialogs.confirm(
-            "Roll back this thread to the selected checkpoint?\nThis action cannot be undone.",
-          );
+        ? window.confirm(t.chat.view.rollbackConfirm)
+        : await localApi.dialogs.confirm(t.chat.view.rollbackWarningConfirm);
     if (!confirmed) return;
 
     useComposerDraftStore.setState((store) => ({
@@ -216,7 +213,7 @@ export function useTimelineRewind(input: TimelineRewindInput) {
       const error = squashAtomCommandFailure(result);
       setThreadError(
         activeThread.id,
-        error instanceof Error ? error.message : "Failed to revert thread state.",
+        error instanceof Error ? error.message : t.chat.view.revertThreadError,
       );
     }
     useComposerDraftStore.setState((store) => {
@@ -239,7 +236,7 @@ export function useTimelineRewind(input: TimelineRewindInput) {
         sourceThreadId: input.sourceThreadId,
         targetThreadId,
         runId: input.runId,
-        title: `${activeThread.title} fork`,
+        title: t.chat.machineThreadText.fork(activeThread.title),
       },
     });
     if (result._tag === "Failure") {
@@ -247,17 +244,14 @@ export function useTimelineRewind(input: TimelineRewindInput) {
         const error = squashAtomCommandFailure(result);
         setThreadError(
           activeThread.id,
-          error instanceof Error ? error.message : "Failed to fork this response.",
+          error instanceof Error ? error.message : t.chat.view.forkResponseError,
         );
       }
       return;
     }
     const targetThreadReady = await waitForThreadShell(targetThreadRef);
     if (!targetThreadReady) {
-      setThreadError(
-        activeThread.id,
-        "The fork was created, but its thread data did not reach this client. Reconnect and try opening it from the sidebar.",
-      );
+      setThreadError(activeThread.id, t.chat.view.forkDataUnavailable);
       return;
     }
     await navigate({

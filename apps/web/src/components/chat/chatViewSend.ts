@@ -1,3 +1,5 @@
+/** Prepares thread sends and rewind recovery without coupling their lifecycle to the chat render. */
+import { t } from "~/i18n";
 import {
   CommandId,
   type EnvironmentId,
@@ -86,9 +88,7 @@ export async function startFanoutThread(input: {
   let requestMayHaveStarted = false;
   try {
     if (uncertainThreadId) {
-      throw new Error(
-        "The previous request may have started. Open its thread to check before sending again.",
-      );
+      throw new Error(t.chat.view.previousRequestMayHaveStarted);
     }
     requestMayHaveStarted = true;
     const result = await input.start(targetThreadId);
@@ -108,19 +108,17 @@ export async function startFanoutThread(input: {
     const failureToastId = toastManager.add(
       stackedThreadToast({
         type: "error",
-        title: `Could not start ${input.model}`,
-        description: error instanceof Error ? error.message : "Failed to send message.",
+        title: t.chat.view.startModelError(input.model),
+        description: error instanceof Error ? error.message : t.chat.view.sendMessageError,
         ...(retainedThreadId
           ? {
               timeout: 0,
               data: {
                 secondaryActionProps: {
-                  children: "Allow retry",
+                  children: t.chat.view.allowRetry,
                   onClick: () => {
                     void readLocalApi()
-                      ?.dialogs.confirm(
-                        "The previous request may already be running. Check its thread first. Allow another send that could create a duplicate thread?",
-                      )
+                      ?.dialogs.confirm(t.chat.view.duplicateThreadConfirm)
                       .then(
                         (confirmed) => {
                           if (
@@ -137,7 +135,7 @@ export async function startFanoutThread(input: {
                 },
               },
               actionProps: {
-                children: "Open thread",
+                children: t.chat.view.openThread,
                 onClick: () => input.openThread(retainedThreadId),
               },
             }
@@ -184,10 +182,10 @@ export async function rewindToMessage(input: {
   const { message, environmentId, draftTarget } = input;
   try {
     if (input.composerHasPendingAttachments) {
-      throw new Error("Wait for attachments to finish preparing before rewinding.");
+      throw new Error(t.chat.view.waitForAttachmentsBeforeRewinding);
     }
     const connection = readPreparedConnection(environmentId);
-    if (!connection) throw new Error("The environment is not connected.");
+    if (!connection) throw new Error(t.chat.view.environmentNotConnected);
     const files = await prepareRevertedMessageAttachments({
       message,
       environmentId,
@@ -200,7 +198,7 @@ export async function rewindToMessage(input: {
       (draft?.images.length ?? 0) + (draft?.files.length ?? 0) + files.length >
       PROVIDER_SEND_TURN_MAX_ATTACHMENTS
     ) {
-      throw new Error("Make room for this message's attachments in the composer before rewinding.");
+      throw new Error(t.chat.view.makeRoomBeforeRewinding);
     }
     const commandId = CommandId.make(randomUUID());
     await waitForRevertedMessage(input.routeThreadRef, input.turnCount, commandId, async () => {
@@ -247,7 +245,7 @@ export async function rewindToMessage(input: {
     store.addFiles(draftTarget, restoredFiles, { allowDuplicates: true });
     return { error: null, prompt: nextPrompt };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Failed to revert thread state." };
+    return { error: error instanceof Error ? error.message : t.chat.view.revertThreadError };
   }
 }
 
@@ -295,7 +293,7 @@ export function resolveMultipleModelTargets(input: {
       (entry) => entry.instanceId === selection.instanceId,
     );
     if (!provider?.enabled || !provider.isAvailable || provider.status !== "ready") {
-      return { error: `Provider for ${selection.model} is unavailable.` };
+      return { error: t.chat.view.providerUnavailable(selection.model) };
     }
     const providerBlockReason = getAntigravitySendBlockReason(provider.snapshot, selection.model);
     if (providerBlockReason) return { error: providerBlockReason };
@@ -344,12 +342,12 @@ export function prepareTurnAttachments(input: {
       if (usesAttachmentUploads) {
         const uploaded = getUploadedAttachments({ environmentId, images: [attachment] })?.[0];
         if (!uploaded) {
-          throw new Error(`Attachment '${attachment.name}' did not finish uploading.`);
+          throw new Error(t.chat.view.attachmentUploadIncomplete(attachment.name));
         }
         return uploaded;
       }
       if (attachment.type !== "image") {
-        throw new Error("This server does not support file attachments.");
+        throw new Error(t.chat.view.fileAttachmentsUnsupported);
       }
       return {
         type: "image" as const,

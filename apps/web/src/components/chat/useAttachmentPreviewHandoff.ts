@@ -1,3 +1,5 @@
+/** Keeps optimistic image previews alive until their server assets are ready. */
+import { t } from "~/i18n";
 import { useStableCallback } from "../../hooks/useStableCallback";
 import { type EnvironmentId, type MessageId } from "@t3tools/contracts";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -161,7 +163,7 @@ export function useAttachmentPreviewHandoff(input: AttachmentPreviewHandoffInput
               imageInstances.push(image);
               const handleLoad = () => resolve();
               const handleError = () =>
-                reject(new Error(`Failed to load server preview for ${messageId}.`));
+                reject(new Error(t.chat.view.serverPreviewError(messageId)));
               image.addEventListener("load", handleLoad, { once: true });
               image.addEventListener("error", handleError, { once: true });
               image.src = previewUrl;

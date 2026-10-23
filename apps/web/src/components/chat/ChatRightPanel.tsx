@@ -1,3 +1,4 @@
+/** Owns right-panel sizing independently of ChatView and hosts the local standalone panel controls. */
 import { usePreviewPanelInlineSize } from "../../hooks/usePreviewPanelInlineSize";
 import { RightPanelSheet } from "../RightPanelSheet";
 import { RightPanelTabs, type RightPanelTabsProps } from "../RightPanelTabs";
@@ -30,12 +31,25 @@ export function ChatRightPanel(props: ChatRightPanelProps) {
   const inlineSize = usePreviewPanelInlineSize(undefined, {
     container: workspaceLayoutElement,
     widthStorageKey,
+    onCollapse: onCloseSheet,
+    standalone: true,
+    defaultWidth: 560,
   });
   if (!sheet) {
-    return <RightPanelTabs {...tabs} mode="inline" maximized={maximized} inlineSize={inlineSize} />;
+    return (
+      <RightPanelTabs
+        {...tabs}
+        standalone
+        layoutControls={layoutControls}
+        mode="inline"
+        maximized={maximized}
+        inlineSize={inlineSize}
+      />
+    );
   }
   return (
     <RightPanelSheet
+      standalone
       animationDurationMs={sheetAnimationDurationMs}
       open={tabs.open === true}
       onClose={onCloseSheet}

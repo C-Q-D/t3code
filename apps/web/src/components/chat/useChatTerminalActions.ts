@@ -1,3 +1,5 @@
+/** Routes terminal actions to the active environment while preserving composer context and focus. */
+import { t } from "~/i18n";
 import type {
   EnvironmentProject,
   EnvironmentThreadShell,
@@ -255,7 +257,7 @@ export function useChatTerminalActions(input: ChatTerminalActionsInput) {
         const error = squashAtomCommandFailure(openResult);
         setThreadError(
           activeThreadId,
-          error instanceof Error ? error.message : `Failed to run script "${script.name}".`,
+          error instanceof Error ? error.message : t.chat.view.runScriptError(script.name),
         );
       }
       return;
@@ -273,7 +275,7 @@ export function useChatTerminalActions(input: ChatTerminalActionsInput) {
         const error = squashAtomCommandFailure(writeResult);
         setThreadError(
           activeThreadId,
-          error instanceof Error ? error.message : `Failed to run script "${script.name}".`,
+          error instanceof Error ? error.message : t.chat.view.runScriptError(script.name),
         );
       }
       return;
@@ -289,8 +291,8 @@ export function useChatTerminalActions(input: ChatTerminalActionsInput) {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Could not open preview",
-            description: error instanceof Error ? error.message : "An unexpected error occurred.",
+            title: t.chat.view.openPreviewError,
+            description: error instanceof Error ? error.message : t.chat.view.unexpectedError,
           }),
         );
       }
@@ -302,7 +304,7 @@ export function useChatTerminalActions(input: ChatTerminalActionsInput) {
     void runProjectScript(
       {
         id: "chat-code-block",
-        name: "Chat code block",
+        name: t.chat.view.chatCodeBlock,
         command,
         icon: "play",
         runOnWorktreeCreate: false,
@@ -371,7 +373,9 @@ export function useChatTerminalActions(input: ChatTerminalActionsInput) {
   const closePanelTerminalStable = useStableCallback(closePanelTerminal);
   const requestCloseTerminal = (terminalId: string) => {
     if (!hasTerminalWriteAccess()) return;
-    const label = activeTerminalLabelsById.get(terminalId) ?? getTerminalLabel(terminalId);
+    const label =
+      activeTerminalLabelsById.get(terminalId) ??
+      getTerminalLabel(terminalId, t.chat.workLog.shared.terminal);
     void confirmTerminalClose([label]).then((confirmed) => {
       if (confirmed && readEnvironmentScope(environmentId, AuthTerminalOperateScope)) {
         closeTerminal(terminalId);
@@ -381,7 +385,9 @@ export function useChatTerminalActions(input: ChatTerminalActionsInput) {
   const requestCloseTerminalStable = useStableCallback(requestCloseTerminal);
   const requestClosePanelTerminal = (terminalId: string) => {
     if (!hasTerminalWriteAccess()) return;
-    const label = activeTerminalLabelsById.get(terminalId) ?? getTerminalLabel(terminalId);
+    const label =
+      activeTerminalLabelsById.get(terminalId) ??
+      getTerminalLabel(terminalId, t.chat.workLog.shared.terminal);
     void confirmTerminalClose([label]).then((confirmed) => {
       if (confirmed && readEnvironmentScope(environmentId, AuthTerminalOperateScope)) {
         closePanelTerminal(terminalId);

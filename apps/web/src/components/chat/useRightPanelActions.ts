@@ -1,3 +1,5 @@
+/** Routes panel actions through the active thread and preserves preview recovery when closing. */
+import { t } from "~/i18n";
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import type { Dispatch } from "react";
 import type { ThreadPreviewState } from "../../previewStateStore";
@@ -116,7 +118,7 @@ export function useRightPanelActions(input: RightPanelActionsInput) {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Unable to open browser",
+            title: t.chat.view.openBrowserError,
             description: error.message,
           }),
         );
@@ -238,8 +240,8 @@ export function useRightPanelActions(input: RightPanelActionsInput) {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Failed to copy path",
-          description: "Clipboard API unavailable.",
+          title: t.chat.view.copyPathError,
+          description: t.chat.view.clipboardUnavailable,
         }),
       );
       return;
@@ -253,7 +255,7 @@ export function useRightPanelActions(input: RightPanelActionsInput) {
       () => {
         toastManager.add({
           type: "success",
-          title: "Path copied",
+          title: t.chat.view.pathCopied,
           description: clipboardPath,
         });
       },
@@ -261,8 +263,8 @@ export function useRightPanelActions(input: RightPanelActionsInput) {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Failed to copy path",
-            description: error instanceof Error ? error.message : "An error occurred.",
+            title: t.chat.view.copyPathError,
+            description: error instanceof Error ? error.message : t.chat.view.genericError,
           }),
         );
       },

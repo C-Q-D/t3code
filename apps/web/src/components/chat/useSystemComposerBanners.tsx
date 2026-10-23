@@ -1,3 +1,6 @@
+/** Builds machine and update notices while leaving connection and update commands with their services. */
+import { TimelineBannerAction } from "./TimelineStatusBanners";
+import { t } from "~/i18n";
 import { useStableCallback } from "../../hooks/useStableCallback";
 import { type EnvironmentId } from "@t3tools/contracts";
 import { type EnvironmentConnectionPresentation } from "@t3tools/client-runtime/connection";
@@ -111,8 +114,8 @@ export function useSystemComposerBanners(input: SystemComposerBannersInput) {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Could not reconnect environment",
-          description: error instanceof Error ? error.message : "Failed to reconnect.",
+          title: t.chat.view.reconnectEnvironmentError,
+          description: error instanceof Error ? error.message : t.chat.view.reconnectError,
         }),
       );
     }
@@ -139,8 +142,8 @@ export function useSystemComposerBanners(input: SystemComposerBannersInput) {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Could not disconnect server",
-            description: error instanceof Error ? error.message : "Failed to disconnect.",
+            title: t.chat.view.disconnectServerError,
+            description: error instanceof Error ? error.message : t.chat.view.disconnectError,
           }),
         );
       }
@@ -167,8 +170,10 @@ export function useSystemComposerBanners(input: SystemComposerBannersInput) {
     versionMismatch !== null && versionMismatchDismissKey !== null && !versionMismatchDismissed;
   const versionMismatchServerLabel =
     hasMultipleRegisteredEnvironments && activeThreadEnvironmentId !== null
-      ? `${activeEnvironment?.label ?? serverConfig?.environment.label ?? activeThreadEnvironmentId} server`
-      : "server";
+      ? t.chat.view.namedServer(
+          activeEnvironment?.label ?? serverConfig?.environment.label ?? activeThreadEnvironmentId,
+        )
+      : t.chat.view.server;
   const serverUpdateEnvironmentId = activeThreadEnvironmentId;
   const versionMismatchSelfUpdate = resolveServerSelfUpdateCapability(serverConfig);
   const versionMismatchInstallation = serverConfig?.environment.capabilities.serverInstallation;
@@ -193,15 +198,30 @@ export function useSystemComposerBanners(input: SystemComposerBannersInput) {
           size="xs"
           variant="ghost"
           disabled={disconnectingEnvironment}
-          title="Hide this server's threads. Switch it on again in Connections."
+          title={t.chat.view.disconnectServerHint}
           onClick={() =>
             void handleDisconnectActiveEnvironmentStable(
               activeEnvironmentUnavailableState.environmentId,
             )
           }
         >
-          Disconnect server
+          {t.chat.view.disconnectServer}
         </Button>
+      ) : undefined;
+    const timelineDisconnectAction =
+      canDisconnectActiveEnvironment && activeEnvironmentUnavailableState ? (
+        <TimelineBannerAction
+          quiet
+          disabled={disconnectingEnvironment}
+          title={t.chat.view.disconnectServerHint}
+          onClick={() =>
+            void handleDisconnectActiveEnvironmentStable(
+              activeEnvironmentUnavailableState.environmentId,
+            )
+          }
+        >
+          {t.chat.view.disconnectServer}
+        </TimelineBannerAction>
       ) : undefined;
     const environmentReconnecting =
       unavailableConnection !== null &&
@@ -214,26 +234,27 @@ export function useSystemComposerBanners(input: SystemComposerBannersInput) {
         id: `environment-unavailable:${activeEnvironmentUnavailableState.environmentId}`,
         variant: unavailableConnection.phase === "error" ? "error" : "warning",
         icon: <WifiOffIcon />,
-        title: `${activeEnvironmentUnavailableState.label} is ${environmentReconnecting ? "reconnecting" : "offline"}`,
+        title: t.chat.view.environmentOffline(
+          activeEnvironmentUnavailableState.label,
+          environmentReconnecting,
+        ),
         description: activeEnvironment ? (
           <ConnectionDiagnosisHeadline environment={activeEnvironment} />
         ) : undefined,
         actions: (
           <>
             {!environmentReconnecting ? (
-              <Button
-                size="xs"
-                variant="ghost"
+              <TimelineBannerAction
                 onClick={() =>
                   void handleReconnectActiveEnvironmentStable(
                     activeEnvironmentUnavailableState.environmentId,
                   )
                 }
               >
-                Reconnect
-              </Button>
+                {t.chat.view.reconnect}
+              </TimelineBannerAction>
             ) : null}
-            {disconnectAction}
+            {timelineDisconnectAction}
           </>
         ),
       });
@@ -254,7 +275,7 @@ export function useSystemComposerBanners(input: SystemComposerBannersInput) {
         icon: <ComposerServerUpdateIcon status={serverUpdateState.status} />,
         title:
           updateInProgress || updateFailed ? (
-            `${updateFailed ? "Could not update" : "Updating"} ${versionMismatchServerLabel}`
+            t.chat.machineThreadText.update(updateFailed, versionMismatchServerLabel)
           ) : versionMismatch ? (
             <Tooltip>
               <TooltipTrigger
@@ -263,7 +284,7 @@ export function useSystemComposerBanners(input: SystemComposerBannersInput) {
                     type="button"
                     className="block max-w-full cursor-help truncate rounded-sm text-left"
                   >
-                    Server update available
+                    {t.chat.view.serverUpdateAvailable}
                   </button>
                 }
               />
@@ -273,7 +294,7 @@ export function useSystemComposerBanners(input: SystemComposerBannersInput) {
               </TooltipPopup>
             </Tooltip>
           ) : (
-            "Server update available"
+            t.chat.view.serverUpdateAvailable
           ),
         description:
           serverUpdateState.status === "failed"
@@ -298,14 +319,14 @@ export function useSystemComposerBanners(input: SystemComposerBannersInput) {
             desktopAppUpdate={versionMismatchDesktopAppUpdate}
             threadContinuation={versionMismatchThreadContinuation}
             targetVersion={versionMismatch.clientVersion}
-            label={updateFailed ? "Retry" : "Update"}
+            label={updateFailed ? t.chat.view.retry : t.chat.view.update}
             variant="ghost"
           />
         ),
         ...(updateInProgress || (!updateFailed && !versionMismatchDismissKey)
           ? {}
           : {
-              dismissLabel: "Dismiss update notice",
+              dismissLabel: t.chat.view.dismissUpdateNotice,
               onDismiss: () => {
                 if (updateFailed) {
                   dismissServerUpdateFailure(serverUpdateState);

@@ -1,3 +1,5 @@
+/** Owns plan follow-up and new-thread implementation sends without duplicating draft lifecycle state. */
+import { t } from "~/i18n";
 import {
   AuthOrchestrationOperateScope,
   type EnvironmentId,
@@ -227,7 +229,7 @@ export function usePlanFollowUpSend(input: PlanFollowUpSendInput) {
       const error = squashAtomCommandFailure(failure);
       setThreadError(
         threadIdForSend,
-        error instanceof Error ? error.message : "Failed to send plan follow-up.",
+        error instanceof Error ? error.message : t.chat.view.sendPlanFollowUpError,
       );
     }
     sendInFlightRef.current = false;
@@ -378,7 +380,7 @@ export function useImplementPlanInNewThread(input: ImplementPlanInNewThreadInput
       });
       if (cleanupResult._tag === "Failure" && !isAtomCommandInterrupted(cleanupResult)) {
         console.warn(
-          "Failed to clean up implementation thread after start failure.",
+          t.chat.view.cleanupImplementationThreadError,
           squashAtomCommandFailure(cleanupResult),
         );
       }
@@ -387,11 +389,8 @@ export function useImplementPlanInNewThread(input: ImplementPlanInNewThreadInput
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Could not start implementation thread",
-            description:
-              error instanceof Error
-                ? error.message
-                : "An error occurred while creating the new thread.",
+            title: t.chat.view.startImplementationThreadError,
+            description: error instanceof Error ? error.message : t.chat.view.createThreadError,
           }),
         );
       }

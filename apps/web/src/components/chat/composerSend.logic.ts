@@ -1,3 +1,5 @@
+/** Derives send guards and notices from snapshots without dispatching commands. */
+import { t } from "~/i18n";
 import type { EnvironmentId, ThreadContextRecord } from "@t3tools/contracts";
 import { collectInlineContextIds } from "../../lib/composerContextReferences";
 
@@ -19,8 +21,8 @@ export function loadBalancingSendWarning(input: {
 }) {
   if (input.pending) {
     return {
-      title: "Checking machine resources",
-      description: "Resource checks are still running. You can choose a machine in the composer.",
+      title: t.chat.view.checkingMachineResources,
+      description: t.chat.view.resourceChecksPending,
     };
   }
   const noMachineReadsEveryThread =
@@ -29,10 +31,10 @@ export function loadBalancingSendWarning(input: {
       input.threadContexts.every((record) => record.environmentId === environmentId),
     );
   return {
-    title: "Choose a machine to continue",
+    title: t.chat.view.chooseMachine,
     description: noMachineReadsEveryThread
-      ? "No machine can read every attached thread. Choose a machine in the composer or remove the threads."
-      : "No eligible machine has available resources. Choose a machine in the composer to override.",
+      ? t.chat.machineThreadUi.noMachine
+      : t.chat.view.noEligibleMachine,
   };
 }
 

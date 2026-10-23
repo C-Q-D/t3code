@@ -1,3 +1,5 @@
+/** Builds activity notices from thread state without owning commands or composer draft state. */
+import { t } from "~/i18n";
 import type {
   OrchestrationV2PendingBackgroundTask,
   OrchestrationV2ProviderGoal,
@@ -30,7 +32,9 @@ export function childInputBannerItem(input: {
     variant: "info",
     priority: "activity",
     icon: first.hasPendingApprovals ? <ShieldQuestionIcon /> : <MessageCircleIcon />,
-    title: childThreadInputsTitle(childThreadInputs),
+    title: childThreadInputs.some((child) => child.hasPendingApprovals)
+      ? childThreadInputsTitle(childThreadInputs)
+      : t.chat.view.subagentsNeedInput(childThreadInputs.length),
     description: childThreadInputs.map((child, index) => (
       <Fragment key={child.id}>
         {index > 0 ? " " : null}
@@ -44,15 +48,17 @@ export function childInputBannerItem(input: {
     )),
     actions: (
       <Button size="xs" variant="ghost" onClick={() => onOpenThread(first.id)}>
-        {first.hasPendingApprovals ? "Open approval" : "Open question"}
+        {first.hasPendingApprovals ? t.chat.machineThreadUi.approval : t.chat.view.openQuestion}
       </Button>
     ),
   };
 }
 
+/** Uses current-plan progress, not the goal token budget; command failures remain owned by the caller. */
 export function goalBannerItem(input: {
   readonly threadId: ThreadId;
   readonly goal: OrchestrationV2ProviderGoal;
+  readonly progress: ComposerBannerStackItem["progress"];
   readonly isWorking: boolean;
   readonly onSendCommand: (text: string, failureMessage: string) => Promise<void>;
 }): ComposerBannerStackItem {
@@ -68,29 +74,32 @@ export function goalBannerItem(input: {
         ? presentation.title
         : `${presentation.title} · ${presentation.usage}`,
     description: presentation.objective,
+    // Use only the current run's plan counts; goal token budgets are not task completion.
+    progress: input.progress ?? null,
     actions: isWorking ? undefined : (
       <>
         {presentation.canResume ? (
           <Button
             size="xs"
             variant="ghost"
-            onClick={() => void onSendCommand("/goal resume", "Failed to resume goal.")}
+            onClick={() => void onSendCommand("/goal resume", t.chat.view.resumeGoalError)}
           >
-            Resume
+            {t.chat.view.resume}
           </Button>
         ) : null}
         <Button
           size="xs"
           variant="ghost"
-          onClick={() => void onSendCommand("/goal clear", "Failed to clear goal.")}
+          onClick={() => void onSendCommand("/goal clear", t.chat.view.clearGoalError)}
         >
-          Clear
+          {t.chat.view.clear}
         </Button>
       </>
     ),
   };
 }
 
+/** Offers stop and navigation for pending tasks; no notice is returned once every task is complete. */
 export function backgroundWorkBannerItem(input: {
   readonly threadId: ThreadId;
   readonly tasks: ReadonlyArray<OrchestrationV2PendingBackgroundTask>;
@@ -134,10 +143,16 @@ export function backgroundWorkBannerItem(input: {
                   <span className="whitespace-nowrap">
                     <InlineButton
                       tone="muted"
-                      aria-label={`${presentation.items.length === 1 ? "Show" : "Open"} subagent ${item.label}`}
+                      aria-label={
+                        presentation.items.length === 1
+                          ? t.chat.view.showSubagent(item.label)
+                          : t.chat.view.openSubagent(item.label)
+                      }
                       onClick={() => onOpenThread(childThreadId)}
                     >
-                      {presentation.items.length === 1 ? "Show" : item.label}
+                      {presentation.items.length === 1
+                        ? t.chat.view.showSubagentAction
+                        : item.label}
                     </InlineButton>
                     {separator}
                   </span>
@@ -152,7 +167,7 @@ export function backgroundWorkBannerItem(input: {
         disabled={input.stopDisabled}
         onClick={() => void input.onStop()}
       >
-        {input.stopping ? "Stopping..." : "Stop"}
+        {input.stopping ? t.chat.view.stopping : t.chat.view.stop}
       </Button>
     ),
   };
@@ -174,28 +189,34 @@ export function branchMismatchBannerItem(input: {
     icon: <GitBranchIcon />,
     title: (
       <span className="flex min-w-0 items-baseline gap-1.5">
-        <span className="shrink-0 font-normal text-muted-foreground">Branch changed from</span>
+        <span className="shrink-0 font-normal text-warning-foreground">
+          {t.chat.view.branchChanged}
+        </span>
         <Tooltip>
           <TooltipTrigger
             render={
-              <code className="min-w-0 truncate font-medium text-foreground">
+              <code className="min-w-0 truncate font-medium text-warning-foreground">
                 {mismatch.threadBranch}
               </code>
             }
           />
           <TooltipPopup side="top">
-            This thread last ran on {mismatch.threadBranch}. Sending will continue on{" "}
-            {mismatch.currentBranch}.
+            {t.chat.view.branchMismatchHint(mismatch.threadBranch, mismatch.currentBranch)}
           </TooltipPopup>
         </Tooltip>
       </span>
     ),
     actions: (
-      <Button size="xs" variant="ghost" disabled={input.restoreDisabled} onClick={input.onRestore}>
-        {input.restoring ? "Restoring..." : "Restore branch"}
+      <Button
+        size="md"
+        variant="secondary"
+        disabled={input.restoreDisabled}
+        onClick={input.onRestore}
+      >
+        {input.restoring ? t.chat.view.restoring : t.chat.view.restoreBranch}
       </Button>
     ),
-    dismissLabel: "Dismiss branch change notice",
+    dismissLabel: t.chat.view.dismissBranchNotice,
     onDismiss: input.onDismiss,
   };
 }

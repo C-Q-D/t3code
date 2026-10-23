@@ -1,3 +1,6 @@
+/** Owns thread lifecycle actions and status notices separately from normal composer sends. */
+import { SNOOZE_UI_ENABLED } from "../../snoozeUi";
+import { t } from "~/i18n";
 import type { EnvironmentServerConfig } from "@t3tools/client-runtime/connection";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
 import type { Dispatch } from "react";
@@ -37,7 +40,7 @@ import {
 } from "@t3tools/client-runtime/state/runtime";
 import { useUiStateStore } from "../../uiStateStore";
 import { type ChatMessage } from "../../types";
-import { AlarmClockIcon, CheckCircle2Icon } from "lucide-react";
+import { AlarmClockCheckIcon, AlarmClockIcon, CheckCircle2Icon } from "lucide-react";
 import { stackedThreadToast, toastManager } from "../ui/toast";
 import { newMessageId } from "~/lib/utils";
 import { buildThreadRouteParams } from "../../threadRoutes";
@@ -65,6 +68,7 @@ type PendingThreadRequests = ReturnType<typeof usePendingThreadRequests>;
 type LocalDispatchState = ReturnType<typeof useLocalDispatchState>;
 
 interface ThreadLifecycleInput {
+  readonly activeComposerTasksProgress: Parameters<typeof goalBannerItem>[0]["progress"];
   readonly environmentId: EnvironmentId;
   readonly routeThreadKey: string;
   readonly currentRouteThreadKeyRef: { readonly current: string | null };
@@ -179,6 +183,7 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
   }
   const snoozeClock = snoozeClockState.now;
   const activeThreadSnoozed =
+    SNOOZE_UI_ENABLED &&
     activeThreadShell !== null &&
     supportsSnooze &&
     effectiveSnoozed(activeThreadShell, { now: snoozeClock });
@@ -210,12 +215,14 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
     activeThreadShell?.lastVisitedAt,
     activeThreadLocalVisitedAt,
   );
-  const activeThreadWokeVisible = isThreadWokeUnseen({
-    wokeAt: activeThreadWokeAt,
-    settled: activeThreadShell?.settledOverride === "settled",
-    lastVisitedAt: activeThreadLastVisitedAt,
-    latestRunCompletedAt: activeLatestRun?.completedAt ?? null,
-  });
+  const activeThreadWokeVisible =
+    SNOOZE_UI_ENABLED &&
+    isThreadWokeUnseen({
+      wokeAt: activeThreadWokeAt,
+      settled: activeThreadShell?.settledOverride === "settled",
+      lastVisitedAt: activeThreadLastVisitedAt,
+      latestRunCompletedAt: activeLatestRun?.completedAt ?? null,
+    });
   const activeThreadSettled =
     supportsSettlement && activeThreadShell?.settledOverride === "settled";
   const unsettleThreadMutation = useOrchestrationCommand(threadEnvironment.unsettle, {
@@ -241,8 +248,8 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Failed to un-settle thread",
-          description: error instanceof Error ? error.message : "An error occurred.",
+          title: t.chat.view.unsettleThreadError,
+          description: error instanceof Error ? error.message : t.chat.view.genericError,
         }),
       );
     }
@@ -286,8 +293,8 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Failed to wake thread",
-          description: error instanceof Error ? error.message : "An error occurred.",
+          title: t.chat.view.wakeThreadError,
+          description: error instanceof Error ? error.message : t.chat.view.genericError,
         }),
       );
     }
@@ -343,7 +350,7 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Failed to switch checkout",
+            title: t.chat.view.switchCheckoutError,
             description: chatActionErrorMessage(squashAtomCommandFailure(checkoutResult)),
           }),
         );
@@ -367,7 +374,7 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "Checkout switched, but the thread could not be updated",
+              title: t.chat.view.checkoutThreadUpdateError,
               description: chatActionErrorMessage(squashAtomCommandFailure(updateResult)),
             }),
           );
@@ -406,7 +413,7 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
         const error = squashAtomCommandFailure(result);
         setThreadError(
           activeThread.id,
-          error instanceof Error ? error.message : "Failed to stop background work.",
+          error instanceof Error ? error.message : t.chat.view.stopBackgroundWorkError,
         );
       }
     }
@@ -432,7 +439,7 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
     }
     const shell = readThreadShell(threadRef);
     if (shell === null ? isEnvironmentLive() : shell.deletedAt != null) {
-      toastManager.add({ type: "info", title: "This thread is no longer available" });
+      toastManager.add({ type: "info", title: t.chat.machineThreadUi.unavailable });
       return;
     }
     void navigate({
@@ -517,6 +524,7 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
       ? goalBannerItem({
           threadId: activeThread.id,
           goal: activeGoal,
+          progress: input.activeComposerTasksProgress,
           isWorking,
           onSendCommand: sendStandaloneCommandStable,
         })
@@ -532,32 +540,41 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
         onOpenThread: onOpenRelatedThreadStable,
       })
     : null;
-  // The relative times read the clock; nowMinute re-renders them on the minute.
-  const snoozedUntil = activeThreadShell?.snoozedUntil ?? null;
-  const settledAt = activeThreadShell?.settledAt ?? null;
+  // T2 thread state lives in the overlay, so relative-time updates do not invalidate the list footer.
+  // Dismissing a wake still acknowledges it; sending still clears it through the existing send path.
   const threadStatusLine = activeThreadSnoozed ? (
     <ThreadStatusLine
-      icon={<AlarmClockIcon />}
-      label={snoozedUntil ? `Snoozed, ${formatRelativeTimeUntilLabel(snoozedUntil)}` : "Snoozed"}
       clockMinute={nowMinute}
-      actionLabel={isUnsnoozing ? "Waking..." : "Wake now"}
+      icon={<AlarmClockIcon />}
+      label={
+        activeThreadShell?.snoozedUntil
+          ? t.chat.view.snoozedUntil(formatRelativeTimeUntilLabel(activeThreadShell.snoozedUntil))
+          : t.chat.view.snoozed
+      }
+      actionLabel={isUnsnoozing ? t.chat.view.waking : t.chat.view.wakeNow}
       actionDisabled={!canOperateThread || isUnsnoozing}
       onAction={() => void handleUnsnoozeActiveThreadStable()}
     />
   ) : activeThreadSettled ? (
     <ThreadStatusLine
-      icon={<CheckCircle2Icon />}
-      label={settledAt ? `Settled ${formatRelativeTimeLabel(settledAt)}` : "Settled"}
       clockMinute={nowMinute}
-      actionLabel={isUnsettling ? "Un-settling..." : "Un-settle"}
+      icon={<CheckCircle2Icon />}
+      label={
+        activeThreadShell?.settledAt
+          ? t.chat.view.settledAt(formatRelativeTimeLabel(activeThreadShell.settledAt))
+          : t.chat.view.settled
+      }
+      actionLabel={isUnsettling ? t.chat.view.unsettling : t.chat.view.unsettle}
       actionDisabled={!canOperateThread || isUnsettling}
       onAction={() => void handleUnsettleActiveThreadStable()}
     />
   ) : activeThreadWokeVisible ? (
     <ThreadStatusLine
-      icon={<AlarmClockIcon />}
-      label="Woke from snooze"
-      actionLabel="Dismiss"
+      clockMinute={nowMinute}
+      icon={<AlarmClockCheckIcon />}
+      label={t.chat.view.wokeFromSnooze}
+      emphasized
+      actionLabel={t.chat.view.dismiss}
       onAction={acknowledgeActiveThreadWokeStable}
     />
   ) : null;
@@ -569,7 +586,7 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
         stackedThreadToast({
           type: "error",
           title,
-          description: error instanceof Error ? error.message : "An error occurred.",
+          description: error instanceof Error ? error.message : t.chat.view.genericError,
         }),
       );
     };
@@ -582,7 +599,9 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
         return;
       }
       if (settleAndAdvance(activeThreadRef)) return;
-      void settleThread(activeThreadRef).then(toastThreadActionFailure("Failed to settle thread"));
+      void settleThread(activeThreadRef).then(
+        toastThreadActionFailure(t.chat.view.settleThreadError),
+      );
     },
     "thread.pin": () => {
       if (!readEnvironmentScope(environmentId, AuthOrchestrationOperateScope)) return false;
@@ -591,7 +610,7 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
         activeThreadPinned ? confirmAndUnpinThread(activeThreadRef) : pinThread(activeThreadRef)
       ).then(
         toastThreadActionFailure(
-          activeThreadPinned ? "Failed to unpin thread" : "Failed to pin thread",
+          activeThreadPinned ? t.chat.view.unpinThreadError : t.chat.view.pinThreadError,
         ),
       );
     },
