@@ -1,3 +1,5 @@
+/** Shows base freshness without changing the host branch state. */
+import { t } from "~/i18n";
 import type { PullRequestUpdateMethod } from "@t3tools/contracts";
 import { TriangleAlertIcon } from "lucide-react";
 import type { ReactNode } from "react";
@@ -24,20 +26,19 @@ function PullRequestBaseFreshnessWarning({
   children,
 }: {
   readonly baseBranch: string;
-  readonly freshness: BaseFreshness;
+  readonly freshness: {
+    readonly behindBy: number | null;
+    readonly methods: ReadonlyArray<PullRequestUpdateMethod>;
+  };
   readonly pending: boolean;
   readonly onUpdate: (method: PullRequestUpdateMethod) => void;
-  readonly iconClassName?: string | undefined;
+  readonly iconClassName?: string;
   readonly className?: string;
   readonly children?: ReactNode;
 }) {
   const behind =
-    freshness.behindBy === null
-      ? ""
-      : ` by ${freshness.behindBy.toLocaleString()} ${
-          freshness.behindBy === 1 ? "commit" : "commits"
-        }`;
-  const summary = `This branch is out-of-date with ${baseBranch}${behind}.`;
+    freshness.behindBy === null ? "" : t.git.pullRequest.behindCommits(freshness.behindBy);
+  const summary = t.git.pullRequest.branchOutdated(baseBranch, behind);
   return (
     <Popover>
       <PopoverTrigger
@@ -60,7 +61,11 @@ function PullRequestBaseFreshnessWarning({
       </PopoverTrigger>
       <PopoverPopup align="start" side="bottom" className="max-w-80" padding="compact">
         <p className="text-xs text-foreground">{summary}</p>
-        <p className="mt-0.5 text-xs text-muted-foreground">Changes can be cleanly merged.</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          {t.git.pullRequest.changesCanBeCleanlyMerged}
+        </p>
+        {/* Each way the host offers and this reader may take, as its own button: a split button
+            would need a menu inside a popover, and two buttons say the same thing in one layer. */}
         {freshness.methods.length > 0 ? (
           <span className="mt-2 flex flex-wrap items-center gap-1.5">
             {freshness.methods.map((method) => (
@@ -72,7 +77,9 @@ function PullRequestBaseFreshnessWarning({
                 onClick={() => onUpdate(method)}
               >
                 <PullRequestGlyph.merged aria-hidden className="size-3" />
-                {method === "rebase" ? "Update with rebase" : "Update branch"}
+                {method === "rebase"
+                  ? t.git.pullRequest.updateWithRebase
+                  : t.git.pullRequest.updateBranch}
               </Button>
             ))}
           </span>
@@ -101,7 +108,10 @@ export function PullRequestBaseBranch({
   const label = (
     <>
       {stacked ? (
-        <PullRequestGlyph.stack aria-label="Stacked pull request" className="size-3 shrink-0" />
+        <PullRequestGlyph.stack
+          aria-label={t.git.pullRequest.stackedPullRequest}
+          className="size-3 shrink-0"
+        />
       ) : null}
       <code className="flex min-w-0">
         <MiddleTruncate value={baseBranch} showTitle={false} />
@@ -115,8 +125,8 @@ export function PullRequestBaseBranch({
         freshness={freshness}
         pending={pending}
         onUpdate={onUpdate}
-        iconClassName={iconClassName}
-        className="max-w-[40%]"
+        {...(iconClassName ? { iconClassName } : {})}
+        className="max-w-36"
       >
         {label}
       </PullRequestBaseFreshnessWarning>
@@ -126,12 +136,12 @@ export function PullRequestBaseBranch({
     <Tooltip>
       <TooltipTrigger
         render={
-          <span className="inline-flex min-w-0 max-w-[40%] shrink-0 items-center gap-1">
-            {label}
-          </span>
+          <span className="inline-flex min-w-0 max-w-36 shrink-0 items-center gap-1">{label}</span>
         }
       />
-      <TooltipPopup side="top">{stacked ? `Stacked on ${baseBranch}` : baseBranch}</TooltipPopup>
+      <TooltipPopup side="top">
+        {stacked ? t.git.pullRequest.stackedOn(baseBranch) : baseBranch}
+      </TooltipPopup>
     </Tooltip>
   );
 }

@@ -59,7 +59,10 @@ vi.mock("~/lib/openPullRequestLink", () => ({
   findProjectForChangeRequest: () => null,
 }));
 vi.mock("./LinkPullRequestDialog", () => ({ openLinkPullRequestDialog: vi.fn() }));
-vi.mock("./PullRequestSpeedActions", () => ({ PullRequestSpeedActions: () => null }));
+vi.mock("./PullRequestSpeedActions", async () => {
+  const { createContext } = await import("react");
+  return { PullRequestSpeedActions: () => null, PullRequestSpeedModeContext: createContext(false) };
+});
 vi.mock("../ui/scroll-area", () => ({ ScrollArea: Wrapper }));
 vi.mock("../ui/tooltip", () => ({
   Tooltip: Wrapper,

@@ -1,3 +1,4 @@
+/** Edits a plain-text PR title; host writes remain in the atom command. */
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import type { EnvironmentId, PullRequestDetail, PullRequestRef } from "@t3tools/contracts";
 import { useState } from "react";
@@ -9,7 +10,8 @@ import { Input } from "../ui/input";
 import { toastManager } from "../ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { PullRequestDetailTitleRow } from "./PullRequestDetailLayout";
-import { PullRequestEditButton } from "./PullRequestEditButton";
+import { PencilIcon } from "lucide-react";
+import { t } from "~/i18n";
 import { readableFailure } from "./pullRequestDetail.logic";
 import { canEditPullRequestChangeRequest } from "./pullRequestEditing.logic";
 
@@ -50,10 +52,10 @@ export function PullRequestTitleEditor({
     if (result._tag === "Failure") {
       toastManager.add({
         type: "error",
-        title: "The title could not be saved",
+        title: t.git.pullRequest.theTitleCouldNotBeSaved,
         description: readableFailure(
           squashAtomCommandFailure(result),
-          "The host refused the new title.",
+          t.git.pullRequest.theHostRefusedTheNewTitle,
         ),
       });
       return;
@@ -62,39 +64,41 @@ export function PullRequestTitleEditor({
     onSaved();
   };
 
-  if (titleDraft === null) {
-    return (
-      <PullRequestDetailTitleRow className="group gap-1">
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <h1 className="min-w-0 flex-1 truncate text-base font-semibold leading-snug">
-                {detail.title}
-              </h1>
-            }
-          />
-          <TooltipPopup side="top">{detail.title}</TooltipPopup>
-        </Tooltip>
-        {canEditPullRequestChangeRequest(detail) ? (
-          <PullRequestEditButton
-            aria-label="Edit title"
-            onClick={() => setTitleScope({ pullRequestKey, text: detail.title })}
-          />
-        ) : null}
-      </PullRequestDetailTitleRow>
-    );
-  }
-  return (
+  return titleDraft === null ? (
+    <PullRequestDetailTitleRow className="group gap-2">
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <h1 className="min-w-0 truncate font-serif text-pr-detail-title font-bold">
+              {detail.title}
+            </h1>
+          }
+        />
+        <TooltipPopup side="top">{detail.title}</TooltipPopup>
+      </Tooltip>
+      {canEditPullRequestChangeRequest(detail) ? (
+        <Button
+          size="icon-xs"
+          variant="ghost-muted"
+          aria-label={t.git.pullRequest.editTitle}
+          onClick={() => setTitleScope({ pullRequestKey, text: detail.title })}
+        >
+          <PencilIcon aria-hidden className="size-3.5" />
+        </Button>
+      ) : null}
+    </PullRequestDetailTitleRow>
+  ) : (
+    // A title is one line of text, not markdown, so it takes an input rather than
+    // the editor the description and the remarks share.
     <div className="space-y-2">
       <Input
         autoFocus
         size="sm"
         disabled={titleSaving}
         value={titleDraft}
-        aria-label="Pull request title"
+        aria-label={t.git.pullRequest.pullRequestTitle}
         onChange={(event) => setTitleScope({ pullRequestKey, text: event.target.value })}
         onKeyDown={(event) => {
-          if (event.nativeEvent.isComposing || event.keyCode === 229) return;
           if (event.key === "Enter") {
             event.preventDefault();
             void saveTitle(titleDraft);
@@ -111,7 +115,7 @@ export function PullRequestTitleEditor({
           disabled={titleSaving}
           onClick={() => setTitleScope(null)}
         >
-          Cancel
+          {t.common.confirm.cancel}
         </Button>
         <Button
           size="xs"
@@ -119,7 +123,7 @@ export function PullRequestTitleEditor({
           disabled={!canWriteSourceControl || titleSaving || titleDraft.trim().length === 0}
           onClick={() => void saveTitle(titleDraft)}
         >
-          {titleSaving ? "Saving..." : "Save"}
+          {titleSaving ? t.git.pullRequest.saving : t.git.pullRequest.save}
         </Button>
       </div>
     </div>

@@ -1,22 +1,36 @@
-import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
-import { ArrowLeftIcon, ExternalLinkIcon } from "lucide-react";
-import type { MouseEvent as ReactMouseEvent } from "react";
+/** Owns the PR identity row and local ask, explain, and copy controls. */
+import { PixelSparkIcon } from "../icons/PixelLucideIcon";
+import { t } from "~/i18n";
+import { useAtomValue } from "@effect/atom-react";
+import { type PullRequestDetail } from "@t3tools/contracts";
+import {
+  ArrowLeftIcon,
+  CopyIcon,
+  ChevronDownIcon,
+  GitBranchIcon,
+  MessageCircleQuestionIcon,
+  LinkIcon,
+  HashIcon,
+  PanelRightIcon,
+  TerminalIcon,
+} from "lucide-react";
+import { type MouseEvent as ReactMouseEvent } from "react";
 
-import { cn } from "~/lib/utils";
+import { shortcutLabelForCommand } from "~/keybindings";
+import { primaryServerKeybindingsAtom } from "~/state/server";
 import { readLocalApi } from "~/localApi";
+import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
+
+import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { Menu, MenuItem, MenuPopup, MenuShortcut, MenuTrigger } from "../ui/menu";
 import { openOnHostLabel, showPullRequestLinkContextMenu } from "./pullRequestLinkContextMenu";
+import { resolvePullRequestState } from "./pullRequestPresentation";
 
-interface CrumbsPullRequest {
-  readonly url: string;
-  readonly provider: string;
-  readonly number: number;
-  readonly repository: string;
-  readonly title: string;
-}
-
-const openNumberContextMenu = (event: ReactMouseEvent, detail: CrumbsPullRequest): void => {
+const openNumberContextMenu = (
+  event: ReactMouseEvent,
+  detail: { readonly url: string; readonly provider: string },
+): void => {
   event.preventDefault();
   event.stopPropagation();
   void showPullRequestLinkContextMenu({
@@ -26,166 +40,153 @@ const openNumberContextMenu = (event: ReactMouseEvent, detail: CrumbsPullRequest
   });
 };
 
-const ROW_CLASS_NAME =
-  "col-start-1 row-start-1 flex min-w-0 items-center gap-1 text-sm text-muted-foreground transition-[opacity,transform] ease-out motion-reduce:transform-none motion-reduce:transition-none sm:text-xs";
-
-function BackButton({ onBack, focusable }: { onBack: () => void; focusable: boolean }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <Button
-            size="icon-micro"
-            variant="ghost-muted"
-            {...(focusable ? {} : { tabIndex: -1 })}
-            onClick={onBack}
-            className="-ml-1.5"
-            aria-label="Back to this thread's pull requests"
-          >
-            <ArrowLeftIcon aria-hidden className="size-3.5" />
-          </Button>
-        }
-      />
-      <TooltipPopup side="top">Back to pull requests</TooltipPopup>
-    </Tooltip>
-  );
-}
-
-function NumberLink({
+/** Preserves the fork header behavior within the upstream component boundary. */
+export function PullRequestDetailCrumbs({
   detail,
-  toneClassName,
-  openOnHostText,
-  focusable,
+  onBack,
+  onClose,
+  handoff,
+  askAboutPullRequest,
+  explainPullRequest,
+  copyReference,
+  checkoutCommand,
 }: {
-  detail: CrumbsPullRequest;
-  toneClassName: string;
-  openOnHostText: string;
-  focusable: boolean;
+  detail: PullRequestDetail | null;
+  onBack: (() => void) | undefined;
+  onClose: (() => void) | undefined;
+  handoff: string | null;
+  askAboutPullRequest: () => void;
+  explainPullRequest: () => void;
+  copyReference: (value: string, label: string) => void;
+  checkoutCommand: string | null;
 }) {
+  const keybindings = useAtomValue(primaryServerKeybindingsAtom);
+  const statePresentation = detail
+    ? resolvePullRequestState({ state: detail.state, isDraft: detail.isDraft })
+    : null;
   return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
+    <div className="flex min-h-7 min-w-0 flex-wrap items-center gap-2 px-4 pt-1 pb-2.5">
+      {onBack ? (
+        <Button
+          size="icon-sm"
+          variant="ghost-muted"
+          onClick={onBack}
+          aria-label={t.git.pullRequest.backToThisThreadSPullRequests}
+        >
+          <ArrowLeftIcon aria-hidden className="size-3.5" />
+        </Button>
+      ) : null}
+      {detail && statePresentation ? (
+        <>
+          <Badge
+            size="lg"
+            variant={
+              detail.state === "open" && detail.isDraft
+                ? "neutral"
+                : detail.state === "open"
+                  ? "success"
+                  : detail.state === "merged"
+                    ? "accent"
+                    : "danger"
+            }
+          >
+            <statePresentation.Icon aria-hidden className="size-3" />
+            {statePresentation.label}
+          </Badge>
           <button
             type="button"
-            {...(focusable ? {} : { tabIndex: -1 })}
             onClick={() => void readLocalApi()?.shell.openExternal(detail.url)}
             onAuxClick={(event) => {
               if (event.button === 1) void readLocalApi()?.shell.openExternal(detail.url);
             }}
             onContextMenu={(event) => openNumberContextMenu(event, detail)}
-            className={cn(
-              "inline-flex shrink-0 cursor-pointer items-center gap-0.5 font-medium underline-offset-2 hover:underline",
-              toneClassName,
-            )}
-            aria-label={`Open pull request #${detail.number} on host`}
+            className="shrink-0 cursor-pointer rounded-keycap font-mono text-secondary-copy-medium text-muted-foreground underline-offset-2 hover:underline focus-visible:inset-shadow-focus"
+            aria-label={t.git.pullRequest.openRequestOnHost(detail.number)}
           >
             #{detail.number}
-            <ExternalLinkIcon aria-hidden className="size-2.5" />
           </button>
-        }
-      />
-      <TooltipPopup side="top">{openOnHostText}</TooltipPopup>
-    </Tooltip>
-  );
-}
-
-/**
- * The repository and number above the title, swapped for the number and title once the reader has
- * scrolled the title away.
- */
-export function PullRequestDetailCrumbs({
-  detail,
-  toneClassName,
-  condensed,
-  repositoryUrl,
-  openOnHostText,
-  onBack,
-}: {
-  detail: CrumbsPullRequest | null;
-  toneClassName: string | null;
-  condensed: boolean;
-  repositoryUrl: string | null;
-  openOnHostText: string;
-  onBack: (() => void) | undefined;
-}) {
-  const ready = detail !== null && toneClassName !== null;
-  return (
-    <div className="pl-4 grid h-7 min-w-0 items-center overflow-hidden">
-      <div
-        aria-hidden={condensed}
-        inert={condensed}
-        className={cn(
-          ROW_CLASS_NAME,
-          condensed
-            ? "pointer-events-none -translate-y-1 opacity-0 duration-100"
-            : "translate-y-0 opacity-100 delay-50 duration-150",
-        )}
-      >
-        {ready ? (
+        </>
+      ) : null}
+      <div className="ml-auto flex min-w-0 items-center gap-1">
+        {detail ? (
           <>
-            {onBack ? <BackButton onBack={onBack} focusable /> : null}
-            <Tooltip>
-              <TooltipTrigger
+            <Button
+              size="md"
+              variant="ghost"
+              disabled={handoff !== null}
+              onClick={askAboutPullRequest}
+            >
+              <MessageCircleQuestionIcon aria-hidden className="size-3.5" />
+              {handoff === "ask" ? t.git.pullRequest.opening : t.git.pullRequest.askAQuestion}
+            </Button>
+            <Button
+              size="md"
+              variant="secondary"
+              disabled={handoff !== null}
+              onClick={explainPullRequest}
+            >
+              <PixelSparkIcon aria-hidden className="size-3.5" />
+              {handoff === "explain" ? t.git.pullRequest.opening : t.git.pullRequest.explainThisPR}
+            </Button>
+            <Menu>
+              <MenuTrigger
                 render={
-                  repositoryUrl ? (
-                    <button
-                      type="button"
-                      onClick={() => void readLocalApi()?.shell.openExternal(repositoryUrl)}
-                      className="min-w-0 cursor-pointer truncate text-left font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-                    >
-                      {detail.repository}
-                    </button>
-                  ) : (
-                    <span className="min-w-0 truncate font-medium text-muted-foreground">
-                      {detail.repository}
-                    </span>
-                  )
+                  <Button
+                    size="icon-menu"
+                    variant="ghost-muted"
+                    aria-label={t.git.pullRequest.copyMenu}
+                  />
                 }
-              />
-              <TooltipPopup side="top">
-                {repositoryUrl ? `Open ${detail.repository} repository` : detail.repository}
-              </TooltipPopup>
-            </Tooltip>
-            <NumberLink
-              detail={detail}
-              toneClassName={toneClassName}
-              openOnHostText={openOnHostText}
-              focusable
-            />
+              >
+                <CopyIcon aria-hidden className="size-3.5" />
+                <ChevronDownIcon aria-hidden className="size-3" />
+              </MenuTrigger>
+              <MenuPopup align="end">
+                <MenuItem onClick={() => copyReference(detail.url, t.git.pullRequest.pRLink)}>
+                  <LinkIcon aria-hidden className="size-3.5" />
+                  {t.git.pullRequest.copyLinkLabel}
+                  <MenuShortcut>
+                    {shortcutLabelForCommand(keybindings, "thread.copyReference")}
+                  </MenuShortcut>
+                </MenuItem>
+                <MenuItem
+                  onClick={() => copyReference(`#${detail.number}`, t.git.pullRequest.pRNumber)}
+                >
+                  <HashIcon aria-hidden className="size-3.5" />
+                  {t.git.pullRequest.copyNumberLabel}
+                  <MenuShortcut>
+                    {shortcutLabelForCommand(keybindings, "pullRequest.copyNumber")}
+                  </MenuShortcut>
+                </MenuItem>
+                <MenuItem
+                  onClick={() => copyReference(detail.headBranch, t.git.pullRequest.branchName)}
+                >
+                  <GitBranchIcon aria-hidden className="size-3.5" />
+                  {t.git.pullRequest.copyBranchLabel}
+                </MenuItem>
+                {checkoutCommand ? (
+                  <MenuItem
+                    onClick={() =>
+                      copyReference(checkoutCommand, t.git.pullRequest.pullRequestCheckoutCommand)
+                    }
+                  >
+                    <TerminalIcon aria-hidden className="size-3.5" />
+                    {t.git.pullRequest.copyCheckoutLabel}
+                  </MenuItem>
+                ) : null}
+              </MenuPopup>
+            </Menu>
           </>
         ) : null}
-      </div>
-      <div
-        aria-hidden={!condensed}
-        inert={!condensed}
-        className={cn(
-          ROW_CLASS_NAME,
-          condensed
-            ? "translate-y-0 opacity-100 delay-50 duration-150"
-            : "pointer-events-none translate-y-1 opacity-0 duration-100",
-        )}
-      >
-        {ready ? (
-          <>
-            {onBack ? <BackButton onBack={onBack} focusable={condensed} /> : null}
-            <NumberLink
-              detail={detail}
-              toneClassName={toneClassName}
-              openOnHostText={openOnHostText}
-              focusable={condensed}
-            />
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <span className="min-w-0 truncate font-medium text-foreground">
-                    {detail.title}
-                  </span>
-                }
-              />
-              <TooltipPopup side="top">{detail.title}</TooltipPopup>
-            </Tooltip>
-          </>
+        {onClose ? (
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            aria-label={t.git.pullRequest.collapsePullRequestPanel}
+            onClick={onClose}
+          >
+            <PanelRightIcon aria-hidden className="size-3.5" />
+          </Button>
         ) : null}
       </div>
     </div>
