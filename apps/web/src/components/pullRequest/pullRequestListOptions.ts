@@ -1,3 +1,5 @@
+/** Shared filter options retain the local ordering and translated labels. */
+import { t } from "~/i18n";
 import type { PullRequestInvolvement, PullRequestListState } from "@t3tools/contracts";
 import {
   CalendarArrowDownIcon,
@@ -17,24 +19,24 @@ import type { PullRequestListSort } from "./pullRequestListPreferences";
 import { PullRequestGlyph } from "./pullRequestIcons";
 
 export const INVOLVEMENT_TABS = [
-  { value: "all", label: "All", Icon: LayersIcon },
-  { value: "reviewing", label: "Reviewing", Icon: EyeIcon },
-  { value: "authored", label: "Authored", Icon: PenLineIcon },
+  { value: "authored", label: t.git.pullRequest.authored, Icon: PenLineIcon },
+  { value: "reviewing", label: t.git.pullRequest.reviewing, Icon: EyeIcon },
+  { value: "all", label: t.git.pullRequest.all, Icon: LayersIcon },
 ] as const satisfies ReadonlyArray<PullRequestFilterOption<PullRequestInvolvement>>;
 
 export const STATE_TABS = [
-  { value: "all", label: "All", Icon: LayersIcon },
-  { value: "open", label: "Open", Icon: PullRequestGlyph.pullRequest },
-  { value: "closed", label: "Closed", Icon: PullRequestGlyph.closed },
-  { value: "merged", label: "Merged", Icon: PullRequestGlyph.merged },
+  { value: "all", label: t.git.pullRequest.all, Icon: LayersIcon },
+  { value: "open", label: t.git.pullRequest.open, Icon: PullRequestGlyph.pullRequest },
+  { value: "closed", label: t.git.pullRequest.closed, Icon: PullRequestGlyph.closed },
+  { value: "merged", label: t.git.pullRequest.merged, Icon: PullRequestGlyph.merged },
 ] as const satisfies ReadonlyArray<PullRequestFilterOption<PullRequestListState>>;
 
 export const SORT_OPTIONS = [
-  { value: "ready", label: "Merge readiness", Icon: ListChecksIcon },
-  { value: "blocked", label: "Blocked on me", Icon: UserLockIcon },
-  { value: "updated", label: "Recently updated", Icon: ClockIcon },
-  { value: "newest", label: "Newest shown", Icon: CalendarArrowDownIcon },
-  { value: "oldest", label: "Oldest shown", Icon: CalendarArrowUpIcon },
-  { value: "largest", label: "Largest shown", Icon: Maximize2Icon },
-  { value: "smallest", label: "Smallest shown", Icon: Minimize2Icon },
+  { value: "updated", label: t.git.pullRequest.recentlyUpdated, Icon: ClockIcon },
+  { value: "newest", label: t.git.pullRequest.newestShown, Icon: CalendarArrowDownIcon },
+  { value: "oldest", label: t.git.pullRequest.oldestShown, Icon: CalendarArrowUpIcon },
+  { value: "largest", label: t.git.pullRequest.largestShown, Icon: Maximize2Icon },
+  { value: "smallest", label: t.git.pullRequest.smallestShown, Icon: Minimize2Icon },
+  { value: "ready", label: t.git.pullRequest.mergeReadiness, Icon: ListChecksIcon },
+  { value: "blocked", label: t.git.pullRequest.blockedOnMe, Icon: UserLockIcon },
 ] as const satisfies ReadonlyArray<PullRequestFilterOption<PullRequestListSort>>;

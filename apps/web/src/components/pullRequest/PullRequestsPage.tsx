@@ -1,6 +1,8 @@
+/** Coordinates the PR page; route validation and list presentation have separate owners. */
+import { t } from "~/i18n";
 import { applyPullRequestDraftFilterChange } from "@t3tools/client-runtime/pull-request-query";
 import { Spinner } from "~/components/ui/spinner";
-import type { PullRequestSpeedActionResult } from "~/components/pullRequest/PullRequestSpeedActions";
+import { type PullRequestSpeedActionResult } from "~/components/pullRequest/PullRequestSpeedActions";
 import { usePullRequestCloseBatch } from "~/components/pullRequest/usePullRequestActions";
 import { SidebarPointerSensor } from "~/components/Sidebar.pointer";
 import { resolveSidebarSweepKeys } from "~/components/Sidebar.logic";
@@ -14,12 +16,11 @@ import type {
   PullRequestListCursors,
   PullRequestListInput,
   PullRequestListResult,
-  PullRequestListState,
   SourceControlProviderKind,
 } from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
-import { useNavigate, useSearch } from "@tanstack/react-router";
-import { ArrowDownUpIcon, LayersIcon, Plug2Icon } from "lucide-react";
+import { useSearch, useNavigate } from "@tanstack/react-router";
+import { LayersIcon, Plug2Icon } from "lucide-react";
 import { useEffect, useEffectEvent, useRef, useState, type ComponentProps } from "react";
 
 import {
@@ -45,49 +46,64 @@ import {
   reusePullRequestEntries,
   settlePullRequestOverrides,
   largestPullRequestReadCount,
-} from "./pullRequestList.logic";
+} from "~/components/pullRequest/pullRequestList.logic";
 import {
   pullRequestListPreferences,
   type PullRequestListPreferencePatch,
   writePullRequestListPreferences,
-} from "./pullRequestListPreferences";
-import { environmentMachineIcon } from "../EnvironmentMachineIcon";
-import { PullRequestDetailPanel } from "./PullRequestDetailPanel";
+} from "~/components/pullRequest/pullRequestListPreferences";
+import { environmentMachineIcon } from "~/components/EnvironmentMachineIcon";
+import { PullRequestDetailPanel } from "~/components/pullRequest/PullRequestDetailPanel";
 import {
   PullRequestFiltersMenu,
+  PullRequestFilterSelect,
   PullRequestSearchInput,
   pullRequestHostLabel,
   pullRequestProjectKey,
   type PullRequestFilterOption,
-} from "./PullRequestListFilters";
-import { PullRequestCompactFilterMenu } from "./PullRequestCompactFilterMenu";
-import { INVOLVEMENT_TABS, SORT_OPTIONS, STATE_TABS } from "./pullRequestListOptions";
-import { PullRequestsColumn } from "./PullRequestsColumn";
-import { PullRequestListGroups } from "./PullRequestListGroups";
+} from "~/components/pullRequest/PullRequestListFilters";
+import {
+  INVOLVEMENT_TABS,
+  SORT_OPTIONS,
+  STATE_TABS,
+} from "~/components/pullRequest/pullRequestListOptions";
+import {
+  PullRequestsColumn,
+  PullRequestRefreshControl,
+} from "~/components/pullRequest/PullRequestsColumn";
+import { PullRequestListGroups } from "~/components/pullRequest/PullRequestListGroups";
 import {
   usePullRequestDisplayGroups,
   usePullRequestQueryFilters,
   usePullRequestScope,
   type PullRequestsSearch,
-} from "./usePullRequestListView";
-import { pullRequestGroups, pullRequestListEntryId } from "./pullRequestListGroups.logic";
-import { PullRequestListEmptyState } from "./PullRequestListEmptyState";
-import { PullRequestListGhost } from "./PullRequestGhosts";
-import { type PullRequestRowTarget } from "./PullRequestRow";
-import { PullRequestsUnavailableState } from "./PullRequestsUnavailableState";
-import { RightPanelTabs } from "../RightPanelTabs";
+} from "~/components/pullRequest/usePullRequestListView";
+import {
+  pullRequestGroups,
+  pullRequestListEntryId,
+} from "~/components/pullRequest/pullRequestListGroups.logic";
+import { PullRequestListEmptyState } from "~/components/pullRequest/PullRequestListEmptyState";
+import { PullRequestListGhost } from "~/components/pullRequest/PullRequestGhosts";
+import { type PullRequestRowTarget } from "~/components/pullRequest/PullRequestRow";
+import { PullRequestsUnavailableState } from "~/components/pullRequest/PullRequestsUnavailableState";
+import { RightPanelTabs } from "~/components/RightPanelTabs";
+import { useTitlebarSlot } from "~/components/frame/titlebarSlot";
+import { pullRequestListDetailWidth } from "~/components/pullRequest/pullRequestListLayout.logic";
 import { isCommandPaletteOpen } from "~/commandPaletteBus";
 import { isElectron } from "~/env";
 import { resolveShortcutCommand, shortcutLabelForCommand } from "~/keybindings";
 import { isTerminalFocused } from "~/lib/terminalFocus";
-import { PanelLayoutControls, RightPanelMaximizeControl } from "../chat/PanelLayoutControls";
-import { Button } from "../ui/button";
-import { SidebarInset } from "../ui/sidebar";
+import {
+  PanelLayoutControls,
+  RightPanelMaximizeControl,
+} from "~/components/chat/PanelLayoutControls";
+import { Button } from "~/components/ui/button";
+import { SidebarInset } from "~/components/ui/sidebar";
 import { useLiveRefresh } from "~/hooks/useLiveRefresh";
 import { useStableCallback } from "~/hooks/useStableCallback";
 import { useOpenPanelPullRequestUrl } from "~/hooks/useOpenPanelPullRequestUrl";
 import { writeTextToClipboard } from "~/hooks/useCopyToClipboard";
-import { toastManager } from "../ui/toast";
+import { toastManager } from "~/components/ui/toast";
 import { useEscapeToGoBack } from "~/hooks/useNavigateBack";
 import { usePanelAnimationSettings, usePanelPresence } from "~/panelAnimations";
 import {
@@ -107,7 +123,6 @@ import {
   type EnvironmentQueryTarget,
 } from "~/state/pullRequests";
 import { useAtomCommand } from "~/state/use-atom-command";
-import { cn } from "~/lib/utils";
 import { primaryServerKeybindingsAtom } from "~/state/server";
 import { getSourceControlPresentationForKind } from "~/sourceControlPresentation";
 
@@ -675,6 +690,17 @@ export function PullRequestsPage() {
   );
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [defaultDetailWidth, setDefaultDetailWidth] = useState<number | null>(null);
+  const measureListHost = useStableCallback((host: HTMLDivElement | null) => {
+    if (host === null) return;
+    const listWidth = Number.parseFloat(
+      getComputedStyle(host).getPropertyValue("--spacing-pr-list"),
+    );
+    // Measure before mounting the resizable panel: it reads its default only on mount.
+    // Saved splitter widths still win; a fresh layout leaves the board's 400px for the list.
+    setDefaultDetailWidth(pullRequestListDetailWidth(host.clientWidth, listWidth || 400));
+  });
+
   const {
     entries,
     listedPullRequestTabStatuses,
@@ -1084,25 +1110,38 @@ export function PullRequestsPage() {
       rightPanelAvailable={rightPanelAvailable}
       rightPanelOpen={rightPanelState.isOpen}
       rightPanelShortcutLabel={shortcutLabelForCommand(keybindings, "rightPanel.toggle")}
-      rightPanelUnavailableLabel="Select a pull request first"
+      rightPanelUnavailableLabel={t.git.pullRequest.selectAPullRequestFirst}
       onToggleTerminal={() => undefined}
       onToggleRightPanel={toggleRightPanel}
     />
   );
-  const openPanelControls = (
-    <div
-      className="absolute top-[var(--workspace-controls-top)] right-[var(--workspace-controls-right)] z-50 mr-px flex h-[var(--workspace-topbar-height)] items-center gap-1 [-webkit-app-region:no-drag]"
-      data-workspace-titlebar-controls
-    >
-      {rightPanelState.isOpen ? (
-        <RightPanelMaximizeControl
-          maximized={rightPanelMaximized}
-          onToggle={toggleRightPanelMaximized}
+  const titlebar = useTitlebarSlot({
+    breadcrumb: <h1 className="font-serif text-plan-title font-bold">PR</h1>,
+    actions: (
+      <div className="flex items-center gap-2">
+        <PullRequestRefreshControl
+          refreshing={refreshing}
+          onRefresh={() => void refreshFromHost()}
         />
-      ) : null}
-      {panelToggleControls}
-    </div>
-  );
+        {pullRequestsSupported ? (
+          <div className="flex items-center gap-1">
+            {rightPanelState.isOpen ? (
+              <RightPanelMaximizeControl
+                maximized={rightPanelMaximized}
+                onToggle={toggleRightPanelMaximized}
+              />
+            ) : null}
+            {panelToggleControls}
+          </div>
+        ) : null}
+      </div>
+    ),
+  });
+  // The rows carried over from the last filters can also narrow to nothing one step further on,
+  // where involvement is applied against the viewers of the answer they came from. "Nothing under
+  // these filters" is a claim, and it is the wrong one to make about a question still in flight,
+  // so that case waits with the skeletons rather than answering for the hosts. A search says so
+  // in its own words and is left to.
   const carriedToNothing =
     shownCount === 0 &&
     typedQuery.length === 0 &&
@@ -1113,13 +1152,15 @@ export function PullRequestsPage() {
         <PullRequestListGhost rows={7} />
       ) : !pullRequestsSupported ? (
         <PullRequestsUnavailableState
-          title="Pull requests unavailable"
-          error="Update your T3 Code servers to browse pull requests."
+          variant="list"
+          title={t.git.pullRequest.pullRequestsUnavailable}
+          error={t.git.pullRequest.updateYourT3CodeServersToBrowsePullRequests}
         />
       ) : firstLoad ? (
         <PullRequestListGhost rows={7} />
       ) : listQuery.error && shownCount === 0 ? (
         <PullRequestsUnavailableState
+          variant="list"
           error={listQuery.error}
           refreshing={listQuery.isPending}
           onRetry={() => listQuery.refresh()}
@@ -1164,9 +1205,12 @@ export function PullRequestsPage() {
 
       {listQuery.error && shownCount > 0 ? (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-warning/30 bg-warning-surface px-3 py-2 text-xs">
-          <span>{listQuery.error} Showing the last pull requests loaded.</span>
+          <span>
+            {listQuery.error}
+            {t.git.pullRequest.showingTheLastPullRequestsLoaded}
+          </span>
           <Button size="xs" variant="outline" onClick={() => listQuery.refresh()}>
-            Retry
+            {t.git.pullRequest.retry}
           </Button>
         </div>
       ) : null}
@@ -1175,19 +1219,21 @@ export function PullRequestsPage() {
           {loadingMore ? (
             <span className="flex items-center gap-2">
               <Spinner aria-hidden size="sm" />
-              {sentCursors === null ? "Updating pull requests" : "Loading more"}
+              {sentCursors === null
+                ? t.git.pullRequest.updatingPullRequests
+                : t.git.pullRequest.loadingMore}
             </span>
           ) : canContinue || pageSize < MAX_PAGE_SIZE ? (
             <Button
-              size="sm"
+              size="toolbar"
               variant="outline"
               onClick={loadMore}
               disabled={listQuery.isPending || showingCarried}
             >
-              Load more pull requests
+              {t.git.pullRequest.loadMorePullRequests}
             </Button>
           ) : (
-            <span>Narrow your search to find more pull requests.</span>
+            <span>{t.git.pullRequest.narrowYourSearchToFindMorePullRequests}</span>
           )}
         </div>
       ) : null}
@@ -1195,7 +1241,7 @@ export function PullRequestsPage() {
   );
   const hostEntries = hosts.length > 0 ? hosts : expectedHosts;
   const hostMenuOptions: ReadonlyArray<PullRequestFilterOption<string>> = [
-    { value: "", label: "All", Icon: Plug2Icon },
+    { value: "", label: t.git.pullRequest.all, Icon: Plug2Icon },
     ...hostEntries.map((entry) => {
       const summary = hosts.find((host) => host.host === entry.host);
       return {
@@ -1204,12 +1250,12 @@ export function PullRequestsPage() {
         Icon: getSourceControlPresentationForKind(entry.kind).Icon,
         ...(summary === undefined || summary.configured
           ? {}
-          : { unavailable: summary.detail ?? "This host could not be read." }),
+          : { unavailable: summary.detail ?? t.git.pullRequest.thisHostCouldNotBeRead }),
       };
     }),
   ];
   const serverMenuOptions: ReadonlyArray<PullRequestFilterOption<string>> = [
-    { value: "", label: "All servers", Icon: LayersIcon },
+    { value: "", label: t.git.pullRequest.allServers, Icon: LayersIcon },
     ...capableEnvironments.map((environment) => ({
       value: environment.environmentId,
       label: environment.label,
@@ -1217,11 +1263,9 @@ export function PullRequestsPage() {
     })),
   ];
   const sortMenu = (
-    <PullRequestCompactFilterMenu
-      label="Sort pull requests"
-      triggerIcon={<ArrowDownUpIcon aria-hidden className="size-4" />}
-      triggerLabel="Sort"
-      outlined
+    <PullRequestFilterSelect
+      label={t.git.pullRequest.sortPullRequests}
+      valueOnly
       value={sort}
       options={SORT_OPTIONS}
       onChange={(next) => updateListScope({ sort: next })}
@@ -1274,48 +1318,10 @@ export function PullRequestsPage() {
     />
   );
   const columnProps = {
-    refreshing,
-    onRefresh: () => void refreshFromHost(),
-    searchValue: search.q ?? "",
-    involvement: search.involvement,
-    state: search.state,
-    host: search.host,
-    hostMenuOptions,
-    onInvolvement: (involvement: PullRequestInvolvement) => updateListScope({ involvement }),
-    onState: (state: PullRequestListState) => updateListScope({ state }),
-    onHost: (host: string | undefined) => updateListScope({ host }),
     searchInput,
     sortMenu,
     filtersMenu,
-    rightPanelControl: !pullRequestsSupported ? null : (
-      <span
-        aria-hidden
-        className={cn(
-          "shrink-0",
-          rightPanelState.isOpen ? "-ml-3 w-0" : "w-7 sm:w-5",
-          panelAnimationsActive && "transition-[width,margin] ease-out",
-        )}
-        style={
-          panelAnimationsActive
-            ? { transitionDuration: `${panelAnimationDurationMs}ms` }
-            : undefined
-        }
-      />
-    ),
-    titlebarControls:
-      // While the panel is closed the strip lives inside the header: a no-drag
-      // descendant beats the header's desktop drag-region, where a floating
-      // sibling loses (app-region hit-testing ignores z-index).
-      pullRequestsSupported ? (
-        rightPanelPresent ? (
-          <span
-            aria-hidden
-            className="pointer-events-none absolute inset-y-0 left-full w-7 [-webkit-app-region:no-drag]"
-          />
-        ) : (
-          openPanelControls
-        )
-      ) : null,
+    shownCount,
     rightPanelOpen: rightPanelState.isOpen,
     maximizedAway: rightPanelMaximized,
     listBody,
@@ -1362,16 +1368,20 @@ export function PullRequestsPage() {
     event.stopPropagation();
     if (event.repeat) return;
     const url = openPanelPullRequestUrl;
-    void writeTextToClipboard(url, "pull request link").then(
+    void writeTextToClipboard(url, t.git.pullRequest.pullRequestLink).then(
       (didCopy) => {
         if (didCopy)
-          toastManager.add({ type: "success", title: "PR link copied", description: url });
+          toastManager.add({
+            type: "success",
+            title: t.git.pullRequest.pRLinkCopied,
+            description: url,
+          });
       },
       (error) => {
         toastManager.add({
           type: "error",
-          title: "Failed to copy PR link",
-          description: error instanceof Error ? error.message : "An error occurred.",
+          title: t.git.pullRequest.failedToCopyPRLink,
+          description: error instanceof Error ? error.message : t.git.actions.anErrorOccurred,
         });
       },
     );
@@ -1410,12 +1420,15 @@ export function PullRequestsPage() {
   }, [keybindings]);
 
   return (
-    <SidebarInset className="h-dvh min-h-0 overflow-hidden overscroll-y-none">
-      <div className="relative flex min-h-0 flex-1">
-        {pullRequestsSupported && rightPanelPresent ? openPanelControls : null}
+    <SidebarInset className="h-full min-h-0 overflow-hidden overscroll-y-none">
+      {titlebar}
+      <div ref={measureListHost} className="relative flex min-h-0 flex-1">
         <PullRequestsColumn {...columnProps} />
 
-        {rightPanelPresent && renderedPullRequestSurface && panelEnvironmentId !== null ? (
+        {rightPanelPresent &&
+        renderedPullRequestSurface &&
+        panelEnvironmentId !== null &&
+        defaultDetailWidth !== null ? (
           <RightPanelTabs
             mode="inline"
             open={rightPanelState.isOpen}
@@ -1423,7 +1436,7 @@ export function PullRequestsPage() {
             keybindings={keybindings}
             getShortcutContext={getShortcutContext}
             widthStorageKey="t3code:pull-request-panel-width"
-            defaultWidth={typeof window === "undefined" ? 640 : Math.floor(window.innerWidth / 2)}
+            defaultWidth={defaultDetailWidth}
             surfaces={renderedRightPanelSurfaces}
             environmentId={panelEnvironmentId}
             activeSurfaceId={renderedPullRequestSurface.id}
