@@ -23,6 +23,18 @@ const shortcut = {
   modKey: true,
 };
 
+it.effect("retains the composer optimization command in resolved rules", () =>
+  Effect.gen(function* () {
+    const parsed = yield* decode(ResolvedKeybindingsConfig, [
+      { command: "composer.optimizePrompt", shortcut },
+    ]);
+    assert.deepEqual(
+      parsed.map((rule) => rule.command),
+      ["composer.optimizePrompt"],
+    );
+  }),
+);
+
 it.effect("drops resolved rules with commands this build does not know", () =>
   Effect.gen(function* () {
     const parsed = yield* decode(ResolvedKeybindingsConfig, [

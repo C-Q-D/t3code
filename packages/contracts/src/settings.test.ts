@@ -28,6 +28,20 @@ const decodeServerSettingsPatch = Schema.decodeUnknownSync(ServerSettingsPatch);
 const encodeServerSettings = Schema.encodeSync(ServerSettings);
 const decodeClaudeSettings = Schema.decodeUnknownSync(ClaudeSettings);
 
+describe("composer assistance settings", () => {
+  it("enables both features when decoding old client settings", () => {
+    expect(decodeClientSettings({ composerRichTextEnabled: false })).toMatchObject({
+      composerSuggestionsEnabled: true,
+      composerPromptOptimizeEnabled: true,
+    });
+  });
+  it("preserves explicit disabled preferences in snapshots and patches", () => {
+    const settings = { composerSuggestionsEnabled: false, composerPromptOptimizeEnabled: false };
+    expect(decodeClientSettings(settings)).toMatchObject(settings);
+    expect(decodeClientSettingsPatch(settings)).toEqual(settings);
+  });
+});
+
 describe("ClientSettings physics motion", () => {
   it("defaults to on when no preference is saved", () => {
     expect(decodeClientSettings({})).toHaveProperty("physicsMotion", "on");

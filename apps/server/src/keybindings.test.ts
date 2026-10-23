@@ -11,6 +11,14 @@ import * as Schema from "effect/Schema";
 import * as ServerConfig from "./config.ts";
 import * as Keybindings from "./keybindings.ts";
 import { KeybindingsConfigError, MAX_KEYBINDINGS_COUNT } from "@t3tools/contracts";
+import { DEFAULT_KEYBINDINGS } from "@t3tools/shared/keybindings";
+
+it("reserves mod+shift+u exclusively for optimizing the focused composer", () => {
+  assert.deepEqual(
+    DEFAULT_KEYBINDINGS.filter((rule) => rule.key === "mod+shift+u"),
+    [{ key: "mod+shift+u", command: "composer.optimizePrompt", when: "composerFocus" }],
+  );
+});
 
 const KeybindingsConfigJson = Schema.fromJsonString(KeybindingsConfig);
 const encodeKeybindingsConfigJson = Schema.encodeEffect(KeybindingsConfigJson);
