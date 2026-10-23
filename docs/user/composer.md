@@ -145,6 +145,30 @@ the text is an unedited recalled prompt, with the caret on the first visual line
 the last visual line for `ArrowDown`, counting wrapped lines. Editing a recalled prompt turns it
 into a normal draft.
 
+## Next-message suggestions
+
+On web and desktop, Claude and Codex threads can suggest your next message after a reply. The
+suggestion appears as gray text in the empty composer. Press `Tab` or `→` to insert it, then edit
+or send it as usual. Typing anything else leaves it unused.
+
+Suggestions come from the thread's own model and reuse its cached conversation, so each one uses a
+little quota. They start after the thread's second reply and only shortly after a reply ends. They
+are skipped in plan mode, while the agent waits for your answer, and after a failed reply. Turn
+them off with **Settings → General → Composer suggestions**.
+
+## Improve a draft
+
+On web and desktop, in Claude and Codex threads, click the wand button beside **+**, press
+`Cmd+Shift+U` on macOS or `Ctrl+Shift+U` on Windows and Linux, or choose **Improve prompt** in the
+command palette. The thread's own model rewrites the draft more clearly and replaces it. Nothing is
+sent. Choose **Undo** above the composer or press `Cmd+Z` / `Ctrl+Z` to bring the original back.
+Attachments and other context in the draft stay as they are.
+
+Editing the draft while it is being improved discards the result. A dot on the button means the
+provider's cache for this thread may have expired, so this improvement may cost full price. Change
+the shortcut with `composer.optimizePrompt` in **Settings → Keybindings**, or hide the button with
+**Settings → General → Prompt improvement**.
+
 ## Edit an earlier prompt
 
 On web and desktop, choose **Edit from here** beneath a sent message to rewind
