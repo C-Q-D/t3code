@@ -34,6 +34,7 @@ export function ThreadContextChip(props: {
             render={<Link to="/$environmentId/$threadId" params={{ environmentId, threadId }} />}
             aria-label={t.app.thread.accessibleLabel(title)}
             data-markdown-copy={props.copyMarkdown}
+            data-markdown-thread-chip="true"
             className="no-underline"
           >
             {project ? (

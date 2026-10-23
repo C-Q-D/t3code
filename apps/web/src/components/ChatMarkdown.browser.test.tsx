@@ -91,6 +91,24 @@ function buttonsLabelled(container: HTMLElement, label: string) {
   );
 }
 
+it("keeps thread chip colors and decoration separate from ordinary Markdown links", async () => {
+  setup();
+  await using screen = await renderText(
+    "[Thread](t3-thread://v1/thread) and [Website](https://example.com)",
+    { environmentId: EnvironmentId.make("environment") },
+  );
+  const chip = screen.container.querySelector('[data-slot="context-chip-label"]')!.closest("a")!;
+  const website = screen.getByRole("link", { name: "Website", exact: true });
+  expect(getComputedStyle(chip).color).not.toBe(getComputedStyle(website.element()).color);
+  expect(getComputedStyle(chip).textDecorationLine).toBe("none");
+  const chipLink = screen.getByRole("link", {
+    name: chip.getAttribute("aria-label")!,
+    exact: true,
+  });
+  await chipLink.hover();
+  expect(getComputedStyle(chip).backgroundImage).toBe("none");
+});
+
 describe("ChatMarkdown favicon privacy", () => {
   it("suppresses private link images while preserving public links across updates", async () => {
     setup();
