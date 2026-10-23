@@ -117,7 +117,6 @@ function Harness({
         onPaste={() => {}}
       />
       <button onClick={() => void optimizer.trigger()}>Improve</button>
-      <button onClick={optimizer.undo}>Undo improvement</button>
       <pre data-draft>{prompt}</pre>
       <div role="status">
         <ComposerPromptOptimizeTab optimizer={optimizer} />
@@ -363,7 +362,7 @@ it("restores the original draft using the explicit undo action", async () => {
   await screen.getByRole("button", { name: "Improve", exact: true }).click();
   await expect.element(screen.getByRole("textbox")).toHaveTextContent("Find the root cause first.");
   expect(window.getSelection()?.anchorOffset).toBe(26);
-  await screen.getByRole("button", { name: "Undo improvement" }).click();
+  await screen.getByRole("button", { name: "Undo", exact: true }).click();
   expect(screen.container.querySelector("[data-draft]")?.textContent).toBe("  fix the bug  ");
 });
 
