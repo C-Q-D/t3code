@@ -170,7 +170,18 @@ it("ignores assistant deltas, tool output and new tools but renders completed ru
     input: "test",
     output: "first line",
   };
-  const projection: OrchestrationV2ThreadProjection = { ...v2Projection, turnItems: [tool] };
+  const assistant: OrchestrationV2TurnItem = {
+    ...tool,
+    id: TurnItemId.make("assistant-item"),
+    type: "assistant_message",
+    messageId: MessageId.make("assistant"),
+    streaming: true,
+    text: "first assistant chunk",
+  };
+  const projection: OrchestrationV2ThreadProjection = {
+    ...v2Projection,
+    turnItems: [assistant, tool],
+  };
   const atom = Atom.make({ environmentId: EnvironmentId.make("test"), projection });
   source.read.mockReset().mockReturnValue(atom);
   const rendered = vi.fn();
@@ -186,15 +197,7 @@ it("ignores assistant deltas, tool output and new tools but renders completed ru
       environmentId: EnvironmentId.make("test"),
       projection: {
         ...projection,
-        turnItems: [
-          {
-            ...tool,
-            type: "assistant_message",
-            messageId: MessageId.make("assistant"),
-            streaming: true,
-            text: "assistant delta",
-          },
-        ],
+        turnItems: [{ ...assistant, text: "first assistant chunk plus delta" }, tool],
       },
     }),
   );
@@ -202,14 +205,17 @@ it("ignores assistant deltas, tool output and new tools but renders completed ru
   await act(() =>
     registry.set(atom, {
       environmentId: EnvironmentId.make("test"),
-      projection: { ...projection, turnItems: [{ ...tool, output: "second line" }] },
+      projection: { ...projection, turnItems: [assistant, { ...tool, output: "second line" }] },
     }),
   );
   expect(rendered).toHaveBeenCalledTimes(initial);
   await act(() =>
     registry.set(atom, {
       environmentId: EnvironmentId.make("test"),
-      projection: { ...projection, turnItems: [tool, { ...tool, id: TurnItemId.make("tool-2") }] },
+      projection: {
+        ...projection,
+        turnItems: [assistant, tool, { ...tool, id: TurnItemId.make("tool-2") }],
+      },
     }),
   );
   expect(rendered).toHaveBeenCalledTimes(initial);
