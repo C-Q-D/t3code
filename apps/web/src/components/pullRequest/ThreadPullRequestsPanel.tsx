@@ -46,7 +46,7 @@ import {
 } from "./pullRequestPresentation";
 import { PullRequestGlyph } from "./pullRequestIcons";
 import { pullRequestQuickActions } from "./pullRequestList.logic";
-import { PullRequestSpeedActions } from "./PullRequestSpeedActions";
+import { PullRequestSpeedActions, PullRequestSpeedModeContext } from "./PullRequestSpeedActions";
 
 const SOURCE_LABELS: Record<ThreadPullRequestLink["source"], string> = {
   manual: t.git.pullRequest.linkedByYou,
@@ -379,7 +379,6 @@ function LinkRowImpl({
         <PullRequestSpeedActions
           entry={actionEntry}
           hostActions={linkHostActions}
-          visible={speedMode}
           onPendingChange={setActionPending}
         />
       ) : null}
@@ -565,53 +564,55 @@ function EnabledThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThread
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-1.5 px-3 pb-3">
-      {header}
-      {/* Keep mounted rows bounded for threads with hundreds of linked pull requests. */}
-      <LegendList<PullRequestListLine>
-        data={lines}
-        keyExtractor={(line) => `${line.link.host}/${line.link.repository}#${line.link.number}`}
-        extraData={{
-          speedMode,
-          environmentProjects,
-          capabilities,
-          supportsWatch,
-          thread,
-          threadRef,
-        }}
-        renderItem={({ item: line }) => (
-          <div className="pb-1.5">
-            <LinkRow
-              line={line}
-              threadRef={threadRef}
-              projectId={
-                capabilities?.pullRequests === true
-                  ? (findProjectForChangeRequest(environmentProjects, line.link)?.id ??
-                    thread?.projectId ??
-                    null)
-                  : null
-              }
-              speedMode={speedMode}
-              onUnlink={handleUnlink}
-              onSetWatching={supportsWatch ? handleSetWatching : null}
-            />
-          </div>
-        )}
-        estimatedItemSize={64}
-        drawDistance={440}
-        className="min-h-0 flex-1 overscroll-contain"
-      />
-      <footer className="px-1 text-meta text-muted-foreground">
-        <span>
-          {t.git.pullRequest.linkedRequestCounts(openCount, links.length)}
-          {lastSynced ? (
-            <>
-              {t.git.pullRequest.syncedAt("")}
-              <RelativeTime timestamp={lastSynced} />
-            </>
-          ) : null}
-        </span>
-      </footer>
-    </div>
+    <PullRequestSpeedModeContext value={speedMode}>
+      <div className="flex h-full min-h-0 flex-col gap-1.5 px-3 pb-3">
+        {header}
+        {/* Keep mounted rows bounded for threads with hundreds of linked pull requests. */}
+        <LegendList<PullRequestListLine>
+          data={lines}
+          keyExtractor={(line) => `${line.link.host}/${line.link.repository}#${line.link.number}`}
+          extraData={{
+            speedMode,
+            environmentProjects,
+            capabilities,
+            supportsWatch,
+            thread,
+            threadRef,
+          }}
+          renderItem={({ item: line }) => (
+            <div className="pb-1.5">
+              <LinkRow
+                line={line}
+                threadRef={threadRef}
+                projectId={
+                  capabilities?.pullRequests === true
+                    ? (findProjectForChangeRequest(environmentProjects, line.link)?.id ??
+                      thread?.projectId ??
+                      null)
+                    : null
+                }
+                speedMode={speedMode}
+                onUnlink={handleUnlink}
+                onSetWatching={supportsWatch ? handleSetWatching : null}
+              />
+            </div>
+          )}
+          estimatedItemSize={64}
+          drawDistance={440}
+          className="min-h-0 flex-1 overscroll-contain"
+        />
+        <footer className="px-1 text-meta text-muted-foreground">
+          <span>
+            {t.git.pullRequest.linkedRequestCounts(openCount, links.length)}
+            {lastSynced ? (
+              <>
+                {t.git.pullRequest.syncedAt("")}
+                <RelativeTime timestamp={lastSynced} />
+              </>
+            ) : null}
+          </span>
+        </footer>
+      </div>
+    </PullRequestSpeedModeContext>
   );
 }

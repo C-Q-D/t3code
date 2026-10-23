@@ -374,7 +374,7 @@ export function DeviceToolsPanel(props: {
 
         <Section title={t.tools.device.launchAppHeading}>
           <Row label={t.tools.device.foreground}>
-            <span className="truncate font-mono text-xs">{foregroundApp?.id ?? "—"}</span>
+            <span className="truncate font-mono text-xs">{foregroundApp?.id ?? "-"}</span>
           </Row>
           {foregroundApp ? (
             <div className="flex gap-1.5">

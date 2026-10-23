@@ -27,7 +27,7 @@ vi.mock("../ui/toast", () => ({ toastManager: { add: vi.fn() } }));
 
 import { TooltipProvider } from "../ui/tooltip";
 import { toastManager } from "../ui/toast";
-import { PullRequestSpeedActions } from "./PullRequestSpeedActions";
+import { PullRequestSpeedActions, PullRequestSpeedModeContext } from "./PullRequestSpeedActions";
 
 const entry = {
   environmentId: EnvironmentId.make("speed-actions-environment"),
@@ -59,12 +59,13 @@ async function renderActions(hostActions = closeActions) {
   await act(async () => {
     root!.render(
       <TooltipProvider>
-        <PullRequestSpeedActions
-          entry={entry}
-          hostActions={hostActions}
-          visible
-          onPendingChange={reportPending}
-        />
+        <PullRequestSpeedModeContext value={true}>
+          <PullRequestSpeedActions
+            entry={entry}
+            hostActions={hostActions}
+            onPendingChange={reportPending}
+          />
+        </PullRequestSpeedModeContext>
       </TooltipProvider>,
     );
   });

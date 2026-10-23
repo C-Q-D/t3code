@@ -6,8 +6,10 @@ import {
 } from "@t3tools/client-runtime/pull-request-query";
 import { RefreshIcon } from "~/components/ui/refresh-icon";
 import { Spinner } from "~/components/ui/spinner";
-import { useShortcutModifierState } from "~/shortcutModifierState";
-import type { PullRequestSpeedActionResult } from "~/components/pullRequest/PullRequestSpeedActions";
+import {
+  PullRequestSpeedModeProvider,
+  type PullRequestSpeedActionResult,
+} from "~/components/pullRequest/PullRequestSpeedActions";
 import { usePullRequestCloseBatch } from "~/components/pullRequest/usePullRequestActions";
 import { SidebarPointerSensor } from "~/components/Sidebar.pointer";
 import { resolveSidebarSweepKeys } from "~/components/Sidebar.logic";
@@ -339,9 +341,6 @@ export const Route = createFileRoute("/_chat/pull-requests")({
  */
 function PullRequestsRouteView() {
   useEscapeToGoBack();
-  const modifiers = useShortcutModifierState(true);
-  const speedMode =
-    modifiers.shiftKey && !modifiers.metaKey && !modifiers.ctrlKey && !modifiers.altKey;
   const search = Route.useSearch();
   const sort = search.sort ?? "ready";
   const statsPolicy: PullRequestStatsPolicy =
@@ -1335,7 +1334,7 @@ function PullRequestsRouteView() {
     typedQuery.length === 0 &&
     (!querySettled || (showingCarried && listQuery.isPending));
   const listBody = (
-    <>
+    <PullRequestSpeedModeProvider>
       {!capabilityKnown ? (
         <PullRequestListGhost rows={7} />
       ) : !pullRequestsSupported ? (
@@ -1404,7 +1403,6 @@ function PullRequestsRouteView() {
                       selected.number === entry.number
                     }
                     onSelect={selectEntry}
-                    speedMode={speedMode}
                     hostActions={hostActionsOf(entry)}
                     onActed={onSpeedAction}
                     closing={closingKeys.has(entryKey)}
@@ -1452,7 +1450,7 @@ function PullRequestsRouteView() {
           )}
         </div>
       ) : null}
-    </>
+    </PullRequestSpeedModeProvider>
   );
   const hostEntries = hosts.length > 0 ? hosts : expectedHosts;
   const hostMenuOptions: ReadonlyArray<PullRequestFilterOption<string>> = [

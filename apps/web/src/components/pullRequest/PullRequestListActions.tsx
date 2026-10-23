@@ -2,7 +2,7 @@
 import { useAtomValue } from "@effect/atom-react";
 import type { PullRequestAction } from "@t3tools/contracts";
 import { XIcon } from "lucide-react";
-import type { PointerEvent as ReactPointerEvent } from "react";
+import { use, type PointerEvent as ReactPointerEvent } from "react";
 
 import { t } from "~/i18n";
 import { cn } from "~/lib/utils";
@@ -14,7 +14,10 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { resolvePullRequestMergeMethod } from "./pullRequestDetail.logic";
 import { PullRequestGlyph } from "./pullRequestIcons";
 import { pullRequestQuickActions, type EnvironmentPullRequestEntry } from "./pullRequestList.logic";
-import type { PullRequestSpeedActionResult } from "./PullRequestSpeedActions";
+import {
+  PullRequestSpeedModeContext,
+  type PullRequestSpeedActionResult,
+} from "./PullRequestSpeedActions";
 import {
   usePullRequestActionRunner,
   usePullRequestDefaultMergeMethodResolver,
@@ -28,7 +31,6 @@ import {
 export function PullRequestListActions({
   entry,
   hostActions,
-  speedMode,
   onActed,
   closing,
   sweeping,
@@ -36,7 +38,6 @@ export function PullRequestListActions({
 }: {
   entry: EnvironmentPullRequestEntry;
   hostActions: ReadonlySet<PullRequestAction>;
-  speedMode: boolean;
   onActed: (result: PullRequestSpeedActionResult) => void;
   closing: boolean;
   sweeping: boolean;
@@ -72,7 +73,35 @@ export function PullRequestListActions({
       );
     },
   });
-  const busy = actionPending || closing || sweeping;
+  return (
+    <ListActionGroup
+      entry={entry}
+      hostActions={hostActions}
+      busy={actionPending || closing || sweeping}
+      canWrite={canWrite}
+      perform={perform}
+      {...(onCloseSweepStart ? { onCloseSweepStart } : {})}
+    />
+  );
+}
+
+/** Keeps Shift updates inside the action tray while the row and command hooks remain stable. */
+function ListActionGroup({
+  entry,
+  hostActions,
+  busy,
+  canWrite,
+  perform,
+  onCloseSweepStart,
+}: {
+  entry: EnvironmentPullRequestEntry;
+  hostActions: ReadonlySet<PullRequestAction>;
+  busy: boolean;
+  canWrite: boolean;
+  perform: (action: PullRequestAction) => Promise<void>;
+  onCloseSweepStart?: (entry: EnvironmentPullRequestEntry, event: PointerEvent) => void;
+}) {
+  const speedMode = use(PullRequestSpeedModeContext);
   const actions = pullRequestQuickActions(entry, hostActions).filter(
     (action) => speedMode || busy || action === "close",
   );

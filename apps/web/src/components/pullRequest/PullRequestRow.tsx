@@ -90,7 +90,6 @@ function PullRequestRowImpl({
   statsKey,
   statsRef,
   onSelect,
-  speedMode,
   hostActions,
   onActed,
   closing = false,
@@ -107,7 +106,6 @@ function PullRequestRowImpl({
   statsKey?: string;
   statsRef?: RefCallback<HTMLDivElement>;
   onSelect: (entry: PullRequestRowTarget) => void;
-  speedMode: boolean;
   hostActions: ReadonlySet<PullRequestAction>;
   onActed: (result: PullRequestSpeedActionResult) => void;
   closing?: boolean;
@@ -209,7 +207,7 @@ function PullRequestRowImpl({
               aria-label={t.git.pullRequest.commentCountUnavailable}
             >
               <MessageSquareIcon aria-hidden className="size-2.75" />
-              <span aria-hidden>—</span>
+              <span aria-hidden>-</span>
             </TooltipTrigger>
             <TooltipPopup>{t.git.pullRequest.commentCountUnavailable}</TooltipPopup>
           </Tooltip>
@@ -279,7 +277,6 @@ function PullRequestRowImpl({
         <PullRequestListActions
           entry={entry}
           hostActions={hostActions}
-          speedMode={speedMode}
           onActed={onActed}
           closing={closing}
           sweeping={sweeping}
