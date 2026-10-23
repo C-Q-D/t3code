@@ -1744,6 +1744,64 @@ describe("CodexAdapterV2 post-settle continuation", () => {
       ),
   );
 
+  it.effect(
+    "side query preserves a usage-limit notification when completion omits its error code",
+    () =>
+      Effect.gen(function* () {
+        const base = sideQueryTranscript("completed");
+        const transcript = {
+          ...base,
+          scenario: "side-notification-failure",
+          entries: [
+            ...base.entries.slice(0, -3),
+            {
+              type: "emit_inbound",
+              frame: {
+                method: "error",
+                params: {
+                  threadId: "side-child",
+                  turnId: "side-turn",
+                  willRetry: false,
+                  error: {
+                    message: "provider refused",
+                    additionalDetails: "quota detail",
+                    codexErrorInfo: "usageLimitExceeded",
+                  },
+                },
+              },
+            },
+            {
+              type: "emit_inbound",
+              frame: {
+                method: "turn/completed",
+                params: {
+                  threadId: "side-child",
+                  turn: {
+                    ...makeCodexReplayTurn({ id: "side-turn", status: "failed" }),
+                    error: {
+                      message: "provider refused",
+                      additionalDetails: null,
+                      codexErrorInfo: null,
+                    },
+                  },
+                },
+              },
+            },
+            ...base.entries.slice(-2),
+          ] satisfies Array<CodexReplay.CodexAppServerReplayEntry>,
+        };
+        const { harness, queryInput } = yield* prepareSideQuery(transcript, () => Effect.void);
+        const result = yield* harness.runtime.runSideQuery!(queryInput);
+        assert.equal(result.stop, "error");
+        assert.deepEqual(result.failure, { class: "usage_limit", detail: "quota detail" });
+      }).pipe(
+        Effect.scoped,
+        Effect.provide(
+          Layer.mergeAll(IdAllocator.layer, McpProviderSessions.layer, NodeServices.layer),
+        ),
+      ),
+  );
+
   it.effect("side query releases its fork when the caller deadline interrupts it", () =>
     Effect.gen(function* () {
       const ready = yield* Deferred.make<void>();

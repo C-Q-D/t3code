@@ -6737,6 +6737,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
             let latestMessageId: string | undefined;
             let usage: ProviderAdapter.ProviderAdapterV2SideQueryUsage | null = null;
             let failure: ProviderAdapter.ProviderAdapterV2SideQueryResult["failure"] = null;
+            let latestProviderError: CodexSchema.V2ErrorNotification["error"] | undefined;
             let stop: ProviderAdapter.ProviderAdapterV2SideQueryResult["stop"] = "completed";
             // Per-notification collection is already inside the query span; avoid a span per delta.
             const collect = Effect.fnUntraced(function* (method: string, payload: unknown) {
@@ -6801,6 +6802,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                 case "error": {
                   const notification = yield* decodeSideError(payload).pipe(Effect.orDie);
                   if (!notification.willRetry) {
+                    latestProviderError = notification.error;
                     failure = {
                       class: codexUsageLimitError(
                         codexErrorInfoCode(notification.error.codexErrorInfo),
@@ -6821,21 +6823,33 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                     failure = null;
                   } else if (turn.status !== "completed") {
                     stop = "error";
-                    failure =
-                      turn.error == null
-                        ? (failure ?? {
-                            class: "provider_error",
-                            detail: `Side query ended with status ${turn.status}.`,
-                          })
-                        : {
-                            class: codexUsageLimitError(
-                              codexErrorInfoCode(turn.error.codexErrorInfo),
-                              turn.error.codexErrorInfo,
-                            )
-                              ? "usage_limit"
-                              : "provider_error",
-                            detail: turn.error.additionalDetails?.trim() || turn.error.message,
-                          };
+                    if (turn.error == null) {
+                      failure ??= {
+                        class: "provider_error",
+                        detail: `Side query ended with status ${turn.status}.`,
+                      };
+                    } else {
+                      const code = codexErrorInfoCode(turn.error.codexErrorInfo);
+                      const failureClass = codexUsageLimitError(code, turn.error.codexErrorInfo)
+                        ? "usage_limit"
+                        : "provider_error";
+                      // Match main-turn terminalization: a repeated, less detailed completion
+                      // must not erase the notification's quota classification or explanation.
+                      const repeatsNotification =
+                        latestProviderError !== undefined &&
+                        failure !== null &&
+                        latestProviderError.message === turn.error.message &&
+                        (turn.error.codexErrorInfo == null ||
+                          codexErrorInfoCode(latestProviderError.codexErrorInfo) === code) &&
+                        (codexExhaustionHttpStatus(turn.error.codexErrorInfo) === null ||
+                          failure.class === failureClass);
+                      if (!repeatsNotification) {
+                        failure = {
+                          class: failureClass,
+                          detail: turn.error.additionalDetails?.trim() || turn.error.message,
+                        };
+                      }
+                    }
                   } else {
                     failure = null;
                   }
