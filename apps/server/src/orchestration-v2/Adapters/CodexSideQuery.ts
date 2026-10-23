@@ -2,7 +2,11 @@
 import type * as CodexClient from "effect-codex-app-server/client";
 import type * as CodexRpc from "effect-codex-app-server/rpc";
 import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
 import * as Predicate from "effect/Predicate";
+import type * as Scope from "effect/Scope";
+
+const SIDE_QUERY_UNSUBSCRIBE_TIMEOUT_MS = 5_000;
 
 const refusals: {
   readonly [M in CodexRpc.ServerRequestMethod]?: CodexRpc.ServerRequestResponsesByMethod[M];
@@ -19,9 +23,9 @@ const refusals: {
 
 /**
  * Wrap one app-server client without changing outbound requests or main-thread handlers.
- * The owner registers a fork before starting its turn and removes it after unsubscribe.
+ * A fork stays registered until bounded unsubscribe finishes, including abandoned late replies.
  * Notifications are already schema-validated by the client; unknown notifications remain unknown.
- * No I/O, retries, or deadlines are introduced by the registry itself.
+ * Fork acquisition inherits the caller's deadline; unsubscribe has a five-second limit, no retries.
  * @param transport The session's existing client, shared with the main thread.
  * @returns The guarded client and lifecycle operations for ephemeral thread collectors.
  */
@@ -73,19 +77,72 @@ export function make(transport: CodexClient.CodexAppServerClient["Service"]) {
       ),
   };
 
+  const remove = (threadId: string) => {
+    threads.delete(threadId);
+    for (const [turnId, owner] of turns) {
+      if (owner === threadId) turns.delete(turnId);
+    }
+  };
+
+  const release = Effect.fn("CodexSideQuery.release")((threadId: string) =>
+    transport.request("thread/unsubscribe", { threadId }).pipe(
+      // Finalizers are masked; the RPC must remain interruptible for its own deadline.
+      Effect.interruptible,
+      Effect.timeout(SIDE_QUERY_UNSUBSCRIBE_TIMEOUT_MS),
+      Effect.catchCause((cause) =>
+        Effect.logWarning("Failed to unsubscribe Codex side query.", { threadId, cause }),
+      ),
+      Effect.ensuring(Effect.sync(() => remove(threadId))),
+      Effect.asVoid,
+    ),
+  );
+
+  /**
+   * Acquires a routed ephemeral fork for the caller's scope.
+   * @param params Native fork parameters, including the main thread's explicit model.
+   * @param collect Receives only this fork's notifications while the query is active.
+   * @param sessionScope Owns pending fork replies after the query is cancelled.
+   * @returns The provider fork response; startup errors propagate to the caller. Waiting is
+   * interruptible. Release never replaces a result with a transport error and is not retried.
+   */
+  const acquireFork = Effect.fn("CodexSideQuery.acquireFork")(function* (
+    params: CodexRpc.ClientRequestParamsByMethod["thread/fork"],
+    collect: (method: string, payload: unknown) => Effect.Effect<void>,
+    sessionScope: Scope.Scope,
+  ) {
+    let abandoned = false;
+    let ownedThreadId: string | undefined;
+    // Only launching the receiver is masked. Cancelling its join must not cancel the
+    // protocol request: its late reply is the only way to identify and release the fork.
+    const receiver = yield* Effect.acquireRelease(
+      transport.request("thread/fork", params).pipe(
+        Effect.flatMap((response) => {
+          const threadId = response.thread.id;
+          threads.set(threadId, abandoned ? () => Effect.void : collect);
+          if (abandoned) return release(threadId).pipe(Effect.as(response));
+          ownedThreadId = threadId;
+          return Effect.succeed(response);
+        }),
+        Effect.forkIn(sessionScope, { startImmediately: true }),
+      ),
+      () =>
+        Effect.suspend(() => {
+          abandoned = true;
+          return ownedThreadId === undefined ? Effect.void : release(ownedThreadId);
+        }),
+    );
+    return yield* Fiber.join(receiver);
+  });
+
   return {
     client,
+    acquireFork,
     register: (
       threadId: string,
       collect: (method: string, payload: unknown) => Effect.Effect<void>,
     ) => {
       threads.set(threadId, collect);
     },
-    remove: (threadId: string) => {
-      threads.delete(threadId);
-      for (const [turnId, owner] of turns) {
-        if (owner === threadId) turns.delete(turnId);
-      }
-    },
+    remove,
   };
 }

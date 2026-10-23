@@ -6869,30 +6869,19 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
             });
             // Side turns must reuse every main-turn parameter, and fork must explicitly pass
             // model. Otherwise Codex changes the cached prefix, even in the same app-server.
-            const fork = yield* Effect.acquireRelease(
-              client
-                .request("thread/fork", {
-                  threadId: parentThreadId,
-                  ephemeral: true,
-                  excludeTurns: true,
-                  ...codexThreadRuntimeParams({
-                    mcpSession,
-                    modelSelection: query.modelSelection,
-                    runtimePolicy: query.runtimePolicy,
-                  }),
-                })
-                .pipe(
-                  Effect.tap((response) =>
-                    Effect.sync(() => sideQueries.register(response.thread.id, collect)),
-                  ),
-                ),
-              (response) =>
-                client
-                  .request("thread/unsubscribe", { threadId: response.thread.id })
-                  .pipe(
-                    Effect.orDie,
-                    Effect.ensuring(Effect.sync(() => sideQueries.remove(response.thread.id))),
-                  ),
+            const fork = yield* sideQueries.acquireFork(
+              {
+                threadId: parentThreadId,
+                ephemeral: true,
+                excludeTurns: true,
+                ...codexThreadRuntimeParams({
+                  mcpSession,
+                  modelSelection: query.modelSelection,
+                  runtimePolicy: query.runtimePolicy,
+                }),
+              },
+              collect,
+              scope,
             );
             const params = yield* buildSessionTurnParams(query, fork.thread.id, [
               { type: "text", text: query.prompt },
