@@ -215,7 +215,7 @@ function AutomationMessageRow({ row }: { row: Extract<TimelineRow, { kind: "mess
               {promptLink !== null && (
                 <MessageCopyButton
                   text={promptLink}
-                  label="Copy prompt link"
+                  label={t.chat.timelineUi.copyLink}
                   icon={LinkIconNode}
                   variant="ghost"
                 />
