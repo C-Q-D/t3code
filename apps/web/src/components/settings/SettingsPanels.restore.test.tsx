@@ -70,6 +70,57 @@ beforeEach(() => {
 });
 
 describe("restoring V2 settings", () => {
+  it("restores thread title instructions when they are the only changed setting", async () => {
+    state.settings = { ...DEFAULT_UNIFIED_SETTINGS, threadTitleInstructions: "Use short titles" };
+    hooks.beginRender();
+    const restore = useSettingsRestore();
+
+    expect(restore.changedSettingLabels).toEqual(["Thread title instructions"]);
+    await restore.restoreDefaults();
+
+    expect(state.confirm.mock.calls[0]?.[0]).toContain("Thread title instructions");
+    expect(state.update.mock.calls[0]?.[0]).toHaveProperty("threadTitleInstructions", "");
+  });
+
+  it("resets thread title instructions together with other settings", async () => {
+    state.settings = {
+      ...DEFAULT_UNIFIED_SETTINGS,
+      threadTitleInstructions: "Use short titles",
+      autoResumeLimitedThreads: true,
+    };
+    hooks.beginRender();
+
+    await useSettingsRestore().restoreDefaults();
+
+    expect(state.update.mock.calls[0]?.[0]).toMatchObject({
+      threadTitleInstructions: "",
+      autoResumeLimitedThreads: false,
+    });
+  });
+
+  it.each([
+    { idleCompaction: "off" },
+    { idleCompaction: "beforeCacheExpires" },
+    { compactIdleThreads: true },
+    { compactIdleThreads: "off" },
+  ] as const)("restores idle compaction from %j", async (compaction) => {
+    state.settings = { ...DEFAULT_UNIFIED_SETTINGS, ...compaction };
+    hooks.beginRender();
+    const restore = useSettingsRestore();
+
+    expect(restore.changedSettingLabels).toEqual(["Compact idle Claude threads (beta)"]);
+    await restore.restoreDefaults();
+
+    expect(state.update.mock.calls[0]?.[0]).toHaveProperty("idleCompaction", "onReturn");
+  });
+
+  it("does not mark an explicit default compaction mode as changed", () => {
+    state.settings = { ...DEFAULT_UNIFIED_SETTINGS, idleCompaction: "onReturn" };
+    hooks.beginRender();
+
+    expect(useSettingsRestore().changedSettingLabels).toEqual([]);
+  });
+
   it.each(["system", "off"] as const)(
     "lists physics motion set to %s and restores it to on",
     async (physicsMotion) => {
