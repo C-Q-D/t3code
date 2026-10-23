@@ -1,6 +1,8 @@
 /** Owns one composer's explicit prompt improvement, draft snapshot and transient feedback. */
 import {
   isComposerAssistSupportedDriver,
+  composerCacheExpiresAt,
+  composerCacheMaybeExpired,
   type ComposerOptimizeResult,
   type EnvironmentId,
   type ThreadId,
@@ -21,6 +23,10 @@ export interface ComposerPromptOptimizerInput {
   driver: string;
   enabled: boolean;
   running: boolean;
+  lastTurnCompletedAt?: string | null;
+  promptCacheExpiresAt?: string | null;
+  runKey?: string | null;
+  onReplaced?: () => void;
   editorRef: RefObject<ComposerPromptEditorHandle | null>;
 }
 
@@ -40,6 +46,22 @@ export function useComposerPromptOptimizer(input: ComposerPromptOptimizerInput) 
   } | null>(null);
   const [inFlight, setInFlight] = useState(false);
   const [pendingDraftKey, setPendingDraftKey] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const expiresAt = composerCacheExpiresAt({
+    driver: input.driver,
+    lastTurnCompletedAt: input.lastTurnCompletedAt ?? null,
+    promptCacheExpiresAt: input.promptCacheExpiresAt,
+  });
+  const cacheMaybeExpired = composerCacheMaybeExpired(expiresAt, now);
+  useEffect(() => {
+    if (expiresAt === null) return;
+    // Wake only at the cache boundary, without repainting on a clock interval.
+    const timer = window.setTimeout(
+      () => setNow(Date.now()),
+      Math.min(2147483647, Math.max(0, expiresAt - Date.now() + 1)),
+    );
+    return () => window.clearTimeout(timer);
+  }, [expiresAt]);
   const pending = useRef(false);
   const latest = useRef(input);
   const epoch = useRef(0);
@@ -47,7 +69,8 @@ export function useComposerPromptOptimizer(input: ComposerPromptOptimizerInput) 
   useLayoutEffect(() => {
     if (
       latest.current.draftKey !== input.draftKey ||
-      latest.current.environmentId !== input.environmentId
+      latest.current.environmentId !== input.environmentId ||
+      latest.current.runKey !== input.runKey
     )
       epoch.current += 1;
     latest.current = input;
@@ -93,6 +116,7 @@ export function useComposerPromptOptimizer(input: ComposerPromptOptimizerInput) 
     };
     const requestEpoch = epoch.current;
     pending.current = true;
+    setNow(Date.now());
     setPendingDraftKey(input.draftKey);
     setFeedback(null);
     setInFlight(true);
@@ -123,8 +147,10 @@ export function useComposerPromptOptimizer(input: ComposerPromptOptimizerInput) 
     }
     const result = response.value;
     if (result._tag === "Optimized") {
-      if (input.editorRef.current?.replacePrompt(result.text))
+      if (input.editorRef.current?.replacePrompt(result.text)) {
+        input.onReplaced?.();
         setFeedback({ ...feedbackForDraft, label: copy.done, done: true, text: result.text });
+      }
     } else {
       setFeedback({ ...feedbackForDraft, label: optimizeFailureLabel(result), done: false });
     }
@@ -133,17 +159,22 @@ export function useComposerPromptOptimizer(input: ComposerPromptOptimizerInput) 
     const snapshot = original.current;
     if (!snapshot || snapshot.draftKey !== input.draftKey || !shown?.done) return;
     input.editorRef.current?.replacePrompt(snapshot.text, snapshot.cursor);
+    input.onReplaced?.();
     original.current = null;
     setFeedback(null);
   };
   return {
     trigger,
     undo,
-    label: inFlight && pendingDraftKey === input.draftKey ? copy.inFlight : (shown?.label ?? ""),
+    label:
+      inFlight && pendingDraftKey === input.draftKey
+        ? `${copy.inFlight}${cacheMaybeExpired ? ` · ${copy.maybeFullPrice}` : ""}`
+        : (shown?.label ?? ""),
     done: shown?.done ?? false,
     inFlight,
     visible,
     disabledReason,
+    cacheMaybeExpired,
   };
 }
 

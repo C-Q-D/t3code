@@ -2,11 +2,19 @@
 import { useRef, useState } from "react";
 import { EnvironmentId, ThreadId, type ComposerOptimizeResult } from "@t3tools/contracts";
 import { Atom, AsyncResult } from "effect/reactivity";
+import { composerAssistEnvironment } from "~/state/composerAssist";
 import { expect, it, vi } from "vite-plus/test";
-import { userEvent } from "vite-plus/test/browser";
+import { page, userEvent } from "vite-plus/test/browser";
 import { act, render } from "../../../test/render";
 import { ComposerPromptEditor, type ComposerPromptEditorHandle } from "../ComposerPromptEditor";
-import { useComposerPromptOptimizer } from "./useComposerPromptOptimizer";
+import {
+  useComposerPromptOptimizer,
+  type ComposerPromptOptimizerInput,
+} from "./useComposerPromptOptimizer";
+import {
+  ComposerPromptOptimizeButton,
+  ComposerPromptOptimizeTab,
+} from "./ComposerPromptOptimizeTab";
 
 /** Lets each test release one RPC response at an explicit milestone. */
 function deferredResult() {
@@ -26,7 +34,13 @@ vi.mock("~/state/composerAssist", () => ({
 }));
 
 /** Mounts the same editor contract used by ChatComposer; buttons invoke the hook's public operations. */
-function Harness({ thread = "thread" }: { thread?: string }) {
+function Harness({
+  thread = "thread",
+  options,
+}: {
+  thread?: string;
+  options?: Partial<ComposerPromptOptimizerInput>;
+}) {
   const [prompt, setPrompt] = useState("  fix the bug  ");
   const [cursor, setCursor] = useState(15);
   const editorRef = useRef<ComposerPromptEditorHandle | null>(null);
@@ -39,9 +53,11 @@ function Harness({ thread = "thread" }: { thread?: string }) {
     enabled: true,
     running: false,
     editorRef,
+    ...options,
   });
   return (
     <>
+      <ComposerPromptOptimizeButton optimizer={optimizer} shortcut="Ctrl+Shift+U" />
       <ComposerPromptEditor
         editorRef={editorRef}
         value={prompt}
@@ -59,7 +75,9 @@ function Harness({ thread = "thread" }: { thread?: string }) {
       <button onClick={() => void optimizer.trigger()}>Improve</button>
       <button onClick={optimizer.undo}>Undo improvement</button>
       <pre data-draft>{prompt}</pre>
-      <span role="status">{optimizer.label}</span>
+      <div role="status">
+        <ComposerPromptOptimizeTab optimizer={optimizer} />
+      </div>
     </>
   );
 }
@@ -79,7 +97,7 @@ it("replaces the original untrimmed draft and restores it with one editor undo",
     environmentId: "env",
     input: { threadId: "thread", draft: "  fix the bug  ", style: "default" },
   });
-  await expect.element(screen.getByRole("status")).toHaveTextContent("Improved");
+  await expect.element(screen.getByText("Improved", { exact: true })).toBeVisible();
   await expect
     .element(screen.getByRole("textbox"))
     .toHaveTextContent("Fix the bug and run its regression test.");
@@ -88,6 +106,103 @@ it("replaces the original untrimmed draft and restores it with one editor undo",
   await expect.element(screen.getByRole("textbox")).toHaveTextContent("fix the bug");
   expect(screen.container.querySelector("[data-draft]")?.textContent).toBe("  fix the bug  ");
 });
+
+it("dispatches from the visible improvement button", async () => {
+  fake.run
+    .mockReset()
+    .mockResolvedValue(
+      AsyncResult.success({ _tag: "Filtered", requestId: "button", reason: "unchanged" }),
+    );
+  await using screen = await render(<Harness />);
+  await screen.getByRole("button", { name: "Improve prompt", exact: true }).click();
+  expect(fake.run).toHaveBeenCalledTimes(1);
+  await expect.element(screen.getByRole("status")).toHaveTextContent("The draft is already clear");
+});
+
+it.each([
+  [{ prompt: "" }, "Write a draft first"],
+  [{ driver: "cursor" }, "This provider does not support prompt improvement"],
+  [{ running: true }, "Wait for the reply to finish"],
+] as const)("disables the button for %j and explains why", async (options, reason) => {
+  fake.run.mockReset();
+  await using screen = await render(<Harness options={options} />);
+  await expect
+    .element(screen.getByRole("button", { name: "Improve prompt", exact: true }))
+    .toBeDisabled();
+  await screen.getByRole("group", { name: "Improve prompt" }).hover();
+  await expect.element(page.getByText(reason, { exact: true })).toBeVisible();
+  expect(fake.run).not.toHaveBeenCalled();
+});
+
+it("warns about expired cache before dispatch and during the request", async () => {
+  using _now = vi.spyOn(Date, "now").mockReturnValue(1790000000000);
+  const pending = deferredResult();
+  fake.run.mockReset().mockReturnValue(pending.promise);
+  await using screen = await render(
+    <Harness
+      options={{
+        driver: "claudeAgent",
+        lastTurnCompletedAt: "2026-01-01T00:00:00Z",
+        promptCacheExpiresAt: "2026-01-01T01:00:00Z",
+      }}
+    />,
+  );
+  await screen.getByRole("group", { name: "Improve prompt" }).hover();
+  await expect
+    .element(
+      page.getByText("Improve prompt Ctrl+Shift+U · This one may cost full price", { exact: true }),
+    )
+    .toBeVisible();
+  await screen.getByRole("button", { name: "Improve prompt", exact: true }).click();
+  await expect
+    .element(screen.getByRole("status"))
+    .toHaveTextContent("Improving… · This one may cost full price");
+  await expect
+    .element(screen.getByRole("button", { name: "Improve prompt", exact: true }))
+    .toBeDisabled();
+  await act(async () =>
+    pending.resolve(
+      AsyncResult.success({ _tag: "Filtered", requestId: "cache", reason: "unchanged" }),
+    ),
+  );
+});
+
+it("does not warn while the cache is fresh", async () => {
+  using _now = vi.spyOn(Date, "now").mockReturnValue(1767225900000);
+  const pending = deferredResult();
+  fake.run.mockReset().mockReturnValue(pending.promise);
+  await using screen = await render(
+    <Harness options={{ driver: "codex", lastTurnCompletedAt: "2026-01-01T00:00:00Z" }} />,
+  );
+  await screen.getByRole("group", { name: "Improve prompt" }).hover();
+  await expect
+    .element(page.getByText("Improve prompt Ctrl+Shift+U", { exact: true }))
+    .toBeVisible();
+  expect(screen.container.querySelector("[data-composer-cache-warning]")).toBeNull();
+  await screen.getByRole("button", { name: "Improve prompt", exact: true }).click();
+  await expect.element(screen.getByRole("status")).toHaveTextContent("Improving…");
+  await act(async () =>
+    pending.resolve(
+      AsyncResult.success({ _tag: "Filtered", requestId: "fresh", reason: "unchanged" }),
+    ),
+  );
+});
+
+it.each(["setting", "permission"] as const)(
+  "hides improvement and blocks dispatch when %s is off",
+  async (gate) => {
+    fake.run.mockReset();
+    using _permission = vi
+      .spyOn(composerAssistEnvironment.optimizePrompt, "permissionAtom")
+      .mockReturnValue(Atom.make(gate !== "permission"));
+    await using screen = await render(<Harness options={{ enabled: gate !== "setting" }} />);
+    await expect
+      .element(screen.getByRole("button", { name: "Improve prompt", exact: true }))
+      .not.toBeInTheDocument();
+    await screen.getByRole("button", { name: "Improve", exact: true }).click();
+    expect(fake.run).not.toHaveBeenCalled();
+  },
+);
 
 it.each(["edited draft", ""])(
   "discards a late result after the draft becomes %j",

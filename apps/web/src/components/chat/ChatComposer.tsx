@@ -1,5 +1,13 @@
 /** Renders composition using isolated controls while preserving local layout and physical feedback. */
 import { Link2Icon } from "lucide-react";
+import { useComposerPromptOptimizer } from "./useComposerPromptOptimizer";
+import {
+  ComposerPromptOptimizeButton,
+  ComposerPromptOptimizeTab,
+} from "./ComposerPromptOptimizeTab";
+import { useEnvironmentThread } from "~/state/threads";
+import * as Option from "effect/Option";
+import * as DateTime from "effect/DateTime";
 import { ComposerSubmissionStateContext } from "./composerSubmissionState";
 import { getComposerSubmissionState } from "./composerSubmissionState.logic";
 import { ComposerControlVariantContext } from "./ComposerControl";
@@ -315,6 +323,10 @@ function consumePasteAsTextShortcut(deadline: { current: number }): boolean {
 const runtimeModeOptions = runtimeModes.map((mode) => ({ mode, ...runtimeModeConfig[mode] }));
 
 export interface ChatComposerHandle {
+  /** Explicit improvement action; guards are checked again at invocation. */
+  optimizePrompt: () => Promise<void>;
+  /** Whether the palette can currently offer improvement for this composer. */
+  canOptimizePrompt: () => boolean;
   focusAtEnd: () => void;
   focusAt: (cursor: number) => void;
   restoreAfterTimelineReachedEnd: () => void;
@@ -3197,10 +3209,49 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     setIsComposerModelPickerOpen(true);
   };
   const openModelPickerStable = useStableCallback(openModelPicker);
+  const optimizeThreadState = useEnvironmentThread(environmentId, activeThreadId);
+  const completedProviderTurn = Option.getOrNull(optimizeThreadState.data)
+    ?.providerTurns.filter((turn) => turn.completedAt !== null)
+    .toSorted(
+      (left, right) =>
+        DateTime.toEpochMillis(right.completedAt!) - DateTime.toEpochMillis(left.completedAt!),
+    )[0];
+  const promptOptimizer = useComposerPromptOptimizer({
+    environmentId,
+    threadId: activeThreadId,
+    draftKey: composerTargetKey(composerDraftTarget),
+    prompt,
+    driver:
+      providerInstanceEntries.find(
+        (entry) => entry.instanceId === props.activeThreadShell?.providerInstanceId,
+      )?.driverKind ?? "",
+    enabled: settings.composerPromptOptimizeEnabled,
+    running:
+      phase === "running" ||
+      isSendBusy ||
+      pendingUserInputs.length > 0 ||
+      pendingApprovals.length > 0,
+    editorRef: composerEditorRef,
+    lastTurnCompletedAt: completedProviderTurn?.completedAt
+      ? DateTime.formatIso(completedProviderTurn.completedAt)
+      : null,
+    promptCacheExpiresAt: completedProviderTurn?.tokenUsage?.promptCacheExpiresAt ?? null,
+    runKey: props.activeThreadShell?.latestRun?.runId ?? null,
+    onReplaced: () => {
+      setComposerTrigger(null);
+      setComposerHighlightedItemId(null);
+    },
+  });
+  const optimizePromptStable = useStableCallback(promptOptimizer.trigger);
+  const canOptimizePromptStable = useStableCallback(
+    () => promptOptimizer.visible && promptOptimizer.disabledReason === null,
+  );
 
   useImperativeHandle(
     composerRef,
     () => ({
+      optimizePrompt: optimizePromptStable,
+      canOptimizePrompt: canOptimizePromptStable,
       focusAtEnd: () => {
         composerEditorRef.current?.focusAtEnd();
       },
@@ -3485,6 +3536,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       interactionMode,
       planModeUiEnabled,
       compactThreadContextStable,
+      optimizePromptStable,
+      canOptimizePromptStable,
       restoreAfterTimelineReachedEnd,
       getTimelineScrollableNode,
       isTimelineAtLogicalEnd,
@@ -3634,6 +3687,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         : null}
       {props.queuedRunsControl}
       <ComposerBanner.Dock>
+        <ComposerPromptOptimizeTab optimizer={promptOptimizer} />
         <ComposerBanner.Column>
           <ComposerBannerStack
             key={activeThreadId}
@@ -4111,6 +4165,12 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                   }
                   className="flex shrink-0 flex-nowrap items-center justify-end gap-2"
                 >
+                  <ComposerPromptOptimizeButton
+                    optimizer={promptOptimizer}
+                    shortcut={shortcutLabelForCommand(keybindings, "composer.optimizePrompt", {
+                      context: { composerFocus: true },
+                    })}
+                  />
                   {composerAttachButton}
                   <ComposerFooterPrimaryActions
                     usageLimitsReport={props.usageLimitsReport}
