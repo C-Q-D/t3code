@@ -8,10 +8,12 @@ import {
   composerCacheMaybeExpired,
 } from "./composerAssist.ts";
 
+const decodeOptimizeInput = Schema.decodeUnknownSync(ComposerOptimizeInput);
+
 describe("ComposerOptimizeInput", () => {
   it.each(["", " \n\t ", "x".repeat(20_001)])("rejects invalid draft %#", (draft) => {
     expect(() =>
-      Schema.decodeUnknownSync(ComposerOptimizeInput)({
+      decodeOptimizeInput({
         threadId: "thread",
         draft,
         style: "default",
@@ -20,7 +22,7 @@ describe("ComposerOptimizeInput", () => {
   });
   it.each(["  improve this\n", "x".repeat(20_000)])("preserves valid draft %#", (draft) => {
     expect(
-      Schema.decodeUnknownSync(ComposerOptimizeInput)({
+      decodeOptimizeInput({
         threadId: "thread",
         draft,
         style: "default",
