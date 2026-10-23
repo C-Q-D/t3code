@@ -51,6 +51,7 @@ vi.mock("~/state/query", () => ({
   useEnvironmentQueryRefresh: () => ({ isPending: () => false, refresh: vi.fn() }),
 }));
 vi.mock("../pullRequest/usePullRequestActions", () => ({
+  usePullRequestDefaultMergeMethodResolver: () => () => "merge" as const,
   usePullRequestActionRunner: () => ({ actionPending: false, perform: state.perform }),
   usePullRequestHandoffs: () => ({ handoff: null, startHandoff: state.startHandoff }),
 }));
