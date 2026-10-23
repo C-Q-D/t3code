@@ -2042,8 +2042,6 @@ function ScheduledTaskEditorForm({
                   provider={activeEntry.driverKind}
                   models={activeEntry.models}
                   model={modelSelection.model}
-                  prompt=""
-                  onPromptChange={() => {}}
                   modelOptions={modelSelection.options ?? []}
                   allowPromptInjectedEffort={false}
                   planModeEnabled={draft.interactionMode === "plan"}

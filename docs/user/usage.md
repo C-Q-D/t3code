@@ -97,7 +97,8 @@ Missing or stale reset times have no refill estimate; refresh to get a new readi
 model-specific weekly allowances keep their reported values.
 
 The same account signed in on multiple environments, or also reported by a hub, counts once.
-Use the environment and usage source filters to choose which limits to see. Limits are independent
+Only enabled environments contribute limits. Use the environment and usage source filters to choose
+which limits to see. Limits are independent
 of the time range and remain available without permission to read usage diagnostics.
 
 Opening **Usage** checks limits automatically, at most once per environment every five minutes,
