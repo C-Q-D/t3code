@@ -1,4 +1,6 @@
+/** Translates Codex app-server traffic into provider events; ephemeral queries stay outside that stream. */
 import { revertCodexThread } from "../../provider/CodexThreadRevert.ts";
+import * as CodexSideQuery from "./CodexSideQuery.ts";
 import {
   codexAutoCompactThreshold,
   makeCodexConfigReadLogRedactor,
@@ -1798,7 +1800,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                     }),
                 ),
               );
-        const client = yield* clientFactory.open({
+        const transport = yield* clientFactory.open({
           instanceId: adapterOptions.instanceId,
           threadId: input.threadId,
           providerSessionId: input.providerSessionId,
@@ -1806,6 +1808,10 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
           settings: resolvedRuntime?.config ?? adapterOptions.settings,
           environment: resolvedRuntime?.environment ?? adapterOptions.environment,
         });
+        // Guard every registered handler, including deltas and goal notifications,
+        // before it can touch main-session state or wait for an unknown side turn.
+        const sideQueries = CodexSideQuery.make(transport);
+        const client = sideQueries.client;
         const compactionLimitsByCwd = new Map<string | null, CodexCompactionLimits | null>();
         const additionalContextByThread = yield* Ref.make(
           new Map<
