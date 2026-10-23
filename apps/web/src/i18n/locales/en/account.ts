@@ -6,7 +6,7 @@ export const account = {
     publishesActivity: "This environment publishes agent activity to your mobile clients.",
     setupConnect: "Set up T3 Connect",
     meshHint:
-      "Mesh your devices together — publish this environment and connect the rest, all in one place.",
+      "Mesh your devices together. Publish this environment and connect the rest, all in one place.",
     dontShowAgain: "Don't show this again",
     notNow: "Not now",
     next: "Next",

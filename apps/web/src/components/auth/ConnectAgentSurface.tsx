@@ -321,7 +321,7 @@ function AccessOption({
       </span>
       <span>
         {label}
-        <span className="sr-only"> — {description}</span>
+        <span className="sr-only">: {description}</span>
       </span>
     </RadioPrimitive.Root>
   );

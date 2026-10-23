@@ -38,11 +38,11 @@ export function UsageMetricStrip({
   const averageCost = summarizeColumns(series.cost.map((total) => ({ total }))).average;
   // Cache writes are misses, matching the model detail's input-based cache hit rate.
   const input = merged.cachedInputTokens + merged.uncachedInputTokens + merged.cacheCreationTokens;
-  const hitRate = input > 0 ? formatPercent(merged.cachedInputTokens / input) : "—";
+  const hitRate = input > 0 ? formatPercent(merged.cachedInputTokens / input) : "-";
   const outputShare =
-    merged.totalTokens > 0 ? formatPercent(merged.outputTokens / merged.totalTokens, 2) : "—";
+    merged.totalTokens > 0 ? formatPercent(merged.outputTokens / merged.totalTokens, 2) : "-";
   const savingsRatio =
-    merged.costUsd > 0 ? (merged.costQuality.cacheSavingsUsd / merged.costUsd).toFixed(1) : "—";
+    merged.costUsd > 0 ? (merged.costQuality.cacheSavingsUsd / merged.costUsd).toFixed(1) : "-";
   return (
     <section ref={entranceRef} className="usage-lux-strip" aria-busy={loading}>
       <h2 className="sr-only">{t.tools.usage.totals}</h2>

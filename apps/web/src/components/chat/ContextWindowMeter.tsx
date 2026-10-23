@@ -58,7 +58,7 @@ export function ContextWindowMeter(props: {
   useAnimatedNumber(
     numberRef,
     usage.usedPercentage,
-    (value) => formatPercentage(value) ?? "—",
+    (value) => formatPercentage(value) ?? "-",
     fillRef,
   );
   const totalProcessedTokens = usage.totalProcessedTokens ?? null;
@@ -97,7 +97,7 @@ export function ContextWindowMeter(props: {
               />
             </span>
             <span ref={numberRef} aria-hidden="true" className="tabular-nums">
-              {usedPercentage ?? "—"}
+              {usedPercentage ?? "-"}
             </span>
           </button>
         }

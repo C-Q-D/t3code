@@ -7,7 +7,7 @@ export const account: Messages["account"] = {
     availableToDevices: "其他设备可通过T3 Connect访问此环境。",
     publishesActivity: "此环境会向移动客户端发布 Agent 活动。",
     setupConnect: "设置T3 Connect",
-    meshHint: "连接你的设备 — 在同一处发布此环境并连接其他设备。",
+    meshHint: "连接你的设备，在同一处发布此环境并连接其他设备。",
     dontShowAgain: "不再显示",
     notNow: "暂不",
     next: "下一步",
@@ -355,7 +355,8 @@ export const account: Messages["account"] = {
     connect: "连接",
     sshPasswordRequired: "需要 SSH 验证",
     sshPasswordPrefix: "请输入此主机要求的密码或验证码：",
-    sshPasswordSuffix: "。T3 Code 将你的回复传给本地 SSH 进程，并保存在内存中供此主机复用，不会写入磁盘。",
+    sshPasswordSuffix:
+      "。T3 Code 将你的回复传给本地 SSH 进程，并保存在内存中供此主机复用，不会写入磁盘。",
     expired: "已过期",
     sshKeysHint: "SSH 密钥可以代替密码，但服务器仍可能要求验证码。",
     dismiss: "关闭",

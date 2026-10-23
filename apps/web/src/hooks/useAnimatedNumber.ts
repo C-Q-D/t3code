@@ -6,7 +6,7 @@ import { Spring } from "../lib/motion/spring";
 import { TOKENS } from "../lib/motion/tokens";
 
 /**
- * Animate finite value in formatter units, or show an em dash for unavailable values.
+ * Animate finite value in formatter units, or show a hyphen for unavailable values.
  * ref owns textContent; format returns visual text; optional fillRef owns a 0–100% scaleX.
  * Accessible labels stay caller-owned. Mount/disabled updates are immediate; unmount cancels work.
  */
@@ -20,7 +20,7 @@ export function useAnimatedNumber(
   const { start, stop } = useMotionJob();
   useLayoutEffect(() => {
     const paint = (current: number | null) => {
-      if (ref.current) ref.current.textContent = current === null ? "—" : format(current);
+      if (ref.current) ref.current.textContent = current === null ? "-" : format(current);
       if (fillRef?.current) {
         fillRef.current.style.transform = `scaleX(${Math.max(0, Math.min(100, current ?? 0)) / 100})`;
       }

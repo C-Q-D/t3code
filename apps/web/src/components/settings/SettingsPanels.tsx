@@ -1106,14 +1106,7 @@ export function GeneralSettingsPanel() {
           settingKeys={["idleCompaction", "compactIdleThreads"]}
           mixed={idleCompaction.mixed}
           {...searchableSetting("compact-idle-threads")}
-          description={
-            <>
-              {" "}
-              {t.settings.conversationRenderingUi.compactHint} When to compact an idle Claude thread
-              over 200,000 tokens: after you return, just before its prompt cache expires, or never.
-              Each Claude provider can override this.
-            </>
-          }
+          description={t.settings.conversationRenderingUi.compactHint}
           resetAction={
             globalIdleCompaction(settings) !== globalIdleCompaction(DEFAULT_UNIFIED_SETTINGS) ? (
               <SettingResetButton

@@ -1102,7 +1102,7 @@ export const git: Messages["git"] = {
     /** Formats loading for display. */
     loading: (path: string) => `正在加载${path}…`,
     /** Formats missingLines for display. */
-    missingLines: (start: number, end: number) => `的第${start}—${end}行不在已加载的差异中。`,
+    missingLines: (start: number, end: number) => `的第${start}至${end}行不在已加载的差异中。`,
     /** Formats shown for display. */
     shown: (old: boolean, shown: number, total: number) =>
       `${old ? "已删除的代码，" : ""}显示${shown}行差异，共${total}行`,

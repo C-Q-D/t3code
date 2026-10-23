@@ -215,8 +215,8 @@ export const app = {
   },
   provider: {
     manageDenied: "This connection cannot manage provider accounts.",
-    timeout: "Update timed out — try again.",
-    disconnected: "This environment isn’t connected — try again once it reconnects.",
+    timeout: "Update timed out. Try again.",
+    disconnected: "This environment isn’t connected. Try again once it reconnects.",
     manageDeniedHint:
       "This connection cannot manage provider accounts. View provider settings for update details.",
   },

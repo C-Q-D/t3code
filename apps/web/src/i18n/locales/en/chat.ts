@@ -178,7 +178,7 @@ export const chat = {
     chooseProjectBeforeCompacting: "Choose a project before compacting",
     compactionUnsupported: "Compaction is unavailable for this provider",
     compactionUnavailable: "Compacting is unavailable right now",
-    branchChanged: "Branch changed — was",
+    branchChanged: "Branch changed from",
     restoring: "Restoring...",
     restoreBranch: "Restore branch",
     dismissBranchNotice: "Dismiss branch change notice",
@@ -909,7 +909,7 @@ export const chat = {
     noModelsAreAvailableForThisProvider: "No models are available for this provider.",
     openProviderSetup: "Open provider setup",
     chatGPTUsageLimitReached: "ChatGPT usage limit reached",
-    reviewYourUsageSettingsInChatGPTTo: "Review your usage settings in ChatGPT to continue.",
+    reviewYourUsageSettingsInChatGPTTo: "Review your usage settings in ChatGPT.",
     dismissError: "Dismiss error",
     /** Names the provider driver to install. */
     install: (provider: string): string =>

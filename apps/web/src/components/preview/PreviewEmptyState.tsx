@@ -84,7 +84,7 @@ export function PreviewEmptyState({
                 <button
                   type="button"
                   key={`${server.host}:${server.port}`}
-                  aria-label={`${server.host}:${server.port}${server.processName ? ` (${server.processName})` : ""} — ${t.tools.preview.listening}`}
+                  aria-label={`${server.host}:${server.port}${server.processName ? ` (${server.processName})` : ""}: ${t.tools.preview.listening}`}
                   onClick={() => onOpenUrl(server.requestedUrl)}
                   className="flex h-9 w-full items-center gap-2.5 rounded-compact-row px-2.5 font-mono text-secondary-copy text-foreground outline-none hover:bg-pn6-recent-hover focus-visible:inset-shadow-focus"
                 >

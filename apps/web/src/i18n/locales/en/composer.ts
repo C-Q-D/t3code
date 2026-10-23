@@ -1,8 +1,8 @@
 /** English composer labels and messages; functions format display data only. */
 export const composer = {
   mode: {
-    planTooltip: "Plan mode — click to return to normal build mode",
-    buildTooltip: "Default mode — click to enter plan mode",
+    planTooltip: "Plan mode. Click to return to normal build mode",
+    buildTooltip: "Default mode. Click to enter plan mode",
     plan: "Plan",
     build: "Build",
     runtimeAriaLabel: "Runtime mode",
@@ -307,7 +307,7 @@ export const composer = {
     fileReadAriaLabel: "File to read",
     permissionAriaLabel: "Permission request",
     fileChangeAriaLabel: "File change",
-    processGoneHint: "Provider process is gone — interrupt or restart the run to respond.",
+    processGoneHint: "Provider process is gone. Interrupt or restart the run to respond.",
   },
   userInput: {
     showQuestion: "Show the question and its options",
@@ -388,16 +388,16 @@ export const composer = {
     openSetup: "Open provider setup",
     empty: "No models found",
     /** Names a provider disabled in settings. */
-    disabledHint: (provider: string) => `${provider} — Disabled in settings.`,
+    disabledHint: (provider: string) => `${provider}: Disabled in settings.`,
     limited: "Limited",
     notReady: "Not ready",
     /** Combines a provider name and status label with optional provider-reported detail. */
     statusHint: (provider: string, kind: string, message: string | undefined) =>
-      message ? `${provider} — ${kind}. ${message}` : `${provider} — ${kind}.`,
+      message ? `${provider}: ${kind}. ${message}` : `${provider}: ${kind}.`,
     providersAriaLabel: "Providers",
     favorites: "Favorites",
     /** Marks a provider display name as new. */
-    newProviderTooltip: (provider: string) => `${provider} — New`,
+    newProviderTooltip: (provider: string) => `${provider} (New)`,
     /** Announces that a provider is new using its display name. */
     newProviderAriaLabel: (provider: string) => `${provider}, new`,
     choose: "Choose model",

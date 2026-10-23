@@ -3,8 +3,8 @@ import type { Messages } from "../en";
 
 export const composer: Messages["composer"] = {
   mode: {
-    planTooltip: "计划模式 — 点击返回普通执行模式",
-    buildTooltip: "默认模式 — 点击进入计划模式",
+    planTooltip: "计划模式，点击返回普通执行模式",
+    buildTooltip: "默认模式，点击进入计划模式",
     plan: "计划",
     build: "执行",
     runtimeAriaLabel: "运行模式",
@@ -303,7 +303,7 @@ export const composer: Messages["composer"] = {
     fileReadAriaLabel: "要读取的文件",
     permissionAriaLabel: "权限请求",
     fileChangeAriaLabel: "文件修改",
-    processGoneHint: "Provider 进程已退出 — 请中断或重新开始运行后再响应。",
+    processGoneHint: "Provider 进程已退出，请中断或重新开始运行后再响应。",
   },
   userInput: {
     showQuestion: "显示问题及选项",
@@ -382,16 +382,16 @@ export const composer: Messages["composer"] = {
     openSetup: "打开 Provider 设置",
     empty: "未找到模型",
     /** Names a provider disabled in settings. */
-    disabledHint: (provider: string) => `${provider} — 已在设置中禁用。`,
+    disabledHint: (provider: string) => `${provider}：已在设置中禁用。`,
     limited: "受限",
     notReady: "未就绪",
     /** Combines a provider name and status label with optional provider-reported detail. */
     statusHint: (provider: string, kind: string, message: string | undefined) =>
-      message ? `${provider} — ${kind}。${message}` : `${provider} — ${kind}。`,
+      message ? `${provider}：${kind}。${message}` : `${provider}：${kind}。`,
     providersAriaLabel: "Provider",
     favorites: "收藏",
     /** Marks a provider display name as new. */
-    newProviderTooltip: (provider: string) => `${provider} — 新`,
+    newProviderTooltip: (provider: string) => `${provider}（新）`,
     /** Announces that a provider is new using its display name. */
     newProviderAriaLabel: (provider: string) => `${provider}，新`,
     choose: "选择模型",

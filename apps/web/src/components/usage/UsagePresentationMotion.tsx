@@ -72,7 +72,7 @@ export function UsageAnimatedValue({
     if (!element) return;
     if (!Number.isFinite(value)) {
       springRef.current = null;
-      element.textContent = "—";
+      element.textContent = "-";
       return stop;
     }
     // Sub-cent precision keeps small USD totals animated without rounding their final value.

@@ -108,7 +108,7 @@ describe("restoring V2 settings", () => {
     hooks.beginRender();
     const restore = useSettingsRestore();
 
-    expect(restore.changedSettingLabels).toEqual(["Compact idle Claude threads (beta)"]);
+    expect(restore.changedSettingLabels).toEqual(["Compact idle threads"]);
     await restore.restoreDefaults();
 
     expect(state.update.mock.calls[0]?.[0]).toHaveProperty("idleCompaction", "onReturn");

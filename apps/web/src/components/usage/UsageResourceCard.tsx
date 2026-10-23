@@ -87,14 +87,14 @@ function PrimaryUsageResources({
         <UsageResourceMeter
           label={t.tools.usage.resourceHostCpu.replace(
             "{count}",
-            cpuCount > 0 ? String(cpuCount) : "—",
+            cpuCount > 0 ? String(cpuCount) : "-",
           )}
           percent={cpu}
         />
         <UsageResourceMeter
           label={t.tools.usage.resourceHostMemory}
           percent={memoryPercent}
-          text={host && usedMemory !== null ? memoryPair(usedMemory, host.totalMemoryBytes) : "—"}
+          text={host && usedMemory !== null ? memoryPair(usedMemory, host.totalMemoryBytes) : "-"}
         />
       </div>
       {error && (
@@ -143,7 +143,7 @@ function PrimaryUsageResources({
                 <td>
                   <UsageResourceSpark frames={frames} group={group.key} cpuCount={cpuCount} />
                 </td>
-                <td>{hostCpu === null ? "—" : `${hostCpu.toFixed(1)}%`}</td>
+                <td>{hostCpu === null ? "-" : `${hostCpu.toFixed(1)}%`}</td>
                 <td>{formatBytes(group.residentBytes)}</td>
               </tr>
             );

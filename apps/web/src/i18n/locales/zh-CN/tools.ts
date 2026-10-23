@@ -472,7 +472,7 @@ export const tools: Messages["tools"] = {
     certificateHostname: "证书主机名不匹配",
     certificateDate: "证书已过期或尚未生效",
     redirects: "重定向过多",
-    pickUnavailable: "页面未加载 — 页面渲染前无法选择元素",
+    pickUnavailable: "页面未加载，页面渲染前无法选择元素",
     urlPlaceholder: "搜索或输入 URL",
     menu: "预览菜单",
     openRightPanel: "在右侧面板打开预览",
@@ -915,7 +915,7 @@ export const tools: Messages["tools"] = {
     folderUnavailable: "此文件夹已不可用。",
     partialIndexEmpty: "当前不完整的工作区索引中没有此文件夹的条目。",
     emptyFolder: "此文件夹为空。",
-    refreshFailed: "刷新失败 — 重试",
+    refreshFailed: "刷新失败，请重试",
     partialEntries: "部分工作区条目未显示。",
     refreshWorkspace: "刷新工作区文件",
     refreshing: "正在刷新…",
@@ -1101,7 +1101,7 @@ export const tools: Messages["tools"] = {
     canvasUnavailable: "Canvas 2D不可用",
 
     /** Formats display text from message supplied by the caller. */
-    retryHint: (message) => `${message} — 关闭并重新打开终端以重试。`,
+    retryHint: (message) => `${message}，关闭并重新打开终端以重试。`,
     /** Formats display text from limit supplied by the caller. */
     splitHorizontalLimit: (limit) => `水平拆分终端（每组最多 ${limit} 个）`,
     /** Formats display text from shortcut supplied by the caller. */

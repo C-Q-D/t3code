@@ -334,7 +334,7 @@ export const git = {
       "This change has more files than the host will report ticks for in one read, so the count is short and some boxes below start empty.",
     someOfThisDiffWasNotShown: "Some of this diff was not shown",
     theHostWithheldPartOfThisDiffABinaryFileOrAChangeTooLargeToInline:
-      "The host withheld part of this diff — a binary file, or a change too large to inline.",
+      "The host withheld part of this diff: a binary file, or a change too large to inline.",
     lineCommentsAreWrittenFromTheWholeChange: "Line comments are written from the whole change",
     aCommentIsAnchoredToTheWholeChangeSoSwitchToAllCommitsToWriteOne:
       "A comment is anchored to the whole change, so switch to All commits to write one.",
@@ -369,7 +369,7 @@ export const git = {
     pullRequestReopened: "Pull request reopened",
     branchUpdatedWithTheBaseBranch: "Branch updated with the base branch",
     autoMergeTurnedOnMergesAsSoonAsThisIsReadySoonerIfItAlreadyIs:
-      "Auto-merge turned on — merges as soon as this is ready, sooner if it already is",
+      "Auto-merge turned on. Merges as soon as this is ready, sooner if it already is",
     autoMergeTurnedOff: "Auto-merge turned off",
     revertPullRequestOpened: "Revert pull request opened",
     workflowsApproved: "Workflows approved",
@@ -392,7 +392,7 @@ export const git = {
     theHostRefusedItCheckThatYouHaveWriteAccessAndThatTheBranchStillExists:
       "The host refused it. Check that you have write access, and that the branch still exists.",
     theHostRefusedItCheckThatYouHaveWriteAccessToTheBranchOneFromAForkAlsoNeedsItsAuthorT:
-      "The host refused it. Check that you have write access to the branch — one from a fork also needs its author to allow edits from maintainers — and that it does not conflict with the base.",
+      "The host refused it. Check that you have write access to the branch (a fork branch also needs its author to allow edits from maintainers), and that it does not conflict with the base.",
     theHostRefusedItCheckThatThisRepositoryAllowsAutoMergeThatYouHaveWriteAccessAndThatTh:
       "The host refused it. Check that this repository allows auto-merge, that you have write access, and that there is something left for it to wait on.",
     theHostRefusedItCheckThatYouHaveWriteAccessAndThatTheMergeHasNotAlreadyHappened:
@@ -415,14 +415,14 @@ export const git = {
     theHostRefusedTheNewTitle: "The host refused the new title.",
     addedToTheComposer: "Added to the composer",
     theQuestionIsInTheComposerReadItOverThenSend:
-      "The question is in the composer — read it over, then send.",
+      "The question is in the composer. Read it over, then send.",
     thePullRequestIsInTheComposerTypeYourQuestionThenSend:
-      "The pull request is in the composer — type your question, then send.",
+      "The pull request is in the composer. Type your question, then send.",
     couldNotOpenAThread: "Could not open a thread",
     tryAgainFromTheProjectOrOpenAThreadFirst: "Try again from the project, or open a thread first.",
     askedInAThread: "Asked in a thread",
     theTaskIsInTheComposerReadItOverThenSend:
-      "The task is in the composer — read it over, then send.",
+      "The task is in the composer. Read it over, then send.",
     preparingThePullRequestCheckout: "Preparing the pull request checkout...",
     couldNotOpenAThreadForTheCheckout: "Could not open a thread for the checkout",
     couldNotPrepareThePullRequestCheckout: "Could not prepare the pull request checkout",
@@ -588,7 +588,7 @@ export const git = {
     nothingToPreview: "Nothing to preview.",
     theReactionCouldNotBeSaved: "The reaction could not be saved",
     addAReaction: "Add a reaction",
-    pendingSentWhenYouSubmitTheReview: "Pending — sent when you submit the review",
+    pendingSentWhenYouSubmitTheReview: "Pending. Sent when you submit the review",
     discardThisComment: "Discard this comment",
     resolved: "Resolved",
     open: "Open",

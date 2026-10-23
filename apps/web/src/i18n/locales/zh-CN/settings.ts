@@ -2673,7 +2673,7 @@ ${address}`
       sendAlternate: "输入框：执行相反的排队或引导操作",
       sendBackground: "输入框：在后台启动",
       sendAndNewThread: "输入框：发送并新建对话",
-      steerQueuedMessage: "队列：将首条排队消息作为引导发送",
+      steerQueuedMessage: "队列：发送首条排队消息",
       editQueuedMessage: "队列：编辑最后一条排队消息",
       copyReference: "PR：复制链接或对话 ID",
       reopenClosed: "重新打开已关闭的标签页",
@@ -4044,9 +4044,10 @@ ${address}`
     mathHint:
       "在消息和Markdown预览中排版LaTeX数学公式，例如$x^2$或\\[x^2\\]。输入框中仍可编辑TeX源码。",
     mathReset: "数学公式渲染",
-    compactHint: "在提示词缓存即将过期前压缩长时间空闲的Claude对话，降低返回对话时的费用。",
-    compactReset: "压缩空闲Claude对话",
-    compact: "压缩空闲Claude对话（测试版）",
+    compactHint:
+      "选择何时压缩超过 200,000 个 token 的空闲 Claude 对话：返回对话后、提示词缓存即将过期前，或从不压缩。每个 Claude Provider 都可以单独覆盖此设置。",
+    compactReset: "压缩空闲对话",
+    compact: "压缩空闲对话",
     keepPrHint: "有关联拉取请求的对话不会因闲置而结束。合并或关闭拉取请求仍会结束对话。",
   },
   storageCleanupUi: {
@@ -4142,7 +4143,7 @@ ${address}`
   },
   searchNewUi: {
     math: "渲染数学公式",
-    compact: "压缩空闲Claude对话（测试版）",
+    compact: "压缩空闲对话",
     eas: "EAS设备主机",
     search: "搜索引擎",
     pr: "在T3 Code中打开拉取请求",

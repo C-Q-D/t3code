@@ -178,7 +178,7 @@ export function UsageCompositionCard({
                         </td>
                         {/* ModelTotals does not report unique sessions; records are not session counts. */}
                         <td className="px-3.5 py-2.25 text-right font-mono text-secondary-copy text-muted-foreground">
-                          —
+                          -
                         </td>
                       </tr>
                     );

@@ -480,7 +480,7 @@ export const tools = {
     certificateHostname: "Certificate hostname mismatch",
     certificateDate: "Certificate is expired or not yet valid",
     redirects: "Too many redirects",
-    pickUnavailable: "Page didn't load — pick unavailable until the page renders",
+    pickUnavailable: "Page didn't load. Pick is unavailable until the page renders",
     urlPlaceholder: "Search or enter URL",
     menu: "Preview menu",
     openRightPanel: "Open preview in right panel",
@@ -956,7 +956,7 @@ export const tools = {
     folderUnavailable: "This folder is no longer available.",
     partialIndexEmpty: "No entries from this folder are available in the partial workspace index.",
     emptyFolder: "This folder is empty.",
-    refreshFailed: "Refresh failed — retry",
+    refreshFailed: "Refresh failed. Retry",
     partialEntries: "Some workspace entries are not shown.",
     refreshWorkspace: "Refresh workspace files",
     refreshing: "Refreshing…",
@@ -1147,7 +1147,7 @@ export const tools = {
     canvasUnavailable: "Canvas 2D is unavailable",
 
     /** Formats display text from message supplied by the caller. */
-    retryHint: (message: string) => `${message} — close and reopen the terminal to retry.`,
+    retryHint: (message: string) => `${message}. Close and reopen the terminal to retry.`,
     /** Formats display text from limit supplied by the caller. */
     splitHorizontalLimit: (limit: number) => `Split Terminal Horizontally (max ${limit} per group)`,
     /** Formats display text from shortcut supplied by the caller. */

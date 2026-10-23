@@ -137,7 +137,7 @@ export function UsageHeroCard({
                     }}
                   />
                   {PROVIDER_PRESENTATION[provider].label}{" "}
-                  {awaitingData ? "—" : formatPercent(share)}
+                  {awaitingData ? "-" : formatPercent(share)}
                   <span className="sr-only">
                     {t.tools.usage.sessionCount(
                       totals?.sessions ?? 0,

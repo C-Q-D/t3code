@@ -1350,7 +1350,7 @@ export const settings = {
         "Clipboard copy is unavailable here. Open or manually copy this full pairing URL on the device you want to connect.",
       manualCodeHint:
         "Clipboard copy is unavailable here. Manually copy this code into another client.",
-      qrAriaLabel: "Pairing link — scan to open on another device",
+      qrAriaLabel: "Pairing link. Scan to open on another device",
       copyLink: "Copy link",
       copyCodeOnly: "Copy code only",
       createErrorDescription: "Failed to create pairing URL.",
@@ -1766,7 +1766,7 @@ export const settings = {
       checkoutErrorHint: "Enter the path of the checkout to run in.",
       saveError: "Could not save scheduled task",
       description:
-        "Run a prompt automatically — on an interval, at a fixed time, or when a webhook is called.",
+        "Run a prompt automatically on an interval, at a fixed time, or when a webhook is called.",
       reconnectHint: "Reconnect this environment before saving.",
       environmentLabel: "Runs on",
       taskMissingHint: "This scheduled task no longer exists.",
@@ -2457,7 +2457,7 @@ export const settings = {
     letT3CodeReadRsquoSCookies: (sourceName: string | number | boolean | null | undefined) =>
       `Let T3 Code read ${sourceName}’s cookies`,
     importCookiesTCodeNeedsError: (sourceName: string | number | boolean | null | undefined) =>
-      `To import cookies from ${sourceName}, T3 Code needs Full Disk Access. Turn it on in System Settings, then come back to finish the import — you can revoke it again once the import is done.`,
+      `To import cookies from ${sourceName}, T3 Code needs Full Disk Access. Turn it on in System Settings, then come back to finish the import. You can revoke it again once the import is done.`,
     fullDiskAccess: "Full Disk Access",
     readSCookiesForThisImport: (sourceName: string | number | boolean | null | undefined) =>
       `Read ${sourceName}'s cookies for this import.`,
@@ -2793,7 +2793,7 @@ ${address}`
       sendAlternate: "Composer: Opposite Queue or Steer Action",
       sendBackground: "Composer: Start in Background",
       sendAndNewThread: "Composer: Send and Start New Thread",
-      steerQueuedMessage: "Queue: Send First Queued Message as Steer",
+      steerQueuedMessage: "Queue: Send First Queued Message",
       editQueuedMessage: "Queue: Edit Last Queued Message",
       copyReference: "Pull Request: Copy Link or Thread ID",
       reopenClosed: "Reopen Closed Tab",
@@ -3307,7 +3307,7 @@ ${address}`
     limitedSupport: "Limited support",
     authenticatedAs: "Authenticated as",
     viewDetails: (versionAdvisoryTitle: string | number | boolean | null | undefined) =>
-      `${versionAdvisoryTitle} — view details`,
+      `${versionAdvisoryTitle}, view details`,
     updating: "Updating",
     install: (value: string | number | boolean | null | undefined) => `Install ${value}`,
     updateNow: "Update now",
@@ -3624,7 +3624,7 @@ ${address}`
     checkCaptureAccessInSetup: "Check capture access in setup",
     installTheCaptureHelperToContinue: "Install the capture helper to continue",
     setUpActiveWindowSnapshots: "Set up active-window snapshots",
-    manualCaptureLlWindowEach: "Manual capture only — you'll choose a window each time",
+    manualCaptureLlWindowEach: "Manual capture only. You'll choose a window each time",
     enableCaptureToContinue: "Enable capture to continue",
     connectingYourShortcut: "Connecting your shortcut…",
     waitingForShortcutPermission: "Waiting for shortcut permission",
@@ -4245,9 +4245,9 @@ ${address}`
       "Typeset LaTeX math, such as $x^2$ or \\[x^2\\], in messages and Markdown previews. The composer keeps TeX source editable.",
     mathReset: "math rendering",
     compactHint:
-      "Compact long idle Claude threads just before their prompt cache expires, so coming back costs less.",
-    compactReset: "compact idle Claude threads",
-    compact: "Compact idle Claude threads (beta)",
+      "When to compact an idle Claude thread over 200,000 tokens: after you return, just before its prompt cache expires, or never. Each Claude provider can override this.",
+    compactReset: "compact idle threads",
+    compact: "Compact idle threads",
     keepPrHint: "Inactivity does not settle threads with a pull request. Merge and close still do.",
   },
   storageCleanupUi: {
@@ -4344,7 +4344,7 @@ ${address}`
   },
   searchNewUi: {
     math: "Render math",
-    compact: "Compact idle Claude threads (beta)",
+    compact: "Compact idle threads",
     eas: "EAS device hosts",
     search: "Search engine",
     pr: "Open pull requests in T3 Code",

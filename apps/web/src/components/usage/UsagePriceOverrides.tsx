@@ -728,7 +728,7 @@ export function UsagePriceSummary({
                       </td>
                       <td className="truncate px-3.5 py-2.25">
                         {alias.value ||
-                          (alias.placeholder === t.tools.usage.none ? "—" : alias.placeholder)}
+                          (alias.placeholder === t.tools.usage.none ? "-" : alias.placeholder)}
                       </td>
                       {PRICE_COLUMNS.map((field) => {
                         const cell = usagePriceCell(selected, model, field.key);
@@ -742,7 +742,7 @@ export function UsagePriceSummary({
                               : cell.placeholder === t.tools.usage.mixed ||
                                   cell.placeholder === t.tools.usage.unavailable
                                 ? cell.placeholder
-                                : "—"}
+                                : "-"}
                           </td>
                         );
                       })}
