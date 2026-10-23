@@ -1,10 +1,7 @@
+/** Renders saved environments and T3 Connect controls with per-row search targets. */
+import { t } from "~/i18n";
 import { SessionPermissions } from "./SessionPermissions";
-import {
-  ChevronRightIcon,
-  ChevronsLeftRightEllipsisIcon,
-  EllipsisIcon,
-  RouteIcon,
-} from "lucide-react";
+import { ChevronRightIcon, RouteIcon } from "lucide-react";
 import { useAtomValue } from "@effect/atom-react";
 import { useEffect, useEffectEvent, useState } from "react";
 import {
@@ -21,7 +18,6 @@ import {
   environmentMcpUrl,
 } from "@t3tools/client-runtime/connection";
 import * as Option from "effect/Option";
-
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { cn } from "../../lib/utils";
 import { SettingsRow } from "./settingsLayout";
@@ -40,7 +36,6 @@ import { Switch } from "../ui/switch";
 import { stackedThreadToast, toastManager } from "../ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { Button } from "../ui/button";
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../ui/empty";
 import {
   resolveServerConfigVersionMismatch,
   resolveServerSelfUpdateCapability,
@@ -48,6 +43,7 @@ import {
   supportsServerUpdateThreadContinuation,
 } from "~/versionSkew";
 import { hasCloudPublicConfig } from "~/cloud/publicConfig";
+import { useT3ConnectAuthPrompt } from "../clerk/useT3ConnectAuthPrompt";
 import { useCloudLinkController } from "~/cloud/useCloudLinkController";
 import { environmentCatalog } from "~/connection/catalog";
 import { readEnvironmentScope } from "~/state/session";
@@ -79,32 +75,45 @@ function savedBackendStatus(environment: EnvironmentPresentation): {
   readonly tone: "muted" | "error";
 } {
   if (!environment.entry.enabled && environment.connection.phase !== "unsupported")
-    return { text: "Off", tone: "muted" };
+    return { text: t.settings.connections.status.off, tone: "muted" };
   const { connection } = environment;
   switch (connection.phase) {
     case "connected":
-      return { text: "Connected", tone: "muted" };
+      return { text: t.settings.connections.access.connected, tone: "muted" };
     case "connecting":
-      return { text: "Connecting", tone: "muted" };
+      return { text: t.settings.connections.status.connecting, tone: "muted" };
     case "reconnecting":
       return {
-        text: connection.error ? `Reconnecting: ${connection.error}` : "Reconnecting",
+        text: connection.error
+          ? t.settings.connections.status.reconnectingError(connection.error)
+          : t.settings.connections.status.reconnecting,
         tone: "error",
       };
     case "unsupported":
-      return { text: "Client not supported", tone: "muted" };
+      return { text: t.settings.connections.status.unsupported, tone: "muted" };
     case "error":
       return {
-        text: connection.error ? `Connection failed: ${connection.error}` : "Connection failed",
+        text: connection.error
+          ? t.settings.connections.status.failedError(connection.error)
+          : t.settings.connections.status.failed,
         tone: "error",
       };
     case "offline":
-      return { text: "Offline", tone: "muted" };
+      return { text: t.settings.scopeSentence.offline, tone: "muted" };
     case "available":
-      return { text: "Not connected", tone: "muted" };
+      return { text: t.settings.connections.status.notConnected, tone: "muted" };
   }
 }
 
+/**
+ * Keeps unsupported-client diagnoses distinct from a user-disabled backend and exposes route and permission controls.
+ * @param props.environment Saved backend identity, routes and current connection state.
+ * @param props.removingEnvironmentId Destination currently being removed, or null when idle.
+ * @param props.onSetEnabled Parent-owned toggle action; availability is checked before invoking it.
+ * @param props.onRemove Parent-owned removal action.
+ * @param props.onAddRoute Opens route setup for this backend.
+ * @returns A Graphite environment row; action errors and persistence remain owned by the parent.
+ */
 export function SavedBackendListRow({
   environment,
   removingEnvironmentId,
@@ -123,11 +132,11 @@ export function SavedBackendListRow({
   const isRemoving = removingEnvironmentId === environmentId;
   const errorTraceId = environment.connection.traceId;
   const { copyToClipboard: copyTraceIdToClipboard } = useCopyToClipboard<{ traceId: string }>({
-    target: "trace ID",
+    target: t.settings.connectionInfoUi.trace,
     onCopy: ({ traceId }) => {
       toastManager.add({
         type: "success",
-        title: "Trace ID copied",
+        title: t.settings.connections.environment.copyTraceToast,
         description: traceId,
       });
     },
@@ -135,7 +144,7 @@ export function SavedBackendListRow({
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Could not copy trace ID",
+          title: t.settings.connections.environment.copyTraceError,
           description: error.message,
         }),
       );
@@ -149,15 +158,15 @@ export function SavedBackendListRow({
     onCopy: ({ url }) => {
       toastManager.add({
         type: "success",
-        title: "MCP URL copied",
-        description: `Add it to an agent, e.g. claude mcp add --transport http t3 ${url}`,
+        title: t.settings.connections.environment.copyMcpToast,
+        description: t.settings.connections.environment.copyMcpHint(url),
       });
     },
     onError: (error) => {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Could not copy MCP URL",
+          title: t.settings.connections.environment.copyMcpError,
           description: error.message,
         }),
       );
@@ -210,7 +219,11 @@ export function SavedBackendListRow({
   const subtitleText = [
     environmentTransportLabel(environment, connectedTarget),
     // The headline below names the failure in full.
-    diagnosis ? null : resumingServerUpdate ? "Restarting" : status.text,
+    diagnosis
+      ? null
+      : resumingServerUpdate
+        ? t.settings.connections.status.restarting
+        : status.text,
     enabled && versionMismatch ? serverVersion : null,
   ]
     .filter((value): value is string => value !== null)
@@ -222,22 +235,22 @@ export function SavedBackendListRow({
     versionMismatch !== null &&
     (serverUpdateState.status === "idle" || serverUpdateState.status === "failed");
 
-  const statusTooltip = `${
+  const statusTooltip = t.settings.connections.environment.statusTooltip(
     unsupported
-      ? (environment.connection.error ?? connectionStatusText(environment.connection))
+      ? (environment.connection.error ??
+          connectionStatusText(environment.connection, t.chat.workLog.shared.connection))
       : enabled
-        ? connectionStatusText(environment.connection)
-        : "Switched off"
-  }${
-    versionMismatch
-      ? `\nUpdate available: ${versionMismatch.serverVersion} → ${versionMismatch.clientVersion}`
-      : ""
-  }`;
+        ? connectionStatusText(environment.connection, t.chat.workLog.shared.connection)
+        : t.settings.connections.environment.switchedOff,
+    versionMismatch?.serverVersion ?? null,
+    versionMismatch?.clientVersion ?? null,
+  );
 
   return (
     <EnvironmentRow
       kind={machineKind}
       label={environment.label}
+      status={isConnected ? t.settings.connections.access.connected : null}
       dimmed={!enabled}
       subtitle={
         <span className="flex min-w-0 items-center gap-1">
@@ -274,7 +287,9 @@ export function SavedBackendListRow({
             onClick={() => setRoutesOpen((open) => !open)}
             className="inline-flex shrink-0 items-center gap-0.5 rounded-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring"
           >
-            {routeCount === 1 ? "Routes" : `${routeCount} routes`}
+            {routeCount === 1
+              ? t.settings.connections.environment.routes
+              : t.settings.connections.environment.routeCount(routeCount)}
             <ChevronRightIcon
               aria-hidden
               className={cn(
@@ -293,7 +308,7 @@ export function SavedBackendListRow({
             onClick={() => setPermissionsOpen((open) => !open)}
             className="inline-flex shrink-0 items-center gap-0.5 rounded-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring"
           >
-            Permissions
+            {t.settings.merge.permissions}
             <ChevronRightIcon
               aria-hidden
               className={cn(
@@ -358,22 +373,30 @@ export function SavedBackendListRow({
       serverUpdateState.status !== "running" ? (
         <OutdatedServerUpdateAction
           environmentId={environmentId}
-          serverLabel={`${environment.label} server`}
+          serverLabel={t.settings.connections.environment.serverLabel(environment.label)}
           fromVersion={lastDescriptor?.serverVersion}
           targetVersion={APP_VERSION}
-          label={serverUpdateState.status === "failed" ? "Retry update" : "Update"}
+          label={
+            serverUpdateState.status === "failed"
+              ? t.settings.connections.environment.retryUpdate
+              : t.settings.actions.update
+          }
         />
       ) : null}
       {showUpdateAction ? (
         <ServerUpdateAction
           environmentId={environmentId}
-          serverLabel={`${environment.label} server`}
+          serverLabel={t.settings.connections.environment.serverLabel(environment.label)}
           selfUpdate={resolveServerSelfUpdateCapability(environment.serverConfig)}
           installation={environment.serverConfig?.environment.capabilities.serverInstallation}
           desktopAppUpdate={supportsDesktopAppUpdate(environment.serverConfig)}
           threadContinuation={supportsServerUpdateThreadContinuation(environment.serverConfig)}
           targetVersion={versionMismatch.clientVersion}
-          label={serverUpdateState.status === "failed" ? "Retry update" : "Update"}
+          label={
+            serverUpdateState.status === "failed"
+              ? t.settings.connections.environment.retryUpdate
+              : t.settings.actions.update
+          }
           appearance="icon"
         />
       ) : null}
@@ -384,13 +407,20 @@ export function SavedBackendListRow({
               size="sm"
               checked={enabled}
               disabled={isRemoving || blocked}
-              aria-label={`${enabled ? "Switch off" : "Switch on"} ${environment.label}`}
+              aria-label={t.settings.connections.environment.switchAriaLabel(
+                enabled,
+                environment.label,
+              )}
               onCheckedChange={(checked) => onSetEnabled(environmentId, checked)}
             />
           }
         />
         <TooltipPopup side="top">
-          {blocked ? "Client not supported" : enabled ? "Switch off" : "Switch on"}
+          {blocked
+            ? t.settings.connections.status.unsupported
+            : enabled
+              ? t.settings.connections.environment.switchOff
+              : t.settings.connections.environment.switchOn}
         </TooltipPopup>
       </Tooltip>
       <Menu>
@@ -398,14 +428,14 @@ export function SavedBackendListRow({
           render={
             <Button
               type="button"
-              variant="ghost-muted"
-              size="icon-xs"
+              variant="secondary"
+              size="settings-list"
               disabled={isRemoving}
-              aria-label={`More actions for ${environment.label}`}
+              aria-label={t.settings.connections.environment.actionsAriaLabel(environment.label)}
             />
           }
         >
-          <EllipsisIcon className="size-3.5" />
+          {t.settings.actions.edit}
         </MenuTrigger>
         <MenuPopup align="end">
           <EnvironmentIconMenu
@@ -414,17 +444,25 @@ export function SavedBackendListRow({
           />
           <MenuItem onClick={() => setRoutesOpen((open) => !open)}>
             <RouteIcon />
-            {routesOpen ? "Hide routes" : "Routes"}
+            {routesOpen
+              ? t.settings.connections.environment.hideRoutes
+              : t.settings.connections.environment.routes}
           </MenuItem>
           {mcpUrl ? (
-            <MenuItem onClick={() => copyMcpUrl(mcpUrl, { url: mcpUrl })}>Copy MCP URL</MenuItem>
+            <MenuItem onClick={() => copyMcpUrl(mcpUrl, { url: mcpUrl })}>
+              {t.settings.connections.environment.copyMcpUrl}
+            </MenuItem>
           ) : null}
           {errorTraceId ? (
-            <MenuItem onClick={() => copyTraceId(errorTraceId)}>Copy trace ID</MenuItem>
+            <MenuItem onClick={() => copyTraceId(errorTraceId)}>
+              {t.settings.connections.environment.copyTraceId}
+            </MenuItem>
           ) : null}
           <MenuSeparator />
           <MenuItem variant="destructive" onClick={() => onRemove(environment)}>
-            {isRemoving ? "Removing…" : "Remove from this device…"}
+            {isRemoving
+              ? t.settings.connections.environment.removing
+              : t.settings.connections.environment.remove}
           </MenuItem>
         </MenuPopup>
       </Menu>
@@ -437,7 +475,7 @@ function CloudLinkSwitch({
   disabled,
   disabledReason,
   onCheckedChange,
-  ariaLabel = "Enable T3 Connect",
+  ariaLabel = t.settings.connections.cloud.enable,
 }: {
   readonly checked: boolean;
   readonly disabled: boolean;
@@ -463,7 +501,9 @@ function CloudLinkSwitch({
   );
 }
 
+/** Displays relay controls with their original permission checks; signed-out users use the existing Clerk prompt. */
 function ConfiguredCloudLinkRow({ canManageRelay }: { readonly canManageRelay: boolean }) {
+  const { openAuthPrompt } = useT3ConnectAuthPrompt();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const {
     isSignedIn,
@@ -480,9 +520,9 @@ function ConfiguredCloudLinkRow({ canManageRelay }: { readonly canManageRelay: b
   const [isUpdatingPreference, setIsUpdatingPreference] = useState(false);
 
   const disabledReason = !isSignedIn
-    ? "Sign in to T3 Connect to manage this environment."
+    ? t.settings.connections.cloud.signInError
     : !canManageRelay
-      ? "Your session does not have permission to manage T3 Connect access."
+      ? t.settings.connections.cloud.permissionError
       : null;
   const isBusy = isUpdating || isUpdatingPreference;
   const refreshLinkState = useEffectEvent(primaryCloudLinkState.refresh);
@@ -498,7 +538,11 @@ function ConfiguredCloudLinkRow({ canManageRelay }: { readonly canManageRelay: b
       formatConnectReachable(reachability)
     ) : reachability?.status === "unreachable" ? (
       <span className="block text-destructive">
-        {[reachability.reason, reachability.hint, `Fix: ${reachability.fix}`]
+        {[
+          reachability.reason,
+          reachability.hint,
+          t.settings.connectionInfoText.fix(reachability.fix),
+        ]
           .filter(Boolean)
           .join(" ")}{" "}
         <a
@@ -507,7 +551,7 @@ function ConfiguredCloudLinkRow({ canManageRelay }: { readonly canManageRelay: b
           rel="noreferrer"
           className="underline underline-offset-2"
         >
-          More info
+          {t.settings.connectionInfoUi.more}
         </a>
       </span>
     ) : null;
@@ -524,15 +568,15 @@ function ConfiguredCloudLinkRow({ canManageRelay }: { readonly canManageRelay: b
       toastManager.add({
         type: "success",
         title: enabled
-          ? "T3 Connect linked"
+          ? t.settings.connections.cloud.linkedToast
           : publishAgentActivity
-            ? "T3 Connect tunnel disabled"
-            : "T3 Connect unlinked",
+            ? t.settings.connections.cloud.tunnelDisabledToast
+            : t.settings.connections.cloud.unlinkedToast,
         description: enabled
-          ? "This environment is available through T3 Connect."
+          ? t.settings.connections.cloud.linkedHint
           : publishAgentActivity
-            ? "The managed tunnel was removed. Agent activity publishing stays on."
-            : "This environment is no longer available through T3 Connect.",
+            ? t.settings.connections.cloud.tunnelDisabledHint
+            : t.settings.connections.cloud.unlinkedHint,
       });
     }
     setIsUpdating(false);
@@ -549,10 +593,12 @@ function ConfiguredCloudLinkRow({ canManageRelay }: { readonly canManageRelay: b
     if (ok) {
       toastManager.add({
         type: "success",
-        title: enabled ? "Agent activity enabled" : "Agent activity disabled",
+        title: enabled
+          ? t.settings.connections.cloud.activityEnabledToast
+          : t.settings.connections.cloud.activityDisabledToast,
         description: enabled
-          ? "This environment publishes agent activity to your mobile clients."
-          : "This environment will stop publishing agent activity.",
+          ? t.settings.connections.cloud.activityEnabledHint
+          : t.settings.connections.cloud.activityDisabledHint,
       });
     }
     setIsUpdatingPreference(false);
@@ -568,10 +614,12 @@ function ConfiguredCloudLinkRow({ canManageRelay }: { readonly canManageRelay: b
     if (ok) {
       toastManager.add({
         type: "success",
-        title: enabled ? "Webhooks held while offline" : "Webhooks no longer held",
+        title: enabled
+          ? t.settings.connections.cloud.webhooksHeldToast
+          : t.settings.connections.cloud.webhooksNotHeldToast,
         description: enabled
-          ? "T3 Connect keeps webhook requests for up to 24 hours while this environment is offline."
-          : "Requests to an offline environment now fail. Anything already held is still delivered.",
+          ? t.settings.connections.cloud.webhooksHeldHint
+          : t.settings.connections.cloud.webhooksNotHeldHint,
       });
     }
     setIsUpdatingPreference(false);
@@ -584,45 +632,75 @@ function ConfiguredCloudLinkRow({ canManageRelay }: { readonly canManageRelay: b
           title={searchableSetting("t3-connect").title}
           description={
             linkRevoked
-              ? "This environment was removed from T3 Connect. Turn it on to link it again."
+              ? t.settings.connections.cloud.removedRelink
               : managedTunnelActive
                 ? reachability?.status === "unreachable"
-                  ? "T3 Connect is on, but other devices cannot reach this environment."
+                  ? t.settings.connections.cloud.unreachable
                   : reachability?.status === "reachable"
-                    ? "This environment is available to your other devices through T3 Connect."
-                    : "T3 Connect is on. Reachability has not been checked yet."
+                    ? t.settings.connections.cloud.availableHint
+                    : t.settings.connections.cloud.unchecked
                 : managedTunnelOutOfSync
-                  ? "T3 Connect is out of sync. This environment is linked only to publish agent activity, so other devices cannot connect. Turn T3 Connect on to repair it."
-                  : "Make this environment available to your other devices through T3 Connect."
+                  ? t.settings.connections.cloud.outOfSync
+                  : t.settings.connections.cloud.enableHint
           }
           status={operationError ?? primaryCloudLinkState.error ?? reachabilityStatus}
           control={
+            <Tooltip>
+              <TooltipTrigger render={<span className="inline-flex" />}>
+                {!isSignedIn ? (
+                  <Button size="md" variant="secondary" onClick={openAuthPrompt}>
+                    {t.settings.sidebarNav.signIn}
+                  </Button>
+                ) : (
+                  <CloudLinkSwitch
+                    checked={managedTunnelActive}
+                    disabled={
+                      !canManageRelay ||
+                      !isSignedIn ||
+                      primaryCloudLinkState.data === null ||
+                      primaryCloudLinkState.isPending ||
+                      isBusy
+                    }
+                    disabledReason={disabledReason}
+                    onCheckedChange={(enabled) => void updateManagedTunnel(enabled)}
+                  />
+                )}
+              </TooltipTrigger>
+              <TooltipPopup side="top">
+                {managedTunnelActive
+                  ? t.settings.connections.cloud.availableHint
+                  : t.settings.connections.cloud.enableHint}
+              </TooltipPopup>
+            </Tooltip>
+          }
+        />
+      ) : null}
+      {managedTunnelActive ? (
+        <SettingsRow
+          {...searchableSetting("hold-webhooks-while-offline")}
+          description={t.settings.connections.cloud.webhooksDescription}
+          control={
             <CloudLinkSwitch
-              checked={managedTunnelActive}
-              disabled={
-                !canManageRelay ||
-                !isSignedIn ||
-                primaryCloudLinkState.data === null ||
-                primaryCloudLinkState.isPending ||
-                isBusy
-              }
+              ariaLabel={t.settings.connections.cloud.webhooksAriaLabel}
+              checked={holdWebhooksWhileOffline}
+              disabled={!canManageRelay || !isSignedIn || primaryCloudLinkState.isPending || isBusy}
               disabledReason={disabledReason}
-              onCheckedChange={(enabled) => void updateManagedTunnel(enabled)}
+              onCheckedChange={(enabled) => void updateHoldWebhooks(enabled)}
             />
           }
         />
       ) : linkRevoked ? (
         <SettingsRow
           title={searchableSetting("t3-connect").title}
-          description="This environment was removed from T3 Connect. Run `t3 connect link` on the host to link it again."
+          description={t.settings.connections.cloud.removedRelinkCommand}
         />
       ) : null}
       <SettingsRow
-        title={searchableSetting("publish-agent-activity").title}
-        description="Send activity to mobile notifications and Live Activities without T3 Connect."
+        {...searchableSetting("publish-agent-activity")}
+        description={t.settings.connections.cloud.activityDescription}
         control={
           <CloudLinkSwitch
-            ariaLabel="Publish agent activity to mobile clients"
+            ariaLabel={t.settings.connections.cloud.activityAriaLabel}
             checked={publishAgentActivity}
             disabled={
               !canManageRelay ||
@@ -636,25 +714,11 @@ function ConfiguredCloudLinkRow({ canManageRelay }: { readonly canManageRelay: b
           />
         }
       />
-      {managedTunnelActive ? (
-        <SettingsRow
-          title={searchableSetting("hold-webhooks-while-offline").title}
-          description="Keep webhook requests for up to 24 hours while this environment is offline, then deliver them. Off: T3 Connect only forwards requests and stores nothing."
-          control={
-            <CloudLinkSwitch
-              ariaLabel="Hold webhook requests while this environment is offline"
-              checked={holdWebhooksWhileOffline}
-              disabled={!canManageRelay || !isSignedIn || primaryCloudLinkState.isPending || isBusy}
-              disabledReason={disabledReason}
-              onCheckedChange={(enabled) => void updateHoldWebhooks(enabled)}
-            />
-          }
-        />
-      ) : null}
     </>
   );
 }
 
+/** Preserves the T3 Connect search anchor when relay permissions show an explanation instead of controls. */
 export function CloudLinkRow({
   canReadRelay,
   canManageRelay,
@@ -666,29 +730,25 @@ export function CloudLinkRow({
   if (!canReadRelay) {
     return (
       <SettingsRow
-        title="T3 Connect"
-        description="To edit these settings, pair this connection with both View relay and Manage relay permissions."
+        {...searchableSetting("t3-connect")}
+        description={t.settings.connections.cloud.permissionsHint}
       />
     );
   }
   return <ConfiguredCloudLinkRow canManageRelay={canManageRelay} />;
 }
 
+/** Explains an empty environment list without manufacturing a connected example machine. */
 function EmptyRemoteEnvironments({ cloudEnabled = true }: { readonly cloudEnabled?: boolean }) {
   return (
-    <Empty className="min-h-52">
-      <EmptyMedia variant="icon">
-        <ChevronsLeftRightEllipsisIcon />
-      </EmptyMedia>
-      <EmptyHeader>
-        <EmptyTitle>No saved remote environments</EmptyTitle>
-        <EmptyDescription>
-          {cloudEnabled
-            ? "Click “Add environment” to pair another environment, or connect one from T3 Connect."
-            : "Click “Add environment” to pair another environment."}
-        </EmptyDescription>
-      </EmptyHeader>
-    </Empty>
+    <div className="rounded-settings-row-surface bg-connections-well px-4 py-4.5 text-center text-secondary-copy-large text-secondary-label shadow-connections-icon">
+      <p>{t.settings.connections.environment.empty}</p>
+      <p>
+        {cloudEnabled
+          ? t.settings.connections.environment.emptyCloudHint
+          : t.settings.connections.environment.emptyHint}
+      </p>
+    </div>
   );
 }
 
@@ -709,3 +769,5 @@ export function CloudRemoteEnvironmentRows({
     <EmptyRemoteEnvironments cloudEnabled={false} />
   ) : null;
 }
+
+// Subscribes on its own so desktop download progress does not re-render the page.
