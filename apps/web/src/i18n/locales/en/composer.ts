@@ -1,3 +1,5 @@
+import { englishApprovalMessages } from "@t3tools/client-runtime/work-log/messages";
+
 /** English composer labels and messages; functions format display data only. */
 export const composer = {
   mode: {
@@ -292,6 +294,7 @@ export const composer = {
     dismiss: "Dismiss feedback notice",
   },
   approval: {
+    fullAccessOverride: englishApprovalMessages,
     declinedDraftChanged: "Approval declined. Your message changed, so it wasn't sent.",
     draftChanged: "Your message changed, so it wasn't sent.",
     alreadyResponding: "An approval is already being answered, so your message wasn't sent.",

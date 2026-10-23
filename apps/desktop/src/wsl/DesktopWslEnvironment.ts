@@ -1,4 +1,5 @@
 import * as Context from "effect/Context";
+import { desktopMessages } from "../i18n/desktopMessages.ts";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -698,8 +699,7 @@ const ensureNodePtyImpl = Effect.fn("DesktopWslEnvironment.ensureNodePtyImpl")(f
   if (probe.exitCode === 3) {
     return {
       ok: false,
-      reason:
-        'WSL server dependencies could not be loaded (for example "node-pty"). The native packages the server needs are not unpacked where the WSL distro\'s Node can read them. This is a packaging problem with this build. Please report it.',
+      reason: desktopMessages("en").wsl.dependenciesFailed,
       fatal: true,
     } as const;
   }

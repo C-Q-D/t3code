@@ -1,5 +1,6 @@
 /** Owns desktop backend instances and reports native WSL fallback failures. */
 import * as DesktopUiLocale from "../i18n/DesktopUiLocale.ts";
+import { desktopMessages } from "../i18n/desktopMessages.ts";
 // Pool registry for multiple backend processes. This file is the entry
 // point for the concurrent-Windows+WSL-backend feature; see the design
 // notes below before extending it.
@@ -209,6 +210,11 @@ export const layer = Layer.effect(
       function* (failure: DesktopBackendManager.PreflightFailure) {
         const { reason, fatal } = failure;
         const m = yield* uiLocale.messages;
+        // Keep the diagnostic payload unchanged; translate only the native dialog.
+        const displayReason =
+          reason === desktopMessages("en").wsl.dependenciesFailed
+            ? m.wsl.dependenciesFailed
+            : reason;
         if (!fatal) {
           yield* logBackendPoolWarning(
             "primary WSL preflight retry window exhausted; using Windows for this launch",
@@ -216,7 +222,7 @@ export const layer = Layer.effect(
           );
           yield* electronDialog.showErrorBox(
             m.wsl.unavailableTitle,
-            `${reason}\n\n${m.wsl.unavailableDetail}`,
+            `${displayReason}\n\n${m.wsl.unavailableDetail}`,
           );
           yield* appSettings.applyWslWindowsFallbackInMemory;
           return true;
@@ -225,7 +231,10 @@ export const layer = Layer.effect(
         yield* logBackendPoolWarning("primary WSL preflight failed; falling back to Windows", {
           reason,
         });
-        yield* electronDialog.showErrorBox(m.wsl.failedTitle, `${reason}\n\n${m.wsl.failedDetail}`);
+        yield* electronDialog.showErrorBox(
+          m.wsl.failedTitle,
+          `${displayReason}\n\n${m.wsl.failedDetail}`,
+        );
         // Clear both flags so restart selects Windows and cannot register the broken WSL backend.
         // Clearing wslBackendEnabled alone would leave a stale wslOnly:true that silently re-traps
         // the user in wsl-only mode the next time they enable WSL. If the persisted write fails,

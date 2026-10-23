@@ -288,6 +288,13 @@ export const composer: Messages["composer"] = {
     dismiss: "关闭反馈通知",
   },
   approval: {
+    fullAccessOverride: {
+      question: "为什么还需要审批？",
+      askRule:
+        "完全访问权限会跳过审批，但代理自身设置中的一条询问规则匹配了此操作，因此仍会请求审批。删除该规则或缩小其范围即可停止这些提示。",
+      safetyCheck:
+        "完全访问权限会跳过审批，但代理仍会执行一些无法通过设置跳过的安全检查，例如无法确认删除操作的目标路径。T3 Code 无法关闭这些检查，请检查请求，并在符合预期时批准。",
+    },
     declinedDraftChanged: "审批已拒绝。消息已更改，因此未发送。",
     draftChanged: "消息已更改，因此未发送。",
     alreadyResponding: "正在响应另一项审批，因此未发送消息。",

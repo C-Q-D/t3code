@@ -1,8 +1,5 @@
 import { t } from "~/i18n";
-import {
-  FULL_ACCESS_OVERRIDE_QUESTION,
-  fullAccessOverrideExplanation,
-} from "@t3tools/client-runtime/state/thread-requests";
+import { fullAccessOverrideExplanation } from "@t3tools/client-runtime/state/thread-requests";
 import { memo } from "react";
 import { type PendingApproval } from "../../session-logic";
 import { InlineButton } from "../ui/button";
@@ -66,16 +63,19 @@ export const ComposerPendingApprovalPanel = memo(function ComposerPendingApprova
         {approval.fullAccessOverride ? (
           <Popover>
             <PopoverTrigger openOnHover render={<InlineButton tone="muted" />}>
-              {FULL_ACCESS_OVERRIDE_QUESTION}
+              {t.composer.approval.fullAccessOverride.question}
             </PopoverTrigger>
             <PopoverPopup
               {...composerFloatingLayerProps}
-              aria-label={FULL_ACCESS_OVERRIDE_QUESTION}
+              aria-label={t.composer.approval.fullAccessOverride.question}
               tooltipStyle
               side="top"
               className="max-w-[min(22rem,calc(100vw-2rem))] whitespace-normal"
             >
-              {fullAccessOverrideExplanation(approval.fullAccessOverride)}
+              {fullAccessOverrideExplanation(
+                approval.fullAccessOverride,
+                t.composer.approval.fullAccessOverride,
+              )}
             </PopoverPopup>
           </Popover>
         ) : null}

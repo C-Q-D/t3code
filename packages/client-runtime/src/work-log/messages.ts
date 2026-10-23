@@ -9,6 +9,15 @@ import { englishToolActivityLabels } from "@t3tools/shared/toolActivityLabels";
 import { englishT3ToolLabels } from "@t3tools/shared/t3McpToolPresentation";
 import type { ToolGroupAction } from "./presentation.ts";
 
+/** Default approval copy stays English for clients that do not supply translations. */
+export const englishApprovalMessages = {
+  question: "Why am I being asked this?",
+  askRule:
+    "Full access skips approvals, but an ask rule in the agent's own settings matches this action, so it still asks. Remove or narrow that rule to stop these prompts.",
+  safetyCheck:
+    "Full access skips approvals, but the agent still stops for a few safety checks of its own that no setting can skip, such as a delete whose path it can't verify. T3 Code can't turn these off, so check the request and approve it if it's what you expect.",
+};
+
 /** Formats an English counted noun; count is already computed from tool results. */
 function quantity(count: number, noun: string, plural = `${noun}s`): string {
   return `${count} ${count === 1 ? noun : plural}`;

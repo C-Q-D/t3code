@@ -54,6 +54,8 @@ const en = {
     connecting: "Connecting to WSL…",
   },
   wsl: {
+    dependenciesFailed:
+      'WSL server dependencies could not be loaded (for example "node-pty"). The native packages the server needs are not unpacked where the WSL distro\'s Node can read them. This is a packaging problem with this build. Please report it.',
     unavailableTitle: "WSL backend is still unavailable",
     unavailableDetail:
       "T3 Code will use the Windows backend for this launch and retry WSL the next time the app starts.",
@@ -141,6 +143,8 @@ const zhCN: DesktopMessages = {
     connecting: "正在连接 WSL…",
   },
   wsl: {
+    dependenciesFailed:
+      '无法加载 WSL 服务端依赖（例如 "node-pty"）。服务端所需的原生包未解压到 WSL 发行版的 Node 可以读取的位置。这是此版本的打包问题，请报告此问题。',
     unavailableTitle: "WSL 后端仍不可用",
     unavailableDetail: "本次启动将使用 Windows 后端，下次启动应用时会重试 WSL。",
     failedTitle: "WSL 后端无法启动",
