@@ -120,9 +120,7 @@ function Harness({
       />
       <button onClick={() => void optimizer.trigger()}>Improve</button>
       <pre data-draft>{prompt}</pre>
-      <div role="status">
-        <ComposerPromptOptimizeTab optimizer={optimizer} />
-      </div>
+      <ComposerPromptOptimizeTab optimizer={optimizer} />
     </div>
   );
 }
@@ -142,7 +140,7 @@ it("replaces the original untrimmed draft and restores it with one editor undo",
     environmentId: "env",
     input: { threadId: "thread", draft: "  fix the bug  ", style: "default" },
   });
-  await expect.element(screen.getByText("Improved", { exact: true })).toBeVisible();
+  await expect.element(screen.getByRole("status")).toHaveTextContent("Improved");
   await expect
     .element(screen.getByRole("textbox"))
     .toHaveTextContent("Fix the bug and run its regression test.");
@@ -549,4 +547,29 @@ it("reports a ComposerAssistError as unavailable rather than disconnected", asyn
       "Could not improve: not available right now",
     ),
   );
+});
+
+it("keeps the product live region mounted through pending and completed feedback", async () => {
+  const pending = deferredResult();
+  fake.run.mockReset().mockReturnValue(pending.promise);
+  await using screen = await render(<Harness thread="live-region" />);
+  const region = screen.getByRole("status").element();
+  expect(region.textContent).toBe("");
+  await screen.getByRole("button", { name: "Improve", exact: true }).click();
+  await expect.element(screen.getByRole("status")).toHaveTextContent("Improving…");
+  expect(screen.getByRole("status").element()).toBe(region);
+  await act(() =>
+    pending.resolve(
+      AsyncResult.success({
+        _tag: "Optimized",
+        requestId: "live",
+        text: "Improved content",
+        cacheMaybeExpired: false,
+      }),
+    ),
+  );
+  await expect.element(screen.getByRole("status")).toHaveTextContent("Improved");
+  await screen.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect.element(screen.getByRole("status")).toBeEmptyDOMElement();
+  expect(screen.getByRole("status").element()).toBe(region);
 });

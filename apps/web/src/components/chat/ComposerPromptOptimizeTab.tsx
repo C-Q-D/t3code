@@ -12,21 +12,29 @@ type Optimizer = ReturnType<typeof useComposerPromptOptimizer>;
 
 /** Shows transient improvement feedback without owning its lifecycle. */
 export function ComposerPromptOptimizeTab({ optimizer }: { optimizer: Optimizer }) {
-  if (!optimizer.label) return null;
   return (
-    <ComposerBanner.Root density="comfortable" width="content" shoulderTab>
-      <ComposerBanner.Row>
-        <ComposerBanner.Icon>{optimizer.done ? <Check /> : <WandSparkles />}</ComposerBanner.Icon>
-        <ComposerBanner.Content>{optimizer.label}</ComposerBanner.Content>
-        {optimizer.done ? (
-          <ComposerBanner.Actions>
-            <Button variant="ghost" size="xs" onClick={optimizer.undo}>
-              {t.composer.assist.optimize.undo}
-            </Button>
-          </ComposerBanner.Actions>
-        ) : null}
-      </ComposerBanner.Row>
-    </ComposerBanner.Root>
+    <>
+      <span role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+        {optimizer.label}
+      </span>
+      {optimizer.label ? (
+        <ComposerBanner.Root density="comfortable" width="content" shoulderTab>
+          <ComposerBanner.Row>
+            <ComposerBanner.Icon>
+              {optimizer.done ? <Check /> : <WandSparkles />}
+            </ComposerBanner.Icon>
+            <ComposerBanner.Content>{optimizer.label}</ComposerBanner.Content>
+            {optimizer.done ? (
+              <ComposerBanner.Actions>
+                <Button variant="ghost" size="xs" onClick={optimizer.undo}>
+                  {t.composer.assist.optimize.undo}
+                </Button>
+              </ComposerBanner.Actions>
+            ) : null}
+          </ComposerBanner.Row>
+        </ComposerBanner.Root>
+      ) : null}
+    </>
   );
 }
 
@@ -41,7 +49,7 @@ export function ComposerPromptOptimizeButton({
   if (!optimizer.visible) return null;
   const copy = t.composer.assist.optimize;
   const warning = !optimizer.disabledReason && optimizer.cacheMaybeExpired;
-  const hint = optimizer.disabledReason ?? `${copy.button}${shortcut ? ` ${shortcut}` : ""}`;
+  const hint = optimizer.disabledReason ?? copy.button;
   return (
     <Tooltip>
       <TooltipTrigger
@@ -75,7 +83,10 @@ export function ComposerPromptOptimizeButton({
       </TooltipTrigger>
       <TooltipPopup>
         {hint}
-        {warning ? ` · ${copy.maybeFullPrice}` : ""}
+        {!optimizer.disabledReason && shortcut ? (
+          <span className="text-muted-foreground">{` ${shortcut}`}</span>
+        ) : null}
+        {warning ? <span className="text-warning">{` · ${copy.maybeFullPrice}`}</span> : null}
       </TooltipPopup>
     </Tooltip>
   );
