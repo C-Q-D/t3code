@@ -34,22 +34,30 @@ export function checkOptimizedPrompt(
   );
   if (contextReferences.some((entry) => !outputContexts.has(entry.source)))
     return "references_dropped";
+  const plainDraft = replaceComposerContextReferences(draft, () => "");
   const references = Array.from(
-    replaceComposerContextReferences(draft, () => "").matchAll(
-      /(["'])((?:[A-Za-z]:[\\/]|\\\\|\/)[^\n]*?)\1|@[\p{L}\p{N}_./\\-]+|`+[^`]+`+|(?:[A-Za-z]:[\\/]|\\\\|(?<![\p{L}\p{N}_:/])\/)[^\s`"'<>，。；：！？、（）(),;!?]+/gu,
+    plainDraft.matchAll(
+      /(["'])((?:[A-Za-z]:[\\/]|\\\\|\/)[^\n]*?)\1|@[\p{L}\p{N}_./\\-]+|`+[^`]+`+|(?:[A-Za-z]:[\\/]|\\\\|(?<![\p{L}\p{N}:/])\/)[^\s`"'<>*~，。；：！？、（）【】(),:;!?[\]]+/gu,
     ),
-    (match) => (match[2] ?? match[0]).replace(/[.,;!?，。；：！？、]+$/, ""),
+    (match) => {
+      if (match[2] !== undefined) return match[2];
+      const target = match[0].replace(/[.,:;!?，。；：！？、]+$/, "");
+      // Underscores are valid filename characters unless paired with a leading Markdown wrapper.
+      const wrapper = plainDraft.slice(0, match.index).match(/_+$/)?.[0];
+      return wrapper && target.endsWith(wrapper) ? target.slice(0, -wrapper.length) : target;
+    },
   );
   if (references.some((reference) => !containsTarget(text, reference))) return "references_dropped";
   return null;
 }
 
-/** Matches a complete target, allowing prose punctuation and changed path quotes around it. */
+/** Code delimiters identify their own boundary; paths and mentions still reject longer targets. */
 function containsTarget(text: string, target: string): boolean {
+  if (target.startsWith("`")) return text.includes(target);
   const escaped = target.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const continuation = String.raw`[\p{L}\p{N}_/\\-]|\.[\p{L}\p{N}_]`;
   return new RegExp(
-    String.raw`(?<![\p{L}\p{N}_/\\@\x60])${escaped}(?!${continuation}|\x60)`,
+    String.raw`(?<![\p{L}\p{N}_/\\@\x60])(?:(\*\*|\*|_|~~)${escaped}\1|${escaped})(?!${continuation}|\x60)`,
     "u",
   ).test(text);
 }

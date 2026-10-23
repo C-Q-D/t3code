@@ -60,3 +60,23 @@ it.each([
 ])("accepts punctuation and equivalent path quoting in %j", (draft, raw) => {
   expect(checkOptimizedPrompt(raw, draft)).toBeNull();
 });
+
+it.each([
+  ["fix /src/a.ts: add tests", "Please fix /src/a.ts and add regression tests"],
+  ["fix **/src/a.ts**", "Please fix /src/a.ts and add regression tests"],
+  ["run `cmd`", "执行`cmd`并检查结果"],
+  ["fix _/src/a.ts_", "Please fix /src/a.ts and test"],
+  ["fix ~~/src/a.ts~~", "Please fix /src/a.ts and test"],
+  ["fix [/src/a.ts]", "Please fix (/src/a.ts) and test"],
+  ["fix @file.ts:", "Please fix @file.ts and test"],
+])("preserves targets through prose wrappers: %j", (draft, raw) => {
+  expect(checkOptimizedPrompt(raw, draft)).toBeNull();
+});
+
+it.each([
+  ["fix /src/a.ts", "Please fix /src/a.tsx and test"],
+  ["fix **/src/a.ts**", "Please fix /src/b.ts and test"],
+  ["fix _/src/a.ts_", "Please fix /src/b.ts and test"],
+])("still rejects changed wrapped targets: %j", (draft, raw) => {
+  expect(checkOptimizedPrompt(raw, draft)).toBe("references_dropped");
+});
