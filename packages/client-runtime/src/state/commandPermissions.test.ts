@@ -14,6 +14,7 @@ import {
   AuthSettingsWriteScope,
   AuthSourceControlWriteScope,
   ThreadId,
+  RunId,
   DiscussionId,
   DiscussionSeatId,
   type ServerConfig,
@@ -33,6 +34,7 @@ import { EnvironmentRegistry } from "../connection/registry.ts";
 import { createCommandPermissions } from "./commandPermissions.ts";
 import { createEnvironmentRpcCommand } from "./runtime.ts";
 import { createServerEnvironmentAtoms } from "./server.ts";
+import { createComposerAssistEnvironmentAtoms } from "./composerAssist.ts";
 import { EnvironmentCacheStore } from "../platform/persistence.ts";
 
 vi.mock("./session.ts", () => ({
@@ -65,6 +67,81 @@ const setup = Effect.gen(function* () {
   registry.mount(sessions(env));
   yield* Effect.addFinalizer(() => Effect.sync(() => registry.dispose()));
   return registry;
+});
+
+/** Supplies only the external RPC session; actual composer commands and both permission guards run. */
+const composerPermissionHarness = Effect.fn("ComposerPermissionTest.harness")(function* () {
+  const calls: string[] = [];
+  const client = {
+    [WS_METHODS.composerSuggestNext]: () =>
+      Effect.sync(() => {
+        calls.push("composer.suggestNext");
+        return {
+          _tag: "Suppressed",
+          requestId: "suggest-test",
+          reason: "provider_unsupported",
+        } as const;
+      }),
+    [WS_METHODS.composerOptimizePrompt]: () =>
+      Effect.sync(() => {
+        calls.push("composer.optimizePrompt");
+        return {
+          _tag: "Suppressed",
+          requestId: "optimize-test",
+          reason: "provider_unsupported",
+        } as const;
+      }),
+  };
+  const supervisor = {
+    target: { environmentId: env, label: "test" },
+    session: yield* SubscriptionRef.make(Option.some({ client } as unknown as RpcSession)),
+  } as unknown as EnvironmentSupervisor["Service"];
+  const composerRuntime = Atom.runtime(
+    Layer.succeed(EnvironmentRegistry, {
+      run: (_id: EnvironmentId, effect: Effect.Effect<unknown>) =>
+        Effect.provideService(effect, EnvironmentSupervisor, supervisor),
+    } as unknown as EnvironmentRegistry["Service"]),
+  );
+  const registry = yield* setup;
+  registry.mount(sessions(other));
+  return { registry, commands: createComposerAssistEnvironmentAtoms(composerRuntime), calls };
+});
+
+describe("composer command permissions", () => {
+  it.effect.each([
+    { allowed: false, expectedTag: "Failure", expectedCalls: [] },
+    {
+      allowed: true,
+      expectedTag: "Success",
+      expectedCalls: ["composer.suggestNext", "composer.optimizePrompt"],
+    },
+  ])(
+    "checks destination operate grant ($allowed) before dispatching either composer RPC",
+    ({ allowed, expectedTag, expectedCalls }) =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const { registry, commands, calls } = yield* composerPermissionHarness();
+          registry.set(sessions(env), AsyncResult.success(grant(allowed)));
+          registry.set(sessions(other), AsyncResult.success(grant(!allowed)));
+          expect(registry.get(commands.suggestNext.permissionAtom(env))).toBe(allowed);
+          expect(registry.get(commands.optimizePrompt.permissionAtom(env))).toBe(allowed);
+          const suggestion = yield* Effect.promise(() =>
+            commands.suggestNext.run(registry, {
+              environmentId: env,
+              input: { threadId: ThreadId.make("thread"), runId: RunId.make("run") },
+            }),
+          );
+          const optimization = yield* Effect.promise(() =>
+            commands.optimizePrompt.run(registry, {
+              environmentId: env,
+              input: { threadId: ThreadId.make("thread"), draft: "Improve this", style: "default" },
+            }),
+          );
+          expect([suggestion._tag, optimization._tag]).toEqual([expectedTag, expectedTag]);
+          expect(calls).toEqual(expectedCalls);
+        }),
+      ),
+  );
 });
 
 /**

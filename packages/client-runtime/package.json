@@ -3,6 +3,10 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./state/composerAssist": {
+      "types": "./src/state/composerAssist.ts",
+      "default": "./src/state/composerAssist.ts"
+    },
     "./work-log/messages": {
       "types": "./src/work-log/messages.ts",
       "default": "./src/work-log/messages.ts"
