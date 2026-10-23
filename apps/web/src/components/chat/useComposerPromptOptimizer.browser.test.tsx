@@ -19,7 +19,7 @@ import { en } from "~/i18n/locales/en";
 import { messages as zhCN } from "~/i18n/locales/zh-CN";
 import { expect, it, vi } from "vite-plus/test";
 import { page, userEvent } from "vite-plus/test/browser";
-import { act, render } from "../../../test/render";
+import { act, fakeTimers, render } from "../../../test/render";
 import { ComposerPromptEditor, type ComposerPromptEditorHandle } from "../ComposerPromptEditor";
 import {
   useComposerPromptOptimizer,
@@ -391,7 +391,11 @@ it.each([
   [{ _tag: "Failed", reason: "interrupted" }, "Could not improve: provider error"],
   [{ _tag: "Failed", reason: "usage_limit" }, "Could not improve: usage limit reached"],
   [{ _tag: "Failed", reason: "transport_error" }, "Could not improve: connection lost"],
-  [{ _tag: "Suppressed", reason: "disabled" }, "Could not improve: not available right now"],
+  [{ _tag: "Suppressed", reason: "generating" }, "Wait for the reply to finish"],
+  [
+    { _tag: "Suppressed", reason: "provider_unsupported" },
+    "This provider does not support prompt improvement",
+  ],
 ] as const)("keeps the draft and explains %j", async (result, label) => {
   fake.run.mockReset().mockResolvedValue(AsyncResult.success({ ...result, requestId: "refused" }));
   await using screen = await render(<Harness />);
@@ -400,6 +404,30 @@ it.each([
     expect(screen.container.querySelector('[role="status"]')?.textContent).toBe(label),
   );
   expect(screen.container.querySelector("[data-draft]")?.textContent).toBe("  fix the bug  ");
+});
+
+it.each([
+  ["generating", "Wait for the reply to finish"],
+  ["provider_unsupported", "This provider does not support prompt improvement"],
+] as const)("clears the %s status after three seconds", async (reason, label) => {
+  const pending = deferredResult();
+  fake.run.mockReset().mockReturnValue(pending.promise);
+  await using screen = await render(<Harness />);
+  await screen.getByRole("button", { name: "Improve", exact: true }).click();
+  using _timers = fakeTimers();
+  await act(async () => {
+    pending.resolve(AsyncResult.success({ _tag: "Suppressed", requestId: "gate", reason }));
+    await pending.promise;
+  });
+  expect(screen.container.querySelector('[role="status"]')?.textContent).toBe(label);
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(2999);
+  });
+  expect(screen.container.querySelector('[role="status"]')?.textContent).toBe(label);
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(1);
+  });
+  expect(screen.container.querySelector('[role="status"]')?.textContent).toBe("");
 });
 
 it("keeps the request across remount and applies its result to the mounted composer", async () => {

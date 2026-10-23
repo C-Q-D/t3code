@@ -275,23 +275,52 @@ export function useComposerPromptOptimizer(input: ComposerPromptOptimizerInput) 
 /** Maps protocol refusals to the specified UI reasons; never exposes provider diagnostics. */
 function optimizeFailureLabel(result: Exclude<ComposerOptimizeResult, { _tag: "Optimized" }>) {
   const copy = t.composer.assist.optimize;
-  if (result._tag === "Filtered" && result.reason === "unchanged") return copy.unchanged;
-  const reasons = {
-    timeout: copy.reason.timeout,
-    session_resume_failed: copy.reason.sessionResumeFailed,
-    provider_error: copy.reason.providerError,
-    interrupted: copy.reason.providerError,
-    usage_limit: copy.reason.usageLimit,
-    transport_error: copy.reason.connection,
-    empty: copy.reason.empty,
-    too_long: copy.reason.tooLong,
-    references_dropped: copy.reason.referencesDropped,
+  const labels = {
+    Suppressed: {
+      disabled: copy.failed(copy.reason.unavailable),
+      provider_unsupported: copy.disabledProvider,
+      plan_mode: copy.failed(copy.reason.unavailable),
+      pending_request: copy.failed(copy.reason.unavailable),
+      early_conversation: copy.failed(copy.reason.unavailable),
+      last_response_error: copy.failed(copy.reason.unavailable),
+      usage_limit: copy.failed(copy.reason.usageLimit),
+      composer_not_empty: copy.failed(copy.reason.unavailable),
+      generating: copy.disabledRunning,
+      already_requested: copy.failed(copy.reason.unavailable),
+      inflight: copy.failed(copy.reason.unavailable),
+      cache_stale: copy.failed(copy.reason.unavailable),
+      stale_turn: copy.failed(copy.reason.unavailable),
+      session_not_live: copy.failed(copy.reason.unavailable),
+    },
+    Filtered: {
+      unchanged: copy.unchanged,
+      empty: copy.failed(copy.reason.empty),
+      too_long: copy.failed(copy.reason.tooLong),
+      references_dropped: copy.failed(copy.reason.referencesDropped),
+    },
+    Failed: {
+      timeout: copy.failed(copy.reason.timeout),
+      session_resume_failed: copy.failed(copy.reason.sessionResumeFailed),
+      provider_error: copy.failed(copy.reason.providerError),
+      interrupted: copy.failed(copy.reason.providerError),
+      usage_limit: copy.failed(copy.reason.usageLimit),
+      transport_error: copy.failed(copy.reason.connection),
+    },
+  } satisfies {
+    [Tag in typeof result._tag]: Record<
+      Extract<ComposerOptimizeResult, { _tag: Tag }>["reason"],
+      string
+    >;
   };
-  const reason =
-    result.reason in reasons
-      ? reasons[result.reason as keyof typeof reasons]
-      : copy.reason.unavailable;
-  return copy.failed(reason);
+  switch (result._tag) {
+    case "Suppressed":
+      return labels.Suppressed[result.reason];
+    case "Filtered":
+      return labels.Filtered[result.reason];
+    case "Failed":
+      return labels.Failed[result.reason];
+  }
+  return result satisfies never;
 }
 
 /** Keeps domain and authorization failures separate from transport diagnostics. */
