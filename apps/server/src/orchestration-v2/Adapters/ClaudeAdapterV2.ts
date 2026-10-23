@@ -4154,6 +4154,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
           null;
         const queryPolicyForTurn = Effect.fnUntraced(function* (
           turnInput: Pick<ProviderAdapter.ProviderAdapterV2TurnInput, "runtimePolicy">,
+          cacheAvailability = true,
         ) {
           if (
             permissionModeForClaudeRuntimePolicy(turnInput.runtimePolicy) !== "bypassPermissions"
@@ -4168,6 +4169,12 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                 bypassDisabled: true,
                 autoDisabled: false,
               });
+            }
+            if (!cacheAvailability) {
+              return claudeRuntimeQueryPolicyForRuntimePolicy(
+                turnInput.runtimePolicy,
+                resolved.value,
+              );
             }
             bypassCache = { cwd, availability: resolved.value };
           }
@@ -9343,6 +9350,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
          * The returned builder delays environment resolution until a process is actually opened;
          * its append text must be read before replacing a live process. Resolution errors propagate.
          * Side queries must reuse all main-query parameters or the cached prefix becomes invalid.
+         * cacheAvailability is false for side queries so they cannot update the main policy cache.
          * These helpers are covered by the caller's operation span.
          */
         const prepareQueryInput = Effect.fnUntraced(function* (
@@ -9355,8 +9363,9 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             | "runtimePolicy"
             | "developerContext"
           >,
+          cacheAvailability = true,
         ) {
-          const queryPolicy = yield* queryPolicyForTurn(turnInput);
+          const queryPolicy = yield* queryPolicyForTurn(turnInput, cacheAvailability);
           const mcpOverrides = claudeMcpQueryOverrides({
             mcpSession: yield* mcpSessions.read(turnInput.threadId),
             readOnlySandbox:
@@ -9412,6 +9421,206 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
           });
           return { queryPolicy, queryPolicyKey, compiledSelection, resumeSessionAt, buildOptions };
         });
+
+        /**
+         * Runs one isolated native fork using the main thread's prefix inputs and a supplied prompt.
+         * sideInput uses the current thread, model, runtime policy and contexts; no events or main
+         * query state are written. Returns the last assistant text and terminal usage, including
+         * tool attempts and post-start failures. Startup errors stay in the adapter error channel.
+         * The caller owns the 45-second deadline; there are no retries or pagination. The scoped
+         * query is closed on completion, failure and interruption, independently of the main process.
+         */
+        const runSideQuery = Effect.fn("ClaudeAdapterV2.runSideQuery")(
+          function* (sideInput: ProviderAdapter.ProviderAdapterV2SideQueryInput) {
+            const nativeThreadId = sideInput.providerThread.nativeThreadRef?.nativeId;
+            if (
+              !nativeThreadId ||
+              sideInput.providerThread.nativeThreadRef?.driver !== CLAUDE_PROVIDER
+            ) {
+              return yield* new ProviderAdapter.ProviderAdapterProtocolError({
+                driver: CLAUDE_PROVIDER,
+                detail: "A Claude native session is required for a side query",
+              });
+            }
+            const prepared = yield* prepareQueryInput(sideInput, false);
+            const appendText = yield* readClaudeAppendSystemPromptFile({
+              settings: adapterOptions.settings,
+              cwd: sideInput.runtimePolicy.cwd,
+              fileSystem,
+              path,
+            });
+            const baseOptions = yield* prepared.buildOptions(nativeThreadId, true, appendText);
+            const attemptedTools: Array<string> = [];
+            const query = yield* Effect.acquireRelease(
+              queryRunner.open({
+                threadId: sideInput.threadId,
+                providerSessionId: input.providerSessionId,
+                options: {
+                  ...baseOptions,
+                  forkSession: true,
+                  persistSession: false,
+                  maxTurns: 1,
+                  settings: {
+                    ...(typeof baseOptions.settings === "object" ? baseOptions.settings : {}),
+                    disableAllHooks: true,
+                  },
+                  hooks: {
+                    ...baseOptions.hooks,
+                    PreToolUse: [
+                      {
+                        hooks: [
+                          async (hookInput) => {
+                            if (hookInput.hook_event_name === "PreToolUse") {
+                              attemptedTools.push(hookInput.tool_name);
+                            }
+                            return {
+                              hookSpecificOutput: {
+                                hookEventName: "PreToolUse",
+                                permissionDecision: "deny",
+                                permissionDecisionReason: "T3 旁路查询不执行工具",
+                              },
+                            };
+                          },
+                        ],
+                      },
+                    ],
+                  },
+                  canUseTool: async () => ({ behavior: "deny", message: "T3 旁路查询不执行工具" }),
+                  onUserDialog: async () => ({ behavior: "cancelled" }),
+                },
+              }),
+              (session) => session.close.pipe(Effect.ignore),
+            );
+            let text = "";
+            let model: string | null = null;
+            let usage: ProviderAdapter.ProviderAdapterV2SideQueryUsage | null = null;
+            let stop: ProviderAdapter.ProviderAdapterV2SideQueryResult["stop"] = "error";
+            let failure: ProviderAdapter.ProviderAdapterV2SideQueryResult["failure"] = {
+              class: "transport_error",
+              detail: "Claude side query ended without a result",
+            };
+            let latestAssistantLimited = false;
+            let authenticationFailureMessage: string | undefined;
+            const rejectedLimits = new Set<string>();
+            yield* Effect.gen(function* () {
+              yield* query.offer(makeClaudeUserMessage({ text: sideInput.prompt }));
+              yield* query.messages.pipe(
+                // The SDK throws after error_max_turns. The result is already authoritative;
+                // stop pulling here instead of turning its trailing iterator error into failure.
+                Stream.takeUntil((message) => message.type === "result"),
+                Stream.runForEach((message) =>
+                  Effect.gen(function* () {
+                    if (message.type === "assistant") {
+                      text = message.message.content
+                        .flatMap((block) => (block.type === "text" ? [block.text] : []))
+                        .join("");
+                      model = message.message.model ?? null;
+                      latestAssistantLimited = message.error === "rate_limit";
+                      if (message.error === "authentication_failed") {
+                        authenticationFailureMessage = claudeSignedOutMessage({
+                          configDir: adapterOptions.environment.CLAUDE_CONFIG_DIR,
+                          cwd: path.resolve(sideInput.runtimePolicy.cwd ?? "."),
+                        });
+                      }
+                    }
+                    if (message.type === "rate_limit_event") {
+                      const info = message.rate_limit_info;
+                      const overageAllowed =
+                        info.overageStatus === "allowed" ||
+                        info.overageStatus === "allowed_warning" ||
+                        info.isUsingOverage === true ||
+                        info.overageInUse === true;
+                      const limitType = info.rateLimitType ?? "unknown";
+                      if (info.status === "rejected" && !overageAllowed) {
+                        rejectedLimits.add(limitType);
+                      } else if (
+                        info.status === "allowed" ||
+                        info.status === "allowed_warning" ||
+                        overageAllowed
+                      ) {
+                        rejectedLimits.delete(limitType);
+                      }
+                    }
+                    if (message.type !== "result") return;
+                    usage = {
+                      inputTokens: claudeMessageInputTokens(message.usage),
+                      cachedInputTokens: message.usage.cache_read_input_tokens ?? 0,
+                      cacheCreationTokens: message.usage.cache_creation_input_tokens ?? 0,
+                      outputTokens: message.usage.output_tokens,
+                    };
+                    if (message.subtype === "error_max_turns") {
+                      stop = "max_turns";
+                      failure = null;
+                      return;
+                    }
+                    const usageLimited =
+                      authenticationFailureMessage === undefined &&
+                      (latestAssistantLimited || rejectedLimits.size > 0) &&
+                      (message.subtype !== "success" ||
+                        message.api_error_status == null ||
+                        message.api_error_status === 429) &&
+                      (message.terminal_reason == null ||
+                        message.terminal_reason === "api_error" ||
+                        message.terminal_reason === "blocking_limit");
+                    const failureHint =
+                      message.subtype === "success" && message.api_error_status === 403
+                        ? message.result
+                        : (authenticationFailureMessage ??
+                          (usageLimited
+                            ? "Claude usage limit reached. Send the message again once the limit resets."
+                            : undefined));
+                    const resultFailure = providerFailureFromResult(
+                      message,
+                      yield* DateTime.now,
+                      failureHint,
+                      usageLimited,
+                    );
+                    stop = resultFailure === null ? "completed" : "error";
+                    failure =
+                      resultFailure === null
+                        ? null
+                        : {
+                            class:
+                              resultFailure.class === "usage_limit"
+                                ? "usage_limit"
+                                : "provider_error",
+                            detail: resultFailure.message,
+                          };
+                  }),
+                ),
+              );
+            }).pipe(
+              Effect.catchTags({
+                ClaudeAgentSdkQueryRunnerError: (error) =>
+                  Effect.sync(() => {
+                    const transportFailure = makeProviderFailure({
+                      cause: error,
+                      class: "transport_error",
+                    });
+                    stop = "error";
+                    failure = { class: "transport_error", detail: transportFailure.message };
+                  }),
+              }),
+            );
+            return {
+              text,
+              model,
+              usage,
+              attemptedTools,
+              stop,
+              failure,
+            } satisfies ProviderAdapter.ProviderAdapterV2SideQueryResult;
+          },
+          Effect.scoped,
+          Effect.mapError(
+            (cause) =>
+              new ProviderAdapter.ProviderAdapterProtocolError({
+                driver: CLAUDE_PROVIDER,
+                detail: "Could not start Claude side query",
+                cause,
+              }),
+          ),
+        );
 
         const openQuery = Effect.fnUntraced(function* (
           turnInput: ProviderAdapter.ProviderAdapterV2TurnInput,
@@ -10271,6 +10480,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
         );
 
         const runtime: ProviderAdapter.ProviderAdapterV2SessionRuntime = {
+          runSideQuery,
           instanceId: adapterOptions.instanceId,
           driver: CLAUDE_PROVIDER,
           providerSessionId: input.providerSessionId,

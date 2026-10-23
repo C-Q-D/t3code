@@ -2414,6 +2414,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
     readonly subagentLaunchToolUseId?: string;
     readonly nativeSessionId?: string;
     readonly settings?: ClaudeSettings;
+    readonly sideQuery?: ClaudeAdapterV2.ClaudeAgentSdkQueryRunnerShape["open"];
     readonly freshQueueOnReopen?: boolean;
     readonly forkSession?: ClaudeAdapterV2.ClaudeAgentSdkQueryRunnerShape["forkSession"];
     readonly allocateSessionId?: Effect.Effect<string>;
@@ -2500,6 +2501,9 @@ describe("ClaudeAdapterV2 background wake turns", () => {
             Effect.succeed(options?.nativeSessionId ?? WAKE_NATIVE_SESSION),
           open: (input) =>
             Effect.gen(function* () {
+              if (input.options.forkSession === true && options?.sideQuery !== undefined) {
+                return yield* options.sideQuery(input);
+              }
               openedOptions = input.options;
               const processMessages =
                 options?.freshQueueOnReopen === true && processQueues.length > 0
@@ -2659,6 +2663,355 @@ describe("ClaudeAdapterV2 background wake turns", () => {
       };
     });
   const makeWakeHarness = makeWakeHarnessWithOptions();
+
+  describe("side query", () => {
+    const sideLayers = Layer.mergeAll(
+      IdAllocator.layer,
+      McpProviderSessions.layer,
+      NodeServices.layer,
+    );
+    const sideAssistant = makeAssistantTextFrame({
+      uuid: "side-assistant",
+      text: "Run the tests.",
+    });
+    const sideResult = makeResultFrame({ uuid: "side-result", result: "not the assistant text" });
+    const sdkFailure = new ClaudeAdapterV2.ClaudeAgentSdkQueryRunnerError({
+      method: "messages",
+      cause: new Error("Claude Code returned an error result: Reached maximum number of turns (1)"),
+    });
+
+    const makeSideHarness = Effect.fn("makeSideHarness")(function* (options?: {
+      readonly messages?: Stream.Stream<SDKMessage, ClaudeAdapterV2.ClaudeAgentSdkQueryRunnerError>;
+      readonly onOffer?: (
+        options: ClaudeAdapterV2.ClaudeAgentSdkQueryOptions,
+      ) => Effect.Effect<void>;
+      readonly settings?: ClaudeSettings;
+    }) {
+      const opened: Array<ClaudeAdapterV2.ClaudeAgentSdkQueryOpenInput> = [];
+      const offered: Array<SDKUserMessage> = [];
+      const closed: Array<ClaudeAdapterV2.ClaudeAgentSdkQueryOpenInput> = [];
+      const offeredSignal = yield* Deferred.make<void>();
+      const harness = yield* makeWakeHarnessWithOptions({
+        settings: options?.settings ?? AUTO_COMPACT_CLAUDE_SETTINGS,
+        environment: { CLAUDE_CODE_PROMPT_CACHE_TTL: "1h", SIDE_QUERY_TEST: "inherited" },
+        sideQuery: (input) =>
+          Effect.sync(() => {
+            opened.push(input);
+            return {
+              messages: options?.messages ?? Stream.make(sideAssistant, sideResult),
+              offer: (message: SDKUserMessage) =>
+                Effect.gen(function* () {
+                  offered.push(message);
+                  yield* options?.onOffer?.(input.options) ?? Effect.void;
+                  yield* Deferred.succeed(offeredSignal, undefined);
+                }),
+              setModel: () => Effect.void,
+              applyFlagSettings: () => Effect.void,
+              setPermissionMode: () => Effect.void,
+              stopTask: () => Effect.void,
+              backgroundTasks: () => Effect.succeed(false),
+              interrupt: Effect.void,
+              close: Effect.sync(() => {
+                closed.push(input);
+              }),
+            };
+          }),
+      });
+      const turnInput = makeClaudeTestTurnInput({
+        threadId: harness.threadId,
+        providerThread: harness.providerThread,
+        now: yield* DateTime.now,
+        attemptId: RunAttemptId.make("side-query-main-turn"),
+        text: "Main thread prompt",
+        attachments: [],
+      });
+      const input: ProviderAdapter.ProviderAdapterV2SideQueryInput = {
+        ...turnInput,
+        prompt: "Suggest the next user message.",
+        purpose: "suggestion",
+      };
+      return { ...harness, input, turnInput, opened, offered, closed, offeredSignal };
+    });
+
+    it.effect.each(["full-access", "approval-required"] as const)(
+      "preserves every main-query prefix option in %s mode",
+      (runtimeMode) =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const cwd = yield* fs.makeTempDirectoryScoped();
+          yield* fs.writeFileString(path.join(cwd, "append.txt"), "Shared launch context.\n");
+          const harness = yield* makeSideHarness({
+            settings: {
+              ...AUTO_COMPACT_CLAUDE_SETTINGS,
+              launchArgs: "--append-system-prompt-file append.txt",
+            },
+          });
+          yield* (yield* McpProviderSessions.McpProviderSessions).set({
+            environmentId: EnvironmentId.make("side-query-environment"),
+            threadId: harness.threadId,
+            providerSessionId: "side-query-mcp-session",
+            providerInstanceId: ProviderInstanceId.make("claudeAgent"),
+            endpoint: "http://127.0.0.1:43123/mcp",
+            authorizationHeader: "Bearer fake-side-query-test",
+            browserToolsAvailable: true,
+          });
+          const mainInput = {
+            ...harness.turnInput,
+            providerThread: {
+              ...harness.providerThread,
+              nativeConversationHeadRef: {
+                driver: ClaudeAdapterV2.CLAUDE_PROVIDER,
+                nativeId: "main-head",
+                strength: "strong" as const,
+              },
+            },
+            runtimePolicy: { ...harness.turnInput.runtimePolicy, runtimeMode, cwd },
+            appContext: [{ key: "app", text: "Shared app context" }],
+            developerContext: [{ key: "developer", text: "Shared developer context" }],
+          };
+          yield* harness.runtime.startTurn(mainInput);
+          const main = harness.getOpenedOptions()!;
+          const result = yield* harness.runtime.runSideQuery!({
+            ...mainInput,
+            prompt: "Improve this.",
+            purpose: "optimization",
+          });
+          const side = harness.opened[0]!.options;
+          assert.deepEqual<object>(side, {
+            ...main,
+            resume: WAKE_NATIVE_SESSION,
+            resumeSessionAt: "main-head",
+            forkSession: true,
+            persistSession: false,
+            maxTurns: 1,
+            hooks: { ...main.hooks, PreToolUse: side.hooks!.PreToolUse! },
+            settings: { ...(main.settings as object), disableAllHooks: true },
+            canUseTool: side.canUseTool!,
+            onUserDialog: side.onUserDialog!,
+          });
+          assert.equal(
+            side.permissionMode,
+            runtimeMode === "full-access" ? "bypassPermissions" : "default",
+          );
+          assert.include(side.systemPrompt, { type: "preset", preset: "claude_code" });
+          assert.isDefined(side.mcpServers?.["t3-code"]);
+          assert.lengthOf(harness.opened, 1);
+          assert.deepEqual(harness.offered, [
+            {
+              type: "user",
+              message: { role: "user", content: "Improve this." },
+              parent_tool_use_id: null,
+            },
+          ]);
+          assert.equal(result.stop, "completed");
+        }).pipe(Effect.provide(sideLayers)),
+    );
+
+    it.effect("denies all tool names in order and cancels dialogs", () =>
+      Effect.gen(function* () {
+        const decisions: Array<unknown> = [];
+        const harness = yield* makeSideHarness({
+          onOffer: (options) =>
+            Effect.gen(function* () {
+              const matcher = options.hooks!.PreToolUse![0]!;
+              const hook = matcher.hooks[0]!;
+              decisions.push(matcher.matcher);
+              for (const toolName of ["Write", "Read", "mcp__t3-code__thread_send", "FutureTool"]) {
+                decisions.push(
+                  yield* Effect.promise(() =>
+                    hook(
+                      {
+                        hook_event_name: "PreToolUse",
+                        tool_name: toolName,
+                        tool_input: {},
+                        tool_use_id: "side-tool",
+                        session_id: "forked-session",
+                        transcript_path: "/fake/transcript",
+                        cwd: "/workspace",
+                      },
+                      "side-tool",
+                      { signal: new AbortController().signal },
+                    ),
+                  ),
+                );
+              }
+              decisions.push(
+                yield* Effect.promise(() =>
+                  options.canUseTool!(
+                    "Write",
+                    {},
+                    {
+                      signal: new AbortController().signal,
+                      toolUseID: "side-tool",
+                      requestId: "side-permission",
+                    },
+                  ),
+                ),
+              );
+              decisions.push(
+                yield* Effect.promise(() =>
+                  options.onUserDialog!(
+                    { dialogKind: "resume_return", payload: {} },
+                    {
+                      signal: new AbortController().signal,
+                      requestId: "side-dialog",
+                    },
+                  ),
+                ),
+              );
+            }),
+        });
+        const result = yield* harness.runtime.runSideQuery!(harness.input);
+        const denial = {
+          hookSpecificOutput: {
+            hookEventName: "PreToolUse",
+            permissionDecision: "deny",
+            permissionDecisionReason: "T3 旁路查询不执行工具",
+          },
+        };
+        assert.deepEqual(decisions, [
+          undefined,
+          denial,
+          denial,
+          denial,
+          denial,
+          { behavior: "deny", message: "T3 旁路查询不执行工具" },
+          { behavior: "cancelled" },
+        ]);
+        assert.deepEqual(result.attemptedTools, [
+          "Write",
+          "Read",
+          "mcp__t3-code__thread_send",
+          "FutureTool",
+        ]);
+      }).pipe(Effect.provide(sideLayers)),
+    );
+
+    it.effect(
+      "keeps the last assistant text and cache accounting when max turns ends the SDK stream",
+      () =>
+        Effect.gen(function* () {
+          const lastAssistant = claudeSdkFrame({
+            ...sideAssistant,
+            message: {
+              model: "actual-side-model",
+              content: [
+                { type: "text", text: "Run " },
+                { type: "thinking", thinking: "private reasoning", signature: "fake" },
+                { type: "text", text: "the tests." },
+              ],
+            },
+          });
+          const harness = yield* makeSideHarness({
+            messages: Stream.make(
+              sideAssistant,
+              lastAssistant,
+              makeResultFrame({
+                uuid: "max-turns",
+                result: "ignored",
+                subtype: "error_max_turns",
+                isError: true,
+                errors: ["Reached maximum number of turns (1)"],
+                usage: {
+                  input_tokens: 7,
+                  cache_creation_input_tokens: 11,
+                  cache_read_input_tokens: 101,
+                  output_tokens: 13,
+                },
+              }),
+            ).pipe(Stream.concat(Stream.fail(sdkFailure))),
+          });
+          assert.deepEqual(yield* harness.runtime.runSideQuery!(harness.input), {
+            text: "Run the tests.",
+            model: "actual-side-model",
+            usage: {
+              inputTokens: 119,
+              cachedInputTokens: 101,
+              cacheCreationTokens: 11,
+              outputTokens: 13,
+            },
+            attemptedTools: [],
+            stop: "max_turns",
+            failure: null,
+          });
+          assert.deepEqual(harness.closed, harness.opened);
+        }).pipe(Effect.provide(sideLayers)),
+    );
+
+    it.effect("returns completed text on success and leaves absent model null", () =>
+      Effect.gen(function* () {
+        const harness = yield* makeSideHarness({ messages: Stream.make(sideResult) });
+        assert.deepEqual(yield* harness.runtime.runSideQuery!(harness.input), {
+          text: "",
+          model: null,
+          usage: { inputTokens: 1, cachedInputTokens: 0, cacheCreationTokens: 0, outputTokens: 1 },
+          attemptedTools: [],
+          stop: "completed",
+          failure: null,
+        });
+      }).pipe(Effect.provide(sideLayers)),
+    );
+
+    it.effect.each([
+      { status: 429, failureClass: "usage_limit" },
+      { status: 500, failureClass: "provider_error" },
+    ])(
+      "classifies API $status with the main-turn failure classification",
+      ({ status, failureClass }) =>
+        Effect.gen(function* () {
+          const harness = yield* makeSideHarness({
+            messages: Stream.make(
+              makeResultFrame({
+                uuid: "api-error",
+                result: `API Error: ${status}`,
+                isError: true,
+                apiErrorStatus: status,
+                terminalReason: "api_error",
+              }),
+            ),
+          });
+          const result = yield* harness.runtime.runSideQuery!(harness.input);
+          assert.equal(result.stop, "error");
+          assert.equal(result.failure?.class, failureClass);
+          assert.isNotEmpty(result.failure!.detail);
+        }).pipe(Effect.provide(sideLayers)),
+    );
+
+    it.effect("classifies a subscription limit reported before an error result", () =>
+      Effect.gen(function* () {
+        const harness = yield* makeSideHarness({
+          messages: Stream.make(
+            makeAssistantErrorFrame({ uuid: "limit", error: "rate_limit" }),
+            makeResultFrame({
+              uuid: "limit-result",
+              result: "",
+              subtype: "error_during_execution",
+              errors: ["limit"],
+              terminalReason: null,
+              isError: true,
+            }),
+          ),
+        });
+        const result = yield* harness.runtime.runSideQuery!(harness.input);
+        assert.equal(result.stop, "error");
+        assert.equal(result.failure?.class, "usage_limit");
+      }).pipe(Effect.provide(sideLayers)),
+    );
+
+    it.effect("returns transport failure and closes when the stream fails before a result", () =>
+      Effect.gen(function* () {
+        const harness = yield* makeSideHarness({
+          messages: Stream.make(sideAssistant).pipe(Stream.concat(Stream.fail(sdkFailure))),
+        });
+        const result = yield* harness.runtime.runSideQuery!(harness.input);
+        assert.equal(result.stop, "error");
+        assert.equal(result.failure?.class, "transport_error");
+        assert.equal(result.text, "Run the tests.");
+        assert.deepEqual(harness.closed, harness.opened);
+      }).pipe(Effect.provide(sideLayers)),
+    );
+  });
 
   describe("Claude settings restrictions", () => {
     it.effect("resolves cached managed policy from the configured home through the real SDK", () =>
