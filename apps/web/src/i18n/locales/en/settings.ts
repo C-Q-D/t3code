@@ -2823,6 +2823,7 @@ ${address}`
   keybindings: {
     focusPreviewUrl: "Preview: Focus URL",
     commandLabels: {
+      optimizePrompt: "Improve prompt",
       sendAlternate: "Composer: Opposite Queue or Steer Action",
       sendBackground: "Composer: Start in Background",
       sendAndNewThread: "Composer: Send and Start New Thread",

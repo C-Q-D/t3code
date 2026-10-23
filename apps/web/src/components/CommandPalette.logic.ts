@@ -32,6 +32,24 @@ export const RECENT_THREAD_LIMIT = 12;
 export const ITEM_ICON_CLASS = "size-4 text-icon-muted";
 export const ADDON_ICON_CLASS = "size-4";
 
+/** Creates the improvement entry only when the active composer permits it; execution rechecks its guards. */
+export function buildOptimizePromptAction(input: {
+  available: boolean;
+  icon: ReactNode;
+  run: () => Promise<void>;
+}): CommandPaletteActionItem | null {
+  if (!input.available) return null;
+  return {
+    kind: "action",
+    value: "action:optimize-prompt",
+    title: t.composer.assist.optimize.button,
+    searchTerms: ["improve prompt", "optimize prompt", "优化提示词"],
+    icon: input.icon,
+    shortcutCommand: "composer.optimizePrompt",
+    run: input.run,
+  };
+}
+
 /** A PR's relations include archived threads that normal palette search omits.
  * @param input Command context, item lists, and navigation callbacks defined by the input type.
  * @returns Items or groups in display order; empty input or no matches yields an empty list.

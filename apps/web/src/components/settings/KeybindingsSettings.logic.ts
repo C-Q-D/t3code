@@ -378,6 +378,8 @@ export function buildKeybindingCommandOptions(
 
 /** Localizes display names while preserving dynamic script identifiers and executable command values. */
 export function commandLabel(command: KeybindingCommand): string {
+  if (command === "composer.optimizePrompt")
+    return t.settings.keybindings.commandLabels.optimizePrompt;
   if (command === "composer.sendAlternate")
     return t.settings.keybindings.commandLabels.sendAlternate;
   if (command === "composer.sendBackground")

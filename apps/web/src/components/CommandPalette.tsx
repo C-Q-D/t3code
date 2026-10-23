@@ -53,6 +53,7 @@ import {
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import {
   ArrowLeftIcon,
+  WandSparkles,
   ChartNoAxesColumnIcon,
   CheckIcon,
   ChevronRightIcon,
@@ -80,6 +81,7 @@ import {
   useReducer,
   useRef,
   useState,
+  useSyncExternalStore,
   type KeyboardEvent,
   type ReactNode,
 } from "react";
@@ -162,6 +164,7 @@ import {
   buildBrowseGroups,
   buildRootGroups,
   buildLinkedThreadActionItems,
+  buildOptimizePromptAction,
   buildCommandPaletteRows,
   enumerateCommandPaletteItems,
   findHighlightedCommandPaletteItem,
@@ -486,6 +489,12 @@ function OpenCommandPaletteDialog(props: {
   readonly initialContext: CommandPaletteReturnContext | undefined;
   readonly clearOpenIntent: () => void;
 }) {
+  const composerHandleRef = useComposerHandleContext();
+  const canOptimizePrompt = useSyncExternalStore(
+    (listener) => composerHandleRef?.current?.subscribePromptOptimizer(listener) ?? (() => {}),
+    () => composerHandleRef?.current?.canOptimizePrompt() ?? false,
+    () => false,
+  );
   const navigate = useNavigate();
   const pathname = useLocation({ select: (location) => location.pathname });
   const { clearOpenIntent, openIntent, openChildSearch, setOpen } = props;
@@ -1219,6 +1228,15 @@ function OpenCommandPaletteDialog(props: {
   };
 
   const actionItems: Array<CommandPaletteActionItem | CommandPaletteSubmenuItem> = [];
+  const optimizePrompt = useStableCallback(async () => {
+    await composerHandleRef?.current?.optimizePrompt();
+  });
+  const optimizePromptAction = buildOptimizePromptAction({
+    available: canOptimizePrompt,
+    icon: <WandSparkles className={ITEM_ICON_CLASS} />,
+    run: optimizePrompt,
+  });
+  if (optimizePromptAction) actionItems.push(optimizePromptAction);
 
   if (projects.length > 0) {
     const activeProjectTitle =

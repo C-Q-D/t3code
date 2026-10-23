@@ -2703,6 +2703,7 @@ ${address}`
   keybindings: {
     focusPreviewUrl: "预览：聚焦地址栏",
     commandLabels: {
+      optimizePrompt: "优化提示词",
       sendAlternate: "输入框：执行相反的排队或引导操作",
       sendBackground: "输入框：在后台启动",
       sendAndNewThread: "输入框：发送并新建对话",

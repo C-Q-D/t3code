@@ -85,10 +85,30 @@ export function useComposerPromptOptimizer(input: ComposerPromptOptimizerInput) 
   const original = useRef<{ draftKey: string; text: string; cursor: number } | null>(null);
   const copy = t.composer.assist.optimize;
   const visible = input.enabled && allowed;
+  const [availability] = useState(() => {
+    let available = false;
+    const listeners = new Set<() => void>();
+    return {
+      getSnapshot: () => available,
+      subscribe: (listener: () => void) => {
+        listeners.add(listener);
+        return () => {
+          listeners.delete(listener);
+        };
+      },
+      update: (next: boolean) => {
+        if (available === next) return;
+        available = next;
+        for (const listener of listeners) listener();
+      },
+    };
+  });
   const shown =
     feedback?.draftKey === input.draftKey && (!feedback.done || feedback.text === input.prompt)
       ? feedback
       : null;
+  // Editing dismisses the completed operation permanently, even if the user later types it back.
+  if (feedback?.done && shown === null) setFeedback(null);
   const disabledReason = inFlight
     ? copy.inFlight
     : !input.prompt.trim()
@@ -98,6 +118,10 @@ export function useComposerPromptOptimizer(input: ComposerPromptOptimizerInput) 
         : input.running || !input.threadId
           ? copy.disabledRunning
           : null;
+  useLayoutEffect(() => {
+    availability.update(visible && disabledReason === null);
+    return () => availability.update(false);
+  }, [availability, visible, disabledReason]);
 
   useEffect(() => {
     if (!feedback) return;
@@ -175,6 +199,7 @@ export function useComposerPromptOptimizer(input: ComposerPromptOptimizerInput) 
     visible,
     disabledReason,
     cacheMaybeExpired,
+    availability,
   };
 }
 

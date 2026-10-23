@@ -1,8 +1,16 @@
 /** Exercises improvement through a real editor with a controlled RPC boundary, without a provider. */
-import { useRef, useState } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 import { EnvironmentId, ThreadId, type ComposerOptimizeResult } from "@t3tools/contracts";
 import { Atom, AsyncResult } from "effect/reactivity";
 import { composerAssistEnvironment } from "~/state/composerAssist";
+import { composerShortcutCommands } from "./composerShortcuts";
+import { resolveChatShortcutCommand } from "~/keybindings";
+import { DEFAULT_RESOLVED_KEYBINDINGS } from "@t3tools/shared/keybindings";
+import { buildOptimizePromptAction } from "../CommandPalette.logic";
+import { commandLabel } from "../settings/KeybindingsSettings.logic";
+import { activeLocale, installMessages, t } from "~/i18n";
+import { en } from "~/i18n/locales/en";
+import { messages as zhCN } from "~/i18n/locales/zh-CN";
 import { expect, it, vi } from "vite-plus/test";
 import { page, userEvent } from "vite-plus/test/browser";
 import { act, render } from "../../../test/render";
@@ -55,8 +63,44 @@ function Harness({
     editorRef,
     ...options,
   });
+  const available = useSyncExternalStore(
+    optimizer.availability.subscribe,
+    optimizer.availability.getSnapshot,
+  );
+  const paletteAction = buildOptimizePromptAction({
+    available,
+    icon: null,
+    run: optimizer.trigger,
+  });
   return (
-    <>
+    <div
+      onKeyDown={(event) => {
+        const command = resolveChatShortcutCommand(
+          event.nativeEvent,
+          DEFAULT_RESOLVED_KEYBINDINGS,
+          [],
+          { platform: "Win32", context: { composerFocus: true } },
+        );
+        if (!command) return;
+        const handlers = composerShortcutCommands(
+          {
+            current: {
+              optimizePrompt: optimizer.trigger,
+              openControl: () => {},
+              toggleModelPicker: () => {},
+              stepReasoningEffort: () => {},
+            },
+          },
+          { current: null },
+        );
+        handlers[command]?.({ event: event.nativeEvent, terminalFocusOwner: null });
+      }}
+    >
+      {paletteAction ? (
+        <button role="menuitem" onClick={() => void paletteAction.run()}>
+          Improve prompt
+        </button>
+      ) : null}
       <ComposerPromptOptimizeButton optimizer={optimizer} shortcut="Ctrl+Shift+U" />
       <ComposerPromptEditor
         editorRef={editorRef}
@@ -78,7 +122,7 @@ function Harness({
       <div role="status">
         <ComposerPromptOptimizeTab optimizer={optimizer} />
       </div>
-    </>
+    </div>
   );
 }
 
@@ -105,6 +149,43 @@ it("replaces the original untrimmed draft and restores it with one editor undo",
   await userEvent.keyboard("{Control>}z{/Control}");
   await expect.element(screen.getByRole("textbox")).toHaveTextContent("fix the bug");
   expect(screen.container.querySelector("[data-draft]")?.textContent).toBe("  fix the bug  ");
+});
+
+it("uses the specified localized keybinding labels", () => {
+  const previous = { locale: activeLocale, messages: t };
+  try {
+    installMessages("en", en);
+    expect(commandLabel("composer.optimizePrompt")).toBe("Improve prompt");
+    installMessages("zh-CN", zhCN);
+    expect(commandLabel("composer.optimizePrompt")).toBe("优化提示词");
+  } finally {
+    installMessages(previous.locale, previous.messages);
+  }
+});
+
+it("dispatches improvement through Ctrl+Shift+U", async () => {
+  fake.run
+    .mockReset()
+    .mockResolvedValue(
+      AsyncResult.success({ _tag: "Filtered", requestId: "key", reason: "unchanged" }),
+    );
+  await using screen = await render(<Harness />);
+  await screen.getByRole("textbox").click();
+  await userEvent.keyboard("{Control>}{Shift>}u{/Shift}{/Control}");
+  expect(fake.run).toHaveBeenCalledTimes(1);
+  await expect.element(screen.getByRole("status")).toHaveTextContent("The draft is already clear");
+});
+
+it("dispatches improvement through the palette action", async () => {
+  fake.run
+    .mockReset()
+    .mockResolvedValue(
+      AsyncResult.success({ _tag: "Filtered", requestId: "palette", reason: "unchanged" }),
+    );
+  await using screen = await render(<Harness />);
+  await screen.getByRole("menuitem", { name: "Improve prompt" }).click();
+  expect(fake.run).toHaveBeenCalledTimes(1);
+  await expect.element(screen.getByRole("status")).toHaveTextContent("The draft is already clear");
 });
 
 it("dispatches from the visible improvement button", async () => {
@@ -199,6 +280,11 @@ it.each(["setting", "permission"] as const)(
     await expect
       .element(screen.getByRole("button", { name: "Improve prompt", exact: true }))
       .not.toBeInTheDocument();
+    await expect
+      .element(screen.getByRole("menuitem", { name: "Improve prompt" }))
+      .not.toBeInTheDocument();
+    await screen.getByRole("textbox").click();
+    await userEvent.keyboard("{Control>}{Shift>}u{/Shift}{/Control}");
     await screen.getByRole("button", { name: "Improve", exact: true }).click();
     expect(fake.run).not.toHaveBeenCalled();
   },
@@ -303,6 +389,8 @@ it.each([
   fake.run.mockReset().mockResolvedValue(AsyncResult.success({ ...result, requestId: "refused" }));
   await using screen = await render(<Harness />);
   await screen.getByRole("button", { name: "Improve", exact: true }).click();
-  await expect.element(screen.getByRole("status")).toHaveTextContent(label);
+  await vi.waitFor(() =>
+    expect(screen.container.querySelector('[role="status"]')?.textContent).toBe(label),
+  );
   expect(screen.container.querySelector("[data-draft]")?.textContent).toBe("  fix the bug  ");
 });

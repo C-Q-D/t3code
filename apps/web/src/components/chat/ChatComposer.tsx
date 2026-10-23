@@ -327,6 +327,8 @@ export interface ChatComposerHandle {
   optimizePrompt: () => Promise<void>;
   /** Whether the palette can currently offer improvement for this composer. */
   canOptimizePrompt: () => boolean;
+  /** Subscribes the command palette to this composer's availability; returns unsubscribe. */
+  subscribePromptOptimizer: (listener: () => void) => () => void;
   focusAtEnd: () => void;
   focusAt: (cursor: number) => void;
   restoreAfterTimelineReachedEnd: () => void;
@@ -3243,15 +3245,13 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     },
   });
   const optimizePromptStable = useStableCallback(promptOptimizer.trigger);
-  const canOptimizePromptStable = useStableCallback(
-    () => promptOptimizer.visible && promptOptimizer.disabledReason === null,
-  );
 
   useImperativeHandle(
     composerRef,
     () => ({
       optimizePrompt: optimizePromptStable,
-      canOptimizePrompt: canOptimizePromptStable,
+      canOptimizePrompt: promptOptimizer.availability.getSnapshot,
+      subscribePromptOptimizer: promptOptimizer.availability.subscribe,
       focusAtEnd: () => {
         composerEditorRef.current?.focusAtEnd();
       },
@@ -3537,7 +3537,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       planModeUiEnabled,
       compactThreadContextStable,
       optimizePromptStable,
-      canOptimizePromptStable,
+      promptOptimizer.availability,
       restoreAfterTimelineReachedEnd,
       getTimelineScrollableNode,
       isTimelineAtLogicalEnd,
