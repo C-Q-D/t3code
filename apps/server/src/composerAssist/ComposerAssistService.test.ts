@@ -37,6 +37,64 @@ const instanceId = ProviderInstanceId.make("codex-1");
 
 const optimizationInput = { threadId, draft: "fix it", style: "default" as const };
 
+it.effect("same-key suggestion joins across cache expiry", () =>
+  Effect.gen(function* () {
+    const finish = yield* Deferred.make<void>();
+    const f = yield* fixture({
+      driver: "claudeAgent",
+      cacheExpiresAt: "1970-01-01T00:00:00.001Z",
+      query: () =>
+        Deferred.await(finish).pipe(
+          Effect.as({
+            text: "run tests",
+            model: null,
+            usage: null,
+            attemptedTools: [],
+            stop: "completed" as const,
+            failure: null,
+          }),
+        ),
+    });
+    const first = yield* f.service.suggestNext({ threadId, runId }).pipe(Effect.forkChild);
+    yield* Deferred.await(f.entered);
+    yield* TestClock.adjust("2 millis");
+    const second = yield* f.service.suggestNext({ threadId, runId }).pipe(Effect.forkChild);
+    yield* Deferred.succeed(finish, undefined);
+    assert.propertyVal(yield* Fiber.join(first), "_tag", "Suggested");
+    assert.propertyVal(yield* Fiber.join(second), "_tag", "Suggested");
+    assert.strictEqual(f.calls.length, 1);
+  }).pipe(Effect.scoped),
+);
+
+it.effect("unsupported provider precedes optimization inflight", () =>
+  Effect.gen(function* () {
+    const finish = yield* Deferred.make<void>();
+    const f = yield* fixture({
+      query: () =>
+        Deferred.await(finish).pipe(
+          Effect.as({
+            text: "run tests",
+            model: null,
+            usage: null,
+            attemptedTools: [],
+            stop: "completed" as const,
+            failure: null,
+          }),
+        ),
+    });
+    const optimization = yield* f.service.optimizePrompt(optimizationInput).pipe(Effect.forkChild);
+    yield* Deferred.await(f.entered);
+    f.setDriver("unsupported");
+    assert.propertyVal(
+      yield* f.service.suggestNext({ threadId, runId }),
+      "reason",
+      "provider_unsupported",
+    );
+    yield* Deferred.succeed(finish, undefined);
+    yield* Fiber.join(optimization);
+  }).pipe(Effect.scoped),
+);
+
 it.effect.each(["open", "resume", "budget"] as const)(
   "total deadline covers %s and releases ownership",
   (stage) =>
@@ -76,7 +134,7 @@ it.effect.each(["open", "resume", "budget"] as const)(
     }).pipe(Effect.scoped),
 );
 
-it.effect("optimization restoring a session also suppresses suggestions as inflight", () =>
+it.effect("session-not-live precedes optimization restoring a session", () =>
   Effect.gen(function* () {
     const opening = yield* Deferred.make<void>();
     const finish = yield* Deferred.make<void>();
@@ -86,7 +144,11 @@ it.effect("optimization restoring a session also suppresses suggestions as infli
     });
     const optimization = yield* f.service.optimizePrompt(optimizationInput).pipe(Effect.forkChild);
     yield* Deferred.await(opening);
-    assert.propertyVal(yield* f.service.suggestNext({ threadId, runId }), "reason", "inflight");
+    assert.propertyVal(
+      yield* f.service.suggestNext({ threadId, runId }),
+      "reason",
+      "session_not_live",
+    );
     assert.strictEqual(f.calls.length, 0);
     yield* Deferred.succeed(finish, undefined);
     yield* Fiber.join(optimization);
@@ -465,7 +527,7 @@ const fixture = Effect.fn("ComposerAssistTest.fixture")(function* (
     activeRunId: options.gate === "generating" ? runId : null,
     status: "idle",
   } as OrchestrationV2ThreadShell;
-  const projection = {
+  let projection = {
     thread: {
       id: threadId,
       activeProviderThreadId: providerThreadId,
@@ -555,7 +617,7 @@ const fixture = Effect.fn("ComposerAssistTest.fixture")(function* (
     NodeCrypto.layer,
     Layer.mock(ProjectionStore.ProjectionStoreV2)({
       getThreadShell: () => Effect.sync(() => shell),
-      getThreadRecords: () => Effect.succeed(projection),
+      getThreadRecords: () => Effect.sync(() => projection),
     }),
     Layer.mock(ProviderSessions.ProviderSessionManagerV2)({
       isLive: () => Effect.succeed(options.gate !== "session_not_live"),
@@ -606,6 +668,14 @@ const fixture = Effect.fn("ComposerAssistTest.fixture")(function* (
     lifecycle,
     opens,
     projection,
+    setDriver: (driver: string) => {
+      projection = {
+        ...projection,
+        providerThreads: [
+          { ...projection.providerThreads[0]!, driver: ProviderDriverKind.make(driver) },
+        ],
+      };
+    },
     advanceRun: (id: typeof runId) => {
       shell = { ...shell, latestRunId: id };
     },

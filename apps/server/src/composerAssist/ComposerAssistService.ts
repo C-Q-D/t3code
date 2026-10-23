@@ -280,8 +280,9 @@ const make = Effect.gen(function* () {
     ): QueryOutcome => ({ result: { _tag: "Suppressed", requestId, reason }, side: null });
     const maybeExpired = composerCacheMaybeExpired(state.expiresAt, startedAt);
     const outcome = yield* Effect.gen(function* () {
-      if (optimizations.has(input.threadId)) return suppressed("inflight");
       const providerThread = state.providerThread;
+      if (!providerThread || !isComposerAssistSupportedDriver(providerThread.driver))
+        return suppressed("provider_unsupported");
       if (
         providerThread?.providerSessionId == null ||
         !(yield* sessions.isLive(providerThread.providerSessionId))
@@ -301,14 +302,6 @@ const make = Effect.gen(function* () {
       if (!session.runSideQuery) return suppressed("provider_unsupported");
       if (state.shell.activeRunId !== null || state.shell.status !== "idle")
         return suppressed("generating");
-      if (input.runId !== state.shell.latestRunId) return suppressed("stale_turn");
-      if (maybeExpired) return suppressed("cache_stale");
-      if (
-        state.shell.latestRunCompletedAt == null ||
-        startedAt - DateTime.toEpochMillis(state.shell.latestRunCompletedAt) >
-          COMPOSER_SUGGESTION_MAX_AGE_MS
-      )
-        return suppressed("stale_turn");
       const runSideQuery = session.runSideQuery;
       const claim = yield* ownership.withPermits(1)(
         Effect.gen(function* () {
@@ -323,6 +316,14 @@ const make = Effect.gen(function* () {
             return active.runId === input.runId
               ? Deferred.await(active.done)
               : Effect.succeed(suppressed("inflight"));
+          if (maybeExpired) return Effect.succeed(suppressed("cache_stale"));
+          if (
+            input.runId !== state.shell.latestRunId ||
+            state.shell.latestRunCompletedAt == null ||
+            startedAt - DateTime.toEpochMillis(state.shell.latestRunCompletedAt) >
+              COMPOSER_SUGGESTION_MAX_AGE_MS
+          )
+            return Effect.succeed(suppressed("stale_turn"));
           const done = yield* Deferred.make<QueryOutcome, ComposerAssistError>();
           flights.set(input.threadId, { runId: input.runId, done });
           yield* query(input, requestId, state, runSideQuery).pipe(
