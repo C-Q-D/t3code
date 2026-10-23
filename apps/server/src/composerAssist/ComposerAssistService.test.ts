@@ -18,6 +18,7 @@ import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
+import * as Stream from "effect/Stream";
 import * as TestClock from "effect/testing/TestClock";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
@@ -33,6 +34,299 @@ const runId = RunId.make("run-1");
 const providerThreadId = ProviderThreadId.make("provider-thread-1");
 const providerSessionId = ProviderSessionId.make("session-1");
 const instanceId = ProviderInstanceId.make("codex-1");
+
+const optimizationInput = { threadId, draft: "fix it", style: "default" as const };
+
+it.effect("optimization restoring a session also suppresses suggestions as inflight", () =>
+  Effect.gen(function* () {
+    const opening = yield* Deferred.make<void>();
+    const finish = yield* Deferred.make<void>();
+    const f = yield* fixture({
+      gate: "session_not_live",
+      openWait: Deferred.succeed(opening, undefined).pipe(Effect.andThen(Deferred.await(finish))),
+    });
+    const optimization = yield* f.service.optimizePrompt(optimizationInput).pipe(Effect.forkChild);
+    yield* Deferred.await(opening);
+    assert.propertyVal(yield* f.service.suggestNext({ threadId, runId }), "reason", "inflight");
+    assert.strictEqual(f.calls.length, 0);
+    yield* Deferred.succeed(finish, undefined);
+    yield* Fiber.join(optimization);
+  }).pipe(Effect.scoped),
+);
+
+it.effect("optimization waits for suggestion interruption before starting its query", () =>
+  Effect.gen(function* () {
+    const events: string[] = [];
+    const f = yield* fixture({
+      query: (input) => {
+        events.push(input.purpose);
+        return input.purpose === "suggestion"
+          ? Effect.never.pipe(
+              Effect.onInterrupt(() =>
+                Effect.sync(() => {
+                  events.push("suggestion-ended");
+                }),
+              ),
+            )
+          : Effect.succeed({
+              text: "fix it and test it",
+              model: null,
+              usage: null,
+              attemptedTools: [],
+              stop: "completed",
+              failure: null,
+            });
+      },
+    });
+    const suggestion = yield* f.service.suggestNext({ threadId, runId }).pipe(Effect.forkChild);
+    yield* Deferred.await(f.entered);
+    const optimization = yield* f.service.optimizePrompt(optimizationInput).pipe(Effect.forkChild);
+    yield* TestClock.adjust("45 seconds");
+    assert.propertyVal(yield* Fiber.join(suggestion), "reason", "timeout");
+    assert.propertyVal(yield* Fiber.join(optimization), "text", "fix it and test it");
+    assert.deepStrictEqual(events, ["suggestion", "suggestion-ended", "optimization"]);
+    assert.strictEqual(f.logs.length, 2);
+  }).pipe(Effect.scoped),
+);
+
+it.effect("optimization in flight suppresses suggestions even when a suggestion is memoized", () =>
+  Effect.gen(function* () {
+    const started = yield* Deferred.make<void>();
+    const finish = yield* Deferred.make<void>();
+    const f = yield* fixture({
+      query: (input) =>
+        Effect.gen(function* () {
+          if (input.purpose === "optimization") {
+            yield* Deferred.succeed(started, undefined);
+            yield* Deferred.await(finish);
+          }
+          return {
+            text: "run tests",
+            model: null,
+            usage: null,
+            attemptedTools: [],
+            stop: "completed" as const,
+            failure: null,
+          };
+        }),
+    });
+    yield* f.service.suggestNext({ threadId, runId });
+    const optimization = yield* f.service.optimizePrompt(optimizationInput).pipe(Effect.forkChild);
+    yield* Deferred.await(started);
+    const result = yield* f.service.suggestNext({ threadId, runId });
+    assert.propertyVal(result, "reason", "inflight");
+    assert.deepStrictEqual(f.lifecycle, ["suggestion", "optimization"]);
+    yield* Deferred.succeed(finish, undefined);
+    yield* Fiber.join(optimization);
+  }).pipe(Effect.scoped),
+);
+
+it.effect("optimization deadline interrupts the adapter and releases the thread", () =>
+  Effect.gen(function* () {
+    const interrupted = yield* Deferred.make<void>();
+    let calls = 0;
+    const f = yield* fixture({
+      query: () =>
+        ++calls === 1
+          ? Effect.never.pipe(Effect.onInterrupt(() => Deferred.succeed(interrupted, undefined)))
+          : Effect.succeed({
+              text: "fix it and test it",
+              model: null,
+              usage: null,
+              attemptedTools: [],
+              stop: "completed",
+              failure: null,
+            }),
+    });
+    const request = yield* f.service.optimizePrompt(optimizationInput).pipe(Effect.forkChild);
+    yield* Deferred.await(f.entered);
+    yield* TestClock.adjust("45 seconds");
+    assert.propertyVal(yield* Fiber.join(request), "reason", "timeout");
+    yield* Deferred.await(interrupted);
+    assert.propertyVal(yield* f.service.optimizePrompt(optimizationInput), "_tag", "Optimized");
+    assert.strictEqual(f.logs.length, 2);
+  }).pipe(Effect.scoped),
+);
+
+it.effect("optimization maps startup query errors without exposing provider detail", () =>
+  Effect.gen(function* () {
+    const f = yield* fixture({
+      query: () =>
+        Effect.fail(
+          new ProviderAdapter.ProviderAdapterOpenSessionError({
+            driver: ProviderDriverKind.make("codex"),
+            providerSessionId,
+            cause: "private detail",
+          }),
+        ),
+    });
+    assert.propertyVal(
+      yield* f.service.optimizePrompt(optimizationInput),
+      "reason",
+      "provider_error",
+    );
+    assert.propertyVal(f.logs[0], "outcome", "failed");
+    assert.isFalse(JSON.stringify(f.logs).includes("private detail"));
+  }).pipe(Effect.scoped),
+);
+
+it.effect("optimization rejects a rewrite that drops a draft reference", () =>
+  Effect.gen(function* () {
+    const f = yield* fixture();
+    const result = yield* f.service.optimizePrompt({ ...optimizationInput, draft: "fix @file.ts" });
+    assert.propertyVal(result, "reason", "references_dropped");
+    assert.propertyVal(f.logs[0], "outcome", "filtered");
+  }).pipe(Effect.scoped),
+);
+
+it.effect("optimization reopens, resumes and queries with the resumed thread only in memory", () =>
+  Effect.gen(function* () {
+    const f = yield* fixture({ gate: "session_not_live" });
+    const result = yield* f.service.optimizePrompt(optimizationInput);
+    assert.propertyVal(result, "_tag", "Optimized");
+    assert.deepStrictEqual(f.lifecycle, ["open", "resume", "optimization"]);
+    assert.deepStrictEqual(f.opens[0], {
+      threadId,
+      providerSessionId,
+      modelSelection: { instanceId, model: "requested-model" },
+      runtimePolicy: { runtimeMode: "full-access", interactionMode: "default", cwd: null },
+      resumeFromSession: f.projection.providerSessions[0]!,
+      initialNativeThreadId: "native-1",
+      initialProviderItemIdentityVersion: 2,
+    });
+    assert.propertyVal(f.calls[0]?.providerThread.nativeThreadRef, "nativeId", "resumed-native");
+    assert.propertyVal(f.projection.providerThreads[0]?.nativeThreadRef, "nativeId", "native-1");
+    assert.strictEqual(f.logs.length, 1);
+    assert.propertyVal(f.logs[0], "requestId", result.requestId);
+    assert.propertyVal(f.logs[0], "promptVersion", "o1");
+    assert.propertyVal(f.logs[0], "feature", "optimization");
+  }).pipe(Effect.scoped),
+);
+
+it.effect.each(["open", "resume"] as const)(
+  "optimization reports session_resume_failed when %s fails",
+  (resumeFailure) =>
+    Effect.gen(function* () {
+      const f = yield* fixture({ resumeFailure });
+      assert.propertyVal(
+        yield* f.service.optimizePrompt(optimizationInput),
+        "reason",
+        "session_resume_failed",
+      );
+      assert.strictEqual(f.calls.length, 0);
+      assert.deepStrictEqual(f.lifecycle, resumeFailure === "open" ? ["open"] : ["open", "resume"]);
+      assert.propertyVal(f.logs[0], "outcome", "failed");
+    }).pipe(Effect.scoped),
+);
+
+it.effect.each([
+  ["codex", undefined, "cache_stale", true],
+  ["codex", undefined, undefined, false],
+  ["claudeAgent", "1969-12-31T23:59:59.999Z", undefined, true],
+  ["claudeAgent", "1970-01-01T00:00:00.000Z", undefined, false],
+] as const)(
+  "optimization computes cache hint for %s / %s / %s",
+  ([driver, cacheExpiresAt, gate, expired]) =>
+    Effect.gen(function* () {
+      const f = yield* fixture({
+        driver,
+        ...(cacheExpiresAt === undefined ? {} : { cacheExpiresAt }),
+        ...(gate === undefined ? {} : { gate }),
+      });
+      assert.propertyVal(
+        yield* f.service.optimizePrompt(optimizationInput),
+        "cacheMaybeExpired",
+        expired,
+      );
+      assert.strictEqual(f.calls.length, 1);
+      assert.propertyVal(f.logs[0], "cacheMaybeExpired", expired);
+    }).pipe(Effect.scoped),
+);
+
+it.effect.each(["provider_unsupported", "generating"] as const)(
+  "optimization suppresses %s and logs without a query",
+  (gate) =>
+    Effect.gen(function* () {
+      const f = yield* fixture({ gate });
+      assert.propertyVal(yield* f.service.optimizePrompt(optimizationInput), "reason", gate);
+      assert.strictEqual(f.calls.length, 0);
+      assert.strictEqual(f.logs.length, 1);
+    }).pipe(Effect.scoped),
+);
+
+it.effect.each([
+  ["", "empty"],
+  ["fix it", "unchanged"],
+  ["x".repeat(2001), "too_long"],
+] as const)("optimization filters response %j as %s", ([text, reason]) =>
+  Effect.gen(function* () {
+    const f = yield* fixture({
+      query: () =>
+        Effect.succeed({
+          text,
+          model: null,
+          usage: null,
+          attemptedTools: [],
+          stop: "completed",
+          failure: null,
+        }),
+    });
+    const result = yield* f.service.optimizePrompt(optimizationInput);
+    assert.propertyVal(result, "_tag", "Filtered");
+    assert.propertyVal(result, "reason", reason);
+  }).pipe(Effect.scoped),
+);
+
+it.effect(
+  "optimization keeps literal drafts in its prompt and filters text after a tool interruption",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* fixture({
+        query: () =>
+          Effect.succeed({
+            text: "<prompt>fix @file.ts and test it</prompt>",
+            model: "actual",
+            usage: null,
+            attemptedTools: ["Read"],
+            stop: "interrupted_on_tool",
+            failure: null,
+          }),
+      });
+      const result = yield* f.service.optimizePrompt({
+        ...optimizationInput,
+        draft: "  fix @file.ts $&\n",
+      });
+      assert.propertyVal(result, "text", "fix @file.ts and test it");
+      assert.include(f.calls[0]!.prompt, "<draft>\n  fix @file.ts $&\n\n</draft>");
+      assert.deepStrictEqual(f.calls[0]?.appContext, [
+        { key: "mcp_app_item__1", text: "app context" },
+      ]);
+      assert.deepStrictEqual(f.calls[0]?.developerContext, [
+        { key: "persona", text: "developer context" },
+      ]);
+      assert.propertyVal(f.logs[0], "toolAttempted", true);
+      assert.isFalse(JSON.stringify(f.logs).includes("fix @file.ts"));
+    }).pipe(Effect.scoped),
+);
+
+it.effect.each(["usage_limit", "provider_error", "transport_error"] as const)(
+  "optimization maps adapter failure %s",
+  (reason) =>
+    Effect.gen(function* () {
+      const f = yield* fixture({
+        query: () =>
+          Effect.succeed({
+            text: "",
+            model: null,
+            usage: null,
+            attemptedTools: [],
+            stop: "error",
+            failure: { class: reason, detail: "detail" },
+          }),
+      });
+      assert.propertyVal(yield* f.service.optimizePrompt(optimizationInput), "reason", reason);
+    }).pipe(Effect.scoped),
+);
 
 it.effect("keeps provider generation alive after the requesting RPC is interrupted", () =>
   Effect.gen(function* () {
@@ -111,9 +405,15 @@ const fixture = Effect.fn("ComposerAssistTest.fixture")(function* (
   options: {
     readonly gate?: string;
     readonly query?: ProviderAdapter.ProviderAdapterV2SessionRuntime["runSideQuery"];
+    readonly resumeFailure?: "open" | "resume";
+    readonly driver?: string;
+    readonly cacheExpiresAt?: string;
+    readonly openWait?: Effect.Effect<void>;
   } = {},
 ) {
   const entered = yield* Deferred.make<void>();
+  const lifecycle: string[] = [];
+  const opens: Parameters<ProviderSessions.ProviderSessionManagerV2["Service"]["open"]>[0][] = [];
   const calls: ProviderAdapter.ProviderAdapterV2SideQueryInput[] = [];
   const logs: Log.ComposerAssistLogRecord[] = [];
   const completedAt = DateTime.makeUnsafe(0);
@@ -137,25 +437,55 @@ const fixture = Effect.fn("ComposerAssistTest.fixture")(function* (
     providerThreads: [
       {
         id: providerThreadId,
-        driver: ProviderDriverKind.make("codex"),
+        driver: ProviderDriverKind.make(options.driver ?? "codex"),
         providerSessionId,
         providerInstanceId: instanceId,
         appThreadId: threadId,
         nativeThreadRef: { nativeId: "native-1" },
+        nativeMetadata: { itemIdentityVersion: 2 },
       },
     ],
     providerTurns: [
       {
         providerThreadId,
         completedAt: options.gate === "cache_stale" ? DateTime.makeUnsafe(-600001) : completedAt,
+        tokenUsage: { promptCacheExpiresAt: options.cacheExpiresAt },
       },
     ],
-    providerSessions: [],
+    providerSessions: [{ id: providerSessionId }],
   } as unknown as OrchestrationV2ThreadProjection;
-  const runtime = {
+  const unexpectedMainOperation = () =>
+    Effect.die("Composer assistance must not invoke main-thread operations.");
+  const runtime: ProviderAdapter.ProviderAdapterV2SessionRuntime = {
     driver: ProviderDriverKind.make("codex"),
     instanceId,
     providerSessionId,
+    providerSession: projection.providerSessions[0]!,
+    events: Stream.never,
+    ensureThread: unexpectedMainOperation,
+    startTurn: unexpectedMainOperation,
+    steerTurn: unexpectedMainOperation,
+    interruptTurn: unexpectedMainOperation,
+    respondToRuntimeRequest: unexpectedMainOperation,
+    readThreadSnapshot: unexpectedMainOperation,
+    rollbackThread: unexpectedMainOperation,
+    forkThread: unexpectedMainOperation,
+    resumeThread: Effect.fn("Fake.resumeThread")(function* () {
+      lifecycle.push("resume");
+      if (options.resumeFailure === "resume")
+        return yield* new ProviderAdapter.ProviderAdapterResumeThreadError({
+          driver: ProviderDriverKind.make("codex"),
+          providerSessionId,
+          providerThreadId,
+        });
+      return {
+        ...projection.providerThreads[0]!,
+        nativeThreadRef: {
+          ...projection.providerThreads[0]!.nativeThreadRef!,
+          nativeId: "resumed-native",
+        },
+      };
+    }),
     ...(options.gate === "provider_unsupported"
       ? {}
       : {
@@ -163,6 +493,7 @@ const fixture = Effect.fn("ComposerAssistTest.fixture")(function* (
             input: ProviderAdapter.ProviderAdapterV2SideQueryInput,
           ) {
             calls.push(input);
+            lifecycle.push(input.purpose);
             yield* Deferred.succeed(entered, undefined);
             return yield* (
               options.query?.(input) ??
@@ -177,17 +508,33 @@ const fixture = Effect.fn("ComposerAssistTest.fixture")(function* (
             );
           }),
         }),
-  } as ProviderAdapter.ProviderAdapterV2SessionRuntime;
+  };
 
   const dependencies = Layer.mergeAll(
     NodeCrypto.layer,
     Layer.mock(ProjectionStore.ProjectionStoreV2)({
-      getThreadShell: () => Effect.succeed(shell),
+      getThreadShell: () => Effect.sync(() => shell),
       getThreadRecords: () => Effect.succeed(projection),
     }),
     Layer.mock(ProviderSessions.ProviderSessionManagerV2)({
       isLive: () => Effect.succeed(options.gate !== "session_not_live"),
-      get: () => Effect.succeed(Option.some(runtime)),
+      get: () =>
+        Effect.succeed(
+          options.gate === "session_not_live" || options.resumeFailure
+            ? Option.none()
+            : Option.some(runtime),
+        ),
+      open: Effect.fn("Fake.open")(function* (input) {
+        lifecycle.push("open");
+        opens.push(input);
+        if (options.openWait) yield* options.openWait;
+        if (options.resumeFailure === "open")
+          return yield* new ProviderSessions.ProviderSessionOpenError({
+            instanceId,
+            providerSessionId,
+          });
+        return runtime;
+      }),
     }),
     RuntimePolicy.layer,
     Layer.mock(McpContext.McpAppModelContext)({
@@ -215,6 +562,9 @@ const fixture = Effect.fn("ComposerAssistTest.fixture")(function* (
     calls,
     logs,
     entered,
+    lifecycle,
+    opens,
+    projection,
     advanceRun: (id: typeof runId) => {
       shell = { ...shell, latestRunId: id };
     },

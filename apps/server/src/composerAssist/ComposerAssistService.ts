@@ -1,4 +1,4 @@
-/** Runs composer side queries without writing orchestration events or conversation history. */
+/** Runs isolated composer queries; restoring the main session remains owned by its manager. */
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
@@ -14,12 +14,19 @@ import {
   COMPOSER_SUGGESTION_MAX_AGE_MS,
   composerCacheExpiresAt,
   composerCacheMaybeExpired,
+  isComposerAssistSupportedDriver,
 } from "@t3tools/contracts";
 import { checkCandidate, stripWrapping } from "@t3tools/shared/composerAssist/filters";
 import {
   SUGGESTION_PROMPT,
   SUGGESTION_PROMPT_VERSION,
+  OPTIMIZE_PROMPT_VERSION,
+  optimizePrompt,
 } from "@t3tools/shared/composerAssist/prompts";
+import {
+  checkOptimizedPrompt,
+  stripOptimizeWrapping,
+} from "@t3tools/shared/composerAssist/optimizeFilters";
 import type * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as ProviderSessions from "../orchestration-v2/ProviderSessionManager.ts";
@@ -35,7 +42,7 @@ import type {
   ComposerOptimizeResult,
 } from "@t3tools/contracts";
 
-/** Composer queries are independent of orchestration events and never send user drafts. */
+/** Returns composer text without sending it as a conversation message. */
 export class ComposerAssistService extends Context.Service<
   ComposerAssistService,
   {
@@ -62,7 +69,39 @@ const make = Effect.gen(function* () {
     string,
     { runId: string; done: Deferred.Deferred<QueryOutcome, ComposerAssistError> }
   >();
+  const optimizations = new Map<string, Deferred.Deferred<void>>();
   const memo = new Map<string, { expiresAt: number; outcome: QueryOutcome }>();
+
+  /** Both features use the same interruptible 45-second deadline and never retry provider work. */
+  const runAdapter = Effect.fn("ComposerAssistService.runAdapter")(
+    (
+      runSideQuery: NonNullable<ProviderAdapter.ProviderAdapterV2SessionRuntime["runSideQuery"]>,
+      input: ProviderAdapter.ProviderAdapterV2SideQueryInput,
+    ) => runSideQuery(input).pipe(Effect.timeout(SIDE_QUERY_DEADLINE_MS), Effect.result),
+  );
+
+  /** Waits on completion signals, then atomically claims the thread; failed suggestions also release it. */
+  const reserveOptimization = Effect.fn("ComposerAssistService.reserveOptimization")(function* (
+    threadId: string,
+  ): Effect.fn.Return<Deferred.Deferred<void>> {
+    const claim = yield* ownership.withPermits(1)(
+      Effect.gen(function* () {
+        const optimization = optimizations.get(threadId);
+        if (optimization) return { wait: Deferred.await(optimization) };
+        const suggestion = flights.get(threadId);
+        if (suggestion)
+          return { wait: Deferred.await(suggestion.done).pipe(Effect.exit, Effect.asVoid) };
+        const done = yield* Deferred.make<void>();
+        optimizations.set(threadId, done);
+        return { done };
+      }),
+    );
+    if (claim.wait !== undefined) {
+      yield* claim.wait;
+      return yield* reserveOptimization(threadId);
+    }
+    return claim.done;
+  });
 
   /** Captures immutable projection inputs before claiming a side query; reads do not retry. */
   const read = Effect.fn("ComposerAssistService.read")(
@@ -131,7 +170,7 @@ const make = Effect.gen(function* () {
         ),
       );
     const contexts = yield* readTurnContext(input.threadId, appContext, developerContext);
-    const side = yield* runSideQuery({
+    const side = yield* runAdapter(runSideQuery, {
       appThread: state.records.thread,
       threadId: input.threadId,
       providerThread: state.providerThread!,
@@ -140,7 +179,7 @@ const make = Effect.gen(function* () {
       ...contexts,
       prompt: SUGGESTION_PROMPT,
       purpose: "suggestion",
-    }).pipe(Effect.timeout(SIDE_QUERY_DEADLINE_MS), Effect.result);
+    });
     if (side._tag === "Failure")
       return {
         result: {
@@ -166,6 +205,58 @@ const make = Effect.gen(function* () {
     };
   });
 
+  /** Writes one metadata record per caller; joined requests share usage but retain their own IDs. */
+  const writeOutcome = Effect.fn("ComposerAssistService.writeOutcome")(function* (
+    input: {
+      threadId: ComposerSuggestInput["threadId"];
+      runId: string | null;
+      feature: "suggestion" | "optimization";
+    },
+    requestId: string,
+    startedAt: number,
+    state: Effect.Success<ReturnType<typeof read>>,
+    outcome: QueryOutcome<ComposerSuggestResult | ComposerOptimizeResult>,
+    maybeExpired: boolean,
+  ) {
+    const result = outcome.result;
+    const usage = outcome.side?.usage ?? null;
+    const uncached = usage === null ? null : usage.inputTokens - usage.cachedInputTokens;
+    yield* log.write({
+      ts: DateTime.formatIso(DateTime.makeUnsafe(startedAt)),
+      feature: input.feature,
+      requestId,
+      threadId: input.threadId,
+      runId: input.runId,
+      driver: state.providerThread?.driver ?? null,
+      instanceId: state.records.thread.modelSelection.instanceId,
+      requestedModel: state.records.thread.modelSelection.model ?? null,
+      actualModel: outcome.side?.model ?? null,
+      outcome:
+        result._tag === "Optimized"
+          ? "optimized"
+          : result._tag === "Suggested"
+            ? "suggested"
+            : result._tag === "Filtered"
+              ? result.reason === "empty"
+                ? "empty"
+                : "filtered"
+              : result._tag === "Failed"
+                ? "failed"
+                : "suppressed",
+      reason: "reason" in result ? result.reason : null,
+      promptVersion:
+        input.feature === "suggestion" ? SUGGESTION_PROMPT_VERSION : OPTIMIZE_PROMPT_VERSION,
+      usage,
+      uncachedInputTokens: uncached,
+      cacheColdSuspected: uncached !== null && uncached > CACHE_COLD_SUSPECT_UNCACHED_TOKENS,
+      cacheMaybeExpired: maybeExpired,
+      toolAttempted: (outcome.side?.attemptedTools.length ?? 0) > 0,
+      stop: outcome.side?.stop ?? null,
+      latencyMs: (yield* Clock.currentTimeMillis) - startedAt,
+      chars: outcome.side?.text.length ?? 0,
+    });
+  });
+
   /** Runs independently of the requesting RPC; every request, including joins, writes its own metadata. */
   const suggest = Effect.fn("ComposerAssistService.suggest")(function* (
     input: ComposerSuggestInput,
@@ -178,6 +269,7 @@ const make = Effect.gen(function* () {
     ): QueryOutcome => ({ result: { _tag: "Suppressed", requestId, reason }, side: null });
     const maybeExpired = composerCacheMaybeExpired(state.expiresAt, startedAt);
     const outcome = yield* Effect.gen(function* () {
+      if (optimizations.has(input.threadId)) return suppressed("inflight");
       const providerThread = state.providerThread;
       if (
         providerThread?.providerSessionId == null ||
@@ -212,6 +304,7 @@ const make = Effect.gen(function* () {
           const now = yield* Clock.currentTimeMillis;
           for (const [key, entry] of memo) if (entry.expiresAt <= now) memo.delete(key);
           const key = `${input.threadId.length}:${input.threadId}${input.runId}`;
+          if (optimizations.has(input.threadId)) return Effect.succeed(suppressed("inflight"));
           const cached = memo.get(key);
           if (cached) return Effect.succeed(cached.outcome);
           const active = flights.get(input.threadId);
@@ -230,12 +323,10 @@ const make = Effect.gen(function* () {
                 });
               }),
             ),
-            Effect.exit,
-            Effect.flatMap((exit) => Deferred.done(done, exit)),
-            Effect.ensuring(
+            Effect.onExit((exit) =>
               Effect.sync(() => {
                 flights.delete(input.threadId);
-              }),
+              }).pipe(Effect.andThen(Deferred.done(done, exit))),
             ),
             Effect.forkIn(scope),
           );
@@ -245,41 +336,151 @@ const make = Effect.gen(function* () {
       return yield* claim;
     });
     const result = { ...outcome.result, requestId };
-    const usage = outcome.side?.usage ?? null;
-    const uncached = usage === null ? null : usage.inputTokens - usage.cachedInputTokens;
-    yield* log.write({
-      ts: DateTime.formatIso(DateTime.makeUnsafe(startedAt)),
-      feature: "suggestion",
+    yield* writeOutcome(
+      { ...input, feature: "suggestion" },
       requestId,
-      threadId: input.threadId,
-      runId: input.runId,
-      driver: state.providerThread?.driver ?? null,
-      instanceId: state.records.thread.modelSelection.instanceId,
-      requestedModel: state.records.thread.modelSelection.model ?? null,
-      actualModel: outcome.side?.model ?? null,
-      outcome:
-        result._tag === "Suggested"
-          ? "suggested"
-          : result._tag === "Filtered"
-            ? result.reason === "empty"
-              ? "empty"
-              : "filtered"
-            : result._tag === "Failed"
-              ? "failed"
-              : "suppressed",
-      reason: "reason" in result ? result.reason : null,
-      promptVersion: SUGGESTION_PROMPT_VERSION,
-      usage,
-      uncachedInputTokens: uncached,
-      cacheColdSuspected: uncached !== null && uncached > CACHE_COLD_SUSPECT_UNCACHED_TOKENS,
-      cacheMaybeExpired: maybeExpired,
-      toolAttempted: (outcome.side?.attemptedTools.length ?? 0) > 0,
-      stop: outcome.side?.stop ?? null,
-      latencyMs: (yield* Clock.currentTimeMillis) - startedAt,
-      chars: outcome.side?.text.length ?? 0,
-    });
+      startedAt,
+      state,
+      outcome,
+      maybeExpired,
+    );
     return result;
   });
+  /** Restores idle sessions when needed and returns a rewrite; projection reads are repeated after waiting. */
+  const optimize = Effect.fn("ComposerAssistService.optimize")(function* (
+    input: ComposerOptimizeInput,
+  ): Effect.fn.Return<ComposerOptimizeResult, ComposerAssistError> {
+    const requestId = yield* crypto.randomUUIDv4().pipe(Effect.orDie);
+    const startedAt = yield* Clock.currentTimeMillis;
+    const done = yield* reserveOptimization(input.threadId);
+    return yield* Effect.gen(function* () {
+      const state = yield* read(input.threadId);
+      const maybeExpired = composerCacheMaybeExpired(
+        state.expiresAt,
+        yield* Clock.currentTimeMillis,
+      );
+      const outcome = yield* Effect.gen(function* (): Effect.fn.Return<
+        QueryOutcome<ComposerOptimizeResult>,
+        ComposerAssistError
+      > {
+        const suppressed = (
+          reason: "provider_unsupported" | "generating",
+        ): QueryOutcome<ComposerOptimizeResult> => ({
+          result: { _tag: "Suppressed", requestId, reason },
+          side: null,
+        });
+        const failed = (
+          reason: "session_resume_failed" | "provider_error" | "timeout",
+        ): QueryOutcome<ComposerOptimizeResult> => ({
+          result: { _tag: "Failed", requestId, reason },
+          side: null,
+        });
+        const providerThread = state.providerThread;
+        if (!providerThread || !isComposerAssistSupportedDriver(providerThread.driver))
+          return suppressed("provider_unsupported");
+        if (state.shell.activeRunId !== null || state.shell.status !== "idle")
+          return suppressed("generating");
+        if (providerThread.providerSessionId === null) return failed("session_resume_failed");
+        const runtimePolicy = yield* policy
+          .resolve({
+            thread: state.records.thread,
+            modelSelection: state.records.thread.modelSelection,
+          })
+          .pipe(
+            Effect.mapError(
+              () =>
+                new ComposerAssistError({
+                  reason: "internal",
+                  message: "Could not resolve runtime policy.",
+                }),
+            ),
+          );
+        const sessionResult = yield* Effect.gen(function* () {
+          const live = yield* sessions.get(providerThread.providerSessionId!);
+          if (Option.isSome(live)) return { session: live.value, providerThread };
+          const previous = state.records.providerSessions.find(
+            (candidate) => candidate.id === providerThread.providerSessionId,
+          );
+          // Restoring the main session may emit lifecycle events; the side query must emit no run, attempt, turn, item, message or checkpoint events and must not finalize a run.
+          const session = yield* sessions.open({
+            threadId: input.threadId,
+            providerSessionId: providerThread.providerSessionId!,
+            modelSelection: state.records.thread.modelSelection,
+            runtimePolicy,
+            ...(previous === undefined ? {} : { resumeFromSession: previous }),
+            ...(providerThread.nativeThreadRef?.nativeId == null
+              ? {}
+              : { initialNativeThreadId: providerThread.nativeThreadRef.nativeId }),
+            ...(providerThread.nativeMetadata?.itemIdentityVersion === undefined
+              ? {}
+              : {
+                  initialProviderItemIdentityVersion:
+                    providerThread.nativeMetadata.itemIdentityVersion,
+                }),
+          });
+          const resumed = yield* session.resumeThread({
+            providerThread,
+            threadId: input.threadId,
+            modelSelection: state.records.thread.modelSelection,
+            runtimePolicy,
+          });
+          return { session, providerThread: resumed };
+        }).pipe(Effect.result);
+        if (sessionResult._tag === "Failure") return failed("session_resume_failed");
+        const { session, providerThread: resumedThread } = sessionResult.success;
+        if (!session.runSideQuery) return suppressed("provider_unsupported");
+        const contexts = yield* readTurnContext(input.threadId, appContext, developerContext);
+        const side = yield* runAdapter(session.runSideQuery, {
+          appThread: state.records.thread,
+          threadId: input.threadId,
+          providerThread: resumedThread,
+          modelSelection: state.records.thread.modelSelection,
+          runtimePolicy,
+          ...contexts,
+          prompt: optimizePrompt(input.draft),
+          purpose: "optimization",
+        });
+        if (side._tag === "Failure")
+          return failed(side.failure._tag === "TimeoutError" ? "timeout" : "provider_error");
+        const response = side.success;
+        if (response.failure !== null)
+          return {
+            result: { _tag: "Failed", requestId, reason: response.failure.class },
+            side: response,
+          };
+        const reason = checkOptimizedPrompt(response.text, input.draft);
+        return {
+          result:
+            reason === null
+              ? {
+                  _tag: "Optimized",
+                  requestId,
+                  text: stripOptimizeWrapping(response.text),
+                  cacheMaybeExpired: maybeExpired,
+                }
+              : { _tag: "Filtered", requestId, reason },
+          side: response,
+        };
+      });
+      yield* writeOutcome(
+        { threadId: input.threadId, runId: state.shell.latestRunId, feature: "optimization" },
+        requestId,
+        startedAt,
+        state,
+        outcome,
+        maybeExpired,
+      );
+      return outcome.result;
+    }).pipe(
+      Effect.ensuring(
+        Effect.gen(function* () {
+          optimizations.delete(input.threadId);
+          yield* Deferred.succeed(done, undefined);
+        }),
+      ),
+    );
+  });
+
   return ComposerAssistService.of({
     suggestNext: Effect.fn("ComposerAssistService.suggestNext")(function* (
       input: ComposerSuggestInput,
@@ -287,13 +488,9 @@ const make = Effect.gen(function* () {
       return yield* Fiber.join(yield* suggest(input).pipe(Effect.forkIn(scope)));
     }),
     optimizePrompt: Effect.fn("ComposerAssistService.optimizePrompt")(function* (
-      _input: ComposerOptimizeInput,
-    ): Effect.fn.Return<ComposerOptimizeResult> {
-      return {
-        _tag: "Suppressed",
-        requestId: yield* crypto.randomUUIDv4().pipe(Effect.orDie),
-        reason: "provider_unsupported",
-      };
+      input: ComposerOptimizeInput,
+    ): Effect.fn.Return<ComposerOptimizeResult, ComposerAssistError> {
+      return yield* Fiber.join(yield* optimize(input).pipe(Effect.forkIn(scope)));
     }),
   });
 });
@@ -305,7 +502,7 @@ const SUGGESTION_MEMO_TTL_MS = 10 * 60_000;
 const CACHE_COLD_SUSPECT_UNCACHED_TOKENS = 8000;
 
 /** Memoized provider metadata is shared, while request IDs and log entries remain per RPC. */
-interface QueryOutcome {
-  readonly result: ComposerSuggestResult;
+interface QueryOutcome<R = ComposerSuggestResult> {
+  readonly result: R;
   readonly side: ProviderAdapter.ProviderAdapterV2SideQueryResult | null;
 }
