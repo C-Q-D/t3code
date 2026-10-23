@@ -72,6 +72,7 @@ const make = Effect.gen(function* () {
   >();
   const optimizations = new Map<string, Deferred.Deferred<void>>();
   const memo = new Map<string, { expiresAt: number; result: ComposerSuggestResult }>();
+  let pendingDiagnosticWrites = 0;
 
   /** Adapter failures are values; the caller owns the total deadline and never retries. */
   const runAdapter = Effect.fn("ComposerAssistService.runAdapter")(
@@ -216,7 +217,7 @@ const make = Effect.gen(function* () {
     };
   });
 
-  /** Writes one metadata record per caller; joined requests share usage but retain their own IDs. */
+  /** Enqueues metadata in the service scope without delaying RPCs; at capacity new records are dropped. */
   const writeOutcome = Effect.fn("ComposerAssistService.writeOutcome")(function* (
     input: {
       threadId: ComposerSuggestInput["threadId"];
@@ -233,7 +234,7 @@ const make = Effect.gen(function* () {
     const result = outcome.result;
     const usage = outcome.side?.usage ?? null;
     const uncached = usage === null ? null : usage.inputTokens - usage.cachedInputTokens;
-    yield* log.write({
+    const record: ComposerAssistLog.ComposerAssistLogRecord = {
       ts: DateTime.formatIso(DateTime.makeUnsafe(startedAt)),
       feature: input.feature,
       requestId,
@@ -267,7 +268,21 @@ const make = Effect.gen(function* () {
       stop: outcome.side?.stop ?? null,
       latencyMs: (yield* Clock.currentTimeMillis) - startedAt,
       chars: outcome.side?.text.length ?? 0,
-    });
+    };
+    if (pendingDiagnosticWrites >= MAX_PENDING_DIAGNOSTIC_WRITES) {
+      yield* Effect.logWarning("Composer diagnostic queue is full; dropping record.");
+      return;
+    }
+    // Reserve before forking so concurrent completions cannot exceed the disk backlog limit.
+    pendingDiagnosticWrites++;
+    yield* log.write(record).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          pendingDiagnosticWrites--;
+        }),
+      ),
+      Effect.forkIn(scope, { startImmediately: true }),
+    );
   });
 
   /** Runs independently of the requesting RPC; every request, including joins, writes its own metadata. */
@@ -568,6 +583,7 @@ const SIDE_QUERY_DEADLINE_MS = 45_000;
 const SUGGESTION_MEMO_TTL_MS = 10 * 60_000;
 const SUGGESTION_MEMO_MAX_ENTRIES = 256;
 const CACHE_COLD_SUSPECT_UNCACHED_TOKENS = 8000;
+const MAX_PENDING_DIAGNOSTIC_WRITES = 64;
 
 /** In-flight callers share provider metadata; the bounded memo retains only the client result. */
 interface QueryOutcome<R = ComposerSuggestResult> {

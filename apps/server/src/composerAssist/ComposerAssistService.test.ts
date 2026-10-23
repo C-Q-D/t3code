@@ -23,6 +23,7 @@ import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
+import * as Logger from "effect/Logger";
 import * as Stream from "effect/Stream";
 import * as TestClock from "effect/testing/TestClock";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
@@ -41,6 +42,50 @@ const providerSessionId = ProviderSessionId.make("session-1");
 const instanceId = ProviderInstanceId.make("codex-1");
 
 const optimizationInput = { threadId, draft: "fix it", style: "default" as const };
+
+it.effect("returns RPC results with a stuck diagnostic sink and drops records above 64", () =>
+  Effect.gen(function* () {
+    const warnings: unknown[] = [];
+    const writing = yield* Deferred.make<void>();
+    const returned = yield* Deferred.make<void>();
+    yield* Effect.gen(function* () {
+      const f = yield* fixture({
+        logSink: {
+          write: () => Deferred.succeed(writing, undefined).pipe(Effect.andThen(Effect.never)),
+        },
+      });
+      const first = yield* f.service.suggestNext({ threadId, runId }).pipe(
+        Effect.tap(() => Deferred.succeed(returned, undefined)),
+        Effect.forkScoped,
+      );
+      yield* Deferred.await(writing);
+      yield* TestClock.adjust("45 seconds");
+      assert.isTrue(yield* Deferred.isDone(returned), "RPC results must not wait for diagnostics");
+      assert.propertyVal(yield* Fiber.join(first), "_tag", "Suggested");
+      const remaining = yield* Effect.forEach(Array.from({ length: 64 }), () =>
+        f.service.suggestNext({ threadId, runId }),
+      );
+      assert.deepEqual(
+        remaining.map((result) => result._tag),
+        Array(64).fill("Suggested"),
+      );
+      assert.lengthOf(f.logs, 64, "the newest record must be dropped at capacity");
+      assert.deepEqual(warnings, [["Composer diagnostic queue is full; dropping record."]]);
+    }).pipe(
+      Effect.provide(
+        Logger.layer(
+          [
+            Logger.make(({ message, logLevel }) => {
+              if (logLevel === "Warn") warnings.push(message);
+            }),
+          ],
+          { mergeWithExisting: false },
+        ),
+      ),
+      Effect.scoped,
+    );
+  }),
+);
 
 it.effect.each([
   ["optimization", "nested"],
