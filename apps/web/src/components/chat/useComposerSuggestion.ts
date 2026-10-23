@@ -1,4 +1,5 @@
 /** Owns the empty-composer suggestion lifecycle; never submits a user message. */
+import { isComposerThreadGenerating } from "@t3tools/shared/composerAssist/isComposerThreadGenerating";
 import { RegistryContext, useAtomValue } from "@effect/atom-react";
 import {
   COMPOSER_SUGGESTION_MIN_COMPLETED_RUNS,
@@ -73,8 +74,7 @@ export function useComposerSuggestion(input: {
     input.shell.pendingRuntimeRequest === null &&
     input.completedRuns >= COMPOSER_SUGGESTION_MIN_COMPLETED_RUNS &&
     input.shell.lastErrorClass == null &&
-    input.shell.status === "idle" &&
-    input.shell.activeRunId === null;
+    !isComposerThreadGenerating(input.shell);
   const [suggestion, setSuggestion] = useState<{ key: string; text: string } | null>(null);
   const current = useRef({ key, eligible, generation: 0, mounted: false });
   useLayoutEffect(() => {

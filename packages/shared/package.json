@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./composerAssist/isComposerThreadGenerating": "./src/composerAssist/isComposerThreadGenerating.ts",
     "./composerAssist/providerTurns": "./src/composerAssist/providerTurns.ts",
     "./composerAssist/optimizeFilters": "./src/composerAssist/optimizeFilters.ts",
     "./composerAssist/prompts": "./src/composerAssist/prompts.ts",

@@ -1,4 +1,5 @@
 /** Runs isolated composer queries; restoring the main session remains owned by its manager. */
+import { isComposerThreadGenerating } from "@t3tools/shared/composerAssist/isComposerThreadGenerating";
 import * as Context from "effect/Context";
 import * as Schema from "effect/Schema";
 import * as Crypto from "effect/Crypto";
@@ -313,8 +314,7 @@ const make = Effect.gen(function* () {
       if (Option.isNone(sessionOption)) return suppressed("session_not_live");
       const session = sessionOption.value;
       if (!session.runSideQuery) return suppressed("provider_unsupported");
-      if (state.shell.activeRunId !== null || state.shell.status !== "idle")
-        return suppressed("generating");
+      if (isComposerThreadGenerating(state.shell)) return suppressed("generating");
       const runSideQuery = session.runSideQuery;
       const claim = yield* ownership.withPermits(1)(
         Effect.gen(function* () {
@@ -411,8 +411,7 @@ const make = Effect.gen(function* () {
         const providerThread = state.providerThread;
         if (!providerThread || !isComposerAssistSupportedDriver(providerThread.driver))
           return suppressed("provider_unsupported");
-        if (state.shell.activeRunId !== null || state.shell.status !== "idle")
-          return suppressed("generating");
+        if (isComposerThreadGenerating(state.shell)) return suppressed("generating");
         if (providerThread.providerSessionId === null) return failed("session_resume_failed");
         const runtimePolicy = yield* policy
           .resolve({

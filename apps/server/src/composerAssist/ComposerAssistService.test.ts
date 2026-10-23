@@ -45,6 +45,23 @@ const instanceId = ProviderInstanceId.make("codex-1");
 
 const optimizationInput = { threadId, draft: "fix it", style: "default" as const };
 
+it.effect("allows both features after the latest run completes", () =>
+  Effect.gen(function* () {
+    const f = yield* fixture();
+    assert.propertyVal(yield* f.service.suggestNext({ threadId, runId }), "_tag", "Suggested");
+    assert.propertyVal(yield* f.service.optimizePrompt(optimizationInput), "_tag", "Optimized");
+  }).pipe(Effect.scoped),
+);
+
+it.effect("suppresses both features for a running status without an active run ID", () =>
+  Effect.gen(function* () {
+    const f = yield* fixture({ status: "running" });
+    assert.propertyVal(yield* f.service.suggestNext({ threadId, runId }), "reason", "generating");
+    assert.propertyVal(yield* f.service.optimizePrompt(optimizationInput), "reason", "generating");
+    assert.strictEqual(f.calls.length, 0);
+  }).pipe(Effect.scoped),
+);
+
 it.effect(
   "uses the same active-thread cache expiry as the client with multiple provider threads",
   () =>
@@ -889,6 +906,7 @@ it.effect("suppresses a different current run while an older side query is in fl
 const fixture = Effect.fn("ComposerAssistTest.fixture")(function* (
   options: {
     readonly gate?: string;
+    readonly status?: OrchestrationV2ThreadShell["status"];
     readonly missingThread?: boolean;
     readonly policyFailure?: boolean;
     readonly policyCause?: unknown;
@@ -908,14 +926,6 @@ const fixture = Effect.fn("ComposerAssistTest.fixture")(function* (
   const calls: ProviderAdapter.ProviderAdapterV2SideQueryInput[] = [];
   const logs: Log.ComposerAssistLogRecord[] = [];
   const completedAt = DateTime.makeUnsafe(0);
-  let shell = {
-    id: threadId,
-    latestRunId: runId,
-    latestRunCompletedAt:
-      options.gate === "stale_turn" ? DateTime.makeUnsafe(-600001) : completedAt,
-    activeRunId: options.gate === "generating" ? runId : null,
-    status: "idle",
-  } as OrchestrationV2ThreadShell;
   let projection = {
     thread: {
       id: threadId,
@@ -944,7 +954,25 @@ const fixture = Effect.fn("ComposerAssistTest.fixture")(function* (
       },
     ],
     providerSessions: [{ id: providerSessionId }],
+    runs: [
+      {
+        id: runId,
+        ordinal: 1,
+        status: options.gate === "generating" ? "running" : "completed",
+        completedAt: options.gate === "stale_turn" ? DateTime.makeUnsafe(-600001) : completedAt,
+      },
+    ],
+    turnItems: [],
+    visibleTurnItems: [],
+    runtimeRequests: [],
+    messages: [],
+    plans: [],
+    nodes: [],
+    attempts: [],
   } as unknown as OrchestrationV2ThreadProjection;
+  let shell = ProjectionStore.threadShellFromProjection(projection);
+  // Simulate a status update arriving before its active-run ID for the independent status gate.
+  if (options.status) shell = { ...shell, status: options.status };
   const unexpectedMainOperation = () =>
     Effect.die("Composer assistance must not invoke main-thread operations.");
   const runtime: ProviderAdapter.ProviderAdapterV2SessionRuntime = {

@@ -99,7 +99,7 @@ function setup(): Input {
     target,
     shell: {
       latestRunId: runId,
-      status: "idle",
+      status: "completed",
       activeRunId: null,
       interactionMode: "default",
       pendingRuntimeRequest: null,
