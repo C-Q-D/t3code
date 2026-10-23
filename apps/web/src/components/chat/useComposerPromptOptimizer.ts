@@ -20,6 +20,7 @@ import { useAtomValue } from "@effect/atom-react";
 import { composerAssistEnvironment } from "~/state/composerAssist";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { t } from "~/i18n";
+import { isRpcClientError } from "@t3tools/client-runtime/rpc";
 import { isTransportConnectionErrorMessage } from "@t3tools/client-runtime/errors";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import type { AtomCommand, AtomCommandResult } from "@t3tools/client-runtime/state/runtime";
@@ -297,10 +298,21 @@ function commandFailureReason(response: Extract<CommandResponse, { _tag: "Failur
   const tag = typeof error === "object" && error !== null && "_tag" in error ? error._tag : null;
   if (tag === "ComposerAssistError" || tag === "EnvironmentAuthorizationError")
     return t.composer.assist.optimize.reason.unavailable;
+  if (tag === "RpcClientError") {
+    // The wrapper also carries decoding defects; only socket I/O failures imply a lost connection.
+    if (isRpcClientError(error)) {
+      switch (error.reason._tag) {
+        case "SocketReadError":
+        case "SocketWriteError":
+        case "SocketCloseError":
+          return t.composer.assist.optimize.reason.connection;
+      }
+    }
+    return t.composer.assist.optimize.reason.unavailable;
+  }
   const connection =
     tag === "ConnectionTransientError" ||
     tag === "ConnectionBlockedError" ||
-    tag === "RpcClientError" ||
     isTransportConnectionErrorMessage(error instanceof Error ? error.message : null);
   return connection
     ? t.composer.assist.optimize.reason.connection

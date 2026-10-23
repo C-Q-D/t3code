@@ -2,6 +2,8 @@
 import { useRef, useState, useSyncExternalStore } from "react";
 import { EnvironmentId, ThreadId, type ComposerOptimizeResult } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
+import { RpcClientError } from "effect/rpc";
+import * as Socket from "effect/socket/Socket";
 import { ComposerAssistError } from "@t3tools/contracts";
 import { Atom, AsyncResult } from "effect/reactivity";
 import { composerAssistEnvironment } from "~/state/composerAssist";
@@ -616,3 +618,24 @@ it.each([false, true])(
     expect(fake.run).toHaveBeenCalledTimes(1);
   },
 );
+
+it.each([
+  [
+    new RpcClientError.RpcClientDefect({
+      message: "incompatible protocol",
+      cause: new Error("invalid response"),
+    }),
+    "Could not improve: not available right now",
+  ],
+  [new Socket.SocketCloseError({ code: 1006 }), "Could not improve: connection lost"],
+] as const)("classifies RPC reason %j", async (reason, label) => {
+  fake.run
+    .mockReset()
+    .mockResolvedValue(
+      AsyncResult.failure(Cause.fail(new RpcClientError.RpcClientError({ reason }))),
+    );
+  await using screen = await render(<Harness />);
+  await screen.getByRole("button", { name: "Improve", exact: true }).click();
+  await vi.waitFor(() => expect(screen.getByRole("status").element().textContent).toBe(label));
+  expect(screen.container.querySelector("[data-draft]")?.textContent).toBe("  fix the bug  ");
+});
