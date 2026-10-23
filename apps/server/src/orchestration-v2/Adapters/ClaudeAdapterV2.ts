@@ -499,7 +499,7 @@ type ClaudeAgentSdkThreadIdentity =
 
 export type ClaudeAgentSdkQueryOptions = Omit<
   ClaudeQueryOptions,
-  "maxTurns" | "model" | "permissionMode" | "resume" | "sessionId" | "tools"
+  "model" | "permissionMode" | "resume" | "sessionId" | "tools"
 > & {
   readonly model: string;
   readonly tools: NonNullable<ClaudeQueryOptions["tools"]>;
@@ -4153,7 +4153,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
         let bypassCache: { cwd: string | null; availability: ClaudeBypassAvailability } | null =
           null;
         const queryPolicyForTurn = Effect.fnUntraced(function* (
-          turnInput: ProviderAdapter.ProviderAdapterV2TurnInput,
+          turnInput: Pick<ProviderAdapter.ProviderAdapterV2TurnInput, "runtimePolicy">,
         ) {
           if (
             permissionModeForClaudeRuntimePolicy(turnInput.runtimePolicy) !== "bypassPermissions"
@@ -9337,9 +9337,24 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
           return false;
         });
 
-        const openQuery = Effect.fnUntraced(function* (
-          turnInput: ProviderAdapter.ProviderAdapterV2TurnInput,
-          nativeThreadId: string,
+        /**
+         * Resolves the shared prefix inputs without changing the live query or its resume ledger.
+         * input carries the same thread, model, policy and contexts for main and side queries.
+         * The returned builder delays environment resolution until a process is actually opened;
+         * its append text must be read before replacing a live process. Resolution errors propagate.
+         * Side queries must reuse all main-query parameters or the cached prefix becomes invalid.
+         * These helpers are covered by the caller's operation span.
+         */
+        const prepareQueryInput = Effect.fnUntraced(function* (
+          turnInput: Pick<
+            ProviderAdapter.ProviderAdapterV2TurnInput,
+            | "threadId"
+            | "appThread"
+            | "providerThread"
+            | "modelSelection"
+            | "runtimePolicy"
+            | "developerContext"
+          >,
         ) {
           const queryPolicy = yield* queryPolicyForTurn(turnInput);
           const mcpOverrides = claudeMcpQueryOverrides({
@@ -9353,6 +9368,57 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
           const queryPolicyKey = claudeEffectiveQueryPolicyKey(queryPolicy, mcpOverrides);
           const compiledSelection = compileClaudeModelSelection(turnInput.modelSelection);
           const resumeSessionAt = yield* getNativeConversationHeadId(turnInput.providerThread);
+          const buildOptions = Effect.fnUntraced(function* (
+            nativeThreadId: string,
+            resume: boolean,
+            appendSystemPromptFileText: string | undefined,
+          ) {
+            return makeClaudeQueryOptions({
+              modelSelection: turnInput.modelSelection,
+              ...(turnInput.developerContext === undefined
+                ? {}
+                : { developerContext: turnInput.developerContext }),
+              nativeThreadId,
+              resume,
+              ...(resumeSessionAt === undefined ? {} : { resumeSessionAt }),
+              cwd: turnInput.runtimePolicy.cwd,
+              attachmentsDir,
+              settings: adapterOptions.settings,
+              environment: claudeQueryEnvironment(
+                adapterOptions.environment,
+                turnInput.appThread,
+                turnInput.appThread.lineage.relationshipToParent === "subagent"
+                  ? yield* resolveSubagentPromptCacheTtl(turnInput.runtimePolicy.cwd)
+                  : undefined,
+              ),
+              tools: queryPolicy.tools ?? CLAUDE_CODE_PRESET_TOOLS,
+              ...(mcpOverrides.allowedTools === undefined
+                ? {}
+                : { allowedTools: mcpOverrides.allowedTools }),
+              ...(mcpOverrides.mcpServers === undefined
+                ? {}
+                : { mcpServers: mcpOverrides.mcpServers }),
+              permissionMode: queryPolicy.permissionMode,
+              ...(queryPolicy.allowDangerouslySkipPermissions === undefined
+                ? {}
+                : {
+                    allowDangerouslySkipPermissions: queryPolicy.allowDangerouslySkipPermissions,
+                  }),
+              canUseTool,
+              onUserDialog,
+              supportedDialogKinds: ["resume_return"],
+              ...(appendSystemPromptFileText === undefined ? {} : { appendSystemPromptFileText }),
+            });
+          });
+          return { queryPolicy, queryPolicyKey, compiledSelection, resumeSessionAt, buildOptions };
+        });
+
+        const openQuery = Effect.fnUntraced(function* (
+          turnInput: ProviderAdapter.ProviderAdapterV2TurnInput,
+          nativeThreadId: string,
+        ) {
+          const prepared = yield* prepareQueryInput(turnInput);
+          const { queryPolicy, queryPolicyKey, compiledSelection, resumeSessionAt } = prepared;
           const existing = yield* Ref.get(queryContext);
           // A continuation prompts nothing: it drains output the live process
           // already produced, so it keeps that process whatever its selection.
@@ -9450,42 +9516,11 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             turnInput.nativeThreadHasTurns ?? turnInput.providerTurnOrdinal > 1;
           const shouldResume =
             resumeSessionAt !== undefined || openedWithResume || hasPersistedProviderTurn;
-          const queryOptions = makeClaudeQueryOptions({
-            modelSelection: turnInput.modelSelection,
-            ...(turnInput.developerContext === undefined
-              ? {}
-              : { developerContext: turnInput.developerContext }),
+          const queryOptions = yield* prepared.buildOptions(
             nativeThreadId,
-            resume: shouldResume,
-            ...(resumeSessionAt === undefined ? {} : { resumeSessionAt }),
-            cwd: turnInput.runtimePolicy.cwd,
-            attachmentsDir,
-            settings: adapterOptions.settings,
-            environment: claudeQueryEnvironment(
-              adapterOptions.environment,
-              turnInput.appThread,
-              turnInput.appThread.lineage.relationshipToParent === "subagent"
-                ? yield* resolveSubagentPromptCacheTtl(turnInput.runtimePolicy.cwd)
-                : undefined,
-            ),
-            tools: queryPolicy.tools ?? CLAUDE_CODE_PRESET_TOOLS,
-            ...(mcpOverrides.allowedTools === undefined
-              ? {}
-              : { allowedTools: mcpOverrides.allowedTools }),
-            ...(mcpOverrides.mcpServers === undefined
-              ? {}
-              : { mcpServers: mcpOverrides.mcpServers }),
-            permissionMode: queryPolicy.permissionMode,
-            ...(queryPolicy.allowDangerouslySkipPermissions === undefined
-              ? {}
-              : {
-                  allowDangerouslySkipPermissions: queryPolicy.allowDangerouslySkipPermissions,
-                }),
-            canUseTool,
-            onUserDialog,
-            supportedDialogKinds: ["resume_return"],
-            ...(appendSystemPromptFileText === undefined ? {} : { appendSystemPromptFileText }),
-          });
+            shouldResume,
+            appendSystemPromptFileText,
+          );
           const querySession = yield* queryRunner
             .open({
               threadId: turnInput.threadId,
