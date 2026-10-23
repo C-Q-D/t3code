@@ -74,6 +74,7 @@ const make = Effect.gen(function* () {
   const optimizations = new Map<string, Deferred.Deferred<void>>();
   const memo = new Map<string, { expiresAt: number; result: ComposerSuggestResult }>();
   let pendingDiagnosticWrites = 0;
+  let diagnosticBacklogWarned = false;
 
   /** Adapter failures are values; the caller owns the total deadline and never retries. */
   const runAdapter = Effect.fn("ComposerAssistService.runAdapter")(
@@ -264,7 +265,10 @@ const make = Effect.gen(function* () {
       chars: outcome.side?.text.length ?? 0,
     };
     if (pendingDiagnosticWrites >= MAX_PENDING_DIAGNOSTIC_WRITES) {
-      yield* Effect.logWarning("Composer diagnostic queue is full; dropping record.");
+      if (!diagnosticBacklogWarned) {
+        diagnosticBacklogWarned = true;
+        yield* Effect.logWarning("Composer diagnostic queue is full; dropping record.");
+      }
       return;
     }
     // Reserve before forking so concurrent completions cannot exceed the disk backlog limit.
@@ -273,6 +277,7 @@ const make = Effect.gen(function* () {
       Effect.ensuring(
         Effect.sync(() => {
           pendingDiagnosticWrites--;
+          diagnosticBacklogWarned = false;
         }),
       ),
       Effect.forkIn(scope, { startImmediately: true }),

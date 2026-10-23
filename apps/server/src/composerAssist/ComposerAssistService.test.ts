@@ -153,15 +153,25 @@ it.effect("writes bounded attempted tool types to the real diagnostic file witho
   }).pipe(Effect.provide(NodeServices.layer), Effect.scoped),
 );
 
-it.effect("returns RPC results with a stuck diagnostic sink and drops records above 64", () =>
+it.effect("returns RPC results and warns once per full diagnostic backlog", () =>
   Effect.gen(function* () {
     const warnings: unknown[] = [];
     const writing = yield* Deferred.make<void>();
     const returned = yield* Deferred.make<void>();
+    const release = yield* Deferred.make<void>();
+    const firstWrite = yield* Deferred.make<Fiber.Fiber<unknown, unknown>>();
+    const written: string[] = [];
     yield* Effect.gen(function* () {
       const f = yield* fixture({
         logSink: {
-          write: () => Deferred.succeed(writing, undefined).pipe(Effect.andThen(Effect.never)),
+          write: (record) =>
+            Effect.gen(function* () {
+              if (yield* Deferred.isDone(writing)) return yield* Effect.never;
+              yield* Deferred.succeed(firstWrite, yield* Effect.fiber);
+              yield* Deferred.succeed(writing, undefined);
+              yield* Deferred.await(release);
+              written.push(record.requestId);
+            }),
         },
       });
       const first = yield* f.service.suggestNext({ threadId, runId }).pipe(
@@ -171,16 +181,78 @@ it.effect("returns RPC results with a stuck diagnostic sink and drops records ab
       yield* Deferred.await(writing);
       yield* TestClock.adjust("45 seconds");
       assert.isTrue(yield* Deferred.isDone(returned), "RPC results must not wait for diagnostics");
-      assert.propertyVal(yield* Fiber.join(first), "_tag", "Suggested");
-      const remaining = yield* Effect.forEach(Array.from({ length: 64 }), () =>
+      const firstResult = yield* Fiber.join(first);
+      assert.propertyVal(firstResult, "_tag", "Suggested");
+      const remaining = yield* Effect.forEach(Array.from({ length: 73 }), () =>
         f.service.suggestNext({ threadId, runId }),
       );
       assert.deepEqual(
         remaining.map((result) => result._tag),
-        Array(64).fill("Suggested"),
+        Array(73).fill("Suggested"),
       );
       assert.lengthOf(f.logs, 64, "the newest record must be dropped at capacity");
       assert.deepEqual(warnings, [["Composer diagnostic queue is full; dropping record."]]);
+      yield* Deferred.succeed(release, undefined);
+      yield* Fiber.await(yield* Deferred.await(firstWrite));
+      assert.deepEqual(written, [firstResult.requestId]);
+      const accepted = yield* f.service.suggestNext({ threadId, runId });
+      assert.strictEqual(f.logs.at(-1)?.requestId, accepted.requestId);
+      assert.lengthOf(f.logs, 65, "restored capacity must accept a new record");
+      yield* f.service.suggestNext({ threadId, runId });
+      assert.lengthOf(f.logs, 65, "the next record must be dropped at capacity again");
+      assert.deepEqual(warnings, [
+        ["Composer diagnostic queue is full; dropping record."],
+        ["Composer diagnostic queue is full; dropping record."],
+      ]);
+    }).pipe(
+      Effect.provide(
+        Logger.layer(
+          [
+            Logger.make(({ message, logLevel }) => {
+              if (logLevel === "Warn") warnings.push(message);
+            }),
+          ],
+          { mergeWithExisting: false },
+        ),
+      ),
+      Effect.scoped,
+    );
+  }),
+);
+
+it.effect("accepts and writes a new diagnostic after an occupied write is interrupted", () =>
+  Effect.gen(function* () {
+    const warnings: unknown[] = [];
+    const firstWrite = yield* Deferred.make<Fiber.Fiber<unknown, unknown>>();
+    const received: string[] = [];
+    const written: string[] = [];
+    yield* Effect.gen(function* () {
+      const f = yield* fixture({
+        logSink: {
+          write: (record) =>
+            Effect.gen(function* () {
+              received.push(record.requestId);
+              if (received.length === 1) yield* Deferred.succeed(firstWrite, yield* Effect.fiber);
+              if (received.length <= 64) return yield* Effect.never;
+              written.push(record.requestId);
+            }),
+        },
+      });
+      yield* Effect.forEach(Array.from({ length: 65 }), () =>
+        f.service.suggestNext({ threadId, runId }),
+      );
+      assert.lengthOf(received, 64);
+      assert.deepEqual(written, []);
+      assert.lengthOf(warnings, 1);
+      yield* Fiber.interrupt(yield* Deferred.await(firstWrite));
+      const next = yield* f.service.suggestNext({ threadId, runId });
+      assert.deepEqual(
+        written,
+        [next.requestId],
+        "interruption must return capacity for a new write",
+      );
+      assert.lengthOf(received, 65);
+      assert.lengthOf(warnings, 1, "the replacement record must not be dropped");
     }).pipe(
       Effect.provide(
         Logger.layer(
