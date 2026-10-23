@@ -1,3 +1,5 @@
+/** Keeps provider controls isolated from prompt edits while applying local labels and control variants. */
+import { t } from "~/i18n";
 import type { ChatComposerProps } from "./ChatComposer";
 import type { PromptUltrathink } from "./TraitsPicker";
 import type { ProviderInstanceEntry } from "../../providerInstances";
@@ -225,7 +227,7 @@ export function ComposerControlsBar(props: {
       triggerClassName={
         composerControlsCollapsed
           ? cn(
-              "min-w-13 shrink text-xs!",
+              "min-w-13 shrink",
               !showInlineRestingControls &&
                 "@max-[640px]/composer-surface:[&_[data-chat-provider-model-picker-label]]:w-0 @max-[640px]/composer-surface:[&_[data-chat-provider-model-picker-label]]:flex-none",
             )
@@ -265,7 +267,7 @@ export function ComposerControlsBar(props: {
       className="shrink-0"
     >
       <CircleAlertIcon className="size-4" />
-      {providerSetupInstanceId ? "Open provider settings" : "No provider available"}
+      {providerSetupInstanceId ? t.composer.provider.openSettings : t.composer.provider.unavailable}
     </ComposerControl>
   ) : (
     <>

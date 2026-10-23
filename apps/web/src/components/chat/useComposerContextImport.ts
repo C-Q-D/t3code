@@ -1,3 +1,5 @@
+/** Imports context into the current draft and reports localized cross-environment failures. */
+import { t } from "~/i18n";
 import type { RefObject } from "react";
 import type { ChatComposerProps } from "./ChatComposer";
 import {
@@ -143,15 +145,15 @@ export function useComposerContextImport(input: {
     const fail = (reason: string) => {
       toastManager.add({
         type: "error",
-        title: `Couldn't bring ${record.name} into this message`,
-        description: `${reason} Remove the chip or attach the file again.`,
+        title: t.composer.attachments.importError(record.name),
+        description: t.composer.attachments.importRecoveryHint(reason),
       });
     };
     let file = copiedComposerAttachmentFile(sourceEnvironmentId, record.attachmentId);
     if (!file) {
       const sourceConnection = readPreparedConnection(sourceEnvironmentId);
       if (!sourceConnection) {
-        fail("The environment it came from is not connected.");
+        fail(t.composer.attachments.sourceDisconnectedError);
         return;
       }
       const result = await createAssetUrl({
@@ -163,12 +165,12 @@ export function useComposerContextImport(input: {
           ? resolveAssetUrl(sourceConnection.httpBaseUrl, result.value.relativeUrl)
           : null;
       if (!url) {
-        fail("The original attachment is no longer available.");
+        fail(t.composer.attachments.sourceMissingError);
         return;
       }
       const blob = await downloadAttachmentBlob(url);
       if (!blob) {
-        fail("Downloading it from the source failed.");
+        fail(t.composer.attachments.sourceDownloadError);
         return;
       }
       file = new File([blob], record.name, { type: record.mimeType || blob.type });
@@ -192,7 +194,7 @@ export function useComposerContextImport(input: {
       (pendingThreadImportsRef.current.get(importTargetKey) ?? 0) > 0 &&
       countReservedAttachments() >= PROVIDER_SEND_TURN_MAX_ATTACHMENTS
     ) {
-      fail("The attachment limit has been reached.");
+      fail(t.composer.attachmentErrors.limit);
       return;
     }
     if (record.kind === "image") {
@@ -216,8 +218,7 @@ export function useComposerContextImport(input: {
             ) ?? false,
         },
       );
-      if (!accepted.includes(localId))
-        fail("The draft rejected this attachment (duplicate or attachment limit reached).");
+      if (!accepted.includes(localId)) fail(t.composer.attachments.draftRejectedError);
     } else {
       const accepted = addComposerFilesToDraft([
         {
@@ -229,8 +230,7 @@ export function useComposerContextImport(input: {
           file,
         },
       ]);
-      if (!accepted.includes(localId))
-        fail("The draft rejected this attachment (duplicate or attachment limit reached).");
+      if (!accepted.includes(localId)) fail(t.composer.attachments.draftRejectedError);
     }
   };
   const importAttachmentRecord = async (

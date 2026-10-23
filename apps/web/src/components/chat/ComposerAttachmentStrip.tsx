@@ -1,3 +1,6 @@
+/** Owns attachment presentation and upload controls, independently of prompt typing. */
+import { ComposerControl } from "./ComposerControl";
+import { t } from "~/i18n";
 import type {
   ChatAttachment,
   ChatFileAttachment,
@@ -6,7 +9,7 @@ import type {
   SnapShotSource,
 } from "@t3tools/contracts";
 import { formatAttachmentSize } from "@t3tools/client-runtime/state/attachments";
-import { CircleAlertIcon, PaperclipIcon, PlayIcon, XIcon } from "lucide-react";
+import { CircleAlertIcon, FileXIcon, PlusIcon, PlayIcon, XIcon } from "lucide-react";
 import { type ComponentProps, useLayoutEffect, useRef } from "react";
 
 import {
@@ -149,7 +152,7 @@ export function ComposerAttachmentMediaRow({
   return (
     <div
       className={cn(
-        "mb-3 flex max-w-full gap-2",
+        "composer-attachment-images flex max-w-full gap-2",
         pendingSnapShotIds.length > 0 ||
           expandedImages.some((image) => image.source?.kind === "snap-shot")
           ? "snap-x snap-proximity overflow-x-auto overscroll-x-contain pb-1 scrollbar-thumb-foreground/18 scrollbar-track-transparent [scrollbar-width:thin] [&::-webkit-scrollbar]:h-2.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:border-3 [&::-webkit-scrollbar-thumb]:border-transparent [&::-webkit-scrollbar-thumb]:bg-foreground/18 [&::-webkit-scrollbar-thumb]:bg-clip-content [&::-webkit-scrollbar-thumb:hover]:bg-foreground/28 [&::-webkit-scrollbar-track]:mx-1 [&::-webkit-scrollbar-track]:bg-transparent"
@@ -168,6 +171,7 @@ export function ComposerAttachmentMediaRow({
             <SnapShotAttachmentFrame
               key={image.id}
               data-chat-composer-expanded-image="true"
+              data-attachment-failed={upload?.status === "failed" || undefined}
               aria-hidden={snapShotAnimationPending || undefined}
               inert={snapShotAnimationPending || undefined}
               arrival={snapShotArrival}
@@ -178,7 +182,7 @@ export function ComposerAttachmentMediaRow({
                 "group/attachment shrink-0 snap-start bg-background",
                 image.source?.kind === "snap-shot"
                   ? SNAP_SHOT_ATTACHMENT_FRAME_CLASS
-                  : "relative h-16 w-16 overflow-hidden rounded-lg border border-border/80",
+                  : "composer-attachment-card relative h-14 w-14 overflow-hidden",
                 snapShotAnimationPending && "invisible",
               )}
             >
@@ -186,7 +190,7 @@ export function ComposerAttachmentMediaRow({
                 <button
                   type="button"
                   className="h-full w-full cursor-zoom-in"
-                  aria-label={`Preview ${image.name}`}
+                  aria-label={t.composer.attachments.preview(image.name)}
                   onClick={() => {
                     const preview = buildExpandedImagePreview(images, image.id);
                     if (!preview) return;
@@ -198,7 +202,10 @@ export function ComposerAttachmentMediaRow({
                     alt={image.name}
                     className="h-full w-full object-cover"
                     fallback={
-                      isHeicImageFile({ name: image.name, type: image.mimeType }) ? (
+                      isHeicImageFile({
+                        name: image.name,
+                        type: image.mimeType,
+                      }) ? (
                         <AttachmentImage
                           name={image.name}
                           mimeType={image.mimeType}
@@ -234,21 +241,24 @@ export function ComposerAttachmentMediaRow({
                     render={
                       <span
                         role="img"
-                        aria-label="Draft attachment may not persist"
+                        aria-label={t.composer.attachments.persistenceWarning}
                         className="absolute left-1 top-1 inline-flex items-center justify-center rounded bg-background/85 p-0.5 text-warning-foreground"
                       >
                         <CircleAlertIcon className="size-3" />
                       </span>
                     }
                   />
-                  <TooltipPopup side="top">
-                    Draft attachment could not be saved locally and may be lost on navigation.
-                  </TooltipPopup>
+                  <TooltipPopup side="top">{t.composer.attachments.persistenceHint}</TooltipPopup>
                 </Tooltip>
               )}
               {upload?.status === "uploading" && (
-                <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-background/85 px-1 text-center text-3xs text-foreground">
-                  {formatAttachmentUploadProgress(upload.progress)}
+                <span className="composer-attachment-upload pointer-events-none absolute inset-x-0 bottom-0 bg-background/85 px-1 text-center text-3xs text-foreground">
+                  <progress
+                    className="composer-attachment-progress"
+                    aria-label={t.composer.attachments.uploadProgress}
+                    value={upload.progress}
+                    max={1}
+                  />
                 </span>
               )}
               {upload?.status === "failed" && (
@@ -267,7 +277,7 @@ export function ComposerAttachmentMediaRow({
                           })
                         }
                         disabled={!canOperateThread}
-                        aria-label={`Retry upload for ${image.name}`}
+                        aria-label={t.composer.attachments.retryUpload(image.name)}
                       />
                     }
                   >
@@ -276,6 +286,7 @@ export function ComposerAttachmentMediaRow({
                   <TooltipPopup side="top">{upload.reason}</TooltipPopup>
                 </Tooltip>
               )}
+              {/* Snap-shot frames reveal their remove button on hover or focus. */}
               <span
                 className={cn(
                   "absolute right-1 top-1 flex",
@@ -287,7 +298,7 @@ export function ComposerAttachmentMediaRow({
                   variant="media-close"
                   size="icon-xs"
                   onClick={() => onRemoveImage(image.id)}
-                  aria-label={`Remove ${image.name}`}
+                  aria-label={t.composer.attachments.remove(image.name)}
                 >
                   <XIcon />
                 </Button>
@@ -317,15 +328,18 @@ export function ComposerAttachmentMediaRow({
           maxFileAttachmentBytes !== null &&
           file.sizeBytes <= maxFileAttachmentBytes;
         const upload = fileCanUpload ? uploadsByImageId[file.id] : undefined;
+        const needsReattach = composerFileNeedsReattach(file);
         return (
           <div
             key={file.id}
-            className="relative h-16 w-16 shrink-0 snap-start overflow-hidden rounded-lg border border-border/80 bg-black"
+            className="composer-attachment-card composer-attachment-video relative h-14 w-14 shrink-0 snap-start overflow-hidden"
+            data-attachment-failed={needsReattach || upload?.status === "failed" || undefined}
+            data-attachment-reattach={needsReattach || undefined}
           >
             <button
               type="button"
               className="flex h-full w-full cursor-zoom-in flex-col items-center justify-center gap-1 px-1 text-white"
-              aria-label={`Play ${file.name}`}
+              aria-label={t.composer.attachments.play(file.name)}
               onClick={() => {
                 if (file.file !== null) {
                   const preview = buildExpandedImagePreview([file], file.id);
@@ -336,16 +350,26 @@ export function ComposerAttachmentMediaRow({
                 onFileOpen({ ...file, id: file.uploadedAttachmentId });
               }}
             >
-              {file.file && (
+              {file.file && !needsReattach && (
                 <>
                   <ComposerVideoThumbnail file={file.file} />
                   <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-black/10" />
                 </>
               )}
-              <PlayIcon className="relative z-10 size-4 fill-current drop-shadow-md" />
+              {needsReattach ? (
+                <span className="flex items-center gap-2.5 font-mono text-secondary-copy text-error">
+                  <FileXIcon className="size-4" />
+                  {file.name}
+                  <span className="composer-attachment-meta">
+                    {t.composer.attachments.attachAgain}
+                  </span>
+                </span>
+              ) : (
+                <PlayIcon className="relative z-10 size-4 fill-current drop-shadow-md" />
+              )}
             </button>
             {upload?.status === "uploading" && (
-              <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-background/85 px-1 text-center text-3xs text-foreground">
+              <span className="composer-attachment-upload pointer-events-none absolute inset-x-0 bottom-0 bg-background/85 px-1 text-center text-3xs text-foreground">
                 {formatAttachmentUploadProgress(upload.progress)}
               </span>
             )}
@@ -365,7 +389,7 @@ export function ComposerAttachmentMediaRow({
                         })
                       }
                       disabled={!canOperateThread}
-                      aria-label={`Retry upload for ${file.name}`}
+                      aria-label={t.composer.attachments.retryUpload(file.name)}
                     />
                   }
                 >
@@ -379,7 +403,7 @@ export function ComposerAttachmentMediaRow({
               size="icon-xs"
               className="absolute right-1 top-1"
               onClick={() => onRemoveFile(file.id)}
-              aria-label={`Remove ${file.name}`}
+              aria-label={t.composer.attachments.remove(file.name)}
             >
               <XIcon />
             </Button>
@@ -416,7 +440,7 @@ export function ComposerAttachmentFileList({
 }) {
   const uploadsByImageId = useAttachmentUploadStore((state) => state.uploadsByImageId);
   return (
-    <div className="mb-3 flex flex-col gap-1">
+    <div className="composer-attachment-files">
       {files.map((file) => {
         const fileCanUpload =
           supportsAttachmentUploads &&
@@ -428,22 +452,23 @@ export function ComposerAttachmentFileList({
         return (
           <div
             key={file.id}
-            className="flex min-w-0 items-center gap-2 py-1 text-sm text-foreground"
+            className="composer-attachment-card composer-attachment-file flex min-w-0 items-center gap-2.5 px-3"
+            data-attachment-failed={needsReattach || upload?.status === "failed" || undefined}
           >
             <PierreEntryIcon pathValue={file.name} kind="file" theme={resolvedTheme} />
             <button
               type="button"
               disabled={needsReattach}
-              className="min-w-0 flex-1 truncate text-left hover:underline focus-visible:outline-2"
+              className="min-w-0 max-w-60 truncate text-left hover:underline focus-visible:outline-2"
               onClick={() => onPreviewFile(file.id)}
             >
               {file.name}
             </button>
-            <span className="shrink-0 text-xs text-secondary-label">
+            <span className="composer-attachment-meta shrink-0 text-secondary-copy text-secondary-label">
               {needsReattach
                 ? canReattachFile
-                  ? "Attach again"
-                  : "Remove to send"
+                  ? t.composer.attachments.attachAgain
+                  : t.composer.attachments.removeToSend
                 : upload?.status === "uploading"
                   ? formatAttachmentUploadProgress(upload.progress)
                   : formatAttachmentSize(file.sizeBytes)}
@@ -463,7 +488,7 @@ export function ComposerAttachmentFileList({
                         })
                       }
                       disabled={!canOperateThread}
-                      aria-label={`Retry upload for ${file.name}`}
+                      aria-label={t.composer.attachments.retryUpload(file.name)}
                     />
                   }
                 >
@@ -476,7 +501,7 @@ export function ComposerAttachmentFileList({
               variant="ghost"
               size="icon-xs"
               onClick={() => onRemoveFile(file.id)}
-              aria-label={`Remove ${file.name}`}
+              aria-label={t.composer.attachments.remove(file.name)}
             >
               <XIcon />
             </Button>
@@ -516,7 +541,7 @@ export function ComposerFilePreviewDialog({
           mimeType={file.mimeType}
           sizeBytes={file.sizeBytes}
           file={file.file}
-          origin="Draft"
+          origin={t.composer.placeholder.draft}
           {...(file.uploadedAttachmentId && file.uploadEnvironmentId
             ? {
                 asset: {
@@ -559,7 +584,7 @@ export function ComposerRestingImagePreviews({
           key={image.id}
           type="button"
           className="relative size-7 shrink-0 cursor-zoom-in overflow-hidden rounded-md border border-border/70 bg-muted/60"
-          aria-label={`Preview ${image.name}`}
+          aria-label={t.composer.attachments.preview(image.name)}
           onPointerDown={(event) => event.preventDefault()}
           onClick={() => {
             const preview = buildExpandedImagePreview(allImages, image.id);
@@ -604,7 +629,7 @@ export function ComposerRestingImagePreviews({
         <button
           type="button"
           className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md border border-border/70 bg-muted/60 font-medium text-secondary-label text-xs tabular-nums outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
-          aria-label={`Show ${String(counts.overflowCount)} more image attachments`}
+          aria-label={t.composer.attachments.showMoreImages(counts.overflowCount)}
           onPointerDown={(event) => event.preventDefault()}
           onClick={onShowMore}
         >
@@ -627,11 +652,11 @@ export function ComposerQueuedAttachmentRow({
   readonly onRemove: (attachmentId: string) => void;
 }) {
   return (
-    <div className="mb-3 flex flex-wrap gap-2">
+    <div className="composer-attachment-images flex flex-wrap gap-2">
       {attachments.map(({ attachment, url }) => (
         <div
           key={attachment.id}
-          className="relative h-16 w-16 overflow-hidden rounded-lg border border-border/80 bg-background"
+          className="composer-attachment-card relative h-14 w-14 overflow-hidden"
         >
           {attachment.type === "image" && url ? (
             <img src={url} alt={attachment.name} className="h-full w-full object-cover" />
@@ -645,7 +670,7 @@ export function ComposerQueuedAttachmentRow({
             size="icon-xs"
             className="absolute right-1 top-1"
             onClick={() => onRemove(attachment.id)}
-            aria-label={`Remove ${attachment.name}`}
+            aria-label={t.composer.attachments.remove(attachment.name)}
           >
             <XIcon />
           </Button>
@@ -684,19 +709,19 @@ export function ComposerAttachButton({
       <Tooltip>
         <TooltipTrigger
           render={
-            <Button
+            <ComposerControl
               type="button"
-              variant="ghost"
-              size="icon-sm"
+              variant="composer"
+              className="w-8.5 p-0"
               onPointerDown={(event) => event.preventDefault()}
               onClick={() => inputRef.current?.click()}
-              aria-label="Attach files"
+              aria-label={t.composer.attachments.attach}
             />
           }
         >
-          <PaperclipIcon />
+          <PlusIcon className="size-4.25" />
         </TooltipTrigger>
-        <TooltipPopup>Attach files</TooltipPopup>
+        <TooltipPopup>{t.composer.attachments.attach}</TooltipPopup>
       </Tooltip>
     </>
   );

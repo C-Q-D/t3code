@@ -1,3 +1,5 @@
+/** Builds composer suggestions without owning the draft or menu positioning. */
+import { t } from "~/i18n";
 import { matchComposerThreadItems } from "@t3tools/client-runtime/composerThreadItems";
 import type {
   EnvironmentId,
@@ -181,7 +183,7 @@ export function useComposerMenuItems({
           type: "slash-command",
           command: "model",
           label: "/model",
-          description: "Switch response model for this thread",
+          description: t.composer.commandMenu.switchModelDescription,
         },
         ...(planModeUiEnabled
           ? ([
@@ -190,14 +192,14 @@ export function useComposerMenuItems({
                 type: "slash-command",
                 command: "plan",
                 label: "/plan",
-                description: "Switch this thread into plan mode",
+                description: t.composer.commandMenu.planDescription,
               },
               {
                 id: "slash:default",
                 type: "slash-command",
                 command: "default",
                 label: "/default",
-                description: "Switch this thread back to normal build mode",
+                description: t.composer.commandMenu.buildDescription,
               },
             ] as const)
           : []),
@@ -215,7 +217,10 @@ export function useComposerMenuItems({
         provider: selectedProvider,
         command,
         label: `/${command.name}`,
-        description: command.description ?? command.input?.hint ?? "Run provider command",
+        description:
+          command.description ??
+          command.input?.hint ??
+          t.composer.commandMenu.runCommandDescription,
       }));
       const query = composerTrigger.query.trim().toLowerCase();
       const skillItems = slashMenuSkills.map((skill) => ({
@@ -227,7 +232,7 @@ export function useComposerMenuItems({
         description:
           skill.shortDescription ??
           skill.description ??
-          (skill.scope ? `${skill.scope} skill` : ""),
+          (skill.scope ? t.composer.commandMenu.skillScope(skill.scope) : ""),
       }));
       const visibleProviderSlashCommandItems = providerSlashCommandItems.filter(
         (item) => item.command.name !== "compact" || compactSlashCommandAvailable,
@@ -248,7 +253,9 @@ export function useComposerMenuItems({
         description:
           skill.shortDescription ??
           skill.description ??
-          (skill.scope ? `${skill.scope} skill` : "Run provider skill"),
+          (skill.scope
+            ? t.composer.commandMenu.skillScope(skill.scope)
+            : t.composer.commandMenu.runSkillDescription),
       }));
     }
     if (
@@ -319,25 +326,25 @@ export function useComposerMenuItems({
         exactPullRequestLookup.isPending));
   const emptyState = (() => {
     if (composerTriggerKind === "skill") {
-      return "No skills found. Try / to browse provider commands.";
+      return t.composer.commandMenu.skillsEmpty;
     }
     if (composerTriggerKind === "pull-request") {
       if (pullRequestProjectId === null || pullRequestRepository === null) {
-        return "Pull requests are not available for this project.";
+        return t.composer.commandMenu.pullRequestsUnavailableHint;
       }
       if (
         pullRequestLookup.error !== null ||
         pullRequestLookup.data?.errors.some((error) => error.projectId === pullRequestProjectId)
       ) {
-        return "Pull requests could not be read for this project.";
+        return t.composer.commandMenu.pullRequestsReadError;
       }
       return composerTrigger?.query
-        ? `No pull request matches ${composerTrigger.query}.`
-        : "No pull requests found in this repository.";
+        ? t.composer.commandMenu.pullRequestEmpty(composerTrigger.query)
+        : t.composer.commandMenu.repositoryPullRequestsEmpty;
     }
     return composerTriggerKind === "path"
-      ? "No matching files or folders."
-      : "No matching command.";
+      ? t.composer.commandMenu.pathsEmpty
+      : t.composer.commandMenu.commandsEmpty;
   })();
 
   return { items, isLoading, emptyState };

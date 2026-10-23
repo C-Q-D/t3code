@@ -1,11 +1,16 @@
+/** Renders isolated model and mode controls and forwards footer action state. */
+import { PixelAgentIcon } from "../icons/PixelLucideIcon";
+import { cn } from "~/lib/utils";
+import { t } from "~/i18n";
 import type {
+  UsageLimitsReport,
   ModelSelection,
   ProviderInstanceId,
   ProviderInteractionMode,
   RuntimeMode,
 } from "@t3tools/contracts";
 import { createModelSelection } from "@t3tools/shared/model";
-import { BotIcon, PencilRulerIcon } from "lucide-react";
+import { CheckIcon, PencilRulerIcon } from "lucide-react";
 import { type ComponentProps, memo } from "react";
 
 import type { ContextWindowSnapshot } from "../../lib/contextWindow";
@@ -48,9 +53,7 @@ export const ComposerFooterModeControls = memo(function ComposerFooterModeContro
     supervisedRuntimeModeOption;
   const RuntimeModeIcon = runtimeModeOption.icon;
   const interactionModeTooltip =
-    props.interactionMode === "plan"
-      ? "Plan mode. Click to return to normal build mode"
-      : "Default mode. Click to enter plan mode";
+    props.interactionMode === "plan" ? t.composer.mode.planTooltip : t.composer.mode.buildTooltip;
 
   const interactionModeToggle = props.showInteractionModeToggle ? (
     <>
@@ -76,13 +79,13 @@ export const ComposerFooterModeControls = memo(function ComposerFooterModeContro
             />
           ) : (
             <ComposerControlIcon
-              icon={BotIcon}
+              icon={PixelAgentIcon}
               size={size}
               opticalSize={size === "xs" ? "default" : "large"}
             />
           )}
           <span data-composer-control-label className="sr-only sm:not-sr-only">
-            {props.interactionMode === "plan" ? "Plan" : "Build"}
+            {props.interactionMode === "plan" ? t.composer.mode.plan : t.composer.mode.build}
           </span>
         </TooltipTrigger>
         <TooltipPopup side="top">{interactionModeTooltip}</TooltipPopup>
@@ -106,33 +109,40 @@ export const ComposerFooterModeControls = memo(function ComposerFooterModeContro
               <ComposerSelectControl
                 data-composer-shortcut="composer.mode"
                 size={size}
-                aria-label="Runtime mode"
+                aria-label={t.composer.mode.runtimeAriaLabel}
               />
             }
           >
             <ComposerControlIcon icon={RuntimeModeIcon} size={size} />
             <SelectValue data-composer-control-label>{runtimeModeOption.label}</SelectValue>
           </TooltipTrigger>
-          <SelectPopup alignItemWithTrigger={false} {...composerFloatingLayerProps}>
+          <SelectPopup
+            alignItemWithTrigger={false}
+            data-composer-runtime-popup
+            {...composerFloatingLayerProps}
+          >
             {props.runtimeModeOptions.map((option) => {
               const OptionIcon = option.icon;
               return (
-                <SelectItem
-                  key={option.mode}
-                  value={option.mode}
-                  hideIndicator
-                  className="min-w-64"
-                >
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div className="grid min-w-0 flex-1 gap-0.5">
-                      <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
-                        <OptionIcon className="size-3.5 shrink-0 text-muted-foreground" />
-                        {option.label}
-                      </span>
-                      <span className="text-muted-foreground text-xs leading-4">
+                <SelectItem key={option.mode} value={option.mode} hideIndicator>
+                  <div className="flex min-w-0 items-start gap-2.5">
+                    <OptionIcon className="mt-0.5 size-3.75 shrink-0" />
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <span className="font-semibold">{option.label}</span>
+                      <span
+                        className={cn(
+                          "text-secondary-copy",
+                          option.mode === props.runtimeMode
+                            ? "text-composer-notice-label"
+                            : "text-secondary-label",
+                        )}
+                      >
                         {option.description}
                       </span>
                     </div>
+                    {option.mode === props.runtimeMode ? (
+                      <CheckIcon aria-hidden="true" className="size-3.5 shrink-0" />
+                    ) : null}
                   </div>
                 </SelectItem>
               );
@@ -151,6 +161,7 @@ export const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryA
   compact: boolean;
   canOperateThread: boolean;
   activeContextWindow: ContextWindowSnapshot | null;
+  usageLimitsReport?: UsageLimitsReport | null | undefined;
   reserveContextWindowMeter: boolean;
   activeThreadModelDisplayName: string | null;
   isPreparingWorktree: boolean;
@@ -193,6 +204,7 @@ export const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryA
       {props.activeContextWindow ? (
         <ContextWindowMeter
           usage={props.activeContextWindow}
+          usageLimitsReport={props.usageLimitsReport}
           modelDisplayName={props.activeThreadModelDisplayName}
           onCompact={props.onCompactContext}
           compactDisabled={props.compactDisabled}
