@@ -1,5 +1,9 @@
 /** Exercises side-query behavior through the service with controlled provider boundaries. */
 import { assert, it } from "@effect/vitest";
+import * as NodeServices from "@effect/platform-node/NodeServices";
+import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
+import * as ServerConfig from "../config.ts";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import {
   ThreadId,
@@ -37,6 +41,76 @@ const providerSessionId = ProviderSessionId.make("session-1");
 const instanceId = ProviderInstanceId.make("codex-1");
 
 const optimizationInput = { threadId, draft: "fix it", style: "default" as const };
+
+it.effect.each([
+  ["optimization", "nested"],
+  ["optimization", "string"],
+  ["optimization", "detail"],
+  ["suggestion", "nested"],
+  ["suggestion", "string"],
+  ["suggestion", "detail"],
+  ["optimization", "allowlisted"],
+] as const)("writes safe diagnostics for %s / %s", ([feature, kind]) =>
+  Effect.gen(function* () {
+    const marker = "DRAFT_BODY_SENTINEL";
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const directory = yield* fs.makeTempDirectoryScoped({ prefix: "t3-composer-redaction-" });
+    const result = yield* Effect.gen(function* () {
+      const logSink = yield* Log.ComposerAssistLog;
+      const f = yield* fixture({
+        logSink,
+        ...(kind === "detail"
+          ? {
+              query: () =>
+                Effect.succeed({
+                  text: "",
+                  model: null,
+                  usage: null,
+                  attemptedTools: [],
+                  stop: "error" as const,
+                  failure: { class: "provider_error" as const, detail: marker },
+                }),
+            }
+          : { policyFailure: true, policyCause: kind === "string" ? marker : new Error(marker) }),
+      });
+      return yield* feature === "suggestion"
+        ? f.service.suggestNext({ threadId, runId }).pipe(Effect.result)
+        : f.service.optimizePrompt({ ...optimizationInput, draft: marker }).pipe(Effect.result);
+    }).pipe(
+      Effect.provide(Log.layer.pipe(Layer.provide(ServerConfig.layerTest(directory, directory)))),
+      Effect.scoped,
+    );
+    const content = yield* fs.readFileString(
+      path.join(directory, "userdata", "logs", "composer-assist.ndjson"),
+    );
+    assert.isFalse(content.includes(marker));
+    assert.strictEqual(content.trim().split("\n").length, 1);
+    if (kind === "detail") {
+      assert.strictEqual(result._tag, "Success");
+      if (result._tag === "Success") assert.propertyVal(result.success, "reason", "provider_error");
+      assert.include(content, "provider_error");
+    } else {
+      assert.strictEqual(result._tag, "Failure");
+      if (result._tag === "Failure") {
+        assert.isFalse(result.failure.message.includes(marker));
+        assert.include(result.failure.message, kind === "string" ? "string" : "Error");
+        if (kind === "allowlisted") {
+          assert.include(
+            result.failure.message,
+            "Failed to resolve runtime policy for provider instance codex-1 in project project-1.",
+          );
+        }
+      }
+      assert.include(content, kind === "string" ? "string" : "Error");
+      if (kind === "allowlisted")
+        assert.include(
+          content,
+          "Failed to resolve runtime policy for provider instance codex-1 in project project-1.",
+        );
+    }
+  }).pipe(Effect.provide(NodeServices.layer), Effect.scoped),
+);
 
 it.effect("rejected requests prune expired suggestion memos", () =>
   Effect.gen(function* () {
@@ -100,9 +174,10 @@ it.effect.each(["suggestion", "optimization"] as const)(
       if (result._tag === "Failure") {
         assert.strictEqual(result.failure.reason, "internal");
         assert.include(result.failure.message, "RuntimePolicyResolveError");
-        assert.include(result.failure.message, "policy unavailable");
+        assert.isFalse(result.failure.message.includes("policy unavailable"));
+        assert.include(result.failure.message, "Composer assist failed (Error)");
       }
-      assert.include(JSON.stringify(f.logs), "policy unavailable");
+      assert.isFalse(JSON.stringify(f.logs).includes("policy unavailable"));
       assert.propertyVal(f.logs[0], "instanceId", instanceId);
       assert.isFalse(JSON.stringify(f.logs).includes("fix it"));
     }).pipe(Effect.scoped),
@@ -589,6 +664,8 @@ const fixture = Effect.fn("ComposerAssistTest.fixture")(function* (
     readonly gate?: string;
     readonly missingThread?: boolean;
     readonly policyFailure?: boolean;
+    readonly policyCause?: unknown;
+    readonly logSink?: typeof Log.ComposerAssistLog.Service;
     readonly query?: ProviderAdapter.ProviderAdapterV2SessionRuntime["runSideQuery"];
     readonly resumeFailure?: "open" | "resume";
     readonly driver?: string;
@@ -727,7 +804,7 @@ const fixture = Effect.fn("ComposerAssistTest.fixture")(function* (
               new RuntimePolicy.RuntimePolicyResolveError({
                 projectId: ProjectId.make("project-1"),
                 providerInstanceId: instanceId,
-                cause: new Error("policy unavailable"),
+                cause: options.policyCause ?? new Error("policy unavailable"),
               }),
             ),
         })
@@ -745,7 +822,7 @@ const fixture = Effect.fn("ComposerAssistTest.fixture")(function* (
       write: (record) =>
         Effect.sync(() => {
           logs.push(record);
-        }),
+        }).pipe(Effect.andThen(options.logSink?.write(record) ?? Effect.void)),
     }),
   );
   const service = Context.get(

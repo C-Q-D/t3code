@@ -1,5 +1,6 @@
 /** Runs isolated composer queries; restoring the main session remains owned by its manager. */
 import * as Context from "effect/Context";
+import * as Schema from "effect/Schema";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -582,16 +583,53 @@ function internalError(operation: string, cause: unknown): ComposerAssistError {
   });
 }
 
-/** Only error categories/messages enter diagnostics; provider payload objects are never serialized. */
+/** Unknown/provider causes may contain prompt bodies; only audited T3 error messages are copied. */
 function describeCause(cause: unknown, depth = 0): string {
-  if (typeof cause === "string") return cause;
-  if (typeof cause !== "object" || cause === null) return String(cause);
+  if (typeof cause !== "object" || cause === null)
+    return `Composer assist failed (${cause === null ? "null" : typeof cause})`;
   const category =
-    "_tag" in cause ? String(cause._tag) : cause instanceof Error ? cause.name : "Error";
-  const message = "message" in cause ? String(cause.message) : "";
+    "_tag" in cause && typeof cause._tag === "string"
+      ? cause._tag
+      : typeof cause.constructor === "function"
+        ? cause.constructor.name
+        : "Object";
+  const message = trustedCauseMessage(cause);
+  const summary =
+    message === null ? `Composer assist failed (${category})` : `${category}: ${message}`;
   const nested =
     depth < 4 && "cause" in cause && cause.cause !== undefined
       ? `; ${describeCause(cause.cause, depth + 1)}`
       : "";
-  return `${category}: ${message}${nested}`;
+  return `${summary}${nested}`;
+}
+
+const isProjectionSetupError = Schema.is(ProjectionStore.ProjectionStoreSetupError);
+const isProjectionReadError = Schema.is(ProjectionStore.ProjectionStoreReadError);
+const isProjectionThreadNotFoundError = Schema.is(
+  ProjectionStore.ProjectionStoreThreadNotFoundError,
+);
+const isSessionLookupError = Schema.is(ProviderSessions.ProviderSessionLookupError);
+const isRuntimePolicyError = Schema.is(RuntimePolicy.RuntimePolicyResolveError);
+
+/** Rebuild audited T3 messages from IDs so even a structural error cannot inject its own message. */
+function trustedCauseMessage(cause: unknown): string | null {
+  // Setup has fixed text; the other getters interpolate only the IDs explicitly copied here.
+  // These getters do not include cause, provider output, drafts, paths or caller-supplied messages.
+  if (isProjectionSetupError(cause))
+    return new ProjectionStore.ProjectionStoreSetupError({}).message;
+  if (isProjectionReadError(cause))
+    return new ProjectionStore.ProjectionStoreReadError({ threadId: cause.threadId }).message;
+  if (isProjectionThreadNotFoundError(cause))
+    return new ProjectionStore.ProjectionStoreThreadNotFoundError({ threadId: cause.threadId })
+      .message;
+  if (isSessionLookupError(cause))
+    return new ProviderSessions.ProviderSessionLookupError({
+      providerSessionId: cause.providerSessionId,
+    }).message;
+  if (isRuntimePolicyError(cause))
+    return new RuntimePolicy.RuntimePolicyResolveError({
+      projectId: cause.projectId,
+      providerInstanceId: cause.providerInstanceId,
+    }).message;
+  return null;
 }
