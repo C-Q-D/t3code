@@ -40,7 +40,7 @@ const v2ThreadShell: OrchestrationV2ThreadShell = {
   interactionMode: "default",
   branch: null,
   worktreePath: null,
-  activeProviderThreadId: null,
+  activeProviderThreadId: ProviderThreadId.make("provider-thread"),
   lineage: { rootThreadId: v2ThreadId, parentThreadId: null, relationshipToParent: null },
   forkedFrom: null,
   createdBy: "user",
@@ -258,8 +258,9 @@ it.each([
 });
 
 it.each([
-  { suggestionsEnabled: true, optimizeEnabled: false, driver: "codex" },
-  { suggestionsEnabled: false, optimizeEnabled: true, driver: "claudeAgent" },
+  { suggestionsEnabled: true, optimizeEnabled: false, driver: "codex", otherThread: false },
+  { suggestionsEnabled: false, optimizeEnabled: true, driver: "claudeAgent", otherThread: false },
+  { suggestionsEnabled: true, optimizeEnabled: true, driver: "codex", otherThread: true },
 ])("subscribes and renders provider completion for %j", async (props) => {
   using stack = new DisposableStack();
   const registry = stack.adopt(AtomRegistry.make(), (value) => value.dispose());
@@ -274,7 +275,18 @@ it.each([
     startedAt: v2Now,
     completedAt: null,
   };
-  const atom = Atom.make({ projection: { ...v2Projection, providerTurns: [turn] } });
+  const otherTurns: OrchestrationV2ProviderTurn[] = props.otherThread
+    ? [
+        {
+          ...turn,
+          id: ProviderTurnId.make("other-turn"),
+          providerThreadId: ProviderThreadId.make("other-provider-thread"),
+          status: "completed",
+          completedAt: DateTime.makeUnsafe("2026-06-20T00:09:00.000Z"),
+        },
+      ]
+    : [];
+  const atom = Atom.make({ projection: { ...v2Projection, providerTurns: [turn, ...otherTurns] } });
   source.read.mockReset().mockReturnValue(atom);
   const rendered = vi.fn();
   await using screen = await render(
@@ -289,7 +301,7 @@ it.each([
     registry.set(atom, {
       projection: {
         ...v2Projection,
-        providerTurns: [{ ...turn, status: "completed", completedAt: v2Now }],
+        providerTurns: [{ ...turn, status: "completed", completedAt: v2Now }, ...otherTurns],
       },
     }),
   );
@@ -312,6 +324,7 @@ it.each([
               promptCacheExpiresAt: "2026-06-20T01:00:00.000Z",
             },
           },
+          ...otherTurns,
         ],
       },
     }),

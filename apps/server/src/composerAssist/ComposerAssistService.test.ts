@@ -13,6 +13,7 @@ import {
   ProviderSessionId,
   ProviderInstanceId,
   ProviderDriverKind,
+  composerCacheExpiresAt,
   type OrchestrationV2ThreadShell,
   type OrchestrationV2ThreadProjection,
 } from "@t3tools/contracts";
@@ -34,6 +35,7 @@ import * as McpContext from "../mcpApps/McpAppModelContext.ts";
 import * as DeveloperContext from "../orchestration-v2/ThreadDeveloperContext.ts";
 import * as Log from "./ComposerAssistLog.ts";
 import * as Service from "./ComposerAssistService.ts";
+import { latestCompletedComposerProviderTurn } from "@t3tools/shared/composerAssist/providerTurns";
 
 const threadId = ThreadId.make("thread-1");
 const runId = RunId.make("run-1");
@@ -42,6 +44,49 @@ const providerSessionId = ProviderSessionId.make("session-1");
 const instanceId = ProviderInstanceId.make("codex-1");
 
 const optimizationInput = { threadId, draft: "fix it", style: "default" as const };
+
+it.effect(
+  "uses the same active-thread cache expiry as the client with multiple provider threads",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* fixture();
+      const activeTurn = f.projection.providerTurns[0]!;
+      f.projection.providerTurns.push({
+        ...activeTurn,
+        providerThreadId: ProviderThreadId.make("other-provider-thread"),
+        completedAt: DateTime.makeUnsafe(540_000),
+      });
+      const clientTurn = latestCompletedComposerProviderTurn(
+        f.projection.providerTurns,
+        f.projection.thread.activeProviderThreadId,
+      );
+      const clientExpiry = composerCacheExpiresAt({
+        driver: "codex",
+        lastTurnCompletedAt: clientTurn?.completedAt
+          ? DateTime.formatIso(clientTurn.completedAt)
+          : null,
+        promptCacheExpiresAt: clientTurn?.tokenUsage?.promptCacheExpiresAt,
+      });
+      assert.strictEqual(clientExpiry, 600_000);
+      yield* TestClock.setTime(600_000);
+      assert.propertyVal(
+        yield* f.service.optimizePrompt(optimizationInput),
+        "cacheMaybeExpired",
+        false,
+      );
+      yield* TestClock.adjust("1 milli");
+      assert.propertyVal(
+        yield* f.service.optimizePrompt(optimizationInput),
+        "cacheMaybeExpired",
+        true,
+      );
+      assert.propertyVal(
+        yield* f.service.suggestNext({ threadId, runId }),
+        "reason",
+        "cache_stale",
+      );
+    }).pipe(Effect.scoped),
+);
 
 it.effect("writes bounded attempted tool types to the real diagnostic file without payloads", () =>
   Effect.gen(function* () {

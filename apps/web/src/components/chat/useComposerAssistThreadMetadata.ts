@@ -1,4 +1,5 @@
 /** Shares value-stable thread quota and cache metadata across composer assistance features. */
+import { latestCompletedComposerProviderTurn } from "@t3tools/shared/composerAssist/providerTurns";
 import { useAtomValue } from "@effect/atom-react";
 import { isComposerAssistSupportedDriver, type ScopedThreadRef } from "@t3tools/contracts";
 import { threadKey, parseThreadKey } from "@t3tools/client-runtime/state/entities";
@@ -16,16 +17,13 @@ const assistThreadMetadataAtom = Atom.family((key: string) => {
     const projection = get(
       environmentThreadDetails.threadAtom({ environmentId, threadId }),
     )?.projection;
-    const last = projection?.providerTurns.reduce<(typeof projection.providerTurns)[number] | null>(
-      (latest, turn) => {
-        if (turn.completedAt === null) return latest;
-        return latest?.completedAt == null ||
-          DateTime.toEpochMillis(turn.completedAt) > DateTime.toEpochMillis(latest.completedAt)
-          ? turn
-          : latest;
-      },
-      null,
-    );
+    const last =
+      projection === undefined
+        ? undefined
+        : latestCompletedComposerProviderTurn(
+            projection.providerTurns,
+            projection.thread.activeProviderThreadId,
+          );
     return {
       completedRuns: projection?.runs.filter((run) => run.status === "completed").length ?? 0,
       lastTurnCompletedAt: last?.completedAt == null ? null : DateTime.formatIso(last.completedAt),

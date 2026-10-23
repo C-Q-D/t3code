@@ -17,6 +17,7 @@ import {
   composerCacheMaybeExpired,
   isComposerAssistSupportedDriver,
 } from "@t3tools/contracts";
+import { latestCompletedComposerProviderTurn } from "@t3tools/shared/composerAssist/providerTurns";
 import { checkCandidate, stripWrapping } from "@t3tools/shared/composerAssist/filters";
 import {
   SUGGESTION_PROMPT,
@@ -133,20 +134,10 @@ const make = Effect.gen(function* () {
       const providerThread = records.providerThreads.find(
         (candidate) => candidate.id === records.thread.activeProviderThreadId,
       );
-      const turn = records.providerTurns
-        .filter(
-          (candidate) =>
-            candidate.providerThreadId === providerThread?.id && candidate.completedAt !== null,
-        )
-        .reduce<(typeof records.providerTurns)[number] | undefined>(
-          (latest, candidate) =>
-            latest === undefined ||
-            DateTime.toEpochMillis(candidate.completedAt!) >
-              DateTime.toEpochMillis(latest.completedAt!)
-              ? candidate
-              : latest,
-          undefined,
-        );
+      const turn = latestCompletedComposerProviderTurn(
+        records.providerTurns,
+        records.thread.activeProviderThreadId,
+      );
       const expiresAt = composerCacheExpiresAt({
         driver: providerThread?.driver ?? "",
         lastTurnCompletedAt: turn?.completedAt ? DateTime.formatIso(turn.completedAt) : null,
