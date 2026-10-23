@@ -553,7 +553,50 @@ export type ProviderAdapterV2SubagentOutcome = {
   readonly result: OrchestrationV2Subagent["result"];
 };
 
+/** A forked query inherits the main thread's model and policy without mutating its state. */
+export interface ProviderAdapterV2SideQueryInput {
+  readonly threadId: ThreadId;
+  readonly providerThread: OrchestrationV2ProviderThread;
+  readonly modelSelection: ModelSelection;
+  readonly runtimePolicy: ProviderAdapterV2RuntimePolicy;
+  readonly prompt: string;
+  readonly purpose: "suggestion" | "optimization";
+}
+
+/** Token accounting includes cached reads and cache creation in inputTokens. */
+export interface ProviderAdapterV2SideQueryUsage {
+  readonly inputTokens: number;
+  readonly cachedInputTokens: number;
+  readonly cacheCreationTokens?: number;
+  readonly outputTokens: number;
+}
+
+/** Query output may be empty; post-start provider failures belong here, not in the error channel. */
+export interface ProviderAdapterV2SideQueryResult {
+  readonly text: string;
+  readonly model: string | null;
+  readonly usage: ProviderAdapterV2SideQueryUsage | null;
+  /** Attempted tool names or item types in arrival order; empty means no attempt. */
+  readonly attemptedTools: ReadonlyArray<string>;
+  readonly stop: "completed" | "max_turns" | "interrupted_on_tool" | "error";
+  /** Non-null when stop is error. */
+  readonly failure: null | {
+    readonly class: "usage_limit" | "provider_error" | "transport_error";
+    readonly detail: string;
+  };
+}
+
 export interface ProviderAdapterV2SessionRuntime {
+  /**
+   * Runs an isolated fork with no provider events, projection writes or main-session mutations.
+   * Absence means unsupported. Input preserves the main thread's model and runtime policy.
+   * Only startup failures use the error channel; later failures are returned in the result.
+   * The caller applies a 45-second deadline without retries; interruption must release
+   * the query's process or ephemeral thread. There is no pagination.
+   */
+  readonly runSideQuery?: (
+    input: ProviderAdapterV2SideQueryInput,
+  ) => Effect.Effect<ProviderAdapterV2SideQueryResult, ProviderAdapterV2Error>;
   readonly instanceId: ProviderInstanceId;
   readonly driver: ProviderDriverKind;
   readonly providerSessionId: ProviderSessionId;
