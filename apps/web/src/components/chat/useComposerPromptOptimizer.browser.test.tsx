@@ -4,9 +4,20 @@ import { EnvironmentId, ThreadId, type ComposerOptimizeResult } from "@t3tools/c
 import { Atom, AsyncResult } from "effect/reactivity";
 import { expect, it, vi } from "vite-plus/test";
 import { userEvent } from "vite-plus/test/browser";
-import { render } from "../../../test/render";
+import { act, render } from "../../../test/render";
 import { ComposerPromptEditor, type ComposerPromptEditorHandle } from "../ComposerPromptEditor";
 import { useComposerPromptOptimizer } from "./useComposerPromptOptimizer";
+
+/** Lets each test release one RPC response at an explicit milestone. */
+function deferredResult() {
+  let resolve!: (value: ReturnType<typeof AsyncResult.success<ComposerOptimizeResult>>) => void;
+  const promise = new Promise<ReturnType<typeof AsyncResult.success<ComposerOptimizeResult>>>(
+    (settle) => {
+      resolve = settle;
+    },
+  );
+  return { promise, resolve };
+}
 
 const fake = vi.hoisted(() => ({ run: vi.fn() }));
 vi.mock("~/state/use-atom-command", () => ({ useAtomCommand: () => fake.run }));
@@ -15,14 +26,14 @@ vi.mock("~/state/composerAssist", () => ({
 }));
 
 /** Mounts the same editor contract used by ChatComposer; buttons invoke the hook's public operations. */
-function Harness() {
+function Harness({ thread = "thread" }: { thread?: string }) {
   const [prompt, setPrompt] = useState("  fix the bug  ");
   const [cursor, setCursor] = useState(15);
   const editorRef = useRef<ComposerPromptEditorHandle | null>(null);
   const optimizer = useComposerPromptOptimizer({
     environmentId: EnvironmentId.make("env"),
-    threadId: ThreadId.make("thread"),
-    draftKey: "thread",
+    threadId: ThreadId.make(thread),
+    draftKey: thread,
     prompt,
     driver: "codex",
     enabled: true,
@@ -76,6 +87,66 @@ it("replaces the original untrimmed draft and restores it with one editor undo",
   await userEvent.keyboard("{Control>}z{/Control}");
   await expect.element(screen.getByRole("textbox")).toHaveTextContent("fix the bug");
   expect(screen.container.querySelector("[data-draft]")?.textContent).toBe("  fix the bug  ");
+});
+
+it.each(["edited draft", ""])(
+  "discards a late result after the draft becomes %j",
+  async (nextDraft) => {
+    const pending = deferredResult();
+    fake.run.mockReset().mockReturnValue(pending.promise);
+    await using screen = await render(<Harness />);
+    await screen.getByRole("button", { name: "Improve", exact: true }).click();
+    await expect.element(screen.getByRole("status")).toHaveTextContent("Improving…");
+    await screen.getByRole("textbox").fill(nextDraft);
+    await act(async () =>
+      pending.resolve(
+        AsyncResult.success({
+          _tag: "Optimized",
+          requestId: "late",
+          text: "Stale rewrite",
+          cacheMaybeExpired: false,
+        }),
+      ),
+    );
+    await expect
+      .element(screen.getByRole("status"))
+      .toHaveTextContent("Draft changed; result discarded");
+    expect(screen.container.querySelector("[data-draft]")?.textContent).toBe(nextDraft);
+  },
+);
+
+it("silently drops a response after changing threads", async () => {
+  const pending = deferredResult();
+  fake.run.mockReset().mockReturnValue(pending.promise);
+  await using screen = await render(<Harness />);
+  await screen.getByRole("button", { name: "Improve", exact: true }).click();
+  await screen.rerender(<Harness thread="other" />);
+  await act(async () =>
+    pending.resolve(
+      AsyncResult.success({
+        _tag: "Optimized",
+        requestId: "late",
+        text: "Stale rewrite",
+        cacheMaybeExpired: false,
+      }),
+    ),
+  );
+  await expect.element(screen.getByRole("status")).toBeEmptyDOMElement();
+  expect(screen.container.querySelector("[data-draft]")?.textContent).toBe("  fix the bug  ");
+});
+
+it("does not dispatch a second request while the first is pending", async () => {
+  const pending = deferredResult();
+  fake.run.mockReset().mockReturnValue(pending.promise);
+  await using screen = await render(<Harness />);
+  await screen.getByRole("button", { name: "Improve", exact: true }).click();
+  await screen.getByRole("button", { name: "Improve", exact: true }).click();
+  expect(fake.run).toHaveBeenCalledTimes(1);
+  await act(async () =>
+    pending.resolve(
+      AsyncResult.success({ _tag: "Filtered", requestId: "one", reason: "unchanged" }),
+    ),
+  );
 });
 
 it("restores the original draft using the explicit undo action", async () => {
