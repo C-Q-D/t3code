@@ -101,7 +101,7 @@ import { PullRequestGlyph } from "~/components/pullRequest/pullRequestIcons";
 import { observeResize } from "~/lib/observeResize";
 
 /** Controlled panel surfaces, actions and host geometry; tab identity and ordering are supplied by the owner. */
-interface RightPanelTabsProps {
+export interface RightPanelTabsProps {
   mode: PreviewPanelMode;
   /** Chat owns sibling slabs below the shared titlebar; other hosts retain their existing layout. */
   standalone?: boolean;

@@ -61,6 +61,7 @@ import {
   WorkspaceBreadcrumbText,
 } from "../WorkspaceBreadcrumb";
 import { observeResize } from "~/lib/observeResize";
+import { textDirection } from "~/textDirection";
 import { useClientSettings } from "../../hooks/useSettings";
 import { useTitlebarSlot } from "../frame/titlebarSlot";
 import {
@@ -533,6 +534,7 @@ export const ChatHeader = memo(function ChatHeader({
             {renamingTitle !== null ? (
               <input
                 autoFocus
+                dir="auto"
                 aria-label={t.chat.header.threadTitle}
                 className="h-8 min-w-0 flex-1 rounded-full bg-input px-3 font-serif text-chat-title font-bold text-foreground shadow-well-control outline-none focus:inset-shadow-focus"
                 defaultValue={renamingTitle}
@@ -582,7 +584,7 @@ export const ChatHeader = memo(function ChatHeader({
                     />
                   }
                 >
-                  <span className="min-w-0">
+                  <span className="min-w-0" dir={textDirection(activeThreadTitle)}>
                     <WorkspaceBreadcrumbText>{activeThreadTitle}</WorkspaceBreadcrumbText>
                   </span>
                   <span
