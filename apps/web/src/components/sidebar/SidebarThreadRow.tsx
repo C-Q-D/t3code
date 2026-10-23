@@ -1044,7 +1044,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
       <span
         aria-hidden
         className={cn(
-          "min-w-0 flex-1 truncate",
+          "min-w-0 flex-1 truncate text-start",
           variant === "card" ? "text-heading leading-4.5" : "text-control",
           props.isActive
             ? "font-bold"
