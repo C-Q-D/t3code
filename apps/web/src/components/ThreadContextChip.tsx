@@ -1,11 +1,13 @@
 /** Renders a linked conversation context chip with localized accessibility text. */
 import { t } from "~/i18n";
+import { scopeProjectRef } from "@t3tools/client-runtime/environment";
 import type { ThreadContextRecord } from "@t3tools/contracts";
 import { Link } from "@tanstack/react-router";
 import { MessagesSquareIcon } from "lucide-react";
 
-import { useThreadShell } from "~/state/entities";
+import { useProject, useThreadShell } from "~/state/entities";
 import { ContextChip, ContextChipLabel } from "./ContextChip";
+import { ProjectFavicon } from "./ProjectFavicon";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 
 /**
@@ -20,6 +22,7 @@ export function ThreadContextChip(props: {
 }) {
   const { environmentId, threadId } = props.record;
   const shell = useThreadShell({ environmentId, threadId });
+  const project = useProject(shell ? scopeProjectRef(environmentId, shell.projectId) : null);
   const title = shell?.title?.trim() || props.record.title;
   return (
     <Tooltip>
@@ -33,7 +36,11 @@ export function ThreadContextChip(props: {
             data-markdown-copy={props.copyMarkdown}
             className="no-underline"
           >
-            <MessagesSquareIcon />
+            {project ? (
+              <ProjectFavicon project={project} className="size-[1.17em] self-center" />
+            ) : (
+              <MessagesSquareIcon />
+            )}
             <ContextChipLabel>{title}</ContextChipLabel>
           </ContextChip>
         }
