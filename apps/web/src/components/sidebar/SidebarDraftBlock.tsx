@@ -1,13 +1,14 @@
+/** Renders frozen draft summaries without subscribing the list to composer edits. */
 import { discardComposerDraft } from "../../lib/discardComposerDraft";
 import { replaceComposerContextReferences } from "@t3tools/shared/composerContextReferences";
-import { SquarePenIcon, XIcon } from "lucide-react";
+import { SquarePenIcon, XIcon, GitBranchIcon } from "lucide-react";
 import {
   memo,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
 } from "react";
-import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
+import { type EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import { cn } from "~/lib/utils";
 import { resolveSidebarRowAccessibility } from "../Sidebar.logic";
 import { ProjectFavicon, type ProjectFaviconProject } from "../ProjectFavicon";
@@ -20,18 +21,24 @@ import {
   type DraftSessionState,
 } from "../../composerDraftStore";
 import { draftPenClassName, draftSurfaceClassName } from "./SidebarThreadRow";
+import { t } from "~/i18n";
+import { useFocusVisibleWithin } from "../../hooks/useFocusVisibleWithin";
+import { MiddleTruncate } from "../ui/middle-truncate";
 
+/** Renders an invested draft in the card layout; the frozen snapshot avoids repainting while typing. */
 const SidebarDraftRow = memo(function SidebarDraftRow(props: {
   draftId: DraftId;
   composer: ComposerThreadDraftState;
   project: ProjectFaviconProject | null;
   projectDisplayName: string | null;
+  branch: string | null;
   isActive: boolean;
   onNavigate: (draftId: DraftId) => void;
   onDiscard: (draftId: DraftId) => void;
   onContextMenu: (draftId: DraftId, position: { x: number; y: number }) => void;
 }) {
   const { composer, draftId, onContextMenu, onDiscard, onNavigate } = props;
+  const focusVisibleWithin = useFocusVisibleWithin();
   const promptPreview =
     replaceComposerContextReferences(composer.prompt, (occurrence) => occurrence.label)
       .trim()
@@ -45,12 +52,10 @@ const SidebarDraftRow = memo(function SidebarDraftRow(props: {
     composer.previewAnnotations.length +
     composer.reviewComments.length;
   const preview =
-    promptPreview.length > 0
-      ? promptPreview
-      : `${attachmentCount} attachment${attachmentCount === 1 ? "" : "s"}`;
+    promptPreview.length > 0 ? promptPreview : t.sidebar.thread.attachmentCount(attachmentCount);
   const accessibility = resolveSidebarRowAccessibility({
     title: preview,
-    statusLabel: "Unsent draft",
+    statusLabel: t.sidebar.thread.unsentDraftHint,
     projectDisplayName: props.projectDisplayName,
     isActive: props.isActive,
   });
@@ -79,30 +84,32 @@ const SidebarDraftRow = memo(function SidebarDraftRow(props: {
     onDiscard(draftId);
   };
   return (
-    <li className="list-none py-0.5">
+    <li className="list-none pb-0.75">
       <div
         role="button"
         tabIndex={0}
         aria-label={accessibility.label}
         aria-current={accessibility.current}
         data-testid="sidebar-draft-row"
+        data-focus-visible-within={focusVisibleWithin.active}
+        {...focusVisibleWithin.handlers}
         className={cn(
-          "group/sidebar-row relative w-full cursor-pointer overflow-hidden rounded-md text-left text-sidebar-foreground outline-none select-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
-          props.isActive ? "bg-sidebar-row-active" : draftSurfaceClassName,
+          "group/sidebar-row relative w-full cursor-pointer rounded-card-row text-left text-sidebar-foreground outline-none select-none focus-visible:inset-shadow-focus",
+          props.isActive ? "bg-sidebar-row-active shadow-raise-m" : draftSurfaceClassName,
         )}
         onClick={handleActivate}
         onContextMenu={handleContextMenu}
         onKeyDown={handleKeyDown}
       >
         <span className="sr-only">{preview}</span>
-        <div className="relative z-10 h-[4.875rem] px-(--sidebar-row-content-inset) py-(--sidebar-content-inset)">
+        <div className="relative z-10 flex h-19.5 flex-col gap-0.75 px-3 py-2.5">
           <div className="flex h-5 min-w-0 items-center gap-1.5">
             <SquarePenIcon aria-hidden className={draftPenClassName} />
             {props.project ? (
               <ProjectFavicon project={props.project} className="size-4 shrink-0" />
             ) : null}
-            <span className="min-w-0 flex-1 truncate text-xs font-medium text-secondary-label">
-              {props.projectDisplayName}
+            <span className="min-w-0 flex-1 truncate text-secondary-copy text-secondary-label">
+              {props.projectDisplayName ?? t.tools.palette.noProject}
             </span>
             <span className="ml-auto flex h-5 min-w-5 shrink-0 items-center justify-end">
               <Tooltip>
@@ -110,20 +117,36 @@ const SidebarDraftRow = memo(function SidebarDraftRow(props: {
                   render={
                     <button
                       type="button"
-                      aria-label="Discard draft"
+                      aria-label={t.sidebar.thread.discardDraft}
                       onClick={handleDiscard}
-                      className="pointer-events-none inline-flex cursor-pointer items-center rounded-md bg-transparent px-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 group-hover/sidebar-row:pointer-events-auto group-hover/sidebar-row:opacity-100"
+                      className="-my-1.5 -mr-1.5 hidden h-7.5 w-7 cursor-pointer items-center justify-center rounded-full bg-secondary text-foreground shadow-raise-xs-control outline-none hover:bg-accent focus-visible:inset-shadow-focus group-hover/sidebar-row:inline-flex group-focus-visible/sidebar-row:inline-flex group-data-[focus-visible-within=true]/sidebar-row:inline-flex"
                     >
-                      <XIcon className="size-3" />
+                      <XIcon className="size-3.5" />
                     </button>
                   }
                 />
-                <TooltipPopup side="top">Discard draft</TooltipPopup>
+                <TooltipPopup side="top">{t.sidebar.thread.discardDraft}</TooltipPopup>
               </Tooltip>
             </span>
           </div>
-          <div aria-hidden className="mt-0.5 truncate text-sm font-medium text-foreground/90">
+          <div
+            aria-hidden
+            className={cn(
+              "h-4.5 shrink-0 truncate text-heading leading-4.5 text-foreground",
+              props.isActive ? "font-bold" : "font-semibold",
+            )}
+          >
             {preview}
+          </div>
+          <div className="flex h-3.5 shrink-0 items-center gap-2 font-mono text-meta-large leading-3.5 text-muted-foreground">
+            {props.branch ? (
+              <>
+                <GitBranchIcon aria-hidden className="size-3 shrink-0" />
+                <span className="flex min-w-0">
+                  <MiddleTruncate value={props.branch} showTitle={false} />
+                </span>
+              </>
+            ) : null}
           </div>
         </div>
       </div>
@@ -137,6 +160,7 @@ interface SidebarDraftRowData {
   composer: ComposerThreadDraftState;
 }
 
+/** Owns draft subscriptions above pinned rows so composer keystrokes never rerender the whole list. */
 export const SidebarDraftBlock = memo(function SidebarDraftBlock(props: {
   projectByKey: ReadonlyMap<string, EnvironmentProject>;
   projectDisplayNameByKey: ReadonlyMap<string, string>;
@@ -147,6 +171,12 @@ export const SidebarDraftBlock = memo(function SidebarDraftBlock(props: {
 }) {
   const draftThreadsByThreadKey = useComposerDraftStore((store) => store.draftThreadsByThreadKey);
   const draftsByThreadKey = useComposerDraftStore((store) => store.draftsByThreadKey);
+  // The open draft's row is FROZEN at the moment the draft became the route:
+  // it stays visible (like a thread row) but never repaints while the user
+  // types. A draft that was never navigated away from has no snapshot to
+  // freeze, so a fresh typing session shows no row at all. Captured
+  // synchronously on route change (setState-during-render derived state) so
+  // the row never flickers out for a frame between route change and capture.
   const [frozenActive, setFrozenActive] = useState<{
     routeDraftId: string | null;
     row: SidebarDraftRowData | null;
@@ -166,6 +196,9 @@ export const SidebarDraftBlock = memo(function SidebarDraftBlock(props: {
   }
   const drafts = (() => {
     const rows: SidebarDraftRowData[] = [];
+    // Every non-promoted session with content gets a row, mapped or not:
+    // new-thread surfaces mint fresh drafts and leave invested ones behind
+    // unmapped, so the mapping only knows about the latest per project.
     for (const [draftKey, session] of Object.entries(draftThreadsByThreadKey)) {
       if (session.promotedTo != null) {
         continue;
@@ -177,6 +210,9 @@ export const SidebarDraftBlock = memo(function SidebarDraftBlock(props: {
         continue;
       }
       if (draftKey === props.routeDraftId) {
+        // Open draft: render the frozen entry snapshot, or nothing for a
+        // draft that has never been left. Gated on the LIVE session above so
+        // send/discard still removes the row immediately.
         if (frozenActive.routeDraftId === draftKey && frozenActive.row !== null) {
           rows.push(frozenActive.row);
         }
@@ -205,8 +241,12 @@ export const SidebarDraftBlock = memo(function SidebarDraftBlock(props: {
             composer={composer}
             project={props.projectByKey.get(projectKey) ?? null}
             projectDisplayName={props.projectDisplayNameByKey.get(projectKey) ?? null}
+            branch={session.branch}
             isActive={draftId === props.routeDraftId}
             onNavigate={props.onNavigateToDraft}
+            // The /draft/$draftId route redirects home on its own when the
+            // draft it renders disappears, so discarding the open draft needs
+            // no special-casing here.
             onDiscard={discardComposerDraft}
             onContextMenu={props.onDraftContextMenu}
           />

@@ -1,4 +1,4 @@
-import { CollapsibleSectionHeader } from "../ui/collapsible-section-header";
+/** Keeps sidebar drag targets in the sortable geometry. */
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { type ReactNode } from "react";
@@ -10,7 +10,8 @@ import {
 } from "../Sidebar.logic";
 import { SIDEBAR_SORTABLE_DRAG_DISABLED } from "./SidebarThreadRow";
 
-function SortableSidebarMarker(props: {
+/** Keeps headers and empty targets in the sortable geometry without allowing them to be picked up; placeholder reveals must not animate from a hidden position. */
+export function SortableSidebarMarker(props: {
   marker: SidebarListMarker;
   className?: string;
   children?: ReactNode;
@@ -29,6 +30,7 @@ function SortableSidebarMarker(props: {
       className={cn("list-none", props.className)}
       style={{
         transform: CSS.Translate.toString(transform),
+        // A newly revealed target must not slide from its hidden position.
         transition: props.marker.endsWith("-placeholder") ? "none" : transition,
         visibility: transform?.scaleY === 0 ? "hidden" : undefined,
       }}
@@ -38,8 +40,10 @@ function SortableSidebarMarker(props: {
   );
 }
 
+/** Keep the empty Active target measurable without reserving resting space.
+ * The sorting strategy opens its hint during a drag; props select its label and target state. */
 export function SidebarSectionPlaceholder(props: {
-  marker: "active-placeholder" | "settled-placeholder";
+  marker: "active-placeholder";
   label: string;
   showHint: boolean;
   isDropTarget: boolean;
@@ -95,41 +99,6 @@ export function SidebarDragBoundary(props: {
           />
         </div>
       ) : null}
-    </SortableSidebarMarker>
-  );
-}
-
-export function SidebarSectionHeader(props: {
-  marker: "working-header" | "snoozed-header" | "settled-header";
-  label: string;
-  className?: string;
-  dragging?: boolean;
-  isDropTarget?: boolean;
-  toggle: { expanded: boolean; onToggle: () => void };
-}) {
-  const shelf =
-    props.marker === "working-header"
-      ? "working"
-      : props.marker === "snoozed-header"
-        ? "snoozed"
-        : "settled";
-  const snoozed = shelf === "snoozed";
-  return (
-    <SortableSidebarMarker
-      marker={props.marker}
-      data-testid={`sidebar-${props.marker}`}
-      className={cn("mx-0.5 h-8", props.className)}
-    >
-      <CollapsibleSectionHeader
-        onClick={props.toggle.onToggle}
-        expanded={props.toggle.expanded}
-        tone={
-          props.isDropTarget ? "accent" : props.dragging ? "emphasized" : snoozed ? "info" : "muted"
-        }
-        data-testid={`sidebar-${shelf}-shelf-toggle`}
-      >
-        {props.label}
-      </CollapsibleSectionHeader>
     </SortableSidebarMarker>
   );
 }

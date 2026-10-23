@@ -1,7 +1,8 @@
 /** Verifies sidebar presentation, visibility and user actions with controlled thread fixtures.
  * @vitest-environment jsdom
  */
-// Unit tests use jsdom; test/render.tsx depends on the browser runner. The fixture owns cleanup.
+
+import { completeSidebarRouteReveal, pendingSidebarRouteReveal } from "./sidebar/routeReveal"; // Unit tests use jsdom; test/render.tsx depends on the browser runner. The fixture owns cleanup.
 import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
 import { buildSidebarTabs } from "./sidebar/sidebarTabs.logic";
@@ -2725,5 +2726,26 @@ describe("useThreadJumpHintVisibility", () => {
     await hints.release();
     await hints.advance(201);
     expect(hints.container.textContent).toBe("");
+  });
+});
+
+describe("pendingSidebarRouteReveal", () => {
+  it("keeps a revealed thread settled across a mount that reads no route params", () => {
+    const reveal = { observedKey: null, pendingKey: null };
+    expect(pendingSidebarRouteReveal(reveal, "env:a1")).toBe("env:a1");
+    completeSidebarRouteReveal(reveal);
+
+    // Back from Settings: location commits before the thread match does.
+    expect(pendingSidebarRouteReveal(reveal, null)).toBeNull();
+    expect(pendingSidebarRouteReveal(reveal, "env:a1")).toBeNull();
+
+    expect(pendingSidebarRouteReveal(reveal, "env:b1")).toBe("env:b1");
+  });
+
+  it("keeps a pending reveal through a render without route params", () => {
+    const reveal = { observedKey: null, pendingKey: null };
+    pendingSidebarRouteReveal(reveal, "env:a1");
+    expect(pendingSidebarRouteReveal(reveal, null)).toBeNull();
+    expect(pendingSidebarRouteReveal(reveal, "env:a1")).toBe("env:a1");
   });
 });

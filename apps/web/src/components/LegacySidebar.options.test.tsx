@@ -86,7 +86,7 @@ function SidebarFixture() {
   return (
     <SidebarProvider>
       <CommandDialog>
-        <LegacySidebar />
+        <LegacySidebar routeReveal={{ observedKey: null, pendingKey: null }} />
       </CommandDialog>
     </SidebarProvider>
   );
