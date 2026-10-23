@@ -9,6 +9,7 @@ export const composer = {
     },
     optimize: {
       button: "Improve prompt",
+      disabledNoThread: "Available after the first message",
       disabledEmpty: "Write a draft first",
       disabledTooLong: (limit: number) =>
         `Drafts over ${limit.toLocaleString("en-US")} characters can't be improved`,

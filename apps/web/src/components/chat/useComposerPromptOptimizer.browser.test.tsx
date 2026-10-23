@@ -665,3 +665,44 @@ it("keeps the live region accessible while the real idle Dock is hidden", async 
     ),
   );
 });
+
+it.each([
+  {
+    locale: "en",
+    driver: "codex",
+    button: "Improve prompt",
+    hint: "Available after the first message",
+  },
+  { locale: "zh-CN", driver: "", button: "优化提示词", hint: "发送第一条消息后可用" },
+] as const)(
+  "blocks all draft-thread entry points and explains availability in $locale",
+  async ({ locale, driver, button, hint }) => {
+    const previous = { locale: activeLocale, messages: t };
+    using cleanup = new DisposableStack();
+    cleanup.defer(() => installMessages(previous.locale, previous.messages));
+    installMessages(locale, locale === "en" ? en : zhCN);
+    fake.run.mockReset();
+    await using screen = await render(<Harness options={{ threadId: null, driver }} />);
+    const optimizeButton = screen.getByRole("button", { name: button, exact: true });
+    await expect.element(optimizeButton).toBeDisabled();
+    (optimizeButton.element() as HTMLButtonElement).click();
+    expect(fake.run).not.toHaveBeenCalled();
+    await screen.getByRole("textbox").click();
+    await userEvent.keyboard("{Control>}{Shift>}u{/Shift}{/Control}");
+    expect(fake.run).not.toHaveBeenCalled();
+    await expect
+      .element(screen.getByRole("menuitem", { name: "Improve prompt" }))
+      .not.toBeInTheDocument();
+    await screen.getByRole("button", { name: "Improve", exact: true }).click();
+    expect(fake.run).not.toHaveBeenCalled();
+    await screen.getByRole("group", { name: button }).hover();
+    await vi.waitFor(() =>
+      expect(document.querySelector('[data-slot="tooltip-popup"]')?.textContent).toBe(hint),
+    );
+    await screen.getByRole("textbox").fill("");
+    await screen.getByRole("group", { name: button }).hover();
+    await vi.waitFor(() =>
+      expect(document.querySelector('[data-slot="tooltip-popup"]')?.textContent).toBe(hint),
+    );
+  },
+);

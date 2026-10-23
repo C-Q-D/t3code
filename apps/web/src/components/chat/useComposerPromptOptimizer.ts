@@ -142,15 +142,17 @@ export function useComposerPromptOptimizer(input: ComposerPromptOptimizerInput) 
   if (feedback?.done && shown === null) setFeedback(null);
   const disabledReason = inFlight
     ? copy.inFlight
-    : !input.prompt.trim()
-      ? copy.disabledEmpty
-      : input.prompt.length > COMPOSER_OPTIMIZE_DRAFT_MAX_CHARS
-        ? copy.disabledTooLong(COMPOSER_OPTIMIZE_DRAFT_MAX_CHARS)
-        : !isComposerAssistSupportedDriver(input.driver)
-          ? copy.disabledProvider
-          : input.running || !input.threadId
-            ? copy.disabledRunning
-            : null;
+    : !input.threadId
+      ? copy.disabledNoThread
+      : !input.prompt.trim()
+        ? copy.disabledEmpty
+        : input.prompt.length > COMPOSER_OPTIMIZE_DRAFT_MAX_CHARS
+          ? copy.disabledTooLong(COMPOSER_OPTIMIZE_DRAFT_MAX_CHARS)
+          : !isComposerAssistSupportedDriver(input.driver)
+            ? copy.disabledProvider
+            : input.running
+              ? copy.disabledRunning
+              : null;
   useLayoutEffect(() => {
     availability.update(visible && disabledReason === null);
     return () => availability.update(false);
