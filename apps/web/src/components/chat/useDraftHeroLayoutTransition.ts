@@ -1,5 +1,6 @@
 /** Owns the draft-to-docked composer's layout animation; mobile view transitions remain external. */
 import { useLayoutEffect, useRef } from "react";
+import { useStableCallback } from "../../hooks/useStableCallback";
 import { usePhysicsMotion } from "../../hooks/usePhysicsMotion";
 import { SpringTimeline } from "../../lib/motion/springTimeline";
 import { springToLinear } from "../../lib/motion/springToLinear";
@@ -33,11 +34,11 @@ export function useDraftHeroLayoutTransition(
     composerAnchorRef.current = element;
   };
 
-  const captureComposerRect = () => {
+  const captureComposerRect = useStableCallback(() => {
     const rect = composerAnchorRef.current?.getBoundingClientRect() ?? null;
     if (physics) capturedPhysicsRectRef.current = rect;
     else previousComposerRectRef.current = rect;
-  };
+  });
 
   useLayoutEffect(
     () => () => {
