@@ -5,6 +5,7 @@ import {
   ThreadId,
   RunId,
   ProviderThreadId,
+  ProjectId,
   ProviderSessionId,
   ProviderInstanceId,
   ProviderDriverKind,
@@ -36,6 +37,44 @@ const providerSessionId = ProviderSessionId.make("session-1");
 const instanceId = ProviderInstanceId.make("codex-1");
 
 const optimizationInput = { threadId, draft: "fix it", style: "default" as const };
+
+it.effect.each(["suggestion", "optimization"] as const)(
+  "logs thread-not-found once for %s",
+  (feature) =>
+    Effect.gen(function* () {
+      const f = yield* fixture({ missingThread: true });
+      const result = yield* feature === "suggestion"
+        ? f.service.suggestNext({ threadId, runId }).pipe(Effect.result)
+        : f.service.optimizePrompt(optimizationInput).pipe(Effect.result);
+      assert.strictEqual(result._tag, "Failure");
+      if (result._tag === "Failure") assert.strictEqual(result.failure.reason, "thread_not_found");
+      assert.strictEqual(f.logs.length, 1);
+      assert.propertyVal(f.logs[0], "reason", "thread_not_found");
+      assert.propertyVal(f.logs[0], "driver", null);
+      assert.propertyVal(f.logs[0], "instanceId", null);
+    }).pipe(Effect.scoped),
+);
+
+it.effect.each(["suggestion", "optimization"] as const)(
+  "logs policy failure once for %s",
+  (feature) =>
+    Effect.gen(function* () {
+      const f = yield* fixture({ policyFailure: true });
+      const result = yield* feature === "suggestion"
+        ? f.service.suggestNext({ threadId, runId }).pipe(Effect.result)
+        : f.service.optimizePrompt(optimizationInput).pipe(Effect.result);
+      assert.strictEqual(result._tag, "Failure");
+      assert.strictEqual(f.logs.length, 1);
+      if (result._tag === "Failure") {
+        assert.strictEqual(result.failure.reason, "internal");
+        assert.include(result.failure.message, "RuntimePolicyResolveError");
+        assert.include(result.failure.message, "policy unavailable");
+      }
+      assert.include(JSON.stringify(f.logs), "policy unavailable");
+      assert.propertyVal(f.logs[0], "instanceId", instanceId);
+      assert.isFalse(JSON.stringify(f.logs).includes("fix it"));
+    }).pipe(Effect.scoped),
+);
 
 it.effect("same-key suggestion joins across cache expiry", () =>
   Effect.gen(function* () {
@@ -505,6 +544,8 @@ it.effect("suppresses a different current run while an older side query is in fl
 const fixture = Effect.fn("ComposerAssistTest.fixture")(function* (
   options: {
     readonly gate?: string;
+    readonly missingThread?: boolean;
+    readonly policyFailure?: boolean;
     readonly query?: ProviderAdapter.ProviderAdapterV2SessionRuntime["runSideQuery"];
     readonly resumeFailure?: "open" | "resume";
     readonly driver?: string;
@@ -616,7 +657,7 @@ const fixture = Effect.fn("ComposerAssistTest.fixture")(function* (
   const dependencies = Layer.mergeAll(
     NodeCrypto.layer,
     Layer.mock(ProjectionStore.ProjectionStoreV2)({
-      getThreadShell: () => Effect.sync(() => shell),
+      getThreadShell: () => Effect.sync(() => (options.missingThread ? null : shell)),
       getThreadRecords: () => Effect.sync(() => projection),
     }),
     Layer.mock(ProviderSessions.ProviderSessionManagerV2)({
@@ -639,7 +680,18 @@ const fixture = Effect.fn("ComposerAssistTest.fixture")(function* (
         return runtime;
       }),
     }),
-    RuntimePolicy.layer,
+    options.policyFailure
+      ? Layer.succeed(RuntimePolicy.RuntimePolicyV2, {
+          resolve: () =>
+            Effect.fail(
+              new RuntimePolicy.RuntimePolicyResolveError({
+                projectId: ProjectId.make("project-1"),
+                providerInstanceId: instanceId,
+                cause: new Error("policy unavailable"),
+              }),
+            ),
+        })
+      : RuntimePolicy.layer,
     Layer.mock(McpContext.McpAppModelContext)({
       forThread: () =>
         Effect.succeed([

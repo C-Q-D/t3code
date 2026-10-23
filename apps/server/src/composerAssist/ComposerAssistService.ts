@@ -155,9 +155,16 @@ const make = Effect.gen(function* () {
     Effect.mapError((cause) =>
       cause._tag === "ComposerAssistError"
         ? cause
-        : new ComposerAssistError({ reason: "internal", message: "Could not read thread state." }),
+        : internalError("Could not read thread state", cause),
     ),
   );
+
+  /** Captures available metadata for the one RPC completion record, even when work fails. */
+  interface RequestDetails {
+    state: Effect.Success<ReturnType<typeof read>> | null;
+    outcome: QueryOutcome<ComposerSuggestResult | ComposerOptimizeResult> | null;
+    maybeExpired: boolean;
+  }
 
   /** Applies the adapter deadline without retry, then filters any text, including tool-interrupted output. */
   const query = Effect.fn("ComposerAssistService.query")(function* (
@@ -171,15 +178,7 @@ const make = Effect.gen(function* () {
         thread: state.records.thread,
         modelSelection: state.records.thread.modelSelection,
       })
-      .pipe(
-        Effect.mapError(
-          () =>
-            new ComposerAssistError({
-              reason: "internal",
-              message: "Could not resolve runtime policy.",
-            }),
-        ),
-      );
+      .pipe(Effect.mapError((cause) => internalError("Could not resolve runtime policy", cause)));
     const contexts = yield* readTurnContext(input.threadId, appContext, developerContext);
     const side = yield* runAdapter(runSideQuery, {
       appThread: state.records.thread,
@@ -228,6 +227,7 @@ const make = Effect.gen(function* () {
     state: Effect.Success<ReturnType<typeof read>> | null,
     outcome: QueryOutcome<ComposerSuggestResult | ComposerOptimizeResult>,
     maybeExpired: boolean,
+    error?: ComposerAssistError,
   ) {
     const result = outcome.result;
     const usage = outcome.side?.usage ?? null;
@@ -254,7 +254,8 @@ const make = Effect.gen(function* () {
               : result._tag === "Failed"
                 ? "failed"
                 : "suppressed",
-      reason: "reason" in result ? result.reason : null,
+      reason: error?.reason ?? ("reason" in result ? result.reason : null),
+      ...(error ? { error: { category: error.reason, message: error.message } } : {}),
       promptVersion:
         input.feature === "suggestion" ? SUGGESTION_PROMPT_VERSION : OPTIMIZE_PROMPT_VERSION,
       usage,
@@ -273,12 +274,15 @@ const make = Effect.gen(function* () {
     input: ComposerSuggestInput,
     requestId: string,
     startedAt: number,
+    details: RequestDetails,
   ): Effect.fn.Return<ComposerSuggestResult, ComposerAssistError> {
     const state = yield* read(input.threadId);
+    details.state = state;
     const suppressed = (
       reason: Extract<ComposerSuggestResult, { _tag: "Suppressed" }>["reason"],
     ): QueryOutcome => ({ result: { _tag: "Suppressed", requestId, reason }, side: null });
     const maybeExpired = composerCacheMaybeExpired(state.expiresAt, startedAt);
+    details.maybeExpired = maybeExpired;
     const outcome = yield* Effect.gen(function* () {
       const providerThread = state.providerThread;
       if (!providerThread || !isComposerAssistSupportedDriver(providerThread.driver))
@@ -288,15 +292,9 @@ const make = Effect.gen(function* () {
         !(yield* sessions.isLive(providerThread.providerSessionId))
       )
         return suppressed("session_not_live");
-      const sessionOption = yield* sessions.get(providerThread.providerSessionId).pipe(
-        Effect.mapError(
-          () =>
-            new ComposerAssistError({
-              reason: "internal",
-              message: "Could not read provider session.",
-            }),
-        ),
-      );
+      const sessionOption = yield* sessions
+        .get(providerThread.providerSessionId)
+        .pipe(Effect.mapError((cause) => internalError("Could not read provider session", cause)));
       if (Option.isNone(sessionOption)) return suppressed("session_not_live");
       const session = sessionOption.value;
       if (!session.runSideQuery) return suppressed("provider_unsupported");
@@ -356,14 +354,7 @@ const make = Effect.gen(function* () {
       return yield* claim;
     });
     const result = { ...outcome.result, requestId };
-    yield* writeOutcome(
-      { ...input, feature: "suggestion" },
-      requestId,
-      startedAt,
-      state,
-      outcome,
-      maybeExpired,
-    );
+    details.outcome = outcome;
     return result;
   });
   /** Restores idle sessions when needed and returns a rewrite; projection reads are repeated after waiting. */
@@ -371,14 +362,17 @@ const make = Effect.gen(function* () {
     input: ComposerOptimizeInput,
     requestId: string,
     startedAt: number,
+    details: RequestDetails,
   ): Effect.fn.Return<ComposerOptimizeResult, ComposerAssistError> {
     const done = yield* reserveOptimization(input.threadId);
     return yield* Effect.gen(function* () {
       const state = yield* read(input.threadId);
+      details.state = state;
       const maybeExpired = composerCacheMaybeExpired(
         state.expiresAt,
         yield* Clock.currentTimeMillis,
       );
+      details.maybeExpired = maybeExpired;
       const outcome = yield* Effect.gen(function* (): Effect.fn.Return<
         QueryOutcome<ComposerOptimizeResult>,
         ComposerAssistError
@@ -407,16 +401,14 @@ const make = Effect.gen(function* () {
             modelSelection: state.records.thread.modelSelection,
           })
           .pipe(
-            Effect.mapError(
-              () =>
-                new ComposerAssistError({
-                  reason: "internal",
-                  message: "Could not resolve runtime policy.",
-                }),
-            ),
+            Effect.mapError((cause) => internalError("Could not resolve runtime policy", cause)),
+          );
+        const live = yield* sessions
+          .get(providerThread.providerSessionId)
+          .pipe(
+            Effect.mapError((cause) => internalError("Could not read provider session", cause)),
           );
         const sessionResult = yield* Effect.gen(function* () {
-          const live = yield* sessions.get(providerThread.providerSessionId!);
           if (Option.isSome(live)) return { session: live.value, providerThread };
           const previous = state.records.providerSessions.find(
             (candidate) => candidate.id === providerThread.providerSessionId,
@@ -485,14 +477,7 @@ const make = Effect.gen(function* () {
           side: response,
         };
       });
-      yield* writeOutcome(
-        { threadId: input.threadId, runId: state.shell.latestRunId, feature: "optimization" },
-        requestId,
-        startedAt,
-        state,
-        outcome,
-        maybeExpired,
-      );
+      details.outcome = outcome;
       return outcome.result;
     }).pipe(
       Effect.ensuring(
@@ -510,28 +495,43 @@ const make = Effect.gen(function* () {
   >(
     input: ComposerSuggestInput | ComposerOptimizeInput,
     feature: "suggestion" | "optimization",
-    work: (requestId: string, startedAt: number) => Effect.Effect<R, ComposerAssistError>,
+    work: (
+      requestId: string,
+      startedAt: number,
+      details: RequestDetails,
+    ) => Effect.Effect<R, ComposerAssistError>,
   ) {
     const requestId = yield* crypto.randomUUIDv4().pipe(Effect.orDie);
     const startedAt = yield* Clock.currentTimeMillis;
-    return yield* work(requestId, startedAt).pipe(
+    const details: RequestDetails = { state: null, outcome: null, maybeExpired: false };
+    const completion = yield* work(requestId, startedAt, details).pipe(
       Effect.timeout(SIDE_QUERY_DEADLINE_MS),
       Effect.catchTags({
         TimeoutError: () =>
-          Effect.gen(function* () {
-            const result = { _tag: "Failed", requestId, reason: "timeout" } as const;
-            yield* writeOutcome(
-              { threadId: input.threadId, runId: "runId" in input ? input.runId : null, feature },
-              requestId,
-              startedAt,
-              null,
-              { result, side: null },
-              false,
-            );
-            return result;
-          }),
+          Effect.succeed({ _tag: "Failed", requestId, reason: "timeout" } as const),
       }),
+      Effect.result,
     );
+    const error = completion._tag === "Failure" ? completion.failure : undefined;
+    const result =
+      completion._tag === "Success"
+        ? completion.success
+        : ({ _tag: "Failed", requestId, reason: "provider_error" } as const);
+    yield* writeOutcome(
+      {
+        threadId: input.threadId,
+        runId: "runId" in input ? input.runId : (details.state?.shell.latestRunId ?? null),
+        feature,
+      },
+      requestId,
+      startedAt,
+      details.state,
+      { result, side: details.outcome?.side ?? null },
+      details.maybeExpired,
+      error,
+    );
+    if (completion._tag === "Failure") return yield* completion.failure;
+    return completion.success;
   });
 
   return ComposerAssistService.of({
@@ -539,18 +539,18 @@ const make = Effect.gen(function* () {
       input: ComposerSuggestInput,
     ): Effect.fn.Return<ComposerSuggestResult, ComposerAssistError> {
       return yield* Fiber.join(
-        yield* request(input, "suggestion", (id, start) => suggest(input, id, start)).pipe(
-          Effect.forkIn(scope),
-        ),
+        yield* request(input, "suggestion", (id, start, details) =>
+          suggest(input, id, start, details),
+        ).pipe(Effect.forkIn(scope)),
       );
     }),
     optimizePrompt: Effect.fn("ComposerAssistService.optimizePrompt")(function* (
       input: ComposerOptimizeInput,
     ): Effect.fn.Return<ComposerOptimizeResult, ComposerAssistError> {
       return yield* Fiber.join(
-        yield* request(input, "optimization", (id, start) => optimize(input, id, start)).pipe(
-          Effect.forkIn(scope),
-        ),
+        yield* request(input, "optimization", (id, start, details) =>
+          optimize(input, id, start, details),
+        ).pipe(Effect.forkIn(scope)),
       );
     }),
   });
@@ -566,4 +566,26 @@ const CACHE_COLD_SUSPECT_UNCACHED_TOKENS = 8000;
 interface QueryOutcome<R = ComposerSuggestResult> {
   readonly result: R;
   readonly side: ProviderAdapter.ProviderAdapterV2SideQueryResult | null;
+}
+
+/** Preserves the typed boundary and nested diagnostic categories without serializing arbitrary fields. */
+function internalError(operation: string, cause: unknown): ComposerAssistError {
+  return new ComposerAssistError({
+    reason: "internal",
+    message: `${operation}: ${describeCause(cause)}`,
+  });
+}
+
+/** Only error categories/messages enter diagnostics; provider payload objects are never serialized. */
+function describeCause(cause: unknown, depth = 0): string {
+  if (typeof cause === "string") return cause;
+  if (typeof cause !== "object" || cause === null) return String(cause);
+  const category =
+    "_tag" in cause ? String(cause._tag) : cause instanceof Error ? cause.name : "Error";
+  const message = "message" in cause ? String(cause.message) : "";
+  const nested =
+    depth < 4 && "cause" in cause && cause.cause !== undefined
+      ? `; ${describeCause(cause.cause, depth + 1)}`
+      : "";
+  return `${category}: ${message}${nested}`;
 }

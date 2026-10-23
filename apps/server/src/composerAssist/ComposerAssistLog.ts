@@ -20,6 +20,7 @@ export interface ComposerAssistLogRecord {
   readonly actualModel: string | null;
   readonly outcome: "suggested" | "optimized" | "empty" | "filtered" | "suppressed" | "failed";
   readonly reason: string | null;
+  readonly error?: { readonly category: string; readonly message: string };
   readonly promptVersion: "s1" | "o1";
   readonly usage: {
     readonly inputTokens: number;
