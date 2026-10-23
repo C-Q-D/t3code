@@ -72,13 +72,24 @@ const make = Effect.gen(function* () {
   const optimizations = new Map<string, Deferred.Deferred<void>>();
   const memo = new Map<string, { expiresAt: number; outcome: QueryOutcome }>();
 
-  /** Both features use the same interruptible 45-second deadline and never retry provider work. */
+  /** Adapter failures are values; the caller owns the total deadline and never retries. */
   const runAdapter = Effect.fn("ComposerAssistService.runAdapter")(
     (
       runSideQuery: NonNullable<ProviderAdapter.ProviderAdapterV2SessionRuntime["runSideQuery"]>,
       input: ProviderAdapter.ProviderAdapterV2SideQueryInput,
-    ) => runSideQuery(input).pipe(Effect.timeout(SIDE_QUERY_DEADLINE_MS), Effect.result),
+    ) => runSideQuery(input).pipe(Effect.result),
   );
+
+  /** Session-manager work may resist interruption; stop waiting without losing its scope ownership. */
+  const awaitSessionOperation = Effect.fn("ComposerAssistService.awaitSessionOperation")(function* <
+    A,
+    E,
+  >(operation: Effect.Effect<A, E>) {
+    const fiber = yield* operation.pipe(Effect.forkIn(scope));
+    return yield* Fiber.join(fiber).pipe(
+      Effect.onInterrupt(() => Fiber.interrupt(fiber).pipe(Effect.forkIn(scope), Effect.asVoid)),
+    );
+  });
 
   /** Waits on completion signals, then atomically claims the thread; failed suggestions also release it. */
   const reserveOptimization = Effect.fn("ComposerAssistService.reserveOptimization")(function* (
@@ -185,7 +196,7 @@ const make = Effect.gen(function* () {
         result: {
           _tag: "Failed",
           requestId,
-          reason: side.failure._tag === "TimeoutError" ? "timeout" : "provider_error",
+          reason: "provider_error",
         },
         side: null,
       };
@@ -214,7 +225,7 @@ const make = Effect.gen(function* () {
     },
     requestId: string,
     startedAt: number,
-    state: Effect.Success<ReturnType<typeof read>>,
+    state: Effect.Success<ReturnType<typeof read>> | null,
     outcome: QueryOutcome<ComposerSuggestResult | ComposerOptimizeResult>,
     maybeExpired: boolean,
   ) {
@@ -227,9 +238,9 @@ const make = Effect.gen(function* () {
       requestId,
       threadId: input.threadId,
       runId: input.runId,
-      driver: state.providerThread?.driver ?? null,
-      instanceId: state.records.thread.modelSelection.instanceId,
-      requestedModel: state.records.thread.modelSelection.model ?? null,
+      driver: state?.providerThread?.driver ?? null,
+      instanceId: state?.records.thread.modelSelection.instanceId ?? null,
+      requestedModel: state?.records.thread.modelSelection.model ?? null,
       actualModel: outcome.side?.model ?? null,
       outcome:
         result._tag === "Optimized"
@@ -260,9 +271,9 @@ const make = Effect.gen(function* () {
   /** Runs independently of the requesting RPC; every request, including joins, writes its own metadata. */
   const suggest = Effect.fn("ComposerAssistService.suggest")(function* (
     input: ComposerSuggestInput,
+    requestId: string,
+    startedAt: number,
   ): Effect.fn.Return<ComposerSuggestResult, ComposerAssistError> {
-    const requestId = yield* crypto.randomUUIDv4().pipe(Effect.orDie);
-    const startedAt = yield* Clock.currentTimeMillis;
     const state = yield* read(input.threadId);
     const suppressed = (
       reason: Extract<ComposerSuggestResult, { _tag: "Suppressed" }>["reason"],
@@ -315,6 +326,14 @@ const make = Effect.gen(function* () {
           const done = yield* Deferred.make<QueryOutcome, ComposerAssistError>();
           flights.set(input.threadId, { runId: input.runId, done });
           yield* query(input, requestId, state, runSideQuery).pipe(
+            Effect.timeout(Math.max(0, SIDE_QUERY_DEADLINE_MS - (now - startedAt))),
+            Effect.catchTags({
+              TimeoutError: () =>
+                Effect.succeed<QueryOutcome>({
+                  result: { _tag: "Failed", requestId, reason: "timeout" },
+                  side: null,
+                }),
+            }),
             Effect.tap((value) =>
               Effect.gen(function* () {
                 memo.set(key, {
@@ -349,9 +368,9 @@ const make = Effect.gen(function* () {
   /** Restores idle sessions when needed and returns a rewrite; projection reads are repeated after waiting. */
   const optimize = Effect.fn("ComposerAssistService.optimize")(function* (
     input: ComposerOptimizeInput,
+    requestId: string,
+    startedAt: number,
   ): Effect.fn.Return<ComposerOptimizeResult, ComposerAssistError> {
-    const requestId = yield* crypto.randomUUIDv4().pipe(Effect.orDie);
-    const startedAt = yield* Clock.currentTimeMillis;
     const done = yield* reserveOptimization(input.threadId);
     return yield* Effect.gen(function* () {
       const state = yield* read(input.threadId);
@@ -402,28 +421,32 @@ const make = Effect.gen(function* () {
             (candidate) => candidate.id === providerThread.providerSessionId,
           );
           // Restoring the main session may emit lifecycle events; the side query must emit no run, attempt, turn, item, message or checkpoint events and must not finalize a run.
-          const session = yield* sessions.open({
-            threadId: input.threadId,
-            providerSessionId: providerThread.providerSessionId!,
-            modelSelection: state.records.thread.modelSelection,
-            runtimePolicy,
-            ...(previous === undefined ? {} : { resumeFromSession: previous }),
-            ...(providerThread.nativeThreadRef?.nativeId == null
-              ? {}
-              : { initialNativeThreadId: providerThread.nativeThreadRef.nativeId }),
-            ...(providerThread.nativeMetadata?.itemIdentityVersion === undefined
-              ? {}
-              : {
-                  initialProviderItemIdentityVersion:
-                    providerThread.nativeMetadata.itemIdentityVersion,
-                }),
-          });
-          const resumed = yield* session.resumeThread({
-            providerThread,
-            threadId: input.threadId,
-            modelSelection: state.records.thread.modelSelection,
-            runtimePolicy,
-          });
+          const session = yield* awaitSessionOperation(
+            sessions.open({
+              threadId: input.threadId,
+              providerSessionId: providerThread.providerSessionId!,
+              modelSelection: state.records.thread.modelSelection,
+              runtimePolicy,
+              ...(previous === undefined ? {} : { resumeFromSession: previous }),
+              ...(providerThread.nativeThreadRef?.nativeId == null
+                ? {}
+                : { initialNativeThreadId: providerThread.nativeThreadRef.nativeId }),
+              ...(providerThread.nativeMetadata?.itemIdentityVersion === undefined
+                ? {}
+                : {
+                    initialProviderItemIdentityVersion:
+                      providerThread.nativeMetadata.itemIdentityVersion,
+                  }),
+            }),
+          );
+          const resumed = yield* awaitSessionOperation(
+            session.resumeThread({
+              providerThread,
+              threadId: input.threadId,
+              modelSelection: state.records.thread.modelSelection,
+              runtimePolicy,
+            }),
+          );
           return { session, providerThread: resumed };
         }).pipe(Effect.result);
         if (sessionResult._tag === "Failure") return failed("session_resume_failed");
@@ -440,8 +463,7 @@ const make = Effect.gen(function* () {
           prompt: optimizePrompt(input.draft),
           purpose: "optimization",
         });
-        if (side._tag === "Failure")
-          return failed(side.failure._tag === "TimeoutError" ? "timeout" : "provider_error");
+        if (side._tag === "Failure") return failed("provider_error");
         const response = side.success;
         if (response.failure !== null)
           return {
@@ -481,16 +503,54 @@ const make = Effect.gen(function* () {
     );
   });
 
+  /** One deadline starts at RPC entry, including waiting, projection/context reads and session recovery. */
+  const request = Effect.fn("ComposerAssistService.request")(function* <
+    R extends ComposerSuggestResult | ComposerOptimizeResult,
+  >(
+    input: ComposerSuggestInput | ComposerOptimizeInput,
+    feature: "suggestion" | "optimization",
+    work: (requestId: string, startedAt: number) => Effect.Effect<R, ComposerAssistError>,
+  ) {
+    const requestId = yield* crypto.randomUUIDv4().pipe(Effect.orDie);
+    const startedAt = yield* Clock.currentTimeMillis;
+    return yield* work(requestId, startedAt).pipe(
+      Effect.timeout(SIDE_QUERY_DEADLINE_MS),
+      Effect.catchTags({
+        TimeoutError: () =>
+          Effect.gen(function* () {
+            const result = { _tag: "Failed", requestId, reason: "timeout" } as const;
+            yield* writeOutcome(
+              { threadId: input.threadId, runId: "runId" in input ? input.runId : null, feature },
+              requestId,
+              startedAt,
+              null,
+              { result, side: null },
+              false,
+            );
+            return result;
+          }),
+      }),
+    );
+  });
+
   return ComposerAssistService.of({
     suggestNext: Effect.fn("ComposerAssistService.suggestNext")(function* (
       input: ComposerSuggestInput,
     ): Effect.fn.Return<ComposerSuggestResult, ComposerAssistError> {
-      return yield* Fiber.join(yield* suggest(input).pipe(Effect.forkIn(scope)));
+      return yield* Fiber.join(
+        yield* request(input, "suggestion", (id, start) => suggest(input, id, start)).pipe(
+          Effect.forkIn(scope),
+        ),
+      );
     }),
     optimizePrompt: Effect.fn("ComposerAssistService.optimizePrompt")(function* (
       input: ComposerOptimizeInput,
     ): Effect.fn.Return<ComposerOptimizeResult, ComposerAssistError> {
-      return yield* Fiber.join(yield* optimize(input).pipe(Effect.forkIn(scope)));
+      return yield* Fiber.join(
+        yield* request(input, "optimization", (id, start) => optimize(input, id, start)).pipe(
+          Effect.forkIn(scope),
+        ),
+      );
     }),
   });
 });

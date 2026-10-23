@@ -37,6 +37,45 @@ const instanceId = ProviderInstanceId.make("codex-1");
 
 const optimizationInput = { threadId, draft: "fix it", style: "default" as const };
 
+it.effect.each(["open", "resume", "budget"] as const)(
+  "total deadline covers %s and releases ownership",
+  (stage) =>
+    Effect.gen(function* () {
+      const started = yield* Deferred.make<void>();
+      const release = yield* Deferred.make<void>();
+      const completed = yield* Deferred.make<void>();
+      const wait = Deferred.succeed(started, undefined).pipe(
+        Effect.andThen(Deferred.await(release)),
+        Effect.uninterruptible,
+      );
+      const f = yield* fixture({
+        gate: "session_not_live",
+        ...(stage === "resume" ? { resumeWait: wait } : { openWait: wait }),
+        ...(stage === "budget" ? { query: () => Effect.never } : {}),
+      });
+      yield* Effect.gen(function* () {
+        const request = yield* f.service.optimizePrompt(optimizationInput).pipe(
+          Effect.tap(() => Deferred.succeed(completed, undefined)),
+          Effect.forkChild,
+        );
+        yield* Deferred.await(started);
+        if (stage === "budget") {
+          yield* TestClock.adjust("30 seconds");
+          yield* Deferred.succeed(release, undefined);
+          yield* Deferred.await(f.entered);
+          yield* TestClock.adjust("15 seconds");
+        } else yield* TestClock.adjust("45 seconds");
+        assert.isTrue(yield* Deferred.isDone(completed));
+        assert.propertyVal(yield* Fiber.join(request), "reason", "timeout");
+        assert.notPropertyVal(
+          yield* f.service.suggestNext({ threadId, runId }),
+          "reason",
+          "inflight",
+        );
+      }).pipe(Effect.ensuring(Deferred.succeed(release, undefined)));
+    }).pipe(Effect.scoped),
+);
+
 it.effect("optimization restoring a session also suppresses suggestions as inflight", () =>
   Effect.gen(function* () {
     const opening = yield* Deferred.make<void>();
@@ -409,6 +448,7 @@ const fixture = Effect.fn("ComposerAssistTest.fixture")(function* (
     readonly driver?: string;
     readonly cacheExpiresAt?: string;
     readonly openWait?: Effect.Effect<void>;
+    readonly resumeWait?: Effect.Effect<void>;
   } = {},
 ) {
   const entered = yield* Deferred.make<void>();
@@ -472,6 +512,7 @@ const fixture = Effect.fn("ComposerAssistTest.fixture")(function* (
     forkThread: unexpectedMainOperation,
     resumeThread: Effect.fn("Fake.resumeThread")(function* () {
       lifecycle.push("resume");
+      if (options.resumeWait) yield* options.resumeWait;
       if (options.resumeFailure === "resume")
         return yield* new ProviderAdapter.ProviderAdapterResumeThreadError({
           driver: ProviderDriverKind.make("codex"),
