@@ -9,7 +9,7 @@ import {
   type ComposerSuggestResult,
 } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
-import { AsyncResult, AtomRegistry } from "effect/reactivity";
+import { AsyncResult, Atom, AtomRegistry } from "effect/reactivity";
 import { StrictMode, createRef, useState } from "react";
 import { userEvent } from "vite-plus/test/browser";
 import { expect, it, vi } from "vite-plus/test";
@@ -23,6 +23,7 @@ import { useClientSettings, persistClientSettingsPatch } from "../../hooks/useSe
 import { searchSettings } from "../settings/settingsSearch";
 import type { ClientSettings } from "@t3tools/contracts";
 
+const permission = Atom.make(true);
 const rpc = vi.hoisted(() => ({ run: vi.fn() }));
 const storage = vi.hoisted(() => ({ save: vi.fn(), confirm: vi.fn() }));
 vi.mock(import("../../localApi"), async (original) => {
@@ -69,7 +70,11 @@ vi.mock(import("../../state/composerAssist"), async (original) => {
   return {
     composerAssistEnvironment: {
       ...actual.composerAssistEnvironment,
-      suggestNext: { ...actual.composerAssistEnvironment.suggestNext, run: rpc.run },
+      suggestNext: {
+        ...actual.composerAssistEnvironment.suggestNext,
+        run: rpc.run,
+        permissionAtom: () => permission,
+      },
     },
   };
 });
@@ -482,6 +487,52 @@ it.each(["thread", "run", "draft"])(
     expect(rpc.run).toHaveBeenCalledTimes(1);
   },
 );
+
+it("requests the same run once after permission is granted and hides it on revocation", async () => {
+  const input = setup();
+  using _clock = vi.spyOn(Date, "now").mockReturnValue(1792749900000);
+  using resources = new DisposableStack();
+  const registry = resources.adopt(AtomRegistry.make(), (value) => value.dispose());
+  registry.set(permission, false);
+  await using screen = await render(
+    <RegistryContext.Provider value={registry}>
+      <Probe input={input} />
+    </RegistryContext.Provider>,
+  );
+  await expect.element(screen.getByLabelText("prediction")).toHaveTextContent("none");
+  expect(rpc.run).not.toHaveBeenCalled();
+  await act(async () => {
+    registry.set(permission, true);
+  });
+  await expect.element(screen.getByLabelText("prediction")).toHaveTextContent("跑一下测试");
+  expect(rpc.run).toHaveBeenCalledTimes(1);
+  await act(async () => {
+    registry.set(permission, false);
+  });
+  await expect.element(screen.getByLabelText("prediction")).toHaveTextContent("none");
+  await act(async () => {
+    registry.set(permission, true);
+  });
+  await expect.element(screen.getByLabelText("prediction")).toHaveTextContent("none");
+  expect(rpc.run).toHaveBeenCalledTimes(1);
+});
+
+it("hides an existing suggestion when permission is revoked", async () => {
+  const input = setup();
+  using _clock = vi.spyOn(Date, "now").mockReturnValue(1792749900000);
+  using resources = new DisposableStack();
+  const registry = resources.adopt(AtomRegistry.make(), (value) => value.dispose());
+  await using screen = await render(
+    <RegistryContext.Provider value={registry}>
+      <Probe input={input} />
+    </RegistryContext.Provider>,
+  );
+  await expect.element(screen.getByLabelText("prediction")).toHaveTextContent("跑一下测试");
+  await act(async () => {
+    registry.set(permission, false);
+  });
+  await expect.element(screen.getByLabelText("prediction")).toHaveTextContent("none");
+});
 
 it("keeps one deduplication record per thread after consecutive runs", async () => {
   const input = setup();

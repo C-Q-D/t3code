@@ -1,5 +1,5 @@
 /** Owns the empty-composer suggestion lifecycle; never submits a user message. */
-import { RegistryContext } from "@effect/atom-react";
+import { RegistryContext, useAtomValue } from "@effect/atom-react";
 import {
   COMPOSER_SUGGESTION_MIN_COMPLETED_RUNS,
   composerCacheExpiresAt,
@@ -50,6 +50,9 @@ export function useComposerSuggestion(input: {
   readonly promptCacheExpiresAt: string | null | undefined;
 }) {
   const registry = useContext(RegistryContext);
+  const allowed = useAtomValue(
+    composerAssistEnvironment.suggestNext.permissionAtom(input.target?.environmentId ?? null),
+  );
   const request = useAtomCommand(composerAssistEnvironment.suggestNext, {
     reportFailure: false,
     reportDefect: false,
@@ -60,6 +63,7 @@ export function useComposerSuggestion(input: {
       ? JSON.stringify([threadKey(input.target), input.shell.latestRunId])
       : null;
   const eligible =
+    allowed &&
     input.enabled &&
     input.connected &&
     input.composerEmpty &&
