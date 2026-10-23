@@ -31,6 +31,7 @@ it.effect("writes two complete metadata records without draft or suggestion bodi
       cacheColdSuspected: false,
       cacheMaybeExpired: false,
       toolAttempted: false,
+      attemptedTools: [],
       stop: "completed",
       latencyMs: 4800,
       chars: 13,

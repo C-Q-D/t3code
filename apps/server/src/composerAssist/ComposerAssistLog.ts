@@ -32,6 +32,8 @@ export interface ComposerAssistLogRecord {
   readonly cacheColdSuspected: boolean;
   readonly cacheMaybeExpired: boolean;
   readonly toolAttempted: boolean;
+  /** Tool names or item types only, limited to eight entries of 64 characters each. */
+  readonly attemptedTools: ReadonlyArray<string>;
   readonly stop: string | null;
   readonly latencyMs: number;
   readonly chars: number;

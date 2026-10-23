@@ -43,6 +43,67 @@ const instanceId = ProviderInstanceId.make("codex-1");
 
 const optimizationInput = { threadId, draft: "fix it", style: "default" as const };
 
+it.effect("writes bounded attempted tool types to the real diagnostic file without payloads", () =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const directory = yield* fs.makeTempDirectoryScoped({ prefix: "t3-composer-tools-" });
+    const written = yield* Deferred.make<void>();
+    yield* Effect.gen(function* () {
+      const log = yield* Log.ComposerAssistLog;
+      const f = yield* fixture({
+        logSink: {
+          write: (record) =>
+            log.write(record).pipe(Effect.andThen(Deferred.succeed(written, undefined))),
+        },
+        query: () =>
+          Effect.succeed({
+            text: "PRIVATE_GENERATED_BODY",
+            model: null,
+            usage: null,
+            attemptedTools: [
+              "mcpToolCall",
+              "x".repeat(65),
+              "Read",
+              "Write",
+              "Bash",
+              "Grep",
+              "Glob",
+              "WebFetch",
+              "DROPPED_TOOL",
+            ],
+            toolArguments: { body: "PRIVATE_TOOL_ARGUMENTS" },
+            stop: "interrupted_on_tool" as const,
+            failure: null,
+          }),
+      });
+      yield* f.service.optimizePrompt({ ...optimizationInput, draft: "PRIVATE_DRAFT_BODY" });
+      yield* Deferred.await(written);
+    }).pipe(
+      Effect.provide(Log.layer.pipe(Layer.provide(ServerConfig.layerTest(directory, directory)))),
+      Effect.scoped,
+    );
+    const content = yield* fs.readFileString(
+      path.join(directory, "userdata", "logs", "composer-assist.ndjson"),
+    );
+    const record = JSON.parse(content);
+    assert.deepEqual(record.attemptedTools, [
+      "mcpToolCall",
+      "x".repeat(64),
+      "Read",
+      "Write",
+      "Bash",
+      "Grep",
+      "Glob",
+      "WebFetch",
+    ]);
+    assert.isTrue(record.toolAttempted);
+    assert.isFalse(content.includes("PRIVATE_"));
+    assert.isFalse(content.includes("DROPPED_TOOL"));
+    assert.isFalse(content.includes("toolArguments"));
+  }).pipe(Effect.provide(NodeServices.layer), Effect.scoped),
+);
+
 it.effect("returns RPC results with a stuck diagnostic sink and drops records above 64", () =>
   Effect.gen(function* () {
     const warnings: unknown[] = [];

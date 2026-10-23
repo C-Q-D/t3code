@@ -265,6 +265,9 @@ const make = Effect.gen(function* () {
       cacheColdSuspected: uncached !== null && uncached > CACHE_COLD_SUSPECT_UNCACHED_TOKENS,
       cacheMaybeExpired: maybeExpired,
       toolAttempted: (outcome.side?.attemptedTools.length ?? 0) > 0,
+      attemptedTools: (outcome.side?.attemptedTools ?? [])
+        .slice(0, MAX_DIAGNOSTIC_TOOL_NAMES)
+        .map((name) => name.slice(0, MAX_DIAGNOSTIC_TOOL_NAME_CHARS)),
       stop: outcome.side?.stop ?? null,
       latencyMs: (yield* Clock.currentTimeMillis) - startedAt,
       chars: outcome.side?.text.length ?? 0,
@@ -584,6 +587,8 @@ const SUGGESTION_MEMO_TTL_MS = 10 * 60_000;
 const SUGGESTION_MEMO_MAX_ENTRIES = 256;
 const CACHE_COLD_SUSPECT_UNCACHED_TOKENS = 8000;
 const MAX_PENDING_DIAGNOSTIC_WRITES = 64;
+const MAX_DIAGNOSTIC_TOOL_NAMES = 8;
+const MAX_DIAGNOSTIC_TOOL_NAME_CHARS = 64;
 
 /** In-flight callers share provider metadata; the bounded memo retains only the client result. */
 interface QueryOutcome<R = ComposerSuggestResult> {
