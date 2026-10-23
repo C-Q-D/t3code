@@ -573,3 +573,46 @@ it("keeps the product live region mounted through pending and completed feedback
   await expect.element(screen.getByRole("status")).toBeEmptyDOMElement();
   expect(screen.getByRole("status").element()).toBe(region);
 });
+
+it.each([false, true])(
+  "routes one result to its initiator unless it unmounted (%s)",
+  async (unmountInitiator) => {
+    const pending = deferredResult();
+    fake.run.mockReset().mockReturnValue(pending.promise);
+    const firstContainer = document.createElement("section");
+    firstContainer.id = "owner-editor";
+    const secondContainer = document.createElement("section");
+    secondContainer.id = "peer-editor";
+    await using first = await render(<Harness thread="shared-thread" />, {
+      container: firstContainer,
+    });
+    await using second = await render(<Harness thread="shared-thread" />, {
+      container: secondContainer,
+    });
+    await first.getByRole("button", { name: "Improve", exact: true }).click();
+    if (unmountInitiator) await first.unmount();
+    await act(() =>
+      pending.resolve(
+        AsyncResult.success({
+          _tag: "Optimized",
+          requestId: "owner",
+          text: "Owner rewrite",
+          cacheMaybeExpired: false,
+        }),
+      ),
+    );
+    const target = unmountInitiator ? second : first;
+    await vi.waitFor(() =>
+      expect(target.getByRole("textbox").element().textContent).toBe("Owner rewrite"),
+    );
+    await expect.element(target.getByRole("status")).toHaveTextContent("Improved");
+    await expect.element(target.getByRole("textbox")).toHaveFocus();
+    if (!unmountInitiator) {
+      expect(second.container.querySelector("[data-draft]")?.textContent).toBe("  fix the bug  ");
+      await expect.element(second.getByRole("status")).toBeEmptyDOMElement();
+    }
+    await target.getByRole("button", { name: "Undo", exact: true }).click();
+    expect(target.container.querySelector("[data-draft]")?.textContent).toBe("  fix the bug  ");
+    expect(fake.run).toHaveBeenCalledTimes(1);
+  },
+);

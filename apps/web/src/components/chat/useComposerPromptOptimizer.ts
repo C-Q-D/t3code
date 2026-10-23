@@ -27,6 +27,7 @@ import type { ComposerPromptEditorHandle } from "../ComposerPromptEditor";
 
 /** One in-flight operation survives editor remounts; entries disappear on every settlement. */
 type PendingOptimization = {
+  initiator: symbol;
   draftKey: string;
   text: string;
   cursor: number;
@@ -40,7 +41,7 @@ const requests = new Map<string, PendingOptimization>();
 const requestListeners = new Set<() => void>();
 const resultConsumers = new Map<
   string,
-  Set<(request: PendingOptimization, response: CommandResponse) => void>
+  Map<symbol, (request: PendingOptimization, response: CommandResponse) => void>
 >();
 
 /** Notifies mounted editors; useSyncExternalStore compares each thread's own entry. */
@@ -78,6 +79,7 @@ export function useComposerPromptOptimizer(input: ComposerPromptOptimizerInput) 
     draftKey: string;
     text?: string;
   } | null>(null);
+  const [instanceId] = useState(() => Symbol("composer-optimizer"));
   const requestKey = JSON.stringify([input.environmentId, input.threadId]);
   const pendingRequest = useSyncExternalStore(
     (listener) => {
@@ -161,6 +163,7 @@ export function useComposerPromptOptimizer(input: ComposerPromptOptimizerInput) 
 
   useLayoutEffect(() => {
     const consume = (request: PendingOptimization, response: CommandResponse) => {
+      const copy = t.composer.assist.optimize;
       const current = latest.current;
       if (current.draftKey !== request.draftKey) return;
       const feedbackForDraft = { draftKey: current.draftKey };
@@ -197,15 +200,15 @@ export function useComposerPromptOptimizer(input: ComposerPromptOptimizerInput) 
     };
     let consumers = resultConsumers.get(requestKey);
     if (!consumers) {
-      consumers = new Set();
+      consumers = new Map();
       resultConsumers.set(requestKey, consumers);
     }
-    consumers.add(consume);
+    consumers.set(instanceId, consume);
     return () => {
-      consumers.delete(consume);
+      consumers.delete(instanceId);
       if (consumers.size === 0) resultConsumers.delete(requestKey);
     };
-  }, [requestKey, copy]);
+  }, [requestKey, instanceId]);
 
   const trigger = async () => {
     if (!visible || disabledReason || !input.threadId || requests.has(requestKey)) return;
@@ -213,6 +216,7 @@ export function useComposerPromptOptimizer(input: ComposerPromptOptimizerInput) 
     if (!snapshot?.value.trim() || snapshot.value.length > COMPOSER_OPTIMIZE_DRAFT_MAX_CHARS)
       return;
     const request: PendingOptimization = {
+      initiator: instanceId,
       draftKey: input.draftKey,
       text: snapshot.value,
       cursor: snapshot.expandedCursor,
@@ -232,8 +236,9 @@ export function useComposerPromptOptimizer(input: ComposerPromptOptimizerInput) 
           style: "default",
         },
       });
-      // Only the currently mounted editor consumes the result, never a stale instance closure.
-      const consumer = [...(resultConsumers.get(requestKey) ?? [])].at(-1);
+      // Keep focus and undo ownership with the initiator; only an unmounted owner permits handoff.
+      const consumers = resultConsumers.get(requestKey);
+      const consumer = consumers?.get(request.initiator) ?? [...(consumers?.values() ?? [])].at(-1);
       consumer?.(request, response);
     } finally {
       requests.delete(requestKey);
