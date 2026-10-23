@@ -152,6 +152,10 @@ const EMPTY_PREVIEW_SESSIONS = {};
 const EMPTY_PREVIEW_DESKTOP_STATE = {};
 const EMPTY_TERMINAL_LABELS = new Map<string, string>();
 const EMPTY_PENDING_SURFACES = new Set<string>();
+/**
+ * Renders workspace pull requests and their detail panel using the route's selected filters.
+ * @returns The filtered list and the selected pull request's detail surface.
+ */
 export function PullRequestsPage() {
   useEscapeToGoBack();
   const search = useSearch({ from: "/_chat/pull-requests" });

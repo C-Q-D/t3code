@@ -146,6 +146,12 @@ export function PullRequestSpeedModeProvider({ children }: { children: ReactNode
   return <PullRequestSpeedModeContext value={speedMode}>{children}</PullRequestSpeedModeContext>;
 }
 
+/**
+ * Subscribes at the visibility wrapper so Shift does not recreate its supplied action buttons.
+ * @param props Busy state keeps the group visible; pending marks ongoing actions, label names the
+ * accessible group, and children are the caller-owned buttons.
+ * @returns The action wrapper, visible while Shift is held or an action remains busy.
+ */
 function SpeedModeGroup({
   busy,
   pending,

@@ -41,6 +41,13 @@ import {
 } from "./pullRequestDetail.logic";
 import { pullRequestEntryKey, type EnvironmentPullRequestEntry } from "./pullRequestList.logic";
 
+/**
+ * Resolves the project preference before legacy client overrides; the action runner separately
+ * reconciles that preference with host capabilities and the last selected merge method.
+ * @param environmentId Environment whose settings own the project preference.
+ * @param projectId Project to resolve, or null for the environment-level default.
+ * @returns A resolver yielding the configured merge method, or undefined when none is configured.
+ */
 export function usePullRequestDefaultMergeMethodResolver(
   environmentId: EnvironmentId,
   projectId: ProjectId | null,

@@ -16,6 +16,7 @@ import {
   type PullRequestSpeedActionResult,
 } from "./PullRequestSpeedActions";
 
+/** Group glyphs use the same vocabulary as the participation filter. */
 const GROUP_ICONS: Record<string, LucideIcon> = {
   authored: PenLineIcon,
   reviewRequested: EyeIcon,
@@ -24,6 +25,11 @@ const GROUP_ICONS: Record<string, LucideIcon> = {
 
 const MATCHED_ELSEWHERE_SCORE = 10;
 
+/**
+ * Names an existing participation group and counts only its displayed entries.
+ * @param props Group identity, localized label and the rows selected by the current filters.
+ * @returns A compact heading above that group's rows; grouping order remains owned by the list logic.
+ */
 function PullRequestGroupHeader({
   group,
 }: {
@@ -39,6 +45,12 @@ function PullRequestGroupHeader({
   );
 }
 
+/**
+ * Keeps main-list row rendering outside the quick-action groups' Shift subscription.
+ * @param props Ordered display groups, selected row, host capabilities, measurement ref and row
+ * interaction callbacks; closing and sweeping sets retain the caller's optimistic action state.
+ * @returns Group headings and selectable rows under the shared speed-mode provider.
+ */
 export function PullRequestListGroups({
   groups,
   environmentLabels,

@@ -16,6 +16,14 @@ interface BaseFreshness {
   readonly methods: ReadonlyArray<PullRequestUpdateMethod>;
 }
 
+/**
+ * Keeps the stale-branch warning beside the branch it describes, without taking a separate row
+ * away from the detail content. A popover keeps the update controls reachable by pointer;
+ * a tooltip's non-interactive layer would prevent the reader from pressing them.
+ * @param props Base branch and freshness (a null count means unknown), available update methods,
+ * pending state, and the update callback; optional children and classes shape the branch trigger.
+ * @returns The branch warning with update controls disabled while an update is pending.
+ */
 function PullRequestBaseFreshnessWarning({
   baseBranch,
   freshness,

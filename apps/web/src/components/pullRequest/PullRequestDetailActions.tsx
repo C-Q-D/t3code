@@ -74,6 +74,12 @@ export function ActOnEnvironmentPicker({
   );
 }
 
+/**
+ * Offers checkout modes without moving a branch until the reader chooses a destination.
+ * @param props Available modes, checkout root (null disables checkout), active handoff (null when
+ * idle), and environment selection; callbacks let the panel own checkout and destination changes.
+ * @returns Checkout controls with unavailable modes and in-progress handoffs disabled.
+ */
 export function PullRequestCheckoutMenu({
   handoff,
   checkoutRoot,
@@ -156,6 +162,11 @@ export function PullRequestCheckoutMenu({
   );
 }
 
+/**
+ * Keeps conflict resolution in the panel's handoff flow so it shares the same pending guard.
+ * @param props Active handoff (null when idle), availability guard, and callback to prepare resolution.
+ * @returns A resolution control disabled when unavailable or another handoff is active.
+ */
 export function PullRequestResolveConflictsButton({
   handoff,
   unavailable,

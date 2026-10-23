@@ -27,6 +27,12 @@ import { Menu, MenuItem, MenuPopup, MenuShortcut, MenuTrigger } from "../ui/menu
 import { openOnHostLabel, showPullRequestLinkContextMenu } from "./pullRequestLinkContextMenu";
 import { resolvePullRequestState } from "./pullRequestPresentation";
 
+/**
+ * Replaces the browser context menu without triggering the surrounding PR navigation.
+ * @param event Pointer location and browser event to consume.
+ * @param detail Host URL and provider used to label the link actions.
+ * @returns Nothing; opening the shared link menu is delegated asynchronously.
+ */
 const openNumberContextMenu = (
   event: ReactMouseEvent,
   detail: { readonly url: string; readonly provider: string },
