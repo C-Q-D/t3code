@@ -10,6 +10,11 @@ vi.mock("@effect/atom-react", async (importOriginal) => ({
   useAtomValue: () => state.providers,
 }));
 vi.mock("../../state/server", () => ({ primaryServerProvidersAtom: {} }));
+// Keep the local notice registration without loading unrelated footer notices and their stores.
+vi.mock("./SidebarChrome", async () => {
+  const { createPresenceRegistry } = await import("../../lib/presenceRegistry");
+  return { sidebarNoticeRegistry: createPresenceRegistry() };
+});
 
 const checkedAt = "2026-10-19T03:00:00.000Z";
 
@@ -45,17 +50,17 @@ const advance = (ms: number) => act(() => vi.advanceTimersByTime(ms));
 // Fake timers move past the exit before any real transitionend can fire, like a skipped or
 // cancelled transition in the app.
 describe("SidebarProviderUpdatePill exit", () => {
-  it("replaces a finished update's spinner with success, then dismisses it", async () => {
+  it("replaces a finished update's loading indicator with success, then dismisses it", async () => {
     setup([provider("running")]);
     await using screen = await render(<SidebarProviderUpdatePill />);
     using _timers = fakeTimers();
-    expect(screen.container.querySelector('[role="status"]')).not.toBeNull();
+    expect(screen.container.querySelector('[aria-label="Loading"]')).not.toBeNull();
 
     setup([provider("succeeded")]);
     await screen.rerender(<SidebarProviderUpdatePill />);
     await advance(180);
     expect(screen.container.textContent).toContain("Claude updated: v2.1.303");
-    expect(screen.container.querySelector('[role="status"]')).toBeNull();
+    expect(screen.container.querySelector('[aria-label="Loading"]')).toBeNull();
 
     await advance(3_000);
     await advance(180);

@@ -14,6 +14,9 @@ import {
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { sidebarNoticeRegistry } from "./SidebarChrome";
 
+// Matches the duration-180 transition in styles/sidebar.css.
+const PROVIDER_UPDATE_PILL_EXIT_MS = 180;
+
 /** Return the latest ISO check timestamp, or undefined when there are no providers. */
 function latestProviderCheckedAt(
   providers: ReadonlyArray<Pick<ServerProvider, "checkedAt">>,
@@ -85,6 +88,23 @@ export function SidebarProviderUpdatePill() {
 
   const exitAfterVisible = useEffectEvent((key: string) => startExit(key, null, key));
 
+  const finishExit = useEffectEvent(() => {
+    if (dismissAfterExitKey !== null) {
+      setDismissedKeys((previous) => new Set(previous).add(dismissAfterExitKey));
+    }
+    setRenderedView(pendingView);
+    setPendingView(null);
+    setExitingKey(null);
+    setDismissAfterExitKey(null);
+  });
+
+  useEffect(() => {
+    if (exitingKey === null) return;
+    // A cancelled or skipped CSS transition must not keep a hidden spinner mounted.
+    const timeoutId = window.setTimeout(finishExit, PROVIDER_UPDATE_PILL_EXIT_MS);
+    return () => window.clearTimeout(timeoutId);
+  }, [exitingKey]);
+
   useEffect(() => {
     if (!dismissAfterVisibleMs || !viewKey) {
       return;
@@ -111,21 +131,6 @@ export function SidebarProviderUpdatePill() {
         exitingKey === displayedView.key ? "sidebar-provider-update-exiting" : ""
       }`}
       data-tone={displayedView.tone}
-      onTransitionEnd={(event) => {
-        if (event.target !== event.currentTarget) {
-          return;
-        }
-        if (!displayedView || exitingKey !== displayedView.key) {
-          return;
-        }
-        if (dismissAfterExitKey === displayedView.key) {
-          setDismissedKeys((previous) => new Set(previous).add(displayedView.key));
-        }
-        setRenderedView(pendingView);
-        setPendingView(null);
-        setExitingKey(null);
-        setDismissAfterExitKey(null);
-      }}
     >
       {showDismissProgress ? (
         <div
