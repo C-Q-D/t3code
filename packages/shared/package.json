@@ -3,6 +3,8 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./composerAssist/filters": "./src/composerAssist/filters.ts",
+    "./composerAssist/words": "./src/composerAssist/words.ts",
     "./remoteLabels": {
       "types": "./src/remoteLabels.ts",
       "default": "./src/remoteLabels.ts"
