@@ -440,7 +440,7 @@ export const chat: Messages["chat"] = {
     threadActions: (title) => `${title} 的对话操作`,
   },
   timeline: {
-    backgroundSetup: "后台设置",
+    backgroundSetup: "正在后台准备",
     /** Labels a continued segment with its already formatted duration. */
     continuedFor: (duration: string) => `继续运行了 ${duration}`,
     continued: "继续运行",

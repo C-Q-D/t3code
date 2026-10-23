@@ -3,8 +3,10 @@ import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
+import * as Logger from "effect/Logger";
 import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
+import * as References from "effect/References";
 import * as Stream from "effect/Stream";
 import { HttpClient } from "effect/http";
 import { ChildProcessSpawner } from "effect/process";
@@ -22,9 +24,16 @@ import * as DesktopBackendPool from "./DesktopBackendPool.ts";
 import type { DesktopBackendStartConfig } from "./DesktopBackendManager.ts";
 
 /** Builds a pool with an observable label and inert external resources; no backends are spawned. */
-function layerPool(labelRef: Ref.Ref<string>): Layer.Layer<DesktopBackendPool.DesktopBackendPool> {
+function layerPool(
+  labelRef: Ref.Ref<string>,
+  options: {
+    primaryConfig?: DesktopBackendStartConfig;
+    locale?: "en" | "zh-CN";
+    showErrorBox?: ElectronDialog.ElectronDialog["Service"]["showErrorBox"];
+  } = {},
+): Layer.Layer<DesktopBackendPool.DesktopBackendPool> {
   return DesktopBackendPool.layer.pipe(
-    Layer.provide(DesktopUiLocale.layerTest()),
+    Layer.provide(DesktopUiLocale.layerTest(options.locale)),
     Layer.provideMerge(
       Layer.mergeAll(
         FileSystem.layerNoop({}),
@@ -59,14 +68,19 @@ function layerPool(labelRef: Ref.Ref<string>): Layer.Layer<DesktopBackendPool.De
         }),
         DesktopBrowserHost.layer,
         Layer.succeed(DesktopBackendConfiguration.DesktopBackendConfiguration, {
-          resolvePrimary: Effect.die("unexpected primary config resolve"),
+          resolvePrimary: options.primaryConfig
+            ? Effect.succeed(options.primaryConfig)
+            : Effect.die("unexpected primary config resolve"),
           resolvePrimaryLabel: Ref.get(labelRef),
           resolveWsl: () => Effect.die("unexpected WSL config resolve"),
           currentBootstrapToken: Effect.die("unexpected bootstrap token read"),
         } satisfies DesktopBackendConfiguration.DesktopBackendConfiguration["Service"]),
         DesktopAppSettings.layerTest(),
         DesktopWslEnvironment.layerTest(),
-        ElectronDialog.layer,
+        Layer.succeed(ElectronDialog.ElectronDialog, {
+          ...ElectronDialog.make,
+          showErrorBox: options.showErrorBox ?? ElectronDialog.make.showErrorBox,
+        }),
         ElectronApp.layer,
         Layer.succeed(DesktopWindow.DesktopWindow, {
           createMain: Effect.die("unexpected window create"),
@@ -91,6 +105,78 @@ function layerPool(labelRef: Ref.Ref<string>): Layer.Layer<DesktopBackendPool.De
 }
 
 describe("DesktopBackendPool", () => {
+  it.effect.each([
+    {
+      name: "translates dependency failures without translating diagnostic reasons",
+      reason:
+        'WSL server dependencies could not be loaded (for example "node-pty"). The native packages the server needs are not unpacked where the WSL distro\'s Node can read them. This is a packaging problem with this build. Please report it.',
+      displayedReason:
+        '无法加载 WSL 服务端依赖（例如 "node-pty"）。服务端所需的原生包未解压到 WSL 发行版的 Node 可以读取的位置。这是此版本的打包问题，请报告此问题。',
+    },
+    {
+      name: "preserves other preflight reasons in the dialog and diagnostics",
+      reason: "WSL distro Ubuntu could not be started",
+      displayedReason: "WSL distro Ubuntu could not be started",
+    },
+  ])("$name", ({ reason, displayedReason }) => {
+    const dialogs: Array<{ title: string; content: string }> = [];
+    const diagnosticReasons: Array<unknown> = [];
+    const logger = Logger.make(({ fiber }) => {
+      const annotations = fiber.getRef(References.CurrentLogAnnotations);
+      if (annotations.component === "desktop-backend-pool") {
+        diagnosticReasons.push(annotations.reason);
+      }
+    });
+    const layer = layerPool(Ref.makeUnsafe("WSL (Ubuntu)"), {
+      locale: "zh-CN",
+      showErrorBox: (title, content) =>
+        Effect.sync(() => {
+          dialogs.push({ title, content });
+        }),
+      primaryConfig: {
+        executablePath: "/electron",
+        args: [],
+        entryPath: "/server/bin.mjs",
+        cwd: "/server",
+        env: {},
+        bootstrap: {
+          mode: "desktop",
+          noBrowser: true,
+          port: 3774,
+          t3Home: "/tmp/t3",
+          host: "127.0.0.1",
+          desktopBootstrapToken: "token",
+          tailscaleServeEnabled: false,
+          tailscaleServePort: 443,
+        },
+        bootstrapDelivery: "fd3",
+        extendEnv: true,
+        httpBaseUrl: new URL("http://127.0.0.1:3774"),
+        captureOutput: false,
+        // Surface the failure on the first start, without advancing a retry timer.
+        preflightFailure: Option.some({ reason, fatal: true, retryLimit: 1 }),
+      },
+    });
+
+    return Effect.scoped(
+      Effect.gen(function* () {
+        const pool = yield* DesktopBackendPool.DesktopBackendPool;
+        const primary = yield* pool.primary;
+        yield* primary.start;
+
+        assert.deepEqual(dialogs, [
+          {
+            title: "WSL 后端无法启动",
+            content: `${displayedReason}\n\n正在回退到 Windows 后端以打开 T3 Code。修复 WSL 发行版后，请在“设置 > 连接”中重新启用 WSL 后端。`,
+          },
+        ]);
+        assert.deepEqual(diagnosticReasons, [reason]);
+      }).pipe(
+        Effect.provide(Layer.mergeAll(layer, Logger.layer([logger], { mergeWithExisting: false }))),
+      ),
+    );
+  });
+
   it.effect("unregister stops the registered instance", () =>
     Effect.scoped(
       Effect.gen(function* () {

@@ -12,7 +12,7 @@ export const settings: Messages["settings"] = {
     placeholder: "标题保持简短，以主要主题开头。",
   },
   telemetryOverrides: {
-    environment: "由环境设置",
+    environment: "由环境变量设置",
     bootstrap: "由桌面端设置",
   },
   idleCompactionModes: {
