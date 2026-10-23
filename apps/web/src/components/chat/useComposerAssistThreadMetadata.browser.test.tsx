@@ -4,6 +4,10 @@ import { Atom, AtomRegistry } from "effect/reactivity";
 import {
   EnvironmentId,
   MessageId,
+  NodeId,
+  ProviderThreadId,
+  ProviderTurnId,
+  type OrchestrationV2ProviderTurn,
   RunId,
   TurnItemId,
   type OrchestrationV2Run,
@@ -19,7 +23,7 @@ import {
   type OrchestrationV2ThreadProjection,
 } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
-import { useComposerSuggestionMetadata } from "./useComposerSuggestion";
+import { useComposerAssistThreadMetadata } from "./useComposerAssistThreadMetadata";
 
 const v2Now = DateTime.makeUnsafe("2026-06-20T00:00:00.000Z");
 const v2ProjectId = ProjectId.make("project-v2");
@@ -117,24 +121,34 @@ vi.mock(import("../../state/threads"), async (original) => {
 
 /** Records render commits while displaying the actual selected value. */
 function Probe({
-  enabled = true,
+  suggestionsEnabled = true,
+  optimizeEnabled = false,
+  hasThread = true,
   driver = "codex",
   rendered,
 }: {
-  enabled?: boolean;
+  suggestionsEnabled?: boolean;
+  optimizeEnabled?: boolean;
+  hasThread?: boolean;
   driver?: string;
   rendered: () => void;
 }) {
-  const data = useComposerSuggestionMetadata(
-    { environmentId: EnvironmentId.make("test"), threadId: v2ThreadShell.id },
-    enabled,
+  const data = useComposerAssistThreadMetadata(
+    hasThread ? { environmentId: EnvironmentId.make("test"), threadId: v2ThreadShell.id } : null,
+    suggestionsEnabled,
+    optimizeEnabled,
     driver,
   );
   rendered();
-  return <output>{data.completedRuns}</output>;
+  return (
+    <output>
+      {data.completedRuns} | {data.lastTurnCompletedAt ?? "none"} |{" "}
+      {data.promptCacheExpiresAt ?? "none"}
+    </output>
+  );
 }
 
-it("ignores tool output and new tool entries but renders a completed run", async () => {
+it("ignores assistant deltas, tool output and new tools but renders completed runs", async () => {
   using stack = new DisposableStack();
   const registry = stack.adopt(AtomRegistry.make(), (registry) => registry.dispose());
   const tool: OrchestrationV2TurnItem = {
@@ -156,7 +170,7 @@ it("ignores tool output and new tool entries but renders a completed run", async
     input: "test",
     output: "first line",
   };
-  const projection = { ...v2Projection, turnItems: [tool] };
+  const projection: OrchestrationV2ThreadProjection = { ...v2Projection, turnItems: [tool] };
   const atom = Atom.make({ environmentId: EnvironmentId.make("test"), projection });
   source.read.mockReset().mockReturnValue(atom);
   const rendered = vi.fn();
@@ -165,8 +179,26 @@ it("ignores tool output and new tool entries but renders a completed run", async
       <Probe rendered={rendered} />
     </RegistryContext.Provider>,
   );
-  await expect.element(screen.getByRole("status")).toHaveTextContent("0");
+  await expect.element(screen.getByRole("status")).toHaveTextContent("0 | none | none");
   const initial = rendered.mock.calls.length;
+  await act(() =>
+    registry.set(atom, {
+      environmentId: EnvironmentId.make("test"),
+      projection: {
+        ...projection,
+        turnItems: [
+          {
+            ...tool,
+            type: "assistant_message",
+            messageId: MessageId.make("assistant"),
+            streaming: true,
+            text: "assistant delta",
+          },
+        ],
+      },
+    }),
+  );
+  expect(rendered).toHaveBeenCalledTimes(initial);
   await act(() =>
     registry.set(atom, {
       environmentId: EnvironmentId.make("test"),
@@ -204,16 +236,82 @@ it("ignores tool output and new tool entries but renders a completed run", async
       projection: { ...projection, runs: [run] },
     }),
   );
-  await expect.element(screen.getByRole("status")).toHaveTextContent("1");
+  await expect.element(screen.getByRole("status")).toHaveTextContent("1 | none | none");
   expect(rendered).toHaveBeenCalledTimes(initial + 1);
 });
 
 it.each([
-  { enabled: false, driver: "codex" },
-  { enabled: true, driver: "cursor" },
-])("does not subscribe when enabled=$enabled and driver=$driver", async (props) => {
+  { suggestionsEnabled: false, optimizeEnabled: false, driver: "codex", hasThread: true },
+  { suggestionsEnabled: true, optimizeEnabled: true, driver: "cursor", hasThread: true },
+  { suggestionsEnabled: true, optimizeEnabled: true, driver: "codex", hasThread: false },
+])("does not subscribe for %j", async (props) => {
   source.read.mockReset().mockReturnValue(Atom.make(null));
   await using screen = await render(<Probe {...props} rendered={() => {}} />);
-  await expect.element(screen.getByRole("status")).toHaveTextContent("0");
+  await expect.element(screen.getByRole("status")).toHaveTextContent("0 | none | none");
   expect(source.read).not.toHaveBeenCalled();
+});
+
+it.each([
+  { suggestionsEnabled: true, optimizeEnabled: false, driver: "codex" },
+  { suggestionsEnabled: false, optimizeEnabled: true, driver: "claudeAgent" },
+])("subscribes and renders provider completion for %j", async (props) => {
+  using stack = new DisposableStack();
+  const registry = stack.adopt(AtomRegistry.make(), (value) => value.dispose());
+  const turn: OrchestrationV2ProviderTurn = {
+    id: ProviderTurnId.make("turn"),
+    providerThreadId: ProviderThreadId.make("provider-thread"),
+    nodeId: NodeId.make("node"),
+    runAttemptId: null,
+    nativeTurnRef: null,
+    ordinal: 1,
+    status: "running",
+    startedAt: v2Now,
+    completedAt: null,
+  };
+  const atom = Atom.make({ projection: { ...v2Projection, providerTurns: [turn] } });
+  source.read.mockReset().mockReturnValue(atom);
+  const rendered = vi.fn();
+  await using screen = await render(
+    <RegistryContext.Provider value={registry}>
+      <Probe {...props} rendered={rendered} />
+    </RegistryContext.Provider>,
+  );
+  await expect.element(screen.getByRole("status")).toHaveTextContent("0 | none | none");
+  expect(source.read).toHaveBeenCalled();
+  const initial = rendered.mock.calls.length;
+  await act(() =>
+    registry.set(atom, {
+      projection: {
+        ...v2Projection,
+        providerTurns: [{ ...turn, status: "completed", completedAt: v2Now }],
+      },
+    }),
+  );
+  await expect
+    .element(screen.getByRole("status"))
+    .toHaveTextContent("0 | 2026-06-20T00:00:00.000Z | none");
+  expect(rendered).toHaveBeenCalledTimes(initial + 1);
+  await act(() =>
+    registry.set(atom, {
+      projection: {
+        ...v2Projection,
+        providerTurns: [
+          {
+            ...turn,
+            status: "completed",
+            completedAt: v2Now,
+            tokenUsage: {
+              usedTokens: 100,
+              updatedAt: "2026-06-20T00:00:00.000Z",
+              promptCacheExpiresAt: "2026-06-20T01:00:00.000Z",
+            },
+          },
+        ],
+      },
+    }),
+  );
+  await expect
+    .element(screen.getByRole("status"))
+    .toHaveTextContent("0 | 2026-06-20T00:00:00.000Z | 2026-06-20T01:00:00.000Z");
+  expect(rendered).toHaveBeenCalledTimes(initial + 2);
 });

@@ -1,5 +1,5 @@
 /** Owns the empty-composer suggestion lifecycle; never submits a user message. */
-import { RegistryContext, useAtomValue } from "@effect/atom-react";
+import { RegistryContext } from "@effect/atom-react";
 import {
   COMPOSER_SUGGESTION_MIN_COMPLETED_RUNS,
   composerCacheExpiresAt,
@@ -9,68 +9,13 @@ import {
   type ScopedThreadRef,
   type RunId,
 } from "@t3tools/contracts";
-import { Atom, type AtomRegistry } from "effect/reactivity";
+import { type AtomRegistry } from "effect/reactivity";
 import { useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { threadKey, parseThreadKey } from "@t3tools/client-runtime/state/entities";
+import { threadKey } from "@t3tools/client-runtime/state/entities";
 import { useStableCallback } from "../../hooks/useStableCallback";
 import { composerAssistEnvironment } from "../../state/composerAssist";
 import { useAtomCommand } from "../../state/use-atom-command";
-import { environmentThreadDetails } from "../../state/threads";
-import * as DateTime from "effect/DateTime";
 
-const emptyMetadata = { completedRuns: 0, lastTurnCompletedAt: null, promptCacheExpiresAt: null };
-const emptyMetadataAtom = Atom.make(emptyMetadata);
-
-// Atom.family holds weak values; idle subscriptions are released when the composer leaves.
-const suggestionMetadataAtom = Atom.family((key: string) => {
-  const { environmentId, threadId } = parseThreadKey(key);
-  const atom = Atom.make((get) => {
-    const projection = get(
-      environmentThreadDetails.threadAtom({ environmentId, threadId }),
-    )?.projection;
-    const last = projection?.providerTurns.reduce<(typeof projection.providerTurns)[number] | null>(
-      (latest, turn) => {
-        if (turn.completedAt === null) return latest;
-        return latest?.completedAt == null ||
-          DateTime.toEpochMillis(turn.completedAt) > DateTime.toEpochMillis(latest.completedAt)
-          ? turn
-          : latest;
-      },
-      null,
-    );
-    return {
-      completedRuns: projection?.runs.filter((run) => run.status === "completed").length ?? 0,
-      lastTurnCompletedAt: last?.completedAt == null ? null : DateTime.formatIso(last.completedAt),
-      promptCacheExpiresAt: last?.tokenUsage?.promptCacheExpiresAt ?? null,
-    };
-  });
-  return Atom.withEquality(
-    atom,
-    (a, b) =>
-      a.completedRuns === b.completedRuns &&
-      a.lastTurnCompletedAt === b.lastTurnCompletedAt &&
-      a.promptCacheExpiresAt === b.promptCacheExpiresAt,
-  ).pipe(Atom.setIdleTTL(0));
-});
-
-/**
- * Subscribes only to completed-run and cache values, never to tool or message updates.
- * @param target Existing thread, or null when there is no server thread.
- * @param enabled Client suggestion setting; false removes the projection subscription.
- * @param driver Thread session driver; unsupported drivers do not subscribe.
- * @returns Value-stable quota metadata; absent projections use empty metadata.
- */
-export function useComposerSuggestionMetadata(
-  target: ScopedThreadRef | null,
-  enabled: boolean,
-  driver: string,
-) {
-  return useAtomValue(
-    target && enabled && isComposerAssistSupportedDriver(driver)
-      ? suggestionMetadataAtom(threadKey(target))
-      : emptyMetadataAtom,
-  );
-}
 // Retain only the latest request per thread, including failures and composer remounts.
 // latestRunId advances normally. Edit from here can move it backwards; that permits
 // one new request, though the restored draft normally blocks it via composerEmpty.

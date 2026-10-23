@@ -6,8 +6,7 @@ import {
   ComposerPromptOptimizeTab,
   ComposerPromptOptimizeStatus,
 } from "./ComposerPromptOptimizeTab";
-import { useComposerPromptCache } from "./useComposerPromptCache";
-import { isComposerAssistSupportedDriver } from "@t3tools/contracts";
+import { useComposerAssistThreadMetadata } from "./useComposerAssistThreadMetadata";
 import { ComposerSubmissionStateContext } from "./composerSubmissionState";
 import { getComposerSubmissionState } from "./composerSubmissionState.logic";
 import { ComposerControlVariantContext } from "./ComposerControl";
@@ -15,7 +14,7 @@ import { attachComposerImpact } from "./composerImpact";
 import { shouldJoltComposer } from "./composerValidationMotion";
 import { t } from "~/i18n";
 import { useComposerTypingGuard } from "./useComposerTypingGuard";
-import { useComposerSuggestion, useComposerSuggestionMetadata } from "./useComposerSuggestion";
+import { useComposerSuggestion } from "./useComposerSuggestion";
 
 import { insertAttachmentReferencesForDraft } from "./composerAttachmentReferences";
 import { DESKTOP_PASTE_AS_TEXT_EVENT } from "../../lib/desktopPasteAsText";
@@ -997,9 +996,10 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     providerInstanceEntries.find(
       (entry) => entry.instanceId === suggestionShell?.providerInstanceId,
     )?.driverKind ?? "";
-  const suggestionMetadata = useComposerSuggestionMetadata(
+  const assistThreadMetadata = useComposerAssistThreadMetadata(
     suggestionTarget,
     settings.composerSuggestionsEnabled,
+    settings.composerPromptOptimizeEnabled,
     suggestionDriver,
   );
   const { suggestion: nextMessageSuggestion, accept: acceptNextMessageSuggestion } =
@@ -1018,7 +1018,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         composerPreviewAnnotations.length === 0 &&
         composerReviewComments.length === 0 &&
         composerThreadContexts.length === 0,
-      ...suggestionMetadata,
+      ...assistThreadMetadata,
     });
   const providerCatalogPending = noProviderAvailable && !providerCatalogKnown;
   const showProviderUnavailable = noProviderAvailable && !providerCatalogPending;
@@ -3215,11 +3215,6 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     providerInstanceEntries.find(
       (entry) => entry.instanceId === props.activeThreadShell?.providerInstanceId,
     )?.driverKind ?? "";
-  const promptCache = useComposerPromptCache(
-    environmentId,
-    activeThreadId,
-    settings.composerPromptOptimizeEnabled && isComposerAssistSupportedDriver(optimizeDriver),
-  );
   const promptOptimizer = useComposerPromptOptimizer({
     environmentId,
     threadId: activeThreadId,
@@ -3233,7 +3228,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       pendingUserInputs.length > 0 ||
       pendingApprovals.length > 0,
     editorRef: composerEditorRef,
-    ...promptCache,
+    ...assistThreadMetadata,
     runKey: props.activeThreadShell?.latestRun?.runId ?? null,
     onReplaced: () => {
       setComposerTrigger(null);
