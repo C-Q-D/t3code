@@ -91,6 +91,16 @@ function buttonsLabelled(container: HTMLElement, label: string) {
   );
 }
 
+it.each(["WARNING", "NOTE"])("preserves RTL direction in timeline %s callouts", async (type) => {
+  setup();
+  await using screen = await renderText(`> [!${type}]\n> مرحبا بالعالم`, {
+    presentation: "timeline",
+  });
+  const callout = screen.getByRole("note");
+  await expect.element(callout).toHaveAttribute("dir", "rtl");
+  expect(getComputedStyle(callout.element().querySelector("p")!).direction).toBe("rtl");
+});
+
 it("keeps thread chip colors and decoration separate from ordinary Markdown links", async () => {
   setup();
   await using screen = await renderText(

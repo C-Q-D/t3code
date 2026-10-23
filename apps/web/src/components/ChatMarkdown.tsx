@@ -1042,7 +1042,7 @@ const CHAT_MARKDOWN_COMPONENTS = {
       // W7 is also used by status banners; the other T3 colors belong to Markdown.
       if (alertType === "warning") {
         return (
-          <Alert variant="sand" role="note" data-markdown-callout={alertType}>
+          <Alert variant="sand" role="note" dir={props.dir} data-markdown-callout={alertType}>
             <alert.Icon aria-hidden />
             <AlertTitle data-thread-find-ignore="true">{alert.label}</AlertTitle>
             <AlertDescription>
@@ -1058,6 +1058,7 @@ const CHAT_MARKDOWN_COMPONENTS = {
       return (
         <div
           role="note"
+          dir={props.dir}
           data-markdown-callout={alertType}
           className={cn(
             "timeline-markdown-callout flex items-start gap-2.5 rounded-notice px-3.5 py-2.5 text-body leading-callout",
