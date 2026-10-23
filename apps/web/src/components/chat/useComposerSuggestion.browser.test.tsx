@@ -1,6 +1,6 @@
 /** Exercises quota gates and reply races through a fake RPC command, without a server. */
 import "../../index.css";
-import { RegistryProvider } from "@effect/atom-react";
+import { RegistryContext, RegistryProvider } from "@effect/atom-react";
 import {
   EnvironmentId,
   RunId,
@@ -9,7 +9,7 @@ import {
   type ComposerSuggestResult,
 } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
-import { AsyncResult } from "effect/reactivity";
+import { AsyncResult, AtomRegistry } from "effect/reactivity";
 import { StrictMode, createRef, useState } from "react";
 import { userEvent } from "vite-plus/test/browser";
 import { expect, it, vi } from "vite-plus/test";
@@ -481,3 +481,44 @@ it.each(["thread", "run", "draft"])(
     await expect.element(screen.getByLabelText("prediction")).toHaveTextContent("none");
   },
 );
+
+it("keeps one deduplication record per thread after consecutive runs", async () => {
+  const input = setup();
+  using _clock = vi.spyOn(Date, "now").mockReturnValue(1792749900000);
+  using resources = new DisposableStack();
+  const registry = resources.adopt(AtomRegistry.make(), (value) => value.dispose());
+  // Observe storage ownership without exporting a production-only inspection API.
+  const records: Array<Map<unknown, unknown> | Set<unknown>> = [];
+  const originalSet = WeakMap.prototype.set;
+  using _storage = {
+    [Symbol.dispose]: () => {
+      // oxlint-disable-next-line no-extend-native -- Restore the native method after the scoped storage observation.
+      WeakMap.prototype.set = originalSet;
+    },
+  };
+  // oxlint-disable-next-line no-extend-native -- Observe the private resource bound without adding a production inspection API; vi.spyOn recurses through its own WeakMap bookkeeping.
+  WeakMap.prototype.set = function (owner, value) {
+    if (owner === registry && (value instanceof Map || value instanceof Set)) records.push(value);
+    originalSet.call(this, owner, value);
+    return this;
+  };
+  await using screen = await render(
+    <RegistryContext.Provider value={registry}>
+      <Probe input={input} />
+    </RegistryContext.Provider>,
+  );
+  for (const id of ["run-3", "run-4", "run-5"]) {
+    const nextRun = RunId.make(id);
+    rpc.run.mockResolvedValue(AsyncResult.success({ ...suggested, runId: nextRun, text: id }));
+    await screen.rerender(
+      <RegistryContext.Provider value={registry}>
+        <Probe input={{ ...input, shell: { ...input.shell!, latestRunId: nextRun } }} />
+      </RegistryContext.Provider>,
+    );
+    await expect.element(screen.getByLabelText("prediction")).toHaveTextContent(id);
+  }
+  expect(rpc.run).toHaveBeenCalledTimes(4);
+
+  expect(records).toHaveLength(1);
+  expect(records[0]?.size).toBe(1);
+});

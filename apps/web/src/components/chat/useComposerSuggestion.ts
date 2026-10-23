@@ -7,6 +7,7 @@ import {
   isComposerAssistSupportedDriver,
   type OrchestrationV2ThreadShell,
   type ScopedThreadRef,
+  type RunId,
 } from "@t3tools/contracts";
 import { Atom, type AtomRegistry } from "effect/reactivity";
 import { useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -70,12 +71,13 @@ export function useComposerSuggestionMetadata(
       : emptyMetadataAtom,
   );
 }
-// Registry lifetime matches a client session, including composer remounts. Failures
-// remain recorded because retrying the same prediction would spend quota again.
-const requestedRuns = new WeakMap<AtomRegistry.AtomRegistry, Set<string>>();
+// Retain only the latest request per thread, including failures and composer remounts.
+// latestRunId advances normally. Edit from here can move it backwards; that permits
+// one new request, though the restored draft normally blocks it via composerEmpty.
+const requestedRuns = new WeakMap<AtomRegistry.AtomRegistry, Map<string, RunId>>();
 
 /**
- * Requests at most one prediction per environment/thread/run after local gates pass.
+ * Requests once for the latest run per thread after local gates pass; rollback may request again.
  * @param input Current shell, draft eligibility and completed-turn cache metadata;
  * a null target/shell means no server thread, and a missing cache time is unknown.
  * @returns Visible prediction or null, plus an acceptance callback that retires it.
@@ -153,11 +155,12 @@ export function useComposerSuggestion(input: {
     if ((resetAt && Date.parse(resetAt) > now) || composerCacheMaybeExpired(expiresAt, now)) return;
     let requested = requestedRuns.get(registry);
     if (!requested) {
-      requested = new Set();
+      requested = new Map();
       requestedRuns.set(registry, requested);
     }
-    if (requested.has(key)) return;
-    requested.add(key);
+    const targetKey = threadKey(target);
+    if (requested.get(targetKey) === runId) return;
+    requested.set(targetKey, runId);
     const generation = current.current.generation;
     void suggestNext({
       environmentId: target.environmentId,
