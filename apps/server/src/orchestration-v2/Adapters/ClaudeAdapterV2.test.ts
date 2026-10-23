@@ -257,7 +257,7 @@ describe("ClaudeAdapterV2 runtime query policy", () => {
       NodeCrypto.createHash("sha256")
         .update((options.systemPrompt as { append: string }).append)
         .digest("hex"),
-      "cd29a1d2e9f8661d0860435bc232da8d03a0de49624d2936e3deb5e11643afe4",
+      "63f328f4a36cd9eaeddcf2a31b5f8d2df74b2355ae3af277a151e75d7e6372f0",
     );
   });
 
@@ -278,7 +278,7 @@ describe("ClaudeAdapterV2 runtime query policy", () => {
     assert.isTrue(append.endsWith(suffix));
     assert.equal(
       NodeCrypto.createHash("sha256").update(append.slice(0, -suffix.length)).digest("hex"),
-      "cd29a1d2e9f8661d0860435bc232da8d03a0de49624d2936e3deb5e11643afe4",
+      "63f328f4a36cd9eaeddcf2a31b5f8d2df74b2355ae3af277a151e75d7e6372f0",
     );
   });
 
