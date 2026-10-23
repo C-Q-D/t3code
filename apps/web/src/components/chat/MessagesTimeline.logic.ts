@@ -1368,7 +1368,10 @@ function deriveTurnFolds(input: {
         createdAt: steer.createdAt,
         hiddenEntryIds: segmentHiddenIds(entries),
         entryIds: new Set(entries.map((entry) => entry.id)),
-        label: segmentMs !== null ? `Continued for ${formatDuration(segmentMs)}` : "Continued",
+        label:
+          segmentMs !== null
+            ? t.chat.timeline.continuedFor(formatDuration(segmentMs))
+            : t.chat.timeline.continued,
       });
     }
   }

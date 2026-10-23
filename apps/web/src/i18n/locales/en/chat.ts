@@ -472,6 +472,12 @@ export const chat = {
     threadActions: (title: string) => `Thread actions for ${title}`,
   },
   timeline: {
+    backgroundSetup: "Background setup",
+    /** Labels a continued segment with its already formatted duration. */
+    continuedFor: (duration: string) => `Continued for ${duration}`,
+    continued: "Continued",
+    openAutomation: "Open automation",
+    toolInput: "Tool input",
     threadReadPrefixes: {
       running: "Reading thread",
       completed: "Read thread",
@@ -507,10 +513,10 @@ export const chat = {
     userMessage: "User message",
     previousTurn: "Previous turn",
     nextTurn: "Next turn",
-    sentByAutomation: "Sent by automation",
+    sentByAutomation: "Automation",
     sentByT3Code: "Sent by T3 Code",
-    openSendingThread: "Open sending thread",
-    sentByAnotherAgent: "Sent by another agent",
+    openSendingThread: "Open thread",
+    sentByAnotherAgent: "Agent",
     you: "You",
     queued: "Queued",
     steer: "Steer",
@@ -847,6 +853,10 @@ export const chat = {
     showMoreSuffix: " more",
   },
   queue: {
+    /** Describes starting a queued turn and preserves the optional shortcut. */
+    startTurn: (shortcut: string | null) =>
+      `Start a turn with this message${shortcut ? ` (${shortcut})` : ""}`,
+    sendNow: "Send now",
     collapseQueuedMessages: "Collapse queued messages",
     expandQueuedMessages: "Expand queued messages",
     queued: "Queued",
@@ -903,6 +913,13 @@ export const chat = {
     cancel: "Cancel",
   },
   providerStatus: {
+    adminRequestTarget: "admin request",
+    adminRequestCopied: "Request copied",
+    adminRequestSendHint: "Send it to your workspace admin.",
+    adminRequestCopyError: "Could not copy the request",
+    workspaceUsageLimitHint:
+      "You've reached your workspace's limit for using your ChatGPT plan in other apps. Copy a request to ask your workspace admin for increased usage limits.",
+    copyAdminRequest: "Copy request for admin",
     openProviderSetupToSignInWith: "Open provider setup to sign in with Google.",
     openProviderSetupToSignIn: "Open provider setup to sign in.",
     signInViaTheCLIToAuthenticate: "Sign in via the CLI to authenticate again.",

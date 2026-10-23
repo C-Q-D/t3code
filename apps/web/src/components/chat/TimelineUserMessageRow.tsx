@@ -199,7 +199,7 @@ function AutomationMessageRow({ row }: { row: Extract<TimelineRow, { kind: "mess
                 search={{ environmentId: ctx.activeThreadEnvironmentId, taskId: scheduledTaskId }}
                 className="rounded-sm text-xs text-muted-foreground hover:underline focus-visible:outline-2 focus-visible:outline-ring"
               >
-                Open automation
+                {t.chat.timeline.openAutomation}
               </Link>
             ) : null}
             <TimelineRowTimestamp
@@ -630,7 +630,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
                 aria-label={t.chat.timeline.openSendingThread}
                 tone="muted"
               >
-                Open thread
+                {t.chat.view.openThread}
               </InlineButton>
             ) : null}
             <Tooltip>

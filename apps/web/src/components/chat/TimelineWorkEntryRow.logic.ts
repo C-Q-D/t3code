@@ -1,4 +1,5 @@
 /** Derives work-entry icons and detail content for timeline rows. */
+import { t } from "~/i18n";
 import type { Root, RootContent } from "mdast";
 import { resolveWorkEntryToolPresentation } from "@t3tools/client-runtime/work-log/presentation";
 import { isJavaScriptReplTool } from "@t3tools/shared/toolActivity";
@@ -116,7 +117,8 @@ export function buildToolCallExpandedBody(
             "input" in workEntry.toolData
           ? workEntry.toolData.input
           : undefined;
-    if (input !== undefined) addBlock(`Tool input\n${JSON.stringify(input, null, 2)}`);
+    if (input !== undefined)
+      addBlock(`${t.chat.timeline.toolInput}\n${JSON.stringify(input, null, 2)}`);
   }
   const command = workEntry.command?.trim();
   const raw = workEntryRawCommand(workEntry);

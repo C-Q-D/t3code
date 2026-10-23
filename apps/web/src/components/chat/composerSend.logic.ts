@@ -70,14 +70,14 @@ export function approvalRedirectNotice(input: {
 }): string | null {
   if (input.draftChanged) {
     return input.declined
-      ? "Approval declined. Your message changed, so it wasn't sent."
-      : "Your message changed, so it wasn't sent.";
+      ? t.composer.approval.declinedDraftChanged
+      : t.composer.approval.draftChanged;
   }
   if (input.approvalResponding) {
-    return "An approval is already being answered, so your message wasn't sent.";
+    return t.composer.approval.alreadyResponding;
   }
   if (input.declined && input.approvalArrived) {
-    return "Another approval arrived, so your message wasn't sent.";
+    return t.composer.approval.anotherArrived;
   }
   return null;
 }

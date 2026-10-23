@@ -2,6 +2,7 @@
 import type { Messages } from "../en";
 
 export const common: Messages["common"] = {
+  productName: "T3 Code",
   windowControls: {
     minimize: "最小化窗口",
     maximize: "最大化窗口",

@@ -4,6 +4,7 @@ import type { PullRequestState } from "@t3tools/contracts";
 const monthNameFormatter = new Intl.DateTimeFormat("en-US", { month: "long" });
 
 export const common = {
+  productName: "T3 Code",
   windowControls: {
     minimize: "Minimize window",
     maximize: "Maximize window",

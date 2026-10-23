@@ -288,6 +288,11 @@ export const composer: Messages["composer"] = {
     dismiss: "关闭反馈通知",
   },
   approval: {
+    declinedDraftChanged: "审批已拒绝。消息已更改，因此未发送。",
+    draftChanged: "消息已更改，因此未发送。",
+    alreadyResponding: "正在响应另一项审批，因此未发送消息。",
+    anotherArrived: "收到另一项审批，因此未发送消息。",
+    sendAgainWhenReady: "准备好后请重新发送。",
     cancel: "取消",
     decline: "拒绝",
     allowSession: "本次会话始终允许",

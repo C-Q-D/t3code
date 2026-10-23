@@ -19,14 +19,17 @@ import { ExpandableText } from "../settings/ExpandableText";
 
 /** Copies the fixed workspace-limit request and reports clipboard success or failure without retrying. */
 function copyAdminRequest() {
-  void writeTextToClipboard(CHATGPT_WORKSPACE_ADMIN_REQUEST, "admin request").then(
+  void writeTextToClipboard(
+    CHATGPT_WORKSPACE_ADMIN_REQUEST,
+    t.chat.providerStatus.adminRequestTarget,
+  ).then(
     () =>
       toastManager.add({
         type: "success",
-        title: "Request copied",
-        description: "Send it to your workspace admin.",
+        title: t.chat.providerStatus.adminRequestCopied,
+        description: t.chat.providerStatus.adminRequestSendHint,
       }),
-    () => toastManager.add({ type: "error", title: "Could not copy the request" }),
+    () => toastManager.add({ type: "error", title: t.chat.providerStatus.adminRequestCopyError }),
   );
 }
 
@@ -97,7 +100,7 @@ export const ThreadErrorBanner = memo(function ThreadErrorBanner({
               <p className="font-medium">{t.chat.providerStatus.chatGPTUsageLimitReached}</p>
               <p>
                 {workspaceLimit
-                  ? "You've reached your workspace's limit for using your ChatGPT plan in other apps. Copy a request to ask your workspace admin for increased usage limits."
+                  ? t.chat.providerStatus.workspaceUsageLimitHint
                   : t.chat.providerStatus.reviewYourUsageSettingsInChatGPTTo}
               </p>
             </div>
@@ -109,7 +112,7 @@ export const ThreadErrorBanner = memo(function ThreadErrorBanner({
           <AlertAction>
             {workspaceLimit ? (
               <Button variant="default" size="md" onClick={copyAdminRequest}>
-                Copy request for admin
+                {t.chat.providerStatus.copyAdminRequest}
               </Button>
             ) : chatGptLimit ? (
               <ChatGptUsageButton variant="default" size="md" />

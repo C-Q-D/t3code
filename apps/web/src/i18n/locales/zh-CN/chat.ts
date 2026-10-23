@@ -440,6 +440,12 @@ export const chat: Messages["chat"] = {
     threadActions: (title) => `${title} 的对话操作`,
   },
   timeline: {
+    backgroundSetup: "后台设置",
+    /** Labels a continued segment with its already formatted duration. */
+    continuedFor: (duration: string) => `继续运行了 ${duration}`,
+    continued: "继续运行",
+    openAutomation: "打开自动任务",
+    toolInput: "工具输入",
     threadReadPrefixes: {
       running: "正在读取线程",
       completed: "已读取线程",
@@ -805,6 +811,10 @@ export const chat: Messages["chat"] = {
     showMoreSuffix: "项",
   },
   queue: {
+    /** Describes starting a queued turn and preserves the optional shortcut. */
+    startTurn: (shortcut: string | null) =>
+      `用此消息开始一轮对话${shortcut ? `（${shortcut}）` : ""}`,
+    sendNow: "立即发送",
     collapseQueuedMessages: "折叠排队消息",
     expandQueuedMessages: "展开排队消息",
     queued: "排队中",
@@ -859,6 +869,13 @@ export const chat: Messages["chat"] = {
     cancel: "取消",
   },
   providerStatus: {
+    adminRequestTarget: "管理员请求",
+    adminRequestCopied: "请求已复制",
+    adminRequestSendHint: "请将请求发送给工作区管理员。",
+    adminRequestCopyError: "无法复制请求",
+    workspaceUsageLimitHint:
+      "你已达到工作区允许在其他应用中使用 ChatGPT 套餐的用量上限。请复制请求，向工作区管理员申请提高用量上限。",
+    copyAdminRequest: "复制给管理员的请求",
     openProviderSetupToSignInWith: "打开 Provider 设置以使用 Google 登录。",
     openProviderSetupToSignIn: "打开 Provider 设置以登录。",
     signInViaTheCLIToAuthenticate: "通过CLI登录以重新认证。",

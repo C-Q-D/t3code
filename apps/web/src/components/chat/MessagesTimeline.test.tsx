@@ -1645,8 +1645,8 @@ describe("MessagesTimeline", () => {
     );
 
     expect(agentMarkup).toContain('data-user-message-attribution="agent"');
-    expect(agentMarkup).toContain("Sent by another agent");
-    expect(userMarkup).not.toContain("Sent by another agent");
+    expect(agentMarkup).toContain("Agent");
+    expect(userMarkup).not.toContain("Agent");
   });
 
   it("keeps a subagent parent-thread link at the top of an empty timeline", async () => {

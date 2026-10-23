@@ -292,6 +292,11 @@ export const composer = {
     dismiss: "Dismiss feedback notice",
   },
   approval: {
+    declinedDraftChanged: "Approval declined. Your message changed, so it wasn't sent.",
+    draftChanged: "Your message changed, so it wasn't sent.",
+    alreadyResponding: "An approval is already being answered, so your message wasn't sent.",
+    anotherArrived: "Another approval arrived, so your message wasn't sent.",
+    sendAgainWhenReady: "Send again when it's ready.",
     cancel: "Cancel",
     decline: "Decline",
     allowSession: "Always allow this session",

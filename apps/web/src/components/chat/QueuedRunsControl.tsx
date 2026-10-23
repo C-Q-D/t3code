@@ -525,7 +525,9 @@ export function QueuedRunsControl({
                             expanded ? "rounded-menu-row" : "rounded-full",
                           )}
                           aria-label={
-                            workflow?.canSendNow ? "Send now" : t.chat.queue.sendSteer(null)
+                            workflow?.canSendNow
+                              ? t.chat.queue.sendNow
+                              : t.chat.queue.sendSteer(null)
                           }
                           disabled={item.runId === null || busyRunId !== null || !canSend}
                           onClick={() => {
@@ -539,7 +541,9 @@ export function QueuedRunsControl({
                       </TooltipTrigger>
                       <TooltipPopup>
                         {workflow?.canSendNow
-                          ? `Start a turn with this message${item.serverIndex === 0 && props.steerShortcutLabel ? ` (${props.steerShortcutLabel})` : ""}`
+                          ? t.chat.queue.startTurn(
+                              item.serverIndex === 0 ? (props.steerShortcutLabel ?? null) : null,
+                            )
                           : activeRun === null
                             ? t.chat.queue.thereIsNoActiveRunToSteer
                             : t.chat.queue.sendSteer(

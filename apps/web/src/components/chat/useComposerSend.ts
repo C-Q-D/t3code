@@ -1017,7 +1017,7 @@ export function useComposerSend(input: ComposerSendInput) {
           toastManager.add({
             type: "info",
             title: notice,
-            description: "Send again when it's ready.",
+            description: t.composer.approval.sendAgainWhenReady,
           });
         }
         return;
