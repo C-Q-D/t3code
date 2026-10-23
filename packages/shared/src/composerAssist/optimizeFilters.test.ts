@@ -1,4 +1,8 @@
-/** Protects draft preservation, independent length limits, and wrapper removal. */
+/**
+ * Protects draft preservation, independent length limits, and wrapper removal.
+ * These cases are the fixed reference-filter acceptance set. Evaluate new boundary cases
+ * as known limitations before deciding whether to change the rules.
+ */
 import { expect, it } from "vite-plus/test";
 import { checkOptimizedPrompt, stripOptimizeWrapping } from "./optimizeFilters.ts";
 
@@ -91,4 +95,20 @@ it.each([
 
 it("preserves a complete path in Chinese prose", () => {
   expect(checkOptimizedPrompt("修复 /src/a.ts 并补测试", "fix /src/a.ts")).toBeNull();
+});
+
+it.each([
+  ["修复模块并补测试", "references_dropped"],
+  ["修复/src/b.ts 并补测试", "references_dropped"],
+  ["修复 /src/a.ts 并补测试", null],
+])("recognizes a POSIX path adjacent to CJK: %j", (raw, expected) => {
+  expect(checkOptimizedPrompt(raw, "修复/src/a.ts")).toBe(expected);
+});
+
+it.each(["a/b", "http://x/y"])("does not treat %s as an absolute path", (draft) => {
+  expect(checkOptimizedPrompt("Please fix the module and add tests", draft)).toBeNull();
+});
+
+it("protects a Windows path adjacent to CJK", () => {
+  expect(checkOptimizedPrompt("修复模块", "修复C:\\a.ts")).toBe("references_dropped");
 });

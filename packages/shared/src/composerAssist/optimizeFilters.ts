@@ -49,7 +49,7 @@ function extractReferences(text: string) {
   // Ambiguous bare paths may overcapture prose: rejecting the rewrite preserves the draft,
   // which is safer than accepting a different target. Never recover by substring matching.
   for (const match of plain.matchAll(
-    /(["'])((?:[A-Za-z]:[\\/]|\\\\|\/)[^\n]*?)\1|`+[^`]+`+|@[\p{L}\p{N}_./\\-][^\s`"'<>*~，。；：！？、（）【】(),:;!?[\]]*|(?:[A-Za-z]:[\\/]|\\\\|(?<![\p{L}\p{N}:/])\/)(?:[^\r\n`"'<>*~，。；：！？、（）【】(),:;!?[\]]*[\\/])?[^\s`"'<>*~，。；：！？、（）【】(),:;!?[\]]+/gu,
+    /(["'])((?:[A-Za-z]:[\\/]|\\\\|\/)[^\n]*?)\1|`+[^`]+`+|@[\p{L}\p{N}_./\\-][^\s`"'<>*~，。；：！？、（）【】(),:;!?[\]]*|(?:(?<![A-Za-z0-9])[A-Za-z]:[\\/]|\\\\|(?<![A-Za-z0-9:/])\/)(?:[^\r\n`"'<>*~，。；：！？、（）【】(),:;!?[\]]*[\\/])?[^\s`"'<>*~，。；：！？、（）【】(),:;!?[\]]+/gu,
   )) {
     if (match[0].startsWith("`")) {
       code.add(match[0]);
