@@ -51,13 +51,17 @@ it.effect(
     Effect.gen(function* () {
       const f = yield* fixture();
       const activeTurn = f.projection.providerTurns[0]!;
-      f.projection.providerTurns.push({
-        ...activeTurn,
-        providerThreadId: ProviderThreadId.make("other-provider-thread"),
-        completedAt: DateTime.makeUnsafe(540_000),
-      });
+      const providerTurns = [
+        activeTurn,
+        {
+          ...activeTurn,
+          providerThreadId: ProviderThreadId.make("other-provider-thread"),
+          completedAt: DateTime.makeUnsafe(540_000),
+        },
+      ];
+      f.setProviderTurns(providerTurns);
       const clientTurn = latestCompletedComposerProviderTurn(
-        f.projection.providerTurns,
+        providerTurns,
         f.projection.thread.activeProviderThreadId,
       );
       const clientExpiry = composerCacheExpiresAt({
@@ -988,6 +992,9 @@ const fixture = Effect.fn("ComposerAssistTest.fixture")(function* (
     lifecycle,
     opens,
     projection,
+    setProviderTurns: (providerTurns: OrchestrationV2ThreadProjection["providerTurns"]) => {
+      projection = { ...projection, providerTurns };
+    },
     setDriver: (driver: string) => {
       projection = {
         ...projection,
