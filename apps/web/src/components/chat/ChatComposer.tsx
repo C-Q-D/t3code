@@ -5,9 +5,8 @@ import {
   ComposerPromptOptimizeButton,
   ComposerPromptOptimizeTab,
 } from "./ComposerPromptOptimizeTab";
-import { useEnvironmentThread } from "~/state/threads";
-import * as Option from "effect/Option";
-import * as DateTime from "effect/DateTime";
+import { useComposerPromptCache } from "./useComposerPromptCache";
+import { isComposerAssistSupportedDriver } from "@t3tools/contracts";
 import { ComposerSubmissionStateContext } from "./composerSubmissionState";
 import { getComposerSubmissionState } from "./composerSubmissionState.logic";
 import { ComposerControlVariantContext } from "./ComposerControl";
@@ -3211,22 +3210,21 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     setIsComposerModelPickerOpen(true);
   };
   const openModelPickerStable = useStableCallback(openModelPicker);
-  const optimizeThreadState = useEnvironmentThread(environmentId, activeThreadId);
-  const completedProviderTurn = Option.getOrNull(optimizeThreadState.data)
-    ?.providerTurns.filter((turn) => turn.completedAt !== null)
-    .toSorted(
-      (left, right) =>
-        DateTime.toEpochMillis(right.completedAt!) - DateTime.toEpochMillis(left.completedAt!),
-    )[0];
+  const optimizeDriver =
+    providerInstanceEntries.find(
+      (entry) => entry.instanceId === props.activeThreadShell?.providerInstanceId,
+    )?.driverKind ?? "";
+  const promptCache = useComposerPromptCache(
+    environmentId,
+    activeThreadId,
+    settings.composerPromptOptimizeEnabled && isComposerAssistSupportedDriver(optimizeDriver),
+  );
   const promptOptimizer = useComposerPromptOptimizer({
     environmentId,
     threadId: activeThreadId,
     draftKey: composerTargetKey(composerDraftTarget),
     prompt,
-    driver:
-      providerInstanceEntries.find(
-        (entry) => entry.instanceId === props.activeThreadShell?.providerInstanceId,
-      )?.driverKind ?? "",
+    driver: optimizeDriver,
     enabled: settings.composerPromptOptimizeEnabled,
     running:
       phase === "running" ||
@@ -3234,10 +3232,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       pendingUserInputs.length > 0 ||
       pendingApprovals.length > 0,
     editorRef: composerEditorRef,
-    lastTurnCompletedAt: completedProviderTurn?.completedAt
-      ? DateTime.formatIso(completedProviderTurn.completedAt)
-      : null,
-    promptCacheExpiresAt: completedProviderTurn?.tokenUsage?.promptCacheExpiresAt ?? null,
+    ...promptCache,
     runKey: props.activeThreadShell?.latestRun?.runId ?? null,
     onReplaced: () => {
       setComposerTrigger(null);
