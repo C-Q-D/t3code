@@ -1,6 +1,9 @@
 /** Validates rewritten drafts without applying suggestion word limits. */
 import type { ComposerOptimizeFilterReason } from "@t3tools/contracts";
-import { collectComposerContextReferences } from "../composerContextReferences.ts";
+import {
+  collectComposerContextReferences,
+  replaceComposerContextReferences,
+} from "../composerContextReferences.ts";
 
 /** Removes recognized whole-response wrappers; inline code and draft content stay intact. */
 export function stripOptimizeWrapping(raw: string): string {
@@ -24,15 +27,29 @@ export function checkOptimizedPrompt(
   if (text === "") return "empty";
   if (text.replace(/\s+/g, " ") === draft.trim().replace(/\s+/g, " ")) return "unchanged";
   if (text.length > Math.max(2000, 3 * draft.length)) return "too_long";
-  const references = [
-    ...collectComposerContextReferences(draft).map((entry) => entry.source),
-    ...Array.from(
-      draft.matchAll(
-        /@[\w./\\-]+|`+[^`]+`+|(?:[A-Za-z]:[\\/]|\\\\|(?<![\w:/])\/)[^\s`"'<>，。；）)]+/g,
-      ),
-      (match) => match[0],
+  // The web composer uses this same parser for t3-context links.
+  const contextReferences = collectComposerContextReferences(draft);
+  const outputContexts = new Set(
+    collectComposerContextReferences(text).map((entry) => entry.source),
+  );
+  if (contextReferences.some((entry) => !outputContexts.has(entry.source)))
+    return "references_dropped";
+  const references = Array.from(
+    replaceComposerContextReferences(draft, () => "").matchAll(
+      /(["'])((?:[A-Za-z]:[\\/]|\\\\|\/)[^\n]*?)\1|@[\p{L}\p{N}_./\\-]+|`+[^`]+`+|(?:[A-Za-z]:[\\/]|\\\\|(?<![\p{L}\p{N}_:/])\/)[^\s`"'<>，。；：！？、（）(),;!?]+/gu,
     ),
-  ];
-  if (references.some((reference) => !text.includes(reference))) return "references_dropped";
+    (match) => (match[2] ?? match[0]).replace(/[.,;!?，。；：！？、]+$/, ""),
+  );
+  if (references.some((reference) => !containsTarget(text, reference))) return "references_dropped";
   return null;
+}
+
+/** Matches a complete target, allowing prose punctuation and changed path quotes around it. */
+function containsTarget(text: string, target: string): boolean {
+  const escaped = target.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const continuation = String.raw`[\p{L}\p{N}_/\\-]|\.[\p{L}\p{N}_]`;
+  return new RegExp(
+    String.raw`(?<![\p{L}\p{N}_/\\@\x60])${escaped}(?!${continuation}|\x60)`,
+    "u",
+  ).test(text);
 }

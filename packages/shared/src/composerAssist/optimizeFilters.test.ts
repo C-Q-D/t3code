@@ -39,3 +39,23 @@ it.each([
 ])("unwraps %j without removing inline code", (raw, expected) => {
   expect(stripOptimizeWrapping(raw)).toBe(expected);
 });
+
+it.each([
+  ["修复 @文件.ts", "修复模块并添加测试"],
+  ["fix @file.ts", "fix @file.tsx and test"],
+  ["fix /src/a.ts", "fix /src/a.tsx and test"],
+  ['fix "C:\\My Project\\a.ts"', "fix C:\\My Project\\b.ts and test"],
+])("rejects a missing or changed target in %j", (draft, raw) => {
+  expect(checkOptimizedPrompt(raw, draft)).toBe("references_dropped");
+});
+
+it.each([
+  ["fix @file.ts", "修复 @file.ts，并添加测试"],
+  ["run `cmd`", "运行 `cmd`。然后检查结果"],
+  ["fix @文件.ts", "修复 @文件.ts, then test"],
+  ['fix "C:\\My Project\\a.ts"', "fix 'C:\\My Project\\a.ts' and test"],
+  ['fix "C:\\My Project\\a.ts"', "fix C:\\My Project\\a.ts and test"],
+  ["fix '/my project/a.ts'", 'fix "/my project/a.ts" and test'],
+])("accepts punctuation and equivalent path quoting in %j", (draft, raw) => {
+  expect(checkOptimizedPrompt(raw, draft)).toBeNull();
+});
