@@ -553,12 +553,19 @@ export type ProviderAdapterV2SubagentOutcome = {
   readonly result: OrchestrationV2Subagent["result"];
 };
 
-/** A forked query inherits the main thread's model and policy without mutating its state. */
+/**
+ * A forked query inherits the main turn's thread, context, model and policy without mutating it.
+ * Thread and context must come from the same source as the main turn input: missing or
+ * different values produce a different request prefix and prevent cache reuse.
+ */
 export interface ProviderAdapterV2SideQueryInput {
+  readonly appThread: OrchestrationV2AppThread;
   readonly threadId: ThreadId;
   readonly providerThread: OrchestrationV2ProviderThread;
   readonly modelSelection: ModelSelection;
   readonly runtimePolicy: ProviderAdapterV2RuntimePolicy;
+  readonly appContext?: ReadonlyArray<{ readonly key: string; readonly text: string }>;
+  readonly developerContext?: ReadonlyArray<{ readonly key: string; readonly text: string }>;
   readonly prompt: string;
   readonly purpose: "suggestion" | "optimization";
 }
