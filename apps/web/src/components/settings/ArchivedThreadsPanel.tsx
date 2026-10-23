@@ -1,6 +1,8 @@
+/** Lists archived threads and applies permission-checked restore or delete actions. */
+import { t } from "~/i18n";
 import { settingsScopeEnvironmentLabels } from "./settingsScopeAxis";
 import { Spinner } from "~/components/ui/spinner";
-import { ArchiveIcon, ArchiveX } from "lucide-react";
+import { ArchiveIcon } from "lucide-react";
 import { type ScopedThreadRef } from "@t3tools/contracts";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { presentThreadShell } from "@t3tools/client-runtime/state/shell";
@@ -13,14 +15,22 @@ import { useSettingsScope } from "./SettingsScopeContext";
 import { useThreadActions } from "../../hooks/useThreadActions";
 import { readLocalApi } from "../../localApi";
 import { useArchivedThreadSnapshots } from "../../lib/archivedThreadsState";
-import { RelativeTime } from "../RelativeTime";
+import { useNowMinute } from "../../hooks/useNowMinute";
+import { formatRelativeTimeLabel } from "../../timestampFormat";
 import { Button } from "../ui/button";
 import { stackedThreadToast, toastManager } from "../ui/toast";
-import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settingsLayout";
+import { SettingsPageContainer, SettingsSection } from "./settingsLayout";
 import { searchableSetting } from "./settingsSearch";
 import { ProjectFavicon } from "../ProjectFavicon";
 
+/**
+ * Renders scoped archive groups with P3 list wells, preserving snapshot ordering.
+ * Successful mutations refresh snapshots; deletion requires confirmation and failures use toasts.
+ * @returns Project groups or the existing loading, error, and empty states.
+ */
 export function ArchivedThreadsPanel() {
+  const nowMinute = useNowMinute();
+  const nowMs = Date.parse(`${nowMinute}:00.000Z`);
   const { scope, groups: projectGroups, environments } = useSettingsScope();
   const { unarchiveThread, confirmAndDeleteThread } = useThreadActions();
   const {
@@ -130,8 +140,8 @@ export function ArchivedThreadsPanel() {
     if (!api) return;
     const clicked = await api.contextMenu.show(
       [
-        { id: "unarchive", label: "Unarchive" },
-        { id: "delete", label: "Delete", destructive: true },
+        { id: "unarchive", label: t.settings.archive.unarchive },
+        { id: "delete", label: t.settings.actions.delete, destructive: true },
       ],
       position,
     );
@@ -145,8 +155,9 @@ export function ArchivedThreadsPanel() {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Failed to unarchive thread",
-            description: error instanceof Error ? error.message : "An error occurred.",
+            title: t.settings.archive.unarchiveError,
+            description:
+              error instanceof Error ? error.message : t.settings.archive.actionErrorDescription,
           }),
         );
       }
@@ -162,8 +173,9 @@ export function ArchivedThreadsPanel() {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Failed to delete thread",
-            description: error instanceof Error ? error.message : "An error occurred.",
+            title: t.settings.archive.deleteError,
+            description:
+              error instanceof Error ? error.message : t.settings.archive.actionErrorDescription,
           }),
         );
       }
@@ -177,27 +189,27 @@ export function ArchivedThreadsPanel() {
           id={isLoadingArchive ? undefined : searchableSetting("archive").id}
           title={searchableSetting("archive").title}
         >
-          <SettingsRow
-            title={
-              <span className="inline-flex items-center gap-2">
-                {isLoadingArchive ? (
+          <div className="archive-thread-list">
+            <div className="archive-thread-empty" role="status">
+              {isLoadingArchive && (
+                <span className="mb-2 inline-flex">
                   <Spinner size="sm" tone="muted" />
-                ) : (
-                  <ArchiveIcon className="size-3.5 text-muted-foreground" />
-                )}
+                </span>
+              )}
+              <p>
                 {isLoadingArchive
-                  ? "Loading archived threads"
+                  ? t.settings.archive.loading
                   : archiveError
-                    ? "Could not load archived threads"
-                    : "No archived threads"}
-              </span>
-            }
-            description={
-              isLoadingArchive
-                ? "Checking connected environments."
-                : (archiveError ?? "Archived threads will appear here.")
-            }
-          />
+                    ? t.settings.archive.loadError
+                    : t.settings.archive.empty}
+              </p>
+              <p>
+                {isLoadingArchive
+                  ? t.settings.archive.loadingHint
+                  : (archiveError ?? t.settings.archive.emptyHint)}
+              </p>
+            </div>
+          </div>
         </SettingsSection>
       ) : (
         archivedGroups.map(({ key, project, title, threads: projectThreads }, index) => (
@@ -207,49 +219,58 @@ export function ArchivedThreadsPanel() {
             title={title}
             icon={<ProjectFavicon project={project} />}
           >
-            {projectThreads.map((thread) => (
-              <SettingsRow
-                key={`${thread.environmentId}:${thread.id}`}
-                onContextMenu={(event) => {
-                  event.preventDefault();
-                  void (async () => {
-                    const result = await settlePromise(() =>
-                      handleArchivedThreadContextMenu(
-                        scopeThreadRef(thread.environmentId, thread.id),
-                        {
-                          x: event.clientX,
-                          y: event.clientY,
-                        },
-                      ),
-                    );
-                    if (result._tag === "Failure") {
-                      const error = squashAtomCommandFailure(result);
-                      toastManager.add(
-                        stackedThreadToast({
-                          type: "error",
-                          title: "Archived thread action failed",
-                          description:
-                            error instanceof Error ? error.message : "An error occurred.",
-                        }),
+            <div className="archive-thread-list">
+              {projectThreads.map((thread) => (
+                <div
+                  className="archive-thread-row"
+                  key={`${thread.environmentId}:${thread.id}`}
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    void (async () => {
+                      const result = await settlePromise(() =>
+                        handleArchivedThreadContextMenu(
+                          scopeThreadRef(thread.environmentId, thread.id),
+                          {
+                            x: event.clientX,
+                            y: event.clientY,
+                          },
+                        ),
                       );
-                    }
-                  })();
-                }}
-                title={thread.title}
-                description={
-                  <span className={hasMultipleEnvironments ? "block truncate" : undefined}>
-                    {hasMultipleEnvironments ? `${thread.environmentLabel} · ` : null}
-                    Archived <RelativeTime timestamp={thread.archivedAt ?? thread.createdAt} />
-                    {" \u00b7 Created "}
-                    <RelativeTime timestamp={thread.createdAt} />
+                      if (result._tag === "Failure") {
+                        const error = squashAtomCommandFailure(result);
+                        toastManager.add(
+                          stackedThreadToast({
+                            type: "error",
+                            title: t.settings.archive.actionError,
+                            description:
+                              error instanceof Error
+                                ? error.message
+                                : t.settings.archive.actionErrorDescription,
+                          }),
+                        );
+                      }
+                    })();
+                  }}
+                >
+                  <span className="archive-thread-icon" aria-hidden="true">
+                    <ArchiveIcon className="size-3.75" strokeWidth={1.75} />
                   </span>
-                }
-                control={
+                  <div className="flex min-w-0 flex-1 flex-col gap-0.25">
+                    <div className="truncate text-control leading-normal font-semibold">
+                      {thread.title}
+                    </div>
+                    <div className="truncate text-secondary-copy-medium leading-normal text-secondary-label">
+                      {hasMultipleEnvironments ? `${thread.environmentLabel} · ` : null}
+                      {t.settings.archive.historyHint(
+                        formatRelativeTimeLabel(thread.archivedAt ?? thread.createdAt, nowMs),
+                        formatRelativeTimeLabel(thread.createdAt, nowMs),
+                      )}
+                    </div>
+                  </div>
                   <Button
                     type="button"
-                    variant="outline"
-                    size="sm"
-                    className="shrink-0"
+                    variant="secondary"
+                    size="settings-list"
                     onClick={() => {
                       void (async () => {
                         const result = await unarchiveThread(
@@ -264,21 +285,22 @@ export function ArchivedThreadsPanel() {
                           toastManager.add(
                             stackedThreadToast({
                               type: "error",
-                              title: "Failed to unarchive thread",
+                              title: t.settings.archive.unarchiveError,
                               description:
-                                error instanceof Error ? error.message : "An error occurred.",
+                                error instanceof Error
+                                  ? error.message
+                                  : t.settings.archive.actionErrorDescription,
                             }),
                           );
                         }
                       })();
                     }}
                   >
-                    <ArchiveX className="size-3.5" />
-                    <span>Unarchive</span>
+                    <span>{t.settings.archive.unarchive}</span>
                   </Button>
-                }
-              />
-            ))}
+                </div>
+              ))}
+            </div>
           </SettingsSection>
         ))
       )}

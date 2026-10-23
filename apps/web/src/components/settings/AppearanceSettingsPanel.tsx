@@ -1,10 +1,12 @@
+/** Renders scoped appearance controls, theme choices, and typography settings. */
+import { BackgroundImageSetting } from "./BackgroundImageSetting";
+import { t } from "~/i18n";
+import { usePhysicsMotion } from "~/hooks/usePhysicsMotion";
 import type { CSSProperties } from "react";
 import { useState } from "react";
 import {
   DEFAULT_ENVIRONMENT_IDENTIFICATION_MODE,
   DEFAULT_UNIFIED_SETTINGS,
-  type ChatWidth,
-  type EnvironmentIdentificationMode,
   MAX_APPEARANCE_CONTRAST,
   MAX_GLASS_OPACITY,
   MAX_PANEL_ANIMATION_DURATION_MS,
@@ -16,11 +18,12 @@ import {
   resolveEnvironmentIdentificationPillLabel,
   useEnvironmentStageLabel,
 } from "../SidebarStageBackdrop";
+import { isElectron } from "../../env";
 import { useCustomThemes } from "../../hooks/useCustomThemes";
 import { useTheme } from "../../hooks/useTheme";
 import { useScopedSettings, useUpdateScopedSettings } from "./useScopedSettings";
-import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { Switch } from "../ui/switch";
+import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group";
 import { ThemeLibrary } from "./ThemeSettings";
 import {
   SettingResetButton,
@@ -32,18 +35,9 @@ import { searchableSetting } from "./settingsSearch";
 import { PanelAnimationsPreview } from "./PanelAnimationsPreview";
 import { TypographySection } from "./TypographySettings";
 
-const ENVIRONMENT_IDENTIFICATION_LABELS: Record<EnvironmentIdentificationMode, string> = {
-  artwork: "Artwork",
-  pill: "Version pill",
-  none: "None",
-};
+const ENVIRONMENT_IDENTIFICATION_LABELS = t.settings.rows.environmentIdentification.options;
 
-const CHAT_WIDTH_LABELS: Record<ChatWidth, string> = {
-  comfortable: "Comfortable",
-  wide: "Wide",
-  full: "Full",
-};
-
+/** M3 appearance groups preserve scoped setting writes, reset actions, and search destinations. */
 export function AppearanceSettingsPanel() {
   const {
     appearanceMode,
@@ -78,6 +72,7 @@ export function AppearanceSettingsPanel() {
   const panelAnimationDurationRatio =
     (settings.panelAnimationDurationMs - MIN_PANEL_ANIMATION_DURATION_MS) /
     (MAX_PANEL_ANIMATION_DURATION_MS - MIN_PANEL_ANIMATION_DURATION_MS);
+  const { enabled: physicsMotionEnabled } = usePhysicsMotion();
   const panelAnimationDurationSliderStyle = {
     "--settings-slider-progress": `${panelAnimationDurationRatio * 100}%`,
     "--settings-slider-fill-offset": `${0.5 - panelAnimationDurationRatio}rem`,
@@ -85,32 +80,27 @@ export function AppearanceSettingsPanel() {
 
   return (
     <SettingsPageContainer>
-      <SettingsSection id="appearance" title="Colors & themes" variant="plain" hideTitle>
-        <div id={searchableSetting("theme").id}>
-          <ThemeLibrary
-            appearanceMode={appearanceMode}
-            customThemes={customThemes}
-            initialAppearance={resolvedTheme}
-            refreshTheme={refreshTheme}
-            isImportOpen={isImportThemeOpen}
-            setAppearanceMode={setAppearanceMode}
-            setTheme={setTheme}
-            setThemeHalf={setThemeHalf}
-            theme={theme}
-            themeHalves={themeHalves}
-            onImportOpenChange={setIsImportThemeOpen}
-          />
-        </div>
-      </SettingsSection>
-
-      <SettingsSection id="appearance-interface" title="Interface">
+      <SettingsSection id="appearance" title={t.settings.sections.appearance}>
+        <ThemeLibrary
+          appearanceMode={appearanceMode}
+          customThemes={customThemes}
+          initialAppearance={resolvedTheme}
+          refreshTheme={refreshTheme}
+          isImportOpen={isImportThemeOpen}
+          setAppearanceMode={setAppearanceMode}
+          setTheme={setTheme}
+          setThemeHalf={setThemeHalf}
+          theme={theme}
+          themeHalves={themeHalves}
+          onImportOpenChange={setIsImportThemeOpen}
+        />
         <SettingsRow
           {...searchableSetting("setting-appearance-contrast")}
-          description="Adjust the contrast of colors and borders across the interface."
+          description={t.settings.rows.settingAppearanceContrast.description}
           resetAction={
             settings.appearanceContrast !== DEFAULT_UNIFIED_SETTINGS.appearanceContrast ? (
               <SettingResetButton
-                label="contrast"
+                label={t.settings.rows.settingAppearanceContrast.resetLabel}
                 onClick={() =>
                   updateSettings({
                     appearanceContrast: DEFAULT_UNIFIED_SETTINGS.appearanceContrast,
@@ -120,16 +110,16 @@ export function AppearanceSettingsPanel() {
             ) : null
           }
           control={
-            <div className="flex w-full items-center gap-3 sm:w-52">
+            <div className="flex w-50 max-w-full items-center gap-2.5">
               <output
-                className="min-w-12 rounded-md bg-muted px-2 py-1 text-center font-mono text-xs font-medium tabular-nums text-foreground"
+                className="order-last w-9 shrink-0 text-right font-mono text-secondary-copy tabular-nums text-secondary-label"
                 htmlFor="appearance-contrast"
               >
                 {settings.appearanceContrast}%
               </output>
               <input
-                aria-label="Contrast"
-                className="settings-slider min-w-0 flex-1"
+                aria-label={t.settings.rows.settingAppearanceContrast.title}
+                className="settings-slider settings-appearance-slider min-w-0 flex-1"
                 id="appearance-contrast"
                 max={MAX_APPEARANCE_CONTRAST}
                 min={MIN_APPEARANCE_CONTRAST}
@@ -154,11 +144,11 @@ export function AppearanceSettingsPanel() {
 
         <SettingsRow
           {...searchableSetting("setting-glass-opacity")}
-          description="Higher values make menus, dialogs, and the composer more solid."
+          description={t.settings.rows.settingGlassOpacity.description}
           resetAction={
             settings.glassOpacity !== DEFAULT_UNIFIED_SETTINGS.glassOpacity ? (
               <SettingResetButton
-                label="glass opacity"
+                label={t.settings.rows.settingGlassOpacity.resetLabel}
                 onClick={() =>
                   updateSettings({ glassOpacity: DEFAULT_UNIFIED_SETTINGS.glassOpacity })
                 }
@@ -166,16 +156,16 @@ export function AppearanceSettingsPanel() {
             ) : null
           }
           control={
-            <div className="flex w-full items-center gap-3 sm:w-52">
+            <div className="flex w-50 max-w-full items-center gap-2.5">
               <output
-                className="min-w-12 rounded-md bg-muted px-2 py-1 text-center font-mono text-xs font-medium tabular-nums text-foreground"
+                className="order-last w-9 shrink-0 text-right font-mono text-secondary-copy tabular-nums text-secondary-label"
                 htmlFor="glass-opacity"
               >
                 {settings.glassOpacity}%
               </output>
               <input
-                aria-label="Glass opacity"
-                className="settings-slider min-w-0 flex-1"
+                aria-label={t.settings.rows.settingGlassOpacity.title}
+                className="settings-slider settings-appearance-slider min-w-0 flex-1"
                 id="glass-opacity"
                 max={MAX_GLASS_OPACITY}
                 min={MIN_GLASS_OPACITY}
@@ -198,14 +188,87 @@ export function AppearanceSettingsPanel() {
           }
         />
 
+        {isElectron ? <BackgroundImageSetting /> : null}
+
+        <SettingsRow
+          {...searchableSetting("diff-color-scheme")}
+          description={t.settings.rows.diffColorScheme.description}
+          resetAction={
+            settings.diffColorScheme !== DEFAULT_UNIFIED_SETTINGS.diffColorScheme ? (
+              <SettingResetButton
+                label={t.settings.rows.diffColorScheme.resetLabel}
+                onClick={() =>
+                  updateSettings({ diffColorScheme: DEFAULT_UNIFIED_SETTINGS.diffColorScheme })
+                }
+              />
+            ) : null
+          }
+          control={
+            <ToggleGroup
+              size="settings"
+              value={[settings.diffColorScheme]}
+              aria-label={t.settings.rows.diffColorScheme.title}
+              onValueChange={(values) => {
+                const value = values[0];
+                if (value === "blue-orange" || value === "red-green") {
+                  updateSettings({ diffColorScheme: value });
+                }
+              }}
+            >
+              <ToggleGroupItem value="blue-orange">
+                {t.settings.rows.diffColorScheme.options.blueOrange}
+              </ToggleGroupItem>
+              <ToggleGroupItem value="red-green">
+                {t.settings.rows.diffColorScheme.options.redGreenDefault}
+              </ToggleGroupItem>
+            </ToggleGroup>
+          }
+        />
+      </SettingsSection>
+      <SettingsSection id="appearance-interface" title={t.settings.sections.appearanceInterface}>
+        <SettingsRow
+          {...searchableSetting("chat-width")}
+          description={t.settings.rows.chatWidth.description}
+          resetAction={
+            settings.chatWidth !== DEFAULT_UNIFIED_SETTINGS.chatWidth ? (
+              <SettingResetButton
+                label={t.settings.rows.chatWidth.resetLabel}
+                onClick={() => updateSettings({ chatWidth: DEFAULT_UNIFIED_SETTINGS.chatWidth })}
+              />
+            ) : null
+          }
+          control={
+            <ToggleGroup
+              size="settings"
+              value={[settings.chatWidth]}
+              aria-label={t.settings.rows.chatWidth.title}
+              onValueChange={(values) => {
+                const value = values[0];
+                if (value === "comfortable" || value === "wide" || value === "full") {
+                  updateSettings({ chatWidth: value });
+                }
+              }}
+            >
+              <ToggleGroupItem value="comfortable">
+                {t.settings.rows.chatWidth.comfortableDefaultLabel}
+              </ToggleGroupItem>
+              <ToggleGroupItem value="wide">
+                {t.settings.rows.chatWidth.options.wide}
+              </ToggleGroupItem>
+              <ToggleGroupItem value="full">
+                {t.settings.rows.chatWidth.options.full}
+              </ToggleGroupItem>
+            </ToggleGroup>
+          }
+        />
         {showEnvironmentIdentification ? (
           <SettingsRow
             {...searchableSetting("environment-identification")}
-            description="Choose how Dev and Nightly environments are identified."
+            description={t.settings.rows.environmentIdentification.description}
             resetAction={
               settings.environmentIdentificationMode !== DEFAULT_ENVIRONMENT_IDENTIFICATION_MODE ? (
                 <SettingResetButton
-                  label="environment identification"
+                  label={t.settings.rows.environmentIdentification.resetLabel}
                   onClick={() =>
                     updateSettings({
                       environmentIdentificationMode: DEFAULT_ENVIRONMENT_IDENTIFICATION_MODE,
@@ -215,90 +278,39 @@ export function AppearanceSettingsPanel() {
               ) : null
             }
             control={
-              <Select
-                value={settings.environmentIdentificationMode}
-                onValueChange={(value) => {
+              <ToggleGroup
+                size="settings"
+                value={[settings.environmentIdentificationMode]}
+                aria-label={t.settings.rows.environmentIdentification.title}
+                onValueChange={(values) => {
+                  const value = values[0];
                   if (value === "artwork" || value === "pill" || value === "none") {
                     updateSettings({ environmentIdentificationMode: value });
                   }
                 }}
               >
-                <SelectTrigger
-                  size="sm"
-                  className="w-full sm:w-40"
-                  aria-label="Environment identification"
-                >
-                  <SelectValue>
-                    {ENVIRONMENT_IDENTIFICATION_LABELS[settings.environmentIdentificationMode]}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectPopup align="end" alignItemWithTrigger={false}>
-                  {Object.entries(ENVIRONMENT_IDENTIFICATION_LABELS).map(([value, label]) => (
-                    <SelectItem hideIndicator key={value} value={value}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectPopup>
-              </Select>
+                <ToggleGroupItem value="artwork">
+                  {ENVIRONMENT_IDENTIFICATION_LABELS.artwork}
+                </ToggleGroupItem>
+                <ToggleGroupItem value="pill">
+                  {ENVIRONMENT_IDENTIFICATION_LABELS.pill}
+                </ToggleGroupItem>
+                <ToggleGroupItem value="none">
+                  {ENVIRONMENT_IDENTIFICATION_LABELS.none}
+                </ToggleGroupItem>
+              </ToggleGroup>
             }
           />
         ) : null}
 
         <SettingsRow
-          {...searchableSetting("diff-color-scheme")}
-          description="Choose colors for additions and deletions, including change counts."
-          resetAction={
-            settings.diffColorScheme !== DEFAULT_UNIFIED_SETTINGS.diffColorScheme ? (
-              <SettingResetButton
-                label="diff colors"
-                onClick={() =>
-                  updateSettings({ diffColorScheme: DEFAULT_UNIFIED_SETTINGS.diffColorScheme })
-                }
-              />
-            ) : null
-          }
-          control={
-            <div className="w-full sm:w-40">
-              <Select
-                value={settings.diffColorScheme}
-                onValueChange={(value) => {
-                  if (value === "red-green" || value === "blue-orange")
-                    updateSettings({ diffColorScheme: value });
-                }}
-              >
-                <SelectTrigger size="sm" className="w-full min-w-0" aria-label="Diff colors">
-                  <span
-                    aria-hidden="true"
-                    className={
-                      settings.diffColorScheme === "blue-orange"
-                        ? "flex shrink-0 flex-row-reverse gap-1"
-                        : "flex shrink-0 gap-1"
-                    }
-                  >
-                    <span className="size-2 rounded-full bg-diff-deletion" />
-                    <span className="size-2 rounded-full bg-diff-addition" />
-                  </span>
-                  <SelectValue>
-                    {settings.diffColorScheme === "blue-orange" ? "Blue & orange" : "Red & green"}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectPopup align="end" alignItemWithTrigger={false}>
-                  <SelectItem value="red-green">Red & green (default)</SelectItem>
-                  <SelectItem value="blue-orange">Blue & orange</SelectItem>
-                </SelectPopup>
-              </Select>
-            </div>
-          }
-        />
-
-        <SettingsRow
           {...searchableSetting("composer-context")}
-          description="Keep branch and worktree controls below the composer after a thread starts."
+          description={t.settings.rows.composerContext.description}
           resetAction={
             settings.persistComposerContextStrip !==
             DEFAULT_UNIFIED_SETTINGS.persistComposerContextStrip ? (
               <SettingResetButton
-                label="composer context"
+                label={t.settings.rows.composerContext.resetLabel}
                 onClick={() =>
                   updateSettings({
                     persistComposerContextStrip:
@@ -314,50 +326,56 @@ export function AppearanceSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ persistComposerContextStrip: Boolean(checked) })
               }
-              aria-label="Keep composer context visible in active threads"
+              aria-label={t.settings.rows.composerContext.ariaLabel}
             />
           }
         />
-
+      </SettingsSection>
+      <SettingsSection id="motion" title={t.settings.sections.appearanceMotion}>
         <SettingsRow
-          {...searchableSetting("chat-width")}
-          description="Set how wide messages and the composer can grow on large screens."
+          {...searchableSetting("physics-motion")}
+          description={t.settings.rows.physicsMotion.description}
+          control={
+            <ToggleGroup
+              size="settings"
+              value={[settings.physicsMotion]}
+              aria-label={t.settings.rows.physicsMotion.ariaLabel}
+              onValueChange={(values) => {
+                const physicsMotion = values[0];
+                if (
+                  physicsMotion === "on" ||
+                  physicsMotion === "system" ||
+                  physicsMotion === "off"
+                ) {
+                  updateSettings({ physicsMotion });
+                }
+              }}
+            >
+              <ToggleGroupItem value="on">{t.settings.rows.physicsMotion.on}</ToggleGroupItem>
+              <ToggleGroupItem value="system">
+                {t.settings.rows.physicsMotion.system}
+              </ToggleGroupItem>
+              <ToggleGroupItem value="off">{t.settings.rows.physicsMotion.off}</ToggleGroupItem>
+            </ToggleGroup>
+          }
           resetAction={
-            settings.chatWidth !== DEFAULT_UNIFIED_SETTINGS.chatWidth ? (
+            settings.physicsMotion !== DEFAULT_UNIFIED_SETTINGS.physicsMotion ? (
               <SettingResetButton
-                label="chat width"
-                onClick={() => updateSettings({ chatWidth: DEFAULT_UNIFIED_SETTINGS.chatWidth })}
+                label={t.settings.rows.physicsMotion.resetLabel}
+                onClick={() =>
+                  updateSettings({ physicsMotion: DEFAULT_UNIFIED_SETTINGS.physicsMotion })
+                }
               />
             ) : null
-          }
-          control={
-            <div className="w-full sm:w-40">
-              <Select
-                value={settings.chatWidth}
-                onValueChange={(value) => {
-                  if (value === "comfortable" || value === "wide" || value === "full")
-                    updateSettings({ chatWidth: value });
-                }}
-              >
-                <SelectTrigger size="sm" className="w-full min-w-0" aria-label="Chat width">
-                  <SelectValue>{CHAT_WIDTH_LABELS[settings.chatWidth]}</SelectValue>
-                </SelectTrigger>
-                <SelectPopup align="end" alignItemWithTrigger={false}>
-                  <SelectItem value="comfortable">Comfortable (default)</SelectItem>
-                  <SelectItem value="wide">Wide</SelectItem>
-                  <SelectItem value="full">Full</SelectItem>
-                </SelectPopup>
-              </Select>
-            </div>
           }
         />
         <SettingsRow
           {...searchableSetting("math-rendering")}
-          description="Typeset LaTeX math, such as $x^2$ or \[x^2\], in messages and Markdown previews. The composer keeps TeX source editable."
+          description={t.settings.conversationRenderingUi.mathHint}
           resetAction={
             settings.mathRenderingEnabled !== DEFAULT_UNIFIED_SETTINGS.mathRenderingEnabled ? (
               <SettingResetButton
-                label="math rendering"
+                label={t.settings.conversationRenderingUi.mathReset}
                 onClick={() =>
                   updateSettings({
                     mathRenderingEnabled: DEFAULT_UNIFIED_SETTINGS.mathRenderingEnabled,
@@ -372,29 +390,34 @@ export function AppearanceSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ mathRenderingEnabled: Boolean(checked) })
               }
-              aria-label="Render math"
+              aria-label={t.settings.conversationRenderingUi.math}
             />
           }
         />
-      </SettingsSection>
-
-      <SettingsSection id="motion" title="Motion">
         <SettingsRow
           {...searchableSetting("panel-animations")}
-          description="Set how fast panels open and close."
+          description={
+            physicsMotionEnabled
+              ? t.settings.rows.panelAnimations.overriddenByPhysics
+              : t.settings.rows.panelAnimations.description
+          }
+          controlLayout="full"
           control={
-            <div className="grid w-full grid-cols-[5rem_minmax(0,1fr)] items-center gap-3 sm:w-auto sm:grid-cols-[7rem_13rem] sm:gap-4">
-              <PanelAnimationsPreview durationMs={settings.panelAnimationDurationMs} />
-              <div className="flex w-full items-center gap-3">
+            <div className="flex w-full flex-wrap items-center gap-4">
+              <div className="min-w-40 flex-1">
+                <PanelAnimationsPreview durationMs={settings.panelAnimationDurationMs} />
+              </div>
+              <div className="flex w-full items-center gap-2.5">
                 <output
-                  className="min-w-16 rounded-md bg-muted px-2 py-1 text-center font-mono text-xs font-medium tabular-nums text-foreground"
+                  className="order-last w-16 shrink-0 text-right font-mono text-secondary-copy tabular-nums text-secondary-label"
                   htmlFor="panel-animation-duration"
                 >
                   {settings.panelAnimationDurationMs} ms
                 </output>
                 <input
-                  aria-label="Panel animation duration"
-                  className="settings-slider min-w-0 flex-1"
+                  aria-label={t.settings.rows.panelAnimations.ariaLabel}
+                  className="settings-slider settings-appearance-slider min-w-0 flex-1 disabled:cursor-not-allowed disabled:opacity-50 disabled:grayscale"
+                  disabled={physicsMotionEnabled}
                   id="panel-animation-duration"
                   max={MAX_PANEL_ANIMATION_DURATION_MS}
                   min={MIN_PANEL_ANIMATION_DURATION_MS}
@@ -420,7 +443,7 @@ export function AppearanceSettingsPanel() {
             settings.panelAnimationDurationMs !==
             DEFAULT_UNIFIED_SETTINGS.panelAnimationDurationMs ? (
               <SettingResetButton
-                label="panel animations"
+                label={t.settings.rows.panelAnimations.resetLabel}
                 onClick={() =>
                   updateSettings({
                     panelAnimationDurationMs: DEFAULT_UNIFIED_SETTINGS.panelAnimationDurationMs,

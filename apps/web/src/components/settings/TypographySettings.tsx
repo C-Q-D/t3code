@@ -1,3 +1,5 @@
+/** Edits scoped font preferences while keeping platform fallback families visible. */
+import { t } from "~/i18n";
 import type { ReactNode } from "react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import {
@@ -38,11 +40,16 @@ import {
 } from "./settingsLayout";
 import { searchableSetting } from "./settingsSearch";
 
+/**
+ * Freezes platform font fallback labels at mount so clearing a preference still names the font that will render.
+ * @returns Default sans/code labels and the effective interface family, with blank preferences resolved to sans.
+ */
 function useFontDefaultFamilies() {
   const settings = useScopedSettings();
   const [defaults] = useState(() => ({
-    sans: resolveDefaultFamilyLabel(DEFAULT_SANS_FONT_STACK) ?? "System default",
-    code: resolveDefaultFamilyLabel(DEFAULT_CODE_FONT_STACK) ?? "System monospace",
+    sans: resolveDefaultFamilyLabel(DEFAULT_SANS_FONT_STACK) ?? t.common.system,
+    code:
+      resolveDefaultFamilyLabel(DEFAULT_CODE_FONT_STACK) ?? t.settings.appearance.systemMonospace,
   }));
   return {
     sans: defaults.sans,
@@ -58,7 +65,7 @@ function InterfaceFontRow({ preview }: { preview?: ReactNode }) {
   return (
     <FontFamilySettingsRow
       {...searchableSetting("interface-font")}
-      description="Everything outside code blocks and the terminal."
+      description={t.settings.rows.interfaceFont.description}
       defaultFamily={defaults.sans}
       defaultValue={DEFAULT_UNIFIED_SETTINGS.fontFamilySans}
       value={settings.fontFamilySans}
@@ -70,7 +77,7 @@ function InterfaceFontRow({ preview }: { preview?: ReactNode }) {
         })
       }
       size={{
-        label: "Interface font size",
+        label: t.settings.rows.interfaceFont.sizeAriaLabel,
         min: MIN_INTERFACE_FONT_SIZE,
         max: MAX_INTERFACE_FONT_SIZE,
         value: settings.fontSizeInterface,
@@ -89,7 +96,7 @@ function PromptFontRow() {
   return (
     <FontFamilySettingsRow
       {...searchableSetting("prompt-font")}
-      description="Only the box you write prompts in. Mono works well here."
+      description={t.settings.rows.promptFont.description}
       defaultFamily={defaults.interfaceFamily}
       defaultValue={DEFAULT_UNIFIED_SETTINGS.fontFamilyComposer}
       value={settings.fontFamilyComposer}
@@ -101,7 +108,7 @@ function PromptFontRow() {
         })
       }
       size={{
-        label: "Prompt font size",
+        label: t.settings.rows.promptFont.sizeAriaLabel,
         min: MIN_PROMPT_FONT_SIZE,
         max: MAX_PROMPT_FONT_SIZE,
         value: settings.fontSizePrompt,
@@ -115,7 +122,7 @@ function PromptFontRow() {
 
 function CodeFontRow({
   title,
-  description = "Code blocks, diffs, and file previews.",
+  description = t.settings.rows.codeFont.description,
   preview,
 }: {
   title?: string;
@@ -142,7 +149,7 @@ function CodeFontRow({
       }
       requireMonospace
       size={{
-        label: "Code font size",
+        label: t.settings.rows.codeFont.sizeAriaLabel,
         min: MIN_CODE_FONT_SIZE,
         max: MAX_CODE_FONT_SIZE,
         value: settings.fontSizeCode,
@@ -161,7 +168,7 @@ function TerminalFontRow() {
   return (
     <FontFamilySettingsRow
       {...searchableSetting("terminal-font")}
-      description="Terminal output, independent from code blocks and diffs."
+      description={t.settings.rows.terminalFont.description}
       defaultFamily={defaults.code}
       defaultValue={DEFAULT_UNIFIED_SETTINGS.fontFamilyTerminal}
       value={settings.fontFamilyTerminal}
@@ -174,7 +181,7 @@ function TerminalFontRow() {
       }
       requireMonospace
       size={{
-        label: "Terminal font size",
+        label: t.settings.rows.terminalFont.sizeAriaLabel,
         min: MIN_TERMINAL_FONT_SIZE,
         max: MAX_TERMINAL_FONT_SIZE,
         value: settings.fontSizeTerminal,
@@ -202,11 +209,11 @@ function FontSmoothingRow() {
   return (
     <SettingsRow
       {...searchableSetting("font-smoothing")}
-      description="Use thinner grayscale text smoothing instead of the macOS default."
+      description={t.settings.rows.fontSmoothing.description}
       resetAction={
         settings.fontSmoothing !== DEFAULT_UNIFIED_SETTINGS.fontSmoothing ? (
           <SettingResetButton
-            label="font smoothing"
+            label={t.settings.rows.fontSmoothing.resetLabel}
             onClick={() =>
               updateSettings({ fontSmoothing: DEFAULT_UNIFIED_SETTINGS.fontSmoothing })
             }
@@ -217,7 +224,7 @@ function FontSmoothingRow() {
         <Switch
           checked={settings.fontSmoothing}
           onCheckedChange={(checked) => updateSettings({ fontSmoothing: Boolean(checked) })}
-          aria-label="Font smoothing"
+          aria-label={t.settings.rows.fontSmoothing.title}
         />
       }
     />
@@ -230,11 +237,11 @@ function WordWrapRow() {
   return (
     <SettingsRow
       {...searchableSetting("word-wrap")}
-      description="Wrap long lines in code blocks, tables, diffs, and file previews by default."
+      description={t.settings.rows.wordWrap.description}
       resetAction={
         settings.wordWrap !== DEFAULT_UNIFIED_SETTINGS.wordWrap ? (
           <SettingResetButton
-            label="word wrapping"
+            label={t.settings.rows.wordWrap.resetLabel}
             onClick={() => updateSettings({ wordWrap: DEFAULT_UNIFIED_SETTINGS.wordWrap })}
           />
         ) : null
@@ -243,7 +250,7 @@ function WordWrapRow() {
         <Switch
           checked={settings.wordWrap}
           onCheckedChange={(checked) => updateSettings({ wordWrap: Boolean(checked) })}
-          aria-label="Wrap code, tables, diffs, and file previews by default"
+          aria-label={t.settings.rows.wordWrap.ariaLabel}
         />
       }
     />
@@ -268,8 +275,8 @@ function SimpleFontRows() {
     <>
       <InterfaceFontRow preview={<PromptFontPreview />} />
       <CodeFontRow
-        title="Monospace font"
-        description="Code blocks, diffs, file previews, and the terminal."
+        title={t.settings.appearance.monospaceFont.title}
+        description={t.settings.appearance.monospaceFont.description}
         preview={
           <>
             <CodeFontPreview />
@@ -294,6 +301,7 @@ function SimpleFontRows() {
 
 // Font smoothing only renders on macOS, so a search jump to it elsewhere
 // must not flip the section - the target would never mount to be scrolled to.
+
 const ADVANCED_TYPOGRAPHY_TARGET_IDS: ReadonlySet<string> = new Set([
   "prompt-font",
   "terminal-font",
@@ -319,14 +327,14 @@ export function TypographySection() {
   return (
     <SettingsSection
       id="typography"
-      title="Typography"
+      title={t.settings.sections.appearanceTypography}
       headerAction={
         <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-muted-foreground">
-          Advanced
+          {t.settings.rows.backgroundActivity.options.advanced}
           <Switch
             checked={advanced}
             onCheckedChange={(checked) => setAdvanced(Boolean(checked))}
-            aria-label="Show advanced typography settings"
+            aria-label={t.settings.appearance.advancedAriaLabel}
           />
         </label>
       }
@@ -337,6 +345,7 @@ export function TypographySection() {
   );
 }
 
+/** Edits a font family and size, retaining validated drafts, discovery, and the paired reset. */
 function FontFamilySettingsRow({
   id,
   title,
@@ -424,7 +433,7 @@ function FontFamilySettingsRow({
   const familyControl =
     fontEnumeration.status === "granted" ? (
       <FontFamilyPicker
-        ariaLabel={`${title} family`}
+        ariaLabel={t.settings.appearance.fontFamilyAriaLabel(title)}
         defaultFamily={defaultFamily}
         selectedFamily={trimmed}
         requireMonospace={requireMonospace}
@@ -433,8 +442,8 @@ function FontFamilySettingsRow({
       />
     ) : (
       <Input
-        size="sm"
-        aria-label={`${title} family`}
+        size="settings"
+        aria-label={t.settings.appearance.fontFamilyAriaLabel(title)}
         aria-invalid={draftPending || undefined}
         autoCapitalize="off"
         autoComplete="off"
@@ -493,7 +502,7 @@ function FontFamilySettingsRow({
           }
         }}
       >
-        <SelectTrigger size="sm" className="w-22 shrink-0" aria-label={size.label}>
+        <SelectTrigger size="settings" className="shrink-0" aria-label={size.label}>
           <SelectValue>{size.value} px</SelectValue>
         </SelectTrigger>
         <SelectPopup align="end" alignItemWithTrigger={false}>
