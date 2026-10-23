@@ -17,17 +17,18 @@ it.each([
 });
 
 it.each([
-  ["fix @file.ts", "fix @file.ts and test it"],
-  ["fix `myFunction()`", "fix `myFunction()` and test it"],
-  ["fix /src/module.ts", "fix /src/module.ts and test it"],
-  ["fix C:\\src\\module.ts", "fix C:\\src\\module.ts and test it"],
+  ["at reference", "fix @file.ts", "fix @file.ts and test it"],
+  ["inline code", "fix `myFunction()`", "fix `myFunction()` and test it"],
+  ["POSIX path", "fix /src/module.ts", "fix /src/module.ts and test it"],
+  ["Windows path", "fix C:\\src\\module.ts", "fix C:\\src\\module.ts and test it"],
   [
+    "context link",
     "fix [module](t3-context://v1/file/file_1)",
     "fix [module](t3-context://v1/file/file_1) and test it",
   ],
-  ["fix it", "x".repeat(2000)],
-  ["a".repeat(1000), "x".repeat(3000)],
-])("preserves references and accepts the length boundary for %j", (draft, raw) => {
+  ["2000-character boundary", "fix it", "x".repeat(2000)],
+  ["three-times-draft boundary", "a".repeat(1000), "x".repeat(3000)],
+])("accepts preserved target or exact limit: %s", (_case, draft, raw) => {
   expect(checkOptimizedPrompt(raw, draft)).toBeNull();
 });
 

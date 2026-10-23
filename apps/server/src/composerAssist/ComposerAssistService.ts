@@ -568,7 +568,7 @@ const SUGGESTION_MEMO_TTL_MS = 10 * 60_000;
 const SUGGESTION_MEMO_MAX_ENTRIES = 256;
 const CACHE_COLD_SUSPECT_UNCACHED_TOKENS = 8000;
 
-/** Memoized provider metadata is shared, while request IDs and log entries remain per RPC. */
+/** In-flight callers share provider metadata; the bounded memo retains only the client result. */
 interface QueryOutcome<R = ComposerSuggestResult> {
   readonly result: R;
   readonly side: ProviderAdapter.ProviderAdapterV2SideQueryResult | null;

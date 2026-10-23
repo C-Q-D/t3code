@@ -180,7 +180,21 @@ it.effect.each(["open", "resume", "budget"] as const)(
       const f = yield* fixture({
         gate: "session_not_live",
         ...(stage === "resume" ? { resumeWait: wait } : { openWait: wait }),
-        ...(stage === "budget" ? { query: () => Effect.never } : {}),
+        ...(stage === "budget"
+          ? {
+              query: (input: ProviderAdapter.ProviderAdapterV2SideQueryInput) =>
+                input.purpose === "optimization"
+                  ? Effect.never
+                  : Effect.succeed({
+                      text: "run tests",
+                      model: null,
+                      usage: null,
+                      attemptedTools: [],
+                      stop: "completed" as const,
+                      failure: null,
+                    }),
+            }
+          : {}),
       });
       yield* Effect.gen(function* () {
         const request = yield* f.service.optimizePrompt(optimizationInput).pipe(
@@ -196,11 +210,8 @@ it.effect.each(["open", "resume", "budget"] as const)(
         } else yield* TestClock.adjust("45 seconds");
         assert.isTrue(yield* Deferred.isDone(completed));
         assert.propertyVal(yield* Fiber.join(request), "reason", "timeout");
-        assert.notPropertyVal(
-          yield* f.service.suggestNext({ threadId, runId }),
-          "reason",
-          "inflight",
-        );
+        f.setLive();
+        assert.propertyVal(yield* f.service.suggestNext({ threadId, runId }), "_tag", "Suggested");
       }).pipe(Effect.ensuring(Deferred.succeed(release, undefined)));
     }).pipe(Effect.scoped),
 );
@@ -587,6 +598,7 @@ const fixture = Effect.fn("ComposerAssistTest.fixture")(function* (
   } = {},
 ) {
   const entered = yield* Deferred.make<void>();
+  let live = options.gate !== "session_not_live";
   const lifecycle: string[] = [];
   const opens: Parameters<ProviderSessions.ProviderSessionManagerV2["Service"]["open"]>[0][] = [];
   const calls: ProviderAdapter.ProviderAdapterV2SideQueryInput[] = [];
@@ -693,13 +705,9 @@ const fixture = Effect.fn("ComposerAssistTest.fixture")(function* (
       getThreadRecords: () => Effect.sync(() => projection),
     }),
     Layer.mock(ProviderSessions.ProviderSessionManagerV2)({
-      isLive: () => Effect.succeed(options.gate !== "session_not_live"),
+      isLive: () => Effect.sync(() => live),
       get: () =>
-        Effect.succeed(
-          options.gate === "session_not_live" || options.resumeFailure
-            ? Option.none()
-            : Option.some(runtime),
-        ),
+        Effect.sync(() => (!live || options.resumeFailure ? Option.none() : Option.some(runtime))),
       open: Effect.fn("Fake.open")(function* (input) {
         lifecycle.push("open");
         opens.push(input);
@@ -759,6 +767,9 @@ const fixture = Effect.fn("ComposerAssistTest.fixture")(function* (
           { ...projection.providerThreads[0]!, driver: ProviderDriverKind.make(driver) },
         ],
       };
+    },
+    setLive: () => {
+      live = true;
     },
     setGenerating: (generating: boolean) => {
       shell = { ...shell, activeRunId: generating ? runId : null };
