@@ -436,6 +436,20 @@ export const settings: Messages["settings"] = {
       resetLabel: "富文本输入框",
       ariaLabel: "富文本输入框",
     },
+    composerSuggestions: {
+      title: "输入建议",
+      description:
+        "一轮回复结束后，在输入框里用灰字显示你可能要说的下一句，按 Tab 或 → 填入。仅 Claude 和 Codex 线程，会额外消耗少量额度。",
+      resetLabel: "输入建议",
+      ariaLabel: "输入建议",
+    },
+    composerPromptOptimize: {
+      title: "提示词优化",
+      description:
+        "在输入框底栏显示魔杖按钮，用当前线程的模型把草稿改写得更清楚，可撤销，不会自动发送。仅 Claude 和 Codex 线程。",
+      resetLabel: "提示词优化",
+      ariaLabel: "提示词优化",
+    },
     composerCollapse: {
       title: "滚动时收起输入框",
       description: "滚动已有对话时，将输入框收起为一行。聚焦输入框或开始输入即可再次展开。",

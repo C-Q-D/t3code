@@ -479,6 +479,13 @@ export function useSettingsRestore(onRestored?: () => void) {
     ...(settings.composerRichTextEnabled !== DEFAULT_UNIFIED_SETTINGS.composerRichTextEnabled
       ? [t.settings.rows.composerRichText.title]
       : []),
+    ...(settings.composerSuggestionsEnabled !== DEFAULT_UNIFIED_SETTINGS.composerSuggestionsEnabled
+      ? [t.settings.rows.composerSuggestions.title]
+      : []),
+    ...(settings.composerPromptOptimizeEnabled !==
+    DEFAULT_UNIFIED_SETTINGS.composerPromptOptimizeEnabled
+      ? [t.settings.rows.composerPromptOptimize.title]
+      : []),
     ...(settings.sendShortcut !== DEFAULT_UNIFIED_SETTINGS.sendShortcut
       ? [t.settings.rows.sendShortcut.title]
       : []),
@@ -618,6 +625,8 @@ export function useSettingsRestore(onRestored?: () => void) {
       showSkillsInSlashMenu: DEFAULT_UNIFIED_SETTINGS.showSkillsInSlashMenu,
       composerCollapseOnScroll: DEFAULT_UNIFIED_SETTINGS.composerCollapseOnScroll,
       composerRichTextEnabled: DEFAULT_UNIFIED_SETTINGS.composerRichTextEnabled,
+      composerSuggestionsEnabled: DEFAULT_UNIFIED_SETTINGS.composerSuggestionsEnabled,
+      composerPromptOptimizeEnabled: DEFAULT_UNIFIED_SETTINGS.composerPromptOptimizeEnabled,
       sendShortcut: DEFAULT_UNIFIED_SETTINGS.sendShortcut,
       followUpBehavior: DEFAULT_UNIFIED_SETTINGS.followUpBehavior,
       contextWindowMeterEnabled: DEFAULT_UNIFIED_SETTINGS.contextWindowMeterEnabled,
@@ -1528,6 +1537,60 @@ export function GeneralSettingsPanel() {
                 updateSettings({ composerRichTextEnabled: Boolean(checked) })
               }
               aria-label={t.settings.rows.composerRichText.ariaLabel}
+            />
+          }
+        />
+
+        <SettingsRow
+          {...searchableSetting("composer-suggestions")}
+          description={t.settings.rows.composerSuggestions.description}
+          resetAction={
+            settings.composerSuggestionsEnabled !==
+            DEFAULT_UNIFIED_SETTINGS.composerSuggestionsEnabled ? (
+              <SettingResetButton
+                label={t.settings.rows.composerSuggestions.resetLabel}
+                onClick={() =>
+                  updateSettings({
+                    composerSuggestionsEnabled: DEFAULT_UNIFIED_SETTINGS.composerSuggestionsEnabled,
+                  })
+                }
+              />
+            ) : null
+          }
+          control={
+            <Switch
+              checked={settings.composerSuggestionsEnabled}
+              onCheckedChange={(checked) =>
+                updateSettings({ composerSuggestionsEnabled: Boolean(checked) })
+              }
+              aria-label={t.settings.rows.composerSuggestions.ariaLabel}
+            />
+          }
+        />
+        <SettingsRow
+          {...searchableSetting("composer-prompt-optimize")}
+          description={t.settings.rows.composerPromptOptimize.description}
+          resetAction={
+            settings.composerPromptOptimizeEnabled !==
+            DEFAULT_UNIFIED_SETTINGS.composerPromptOptimizeEnabled ? (
+              <SettingResetButton
+                label={t.settings.rows.composerPromptOptimize.resetLabel}
+                onClick={() =>
+                  updateSettings({
+                    composerPromptOptimizeEnabled:
+                      DEFAULT_UNIFIED_SETTINGS.composerPromptOptimizeEnabled,
+                  })
+                }
+              />
+            ) : null
+          }
+          control={
+            <Switch
+              checked={settings.composerPromptOptimizeEnabled}
+              onCheckedChange={(checked) =>
+                updateSettings({ composerPromptOptimizeEnabled: Boolean(checked) })
+              }
+              aria-label={t.settings.rows.composerPromptOptimize.ariaLabel}
             />
           }
         />

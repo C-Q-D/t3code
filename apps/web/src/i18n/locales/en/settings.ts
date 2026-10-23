@@ -468,6 +468,20 @@ export const settings = {
       resetLabel: "rich text composer",
       ariaLabel: "Rich text composer",
     },
+    composerSuggestions: {
+      title: "Composer suggestions",
+      description:
+        "After each reply, show a likely next message as gray text in the composer. Press Tab or → to insert it. Claude and Codex threads only; uses a little extra quota.",
+      resetLabel: "composer suggestions",
+      ariaLabel: "Composer suggestions",
+    },
+    composerPromptOptimize: {
+      title: "Prompt improvement",
+      description:
+        "Show a wand button in the composer that rewrites your draft with this thread's model. You can undo it, and it never sends. Claude and Codex threads only.",
+      resetLabel: "prompt improvement",
+      ariaLabel: "Prompt improvement",
+    },
     composerCollapse: {
       title: "Collapse composer on scroll",
       description:

@@ -1,4 +1,5 @@
 /** Exercises quota gates and reply races through a fake RPC command, without a server. */
+import "../../index.css";
 import { RegistryProvider } from "@effect/atom-react";
 import {
   EnvironmentId,
@@ -17,8 +18,52 @@ import { useComposerSuggestion } from "./useComposerSuggestion";
 import { ComposerPromptEditor, type ComposerPromptEditorHandle } from "../ComposerPromptEditor";
 import { installMessages, t, activeLocale } from "../../i18n";
 import { messages as chineseMessages } from "../../i18n/locales/zh-CN";
+import { GeneralSettingsPanel, useSettingsRestore } from "../settings/SettingsPanels";
+import { useClientSettings, persistClientSettingsPatch } from "../../hooks/useSettings";
+import { searchSettings } from "../settings/settingsSearch";
+import type { ClientSettings } from "@t3tools/contracts";
 
 const rpc = vi.hoisted(() => ({ run: vi.fn() }));
+const storage = vi.hoisted(() => ({ save: vi.fn(), confirm: vi.fn() }));
+vi.mock(import("../../localApi"), async (original) => {
+  const actual = await original();
+  const api = {
+    persistence: { getClientSettings: async () => null, setClientSettings: storage.save },
+    dialogs: { confirm: storage.confirm },
+  };
+  return { ...actual, ensureLocalApi: (() => api) as never, readLocalApi: (() => api) as never };
+});
+vi.mock(import("../settings/SettingsScopeContext"), async (original) => ({
+  ...(await original()),
+  useSettingsScope: (() => ({
+    scope: { kind: "all", environmentIds: [] },
+    environments: [],
+    connectedEnvironments: [],
+    environment: null,
+    target: null,
+    targets: [],
+    search: {},
+    selectScope: () => {},
+  })) as never,
+}));
+vi.mock(import("../../state/environments"), async (original) => ({
+  ...(await original()),
+  useEnvironments: () => ({
+    isReady: true,
+    networkStatus: "online" as const,
+    environments: [],
+    presentationById: new Map(),
+  }),
+  useEnvironmentProviders: () => new Map(),
+  usePrimaryEnvironmentId: () => null,
+  usePrimaryEnvironment: () => null,
+}));
+// This client-only settings fixture has no connected environments or server grants to discover.
+vi.mock(import("../../state/session"), async (original) => ({
+  ...(await original()),
+  useEnvironmentsWithScope: () => new Set<EnvironmentId>(),
+  useEnvironmentScope: () => false,
+}));
 vi.mock(import("../../state/composerAssist"), async (original) => {
   const actual = await original();
   return {
@@ -112,6 +157,100 @@ function chineseLocale() {
   installMessages("zh-CN", chineseMessages);
   return { [Symbol.dispose]: () => installMessages(previous.locale, previous.messages) };
 }
+
+/** Shares real client settings between the settings page and the suggestion consumer. */
+function SettingsProbe({ input }: { input: Input }) {
+  const settings = useClientSettings();
+  const { changedSettingLabels, restoreDefaults } = useSettingsRestore();
+  return (
+    <>
+      <GeneralSettingsPanel />
+      <button onClick={() => void restoreDefaults()}>Restore all settings</button>
+      <output aria-label="changed settings">{changedSettingLabels.join(", ")}</output>
+      <Probe input={{ ...input, enabled: settings.composerSuggestionsEnabled }} />
+    </>
+  );
+}
+
+it("turns suggestions off from settings, persists both switches and restores their defaults", async () => {
+  const input = setup();
+  using _clock = vi.spyOn(Date, "now").mockReturnValue(1792749900000);
+  storage.save.mockReset().mockResolvedValue(undefined);
+  storage.confirm.mockReset().mockResolvedValue(true);
+  await persistClientSettingsPatch({
+    composerSuggestionsEnabled: true,
+    composerPromptOptimizeEnabled: true,
+  });
+  await using _settings = {
+    [Symbol.asyncDispose]: () =>
+      persistClientSettingsPatch({
+        composerSuggestionsEnabled: true,
+        composerPromptOptimizeEnabled: true,
+      }),
+  };
+  const running: Input = {
+    ...input,
+    shell: { ...input.shell!, status: "running", activeRunId: runId },
+  };
+  await using screen = await render(
+    <RegistryProvider>
+      <SettingsProbe input={running} />
+    </RegistryProvider>,
+  );
+  await userEvent.click(screen.getByRole("switch", { name: "Composer suggestions", exact: true }));
+  await userEvent.click(screen.getByRole("switch", { name: "Prompt improvement", exact: true }));
+  await vi.waitFor(() => {
+    const labels = screen.getByLabelText("changed settings").element().textContent;
+    expect(labels).toContain("Composer suggestions");
+    expect(labels).toContain("Prompt improvement");
+  });
+  await expect
+    .element(
+      screen.getByRole("button", { name: "Reset composer suggestions to default", exact: true }),
+    )
+    .toBeVisible();
+  await expect
+    .element(
+      screen.getByRole("button", { name: "Reset prompt improvement to default", exact: true }),
+    )
+    .toBeVisible();
+  expect(storage.save.mock.calls.at(-1)?.[0] as ClientSettings).toMatchObject({
+    composerSuggestionsEnabled: false,
+    composerPromptOptimizeEnabled: false,
+  });
+  await screen.rerender(
+    <RegistryProvider>
+      <SettingsProbe input={input} />
+    </RegistryProvider>,
+  );
+  expect(rpc.run).not.toHaveBeenCalled();
+  await userEvent.click(
+    screen.getByRole("button", { name: "Reset prompt improvement to default", exact: true }),
+  );
+  await expect
+    .element(screen.getByRole("switch", { name: "Prompt improvement", exact: true }))
+    .toBeChecked();
+  expect(rpc.run).not.toHaveBeenCalled();
+  await userEvent.click(screen.getByRole("switch", { name: "Prompt improvement", exact: true }));
+  await userEvent.click(screen.getByRole("button", { name: "Restore all settings", exact: true }));
+  await expect
+    .element(screen.getByRole("switch", { name: "Composer suggestions", exact: true }))
+    .toBeChecked();
+  await expect
+    .element(screen.getByRole("switch", { name: "Prompt improvement", exact: true }))
+    .toBeChecked();
+  await expect.element(screen.getByLabelText("prediction")).toHaveTextContent("跑一下测试");
+  expect(storage.save.mock.calls.at(-1)?.[0] as ClientSettings).toMatchObject({
+    composerSuggestionsEnabled: true,
+    composerPromptOptimizeEnabled: true,
+  });
+  expect(searchSettings("Composer suggestions").map((entry) => entry.id)).toContain(
+    "composer-suggestions",
+  );
+  expect(searchSettings("Prompt improvement").map((entry) => entry.id)).toContain(
+    "composer-prompt-optimize",
+  );
+});
 
 it("shows the suggestion in the empty editor and retires it when the user types", async () => {
   const input = setup();

@@ -503,6 +503,18 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["composer rest resting scroll wheel conversation timeline shrink minimize"],
   },
   {
+    id: "composer-suggestions",
+    title: t.settings.rows.composerSuggestions.title,
+    to: "/settings/general",
+    searchTerms: ["composer suggestions next message tab claude codex 输入建议 下一句"],
+  },
+  {
+    id: "composer-prompt-optimize",
+    title: t.settings.rows.composerPromptOptimize.title,
+    to: "/settings/general",
+    searchTerms: ["prompt improvement optimize rewrite wand composer claude codex 提示词优化 改写"],
+  },
+  {
     id: "send-shortcut",
     title: t.settings.rows.sendShortcut.title,
     to: "/settings/general",
