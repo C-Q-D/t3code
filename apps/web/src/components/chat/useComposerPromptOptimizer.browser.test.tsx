@@ -479,3 +479,27 @@ it.each(["keyboard", "button"] as const)(
     expect(screen.container.querySelector("[data-draft]")?.textContent).toBe("abcdefghXij");
   },
 );
+
+it("reports discarded when a new run arrives before the draft clearing update", async () => {
+  const pending = deferredResult();
+  fake.run.mockReset().mockReturnValue(pending.promise);
+  await using screen = await render(<Harness options={{ runKey: "previous-run" }} />);
+  await screen.getByRole("button", { name: "Improve", exact: true }).click();
+  await screen.rerender(<Harness options={{ runKey: "sent-run", running: true }} />);
+  await act(() =>
+    pending.resolve(
+      AsyncResult.success({
+        _tag: "Optimized",
+        requestId: "sent",
+        text: "Stale rewrite",
+        cacheMaybeExpired: false,
+      }),
+    ),
+  );
+  await vi.waitFor(() =>
+    expect(screen.getByRole("status").element().textContent).toBe(
+      "Draft changed; result discarded",
+    ),
+  );
+  expect(screen.container.querySelector("[data-draft]")?.textContent).toBe("  fix the bug  ");
+});

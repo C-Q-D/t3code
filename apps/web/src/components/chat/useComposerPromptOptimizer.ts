@@ -157,9 +157,13 @@ export function useComposerPromptOptimizer(input: ComposerPromptOptimizerInput) 
   useLayoutEffect(() => {
     const consume = (request: PendingOptimization, response: CommandResponse) => {
       const current = latest.current;
-      if (current.draftKey !== request.draftKey || current.runKey !== request.runKey) return;
+      if (current.draftKey !== request.draftKey) return;
       const feedbackForDraft = { draftKey: current.draftKey };
-      if (current.editorRef.current?.readSnapshot().value !== request.text || current.running) {
+      if (
+        current.runKey !== request.runKey ||
+        current.editorRef.current?.readSnapshot().value !== request.text ||
+        current.running
+      ) {
         setFeedback({ ...feedbackForDraft, label: copy.discarded, done: false });
         return;
       }
