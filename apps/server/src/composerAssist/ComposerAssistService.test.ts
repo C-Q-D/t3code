@@ -38,6 +38,38 @@ const instanceId = ProviderInstanceId.make("codex-1");
 
 const optimizationInput = { threadId, draft: "fix it", style: "default" as const };
 
+it.effect("rejected requests prune expired suggestion memos", () =>
+  Effect.gen(function* () {
+    const f = yield* fixture();
+    yield* f.service.suggestNext({ threadId, runId });
+    yield* TestClock.adjust("11 minutes");
+    f.setGenerating(true);
+    assert.propertyVal(yield* f.service.suggestNext({ threadId, runId }), "reason", "generating");
+    // Rewind only to observe retention: an already-pruned result must not become reachable again.
+    yield* TestClock.setTime(0);
+    f.setGenerating(false);
+    assert.propertyVal(yield* f.service.suggestNext({ threadId, runId }), "_tag", "Suggested");
+    assert.strictEqual(f.calls.length, 2);
+  }).pipe(Effect.scoped),
+);
+
+it.effect("suggestion memo evicts the oldest entry beyond 256", () =>
+  Effect.gen(function* () {
+    const f = yield* fixture();
+    for (let index = 0; index < 257; index++) {
+      const nextRun = RunId.make(`memo-${index}`);
+      f.advanceRun(nextRun);
+      yield* f.service.suggestNext({ threadId, runId: nextRun });
+    }
+    f.advanceRun(RunId.make("memo-1"));
+    yield* f.service.suggestNext({ threadId, runId: RunId.make("memo-1") });
+    assert.strictEqual(f.calls.length, 257);
+    f.advanceRun(RunId.make("memo-0"));
+    yield* f.service.suggestNext({ threadId, runId: RunId.make("memo-0") });
+    assert.strictEqual(f.calls.length, 258);
+  }).pipe(Effect.scoped),
+);
+
 it.effect.each(["suggestion", "optimization"] as const)(
   "logs thread-not-found once for %s",
   (feature) =>
@@ -727,6 +759,9 @@ const fixture = Effect.fn("ComposerAssistTest.fixture")(function* (
           { ...projection.providerThreads[0]!, driver: ProviderDriverKind.make(driver) },
         ],
       };
+    },
+    setGenerating: (generating: boolean) => {
+      shell = { ...shell, activeRunId: generating ? runId : null };
     },
     advanceRun: (id: typeof runId) => {
       shell = { ...shell, latestRunId: id };

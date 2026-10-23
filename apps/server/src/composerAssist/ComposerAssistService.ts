@@ -70,7 +70,7 @@ const make = Effect.gen(function* () {
     { runId: string; done: Deferred.Deferred<QueryOutcome, ComposerAssistError> }
   >();
   const optimizations = new Map<string, Deferred.Deferred<void>>();
-  const memo = new Map<string, { expiresAt: number; outcome: QueryOutcome }>();
+  const memo = new Map<string, { expiresAt: number; result: ComposerSuggestResult }>();
 
   /** Adapter failures are values; the caller owns the total deadline and never retries. */
   const runAdapter = Effect.fn("ComposerAssistService.runAdapter")(
@@ -304,11 +304,10 @@ const make = Effect.gen(function* () {
       const claim = yield* ownership.withPermits(1)(
         Effect.gen(function* () {
           const now = yield* Clock.currentTimeMillis;
-          for (const [key, entry] of memo) if (entry.expiresAt <= now) memo.delete(key);
           const key = `${input.threadId.length}:${input.threadId}${input.runId}`;
           if (optimizations.has(input.threadId)) return Effect.succeed(suppressed("inflight"));
           const cached = memo.get(key);
-          if (cached) return Effect.succeed(cached.outcome);
+          if (cached) return Effect.succeed<QueryOutcome>({ result: cached.result, side: null });
           const active = flights.get(input.threadId);
           if (active)
             return active.runId === input.runId
@@ -335,9 +334,14 @@ const make = Effect.gen(function* () {
             }),
             Effect.tap((value) =>
               Effect.gen(function* () {
+                if (memo.size >= SUGGESTION_MEMO_MAX_ENTRIES) {
+                  const oldest = memo.keys().next();
+                  if (!oldest.done) memo.delete(oldest.value);
+                }
+                // Cache only the client result, never raw filtered text or provider payloads.
                 memo.set(key, {
                   expiresAt: (yield* Clock.currentTimeMillis) + SUGGESTION_MEMO_TTL_MS,
-                  outcome: value,
+                  result: value.result,
                 });
               }),
             ),
@@ -503,6 +507,7 @@ const make = Effect.gen(function* () {
   ) {
     const requestId = yield* crypto.randomUUIDv4().pipe(Effect.orDie);
     const startedAt = yield* Clock.currentTimeMillis;
+    for (const [key, entry] of memo) if (entry.expiresAt <= startedAt) memo.delete(key);
     const details: RequestDetails = { state: null, outcome: null, maybeExpired: false };
     const completion = yield* work(requestId, startedAt, details).pipe(
       Effect.timeout(SIDE_QUERY_DEADLINE_MS),
@@ -560,6 +565,7 @@ export const layer = Layer.effect(ComposerAssistService, make);
 
 const SIDE_QUERY_DEADLINE_MS = 45_000;
 const SUGGESTION_MEMO_TTL_MS = 10 * 60_000;
+const SUGGESTION_MEMO_MAX_ENTRIES = 256;
 const CACHE_COLD_SUSPECT_UNCACHED_TOKENS = 8000;
 
 /** Memoized provider metadata is shared, while request IDs and log entries remain per RPC. */
