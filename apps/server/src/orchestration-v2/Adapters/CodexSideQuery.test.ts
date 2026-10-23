@@ -67,6 +67,69 @@ const requests = [
 ] as const;
 
 describe("Codex side-query routing", () => {
+  it.effect(
+    "delivers account rate limits to the main handler while a side query is registered",
+    () =>
+      Effect.gen(function* () {
+        const finished = yield* Deferred.make<void>();
+        const received: Array<unknown> = [];
+        const side: Array<string> = [];
+        const transport = yield* Effect.service(CodexClient.CodexAppServerClient);
+        const router = CodexSideQuery.make(transport);
+        router.register("side", (method) =>
+          Effect.sync(() => {
+            side.push(method);
+          }),
+        );
+        yield* router.client.handleServerNotification("account/rateLimits/updated", (payload) =>
+          Effect.sync(() => {
+            received.push(payload);
+          }),
+        );
+        yield* router.client.handleServerNotification("item/agentMessage/delta", () =>
+          Deferred.succeed(finished, undefined).pipe(Effect.asVoid),
+        );
+        yield* router.client.notify("initialized", undefined);
+        yield* Deferred.await(finished);
+        assert.deepEqual(side, ["item/agentMessage/delta"]);
+        assert.deepEqual(received, [{ rateLimits: { limitId: "codex" } }]);
+      }).pipe(
+        Effect.scoped,
+        Effect.provide(
+          CodexReplay.layerReplay({
+            provider: "codex",
+            protocol: "codex.app-server",
+            version: "0.164.0",
+            scenario: "side-account-notifications",
+            entries: [
+              { type: "expect_outbound", frame: { method: "initialized" } },
+              {
+                type: "emit_inbound",
+                frame: {
+                  method: "item/agentMessage/delta",
+                  params: { threadId: "side", turnId: "turn", itemId: "m", delta: "hidden" },
+                },
+              },
+              {
+                type: "emit_inbound",
+                frame: {
+                  method: "account/rateLimits/updated",
+                  params: { rateLimits: { limitId: "codex" } },
+                },
+              },
+              {
+                type: "emit_inbound",
+                frame: {
+                  method: "item/agentMessage/delta",
+                  params: { threadId: "main", turnId: "main-turn", itemId: "done", delta: "done" },
+                },
+              },
+            ],
+          }),
+        ),
+      ),
+  );
+
   it.effect("refuses all seven request protocols without invoking main approval handlers", () =>
     Effect.gen(function* () {
       const finished = yield* Deferred.make<void>();

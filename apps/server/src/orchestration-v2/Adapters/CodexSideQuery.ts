@@ -53,6 +53,7 @@ export function make(transport: CodexClient.CodexAppServerClient["Service"]) {
     handleServerNotification: (method, handler) =>
       transport.handleServerNotification(method, (payload) =>
         Effect.suspend(() => {
+          // Account notifications without thread IDs still reach main handlers because their quota state applies to the whole account.
           const threadId = find(payload);
           const collect = threadId === undefined ? undefined : threads.get(threadId);
           return collect === undefined ? handler(payload) : collect(method, payload);
