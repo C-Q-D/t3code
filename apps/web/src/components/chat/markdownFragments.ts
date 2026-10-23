@@ -1,4 +1,5 @@
-import type { MouseEvent as ReactMouseEvent } from "react";
+/** Normalizes Markdown fragments and tracks rendered block boundaries without changing source text. */
+import type { RefObject, MouseEvent as ReactMouseEvent } from "react";
 
 import { hastPlainTextDeep } from "./markdownHast.logic";
 
@@ -109,5 +110,12 @@ export function rehypeHeadingIds() {
       node.children?.forEach(visit);
     };
     visit(tree);
+  };
+}
+
+/** Records the last root element after Markdown transforms; text nodes do not affect last-child. */
+export function rehypeLastBlock(lastBlock: RefObject<string | null>) {
+  return (tree: HeadingHastNode) => {
+    lastBlock.current = tree.children?.findLast((node) => node.type === "element")?.tagName ?? null;
   };
 }

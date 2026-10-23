@@ -1,3 +1,5 @@
+/** Routes Markdown file actions through the selected environment and its permissions. */
+import { t } from "~/i18n";
 import { formatFilePathForClipboard } from "@t3tools/client-runtime/media-actions";
 import {
   isAtomCommandInterrupted,
@@ -86,8 +88,8 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Unable to open file",
-            description: error instanceof Error ? error.message : "An error occurred.",
+            title: t.chat.markdown.unableToOpenFile,
+            description: error instanceof Error ? error.message : t.chat.markdown.anErrorOccurred,
           }),
         );
       } catch (cause) {
@@ -98,8 +100,8 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Unable to open file",
-            description: cause instanceof Error ? cause.message : "An error occurred.",
+            title: t.chat.markdown.unableToOpenFile,
+            description: cause instanceof Error ? cause.message : t.chat.markdown.anErrorOccurred,
           }),
         );
       }
@@ -136,8 +138,8 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Unable to open file in browser",
-            description: error instanceof Error ? error.message : "An error occurred.",
+            title: t.chat.markdown.unableToOpenFileInBrowser,
+            description: error instanceof Error ? error.message : t.chat.markdown.anErrorOccurred,
           }),
         );
       } catch (cause) {
@@ -148,8 +150,8 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Unable to open file in browser",
-            description: cause instanceof Error ? cause.message : "An error occurred.",
+            title: t.chat.markdown.unableToOpenFileInBrowser,
+            description: cause instanceof Error ? cause.message : t.chat.markdown.anErrorOccurred,
           }),
         );
       }
@@ -174,8 +176,8 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Unable to reveal file",
-            description: error instanceof Error ? error.message : "An error occurred.",
+            title: t.chat.markdown.unableToRevealFile,
+            description: error instanceof Error ? error.message : t.chat.markdown.anErrorOccurred,
           }),
         );
       } catch (cause) {
@@ -186,8 +188,8 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Unable to reveal file",
-            description: cause instanceof Error ? cause.message : "An error occurred.",
+            title: t.chat.markdown.unableToRevealFile,
+            description: cause instanceof Error ? cause.message : t.chat.markdown.anErrorOccurred,
           }),
         );
       }
@@ -199,8 +201,8 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: `Failed to copy ${title.toLowerCase()}`,
-          description: "Clipboard API unavailable.",
+          title: t.chat.markdown.copyFailed(title),
+          description: t.chat.markdown.clipboardAPIUnavailable,
         }),
       );
       return;
@@ -220,7 +222,7 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
       ([, text]) => {
         toastManager.add({
           type: "success",
-          title: `${title} copied`,
+          title: t.chat.markdown.copiedTitle(title),
           description: text,
         });
       },
@@ -232,8 +234,8 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: `Failed to copy ${title.toLowerCase()}`,
-            description: error instanceof Error ? error.message : "An error occurred.",
+            title: t.chat.markdown.copyFailed(title),
+            description: error instanceof Error ? error.message : t.chat.markdown.anErrorOccurred,
           }),
         );
       },
@@ -248,13 +250,21 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
       const copyItems = markdownFileCopyMenuItems({ targetPath, workspaceRelativePath });
       const clicked = await api.contextMenu.show(
         [
-          ...(onOpenMedia ? ([{ id: "preview-media", label: "Preview media" }] as const) : []),
+          ...(onOpenMedia
+            ? ([{ id: "preview-media", label: t.chat.markdown.previewMedia }] as const)
+            : []),
           ...(onOpen ? ([{ id: "open", label: openInEditorMenuLabel }] as const) : []),
           ...(onOpenInBrowser
-            ? ([{ id: "open-in-browser", label: "Open in integrated browser" }] as const)
+            ? ([{ id: "open-in-browser", label: t.chat.markdown.openInIntegratedBrowser }] as const)
             : []),
           ...(onReveal && revealLabel ? ([{ id: "reveal", label: revealLabel }] as const) : []),
-          ...copyItems.map(({ id, label }) => ({ id, label })),
+          ...copyItems.map(({ id }) => ({
+            id,
+            label:
+              id === "copy-relative"
+                ? t.chat.markdown.copyRelativePath
+                : t.chat.markdown.copyFullPath,
+          })),
         ] as const,
         position,
       );
@@ -281,7 +291,7 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
             resolveCopyPaths().then((paths) =>
               clicked === "copy-relative" ? paths.relativePath : paths.fullPath,
             ),
-          clicked === "copy-relative" ? "Relative path" : "Full path",
+          clicked === "copy-relative" ? t.chat.markdown.relativePath : t.chat.markdown.fullPath,
         );
       }
     } catch (cause) {
@@ -359,7 +369,7 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
               kind="mention"
               dir="ltr"
               render={<button type="button" />}
-              aria-label={`File options for ${label}`}
+              aria-label={t.chat.markdown.fileOptions(label)}
               aria-haspopup="menu"
               className={cn(MARKDOWN_FILE_LINK_CLASS_NAME, "select-text")}
               data-markdown-copy={copyMarkdown}

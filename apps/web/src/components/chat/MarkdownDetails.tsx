@@ -1,3 +1,5 @@
+/** Keeps authored details content available to expansion and thread search. */
+import { t } from "~/i18n";
 import { ChevronRightIcon } from "lucide-react";
 import {
   Children,
@@ -11,6 +13,12 @@ import {
 import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "../ui/collapsible";
 import { findRevealRef, MarkdownFindContext } from "./markdownFindContext";
 
+/**
+ * Renders a collapsible Markdown details section, using its summary child as the heading.
+ * @param props - Children, which may be null or empty, and optional initial open state, defaulting
+ * to false.
+ * @returns The disclosure element, with a fallback heading when no summary exists; never null.
+ */
 export function MarkdownDetails({
   children,
   open = false,
@@ -30,7 +38,7 @@ export function MarkdownDetails({
   const summary =
     isValidElement<{ children?: ReactNode }>(summaryNode) && summaryNode.props.children
       ? summaryNode.props.children
-      : "Details";
+      : t.chat.markdown.details;
   const content = childNodes.filter((_, index) => index !== summaryIndex);
 
   return (

@@ -1,3 +1,5 @@
+/** Resolves Markdown media without granting filesystem access beyond the current client. */
+import { t } from "~/i18n";
 import { MISSING_FILE_ACCESS_MESSAGE } from "@t3tools/client-runtime/state/assets";
 import { mediaFileReference, mediaUrlReference } from "@t3tools/client-runtime/media-reference";
 import type { AssetResource, EnvironmentId } from "@t3tools/contracts";
@@ -75,6 +77,12 @@ const CHAT_MARKDOWN_WORKSPACE_IMAGE_CLASS_NAME = cn(
 );
 export const MarkdownLinkContext = createContext(false);
 
+/**
+ * Builds accessible image expansion handlers without intercepting linked images.
+ * @param onImageExpand - Gallery-opening callback, or undefined to disable expansion.
+ * @param alt - Image description; an empty or whitespace-only value uses the generic image name.
+ * @returns Button semantics and event handlers, or an empty object when expansion is disabled.
+ */
 function expandableMarkdownImageProps(
   onImageExpand: ((preview: ExpandedImagePreview) => void) | undefined,
   alt: string,
@@ -91,7 +99,7 @@ function expandableMarkdownImageProps(
   return {
     role: "button" as const,
     tabIndex: 0,
-    "aria-label": `Preview ${previewName}`,
+    "aria-label": t.chat.markdown.preview(previewName),
     onClick: expand,
     onKeyDown: (event: ReactKeyboardEvent) => {
       if (event.key === "Enter" || event.key === " ") expand(event);
@@ -99,12 +107,19 @@ function expandableMarkdownImageProps(
   };
 }
 
+/**
+ * Renders an unavailable-media warning and its optional authored description.
+ * @param props - Required alt text, which may be empty, and optional media kind; undefined defaults
+ * to an image warning.
+ * @returns The warning label element; never null.
+ */
 function ChatMarkdownMediaUnavailableLabel(props: {
   readonly alt: string;
   readonly kind?: "image" | "video" | undefined;
   readonly detail?: string | undefined;
 }) {
-  const label = props.kind === "video" ? "Video unavailable" : "Image unavailable";
+  const label =
+    props.kind === "video" ? t.chat.markdown.videoUnavailable : t.chat.markdown.imageUnavailable;
   return (
     <span data-thread-find-ignore className="inline-flex items-center gap-1.5">
       <TriangleAlertIcon aria-hidden className="size-3.5 shrink-0" />
@@ -228,7 +243,7 @@ export function ChatMarkdownImage(props: {
         id={props.imageProps?.id}
         data-markdown-copy={props.copyMarkdown}
         role="status"
-        aria-label="Loading image"
+        aria-label={t.chat.markdown.loadingImage}
         className={CHAT_MARKDOWN_MEDIA_LAYOUT_CLASS_NAME}
       />
     );
@@ -246,7 +261,7 @@ export function ChatMarkdownImage(props: {
         style={props.style}
         {...(failed
           ? { role: "alert" as const }
-          : { role: "status" as const, "aria-label": "Loading image" })}
+          : { role: "status" as const, "aria-label": t.chat.markdown.loadingImage })}
       >
         {failed ? (
           <span className="flex size-full items-center justify-center p-2 text-center text-xs text-muted-foreground">

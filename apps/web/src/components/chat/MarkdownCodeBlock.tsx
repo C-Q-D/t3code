@@ -1,3 +1,5 @@
+/** Renders code fences and shared timeline chrome without changing authored code. */
+import { t } from "~/i18n";
 import { Check, Copy } from "lucide";
 import { PlayIcon, WrapTextIcon } from "lucide-react";
 import { toHtml } from "hast-util-to-html";
@@ -25,6 +27,9 @@ import {
 import { reportMarkdownActionFailure } from "./markdownActionFailure";
 import { PierreEntryIcon } from "./PierreEntryIcon";
 
+// One value per Markdown tree keeps code, tables and diagrams on the same presentation.
+export const MarkdownTimelineContext = React.createContext(false);
+
 const MAX_HIGHLIGHT_CACHE_ENTRIES = 500;
 const MAX_HIGHLIGHT_CACHE_MEMORY_BYTES = 50 * 1024 * 1024;
 
@@ -37,12 +42,19 @@ const THREAD_FIND_IGNORE_PROPS = {
   "data-thread-find-ignore": "",
 } as React.HTMLAttributes<HTMLDivElement>;
 
+/**
+ * Frame rendered and editable fences; only a timeline Markdown parent enables D1 chrome.
+ * @param props Language/optional filename, theme, wrap state (defaults true), content and optional
+ * header actions/title. as defaults to div and supports the composer's existing node-view wrapper.
+ * @returns The code surface and header; timeline Mermaid uses its own inset frame.
+ */
 export function MarkdownCodeBlockFrame({
   as: Wrapper = "div",
   language,
   fenceTitle,
   theme,
   wrapped = true,
+  diagramRendered = false,
   title,
   actions,
   headerProps,
@@ -53,32 +65,66 @@ export function MarkdownCodeBlockFrame({
   fenceTitle: string | null;
   theme: "light" | "dark";
   wrapped?: boolean;
+  /** Whether a committed Mermaid diagram can handle the header's expand action. */
+  diagramRendered?: boolean;
+  /** Replaces the language title, as the composer does with its language picker. */
   title?: React.ReactNode;
   actions?: React.ReactNode;
   headerProps?: React.HTMLAttributes<HTMLDivElement>;
   children: React.ReactNode;
 }) {
+  const inTimeline = use(MarkdownTimelineContext);
+  const mermaidTimeline = inTimeline && language === "mermaid";
+  const timeline = inTimeline && !mermaidTimeline;
   return (
     <Wrapper
       dir="ltr"
-      className="chat-markdown-codeblock my-[0.65rem] overflow-hidden rounded-lg border border-border/70 bg-secondary leading-snug dark:border-transparent dark:bg-input/32"
+      className={
+        mermaidTimeline
+          ? "chat-markdown-codeblock timeline-mermaid-frame mt-4.5 mb-3 overflow-hidden rounded-card-row bg-code text-code-foreground shadow-timeline-diagram-well"
+          : timeline
+            ? "chat-markdown-codeblock timeline-codeblock my-3.5 overflow-hidden rounded-card-surface bg-code text-code-foreground shadow-well-control"
+            : "chat-markdown-codeblock my-[0.65rem] overflow-hidden rounded-lg border border-border/70 bg-secondary leading-snug dark:border-transparent dark:bg-input/32"
+      }
       data-language={language}
       data-wrap={wrapped ? "true" : "false"}
+      data-diagram-rendered={mermaidTimeline ? (diagramRendered ? "true" : "false") : undefined}
     >
       <div
         {...headerProps}
         className={cn(
-          "chat-markdown-codeblock-header flex items-center justify-between gap-2 pt-1.5 pr-1.5 pb-0 pl-3 select-none",
+          "chat-markdown-codeblock-header flex items-center justify-between select-none",
+          mermaidTimeline
+            ? "h-10 gap-1.5 ps-3.5 pe-2"
+            : timeline
+              ? "h-10 gap-0.5 ps-4 pe-2"
+              : "gap-2 pt-1.5 pr-1.5 pb-0 pl-3",
           headerProps?.className,
         )}
       >
         {title ?? (
-          <span className="inline-flex min-w-0 items-center gap-1.5 font-mono text-2xs">
-            <MarkdownCodeBlockTitleContent
-              fenceTitle={fenceTitle}
-              language={language}
-              theme={theme}
-            />
+          <span
+            className={
+              inTimeline
+                ? "inline-flex h-5.5 min-w-0 items-center gap-1.5 rounded-full bg-timeline-log-hover px-2.5 text-secondary-copy font-semibold text-timeline-code-label"
+                : "inline-flex min-w-0 items-center gap-1.5 font-mono text-2xs"
+            }
+          >
+            {inTimeline && !fenceTitle ? (
+              <span className="truncate">
+                {language === "typescript"
+                  ? "TypeScript"
+                  : language === "mermaid"
+                    ? "Mermaid"
+                    : language}
+              </span>
+            ) : (
+              <MarkdownCodeBlockTitleContent
+                fenceTitle={fenceTitle}
+                language={language}
+                theme={theme}
+              />
+            )}
           </span>
         )}
         {actions}
@@ -114,7 +160,10 @@ function MarkdownCodeBlockTitleContent({
     <Tooltip>
       <TooltipTrigger
         render={
-          <span className="inline-flex shrink-0 rounded-sm" aria-label={`Language: ${language}`} />
+          <span
+            className="inline-flex shrink-0 rounded-sm"
+            aria-label={t.chat.markdown.language(language)}
+          />
         }
       >
         <PierreEntryIcon pathValue={fileName} kind="file" theme={theme} className="size-3.5" />
@@ -124,6 +173,19 @@ function MarkdownCodeBlockTitleContent({
   );
 }
 
+// D1 code-well actions are circular and use the well's hover, unlike the 10px-corner message actions.
+export const TIMELINE_CODE_ACTION_CLASS =
+  "flex size-7.5 shrink-0 cursor-pointer items-center justify-center rounded-full bg-transparent text-secondary-label hover:bg-timeline-log-hover hover:text-foreground focus-visible:outline-none focus-visible:inset-shadow-focus";
+
+/**
+ * Renders code or diagram content with copy, wrapping, and optional shell execution controls.
+ * @param props - Required code and language strings (which may be empty), light/dark theme,
+ * streaming state, and children (which may be null). A null fenceTitle omits the filename; optional
+ * leadingActions may be empty. canWrap defaults to true and diagram to false. Optional
+ * onRunShellCommand receives complete eligible commands only after a user action.
+ * @returns The code block and available actions; never null. Clipboard failures are reported to the
+ * console.
+ */
 export function MarkdownCodeBlock({
   code,
   language,
@@ -131,9 +193,10 @@ export function MarkdownCodeBlock({
   theme,
   onRunShellCommand,
   isStreaming,
-  viewToggle,
+  leadingActions,
   canWrap = true,
   diagram = false,
+  diagramRendered = false,
   children,
 }: {
   code: string;
@@ -142,16 +205,21 @@ export function MarkdownCodeBlock({
   theme: "light" | "dark";
   onRunShellCommand?: ((command: string) => void) | undefined;
   isStreaming: boolean;
-  viewToggle?: ReactNode;
+  leadingActions?: ReactNode;
   canWrap?: boolean;
   diagram?: boolean;
+  /** Forwards the Mermaid renderer's committed availability to its frame. */
+  diagramRendered?: boolean;
   children: ReactNode;
 }) {
+  const inTimeline = use(MarkdownTimelineContext);
+  const mermaidTimeline = inTimeline && language === "mermaid";
+  const timeline = inTimeline && !mermaidTimeline;
   const [copied, setCopied] = useState(false);
   const [wrapped, setWrapped] = useState(() => getClientSettings().wordWrap);
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const wrapLabel = wrapped ? "Disable line wrap" : "Wrap lines";
-  const copyLabel = copied ? "Copied" : "Copy code";
+  const wrapLabel = wrapped ? t.chat.markdown.disableLineWrap : t.chat.markdown.wrapLines;
+  const copyLabel = copied ? t.chat.markdown.copied : t.chat.markdown.copyCode;
   const command = code.trim();
   const canRun =
     onRunShellCommand !== undefined &&
@@ -206,26 +274,57 @@ export function MarkdownCodeBlock({
     <Tooltip>
       <TooltipTrigger
         render={
-          <Button
-            type="button"
-            variant="ghost-muted"
-            size="icon-xs"
-            onClick={handleCopy}
-            aria-label={copyLabel}
-          />
+          inTimeline ? (
+            <button
+              type="button"
+              className={cn(TIMELINE_CODE_ACTION_CLASS, mermaidTimeline && "size-7")}
+              onClick={handleCopy}
+              aria-label={copyLabel}
+            />
+          ) : (
+            <Button
+              type="button"
+              variant="ghost-muted"
+              size="icon-xs"
+              onClick={handleCopy}
+              aria-label={copyLabel}
+            />
+          )
         }
       >
-        <MorphIcon className="size-3" icon={copied ? Check : Copy} />
+        <MorphIcon
+          className={mermaidTimeline ? "size-3.5" : timeline ? "size-3.75" : "size-3"}
+          icon={copied ? Check : Copy}
+        />
       </TooltipTrigger>
       <TooltipPopup side="top">{copyLabel}</TooltipPopup>
     </Tooltip>
   );
 
   if (diagram) {
+    if (mermaidTimeline) {
+      return (
+        <MarkdownCodeBlockFrame
+          language={language}
+          diagramRendered={diagramRendered}
+          fenceTitle={fenceTitle}
+          theme={theme}
+          headerProps={THREAD_FIND_IGNORE_PROPS}
+          actions={
+            <div className="flex items-center gap-1.5">
+              {leadingActions}
+              {copyButton}
+            </div>
+          }
+        >
+          {children}
+        </MarkdownCodeBlockFrame>
+      );
+    }
     return (
       <div className="my-[0.65rem] border border-transparent" data-language={language}>
         <div className="flex items-center justify-end gap-0.5 pt-1.5 pr-1.5 select-none">
-          {viewToggle}
+          {leadingActions}
           {copyButton}
         </div>
         {children}
@@ -241,22 +340,38 @@ export function MarkdownCodeBlock({
       wrapped={wrapped}
       headerProps={THREAD_FIND_IGNORE_PROPS}
       actions={
-        <span className="flex items-center gap-0.5" role="toolbar" aria-label="Code block actions">
+        <span
+          className="flex items-center gap-0.5"
+          role="toolbar"
+          aria-label={t.chat.markdown.codeBlockActions}
+        >
+          {leadingActions}
+          {inTimeline ? copyButton : null}
           {canWrap ? (
             <Tooltip>
               <TooltipTrigger
                 render={
-                  <Button
-                    type="button"
-                    variant={wrapped ? "secondary" : "ghost-muted"}
-                    size="icon-xs"
-                    aria-pressed={wrapped}
-                    onClick={() => setWrapped((value) => !value)}
-                    aria-label={wrapLabel}
-                  />
+                  timeline ? (
+                    <button
+                      type="button"
+                      className={TIMELINE_CODE_ACTION_CLASS}
+                      aria-pressed={wrapped}
+                      onClick={() => setWrapped((value) => !value)}
+                      aria-label={wrapLabel}
+                    />
+                  ) : (
+                    <Button
+                      type="button"
+                      variant={wrapped ? "secondary" : "ghost-muted"}
+                      size="icon-xs"
+                      aria-pressed={wrapped}
+                      onClick={() => setWrapped((value) => !value)}
+                      aria-label={wrapLabel}
+                    />
+                  )
                 }
               >
-                <WrapTextIcon className="size-3" />
+                <WrapTextIcon className={timeline ? "size-3.75" : "size-3"} />
               </TooltipTrigger>
               <TooltipPopup side="top">{wrapLabel}</TooltipPopup>
             </Tooltip>
@@ -265,22 +380,30 @@ export function MarkdownCodeBlock({
             <Tooltip>
               <TooltipTrigger
                 render={
-                  <Button
-                    type="button"
-                    variant="ghost-muted"
-                    size="icon-xs"
-                    onClick={() => onRunShellCommand(command)}
-                    aria-label="Run in terminal"
-                  />
+                  timeline ? (
+                    <button
+                      type="button"
+                      className={TIMELINE_CODE_ACTION_CLASS}
+                      onClick={() => onRunShellCommand(command)}
+                      aria-label={t.chat.markdown.runInTerminal}
+                    />
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="ghost-muted"
+                      size="icon-xs"
+                      onClick={() => onRunShellCommand(command)}
+                      aria-label={t.chat.markdown.runInTerminal}
+                    />
+                  )
                 }
               >
-                <PlayIcon className="size-3" />
+                <PlayIcon className={timeline ? "size-3.75" : "size-3"} />
               </TooltipTrigger>
-              <TooltipPopup side="top">Run in terminal</TooltipPopup>
+              <TooltipPopup side="top">{t.chat.markdown.runInTerminal}</TooltipPopup>
             </Tooltip>
           ) : null}
-          {viewToggle}
-          {copyButton}
+          {inTimeline ? null : copyButton}
         </span>
       }
     >

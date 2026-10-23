@@ -1,21 +1,20 @@
 /** Renders internal thread links using live titles without translating user content. */
 import { t } from "~/i18n";
-import { scopeProjectRef, scopeThreadRef } from "@t3tools/client-runtime/environment";
+import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import {
   formatThreadLink,
   percentDecodedThreadLinkId,
   resolveThreadLinkRef,
 } from "@t3tools/shared/threadLinks";
-import { Link } from "@tanstack/react-router";
-import { MessageSquareTextIcon } from "lucide-react";
 
-import { useProject, useThreadRefs, useThreadShell } from "../../state/entities";
-import { ProjectFavicon } from "../ProjectFavicon";
+import { useThreadRefs, useThreadShell } from "../../state/entities";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { ThreadContextChip } from "../ThreadContextChip";
 
 /** Keeps archived or cross-environment thread references navigable even when live metadata is absent.
  * @param props environmentId and threadId identify the written target; label is the fallback title.
- * @returns A thread route link using resolved metadata when available and localized unavailable guidance otherwise. */
+ * @returns A navigable thread chip with resolved copy text and localized unavailable guidance. */
 export function MarkdownThreadLink(props: {
   readonly environmentId: EnvironmentId;
   readonly threadId: ThreadId;
@@ -36,29 +35,19 @@ export function MarkdownThreadLink(props: {
   const thread = local ?? remote;
   const environmentId = thread?.environmentId ?? props.environmentId;
   const threadId = thread?.id ?? props.threadId;
-  const project = useProject(
-    thread === null ? null : scopeProjectRef(environmentId, thread.projectId),
-  );
   const title = thread?.title.trim() || props.label;
+  const chip = (
+    <ThreadContextChip
+      record={{ environmentId, threadId, title: props.label }}
+      copyMarkdown={formatThreadLink(threadId, title)}
+    />
+  );
+  if (thread !== null) return chip;
+  // Archived threads can still open; missing index metadata is guidance, not a disabled link.
   return (
-    <Link
-      to="/$environmentId/$threadId"
-      params={{ environmentId, threadId }}
-      // Like an attached thread chip: archived threads are not in the index but still open.
-      title={thread === null ? t.chat.newComponents.threadUnavailable : project?.title}
-      data-markdown-copy={formatThreadLink(threadId, title)}
-    >
-      <span
-        className="ms-[0.25em] me-[0.2em] inline-flex size-[14px] [vertical-align:-0.125em]"
-        aria-hidden
-      >
-        {project === null ? (
-          <MessageSquareTextIcon className="block size-full shrink-0" />
-        ) : (
-          <ProjectFavicon project={project} className="size-full" />
-        )}
-      </span>
-      {title}
-    </Link>
+    <Tooltip>
+      <TooltipTrigger render={<span />}>{chip}</TooltipTrigger>
+      <TooltipPopup side="top">{t.chat.newComponents.threadUnavailable}</TooltipPopup>
+    </Tooltip>
   );
 }
