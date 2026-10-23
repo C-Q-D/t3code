@@ -14,7 +14,7 @@ import { ReactNodeViewRenderer, NodeViewWrapper, type NodeViewProps } from "@tip
 import StarterKit from "@tiptap/starter-kit";
 import { type Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { newlineInCode, splitBlockKeepMarks } from "@tiptap/pm/commands";
-import { isHistoryTransaction } from "@tiptap/pm/history";
+import { closeHistory, isHistoryTransaction } from "@tiptap/pm/history";
 import {
   type EditorState,
   NodeSelection,
@@ -134,6 +134,8 @@ import {
 import "./chat/physicalComposer/physicalComposer.css";
 
 export interface ComposerPromptEditorHandle {
+  /** Replaces only text as an isolated undo step; cursor defaults to the end. Returns false before mount. */
+  replacePrompt: (text: string, cursor?: number) => boolean;
   /** Capture visible text before submission; invoke the returned animation only after acceptance. */
   capturePhysicalSend: () => (() => void) | null;
   focus: () => void;
@@ -1793,6 +1795,19 @@ function ComposerPromptEditorTiptapInner(
   useImperativeHandle(
     editorRef,
     () => ({
+      replacePrompt: (text, cursor = text.length) => {
+        if (!editor) return false;
+        // Close both boundaries so the previous typing and the next edit cannot join this rewrite.
+        editor.view.dispatch(closeHistory(editor.state.tr));
+        editor.commands.setContent(
+          buildDocJson(text, skillLabelFor, { styling: richText, literalText }),
+        );
+        const map = serializeEditorDoc(editor.state.doc);
+        editor.commands.setTextSelection(flatToPm(map, markdownToFlat(map, cursor)));
+        editor.view.dispatch(closeHistory(editor.state.tr));
+        editor.commands.focus();
+        return true;
+      },
       capturePhysicalSend: () => (editor ? capturePhysicalSend(editor) : null),
       focus: () => {
         // The collapsed cursor cannot say where inside `$name` text a caret
@@ -1869,7 +1884,7 @@ function ComposerPromptEditorTiptapInner(
           : edgeRect.bottom - caretRect.bottom < threshold;
       },
     }),
-    [editor, focusAt, literalText, readSnapshot],
+    [editor, focusAt, literalText, readSnapshot, richText, skillLabelFor],
   );
 
   const handleCopyCut = (event: React.ClipboardEvent, cut: boolean) => {
