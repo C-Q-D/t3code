@@ -1,4 +1,6 @@
 /** Exercises improvement through a real editor with a controlled RPC boundary, without a provider. */
+import "~/index.css";
+import { ComposerBanner } from "./ComposerBanner";
 import { useRef, useState, useSyncExternalStore } from "react";
 import { EnvironmentId, ThreadId, type ComposerOptimizeResult } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
@@ -26,6 +28,7 @@ import {
 import {
   ComposerPromptOptimizeButton,
   ComposerPromptOptimizeTab,
+  ComposerPromptOptimizeStatus,
 } from "./ComposerPromptOptimizeTab";
 
 /** Lets each test release one RPC response at an explicit milestone. */
@@ -122,7 +125,10 @@ function Harness({
       />
       <button onClick={() => void optimizer.trigger()}>Improve</button>
       <pre data-draft>{prompt}</pre>
-      <ComposerPromptOptimizeTab optimizer={optimizer} />
+      <ComposerPromptOptimizeStatus optimizer={optimizer} />
+      <ComposerBanner.Dock>
+        <ComposerPromptOptimizeTab optimizer={optimizer} />
+      </ComposerBanner.Dock>
     </div>
   );
 }
@@ -638,4 +644,24 @@ it.each([
   await screen.getByRole("button", { name: "Improve", exact: true }).click();
   await vi.waitFor(() => expect(screen.getByRole("status").element().textContent).toBe(label));
   expect(screen.container.querySelector("[data-draft]")?.textContent).toBe("  fix the bug  ");
+});
+
+it("keeps the live region accessible while the real idle Dock is hidden", async () => {
+  const pending = deferredResult();
+  fake.run.mockReset().mockReturnValue(pending.promise);
+  await using screen = await render(<Harness thread="hidden-dock" />);
+  const dock = screen.container.querySelector<HTMLElement>(
+    '[data-slot="composer-banner-attachment"]',
+  )!;
+  await expect.element(page.elementLocator(dock)).not.toBeVisible();
+  const region = await vi.waitFor(() => screen.getByRole("status").element());
+  expect(region.textContent).toBe("");
+  await screen.getByRole("button", { name: "Improve", exact: true }).click();
+  await expect.element(screen.getByRole("status")).toHaveTextContent("Improving…");
+  expect(screen.getByRole("status").element()).toBe(region);
+  await act(() =>
+    pending.resolve(
+      AsyncResult.success({ _tag: "Filtered", requestId: "dock", reason: "unchanged" }),
+    ),
+  );
 });

@@ -6,7 +6,10 @@ import { it, expect, vi } from "vite-plus/test";
 import { act, render } from "../../../test/render";
 import { ComposerPromptEditor, type ComposerPromptEditorHandle } from "../ComposerPromptEditor";
 import { useComposerPromptOptimizer } from "./useComposerPromptOptimizer";
-import { ComposerPromptOptimizeTab } from "./ComposerPromptOptimizeTab";
+import {
+  ComposerPromptOptimizeTab,
+  ComposerPromptOptimizeStatus,
+} from "./ComposerPromptOptimizeTab";
 import { useComposerSend } from "./useComposerSend";
 import * as session from "~/state/session";
 import * as settings from "~/hooks/useSettings";
@@ -169,6 +172,7 @@ function SendHarness() {
       <button onClick={() => void optimizer.trigger()}>Improve</button>
       <button onClick={() => void onSend()}>Send</button>
       <span>{runKey}</span>
+      <ComposerPromptOptimizeStatus optimizer={optimizer} />
       <ComposerPromptOptimizeTab optimizer={optimizer} />
     </>
   );

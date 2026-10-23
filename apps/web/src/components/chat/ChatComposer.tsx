@@ -4,6 +4,7 @@ import { useComposerPromptOptimizer } from "./useComposerPromptOptimizer";
 import {
   ComposerPromptOptimizeButton,
   ComposerPromptOptimizeTab,
+  ComposerPromptOptimizeStatus,
 } from "./ComposerPromptOptimizeTab";
 import { useComposerPromptCache } from "./useComposerPromptCache";
 import { isComposerAssistSupportedDriver } from "@t3tools/contracts";
@@ -3681,6 +3682,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           )
         : null}
       {props.queuedRunsControl}
+      <ComposerPromptOptimizeStatus optimizer={promptOptimizer} />
       <ComposerBanner.Dock>
         <ComposerPromptOptimizeTab optimizer={promptOptimizer} />
         <ComposerBanner.Column>
