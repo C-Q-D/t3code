@@ -14,7 +14,7 @@ import { MenuPopup, MenuTrigger } from "../ui/menu";
 import { TraitsMenu as Menu } from "./TraitsMenu";
 import { setPhysicsEnabled } from "~/lib/motion/preference";
 import { MOTION_SNAP_DURATION_MS } from "~/lib/motion/springToLinear";
-import { TraitsMenuContent } from "./TraitsPicker";
+import { readPromptUltrathink, TraitsMenuContent } from "./TraitsPicker";
 
 const MODELS: ReadonlyArray<ServerProviderModel> = [
   {
@@ -63,8 +63,8 @@ function ProviderTraitsHarness() {
             provider={ProviderDriverKind.make("codex")}
             models={MODELS}
             model="custom-model"
-            prompt={prompt}
-            onPromptChange={setPrompt}
+            promptUltrathink={readPromptUltrathink(prompt)}
+            onPromptEdit={setPrompt}
             planModeEnabled
             modelOptions={options}
             onModelOptionsChange={setOptions}

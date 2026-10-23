@@ -10,7 +10,7 @@ import {
 import { fakeTimers, render } from "../../../test/render";
 import { captureAnimations } from "../../test/captureAnimations";
 import { MOTION_SNAP_DURATION_MS } from "~/lib/motion/springToLinear";
-import { TraitsMenuContent } from "./TraitsPicker";
+import { readPromptUltrathink, TraitsMenuContent } from "./TraitsPicker";
 import { TraitsMenu } from "./TraitsMenu";
 import { MenuTrigger, MenuPopup } from "../ui/menu";
 import { isPhysicsEnabled, setPhysicsEnabled } from "~/lib/motion/preference";
@@ -64,8 +64,8 @@ function Harness({
           provider={ProviderDriverKind.make("claudeCode")}
           models={availableModels}
           model="custom-model"
-          prompt={prompt}
-          onPromptChange={setPrompt}
+          promptUltrathink={readPromptUltrathink(prompt)}
+          onPromptEdit={setPrompt}
           planModeEnabled
           modelOptions={options}
           onModelOptionsChange={setOptions}

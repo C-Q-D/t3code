@@ -501,7 +501,7 @@ export const TraitsMenuContent = memo(function TraitsMenuContentImpl({
                         handleSelectChange(descriptor, option.id);
                       } else {
                         // Removing only our prefix restores the provider value already saved underneath.
-                        onPromptChange(prompt.replace(/^Ultrathink:\s*/i, ""));
+                        onPromptEdit?.((prompt) => prompt.replace(/^Ultrathink:\s*/i, ""));
                       }
                     }}
                   />
