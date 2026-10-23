@@ -9451,46 +9451,69 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             });
             const baseOptions = yield* prepared.buildOptions(nativeThreadId, true, appendText);
             const attemptedTools: Array<string> = [];
-            const query = yield* Effect.acquireRelease(
-              queryRunner.open({
-                threadId: sideInput.threadId,
-                providerSessionId: input.providerSessionId,
-                options: {
-                  ...baseOptions,
-                  forkSession: true,
-                  persistSession: false,
-                  maxTurns: 1,
-                  settings: {
-                    ...(typeof baseOptions.settings === "object" ? baseOptions.settings : {}),
-                    disableAllHooks: true,
+            let abandoned = false;
+            let ownedQuery: ClaudeAgentSdkQuerySession | undefined;
+            // The session owns opening; the caller only waits interruptibly. A late query
+            // must still be received and closed after the caller's deadline has expired.
+            const receiver = yield* Effect.acquireRelease(
+              queryRunner
+                .open({
+                  threadId: sideInput.threadId,
+                  providerSessionId: input.providerSessionId,
+                  options: {
+                    ...baseOptions,
+                    forkSession: true,
+                    persistSession: false,
+                    maxTurns: 1,
+                    settings: {
+                      ...(typeof baseOptions.settings === "object" ? baseOptions.settings : {}),
+                      disableAllHooks: true,
+                    },
+                    hooks: {
+                      ...baseOptions.hooks,
+                      PreToolUse: [
+                        {
+                          hooks: [
+                            async (hookInput) => {
+                              if (hookInput.hook_event_name === "PreToolUse") {
+                                attemptedTools.push(hookInput.tool_name);
+                              }
+                              return {
+                                hookSpecificOutput: {
+                                  hookEventName: "PreToolUse",
+                                  permissionDecision: "deny",
+                                  permissionDecisionReason: "T3 旁路查询不执行工具",
+                                },
+                              };
+                            },
+                          ],
+                        },
+                      ],
+                    },
+                    canUseTool: async () => ({
+                      behavior: "deny",
+                      message: "T3 旁路查询不执行工具",
+                    }),
+                    onUserDialog: async () => ({ behavior: "cancelled" }),
                   },
-                  hooks: {
-                    ...baseOptions.hooks,
-                    PreToolUse: [
-                      {
-                        hooks: [
-                          async (hookInput) => {
-                            if (hookInput.hook_event_name === "PreToolUse") {
-                              attemptedTools.push(hookInput.tool_name);
-                            }
-                            return {
-                              hookSpecificOutput: {
-                                hookEventName: "PreToolUse",
-                                permissionDecision: "deny",
-                                permissionDecisionReason: "T3 旁路查询不执行工具",
-                              },
-                            };
-                          },
-                        ],
-                      },
-                    ],
-                  },
-                  canUseTool: async () => ({ behavior: "deny", message: "T3 旁路查询不执行工具" }),
-                  onUserDialog: async () => ({ behavior: "cancelled" }),
-                },
-              }),
-              (session) => session.close.pipe(Effect.ignore),
+                })
+                .pipe(
+                  Effect.flatMap((opened) => {
+                    if (abandoned) return opened.close.pipe(Effect.ignore, Effect.as(opened));
+                    ownedQuery = opened;
+                    return Effect.succeed(opened);
+                  }),
+                  Effect.forkIn(sessionScope, { startImmediately: true }),
+                ),
+              () =>
+                Effect.suspend(() => {
+                  abandoned = true;
+                  return ownedQuery === undefined
+                    ? Effect.void
+                    : ownedQuery.close.pipe(Effect.ignore);
+                }),
             );
+            const query = yield* Fiber.join(receiver);
             let text = "";
             let model: string | null = null;
             let usage: ProviderAdapter.ProviderAdapterV2SideQueryUsage | null = null;

@@ -2681,6 +2681,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
     });
 
     const makeSideHarness = Effect.fn("makeSideHarness")(function* (options?: {
+      readonly registerMcp?: Effect.Effect<void>;
       readonly messages?: Stream.Stream<SDKMessage, ClaudeAdapterV2.ClaudeAgentSdkQueryRunnerError>;
       readonly onOffer?: (
         options: ClaudeAdapterV2.ClaudeAgentSdkQueryOptions,
@@ -2692,6 +2693,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
       const closed: Array<ClaudeAdapterV2.ClaudeAgentSdkQueryOpenInput> = [];
       const mainClosed: Array<true> = [];
       const offeredSignal = yield* Deferred.make<void>();
+      const closedSignal = yield* Deferred.make<void>();
       const harness = yield* makeWakeHarnessWithOptions({
         settings: options?.settings ?? AUTO_COMPACT_CLAUDE_SETTINGS,
         environment: { CLAUDE_CODE_PROMPT_CACHE_TTL: "1h", SIDE_QUERY_TEST: "inherited" },
@@ -2700,8 +2702,9 @@ describe("ClaudeAdapterV2 background wake turns", () => {
             mainClosed.push(true);
           }),
         sideQuery: (input) =>
-          Effect.sync(() => {
+          Effect.gen(function* () {
             opened.push(input);
+            yield* options?.registerMcp ?? Effect.void;
             return {
               messages: options?.messages ?? Stream.make(sideAssistant, sideResult),
               offer: (message: SDKUserMessage) =>
@@ -2718,7 +2721,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
               interrupt: Effect.void,
               close: Effect.sync(() => {
                 closed.push(input);
-              }),
+              }).pipe(Effect.andThen(Deferred.succeed(closedSignal, undefined))),
             };
           }),
       });
@@ -2735,7 +2738,17 @@ describe("ClaudeAdapterV2 background wake turns", () => {
         prompt: "Suggest the next user message.",
         purpose: "suggestion",
       };
-      return { ...harness, input, turnInput, opened, offered, closed, mainClosed, offeredSignal };
+      return {
+        ...harness,
+        input,
+        turnInput,
+        opened,
+        offered,
+        closed,
+        mainClosed,
+        offeredSignal,
+        closedSignal,
+      };
     });
 
     it.effect.each(["full-access", "approval-required"] as const)(
@@ -3071,6 +3084,37 @@ describe("ClaudeAdapterV2 background wake turns", () => {
           harness.getOpenedOptions()!.resume,
           "side queries must not add the parent to openedNativeThreads",
         );
+        assert.deepEqual(harness.mainClosed, []);
+      }).pipe(Effect.provide(sideLayers)),
+    );
+
+    it.effect("ends at the deadline during MCP registration and closes a late query", () =>
+      Effect.gen(function* () {
+        const registering = yield* Deferred.make<void>();
+        const registered = yield* Deferred.make<void>();
+        const settled = yield* Deferred.make<void>();
+        const harness = yield* makeSideHarness({
+          registerMcp: Deferred.succeed(registering, undefined).pipe(
+            Effect.andThen(Deferred.await(registered)),
+            Effect.timeout("90 seconds"),
+            Effect.orDie,
+          ),
+        });
+        const fiber = yield* harness.runtime.runSideQuery!(harness.input).pipe(
+          Effect.timeout("45 seconds"),
+          Effect.ensuring(Deferred.succeed(settled, undefined)),
+          Effect.forkScoped,
+        );
+        yield* Deferred.await(registering);
+        yield* TestClock.adjust("45 seconds");
+        const settledAtDeadline = yield* Deferred.isDone(settled);
+        yield* Deferred.succeed(registered, undefined);
+        yield* Deferred.await(harness.closedSignal);
+        const exit = yield* Fiber.await(fiber);
+        assert.isTrue(settledAtDeadline, "MCP registration must not extend the caller deadline");
+        assert.isTrue(Exit.isFailure(exit));
+        assert.deepEqual(harness.closed, harness.opened);
+        assert.deepEqual(harness.offered, []);
         assert.deepEqual(harness.mainClosed, []);
       }).pipe(Effect.provide(sideLayers)),
     );
