@@ -65,7 +65,10 @@ import { WorktreeToolkit } from "./worktree/tools.ts";
 import { DeviceToolkit } from "./device/tools.ts";
 import { PullRequestsToolkit } from "./pullRequests/tools.ts";
 import { HtmlToolkit } from "./html/tools.ts";
-import { resolveT3McpToolDefinition, resolveT3McpToolPresentation } from "@t3tools/shared/t3McpToolPresentation";
+import {
+  resolveT3McpToolDefinition,
+  resolveT3McpToolPresentation,
+} from "@t3tools/shared/t3McpToolPresentation";
 
 const layerOrchestratorToolkit = McpHttpServer.layerOrchestratorToolkit.pipe(
   Layer.provide(Layer.mock(ThreadLaunchService.ThreadLaunchService)({})),
