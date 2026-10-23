@@ -447,3 +447,35 @@ it("clears a settled request without a mounted composer", async () => {
   expect(fake.run).toHaveBeenCalledTimes(2);
   expect(second.container.querySelector("[data-draft]")?.textContent).toBe("  fix the bug  ");
 });
+
+it.each(["keyboard", "button"] as const)(
+  "restores the replacement-time cursor with %s undo and allows typing",
+  async (method) => {
+    const pending = deferredResult();
+    fake.run.mockReset().mockReturnValue(pending.promise);
+    await using screen = await render(<Harness thread={`cursor-${method}`} />);
+    await screen.getByRole("textbox").fill("abcdefghij");
+    await userEvent.keyboard("{Home}{ArrowRight}{ArrowRight}{ArrowRight}");
+    await screen.getByRole("button", { name: "Improve prompt", exact: true }).click();
+    await screen.getByRole("textbox").click();
+    await userEvent.keyboard(
+      "{Home}{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}",
+    );
+    await act(() =>
+      pending.resolve(
+        AsyncResult.success({
+          _tag: "Optimized",
+          requestId: "cursor",
+          text: "Improved draft",
+          cacheMaybeExpired: false,
+        }),
+      ),
+    );
+    await expect.element(screen.getByRole("textbox")).toHaveTextContent("Improved draft");
+    if (method === "keyboard") await userEvent.keyboard("{Control>}z{/Control}");
+    else await screen.getByRole("button", { name: "Undo", exact: true }).click();
+    await expect.element(screen.getByRole("textbox")).toHaveTextContent("abcdefghij");
+    await userEvent.keyboard("X");
+    expect(screen.container.querySelector("[data-draft]")?.textContent).toBe("abcdefghXij");
+  },
+);

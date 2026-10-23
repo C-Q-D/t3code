@@ -173,7 +173,11 @@ export function useComposerPromptOptimizer(input: ComposerPromptOptimizerInput) 
       }
       const result = response.value;
       if (result._tag === "Optimized") {
-        original.current = request;
+        // Native undo captures this selection, so the explicit undo must restore the same one.
+        original.current = {
+          ...request,
+          cursor: current.editorRef.current!.readSnapshot().expandedCursor,
+        };
         if (current.editorRef.current?.replacePrompt(result.text)) {
           current.onReplaced?.();
           setFeedback({ ...feedbackForDraft, label: copy.done, done: true, text: result.text });
