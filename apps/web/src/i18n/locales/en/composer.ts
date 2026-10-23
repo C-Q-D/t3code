@@ -10,6 +10,8 @@ export const composer = {
     optimize: {
       button: "Improve prompt",
       disabledEmpty: "Write a draft first",
+      disabledTooLong: (limit: number) =>
+        `Drafts over ${limit.toLocaleString("en-US")} characters can't be improved`,
       disabledProvider: "This provider does not support prompt improvement",
       disabledRunning: "Wait for the reply to finish",
       inFlight: "Improving…",

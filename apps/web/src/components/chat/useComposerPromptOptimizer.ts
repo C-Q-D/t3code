@@ -1,6 +1,7 @@
 /** Owns one composer's explicit prompt improvement, draft snapshot and transient feedback. */
 import {
   isComposerAssistSupportedDriver,
+  COMPOSER_OPTIMIZE_DRAFT_MAX_CHARS,
   composerCacheExpiresAt,
   composerCacheMaybeExpired,
   type ComposerOptimizeResult,
@@ -19,6 +20,8 @@ import { useAtomValue } from "@effect/atom-react";
 import { composerAssistEnvironment } from "~/state/composerAssist";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { t } from "~/i18n";
+import { isTransportConnectionErrorMessage } from "@t3tools/client-runtime/errors";
+import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import type { AtomCommand, AtomCommandResult } from "@t3tools/client-runtime/state/runtime";
 import type { ComposerPromptEditorHandle } from "../ComposerPromptEditor";
 
@@ -138,11 +141,13 @@ export function useComposerPromptOptimizer(input: ComposerPromptOptimizerInput) 
     ? copy.inFlight
     : !input.prompt.trim()
       ? copy.disabledEmpty
-      : !isComposerAssistSupportedDriver(input.driver)
-        ? copy.disabledProvider
-        : input.running || !input.threadId
-          ? copy.disabledRunning
-          : null;
+      : input.prompt.length > COMPOSER_OPTIMIZE_DRAFT_MAX_CHARS
+        ? copy.disabledTooLong(COMPOSER_OPTIMIZE_DRAFT_MAX_CHARS)
+        : !isComposerAssistSupportedDriver(input.driver)
+          ? copy.disabledProvider
+          : input.running || !input.threadId
+            ? copy.disabledRunning
+            : null;
   useLayoutEffect(() => {
     availability.update(visible && disabledReason === null);
     return () => availability.update(false);
@@ -170,7 +175,7 @@ export function useComposerPromptOptimizer(input: ComposerPromptOptimizerInput) 
       if (response._tag === "Failure") {
         setFeedback({
           ...feedbackForDraft,
-          label: copy.failed(copy.reason.connection),
+          label: copy.failed(commandFailureReason(response)),
           done: false,
         });
         return;
@@ -205,7 +210,8 @@ export function useComposerPromptOptimizer(input: ComposerPromptOptimizerInput) 
   const trigger = async () => {
     if (!visible || disabledReason || !input.threadId || requests.has(requestKey)) return;
     const snapshot = input.editorRef.current?.readSnapshot();
-    if (!snapshot?.value.trim()) return;
+    if (!snapshot?.value.trim() || snapshot.value.length > COMPOSER_OPTIMIZE_DRAFT_MAX_CHARS)
+      return;
     const request: PendingOptimization = {
       draftKey: input.draftKey,
       text: snapshot.value,
@@ -278,4 +284,20 @@ function optimizeFailureLabel(result: Exclude<ComposerOptimizeResult, { _tag: "O
       ? reasons[result.reason as keyof typeof reasons]
       : copy.reason.unavailable;
   return copy.failed(reason);
+}
+
+/** Keeps domain and authorization failures separate from transport diagnostics. */
+function commandFailureReason(response: Extract<CommandResponse, { _tag: "Failure" }>) {
+  const error = squashAtomCommandFailure(response);
+  const tag = typeof error === "object" && error !== null && "_tag" in error ? error._tag : null;
+  if (tag === "ComposerAssistError" || tag === "EnvironmentAuthorizationError")
+    return t.composer.assist.optimize.reason.unavailable;
+  const connection =
+    tag === "ConnectionTransientError" ||
+    tag === "ConnectionBlockedError" ||
+    tag === "RpcClientError" ||
+    isTransportConnectionErrorMessage(error instanceof Error ? error.message : null);
+  return connection
+    ? t.composer.assist.optimize.reason.connection
+    : t.composer.assist.optimize.reason.unavailable;
 }

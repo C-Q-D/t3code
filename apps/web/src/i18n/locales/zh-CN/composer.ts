@@ -10,6 +10,7 @@ export const composer: Messages["composer"] = {
     optimize: {
       button: "优化提示词",
       disabledEmpty: "先写一段草稿",
+      disabledTooLong: (limit: number) => `草稿超过 ${limit.toLocaleString("zh-CN")} 字，无法优化`,
       disabledProvider: "此 provider 不支持提示词优化",
       disabledRunning: "等回复结束后再优化",
       inFlight: "正在优化…",

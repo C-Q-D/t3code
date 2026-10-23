@@ -1,6 +1,8 @@
 /** Exercises improvement through a real editor with a controlled RPC boundary, without a provider. */
 import { useRef, useState, useSyncExternalStore } from "react";
 import { EnvironmentId, ThreadId, type ComposerOptimizeResult } from "@t3tools/contracts";
+import * as Cause from "effect/Cause";
+import { ComposerAssistError } from "@t3tools/contracts";
 import { Atom, AsyncResult } from "effect/reactivity";
 import { composerAssistEnvironment } from "~/state/composerAssist";
 import { composerShortcutCommands } from "./composerShortcuts";
@@ -502,4 +504,49 @@ it("reports discarded when a new run arrives before the draft clearing update", 
     ),
   );
   expect(screen.container.querySelector("[data-draft]")?.textContent).toBe("  fix the bug  ");
+});
+
+it.each([20000, 20001])("checks the serialized draft length at %i characters", async (length) => {
+  fake.run
+    .mockReset()
+    .mockResolvedValue(
+      AsyncResult.success({ _tag: "Filtered", requestId: "length", reason: "unchanged" }),
+    );
+  await using screen = await render(<Harness thread={`length-${length}`} />);
+  await screen.getByRole("textbox").fill("x".repeat(length));
+  const button = screen.getByRole("button", { name: "Improve prompt", exact: true });
+  if (length === 20000) {
+    await button.click();
+    expect(fake.run).toHaveBeenCalledTimes(1);
+  } else {
+    await vi.waitFor(() => expect(button.element()).toBeDisabled());
+    await expect
+      .element(screen.getByRole("menuitem", { name: "Improve prompt" }))
+      .not.toBeInTheDocument();
+    await screen.getByRole("textbox").click();
+    await userEvent.keyboard("{Control>}{Shift>}u{/Shift}{/Control}");
+    await screen.getByRole("button", { name: "Improve", exact: true }).click();
+    expect(fake.run).not.toHaveBeenCalled();
+    await screen.getByRole("group", { name: "Improve prompt" }).hover();
+    await expect
+      .element(page.getByText("Drafts over 20,000 characters can't be improved", { exact: true }))
+      .toBeVisible();
+  }
+});
+
+it("reports a ComposerAssistError as unavailable rather than disconnected", async () => {
+  fake.run
+    .mockReset()
+    .mockResolvedValue(
+      AsyncResult.failure(
+        Cause.fail(new ComposerAssistError({ reason: "internal", message: "not available" })),
+      ),
+    );
+  await using screen = await render(<Harness />);
+  await screen.getByRole("button", { name: "Improve", exact: true }).click();
+  await vi.waitFor(() =>
+    expect(screen.getByRole("status").element().textContent).toBe(
+      "Could not improve: not available right now",
+    ),
+  );
 });
