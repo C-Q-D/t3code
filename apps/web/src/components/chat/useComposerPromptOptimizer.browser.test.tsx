@@ -393,3 +393,57 @@ it.each([
   );
   expect(screen.container.querySelector("[data-draft]")?.textContent).toBe("  fix the bug  ");
 });
+
+it("keeps the request across remount and applies its result to the mounted composer", async () => {
+  const pending = deferredResult();
+  fake.run.mockReset().mockReturnValue(pending.promise);
+  await using first = await render(<Harness thread="remount" />);
+  await first.getByRole("button", { name: "Improve", exact: true }).click();
+  await first.unmount();
+  await using second = await render(<Harness thread="remount" />);
+  await vi.waitFor(() =>
+    expect(second.getByRole("status").element().textContent).toBe("Improving…"),
+  );
+  await second.getByRole("button", { name: "Improve", exact: true }).click();
+  await second.getByRole("textbox").click();
+  await userEvent.keyboard("{Control>}{Shift>}u{/Shift}{/Control}");
+  expect(fake.run).toHaveBeenCalledTimes(1);
+  await act(() =>
+    pending.resolve(
+      AsyncResult.success({
+        _tag: "Optimized",
+        requestId: "remount",
+        text: "Recovered improvement",
+        cacheMaybeExpired: false,
+      }),
+    ),
+  );
+  await expect.element(second.getByRole("textbox")).toHaveTextContent("Recovered improvement");
+  await expect.element(second.getByRole("button", { name: "Undo", exact: true })).toBeVisible();
+});
+
+it("clears a settled request without a mounted composer", async () => {
+  const pending = deferredResult();
+  fake.run.mockReset().mockReturnValue(pending.promise);
+  await using first = await render(<Harness thread="unmounted" />);
+  await first.getByRole("button", { name: "Improve", exact: true }).click();
+  await first.unmount();
+  await act(() =>
+    pending.resolve(
+      AsyncResult.success({
+        _tag: "Optimized",
+        requestId: "absent",
+        text: "Must be discarded",
+        cacheMaybeExpired: false,
+      }),
+    ),
+  );
+  await using second = await render(<Harness thread="unmounted" />);
+  await expect.element(second.getByRole("status")).toBeEmptyDOMElement();
+  fake.run.mockResolvedValue(
+    AsyncResult.success({ _tag: "Filtered", requestId: "new", reason: "unchanged" }),
+  );
+  await second.getByRole("button", { name: "Improve", exact: true }).click();
+  expect(fake.run).toHaveBeenCalledTimes(2);
+  expect(second.container.querySelector("[data-draft]")?.textContent).toBe("  fix the bug  ");
+});

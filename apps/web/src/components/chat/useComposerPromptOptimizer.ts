@@ -7,12 +7,43 @@ import {
   type EnvironmentId,
   type ThreadId,
 } from "@t3tools/contracts";
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type RefObject,
+} from "react";
 import { useAtomValue } from "@effect/atom-react";
 import { composerAssistEnvironment } from "~/state/composerAssist";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { t } from "~/i18n";
+import type { AtomCommand, AtomCommandResult } from "@t3tools/client-runtime/state/runtime";
 import type { ComposerPromptEditorHandle } from "../ComposerPromptEditor";
+
+/** One in-flight operation survives editor remounts; entries disappear on every settlement. */
+type PendingOptimization = {
+  draftKey: string;
+  text: string;
+  cursor: number;
+  runKey: string | null | undefined;
+};
+type CommandResponse =
+  typeof composerAssistEnvironment.optimizePrompt extends AtomCommand<infer _W, infer A, infer E>
+    ? AtomCommandResult<A, E>
+    : never;
+const requests = new Map<string, PendingOptimization>();
+const requestListeners = new Set<() => void>();
+const resultConsumers = new Map<
+  string,
+  Set<(request: PendingOptimization, response: CommandResponse) => void>
+>();
+
+/** Notifies mounted editors; useSyncExternalStore compares each thread's own entry. */
+function notifyRequests() {
+  for (const listener of requestListeners) listener();
+}
 
 /** Live composer inputs; only the editor text is replaced, never the send configuration. */
 export interface ComposerPromptOptimizerInput {
@@ -44,8 +75,18 @@ export function useComposerPromptOptimizer(input: ComposerPromptOptimizerInput) 
     draftKey: string;
     text?: string;
   } | null>(null);
-  const [inFlight, setInFlight] = useState(false);
-  const [pendingDraftKey, setPendingDraftKey] = useState<string | null>(null);
+  const requestKey = JSON.stringify([input.environmentId, input.threadId]);
+  const pendingRequest = useSyncExternalStore(
+    (listener) => {
+      requestListeners.add(listener);
+      return () => {
+        requestListeners.delete(listener);
+      };
+    },
+    () => requests.get(requestKey),
+    () => undefined,
+  );
+  const inFlight = pendingRequest !== undefined;
   const [now, setNow] = useState(() => Date.now());
   const expiresAt = composerCacheExpiresAt({
     driver: input.driver,
@@ -62,26 +103,10 @@ export function useComposerPromptOptimizer(input: ComposerPromptOptimizerInput) 
     );
     return () => window.clearTimeout(timer);
   }, [expiresAt]);
-  const pending = useRef(false);
   const latest = useRef(input);
-  const epoch = useRef(0);
-  const mounted = useRef(true);
   useLayoutEffect(() => {
-    if (
-      latest.current.draftKey !== input.draftKey ||
-      latest.current.environmentId !== input.environmentId ||
-      latest.current.runKey !== input.runKey
-    )
-      epoch.current += 1;
     latest.current = input;
   });
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-      epoch.current += 1;
-    };
-  }, []);
   const original = useRef<{ draftKey: string; text: string; cursor: number } | null>(null);
   const copy = t.composer.assist.optimize;
   const visible = input.enabled && allowed;
@@ -129,54 +154,76 @@ export function useComposerPromptOptimizer(input: ComposerPromptOptimizerInput) 
     return () => window.clearTimeout(timer);
   }, [feedback]);
 
+  useLayoutEffect(() => {
+    const consume = (request: PendingOptimization, response: CommandResponse) => {
+      const current = latest.current;
+      if (current.draftKey !== request.draftKey || current.runKey !== request.runKey) return;
+      const feedbackForDraft = { draftKey: current.draftKey };
+      if (current.editorRef.current?.readSnapshot().value !== request.text || current.running) {
+        setFeedback({ ...feedbackForDraft, label: copy.discarded, done: false });
+        return;
+      }
+      if (response._tag === "Failure") {
+        setFeedback({
+          ...feedbackForDraft,
+          label: copy.failed(copy.reason.connection),
+          done: false,
+        });
+        return;
+      }
+      const result = response.value;
+      if (result._tag === "Optimized") {
+        original.current = request;
+        if (current.editorRef.current?.replacePrompt(result.text)) {
+          current.onReplaced?.();
+          setFeedback({ ...feedbackForDraft, label: copy.done, done: true, text: result.text });
+        }
+      } else {
+        setFeedback({ ...feedbackForDraft, label: optimizeFailureLabel(result), done: false });
+      }
+    };
+    let consumers = resultConsumers.get(requestKey);
+    if (!consumers) {
+      consumers = new Set();
+      resultConsumers.set(requestKey, consumers);
+    }
+    consumers.add(consume);
+    return () => {
+      consumers.delete(consume);
+      if (consumers.size === 0) resultConsumers.delete(requestKey);
+    };
+  }, [requestKey, copy]);
+
   const trigger = async () => {
-    if (!visible || disabledReason || !input.threadId || pending.current) return;
+    if (!visible || disabledReason || !input.threadId || requests.has(requestKey)) return;
     const snapshot = input.editorRef.current?.readSnapshot();
     if (!snapshot?.value.trim()) return;
-    original.current = {
+    const request: PendingOptimization = {
       draftKey: input.draftKey,
       text: snapshot.value,
       cursor: snapshot.expandedCursor,
+      runKey: input.runKey,
     };
-    const requestEpoch = epoch.current;
-    pending.current = true;
+    requests.set(requestKey, request);
+    notifyRequests();
     setNow(Date.now());
-    setPendingDraftKey(input.draftKey);
     setFeedback(null);
-    setInFlight(true);
     // The server owns the deadline. Explicit user actions are never retried automatically.
-    const response = await execute({
-      environmentId: input.environmentId,
-      input: {
-        threadId: input.threadId,
-        draft: snapshot.value,
-        style: "default",
-      },
-    });
-    pending.current = false;
-    if (!mounted.current) return;
-    setInFlight(false);
-    if (requestEpoch !== epoch.current) return;
-    const feedbackForDraft = { draftKey: input.draftKey };
-    if (
-      latest.current.editorRef.current?.readSnapshot().value !== snapshot.value ||
-      latest.current.running
-    ) {
-      setFeedback({ ...feedbackForDraft, label: copy.discarded, done: false });
-      return;
-    }
-    if (response._tag === "Failure") {
-      setFeedback({ ...feedbackForDraft, label: copy.failed(copy.reason.connection), done: false });
-      return;
-    }
-    const result = response.value;
-    if (result._tag === "Optimized") {
-      if (input.editorRef.current?.replacePrompt(result.text)) {
-        input.onReplaced?.();
-        setFeedback({ ...feedbackForDraft, label: copy.done, done: true, text: result.text });
-      }
-    } else {
-      setFeedback({ ...feedbackForDraft, label: optimizeFailureLabel(result), done: false });
+    try {
+      const response = await execute({
+        environmentId: input.environmentId,
+        input: {
+          threadId: input.threadId,
+          draft: snapshot.value,
+          style: "default",
+        },
+      });
+      // Only the currently mounted editor consumes the result, never a stale instance closure.
+      const consumer = [...(resultConsumers.get(requestKey) ?? [])].at(-1);
+      consumer?.(request, response);
+    } finally {
+      requests.delete(requestKey);
+      notifyRequests();
     }
   };
   const undo = () => {
@@ -191,7 +238,7 @@ export function useComposerPromptOptimizer(input: ComposerPromptOptimizerInput) 
     trigger,
     undo,
     label:
-      inFlight && pendingDraftKey === input.draftKey
+      inFlight && pendingRequest.draftKey === input.draftKey
         ? `${copy.inFlight}${cacheMaybeExpired ? ` · ${copy.maybeFullPrice}` : ""}`
         : (shown?.label ?? ""),
     done: shown?.done ?? false,
