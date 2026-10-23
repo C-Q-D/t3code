@@ -1,3 +1,8 @@
+/** Renders orchestration events and subagent disclosures in the timeline. */
+import { ChevronRightIcon } from "lucide-react";
+import { PixelIcon } from "../icons/PixelIcon";
+import { WorkLogButton } from "./WorkLog";
+import { t } from "~/i18n";
 import { WorkLogBlock } from "./WorkLog";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { useAtomValue } from "@effect/atom-react";
@@ -12,16 +17,16 @@ import { ChevronDownIcon } from "lucide-react";
 import { cn } from "~/lib/utils";
 import { V2ItemInspector } from "./V2ItemInspector";
 import { Collapsible, CollapsibleTrigger, CollapsiblePanel } from "../ui/collapsible";
-import {
-  isV2LifecycleItem,
-  EnvironmentSubagentAvatar,
-  SubagentElapsed,
-  V2LifecycleRow,
-} from "./V2LifecycleRow";
+import { isV2LifecycleItem, SubagentElapsed, V2LifecycleRow } from "./V2LifecycleRow";
 import { SecretRequestCard } from "./SecretRequestCard";
 import { TimelineRowCtx, type TimelineRow } from "./timelineRowContext";
 import { v2EventPresentation, subagentGroupTiming } from "./TimelineV2EventRow.logic";
 
+/**
+ * Renders an orchestration event with its timestamp and supported lifecycle details.
+ * @param props - Required event row; requires TimelineRowCtx for formatting and host actions.
+ * @returns The event timeline element; never null.
+ */
 export function V2EventTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "event" }> }) {
   const ctx = use(TimelineRowCtx);
   const { item, visibility, sourceThreadId } = row.projectedItem;
@@ -61,6 +66,7 @@ export function V2EventTimelineRow({ row }: { row: Extract<TimelineRow, { kind: 
           presentation.tone === "danger" && "border-destructive/25 bg-destructive/5",
           presentation.tone === "success" && "border-success/20 bg-success/5",
         )}
+        data-timeline-card-tone={presentation.tone}
         data-v2-item-type={item.type}
         data-v2-item-visibility={visibility}
         data-v2-event-disclosure="true"
@@ -94,7 +100,7 @@ export function V2EventTimelineRow({ row }: { row: Extract<TimelineRow, { kind: 
           ) : null}
           {visibility !== "local" ? (
             <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-3xs text-muted-foreground">
-              {visibility === "inherited" ? "Inherited" : "Synthetic"}
+              {visibility === "inherited" ? t.chat.timeline.inherited : t.chat.timeline.synthetic}
             </span>
           ) : null}
           <ChevronDownIcon className="size-3 shrink-0 text-muted-foreground/60 transition-transform group-open:rotate-180" />
@@ -113,11 +119,12 @@ export function V2EventTimelineRow({ row }: { row: Extract<TimelineRow, { kind: 
           ) : null}
           {visibility === "inherited" ? (
             <p className="mt-1 font-mono text-3xs text-muted-foreground/65">
-              From {sourceThreadId}
+              {t.chat.timeline.fromThread(sourceThreadId)}
             </p>
           ) : null}
           <div className={presentation.detail ? "mt-2" : undefined}>
             <V2ItemInspector
+              presentation="timeline"
               projectedItem={row.projectedItem}
               environmentId={ctx.activeThreadEnvironmentId}
               cwd={ctx.markdownCwd}
@@ -141,6 +148,7 @@ export function V2EventTimelineRow({ row }: { row: Extract<TimelineRow, { kind: 
         presentation.tone === "success" && "border-success/20 bg-success/5",
         presentation.tone === "muted" && "border-border/60 bg-card/30",
       )}
+      data-timeline-card-tone={presentation.tone}
       data-v2-item-type={item.type}
       data-v2-item-visibility={visibility}
     >
@@ -171,7 +179,7 @@ export function V2EventTimelineRow({ row }: { row: Extract<TimelineRow, { kind: 
             ) : null}
             {visibility !== "local" ? (
               <span className="rounded-full bg-muted px-1.5 py-0.5 text-3xs text-muted-foreground">
-                {visibility === "inherited" ? "Inherited" : "Synthetic"}
+                {visibility === "inherited" ? t.chat.timeline.inherited : t.chat.timeline.synthetic}
               </span>
             ) : null}
           </div>
@@ -188,11 +196,12 @@ export function V2EventTimelineRow({ row }: { row: Extract<TimelineRow, { kind: 
           ) : null}
           {visibility === "inherited" ? (
             <p className="mt-1 font-mono text-3xs text-muted-foreground/65">
-              From {sourceThreadId}
+              {t.chat.timeline.fromThread(sourceThreadId)}
             </p>
           ) : null}
           <div className="mt-2">
             <V2ItemInspector
+              presentation="timeline"
               projectedItem={row.projectedItem}
               environmentId={ctx.activeThreadEnvironmentId}
               cwd={ctx.markdownCwd}
@@ -238,8 +247,11 @@ const V2SubagentGroup = memo(function V2SubagentGroup({
     };
   });
   const summary = subagentGroupSummary(agents);
-  const label = `${members.length} ${members.length === 1 ? "subagent" : "subagents"}`;
-  const statusSummary = summarizeSubagentStatuses(agents.map(({ status }) => status));
+  const label = t.chat.workLog.subagentCount(members.length);
+  const statusSummary = summarizeSubagentStatuses(
+    agents.map(({ status }) => status),
+    t.chat.workLog.shared.subagentStatuses,
+  );
   const toggleExpanded = (open: boolean) => {
     ctx.onToggleWorkEntry(row.id, expanded);
     if (open) ctx.workGroupViewState.expandedEntries.add(groupId);
@@ -252,55 +264,46 @@ const V2SubagentGroup = memo(function V2SubagentGroup({
         <CollapsibleTrigger
           aria-label={label}
           aria-description={statusSummary}
-          className={cn(
-            "flex w-full min-w-0 items-center gap-3 py-2 text-left transition-opacity hover:opacity-100",
-            expanded || summary.active
-              ? "text-foreground opacity-100"
-              : "text-muted-foreground opacity-55",
-          )}
-        >
-          <span className="flex shrink-0 items-center -space-x-1.5" aria-hidden>
-            {agents.slice(0, 3).map(({ item, status }) => (
-              <EnvironmentSubagentAvatar
-                key={item.id}
-                environmentId={ctx.activeThreadEnvironmentId}
-                providerInstanceId={item.providerInstanceId}
-                driver={item.driver}
-                status={agents.length === 1 ? status : undefined}
-              />
-            ))}
-            {agents.length > 3 ? (
-              <span className="relative inline-flex size-6 items-center justify-center rounded-full bg-muted text-3xs font-medium text-muted-foreground ring-2 ring-background">
-                +{agents.length - 3}
-              </span>
-            ) : null}
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-xs font-semibold">{label}</span>
-            <span
-              className={cn(
-                "block truncate text-3xs text-muted-foreground",
-                summary.active ? "text-info" : summary.failed && "text-destructive",
-              )}
-            >
-              {statusSummary}
-            </span>
-          </span>
-          <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-            <SubagentElapsed agent={subagentGroupTiming(agents)} />
-          </span>
-          <ChevronDownIcon
-            aria-hidden
-            className={cn(
-              "size-3.5 shrink-0 text-muted-foreground transition-transform",
-              expanded && "rotate-180",
-            )}
-          />
-        </CollapsibleTrigger>
+          render={
+            <WorkLogButton
+              disclosure={
+                <ChevronRightIcon
+                  aria-hidden
+                  className={cn(
+                    "size-3.25 shrink-0 text-muted-foreground",
+                    expanded && "rotate-90",
+                  )}
+                />
+              }
+              icon={<PixelIcon name="subagent" size={14} />}
+              label={
+                <span className="flex min-w-0 items-center gap-2">
+                  <span className="truncate">{label}</span>
+                  <span aria-hidden className="text-placeholder">
+                    ·
+                  </span>
+                  <span
+                    className={cn(
+                      "min-w-0 flex-1 truncate text-muted-foreground",
+                      summary.failed && "text-error",
+                    )}
+                  >
+                    {statusSummary}
+                  </span>
+                </span>
+              }
+              trailing={
+                <span className="shrink-0 text-secondary-copy text-muted-foreground tabular-nums">
+                  <SubagentElapsed agent={subagentGroupTiming(agents)} />
+                </span>
+              }
+            />
+          }
+        />
         {/* Virtualized rows must settle before disclosure scroll anchoring resumes. */}
         <CollapsiblePanel animate={false}>
           {expanded ? (
-            <div className="mt-1 mb-1 rounded-lg border border-border/60 bg-card/30 p-1">
+            <div className="ms-8.5 me-1.5 flex flex-col gap-0.5">
               {members.map((item) => (
                 <V2LifecycleRow
                   environmentId={ctx.activeThreadEnvironmentId}

@@ -1,3 +1,6 @@
+/** Renders work groups and live activity while preserving independent disclosure state. */
+import { ChevronDownIcon, ChevronRightIcon } from "lucide-react";
+import { t } from "~/i18n";
 import { WorkLogButton, WorkLogList, WorkLogRow } from "./WorkLog";
 import type { WorktreeSetupSnapshot } from "@t3tools/contracts";
 import {
@@ -94,7 +97,7 @@ export const WorkGroupSection = memo(function WorkGroupSection({
   }
 
   return (
-    <section aria-label="Activity">
+    <section aria-label={t.chat.timeline.activity}>
       {nonEmptyEntries.map((workEntry) => (
         <SimpleWorkEntryRow
           key={workEntry.id}
@@ -130,8 +133,16 @@ function WorkingTimer({ createdAt }: { createdAt: string }) {
   );
 }
 
-const compactWorkEntryHeight = 24;
+// D1 labels occupy 32px plus a 2px row gap; include both in the virtualizer's initial estimate.
+const compactWorkEntryHeight = 34;
 
+/**
+ * Renders an expanded work group while preserving its scroll and disclosure anchors.
+ * @param props - Required anchor keys and entry array, which may be empty; workspaceRoot may be
+ * undefined. Requires TimelineRowCtx for group state and entry toggles.
+ * @returns The expanded entry list; an empty list renders no entry rows, and the element is never
+ * null.
+ */
 function ExpandedWorkGroupEntries({
   anchorKey,
   disclosureAnchorKey,
@@ -268,7 +279,7 @@ function ExpandedWorkGroupEntries({
           onItemSizeChanged={updateExpandedContentHeight}
           tabIndex={0}
           role="region"
-          aria-label="Tool calls"
+          aria-label={t.chat.timeline.toolCalls}
           data-tool-group-scroll
           style={{ maxHeight: `calc(min(18rem, 50dvh) + ${expandedContentHeight}px)` }}
           className={cn(
@@ -283,20 +294,26 @@ function ExpandedWorkGroupEntries({
 
 const workEntryKey = (entry: TimelineWorkEntry) => entry.id;
 
-export function WorkingTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "working" }> }) {
+export /**
+ * Renders the current working indicator, including compaction or workspace preparation state.
+ * @param props - Required working row; requires TimelineRowCtx for live activity and setup state.
+ * @returns The working row element; never null.
+ */
+function WorkingTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "working" }> }) {
   const { isCompacting, isPreparingWorktree, backgroundWorktreeSetup } =
     use(TimelineRowActivityCtx);
   const shimmer = isPreparingWorktree || isCompacting;
   const label = isPreparingWorktree ? (
-    "Setting up worktree…"
+    t.chat.timeline.settingUpWorktree
   ) : isCompacting ? (
     <CompactingLabel />
   ) : row.createdAt ? (
     <>
-      Working for <WorkingTimer createdAt={row.createdAt} />
+      {t.chat.timeline.workingForPrefix}
+      <WorkingTimer createdAt={row.createdAt} />
     </>
   ) : (
-    "Working..."
+    t.chat.timeline.working
   );
   return (
     <div className="border-b border-border/60 pb-2 pt-1">
@@ -316,12 +333,15 @@ export function WorkingTimelineRow({ row }: { row: Extract<TimelineRow, { kind: 
   );
 }
 
+/** Exposes setup progress without making the background job cancellable from this chip.
+ * @param snapshot Current setup state; a terminal action is available only when both its ID and the timeline callback exist.
+ * @returns Localized progress popover backed by the supplied snapshot. */
 function BackgroundWorktreeSetupChip({ snapshot }: { snapshot: WorktreeSetupSnapshot }) {
   const ctx = use(TimelineRowCtx);
   const terminalId = snapshot.setupScript?.terminalId ?? null;
   const openTerminal = ctx.onOpenWorktreeSetupTerminal;
   const onOpenTerminal = openTerminal && terminalId ? () => openTerminal(terminalId) : null;
-  const scriptName = snapshot.setupScript?.name ?? "Setup script";
+  const scriptName = snapshot.setupScript?.name ?? t.chat.timeline.setupScript;
   return (
     <Popover>
       <PopoverTrigger
@@ -330,7 +350,7 @@ function BackgroundWorktreeSetupChip({ snapshot }: { snapshot: WorktreeSetupSnap
             variant="ghost-muted"
             size="micro"
             className="ml-auto min-w-0 shrink-0"
-            aria-label={`Background setup is still running: ${scriptName}. Show setup progress.`}
+            aria-label={t.chat.timeline.setupStillRunning(scriptName)}
           />
         }
       >
@@ -350,26 +370,43 @@ function BackgroundWorktreeSetupChip({ snapshot }: { snapshot: WorktreeSetupSnap
   );
 }
 
+/**
+ * Renders the context-compaction activity label with its visibility-aware shimmer.
+ * @returns The label element; never null.
+ */
 function CompactingLabel() {
   return (
     <span className="inline-flex items-center gap-1.5">
       <Minimize2Icon aria-hidden="true" className="size-3" />
-      Compacting…
+      {t.chat.timeline.compacting}
     </span>
   );
 }
 
+/**
+ * Renders live reasoning and its work-group disclosure when available.
+ * @param props - Required thinking row; requires TimelineRowCtx for active work and group state.
+ * @returns The reasoning row, or an empty-label placeholder while compaction or workspace
+ * preparation owns the activity slot; never null.
+ */
 export function ThinkingTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "thinking" }> }) {
   const ctx = use(TimelineRowCtx);
   const { isCompacting, isPreparingWorktree } = use(TimelineRowActivityCtx);
   if (isPreparingWorktree || isCompacting) return <WorkLogRow label="" />;
-  const activity = <LiveActivityRow label="Thinking" iconName="brain" active shimmer />;
+  const activity = (
+    <LiveActivityRow
+      label={t.chat.timeline.thinking}
+      iconName="brain"
+      active
+      expanded={row.groupId === undefined ? undefined : row.expanded === true}
+    />
+  );
   const { groupId } = row;
   if (groupId === undefined) return activity;
   return (
     <button
       type="button"
-      className="group/live-work flex min-h-6 w-full max-w-full cursor-pointer items-center rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70"
+      className="group/live-work flex w-full max-w-full cursor-pointer items-center rounded-compact-row text-left focus-visible:outline-none focus-visible:inset-shadow-focus"
       aria-expanded={row.expanded === true}
       onClick={() => ctx.onToggleWorkGroup(groupId, row.id)}
     >
@@ -378,45 +415,41 @@ export function ThinkingTimelineRow({ row }: { row: Extract<TimelineRow, { kind:
   );
 }
 
+/** Use static status color for live work so long conversations do not continuously repaint. */
 function LiveActivityRow({
   label,
   iconName,
   toolIcon,
   failed = false,
   active = false,
-  shimmer = false,
+  expanded,
 }: {
   label: ReactNode;
   iconName?: WorkEntryIconName;
   toolIcon?: ToolActivityIcon | undefined;
   failed?: boolean;
   active?: boolean;
-  shimmer?: boolean;
+  expanded?: boolean | undefined;
 }) {
-  const animated = active && !failed;
-  const showShimmer = animated && shimmer;
   return (
-    <div
-      ref={animated ? observeVisibleAnimation : undefined}
-      className="relative min-h-6 w-fit max-w-full min-w-0 overflow-hidden rounded-md text-sm leading-relaxed"
-    >
-      <LiveActivityContent
-        label={label}
-        iconName={iconName}
-        toolIcon={toolIcon}
-        failed={failed}
-        announceFailure={failed}
-        active={animated && !shimmer}
-      />
-      {showShimmer ? (
-        <ActivityShimmerOverlay>
-          <LiveActivityContent label={label} iconName={iconName} toolIcon={toolIcon} highlighted />
-        </ActivityShimmerOverlay>
-      ) : null}
-    </div>
+    <LiveActivityContent
+      label={label}
+      iconName={iconName}
+      toolIcon={toolIcon}
+      failed={failed}
+      announceFailure={failed}
+      active={active && !failed}
+      expanded={expanded}
+    />
   );
 }
 
+/**
+ * Renders an activity label with tool status and optional failure announcement.
+ * @param props - label may be null or empty; iconName may be undefined and toolIcon is optional.
+ * failed, announceFailure and active default to false. Undefined expanded means no group disclosure.
+ * @returns The activity content element; never null.
+ */
 function LiveActivityContent({
   label,
   iconName,
@@ -424,7 +457,7 @@ function LiveActivityContent({
   failed = false,
   announceFailure = false,
   active = false,
-  highlighted = false,
+  expanded,
 }: {
   label: ReactNode;
   iconName: WorkEntryIconName | undefined;
@@ -432,56 +465,61 @@ function LiveActivityContent({
   failed?: boolean;
   announceFailure?: boolean;
   active?: boolean;
-  highlighted?: boolean;
+  expanded?: boolean | undefined;
 }) {
   const showTrailingFailureMark =
     failed && iconName !== undefined && !toolIconAcceptsTint(toolIcon);
 
   return (
     <WorkLogRow
+      presentation={expanded === undefined ? "entry" : expanded ? "header" : "summary"}
+      disclosure={
+        expanded ? <ChevronDownIcon aria-hidden className="size-3.5 shrink-0" /> : undefined
+      }
       icon={
         iconName ? (
           <span
             className={cn(
-              "flex size-4 items-center justify-center",
-              failed
-                ? failedToolIconClassName
-                : highlighted
-                  ? "text-foreground"
-                  : "text-icon-muted",
+              "flex size-3.5 items-center justify-center",
+              failed ? failedToolIconClassName : "text-secondary-label",
             )}
             role={announceFailure ? "img" : undefined}
-            aria-label={announceFailure ? "Tool call failed" : undefined}
+            aria-label={announceFailure ? t.chat.timeline.toolCallFailed : undefined}
           >
             <ToolActivityIconView
               icon={toolIcon}
               fallbackName={iconName}
-              className="block size-4 shrink-0 stroke-2"
-              muted={!highlighted}
+              className="block size-3.5 shrink-0 stroke-2"
+              muted
             />
           </span>
         ) : null
       }
       label={
-        <span
-          className={cn(
-            "block truncate",
-            highlighted && "text-foreground",
-            active && "live-tool-shine",
-          )}
-        >
-          {label}
+        <span className={cn("block truncate", active && "font-bold text-update")}>
+          {expanded && active ? t.chat.timeline.working : label}
         </span>
       }
       trailing={
-        showTrailingFailureMark ? (
-          <XIcon aria-hidden className={cn("size-3 shrink-0", failedToolIconClassName)} />
-        ) : null
+        <>
+          {showTrailingFailureMark ? (
+            <XIcon aria-hidden className={cn("size-3 shrink-0", failedToolIconClassName)} />
+          ) : null}
+          {expanded === false ? (
+            <ChevronRightIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+          ) : null}
+        </>
       }
     />
   );
 }
 
+/**
+ * Renders a live work entry with its status and optional expandable details.
+ * @param props - Required work-live row; requires TimelineRowCtx for workspace, timestamp, and
+ * interaction state.
+ * @returns The live work row element; never null.
+ */
 export function LiveWorkEntryTimelineRow({
   row,
 }: {
@@ -493,7 +531,7 @@ export function LiveWorkEntryTimelineRow({
     ? getQuestionTextPreview(row.entry.questionAnswer)
     : "";
   const label = questionHeading || liveWorkEntryLabel(row.entry, ctx.workspaceRoot, row.active);
-  const threadLabel = threadReadLabel(label, threadTarget);
+  const threadLabel = threadReadLabel(row.entry, threadTarget, row.active);
 
   const failed = workEntryDisplayIndicatesToolFailure(row.entry);
   const thoughtLine = row.thought && !row.expanded ? liveThoughtLine(row.thought.detail ?? "") : "";
@@ -503,12 +541,14 @@ export function LiveWorkEntryTimelineRow({
     <button
       type="button"
       className={cn(
-        "group/live-work flex w-full max-w-full cursor-pointer rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70",
-        thoughtLine ? "flex-col items-start" : "min-h-6 items-center",
+        "group/live-work flex w-full max-w-full cursor-pointer rounded-compact-row text-left focus-visible:outline-none focus-visible:inset-shadow-focus",
+        thoughtLine ? "flex-col items-start" : "items-center",
       )}
       aria-label={
         failed
-          ? `${thoughtLine ? `${thoughtLine} ` : ""}${threadLabel?.text ?? label}, tool call failed`
+          ? t.chat.timeline.toolFailure(
+              `${thoughtLine ? `${thoughtLine} ` : ""}${threadLabel?.text ?? label}`,
+            )
           : undefined
       }
       aria-expanded={row.expanded}
@@ -544,9 +584,9 @@ export function LiveWorkEntryTimelineRow({
         label={
           thoughtIsStatus ? (
             row.active ? (
-              "Thinking"
+              t.chat.timeline.thinking
             ) : (
-              "Thought"
+              t.chat.timeline.thought
             )
           ) : row.entry.questionAnswer && hasQuestionAnswer(row.entry.questionAnswer) ? (
             <span className="flex min-w-0 gap-1.5">
@@ -561,7 +601,12 @@ export function LiveWorkEntryTimelineRow({
               text={row.entry.detail ?? label}
               cwd={ctx.markdownCwd}
               parseRawHtml={false}
-              extraRemarkPlugins={[[remarkThoughtPreview, row.active ? "Thinking" : "Thought"]]}
+              extraRemarkPlugins={[
+                [
+                  remarkThoughtPreview,
+                  row.active ? t.chat.timeline.thinking : t.chat.timeline.thought,
+                ],
+              ]}
             />
           ) : threadLabel ? (
             <ThreadReadLabel
@@ -577,6 +622,7 @@ export function LiveWorkEntryTimelineRow({
         toolIcon={row.entry.toolIcon ?? row.entry.toolSource?.icon}
         failed={failed}
         active={row.active}
+        expanded={row.expanded}
       />
     </button>
   );
@@ -602,6 +648,12 @@ export function WorkGroupToggleTimelineRow({
   );
 }
 
+/**
+ * Renders a work-group disclosure header with its status icon and timestamp.
+ * @param props - Required label (possibly empty), iconName, expanded state, creation timestamp,
+ * timestamp format, and toggle callback. toolIcon, failed, and active may be undefined.
+ * @returns The work-group header element; never null.
+ */
 function WorkGroupHeader(props: {
   label: string;
   iconName: WorkEntryIconName;
@@ -615,25 +667,41 @@ function WorkGroupHeader(props: {
 }) {
   return (
     <WorkLogButton
-      ref={props.active && !props.failed ? observeVisibleAnimation : undefined}
-      aria-label={props.failed ? `${props.label}, tool call failed` : props.label}
+      presentation={props.expanded ? "header" : "summary"}
+      disclosure={
+        props.expanded ? <ChevronDownIcon aria-hidden className="size-3.5 shrink-0" /> : undefined
+      }
+      aria-label={props.failed ? t.chat.timeline.toolFailure(props.label) : props.label}
       aria-expanded={props.expanded}
       onClick={props.onToggle}
       icon={
         <ToolActivityIconView
           icon={props.toolIcon}
           fallbackName={props.iconName}
-          className="size-4 shrink-0 stroke-2 text-icon-muted"
+          className="size-3.5 shrink-0 stroke-2 text-secondary-label"
           muted
         />
       }
       label={
-        <span className={cn("block truncate", props.active && !props.failed && "live-tool-shine")}>
+        <span
+          className={cn(
+            "block truncate font-semibold",
+            props.active && !props.failed ? "text-update" : "text-foreground",
+          )}
+        >
           {props.label}
         </span>
       }
       trailing={
-        <TimelineRowTimestamp createdAt={props.createdAt} timestampFormat={props.timestampFormat} />
+        <>
+          <TimelineRowTimestamp
+            createdAt={props.createdAt}
+            timestampFormat={props.timestampFormat}
+          />
+          {!props.expanded ? (
+            <ChevronRightIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+          ) : null}
+        </>
       }
     />
   );

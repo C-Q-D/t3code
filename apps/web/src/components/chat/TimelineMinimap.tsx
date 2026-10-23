@@ -1,7 +1,8 @@
+/** Navigates timeline markers within the chat lane gutter without covering message content. */
+import { t } from "~/i18n";
 import { resolveTimelineMinimapPreview, type TimelineMinimapItem } from "./timelineMinimapItems";
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { ChevronDownIcon, ChevronUpIcon } from "lucide-react";
-import { Button } from "../ui/button";
 import {
   resolveTimelineMinimapHeightStyle,
   resolveTimelineMinimapIndexFromPointer,
@@ -34,6 +35,13 @@ function onMouseButtonsReleased(onRelease: () => void): () => void {
   return stop;
 }
 
+/**
+ * Renders timeline markers and previous/next navigation for the visible conversation.
+ * @param props - Required gutter flag, hit-strip width in pixels, marker items (possibly empty),
+ * DOM marker map, and selection callback. currentIndex is null when no marker is current.
+ * @returns The minimap overlay and navigation controls, or null when there are fewer than two
+ * markers.
+ */
 export function TimelineMinimap({
   hasPersistentGutter,
   hitStripWidth,
@@ -120,7 +128,7 @@ export function TimelineMinimap({
   return (
     <div
       className={cn(
-        "group/minimap pointer-events-none absolute inset-y-0 left-0 z-40 hidden w-18 [@media(pointer:fine)]:block",
+        "timeline-minimap pointer-events-none absolute inset-y-0 z-40 hidden w-18",
         hasPersistentGutter
           ? "opacity-100"
           : "opacity-0 transition-opacity duration-150 hover:opacity-100 focus-within:opacity-100",
@@ -132,7 +140,9 @@ export function TimelineMinimap({
       <div className="relative h-full w-full select-none">
         <div
           className={cn(
-            "absolute top-1/2 left-3 -translate-y-1/2",
+            "timeline-minimap-rail absolute",
+            // The strip is width-capped to the side gutter so it never overlays
+            // the centered content column; with no usable gutter it goes inert.
             hitStripWidth > 0 && !passThrough ? "pointer-events-auto" : "pointer-events-none",
           )}
           onMouseDown={() => {
@@ -159,7 +169,9 @@ export function TimelineMinimap({
             }}
           />
           <button
-            aria-label={`Jump to message: ${activeItem?.userText ?? "User message"}`}
+            aria-label={t.chat.timeline.jumpToMessage(
+              activeItem?.userText ?? t.chat.timeline.userMessage,
+            )}
             className="absolute inset-y-0 left-0 w-full cursor-pointer bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70"
             onBlur={() => setActiveIndex(null)}
             onClick={(event) => {
@@ -207,29 +219,15 @@ export function TimelineMinimap({
             }}
             type="button"
           >
-            <div className="absolute top-0 left-3 h-full w-px bg-border/15" />
             {items.map((item, index) => {
               const top = `${resolveTimelineMinimapTopPercent(index, items.length)}%`;
-              const activeDistance =
-                resolvedActiveIndex === null ? null : Math.abs(index - resolvedActiveIndex);
               return (
-                // Compositor-friendly on purpose: in-view state and the hover
-                // fisheye animate constantly (every scroll tick and streaming
-                // update flips a band of strips), so the strip animates only
-                // transform and opacity.
+                // The fixed marker box changes scale without measuring virtual rows.
                 <span
                   aria-hidden="true"
-                  className={cn(
-                    "group/strip pointer-events-none absolute left-0 h-0.5 w-6 origin-left -translate-y-1/2 rounded-full transition-transform duration-150",
-                    activeDistance === 0 ? "bg-muted-foreground/75" : "bg-muted-foreground/35",
-                    activeDistance === 0
-                      ? "scale-x-100"
-                      : activeDistance === 1
-                        ? "scale-x-[0.667]"
-                        : activeDistance === 2
-                          ? "scale-x-[0.417]"
-                          : "scale-x-[0.333]",
-                  )}
+                  className="timeline-minimap-strip pointer-events-none absolute"
+                  data-current={index === resolvedCurrentIndex ? "true" : "false"}
+                  data-active={index === resolvedActiveIndex ? "true" : "false"}
                   data-in-view="false"
                   data-minimap-strip
                   key={item.id}
@@ -242,13 +240,13 @@ export function TimelineMinimap({
                   }}
                   style={{ top }}
                 >
-                  <span className="absolute inset-0 rounded-full bg-foreground/90 opacity-0 transition-opacity duration-150 group-data-[in-view=true]/strip:opacity-100" />
+                  <span className="timeline-minimap-highlight absolute inset-0" />
                 </span>
               );
             })}
             {activeItem ? (
               <span
-                className="pointer-events-auto absolute left-8 w-80 cursor-text select-text"
+                className="timeline-minimap-preview pointer-events-auto absolute w-80 cursor-text select-text"
                 data-minimap-preview
                 onMouseMove={(event) => event.stopPropagation()}
                 style={{
@@ -256,19 +254,14 @@ export function TimelineMinimap({
                   transform: `translateY(${activeTooltipTranslate})`,
                 }}
               >
-                <span className="dropdown-glass block rounded-xl p-3 text-left text-popover-foreground shadow-xl shadow-black/25">
-                  <span className="block max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-sm font-medium leading-5">
-                    {activeItem.userText ?? "User message"}
+                <span className="timeline-minimap-preview-surface block text-left">
+                  <span className="block max-w-full overflow-hidden text-ellipsis whitespace-nowrap">
+                    {t.chat.timeline.jumpToMessage(
+                      activeItem.userText ?? t.chat.timeline.userMessage,
+                    )}
                   </span>
                   {activeItem.assistantText ? (
-                    <span
-                      className="mt-1 max-h-[3.75rem] overflow-hidden text-muted-foreground text-sm leading-5"
-                      style={{
-                        display: "-webkit-box",
-                        WebkitBoxOrient: "vertical",
-                        WebkitLineClamp: 3,
-                      }}
-                    >
+                    <span className="mt-1 line-clamp-3 max-h-15 text-secondary-copy leading-5">
                       {activeItem.assistantText}
                     </span>
                   ) : null}
@@ -290,6 +283,12 @@ export function TimelineMinimap({
   );
 }
 
+/**
+ * Renders one previous or next minimap navigation button.
+ * @param props - Required direction, disabled and interactive flags, and click callback; none are
+ * nullable.
+ * @returns The navigation button element; never null.
+ */
 function TimelineMinimapNavigationButton({
   direction,
   disabled,
@@ -302,7 +301,7 @@ function TimelineMinimapNavigationButton({
   onClick: () => void;
 }) {
   const previous = direction === "previous";
-  const label = previous ? "Previous turn" : "Next turn";
+  const label = previous ? t.chat.timeline.previousTurn : t.chat.timeline.nextTurn;
   const Icon = previous ? ChevronUpIcon : ChevronDownIcon;
 
   return (
@@ -311,23 +310,22 @@ function TimelineMinimapNavigationButton({
         render={
           <span
             className={cn(
-              "absolute left-1 z-10 inline-flex -translate-x-1/2 opacity-0 transition-opacity duration-150 hover:opacity-100 focus-within:opacity-100",
+              "timeline-minimap-navigation absolute z-10 inline-flex",
               interactive ? "pointer-events-auto" : "pointer-events-none",
-              previous ? "bottom-[calc(100%+2px)]" : "top-[calc(100%+2px)]",
+              previous ? "timeline-minimap-previous" : "timeline-minimap-next",
             )}
           />
         }
       >
-        <Button
+        <button
           aria-label={label}
           disabled={disabled}
           onClick={onClick}
-          size="icon-micro"
+          className="timeline-minimap-navigation-button"
           type="button"
-          variant="ghost-muted"
         >
-          <Icon className="size-4 text-foreground/90" />
-        </Button>
+          <Icon aria-hidden="true" />
+        </button>
       </TooltipTrigger>
       <TooltipPopup side={previous ? "top" : "bottom"}>{label}</TooltipPopup>
     </Tooltip>

@@ -1,3 +1,6 @@
+/** Maps work-log activity identities to tool artwork and local pixel icons. */
+import { FileTextIcon } from "lucide-react";
+import { PixelSubagentIcon, PixelThinkIcon } from "../icons/PixelLucideIcon";
 import { PullRequestGlyph } from "../pullRequest/pullRequestIcons";
 import { type ToolActivityIcon } from "@t3tools/contracts";
 import { toolActivityFaviconUrl } from "@t3tools/shared/favicon";
@@ -5,8 +8,6 @@ import { getProjectFaviconCacheKey } from "@t3tools/shared/projectFavicon";
 import { use, useState } from "react";
 import { T3Wordmark } from "../T3Wordmark";
 import {
-  BotIcon,
-  BrainIcon,
   CheckIcon,
   CircleAlertIcon,
   EyeIcon,
@@ -42,6 +43,7 @@ export type WorkEntryIconName =
   | "code"
   | "device"
   | "eye"
+  | "file-text"
   | "globe"
   | "hammer"
   | "message-circle"
@@ -227,14 +229,19 @@ function ToolActivityImageIcon(props: {
   );
 }
 
+/**
+ * Resolves a work-log icon key without changing the persisted or derived activity name.
+ * @param props Activity icon key and caller-owned sizing/layout classes; bot and brain use pixel artwork.
+ * @returns A decorative activity glyph, also usable as the fallback for a tool-supplied image.
+ */
 function WorkEntryIcon({ name, className }: { name: WorkEntryIconName; className: string }) {
   switch (name) {
     case "pull-request":
       return <PullRequestGlyph.pullRequest className={className} aria-hidden />;
     case "bot":
-      return <BotIcon className={className} aria-hidden />;
+      return <PixelSubagentIcon className={className} aria-hidden />;
     case "brain":
-      return <BrainIcon className={className} aria-hidden />;
+      return <PixelThinkIcon className={className} aria-hidden />;
     case "browser":
     case "computer":
       return <BrowserAppIcon className={className} />;
@@ -250,6 +257,8 @@ function WorkEntryIcon({ name, className }: { name: WorkEntryIconName; className
       return <CircleAlertIcon className={className} aria-hidden />;
     case "eye":
       return <EyeIcon className={className} aria-hidden />;
+    case "file-text":
+      return <FileTextIcon className={className} aria-hidden />;
     case "globe":
       return <GlobeIcon className={className} aria-hidden />;
     case "hammer":

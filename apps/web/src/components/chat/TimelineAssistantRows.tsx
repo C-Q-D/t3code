@@ -1,3 +1,5 @@
+/** Renders assistant replies and rich output rows using the timeline context. */
+import { t } from "~/i18n";
 import { shouldPreserveAssistantLineBreaks } from "@t3tools/shared/markdownPipeline";
 import { type RunId } from "@t3tools/contracts";
 import { canForkProjectedAssistantItem } from "@t3tools/client-runtime/state/thread-workflows";
@@ -25,7 +27,8 @@ import { MESSAGE_HEADING_LEVEL, MessageAuthorHeading } from "./TimelineRowParts"
 
 export function AssistantTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" }> }) {
   const ctx = use(TimelineRowCtx);
-  const messageText = row.message.text || (row.message.streaming ? "" : "(empty response)");
+  const messageText =
+    row.message.text || (row.message.streaming ? "" : t.chat.timeline.emptyResponse);
 
   return (
     <>
@@ -40,6 +43,8 @@ export function AssistantTimelineRow({ row }: { row: Extract<TimelineRow, { kind
             listRef={ctx.listRef}
           >
             <ChatMarkdown
+              presentation="timeline"
+              className="timeline-assistant-markdown"
               text={messageText}
               cwd={ctx.markdownCwd}
               threadRef={ctx.threadRef ?? undefined}
@@ -73,6 +78,12 @@ export function AssistantTimelineRow({ row }: { row: Extract<TimelineRow, { kind
   );
 }
 
+/**
+ * Renders the action to fork a conversation from an assistant run.
+ * @param props - Required projected message item; its runId may be null. Requires TimelineRowCtx
+ * for fork permissions and execution.
+ * @returns The fork button, or null when forking is unavailable or the item has no run.
+ */
 function AssistantForkButton({
   projectedItem,
 }: {
@@ -99,8 +110,8 @@ function AssistantForkButton({
         render={
           <Button
             type="button"
-            size="xs"
-            variant="ghost"
+            size="icon-md"
+            variant="ghost-muted"
             disabled={busy}
             onClick={() => {
               setBusy(true);
@@ -108,13 +119,13 @@ function AssistantForkButton({
                 .onForkFromRun({ sourceThreadId: projectedItem.sourceThreadId, runId })
                 .finally(() => setBusy(false));
             }}
-            aria-label="Fork from this response"
+            aria-label={t.chat.timeline.forkFromThisResponse}
           />
         }
       >
-        <GitForkIcon className={cn("size-3", busy && "animate-pulse")} />
+        <GitForkIcon className="size-3.75" />
       </TooltipTrigger>
-      <TooltipPopup side="top">Fork from this response</TooltipPopup>
+      <TooltipPopup side="top">{t.chat.timeline.forkFromThisResponse}</TooltipPopup>
     </Tooltip>
   );
 }
@@ -138,6 +149,7 @@ export function AssistantMetaTimelineRow({
   );
 }
 
+/** Render the retained response actions in D1 order, preserving hover, focus and touch visibility. */
 function AssistantMessageMeta({
   className,
   projectedItem,
@@ -158,7 +170,7 @@ function AssistantMessageMeta({
   return (
     <div
       className={cn(
-        "flex items-center gap-2 text-xs tabular-nums transition-opacity duration-200",
+        "flex items-center gap-0.5 text-secondary-copy tabular-nums transition-opacity duration-200",
         alwaysVisible
           ? "opacity-100"
           : "opacity-0 pointer-coarse:opacity-100 focus-within:opacity-100 group-hover/assistant:opacity-100",
@@ -170,17 +182,19 @@ function AssistantMessageMeta({
           {projectedItem.item.status}
         </span>
       ) : null}
+      {projectedItem?.item.type === "assistant_message" ? (
+        <AssistantForkButton projectedItem={projectedItem} />
+      ) : null}
       <AssistantCopyButton
         message={message}
         showCopyButton={showCopyButton}
         streaming={copyStreaming}
       />
-      {projectedItem?.item.type === "assistant_message" ? (
-        <AssistantForkButton projectedItem={projectedItem} />
-      ) : null}
       {!message.streaming && (
         <Tooltip>
-          <TooltipTrigger render={<p className="text-muted-foreground text-xs tabular-nums" />}>
+          <TooltipTrigger
+            render={<p className="ms-1.5 text-muted-foreground text-secondary-copy tabular-nums" />}
+          >
             {formatDayAwareTimestamp(message.updatedAt, ctx.timestampFormat)}
           </TooltipTrigger>
           <TooltipPopup>
@@ -192,6 +206,11 @@ function AssistantMessageMeta({
   );
 }
 
+/**
+ * Preserve the full-response copy entry when the existing copy-state policy permits it.
+ * @param props Message text, visibility policy and streaming state supplied by the derived row.
+ * @returns The D1-sized shared copy button, or null while copying is unavailable.
+ */
 function AssistantCopyButton({
   message,
   showCopyButton,
@@ -211,7 +230,7 @@ function AssistantCopyButton({
     return null;
   }
 
-  return <MessageCopyButton text={assistantCopyState.text ?? ""} variant="ghost" />;
+  return <MessageCopyButton text={assistantCopyState.text ?? ""} size="icon-md" variant="ghost" />;
 }
 
 export function ProposedPlanTimelineRow({

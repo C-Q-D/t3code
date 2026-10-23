@@ -1,3 +1,6 @@
+/** Renders sent-message context references and delegates resource actions to the timeline. */
+import { PierreEntryIcon } from "./PierreEntryIcon";
+import { t } from "~/i18n";
 import { useRenderedAppearance } from "../../hooks/useTheme";
 import { PullRequestGlyph } from "../pullRequest/pullRequestIcons";
 import { ReadOnlySourcePreview } from "../files/AttachmentFilePreview";
@@ -55,6 +58,12 @@ import {
 } from "../../reviewCommentContext";
 import { TimelineRowCtx } from "./timelineRowContext";
 
+/**
+ * Renders a user-message file mention and its available open actions.
+ * @param props - Required mention record and copyMarkdown string, which may be empty. Requires
+ * TimelineRowCtx for workspace and file actions.
+ * @returns The mention chip element; never null.
+ */
 function UserMessageMentionChip(props: {
   record: Extract<KnownComposerContextRecord, { kind: "mention" }>;
   copyMarkdown: string;
@@ -67,7 +76,7 @@ function UserMessageMentionChip(props: {
           <ContextChip
             kind="mention"
             render={<button type="button" />}
-            aria-label={`Preview ${props.record.path}`}
+            aria-label={t.chat.timeline.preview(props.record.path)}
             data-markdown-copy={props.copyMarkdown}
             onClick={() => {
               if (ctx.threadRef)
@@ -136,6 +145,12 @@ function UserMessagePullRequestContextChip(props: {
   );
 }
 
+/**
+ * Renders the details and optional screenshot of a user preview annotation.
+ * @param props - Required annotation record; image is null when no screenshot attachment is
+ * available. Requires TimelineRowCtx for preview actions.
+ * @returns The annotation details element; never null.
+ */
 function UserMessagePreviewAnnotationDetails(props: {
   record: Extract<KnownComposerContextRecord, { kind: "preview-annotation" }>;
   image: ChatImageAttachment | null;
@@ -148,7 +163,7 @@ function UserMessagePreviewAnnotationDetails(props: {
         <button
           type="button"
           className="block max-h-64 w-full cursor-zoom-in overflow-hidden border-b border-border/70 bg-muted"
-          aria-label={`Preview ${props.image.name}`}
+          aria-label={t.chat.timeline.preview(props.image.name)}
           onClick={() => {
             if (!props.image) return;
             const preview = buildExpandedImagePreview([props.image], props.image.id);
@@ -157,18 +172,20 @@ function UserMessagePreviewAnnotationDetails(props: {
         >
           <img
             src={props.image.previewUrl}
-            alt="Annotated preview crop"
+            alt={t.chat.timeline.annotatedPreviewCrop}
             className="max-h-64 w-full object-contain"
           />
         </button>
       ) : (
         <div className="border-b border-border/70 bg-muted/40 px-3 py-2 text-secondary-label text-xs">
-          Screenshot unavailable
+          {t.chat.timeline.screenshotUnavailable}
         </div>
       )}
       <div className="min-w-0 px-3 py-2.5">
         <div className="text-message-foreground text-xs font-medium">
-          {props.record.pageTitle?.trim() || props.record.pageUrl || "Preview annotation"}
+          {props.record.pageTitle?.trim() ||
+            props.record.pageUrl ||
+            t.chat.timeline.previewAnnotation}
         </div>
         {props.record.comment ? (
           <div className="mt-1 whitespace-pre-wrap wrap-break-word text-sm">
@@ -216,8 +233,9 @@ function UserMessagePreviewAnnotationDetails(props: {
             })}
             {(props.record.elements?.length ?? 0) > visibleElements.length ? (
               <div className="text-secondary-label text-3xs">
-                {(props.record.elements?.length ?? 0) - visibleElements.length} more selected
-                elements
+                {t.chat.timeline.moreSelectedElements(
+                  (props.record.elements?.length ?? 0) - visibleElements.length,
+                )}
               </div>
             ) : null}
           </div>
@@ -278,12 +296,19 @@ interface UserMessageContextRenderContext {
   onOpenFile: (file: ChatFileAttachment) => void;
 }
 
+/**
+ * Renders an unresolved context chip while retaining its copyable reference.
+ * @param props - Required rendering context with reference and copyMarkdown (possibly empty);
+ * annotationImage and attachment may be null. Other context fields retain the host theme and action
+ * callbacks.
+ * @returns The unavailable-context chip element; never null.
+ */
 function UnavailableUserMessageContextChip(props: UserMessageContextRenderContext) {
   return (
     <UnresolvedChip
       label={props.reference.label}
       copyMarkdown={props.copyMarkdown}
-      tooltip="This context is no longer available."
+      tooltip={t.chat.timeline.thisContextIsNoLongerAvailable}
     />
   );
 }
@@ -313,7 +338,7 @@ const userMessageContextPresentationRegistry = createContextPresentationRegistry
           <UserMessageContextChip
             icon={<SkillChipIcon />}
             label={record.label || record.name}
-            kindLabel="Skill"
+            kindLabel={t.chat.timeline.skill}
             tooltip={`$${record.name}`}
             copyMarkdown={context.copyMarkdown}
             kind="skill"
@@ -375,6 +400,38 @@ const userMessageContextPresentationRegistry = createContextPresentationRegistry
         const disabled =
           attachment.downloadable === false && (!isVideo || attachment.previewUrl === undefined);
         const size = formatAttachmentSize(record.sizeBytes);
+        // D1's file well belongs to sent messages; the composer keeps its inline chip.
+        if (!isVideo) {
+          return (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    aria-label={t.chat.timeline.attachment(false, record.name, size)}
+                    data-markdown-copy={context.copyMarkdown}
+                    onClick={() => context.onOpenFile(attachment)}
+                    className="inline-flex h-8.5 max-w-full cursor-pointer items-center gap-2 rounded-tag bg-timeline-file ps-2.5 pe-3 align-middle font-mono text-secondary-copy text-fg-detail shadow-timeline-file hover:underline focus-visible:inset-shadow-focus focus-visible:outline-none disabled:cursor-default"
+                  />
+                }
+              >
+                <PierreEntryIcon
+                  pathValue={record.name}
+                  kind="file"
+                  theme={context.resolvedTheme}
+                  className="size-3.5"
+                />
+                <span className="min-w-0 truncate">{record.name}</span>
+              </TooltipTrigger>
+              <TooltipPopup side="top">
+                {record.name}
+                <br />
+                {size}
+              </TooltipPopup>
+            </Tooltip>
+          );
+        }
         return (
           <FileChip
             name={record.name}
@@ -382,7 +439,7 @@ const userMessageContextPresentationRegistry = createContextPresentationRegistry
             isVideo={isVideo}
             theme={context.resolvedTheme}
             disabled={disabled}
-            accessibleLabel={`${isVideo ? "Video" : "File"} attachment, ${record.name}, ${size}`}
+            accessibleLabel={t.chat.timeline.attachment(isVideo, record.name, size)}
             copyMarkdown={context.copyMarkdown}
             onOpen={() =>
               isVideo ? context.onExpandVideo(attachment) : context.onOpenFile(attachment)
@@ -418,7 +475,7 @@ const userMessageContextPresentationRegistry = createContextPresentationRegistry
         record.kind === "element" ? (
           <UserMessageContextPopover
             copyMarkdown={context.copyMarkdown}
-            accessibleLabel={`Browser element, ${record.label}`}
+            accessibleLabel={t.chat.timeline.browserElement(record.label)}
             kind="element"
             icon={<MousePointerClickIcon />}
             label={record.label}
@@ -438,7 +495,9 @@ const userMessageContextPresentationRegistry = createContextPresentationRegistry
         }
         const isPullRequest = isPullRequestSummaryContext(record);
         const label = reviewCommentContextLabel(record);
-        const kindLabel = isPullRequest ? pullRequestContextKindLabel(record) : "Review comment";
+        const kindLabel = isPullRequest
+          ? pullRequestContextKindLabel(record)
+          : t.chat.timeline.reviewComment;
         const pullRequestState = pullRequestContextDisplayState(record) ?? "unknown";
         if (isPullRequest && record.pullRequest !== undefined) {
           return (
@@ -485,7 +544,7 @@ const userMessageContextPresentationRegistry = createContextPresentationRegistry
         record.kind === "preview-annotation" ? (
           <UserMessageContextPopover
             copyMarkdown={context.copyMarkdown}
-            accessibleLabel={`Preview annotation, ${record.label}`}
+            accessibleLabel={t.chat.timeline.annotation(record.label)}
             kind="preview-annotation"
             icon={<MousePointerClickIcon />}
             label={record.label}

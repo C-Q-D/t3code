@@ -1,3 +1,5 @@
+/** Derives localized orchestration event presentation without changing persisted event data. */
+import { t } from "~/i18n";
 import { type OrchestrationV2TurnItem } from "@t3tools/contracts";
 import { providerErrorPresentation } from "../../session-logic";
 import {
@@ -14,6 +16,12 @@ import * as DateTime from "effect/DateTime";
 
 type V2EventTone = "muted" | "warning" | "danger" | "success";
 
+/**
+ * Selects display text, icon, and tone for an orchestration timeline event.
+ * @param item - Required orchestration turn item with optional title and event-specific details.
+ * @returns Event presentation; detail is null when no applicable detail exists, while label, icon,
+ * and tone are always provided.
+ */
 export function v2EventPresentation(item: OrchestrationV2TurnItem): {
   readonly label: string;
   readonly detail: string | null;
@@ -36,21 +44,21 @@ export function v2EventPresentation(item: OrchestrationV2TurnItem): {
     }
     case "run_interrupt_request":
       return {
-        label: "Interrupt requested",
+        label: t.chat.timeline.interruptRequested,
         detail: item.message,
         tone: "warning",
         icon: CircleAlertIcon,
       };
     case "run_interrupt_result":
       return {
-        label: "Run interrupted",
+        label: t.chat.timeline.runInterrupted,
         detail: item.message,
         tone: "danger",
         icon: XIcon,
       };
     case "handoff":
       return {
-        label: "Context handoff",
+        label: t.chat.timeline.contextHandoff,
         detail:
           item.summary ??
           `${item.fromProviderInstanceIds.join(", ")} → ${item.toProviderInstanceId}`,
@@ -59,8 +67,8 @@ export function v2EventPresentation(item: OrchestrationV2TurnItem): {
       };
     case "fork":
       return {
-        label: "Conversation fork",
-        detail: `Continues in ${item.targetThreadId}`,
+        label: t.chat.timeline.conversationFork,
+        detail: t.chat.timeline.continuesIn(item.targetThreadId),
         tone: "muted",
         icon: GitForkIcon,
       };
@@ -68,9 +76,9 @@ export function v2EventPresentation(item: OrchestrationV2TurnItem): {
       const tokenSummary =
         item.beforeTokenCount === undefined && item.afterTokenCount === undefined
           ? null
-          : `${item.beforeTokenCount ?? "?"} → ${item.afterTokenCount ?? "?"} tokens`;
+          : t.chat.timeline.tokenChange(item.beforeTokenCount ?? "?", item.afterTokenCount ?? "?");
       return {
-        label: "Context compacted",
+        label: t.chat.timeline.contextCompacted,
         detail: item.summary ?? tokenSummary,
         tone: item.status === "failed" ? "danger" : "muted",
         icon: MinusIcon,
@@ -79,7 +87,7 @@ export function v2EventPresentation(item: OrchestrationV2TurnItem): {
     case "todo_list": {
       const steps = item.steps.map((step) => `${step.status}: ${step.text}`).join("\n");
       return {
-        label: "Plan updated",
+        label: t.chat.timeline.planUpdated,
         detail: [item.explanation, steps].filter(Boolean).join("\n\n") || null,
         tone: item.status === "failed" ? "danger" : "success",
         icon: CheckIcon,

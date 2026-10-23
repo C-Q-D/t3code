@@ -1,3 +1,5 @@
+/** Renders settled work entries and their expandable details using timeline-owned actions. */
+import { t } from "~/i18n";
 import { WorkLogDetails, WorkLogRow } from "./WorkLog";
 import {
   getQuestionAnswerPreview,
@@ -74,8 +76,13 @@ export function useThreadReadTarget(entry: TimelineWorkEntry, environmentId: Env
   return threadId && title ? { threadId, title } : null;
 }
 
-export function threadReadLabel(label: string, target: ReturnType<typeof useThreadReadTarget>) {
-  const prefix = target && threadReadLabelPrefix(label);
+/** Adds a live thread title to the localized verb; missing targets keep the generic label. */
+export function threadReadLabel(
+  entry: TimelineWorkEntry,
+  target: ReturnType<typeof useThreadReadTarget>,
+  active = false,
+) {
+  const prefix = target && threadReadLabelPrefix(entry, active);
   return prefix ? { ...target, prefix, text: `${prefix} “${target.title}”` } : null;
 }
 
@@ -168,6 +175,14 @@ export const SimpleWorkEntryRow = memo(function SimpleWorkEntryRow(props: WorkEn
   );
 });
 
+/**
+ * Renders a work-log entry with inspectable details, failures, and available recovery actions.
+ * @param props - Required workEntry; workspaceRoot may be undefined, displayLabel optionally
+ * overrides the heading, and onToggleEntry optionally observes collapse changes. Requires
+ * TimelineRowCtx; WorkGroupViewCtx is optional.
+ * @returns The work-log row element; never null. User actions may expand details or invoke the host
+ * recovery callback.
+ */
 function WorkEntryLogRow(props: WorkEntryRowProps) {
   const { workEntry, workspaceRoot, displayLabel } = props;
   const ctx = use(TimelineRowCtx);
@@ -202,9 +217,7 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
     const warning = failureItem.failure.class === "usage_limit";
     const resetAt = failureItem.failure.resetAt;
     const resetTime = resetAt ? formatUpcomingTimestamp(resetAt, timestampFormat) : null;
-    const label = warning
-      ? `Usage limit reached.${resetTime ? ` Retry after ${resetTime}.` : ""}`
-      : workEntry.label;
+    const label = warning ? t.chat.timeline.usageLimit(resetTime) : workEntry.label;
     const retryRunId =
       failureItem.runId !== null &&
       retryableWorkspacePreparationRunIds.has(failureItem.runId) &&
@@ -250,7 +263,7 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
               onClick={() => onRetryWorkspacePreparation(retryRunId)}
             >
               <RotateCcwIcon aria-hidden />
-              Retry
+              {t.chat.timeline.retry}
             </Button>
           </div>
         ) : null}
@@ -278,8 +291,8 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
   const previewText =
     isReasoning && expanded
       ? workEntry.toolLifecycleStatus === "inProgress"
-        ? "Thinking"
-        : "Thought"
+        ? t.chat.timeline.thinking
+        : t.chat.timeline.thought
       : questionHeading || (displayLabel ?? workEntryDisplayLabel(workEntry, workspaceRoot));
   const answerPreview =
     workEntry.questionAnswer && hasQuestionAnswer(workEntry.questionAnswer)
@@ -358,14 +371,14 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
     : showDestructiveRowStyle
       ? "font-medium text-destructive"
       : workLogEntryIsToolLike(workEntry)
-        ? "text-secondary-label"
+        ? "text-code-foreground"
         : "text-foreground/80";
-  const threadLabel = isReasoning ? null : threadReadLabel(previewText, threadTarget);
+  const threadLabel = isReasoning ? null : threadReadLabel(workEntry, threadTarget);
   const accessiblePreview = [threadLabel?.text ?? previewText, answerPreview]
     .filter(Boolean)
     .join(": ");
   const accessibleDisplayText = showFailedIndicator
-    ? `${accessiblePreview}, tool call failed`
+    ? t.chat.timeline.toolFailure(accessiblePreview)
     : accessiblePreview;
   const rowToggleProps = canExpandProjectedItem
     ? {
@@ -388,23 +401,33 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
       data-v2-item-type={workEntry.projectedItem?.item.type}
       data-v2-item-visibility={workEntry.projectedItem?.visibility}
       {...rowToggleProps}
+      disclosure={
+        <ChevronRightIcon
+          aria-hidden
+          className={cn(
+            "size-3.25 shrink-0 text-muted-foreground",
+            !canExpandProjectedItem && "invisible",
+            expanded && "rotate-90",
+          )}
+        />
+      }
       icon={
         <span
           className={iconWrapperClass}
           role={showFailedIndicator ? "img" : undefined}
-          aria-label={showFailedIndicator ? "Tool call failed" : undefined}
+          aria-label={showFailedIndicator ? t.chat.timeline.toolCallFailed : undefined}
         >
           <ToolActivityIconView
             icon={entryToolIcon}
             fallbackName={entryIconName}
-            className="block size-4 shrink-0 stroke-2"
+            className="block size-3.5 shrink-0 stroke-2"
             muted
           />
         </span>
       }
       label={
         <div className="min-w-0 flex-1 overflow-hidden">
-          <p className="flex min-w-0 w-full items-baseline gap-1.5 text-sm leading-relaxed">
+          <p className="flex min-w-0 w-full items-baseline gap-1.5 text-secondary-copy-large">
             <span
               className={cn(answerPreview ? "min-w-0" : "min-w-0 flex-1", "truncate", headingClass)}
             >
@@ -417,7 +440,9 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
                   extraRemarkPlugins={[
                     [
                       remarkThoughtPreview,
-                      workEntry.toolLifecycleStatus === "inProgress" ? "Thinking" : "Thought",
+                      workEntry.toolLifecycleStatus === "inProgress"
+                        ? t.chat.timeline.thinking
+                        : t.chat.timeline.thought,
                     ],
                   ]}
                 />
@@ -454,26 +479,28 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
             <button
               type="button"
               className="shrink-0 rounded-sm text-sm text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-              aria-label={`Open ${createdThread.title ?? "created thread"}`}
+              aria-label={t.chat.timeline.open(
+                createdThread.title ?? t.chat.timeline.createdThreadLabel,
+              )}
               onClick={(event) => {
                 event.stopPropagation();
                 ctx.onOpenThread(createdThread.targetThreadId);
               }}
               onKeyDown={stopRowToggle}
             >
-              Open chat
+              {t.chat.timeline.openChat}
             </button>
           ) : null}
           {notifiedSubagentThreadId ? (
             <InlineButton
-              aria-label="Open subagent thread"
+              aria-label={t.chat.timeline.openSubagentThread}
               onClick={(event) => {
                 event.stopPropagation();
                 ctx.onOpenThread(notifiedSubagentThreadId);
               }}
               onKeyDown={stopRowToggle}
             >
-              Open subagent
+              {t.chat.timeline.openSubagent}
             </InlineButton>
           ) : null}
           {showFailedIndicator &&
@@ -482,20 +509,6 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
             <XIcon aria-hidden className={cn("size-3 shrink-0", failedToolIconClassName)} />
           ) : null}
           <TimelineRowTimestamp createdAt={workEntry.createdAt} timestampFormat={timestampFormat} />
-          <span
-            className={cn(
-              "flex size-4 shrink-0 items-center justify-center",
-              !canExpandProjectedItem && "invisible",
-            )}
-            aria-hidden
-          >
-            <ChevronRightIcon
-              className={cn(
-                "size-3 shrink-0 text-icon-muted opacity-70 transition-transform duration-200",
-                expanded && "rotate-90",
-              )}
-            />
-          </span>
         </>
       }
     >
@@ -526,6 +539,7 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
         <WorkLogDetails kind="panel">
           {workEntry.projectedItem && plainOutput === undefined ? (
             <V2ItemInspector
+              presentation="timeline"
               projectedItem={workEntry.projectedItem}
               environmentId={ctx.activeThreadEnvironmentId}
               cwd={ctx.markdownCwd}

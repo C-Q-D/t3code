@@ -1,3 +1,4 @@
+/** Derives work-entry icons and detail content for timeline rows. */
 import type { Root, RootContent } from "mdast";
 import { resolveWorkEntryToolPresentation } from "@t3tools/client-runtime/work-log/presentation";
 import { isJavaScriptReplTool } from "@t3tools/shared/toolActivity";
@@ -6,6 +7,11 @@ import { formatWorkspaceRelativePath } from "../../filePathDisplay";
 import { type TimelineWorkEntry, type TimelineRow } from "./timelineRowContext";
 import { type WorkEntryIconName } from "./TimelineToolActivityIcon";
 
+/**
+ * Choose a compact tool-group icon from the shared semantic action.
+ * @param kind Shared summary action, including mixed groups and updates.
+ * @returns An icon name understood by WorkLogRow, without examining labels or provider prose.
+ */
 export function toolGroupSummaryIconName(
   kind: Extract<TimelineRow, { kind: "work-toggle" }>["summaryKind"],
 ): WorkEntryIconName {
@@ -18,7 +24,7 @@ export function toolGroupSummaryIconName(
     case "unwatch-pr":
       return "pull-request";
     case "read":
-      return "eye";
+      return "file-text";
     case "edit":
       return "square-pen";
     case "command":
@@ -143,6 +149,11 @@ export function buildToolCallExpandedBody(
   return blocks.length > 0 ? blocks.join("\n\n") : null;
 }
 
+/**
+ * Choose the retained entry's icon, giving typed notification and tool metadata precedence.
+ * @param workEntry Work entry whose structured source, surface or action may identify its role.
+ * @returns A WorkLogRow icon name; entries without tool metadata fall back to their tone icon.
+ */
 export function workEntryIconName(workEntry: TimelineWorkEntry): WorkEntryIconName {
   if (workEntry.structuredPayload?.type === "notification") {
     if (workEntry.structuredPayload.outcome === "failed") return "circle-alert";
@@ -168,6 +179,7 @@ export function workEntryIconName(workEntry: TimelineWorkEntry): WorkEntryIconNa
     return "message-circle";
   }
   if (workEntry.toolSurface) return workEntry.toolSurface;
+  if (toolGroupAction(workEntry) === "read") return "file-text";
   if (
     workEntry.structuredPayload?.type === "dynamic_tool" &&
     isJavaScriptReplTool(workEntry.structuredPayload.toolName)
