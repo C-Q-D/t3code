@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import type { EnvironmentId, EnvironmentMachineKind } from "@t3tools/contracts";
 
 import type { SidebarProjectSnapshot } from "../sidebarProjectGrouping";
@@ -20,7 +21,7 @@ export interface CommandPaletteProjectLocation {
 
 const UNKNOWN_PROJECT_LOCATION: CommandPaletteProjectLocation = {
   kind: "remote",
-  label: "Remote",
+  label: t.common.threadStatus.remote,
   machine: "server",
 };
 
@@ -55,11 +56,13 @@ export function buildProjectSearchItems(input: ProjectItemsInput) {
         projects: members,
         locationByEnvironmentId: input.locationByEnvironmentId,
       });
-      return members.length > 1 ? (
-        <span className="truncate">{metadata.environmentLabels.join(" · ")}</span>
-      ) : (
-        <ProjectLocationDescription
-          location={input.locationByEnvironmentId.get(project.environmentId)}
+      return (
+        <ProjectSearchDescription
+          grouped={members.length > 1}
+          environmentLabels={metadata.environmentLabels}
+          location={
+            input.locationByEnvironmentId.get(project.environmentId) ?? UNKNOWN_PROJECT_LOCATION
+          }
           workspaceRoot={project.workspaceRoot}
         />
       );
@@ -114,4 +117,36 @@ function ProjectLocationDescription(props: {
       <span className="truncate">{props.workspaceRoot}</span>
     </span>
   );
+}
+
+function ProjectSearchDescription(props: {
+  readonly environmentLabels: ReadonlyArray<string>;
+  readonly grouped: boolean;
+  readonly location: {
+    readonly kind: "local" | "remote";
+    readonly label: string;
+    readonly machine: EnvironmentMachineKind;
+  };
+  readonly workspaceRoot: string;
+}) {
+  if (!props.grouped) {
+    return (
+      <span className="flex min-w-0 items-center gap-1">
+        <span className="inline-flex min-w-0 items-center gap-1">
+          {props.location.kind === "remote" ? (
+            <EnvironmentMachineIcon
+              aria-hidden
+              kind={props.location.machine}
+              className={COMMAND_PALETTE_META_ICON_CLASS}
+            />
+          ) : null}
+          <span className="truncate">{props.location.label}</span>
+        </span>
+        <CommandPaletteMetaDot />
+        <span className="truncate">{props.workspaceRoot}</span>
+      </span>
+    );
+  }
+
+  return <span className="truncate">{props.environmentLabels.join(" · ")}</span>;
 }

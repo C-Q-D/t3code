@@ -784,38 +784,40 @@ export type AddProjectCloneFlow =
       readonly remoteUrl: string;
     };
 
+/**
+ * Returns the repository input hint for a clone flow, or null when no flow is active or the flow is confirming its destination.
+ * @param flow Active repository clone flow, or null when the input is not a repository step.
+ * @returns Localized input hint, or null when no clone flow is active or the flow is in the confirmation step.
+ */
 export function remoteProjectInputPlaceholder(flow: AddProjectCloneFlow | null): string | null {
   if (!flow) return null;
   if (flow.step === "confirm") return null;
   if (flow.source === "url") {
-    return "Enter Git clone URL";
+    return t.tools.palette.cloneUrlPlaceholder;
   }
-  return `Enter ${addProjectRemoteSourceLabel(flow.source)} repository (${addProjectRemoteSourcePathHint(flow.source)})`;
+  return t.tools.palette.repositoryPlaceholder(
+    addProjectRemoteSourceLabel(flow.source),
+    addProjectRemoteSourcePathHint(flow.source),
+  );
 }
 
+/** Returns clone availability with localized setup hints; provider diagnostics remain unchanged. */
 export function buildPaletteRemoteSourceReadiness(
   discovery: SourceControlDiscoveryResult | null,
 ): AddProjectRemoteSourceReadiness {
-  const readiness = buildAddProjectRemoteSourceReadiness(discovery);
-  return (source) => {
-    const entry = readiness(source);
-    return entry.hint === null
-      ? entry
-      : {
-          ...entry,
-          hint: entry.hint.replace(
-            "Open Source Control settings",
-            "Open Settings -> Source Control",
-          ),
-        };
-  };
+  return buildAddProjectRemoteSourceReadiness(discovery, t.tools.palette);
 }
 
+/**
+ * Returns an Error message or the localized fallback for a non-Error cause.
+ * @param error Thrown cause; non-Error values use the fallback message.
+ * @returns The value described above, without changing user data or protocol identifiers.
+ */
 export function errorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim().length > 0) {
     return error.message;
   }
-  return "An error occurred.";
+  return t.tools.palette.error;
 }
 
 const OVERLAY_MODE_BY_COMMAND = {

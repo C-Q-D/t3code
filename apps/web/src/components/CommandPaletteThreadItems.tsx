@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { threadSearchMatchKey } from "@t3tools/client-runtime/state/thread-search";
 import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
@@ -51,6 +52,7 @@ function useProviderEntryByEnvironmentAndInstanceId() {
   );
 }
 
+/** Keeps content matches keyed by thread and environment so identically named remote threads cannot share a search excerpt. */
 function useThreadSearchWithContentMatches(query: string) {
   const { environments } = useEnvironments();
   const environmentIds: ReadonlyArray<EnvironmentId> = environments
@@ -109,7 +111,8 @@ export function useCommandPaletteThreadItems(input: {
           project={projectByKey.get(`${thread.environmentId}:${thread.projectId}`) ?? null}
           projectTitle={projectTitle ?? null}
           environmentLabel={
-            projectEnvironmentLocationById.get(thread.environmentId)?.label ?? "Remote"
+            projectEnvironmentLocationById.get(thread.environmentId)?.label ??
+            t.common.threadStatus.remote
           }
           branch={thread.branch}
           worktreePath={thread.worktreePath}

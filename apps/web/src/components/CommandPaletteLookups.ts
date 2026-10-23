@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import {
   type ClientSettings,
   type EnvironmentId,
@@ -17,6 +18,7 @@ import { orderItemsByPreferredIds, sortLogicalProjectsForSidebar } from "./Sideb
 // Each helper reads its own source hook so the compiler caches the derived value on that
 // source. Taking the source as an argument instead leaves the helper hook-free, and the
 // compiler then treats it as a plain function and caches nothing.
+/** Preserves the distinction between the primary machine, desktop-local machines and remote environments when labeling project destinations. */
 export function useEnvironmentLookups() {
   const { environments } = useEnvironments();
   const environmentLabelById = new Map(
@@ -30,7 +32,11 @@ export function useEnvironmentLookups() {
         environment.environmentId,
         {
           kind: isLocal ? "local" : "remote",
-          label: isPrimary ? "Local" : isLocal ? `${environment.label} (Local)` : environment.label,
+          label: isPrimary
+            ? t.tools.palette.local
+            : isLocal
+              ? t.tools.palette.localEnvironment(environment.label)
+              : environment.label,
           machine: resolveEnvironmentMachineKind(environment.serverConfig),
         },
       ] as const;
@@ -39,6 +45,7 @@ export function useEnvironmentLookups() {
   return { environmentLabelById, projectEnvironmentLocationById };
 }
 
+/** Builds source-hook-owned lookups for palette consumers; scoped keys disambiguate project records across environments. */
 export function useProjectLookups() {
   const projects = useProjects();
   const projectCwdById = new Map<ProjectId, string>(
@@ -53,6 +60,7 @@ export function useProjectLookups() {
   return { projectCwdById, projectByKey, projectTitleById };
 }
 
+/** Limits palette settings subscriptions to the grouping and ordering preferences that can change its project results. */
 export const selectCommandPaletteClientSettings = (settings: ClientSettings) => ({
   sidebarProjectGroupingMode: settings.sidebarProjectGroupingMode,
   sidebarProjectGroupingOverrides: settings.sidebarProjectGroupingOverrides,
@@ -60,6 +68,7 @@ export const selectCommandPaletteClientSettings = (settings: ClientSettings) => 
   sidebarThreadSortOrder: settings.sidebarThreadSortOrder,
 });
 
+/** Uses the sidebar grouping and saved manual order so project selection stays consistent between the rail and palette. */
 export function useSortedProjectGroups(environmentLabelById: ReadonlyMap<EnvironmentId, string>) {
   const projects = useProjects();
   const threads = useThreadShells();
