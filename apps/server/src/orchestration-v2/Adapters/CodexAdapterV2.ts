@@ -1143,6 +1143,17 @@ function parseCodexRetryProgress(
   return { attempt, maxAttempts };
 }
 
+const decodeSideAgentMessageDelta = Schema.decodeUnknownEffect(
+  CodexSchema.V2AgentMessageDeltaNotification,
+);
+const decodeSideItemStarted = Schema.decodeUnknownEffect(CodexSchema.V2ItemStartedNotification);
+const decodeSideItemCompleted = Schema.decodeUnknownEffect(CodexSchema.V2ItemCompletedNotification);
+const decodeSideThreadTokenUsageUpdated = Schema.decodeUnknownEffect(
+  CodexSchema.V2ThreadTokenUsageUpdatedNotification,
+);
+const decodeSideError = Schema.decodeUnknownEffect(CodexSchema.V2ErrorNotification);
+const decodeSideTurnCompleted = Schema.decodeUnknownEffect(CodexSchema.V2TurnCompletedNotification);
+
 function codexErrorInfoCode(value: unknown): string | null {
   if (typeof value === "string") {
     return value;
@@ -6444,21 +6455,25 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
           );
         });
 
-        const startNativeTurn = Effect.fn("CodexAdapterV2.startNativeTurn")(
+        /**
+         * Builds the shared per-turn prefix from the current model, policy and MCP session.
+         * Both main turns and ephemeral queries must use these same context inputs.
+         * @param turnInput Main-thread selection, policy and context, unchanged by the caller.
+         * @param nativeThreadId Destination native thread; only this id differs for a fork.
+         * @param codexInput User input for this turn.
+         * @returns Validated turn parameters; invalid policy/model options fail before a request.
+         */
+        const buildSessionTurnParams = Effect.fn("CodexAdapterV2.buildSessionTurnParams")(
           function* (
-            turnInput: ProviderAdapter.ProviderAdapterV2TurnInput,
+            turnInput:
+              | ProviderAdapter.ProviderAdapterV2SideQueryInput
+              | ProviderAdapter.ProviderAdapterV2TurnInput,
+            nativeThreadId: string,
             codexInput: ReadonlyArray<CodexSchema.V2TurnStartParams__UserInput>,
           ) {
-            const threadId = yield* getNativeThreadId(turnInput.providerThread);
-            yield* prefetchCodexCompactionLimits(
-              client,
-              compactionLimitsByCwd,
-              turnInput.runtimePolicy.cwd,
-              scope,
-            );
             const mcpSession = yield* mcpSessions.read(turnInput.threadId);
-            const turnStartParams = yield* buildCodexTurnStartParams({
-              nativeThreadId: threadId,
+            return yield* buildCodexTurnStartParams({
+              nativeThreadId,
               codexInput,
               runtimePolicy: turnInput.runtimePolicy,
               modelSelection: turnInput.modelSelection,
@@ -6471,6 +6486,22 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                 ? {}
                 : { developerContext: turnInput.developerContext }),
             });
+          },
+        );
+
+        const startNativeTurn = Effect.fn("CodexAdapterV2.startNativeTurn")(
+          function* (
+            turnInput: ProviderAdapter.ProviderAdapterV2TurnInput,
+            codexInput: ReadonlyArray<CodexSchema.V2TurnStartParams__UserInput>,
+          ) {
+            const threadId = yield* getNativeThreadId(turnInput.providerThread);
+            yield* prefetchCodexCompactionLimits(
+              client,
+              compactionLimitsByCwd,
+              turnInput.runtimePolicy.cwd,
+              scope,
+            );
+            const turnStartParams = yield* buildSessionTurnParams(turnInput, threadId, codexInput);
             yield* Ref.update(pendingRootTurns, (current) => {
               const updated = new Map(current);
               updated.set(threadId, turnInput);
@@ -6687,7 +6718,172 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
           ),
         };
 
+        /**
+         * Forks one ephemeral query in this app-server without publishing provider events.
+         * @param query Main-thread context and the already composed side-query prompt (C-4).
+         * @returns Last assistant text, last-turn usage and provider outcome; startup errors use
+         * the error channel. The caller owns the 45-second deadline; no requests are retried.
+         * The scoped subscription is released on success, failure or caller interruption.
+         */
+        const runSideQuery = Effect.fn("CodexAdapterV2.runSideQuery")(
+          function* (query: ProviderAdapter.ProviderAdapterV2SideQueryInput) {
+            yield* ensureInitialized;
+            const parentThreadId = yield* getNativeThreadId(query.providerThread);
+            const mcpSession = yield* mcpSessions.read(query.threadId);
+            const done = yield* Deferred.make<void>();
+            let text = "";
+            let latestMessageId: string | undefined;
+            let usage: ProviderAdapter.ProviderAdapterV2SideQueryUsage | null = null;
+            let failure: ProviderAdapter.ProviderAdapterV2SideQueryResult["failure"] = null;
+            let stop: ProviderAdapter.ProviderAdapterV2SideQueryResult["stop"] = "completed";
+            // Per-notification collection is already inside the query span; avoid a span per delta.
+            const collect = Effect.fnUntraced(function* (method: string, payload: unknown) {
+              switch (method) {
+                case "item/agentMessage/delta": {
+                  const message = yield* decodeSideAgentMessageDelta(payload).pipe(Effect.orDie);
+                  if (latestMessageId !== message.itemId) {
+                    latestMessageId = message.itemId;
+                    text = "";
+                  }
+                  text += message.delta;
+                  break;
+                }
+                case "item/started": {
+                  const { item } = yield* decodeSideItemStarted(payload).pipe(Effect.orDie);
+                  if (item.type === "agentMessage") {
+                    latestMessageId = item.id;
+                    text = item.text;
+                  }
+                  break;
+                }
+                case "item/completed": {
+                  const { item } = yield* decodeSideItemCompleted(payload).pipe(Effect.orDie);
+                  if (item.type === "agentMessage") {
+                    latestMessageId = item.id;
+                    text = item.text;
+                  }
+                  break;
+                }
+                case "thread/tokenUsage/updated": {
+                  const { tokenUsage } = yield* decodeSideThreadTokenUsageUpdated(payload).pipe(
+                    Effect.orDie,
+                  );
+                  const { inputTokens, cachedInputTokens, outputTokens } = tokenUsage.last;
+                  // Codex's last.inputTokens already includes cached reads; total is cumulative.
+                  usage = { inputTokens, cachedInputTokens, outputTokens };
+                  break;
+                }
+                case "error": {
+                  const notification = yield* decodeSideError(payload).pipe(Effect.orDie);
+                  if (!notification.willRetry) {
+                    failure = {
+                      class: codexUsageLimitError(
+                        codexErrorInfoCode(notification.error.codexErrorInfo),
+                        notification.error.codexErrorInfo,
+                      )
+                        ? "usage_limit"
+                        : "provider_error",
+                      detail:
+                        notification.error.additionalDetails?.trim() || notification.error.message,
+                    };
+                  }
+                  break;
+                }
+                case "turn/completed": {
+                  const { turn } = yield* decodeSideTurnCompleted(payload).pipe(Effect.orDie);
+                  if (turn.status !== "completed") {
+                    stop = "error";
+                    failure =
+                      turn.error == null
+                        ? (failure ?? {
+                            class: "provider_error",
+                            detail: `Side query ended with status ${turn.status}.`,
+                          })
+                        : {
+                            class: codexUsageLimitError(
+                              codexErrorInfoCode(turn.error.codexErrorInfo),
+                              turn.error.codexErrorInfo,
+                            )
+                              ? "usage_limit"
+                              : "provider_error",
+                            detail: turn.error.additionalDetails?.trim() || turn.error.message,
+                          };
+                  } else {
+                    failure = null;
+                  }
+                  yield* Deferred.succeed(done, undefined);
+                  break;
+                }
+                case "thread/closed": {
+                  stop = "error";
+                  failure = {
+                    class: "transport_error",
+                    detail: "Side-query thread closed before completion.",
+                  };
+                  yield* Deferred.succeed(done, undefined);
+                  break;
+                }
+              }
+            });
+            // Side turns must reuse every main-turn parameter, and fork must explicitly pass
+            // model. Otherwise Codex changes the cached prefix, even in the same app-server.
+            const fork = yield* Effect.acquireRelease(
+              client
+                .request("thread/fork", {
+                  threadId: parentThreadId,
+                  ephemeral: true,
+                  excludeTurns: true,
+                  ...codexThreadRuntimeParams({
+                    mcpSession,
+                    modelSelection: query.modelSelection,
+                    runtimePolicy: query.runtimePolicy,
+                  }),
+                })
+                .pipe(
+                  Effect.tap((response) =>
+                    Effect.sync(() => sideQueries.register(response.thread.id, collect)),
+                  ),
+                ),
+              (response) =>
+                client
+                  .request("thread/unsubscribe", { threadId: response.thread.id })
+                  .pipe(
+                    Effect.orDie,
+                    Effect.ensuring(Effect.sync(() => sideQueries.remove(response.thread.id))),
+                  ),
+            );
+            const params = yield* buildSessionTurnParams(query, fork.thread.id, [
+              { type: "text", text: query.prompt },
+            ]);
+            yield* client.request("turn/start", {
+              ...params,
+              approvalPolicy: "untrusted",
+              approvalsReviewer: "user",
+              sandboxPolicy: { type: "readOnly" },
+            });
+            yield* Deferred.await(done);
+            return {
+              text,
+              model: fork.model,
+              usage,
+              attemptedTools: [],
+              stop,
+              failure,
+            } satisfies ProviderAdapter.ProviderAdapterV2SideQueryResult;
+          },
+          Effect.scoped,
+          Effect.mapError(
+            (cause) =>
+              new ProviderAdapter.ProviderAdapterProtocolError({
+                driver: CODEX_PROVIDER,
+                detail: "Failed to start Codex side query.",
+                cause,
+              }),
+          ),
+        );
+
         const runtime: ProviderAdapter.ProviderAdapterV2SessionRuntime = {
+          runSideQuery,
           instanceId: adapterOptions.instanceId,
           driver: CODEX_PROVIDER,
           providerSessionId: input.providerSessionId,

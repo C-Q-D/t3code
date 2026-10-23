@@ -1,3 +1,4 @@
+/** Verifies Codex adapter behavior with protocol replays, including isolated side-query lifecycles. */
 import { historyResponseItems } from "@t3tools/provider-core/server/handoffBudget";
 import {
   makeProviderTextDeltaCoalescer,
@@ -1235,6 +1236,322 @@ describe("CodexAdapterV2 post-settle continuation", () => {
         awaitTerminal: (count: number) => changes.until(() => terminalEvents().length >= count),
       };
     });
+
+  const sideMainParams = {
+    threadId: "side-parent",
+    input: [{ type: "text", text: "main prompt" }],
+    cwd: "/workspace",
+    model: "gpt-5.4",
+    approvalPolicy: "never",
+    approvalsReviewer: "user",
+    sandboxPolicy: { type: "dangerFullAccess" },
+    summary: "detailed",
+    effort: "high",
+    collaborationMode: { mode: "plan", settings: { model: "gpt-5.4", reasoning_effort: "high" } },
+    additionalContext: {
+      app: { kind: "untrusted", value: "app context" },
+      developer: { kind: "application", value: "developer context" },
+    },
+  };
+
+  /** Replays one completed main turn then one ephemeral fork; expected policies come from C-4. */
+  const sideQueryTranscript = (
+    completion: "completed" | "usageLimitExceeded" | "internalServerError",
+  ): CodexReplay.CodexAppServerReplayTranscript => {
+    const preamble = codexReplayPreamble({
+      nativeThreadId: "side-parent",
+      nativeTurnId: "parent-turn",
+      prompt: "main prompt",
+    });
+    return makeCodexReplayTranscript({
+      scenario: `side-query-${completion}`,
+      entries: [
+        ...preamble.slice(0, 5),
+        { type: "expect_outbound", frame: { id: 3, method: "turn/start", params: sideMainParams } },
+        ...preamble.slice(6),
+        {
+          type: "emit_inbound",
+          frame: {
+            method: "turn/completed",
+            params: {
+              threadId: "side-parent",
+              turn: makeCodexReplayTurn({ id: "parent-turn", status: "completed" }),
+            },
+          },
+        },
+        {
+          type: "expect_outbound",
+          frame: {
+            id: 4,
+            method: "thread/fork",
+            params: {
+              threadId: "side-parent",
+              ephemeral: true,
+              excludeTurns: true,
+              model: "gpt-5.4",
+              cwd: "/workspace",
+              config: { "tools.update_plan.enabled": true, mcp_optional_startup_grace_ms: 10000 },
+            },
+          },
+        },
+        {
+          type: "emit_inbound",
+          frame: {
+            id: 4,
+            result: {
+              thread: {
+                id: "side-child",
+                sessionId: "side-child",
+                forkedFromId: "side-parent",
+                preview: "",
+                ephemeral: true,
+                modelProvider: "openai",
+                createdAt: 1782622440,
+                updatedAt: 1782622440,
+                status: { type: "idle" },
+                path: null,
+                cwd: "/workspace",
+                cliVersion: "0.164.0",
+                source: "vscode",
+                threadSource: null,
+                agentNickname: null,
+                agentRole: null,
+                gitInfo: null,
+                name: null,
+                turns: [],
+              },
+              model: "gpt-5.4-resolved",
+              modelProvider: "openai",
+              cwd: "/workspace",
+              approvalPolicy: "never",
+              approvalsReviewer: "user",
+              sandbox: { type: "dangerFullAccess" },
+            },
+          },
+        },
+        {
+          type: "expect_outbound",
+          frame: {
+            id: 5,
+            method: "turn/start",
+            params: {
+              ...sideMainParams,
+              threadId: "side-child",
+              input: [{ type: "text", text: "side prompt" }],
+              approvalPolicy: "untrusted",
+              approvalsReviewer: "user",
+              sandboxPolicy: { type: "readOnly" },
+            },
+          },
+        },
+        {
+          type: "emit_inbound",
+          frame: {
+            method: "turn/started",
+            params: {
+              threadId: "side-child",
+              turn: makeCodexReplayTurn({ id: "side-turn", status: "inProgress" }),
+            },
+          },
+        },
+        {
+          type: "emit_inbound",
+          frame: {
+            id: 5,
+            result: { turn: makeCodexReplayTurn({ id: "side-turn", status: "inProgress" }) },
+          },
+        },
+        {
+          type: "emit_inbound",
+          frame: {
+            method: "item/started",
+            params: {
+              threadId: "side-child",
+              turnId: "side-turn",
+              item: { type: "agentMessage", id: "first", text: "", phase: "commentary" },
+            },
+          },
+        },
+        {
+          type: "emit_inbound",
+          frame: {
+            method: "item/agentMessage/delta",
+            params: {
+              threadId: "side-child",
+              turnId: "side-turn",
+              itemId: "first",
+              delta: "draft",
+            },
+          },
+        },
+        {
+          type: "emit_inbound",
+          frame: {
+            method: "item/completed",
+            params: {
+              threadId: "side-child",
+              turnId: "side-turn",
+              item: { type: "agentMessage", id: "first", text: "draft", phase: "commentary" },
+            },
+          },
+        },
+        {
+          type: "emit_inbound",
+          frame: {
+            method: "item/completed",
+            params: {
+              threadId: "side-child",
+              turnId: "side-turn",
+              item: {
+                type: "agentMessage",
+                id: "last",
+                text: "final suggestion",
+                phase: "final_answer",
+              },
+            },
+          },
+        },
+        {
+          type: "emit_inbound",
+          frame: {
+            method: "thread/tokenUsage/updated",
+            params: {
+              threadId: "side-child",
+              turnId: "side-turn",
+              tokenUsage: {
+                total: {
+                  totalTokens: 9900,
+                  inputTokens: 9000,
+                  cachedInputTokens: 8000,
+                  outputTokens: 900,
+                  reasoningOutputTokens: 300,
+                },
+                last: {
+                  totalTokens: 125,
+                  inputTokens: 120,
+                  cachedInputTokens: 97,
+                  outputTokens: 5,
+                  reasoningOutputTokens: 2,
+                },
+                modelContextWindow: 200000,
+              },
+            },
+          },
+        },
+        {
+          type: "emit_inbound",
+          frame: {
+            method: "turn/completed",
+            params: {
+              threadId: "side-child",
+              turn: {
+                ...makeCodexReplayTurn({
+                  id: "side-turn",
+                  status: completion === "completed" ? "completed" : "failed",
+                }),
+                error:
+                  completion === "completed"
+                    ? null
+                    : {
+                        message: "provider refused",
+                        codexErrorInfo: completion,
+                        additionalDetails: null,
+                      },
+              },
+            },
+          },
+        },
+        {
+          type: "expect_outbound",
+          frame: { id: 6, method: "thread/unsubscribe", params: { threadId: "side-child" } },
+        },
+        { type: "emit_inbound", frame: { id: 6, result: { status: "unsubscribed" } } },
+      ],
+    });
+  };
+
+  it.effect.each(["completed", "usageLimitExceeded", "internalServerError"] as const)(
+    "side query preserves the main prefix and returns isolated %s results",
+    (completion) =>
+      Effect.gen(function* () {
+        const sent: Array<{ method: string; params: unknown }> = [];
+        const harness = yield* makeCodexReplayHarness(
+          sideQueryTranscript(completion),
+          undefined,
+          (method, params) =>
+            Effect.sync(() => {
+              sent.push({ method, params });
+            }),
+        );
+        assert.isFunction(harness.runtime.runSideQuery, "Codex must expose C-4 runSideQuery");
+        const turnInput = {
+          ...makeCodexTestTurnInput({
+            threadId: harness.threadId,
+            providerThread: harness.providerThread,
+            now: yield* DateTime.now,
+            attemptId: RunAttemptId.make("side-parent-attempt"),
+            text: "main prompt",
+          }),
+          modelSelection: {
+            ...CODEX_TEST_MODEL_SELECTION,
+            options: [{ id: "reasoningEffort", value: "high" }],
+          },
+          runtimePolicy: { ...CODEX_TEST_RUNTIME_POLICY, interactionMode: "plan" as const },
+          appContext: [{ key: "app", text: "app context" }],
+          developerContext: [{ key: "developer", text: "developer context" }],
+        };
+        yield* harness.runtime.startTurn(turnInput);
+        yield* harness.firstTerminal;
+        const eventsBefore = [...harness.events];
+        const result = yield* harness.runtime.runSideQuery!({
+          ...turnInput,
+          prompt: "side prompt",
+          purpose: "suggestion",
+        });
+        const mainParams = sent.find((entry) => entry.method === "turn/start")?.params;
+        assert.deepEqual(mainParams, sideMainParams);
+        assert.deepEqual(sent.filter((entry) => entry.method === "turn/start")[1]?.params, {
+          ...sideMainParams,
+          threadId: "side-child",
+          input: [{ type: "text", text: "side prompt" }],
+          approvalPolicy: "untrusted",
+          approvalsReviewer: "user",
+          sandboxPolicy: { type: "readOnly" },
+        });
+        assert.deepEqual(sent.find((entry) => entry.method === "thread/fork")?.params, {
+          threadId: "side-parent",
+          ephemeral: true,
+          excludeTurns: true,
+          model: "gpt-5.4",
+          cwd: "/workspace",
+          config: { "tools.update_plan.enabled": true, mcp_optional_startup_grace_ms: 10000 },
+        });
+        assert.deepEqual(result, {
+          text: "final suggestion",
+          model: "gpt-5.4-resolved",
+          usage: { inputTokens: 120, cachedInputTokens: 97, outputTokens: 5 },
+          attemptedTools: [],
+          stop: completion === "completed" ? "completed" : "error",
+          failure:
+            completion === "completed"
+              ? null
+              : {
+                  class: completion === "usageLimitExceeded" ? "usage_limit" : "provider_error",
+                  detail: "provider refused",
+                },
+        });
+        assert.deepEqual(harness.events, eventsBefore);
+        assert.deepEqual(sent.at(-1), {
+          method: "thread/unsubscribe",
+          params: { threadId: "side-child" },
+        });
+      }).pipe(
+        Effect.scoped,
+        Effect.provide(
+          Layer.mergeAll(IdAllocator.layer, McpProviderSessions.layer, NodeServices.layer),
+        ),
+      ),
+  );
 
   /** Builds usage notifications with the usable window reported by Codex, not its configured window. */
   const compactionUsageEntry = (
