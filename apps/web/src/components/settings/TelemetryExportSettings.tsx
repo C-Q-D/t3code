@@ -39,7 +39,7 @@ const SIGNALS = [
 type SignalDescriptor = (typeof SIGNALS)[number];
 type SignalKey = SignalDescriptor["key"];
 
-const OVERRIDE_LABELS = { environment: "Set by environment", bootstrap: "Set by desktop" } as const;
+const OVERRIDE_LABELS = t.settings.telemetryOverrides;
 
 /** Reports environment or desktop overrides without replacing the saved editable endpoint. */
 function runningOverride(

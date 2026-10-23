@@ -1,3 +1,5 @@
+/** Edits title-generation instructions without translating the saved prompt text. */
+import { t } from "~/i18n";
 import { useRef } from "react";
 
 import { Textarea } from "../ui/textarea";
@@ -10,6 +12,7 @@ import {
   useUpdateScopedSettings,
 } from "./useScopedSettings";
 
+/** Saves the edited instruction text on blur for the selected settings targets. */
 export function ThreadTitleInstructionsSettings() {
   const settings = useScopedSettings();
   const { targets } = useSettingsScope();
@@ -23,11 +26,11 @@ export function ThreadTitleInstructionsSettings() {
       serverScoped
       settingKeys={["threadTitleInstructions"]}
       {...searchableSetting("thread-title-instructions")}
-      description="Appended to the prompt for new and regenerated thread titles."
+      description={t.settings.threadTitleInstructions.description}
       resetAction={
         mixed || settings.threadTitleInstructions !== "" ? (
           <SettingResetButton
-            label="thread title instructions"
+            label={t.settings.threadTitleInstructions.resetLabel}
             onClick={() => updateSettings({ threadTitleInstructions: "" })}
           />
         ) : null
@@ -36,7 +39,7 @@ export function ThreadTitleInstructionsSettings() {
       <div className="mt-3 max-w-2xl pb-3.5">
         <Textarea
           key={`${scopeKey}:${mixed}:${settings.threadTitleInstructions}`}
-          aria-label="Thread title instructions"
+          aria-label={t.settings.threadTitleInstructions.title}
           onChange={() => {
             edited.current = true;
           }}
@@ -44,8 +47,8 @@ export function ThreadTitleInstructionsSettings() {
           defaultValue={mixed ? "" : settings.threadTitleInstructions}
           placeholder={
             mixed
-              ? "Mixed. Enter instructions to apply to all selected targets."
-              : "Keep titles to a few words. Lead with the main subject."
+              ? t.settings.threadTitleInstructions.mixedPlaceholder
+              : t.settings.threadTitleInstructions.placeholder
           }
           onBlur={(event) => {
             const value = event.target.value.trim();

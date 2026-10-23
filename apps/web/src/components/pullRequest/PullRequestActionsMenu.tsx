@@ -234,7 +234,11 @@ export function PullRequestActionsMenu({
         {canWriteGuide ? (
           <MenuItem density="compact" disabled={guideRunning} onClick={writeGuide}>
             <PixelSparkIcon aria-hidden className="size-3.5" />
-            {guideRunning ? "Writing guide..." : !guideWritten ? "Write guide" : "Rewrite guide"}
+            {guideRunning
+              ? t.git.guideTabUi.writingAction
+              : !guideWritten
+                ? t.git.guideTabUi.write
+                : t.git.guideTabUi.rewriteAction}
           </MenuItem>
         ) : null}
         {pickableEnvironments.length > 0 ? (

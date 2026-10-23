@@ -17,6 +17,24 @@ import type {
 import type { ThemeColorRole } from "@t3tools/shared/themePalettes";
 
 export const settings = {
+  terminalPreviewStatus:
+    "  \x1b[42;30m READY \x1b[0m \x1b[2mwatching for changes, press\x1b[0m \x1b[1mq\x1b[0m \x1b[2mto quit\x1b[0m\r\n",
+  threadTitleInstructions: {
+    title: "Thread title instructions",
+    description: "Appended to the prompt for new and regenerated thread titles.",
+    resetLabel: "thread title instructions",
+    mixedPlaceholder: "Mixed. Enter instructions to apply to all selected targets.",
+    placeholder: "Keep titles to a few words. Lead with the main subject.",
+  },
+  telemetryOverrides: {
+    environment: "Set by environment",
+    bootstrap: "Set by desktop",
+  },
+  idleCompactionModes: {
+    onReturn: "When you return",
+    beforeCacheExpires: "Before the cache expires (beta)",
+    off: "Never",
+  },
   sourceControlHostFields: {
     bitbucket: {
       accessToken: {
@@ -1404,6 +1422,7 @@ export const settings = {
       restarting: "Restarting",
     },
     environment: {
+      mcpUrlTarget: "MCP URL",
       copyTraceToast: "Trace ID copied",
       copyTraceError: "Could not copy trace ID",
       copyMcpToast: "MCP URL copied",

@@ -526,7 +526,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       : []),
     ...(isTextGenerationModelDirty ? [t.settings.rows.textGenerationModel.title] : []),
     ...(settings.threadTitleInstructions !== DEFAULT_UNIFIED_SETTINGS.threadTitleInstructions
-      ? ["Thread title instructions"]
+      ? [t.settings.threadTitleInstructions.title]
       : []),
     ...(globalIdleCompaction(settings) !== globalIdleCompaction(DEFAULT_UNIFIED_SETTINGS)
       ? [t.settings.conversationRenderingUi.compact]
@@ -1130,11 +1130,11 @@ export function GeneralSettingsPanel() {
                 aria-label={t.settings.conversationRenderingUi.compact}
               >
                 <SelectValue>
-                  {(value: string | null) =>
-                    value === null
-                      ? t.settings.general.mixed
-                      : IDLE_COMPACTION_MODES.find((mode) => mode.value === value)?.label
-                  }
+                  {(value: string | null) => {
+                    if (value === null) return t.settings.general.mixed;
+                    const mode = IDLE_COMPACTION_MODES.find((mode) => mode.value === value);
+                    return mode ? t.settings.idleCompactionModes[mode.value] : undefined;
+                  }}
                 </SelectValue>
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
@@ -1146,7 +1146,7 @@ export function GeneralSettingsPanel() {
                     // A server from before modes has only the on/off switch, so it cannot store "Never".
                     disabled={mode.value === "off" && !idleCompaction.neverAvailable}
                   >
-                    {mode.label}
+                    {t.settings.idleCompactionModes[mode.value]}
                   </SelectItem>
                 ))}
               </SelectPopup>

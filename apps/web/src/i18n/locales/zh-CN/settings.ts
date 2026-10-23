@@ -2,6 +2,24 @@
 import type { Messages } from "../en";
 
 export const settings: Messages["settings"] = {
+  terminalPreviewStatus:
+    "  \x1b[42;30m 就绪 \x1b[0m \x1b[2m正在监视改动，按\x1b[0m \x1b[1mq\x1b[0m \x1b[2m退出\x1b[0m\r\n",
+  threadTitleInstructions: {
+    title: "对话标题指引",
+    description: "生成新对话标题或重新生成标题时，将这些指引追加到提示词中。",
+    resetLabel: "对话标题指引",
+    mixedPlaceholder: "当前设置不同。输入指引以应用到所有选定目标。",
+    placeholder: "标题保持简短，以主要主题开头。",
+  },
+  telemetryOverrides: {
+    environment: "由环境设置",
+    bootstrap: "由桌面端设置",
+  },
+  idleCompactionModes: {
+    onReturn: "返回对话时",
+    beforeCacheExpires: "缓存过期前（测试版）",
+    off: "从不",
+  },
   sourceControlHostFields: {
     bitbucket: {
       accessToken: {
@@ -1343,6 +1361,7 @@ export const settings: Messages["settings"] = {
       restarting: "正在重启",
     },
     environment: {
+      mcpUrlTarget: "MCP 地址",
       copyTraceToast: "已复制追踪ID",
       copyTraceError: "无法复制追踪ID",
       copyMcpToast: "已复制MCP URL",

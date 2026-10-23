@@ -154,7 +154,7 @@ export function SavedBackendListRow({
     copyTraceIdToClipboard(traceId, { traceId });
   };
   const { copyToClipboard: copyMcpUrl } = useCopyToClipboard<{ url: string }>({
-    target: "MCP URL",
+    target: t.settings.connections.environment.mcpUrlTarget,
     onCopy: ({ url }) => {
       toastManager.add({
         type: "success",

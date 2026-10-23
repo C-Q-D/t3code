@@ -1202,6 +1202,8 @@ export const git = {
     count: (count: number) => (count === 1 ? "1 note" : `${count} notes`),
   },
   guideTabUi: {
+    writingAction: "Writing guide...",
+    rewriteAction: "Rewrite guide",
     reading: "Reading the change...",
     writing: "Writing a review guide",
     empty: "No review guide yet",

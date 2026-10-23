@@ -1144,6 +1144,8 @@ export const git: Messages["git"] = {
     count: (count: number) => `${count}条注释`,
   },
   guideTabUi: {
+    writingAction: "正在编写审阅指南…",
+    rewriteAction: "重写审阅指南",
     reading: "正在阅读改动…",
     writing: "正在编写审阅指南",
     empty: "尚无审阅指南",

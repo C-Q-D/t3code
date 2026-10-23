@@ -610,7 +610,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "thread-title-instructions",
-    title: "Thread title instructions",
+    title: t.settings.threadTitleInstructions.title,
     to: "/settings/general",
     scope: "project-defaults",
     searchTerms: ["generated thread titles prompt custom style naming rename regenerate"],
