@@ -7,9 +7,8 @@ import { attachComposerImpact } from "./composerImpact";
 import { shouldJoltComposer } from "./composerValidationMotion";
 import { t } from "~/i18n";
 import { useComposerTypingGuard } from "./useComposerTypingGuard";
-import { useComposerSuggestion } from "./useComposerSuggestion";
-import { useQuietThreadProjection } from "../../state/entities";
-import * as DateTime from "effect/DateTime";
+import { useComposerSuggestion, useComposerSuggestionMetadata } from "./useComposerSuggestion";
+
 import { insertAttachmentReferencesForDraft } from "./composerAttachmentReferences";
 import { DESKTOP_PASTE_AS_TEXT_EVENT } from "../../lib/desktopPasteAsText";
 import { runtimeModeConfig, runtimeModeOptions as runtimeModes } from "./runtimeModeConfig";
@@ -977,7 +976,6 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   const noProviderAvailable =
     selectedProviderEntry === undefined && multipleModelSelections === null;
   const suggestionTarget = routeKind === "server" ? routeThreadRef : null;
-  const suggestionProjection = useQuietThreadProjection(suggestionTarget)?.projection;
   const suggestionShell = props.activeThreadShell?.source ?? null;
   // The selected picker may already point at a different provider. Side queries
   // belong to the existing thread session, not the next message's selection.
@@ -985,15 +983,11 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     providerInstanceEntries.find(
       (entry) => entry.instanceId === suggestionShell?.providerInstanceId,
     )?.driverKind ?? "";
-  const lastCompletedProviderTurn = suggestionProjection?.providerTurns.reduce<
-    (typeof suggestionProjection.providerTurns)[number] | null
-  >((latest, turn) => {
-    if (turn.completedAt === null) return latest;
-    return latest?.completedAt == null ||
-      DateTime.toEpochMillis(turn.completedAt) > DateTime.toEpochMillis(latest.completedAt)
-      ? turn
-      : latest;
-  }, null);
+  const suggestionMetadata = useComposerSuggestionMetadata(
+    suggestionTarget,
+    settings.composerSuggestionsEnabled,
+    suggestionDriver,
+  );
   const { suggestion: nextMessageSuggestion, accept: acceptNextMessageSuggestion } =
     useComposerSuggestion({
       target: suggestionTarget,
@@ -1010,13 +1004,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         composerPreviewAnnotations.length === 0 &&
         composerReviewComments.length === 0 &&
         composerThreadContexts.length === 0,
-      completedRuns:
-        suggestionProjection?.runs.filter((run) => run.status === "completed").length ?? 0,
-      lastTurnCompletedAt:
-        lastCompletedProviderTurn?.completedAt == null
-          ? null
-          : DateTime.formatIso(lastCompletedProviderTurn.completedAt),
-      promptCacheExpiresAt: lastCompletedProviderTurn?.tokenUsage?.promptCacheExpiresAt,
+      ...suggestionMetadata,
     });
   const providerCatalogPending = noProviderAvailable && !providerCatalogKnown;
   const showProviderUnavailable = noProviderAvailable && !providerCatalogPending;
