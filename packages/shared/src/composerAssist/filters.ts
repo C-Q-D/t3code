@@ -13,6 +13,7 @@ import { wordCount } from "./words.ts";
 type FilterReason = typeof ComposerSuggestionFilterReason.Type;
 const SUGGESTION_MIN_WORDS = 2;
 const SUGGESTION_MAX_WORDS = 12;
+const SUGGESTION_MAX_CJK_CHARS = 40;
 const SUGGESTION_MAX_CHARS = 100;
 
 const ONE_WORD_OK = new Set([
@@ -115,7 +116,14 @@ const LENGTH_AND_FORMAT: readonly Check[] = [
       return true;
     },
   ],
-  ["too_many_words", (_t, _lower, words) => words > SUGGESTION_MAX_WORDS],
+  [
+    "too_many_words",
+    (t, _lower, words) =>
+      // Han and kana suggestions need a character budget instead of weighted-word truncation.
+      /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(t)
+        ? Array.from(t.replace(/\s/gu, "")).length > SUGGESTION_MAX_CJK_CHARS
+        : words > SUGGESTION_MAX_WORDS,
+  ],
   ["too_long", (t) => t.length >= SUGGESTION_MAX_CHARS],
   ["multiple_sentences", (t) => /[.!?]\s+[A-Z]|[。！？]\s*[\p{L}\p{N}]/u.test(t)],
   // 换行、Markdown 强调、代码块（反引号）都不适合作为一句可直接发送的输入
