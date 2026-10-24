@@ -53,13 +53,22 @@ it.effect("allows both features after the latest run completes", () =>
   }).pipe(Effect.scoped),
 );
 
-it.effect("suppresses both features for a running status without an active run ID", () =>
-  Effect.gen(function* () {
-    const f = yield* fixture({ status: "running" });
-    assert.propertyVal(yield* f.service.suggestNext({ threadId, runId }), "reason", "generating");
-    assert.propertyVal(yield* f.service.optimizePrompt(optimizationInput), "reason", "generating");
-    assert.strictEqual(f.calls.length, 0);
-  }).pipe(Effect.scoped),
+it.effect.each(["waiting", "queued", "running"] as const)(
+  "suppresses both features for a projected %s run",
+  (status) =>
+    Effect.gen(function* () {
+      const f = yield* fixture({ status });
+      const shell = ProjectionStore.threadShellFromProjection(f.projection);
+      assert.strictEqual(shell.status, status);
+      assert.strictEqual(shell.activeRunId, status === "running" ? runId : null);
+      assert.propertyVal(yield* f.service.suggestNext({ threadId, runId }), "reason", "generating");
+      assert.propertyVal(
+        yield* f.service.optimizePrompt(optimizationInput),
+        "reason",
+        "generating",
+      );
+      assert.strictEqual(f.calls.length, 0);
+    }).pipe(Effect.scoped),
 );
 
 it.effect(
@@ -958,8 +967,14 @@ const fixture = Effect.fn("ComposerAssistTest.fixture")(function* (
       {
         id: runId,
         ordinal: 1,
-        status: options.gate === "generating" ? "running" : "completed",
-        completedAt: options.gate === "stale_turn" ? DateTime.makeUnsafe(-600001) : completedAt,
+        status: options.status ?? (options.gate === "generating" ? "running" : "completed"),
+        queueHeld: false,
+        completedAt:
+          options.status || options.gate === "generating"
+            ? null
+            : options.gate === "stale_turn"
+              ? DateTime.makeUnsafe(-600001)
+              : completedAt,
       },
     ],
     turnItems: [],
@@ -971,8 +986,6 @@ const fixture = Effect.fn("ComposerAssistTest.fixture")(function* (
     attempts: [],
   } as unknown as OrchestrationV2ThreadProjection;
   let shell = ProjectionStore.threadShellFromProjection(projection);
-  // Simulate a status update arriving before its active-run ID for the independent status gate.
-  if (options.status) shell = { ...shell, status: options.status };
   const unexpectedMainOperation = () =>
     Effect.die("Composer assistance must not invoke main-thread operations.");
   const runtime: ProviderAdapter.ProviderAdapterV2SessionRuntime = {
