@@ -67,6 +67,7 @@ function Harness({
     driver: "codex",
     enabled: true,
     running: false,
+    shell: null,
     editorRef,
     ...options,
   });
@@ -132,6 +133,32 @@ function Harness({
     </div>
   );
 }
+
+it.each(["preparing", "queued", "starting"] as const)(
+  "disables optimization for a remote %s run without a local send",
+  async (status) => {
+    const previous = { locale: activeLocale, messages: t };
+    using cleanup = new DisposableStack();
+    cleanup.defer(() => installMessages(previous.locale, previous.messages));
+    installMessages("zh-CN", zhCN);
+    fake.run.mockReset();
+    const options = {
+      running: false,
+      shell: { status, activeRunId: status === "queued" ? null : "remote-run" },
+    };
+    await using screen = await render(<Harness options={options} />);
+    const button = screen.getByRole("button", { name: "优化提示词", exact: true });
+    await expect.element(button).toBeDisabled();
+    await screen.getByRole("group", { name: "优化提示词" }).hover();
+    await vi.waitFor(() =>
+      expect(document.querySelector('[data-slot="tooltip-popup"]')?.textContent).toBe(
+        "等回复结束后再优化",
+      ),
+    );
+    await screen.getByRole("button", { name: "Improve", exact: true }).click();
+    expect(fake.run).not.toHaveBeenCalled();
+  },
+);
 
 it("replaces the original untrimmed draft and restores it with one editor undo", async () => {
   fake.run.mockReset().mockResolvedValue(

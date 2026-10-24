@@ -46,6 +46,7 @@ function SendHarness() {
     driver: "codex",
     enabled: true,
     running: false,
+    shell: null,
     runKey,
     editorRef,
   });

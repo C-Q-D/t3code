@@ -3218,11 +3218,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     prompt,
     driver: assistThreadDriver,
     enabled: settings.composerPromptOptimizeEnabled,
-    running:
-      phase === "running" ||
-      isSendBusy ||
-      pendingUserInputs.length > 0 ||
-      pendingApprovals.length > 0,
+    shell: assistThreadShell,
+    running: isSendBusy || pendingUserInputs.length > 0 || pendingApprovals.length > 0,
     editorRef: composerEditorRef,
     ...assistThreadMetadata,
     runKey: props.activeThreadShell?.latestRun?.runId ?? null,

@@ -1,4 +1,5 @@
 /** Owns one composer's explicit prompt improvement, draft snapshot and transient feedback. */
+import { isComposerThreadGenerating } from "@t3tools/shared/composerAssist/isComposerThreadGenerating";
 import {
   isComposerAssistSupportedDriver,
   COMPOSER_OPTIMIZE_DRAFT_MAX_CHARS,
@@ -59,6 +60,7 @@ export interface ComposerPromptOptimizerInput {
   driver: string;
   enabled: boolean;
   running: boolean;
+  shell: Parameters<typeof isComposerThreadGenerating>[0] | null;
   lastTurnCompletedAt?: string | null;
   promptCacheExpiresAt?: string | null;
   runKey?: string | null;
@@ -150,7 +152,7 @@ export function useComposerPromptOptimizer(input: ComposerPromptOptimizerInput) 
           ? copy.disabledTooLong(COMPOSER_OPTIMIZE_DRAFT_MAX_CHARS)
           : !isComposerAssistSupportedDriver(input.driver)
             ? copy.disabledProvider
-            : input.running
+            : input.running || (input.shell !== null && isComposerThreadGenerating(input.shell))
               ? copy.disabledRunning
               : null;
   useLayoutEffect(() => {
