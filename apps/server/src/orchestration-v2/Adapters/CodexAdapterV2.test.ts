@@ -1290,7 +1290,11 @@ describe("CodexAdapterV2 post-settle continuation", () => {
               excludeTurns: true,
               model: "gpt-5.4",
               cwd: "/workspace",
-              config: { "tools.update_plan.enabled": true, mcp_optional_startup_grace_ms: 10000 },
+              config: {
+                "tools.update_plan.enabled": true,
+                mcp_optional_startup_grace_ms: 10000,
+                "features.hooks": false,
+              },
             },
           },
         },
@@ -1524,7 +1528,11 @@ describe("CodexAdapterV2 post-settle continuation", () => {
           excludeTurns: true,
           model: "gpt-5.4",
           cwd: "/workspace",
-          config: { "tools.update_plan.enabled": true, mcp_optional_startup_grace_ms: 10000 },
+          config: {
+            "tools.update_plan.enabled": true,
+            mcp_optional_startup_grace_ms: 10000,
+            "features.hooks": false,
+          },
         });
         assert.deepEqual(result, {
           text: "final suggestion",

@@ -22,7 +22,7 @@ const refusals: {
 };
 
 /**
- * Wrap one app-server client without changing outbound requests or main-thread handlers.
+ * Routes side-query traffic while leaving main-thread requests and handlers unchanged.
  * A fork stays registered until bounded unsubscribe finishes, including abandoned late replies.
  * Notifications are already schema-validated by the client; unknown notifications remain unknown.
  * Fork acquisition inherits the caller's deadline; unsubscribe has a five-second limit, no retries.
@@ -116,16 +116,22 @@ export function make(transport: CodexClient.CodexAppServerClient["Service"]) {
     // Only launching the receiver is masked. Cancelling its join must not cancel the
     // protocol request: its late reply is the only way to identify and release the fork.
     const receiver = yield* Effect.acquireRelease(
-      transport.request("thread/fork", params).pipe(
-        Effect.flatMap((response) => {
-          const threadId = response.thread.id;
-          threads.set(threadId, abandoned ? () => Effect.void : collect);
-          if (abandoned) return release(threadId).pipe(Effect.as(response));
-          ownedThreadId = threadId;
-          return Effect.succeed(response);
-        }),
-        Effect.forkIn(sessionScope, { startImmediately: true }),
-      ),
+      // Side queries must not execute user hooks; preserve the caller's MCP and other overrides.
+      transport
+        .request("thread/fork", {
+          ...params,
+          config: { ...params.config, "features.hooks": false },
+        })
+        .pipe(
+          Effect.flatMap((response) => {
+            const threadId = response.thread.id;
+            threads.set(threadId, abandoned ? () => Effect.void : collect);
+            if (abandoned) return release(threadId).pipe(Effect.as(response));
+            ownedThreadId = threadId;
+            return Effect.succeed(response);
+          }),
+          Effect.forkIn(sessionScope, { startImmediately: true }),
+        ),
       () =>
         Effect.suspend(() => {
           abandoned = true;

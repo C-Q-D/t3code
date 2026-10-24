@@ -42,10 +42,23 @@ const forkResult = {
   sandbox: { type: "dangerFullAccess" },
 };
 
-const forkParams = { threadId: "parent", ephemeral: true, excludeTurns: true, model: "gpt-5.4" };
+const forkParams = {
+  threadId: "parent",
+  ephemeral: true,
+  excludeTurns: true,
+  model: "gpt-5.4",
+  config: { mcp_servers: { docs: { command: "mcp-docs" } }, "features.hooks": true },
+};
 const forkEntry = {
   type: "expect_outbound",
-  frame: { id: 1, method: "thread/fork", params: forkParams },
+  frame: {
+    id: 1,
+    method: "thread/fork",
+    params: {
+      ...forkParams,
+      config: { mcp_servers: { docs: { command: "mcp-docs" } }, "features.hooks": false },
+    },
+  },
 } as const;
 const forkReply = {
   type: "emit_inbound",
@@ -92,16 +105,19 @@ const setup = Effect.fn("test.sideQueryLifecycle.setup")(function* (
     Effect.provide(context),
   );
   const released = yield* Deferred.make<void>();
+  const forks: unknown[] = [];
   const router = CodexSideQuery.make({
     ...transport,
-    request: (method, params) =>
-      transport
+    request: (method, params) => {
+      if (method === "thread/fork") forks.push(params);
+      return transport
         .request(method, params)
         .pipe(
           Effect.onExit(() =>
             method === "thread/unsubscribe" ? Deferred.succeed(released, undefined) : Effect.void,
           ),
-        ),
+        );
+    },
   });
   const main: Array<string> = [];
   const mainReceived = yield* Deferred.make<void>();
@@ -118,7 +134,7 @@ const setup = Effect.fn("test.sideQueryLifecycle.setup")(function* (
   const query = router
     .acquireFork(forkParams, () => Effect.void, scope)
     .pipe(Effect.as("query result"), Effect.scoped);
-  return { router, query, main, mainReceived, released };
+  return { router, query, main, mainReceived, released, forks };
 });
 
 describe("Codex side-query lifecycle", () => {
@@ -176,6 +192,7 @@ describe("Codex side-query lifecycle", () => {
       yield* Deferred.await(fixture.released);
       assert.isTrue(endedBeforeReply, "caller deadline must finish before the fork replies");
       assert.isTrue(Exit.isFailure(result));
+      assert.deepEqual(fixture.forks, [forkEntry.frame.params]);
       assert.deepEqual(fixture.main, []);
       yield* fixture.router.client.notify("initialized", undefined);
       yield* Deferred.await(fixture.mainReceived);
@@ -228,6 +245,7 @@ describe("Codex side-query lifecycle", () => {
         const result = yield* Fiber.join(pending);
         assert.isTrue(endedBeforeReply, "release must not wait indefinitely for unsubscribe");
         assert.deepEqual(result, Exit.succeed("query result"));
+        assert.deepEqual(fixture.forks, [forkEntry.frame.params]);
         assert.deepEqual(warnings, ["Failed to unsubscribe Codex side query."]);
         yield* fixture.router.client.notify("initialized", undefined);
         yield* Deferred.await(fixture.mainReceived);
