@@ -1,5 +1,6 @@
 /** Renders project and thread navigation and dispatches scoped menu actions; server services own export IO. */
 import {
+  ProjectId,
   type EnvironmentId,
   type ScopedProjectRef,
   AuthOrchestrationOperateScope,
@@ -10,6 +11,10 @@ import {
 import { copyThreadReference } from "../lib/copyThreadReference";
 import { threadChipCopyTarget } from "@t3tools/client-runtime/thread-reference";
 import { attachSidebarTree, SIDEBAR_TREE_PROPS } from "../lib/sidebarTree";
+import { foldSearchQuery, rankMessageMatches } from "@t3tools/shared/paletteSearch";
+import { findForMessageMatch, openThreadFindOnQuery } from "./chat/threadFindStore";
+import type { OlderSettledScope } from "@t3tools/client-runtime/state/threads";
+import { useOlderSettledShelf, useOlderSettledShelfGrowth } from "../state/olderSettledShelf";
 import { ThreadContextDragGhost } from "./chat/ThreadContextDragGhost";
 import {
   endThreadContextDrag,
@@ -38,9 +43,15 @@ import {
 import {
   createInboxReturnTracker,
   isThreadWorking,
+  isThreadWorking as isSidebarThreadWorking,
 } from "@t3tools/client-runtime/state/thread-inbox";
 import { sortSettledThreads } from "@t3tools/client-runtime/state/thread-sort";
-import { threadSearchMatchKey } from "@t3tools/client-runtime/state/thread-search";
+import {
+  nextShownOrder,
+  threadSearchSubject,
+  type ShownOrder,
+  threadSearchMatchKey,
+} from "@t3tools/client-runtime/state/thread-search";
 import {
   threadRuntimeCanArchive,
   type EnvironmentThreadShell,
@@ -165,8 +176,8 @@ import {
   sortPinnedThreadsForSidebar,
   sortThreadsForSidebar,
   sortWorkingThreadsBySend,
-  useThreadJumpHintVisibility,
-  isSidebarThreadWorking,
+  useThreadJumpHintsVisible,
+  resolveSidebarReorderableThreadKeys,
   type SidebarListItem,
   type SidebarSection,
   resolveSidebarRowThreadId,
@@ -366,17 +377,14 @@ function partitionSidebarThreads(input: {
       : active;
   const snoozed: EnvironmentThreadShell[] = [];
   const settled: EnvironmentThreadShell[] = [];
-  const draggableThreadKeys = new Set<string>();
-  const activeReorderableThreadKeys = new Set<string>();
-  const connected = new Set(connectedEnvironmentIds);
+  const { draggableThreadKeys, activeReorderableThreadKeys } = resolveSidebarReorderableThreadKeys({
+    threads: visible,
+    serverConfigs,
+    connectedEnvironmentIds,
+  });
   for (const thread of visible) {
     const configLoaded = serverConfigs.has(thread.environmentId);
     const threadKey = scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id));
-    // Cached offline configs permit rendering, not reorder writes.
-    if (configLoaded && connected.has(thread.environmentId)) {
-      draggableThreadKeys.add(threadKey);
-      activeReorderableThreadKeys.add(threadKey);
-    }
     if (optimisticDrop?.key === threadKey) {
       const projected = applySidebarThreadDrop(
         thread,
@@ -897,7 +905,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
 
   const threadSearchInputRef = useRef<HTMLInputElement>(null);
   const [threadSearchQuery, setThreadSearchQuery] = useState("");
-  const [searchHighlight, setSearchHighlight] = useState({ orderKey: "", index: 0 });
+  const [searchHighlightKey, setSearchHighlightKey] = useState<string | null>(null);
   const isSearchingThreads = threadSearchQuery.trim().length > 0;
   const searchableThreads = (() => [
     ...pinnedThreads,
@@ -908,44 +916,74 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   ])();
   const searchEnvironmentIds = useConnectedEnvironmentIds();
   // useThreadSearch owns the debounce and the two-character floor.
-  const threadSearch = useThreadSearch(searchEnvironmentIds, threadSearchQuery);
-  const threadSearchMatchByKey = (() =>
-    new Map(threadSearch.matches.map((match) => [threadSearchMatchKey(match), match] as const)))();
-  const threadSearchResults = (() =>
-    searchSidebarThreads(
-      searchableThreads,
-      threadSearchQuery,
-      new Set(threadSearchMatchByKey.keys()),
-    ))();
-
-  const threadSearchResultOrderKey = threadSearchResults
-    .map((thread) => scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)))
-    .join("\0");
-
-  // The highlight belongs to one result list; a new list starts at the top.
-  const activeSearchResultIndex =
-    searchHighlight.orderKey === threadSearchResultOrderKey ? searchHighlight.index : 0;
+  const threadSearch = useThreadSearch(
+    searchEnvironmentIds,
+    threadSearchQuery,
+    scopedProjectGroups.length === 0
+      ? {}
+      : {
+          projectIds: scopedProjectGroups.flatMap((group) =>
+            group.memberProjectRefs.map((ref) => ref.projectId),
+          ),
+        },
+  );
+  const threadByMatchKey = new Map(
+    searchableThreads.map((thread) => [
+      threadSearchMatchKey({ environmentId: thread.environmentId, threadId: thread.id }),
+      thread,
+    ]),
+  );
+  const rankedServerMatches = rankMessageMatches(
+    threadSearch.matches,
+    (match) => {
+      const thread = threadByMatchKey.get(threadSearchMatchKey(match));
+      return thread ? threadSearchSubject(thread, null) : undefined;
+    },
+    foldSearchQuery(threadSearchQuery),
+    Date.parse(nowMinute),
+    { picks: false },
+  );
+  const serverMatchByKey = new Map(
+    rankedServerMatches.map((match) => [threadSearchMatchKey(match), match] as const),
+  );
+  const [shownMessageOrder, setShownMessageOrder] = useState<ShownOrder | null>(null);
+  const messageOrder = nextShownOrder(
+    shownMessageOrder,
+    threadSearch.query,
+    [...serverMatchByKey.keys()],
+    Number.POSITIVE_INFINITY,
+  );
+  if (messageOrder !== shownMessageOrder) setShownMessageOrder(messageOrder);
+  const { titleMatches, contentMatches } = searchSidebarThreads(
+    searchableThreads,
+    threadSearchQuery,
+    new Set(messageOrder.keys),
+    Date.parse(nowMinute),
+  );
+  const threadSearchResults = [...titleMatches, ...contentMatches];
+  const threadSearchMatchByKey = new Map(
+    contentMatches.flatMap((thread) => {
+      const key = threadSearchMatchKey({
+        environmentId: thread.environmentId,
+        threadId: thread.id,
+      });
+      const match = serverMatchByKey.get(key);
+      return match ? [[key, match] as const] : [];
+    }),
+  );
+  const threadSearchResultKeys = threadSearchResults.map((thread) =>
+    scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)),
+  );
+  const activeSearchResultIndex = Math.max(
+    0,
+    searchHighlightKey === null ? 0 : threadSearchResultKeys.indexOf(searchHighlightKey),
+  );
   const setActiveSearchResultIndex = (index: number | ((index: number) => number)) =>
-    setSearchHighlight((current) => {
-      const currentIndex = current.orderKey === threadSearchResultOrderKey ? current.index : 0;
-      return {
-        orderKey: threadSearchResultOrderKey,
-        index: typeof index === "function" ? index(currentIndex) : index,
-      };
-    });
-  const activeSearchResult = isSearchingThreads
-    ? threadSearchResults[activeSearchResultIndex]
-    : undefined;
-  const activeSearchResultKey =
-    activeSearchResult === undefined
-      ? null
-      : scopedThreadKey(scopeThreadRef(activeSearchResult.environmentId, activeSearchResult.id));
-  useEffect(() => {
-    if (activeSearchResultKey === null) return;
-    document
-      .querySelector(`[data-search-result-key="${globalThis.CSS.escape(activeSearchResultKey)}"]`)
-      ?.scrollIntoView({ block: "nearest" });
-  }, [activeSearchResultKey]);
+    setSearchHighlightKey(
+      threadSearchResultKeys[
+        typeof index === "function" ? index(activeSearchResultIndex) : index
+      ] ?? null,
+    );
 
   const nextSnoozeWakeAt = snoozedThreads[0]?.snoozedUntil ?? null;
   useEffect(
@@ -1005,9 +1043,30 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     setLastSettledResetKey(settledResetKey);
     setSettledVisibleCount(SIDEBAR_SETTLED_INITIAL_COUNT);
   }
+  const olderSettledShelf = useOlderSettledShelf({
+    scopes: [...serverConfigs.keys()].flatMap<OlderSettledScope>((environmentId) => {
+      if (scopedProjectKeys === null) return [{ environmentId, projectIds: null }];
+      const prefix = `${environmentId}:`;
+      const projectIds = [...scopedProjectKeys].flatMap((key) =>
+        key.startsWith(prefix) ? [ProjectId.make(key.slice(prefix.length))] : [],
+      );
+      return projectIds.length === 0 ? [] : [{ environmentId, projectIds }];
+    }),
+    expanded: !isTodayView && currentTab === "settled",
+    visibleCount: settledVisibleCount,
+  });
+  const listedSettledThreads = settledThreads.filter(olderSettledShelf.isListed);
+  useOlderSettledShelfGrowth(olderSettledShelf, listedSettledThreads);
+  const unloadedSettledCount = olderSettledShelf.unloadedCount(threads);
   const sidebarTabs = (() =>
     buildSidebarTabs(
-      { pinnedThreads, activeThreads, workingThreads, snoozedThreads, settledThreads },
+      {
+        pinnedThreads,
+        activeThreads,
+        workingThreads,
+        snoozedThreads,
+        settledThreads: listedSettledThreads,
+      },
       {
         settledVisibleCount,
         routeThreadKey: routeRowThreadKey,
@@ -1024,8 +1083,11 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           searchResults: threadSearchResults,
         }))();
   const orderedThreads = sidebarView.rows;
-  const hiddenSettledCount = sidebarTabs.hiddenSettledCount;
-  const showMoreSettled = () => setSettledVisibleCount(nextSidebarSettledVisibleCount);
+  const hiddenSettledCount = sidebarTabs.hiddenSettledCount + unloadedSettledCount;
+  const showMoreSettled = () => {
+    olderSettledShelf.retry();
+    setSettledVisibleCount(nextSidebarSettledVisibleCount);
+  };
   const orderedThreadKeys = (() =>
     orderedThreads.map((thread) =>
       scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)),
@@ -1224,8 +1286,13 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         }),
       );
     }
+    const match = threadSearchMatchByKey.get(
+      threadSearchMatchKey({ environmentId: thread.environmentId, threadId: thread.id }),
+    );
+    const query = threadSearch.query;
     clearThreadSearch();
     navigateToThread(threadRef);
+    if (match) openThreadFindOnQuery(scopedThreadKey(threadRef), findForMessageMatch(match, query));
   };
   const handleThreadSearchKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
     // IME composition (Japanese/Chinese input) uses the same keys; committing
@@ -2817,17 +2884,13 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       },
     },
   );
-  const { showThreadJumpHints: showJumpHints, updateThreadJumpHintsVisibility } =
-    useThreadJumpHintVisibility();
-  useEffect(() => {
-    updateThreadJumpHintsVisibility(shouldShowJumpHintsNow);
-  }, [shouldShowJumpHintsNow, updateThreadJumpHintsVisibility]);
+  const showJumpHints = useThreadJumpHintsVisible(shouldShowJumpHintsNow);
 
   // Honor the rail scope while sharing physical target selection with the picker.
   const newThreadDestination = resolveSidebarNewThreadDestination({
     shiftKey: false,
     groups: projectGroups,
-    scopeKey: projectScopeKey,
+    scopeKey: scopedProjectGroup?.projectKey ?? null,
     preferredProjectRef: resolveThreadActionProjectRef({
       ...newThreadContext,
       activeThread: newThreadContext.activeThread ?? undefined,
@@ -2982,6 +3045,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                             ) ?? null
                           }
                           searchQuery={threadSearchQuery}
+                          searchMatchQuery={threadSearch.query}
                           onHighlight={() => setActiveSearchResultIndex(index)}
                           onSelect={() => selectThreadSearchResult(thread)}
                           onFileDropThreads={handleThreadFileDrop}
@@ -3032,10 +3096,6 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                   <ul
                     ref={attachTreeRef}
                     data-dragging={(!isContextDrag && dragState !== null) || undefined}
-                    // VoiceOver treats an exposed list as an interaction boundary,
-                    // which hides its rows from ordinary linear navigation. A
-                    // presentational list also makes its implicit listitems
-                    // presentational while preserving every descendant control.
                     {...SIDEBAR_TREE_PROPS}
                     className={cn(
                       "sidebar-thread-list relative flex flex-col gap-px",
@@ -3241,6 +3301,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                       <li className="list-none">
                         <button
                           type="button"
+                          disabled={olderSettledShelf.loading}
                           onClick={showMoreSettled}
                           className="mx-3 mt-2 inline-flex cursor-pointer rounded-keycap text-left text-secondary-copy-medium text-secondary-label outline-none hover:text-foreground focus-visible:inset-shadow-focus"
                         >

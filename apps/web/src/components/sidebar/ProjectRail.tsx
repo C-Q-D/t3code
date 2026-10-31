@@ -9,17 +9,26 @@ import {
   FolderIcon,
   GlobeIcon,
   LayersIcon,
+  PinIcon,
+  PinOffIcon,
   PlusIcon,
   SearchIcon,
   SettingsIcon,
 } from "lucide-react";
-import { useState, useEffect, useReducer, useRef, type ComponentProps } from "react";
+import { useState, useReducer, useRef, type ComponentProps } from "react";
 import { t } from "~/i18n";
 import { cn } from "~/lib/utils";
 import { openCommandPalette } from "../../commandPaletteBus";
 import { useClientSettings } from "../../hooks/useSettings";
-import { getProjectOrderKey, selectProjectGroupingSettings } from "../../logicalProject";
 import {
+  getProjectOrderKey,
+  selectProjectGroupingSettings,
+  pickableProjectGroups,
+} from "@t3tools/client-runtime/state/project-grouping";
+import { useProjectPin } from "../../hooks/useProjectGroupUpdate";
+import { useThreadSelectionStore } from "../../threadSelectionStore";
+import {
+  resolveSidebarProjectScopeKeys,
   buildSidebarProjectSnapshots,
   getSidebarProjectSettingsKey,
   projectGroupsSpanEnvironments,
@@ -56,11 +65,7 @@ import {
 } from "../ui/combobox";
 import { Tooltip, TooltipPopup, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 import { isSidebarUtilityPage, isWebPagesPage, useNavigateToMainApp } from "./mainAppLocation";
-import {
-  deriveProjectRailSelection,
-  reduceProjectRailPickerState,
-  toggleProjectRailScope,
-} from "./projectRail.logic";
+import { reduceProjectRailPickerState } from "./projectRail.logic";
 
 /**
  * Feature-specific 38px stone key. label supplies the localized accessible name and, unless
@@ -106,8 +111,14 @@ export function ProjectRail() {
   const settings = useClientSettings(selectProjectGroupingSettings);
   const sortOrder = useClientSettings((state) => state.sidebarProjectSortOrder);
   const projectOrder = useUiStateStore((state) => state.projectOrder);
-  const persistedKey = useUiStateStore((state) => state.sidebarProjectScopeKey);
-  const setScope = useUiStateStore((state) => state.setSidebarProjectScopeKey);
+  const persistedKeys = useUiStateStore((state) => state.sidebarProjectScopeKeys);
+  const setStoredScope = useUiStateStore((state) => state.setSidebarProjectScopeKeys);
+  const clearSelection = useThreadSelectionStore((state) => state.clearSelection);
+  const { canPinProjectGroup, toggleProjectGroupPin } = useProjectPin();
+  const setScope = (keys: readonly string[]) => {
+    clearSelection();
+    setStoredScope(keys);
+  };
   const snapshotsReady = useAllEnvironmentProjectSnapshotsReady();
   const configsReady = useAtomValue(environmentProjects.projectConfigsReadyAtom);
   const navigate = useNavigate();
@@ -186,38 +197,24 @@ export function ProjectRail() {
       value: groups,
     });
   }
-  const calculateSelection = () =>
-    deriveProjectRailSelection({
-      groups,
-      key: persistedKey,
-      settings,
-      canClearMissingScope: snapshotsReady && configsReady,
-    });
-  const [selectionCache, setSelectionCache] = useState(() => ({
-    inputs: [configsReady, groups, persistedKey, settings, snapshotsReady] as const,
-    value: calculateSelection(),
-  }));
-  let selection = selectionCache.value;
-  if (
-    !Object.is(selectionCache.inputs[0], configsReady) ||
-    !Object.is(selectionCache.inputs[1], groups) ||
-    !Object.is(selectionCache.inputs[2], persistedKey) ||
-    !Object.is(selectionCache.inputs[3], settings) ||
-    !Object.is(selectionCache.inputs[4], snapshotsReady)
-  ) {
-    selection = calculateSelection();
-    setSelectionCache({
-      inputs: [configsReady, groups, persistedKey, settings, snapshotsReady] as const,
-      value: selection,
-    });
-  }
-  useEffect(() => {
-    // Settings unmounts Sidebar, so the rail must also reconcile deleted scopes after all snapshots arrive.
-    if (selection.key !== persistedKey) setScope(selection.key);
-  }, [persistedKey, selection.key, setScope]);
+  const scopeKeys = resolveSidebarProjectScopeKeys({
+    groups,
+    keys: persistedKeys,
+    settings,
+    canClearMissingScope: snapshotsReady && configsReady,
+  }).filter((key) => !groups.some((group) => group.projectKey === key && group.archived));
+  const toggleScope = (key: string) =>
+    setScope(
+      scopeKeys.includes(key)
+        ? scopeKeys.filter((candidate) => candidate !== key)
+        : [...scopeKeys, key],
+    );
   const calculateItems = () => [
     { value: "all", label: t.sidebar.projects.all },
-    ...groups.map((group) => ({ value: group.projectKey, label: group.displayName })),
+    ...pickableProjectGroups(groups).map((group) => ({
+      value: group.projectKey,
+      label: group.displayName,
+    })),
   ];
   const [itemsCache, setItemsCache] = useState(() => ({
     inputs: [groups] as const,
@@ -248,7 +245,8 @@ export function ProjectRail() {
     setFilteredItemsCache({ inputs: [filter, items, query] as const, value: filteredItems });
   }
   const showEnvironments = projectGroupsSpanEnvironments(groups);
-  const activeItem = items.find((item) => item.value === (selection.key ?? "all")) ?? null;
+  const activeItem =
+    items.find((item) => item.value === (scopeKeys.length === 1 ? scopeKeys[0] : "all")) ?? null;
 
   /** Open the chosen group's physical project settings without changing the current thread filter. */
   function openProjectSettings(project: SidebarProjectSnapshot) {
@@ -293,9 +291,13 @@ export function ProjectRail() {
           onItemHighlighted={(item) => {
             highlightedKey.current = item?.value ?? null;
           }}
-          onValueChange={(item) => {
-            if (suppressScopeChange.current) return;
-            if (item) setScope(item.value === "all" ? null : item.value);
+          onValueChange={(item, details) => {
+            if (suppressScopeChange.current || !item) return;
+            if (item.value === "all") setScope([]);
+            else if (details.event instanceof MouseEvent && details.event.shiftKey) {
+              details.cancel();
+              toggleScope(item.value);
+            } else setScope([item.value]);
           }}
         >
           <ComboboxTrigger
@@ -305,7 +307,7 @@ export function ProjectRail() {
               event.preventBaseUIHandler();
               suppressScopeChange.current = true;
               dispatchPicker({ type: "open-changed", open: false });
-              setScope(toggleProjectRailScope(selection.key, null, onWebPagesPage));
+              setScope([]);
               if (onUtilityPage || onWebPagesPage) void navigateToMainApp();
             }}
             onContextMenu={(event) => {
@@ -327,7 +329,7 @@ export function ProjectRail() {
                 label={t.sidebar.projects.todayTooltip}
                 className={cn(
                   "bg-popover text-foreground shadow-raise-new-thread",
-                  selection.key === null && "inset-shadow-selected",
+                  scopeKeys.length === 0 && "inset-shadow-selected",
                 )}
               />
             }
@@ -354,6 +356,16 @@ export function ProjectRail() {
                       event.metaKey
                     )
                       return;
+                    if (
+                      event.shiftKey &&
+                      event.key === "Enter" &&
+                      highlightedKey.current &&
+                      highlightedKey.current !== "all"
+                    ) {
+                      event.preventDefault();
+                      toggleScope(highlightedKey.current);
+                      return;
+                    }
                     if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10"))
                       return;
                     const project = groups.find(
@@ -368,13 +380,22 @@ export function ProjectRail() {
                 />
               </div>
               <ComboboxEmpty>{t.sidebar.projects.noMatchingProjects}</ComboboxEmpty>
-              <ComboboxPrimitive.List className="flex min-h-0 flex-col gap-0.5 overflow-y-auto">
+              <ComboboxPrimitive.List
+                aria-multiselectable
+                className="flex min-h-0 flex-col gap-0.5 overflow-y-auto"
+              >
                 {(item: (typeof items)[number]) => {
                   const project = groups.find((group) => group.projectKey === item.value);
                   return (
                     <ComboboxPrimitive.Item
                       key={item.value}
                       value={item}
+                      aria-selected={
+                        item.value === "all"
+                          ? scopeKeys.length === 0
+                          : scopeKeys.includes(item.value)
+                      }
+                      data-selected={undefined}
                       className="flex h-9 shrink-0 cursor-pointer items-center gap-2.5 rounded-menu-row py-0 pr-1.5 pl-2.5 text-control text-foreground outline-none data-highlighted:bg-accent data-selected:bg-accent"
                       onContextMenu={(event) => {
                         if (project) {
@@ -396,9 +417,31 @@ export function ProjectRail() {
                           machineByEnvironmentId={machines}
                         />
                       ) : null}
-                      <ComboboxPrimitive.ItemIndicator>
+                      {(
+                        item.value === "all"
+                          ? scopeKeys.length === 0
+                          : scopeKeys.includes(item.value)
+                      ) ? (
                         <CheckIcon className="size-3.5" strokeWidth={2.25} />
-                      </ComboboxPrimitive.ItemIndicator>
+                      ) : null}
+                      {project && canPinProjectGroup(project) ? (
+                        <button
+                          type="button"
+                          aria-label={project.pinned ? "Unpin project" : "Pin project"}
+                          className="flex size-6.5 shrink-0 cursor-pointer items-center justify-center rounded-project-rail-settings bg-secondary text-fg-detail outline-none focus-visible:inset-shadow-focus"
+                          onPointerDown={(event) => event.stopPropagation()}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            toggleProjectGroupPin(project);
+                          }}
+                        >
+                          {project.pinned ? (
+                            <PinOffIcon className="size-3.25" />
+                          ) : (
+                            <PinIcon className="size-3.25" />
+                          )}
+                        </button>
+                      ) : null}
                       {project ? (
                         <button
                           type="button"
@@ -438,20 +481,26 @@ export function ProjectRail() {
           aria-hidden
         />
         <div className="project-rail-scroll flex min-h-0 w-full flex-col gap-2 overflow-y-auto px-1 pb-1">
-          {groups.map((project) => (
+          {pickableProjectGroups(groups).map((project) => (
             <ProjectRailKey
               key={project.projectKey}
               label={t.sidebar.projects.filterByProjectAriaLabel(project.displayName)}
               tooltip={project.displayName}
-              aria-pressed={selection.project?.projectKey === project.projectKey}
+              aria-pressed={scopeKeys.includes(project.projectKey)}
               className={cn(
                 "self-center hover:bg-popover",
-                selection.project?.projectKey === project.projectKey
+                scopeKeys.includes(project.projectKey)
                   ? "bg-popover shadow-raise-new-thread inset-shadow-selected"
                   : "bg-project-rail-idle shadow-well-project hover:inset-shadow-project-rail-hover",
               )}
-              onClick={() => {
-                setScope(toggleProjectRailScope(selection.key, project.projectKey, onWebPagesPage));
+              onClick={(event) => {
+                if (event.shiftKey) toggleScope(project.projectKey);
+                else
+                  setScope(
+                    scopeKeys.length === 1 && scopeKeys[0] === project.projectKey && !onWebPagesPage
+                      ? []
+                      : [project.projectKey],
+                  );
                 if (onWebPagesPage) void navigateToMainApp();
               }}
             >
