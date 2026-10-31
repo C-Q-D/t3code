@@ -1,3 +1,5 @@
+/** Owns the pull request detail surface and its agent handoffs. */
+import { t } from "~/i18n";
 import { projectChangeRequestUrl } from "@t3tools/client-runtime/change-request-links";
 import { normalizeThreadPullRequestKey } from "@t3tools/client-runtime/thread-pull-requests";
 import { useAtomValue } from "@effect/atom-react";
@@ -32,7 +34,7 @@ import {
   FileDiffIcon,
   GitCommitHorizontalIcon,
   MessageSquareIcon,
-  PanelRightIcon,
+  TriangleAlertIcon,
 } from "lucide-react";
 import {
   lazy,
@@ -53,7 +55,6 @@ import { isCommandPaletteOpen } from "~/commandPaletteBus";
 import { resolveShortcutCommand, type ShortcutMatchContext } from "~/keybindings";
 import { primaryServerKeybindingsAtom } from "~/state/server";
 import { usePullRequestDefaultMergeMethodResolver } from "./usePullRequestActions";
-import { offHeadPullRequestCheckoutToast } from "./pullRequestCheckoutToast";
 import { usePreparePullRequestThreadAction } from "~/state/sourceControlActions";
 import { cn } from "~/lib/utils";
 import { readLocalApi } from "~/localApi";
@@ -66,17 +67,15 @@ import { useLiveRefresh } from "~/hooks/useLiveRefresh";
 import { pullRequestEnvironment, usePullRequestTurnRefresh } from "~/state/pullRequests";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { PullRequestStackMenu } from "./PullRequestStackMenu";
-import { PullRequestChangeBreakdownStat } from "./PullRequestChangeBreakdownStat";
-import {
-  capitalizeTerm,
-  sourceControlClients,
-} from "@t3tools/client-runtime/source-control-clients";
+import { PullRequestDiffStat } from "./pullRequestPresentation";
+import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import { PullRequestThreadLinks } from "./PullRequestThreadLinks";
 import { vcsEnvironment } from "~/state/vcs";
 import { RelativeTime } from "~/components/RelativeTime";
 import { useUiStateStore } from "~/uiStateStore";
 
 import { Button } from "../ui/button";
+import { Badge } from "../ui/badge";
 import { toastManager } from "../ui/toast";
 import { Tooltip, TooltipPopup, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 import { MiddleTruncate } from "../ui/middle-truncate";
@@ -88,6 +87,7 @@ import {
 import { PullRequestDetailGhost, PullRequestTimelineGhost } from "./PullRequestGhosts";
 import { PullRequestCopyableCode } from "./PullRequestCopyableCode";
 import { pullRequestRefKey, usePullRequestDetail } from "./usePullRequestDetail";
+import { useInlineActionConfirm } from "./useInlineActionConfirm";
 import { PullRequestActionsMenu } from "./PullRequestActionsMenu";
 import {
   PullRequestApproveWorkflowsButton,
@@ -131,7 +131,7 @@ import {
   checkoutFailureDescription,
   readableFailure,
   resolvePullRequestReferenceHost,
-  resolvePullRequestPrimaryControl,
+  resolvePullRequestActionGroups,
   allowedPullRequestMergeMethods,
   allowsSinglePullRequestMerge,
   canDeletePullRequestBranch,
@@ -151,56 +151,69 @@ import {
   pullRequestChecksState,
   pullRequestChecksStatePresentation,
   pullRequestReviewOutcomeToneClassName,
-  resolvePullRequestState,
   summarizePullRequestChecks,
 } from "./pullRequestPresentation";
 import { PullRequestGuideTab } from "./PullRequestGuideTab";
 import { guideRunKey, useGuideRunStore } from "./guide/guideRunStore";
 import { useReviewGuideWriter } from "./guide/useReviewGuideWriter";
 
-const actionFailureLabels = (term: string): Record<PullRequestAction, string> => ({
-  merge: `Could not merge this ${term}`,
-  ready: "Could not mark this ready for review",
-  draft: "Could not convert this to a draft",
-  close: `Could not close this ${term}`,
-  reopen: `Could not reopen this ${term}`,
-  "update-branch": "Could not update this branch",
-  "enable-auto-merge": "Could not turn on auto-merge",
-  "disable-auto-merge": "Could not turn off auto-merge",
-  revert: `Could not open a revert ${term}`,
-  "delete-branch": "Could not delete this branch",
-  "approve-workflows": "Could not approve workflows",
-});
+const ACTION_FAILURE_LABELS: Record<PullRequestAction, string> = {
+  merge: t.git.pullRequest.couldNotMergeThisPullRequest,
+  ready: t.git.pullRequest.couldNotMarkThisReadyForReview,
+  draft: t.git.pullRequest.couldNotConvertThisToADraft,
+  close: t.git.pullRequest.couldNotCloseThisPullRequest,
+  reopen: t.git.pullRequest.couldNotReopenThisPullRequest,
+  "update-branch": t.git.pullRequest.couldNotUpdateThisBranch,
+  "enable-auto-merge": t.git.pullRequest.couldNotTurnOnAutoMerge,
+  "disable-auto-merge": t.git.pullRequest.couldNotTurnOffAutoMerge,
+  revert: t.git.pullRequest.couldNotOpenARevertPullRequest,
+  "approve-workflows": t.git.pullRequest.couldNotApproveWorkflows,
+  get "delete-branch"() {
+    return t.git.branchDeletionUi.failed;
+  },
+};
 
-const actionFailureHints = (term: string): Record<PullRequestAction, string> => ({
+const ACTION_FAILURE_HINTS: Record<PullRequestAction, string> = {
   merge:
-    "The host refused the merge. Check that you have write access, that the checks it requires have passed, and that the branch is not conflicting.",
-  ready: "The host refused it. Check that you have write access to this repository.",
-  draft: "The host refused it. Check that you have write access to this repository.",
-  close: "The host refused it. Check that you have write access, or that you opened it.",
-  reopen:
-    "The host refused it. Check that you have write access, and that the branch still exists.",
+    t.git.pullRequest
+      .theHostRefusedTheMergeCheckThatYouHaveWriteAccessThatTheChecksItRequiresHavePassedAnd,
+  ready: t.git.pullRequest.theHostRefusedItCheckThatYouHaveWriteAccessToThisRepository,
+  draft: t.git.pullRequest.theHostRefusedItCheckThatYouHaveWriteAccessToThisRepository,
+  close: t.git.pullRequest.theHostRefusedItCheckThatYouHaveWriteAccessOrThatYouOpenedIt,
+  reopen: t.git.pullRequest.theHostRefusedItCheckThatYouHaveWriteAccessAndThatTheBranchStillExists,
+  // Said for the merge commit, which is what an update is unless a rebase was asked for. The
+  // rebase has its own reasons to fail and its own sentence below.
   "update-branch":
-    "The host refused it. Check that you have write access to the branch (a fork branch also needs its author to allow edits from maintainers), and that it does not conflict with the base.",
+    t.git.pullRequest
+      .theHostRefusedItCheckThatYouHaveWriteAccessToTheBranchOneFromAForkAlsoNeedsItsAuthorT,
+  // The one refusal that is usually a repository setting rather than anything about this branch:
+  // GitHub will not arm an auto-merge at all unless the repository has the feature switched on.
   "enable-auto-merge":
-    "The host refused it. Check that this repository allows auto-merge, that you have write access, and that there is something left for it to wait on.",
+    t.git.pullRequest
+      .theHostRefusedItCheckThatThisRepositoryAllowsAutoMergeThatYouHaveWriteAccessAndThatTh,
   "disable-auto-merge":
-    "The host refused it. Check that you have write access, and that the merge has not already happened.",
-  revert: `The host refused it. Check that you have write access and that this ${term} was merged on the host.`,
-  "delete-branch":
-    "The host refused it. Check that you have write access to the source repository and that the branch has not moved since this page loaded.",
+    t.git.pullRequest
+      .theHostRefusedItCheckThatYouHaveWriteAccessAndThatTheMergeHasNotAlreadyHappened,
+  revert:
+    t.git.pullRequest
+      .theHostRefusedItCheckThatYouHaveWriteAccessAndThatThisPullRequestWasMergedOnTheHost,
+  get "delete-branch"() {
+    return t.git.branchDeletionUi.refused;
+  },
   "approve-workflows":
-    "The host refused it. Check that you have Actions write access and that these workflow runs are still awaiting approval.",
-});
+    t.git.pullRequest
+      .theHostRefusedItCheckThatYouHaveActionsWriteAccessAndThatTheseWorkflowRunsAreStillAwa,
+};
 
 const UPDATE_BRANCH_REBASE_FAILURE_HINT =
-  "The host refused it. A rebase stops at the first commit that does not apply cleanly; updating with a merge commit may still work.";
+  t.git.pullRequest
+    .theHostRefusedItARebaseStopsAtTheFirstCommitThatDoesNotApplyCleanlyUpdatingWithAMerge;
 
 const TABS: ReadonlyArray<{ value: PullRequestDetailTab; label: string }> = [
-  { value: "summary", label: "Summary" },
-  { value: "guide", label: "Guide" },
-  { value: "timeline", label: "Timeline" },
-  { value: "code", label: "Code" },
+  { value: "summary", label: t.git.actions.summary },
+  { value: "guide", label: t.git.pullRequest.guide },
+  { value: "timeline", label: t.git.pullRequest.timeline },
+  { value: "code", label: t.git.pullRequest.code },
 ];
 
 // Defer the diff viewer's worker pool until Code is approached.
@@ -213,10 +226,13 @@ const lastHandoffPromptByDraft = new Map<string, string>();
 const composerTargetKey = (target: ScopedThreadRef | DraftId): string =>
   typeof target === "string" ? target : scopedThreadKey(target);
 
+/** Reports clipboard failure without changing the checkout or composer.
+ * @param error Clipboard failure shown to the user.
+ */
 function reportCheckoutCommandError(error: Error) {
   toastManager.add({
     type: "error",
-    title: "Could not copy checkout command",
+    title: t.git.pullRequest.couldNotCopyCheckoutCommand,
     description: error.message,
   });
 }
@@ -259,6 +275,11 @@ function pullRequestStackReference(
       };
 }
 
+/**
+ * Renders request details, host actions, and agent handoffs while keeping submitted bodies and prompts unchanged.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 export function PullRequestDetailPanel({
   environmentId,
   shortcutsEnabled,
@@ -320,6 +341,7 @@ export function PullRequestDetailPanel({
     reference.number,
   );
   const pullRequestKey = pullRequestRefKey(reference);
+  const inlineConfirm = useInlineActionConfirm(pullRequestKey);
   const matchingListEntry =
     listEntry?.projectId === reference.projectId &&
     listEntry.repository.toLowerCase() === reference.repository.toLowerCase() &&
@@ -474,12 +496,13 @@ export function PullRequestDetailPanel({
   ).changeRequest;
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
   const { copyToClipboard: copyReference } = useCopyToClipboard<string>({
-    target: `${terminology.singular} reference`,
-    onCopy: (label) => toastManager.add({ type: "success", title: `${label} copied` }),
+    target: t.git.pullRequest.pullRequestReference,
+    onCopy: (label) =>
+      toastManager.add({ type: "success", title: t.git.pullRequest.copiedLabel(label) }),
     onError: (error, label) =>
       toastManager.add({
         type: "error",
-        title: `Failed to copy ${label}`,
+        title: t.git.pullRequest.copyLabelError(label),
         description: error.message,
       }),
   });
@@ -491,7 +514,7 @@ export function PullRequestDetailPanel({
     if (command !== "pullRequest.copyNumber") return;
     event.preventDefault();
     event.stopPropagation();
-    if (!event.repeat) copyReference(`#${reference.number}`, `${terminology.shortLabel} number`);
+    if (!event.repeat) copyReference(`#${reference.number}`, t.git.pullRequest.pRNumber);
   });
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- window keydown capture listener for the copy-number shortcut
   useEffect(() => {
@@ -510,7 +533,6 @@ export function PullRequestDetailPanel({
       ? null
       : (sourceControlClients.parseChangeRequestUrl(detail.url)?.link.repositoryUrl ?? null);
   const hostClient = sourceControlClients.get(detail?.provider);
-  const openOnHostText = openOnHostLabel(hostClient);
   const markdownContext = pullRequestMarkdownContext(detail, threadRef);
   const authorProfileUrl =
     detail?.author && repositoryUrl !== null
@@ -672,20 +694,20 @@ export function PullRequestDetailPanel({
       const hint =
         updateMethod === "rebase"
           ? UPDATE_BRANCH_REBASE_FAILURE_HINT
-          : actionFailureHints(terminology.singular)[action];
+          : ACTION_FAILURE_HINTS[action];
       toastManager.add({
         type: "error",
-        title: actionFailureLabels(terminology.singular)[action],
+        title: ACTION_FAILURE_LABELS[action],
         description: readableFailure(failure, hint),
       });
       onActed?.(action, "failed");
       return false;
     }
     if (action === "revert") {
-      toastManager.add({ type: "success", title: `Revert ${terminology.singular} opened` });
+      toastManager.add({ type: "success", title: t.git.pullRequest.revertPullRequestOpened });
     }
     if (action === "delete-branch") {
-      toastManager.add({ type: "success", title: "Branch deleted" });
+      toastManager.add({ type: "success", title: t.git.branchDeletionUi.deleted });
     }
     if (pullRequestActionNeedsHostRefresh(action)) {
       void refreshFromHost();
@@ -715,7 +737,7 @@ export function PullRequestDetailPanel({
     });
     if (commentResult._tag === "Failure") {
       setPendingAction(null);
-      toastManager.add({ type: "error", title: "Could not post the comment" });
+      toastManager.add({ type: "error", title: t.git.pullRequest.couldNotPostTheComment });
       return { commentPosted: false };
     }
     const actionSucceeded = await finishAction(action);
@@ -807,11 +829,11 @@ export function PullRequestDetailPanel({
       writeTaskToComposer(attachTarget, task);
       toastManager.add({
         type: "success",
-        title: "Added to the composer",
+        title: t.git.pullRequest.addedToTheComposer,
         description:
           task.prompt.length > 0
-            ? "The question is in the composer. Read it over, then send."
-            : `The ${terminology.singular} is in the composer. Type your question, then send.`,
+            ? t.git.pullRequest.theQuestionIsInTheComposerReadItOverThenSend
+            : t.git.pullRequest.thePullRequestIsInTheComposerTypeYourQuestionThenSend,
       });
       return;
     }
@@ -838,18 +860,20 @@ export function PullRequestDetailPanel({
     if (opened === null) {
       toastManager.add({
         type: "error",
-        title: "Could not open a thread",
-        description: "Try again from the project, or open a thread first.",
+        title: t.git.pullRequest.couldNotOpenAThread,
+        description: t.git.pullRequest.tryAgainFromTheProjectOrOpenAThreadFirst,
       });
       return;
     }
     toastManager.add({
       type: "success",
-      title: "Asked in a thread",
+      title: t.git.pullRequest.askedInAThread,
+      // "Ask" leaves the composer empty on purpose, so saying the question is in it would send
+      // the reader looking for something that is not there. The chips are what landed.
       description:
         task.prompt.length > 0
-          ? "The question is in the composer. Read it over, then send."
-          : `The ${terminology.singular} is in the composer. Type your question, then send.`,
+          ? t.git.pullRequest.theQuestionIsInTheComposerReadItOverThenSend
+          : t.git.pullRequest.thePullRequestIsInTheComposerTypeYourQuestionThenSend,
     });
   };
 
@@ -863,8 +887,8 @@ export function PullRequestDetailPanel({
       writeTaskToComposer(attachTarget, task);
       toastManager.add({
         type: "success",
-        title: "Added to the composer",
-        description: "The task is in the composer. Read it over, then send.",
+        title: t.git.pullRequest.addedToTheComposer,
+        description: t.git.pullRequest.theTaskIsInTheComposerReadItOverThenSend,
       });
       return;
     }
@@ -884,7 +908,7 @@ export function PullRequestDetailPanel({
     setHandoff(kind);
     const toastId = toastManager.add({
       type: "loading",
-      title: `Preparing the ${terminology.singular} checkout...`,
+      title: t.git.pullRequest.preparingThePullRequestCheckout,
     });
     const projectRef = scopeProjectRef(
       actingEnvironmentId,
@@ -899,8 +923,8 @@ export function PullRequestDetailPanel({
       setHandoff(null);
       toastManager.update(toastId, {
         type: "error",
-        title: "Could not open a thread for the checkout",
-        description: "Try again from the project, or open a thread first.",
+        title: t.git.pullRequest.couldNotOpenAThreadForTheCheckout,
+        description: t.git.pullRequest.tryAgainFromTheProjectOrOpenAThreadFirst,
       });
       return;
     }
@@ -913,7 +937,7 @@ export function PullRequestDetailPanel({
       setHandoff(null);
       toastManager.update(toastId, {
         type: "error",
-        title: `Could not prepare the ${terminology.singular} checkout`,
+        title: t.git.pullRequest.couldNotPrepareThePullRequestCheckout,
         description: checkoutFailureDescription(
           isAtomCommandInterrupted(prepared) ? undefined : squashAtomCommandFailure(prepared),
         ),
@@ -933,25 +957,36 @@ export function PullRequestDetailPanel({
       // Sending after failed rebinding would use the previous checkout.
       toastManager.update(toastId, {
         type: "error",
-        title: "Checked out, but the thread stayed where it was",
-        description: `The checkout is ready on \`${prepared.value.branch}\`. Point a thread at it from the branch picker, then ask again.`,
+        title: t.git.pullRequest.checkedOutButTheThreadStayedWhereItWas,
+        description: t.git.pullRequest.checkoutThreadHint(prepared.value.branch),
       });
       return;
     }
     setHandoff(null);
+    // A worktree that was already there and had been worked in keeps whatever it holds, so the
+    // thread opens on older code than the pull request carries. Said once, in place of the
+    // success, because everything else about the handoff did happen.
+    const staleCheckoutToast = {
+      type: "warning",
+      title: t.git.pullRequest.checkedOutButNotOnTheLatestCommits,
+      description:
+        t.git.pullRequest
+          .theCheckoutCouldNotBeMovedOntoThePullRequestSLatestCommitsSoTheCodeThereIsOlderThanTh,
+    } as const;
     if (task === null) {
       toastManager.update(
         toastId,
         prepared.value.isOnPullRequestHead
           ? {
               type: "success",
-              title: mode === "local" ? "Checked out here" : "Checked out",
+              title:
+                mode === "local" ? t.git.pullRequest.checkedOutHere : t.git.pullRequest.checkedOut,
               description:
                 mode === "local"
-                  ? `This repository is on the ${terminology.singular}'s branch, with a thread open on it.`
-                  : `The ${terminology.singular} is in its own worktree, with a thread open on it.`,
+                  ? t.git.pullRequest.thisRepositoryIsOnThePullRequestSBranchWithAThreadOpenOnIt
+                  : t.git.pullRequest.thePullRequestIsInItsOwnWorktreeWithAThreadOpenOnIt,
             }
-          : offHeadPullRequestCheckoutToast(terminology),
+          : staleCheckoutToast,
       );
       return;
     }
@@ -961,10 +996,10 @@ export function PullRequestDetailPanel({
       prepared.value.isOnPullRequestHead
         ? {
             type: "success",
-            title: "Checkout ready",
-            description: "The task is in the composer. Read it over, then send.",
+            title: t.git.pullRequest.checkoutReady,
+            description: t.git.pullRequest.theTaskIsInTheComposerReadItOverThenSend,
           }
-        : offHeadPullRequestCheckoutToast(terminology),
+        : staleCheckoutToast,
     );
   };
 
@@ -1110,14 +1145,14 @@ export function PullRequestDetailPanel({
     projectDefaultMergeMethod,
     lastSelectedMergeMethod,
   );
-  const selectedMergeMethodLabel = PULL_REQUEST_MERGE_METHOD_LABELS[selectedMergeMethod];
-  const pendingAutoMergeLabel = `Auto-merge (${selectedMergeMethodLabel.toLowerCase()})`;
   const conflicting = isPullRequestConflicting(detail);
   const autoMergeArmed = detail?.state === "open" && detail.autoMergeEnabled === true;
   const armedMergeMethod = detail?.autoMergeMethod;
   const armedAutoMergeLabel = armedMergeMethod
-    ? `Auto-merge (${PULL_REQUEST_MERGE_METHOD_LABELS[armedMergeMethod].toLowerCase()})`
-    : "Auto-merge";
+    ? t.git.pullRequest.autoMergeMethod(
+        PULL_REQUEST_MERGE_METHOD_LABELS[armedMergeMethod].toLowerCase(),
+      )
+    : t.git.pullRequest.autoMerge;
   const workflowApprovalsRequired =
     detail?.state === "open" ? (detail.workflowApprovalsRequired ?? 0) : 0;
   const freshness = detail === null ? null : resolveBaseFreshness(detail);
@@ -1135,50 +1170,20 @@ export function PullRequestDetailPanel({
       ? "pending"
       : latestChecksState;
   const checksStale = checksState !== detailChecksState;
-  const primaryAction = detail
-    ? resolvePullRequestPrimaryControl({
-        state: detail.state,
-        isDraft: detail.isDraft,
-        mergeability: detail.mergeability,
-        checksState,
-        autoMergeEnabled: detail.autoMergeEnabled,
-        hasMergeMethod: allowedMergeMethods.length > 0,
-        canMerge: canMergeSinglePullRequest && can("merge"),
-        canMarkReady: can("ready"),
-        canEnableAutoMerge: canMergeSinglePullRequest && can("enable-auto-merge"),
-      })
-    : null;
-  const showsDraftToggle =
-    detail?.state === "open" &&
-    can(detail.isDraft ? "ready" : "draft") &&
-    !(detail.isDraft && primaryAction === "ready");
-  const showsAutoMerge =
-    canMergeSinglePullRequest &&
-    detail?.state === "open" &&
-    ((autoMergeArmed && can("disable-auto-merge")) ||
-      (!autoMergeArmed &&
-        primaryAction !== "enable-auto-merge" &&
-        !detail.isDraft &&
-        !conflicting &&
-        can("enable-auto-merge") &&
-        allowedMergeMethods.length > 0));
-  const showsMergeNow =
-    canMergeSinglePullRequest &&
-    detail?.state === "open" &&
-    (primaryAction === "enable-auto-merge" || primaryAction === "auto-merge-armed") &&
-    can("merge") &&
-    !detail.isDraft &&
-    !conflicting &&
-    allowedMergeMethods.length > 0;
-  const showsMergeMethods =
-    detail?.state === "open" &&
-    can("merge") &&
-    !detail.isDraft &&
-    !conflicting &&
-    allowedMergeMethods.length > 1;
-  const statePresentation = detail
-    ? resolvePullRequestState({ state: detail.state, isDraft: detail.isDraft })
-    : null;
+  const headerActions = resolvePullRequestActionGroups({
+    state: detail?.state ?? "closed",
+    isDraft: detail?.isDraft ?? false,
+    mergeability: detail?.mergeability ?? "unknown",
+    checksState,
+    autoMergeEnabled: detail?.autoMergeEnabled,
+    mergeMethodCount: allowedMergeMethods.length,
+    canMergeSinglePullRequest,
+    canMerge: can("merge"),
+    canMarkReady: can("ready"),
+    canConvertToDraft: can("draft"),
+    canEnableAutoMerge: can("enable-auto-merge"),
+    canDisableAutoMerge: can("disable-auto-merge"),
+  });
   const showsDeleteBranch = detail !== null && canDeletePullRequestBranch(detail);
   const environmentConnected = environments.some(
     (environment) =>
@@ -1188,8 +1193,11 @@ export function PullRequestDetailPanel({
     if (detail === null) return;
     const confirmed = await readLocalApi()?.dialogs.confirm(
       [
-        `Delete branch ${detail.headBranch}?`,
-        `This deletes ${detail.headBranch} from ${detail.headRepositoryNameWithOwner ?? detail.repository}. Local branches and worktrees are not changed.`,
+        t.git.branchDeletionText.confirm(detail.headBranch),
+        t.git.branchDeletionText.hint(
+          detail.headBranch,
+          detail.headRepositoryNameWithOwner ?? detail.repository,
+        ),
       ].join("\n"),
       { variant: "destructive" },
     );
@@ -1199,7 +1207,7 @@ export function PullRequestDetailPanel({
     workflowApprovalsRequired > 0 && !checksStale && can("approve-workflows");
   const checksSummary = checksStale
     ? checksState === null
-      ? "No checks reported"
+      ? t.git.pullRequest.noChecksReported
       : pullRequestChecksStatePresentation(checksState).label
     : detail
       ? summarizePullRequestChecks(detail.checks)
@@ -1225,7 +1233,6 @@ export function PullRequestDetailPanel({
         onActingEnvironmentChange={selectActingEnvironment}
       />
     ) : null;
-
   const resolveConflictsControl = (
     <PullRequestResolveConflictsButton
       handoff={handoff}
@@ -1273,308 +1280,281 @@ export function PullRequestDetailPanel({
           onPickerOpenChange={setThreadPickerOpen}
         />
       ) : null}
-      <div
-        className={cn(
-          "@container/pr-header grid min-w-0 shrink-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2",
-          detail && "border-b border-border/60",
-          !detail && !onClose && "hidden",
-        )}
-      >
-        <PullRequestDetailCrumbs
-          detail={detail}
-          toneClassName={statePresentation?.toneClassName ?? null}
-          condensed={condensed}
-          repositoryUrl={repositoryUrl}
-          openOnHostText={openOnHostText}
-          onBack={onBack}
-        />
-        <div className="mr-4 flex h-7 shrink-0 select-none items-center justify-end gap-1">
-          {detail ? (
-            <TooltipProvider delay={150} closeDelay={150} timeout={400}>
-              {!nativeStack && supportsStackActions && nativeStackQuery.error ? (
-                <Button variant="ghost" size="xs" onClick={nativeStackQuery.refresh}>
-                  Retry stack lookup
-                </Button>
-              ) : null}
-              {nativeStack ? (
-                <PullRequestStackMenu
-                  hostLabel={hostClient.label}
-                  terminology={terminology}
-                  stack={nativeStack}
-                  notice={nativeStackQuery.notice}
-                  onRetry={nativeStackQuery.error ? nativeStackQuery.refresh : undefined}
-                  reference={reference}
-                  environmentId={environmentId}
-                  onSelect={onSelectPullRequest}
-                  mergeMethod={selectedMergeMethod}
-                  canMerge={
-                    nativeStackQuery.isFresh &&
-                    supportsStackActions &&
-                    can("merge") &&
-                    allowedMergeMethods.length > 0
-                  }
-                  canRebase={
-                    nativeStackQuery.isFresh &&
-                    supportsStackActions &&
-                    detail.viewerPermissions.stackRebase === true
-                  }
-                  onActed={() => {
-                    refreshDetail();
-                    onActed?.();
-                  }}
-                />
-              ) : null}
-              {context === "page" ? (
-                <PullRequestThreadLinks
-                  display="count"
-                  environmentId={environmentId}
-                  reference={reference}
-                  url={detail.url}
-                  threadRef={null}
-                />
-              ) : null}
-              <PullRequestPrimaryAction
-                pullRequestKey={pullRequestKey}
-                primaryAction={primaryAction}
-                autoMergeArmed={autoMergeArmed}
-                armedAutoMergeLabel={armedAutoMergeLabel}
-                pendingAutoMergeLabel={pendingAutoMergeLabel}
-                selectedMergeMethod={selectedMergeMethod}
-                selectedMergeMethodLabel={selectedMergeMethodLabel}
-                statePresentation={statePresentation}
-                pendingAction={pendingAction}
-                perform={perform}
-                resolveConflicts={resolveConflictsControl}
-              />
-              {checkoutControl}
-              <PullRequestActionsMenu
-                environmentId={environmentId}
-                reference={reference}
-                pullRequestKey={pullRequestKey}
-                detail={detail}
-                terminology={terminology}
-                linkThreadRef={
-                  threadRef ??
-                  (typeof composerDraftTarget === "object" ? composerDraftTarget : null)
-                }
-                onThreadPickerOpenChange={setThreadPickerOpen}
-                refreshing={refreshing}
-                refreshFromHost={refreshFromHost}
-                handoff={handoff}
-                attachesToComposer={attachTarget !== null}
-                askAboutPullRequest={askAboutPullRequest}
-                explainPullRequest={explainPullRequest}
-                canFixFindings={canFixFindings}
-                startFixFindings={startFixFindings}
-                handoffLabels={handoffLabels}
-                canWriteGuide={reviewGuidesEnabled && guideWriter.canWrite}
-                guideRunning={guideWriter.running}
-                guideWritten={guideWriter.data?.guide != null}
-                writeGuide={writeGuide}
-                pickableEnvironments={pickableEnvironments}
-                actingEnvironmentId={actingEnvironmentId}
-                onActingEnvironmentChange={selectActingEnvironment}
-                can={can}
-                autoMergeArmed={autoMergeArmed}
-                showsDraftToggle={showsDraftToggle}
-                showsMergeNow={showsMergeNow}
-                showsAutoMerge={showsAutoMerge}
-                showsMergeMethods={showsMergeMethods}
-                allowedMergeMethods={allowedMergeMethods}
-                selectedMergeMethod={selectedMergeMethod}
-                onSelectMergeMethod={selectMergeMethod}
-                showsDeleteBranch={showsDeleteBranch}
-                environmentConnected={environmentConnected}
-                canWriteSourceControl={canWriteSourceControl}
-                onMaintainerEditsSaved={refreshDetail}
-                confirmDeleteBranch={confirmDeleteBranch}
-                pendingAction={pendingAction}
-                perform={perform}
-                openOnHostText={openOnHostText}
-                copyReference={copyReference}
-              />
-            </TooltipProvider>
-          ) : null}
-          {onClose ? (
-            <Button
-              size="icon-xs"
-              variant="ghost"
-              aria-label={`Collapse ${terminology.singular} panel`}
-              onClick={onClose}
+      <div className={cn("min-w-0 shrink-0", !detail && !onClose && "hidden")}>
+        <TooltipProvider delay={150} closeDelay={150} timeout={400}>
+          <PullRequestDetailCrumbs
+            detail={detail}
+            onBack={onBack}
+            onClose={onClose}
+            handoff={handoff}
+            askAboutPullRequest={askAboutPullRequest}
+            explainPullRequest={explainPullRequest}
+            copyReference={copyReference}
+            checkoutCommand={checkoutCommand}
+          />
+          <div className={cn("grid", condensed ? "pr-detail-expanded" : "pr-detail-folded")}>
+            <div
+              ref={condensedRowRef}
+              inert={!condensed}
+              className={cn(
+                "min-h-0 overflow-hidden px-4 transition-opacity motion-reduce:transition-none",
+                !condensed && "opacity-0",
+              )}
             >
-              <PanelRightIcon className="size-3.5" />
-            </Button>
-          ) : null}
-        </div>
-
-        <div
-          className={cn(
-            "col-span-2 grid",
-            condensed
-              ? "grid-rows-[1fr]"
-              : "grid-rows-[0fr] transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none",
-          )}
-        >
-          <div
-            ref={condensedRowRef}
-            className={cn(
-              "min-h-0 overflow-hidden transition-[opacity,transform] duration-150 ease-out motion-reduce:transform-none motion-reduce:transition-none",
-              condensed
-                ? "translate-y-0 opacity-100 delay-50"
-                : "translate-y-1 opacity-0 duration-100",
-            )}
-            inert={!condensed}
-          >
-            {detail ? (
-              <div className="col-span-2 min-w-0 px-4 pb-2 pt-1">
-                <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-                  <span className="flex min-w-0 shrink items-center gap-1.5 overflow-hidden text-xs text-muted-foreground">
+              {detail ? (
+                <p className="truncate pb-2.5 font-serif text-card-title font-bold">
+                  {detail.title}
+                </p>
+              ) : null}
+              {detail ? (
+                <div className="min-w-0 pb-2.5">
+                  <div className="flex min-w-0 items-center gap-2 text-secondary-copy text-muted-foreground">
+                    <span className="flex min-w-0 shrink items-center gap-1.5 overflow-hidden text-secondary-copy text-muted-foreground">
+                      <PullRequestActorLabel
+                        actor={detail.author}
+                        profileUrl={authorProfileUrl}
+                        variant="avatar"
+                        className="shrink-0"
+                      />
+                      <span className="shrink-0">
+                        {<RelativeTime timestamp={detail.updatedAt} />}
+                      </span>
+                    </span>
+                    <span aria-hidden className="h-3 w-px shrink-0 bg-border/70" />
+                    <span className="flex min-w-0 flex-1 items-center gap-1.5 font-mono text-meta text-muted-foreground/65">
+                      <PullRequestBaseBranch
+                        baseBranch={detail.baseBranch}
+                        freshness={freshness}
+                        stacked={isStackedPullRequest}
+                        pending={actionPending}
+                        onUpdate={(method) => void perform("update-branch", undefined, method)}
+                        iconClassName="size-3"
+                      />
+                      <ArrowLeftIcon
+                        aria-label={t.git.pullRequest.receivesChangesFrom}
+                        className="size-3 shrink-0 opacity-60"
+                      />
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <code className="flex min-w-0 flex-1">
+                              <MiddleTruncate value={detail.headBranch} showTitle={false} />
+                            </code>
+                          }
+                        />
+                        <TooltipPopup side="top">{detail.headBranch}</TooltipPopup>
+                      </Tooltip>
+                    </span>
+                    <span className="ml-auto inline-flex shrink-0 items-baseline justify-end gap-2 text-meta">
+                      <span
+                        className="inline-flex items-baseline gap-1 tabular-nums"
+                        aria-label={t.git.pullRequest.changedFileCount(detail.changedFiles)}
+                      >
+                        <FileDiffIcon aria-hidden className="size-3 self-center" />
+                        {detail.changedFiles.toLocaleString()}
+                      </span>
+                      <PullRequestDiffStat
+                        additions={detail.additions}
+                        deletions={detail.deletions}
+                        className="shrink-0 font-mono text-meta"
+                      />
+                    </span>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </div>
+          <div className={cn("grid", condensed ? "pr-detail-folded" : "pr-detail-expanded")}>
+            <div
+              ref={foldRef}
+              inert={condensed}
+              className={cn(
+                "min-h-0 overflow-hidden transition-opacity motion-reduce:transition-none",
+                condensed && "opacity-0",
+              )}
+            >
+              {detail ? (
+                <PullRequestDetailHeaderBody
+                  title={
+                    <PullRequestTitleEditor
+                      environmentId={environmentId}
+                      reference={reference}
+                      pullRequestKey={pullRequestKey}
+                      detail={detail}
+                      canWriteSourceControl={canWriteSourceControl}
+                      onSaved={refreshDetail}
+                    />
+                  }
+                  author={
                     <PullRequestActorLabel
                       actor={detail.author}
                       profileUrl={authorProfileUrl}
                       variant="avatar"
-                      className="shrink-0"
+                      avatarSize="lg"
                     />
-                    <span className="shrink-0">
-                      <RelativeTime timestamp={detail.updatedAt} />
+                  }
+                  updated={
+                    <span>
+                      {t.git.pullRequest.updated}
+                      {<RelativeTime timestamp={detail.updatedAt} />}
                     </span>
-                  </span>
-                  <span aria-hidden className="h-3 w-px shrink-0 bg-border/70" />
-                  <span className="flex min-w-0 flex-1 items-center gap-1.5 font-mono text-2xs text-muted-foreground/65">
+                  }
+                  base={
                     <PullRequestBaseBranch
                       baseBranch={detail.baseBranch}
                       freshness={freshness}
                       stacked={isStackedPullRequest}
                       pending={actionPending}
                       onUpdate={(method) => void perform("update-branch", undefined, method)}
-                      iconClassName="size-3"
                     />
-                    <ArrowLeftIcon
-                      aria-label="receives changes from"
-                      className="size-3 shrink-0 opacity-60"
+                  }
+                  head={
+                    <PullRequestCopyableCode
+                      key={detail.headBranch}
+                      value={detail.headBranch}
+                      target={t.git.pullRequest.branchName}
+                      copyLabel={t.git.pullRequest.copyPullRequestBranch}
+                      copiedLabel={t.git.pullRequest.branchNameCopied}
+                      className="p-0"
                     />
-                    <Tooltip>
-                      <TooltipTrigger
-                        render={
-                          <code className="flex min-w-0 flex-1">
-                            <MiddleTruncate value={detail.headBranch} showTitle={false} />
-                          </code>
-                        }
-                      />
-                      <TooltipPopup side="top">{detail.headBranch}</TooltipPopup>
-                    </Tooltip>
-                  </span>
-                  <span className="ml-auto inline-flex shrink-0 items-baseline justify-end gap-2 text-2xs">
-                    <span
-                      className="inline-flex items-baseline gap-1 tabular-nums"
-                      aria-label={`${detail.changedFiles.toLocaleString()} changed ${
-                        detail.changedFiles === 1 ? "file" : "files"
-                      }`}
-                    >
-                      <FileDiffIcon aria-hidden className="size-3 self-center" />
-                      {detail.changedFiles.toLocaleString()}
-                    </span>
-                    <PullRequestChangeBreakdownStat
-                      environmentId={environmentId}
-                      reference={reference}
+                  }
+                  files={t.git.pullRequest.fileCount(detail.changedFiles)}
+                  diffStat={
+                    <PullRequestDiffStat
                       additions={detail.additions}
                       deletions={detail.deletions}
-                      className="shrink-0 font-mono text-2xs"
-                      eager
+                      className="shrink-0 font-mono text-secondary-copy"
                     />
-                  </span>
-                </div>
+                  }
+                />
+              ) : null}
+            </div>
+          </div>
+          {detail ? (
+            <div className="flex flex-col gap-2.5 px-4 pb-2.5">
+              {conflicting ? (
+                <p className="flex items-center gap-1.5 text-secondary-copy text-attention">
+                  <TriangleAlertIcon aria-hidden className="size-3.25" />
+                  {t.git.pullRequest.mergeConflictsWith(detail.baseBranch)}
+                </p>
+              ) : null}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <PullRequestPrimaryAction
+                  headerActions={headerActions}
+                  inlineConfirm={inlineConfirm}
+                  pendingAction={pendingAction}
+                  selectedMergeMethod={selectedMergeMethod}
+                  allowedMergeMethods={allowedMergeMethods}
+                  onSelectMergeMethod={selectMergeMethod}
+                  freshness={freshness}
+                  perform={perform}
+                />
+                {checkoutControl}
+                <PullRequestActionsMenu
+                  pullRequestKey={pullRequestKey}
+                  terminology={terminology}
+                  canWriteSourceControl={canWriteSourceControl}
+                  onMaintainerEditsSaved={refreshDetail}
+                  environmentId={environmentId}
+                  reference={reference}
+                  detail={detail}
+                  linkThreadRef={
+                    threadRef ??
+                    (typeof composerDraftTarget === "object" ? composerDraftTarget : null)
+                  }
+                  onThreadPickerOpenChange={setThreadPickerOpen}
+                  refreshing={refreshing}
+                  refreshFromHost={refreshFromHost}
+                  handoff={handoff}
+                  canFixFindings={canFixFindings}
+                  startFixFindings={startFixFindings}
+                  handoffLabels={handoffLabels}
+                  canWriteGuide={reviewGuidesEnabled && guideWriter.canWrite}
+                  guideRunning={guideWriter.running}
+                  guideWritten={guideWriter.data?.guide != null}
+                  writeGuide={writeGuide}
+                  pickableEnvironments={pickableEnvironments}
+                  actingEnvironmentId={actingEnvironmentId}
+                  onActingEnvironmentChange={selectActingEnvironment}
+                  can={can}
+                  headerActions={headerActions}
+                  selectedMergeMethod={selectedMergeMethod}
+                  showsDeleteBranch={showsDeleteBranch}
+                  environmentConnected={environmentConnected}
+                  confirmDeleteBranch={confirmDeleteBranch}
+                  pendingAction={pendingAction}
+                  perform={perform}
+                  openOnHostText={openOnHostLabel(hostClient)}
+                  repositoryUrl={repositoryUrl}
+                  conflicting={conflicting}
+                  conflictsUnavailable={
+                    attachTarget === null && (checkoutRoot === null || !canPrepareWorktree)
+                  }
+                  startResolveConflicts={startResolveConflicts}
+                  inlineConfirm={inlineConfirm}
+                />
+                {!nativeStack && supportsStackActions && nativeStackQuery.error ? (
+                  <Button variant="ghost" size="xs" onClick={nativeStackQuery.refresh}>
+                    {t.git.pullRequest.retryStackLookup}
+                  </Button>
+                ) : null}
+                {nativeStack ? (
+                  <PullRequestStackMenu
+                    hostLabel={hostClient.label}
+                    terminology={terminology}
+                    stack={nativeStack}
+                    notice={nativeStackQuery.notice}
+                    onRetry={nativeStackQuery.error ? nativeStackQuery.refresh : undefined}
+                    reference={reference}
+                    environmentId={environmentId}
+                    onSelect={onSelectPullRequest}
+                    mergeMethod={selectedMergeMethod}
+                    canMerge={
+                      nativeStackQuery.isFresh &&
+                      supportsStackActions &&
+                      can("merge") &&
+                      allowedMergeMethods.length > 0
+                    }
+                    canRebase={
+                      nativeStackQuery.isFresh &&
+                      supportsStackActions &&
+                      detail.viewerPermissions.stackRebase === true
+                    }
+                    onActed={() => {
+                      refreshDetail();
+                      onActed?.();
+                    }}
+                  />
+                ) : null}
+                {context === "page" ? (
+                  <PullRequestThreadLinks
+                    display="count"
+                    environmentId={environmentId}
+                    reference={reference}
+                    url={detail.url}
+                    threadRef={null}
+                  />
+                ) : null}
+
+                {autoMergeArmed ? (
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <Badge variant="info" role="img" aria-label={armedAutoMergeLabel}>
+                          {armedAutoMergeLabel}
+                        </Badge>
+                      }
+                    />
+                    <TooltipPopup>
+                      {armedAutoMergeLabel}
+                      {t.git.pullRequest.theHostWillMergeThisOnItsOwnOnceItsRequirementsAreMet}
+                    </TooltipPopup>
+                  </Tooltip>
+                ) : null}
               </div>
-            ) : null}
-          </div>
-        </div>
-
-        <div
-          className={cn(
-            "col-span-2 grid",
-            condensed
-              ? "grid-rows-[0fr]"
-              : "grid-rows-[1fr] transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none",
-          )}
-        >
-          <div
-            ref={foldRef}
-            className={cn(
-              "min-h-0 overflow-hidden transition-[opacity,transform] duration-150 ease-out motion-reduce:transform-none motion-reduce:transition-none",
-              condensed
-                ? "-translate-y-1 opacity-0 duration-100"
-                : "translate-y-0 opacity-100 delay-50",
-            )}
-            inert={condensed}
-          >
-            {detail ? (
-              <PullRequestDetailHeaderBody
-                title={
-                  <PullRequestTitleEditor
-                    environmentId={environmentId}
-                    reference={reference}
-                    pullRequestKey={pullRequestKey}
-                    detail={detail}
-                    canWriteSourceControl={canWriteSourceControl}
-                    onSaved={refreshDetail}
-                  />
-                }
-                author={
-                  <PullRequestActorLabel actor={detail.author} profileUrl={authorProfileUrl} />
-                }
-                updated={
-                  <span>
-                    updated <RelativeTime timestamp={detail.updatedAt} />
-                  </span>
-                }
-                checkout={
-                  checkoutCommand ? (
-                    <PullRequestCopyableCode
-                      key={checkoutCommand}
-                      value={checkoutCommand}
-                      target={`${terminology.singular} checkout command`}
-                      copyLabel="Copy checkout command"
-                      copiedLabel="Checkout command copied"
-                      className="ml-auto font-mono"
-                      tooltipSide="bottom"
-                      onError={reportCheckoutCommandError}
-                    />
-                  ) : null
-                }
-                base={
-                  <PullRequestBaseBranch
-                    baseBranch={detail.baseBranch}
-                    freshness={freshness}
-                    stacked={isStackedPullRequest}
-                    pending={actionPending}
-                    onUpdate={(method) => void perform("update-branch", undefined, method)}
-                  />
-                }
-                head={
-                  <PullRequestCopyableCode
-                    key={detail.headBranch}
-                    value={detail.headBranch}
-                    target="branch name"
-                    copyLabel={`Copy ${terminology.singular} branch`}
-                    copiedLabel="Branch name copied"
-                  />
-                }
-                files={`${detail.changedFiles.toLocaleString()} ${detail.changedFiles === 1 ? "file" : "files"}`}
-                diffStat={
-                  <PullRequestChangeBreakdownStat
-                    environmentId={environmentId}
-                    reference={reference}
-                    additions={detail.additions}
-                    deletions={detail.deletions}
-                    className="shrink-0 font-mono text-xs"
-                    eager
-                  />
-                }
-              />
-            ) : null}
-          </div>
-        </div>
-
+            </div>
+          ) : null}
+        </TooltipProvider>
         {detail ? (
           <PullRequestDetailTabBar
             tabs={visibleTabs}
@@ -1587,14 +1567,18 @@ export function PullRequestDetailPanel({
             {tab === "summary" ? (
               showsApproveWorkflows ? (
                 <PullRequestApproveWorkflowsButton
-                  pullRequestKey={pullRequestKey}
                   pendingAction={pendingAction}
+                  inlineConfirm={inlineConfirm}
                   perform={perform}
                 />
               ) : (
                 <PullRequestChecksStatusLine
                   className="text-muted-foreground"
-                  aria-label={checksSummary ? `Checks: ${checksSummary}` : "Checks"}
+                  aria-label={
+                    checksSummary
+                      ? t.git.pullRequest.checksSummary(checksSummary)
+                      : t.git.pullRequest.checks
+                  }
                   icon={
                     checksState !== null ? (
                       <PullRequestChecksPopover
@@ -1622,10 +1606,8 @@ export function PullRequestDetailPanel({
                     className="inline-flex items-center gap-1"
                     aria-label={
                       activityError
-                        ? "Comments unavailable"
-                        : `${detail.commentCount.toLocaleString()} ${
-                            detail.commentCount === 1 ? "comment" : "comments"
-                          }`
+                        ? t.git.pullRequest.commentsUnavailable
+                        : t.git.pullRequest.commentCount(detail.commentCount)
                     }
                   >
                     <MessageSquareIcon aria-hidden className="size-3" />
@@ -1639,10 +1621,8 @@ export function PullRequestDetailPanel({
                     className="inline-flex items-center gap-1"
                     aria-label={
                       activityError
-                        ? "Commits unavailable"
-                        : `${detail.commits.length.toLocaleString()} ${
-                            detail.commits.length === 1 ? "commit" : "commits"
-                          }`
+                        ? t.git.pullRequest.commitsUnavailable
+                        : t.git.pullRequest.commitCount(detail.commits.length)
                     }
                   >
                     <GitCommitHorizontalIcon aria-hidden className="size-3" />
@@ -1662,7 +1642,7 @@ export function PullRequestDetailPanel({
                       <PullRequestReviewOutcomeIcon outcome="approved" className="size-3" />
                       {approvalCount.toLocaleString()}
                       <span className="sr-only">
-                        {approvalCount === 1 ? "approval" : "approvals"}
+                        {t.git.pullRequest.approvalWord(approvalCount)}
                       </span>
                     </span>
                   ) : null}
@@ -1672,15 +1652,17 @@ export function PullRequestDetailPanel({
                   variant="ghost-muted"
                   aria-label={
                     timelineOrder === "newest"
-                      ? "Show oldest activity first"
-                      : "Show newest activity first"
+                      ? t.git.pullRequest.showOldestActivityFirst
+                      : t.git.pullRequest.showNewestActivityFirst
                   }
                   onClick={() =>
                     setTimelineOrder((value) => (value === "newest" ? "oldest" : "newest"))
                   }
                 >
                   <ArrowDownUpIcon aria-hidden className="size-3" />
-                  {timelineOrder === "newest" ? "Newest first" : "Oldest first"}
+                  {timelineOrder === "newest"
+                    ? t.git.pullRequest.newestFirst
+                    : t.git.pullRequest.oldestFirst}
                 </Button>
               </div>
             ) : null}
@@ -1718,8 +1700,9 @@ export function PullRequestDetailPanel({
           <PullRequestsUnavailableState
             {...(isPullRequestNotFound(detailQuery.failure)
               ? {
-                  title: `${capitalizeTerm(terminology.singular)} #${reference.number} not found`,
-                  error: `It may be an issue rather than a ${terminology.singular}, or this account can't see it.`,
+                  title: t.git.pullRequest.requestNotFound(reference.number),
+                  error:
+                    t.git.pullRequest.itMayBeAnIssueRatherThanAPullRequestOrThisAccountCanTSeeIt,
                 }
               : { error: detailQuery.error })}
             refreshing={detailQuery.isPending}
@@ -1817,7 +1800,7 @@ export function PullRequestDetailPanel({
               <div className={cn("absolute inset-0", tab !== "code" && "invisible")}>
                 <Suspense
                   fallback={
-                    <DiffPanelLoadingState label={`Loading ${terminology.singular} diff...`} />
+                    <DiffPanelLoadingState label={t.git.pullRequest.loadingPullRequestDiff} />
                   }
                 >
                   <PullRequestCodeTab
