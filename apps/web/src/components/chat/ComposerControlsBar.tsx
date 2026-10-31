@@ -1,3 +1,4 @@
+import { TraitsMenuContent, TraitsPicker, shouldRenderTraitsControls } from "./TraitsPicker";
 /** Keeps provider controls isolated from prompt edits while applying local labels and control variants. */
 import { t } from "~/i18n";
 import type { ChatComposerProps } from "./ChatComposer";
@@ -22,10 +23,7 @@ import {
   type ServerProvider,
 } from "@t3tools/contracts";
 import { cn } from "~/lib/utils";
-import {
-  renderProviderTraitsMenuContent,
-  renderProviderTraitsPicker,
-} from "./composerProviderState";
+import { resolveComposerTraitsInput } from "./composerProviderState";
 import type { useComposerProviderModel } from "./useComposerProviderModel";
 
 /**
@@ -130,7 +128,7 @@ export function ComposerControlsBar(props: {
     modelPickerIconClassName,
     getModelDisabledReason,
   } = props;
-  const providerTraitsMenuContent = renderProviderTraitsMenuContent({
+  const traitsInput = resolveComposerTraitsInput({
     provider: selectedProvider,
     instanceId: selectedInstanceId,
     ...(routeKind === "server" ? { threadRef: routeThreadRef } : {}),
@@ -143,26 +141,19 @@ export function ComposerControlsBar(props: {
     onPromptEdit,
     planModeEnabled,
   });
-  const providerTraitsPickerInput = {
-    provider: selectedProvider,
-    instanceId: selectedInstanceId,
-    ...(routeKind === "server" ? { threadRef: routeThreadRef } : {}),
-    ...(routeKind === "draft" && draftId ? { draftId } : {}),
-    model: selectedModel,
-    models: selectedProviderModels,
-    modelOptions: composerModelOptions?.[selectedInstanceId],
-    reportedModelSelection,
-    promptUltrathink,
-    onPromptEdit,
-    planModeEnabled,
-    isComposerOwned: true,
-  } satisfies Parameters<typeof renderProviderTraitsPicker>[0];
-  const providerTraitsPicker = renderProviderTraitsPicker(providerTraitsPickerInput);
-  const restingProviderTraitsPicker = renderProviderTraitsPicker({
-    ...providerTraitsPickerInput,
-    size: composerControlsCollapsed ? "xs" : "sm",
-    hidden: composerControlsHidden || restingHiddenBlockCount > 1,
-  });
+  const visibleTraits = traitsInput && shouldRenderTraitsControls(traitsInput) ? traitsInput : null;
+  const providerTraitsMenuContent = visibleTraits ? <TraitsMenuContent {...visibleTraits} /> : null;
+  const providerTraitsPicker = visibleTraits ? (
+    <TraitsPicker {...visibleTraits} isComposerOwned />
+  ) : null;
+  const restingProviderTraitsPicker = visibleTraits ? (
+    <TraitsPicker
+      {...visibleTraits}
+      isComposerOwned
+      size={composerControlsCollapsed ? "xs" : "sm"}
+      hidden={composerControlsHidden || restingHiddenBlockCount > 1}
+    />
+  ) : null;
   const restingBlockDefs = [
     ...(providerTraitsPicker
       ? [

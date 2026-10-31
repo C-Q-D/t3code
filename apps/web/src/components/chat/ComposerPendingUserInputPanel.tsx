@@ -1,12 +1,12 @@
+import { isInSideChatPane } from "~/lib/sideChatPane";
+import type { PendingUserInputDraftAnswer } from "@t3tools/client-runtime/state/pending-user-input";
 import { t } from "~/i18n";
 import { type RuntimeRequestId, type ScopedThreadRef } from "@t3tools/contracts";
-import { memo, useEffect, useEffectEvent, useRef, useState } from "react";
+import { memo, use, useEffect, useEffectEvent, useRef, useState } from "react";
+import { BackgroundThreadContext } from "./backgroundThread";
 import { useStableCallback } from "~/hooks/useStableCallback";
 import { type PendingUserInput } from "../../session-logic";
-import {
-  derivePendingUserInputProgress,
-  type PendingUserInputDraftAnswer,
-} from "../../pendingUserInput";
+import { derivePendingUserInputProgress } from "../../pendingUserInput";
 import { CheckIcon, ChevronDownIcon, PencilIcon, XIcon } from "lucide-react";
 import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "../ui/collapsible";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
@@ -93,20 +93,18 @@ const ComposerPendingUserInputCard = memo(function ComposerPendingUserInputCard(
   const canRespond = prompt.responseCapability !== "not_resumable";
   const responseDisabled = disabled || isResponding || !canRespond;
   const autoAdvanceTimerRef = useRef<number | null>(null);
-  // The auto-advance timer fires after the render that armed it.
   const advance = useStableCallback(onAdvance);
   const [optimisticSingleSelect, setOptimisticSingleSelect] = useState<{
     questionId: string;
     optionValue: string;
   } | null>(null);
   const [collapsedQuestionId, setCollapsedQuestionId] = useState<string | null>(null);
-  // The active question keys the shortcut listener, so it must keep its identity across renders.
+  // Keep question identity stable for its shortcut listener.
   const progress = derivePendingUserInputProgress(prompt.questions, answers, questionIndex);
   const activeQuestion = progress.activeQuestion;
   const customAnswerActive = progress.customAnswer.trim().length > 0;
   const isCollapsed = collapsedQuestionId !== null && collapsedQuestionId === activeQuestion?.id;
 
-  // The optimistic pick is dropped once the draft confirms it or the question moves on.
   if (
     optimisticSingleSelect &&
     activeQuestion &&
@@ -118,7 +116,7 @@ const ComposerPendingUserInputCard = memo(function ComposerPendingUserInputCard(
     setOptimisticSingleSelect(null);
   }
 
-  // A delayed answer only advances its own question, while permission remains granted.
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- clears the auto-advance timer when the question changes, input is disabled, or the panel unmounts
   useEffect(() => {
     const clearAutoAdvance = () => {
       if (autoAdvanceTimerRef.current !== null) {
@@ -148,12 +146,15 @@ const ComposerPendingUserInputCard = memo(function ComposerPendingUserInputCard(
   };
 
   const selectOptionFromShortcut = useEffectEvent(handleOptionSelection);
+  const backgroundThread = use(BackgroundThreadContext);
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes a document keydown listener for digit shortcuts while a question is answerable
   useEffect(() => {
-    if (!activeQuestion || responseDisabled || isCollapsed) return;
+    if (!activeQuestion || responseDisabled || isCollapsed || backgroundThread) return;
     const handler = (event: globalThis.KeyboardEvent) => {
       if (event.metaKey || event.ctrlKey || event.altKey) return;
       const target = event.target;
+      if (isInSideChatPane(target)) return;
       if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
         return;
       }
@@ -174,7 +175,7 @@ const ComposerPendingUserInputCard = memo(function ComposerPendingUserInputCard(
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [activeQuestion, isCollapsed, responseDisabled]);
+  }, [activeQuestion, backgroundThread, isCollapsed, responseDisabled]);
 
   if (!activeQuestion) {
     return null;

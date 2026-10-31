@@ -14,6 +14,7 @@ const DISMISS_TRANSITION_MS = 220;
 
 /** A caller-owned notice, including its existing recovery and dismissal actions. */
 export interface ComposerBannerStackItem {
+  readonly group?: "environment" | "attention";
   readonly id: string;
   readonly variant: ComposerBannerVariant;
   readonly priority?: "urgent" | "activity" | "notice";
@@ -55,10 +56,16 @@ interface ComposerBannerStackProps {
   readonly className?: string;
   readonly items: ReadonlyArray<ComposerBannerStackEntry>;
   readonly attachedAbove?: ReactNode;
+  readonly detached?: boolean;
 }
 
 /** Displays ordered notices; expansion keeps keyboard focus and dismissal waits for the exit transition. */
-export function ComposerBannerStack({ className, items, attachedAbove }: ComposerBannerStackProps) {
+export function ComposerBannerStack({
+  className,
+  items,
+  attachedAbove,
+  detached = false,
+}: ComposerBannerStackProps) {
   const [stackExpanded, setStackExpanded] = useState(false);
   const noticesRef = useRef<HTMLDivElement>(null);
   const peekRef = useRef<HTMLButtonElement>(null);
@@ -261,7 +268,7 @@ export function ComposerBannerStack({ className, items, attachedAbove }: Compose
         >
           <ComposerBannerStackAlert
             item={frontItem}
-            attached
+            attached={!detached}
             exiting={exitingItemId === frontItem.id}
             onDismissRequest={() => requestDismiss(frontItem)}
           />
@@ -277,7 +284,9 @@ export function ComposerBannerStack({ className, items, attachedAbove }: Compose
  * @param detailsLabel Accessible label for the overflow action.
  * @param description Marks description text only; false by default for titles.
  * @returns Inline text and an overflow action when measurement detects hidden content. */
-function NoticeText({
+const SUBPIXEL_ROUNDING = 0.001;
+
+export function NoticeText({
   children,
   className,
   detailsLabel,
@@ -290,26 +299,55 @@ function NoticeText({
 }) {
   const textRef = useRef<HTMLSpanElement>(null);
   const detailsRef = useRef<HTMLButtonElement>(null);
-  const [showDetails, setShowDetails] = useState(false);
+  const [detailsAtWidth, setDetailsAtWidth] = useState<number | null>(null);
+  const showDetails = detailsAtWidth !== null;
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- measures text overflow in the DOM via ResizeObserver and MutationObserver to show the details button
   useLayoutEffect(() => {
     const text = textRef.current;
     if (!text) return;
+    const banner = text.closest("[data-slot=composer-banner]");
+    const range = document.createRange();
     const measure = () => {
       // Ignore the space taken by the details button itself so it cannot
       // sustain its own overflow after the text would otherwise fit.
       const recoveredWidth = detailsRef.current ? detailsRef.current.offsetWidth + 4 : 0;
       const hidden = getComputedStyle(text).position === "absolute";
-      setShowDetails(
+      const overflowing =
         hidden ||
-          [text, ...text.querySelectorAll("*")].some(
-            (element) => element.scrollWidth > element.clientWidth + recoveredWidth,
-          ),
+        [text, ...text.querySelectorAll("*")].some((element) => {
+          // A range spans laid-out content only; scrollWidth also counts positioned layers
+          // such as a link's touch hit area, which overflow without cutting any text.
+          // The two rects can disagree by float rounding (~0.00001px on phones); real
+          // overflow is at least one layout unit, 1/64 of a device pixel.
+          range.selectNodeContents(element);
+          return (
+            range.getBoundingClientRect().width >
+            element.getBoundingClientRect().width + recoveredWidth + SUBPIXEL_ROUNDING
+          );
+        });
+      // The button's width can wrap the banner's actions onto a second row, which gives
+      // the text room and removes the button, which unwraps the row again. Once shown,
+      // the button stays until the banner itself gets wider than where it appeared.
+      const width = banner?.clientWidth ?? text.clientWidth;
+      setDetailsAtWidth((shownAt) =>
+        overflowing
+          ? (shownAt ?? width)
+          : banner && shownAt !== null && width <= shownAt
+            ? shownAt
+            : null,
       );
     };
     measure();
-    const stopObserving = observeResize(text, measure);
-    const mutations = new MutationObserver(measure);
+    const stopObserving = observeResize([text, banner ?? text], measure);
+    let content = text.textContent;
+    const mutations = new MutationObserver(() => {
+      if (text.textContent !== content) {
+        content = text.textContent;
+        setDetailsAtWidth(null);
+      }
+      measure();
+    });
     mutations.observe(text, { childList: true, subtree: true, characterData: true });
     return () => {
       stopObserving();

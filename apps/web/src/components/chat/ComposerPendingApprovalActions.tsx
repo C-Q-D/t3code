@@ -12,6 +12,7 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { composerFloatingLayerProps } from "./composerEventScope";
 
 interface ComposerPendingApprovalActionsProps {
+  presentation?: "composer" | "inline";
   requestId: RuntimeRequestId;
   isResponding: boolean;
   canRespond: boolean;

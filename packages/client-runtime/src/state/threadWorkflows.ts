@@ -38,6 +38,7 @@ export interface ThreadQueueWorkflowState {
   readonly canPromoteToSteer: boolean;
   /** The active run is a compaction, so promoting a queued message stops it instead of steering. */
   readonly promoteSkipsCompaction: boolean;
+  readonly canReorder: boolean;
   readonly canSendNow: boolean;
 }
 
@@ -165,6 +166,7 @@ export function deriveThreadQueueWorkflowState(projection: Projection): ThreadQu
     activeRun,
     queuedRuns,
     isHeld: projection.runs.some((run) => run.status === "queued" && run.queueHeld === true),
+    canReorder: capabilities?.supportsQueuedMessages === true,
     canSendNow:
       activeRun === null &&
       projection.thread.archivedAt == null &&

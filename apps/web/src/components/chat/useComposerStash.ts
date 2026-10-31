@@ -144,8 +144,12 @@ export function useComposerStash(input: {
   );
   const setComposerDraftThreadContexts = useComposerDraftStore((store) => store.setThreadContexts);
   const [isStashMenuOpen, setIsStashMenuOpen] = useState(false);
-  // Each stash bumps the key; the badge replays its one-shot pulse animation per key.
-  const [stashPulseKey, setStashPulseKey] = useState(0);
+  const [stashPulse, setStashPulse] = useState<{ key: number; active: boolean }>({
+    key: 0,
+    active: false,
+  });
+  const stashPulseKeyRef = useRef(0);
+  const stashPulseTimeoutRef = useRef<number | null>(null);
   const stashInFlightRef = useRef<Set<string>>(new Set());
 
   const stashQueue = usePromptStashStore((state) => state.entries);
@@ -153,8 +157,24 @@ export function useComposerStash(input: {
   const takeStashEntry = usePromptStashStore((state) => state.takeEntry);
   const finalizeStashEntryImages = usePromptStashStore((state) => state.finalizeEntryImages);
 
+  useEffect(() => {
+    return () => {
+      if (stashPulseTimeoutRef.current !== null) {
+        window.clearTimeout(stashPulseTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const pulseStashBadge = () => {
-    setStashPulseKey((key) => key + 1);
+    stashPulseKeyRef.current += 1;
+    setStashPulse({ key: stashPulseKeyRef.current, active: true });
+    if (stashPulseTimeoutRef.current !== null) {
+      window.clearTimeout(stashPulseTimeoutRef.current);
+    }
+    stashPulseTimeoutRef.current = window.setTimeout(() => {
+      stashPulseTimeoutRef.current = null;
+      setStashPulse((current) => ({ ...current, active: false }));
+    }, 1200);
   };
 
   const restoreStashEntry = async (menuEntry: PromptStashEntry) => {
@@ -713,7 +733,7 @@ export function useComposerStash(input: {
     stashQueue,
     isStashMenuOpen,
     setIsStashMenuOpen,
-    stashPulseKey,
+    stashPulse,
     restoreStashEntryStable,
     deleteStashEntryStable,
     toggleStashMenuStable,

@@ -1,3 +1,4 @@
+import type { TimestampFormat } from "@t3tools/contracts/settings";
 /** Displays queued messages and their edit, reorder, steer and removal actions. */
 import { t } from "~/i18n";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
@@ -93,6 +94,9 @@ export function QueuedRunsControl({
     Pick<ChatMessage, "id" | "inputIntent" | "text" | "attachments">
   >;
   readonly editingRunId: RunId | null;
+  readonly timestampFormat?: TimestampFormat;
+  readonly editBlockedReason?: string | null;
+  readonly onOpenThread?: (threadId: ThreadId) => void;
   readonly onEditQueuedRun: (request: EditQueuedRunRequest) => void;
   readonly onCancelEdit: () => void;
 }) {
@@ -222,7 +226,13 @@ export function QueuedRunsControl({
     // moving the caret inside that draft.
     editLatest(repeat) {
       const latest = queued.at(-1);
-      if (!latest || props.editingRunId !== null || busyRunId !== null) return false;
+      if (
+        !latest ||
+        props.editBlockedReason != null ||
+        props.editingRunId !== null ||
+        busyRunId !== null
+      )
+        return false;
       if (!repeat) {
         setExpanded(true);
         props.onEditQueuedRun({
@@ -491,7 +501,11 @@ export function QueuedRunsControl({
                               expanded ? "rounded-menu-row" : "rounded-full",
                             )}
                             aria-label={t.chat.queue.editQueuedMessage}
-                            disabled={item.runId === null || busyRunId !== null}
+                            disabled={
+                              item.runId === null ||
+                              busyRunId !== null ||
+                              props.editBlockedReason != null
+                            }
                             onClick={() => {
                               if (item.runId !== null && item.messageId !== null) {
                                 setExpanded(true);
@@ -509,11 +523,12 @@ export function QueuedRunsControl({
                         <SquarePenIcon aria-hidden="true" />
                       </TooltipTrigger>
                       <TooltipPopup>
-                        {t.chat.queue.editInComposer(
-                          item.serverIndex === queued.length - 1
-                            ? (props.editShortcutLabel ?? null)
-                            : null,
-                        )}
+                        {props.editBlockedReason ??
+                          t.chat.queue.editInComposer(
+                            item.serverIndex === queued.length - 1
+                              ? (props.editShortcutLabel ?? null)
+                              : null,
+                          )}
                       </TooltipPopup>
                     </Tooltip>
                     <Tooltip>

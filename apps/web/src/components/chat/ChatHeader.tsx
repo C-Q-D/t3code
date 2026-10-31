@@ -5,6 +5,7 @@ import {
   AuthOrchestrationOperateScope,
   type ContextMenuItem,
   type EnvironmentId,
+  type ScopedThreadRef,
   type ThreadId,
 } from "@t3tools/contracts";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
@@ -47,6 +48,7 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import { isTrailingDoubleClick } from "../Sidebar.logic";
+import { Badge } from "../ui/badge";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { toastManager } from "../ui/toast";
 import { useThreadActionMenu } from "~/hooks/useThreadActionMenu";
@@ -88,6 +90,7 @@ interface ChatHeaderProps {
   activeThreadId: ThreadId;
   activeThreadTitle: string;
   /** Draft titlebars show the project capsule and panel actions, without thread title chrome. */
+  activeThreadLinkOrigin?: string | null | undefined;
   isServerThread: boolean;
   activeProject: EnvironmentProject | null;
   parentThreadLink: { threadId: ThreadId; title: string } | null;
@@ -97,6 +100,7 @@ interface ChatHeaderProps {
   popoverAnchorRef: RefObject<HTMLElement | null>;
   onNewThreadInProject: () => void;
   onOpenProjectSettings?: (() => void) | undefined;
+  onFindInThread?: ((threadRef: ScopedThreadRef) => void) | undefined;
 }
 
 function resolveRenameCommit(input: {
@@ -217,6 +221,7 @@ export const ChatHeader = memo(function ChatHeader({
   activeThreadEnvironmentId,
   activeThreadId,
   activeThreadTitle,
+  activeThreadLinkOrigin,
   isServerThread,
   activeProject,
   parentThreadLink,
@@ -225,6 +230,7 @@ export const ChatHeader = memo(function ChatHeader({
   popoverAnchorRef,
   onNewThreadInProject,
   onOpenProjectSettings,
+  onFindInThread,
 }: ChatHeaderProps) {
   const activeProjectName = activeProject?.isScratch
     ? t.chat.draftHero.noProject
@@ -267,6 +273,7 @@ export const ChatHeader = memo(function ChatHeader({
       ? renaming.title
       : null;
   const isRenamingTitle = renamingTitle !== null;
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- measures the breadcrumb list DOM via ResizeObserver, a frame and font loads to collapse the parent title
   useEffect(() => {
     const list = breadcrumbContainer?.querySelector("ol");
     if (!list || !parentThreadLink) return;
@@ -388,6 +395,7 @@ export const ChatHeader = memo(function ChatHeader({
     threadRef: isServerThread ? activeThreadRef : null,
     projectCwd: activeProjectCwd,
     onStartRename: startRename,
+    onFind: onFindInThread,
     menuPresenter,
   });
   const titleButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -601,6 +609,7 @@ export const ChatHeader = memo(function ChatHeader({
           </WorkspaceBreadcrumbItem>
         ) : null}
       </WorkspaceBreadcrumb>
+      {activeThreadLinkOrigin ? <Badge>{activeThreadLinkOrigin}</Badge> : null}
     </div>
   );
   const slots = useTitlebarSlot({

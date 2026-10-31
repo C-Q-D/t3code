@@ -14,7 +14,7 @@ export const ThreadStatusLine = memo(function ThreadStatusLine(props: {
   readonly actionDisabled?: boolean;
   readonly emphasized?: boolean;
   readonly onAction: () => void;
-  // Set when the label reads the clock, so the line updates as time passes.
+  // Set for clock-dependent labels to trigger updates.
   readonly clockMinute?: string;
 }) {
   return (

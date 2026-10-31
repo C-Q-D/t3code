@@ -26,6 +26,13 @@ it.each(["standard", "custom"] as const)(
   "tracks %s notices and untyped inline badges through removal and Dock isolation",
   async (kind) => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    // jsdom has no range layout; this case checks Dock registration, not text overflow.
+    const createRange = document.createRange.bind(document);
+    using _rangeLayout = vi.spyOn(document, "createRange").mockImplementation(() => {
+      const range = createRange();
+      range.getBoundingClientRect = () => new DOMRect();
+      return range;
+    });
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);

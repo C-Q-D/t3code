@@ -140,3 +140,21 @@ export function resolveScrollToEndClearance(input: {
   }
   return Math.ceil(input.overlayHeight - (top - contentTop));
 }
+
+export function shouldUseRestingComposerLayout(input: {
+  isExistingThread: boolean;
+  isMobileViewport: boolean;
+  isScrollCollapsed: boolean;
+  hasExpandedChrome: boolean;
+  hasMultilinePrompt: boolean;
+  timelineOverflows: boolean;
+}): boolean {
+  return (
+    input.isExistingThread &&
+    !input.isMobileViewport &&
+    input.timelineOverflows &&
+    input.isScrollCollapsed &&
+    !input.hasMultilinePrompt &&
+    !input.hasExpandedChrome
+  );
+}

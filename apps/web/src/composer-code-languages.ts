@@ -6,6 +6,7 @@ export const CODE_BLOCK_LANGUAGES = [
       return t.chat.codeLanguage.plainText;
     },
   },
+  { id: "asm", label: "Assembly" },
   { id: "bash", label: "Bash" },
   { id: "c", label: "C" },
   { id: "cpp", label: "C++" },
@@ -49,16 +50,21 @@ export const CODE_BLOCK_LANGUAGES = [
 export type CodeBlockLanguage = { readonly id: string; readonly label: string };
 
 const LANGUAGE_ALIASES: Record<string, string> = {
+  assembly: "asm",
   cs: "csharp",
   "c++": "cpp",
   js: "javascript",
   md: "markdown",
+  plaintext: "",
   py: "python",
   rb: "ruby",
   rs: "rust",
+  s: "asm",
   sh: "bash",
   shell: "bash",
+  text: "",
   ts: "typescript",
+  txt: "",
   yml: "yaml",
 };
 
@@ -66,10 +72,7 @@ export function languageOfInfoString(info: string): string {
   return info.trim().split(/\s+/, 1)[0] ?? "";
 }
 
-/**
- * Plain text clears it, unless something follows: a bare `title=x` would read
- * as the language, so that keeps `text` in front.
- */
+/** Plain text clears the language unless trailing metadata would be parsed as one. */
 export function withInfoStringLanguage(info: string, language: string): string {
   const leading = /^\s*/.exec(info)![0];
   const rest = info.slice(leading.length + languageOfInfoString(info).length);
@@ -78,7 +81,7 @@ export function withInfoStringLanguage(info: string, language: string): string {
 }
 
 export function codeLanguageEntry(language: string): CodeBlockLanguage | null {
-  const id = language === "text" ? "" : (LANGUAGE_ALIASES[language.toLowerCase()] ?? language);
+  const id = LANGUAGE_ALIASES[language.toLowerCase()] ?? language;
   return CODE_BLOCK_LANGUAGES.find((entry) => entry.id === id.toLowerCase()) ?? null;
 }
 

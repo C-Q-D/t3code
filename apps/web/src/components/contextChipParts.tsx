@@ -169,6 +169,7 @@ function averageImageColor(image: HTMLImageElement): string | undefined {
 export function ImageChipButton({
   name,
   previewUrl,
+  disabled = false,
   size,
   suffix,
   style,
@@ -176,6 +177,7 @@ export function ImageChipButton({
 }: Omit<ComponentProps<typeof ContextChip>, "kind" | "render"> & {
   name: string;
   previewUrl: string | undefined;
+  disabled?: boolean;
   size: string;
   suffix?: string | null;
 }) {
@@ -185,7 +187,7 @@ export function ImageChipButton({
   return (
     <ContextChip
       kind="image"
-      render={<button type="button" />}
+      render={<button type="button" disabled={disabled} />}
       aria-label={t.app.context.imageAttachment(name, size)}
       style={{ ...style, ...(accent ? { "--context-chip-accent": accent } : {}) } as CSSProperties}
       {...props}
