@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { runAtomCommand } from "@t3tools/client-runtime/state/runtime";
 import { readCodexAuthDelivery } from "@t3tools/shared/codexAuthHandoff";
 
@@ -35,6 +36,7 @@ export function startProviderAuthDelivery(): void {
   });
 }
 
+/** Sends the one-time callback only to its owning environment and reports failure without retaining the code. */
 async function completeProviderAuth(delivery: ProviderAuthDelivery): Promise<void> {
   try {
     const result = await runAtomCommand(
@@ -53,15 +55,15 @@ async function completeProviderAuth(delivery: ProviderAuthDelivery): Promise<voi
     if (result._tag === "Failure") {
       toastManager.add({
         type: "error",
-        title: "ChatGPT sign-in couldn't finish",
-        description: "Return to the provider and try again.",
+        title: t.settings.providerAuthCallbackCoordinator.chatGptSignInCouldnTFinish,
+        description: t.settings.providerAuthCallbackCoordinator.returnToTheProviderAndTryAgain,
       });
     }
   } catch {
     toastManager.add({
       type: "error",
-      title: "ChatGPT sign-in couldn't finish",
-      description: "Reconnect to the environment and try again.",
+      title: t.settings.providerAuthCallbackCoordinator.chatGptSignInCouldnTFinish,
+      description: t.settings.providerAuthCallbackCoordinator.reconnectEnvironmentTryAgainHint,
     });
   }
 }

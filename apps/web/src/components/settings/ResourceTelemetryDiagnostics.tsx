@@ -30,7 +30,8 @@ import type {
 } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
-import { memo, useEffect, useRef, useState, type ReactNode } from "react";
+import { RegistryContext } from "@effect/atom-react";
+import { memo, useContext, useRef, useState, type ReactNode } from "react";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
@@ -55,6 +56,7 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { toastManager } from "../ui/toast";
 import {
   resourceSummaryBarHeights,
+  processIdentityKey,
   resourceHistoryBarHeight,
   resourceHistoryCpuScaleMax,
   shouldShowResourceMonitorRetry,
@@ -94,18 +96,22 @@ function formatRate(value: number): string {
 function formatCpuTime(valueMs: number): string {
   const seconds = valueMs / 1_000;
   if (seconds < 60)
-    return t.settings.resourceTelemetry.cpuTime.seconds(seconds.toFixed(seconds >= 10 ? 1 : 2));
+    return t.settings.resourceTelemetry.cpuTime.seconds(
+      seconds.toFixed(seconds >= 10 ? 1 : 2).replace(/\.0+$/, ""),
+    );
   const minutes = seconds / 60;
   if (minutes < 60)
-    return t.settings.resourceTelemetry.cpuTime.minutes(minutes.toFixed(minutes >= 10 ? 1 : 2));
-  return t.settings.resourceTelemetry.cpuTime.hours((minutes / 60).toFixed(2));
+    return t.settings.resourceTelemetry.cpuTime.minutes(
+      minutes.toFixed(minutes >= 10 ? 1 : 2).replace(/\.0+$/, ""),
+    );
+  return t.settings.resourceTelemetry.cpuTime.hours((minutes / 60).toFixed(2).replace(/\.0+$/, ""));
 }
 
 /** Formats collector duration from microseconds for the health display. */
 function formatDurationMicros(value: number): string {
   if (value < 1_000) return `${Math.round(value)} µs`;
-  if (value < 1_000_000) return `${(value / 1_000).toFixed(2)} ms`;
-  return `${(value / 1_000_000).toFixed(2)} s`;
+  if (value < 1_000_000) return `${(value / 1_000).toFixed(2).replace(/\.0+$/, "")} ms`;
+  return `${(value / 1_000_000).toFixed(2).replace(/\.0+$/, "")} s`;
 }
 
 /** Formats the collector sampling interval supplied in milliseconds. */
@@ -115,17 +121,6 @@ function formatSampleInterval(valueMs: number): string {
   return t.settings.resourceTelemetry.sampleIntervalSeconds(seconds);
 }
 
-/** Combines PID and start time to keep reused operating-system PIDs distinct. */
-function processIdentityKey(process: ResourceTelemetryProcess): string {
-  return `${process.identity.pid}:${process.identity.startTimeMs}`;
-}
-
-/** Builds a stable historical row key from process identity rather than its command name. */
-function processSummaryIdentityKey(process: ResourceTelemetryProcessSummary): string {
-  return `${process.identity.pid}:${process.identity.startTimeMs}`;
-}
-
-/** Derives the displayed executable name while retaining the complete command for inspection. */
 function formatProcessName(process: Pick<ResourceTelemetryProcess, "command" | "name">): string {
   if (process.name.trim()) return process.name;
   const firstToken = process.command.trim().split(/\s+/)[0] ?? process.command;
@@ -826,7 +821,7 @@ function HistoryProcessTable({
               </tr>
             ) : null}
             {processes.map((process) => (
-              <tr key={processSummaryIdentityKey(process)} className="hover:bg-muted/20">
+              <tr key={processIdentityKey(process)} className="hover:bg-muted/20">
                 <td className="px-4 py-2 sm:pl-5">
                   <Tooltip>
                     <TooltipTrigger
@@ -934,7 +929,7 @@ function AttributionTable({ entries }: { entries: ReadonlyArray<ResourceAttribut
               </td>
               <td className="px-3 py-2 text-right font-mono tabular-nums">{entry.count}</td>
               <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground sm:pr-5">
-                {(entry.durationMs / 1_000).toFixed(2)}s
+                {(entry.durationMs / 1_000).toFixed(2).replace(/\.0+$/, "")}s
               </td>
             </tr>
           ))}
@@ -1112,6 +1107,22 @@ export function ResourceTelemetryDiagnostics({
   environmentId: EnvironmentId | null;
   children?: ReactNode;
 }) {
+  return (
+    <ResourceTelemetryDiagnosticsBody key={environmentId ?? ""} environmentId={environmentId}>
+      {children}
+    </ResourceTelemetryDiagnosticsBody>
+  );
+}
+
+/** Environment changes discard pending process actions while history keeps its own subscription. */
+function ResourceTelemetryDiagnosticsBody({
+  environmentId,
+  children,
+}: {
+  environmentId: EnvironmentId | null;
+  children?: ReactNode;
+}) {
+  const registry = useContext(RegistryContext);
   const canMaintainEnvironment = useEnvironmentScope(environmentId, AuthEnvironmentMaintainScope);
   const telemetry = useResourceTelemetry(environmentId);
   const retryTelemetry = telemetry.retry;
@@ -1120,19 +1131,12 @@ export function ResourceTelemetryDiagnostics({
   });
   const [signalingKeys, setSignalingKeys] = useState<ReadonlySet<string>>(() => new Set());
   const signalingKeysRef = useRef<ReadonlySet<string>>(new Set());
-  const environmentIdRef = useRef(environmentId);
-  useEffect(() => {
-    environmentIdRef.current = environmentId;
-    return () => {
-      environmentIdRef.current = null;
-    };
-  }, [environmentId]);
   const [isRetrying, setIsRetrying] = useState(false);
   const snapshot = telemetry.data;
   const allT3 = snapshot?.groups.allT3;
 
   const signalProcess = async (process: ResourceTelemetryProcess, signal: ServerProcessSignal) => {
-    const targetEnvironmentId = environmentIdRef.current;
+    const targetEnvironmentId = environmentId;
     if (
       targetEnvironmentId === null ||
       !readEnvironmentScope(targetEnvironmentId, AuthEnvironmentMaintainScope)
@@ -1174,10 +1178,7 @@ export function ResourceTelemetryDiagnostics({
         return;
       }
     }
-    if (
-      environmentIdRef.current !== targetEnvironmentId ||
-      !readEnvironmentScope(targetEnvironmentId, AuthEnvironmentMaintainScope)
-    ) {
+    if (!readEnvironmentScope(targetEnvironmentId, AuthEnvironmentMaintainScope)) {
       clearSignaling();
       return;
     }
@@ -1222,7 +1223,6 @@ export function ResourceTelemetryDiagnostics({
   };
 
   const retryCollector = () => {
-    const environmentId = environmentIdRef.current;
     if (
       environmentId === null ||
       !readEnvironmentScope(environmentId, AuthEnvironmentMaintainScope)
@@ -1230,6 +1230,18 @@ export function ResourceTelemetryDiagnostics({
       return;
     setIsRetrying(true);
     void retryTelemetry()
+      .then(() => {
+        // The user can pick another window while the retry runs; refreshing every window
+        // re-reads the one on screen and only invalidates the rest.
+        for (const option of HISTORY_WINDOWS) {
+          registry.refresh(
+            serverEnvironment.resourceTelemetryHistory({
+              environmentId,
+              input: { windowMs: option.windowMs, bucketMs: option.bucketMs },
+            }),
+          );
+        }
+      })
       .catch((error: unknown) => {
         toastManager.add({
           type: "error",
@@ -1297,7 +1309,7 @@ export function ResourceTelemetryDiagnostics({
           </div>
         }
       >
-        <div className="overflow-hidden">
+        <div className="overflow-hidden rounded-[inherit]">
           <div className="flex flex-col gap-3 border-b border-settings-divider px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
             <div>
               <div className="text-meta font-semibold tracking-normal text-muted-foreground">
@@ -1436,7 +1448,7 @@ export function ResourceTelemetryDiagnostics({
           ) : null
         }
       >
-        <div className="grid overflow-hidden md:grid-cols-2 md:divide-x md:divide-settings-divider">
+        <div className="grid overflow-hidden rounded-[inherit] md:grid-cols-2 md:divide-x md:divide-settings-divider">
           <div className="px-4 py-4 sm:px-5">
             <div className="mb-3 flex items-center gap-2 text-meta font-semibold tracking-normal text-muted-foreground">
               <span className="flex size-6 items-center justify-center rounded-md bg-muted/60">
@@ -1579,7 +1591,7 @@ export function ResourceTelemetryDiagnostics({
           ) : null
         }
       >
-        <div className="overflow-hidden">
+        <div className="overflow-hidden rounded-[inherit]">
           <ProcessTable
             processes={snapshot?.processes ?? []}
             canMaintainEnvironment={canMaintainEnvironment}
@@ -1598,7 +1610,7 @@ export function ResourceTelemetryDiagnostics({
           </span>
         }
       >
-        <div className="overflow-hidden">
+        <div className="overflow-hidden rounded-[inherit]">
           <div className="bg-muted/15 px-4 py-3 text-meta-large leading-relaxed text-muted-foreground sm:px-5">
             {t.settings.resourceTelemetry.attribution.description}
           </div>

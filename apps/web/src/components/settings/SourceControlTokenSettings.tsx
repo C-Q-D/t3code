@@ -1,4 +1,4 @@
-/** GitHub token replacement form; saved credentials remain write-only. */
+/** Host token replacement form; saved credentials remain write-only. */
 import { t } from "~/i18n";
 import type { EnvironmentId } from "@t3tools/contracts";
 import { ExternalLinkIcon } from "lucide-react";
@@ -99,8 +99,8 @@ export function SourceControlTokenSettings({
             </InlineButton>
           ) : null}
         </p>
-        <div className="grid gap-3 sm:grid-cols-[12rem_1fr]">
-          <div className="grid gap-1.5">
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="grid gap-1.5 sm:w-48 sm:shrink-0">
             <Label htmlFor={`${definition.kind}-token-host-${environmentId}`}>
               {t.settings.connections.pairing.hostLabel}
             </Label>
@@ -113,7 +113,7 @@ export function SourceControlTokenSettings({
               onChange={(event) => setHost(event.target.value)}
             />
           </div>
-          <div className="grid gap-1.5">
+          <div className="grid min-w-0 flex-1 gap-1.5">
             <Label htmlFor={`${definition.kind}-token-${environmentId}`}>
               {t.settings.gitHubToken.token}
             </Label>

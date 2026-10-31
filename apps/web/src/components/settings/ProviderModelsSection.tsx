@@ -40,10 +40,10 @@ function hasReasoningControl(model: ServerProviderModel): boolean {
   );
 }
 
-// Reasoning is the norm, so only its absence is labeled, and only when other models have it.
+// Missing reasoning is meaningful only when another discovered model exposes a reasoning control.
 // Custom and null capabilities are fallbacks or user-written, not discovered, so they prove nothing.
 // Alias slugs ("default", Cursor's "auto") defer to the provider's own model choice, so reasoning is unknown.
-/** Labels fast mode and, when requested, missing reasoning only for discovered non-alias models. */
+/** Preserves capability labels and marks missing reasoning only when discovered non-alias models establish the comparison. */
 function describeModelCapabilities(
   model: ServerProviderModel,
   flagMissingReasoning: boolean,
@@ -58,6 +58,19 @@ function describeModelCapabilities(
         descriptor.options.some((option) => option.id === "fast" || option.label === "Fast")),
   );
   if (hasFastMode) labels.push(t.settings.providerModels.fastMode);
+  if (descriptors.some((descriptor) => descriptor.id === "thinking"))
+    labels.push(t.settings.providerModels.thinking);
+  if (
+    descriptors.some(
+      (descriptor) =>
+        descriptor.type === "select" &&
+        (descriptor.id === "reasoningEffort" ||
+          descriptor.id === "reasoning" ||
+          descriptor.id === "variant"),
+    )
+  ) {
+    labels.push(t.settings.providerModels.reasoning);
+  }
   if (
     flagMissingReasoning &&
     !model.isCustom &&

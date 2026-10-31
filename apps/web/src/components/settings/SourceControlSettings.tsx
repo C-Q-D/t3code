@@ -508,7 +508,7 @@ export function SourceControlSettingsPanel() {
     if (credentials) {
       return (
         <SettingsSearchTarget id={sourceControlHostSettingsSearchId(item.kind)}>
-          <div className="grid gap-6">
+          <div className="grid gap-4">
             {credentials.appSignIn && item.appSignIn === true ? (
               <SourceControlAppSignInSettings
                 key={`sign-in-${environmentId}`}

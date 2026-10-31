@@ -9,7 +9,7 @@ import {
 } from "~/hooks/useSettings";
 import type { EnvironmentPresentation } from "~/state/environments";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
-import { EnvironmentRow, environmentTransportLabel } from "./EnvironmentRow";
+import { EnvironmentRow, EnvironmentTransportLabel } from "./EnvironmentRow";
 import { SettingsRow } from "./settingsLayout";
 import { searchableSetting } from "./settingsSearch";
 
@@ -115,7 +115,7 @@ export function LoadBalancingSettings({
             key={environment.environmentId}
             kind={resolveEnvironmentMachineKind(environment.serverConfig)}
             label={environment.label}
-            subtitle={environmentTransportLabel(environment)}
+            subtitle={<EnvironmentTransportLabel environment={environment} />}
           >
             <Select
               items={preferences}

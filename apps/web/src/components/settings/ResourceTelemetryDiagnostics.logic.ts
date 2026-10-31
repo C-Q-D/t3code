@@ -1,8 +1,8 @@
 /** Pure process-tree and history geometry used by resource diagnostics. */
 import type { ResourceTelemetryProcess, ResourceTelemetrySourceStatus } from "@t3tools/contracts";
 
-/** Combines PID and start time to keep reused operating-system PIDs distinct. */
-function processIdentityKey(process: ResourceTelemetryProcess): string {
+/** Includes process start time so a reused PID cannot inherit another process action state. */
+export function processIdentityKey(process: Pick<ResourceTelemetryProcess, "identity">): string {
   return `${process.identity.pid}:${process.identity.startTimeMs}`;
 }
 

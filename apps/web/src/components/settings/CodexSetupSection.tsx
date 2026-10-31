@@ -1044,7 +1044,7 @@ function ManagedCodexSetup({
                     disabled={readOnly || busy}
                     onClick={() => onModeChange("existing")}
                   >
-                    Use existing CLI
+                    {t.settings.codexSetup.existing.selectExistingCli}
                   </Button>
                 ) : null}
               </>

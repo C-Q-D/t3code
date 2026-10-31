@@ -14,7 +14,7 @@ import type { EnvironmentPresentation } from "~/state/environments";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { toastManager } from "../ui/toast";
-import { EnvironmentRow, environmentTransportLabel } from "./EnvironmentRow";
+import { EnvironmentRow, EnvironmentTransportLabel } from "./EnvironmentRow";
 import { SettingsRow } from "./settingsLayout";
 import { Switch } from "../ui/switch";
 import { Tooltip, TooltipTrigger, TooltipPopup } from "../ui/tooltip";
@@ -107,7 +107,7 @@ export function PullRequestRoutingSettings({
             key={environment.environmentId}
             kind={resolveEnvironmentMachineKind(environment.serverConfig)}
             label={environment.label}
-            subtitle={environmentTransportLabel(environment)}
+            subtitle={<EnvironmentTransportLabel environment={environment} />}
           >
             <Select
               items={options}

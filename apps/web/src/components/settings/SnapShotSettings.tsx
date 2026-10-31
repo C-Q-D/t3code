@@ -117,7 +117,10 @@ export function SnapShotSettings() {
         : null;
   // The wizard shows errors inline; outside it there is nowhere to, so they become a toast.
   const reportSetupError = (title: string, error: unknown) => {
-    const report = snapShotSetupError(title, error);
+    const report = snapShotSetupError(
+      title,
+      error instanceof Error ? error : new Error(t.settings.restore.retryHint),
+    );
     setSetupError(report);
     if (!wizard)
       toastManager.add({ type: "error", title: report.title, description: report.message });

@@ -623,7 +623,7 @@ function ScheduledTaskEnvironmentList({
           <div key={environment.environmentId} className="space-y-5.5">
             <SettingsSection
               title={secondary ? primary + " · " + secondary : primary}
-              description={<ScheduledTaskEnvironmentTransport environment={environment} />}
+              headerAction={<ScheduledTaskEnvironmentTransport environment={environment} />}
             >
               <div className="space-y-0.5 px-3.5 pt-2.5">
                 {tasks?.map((task) => (

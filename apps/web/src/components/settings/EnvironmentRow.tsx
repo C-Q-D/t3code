@@ -12,6 +12,7 @@ import type { ReactNode } from "react";
 
 import { cn } from "~/lib/utils";
 import type { EnvironmentPresentation } from "~/state/environments";
+import { usePreparedConnection } from "~/state/session";
 import { isDesktopLocalConnectionTarget } from "~/connection/desktopLocal";
 import { EnvironmentMachineIcon } from "../EnvironmentMachineIcon";
 
@@ -50,6 +51,24 @@ export function environmentTransportLabel(
     return `SSH ${formatDesktopSshTarget(entry.profile.value.target)}`;
   }
   return environment.displayUrl ?? t.settings.connections.pairing.remoteLink;
+}
+
+/** Uses the prepared route while connected so the label describes the path actually carrying requests. */
+export function useEnvironmentTransportLabel(environment: EnvironmentPresentation): string {
+  const prepared = usePreparedConnection(environment.environmentId);
+  return environmentTransportLabel(
+    environment,
+    environment.connection.phase === "connected" && prepared._tag === "Some"
+      ? prepared.value.target
+      : null,
+  );
+}
+
+/** Subscribes at the label boundary so route changes do not require a parent settings refresh. */
+export function EnvironmentTransportLabel(props: {
+  readonly environment: EnvironmentPresentation;
+}) {
+  return useEnvironmentTransportLabel(props.environment);
 }
 
 /**

@@ -1,6 +1,9 @@
+import {
+  AUTH_SCOPE_OPTIONS,
+  sessionPermissionsUnavailableMessage,
+} from "@t3tools/shared/authScopeOptions";
 /** Displays permissions for the authenticated connection without changing session grants. */
 import { type AuthGrantScope, type EnvironmentId, sessionGrantsScope } from "@t3tools/contracts";
-import { AUTH_SCOPE_OPTIONS } from "@t3tools/shared/authScopeOptions";
 import { t } from "~/i18n";
 import { useEnvironmentSessionState } from "~/state/session";
 
@@ -56,6 +59,15 @@ export function SessionPermissions({
       </ul>
     </div>
   ) : (
-    <p className="py-3 text-xs text-muted-foreground">{t.settings.merge.permissionsNotChecked}</p>
+    <p className="py-3 text-xs text-muted-foreground">
+      {!connected
+        ? t.settings.merge.permissionsNotChecked
+        : sessionPermissionsUnavailableMessage({
+            connected,
+            failed: session.hasError,
+            rejected:
+              !session.hasError && !session.isPending && session.data?.authenticated === false,
+          })}
+    </p>
   );
 }

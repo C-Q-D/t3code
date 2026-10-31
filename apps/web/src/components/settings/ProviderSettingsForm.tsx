@@ -401,7 +401,7 @@ function SecretSettingsControl({
           size="icon-sm"
           variant="ghost-destructive"
           onClick={() => onChange(nextProviderConfigWithFieldValue(value, field, ""))}
-          aria-label={`Clear ${field.label}`}
+          aria-label={t.settings.providerSettingsForm.clearSecret(field.label)}
         >
           <XIcon className="size-3.5" />
         </Button>

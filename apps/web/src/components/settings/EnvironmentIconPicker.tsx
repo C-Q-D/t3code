@@ -21,6 +21,7 @@ import {
   MenuSubTrigger,
 } from "../ui/menu";
 
+/** Checks the settings grant before legacy capability denial; current servers no longer advertise the retired capability. */
 export function resolveEnvironmentIconPickerLock(input: {
   readonly serverConfig: Pick<ServerConfig, "environment"> | null;
   readonly operateAccess: "granted" | "denied" | "pending";
@@ -28,11 +29,11 @@ export function resolveEnvironmentIconPickerLock(input: {
   if (input.serverConfig === null) {
     return t.settings.environmentIconPicker.connectEnvironmentChangeIconHint;
   }
-  if (input.serverConfig.environment.capabilities.environmentIcon !== true) {
-    return t.settings.environmentIconPicker.environmentSServerTooOldHint;
-  }
   if (input.operateAccess !== "granted") {
     return t.settings.environmentIconPicker.sessionEnvironmentChangeSettingsError;
+  }
+  if (input.serverConfig.environment.capabilities.environmentIcon === false) {
+    return t.settings.environmentIconPicker.environmentSServerTooOldHint;
   }
   return null;
 }

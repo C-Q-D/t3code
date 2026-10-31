@@ -13,7 +13,7 @@ import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import type {
   ServerProcessDiagnosticsEntry,
   ServerProcessResourceHistorySummary,
@@ -52,7 +52,7 @@ function formatCount(value: number): string {
 /** Formats milliseconds for diagnostic tables without changing the recorded duration. */
 function formatDuration(value: number): string {
   if (value < 1_000) return `${Math.round(value)} ms`;
-  return `${(value / 1_000).toFixed(value >= 10_000 ? 1 : 2)} s`;
+  return `${(value / 1_000).toFixed(value >= 10_000 ? 1 : 2).replace(/\.0+$/, "")} s`;
 }
 
 /** Formats a byte count using binary units for diagnostic measurements. */
@@ -511,11 +511,15 @@ const RESOURCE_HISTORY_WINDOWS = [
 /** Formats accumulated CPU time using the units supplied by the diagnostic source. */
 function formatCpuTime(seconds: number): string {
   if (seconds < 60)
-    return t.settings.diagnostics.cpuTime.seconds(seconds.toFixed(seconds >= 10 ? 1 : 2));
+    return t.settings.diagnostics.cpuTime.seconds(
+      seconds.toFixed(seconds >= 10 ? 1 : 2).replace(/\.0+$/, ""),
+    );
   const minutes = seconds / 60;
   if (minutes < 60)
-    return t.settings.diagnostics.cpuTime.minutes(minutes.toFixed(minutes >= 10 ? 1 : 2));
-  return t.settings.diagnostics.cpuTime.hours((minutes / 60).toFixed(2));
+    return t.settings.diagnostics.cpuTime.minutes(
+      minutes.toFixed(minutes >= 10 ? 1 : 2).replace(/\.0+$/, ""),
+    );
+  return t.settings.diagnostics.cpuTime.hours((minutes / 60).toFixed(2).replace(/\.0+$/, ""));
 }
 
 /** Extracts a short executable label from a complete command for historical rows. */
@@ -832,6 +836,13 @@ function DiagnosticsRefreshButton({
 /** Loads diagnostics for the selected environment while retaining access checks, export drafts and signal confirmations. */
 export function DiagnosticsSettingsPanel() {
   const { environment } = useSettingsScope();
+  // Signals and pending UI state belong to one environment, so a scope switch starts fresh.
+  return <DiagnosticsSettingsBody key={environment?.environmentId ?? ""} />;
+}
+
+/** Scopes pending diagnostics actions to the environment selected when this body mounts. */
+function DiagnosticsSettingsBody() {
+  const { environment } = useSettingsScope();
   const environmentId = environment?.environmentId ?? null;
   const canMaintainEnvironment = useEnvironmentScope(environmentId, AuthEnvironmentMaintainScope);
   const observability = environment?.serverConfig?.observability;
@@ -889,17 +900,6 @@ export function DiagnosticsSettingsPanel() {
   const [openLogsDirectoryError, setOpenLogsDirectoryError] = useState<string | null>(null);
   const [signalingPid, setSignalingPid] = useState<number | null>(null);
   const signalingPidRef = useRef<number | null>(null);
-  const environmentIdRef = useRef(environmentId);
-  const processDataRef = useRef(processData);
-  useEffect(() => {
-    processDataRef.current = processData;
-  }, [processData]);
-  useEffect(() => {
-    environmentIdRef.current = environmentId;
-    return () => {
-      environmentIdRef.current = null;
-    };
-  }, [environmentId]);
 
   const openLogsDirectory = () => {
     const logsDirectoryPath = observability?.logsDirectoryPath ?? null;
@@ -929,8 +929,7 @@ export function DiagnosticsSettingsPanel() {
   const isInitialLoading = isPending && data === null;
   const isProcessInitialLoading = isProcessPending && processData === null;
   const isResourceInitialLoading = isResourcePending && resourceData === null;
-  // The export form waits for each environment's first tables so a search target below them
-  // stays in view. Later loads, such as a new resource window, must not remount it and drop drafts.
+  // Wait for initial tables to stabilize search targets; later loads must preserve export drafts.
   const [exportFormEnvironmentId, setExportFormEnvironmentId] =
     useState<typeof environmentId>(null);
   if (
@@ -943,8 +942,8 @@ export function DiagnosticsSettingsPanel() {
     setExportFormEnvironmentId(environmentId);
   }
   const signalProcess = async (pid: number, signal: ServerProcessSignal) => {
-    const targetEnvironmentId = environmentIdRef.current;
-    const process = processDataRef.current?.processes.find((entry) => entry.pid === pid);
+    const targetEnvironmentId = environmentId;
+    const process = processData?.processes.find((entry) => entry.pid === pid);
     if (
       targetEnvironmentId === null ||
       process === undefined ||
@@ -982,19 +981,9 @@ export function DiagnosticsSettingsPanel() {
         return;
       }
     }
-    const currentEnvironmentId = environmentIdRef.current;
-    if (
-      currentEnvironmentId === null ||
-      currentEnvironmentId !== targetEnvironmentId ||
-      !readEnvironmentScope(currentEnvironmentId, AuthEnvironmentMaintainScope)
-    ) {
-      clearSignaling();
-      return;
-    }
-    if (
-      processDataRef.current?.processes.find((entry) => entry.pid === pid)?.startTimeMs !==
-      process.startTimeMs
-    ) {
+    // The server rejects a pid whose start time no longer matches, so a process that exited
+    // during confirmation is never signaled by mistake.
+    if (!readEnvironmentScope(targetEnvironmentId, AuthEnvironmentMaintainScope)) {
       clearSignaling();
       return;
     }

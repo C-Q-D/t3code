@@ -1,4 +1,4 @@
-/** Environment-local GitHub account choices; account disclosure stays explicitly opt-in. */
+/** Environment-local host account choices; account disclosure stays explicitly opt-in. */
 import { t } from "~/i18n";
 import type { EnvironmentId, SourceControlProviderAuth } from "@t3tools/contracts";
 import { EyeIcon, EyeOffIcon } from "lucide-react";

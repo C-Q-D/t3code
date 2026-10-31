@@ -8,14 +8,7 @@ import { InfoIcon, Undo2Icon } from "lucide-react";
 import { DEFAULT_SERVER_SETTINGS, type ServerSettings } from "@t3tools/contracts";
 import * as Equal from "effect/Equal";
 import { useLocation, useNavigate } from "@tanstack/react-router";
-import {
-  createContext,
-  type ComponentPropsWithoutRef,
-  type ReactNode,
-  useContext,
-  useEffect,
-  useState,
-} from "react";
+import { createContext, type ComponentPropsWithoutRef, type ReactNode, useContext } from "react";
 
 import { usePrimarySettingsAvailable } from "../../hooks/useSettings";
 import { cn } from "../../lib/utils";
@@ -181,7 +174,9 @@ export function SettingsSearchTarget({
   );
 }
 
-export const SETTINGS_PICKER_TRIGGER_CLASSNAME = "min-w-0 max-w-none shrink-0";
+// Settings pickers reuse composer controls but match the bordered selects beside them.
+export const SETTINGS_PICKER_TRIGGER_CLASSNAME =
+  "min-w-0 max-w-none shrink-0 border-input bg-background font-normal text-foreground shadow-xs/5 hover:bg-accent/50 dark:bg-input/32 [&_svg[data-composer-control-chevron]]:stroke-[1.75] [&_svg[data-composer-control-chevron]]:opacity-70";
 
 export function PolicyTooltip({ children }: { readonly children: string }) {
   return (
@@ -203,16 +198,6 @@ export function PolicyTooltip({ children }: { readonly children: string }) {
   );
 }
 
-export function useRelativeTimeTick(intervalMs = 1_000) {
-  const [nowMs, setNowMs] = useState(() => Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNowMs(Date.now()), intervalMs);
-    return () => clearInterval(id);
-  }, [intervalMs]);
-  return nowMs;
-}
-
-/** Serif section headings name each group; explanatory copy belongs to individual settings. */
 export function SettingsSection({
   title,
   hideTitle = false,
