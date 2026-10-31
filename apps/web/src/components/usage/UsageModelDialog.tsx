@@ -156,7 +156,8 @@ export function UsageModelDialog({
   );
 }
 
-export function SpeedPremium({ premiumUsd }: { readonly premiumUsd: number }) {
+/** Shows the additional speed cost in USD alongside model usage details. */
+function SpeedPremium({ premiumUsd }: { readonly premiumUsd: number }) {
   return (
     <span className="text-xs text-muted-foreground">
       {t.tools.usage.premiumPrefix}

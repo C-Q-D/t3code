@@ -84,7 +84,6 @@ import {
   getChangedBrowserSettingLabels,
   getChangedTypographySettingLabels,
   hasChangedBackgroundActivitySettings,
-  rememberEnabledProjectGroupingMode,
 } from "./SettingsPanels.logic";
 import {
   SETTINGS_PICKER_TRIGGER_CLASSNAME,
@@ -942,11 +941,6 @@ export function GeneralSettingsPanel() {
               onValueChange={(value) => {
                 if (value !== "repository" && value !== "repository_path" && value !== "separate")
                   return;
-                if (value === "separate") {
-                  rememberEnabledProjectGroupingMode(settings.sidebarProjectGroupingMode);
-                } else {
-                  rememberEnabledProjectGroupingMode(value);
-                }
                 updateSettings({ sidebarProjectGroupingMode: value });
               }}
             >

@@ -24,27 +24,20 @@ export function isWebPagesPage(pathname: string) {
 const SHELL_LESS_PATHS = new Set(["/pair", "/connect", "/connect-agent"]);
 
 let mainAppHref: string | null = null;
-let appModalReturnHref: string | null = null;
 
 /** Remembers where Settings, Usage, and the utility pages lead back to. */
 export function startMainAppLocationTracking(router: AnyRouter): () => void {
   const record = () => {
     const { pathname, href } = router.state.location;
     if (isAppModalPage(pathname) || SHELL_LESS_PATHS.has(pathname)) return;
-    appModalReturnHref = href;
     if (!isSidebarUtilityPage(pathname) && !isWebPagesPage(pathname)) mainAppHref = href;
   };
   record();
   return router.subscribe("onResolved", record);
 }
 
+/** Returns to the last code destination, excluding settings and utility pages; falls back to the app root. */
 export function useNavigateToMainApp() {
   const navigate = useNavigate();
   return () => navigate({ href: mainAppHref ?? "/" });
-}
-
-/** Leaves Settings or Usage for the page that opened it. */
-export function useCloseAppModal() {
-  const navigate = useNavigate();
-  return () => navigate({ href: appModalReturnHref ?? mainAppHref ?? "/" });
 }

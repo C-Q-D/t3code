@@ -37,7 +37,7 @@ function threadUndoNoticeSummary(notice: Pick<UndoNotice, "action" | "count">): 
 }
 
 /** Includes the configured undo shortcut so keyboard users can act on the notice. */
-export function threadUndoLabel(keybindings: Parameters<typeof shortcutLabelForCommand>[0]) {
+function threadUndoLabel(keybindings: Parameters<typeof shortcutLabelForCommand>[0]) {
   const shortcut = shortcutLabelForCommand(keybindings, "thread.undo");
   return shortcut ? `${shortcut} to undo` : "Undo";
 }

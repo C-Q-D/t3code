@@ -47,15 +47,6 @@ export interface SecretProviderDraft {
   readonly account: string;
 }
 
-/** Seeds editable text from a saved provider; unsupported configs yield an empty account. */
-export function draftFromSecretProvider(provider: SecretProviderConfig): SecretProviderDraft {
-  const classified = classifySecretProvider(provider);
-  return {
-    name: provider.label,
-    account: classified.kind === "one_password" ? classified.account : "",
-  };
-}
-
 /** Distinguishes new identities from edits that must retain their existing id. */
 export type SecretProviderTarget =
   | { readonly mode: "add" }

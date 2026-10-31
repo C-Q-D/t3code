@@ -147,31 +147,6 @@ export function useSidebarRowSubscriptionLease(isActive: boolean): {
   };
 }
 
-const fileDragClears = new Set<(active: false) => void>();
-/** Clears registered row hover state when a native file drag ends outside a drop target. */
-function clearFileDrags() {
-  const clears = [...fileDragClears];
-  fileDragClears.clear();
-  for (const clear of clears) clear(false);
-}
-
-/**
- * A file drag that ends outside every drop target (Escape, or a drop elsewhere)
- * sends no dragleave to the row it last entered, so the window's dragend clears it.
- */
-export function setFileDragActive(setActive: (active: boolean) => void, active: boolean) {
-  setActive(active);
-  if (typeof window === "undefined") return;
-  if (!active) {
-    if (fileDragClears.delete(setActive) && fileDragClears.size === 0) {
-      window.removeEventListener("dragend", clearFileDrags);
-    }
-    return;
-  }
-  if (fileDragClears.size === 0) window.addEventListener("dragend", clearFileDrags, { once: true });
-  fileDragClears.add(setActive);
-}
-
 /**
  * A clock that advances exactly when a snooze wake time passes, so a woken
  * thread leaves the shelf on time without a per-second clock.

@@ -785,7 +785,7 @@ function BrowserSearchEngineSetting() {
 }
 
 /** Keeps pull-request link handling in the local integration settings route. */
-export function PullRequestLinksOpenInAppSetting() {
+function PullRequestLinksOpenInAppSetting() {
   const openInApp = useClientSettings((settings) => settings.pullRequestLinksOpenInApp);
   const updateSettings = useUpdatePrimarySettings();
 

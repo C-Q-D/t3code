@@ -50,14 +50,16 @@ const PACE: Record<LimitPace, { readonly label: string; readonly icon: typeof Ga
   under: { label: t.tools.usage.underPace, icon: TrendingDownIcon },
 };
 
-export function barColor(driver: ServerProvider["driver"]): string {
+/** Uses the provider color for usage bars, falling back to foreground for an unknown driver. */
+function barColor(driver: ServerProvider["driver"]): string {
   const presentation = Object.values(PROVIDER_PRESENTATION).find(
     (entry) => entry.driverKind === driver,
   );
   return presentation?.color ?? "var(--foreground)";
 }
 
-export function PaceIcon({ pace }: { readonly pace: LimitPace }) {
+/** Exposes the usage pace as both an accessible label and a tooltip. */
+function PaceIcon({ pace }: { readonly pace: LimitPace }) {
   const Icon = PACE[pace].icon;
   return (
     <Tooltip>

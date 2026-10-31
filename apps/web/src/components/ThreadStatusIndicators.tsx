@@ -460,7 +460,8 @@ export function prStatusIndicator(
   };
 }
 
-export function ChangeRequestStatusIcon({
+/** Uses the same draft and lifecycle presentation as the linked request status label. */
+function ChangeRequestStatusIcon({
   state,
   isDraft = false,
   className,

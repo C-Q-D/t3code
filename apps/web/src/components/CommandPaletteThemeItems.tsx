@@ -20,7 +20,7 @@ import {
 } from "./settings/ThemePreviewCircles";
 import { stackedThreadToast, toastManager } from "./ui/toast";
 
-export const APPEARANCE_OPTIONS = [
+const APPEARANCE_OPTIONS = [
   { mode: "system", label: en.tools.palette.system, icon: MonitorIcon },
   { mode: "light", label: en.tools.palette.light, icon: SunIcon },
   { mode: "dark", label: en.tools.palette.dark, icon: MoonIcon },

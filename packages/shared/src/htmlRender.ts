@@ -11,8 +11,7 @@ export const HTML_RENDER_MIN_HEIGHT = 80;
 export const HTML_RENDER_MAX_HEIGHT = 2000;
 /** Temporary frame height until a page can be measured, in CSS pixels. */
 export const HTML_RENDER_UNMEASURED_HEIGHT = 320;
-/** Upper bound in CSS pixels for clients that fit live pages beyond the stored frame cap. */
-export const HTML_RENDER_MAX_FIT_HEIGHT = 20_000;
+
 export const HTML_RENDER_MAX_TITLE_LENGTH = 200;
 
 export interface HtmlRenderReference {

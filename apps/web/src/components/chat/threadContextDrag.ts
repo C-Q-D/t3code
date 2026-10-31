@@ -113,7 +113,8 @@ export function endThreadContextDrag() {
   setGhost(null);
 }
 
-export function dropThreadContext(
+/** Delivers scoped threads to the target under a viewport point; returns false when no drop is possible. */
+function dropThreadContext(
   point: { x: number; y: number },
   threads: ReadonlyArray<ScopedThreadRef>,
 ): boolean {

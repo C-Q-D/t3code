@@ -216,7 +216,7 @@ function getSelectedTraits(
 }
 
 /** Derives visible controls, including read-only saved options for unavailable OpenCode models. */
-export function getTraitsSectionVisibility(input: {
+function getTraitsSectionVisibility(input: {
   provider: ProviderDriverKind;
   models: ReadonlyArray<ServerProviderModel>;
   model: string | null | undefined;
@@ -574,7 +574,7 @@ export const TraitsMenuContent = memo(function TraitsMenuContentImpl({
 });
 
 /** Pair speed with reasoning while keeping other traits separated. */
-export function buildTraitsTriggerDisplay(input: {
+function buildTraitsTriggerDisplay(input: {
   provider: ProviderDriverKind;
   descriptors: ReadonlyArray<ProviderOptionDescriptor>;
   primarySelectDescriptorId: string | null;

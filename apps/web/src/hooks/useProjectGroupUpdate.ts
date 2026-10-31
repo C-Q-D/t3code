@@ -126,7 +126,7 @@ export function useProjectPin() {
 }
 
 /** Reports the first member this connection cannot change, and returns that failure. */
-export function checkProjectAccess(
+function checkProjectAccess(
   members: ReadonlyArray<ProjectGroupMember>,
   failureTitle: string,
 ): AtomCommandResult<void, unknown> | null {

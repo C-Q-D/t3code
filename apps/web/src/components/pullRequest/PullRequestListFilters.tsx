@@ -62,7 +62,8 @@ export interface PullRequestFilterOption<Value extends string> {
   readonly unavailable?: string | undefined;
 }
 
-export function PullRequestFilterOptionIcon<Value extends string>({
+/** Project filters retain their favicon; non-project options use their supplied semantic icon. */
+function PullRequestFilterOptionIcon<Value extends string>({
   option,
 }: {
   option: PullRequestFilterOption<Value>;

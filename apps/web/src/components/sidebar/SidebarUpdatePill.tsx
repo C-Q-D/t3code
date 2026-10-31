@@ -140,7 +140,7 @@ const toastUpdateError: ReportLocalUpdateError = (title, description) => {
 };
 
 /** Downloads through the supplied desktop bridge, optionally announcing completion. Reports action or transport errors and returns false; bridge policy owns timeouts and no retry is added. */
-export async function downloadLocalUpdate(
+async function downloadLocalUpdate(
   bridge: DesktopBridge,
   {
     notifyDownloaded,
@@ -167,7 +167,7 @@ export async function downloadLocalUpdate(
 }
 
 /** Requests installation of the expected downloaded version, if supplied. Reports refusal or errors as false; bridge policy owns timeouts and no retry is added. */
-export async function installLocalUpdate(
+async function installLocalUpdate(
   bridge: DesktopBridge,
   reportError: ReportLocalUpdateError = toastUpdateError,
   expectedVersion?: string,

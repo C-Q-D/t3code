@@ -12,7 +12,7 @@ import { ProviderInstanceIcon } from "../chat/ProviderInstanceIcon";
 const CURSOR_KEYCHAIN_COPY = t.tools.usage.keychainHint;
 
 /** Enables Cursor keychain usage for environmentId on click; label identifies the environment, tooltip selects presentation, and onEnabled refreshes successful changes. */
-export function CursorEnableButton({
+function CursorEnableButton({
   environmentId,
   label,
   onEnabled,
