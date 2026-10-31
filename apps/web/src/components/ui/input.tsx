@@ -44,12 +44,12 @@ function Input({
   ...props
 }: InputProps) {
   const { disabled: fieldDisabled, validation } = useFieldRootContext();
-  const { invalid } = getInputControlState(
-    nativeInput ? {} : validation.getInputValidationProps(),
-    props,
-  );
   // Native compositions already receive resolved props from their owning Base UI control.
   const disabled = props.disabled || (!nativeInput && fieldDisabled);
+  const { invalid } = getInputControlState(
+    nativeInput ? {} : validation.getValidationProps(Boolean(disabled)),
+    props,
+  );
   const inputClassName = cn(
     "h-9.5 w-full min-w-0 rounded-[inherit] bg-transparent px-3.5 text-control outline-none caret-message-action placeholder:text-placeholder [transition:background-color_5000000s_ease-in-out_0s]",
     !unstyled &&

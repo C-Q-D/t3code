@@ -1,10 +1,12 @@
 /**
- * Protects dialog slot presence, confirmation focus, and long-description layout.
+ * Protects dialog slots, confirmation focus, description layout, and embedded Field control states.
  * @vitest-environment jsdom
  */
 import { act, createRef } from "react";
 import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
+import type { ComponentProps } from "react";
+import { Field } from "@base-ui/react/field";
 import { describe, expect, it, vi } from "vite-plus/test";
 
 import {
@@ -16,6 +18,69 @@ import {
   AlertDialogPopup,
 } from "./alert-dialog";
 import { Dialog, DialogFooter, DialogHeader, DialogPopup, DialogTitle } from "./dialog";
+import { Input } from "./input";
+import { Textarea } from "./textarea";
+
+it.each([
+  { Control: Input, slot: "input-control", present: null, disabledOverride: "true" },
+  { Control: Textarea, slot: "textarea-control", present: "true", disabledOverride: "false" },
+])(
+  "preserves Field defaults and explicit overrides for $slot in dialogs",
+  async ({ Control, slot, present, disabledOverride }) => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    /** Exercise real Field validation and native overrides through the shared dialog controls. */
+    async function renderField(
+      fieldProps: ComponentProps<typeof Field.Root>,
+      controlProps: Pick<ComponentProps<typeof Input>, "disabled" | "aria-invalid">,
+    ) {
+      await act(async () =>
+        root.render(
+          <Dialog>
+            <Field.Root {...fieldProps}>
+              <Control aria-label="Value" {...controlProps} />
+            </Field.Root>
+          </Dialog>,
+        ),
+      );
+      const wrapper = container.querySelector(`[data-slot="${slot}"]`);
+      if (!wrapper) throw new Error(`Missing ${slot}`);
+      return wrapper;
+    }
+    try {
+      let wrapper = await renderField({ invalid: true }, {});
+      expect(wrapper.getAttribute("data-invalid")).toBe("true");
+      expect(wrapper.getAttribute("data-invalid-present")).toBe(present);
+      expect(wrapper.getAttribute("data-disabled")).toBe("false");
+
+      wrapper = await renderField({ invalid: true }, { "aria-invalid": false });
+      expect(wrapper.getAttribute("data-invalid")).toBe("false");
+      expect(wrapper.getAttribute("data-invalid-present")).toBe(present);
+
+      // JavaScript callers can explicitly remove an ARIA attribute with null.
+      wrapper = await renderField({ invalid: true }, {
+        "aria-invalid": null,
+      } as unknown as ComponentProps<typeof Input>);
+      expect(wrapper.getAttribute("data-invalid")).toBe("false");
+      expect(wrapper.getAttribute("data-invalid-present")).toBe(present === null ? null : "false");
+
+      wrapper = await renderField({ invalid: false }, {});
+      expect(wrapper.getAttribute("data-invalid")).toBe("false");
+
+      wrapper = await renderField({ invalid: true, disabled: true }, {});
+      expect(wrapper.getAttribute("data-disabled")).toBe("true");
+      expect(wrapper.getAttribute("data-invalid")).toBe("false");
+      wrapper = await renderField({ disabled: true }, { disabled: false });
+      expect(wrapper.getAttribute("data-disabled")).toBe(disabledOverride);
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+      vi.unstubAllGlobals();
+    }
+  },
+);
 
 describe("dialog slot presence", () => {
   it("updates header and footer attributes independently through removal and remount", async () => {

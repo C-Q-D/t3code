@@ -27,7 +27,7 @@ function Textarea({ className, size = "default", unstyled = false, ...props }: T
   const { disabled: fieldDisabled, validation } = useFieldRootContext();
   // Field.Control supplies this default; the native merge lets explicit false/null override it.
   const { disabled, invalid, invalidPresent } = getInputControlState(
-    { disabled: fieldDisabled || false, ...validation.getInputValidationProps() },
+    { disabled: fieldDisabled || false, ...validation.getValidationProps(Boolean(fieldDisabled)) },
     props,
   );
 
