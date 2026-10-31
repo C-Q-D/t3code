@@ -10,11 +10,28 @@ import {
   SearchIcon,
   XIcon,
 } from "lucide-react";
-import { type ComponentProps, type ReactNode, useEffect, useRef } from "react";
+import { type ComponentProps, type ReactNode } from "react";
 
 import { Command, CommandFooter, CommandInput, CommandPanel } from "./ui/command";
 import { Kbd, KbdGroup } from "./ui/kbd";
 import { cn } from "~/lib/utils";
+
+/**
+ * A view replacing another inside an open dialog mounts with focus on the body,
+ * left there by the removed input. Claim it so typing cannot reach the composer
+ * behind the modal. On first open the dialog's own initial focus handles it.
+ */
+function claimFocusInOpenDialog(input: HTMLInputElement | null) {
+  if (!input) return;
+  const active = input.ownerDocument.activeElement;
+  if (
+    active === null ||
+    active === input.ownerDocument.body ||
+    input.closest('[role="dialog"]')?.contains(active)
+  ) {
+    input.focus();
+  }
+}
 
 /** Query and chrome inputs; result ownership and navigation remain with the caller. */
 type CommandPaletteContentProps = Omit<ComponentProps<typeof Command>, "children"> & {
@@ -56,17 +73,6 @@ export function CommandPaletteContent({
   inputBreadcrumb,
   ...commandProps
 }: CommandPaletteContentProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  // Direct-open flows replace the initial palette view after the dialog has
-  // already moved focus. Reclaim it when the replacement input mounts so
-  // typing cannot continue in the composer behind the modal. Defer until the
-  // dialog has recorded the previous focus target for restoration on close.
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => inputRef.current?.focus());
-    return () => cancelAnimationFrame(frame);
-  }, []);
-
   return (
     <div
       className={graphite ? "pn5-palette contents" : "contents"}
@@ -95,7 +101,7 @@ export function CommandPaletteContent({
               ) : null}
               <AutocompletePrimitive.Input
                 autoFocus={false}
-                ref={inputRef}
+                ref={claimFocusInOpenDialog}
                 placeholder={inputProps.placeholder}
                 onKeyDown={inputProps.onKeyDown}
                 data-slot="autocomplete-input"
@@ -104,7 +110,7 @@ export function CommandPaletteContent({
               {!inputAccessory && shortcutLabel ? <Kbd>{shortcutLabel}</Kbd> : null}
             </div>
           ) : (
-            <CommandInput autoFocus={false} {...inputProps} ref={inputRef} />
+            <CommandInput autoFocus={false} {...inputProps} ref={claimFocusInOpenDialog} />
           )}
           {inputAccessory}
         </div>

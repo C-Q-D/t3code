@@ -1,3 +1,8 @@
+/** Localized palette UI and interactions; preserves user data, commands, and protocol values. */
+"use client";
+
+import { t } from "~/i18n";
+
 import { threadPullRequestLinkMode } from "@t3tools/client-runtime/thread-pull-request-compatibility";
 import { visibleThreadPullRequests } from "@t3tools/shared/threadPullRequests";
 
@@ -52,6 +57,7 @@ import {
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import {
   ArrowLeftIcon,
+  WandSparkles,
   BugIcon,
   ChartNoAxesColumnIcon,
   CheckIcon,
@@ -64,6 +70,7 @@ import {
   MessageSquareDashedIcon,
   LinkIcon,
   MessageSquareIcon,
+  MessagesSquareIcon,
   PaletteIcon,
   RotateCcwIcon,
   SettingsIcon,
@@ -72,7 +79,6 @@ import {
   PinOffIcon,
   SquarePenIcon,
   TextSearchIcon,
-  UserPlusIcon,
 } from "lucide-react";
 import { openThreadFind } from "./chat/threadFindStore";
 import {
@@ -81,6 +87,7 @@ import {
   useReducer,
   useRef,
   useState,
+  useSyncExternalStore,
   type KeyboardEvent,
   type ReactNode,
 } from "react";
@@ -170,6 +177,7 @@ import {
   buildBrowseGroups,
   buildRootGroups,
   buildLinkedThreadActionItems,
+  buildOptimizePromptAction,
   buildCommandPaletteRows,
   enumerateCommandPaletteItems,
   newThreadNoProjectIndex,
@@ -229,12 +237,14 @@ import { EnvironmentMachineIcon } from "./EnvironmentMachineIcon";
 import { Checkbox } from "./ui/checkbox";
 import { ProjectFilePicker } from "./files/ProjectFilePicker";
 import { openLinkPullRequestDialog } from "./pullRequest/LinkPullRequestDialog";
-import { canShareWithGuestAtom } from "./chat/guestShareAvailability";
-import { openGuestShareDialog } from "./chat/guestShareDialogState";
 import { ProjectContentSearchDialog } from "./search/ProjectContentSearchDialog";
 import { settingsForThisPlatform, SETTINGS_SECTION_LABELS } from "./settings/settingsSearch";
 import { primaryServerKeybindingsAtom } from "../state/server";
-import { resolveShortcutCommand, threadJumpIndexFromCommand } from "../keybindings";
+import {
+  resolveShortcutCommand,
+  shortcutLabelForCommand,
+  threadJumpIndexFromCommand,
+} from "../keybindings";
 import { CommandDialog, CommandDialogPopup, CommandFooterAction } from "./ui/command";
 import { Button } from "./ui/button";
 import { stackedThreadToast, toastManager } from "./ui/toast";
@@ -264,12 +274,12 @@ function openIntentView(intent: CommandPaletteOpenIntent | null): CommandPalette
     case "new-thread-in":
       return {
         addonIcon: <SquarePenIcon className={ADDON_ICON_CLASS} />,
-        groups: [{ value: NEW_THREAD_IN_GROUP, label: "Projects", items: [] }],
+        groups: [{ value: NEW_THREAD_IN_GROUP, label: t.tools.palette.projects, items: [] }],
       };
     case "change-theme":
       return {
         addonIcon: <PaletteIcon className={ADDON_ICON_CLASS} />,
-        groups: [{ value: "themes", label: "Change theme", items: [] }],
+        groups: [{ value: "themes", label: t.tools.palette.changeTheme, items: [] }],
       };
     case "search":
     case undefined:
@@ -316,6 +326,11 @@ export function CommandPalette({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * Selects the requested search surface and renders its dialog while the overlay is open.
+ * @param props Component properties and callbacks defined by the parameter type.
+ * @returns Rendered UI for the supplied props.
+ */
 function CommandPaletteDialog(props: {
   readonly mode: SearchOverlayMode;
   readonly session: number;
@@ -333,14 +348,15 @@ function CommandPaletteDialog(props: {
     <CommandDialogPopup
       aria-label={
         props.mode === "files"
-          ? "File picker"
+          ? t.tools.palette.filePicker
           : props.mode === "content"
-            ? "Search project contents"
-            : "Command palette"
+            ? t.tools.palette.searchProjectContents
+            : t.tools.palette.commandPalette
       }
       className={cn("overflow-hidden", props.mode === "content" && "h-105")}
       data-command-palette="true"
       data-palette-mode={props.mode}
+      paletteMode={props.mode}
       data-testid="command-palette"
       finalFocus={() => {
         if (restoreWorkspaceFocusFromPalette()) return false;
@@ -373,6 +389,11 @@ function CommandPaletteDialog(props: {
   );
 }
 
+/**
+ * Renders command, project, and thread navigation and handles the supplied palette intent.
+ * @param props Component properties and callbacks defined by the parameter type.
+ * @returns Rendered UI for the supplied props.
+ */
 function OpenCommandPaletteDialog(props: {
   readonly openIntent: CommandPaletteOpenIntent | null;
   readonly setOpen: (open: boolean) => void;
@@ -382,6 +403,12 @@ function OpenCommandPaletteDialog(props: {
   ) => void;
   readonly initialContext: CommandPaletteReturnContext | undefined;
 }) {
+  const composerHandleRef = useComposerHandleContext();
+  const canOptimizePrompt = useSyncExternalStore(
+    (listener) => composerHandleRef?.current?.subscribePromptOptimizer(listener) ?? (() => {}),
+    () => composerHandleRef?.current?.canOptimizePrompt() ?? false,
+    () => false,
+  );
   const navigate = useNavigate();
   const pathname = useLocation({ select: (location) => location.pathname });
   const { openChildSearch, setOpen } = props;
@@ -457,9 +484,6 @@ function OpenCommandPaletteDialog(props: {
   const openPanelPullRequestUrl = useOpenPanelPullRequestUrl(referenceThreadRef);
   const activeThreadServerConfig = useServerConfigs().get(
     activeThread?.environmentId ?? ("" as EnvironmentId),
-  );
-  const canShareActiveThreadWithGuest = useAtomValue(
-    canShareWithGuestAtom(activeThread?.environmentId ?? ("" as EnvironmentId)),
   );
   const activeThreadReferenceCopyTarget =
     referenceThreadRef === null || (pathname === "/pull-requests" && !openPanelPullRequestUrl)
@@ -556,7 +580,7 @@ function OpenCommandPaletteDialog(props: {
           isPrimary,
           machine: resolveEnvironmentMachineKind(environment.serverConfig),
           isConnected: canCreateProjectInEnvironment(environment.connection.phase),
-          status: connectionStatusText(environment.connection),
+          status: connectionStatusText(environment.connection, t.chat.workLog.shared.connection),
         };
       });
 
@@ -700,7 +724,7 @@ function OpenCommandPaletteDialog(props: {
   const isBrowsePending = hasBrowseTarget && (browseAccess.isPending || browseQuery.isPending);
   const browseAccessError =
     hasBrowseTarget && !browseAccess.isPending && !browseAccess.canReadFiles
-      ? (browseAccess.error ?? "This connection cannot browse host folders.")
+      ? (browseAccess.error ?? t.tools.palette.browseDenied)
       : null;
   const browseEntries = browseResult?.entries ?? EMPTY_BROWSE_ENTRIES;
   const { visibleEntries: visibleBrowseEntries, exactEntry: exactBrowseEntry } =
@@ -838,7 +862,7 @@ function OpenCommandPaletteDialog(props: {
           kind: "action" as const,
           value: NEW_THREAD_NO_PROJECT_VALUE,
           searchTerms: ["no project", "without project", "none"],
-          title: "No project",
+          title: t.tools.palette.noProject,
           icon: <MessageSquareDashedIcon className={ITEM_ICON_CLASS} />,
           shortcutCommand: "chat.newWithoutProject" as const,
           run: () => startScratchThread(scratchTargetEnvironmentId),
@@ -977,8 +1001,8 @@ function OpenCommandPaletteDialog(props: {
         kind: "action",
         value: `action:add-project:${environmentId}:local`,
         searchTerms: ["local", "folder", "directory", "browse"],
-        title: "Local folder",
-        description: "Browse a folder on disk",
+        title: t.tools.palette.localFolder,
+        description: t.tools.palette.browseFolder,
         icon: <FolderPlusIcon className={ITEM_ICON_CLASS} />,
         keepOpen: true,
         run: async () => {
@@ -992,8 +1016,8 @@ function OpenCommandPaletteDialog(props: {
         kind: "action",
         value: `action:add-project:${environmentId}:new`,
         searchTerms: ["new project", "create", "empty", "repository", "git init"],
-        title: "New project",
-        description: "Start a new Git repository from a name",
+        title: t.tools.palette.newProject,
+        description: t.tools.palette.newRepository,
         icon: <FolderGit2Icon className={ITEM_ICON_CLASS} />,
         keepOpen: true,
         run: async () => {
@@ -1009,11 +1033,14 @@ function OpenCommandPaletteDialog(props: {
 
     for (const source of orderedSources) {
       const label = addProjectRemoteSourceLabel(source);
-      const title = source === "url" ? "Git URL" : `${label} repository`;
+      const title =
+        source === "url"
+          ? t.tools.promptCommandsUi.gitUrl
+          : t.tools.palette.providerRepository(label);
       const description =
         source === "url"
-          ? "Clone from a remote URL"
-          : `Clone ${label} ${addProjectRemoteSourcePathHint(source)}`;
+          ? t.tools.palette.cloneRemote
+          : t.tools.palette.cloneProvider(label, addProjectRemoteSourcePathHint(source));
       const readiness = readinessBySource(source);
       const disabledHint = readiness.hint;
 
@@ -1029,12 +1056,12 @@ function OpenCommandPaletteDialog(props: {
                     openSourceControlSettings();
                   }}
                 >
-                  Setup Required
+                  {t.tools.palette.setupRequired}
                 </Button>
               }
             />
             <TooltipPopup align="end" side="left">
-              {disabledHint ?? "Open Settings -> Source control to configure this provider."}
+              {disabledHint ?? t.tools.palette.configureProvider}
             </TooltipPopup>
           </Tooltip>
         </span>
@@ -1070,7 +1097,9 @@ function OpenCommandPaletteDialog(props: {
       });
     }
 
-    return [{ value: `sources:${environmentId}`, label: "Sources", items: sourceItems }];
+    return [
+      { value: `sources:${environmentId}`, label: t.tools.palette.sources, items: sourceItems },
+    ];
   };
 
   const startAddProjectSourceSelection = (environmentId: EnvironmentId): void => {
@@ -1079,8 +1108,10 @@ function OpenCommandPaletteDialog(props: {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Environment unavailable",
-          description: `${environment?.label ?? "The selected environment"} is not connected.`,
+          title: t.tools.palette.environmentUnavailable,
+          description: t.tools.palette.environmentDisconnected(
+            environment?.label ?? t.tools.palette.selectedEnvironment,
+          ),
         }),
       );
       return;
@@ -1098,6 +1129,13 @@ function OpenCommandPaletteDialog(props: {
     });
   };
 
+  /**
+   * Builds a destination command while retaining its user-defined label and original ID.
+   * @param option Destination environment and availability metadata.
+   * @param value Original command identity used by the palette.
+   * @param run Callback that receives the selected original environment ID.
+   * @returns Action with unchanged search metadata and localized device guidance.
+   */
   const buildEnvironmentItem = (
     option: AddProjectEnvironmentOption,
     value: string,
@@ -1105,11 +1143,15 @@ function OpenCommandPaletteDialog(props: {
   ): CommandPaletteActionItem => ({
     kind: "action",
     value,
-    searchTerms: [option.label, option.environmentId, option.isPrimary ? "this device" : ""],
+    searchTerms: [
+      option.label,
+      option.environmentId,
+      option.isPrimary ? t.tools.promptCommandsUi.device : "",
+    ],
     title: option.label,
     description: option.isConnected
       ? option.isPrimary
-        ? "This device"
+        ? t.tools.palette.thisDevice
         : option.environmentId
       : option.status,
     disabled: !option.isConnected,
@@ -1133,7 +1175,7 @@ function OpenCommandPaletteDialog(props: {
   const addProjectEnvironmentGroups = [
     {
       value: "environments",
-      label: "Environments",
+      label: t.tools.palette.environments,
       items: addProjectEnvironmentItems,
     },
   ];
@@ -1209,6 +1251,15 @@ function OpenCommandPaletteDialog(props: {
   };
 
   const actionItems: Array<CommandPaletteActionItem | CommandPaletteSubmenuItem> = [];
+  const optimizePrompt = useStableCallback(async () => {
+    await composerHandleRef?.current?.optimizePrompt();
+  });
+  const optimizePromptAction = buildOptimizePromptAction({
+    available: canOptimizePrompt,
+    icon: <WandSparkles className={ITEM_ICON_CLASS} />,
+    run: optimizePrompt,
+  });
+  if (optimizePromptAction) actionItems.push(optimizePromptAction);
 
   if (projects.length > 0) {
     const activeProjectTitle =
@@ -1220,13 +1271,15 @@ function OpenCommandPaletteDialog(props: {
       actionItems.push({
         kind: "action",
         value: "action:new-thread",
+        searchTitle: t.tools.palette.newThreadInProject(activeProjectTitle),
         searchTerms: ["new thread", "chat", "create", "draft"],
         title: (
           <>
-            New thread in <span className="font-semibold">{activeProjectTitle}</span>
+            {t.tools.palette.newThreadInPrefix}
+            <span className="font-semibold">{activeProjectTitle}</span>
+            {t.tools.palette.newThreadInSuffix}
           </>
         ),
-        searchTitle: `New thread in ${activeProjectTitle}`,
         icon: <SquarePenIcon className={ITEM_ICON_CLASS} />,
         shortcutCommand: "chat.newLocal",
         run: async () => {
@@ -1244,10 +1297,12 @@ function OpenCommandPaletteDialog(props: {
       kind: "submenu",
       value: "action:new-thread-in",
       searchTerms: ["new thread", "project", "pick", "choose", "select"],
-      title: "New thread in...",
+      title: t.tools.palette.newThreadIn,
       icon: <SquarePenIcon className={ITEM_ICON_CLASS} />,
       addonIcon: <SquarePenIcon className={ADDON_ICON_CLASS} />,
-      groups: [{ value: NEW_THREAD_IN_GROUP, label: "Projects", items: projectThreadItems }],
+      groups: [
+        { value: NEW_THREAD_IN_GROUP, label: t.tools.palette.projects, items: projectThreadItems },
+      ],
     });
   }
 
@@ -1256,7 +1311,7 @@ function OpenCommandPaletteDialog(props: {
       kind: "action",
       value: "action:new-thread-without-project",
       searchTerms: ["new thread", "no project", "without project", "none", "chat"],
-      title: "New thread without a project",
+      title: t.tools.palette.scratchThread,
       icon: <MessageSquareDashedIcon className={ITEM_ICON_CLASS} />,
       shortcutCommand: "chat.newWithoutProject",
       run: () => startScratchThread(scratchTargetEnvironmentId),
@@ -1279,7 +1334,7 @@ function OpenCommandPaletteDialog(props: {
     actionItems.push({
       kind: "action",
       value: "find-current-thread",
-      title: "Find in current thread",
+      title: t.tools.palette.findInThread,
       searchTerms: ["find", "search", "messages", "plans"],
       icon: <TextSearchIcon className={ITEM_ICON_CLASS} />,
       shortcutCommand: "chat.find",
@@ -1319,7 +1374,7 @@ function OpenCommandPaletteDialog(props: {
       kind: "action",
       value: "action:copy-prompt-link",
       searchTerms: ["copy", "share", "prompt", "link"],
-      title: "Copy prompt link",
+      title: t.tools.promptCommandsUi.copy,
       icon: <LinkIcon className={ITEM_ICON_CLASS} />,
       run: () => copyPromptLink(plainPromptLink),
     });
@@ -1330,7 +1385,7 @@ function OpenCommandPaletteDialog(props: {
           kind: "action",
           value: "action:copy-prompt-link-with-context",
           searchTerms: ["copy", "share", "prompt", "link", "repository", "model"],
-          title: "Copy prompt link with repo and model",
+          title: t.tools.promptCommandsUi.copyContext,
           icon: <LinkIcon className={ITEM_ICON_CLASS} />,
           run: () => copyPromptLink(contextLink),
         });
@@ -1347,7 +1402,9 @@ function OpenCommandPaletteDialog(props: {
           ? ["copy", "pull request", "link", "reference"]
           : ["copy", "thread", "thread id", "reference"],
       title:
-        activeThreadReferenceCopyTarget.kind === "pull-request" ? "Copy PR link" : "Copy thread",
+        activeThreadReferenceCopyTarget.kind === "pull-request"
+          ? t.tools.palette.copyPrLink
+          : t.tools.palette.copyThreadId,
       description: activeThreadReferenceCopyTarget.description,
       icon: <LinkIcon className={ITEM_ICON_CLASS} />,
       shortcutCommand: "thread.copyReference",
@@ -1364,37 +1421,25 @@ function OpenCommandPaletteDialog(props: {
       kind: "action",
       value: "action:link-pull-request",
       searchTerms: ["link", "pull request", "pr", "attach", "stack"],
-      title: "Link pull request to thread",
+      title: t.tools.palette.linkPullRequest,
       icon: <PullRequestGlyph.link className={ITEM_ICON_CLASS} />,
       run: async () => {
         openLinkPullRequestDialog(threadRef);
       },
     });
-    actionItems.push({
-      kind: "action",
-      value: "action:open-thread-pull-requests",
-      searchTerms: ["pull requests", "linked", "stack", "prs"],
-      title: "Show linked pull requests",
-      disabled: visibleThreadPullRequests(activeThread.pullRequests).length === 0,
-      icon: <PullRequestGlyph.link className={ITEM_ICON_CLASS} />,
-      run: async () => {
-        useRightPanelStore.getState().open(threadRef, "pull-requests");
-      },
-    });
-  }
-
-  if (activeThread !== null && canShareActiveThreadWithGuest) {
-    const threadRef = scopeThreadRef(activeThread.environmentId, activeThread.id);
-    actionItems.push({
-      kind: "action",
-      value: "action:share-thread-with-guest",
-      searchTerms: ["share", "guest", "invite", "link", "teammate"],
-      title: "Share with guest",
-      icon: <UserPlusIcon className={ITEM_ICON_CLASS} />,
-      run: async () => {
-        openGuestShareDialog(threadRef);
-      },
-    });
+    if (activeThreadServerConfig?.environment.capabilities.threadPullRequests === true) {
+      actionItems.push({
+        kind: "action",
+        value: "action:open-thread-pull-requests",
+        searchTerms: ["pull requests", "linked", "stack", "prs"],
+        title: t.tools.palette.showPullRequests,
+        disabled: visibleThreadPullRequests(activeThread.pullRequests).length === 0,
+        icon: <PullRequestGlyph.link className={ITEM_ICON_CLASS} />,
+        run: async () => {
+          useRightPanelStore.getState().open(threadRef, "pull-requests");
+        },
+      });
+    }
   }
 
   if (activeThread !== null) {
@@ -1403,7 +1448,7 @@ function OpenCommandPaletteDialog(props: {
       kind: "action",
       value: "action:restart-agent-session",
       searchTerms: ["restart", "reset", "reload", "agent", "session", "skills", "plugins", "mcp"],
-      title: "Restart agent session",
+      title: t.tools.palette.restartAgent,
       icon: <RotateCcwIcon className={ITEM_ICON_CLASS} />,
       run: async () => {
         const { environmentId } = thread;
@@ -1416,8 +1461,8 @@ function OpenCommandPaletteDialog(props: {
         }
         toastManager.add({
           type: "success",
-          title: "Agent session will restart",
-          description: "Your next message starts a fresh session.",
+          title: t.tools.palette.agentWillRestart,
+          description: t.tools.palette.freshSession,
         });
         const project = projectByKey.get(`${environmentId}:${thread.projectId}`);
         if (!project) return;
@@ -1438,7 +1483,7 @@ function OpenCommandPaletteDialog(props: {
     kind: "action",
     value: "action:open-file-picker",
     searchTerms: ["go to file", "open file", "file picker", "find file", "quick open"],
-    title: "Go to file",
+    title: t.tools.palette.goToFile,
     icon: <FileSearchIcon className={ITEM_ICON_CLASS} />,
     keepOpen: true,
     shortcutCommand: "filePicker.toggle",
@@ -1451,7 +1496,7 @@ function OpenCommandPaletteDialog(props: {
     kind: "action",
     value: "action:search-project-contents",
     searchTerms: ["search project", "find in files", "grep", "content search", "text search"],
-    title: "Search project contents",
+    title: t.tools.palette.searchProjectContents,
     icon: <TextSearchIcon className={ITEM_ICON_CLASS} />,
     keepOpen: true,
     shortcutCommand: "projectSearch.toggle",
@@ -1465,7 +1510,7 @@ function OpenCommandPaletteDialog(props: {
       kind: "action",
       value: "action:new-project",
       searchTerms: ["new project", "create project", "empty", "repository", "repo", "git init"],
-      title: "New project",
+      title: t.tools.palette.newProject,
       icon: <FolderGit2Icon className={ITEM_ICON_CLASS} />,
       keepOpen: true,
       run: async () => {
@@ -1496,7 +1541,7 @@ function OpenCommandPaletteDialog(props: {
       "url",
       "environment",
     ],
-    title: "Add project",
+    title: t.tools.palette.addProject,
     icon: <FolderPlusIcon className={ITEM_ICON_CLASS} />,
     keepOpen: true,
     run: async () => {
@@ -1510,7 +1555,7 @@ function OpenCommandPaletteDialog(props: {
       kind: "action",
       value: "action:add-project:wsl-folder",
       searchTerms: ["add project", "open", "wsl", "linux", "folder", "directory"],
-      title: "Open WSL folder",
+      title: t.tools.palette.wslFolder,
       description: wslAddProjectEnvironmentOption.label,
       icon: <FolderPlusIcon className={ITEM_ICON_CLASS} />,
       keepOpen: true,
@@ -1545,7 +1590,7 @@ function OpenCommandPaletteDialog(props: {
         "merge",
         "branch",
       ],
-      title: "Open pull requests",
+      title: t.tools.palette.openPullRequests,
       icon: <PullRequestGlyph.pullRequest className={ITEM_ICON_CLASS} />,
       run: async () => {
         await navigate({ to: "/pull-requests", search: readPullRequestListPreferences() });
@@ -1553,11 +1598,35 @@ function OpenCommandPaletteDialog(props: {
     });
   }
 
+  if (projectGroups.length > 0) {
+    actionItems.push({
+      kind: "action",
+      value: "action:new-discussion",
+      searchTerms: ["new discussion", "discuss", "meeting", "新建讨论", "讨论"],
+      title: t.tools.palette.newDiscussion,
+      icon: <MessagesSquareIcon className={ITEM_ICON_CLASS} />,
+      run: async () => {
+        await navigate({ to: "/discussions/new" });
+      },
+    });
+  }
+
+  actionItems.push({
+    kind: "action",
+    value: "action:discussions",
+    searchTerms: ["discussions", "discussion list", "meeting", "讨论列表", "讨论"],
+    title: t.tools.palette.openDiscussions,
+    icon: <MessagesSquareIcon className={ITEM_ICON_CLASS} />,
+    run: async () => {
+      await navigate({ to: "/discussions" });
+    },
+  });
+
   actionItems.push({
     kind: "action",
     value: "action:usage",
     searchTerms: ["usage", "use", "tokens", "cost", "spend", "limits", "stats", "analytics"],
-    title: "Open usage",
+    title: t.tools.palette.openUsage,
     icon: <ChartNoAxesColumnIcon className={ITEM_ICON_CLASS} />,
     shortcutCommand: "usage.open",
     run: async () => {
@@ -1584,7 +1653,7 @@ function OpenCommandPaletteDialog(props: {
     kind: "action",
     value: "action:settings",
     searchTerms: ["settings", "preferences", "configuration", "keybindings"],
-    title: "Open settings",
+    title: t.tools.palette.openSettings,
     icon: <SettingsIcon className={ITEM_ICON_CLASS} />,
     run: async () => {
       await navigate({ to: "/settings" });
@@ -1635,7 +1704,7 @@ function OpenCommandPaletteDialog(props: {
         "remove",
         "t3.json",
       ],
-      title: "Project settings",
+      title: t.common.threadActions.projectSettings,
       description: contextualProjectGroup.displayName,
       icon: <FolderIcon className={ITEM_ICON_CLASS} />,
       run: async () => {
@@ -1657,7 +1726,7 @@ function OpenCommandPaletteDialog(props: {
     value: `setting:${item.id}`,
     searchTerms: [item.title, SETTINGS_SECTION_LABELS[item.to], ...(item.searchTerms ?? [])],
     title: item.title,
-    description: `Settings · ${SETTINGS_SECTION_LABELS[item.to]}`,
+    description: t.tools.palette.settingDescription(SETTINGS_SECTION_LABELS[item.to]),
     ...(item.secondary ? { secondary: true } : {}),
     icon: <SettingsIcon className={ITEM_ICON_CLASS} />,
     run: async () => {
@@ -1743,8 +1812,10 @@ function OpenCommandPaletteDialog(props: {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Environment unavailable",
-          description: `${environment?.label ?? "The selected environment"} is not connected.`,
+          title: t.tools.palette.environmentUnavailable,
+          description: t.tools.palette.environmentDisconnected(
+            environment?.label ?? t.tools.palette.selectedEnvironment,
+          ),
         }),
       );
       return;
@@ -1755,8 +1826,8 @@ function OpenCommandPaletteDialog(props: {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Failed to add project",
-          description: "Windows-style paths are only supported on Windows.",
+          title: t.tools.palette.addFailed,
+          description: t.tools.palette.windowsPathsOnly,
         }),
       );
       return;
@@ -1766,8 +1837,8 @@ function OpenCommandPaletteDialog(props: {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Failed to add project",
-          description: "Relative paths require an active project.",
+          title: t.tools.palette.addFailed,
+          description: t.tools.palette.relativePathNeedsProject,
         }),
       );
       return;
@@ -1809,8 +1880,8 @@ function OpenCommandPaletteDialog(props: {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "Failed to open project",
-              description: error instanceof Error ? error.message : "An error occurred.",
+              title: t.tools.palette.openFailed,
+              description: error instanceof Error ? error.message : t.tools.palette.error,
             }),
           );
           return;
@@ -1824,8 +1895,8 @@ function OpenCommandPaletteDialog(props: {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Cannot add project",
-          description: "This connection cannot add projects.",
+          title: t.tools.palette.cannotAdd,
+          description: t.tools.palette.addDenied,
         }),
       );
       return;
@@ -1847,8 +1918,8 @@ function OpenCommandPaletteDialog(props: {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Failed to add project",
-            description: error instanceof Error ? error.message : "An error occurred.",
+            title: t.tools.palette.addFailed,
+            description: error instanceof Error ? error.message : t.tools.palette.error,
           }),
         );
       }
@@ -1863,8 +1934,8 @@ function OpenCommandPaletteDialog(props: {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Failed to add project",
-          description: error instanceof Error ? error.message : "An error occurred.",
+          title: t.tools.palette.addFailed,
+          description: error instanceof Error ? error.message : t.tools.palette.error,
         }),
       );
       return;
@@ -1926,8 +1997,10 @@ function OpenCommandPaletteDialog(props: {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Environment unavailable",
-          description: `${browseEnvironment?.label ?? "The selected environment"} is not connected.`,
+          title: t.tools.palette.environmentUnavailable,
+          description: t.tools.palette.environmentDisconnected(
+            browseEnvironment?.label ?? t.tools.palette.selectedEnvironment,
+          ),
         }),
       );
       return;
@@ -1975,7 +2048,7 @@ function OpenCommandPaletteDialog(props: {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "Repository lookup failed",
+              title: t.tools.palette.repositoryLookupFailed,
               description: errorMessage(squashAtomCommandFailure(lookupResult)),
             }),
           );
@@ -2009,8 +2082,8 @@ function OpenCommandPaletteDialog(props: {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Clone unavailable",
-          description: "This connection needs permission to write source control and add projects.",
+          title: t.tools.palette.cloneUnavailable,
+          description: t.tools.palette.cloneDenied,
         }),
       );
       return;
@@ -2021,8 +2094,8 @@ function OpenCommandPaletteDialog(props: {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Clone failed",
-          description: "Windows-style paths are only supported on Windows.",
+          title: t.tools.palette.cloneFailed,
+          description: t.tools.palette.windowsPathsOnly,
         }),
       );
       return;
@@ -2032,8 +2105,8 @@ function OpenCommandPaletteDialog(props: {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Clone failed",
-          description: "Relative paths require an active project.",
+          title: t.tools.palette.cloneFailed,
+          description: t.tools.palette.relativePathNeedsProject,
         }),
       );
       return;
@@ -2066,7 +2139,7 @@ function OpenCommandPaletteDialog(props: {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Clone failed",
+            title: t.tools.palette.cloneFailed,
             description: errorMessage(squashAtomCommandFailure(startResult)),
           }),
         );
@@ -2086,8 +2159,8 @@ function OpenCommandPaletteDialog(props: {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Failed to open project",
-          description: error instanceof Error ? error.message : "An error occurred.",
+          title: t.tools.palette.openFailed,
+          description: error instanceof Error ? error.message : t.tools.palette.error,
         }),
       );
     }
@@ -2145,7 +2218,7 @@ function OpenCommandPaletteDialog(props: {
     browseTo,
   });
   const cloneDestinationBrowseGroups = browseGroups.map((group) =>
-    group.value === "directories" ? { ...group, label: "Select where to clone" } : group,
+    group.value === "directories" ? { ...group, label: t.tools.palette.cloneDestination } : group,
   );
 
   const newProjectsRoot = newProjectFlow ? newProjectsRootFor(newProjectFlow.environmentId) : null;
@@ -2188,7 +2261,7 @@ function OpenCommandPaletteDialog(props: {
       ? null
       : {
           value: "new-project-machines",
-          label: "Environments",
+          label: t.tools.palette.environments,
           items: newProjectEnvironmentOptions.map((option) => ({
             ...buildEnvironmentItem(
               option,
@@ -2216,8 +2289,8 @@ function OpenCommandPaletteDialog(props: {
               kind: "action",
               value: "new-project:existing",
               searchTerms: [],
-              title: "Add existing project",
-              description: "Open a folder or clone a repository",
+              title: t.tools.palette.addExisting,
+              description: t.tools.palette.openOrClone,
               icon: <FolderPlusIcon className={ITEM_ICON_CLASS} />,
               titleTrailingContent: (
                 <ChevronRightIcon className="-me-0.5 ms-auto size-4 shrink-0 text-muted-foreground/70" />
@@ -2235,7 +2308,7 @@ function OpenCommandPaletteDialog(props: {
       : [
           {
             value: "new-project-options",
-            label: "Options",
+            label: t.tools.palette.options,
             items: [
               {
                 kind: "action",
@@ -2243,13 +2316,13 @@ function OpenCommandPaletteDialog(props: {
                 searchTerms: [],
                 title:
                   newProjectPublishTargets.length > 1
-                    ? "Create private repository"
-                    : `Create private repository on ${newProjectPublishTarget.definition.label}`,
+                    ? t.tools.palette.privateRepository
+                    : t.tools.palette.privateRepositoryOn(newProjectPublishTarget.definition.label),
                 description:
                   newProjectName.length > 0
                     ? getNewProjectRepository(newProjectPublishTarget, newProjectPathPreview)
                     : (newProjectPublishTarget.owner ??
-                      `Your ${newProjectPublishTarget.definition.label} account`),
+                      t.tools.palette.providerAccount(newProjectPublishTarget.definition.label)),
                 icon: sourceControlHostIcon(newProjectPublishTarget.definition, ITEM_ICON_CLASS),
                 titleTrailingContent: (
                   <span className="ms-auto flex items-center gap-2">
@@ -2296,7 +2369,7 @@ function OpenCommandPaletteDialog(props: {
 
   const inputPlaceholder =
     newProjectFlow !== null
-      ? "Project name"
+      ? t.tools.palette.projectName
       : (remoteProjectInputPlaceholder(addProjectCloneFlow) ??
         getCommandPaletteInputPlaceholder(paletteMode));
   const isSubmenu = paletteMode === "submenu" || paletteMode === "submenu-browse";
@@ -2328,11 +2401,11 @@ function OpenCommandPaletteDialog(props: {
   const submitModifierLabel = useMetaForMod ? "\u2318" : "Ctrl";
   const submitActionLabel = isCloneDestinationStep
     ? willCreateProjectPath
-      ? "Create & Clone"
-      : "Clone"
+      ? t.tools.palette.createAndClone
+      : t.tools.palette.clone
     : willCreateProjectPath
-      ? "Create & Add"
-      : "Add";
+      ? t.tools.palette.createAndAdd
+      : t.tools.palette.add;
   const addShortcutLabel = hasHighlightedBrowseItem ? `${submitModifierLabel} Enter` : "Enter";
   const hasHighlightedNewProjectItem = newProjectFlow !== null && highlightedItemValue !== null;
   const createShortcutLabel = hasHighlightedNewProjectItem
@@ -2340,8 +2413,8 @@ function OpenCommandPaletteDialog(props: {
     : "Enter";
   const remoteProjectButtonLabel = addProjectCloneFlow
     ? addProjectCloneFlow.source === "url"
-      ? "Continue"
-      : "Lookup"
+      ? t.tools.palette.continue
+      : t.tools.palette.lookup
     : null;
   const isRemoteProjectPending = isRemoteProjectLookingUp || isRemoteProjectCloning;
   const canSubmitRemoteProjectFlow =
@@ -2443,8 +2516,8 @@ function OpenCommandPaletteDialog(props: {
       else
         toastManager.add({
           id: "thread-find-unavailable",
-          title: "Thread search is unavailable on this server.",
-          description: "Update the server to enable it.",
+          title: t.chat.threadFindUi.unavailable,
+          description: t.chat.threadFindUi.update,
         });
       return;
     }
@@ -2525,6 +2598,11 @@ function OpenCommandPaletteDialog(props: {
     }
   }
 
+  /**
+   * Opens a submenu or runs an enabled command; rejected actions show a localized error toast.
+   * @param item Selected palette command; disabled commands are ignored.
+   * @returns Nothing; action execution is asynchronous and owns its failure handler.
+   */
   function executeItem(item: CommandPaletteActionItem | CommandPaletteSubmenuItem): void {
     if (item.disabled) {
       return;
@@ -2543,8 +2621,8 @@ function OpenCommandPaletteDialog(props: {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Unable to run command",
-          description: error instanceof Error ? error.message : "An unexpected error occurred.",
+          title: t.tools.palette.runFailed,
+          description: error instanceof Error ? error.message : t.tools.palette.unexpectedError,
         }),
       );
     });
@@ -2626,8 +2704,8 @@ function OpenCommandPaletteDialog(props: {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Could not add WSL project",
-            description: "Start the matching WSL backend, then choose the folder again.",
+            title: t.tools.palette.wslAddFailed,
+            description: t.tools.palette.wslBackendHint,
           }),
         );
         return;
@@ -2646,10 +2724,10 @@ function OpenCommandPaletteDialog(props: {
   const inputAccessory =
     newProjectFlow !== null ? (
       <CommandPaletteSubmitButton
-        label={isCreatingNewProject ? "Creating" : "Create"}
+        label={isCreatingNewProject ? t.tools.palette.creating : t.tools.palette.create}
         shortcutLabel={createShortcutLabel}
-        ariaLabel={`Create (${createShortcutLabel})`}
-        tooltip={`Create (${createShortcutLabel})`}
+        ariaLabel={t.tools.palette.createWithShortcut(createShortcutLabel)}
+        tooltip={t.tools.palette.createWithShortcut(createShortcutLabel)}
         disabled={!canSubmitNewProject}
         onSubmit={() => {
           void submitNewProject();
@@ -2657,10 +2735,10 @@ function OpenCommandPaletteDialog(props: {
       />
     ) : addProjectCloneFlow?.step === "repository" ? (
       <CommandPaletteSubmitButton
-        label={isRemoteProjectPending ? "Working" : remoteProjectButtonLabel}
+        label={isRemoteProjectPending ? t.tools.palette.working : remoteProjectButtonLabel}
         shortcutLabel="Enter"
-        ariaLabel={`${remoteProjectButtonLabel ?? "Continue"} (Enter)`}
-        tooltip={`${remoteProjectButtonLabel ?? "Continue"} (Enter)`}
+        ariaLabel={`${remoteProjectButtonLabel ?? t.tools.palette.continue} (Enter)`}
+        tooltip={`${remoteProjectButtonLabel ?? t.tools.palette.continue} (Enter)`}
         disabled={!canSubmitRemoteProjectFlow}
         onSubmit={() => {
           void submitAddProjectCloneFlow();
@@ -2668,15 +2746,19 @@ function OpenCommandPaletteDialog(props: {
       />
     ) : isBrowsing ? (
       <CommandPaletteSubmitButton
-        label={isCloneDestinationStep && isRemoteProjectPending ? "Cloning" : submitActionLabel}
+        label={
+          isCloneDestinationStep && isRemoteProjectPending
+            ? t.tools.palette.cloning
+            : submitActionLabel
+        }
         shortcutLabel={addShortcutLabel}
         ariaLabel={`${submitActionLabel} (${addShortcutLabel})`}
         tooltip={
           isCloneDestinationStep && !canCloneProject
-            ? "This connection needs permission to write source control and add projects."
+            ? t.tools.palette.cloneDenied
             : canCreateProject
               ? `${submitActionLabel} (${addShortcutLabel})`
-              : "This connection cannot add projects."
+              : t.tools.palette.addDenied
         }
         disabled={
           !canCreateProject ||
@@ -2700,14 +2782,14 @@ function OpenCommandPaletteDialog(props: {
   const footerActionLabel =
     newProjectFlow !== null
       ? highlightedItemValue === null
-        ? "Create"
+        ? t.tools.palette.create
         : highlightedItemValue === newProjectPublishToggleValue
-          ? "Toggle"
-          : "Select"
+          ? t.tools.palette.toggle
+          : t.tools.palette.select
       : addProjectCloneFlow?.step === "repository"
-        ? (remoteProjectButtonLabel ?? "Continue")
+        ? (remoteProjectButtonLabel ?? t.tools.palette.continue)
         : !canSubmitBrowsePath || hasHighlightedBrowseItem
-          ? "Select"
+          ? t.tools.palette.select
           : undefined;
 
   const footerTrailing = canOpenProjectFromFileManager ? (
@@ -2717,7 +2799,7 @@ function OpenCommandPaletteDialog(props: {
         void handleOpenProjectFromFileManager();
       }}
     >
-      {`Open in ${fileManagerName}`}
+      {t.tools.palette.openIn(fileManagerName)}
     </CommandFooterAction>
   ) : isThreadSearchPending && !isLinkedThreadSearch && !isBrowsing ? (
     // In the footer, so the list keeps its height while message results may
@@ -2727,8 +2809,13 @@ function OpenCommandPaletteDialog(props: {
 
   return (
     <CommandPaletteContent
+      graphite
+      {...(addProjectEnvironmentId !== null && isSubmenu
+        ? { inputBreadcrumb: { label: t.tools.palette.addProject, onBack: popView } }
+        : {})}
+      shortcutLabel={shortcutLabelForCommand(keybindings, "commandPalette.toggle")}
       key={`${viewStack.length}-${browseGeneration}-${isBrowsing}-${newProjectFlow ? "new-project" : (addProjectCloneFlow?.step ?? "none")}`}
-      aria-label="Command palette"
+      aria-label={t.tools.palette.commandPalette}
       autoHighlight={autoHighlightsFirstRow ? "always" : false}
       footerActionLabel={footerActionLabel}
       footerTrailing={footerTrailing}
@@ -2751,7 +2838,7 @@ function OpenCommandPaletteDialog(props: {
                 <button
                   type="button"
                   className="flex cursor-pointer items-center"
-                  aria-label="Back"
+                  aria-label={t.tools.palette.back}
                   onClick={popView}
                 >
                   <ArrowLeftIcon />
@@ -2802,7 +2889,7 @@ function OpenCommandPaletteDialog(props: {
         </div>
       ) : isBrowsePending && browseResult === null ? (
         <div role="status" className="px-4 py-3 text-sm text-muted-foreground">
-          Loading folders...
+          {t.tools.palette.loadingFolders}
         </div>
       ) : null}
       <CommandPaletteVirtualizedResults
@@ -2816,19 +2903,19 @@ function OpenCommandPaletteDialog(props: {
           ? {
               emptyStateMessage:
                 addProjectCloneFlow.source === "url"
-                  ? "Enter a Git clone URL and press Enter to continue."
-                  : "Enter a repository path and press Enter to look it up.",
+                  ? t.tools.palette.cloneUrlHint
+                  : t.tools.palette.repositoryPathHint,
             }
           : addProjectCloneFlow?.step === "confirm"
-            ? { emptyStateMessage: "Choose a destination path and press Enter to clone." }
+            ? { emptyStateMessage: t.tools.palette.clonePathHint }
             : relativePathNeedsActiveProject
-              ? { emptyStateMessage: "Relative paths require an active project." }
+              ? { emptyStateMessage: t.tools.palette.relativePathNeedsProject }
               : willCreateProjectPath
                 ? {
-                    emptyStateMessage: "Press Enter to create this folder and add it as a project.",
+                    emptyStateMessage: t.tools.palette.createFolderHint,
                   }
                 : isThreadSearchPending
-                  ? { emptyStateMessage: "Searching thread messages…" }
+                  ? { emptyStateMessage: t.tools.palette.searchingMessages }
                   : {})}
       />
     </CommandPaletteContent>
