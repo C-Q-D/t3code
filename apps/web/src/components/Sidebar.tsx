@@ -9,6 +9,7 @@ import {
 } from "@t3tools/contracts";
 import { copyThreadReference } from "../lib/copyThreadReference";
 import { threadChipCopyTarget } from "@t3tools/client-runtime/thread-reference";
+import { attachSidebarTree, SIDEBAR_TREE_PROPS } from "../lib/sidebarTree";
 import { ThreadContextDragGhost } from "./chat/ThreadContextDragGhost";
 import {
   endThreadContextDrag,
@@ -1444,6 +1445,15 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     listMotionRef.current = node === null ? null : createSidebarListMotion(node);
     // The layout effect below captures the initial positions after the commit.
     // Measuring here forces layout midway through mount, then repeats it there.
+  };
+
+  const attachTreeRef = (node: HTMLUListElement) => {
+    attachListMotionRef(node);
+    const detachTree = attachSidebarTree(node);
+    return () => {
+      detachTree?.();
+      attachListMotionRef(null);
+    };
   };
 
   const [dragState, setDragState] = useState<{
@@ -3020,13 +3030,13 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 <SidebarDragLifecycle onUnmount={cancelThreadDrag} />
                 <SortableContext items={sortableIds} strategy={sidebarSortingStrategy}>
                   <ul
-                    ref={attachListMotionRef}
+                    ref={attachTreeRef}
                     data-dragging={(!isContextDrag && dragState !== null) || undefined}
                     // VoiceOver treats an exposed list as an interaction boundary,
                     // which hides its rows from ordinary linear navigation. A
                     // presentational list also makes its implicit listitems
                     // presentational while preserving every descendant control.
-                    role="presentation"
+                    {...SIDEBAR_TREE_PROPS}
                     className={cn(
                       "sidebar-thread-list relative flex flex-col gap-px",
                       sidebarListItems.length > 0 && "flex-1",
