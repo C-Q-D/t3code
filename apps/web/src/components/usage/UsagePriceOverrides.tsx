@@ -81,13 +81,11 @@ const priceTargetsAtom = Atom.make((get): readonly UsagePriceTarget[] =>
           ? t.tools.usage.offline
           : settings === null
             ? t.tools.usage.pricesNotLoaded
-            : environment.serverConfig?.environment.capabilities.usagePriceOverrides !== true
-              ? t.tools.usage.updateToEdit
-              : access === "pending"
-                ? t.tools.usage.checkingPermissions
-                : access === "denied"
-                  ? t.tools.usage.readOnly
-                  : null,
+            : access === "pending"
+              ? t.tools.usage.checkingPermissions
+              : access === "denied"
+                ? t.tools.usage.readOnly
+                : null,
     };
   }),
 );

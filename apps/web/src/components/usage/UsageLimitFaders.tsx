@@ -13,6 +13,7 @@ import {
   type LimitAccount,
 } from "@t3tools/shared/usageLimits";
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { normalizeProviderAccentColor } from "@t3tools/client-runtime/state/provider-instance-display";
 import { activeLocale, t } from "~/i18n";
 import { useEnvironmentScope } from "../../state/session";
 import { usePrimarySettings } from "../../hooks/useSettings";
@@ -237,6 +238,11 @@ function ProviderFaderCard({ pool, now }: { readonly pool: LimitPool; readonly n
                     return (
                       <UsageLimitFader
                         key={fader.key}
+                        color={
+                          fader.members.length === 1
+                            ? (normalizeProviderAccentColor(account.accentColor) ?? color)
+                            : color
+                        }
                         usedPercent={fader.usedPercent}
                         remainingPercent={fader.remainingPercent}
                         index={firstFaderIndex + faderIndex}

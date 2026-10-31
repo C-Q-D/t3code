@@ -91,6 +91,7 @@ export function limitExtraCards<C>(
     readonly url: string;
     readonly label: string;
     readonly message?: string | undefined;
+    readonly accounts?: readonly string[];
   }[],
   sharedLink: { readonly url: string; readonly label: string } | null,
 ) {

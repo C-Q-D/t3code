@@ -67,6 +67,7 @@ export function UsageLimitExtras({
         return (
           <section className="usage-limit-extra" key={link.url}>
             <h3>{link.label}</h3>
+            {link.accounts?.length ? <p>{link.accounts.join(", ")}</p> : null}
             {link.url === CHATGPT_USAGE_URL ? (
               <p>{t.tools.usage.chatgptUsageHint}</p>
             ) : link.message ? (

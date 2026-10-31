@@ -1,13 +1,14 @@
 /** Decorative, draggable usage meter; account actions remain on the separate name button. */
 import { useStableCallback } from "~/hooks/useStableCallback";
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import { usePhysicsMotion } from "../../hooks/usePhysicsMotion";
 import { useMotionJob } from "../../lib/motion/react";
 import { useAnimatedNumber } from "../../hooks/useAnimatedNumber";
 import { FaderMotion } from "./UsageLimitFader.motion";
 
-/** Render quota in percent; label contains the complete accessible name and reset time. */
+/** Render quota in percent with the resolved account or pool color; label includes reset time. */
 export function UsageLimitFader({
+  color,
   usedPercent,
   remainingPercent,
   label,
@@ -15,6 +16,7 @@ export function UsageLimitFader({
   index,
   children,
 }: {
+  readonly color: string;
   readonly usedPercent: number;
   readonly remainingPercent: number;
   readonly label: string;
@@ -72,7 +74,7 @@ export function UsageLimitFader({
     if (motion.current?.pointer(event.type, usedPercent)) animate();
   };
   return (
-    <div className="usage-fader">
+    <div className="usage-fader" style={{ "--fader-color": color } as CSSProperties}>
       <div
         ref={host}
         className="usage-fader-slot"
