@@ -10,12 +10,16 @@ import { useAtomCommand } from "../../state/use-atom-command";
 import { Button } from "../ui/button";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { Switch } from "../ui/switch";
-import { groupGitHubAccounts, nextGitHubHosts } from "./GitHubAccountSettings.logic";
-import { readGitHubSettings } from "@t3tools/client-runtime/source-control-clients";
+import { groupHostAccounts, nextHostAccountChoices } from "./SourceControlAccountSettings.logic";
+import {
+  readHostCredentialSettings,
+  type SourceControlDefinition,
+  type SourceControlHostCredentials,
+} from "@t3tools/client-runtime/source-control-clients";
 import { redactedPlaceholder } from "./RedactedSensitiveText";
 
-/** Sentinel select value for "follow gh's active login"; logins never contain spaces. */
-const ACTIVE_ACCOUNT = "active gh account";
+/** Sentinel select value for "follow the CLI's active login"; logins never contain spaces. */
+const ACTIVE_ACCOUNT = "active cli account";
 
 function RedactedLogin(props: {
   readonly account: string;
@@ -34,23 +38,34 @@ function RedactedLogin(props: {
   );
 }
 
-export function GitHubAccountSettings({
+/** Edits the selected host credentials on environmentId using definition metadata; onSaved refreshes discovery after persistence. */
+export function SourceControlAccountSettings({
   environmentId,
+  definition,
+  credentials,
   auth,
   onSaved,
 }: {
   readonly environmentId: EnvironmentId;
+  readonly definition: SourceControlDefinition;
+  readonly credentials: SourceControlHostCredentials;
   readonly auth: SourceControlProviderAuth;
   readonly onSaved: () => void;
 }) {
-  const github = useEnvironmentSettings(environmentId, readGitHubSettings);
-  const hosts = github.hosts;
+  const { hosts } = useEnvironmentSettings(environmentId, (settings) =>
+    readHostCredentialSettings(settings, definition.kind),
+  );
+  const { label } = definition;
+  const { cliName } = credentials;
   const updateSettings = useAtomCommand(serverEnvironment.updateSettings, {
-    label: t.settings.gitHubAccount.saveGitHubAccountSettings,
+    label:
+      definition.kind === "github"
+        ? t.settings.gitHubAccount.saveGitHubAccountSettings
+        : `save ${label} account settings`,
   });
   const [saving, setSaving] = useState(false);
   const [revealed, setRevealed] = useState(false);
-  const groups = groupGitHubAccounts(auth.accounts ?? []);
+  const groups = groupHostAccounts(auth.accounts ?? []);
 
   const save = async (
     host: string,
@@ -61,7 +76,9 @@ export function GitHubAccountSettings({
       environmentId,
       input: {
         patch: {
-          sourceControlHosts: { github: { hosts: nextGitHubHosts(hosts, host, change) } },
+          sourceControlHosts: {
+            [definition.kind]: { hosts: nextHostAccountChoices(hosts, host, change) },
+          },
         },
       },
     });
@@ -73,7 +90,9 @@ export function GitHubAccountSettings({
     return (
       <p className="text-secondary-copy-medium text-secondary-label">
         {t.settings.gitHubAccount.signInWith}
-        <code className="rounded bg-muted px-1 py-px text-2xs">gh auth login</code>{" "}
+        <code className="rounded bg-muted px-1 py-px text-2xs">
+          {credentials.loginCommand}
+        </code>{" "}
         {t.settings.gitHubAccount.serverHostRescanAccountsHint}
       </p>
     );
@@ -84,17 +103,23 @@ export function GitHubAccountSettings({
       <div className="flex items-center justify-between gap-3">
         <p className="max-w-2xl text-secondary-copy-medium leading-relaxed text-secondary-label">
           {t.settings.gitHubAccount.chooseWhich}
-          <code className="rounded bg-muted px-1 py-px text-2xs">gh</code>{" "}
-          {t.settings.gitHubAccount.loginEachGitHubHostUsesHint}
+          <code className="rounded bg-muted px-1 py-px text-2xs">{cliName}</code>{" "}
+          {definition.kind === "github"
+            ? t.settings.gitHubAccount.loginEachGitHubHostUsesHint
+            : `login each ${label} host uses, or turn a host off.`}
         </p>
         <Button
           size="icon-xs"
           variant="ghost-muted"
           onClick={() => setRevealed((current) => !current)}
           aria-label={
-            revealed
-              ? t.settings.gitHubAccount.hideGitHubAccounts
-              : t.settings.gitHubAccount.revealGitHubAccounts
+            definition.kind === "github"
+              ? revealed
+                ? t.settings.gitHubAccount.hideGitHubAccounts
+                : t.settings.gitHubAccount.revealGitHubAccounts
+              : revealed
+                ? `Hide ${label} accounts`
+                : `Reveal ${label} accounts`
           }
           aria-pressed={revealed}
         >
@@ -124,7 +149,11 @@ export function GitHubAccountSettings({
               <Switch
                 checked={enabled}
                 disabled={saving}
-                aria-label={t.settings.gitHubAccount.hostEnabledAriaLabel(group.host)}
+                aria-label={
+                  definition.kind === "github"
+                    ? t.settings.gitHubAccount.hostEnabledAriaLabel(group.host)
+                    : `Use ${label} on ${group.host}`
+                }
                 onCheckedChange={(checked) => void save(group.host, { enabled: checked })}
               />
             </div>
@@ -146,13 +175,19 @@ export function GitHubAccountSettings({
                   >
                     <SelectTrigger
                       size="settings"
-                      aria-label={t.settings.gitHubAccount.gitHubAccountFor(group.host)}
+                      aria-label={
+                        definition.kind === "github"
+                          ? t.settings.gitHubAccount.gitHubAccountFor(group.host)
+                          : `${label} account for ${group.host}`
+                      }
                     >
                       <SelectValue>
                         {(value: string) =>
                           value === ACTIVE_ACCOUNT ? (
                             <span className="flex min-w-0 items-center gap-1">
-                              {t.settings.gitHubAccount.activeGhAccount}
+                              {definition.kind === "github"
+                                ? t.settings.gitHubAccount.activeGhAccount
+                                : `Active ${cliName} account`}
                               {group.activeAccount ? (
                                 <>
                                   (
@@ -173,7 +208,9 @@ export function GitHubAccountSettings({
                     <SelectPopup align="end" alignItemWithTrigger={false}>
                       <SelectItem value={ACTIVE_ACCOUNT}>
                         <span className="flex min-w-0 items-center gap-1">
-                          {t.settings.gitHubAccount.activeGhAccount}
+                          {definition.kind === "github"
+                            ? t.settings.gitHubAccount.activeGhAccount
+                            : `Active ${cliName} account`}
                           {group.activeAccount ? (
                             <>
                               (<RedactedLogin revealed={revealed} account={group.activeAccount} />)
@@ -197,8 +234,10 @@ export function GitHubAccountSettings({
             ) : null}
             {stalePin ? (
               <div className="flex items-center justify-between gap-3">
-                <p className="text-secondary-copy-medium text-warning">
-                  {t.settings.gitHubAccount.chosenLoginLongerSignedActiveHint}
+                <p className="text-xs text-warning">
+                  {definition.kind === "github"
+                    ? t.settings.gitHubAccount.chosenLoginLongerSignedActiveHint
+                    : `The chosen login is no longer signed in, so the active ${cliName} login is used.`}
                 </p>
                 <Button
                   size="settings-list"
@@ -218,7 +257,10 @@ export function GitHubAccountSettings({
                 <RedactedLogin revealed={revealed} account={entry.account} />
                 <span>
                   {t.settings.gitHubAccount.canTBeUsed}
-                  {entry.error ?? t.settings.gitHubAccount.ghReportsThisLoginAsInvalid}
+                  {entry.error ??
+                    (definition.kind === "github"
+                      ? t.settings.gitHubAccount.ghReportsThisLoginAsInvalid
+                      : `${cliName} reports this login as invalid.`)}
                 </span>
               </p>
             ))}

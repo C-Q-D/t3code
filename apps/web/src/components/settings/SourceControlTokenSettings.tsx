@@ -5,7 +5,11 @@ import { ExternalLinkIcon } from "lucide-react";
 import { useState } from "react";
 
 import { useEnvironmentSettings } from "../../hooks/useSettings";
-import { readGitHubSettings } from "@t3tools/client-runtime/source-control-clients";
+import {
+  readHostCredentialSettings,
+  type SourceControlDefinition,
+  type SourceControlHostCredentials,
+} from "@t3tools/client-runtime/source-control-clients";
 import { serverEnvironment } from "../../state/server";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { Button, InlineButton } from "../ui/button";
@@ -13,24 +17,29 @@ import { Input } from "../ui/input";
 import { SecretInput } from "./SecretInput";
 import { Label } from "../ui/label";
 
-const DEFAULT_HOST = "github.com";
-
-function newTokenUrl(host: string): string {
-  return `https://${host}/settings/personal-access-tokens/new`;
-}
-
-export function GitHubTokenSettings({
+/** Edits the selected host credentials on environmentId using definition metadata; onSaved refreshes discovery after persistence. */
+export function SourceControlTokenSettings({
   environmentId,
+  definition,
+  credentials,
   onSaved,
 }: {
   readonly environmentId: EnvironmentId;
+  readonly definition: SourceControlDefinition;
+  readonly credentials: SourceControlHostCredentials;
   readonly onSaved: () => void;
 }) {
-  const { tokens } = useEnvironmentSettings(environmentId, readGitHubSettings);
+  const { tokens } = useEnvironmentSettings(environmentId, (settings) =>
+    readHostCredentialSettings(settings, definition.kind),
+  );
   const updateSettings = useAtomCommand(serverEnvironment.updateSettings, {
-    label: t.settings.gitHubToken.saveGitHubToken,
+    label:
+      definition.kind === "github"
+        ? t.settings.gitHubToken.saveGitHubToken
+        : `save ${definition.label} token`,
   });
-  const [host, setHost] = useState(DEFAULT_HOST);
+  const defaultHost = definition.publicHost ?? "";
+  const [host, setHost] = useState(defaultHost);
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
   const normalizedHost = host.trim().toLowerCase();
@@ -43,9 +52,11 @@ export function GitHubTokenSettings({
     setSaving(true);
     const result = await updateSettings({
       environmentId,
-      // The map travels whole: every other saved token as its redaction marker, which keeps it.
+      // Send the whole map; other tokens' redaction markers preserve their values.
       input: {
-        patch: { sourceControlHosts: { github: { tokens: { ...tokens, [target]: token } } } },
+        patch: {
+          sourceControlHosts: { [definition.kind]: { tokens: { ...tokens, [target]: token } } },
+        },
       },
     });
     setSaving(false);
@@ -67,41 +78,47 @@ export function GitHubTokenSettings({
       <fieldset disabled={saving} className="contents">
         <p className="max-w-2xl text-secondary-copy-medium leading-relaxed text-secondary-label">
           {t.settings.gitHubToken.aTokenSavedHereIsUsedBefore}{" "}
-          <code className="rounded bg-muted px-1 py-px text-2xs">GH_TOKEN</code>{" "}
+          <code className="rounded bg-muted px-1 py-px text-2xs">{credentials.tokenEnvVar}</code>{" "}
           {t.settings.gitHubToken.andThe}{" "}
-          <code className="rounded bg-muted px-1 py-px text-2xs">gh</code>{" "}
-          {t.settings.gitHubToken.loginGitHubWorksWithoutGitHubHint}{" "}
-          <InlineButton
-            render={
-              <a
-                href={newTokenUrl(normalizedHost || DEFAULT_HOST)}
-                target="_blank"
-                rel="noreferrer noopener"
-              />
-            }
-          >
-            {t.settings.gitHubToken.createAToken}
-            <ExternalLinkIcon aria-hidden className="size-3" />
-          </InlineButton>
+          <code className="rounded bg-muted px-1 py-px text-2xs">{credentials.cliName}</code>{" "}
+          {definition.kind === "github"
+            ? t.settings.gitHubToken.loginGitHubWorksWithoutGitHubHint
+            : `login, so ${definition.label} works without the ${credentials.cliLabel}. Give it ${credentials.tokenAccess}.`}{" "}
+          {normalizedHost || defaultHost ? (
+            <InlineButton
+              render={
+                <a
+                  href={credentials.newTokenUrl(normalizedHost || defaultHost)}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                />
+              }
+            >
+              {t.settings.gitHubToken.createAToken}
+              <ExternalLinkIcon aria-hidden className="size-3" />
+            </InlineButton>
+          ) : null}
         </p>
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <div className="grid gap-1.5 sm:w-48 sm:shrink-0">
-            <Label htmlFor={`github-token-host-${environmentId}`}>
+        <div className="grid gap-3 sm:grid-cols-[12rem_1fr]">
+          <div className="grid gap-1.5">
+            <Label htmlFor={`${definition.kind}-token-host-${environmentId}`}>
               {t.settings.connections.pairing.hostLabel}
             </Label>
             <Input
-              id={`github-token-host-${environmentId}`}
+              id={`${definition.kind}-token-host-${environmentId}`}
               autoComplete="off"
               size="settings"
-              placeholder={DEFAULT_HOST}
+              placeholder={defaultHost}
               value={host}
               onChange={(event) => setHost(event.target.value)}
             />
           </div>
-          <div className="grid min-w-0 flex-1 gap-1.5">
-            <Label htmlFor={`github-token-${environmentId}`}>{t.settings.gitHubToken.token}</Label>
+          <div className="grid gap-1.5">
+            <Label htmlFor={`${definition.kind}-token-${environmentId}`}>
+              {t.settings.gitHubToken.token}
+            </Label>
             <SecretInput
-              id={`github-token-${environmentId}`}
+              id={`${definition.kind}-token-${environmentId}`}
               size="settings"
               configured={isSaved}
               value={draft}
@@ -112,7 +129,9 @@ export function GitHubTokenSettings({
         <div className="flex items-center justify-between gap-3">
           <p className="text-secondary-copy-medium text-secondary-label">
             {savedHosts.length === 0
-              ? t.settings.gitHubToken.tokenSavedServerUsesGhHint
+              ? definition.kind === "github"
+                ? t.settings.gitHubToken.tokenSavedServerUsesGhHint
+                : `No token saved; the server uses ${credentials.tokenEnvVar} or the ${credentials.cliName} login.`
               : t.settings.gitHubToken.savedFor(savedHosts.join(", "))}
           </p>
           <div className="flex shrink-0 gap-2">

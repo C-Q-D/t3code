@@ -6,20 +6,19 @@ import { Input } from "../ui/input";
 import * as Duration from "effect/Duration";
 import * as Option from "effect/Option";
 import { createElement, useState, type ReactNode } from "react";
-import type {
-  BackgroundActivitySettings,
-  SourceControlDiscoveryResult,
-  SourceControlProviderAuth,
-  SourceControlProviderDiscoveryItem,
-  VcsDiscoveryItem,
+import {
+  type BackgroundActivitySettings,
+  type SourceControlDiscoveryResult,
+  type SourceControlProviderAuth,
+  type SourceControlProviderDiscoveryItem,
+  type VcsDiscoveryItem,
 } from "@t3tools/contracts";
+import { useScopedSettings, useUpdateScopedSettings } from "./useScopedSettings";
 import {
   getBackgroundActivityBaseProfile,
   getBackgroundActivityPresetSettings,
   resolveServerBackgroundActivitySettings,
 } from "@t3tools/shared/backgroundActivitySettings";
-
-import { useScopedSettings, useUpdateScopedSettings } from "./useScopedSettings";
 import { useSettingsScope } from "./SettingsScopeContext";
 import { ProjectDefaultsSettings } from "./ProjectDefaultsSettings";
 import { BranchNamingSettings } from "./BranchNamingSettings";
@@ -42,8 +41,9 @@ import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
 import { SourceControlHostSettings } from "./SourceControlHostSettings";
-import { GitHubAccountSettings } from "./GitHubAccountSettings";
-import { GitHubTokenSettings } from "./GitHubTokenSettings";
+import { SourceControlAccountSettings } from "./SourceControlAccountSettings";
+import { SourceControlAppSignInSettings } from "./SourceControlAppSignInSettings";
+import { SourceControlTokenSettings } from "./SourceControlTokenSettings";
 import { RedactedSensitiveText } from "./RedactedSensitiveText";
 import { SourceControlWritingSettingsSection } from "./SourceControlWritingSettings";
 import {
@@ -241,7 +241,6 @@ function DiscoveryItemRow({
   const setExpanded = onOpenChange ?? setLocalExpanded;
   const hasDetails = children !== undefined;
   const searchTargetId = useSettingsSearchTargetId();
-  // A search jump to a setting inside this row opens it when the target arrives.
   const [seenSearchTargetId, setSeenSearchTargetId] = useState<string | null>(null);
   const targetsThisRow =
     searchTargetId === sourceControlHostSettingsSearchId(item.kind) ||
@@ -502,13 +501,55 @@ export function SourceControlSettingsPanel() {
   const handleScan = () => {
     discovery.refresh();
   };
-  const hostSettingsPanel = (kind: string) => {
-    const definition = sourceControlClients.find(kind);
+  const hostSettingsPanel = (item: SourceControlProviderDiscoveryItem) => {
+    const definition = sourceControlClients.find(item.kind);
     if (!definition?.settings || environmentId === null) return undefined;
+    const { credentials } = definition;
+    if (credentials) {
+      return (
+        <SettingsSearchTarget id={sourceControlHostSettingsSearchId(item.kind)}>
+          <div className="grid gap-6">
+            {credentials.appSignIn && item.appSignIn === true ? (
+              <SourceControlAppSignInSettings
+                key={`sign-in-${environmentId}`}
+                environmentId={environmentId}
+                definition={definition}
+                appSignIn={credentials.appSignIn}
+                account={Option.getOrNull(item.auth.account)}
+                onChanged={handleScan}
+              />
+            ) : null}
+            {credentials.appSignIn && item.appSignIn === true ? (
+              <div className="flex items-center gap-3 text-2xs text-muted-foreground">
+                <span aria-hidden className="h-px flex-1 bg-border" />
+                Or use your own credentials
+                <span aria-hidden className="h-px flex-1 bg-border" />
+              </div>
+            ) : null}
+            <SourceControlTokenSettings
+              key={`token-${environmentId}`}
+              environmentId={environmentId}
+              definition={definition}
+              credentials={credentials}
+              onSaved={handleScan}
+            />
+            {item.status === "available" ? (
+              <SourceControlAccountSettings
+                key={environmentId}
+                environmentId={environmentId}
+                definition={definition}
+                credentials={credentials}
+                auth={item.auth}
+                onSaved={handleScan}
+              />
+            ) : null}
+          </div>
+        </SettingsSearchTarget>
+      );
+    }
     return (
-      <SettingsSearchTarget id={sourceControlHostSettingsSearchId(kind)}>
+      <SettingsSearchTarget id={sourceControlHostSettingsSearchId(item.kind)}>
         <SourceControlHostSettings
-          // Drafts belong to one environment; switching must not carry them over.
           key={environmentId}
           environmentId={environmentId}
           definition={{ ...definition, settings: definition.settings }}
@@ -616,21 +657,7 @@ export function SourceControlSettingsPanel() {
               open={githubOpen}
               onOpenChange={setGithubOpen}
             >
-              <div className="grid gap-4">
-                <GitHubTokenSettings
-                  key={`token-${environmentId}`}
-                  environmentId={environmentId}
-                  onSaved={handleScan}
-                />
-                {github.status === "available" ? (
-                  <GitHubAccountSettings
-                    key={environmentId}
-                    environmentId={environmentId}
-                    auth={github.auth}
-                    onSaved={handleScan}
-                  />
-                ) : null}
-              </div>
+              {hostSettingsPanel(github)}
             </DiscoveryItemRow>
           </SettingsSearchTarget>
         </SettingsSection>
@@ -657,7 +684,7 @@ export function SourceControlSettingsPanel() {
                     : undefined
                 }
               >
-                {item.kind === "github" ? undefined : hostSettingsPanel(item.kind)}
+                {item.kind === "github" ? undefined : hostSettingsPanel(item)}
               </DiscoveryItemRow>
             ))}
           </div>

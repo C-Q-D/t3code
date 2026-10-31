@@ -1,11 +1,11 @@
-/** Presents per-environment GitHub sharing permissions; the overview switch never grants access. */
+/** Presents per-environment pull request sharing permissions; the overview switch never grants access. */
 import { t } from "~/i18n";
 import { useAtomValue } from "@effect/atom-react";
 import { resolveEnvironmentMachineKind } from "@t3tools/contracts";
 import {
-  gitHubRoutingConnectionKey,
-  gitHubRoutingPermissionFor,
-  type GitHubRoutingPermission,
+  pullRequestRoutingConnectionKey,
+  pullRequestRoutingPermissionFor,
+  type PullRequestRoutingPermission,
 } from "@t3tools/client-runtime/connection";
 import { useState } from "react";
 
@@ -20,7 +20,7 @@ import { Switch } from "../ui/switch";
 import { Tooltip, TooltipTrigger, TooltipPopup } from "../ui/tooltip";
 import { searchableSetting } from "./settingsSearch";
 
-const options: ReadonlyArray<{ value: GitHubRoutingPermission; label: string }> = [
+const options: ReadonlyArray<{ value: PullRequestRoutingPermission; label: string }> = [
   { value: "off", label: t.settings.connections.status.off },
   { value: "read", label: t.settings.gitHubRouting.readPrs },
   { value: "read-write", label: t.settings.gitHubRouting.readAndAct },
@@ -35,8 +35,11 @@ const summaryLabels = {
  * Summarizes sharing machines by permission, preserving their order within each group.
  * Null when nothing is shared.
  */
-export function summarizeGitHubRouting(
-  entries: ReadonlyArray<{ readonly label: string; readonly permission: GitHubRoutingPermission }>,
+export function summarizePullRequestRouting(
+  entries: ReadonlyArray<{
+    readonly label: string;
+    readonly permission: PullRequestRoutingPermission;
+  }>,
 ): string | null {
   const groups = (["read-write", "read"] as const).flatMap((permission) => {
     const labels = entries.filter((entry) => entry.permission === permission);
@@ -53,23 +56,23 @@ export function summarizeGitHubRouting(
  * The disabled overview is display-only because there is no global sharing permission.
  * Catalog readiness, unsupported routes, saving guards and command error reporting stay authoritative.
  */
-export function GitHubRoutingSettings({
+export function PullRequestRoutingSettings({
   environments,
 }: {
   readonly environments: ReadonlyArray<EnvironmentPresentation>;
 }) {
-  const permissions = useAtomValue(environmentCatalog.githubRoutingPermissionsValueAtom);
+  const permissions = useAtomValue(environmentCatalog.pullRequestRoutingPermissionsValueAtom);
   const catalog = useAtomValue(environmentCatalog.catalogValueAtom);
-  const update = useAtomCommand(environmentCatalog.setGitHubRoutingPermission);
+  const update = useAtomCommand(environmentCatalog.setPullRequestRoutingPermission);
   const [saving, setSaving] = useState(false);
 
   if (environments.length < 2) return null;
 
-  const { id, title } = searchableSetting("github-routing");
-  const summary = summarizeGitHubRouting(
+  const { id, title } = searchableSetting("pull-request-routing");
+  const summary = summarizePullRequestRouting(
     environments.map((environment) => ({
       label: environment.label,
-      permission: gitHubRoutingPermissionFor(environment.entry, permissions),
+      permission: pullRequestRoutingPermissionFor(environment.entry, permissions),
     })),
   );
   return (
@@ -108,9 +111,11 @@ export function GitHubRoutingSettings({
           >
             <Select
               items={options}
-              value={gitHubRoutingPermissionFor(environment.entry, permissions)}
+              value={pullRequestRoutingPermissionFor(environment.entry, permissions)}
               disabled={
-                !catalog.isReady || saving || gitHubRoutingConnectionKey(environment.entry) === null
+                !catalog.isReady ||
+                saving ||
+                pullRequestRoutingConnectionKey(environment.entry) === null
               }
               onValueChange={(permission) => {
                 if (permission === null) return;
