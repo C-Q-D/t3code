@@ -10296,7 +10296,9 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
          * Resolves the shared prefix inputs without changing the live query or its resume ledger.
          * input carries the same thread, model, policy and contexts for main and side queries.
          * The returned builder delays environment resolution until a process is actually opened;
-         * its append text must be read before replacing a live process. Resolution errors propagate.
+         * callers read its append text and launch settings only when opening a query, before
+         * closing a live process. Reuse must not depend on those files remaining readable.
+         * Resolution errors propagate.
          * Side queries must reuse all main-query parameters or the cached prefix becomes invalid.
          * cacheAvailability is false for side queries so they cannot update the main policy cache.
          * These helpers are covered by the caller's operation span.
@@ -10326,16 +10328,11 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
           const queryPolicyKey = claudeEffectiveQueryPolicyKey(queryPolicy, mcpOverrides);
           const compiledSelection = compileClaudeModelSelection(turnInput.modelSelection);
           const resumeSessionAt = yield* getNativeConversationHeadId(turnInput.providerThread);
-          const launchArgSettings = yield* readClaudeLaunchArgSettings({
-            settings: adapterOptions.settings,
-            cwd: turnInput.runtimePolicy.cwd,
-            fileSystem,
-            path,
-          });
           const buildOptions = Effect.fnUntraced(function* (
             nativeThreadId: string,
             resume: boolean,
             appendSystemPromptFileText: string | undefined,
+            launchArgSettings: ClaudeSdkSettings | undefined,
           ) {
             const toolSearchOverride = yield* resolveToolSearchOverride(
               turnInput.runtimePolicy.cwd,
@@ -10414,7 +10411,18 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               fileSystem,
               path,
             });
-            const baseOptions = yield* prepared.buildOptions(nativeThreadId, true, appendText);
+            const launchArgSettings = yield* readClaudeLaunchArgSettings({
+              settings: adapterOptions.settings,
+              cwd: sideInput.runtimePolicy.cwd,
+              fileSystem,
+              path,
+            });
+            const baseOptions = yield* prepared.buildOptions(
+              nativeThreadId,
+              true,
+              appendText,
+              launchArgSettings,
+            );
             const attemptedTools: Array<string> = [];
             let abandoned = false;
             let ownedQuery: ClaudeAgentSdkQuerySession | undefined;
@@ -10700,6 +10708,12 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             fileSystem,
             path,
           });
+          const launchArgSettings = yield* readClaudeLaunchArgSettings({
+            settings: adapterOptions.settings,
+            cwd: turnInput.runtimePolicy.cwd,
+            fileSystem,
+            path,
+          });
           const closedExistingNativeThreadId = existing !== null ? existing.nativeThreadId : null;
           if (existing !== null) {
             yield* existing.query.close.pipe(Effect.ignore);
@@ -10721,6 +10735,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             nativeThreadId,
             shouldResume,
             appendSystemPromptFileText,
+            launchArgSettings,
           );
           const resolvedTurnCwd = yield* fileSystem
             .realPath(turnInput.runtimePolicy.cwd ?? ".")

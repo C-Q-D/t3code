@@ -4314,6 +4314,80 @@ describe("ClaudeAdapterV2 background wake turns", () => {
   );
 
   describe("Claude settings restrictions", () => {
+    it.effect.each(["deleted", "invalid JSON"] as const)(
+      "reuses the live query after its launch settings file becomes %s",
+      (failure) =>
+        Effect.gen(function* () {
+          const fileSystem = yield* FileSystem.FileSystem;
+          const cwd = yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3-launch-reuse-" });
+          const settingsFile = NodePath.join(cwd, "launch-settings.json");
+          yield* fileSystem.writeFileString(settingsFile, '{"env":{"LAUNCH_SENTINEL":"loaded"}}');
+          let closes = 0;
+          const harness = yield* makeWakeHarnessWithOptions({
+            settings: { ...DEFAULT_CLAUDE_SETTINGS, launchArgs: "--settings launch-settings.json" },
+            close: (messages) =>
+              Effect.sync(() => {
+                closes += 1;
+              }).pipe(Effect.andThen(Queue.shutdown(messages))),
+          });
+          const runtimePolicy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
+            runtimeMode: "approval-required",
+            interactionMode: "default",
+            cwd,
+          });
+          const firstInput = makeClaudeTestTurnInput({
+            threadId: harness.threadId,
+            providerThread: harness.providerThread,
+            now: yield* DateTime.now,
+            attemptId: RunAttemptId.make("launch-settings-first"),
+            text: "First turn.",
+            attachments: [],
+            runtimePolicy,
+          });
+          yield* harness.runtime.startTurn(firstInput);
+          assert.deepInclude(harness.getOpenedOptions()?.settings, {
+            env: { LAUNCH_SENTINEL: "loaded" },
+          });
+          yield* harness.offerAndWait(
+            makeResultFrame({ uuid: "launch-first-result", result: "First answer." }),
+          );
+          assert.equal((yield* Queue.take(harness.terminalReceipts)).status, "completed");
+          yield* failure === "deleted"
+            ? fileSystem.remove(settingsFile)
+            : fileSystem.writeFileString(settingsFile, "{ invalid json");
+
+          const reused = yield* harness.runtime
+            .startTurn(
+              makeClaudeTestTurnInput({
+                threadId: harness.threadId,
+                providerThread: harness.providerThread,
+                now: yield* DateTime.now,
+                attemptId: RunAttemptId.make("launch-settings-reused"),
+                providerTurnOrdinal: 2,
+                text: "Continue in the existing process.",
+                attachments: [],
+                runtimePolicy,
+              }),
+            )
+            .pipe(Effect.exit);
+          assert.isTrue(
+            Exit.isSuccess(reused),
+            "an already loaded settings file must not block query reuse",
+          );
+          assert.lengthOf(harness.processQueues, 1);
+          assert.equal(closes, 0);
+          yield* harness.offerAndWait(
+            makeResultFrame({ uuid: "launch-reused-result", result: "Second answer." }),
+          );
+          assert.equal((yield* Queue.take(harness.terminalReceipts)).status, "completed");
+          assert.lengthOf(harness.offeredMessages, 2);
+        }).pipe(
+          Effect.provide(
+            Layer.mergeAll(IdAllocator.layer, McpProviderSessions.layer, NodeServices.layer),
+          ),
+        ),
+    );
+
     it.effect("resolves cached managed policy from the configured home through the real SDK", () =>
       Effect.gen(function* () {
         const fileSystem = yield* FileSystem.FileSystem;
