@@ -7,6 +7,7 @@ import { useState } from "react";
 import {
   DEFAULT_ENVIRONMENT_IDENTIFICATION_MODE,
   DEFAULT_UNIFIED_SETTINGS,
+  type EnvironmentIdentificationMode,
   MAX_APPEARANCE_CONTRAST,
   MAX_GLASS_OPACITY,
   MAX_PANEL_ANIMATION_DURATION_MS,
@@ -15,7 +16,8 @@ import {
   MIN_PANEL_ANIMATION_DURATION_MS,
 } from "@t3tools/contracts/settings";
 import {
-  resolveEnvironmentIdentificationPillLabel,
+  resolveSidebarStageBackdropVariant,
+  type SidebarStageBackdropVariant,
   useEnvironmentStageLabel,
 } from "../SidebarStageBackdrop";
 import { isElectron } from "../../env";
@@ -33,9 +35,37 @@ import {
 } from "./settingsLayout";
 import { searchableSetting } from "./settingsSearch";
 import { PanelAnimationsPreview } from "./PanelAnimationsPreview";
+import { ThreadDetailsItemsRow } from "./ThreadDetailsItemsRow";
 import { TypographySection } from "./TypographySettings";
 
 const ENVIRONMENT_IDENTIFICATION_LABELS = t.settings.rows.environmentIdentification.options;
+
+/** Lists channel-aware artwork choices; Latest also offers fixed Dev and Nightly artwork. */
+function environmentIdentificationOptions(
+  stageVariant: SidebarStageBackdropVariant | null,
+): ReadonlyArray<readonly [EnvironmentIdentificationMode, string]> {
+  if (stageVariant === "dev") {
+    return [
+      ["artwork", "Dev artwork"],
+      ["nightly-artwork", "Nightly artwork"],
+      ["pill", ENVIRONMENT_IDENTIFICATION_LABELS.pill],
+      ["none", ENVIRONMENT_IDENTIFICATION_LABELS.none],
+    ];
+  }
+  if (stageVariant === "nightly") {
+    return [
+      ["artwork", "Nightly artwork"],
+      ["dev-artwork", "Dev artwork"],
+      ["pill", ENVIRONMENT_IDENTIFICATION_LABELS.pill],
+      ["none", ENVIRONMENT_IDENTIFICATION_LABELS.none],
+    ];
+  }
+  return [
+    ["artwork", ENVIRONMENT_IDENTIFICATION_LABELS.none],
+    ["nightly-artwork", "Nightly artwork"],
+    ["dev-artwork", "Dev artwork"],
+  ];
+}
 
 /** M3 appearance groups preserve scoped setting writes, reset actions, and search destinations. */
 export function AppearanceSettingsPanel() {
@@ -54,8 +84,9 @@ export function AppearanceSettingsPanel() {
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
   const environmentStageLabel = useEnvironmentStageLabel();
-  const showEnvironmentIdentification =
-    resolveEnvironmentIdentificationPillLabel(environmentStageLabel) !== null;
+  const environmentStageVariant = resolveSidebarStageBackdropVariant(environmentStageLabel);
+  const environmentIdentificationOptionList =
+    environmentIdentificationOptions(environmentStageVariant);
   const glassOpacityRatio =
     (settings.glassOpacity - MIN_GLASS_OPACITY) / (MAX_GLASS_OPACITY - MIN_GLASS_OPACITY);
   const glassOpacitySliderStyle = {
@@ -226,6 +257,7 @@ export function AppearanceSettingsPanel() {
         />
       </SettingsSection>
       <SettingsSection id="appearance-interface" title={t.settings.sections.appearanceInterface}>
+        <ThreadDetailsItemsRow />
         <SettingsRow
           {...searchableSetting("chat-width")}
           description={t.settings.rows.chatWidth.description}
@@ -261,47 +293,44 @@ export function AppearanceSettingsPanel() {
             </ToggleGroup>
           }
         />
-        {showEnvironmentIdentification ? (
-          <SettingsRow
-            {...searchableSetting("environment-identification")}
-            description={t.settings.rows.environmentIdentification.description}
-            resetAction={
-              settings.environmentIdentificationMode !== DEFAULT_ENVIRONMENT_IDENTIFICATION_MODE ? (
-                <SettingResetButton
-                  label={t.settings.rows.environmentIdentification.resetLabel}
-                  onClick={() =>
-                    updateSettings({
-                      environmentIdentificationMode: DEFAULT_ENVIRONMENT_IDENTIFICATION_MODE,
-                    })
-                  }
-                />
-              ) : null
-            }
-            control={
-              <ToggleGroup
-                size="settings"
-                value={[settings.environmentIdentificationMode]}
-                aria-label={t.settings.rows.environmentIdentification.title}
-                onValueChange={(values) => {
-                  const value = values[0];
-                  if (value === "artwork" || value === "pill" || value === "none") {
-                    updateSettings({ environmentIdentificationMode: value });
-                  }
-                }}
-              >
-                <ToggleGroupItem value="artwork">
-                  {ENVIRONMENT_IDENTIFICATION_LABELS.artwork}
+        <SettingsRow
+          {...searchableSetting("environment-identification")}
+          description={t.settings.rows.environmentIdentification.description}
+          resetAction={
+            settings.environmentIdentificationMode !== DEFAULT_ENVIRONMENT_IDENTIFICATION_MODE ? (
+              <SettingResetButton
+                label={t.settings.rows.environmentIdentification.resetLabel}
+                onClick={() =>
+                  updateSettings({
+                    environmentIdentificationMode: DEFAULT_ENVIRONMENT_IDENTIFICATION_MODE,
+                  })
+                }
+              />
+            ) : null
+          }
+          control={
+            <ToggleGroup
+              size="settings"
+              value={[settings.environmentIdentificationMode]}
+              aria-label={t.settings.rows.environmentIdentification.title}
+              onValueChange={(values) => {
+                const value = values[0];
+                const option = environmentIdentificationOptionList.find(
+                  ([optionValue]) => optionValue === value,
+                );
+                if (option) {
+                  updateSettings({ environmentIdentificationMode: option[0] });
+                }
+              }}
+            >
+              {environmentIdentificationOptionList.map(([value, label]) => (
+                <ToggleGroupItem key={value} value={value}>
+                  {label}
                 </ToggleGroupItem>
-                <ToggleGroupItem value="pill">
-                  {ENVIRONMENT_IDENTIFICATION_LABELS.pill}
-                </ToggleGroupItem>
-                <ToggleGroupItem value="none">
-                  {ENVIRONMENT_IDENTIFICATION_LABELS.none}
-                </ToggleGroupItem>
-              </ToggleGroup>
-            }
-          />
-        ) : null}
+              ))}
+            </ToggleGroup>
+          }
+        />
 
         <SettingsRow
           {...searchableSetting("composer-context")}
