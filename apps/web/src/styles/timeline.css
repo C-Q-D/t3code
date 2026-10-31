@@ -90,7 +90,7 @@
 }
 
 .chat-markdown .timeline-codeblock pre code,
-.chat-markdown .timeline-codeblock .chat-markdown-shiki .shiki {
+.chat-markdown .timeline-codeblock .chat-markdown-shiki :is(.shiki, .diffs) {
   @apply text-code-copy leading-code;
 }
 
