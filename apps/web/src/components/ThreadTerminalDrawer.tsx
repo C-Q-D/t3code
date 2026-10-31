@@ -139,6 +139,13 @@ function resolveTerminalDrawerMaxHeight(input: DrawerLayout): number {
 
 const DRAG_HEIGHT_PROPERTY = "--terminal-drawer-drag-height";
 
+/** Restores the controlled height expression after either drag path relinquishes its pixel override. */
+function restoreDrawerHeight(drawer: HTMLElement | null, height: number) {
+  // Keep the variable reference even when React skips rewriting an unchanged height prop.
+  drawer?.style.setProperty("height", `var(${DRAG_HEIGHT_PROPERTY}, ${height}px)`);
+  drawer?.style.removeProperty(DRAG_HEIGHT_PROPERTY);
+}
+
 function clampDrawerHeight(height: number, maxHeight: number): number {
   const safeHeight = Number.isFinite(height) ? height : DEFAULT_THREAD_TERMINAL_HEIGHT;
   return Math.min(Math.max(Math.round(safeHeight), MIN_DRAWER_HEIGHT), maxHeight);
@@ -204,20 +211,19 @@ export function useTerminalDrawerResize({
         return bounded;
       },
       paint(value) {
-        drawer?.style.setProperty("height", `${value}px`);
+        drawer?.style.setProperty(DRAG_HEIGHT_PROPERTY, `${value}px`);
       },
       finish(finalHeight, moved) {
         if (!moved || finalHeight === startHeight) return;
         current.current.onCommit(clampDrawerHeight(finalHeight, current.current.maxDrawerHeight));
       },
       cleanup(committed) {
-        if (committed) return;
         const restored = clampDrawerHeight(
-          current.current.preferredDrawerHeight,
+          committed ? drawerHeightRef.current : current.current.preferredDrawerHeight,
           current.current.maxDrawerHeight,
         );
         drawerHeightRef.current = restored;
-        drawer?.style.setProperty("height", `${restored}px`);
+        restoreDrawerHeight(drawer, restored);
       },
     };
   }, `${threadRef.environmentId}:${threadRef.threadId}:${visible}:${isPanel}`);
@@ -1682,7 +1688,7 @@ export default function ThreadTerminalDrawer({
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
-    resizeState.drawer?.style.removeProperty(DRAG_HEIGHT_PROPERTY);
+    restoreDrawerHeight(resizeState.drawer, resizeState.height);
     // A drag that ends where it started keeps the stored preference, which may
     // be taller than the capped height the drag started from.
     if (resizeState.height === resizeState.startHeight || resizeState.height === height) return;

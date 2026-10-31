@@ -3,15 +3,24 @@ import type { ComponentProps, ReactNode } from "react";
 
 import { cn } from "../../lib/utils";
 
-/** Tracks optional content without a relational CSS selector. */
+/** Ignores empty layout divs while retaining text and actual controls as section content. */
+function hasSectionContent(node: Node): boolean {
+  return Array.from(node.childNodes).some((child) => {
+    if (child.nodeType === Node.TEXT_NODE) return Boolean(child.textContent?.trim());
+    if (!(child instanceof Element)) return false;
+    return child.tagName !== "DIV" || hasSectionContent(child);
+  });
+}
+
+/** Tracks optional content through layout wrappers without a relational CSS selector. */
 function observeSectionContent(node: HTMLDivElement | null) {
   if (!node) return;
   const update = () => {
     const section = node.parentElement;
-    if (section) section.dataset.empty = String(node.childNodes.length === 0);
+    if (section) section.dataset.empty = String(!hasSectionContent(node));
   };
   const observer = new MutationObserver(update);
-  observer.observe(node, { childList: true });
+  observer.observe(node, { childList: true, subtree: true, characterData: true });
   update();
   return () => observer.disconnect();
 }

@@ -214,7 +214,7 @@ it("hides the drawer on a downward fling while retaining its sessions and saved 
   expect(after.terminalOpen).toBe(false);
   expect(after.terminalIds).toEqual(["keep-session"]);
   expect(after.terminalHeight).toBe(before.terminalHeight);
-  expect(drawer.style.height).toBe("300px");
+  expect(drawer.style.height).toBe("var(--terminal-drawer-drag-height, 300px)");
 });
 
 it("compresses a slow downward overshoot and returns to 180px without hiding", async () => {
@@ -225,12 +225,14 @@ it("compresses a slow downward overshoot and returns to 180px without hiding", a
   await resizePointer(gesture.handle, "pointerdown", 100, 0);
   await resizePointer(gesture.handle, "pointermove", 320, 1000);
   await gesture.step(16);
-  expect(parseFloat(gesture.drawer.style.height)).toBeCloseTo(139.06976744186048, 6);
+  expect(
+    parseFloat(gesture.drawer.style.getPropertyValue("--terminal-drawer-drag-height")),
+  ).toBeCloseTo(139.06976744186048, 6);
   await resizePointer(gesture.handle, "pointerup", 320, 1100);
   expect(activeJobs()).toBe(1);
   for (let time = 32; activeJobs() && time < 3000; time += 16) await gesture.step(time);
   expect(activeJobs()).toBe(0);
-  expect(gesture.drawer.style.height).toBe("180px");
+  expect(gesture.drawer.style.height).toBe("var(--terminal-drawer-drag-height, 180px)");
   expect(
     selectThreadTerminalUiState(
       useTerminalUiStateStore.getState().terminalUiStateByThreadKey,
@@ -330,5 +332,29 @@ it.each([1, 200])(
         thread,
       ).terminalOpen,
     ).toBe(pause !== 1);
+  },
+);
+
+it.each([
+  { ending: "pointercancel", physicalY: 0 },
+  { ending: "pointerup", physicalY: 100 },
+])(
+  "keeps the height variable live after physical $ending and a normal drag",
+  async ({ ending, physicalY }) => {
+    setPhysicsEnabled(true);
+    await renderDrawer(true);
+    const { drawer, handle, step } = drawerGesture();
+    await resizePointer(handle, "pointerdown", 100, 0);
+    await resizePointer(handle, "pointermove", physicalY, 20);
+    await step(16);
+    await resizePointer(handle, ending, physicalY, 40);
+    expect.soft(drawer.style.height).toBe("var(--terminal-drawer-drag-height, 300px)");
+    setPhysicsEnabled(false);
+    await resizePointer(handle, "pointerdown", 100, 100);
+    await resizePointer(handle, "pointermove", 0, 120);
+    expect(drawer.style.getPropertyValue("--terminal-drawer-drag-height")).toBe("400px");
+    expect(drawer.style.height).toBe("var(--terminal-drawer-drag-height, 300px)");
+    await resizePointer(handle, "pointerup", 0, 140);
+    expect(drawer.style.getPropertyValue("--terminal-drawer-drag-height")).toBe("");
   },
 );

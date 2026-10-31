@@ -13,7 +13,10 @@ it("uses the current height budget throughout an active physical resize", async 
   const newCommit = vi.fn();
   const target = {
     parentElement: {
-      style: { setProperty: (key: string, value: string) => painted.set(key, value) },
+      style: {
+        setProperty: (key: string, value: string) => painted.set(key, value),
+        removeProperty: (key: string) => painted.delete(key),
+      },
     },
     setPointerCapture: vi.fn(),
     hasPointerCapture: () => true,
@@ -65,7 +68,7 @@ it("uses the current height budget throughout an active physical resize", async 
     handlers!.onPointerDown(pointer(800));
     handlers!.onPointerMove(pointer(700));
     handlers!.refresh();
-    expect(painted.get("height")).toBe("700px");
+    expect(painted.get("--terminal-drawer-drag-height")).toBe("700px");
     await act(async () => {
       renderer!.update(createElement(Probe, { max: 400, preferred: 300, commit: newCommit }));
     });
@@ -73,10 +76,10 @@ it("uses the current height budget throughout an active physical resize", async 
     handlers!.refresh();
     expect(drawerHeightRef.current).toBe(400);
     // Elastic drawing may overshoot the new bound, but only within its 160px rubber range.
-    expect(Number.parseFloat(painted.get("height")!)).toBeGreaterThan(400);
-    expect(Number.parseFloat(painted.get("height")!)).toBeLessThan(560);
+    expect(Number.parseFloat(painted.get("--terminal-drawer-drag-height")!)).toBeGreaterThan(400);
+    expect(Number.parseFloat(painted.get("--terminal-drawer-drag-height")!)).toBeLessThan(560);
     handlers!.onPointerCancel(pointer(650));
-    expect(painted.get("height")).toBe("300px");
+    expect(painted.get("height")).toBe("var(--terminal-drawer-drag-height, 300px)");
     expect(drawerHeightRef.current).toBe(300);
     expect(oldCommit).not.toHaveBeenCalled();
     expect(newCommit).not.toHaveBeenCalled();
@@ -91,7 +94,7 @@ it("uses the current height budget throughout an active physical resize", async 
     handlers!.onPointerMove(pointer(1000));
     handlers!.refresh();
     handlers!.onPointerUp(pointer(1000));
-    expect(painted.get("height")).toBe("400px");
+    expect(painted.get("height")).toBe("var(--terminal-drawer-drag-height, 400px)");
     expect(newCommit).toHaveBeenCalledExactlyOnceWith(400);
     expect(oldCommit).not.toHaveBeenCalled();
   } finally {

@@ -4,7 +4,8 @@
  */
 
 import { EnvironmentId, ThreadId, type ScopedThreadRef } from "@t3tools/contracts";
-import { act } from "react";
+import { act, useState } from "react";
+import { ThreadDetailsSection } from "./ThreadDetailsSection";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
 import { useRightPanelStore, selectThreadPanelVisibility } from "../../rightPanelStore";
@@ -182,3 +183,29 @@ it.each([false, true])(
     }
   },
 );
+
+it("marks a section empty when nested content returns null and restores it when content appears", async () => {
+  /** Keeps the section mounted while an optional child changes its rendered content. */
+  function OptionalSection() {
+    const [visible, setVisible] = useState(false);
+    return (
+      <>
+        <button data-toggle onClick={() => setVisible(!visible)}>
+          Toggle content
+        </button>
+        <ThreadDetailsSection headingId="optional-git" title="Git">
+          <div className="flex flex-col gap-3">{visible ? <button>Git action</button> : null}</div>
+        </ThreadDetailsSection>
+      </>
+    );
+  }
+  await act(async () => root.render(<OptionalSection />));
+  const toggle = container.querySelector<HTMLButtonElement>("[data-toggle]")!;
+  const section = container.querySelector("section")!;
+  expect.soft(section.dataset.empty).toBe("true");
+  await act(async () => toggle.click());
+  expect(section.dataset.empty).toBe("false");
+  expect(section.querySelector("button")?.textContent).toBe("Git action");
+  await act(async () => toggle.click());
+  expect(section.dataset.empty).toBe("true");
+});
