@@ -1,6 +1,8 @@
 /** Renders sent-message context references and delegates resource actions to the timeline. */
 import { PierreEntryIcon } from "./PierreEntryIcon";
 import { t } from "~/i18n";
+import { documentChipKindForFileName } from "~/pierre-icons";
+import { isSvgAttachment } from "@t3tools/shared/image";
 import { useRenderedAppearance } from "../../hooks/useTheme";
 import { PullRequestGlyph } from "../pullRequest/pullRequestIcons";
 import { ReadOnlySourcePreview } from "../files/AttachmentFilePreview";
@@ -23,6 +25,7 @@ import {
 } from "../../lib/diffRendering";
 import { PREFERRED_HIGHLIGHTER } from "../../lib/syntaxHighlighting";
 import ChatMarkdown from "../ChatMarkdown";
+import { EnvironmentContextChip } from "../EnvironmentContextChip";
 import { ThreadContextChip } from "../ThreadContextChip";
 import { MessageCircleIcon, MousePointerClickIcon, PaintbrushIcon } from "lucide-react";
 import type { ComposerContextId, KnownComposerContextRecord } from "@t3tools/contracts";
@@ -32,7 +35,6 @@ import { TerminalContextInlineChip } from "./TerminalContextInlineChip";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import {
   ContextChipPopover as UserMessageContextPopover,
-  ContextChipShell,
   FileChip,
   ImageChipButton,
   PULL_REQUEST_CHIP_KINDS,
@@ -49,7 +51,11 @@ import { formatComposerContextReference } from "@t3tools/shared/composerContextR
 import { ContextChip, ContextChipLabel, type ContextChipKind } from "../ContextChip";
 import { createContextPresentationRegistry } from "../contextPresentationRegistry";
 import type { ChatMarkdownContextReference } from "../ChatMarkdown";
-import { SkillChipIcon } from "./SkillInlineText";
+import {
+  SkillChipPopover,
+  skillInstructionsOpener,
+  skillPopoverDescription,
+} from "./SkillInlineText";
 import { formatWorkspaceRelativePath } from "../../filePathDisplay";
 import {
   buildReviewCommentRenderablePatch,
@@ -57,6 +63,7 @@ import {
   type ReviewCommentContext,
 } from "../../reviewCommentContext";
 import { TimelineRowCtx } from "./timelineRowContext";
+import { userMessageFileLabel } from "./TimelineUserMessageRow.logic";
 
 /**
  * Renders a user-message file mention and its available open actions.
@@ -74,7 +81,7 @@ function UserMessageMentionChip(props: {
       <TooltipTrigger
         render={
           <ContextChip
-            kind="mention"
+            kind={documentChipKindForFileName(props.record.path) ?? "mention"}
             render={<button type="button" />}
             aria-label={t.chat.timeline.preview(props.record.path)}
             data-markdown-copy={props.copyMarkdown}
@@ -104,22 +111,19 @@ function UserMessageMentionChip(props: {
   );
 }
 
-function UserMessageContextChip(props: {
-  icon: ReactNode;
-  label: string;
-  kindLabel?: string;
+/** Resolves a recorded skill against the current thread skills; unavailable instructions remain non-actionable. */
+function UserMessageSkillChip(props: {
+  record: Extract<KnownComposerContextRecord, { kind: "skill" }>;
   copyMarkdown: string;
-  tooltip?: string;
-  kind: ContextChipKind;
 }) {
+  const { skills, threadRef } = use(TimelineRowCtx);
+  const skill = skills.find((candidate) => candidate.name === props.record.name);
   return (
-    <ContextChipShell
-      kind={props.kind}
-      icon={props.icon}
-      label={props.label}
-      aria-label={props.kindLabel ? `${props.kindLabel}, ${props.label}` : undefined}
-      data-markdown-copy={props.copyMarkdown}
-      tooltip={props.tooltip}
+    <SkillChipPopover
+      label={props.record.label || props.record.name}
+      description={skill ? skillPopoverDescription(skill) : null}
+      copyMarkdown={props.copyMarkdown}
+      onViewInstructions={skillInstructionsOpener(threadRef, skill)}
     />
   );
 }
@@ -286,6 +290,7 @@ function UserMessageElementDetails({
 }
 
 interface UserMessageContextRenderContext {
+  environmentId: import("@t3tools/contracts").EnvironmentId;
   reference: ChatMarkdownContextReference;
   annotationImage: ChatImageAttachment | null;
   attachment: ChatImageAttachment | ChatFileAttachment | null;
@@ -335,14 +340,7 @@ const userMessageContextPresentationRegistry = createContextPresentationRegistry
       canRender: (record) => record.kind === "skill",
       render: (record, context) =>
         record.kind === "skill" ? (
-          <UserMessageContextChip
-            icon={<SkillChipIcon />}
-            label={record.label || record.name}
-            kindLabel={t.chat.timeline.skill}
-            tooltip={`$${record.name}`}
-            copyMarkdown={context.copyMarkdown}
-            kind="skill"
-          />
+          <UserMessageSkillChip record={record} copyMarkdown={context.copyMarkdown} />
         ) : (
           <UnavailableUserMessageContextChip {...context} />
         ),
@@ -353,6 +351,16 @@ const userMessageContextPresentationRegistry = createContextPresentationRegistry
       render: (record, context) =>
         record.kind === "thread" ? (
           <ThreadContextChip record={record} copyMarkdown={context.copyMarkdown} />
+        ) : (
+          <UnavailableUserMessageContextChip {...context} />
+        ),
+    },
+    {
+      kind: "environment",
+      canRender: (record) => record.kind === "environment",
+      render: (record, context) =>
+        record.kind === "environment" ? (
+          <EnvironmentContextChip record={record} copyMarkdown={context.copyMarkdown} />
         ) : (
           <UnavailableUserMessageContextChip {...context} />
         ),
@@ -397,9 +405,11 @@ const userMessageContextPresentationRegistry = createContextPresentationRegistry
         }
         const attachment = context.attachment;
         const isVideo = isVideoAttachment(attachment);
+        const label = userMessageFileLabel(attachment);
         const disabled =
           attachment.downloadable === false && (!isVideo || attachment.previewUrl === undefined);
-        const size = formatAttachmentSize(record.sizeBytes);
+        const size =
+          attachment.downloadable === false ? "Sending…" : formatAttachmentSize(record.sizeBytes);
         // D1's file well belongs to sent messages; the composer keeps its inline chip.
         if (!isVideo) {
           return (
@@ -434,7 +444,12 @@ const userMessageContextPresentationRegistry = createContextPresentationRegistry
         }
         return (
           <FileChip
-            name={record.name}
+            name={label}
+            svgPreview={
+              isSvgAttachment(attachment)
+                ? { environmentId: context.environmentId, attachmentId: attachment.id }
+                : undefined
+            }
             size={size}
             isVideo={isVideo}
             theme={context.resolvedTheme}
@@ -444,7 +459,7 @@ const userMessageContextPresentationRegistry = createContextPresentationRegistry
             onOpen={() =>
               isVideo ? context.onExpandVideo(attachment) : context.onOpenFile(attachment)
             }
-            tooltip={`${record.name}\n${size}`}
+            tooltip={`${label}\n${size}`}
           />
         );
       },
@@ -559,6 +574,7 @@ const userMessageContextPresentationRegistry = createContextPresentationRegistry
   fallback: (_kind, _record, context) => <UnavailableUserMessageContextChip {...context} />,
 });
 
+/** Renders the stored context kind with its source-specific opener instead of assuming a workspace file. */
 export function UserMessageContextReferenceChip(props: {
   reference: ChatMarkdownContextReference;
   record: KnownComposerContextRecord | undefined;
@@ -568,13 +584,14 @@ export function UserMessageContextReferenceChip(props: {
   onExpandVideo: (file: ChatFileAttachment) => void;
   onOpenFile: (file: ChatFileAttachment) => void;
 }) {
-  const { resolvedTheme } = use(TimelineRowCtx);
+  const { resolvedTheme, activeThreadEnvironmentId } = use(TimelineRowCtx);
   const copyMarkdown = formatComposerContextReference({
     kind: props.reference.kind,
     contextId: props.reference.contextId as ComposerContextId,
     label: props.reference.label,
   });
   return userMessageContextPresentationRegistry.render(props.reference.kind, props.record, {
+    environmentId: activeThreadEnvironmentId,
     reference: props.reference,
     annotationImage: props.annotationImage,
     attachment: props.attachment,
@@ -586,6 +603,7 @@ export function UserMessageContextReferenceChip(props: {
   });
 }
 
+/** Keeps review-comment text and its source link together when replaying a user message. */
 function UserMessageReviewCommentCard({ comment }: { comment: ReviewCommentContext }) {
   const renderedAppearance = useRenderedAppearance();
   const ctx = use(TimelineRowCtx);
@@ -610,6 +628,7 @@ function UserMessageReviewCommentCard({ comment }: { comment: ReviewCommentConte
           <ChatMarkdown
             text={comment.text}
             cwd={ctx.markdownCwd}
+            threadRef={ctx.threadRef ?? undefined}
             skills={ctx.skills}
             parseRawHtml={false}
             lineBreaks

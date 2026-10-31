@@ -8,7 +8,6 @@ import React, {
   Children,
   isValidElement,
   use,
-  useEffect,
   useLayoutEffect,
   useRef,
   useState,
@@ -18,6 +17,7 @@ import React, {
 
 import { getClientSettings } from "../../hooks/useSettings";
 import { observeResize } from "../../lib/observeResize";
+import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import {
   serializeTableElementToCsv,
   serializeTableElementToMarkdown,
@@ -67,66 +67,35 @@ export function MarkdownTable({ children, ...props }: ComponentProps<"table">) {
   const tableRef = useRef<HTMLTableElement | null>(null);
   const [expanded, setExpanded] = useState(() => getClientSettings().wordWrap);
   const [hasClippedCells, setHasClippedCells] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const expandLabel = expanded
     ? t.chat.markdown.collapseTableCells
     : t.chat.markdown.expandTableCells;
+  const { copyToClipboard, isCopied: copied } = useCopyToClipboard<"markdown" | "csv">({
+    timeout: 1200,
+    onError: (cause, format) =>
+      reportMarkdownActionFailure({ operation: "copy-table", format }, cause),
+  });
   const copyLabel = copied ? t.chat.markdown.copied : t.chat.markdown.copyTable;
-
-  const measureClippedCells = () => {
-    const container = containerRef.current;
-    const table = tableRef.current;
-    if (!container || !table) return;
-    setHasClippedCells(tableHasClippedCells(container, table));
-  };
-
-  // A streamed cell can grow until it clips while the table keeps its size,
-  // so remeasure after every render, not only on resize.
-  useLayoutEffect(measureClippedCells);
-
-  // Column width changes can clip a cell without rendering this table.
-  useLayoutEffect(() => {
-    const table = tableRef.current;
-    if (!table) return;
-    return observeResize(table, measureClippedCells);
-  }, [measureClippedCells]);
 
   const handleCopy = (format: "markdown" | "csv") => {
     const table = containerRef.current?.querySelector("table");
-    if (!table || typeof navigator === "undefined" || navigator.clipboard == null) {
-      return;
-    }
-    const text =
+    if (!table) return;
+    copyToClipboard(
       format === "markdown"
         ? serializeTableElementToMarkdown(table)
-        : serializeTableElementToCsv(table);
-    void navigator.clipboard
-      .writeText(text)
-      .then(() => {
-        if (copiedTimerRef.current != null) {
-          clearTimeout(copiedTimerRef.current);
-        }
-        setCopied(true);
-        copiedTimerRef.current = setTimeout(() => {
-          setCopied(false);
-          copiedTimerRef.current = null;
-        }, 1200);
-      })
-      .catch((cause) => {
-        reportMarkdownActionFailure({ operation: "copy-table", format }, cause);
-      });
+        : serializeTableElementToCsv(table),
+      format,
+    );
   };
 
-  useEffect(
-    () => () => {
-      if (copiedTimerRef.current != null) {
-        clearTimeout(copiedTimerRef.current);
-        copiedTimerRef.current = null;
-      }
-    },
-    [],
-  );
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    const table = tableRef.current;
+    if (!container || !table) return;
+    const measure = () => setHasClippedCells(tableHasClippedCells(container, table));
+    measure();
+    return observeResize(container, measure);
+  });
 
   const copyMenu = (
     <Menu>

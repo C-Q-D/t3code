@@ -1306,7 +1306,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
               getItemType={getItemType}
               getFixedItemSize={getFixedItemSize}
               renderItem={renderItem}
-              estimatedItemSize={90}
+              estimatedItemSize={120}
               initialScrollAtEnd={
                 !findActive && citationRequest === null && rememberedPosition?.atEnd !== false
               }

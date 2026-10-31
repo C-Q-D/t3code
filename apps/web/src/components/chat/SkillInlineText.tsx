@@ -1,3 +1,5 @@
+/** Resolves inline skills to shared detail popovers without changing Markdown links or code. */
+import { t } from "~/i18n";
 import type { ScopedThreadRef, ServerProviderSkill } from "@t3tools/contracts";
 import { formatProviderSkillDisplayName } from "@t3tools/shared/inlineSkills";
 import { Children, cloneElement, isValidElement, type ReactNode } from "react";
@@ -83,6 +85,7 @@ export function skillInstructionsOpener(
   return () => useRightPanelStore.getState().openFile(threadRef, skill.path);
 }
 
+/** Shows skill details with an optional instruction opener; absent descriptions retain the shared fallback. */
 export function SkillChipPopover(props: {
   label: string;
   description: string | null | undefined;
@@ -94,7 +97,7 @@ export function SkillChipPopover(props: {
       kind="skill"
       icon={<SkillChipIcon />}
       label={props.label}
-      accessibleLabel={`Skill ${props.label}`}
+      accessibleLabel={`${t.chat.timeline.skill} ${props.label}`}
       copyMarkdown={props.copyMarkdown}
     >
       <div className="space-y-3 p-2 text-sm">

@@ -97,6 +97,7 @@ const MEDIA_EDGE_CLASS_NAME =
 const BUBBLE_CHIP_CLASS_NAME =
   "[&_[data-slot=context-chip]]:[--context-chip-ink:var(--context-chip-message,var(--context-chip-accent))]";
 
+/** Presents sent files as cards; pending uploads cannot open or download until the attachment is ready. */
 function UserFileCard({
   file,
   copyMarkdown,
@@ -146,7 +147,7 @@ function UserFileCard({
         <>
           <button
             type="button"
-            aria-label={`Preview ${label}`}
+            aria-label={t.chat.timeline.preview(label)}
             onClick={() => ctx.onFileOpen(file)}
             className="group/file focus-visible:ring-ring/70 flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-xl text-left focus-visible:ring-2 focus-visible:ring-inset focus-visible:outline-none"
           >
@@ -158,14 +159,14 @@ function UserFileCard({
                 <Button
                   size="icon-xs"
                   variant="ghost-muted"
-                  aria-label={`Download ${label}`}
+                  aria-label={t.chat.timeline.download(label)}
                   onClick={() => ctx.onFileDownload(file)}
                 />
               }
             >
               <DownloadIcon />
             </TooltipTrigger>
-            <TooltipPopup side="top">Download {label}</TooltipPopup>
+            <TooltipPopup side="top">{t.chat.timeline.download(label)}</TooltipPopup>
           </Tooltip>
         </>
       )}
@@ -361,6 +362,7 @@ export function useScheduledTaskTitle(
   return tasksQuery.data?.tasks.find((task) => task.id === scheduledTaskId)?.title;
 }
 
+/** Keeps agent attribution visible while its message body is folded. */
 export function FoldedMessageHeader(props: {
   icon: LucideIcon;
   label: string;
@@ -390,6 +392,7 @@ export function FoldedMessageHeader(props: {
   );
 }
 
+/** Shows nonterminal delivery outcomes without duplicating pending composer state. */
 function UserMessageProjectedStatus({ row }: { row: Extract<TimelineRow, { kind: "message" }> }) {
   const status = row.projectedItem?.item.status;
   if (
@@ -712,7 +715,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
               <button
                 type="button"
                 className="block h-full w-full cursor-zoom-in"
-                aria-label={`Preview ${image.name}`}
+                aria-label={t.chat.timeline.preview(image.name)}
                 onClick={() => {
                   const preview = buildExpandedImagePreview(regularImages, image.id);
                   if (!preview) return;
@@ -777,12 +780,18 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
       )}
     >
       {folded && senderThreadId ? (
-        <InlineButton onClick={() => ctx.onOpenThread(senderThreadId)} tone="muted">
-          Open thread
+        <InlineButton
+          onClick={() => ctx.onOpenThread(senderThreadId)}
+          aria-label={t.chat.timeline.openSendingThread}
+          tone="muted"
+        >
+          {t.chat.view.openThread}
         </InlineButton>
       ) : null}
       <Tooltip>
-        <TooltipTrigger render={<p className="text-muted-foreground text-xs tabular-nums" />}>
+        <TooltipTrigger
+          render={<p className="text-placeholder text-secondary-copy tabular-nums" />}
+        >
           {formatDayAwareTimestamp(row.message.createdAt, ctx.timestampFormat)}
         </TooltipTrigger>
         <TooltipPopup>
@@ -809,7 +818,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
         {promptLink !== null && (
           <MessageCopyButton
             text={promptLink}
-            label="Copy prompt link"
+            label={t.chat.timelineUi.copyLink}
             icon={LinkIconNode}
             variant="ghost"
           />

@@ -1,10 +1,11 @@
 /** Renders secret requests while keeping entered values confined to state and the RPC payload. */
 import { t } from "~/i18n";
+import { pipe } from "effect/Function";
 import {
   SECRET_REQUEST_DEFAULT_PLACEHOLDER,
-  SECRET_REQUEST_PRIVACY_NOTE,
   secretRequestAnswerInput,
   secretRequestDisplay,
+  secretRequestPrivacyNote,
   secretRequestFailureMessage,
   type SecretRequestItem,
 } from "@t3tools/client-runtime/secret-request";
@@ -69,7 +70,7 @@ function PendingSecretRequestForm(props: {
   const [secret, setSecret] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Enter then a click can both run before a re-render; this guard is synchronous.
+  // Enter and click can both submit before a render.
   const inFlight = useRef(false);
 
   const send = async (
@@ -89,7 +90,7 @@ function PendingSecretRequestForm(props: {
       return;
     }
     if (!isAtomCommandInterrupted(result)) {
-      setError(secretRequestFailureMessage(squashAtomCommandFailure(result)));
+      pipe(squashAtomCommandFailure(result), secretRequestFailureMessage, setError);
     }
   };
 
@@ -104,9 +105,13 @@ function PendingSecretRequestForm(props: {
       className="timeline-secret flex min-w-0 flex-col gap-2.5 rounded-card-surface surface-glass p-3.5 text-secondary-copy-large text-foreground shadow-timeline-request-card"
       onSubmit={onSubmit}
       autoComplete="off"
-      onPointerDown={(event) => {
-        if (!(event.target instanceof HTMLElement)) return;
+      // On click, not pointerdown: the mousedown that follows a pointerdown
+      // moves focus back off the input. A click that ends a text selection
+      // leaves it alone so the reason can still be copied.
+      onClick={(event) => {
+        if (!(event.target instanceof Element)) return;
         if (event.target.closest("input, button, a")) return;
+        if (window.getSelection()?.isCollapsed === false) return;
         document.getElementById(inputId)?.focus();
       }}
     >
@@ -166,7 +171,7 @@ function PendingSecretRequestForm(props: {
         className="flex min-w-0 items-center gap-1.5 text-secondary-copy text-secondary-label"
       >
         <ShieldCheckIcon className="size-3.5 shrink-0" aria-hidden />
-        {SECRET_REQUEST_PRIVACY_NOTE}
+        {secretRequestPrivacyNote(item)}
       </p>
     </form>
   );

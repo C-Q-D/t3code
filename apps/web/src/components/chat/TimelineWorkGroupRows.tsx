@@ -1,19 +1,16 @@
 /** Renders work groups and live activity while preserving independent disclosure state. */
 import { ChevronDownIcon, ChevronRightIcon } from "lucide-react";
+import { getQuestionTextPreview } from "@t3tools/client-runtime/work-log/user-input";
 import { t } from "~/i18n";
 import { WorkLogButton, WorkLogList, WorkLogRow } from "./WorkLog";
 import type { WorktreeSetupSnapshot } from "@t3tools/contracts";
-import {
-  getQuestionAnswerPreview,
-  getQuestionTextPreview,
-  hasQuestionAnswer,
-} from "@t3tools/client-runtime/work-log/user-input";
 import { type ToolActivityIcon } from "@t3tools/contracts";
 import { liveThoughtLine } from "@t3tools/client-runtime/work-log/presentation";
 import { resolveWorkGroupScrollAnchor } from "@t3tools/client-runtime/work-log/scroll-anchor";
 import { observeResize } from "~/lib/observeResize";
+import { tickTextContent } from "~/lib/tickTextContent";
 import { observeVisibleAnimation } from "../../lib/visibleAnimation";
-import { memo, use, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { memo, use, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { LegendList, type LegendListRef } from "@legendapp/list/react";
 import { workEntryDisplayIndicatesToolFailure } from "../../session-logic";
 import ChatMarkdown from "../ChatMarkdown";
@@ -54,7 +51,8 @@ import {
   SimpleWorkEntryRow,
 } from "./TimelineWorkEntryRow";
 import {
-  remarkThoughtPreview,
+  THINKING_PREVIEW_PLUGINS,
+  THOUGHT_PREVIEW_PLUGINS,
   toolGroupSummaryIconName,
   workEntryIconName,
 } from "./TimelineWorkEntryRow.logic";
@@ -73,12 +71,17 @@ export const WorkGroupSection = memo(function WorkGroupSection({
   isExpandedToolGroup: boolean;
   displayLabel?: string | undefined;
 }) {
-  const { workspaceRoot, routeThreadKey, onToggleWorkEntry } = use(TimelineRowCtx);
+  const { workspaceRoot, routeThreadKey, onToggleWorkEntry, pendingApprovals } =
+    use(TimelineRowCtx);
   const onToggleStandaloneEntry = (collapsed: boolean) =>
     onToggleWorkEntry(disclosureAnchorKey, collapsed);
-  const nonEmptyEntries = groupedEntries.filter((entry) =>
-    workEntryIsVisibleInGroup(entry, isExpandedToolGroup),
-  );
+  const nonEmptyEntries = groupedEntries.filter((entry) => {
+    const item = entry.projectedItem?.item;
+    return (
+      (item?.type === "approval_request" && pendingApprovals.has(item.requestId)) ||
+      workEntryIsVisibleInGroup(entry, isExpandedToolGroup)
+    );
+  });
 
   if (nonEmptyEntries.length === 0) return null;
   if (isExpandedToolGroup && nonEmptyEntries.every((entry) => entry.itemType === "reasoning")) {
@@ -111,25 +114,13 @@ export const WorkGroupSection = memo(function WorkGroupSection({
   );
 });
 
+/** Subscribes only the elapsed label to the second tick, avoiding a full working-row render each second. */
 function WorkingTimer({ createdAt }: { createdAt: string }) {
-  const textRef = useRef<HTMLSpanElement>(null);
-  const initialText = formatWorkingTimerNow(createdAt);
-
-  useEffect(() => {
-    const updateText = () => {
-      if (textRef.current) {
-        textRef.current.textContent = formatWorkingTimerNow(createdAt);
-      }
-    };
-    updateText();
-    const id = setInterval(updateText, 1000);
-    return () => clearInterval(id);
-  }, [createdAt]);
-
   return (
-    <span ref={textRef} className="tabular-nums">
-      {initialText}
-    </span>
+    <span
+      ref={tickTextContent(() => formatWorkingTimerNow(createdAt), true)}
+      className="tabular-nums"
+    />
   );
 }
 
@@ -223,6 +214,7 @@ function ExpandedWorkGroupEntries({
     setRestoringPosition(false);
   };
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- observes the list scroller and its content with ResizeObserver to update scroll fades
   useLayoutEffect(() => {
     const element = listRef.current?.getScrollableNode();
     if (!element) return;
@@ -248,6 +240,7 @@ function ExpandedWorkGroupEntries({
     setExpandedContentHeight(height);
   };
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- reads expanded row sizes from LegendList's measured state after layout
   useLayoutEffect(updateExpandedContentHeight, [entries, updateExpandedContentHeight]);
 
   return (
@@ -299,14 +292,16 @@ export /**
  * @param props - Required working row; requires TimelineRowCtx for live activity and setup state.
  * @returns The working row element; never null.
  */
+/** Combines active-work context with lifecycle status; the isolated timer owns periodic updates. */
 function WorkingTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "working" }> }) {
   const { isCompacting, isPreparingWorktree, backgroundWorktreeSetup } =
     use(TimelineRowActivityCtx);
-  const shimmer = isPreparingWorktree || isCompacting;
+  const compacting = row.compacting === true || isCompacting;
+  const shimmer = isPreparingWorktree || compacting;
   const label = isPreparingWorktree ? (
     t.chat.timeline.settingUpWorktree
-  ) : isCompacting ? (
-    <CompactingLabel />
+  ) : compacting ? (
+    <CompactingLabel createdAt={row.createdAt} />
   ) : row.createdAt ? (
     <>
       {t.chat.timeline.workingForPrefix}
@@ -370,15 +365,18 @@ function BackgroundWorktreeSetupChip({ snapshot }: { snapshot: WorktreeSetupSnap
   );
 }
 
-/**
- * Renders the context-compaction activity label with its visibility-aware shimmer.
- * @returns The label element; never null.
- */
-function CompactingLabel() {
+/** Displays compaction elapsed time without making the surrounding work group subscribe to clock ticks. */
+function CompactingLabel({ createdAt }: { createdAt: string | null }) {
   return (
     <span className="inline-flex items-center gap-1.5">
       <Minimize2Icon aria-hidden="true" className="size-3" />
-      {t.chat.timeline.compacting}
+      {createdAt ? (
+        <span>
+          Compacting for <WorkingTimer createdAt={createdAt} />
+        </span>
+      ) : (
+        t.chat.timeline.compacting
+      )}
     </span>
   );
 }
@@ -573,7 +571,7 @@ export function LiveWorkEntryTimelineRow({
                 text={thoughtLine}
                 cwd={ctx.markdownCwd}
                 parseRawHtml={false}
-                extraRemarkPlugins={[[remarkThoughtPreview, t.chat.timeline.thought]]}
+                extraRemarkPlugins={THOUGHT_PREVIEW_PLUGINS}
               />
             </span>
           }
@@ -588,25 +586,13 @@ export function LiveWorkEntryTimelineRow({
             ) : (
               t.chat.timeline.thought
             )
-          ) : row.entry.questionAnswer && hasQuestionAnswer(row.entry.questionAnswer) ? (
-            <span className="flex min-w-0 gap-1.5">
-              <span className="min-w-0 truncate">{label}</span>
-              <span className="min-w-0 truncate text-foreground">
-                {getQuestionAnswerPreview(row.entry.questionAnswer)}
-              </span>
-            </span>
           ) : row.entry.itemType === "reasoning" ? (
             <ChatMarkdown
               inline
               text={row.entry.detail ?? label}
               cwd={ctx.markdownCwd}
               parseRawHtml={false}
-              extraRemarkPlugins={[
-                [
-                  remarkThoughtPreview,
-                  row.active ? t.chat.timeline.thinking : t.chat.timeline.thought,
-                ],
-              ]}
+              extraRemarkPlugins={row.active ? THINKING_PREVIEW_PLUGINS : THOUGHT_PREVIEW_PLUGINS}
             />
           ) : threadLabel ? (
             <ThreadReadLabel
@@ -628,6 +614,7 @@ export function LiveWorkEntryTimelineRow({
   );
 }
 
+/** Binds a projected disclosure row to its group identity so expanding it restores the correct work items. */
 export function WorkGroupToggleTimelineRow({
   row,
 }: {
@@ -637,7 +624,7 @@ export function WorkGroupToggleTimelineRow({
   return (
     <WorkGroupHeader
       label={row.summary}
-      iconName={row.summaryToolIcon ?? row.toolSurface ?? toolGroupSummaryIconName(row.summaryKind)}
+      iconName={row.toolSurface ?? toolGroupSummaryIconName(row.summaryKind)}
       toolIcon={row.toolIcon}
       failed={row.hasFailure}
       expanded={row.expanded}

@@ -22,9 +22,13 @@ export function WorkspaceFileDropOverlay() {
   );
 }
 
-/** Sits `bottom` pixels up, clear of the composer and its attached banners. */
+/**
+ * Sits `bottom` pixels up, clear of the composer and its attached banners. The summary names
+ * what waits at the end of the timeline, which is out of view while it shows.
+ */
 export function ScrollToEndButton(props: {
   readonly bottom: number;
+  readonly summary: string | null;
   readonly onScrollToEnd: () => void;
 }) {
   return (
@@ -40,6 +44,9 @@ export function ScrollToEndButton(props: {
         className="pointer-events-auto"
       >
         {t.chat.view.scrollToEnd}
+        {props.summary === null ? null : (
+          <span className="text-muted-foreground"> · {props.summary}</span>
+        )}
       </TimelineScrollToBottomButton>
     </div>
   );

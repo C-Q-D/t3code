@@ -1,6 +1,7 @@
 /** Displays expanded media and navigation while preserving download source names. */
 import { t } from "~/i18n";
-import { memo, useEffect, useRef, useState, type ReactNode, type KeyboardEvent } from "react";
+import { memo, useRef, useState, type ReactNode, type KeyboardEvent } from "react";
+import { flushSync } from "react-dom";
 import { ChevronLeftIcon, ChevronRightIcon, XIcon } from "lucide-react";
 import { Image as ImageGlyph, Text as TextGlyph } from "lucide";
 import { Button } from "../ui/button";
@@ -25,6 +26,7 @@ import { useAtomValue } from "@effect/atom-react";
 import { Atom } from "effect/reactivity";
 import { appAtomRegistry } from "~/rpc/atomRegistry";
 import { expandedImageKey } from "./ExpandedImagePreview";
+import { registerThreadOverlay } from "./threadOverlayRetention";
 
 interface ExpandedImageDialogProps {
   preview: ExpandedImagePreview;
@@ -78,8 +80,14 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
   const [returnFocusTarget] = useState(() =>
     document.activeElement instanceof HTMLElement ? document.activeElement : null,
   );
+  // The host unmounts the dialog outright, so Base UI never runs finalFocus. Without
+  // this, focus stays on the removed dialog, and the composer that owned the opener
+  // reads that as a blur and rests.
+  const close = () => {
+    flushSync(onClose);
+    if (returnFocusTarget?.isConnected) returnFocusTarget.focus({ preventScroll: true });
+  };
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-  // JavaScript `%` keeps the sign of the dividend, and a negative index blanks the dialog.
   const imageCount = preview.images.length;
   const index =
     imageCount > 0 ? (((preview.index + imageOffset) % imageCount) + imageCount) % imageCount : 0;
@@ -95,7 +103,7 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
         ...source,
         onOpenFile: () => {
           openFile();
-          onClose();
+          close();
         },
       }
     : source;
@@ -103,20 +111,6 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
   const navigateImage = (direction: -1 | 1) => {
     setImageOffset((current) => current + direction);
   };
-
-  // The element that opened the preview gets focus back on close. Without
-  // this a close button click leaves focus on the unmounted dialog, and the
-  // composer that owned the opener reads that as a blur and rests.
-  const openerRef = useRef<Element | null>(null);
-  useEffect(() => {
-    openerRef.current = document.activeElement;
-    return () => {
-      const opener = openerRef.current;
-      if (opener instanceof HTMLElement && opener.isConnected) {
-        opener.focus({ preventScroll: true });
-      }
-    };
-  }, []);
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.defaultPrevented || isContextMenuOpen() || event.target instanceof HTMLVideoElement)
@@ -139,17 +133,6 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
     navigateImage(1);
   };
 
-  useEffect(() => {
-    const onEscape = (event: globalThis.KeyboardEvent) => {
-      if (event.key !== "Escape" || isContextMenuOpen()) return;
-      event.preventDefault();
-      event.stopPropagation();
-      onClose();
-    };
-    window.addEventListener("keydown", onEscape, { capture: true });
-    return () => window.removeEventListener("keydown", onEscape, { capture: true });
-  }, [onClose]);
-
   if (!item) return null;
   const isVideo = item.type === "video";
   const openOriginalLink =
@@ -168,8 +151,14 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
   return (
     <Dialog
       open
-      onOpenChange={(open) => {
-        if (!open) onClose();
+      onOpenChange={(open, eventDetails) => {
+        if (open) return;
+        // Escape belongs to an open context menu first.
+        if (eventDetails.reason === "escape-key" && isContextMenuOpen()) {
+          eventDetails.cancel();
+          return;
+        }
+        close();
       }}
     >
       <DialogPopup
@@ -182,7 +171,7 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
         initialFocus={closeButtonRef}
         finalFocus={() => returnFocusTarget}
         onClick={(event) => {
-          if (event.target === event.currentTarget) onClose();
+          if (event.target === event.currentTarget) close();
         }}
       >
         <DialogTitle className="sr-only">{t.chat.media.expandedPreview(isVideo)}</DialogTitle>
@@ -193,7 +182,7 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
           size="icon-sm"
           variant="media-close"
           className="absolute right-0 top-0 z-20"
-          onClick={onClose}
+          onClick={close}
           aria-label={t.chat.media.closePreview(isVideo)}
         >
           <XIcon />
@@ -291,40 +280,51 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
   );
 });
 
-/**
- * The chat view's open media preview. It lives outside ChatView so opening or
- * closing it renders only the dialog host, not the whole chat chrome.
- */
-const expandedImagePreviewAtom = Atom.make<{
+// Keep preview state outside ChatView to isolate dialog renders.
+type ExpandedImagePreviewState = {
   readonly threadKey: string;
   readonly preview: ExpandedImagePreview;
-} | null>(null).pipe(Atom.keepAlive, Atom.withLabel("chat:expanded-image-preview"));
+} | null;
 
+const expandedImagePreviewAtom = Atom.make<ExpandedImagePreviewState>(null).pipe(
+  Atom.keepAlive,
+  Atom.withLabel("chat:expanded-image-preview"),
+);
+
+/** Returns only a preview-owned blob URL; borrowed attachment URLs must not be revoked. */
+function ownedSrc(state: ExpandedImagePreviewState): string | null {
+  const item = state?.preview.images[state.preview.index];
+  return item?.ownsSrc === true ? item.src : null;
+}
+
+// The preview owns a blob URL made for it, so whatever replaces it releases that URL.
+/** Replaces the global preview and releases its previous owned blob URL unless the next state reuses it. */
+function setExpandedImagePreview(next: ExpandedImagePreviewState): void {
+  const previous = ownedSrc(appAtomRegistry.get(expandedImagePreviewAtom));
+  appAtomRegistry.set(expandedImagePreviewAtom, next);
+  if (previous !== null && previous !== ownedSrc(next)) URL.revokeObjectURL(previous);
+}
+
+/** Opens a preview scoped to threadKey; ownership of a marked blob URL transfers to the dialog. */
 export function openExpandedImagePreview(threadKey: string, preview: ExpandedImagePreview): void {
-  appAtomRegistry.set(expandedImagePreviewAtom, { threadKey, preview });
+  setExpandedImagePreview({ threadKey, preview });
 }
 
+/** Clears the preview and releases any blob URL owned by it. */
 function closeExpandedImagePreview(): void {
-  appAtomRegistry.set(expandedImagePreviewAtom, null);
+  setExpandedImagePreview(null);
 }
 
-function closeExpandedImagePreviewFor(threadKey: string): void {
-  if (appAtomRegistry.get(expandedImagePreviewAtom)?.threadKey === threadKey) {
-    closeExpandedImagePreview();
-  }
-}
+// Leaving the thread's route (or the chat view) drops its preview.
+registerThreadOverlay((threadKey) => {
+  const current = appAtomRegistry.get(expandedImagePreviewAtom);
+  if (current !== null && current.threadKey !== threadKey) closeExpandedImagePreview();
+});
 
+/** Mounts the preview only for its owning threadKey, preventing cross-thread image disclosure. */
 export function ExpandedImageDialogHost({ threadKey }: { readonly threadKey: string }) {
   const state = useAtomValue(expandedImagePreviewAtom);
   const preview = state?.threadKey === threadKey ? state.preview : null;
-  const item = preview?.images[preview.index];
-  const ownedSrc = item?.ownsSrc === true ? item.src : null;
-  useEffect(() => {
-    if (ownedSrc === null) return;
-    return () => URL.revokeObjectURL(ownedSrc);
-  }, [ownedSrc]);
-  // Leaving the thread (or the chat view) drops its preview.
-  useEffect(() => () => closeExpandedImagePreviewFor(threadKey), [threadKey]);
   if (preview === null) return null;
   return (
     <ExpandedImageDialog

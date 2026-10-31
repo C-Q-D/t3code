@@ -8,9 +8,10 @@ import {
   type HtmlRenderReference,
 } from "@t3tools/shared/htmlRender";
 import { CodeXmlIcon, Maximize2Icon } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
-import { useAssetUrlRefresh, useAssetUrlState } from "~/assets/assetUrls";
+import { useAssetUrlRefresh } from "~/assets/assetUrls";
+import { useLongLivedAssetUrl } from "~/assets/longLivedAssetUrls";
 
 import { HtmlRenderDocument } from "../files/BrowserDocumentFrame";
 import { Button } from "../ui/button";
@@ -34,18 +35,14 @@ export function HtmlRenderFrame(props: {
   readonly onFullscreenChange?: (fullscreen: boolean) => void;
 }) {
   const { attachmentId, title } = props.htmlRender;
-  const boxRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(HTML_RENDER_COLUMN_WIDTH);
-  useLayoutEffect(() => {
-    const box = boxRef.current;
-    if (!box) return;
+  const observeBox = (box: HTMLDivElement) => {
     setWidth(box.clientWidth);
     return observeResize(box, ([entry]) => {
       if (entry) setWidth(entry.contentRect.width);
     });
-  }, []);
-  // Client fonts can wrap a page taller than the server measured it; a frame
-  // left short would scroll inside the thread and take the reader's scroll.
+  };
+  // Client fonts can exceed the server-measured height and cause nested scrolling.
   const [contentHeight, setContentHeight] = useState<number>();
   const height = htmlRenderFrameHeight(props.htmlRender, width, contentHeight);
   const fileName = htmlRenderFileName(title);
@@ -56,46 +53,26 @@ export function HtmlRenderFrame(props: {
     mimeType: "text/html",
     disposition: "inline" as const,
   };
-  // A cached URL with life left is reused, so the browser's cache serves the
-  // page again; one near expiry is minted afresh, since a frame cannot report a
-  // failed load.
-  const [src, setSrc] = useState<string | null>(null);
-  const srcExpiresAt = useRef(0);
+  // The frame keeps the first URL it loads, so later mints do not reload the page.
+  const [loaded, setLoaded] = useState<{ src: string; expiresAt: number } | null>(null);
+  const assetUrl = useLongLivedAssetUrl(loaded === null ? props.environmentId : null, resource);
+  if (loaded === null && assetUrl._tag === "Success") {
+    setLoaded({ src: assetUrl.url, expiresAt: assetUrl.expiresAt });
+  }
+  const src = loaded?.src ?? null;
+  const failed = loaded === null && assetUrl._tag === "Failure";
+  const refresh = useAssetUrlRefresh(props.environmentId, resource);
   const [expandedSrc, setExpandedSrc] = useState<string | null>(null);
   const { onFullscreenChange } = props;
+  // Tied to the viewer's lifetime: unmounting while expanded must still release
+  // the timeline's follow pin, which a close handler alone never reaches.
+  const expanded = expandedSrc !== null;
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- holds the parent's fullscreen pin while expanded and releases it on collapse or unmount
   useEffect(() => {
-    if (expandedSrc === null) return;
+    if (!expanded) return;
     onFullscreenChange?.(true);
     return () => onFullscreenChange?.(false);
-  }, [expandedSrc, onFullscreenChange]);
-  const [failed, setFailed] = useState(false);
-  const assetUrl = useAssetUrlState(src === null ? props.environmentId : null, resource);
-  const cachedUrl = assetUrl._tag === "Success" ? assetUrl.url : null;
-  const cachedExpiresAt = assetUrl._tag === "Success" ? assetUrl.expiresAt : 0;
-  const cacheFailed = assetUrl._tag === "Failure";
-  const refresh = useAssetUrlRefresh(props.environmentId, resource);
-  // At most one mint per mount: expiry is server time and the check uses the
-  // client clock, so a skewed clock must not mint again on every update.
-  const minting = useRef(false);
-  useEffect(() => {
-    if (src !== null || minting.current) return;
-    if (cacheFailed) {
-      // oxlint-disable-next-line react/set-state-in-effect -- Mirrors the cached URL's failure.
-      setFailed(true);
-      return;
-    }
-    if (cachedUrl === null) return;
-    if (cachedExpiresAt - Date.now() > MIN_URL_LIFE_MS) {
-      srcExpiresAt.current = cachedExpiresAt;
-      setSrc(cachedUrl);
-      return;
-    }
-    minting.current = true;
-    void refresh().then(
-      (url) => (url === null ? setFailed(true) : setSrc(url)),
-      () => setFailed(true),
-    );
-  }, [cacheFailed, cachedExpiresAt, cachedUrl, refresh, src]);
+  }, [expanded, onFullscreenChange]);
 
   return (
     <div className="overflow-hidden rounded-card-row bg-timeline-embed pb-2 shadow-well-pressed">
@@ -105,7 +82,7 @@ export function HtmlRenderFrame(props: {
       </div>
       {/* Measure the real content width; the 8px shell gutters must not enter the page's size context. */}
       <div
-        ref={boxRef}
+        ref={observeBox}
         className="group/html-render relative mx-2 overflow-hidden rounded-tag bg-timeline-embed-content text-shadow-none"
         style={{ height }}
       >
@@ -129,7 +106,7 @@ export function HtmlRenderFrame(props: {
                       variant="glass"
                       onClick={async () => {
                         const url =
-                          srcExpiresAt.current - Date.now() > MIN_URL_LIFE_MS
+                          (loaded?.expiresAt ?? 0) - Date.now() > MIN_URL_LIFE_MS
                             ? src
                             : await refresh().catch(() => null);
                         if (url !== null) setExpandedSrc(url);

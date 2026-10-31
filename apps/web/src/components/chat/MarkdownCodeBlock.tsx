@@ -442,6 +442,7 @@ interface UncachedShikiCodeBlockProps {
   preserveLines: boolean;
 }
 
+/** Highlights uncached code incrementally; disposes pending work when code or highlighting inputs change. */
 function UncachedShikiCodeBlock({
   code,
   language,

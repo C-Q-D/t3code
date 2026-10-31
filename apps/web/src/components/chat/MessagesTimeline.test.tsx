@@ -10,7 +10,6 @@ import {
   MessageId,
   ProjectId,
   RunId,
-  ThreadId,
   type ServerProvider,
 } from "@t3tools/contracts";
 import {
@@ -25,8 +24,6 @@ import {
 import { renderToStaticMarkup } from "react-dom/server";
 import { createRoot } from "react-dom/client";
 import { create, type ReactTestRenderer } from "react-test-renderer";
-import { shouldUseRestingComposerLayout } from "../composerFooterLayout";
-import { useComposerFocusState } from "./useComposerFocusState";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { LegendListRef } from "@legendapp/list/react";
 
@@ -236,6 +233,7 @@ function matchMedia() {
 // Load the module during collection; cold transforms must not consume the hook timeout.
 import { MessagesTimeline } from "./MessagesTimeline";
 
+// oxlint-disable-next-line typescript/no-extraneous-class -- The DOM stub needs constructor identity for instanceof checks.
 const ElementStub = class ElementStub {};
 function stubDomGlobals() {
   const classList = {
@@ -403,7 +401,6 @@ describe("timeline tooltip scroll dismissal", () => {
 function buildProps() {
   return {
     isWorking: false,
-    activeTurnInProgress: false,
     listRef: createRef<LegendListRef | null>(),
     latestRun: null,
     turnDiffSummaries: [],
@@ -412,11 +409,9 @@ function buildProps() {
     onOpenTurnDiff: () => {},
     onOpenThread: () => {},
     onForkFromRun: async () => {},
-    onRollbackCheckpoint: () => {},
     supportsConversationRollback: false,
     onRevertToTurnCount: () => {},
     isRevertingCheckpoint: false,
-    openingVideoAttachmentId: null,
     onImageExpand: () => {},
     activeThreadEnvironmentId: ACTIVE_THREAD_ENVIRONMENT_ID,
     markdownCwd: undefined,
@@ -430,7 +425,6 @@ function buildProps() {
     emptyPlaceholderInset: 0,
     liveFollowEnabled: true,
     onIsAtEndChange: () => {},
-    onManualNavigation: () => {},
   };
 }
 
@@ -626,100 +620,6 @@ describe("MessagesTimeline", () => {
     }
   });
 
-  it.each([
-    { toolLifecycleStatus: "inProgress", isAtEnd: true },
-    { toolLifecycleStatus: "inProgress", isAtEnd: false },
-    { toolLifecycleStatus: "completed", isAtEnd: true },
-    { toolLifecycleStatus: "completed", isAtEnd: false },
-  ] as const)(
-    "restores the composer after closing $toolLifecycleStatus tool output only at the end: $isAtEnd",
-    async ({ toolLifecycleStatus, isAtEnd }) => {
-      const frames = new Map<number, FrameRequestCallback>();
-      let nextFrame = 0;
-      vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
-        frames.set(++nextFrame, callback);
-        return nextFrame;
-      });
-      vi.stubGlobal("cancelAnimationFrame", (frame: number) => frames.delete(frame));
-      vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-      const flushFrame = () =>
-        act(() => {
-          const callbacks = [...frames.values()];
-          frames.clear();
-          callbacks.forEach((callback) => callback(0));
-        });
-      const props = buildProps();
-      const runId = RunId.make("tool-output-run");
-      let timelineIsAtEnd = isAtEnd;
-      props.listRef.current = {
-        getState: () => ({ isAtEnd: timelineIsAtEnd }),
-        getScrollableNode: () => null,
-      } as unknown as LegendListRef;
-      let isResting = false;
-      let composerState: ReturnType<typeof useComposerFocusState> | undefined;
-      function ThreadProbe() {
-        const composer = useComposerFocusState();
-        useLayoutEffect(() => {
-          composerState = composer;
-          isResting = shouldUseRestingComposerLayout({
-            isExistingThread: true,
-            isMobileViewport: false,
-            isScrollCollapsed: composer.isComposerScrollCollapsed,
-            hasExpandedChrome: false,
-            hasMultilinePrompt: false,
-            timelineOverflows: true,
-          });
-        });
-        return (
-          <MessagesTimeline
-            {...props}
-            isWorking={toolLifecycleStatus === "inProgress"}
-            runningRunId={toolLifecycleStatus === "inProgress" ? runId : null}
-            onToolOutputCollapsedAtEnd={composer.restoreAfterTimelineReachedEnd}
-            timelineEntries={[
-              {
-                id: "running-tool",
-                kind: "work",
-                createdAt: MESSAGE_CREATED_AT,
-                entry: {
-                  id: "running-tool",
-                  ...(toolLifecycleStatus === "inProgress" ? { runId } : {}),
-                  createdAt: MESSAGE_CREATED_AT,
-                  label: "Run command",
-                  tone: "tool",
-                  toolLifecycleStatus,
-                  detail: "Command output",
-                },
-              },
-            ]}
-          />
-        );
-      }
-      let renderer: ReactTestRenderer | undefined;
-      try {
-        await act(() => {
-          renderer = create(<ThreadProbe />);
-        });
-        // The user scrolled up to read, so the composer is resting.
-        await act(() => composerState!.setIsComposerScrollCollapsed(true));
-        const toggle = renderer!.root.findByProps({ "aria-expanded": false });
-        await act(() => toggle.props.onClick());
-        await flushFrame();
-        await flushFrame();
-        expect(isResting).toBe(true);
-
-        timelineIsAtEnd = false;
-        await act(() => toggle.props.onClick());
-        await flushFrame();
-        timelineIsAtEnd = isAtEnd;
-        await flushFrame();
-        expect(isResting).toBe(!isAtEnd);
-      } finally {
-        await act(() => renderer?.unmount());
-      }
-    },
-  );
-
   it.each([true, false])(
     "keeps the end in view when tool output toggles only at the end: %s",
     async (isAtEnd) => {
@@ -849,7 +749,12 @@ describe("MessagesTimeline", () => {
           {...props}
           timelineEntries={[buildUserTimelineEntry("First prompt")]}
           liveFollowEnabled={liveFollowEnabled}
-          onManualNavigation={stopFollowing}
+          onViewportAttach={(viewport) =>
+            viewport.subscribe(() => {
+              stopFollowing();
+              viewport.followReleased();
+            })
+          }
         />
       );
     }
@@ -874,37 +779,6 @@ describe("MessagesTimeline", () => {
         atEnd: false,
         scrollOffset: 1300,
       });
-    } finally {
-      await act(() => renderer?.unmount());
-    }
-  });
-
-  it("keeps a following thread's intent while its timeline is held for the next thread", async () => {
-    const { readTimelinePosition } = await import("./timelineScrollAnchoring");
-    const timeline = stubFollowTimeline("environment-local:held-departure");
-    const { props } = timeline;
-    // Smooth follow is still catching up with the stream.
-    timeline.scrollTop = 1300;
-    const render = (held: boolean) => (
-      <MessagesTimeline
-        {...props}
-        timelineEntries={[buildUserTimelineEntry("First prompt")]}
-        liveFollowEnabled={!held}
-        paintOnly={held}
-      />
-    );
-    let renderer: ReactTestRenderer | undefined;
-    try {
-      await act(() => {
-        renderer = create(render(false));
-      });
-      await timeline.flushFrame();
-      expect(readTimelinePosition(props.routeThreadKey)?.atEnd).toBe(true);
-
-      await act(() => renderer?.update(render(true)));
-      await timeline.flushFrame();
-
-      expect(readTimelinePosition(props.routeThreadKey)?.atEnd).toBe(true);
     } finally {
       await act(() => renderer?.unmount());
     }
@@ -1290,7 +1164,7 @@ describe("MessagesTimeline", () => {
   it("anchors a sent attachment message using its measured height", () => {
     const onAnchorReady = vi.fn();
     const onAnchorSizeChanged = vi.fn();
-    // Since #7897 only the first user row after the live edge may anchor, so
+    // Only the first user row after the live edge may anchor, so
     // the preceding row is an assistant reply rather than an older prompt.
     const firstEntry = buildAssistantTimelineEntry("Earlier reply.");
     const secondEntry = {
@@ -1510,7 +1384,6 @@ describe("MessagesTimeline", () => {
       <MessagesTimeline
         {...buildProps()}
         isWorking
-        activeTurnInProgress
         latestRun={{
           runId,
           status: "running",
@@ -1603,7 +1476,7 @@ describe("MessagesTimeline", () => {
     );
 
     expect(markup).toContain("Show full message");
-    // LegendList owns ordinary end-follow (#5449): with live follow on and no
+    // LegendList owns ordinary end-follow: with live follow on and no
     // anchored end space, its maintainScrollAtEnd is enabled.
     expect(markup).toContain('data-maintain-scroll-at-end="enabled"');
     expect(markup).toContain('data-maintain-scroll-at-end-animated="false"');
@@ -1656,8 +1529,8 @@ describe("MessagesTimeline", () => {
         {...buildProps()}
         timelineEntries={[]}
         parentThreadLink={{
-          threadId: ThreadId.make("thread-parent"),
           title: "Architecture audit",
+          open: () => {},
         }}
       />,
     );
@@ -2452,7 +2325,6 @@ describe("MessagesTimeline", () => {
       <MessagesTimeline
         {...buildProps()}
         isWorking
-        activeTurnInProgress
         latestRun={{
           runId: RunId.make("run-1"),
           status: "running",

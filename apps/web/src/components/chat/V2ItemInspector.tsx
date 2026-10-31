@@ -1,11 +1,7 @@
 /** Displays inspectable orchestration item details and permitted item actions. */
 import { t } from "~/i18n";
-import type {
-  EnvironmentId,
-  OrchestrationV2ProjectedTurnItem,
-  RunId,
-  ThreadId,
-} from "@t3tools/contracts";
+import type { ToolCallDiffTarget } from "../../diffPanelStore";
+import type { EnvironmentId, OrchestrationV2ProjectedTurnItem } from "@t3tools/contracts";
 import {
   toolCallLines,
   turnItemDetailRevision,
@@ -15,21 +11,14 @@ import {
 } from "@t3tools/client-runtime/work-log/item-detail";
 import { formatDiffCount } from "@t3tools/client-runtime/diff-count";
 import { isJavaScriptReplTool } from "@t3tools/shared/toolActivity";
-import {
-  CircleCheckIcon,
-  CircleXIcon,
-  ExternalLinkIcon,
-  GitBranchIcon,
-  RotateCcwIcon,
-} from "lucide-react";
-import { memo, Suspense, use, type ReactNode } from "react";
+import { CircleCheckIcon, CircleXIcon, ExternalLinkIcon } from "lucide-react";
+import { memo, type ReactNode, Suspense, use } from "react";
 
 import { useRenderedAppearance } from "../../hooks/useTheme";
 import { cn } from "../../lib/utils";
 import { resolveDiffThemeName } from "../../lib/diffRendering";
 import { getSyntaxHighlighterPromise } from "../../lib/syntaxHighlighting";
 import { useTurnItemDetail } from "../../state/queries";
-import { useV2ItemSupport } from "../../state/v2ItemSupport";
 import { formatWorkspaceRelativePath } from "../../filePathDisplay";
 import { Button } from "../ui/button";
 import ChatMarkdown from "../ChatMarkdown";
@@ -39,6 +28,7 @@ import { CommandOutputPanel, useCommandOutputStreaming } from "./CommandOutputPa
 import { resolveExternalWebLinkHref } from "./externalLinkContextMenu";
 import type { ExpandedImagePreview } from "./ExpandedImagePreview";
 import { ShellCommandBlock } from "./ShellCommandBlock";
+import type { TurnItemSource } from "./timelineRowContext";
 
 /** Retained item and actions; presentation opts into D1 only for timeline callers. */
 interface V2ItemInspectorProps {
@@ -47,13 +37,9 @@ interface V2ItemInspectorProps {
   readonly environmentId: EnvironmentId;
   readonly cwd?: string | undefined;
   readonly workspaceRoot?: string | undefined;
-  readonly onOpenThread: (threadId: ThreadId) => void;
-  readonly onOpenTurnDiff: (runId: RunId, filePath?: string) => void;
-  readonly onRollbackCheckpoint?: (input: {
-    readonly checkpointId: string;
-    readonly scopeId: string;
-  }) => void;
+  readonly onOpenToolDiff?: ((target: ToolCallDiffTarget) => void) | undefined;
   readonly onImageExpand?: ((preview: ExpandedImagePreview) => void) | undefined;
+  readonly source?: TurnItemSource | undefined;
 }
 
 function SyntaxTokens({
@@ -127,6 +113,7 @@ function StructuredValue({
 function useFetchedTurnItem(
   projectedItem: OrchestrationV2ProjectedTurnItem,
   environmentId: EnvironmentId,
+  source: TurnItemSource | undefined,
   skip = false,
 ) {
   const wireItem = projectedItem.item;
@@ -140,6 +127,7 @@ function useFetchedTurnItem(
           revision: turnItemDetailRevision(wireItem),
         }
       : null,
+    source?.detail,
   );
   const fetchedItem = detail.data?.item;
   const item = fetchedItem?.type === wireItem.type ? fetchedItem : wireItem;
@@ -214,12 +202,14 @@ function ToolOutput(props: ToolOutputState & { readonly presentation?: "timeline
   );
 }
 
+/** Loads the projected item output in its source environment; optional image expansion is delegated to the host. */
 export function FetchedToolOutput(props: {
   readonly projectedItem: OrchestrationV2ProjectedTurnItem;
   readonly environmentId: EnvironmentId;
   readonly onImageExpand?: ((preview: ExpandedImagePreview) => void) | undefined;
+  readonly source?: TurnItemSource | undefined;
 }) {
-  const { output } = useFetchedTurnItem(props.projectedItem, props.environmentId);
+  const { output } = useFetchedTurnItem(props.projectedItem, props.environmentId, props.source);
   return (
     <div className={cn("mt-1.5 space-y-1.5", monoClassName)}>
       <ToolOutput {...output} onImageExpand={props.onImageExpand} />
@@ -294,17 +284,18 @@ function ToolCallBody(
 /** Inspect retained or fetched item details; default presentation remains suitable outside the timeline. */
 export const V2ItemInspector = memo(function V2ItemInspector(props: V2ItemInspectorProps) {
   // Command rows stream their output, including the final output, from the server.
+  const environmentStreamsOutput = useCommandOutputStreaming(props.environmentId);
   const streamsOutput =
-    useCommandOutputStreaming(props.environmentId) &&
+    (props.source !== undefined || environmentStreamsOutput) &&
     props.projectedItem.item.type === "command_execution";
-  const fetched = useFetchedTurnItem(props.projectedItem, props.environmentId, streamsOutput);
+  const fetched = useFetchedTurnItem(
+    props.projectedItem,
+    props.environmentId,
+    props.source,
+    streamsOutput,
+  );
   const item = fetched.item;
   const outputState = fetched.output;
-  const support = useV2ItemSupport({
-    environmentId: props.environmentId,
-    sourceThreadId: props.projectedItem.sourceThreadId,
-    sourceItemId: props.projectedItem.sourceItemId,
-  });
   return (
     <div
       className={cn(
@@ -340,6 +331,7 @@ export const V2ItemInspector = memo(function V2ItemInspector(props: V2ItemInspec
                 environmentId={props.environmentId}
                 threadId={props.projectedItem.sourceThreadId}
                 itemId={props.projectedItem.sourceItemId}
+                source={props.source?.commandOutput}
               />
             ) : undefined
           }
@@ -358,11 +350,17 @@ export const V2ItemInspector = memo(function V2ItemInspector(props: V2ItemInspec
                 <span className="text-diff-deletion">-{formatDiffCount(item.deletions ?? 0)}</span>
               </span>
             ) : null}
-            {item.runId !== null ? (
+            {props.onOpenToolDiff ? (
               <Button
                 size="xs"
                 variant="outline"
-                onClick={() => props.onOpenTurnDiff(item.runId!, item.fileName)}
+                onClick={() =>
+                  props.onOpenToolDiff?.({
+                    threadId: props.projectedItem.sourceThreadId,
+                    itemId: props.projectedItem.sourceItemId,
+                    revision: turnItemDetailRevision(item),
+                  })
+                }
               >
                 {t.chat.changedFiles.openDiff}
               </Button>
@@ -452,74 +450,28 @@ export const V2ItemInspector = memo(function V2ItemInspector(props: V2ItemInspec
 
       {item.type === "approval_request" ? <StructuredValue value={item.prompt} /> : null}
       {item.type === "user_input_request" ? (
-        <StructuredValue value={item.questions.map((question) => question.question).join("\n\n")} />
+        <StructuredValue
+          value={item.questions
+            .map((question) =>
+              [question.question, ...question.options.map((option) => `• ${option.label}`)].join(
+                "\n",
+              ),
+            )
+            .join("\n\n")}
+        />
       ) : null}
       {item.type === "notification" ? <StructuredValue value={item.detail} /> : null}
       {item.type === "system_notice" ? <StructuredValue value={item.message} /> : null}
       {item.type === "error" ? <StructuredValue value={item.failure.message} /> : null}
-      {item.type === "proposed_plan" ? <StructuredValue value={item.markdown} /> : null}
       {item.type === "todo_list" ? (
         <StructuredValue
           value={item.steps
-            .map((step) => `${step.status === "completed" ? "✓" : "○"} ${step.text}`)
+            .map(
+              (step) =>
+                `${step.status === "completed" ? "✓" : step.status === "running" ? "◉" : "○"} ${step.text}`,
+            )
             .join("\n")}
         />
-      ) : null}
-
-      {item.type === "checkpoint" ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-muted-foreground">
-            {support.checkpoint?.status ?? item.status} ·{" "}
-            {t.chat.inspector.fileCount(item.files.length)}
-          </span>
-          {props.onRollbackCheckpoint && support.checkpoint?.status === "ready" ? (
-            <Button
-              size="xs"
-              variant="outline"
-              onClick={() =>
-                props.onRollbackCheckpoint?.({
-                  checkpointId: item.checkpointId,
-                  scopeId: item.scopeId,
-                })
-              }
-            >
-              <RotateCcwIcon className="size-3" />
-              {t.chat.inspector.rollBack}
-            </Button>
-          ) : null}
-        </div>
-      ) : null}
-
-      {item.type === "fork" ? (
-        <Button size="xs" variant="outline" onClick={() => props.onOpenThread(item.targetThreadId)}>
-          <GitBranchIcon className="size-3" />
-          {t.chat.inspector.openFork}
-        </Button>
-      ) : null}
-
-      {item.type === "subagent" && item.childThreadId !== null ? (
-        <Button size="xs" variant="outline" onClick={() => props.onOpenThread(item.childThreadId!)}>
-          {t.chat.inspector.openSubagentThread}
-        </Button>
-      ) : null}
-
-      {item.type === "handoff" ? (
-        <div className="space-y-1 text-muted-foreground">
-          <p>
-            {item.fromProviderInstanceIds.join(", ")} → {item.toProviderInstanceId}
-          </p>
-          <p>
-            {item.strategy.replaceAll("_", " ")} · {support.contextHandoff?.status ?? item.status}
-          </p>
-          {support.contextTransfer ? (
-            <p>
-              {t.chat.inspector.transfer(
-                support.contextTransfer.type,
-                support.contextTransfer.status,
-              )}
-            </p>
-          ) : null}
-        </div>
       ) : null}
     </div>
   );

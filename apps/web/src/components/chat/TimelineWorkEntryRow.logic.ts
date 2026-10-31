@@ -1,9 +1,12 @@
 /** Derives work-entry icons and detail content for timeline rows. */
 import { t } from "~/i18n";
+import type { PluggableList } from "unified";
 import type { Root, RootContent } from "mdast";
-import { resolveWorkEntryToolPresentation } from "@t3tools/client-runtime/work-log/presentation";
+import {
+  resolveWorkEntryToolPresentation,
+  toolGroupAction,
+} from "@t3tools/client-runtime/work-log/presentation";
 import { isJavaScriptReplTool } from "@t3tools/shared/toolActivity";
-import { toolGroupAction } from "./MessagesTimeline.logic";
 import { formatWorkspaceRelativePath } from "../../filePathDisplay";
 import { type TimelineWorkEntry, type TimelineRow } from "./timelineRowContext";
 import { type WorkEntryIconName } from "./TimelineToolActivityIcon";
@@ -180,6 +183,7 @@ export function workEntryIconName(workEntry: TimelineWorkEntry): WorkEntryIconNa
   if (workEntry.itemType === "user_input_request" || workEntry.itemType === "approval_request") {
     return "message-circle";
   }
+  if (workEntry.itemType === "todo_list") return "list-todo";
   if (workEntry.toolSurface) return workEntry.toolSurface;
   if (toolGroupAction(workEntry) === "read") return "file-text";
   if (
@@ -248,3 +252,10 @@ export function remarkThoughtPreview(fallback: string) {
       : [{ type: "text", value: fallback }];
   };
 }
+
+export const THOUGHT_PREVIEW_PLUGINS: PluggableList = [
+  [remarkThoughtPreview, t.chat.timeline.thought],
+];
+export const THINKING_PREVIEW_PLUGINS: PluggableList = [
+  [remarkThoughtPreview, t.chat.timeline.thinking],
+];
