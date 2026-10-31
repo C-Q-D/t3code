@@ -89,6 +89,7 @@ describe("buildSidebarThreadActionMenuItems", () => {
       ...baseState,
       branch: "main",
       hasDraft: true,
+      canTurnIntoProject: true,
       projectFilter: { label: "Project", isActive: false },
     });
     expect(items.map((item) => item.id)).toEqual([
@@ -102,9 +103,11 @@ describe("buildSidebarThreadActionMenuItems", () => {
       "copy-path",
       "copy-branch",
       "copy-thread-id",
+      "copy-thread",
       "export-transcript",
       "new-thread-on-branch",
       "project-settings",
+      "turn-into-project",
       "filter-by-project",
       "auto-settle",
       "discard-draft",
@@ -121,7 +124,21 @@ describe("buildSidebarThreadActionMenuItems", () => {
       { id: "auto-settle:enabled", label: "Enabled", checked: true },
       { id: "auto-settle:disabled", label: "Disabled", checked: false },
     ]);
+    expect(items.find((item) => item.id === "copy-thread")).toMatchObject({ disabled: false });
+    expect(items.find((item) => item.id === "turn-into-project")).toMatchObject({
+      disabled: false,
+    });
     expect(items.at(-1)).toMatchObject({ id: "delete", destructive: true });
+  });
+
+  it.each([
+    { name: "running", isRunning: true, canOperate: true, canTurnIntoProject: true },
+    { name: "without permission", isRunning: false, canOperate: false, canTurnIntoProject: true },
+    { name: "ineligible", isRunning: false, canOperate: true, canTurnIntoProject: false },
+  ])("omits project conversion but keeps the read-only reference for $name threads", (state) => {
+    const items = buildSidebarThreadActionMenuItems({ ...baseState, ...state, hasDraft: false });
+    expect(items.map((item) => item.id)).not.toContain("turn-into-project");
+    expect(items.find((item) => item.id === "copy-thread")).toMatchObject({ disabled: false });
   });
 
   it("keeps unsupported and missing-branch V2 actions visible but unavailable", () => {

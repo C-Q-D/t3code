@@ -318,6 +318,7 @@ export function buildThreadActionMenuItems(
  * Adapts commands to V2 groups without changing the titlebar menu.
  * @param state Menu-open snapshot; hasDraft means unsent user content, including attachments.
  * @returns Ordered rows with disabled placeholders for missing capabilities or branches.
+ * Project conversion is omitted unless the thread is eligible, idle and operable.
  * Discard stays local; callers recheck server grants before executing other guarded actions.
  */
 export function buildSidebarThreadActionMenuItems(
@@ -335,7 +336,7 @@ export function buildSidebarThreadActionMenuItems(
       pinning: true,
       titleRegeneration: true,
     },
-  });
+  }).flatMap((item) => [item, ...(item.children ?? [])]);
   const command = (
     id: ThreadActionMenuId,
     available = true,
@@ -380,6 +381,7 @@ export function buildSidebarThreadActionMenuItems(
       disabled: !state.branch,
     },
     { id: "copy-thread-id", label: t.sidebar.actions.copyThreadId, icon: "hash" },
+    { ...command("copy-thread"), label: "Copy thread" },
     command("export-transcript"),
     {
       id: "new-thread-on-branch",
@@ -391,6 +393,10 @@ export function buildSidebarThreadActionMenuItems(
       separatorBefore: true,
     },
     command("project-settings"),
+    // Conversion changes project ownership; only offer it when it can run now.
+    ...(state.canTurnIntoProject && state.canOperate && !state.isRunning
+      ? [command("turn-into-project")]
+      : []),
     ...(state.projectFilter ? [command("filter-by-project")] : []),
     command("auto-settle", state.supports.autoSettleOptOut),
     ...(state.hasDraft
