@@ -75,6 +75,15 @@ export function ThreadDetailsControl({
             "bg-primary text-primary-foreground font-bold text-shadow-none shadow-primary-button enabled:hover:bg-message-action-hover [--lucide-hue-override:currentColor]",
           tone === "destructive" &&
             "text-destructive hover:text-destructive data-pressed:text-destructive",
+          // PR row actions share one 20px pill with a 1px inset focus ring that stays clear of the
+          // label. The solid pill draws it in the canvas color so it shows against the fill.
+          part === "meta" &&
+            (tone === "primary" || tone === "destructive") &&
+            "h-5 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-offset-0",
+          part === "meta" && tone === "primary" && "focus-visible:ring-background",
+          part === "meta" &&
+            tone === "destructive" &&
+            "bg-destructive/10 hover:!bg-destructive/16 data-pressed:!bg-destructive/16 dark:hover:!bg-destructive/16 dark:data-pressed:!bg-destructive/16",
           className,
         ),
       },

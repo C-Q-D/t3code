@@ -1,3 +1,8 @@
+/** Composes thread workspace, version control, automation and relationship details. */
+import { t } from "~/i18n";
+import { formatDiffCount } from "@t3tools/client-runtime/diff-count";
+import { useEnvironmentQuery } from "~/state/query";
+import { vcsEnvironment } from "~/state/vcs";
 import type {
   EditorId,
   EnvironmentId,
@@ -10,6 +15,7 @@ import type {
 import type { DraftId } from "../../composerDraftStore";
 import { useT3ProjectFileScripts } from "../../hooks/useT3ProjectFileScripts";
 import { type EnvMode, type EnvironmentOption } from "../BranchToolbar.logic";
+import { BranchToolbarBranchSelector } from "../BranchToolbarBranchSelector";
 import { BranchToolbar } from "../BranchToolbar";
 import BaseGitActionsControl from "../GitActionsControl";
 import ProjectScriptsControl, {
@@ -40,9 +46,31 @@ import {
 } from "./threadDetailsPanelStyles";
 import { Menu, MenuPopup } from "../ui/menu";
 
+/** Tracks rendered sections because optional children may return null after data arrives. */
+function observeDetailSections(node: HTMLDivElement | null) {
+  if (!node) return;
+  const update = () => {
+    node.dataset.hasContent = String(
+      Array.from(node.querySelectorAll("section")).some(
+        (section) => section.dataset.empty !== "true",
+      ),
+    );
+  };
+  const observer = new MutationObserver(update);
+  observer.observe(node, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ["data-empty"],
+  });
+  update();
+  return () => observer.disconnect();
+}
+
 const GitActionsControl = memo(BaseGitActionsControl);
 
-interface ThreadDetailsPanelProps extends Pick<
+/** Context and callbacks for the configurable thread details card. */
+export interface ThreadDetailsPanelProps extends Pick<
   ComponentProps<typeof ThreadDetailsCard>,
   "anchor" | "handle"
 > {
@@ -86,6 +114,7 @@ interface ThreadDetailsPanelProps extends Pick<
   usage: ThreadDetailsUsageInput;
 }
 
+/** Composes visible sections while retaining the host-owned Git, script and navigation actions. */
 export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
   const visible = useClientSettings(resolveThreadDetailsVisibility);
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
@@ -94,6 +123,13 @@ export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
     props.activeProjectScripts && visible.scripts ? props.gitCwd : null,
   );
   const activeThreadRef = { environmentId: props.environmentId, threadId: props.threadId };
+  // The cached status query also feeds GitActionsControl; the section owns the header slot.
+  const statusQuery = useEnvironmentQuery(
+    props.gitCwd && props.activeProjectName
+      ? vcsEnvironment.status({ environmentId: props.environmentId, input: { cwd: props.gitCwd } })
+      : null,
+  );
+  const changes = statusQuery.data?.branchChanges ?? statusQuery.data?.workingTree;
   const branchToolbarProps = {
     showGitControls: props.isGitRepo,
     environmentId: props.environmentId,
@@ -161,15 +197,15 @@ export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
         };
         return (
           <>
-            <div className="group/details-items">
+            <div className="group/details-items" ref={observeDetailSections}>
               {show.environment || show.openIn || show.scripts ? (
                 <ThreadDetailsSection
                   headingId="thread-details-workspace-heading"
-                  title="Workspace"
+                  title={t.chat.details.workspace}
                   separated={false}
-                  showHeading={false}
+                  showHeading={density === "full"}
                 >
-                  <div className="flex flex-col">
+                  <div className="flex flex-col gap-3">
                     {show.environment ? (
                       <BranchToolbar
                         layout="panel"
@@ -215,19 +251,58 @@ export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
               {props.gitCwd && (show.branch || show.git) ? (
                 <ThreadDetailsSection
                   headingId="thread-details-version-control-heading"
-                  title="Version Control"
-                  showHeading={false}
+                  title={t.chat.details.versionControl}
+                  showHeading={density === "full"}
                   separated={density === "full"}
+                  actions={
+                    visible.changes && props.isGitRepo && props.activeProjectName ? (
+                      <ThreadDetailsControl
+                        part="stat"
+                        aria-label={t.git.diff.changes}
+                        disabled={!props.onOpenChanges}
+                        onClick={props.onOpenChanges}
+                      >
+                        <span className="text-diff-addition-foreground">
+                          +{formatDiffCount(changes?.insertions ?? 0)}
+                        </span>
+                        <span className="text-diff-deletion-foreground">
+                          −{formatDiffCount(changes?.deletions ?? 0)}
+                        </span>
+                      </ThreadDetailsControl>
+                    ) : undefined
+                  }
                 >
-                  <div className="flex flex-col">
+                  <div className="flex flex-col gap-3">
                     {show.branch ? (
-                      <BranchToolbar layout="panel" panelSection="branch" {...branchToolbarProps} />
-                    ) : null}
-                    {show.git ? (
+                      <BranchToolbarBranchSelector
+                        displayMode="panel"
+                        {...branchToolbarProps}
+                        effectiveEnvModeOverride={
+                          props.forceNewWorktree ? "worktree" : props.envMode
+                        }
+                        panelActions={
+                          show.git ? (
+                            <GitActionsControl
+                              displayMode="panel"
+                              compact={density !== "full"}
+                              showActions={visible.gitActions}
+                              showChanges={visible.changes && density !== "full"}
+                              gitCwd={props.gitCwd}
+                              activeThreadRef={activeThreadRef}
+                              {...(props.draftId ? { draftId: props.draftId } : {})}
+                              {...(props.onOpenChanges
+                                ? { onOpenChanges: props.onOpenChanges }
+                                : {})}
+                            />
+                          ) : null
+                        }
+                      />
+                    ) : show.git ? (
                       <GitActionsControl
+                        displayMode="panel"
                         compact={density !== "full"}
                         showActions={visible.gitActions}
-                        showChanges={visible.changes}
+                        showChanges={visible.changes && density !== "full"}
                         gitCwd={props.gitCwd}
                         activeThreadRef={activeThreadRef}
                         {...(props.draftId ? { draftId: props.draftId } : {})}
@@ -265,7 +340,7 @@ export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
               ) : null}
 
               {/* Shown only when no section above has content, so an emptied card can be refilled. */}
-              <div className="p-2 group-has-[>section>:last-child:not(:empty)]/details-items:hidden">
+              <div className="p-2 group-data-[has-content=true]/details-items:hidden">
                 <ThreadDetailsControl
                   size="xs"
                   variant="ghost"

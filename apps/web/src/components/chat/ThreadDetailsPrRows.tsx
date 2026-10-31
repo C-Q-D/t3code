@@ -1,6 +1,8 @@
+import { Minus, Plus } from "lucide";
 /** Displays linked pull requests with expandable additional rows. */
 import { t } from "~/i18n";
 import { AuthOrchestrationOperateScope } from "@t3tools/contracts";
+import { pipe } from "effect/Function";
 import { ThreadDetailsControl } from "./ThreadDetailsControl";
 import type { EnvironmentId, ScopedThreadRef, ThreadPullRequestLink } from "@t3tools/contracts";
 import {
@@ -8,11 +10,11 @@ import {
   resolveThreadPullRequestChains,
   threadPullRequestKeyOf,
   visibleThreadPullRequests,
-} from "@t3tools/shared/threadPullRequests";
-import { Minus, Plus } from "lucide";
+} from "@t3tools/client-runtime/thread-pull-requests";
 import { useState, type ComponentProps, type MouseEvent as ReactMouseEvent } from "react";
 
-import { findProjectOnChangeRequestHost, parseChangeRequestUrl } from "~/lib/openPullRequestLink";
+import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
+import { findProjectOnChangeRequestHost } from "@t3tools/client-runtime/change-request-links";
 
 import { useProjects, useServerConfigs, useThreadShell } from "~/state/entities";
 import { threadEnvironment } from "~/state/threads";
@@ -48,9 +50,9 @@ function ThreadDetailsPrLinkRow({
   isWatching?: boolean | undefined;
 }) {
   const projects = useProjects();
-  const parsed = parseChangeRequestUrl(link.url);
+  const parsed = sourceControlClients.parseChangeRequestUrl(link.url)?.link;
   const project =
-    parsed === null
+    parsed === undefined
       ? null
       : (findProjectOnChangeRequestHost(
           projects.filter((candidate) => candidate.environmentId === environmentId),
@@ -135,7 +137,7 @@ export function ThreadDetailsPrRows({
   const rest =
     currentLink === null
       ? []
-      : pullRequestListLines(resolveThreadPullRequestChains(visibleThreadPullRequests(links)))
+      : pipe(visibleThreadPullRequests(links), resolveThreadPullRequestChains, pullRequestListLines)
           .map((line) => line.link)
           .filter((link) => threadPullRequestKeyOf(link) !== threadPullRequestKeyOf(currentLink));
   if (rest.length === 0) return currentRow;

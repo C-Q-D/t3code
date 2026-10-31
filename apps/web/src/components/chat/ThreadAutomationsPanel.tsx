@@ -73,8 +73,6 @@ export function ThreadAutomationsPanel(props: {
     )
       return;
     setBusyTaskId(task.id);
-    // Partial update: only the enabled flag changes, so a toggle can never
-    // revert concurrent edits made to the task elsewhere.
     const result = await setTaskEnabled({
       environmentId: props.environmentId,
       input: { id: task.id, enabled },

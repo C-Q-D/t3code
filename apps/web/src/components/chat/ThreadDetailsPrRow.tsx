@@ -1,10 +1,14 @@
 /** Presents an F1 PR well and watch explanation while retaining existing host actions and gates. */
 import { t } from "~/i18n";
+import { resolvePullRequestDetailChecks } from "@t3tools/client-runtime/pull-request-checks";
+import {
+  capitalizeTerm,
+  sourceControlClients,
+} from "@t3tools/client-runtime/source-control-clients";
 import { ThreadDetailsControl } from "./ThreadDetailsControl";
 import { PullRequestGlyph } from "../pullRequest/pullRequestIcons";
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import type { EnvironmentId, ProjectId, PullRequestRef } from "@t3tools/contracts";
-import { sourceControlRepositorySelector } from "@t3tools/shared/sourceControl";
 import { EyeIcon, FileDiffIcon, GitBranchIcon, TriangleAlertIcon } from "lucide-react";
 import { selectEnvironmentQueryData } from "@t3tools/client-runtime/state/runtime";
 import { AsyncResult } from "effect/reactivity";
@@ -26,7 +30,6 @@ import {
   buildFixFindingsHandoff,
   buildResolveConflictsPrompt,
   classifyPullRequestChecks,
-  resolvePullRequestDetailChecks,
   describePullRequestChecks,
   isPullRequestConflicting,
   resolvePullRequestMergeMethod,
@@ -59,7 +62,7 @@ import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
-// A server without checks for this pull request answers null; polling it again finds nothing new.
+// A null checks response is settled; polling cannot find checks.
 const isSettledWithoutChecks = (result: AsyncResult.AsyncResult<unknown, unknown>) =>
   result._tag === "Success" && result.value === null;
 
@@ -104,9 +107,8 @@ export function ThreadDetailsPrRow({
   isWatching?: boolean | undefined;
 }) {
   const serverConfigs = useServerConfigs();
-  const supportsPullRequests =
-    serverConfigs.get(environmentId)?.environment.capabilities.pullRequests === true;
-  const repository = sourceControlRepositorySelector(project?.repositoryIdentity);
+  const supportsPullRequests = serverConfigs.get(environmentId) !== undefined;
+  const repository = sourceControlClients.repositorySelector(project?.repositoryIdentity);
   const reference: PullRequestRef | null =
     supportsPullRequests && project !== null
       ? linkedReference
@@ -122,8 +124,7 @@ export function ThreadDetailsPrRow({
           environmentId,
           input: { ...reference, allowStale: false },
         });
-  // Read the queries part by part: every poll publishes a new result (a new
-  // timestamp, `waiting` on and off) even when nothing in it changed.
+  // Select query parts because polling rebuilds unchanged results.
   const detailData = useEnvironmentQuerySelector(detailAtom, selectEnvironmentQueryData);
   const detailQuery = useEnvironmentQueryRefresh(detailAtom);
   const supportsChecks =
@@ -137,6 +138,9 @@ export function ThreadDetailsPrRow({
   const checksQuery = useEnvironmentQueryRefresh(checksAtom);
   const checksAreNewer = useEnvironmentQueryIsNewer(checksAtom, detailAtom);
   const detail = resolvePullRequestDetailChecks(detailData, checksData, checksAreNewer);
+  const terminology = sourceControlClients.get(
+    detail?.provider ?? project?.repositoryIdentity?.provider,
+  ).changeRequest;
   const open = reference !== null && (detail?.state ?? pr?.state) === "open";
   const refreshKey = `${environmentId}:${project?.id}:${reference?.host}:${reference?.repository}:${number}`;
   useLiveRefresh(
@@ -157,6 +161,7 @@ export function ThreadDetailsPrRow({
   const { actionPending, perform } = usePullRequestActionRunner({
     environmentId,
     reference,
+    terminology,
     onSuccess: () => {
       detailQuery.refresh();
       checksQuery.refresh();
@@ -230,7 +235,10 @@ export function ThreadDetailsPrRow({
   const rowTooltip =
     detail === null || statePresentation === null ? (
       <TooltipPopup side="top">
-        {status?.tooltip ?? t.chat.details.pullRequest(number)}
+        {status?.tooltip ??
+          (terminology.singular === "pull request"
+            ? t.chat.details.pullRequest(number)
+            : `${capitalizeTerm(terminology.singular)} #${number}`)}
       </TooltipPopup>
     ) : (
       <TooltipPopup
@@ -432,7 +440,11 @@ export function ThreadDetailsPrRow({
         <AlertDialog open={confirmingMerge} onOpenChange={(open) => setConfirmingMerge(open)}>
           <AlertDialogPopup>
             <AlertDialogHeader>
-              <AlertDialogTitle>{t.chat.details.mergePullRequest}</AlertDialogTitle>
+              <AlertDialogTitle>
+                {terminology.singular === "pull request"
+                  ? t.chat.details.mergePullRequest
+                  : `Merge ${terminology.singular}?`}
+              </AlertDialogTitle>
               <AlertDialogDescription>
                 {t.chat.details.mergeDescription(number, selectedMergeMethod)}
               </AlertDialogDescription>

@@ -3,6 +3,19 @@ import type { ComponentProps, ReactNode } from "react";
 
 import { cn } from "../../lib/utils";
 
+/** Tracks optional content without a relational CSS selector. */
+function observeSectionContent(node: HTMLDivElement | null) {
+  if (!node) return;
+  const update = () => {
+    const section = node.parentElement;
+    if (section) section.dataset.empty = String(node.childNodes.length === 0);
+  };
+  const observer = new MutationObserver(update);
+  observer.observe(node, { childList: true });
+  update();
+  return () => observer.disconnect();
+}
+
 /**
  * Groups F1 detail content under one accessible heading in either card presentation.
  * @param props - Heading ID/title, optional actions and content; separated adds the F1 divider.
@@ -31,7 +44,10 @@ export function ThreadDetailsSection({
       {...props}
       aria-labelledby={showHeading ? headingId : undefined}
       aria-label={showHeading ? undefined : title}
-      className={cn("flex min-w-0 flex-col gap-3", separated && "thread-details-section-separated")}
+      className={cn(
+        "flex min-w-0 flex-col gap-3 data-[empty=true]:hidden",
+        separated && "thread-details-section-separated",
+      )}
     >
       <div
         className={cn("flex min-w-0 items-center justify-between gap-2", !showHeading && "hidden")}
@@ -47,7 +63,7 @@ export function ThreadDetailsSection({
         </div>
         {actions ? <div className="flex shrink-0 items-center gap-1">{actions}</div> : null}
       </div>
-      {children}
+      <div ref={observeSectionContent}>{children}</div>
     </section>
   );
 }

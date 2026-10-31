@@ -5,10 +5,12 @@ import {
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
+  type MouseEventHandler,
   type ReactNode,
   type RefObject,
 } from "react";
 import { flushSync } from "react-dom";
+import { workspaceAreaProps } from "../../lib/workspaceFocus";
 import type { ScopedThreadRef } from "@t3tools/contracts";
 import { scopedThreadKey } from "@t3tools/client-runtime/environment";
 import { ScrollArea } from "../ui/scroll-area";
@@ -26,7 +28,6 @@ import {
   selectThreadPanelVisibility,
   useRightPanelStore,
 } from "../../rightPanelStore";
-import type { ThreadPanelPresentation } from "../../rightPanelLayout";
 import { useChatCanvas } from "./ChatCanvasContext";
 import {
   createThreadDetailsCardPlacement,
@@ -41,6 +42,7 @@ import {
   useThreadDetailsCardPlacementStore,
   type ThreadDetailsCardPlacement,
 } from "../../threadDetailsCardPlacementStore";
+import { requestWorkspaceFocus } from "../../lib/workspaceFocus";
 
 // Keep in sync with the control cursor reset in chat-header.css; these targets cannot start a card drag.
 const CARD_CONTROLS =
@@ -130,15 +132,19 @@ export function ThreadDetailsCard({
   threadRef,
   anchor,
   handle,
-  onPresentationChange,
+  contentKey,
+  onContextMenu,
   children,
 }: {
   threadRef: ScopedThreadRef;
   anchor: RefObject<Element | null>;
   handle: ReturnType<typeof PopoverCreateHandle>;
-  onPresentationChange: (presentation: ThreadPanelPresentation) => void;
+  /** Changes when the set of rendered items changes, so cached heights are measured again. */
+  contentKey: string;
+  onContextMenu?: MouseEventHandler<HTMLDivElement>;
   children: (density: "full" | "compact" | "essential") => ReactNode;
 }) {
+  const detailsArea = workspaceAreaProps("details", 3, "Thread details");
   const canvas = useChatCanvas();
   const threadKey = scopedThreadKey(threadRef);
   const savedPlacement = useThreadDetailsCardPlacementStore((state) => state.placement);
@@ -146,23 +152,27 @@ export function ThreadDetailsCard({
   const { start, stop } = useMotionJob();
   const [cardElement, setCardElement] = useState<HTMLElement | null>(null);
   const [cardSize, setCardSize] = useState({ width: 280, height: 0 });
-  const preferredPlacement = canvas
-    ? resolveThreadDetailsCardLayout({
-        container: canvas.container,
-        lane: canvas.lane,
-        frame: null,
-        topInset: savedPlacement ? 0 : canvas.detailsCardTopInset,
-      })
-    : null;
-  const placement = canvas
-    ? resolveThreadDetailsCardLayout({
-        container: canvas.container,
-        lane: canvas.lane,
-        frame: savedPlacement ? null : canvas.layout.frame,
-        overlapsDetailsCard: !savedPlacement && canvas.layout.overlapsDetailsCard,
-        topInset: savedPlacement ? 0 : canvas.detailsCardTopInset,
-      })
-    : null;
+  const preferredPlacement = !savedPlacement
+    ? (canvas?.preferredDetailsCard ?? null)
+    : canvas
+      ? resolveThreadDetailsCardLayout({
+          container: canvas.container,
+          lane: canvas.lane,
+          frame: null,
+          topInset: savedPlacement ? 0 : canvas.detailsCardTopInset,
+        })
+      : null;
+  const placement = !savedPlacement
+    ? (canvas?.detailsCardPlacement ?? null)
+    : canvas
+      ? resolveThreadDetailsCardLayout({
+          container: canvas.container,
+          lane: canvas.lane,
+          frame: savedPlacement ? null : canvas.layout.frame,
+          overlapsDetailsCard: !savedPlacement && canvas.layout.overlapsDetailsCard,
+          topInset: savedPlacement ? 0 : canvas.detailsCardTopInset,
+        })
+      : null;
   const mode = placement ? "inline" : "popover";
   const topInset = canvas?.detailsCardTopInset ?? 0;
   const overlay = resolveThreadDetailsPopoverLayout(
@@ -175,12 +185,10 @@ export function ThreadDetailsCard({
   const popoverOpen = useRightPanelStore((state) =>
     selectThreadPanelOpen(state.threadPanelVisibilityByThreadKey, threadRef, "popover"),
   );
-  const [contentElement, setContentElement] = useState<HTMLDivElement | null>(null);
-  const measurementKey = `${threadRef.environmentId}:${threadRef.threadId}:${preferredPlacement?.width ?? "popup"}`;
+  const measurementKey = `${threadRef.environmentId}:${threadRef.threadId}:${preferredPlacement?.width ?? "popup"}:${contentKey}`;
   const [measurements, setMeasurements] = useState({
     key: measurementKey,
     heights: { full: 0, compact: 0 },
-    fullContentHeight: 0,
   });
   const contentHeights =
     measurements.key === measurementKey ? measurements.heights : { full: 0, compact: 0 };
@@ -194,26 +202,8 @@ export function ThreadDetailsCard({
       : (placement?.height ?? overlay.height);
   const density =
     mode === "popover" ? "full" : resolveThreadDetailsCardDensity(height, contentHeights);
-  const reportDetailsCard = canvas?.reportDetailsCard;
-  const cardLeft = preferredPlacement?.x;
-  const cardRight = preferredPlacement
-    ? preferredPlacement.x + preferredPlacement.width
-    : undefined;
-  const cardBottom =
-    preferredPlacement && measurements.key === measurementKey && measurements.fullContentHeight > 0
-      ? preferredPlacement.y + Math.min(measurements.fullContentHeight, preferredPlacement.height)
-      : undefined;
-  useLayoutEffect(() => {
-    reportDetailsCard?.(
-      !savedPlacement &&
-        inlineOpen &&
-        cardLeft !== undefined &&
-        cardRight !== undefined &&
-        cardBottom !== undefined
-        ? { left: cardLeft, right: cardRight, bottom: cardBottom }
-        : null,
-    );
-  }, [reportDetailsCard, inlineOpen, cardLeft, cardRight, cardBottom, savedPlacement]);
+  const measureDetailsCard = canvas?.measureDetailsCard;
+  const cardWidth = preferredPlacement?.width;
   useLayoutEffect(() => {
     if (!cardElement) return;
     const measure = () => {
@@ -266,47 +256,55 @@ export function ThreadDetailsCard({
     },
     [cardElement, threadKey, stop],
   );
-  useLayoutEffect(() => () => reportDetailsCard?.(null), [reportDetailsCard]);
   useLayoutEffect(() => {
-    onPresentationChange(mode);
     if (mode === "inline" && popoverOpen)
       useRightPanelStore.getState().setThreadPanelOpen(threadRef, "popover", false);
-  }, [mode, onPresentationChange, threadRef, popoverOpen]);
+  }, [mode, popoverOpen, threadRef]);
+  const [contentElement, setContentElement] = useState<HTMLDivElement | null>(null);
+  const { environmentId, threadId } = threadRef;
+  // Re-measures when the density or measurement key changes, so each density's
+  // height is measured once it renders.
   useLayoutEffect(() => {
     const element = contentElement;
     if (!element || density === "essential") return;
     const measure = () => {
       const frame = element.closest<HTMLElement>("[data-thread-details-card]");
       const next = element.offsetHeight + (frame ? frame.offsetHeight - frame.clientHeight : 0);
-      // PR lists and lineage scroll as they expand. Counting them toward density would hide
-      // the section and workspace controls when the user asks to see more rows.
+      // PR lists, lineage and side chats scroll as they expand. Counting them toward density
+      // would hide the section and workspace controls when the user asks to see more rows.
       const lists = element.querySelectorAll<HTMLElement>(
-        "[data-thread-relationships-panel], [data-thread-details-pr-list]",
+        "[data-thread-relationships-panel], [data-thread-side-chats-panel], [data-thread-details-pr-list]",
       );
       const fittingHeight =
         next - Array.from(lists).reduce((sum, list) => sum + list.offsetHeight, 0);
       setMeasurements((current) => {
         const heights = current.key === measurementKey ? current.heights : { full: 0, compact: 0 };
-        const fullContentHeight =
-          density === "full"
-            ? next
-            : current.key === measurementKey
-              ? current.fullContentHeight
-              : 0;
-        return current.key === measurementKey &&
-          heights[density] === fittingHeight &&
-          current.fullContentHeight === fullContentHeight
+        return current.key === measurementKey && heights[density] === fittingHeight
           ? current
-          : {
-              key: measurementKey,
-              heights: { ...heights, [density]: fittingHeight },
-              fullContentHeight,
-            };
+          : { key: measurementKey, heights: { ...heights, [density]: fittingHeight } };
       });
+      // Only the laid-out DOM knows the full card height, and the canvas keeps preview
+      // frames clear of it, so it is reported from this measure effect.
+      if (!savedPlacement && density === "full" && cardWidth !== undefined) {
+        measureDetailsCard?.({
+          threadRef: { environmentId, threadId },
+          width: cardWidth,
+          fullContentHeight: next,
+        });
+      }
     };
     measure();
     return observeResize(element, measure);
-  }, [contentElement, density, measurementKey]);
+  }, [
+    contentElement,
+    density,
+    measurementKey,
+    cardWidth,
+    measureDetailsCard,
+    environmentId,
+    threadId,
+    savedPlacement,
+  ]);
   /** Starts capture only on blank inline content; controls retain their native gestures. */
   const beginDrag = (event: ReactPointerEvent<HTMLElement>) => {
     if (
@@ -492,6 +490,7 @@ export function ThreadDetailsCard({
         maxHeight: canvas ? height : undefined,
         width: mode === "popover" && canvas ? overlay.width : undefined,
       }}
+      onContextMenu={onContextMenu}
       data-thread-details-card
     >
       <ScrollArea scrollFade className="min-h-0">
@@ -526,61 +525,70 @@ export function ThreadDetailsCard({
           data-thread-details-scrim
         />
       ) : null}
-      {placement ? (
-        inlineOpen ? (
-          <aside
-            ref={setCardElement}
-            onPointerDown={beginDrag}
-            onPointerMove={moveDrag}
-            onPointerUp={endDrag}
-            onPointerCancel={endDrag}
-            onLostPointerCapture={endDrag}
-            onDoubleClick={(event) => {
-              if (event.target instanceof Element && event.target.closest(CARD_CONTROLS)) return;
-              stop();
-              const drag = dragRef.current;
-              dragRef.current = null;
-              if (drag) clearCardDrag(drag);
-              useThreadDetailsCardPlacementStore.getState().reset();
-            }}
-            aria-label={t.chat.details.threadDetails}
-            // Slides down to make room for the find bar, but returns in the same frame
-            // the bar closes: a floating preview below moves up at once and would
-            // otherwise overlap the card mid-slide.
-            className={cn(
-              "absolute z-20",
-              !savedPlacement &&
-                topInset > 0 &&
-                "transition-[top] duration-150 ease-out motion-reduce:transition-none",
-            )}
-            style={{
-              // The default follows the find bar's right anchor during resize;
-              // a saved drag instead uses the clamped canvas-relative position.
-              left: floatingPosition?.left,
-              right: floatingPosition ? undefined : placement.right,
-              top: floatingPosition?.top ?? placement.y,
-              width: placement.width,
-              maxHeight: height,
-            }}
-            data-density={density}
-            data-thread-details-panel="inline"
-          >
-            {card}
-          </aside>
-        ) : null
-      ) : (
-        <PopoverPopup
-          layer="thread-details"
-          anchor={anchor}
-          align="end"
-          // The shared panel viewport adds eight pixels around the A5 card.
-          alignOffset={overlay.gap - 8}
-          collisionAvoidance={{ side: "shift", align: "shift", fallbackAxisSide: "none" }}
-          side="bottom"
-          sideOffset={topInset + overlay.gap - 8}
-          variant="panel"
-          padding="none"
+      {placement && inlineOpen ? (
+        <aside
+          {...detailsArea}
+          data-workspace-focus-key={`details:${threadRef.environmentId}:${threadRef.threadId}`}
+          ref={setCardElement}
+          onPointerDown={beginDrag}
+          onPointerMove={moveDrag}
+          onPointerUp={endDrag}
+          onPointerCancel={endDrag}
+          onLostPointerCapture={endDrag}
+          onDoubleClick={(event) => {
+            if (event.target instanceof Element && event.target.closest(CARD_CONTROLS)) return;
+            stop();
+            const drag = dragRef.current;
+            dragRef.current = null;
+            if (drag) clearCardDrag(drag);
+            useThreadDetailsCardPlacementStore.getState().reset();
+          }}
+          aria-label={t.chat.details.threadDetails}
+          // Slides down to make room for the find bar, but returns in the same frame
+          // the bar closes: a floating preview below moves up at once and would
+          // otherwise overlap the card mid-slide.
+          className={cn(
+            "absolute z-20",
+            !savedPlacement &&
+              topInset > 0 &&
+              "transition-[top] duration-150 ease-out motion-reduce:transition-none",
+          )}
+          style={{
+            // The default follows the find bar's right anchor during resize;
+            // a saved drag instead uses the clamped canvas-relative position.
+            left: floatingPosition?.left,
+            right: floatingPosition ? undefined : placement.right,
+            top: floatingPosition?.top ?? placement.y,
+            width: placement.width,
+            maxHeight: height,
+          }}
+          data-density={density}
+          data-thread-details-panel="inline"
         >
+          {card}
+        </aside>
+      ) : null}
+      {/* Keep the popup mounted in inline mode so its exit lifecycle can finish. */}
+      <PopoverPopup
+        {...(mode === "popover" ? detailsArea : {})}
+        role="dialog"
+        data-workspace-focus-key={`details:${threadRef.environmentId}:${threadRef.threadId}`}
+        initialFocus={() => {
+          requestWorkspaceFocus({ area: "details" });
+          return false;
+        }}
+        layer="thread-details"
+        anchor={anchor}
+        align="end"
+        // The shared panel viewport adds eight pixels around the A5 card.
+        alignOffset={overlay.gap - 8}
+        collisionAvoidance={{ side: "shift", align: "shift", fallbackAxisSide: "none" }}
+        side="bottom"
+        sideOffset={topInset + overlay.gap - 8}
+        variant="panel"
+        padding="none"
+      >
+        {mode === "popover" ? (
           <div
             aria-label={t.chat.details.threadDetails}
             data-density={density}
@@ -588,8 +596,8 @@ export function ThreadDetailsCard({
           >
             {card}
           </div>
-        </PopoverPopup>
-      )}
+        ) : null}
+      </PopoverPopup>
     </Popover>
   );
 }
