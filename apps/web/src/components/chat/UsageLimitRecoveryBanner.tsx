@@ -1,3 +1,7 @@
+import type { TimestampFormat } from "@t3tools/contracts/settings";
+import { deadlineStore } from "@t3tools/client-runtime/clock";
+import { useDeadlinePassed } from "../../hooks/useDeadline";
+import { formatUpcomingTimestamp } from "../../timestampFormat";
 /** Displays usage limit recovery scheduling and its existing actions. */
 import { t } from "~/i18n";
 import { SNOOZE_UI_ENABLED } from "~/snoozeUi";
@@ -7,7 +11,7 @@ import {
   type RunId,
 } from "@t3tools/contracts";
 import { CalendarClockIcon, GaugeIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button } from "../ui/button";
 import type { ComposerBannerStackContent } from "./ComposerBannerStack";
 import { toastManager } from "../ui/toast";
@@ -19,6 +23,7 @@ type RecoveryProps = {
   stoppedAt: string;
   snoozedUntil: string | null;
   recovery: OrchestrationV2LimitRecovery | null;
+  timestampFormat: TimestampFormat;
   onChange: (recovery: OrchestrationV2LimitRecoveryUpdate) => Promise<void>;
 };
 
@@ -47,7 +52,7 @@ export function usageLimitRecoveryBannerItem(props: RecoveryProps): ComposerBann
           <b className="min-w-0 flex-1">{t.chat.limitRecovery.usageLimitReached}</b>
           <span className="text-secondary-copy text-secondary-label">
             {resetAt
-              ? t.chat.limitRecovery.resets(new Date(resetAt).toLocaleString())
+              ? t.chat.limitRecovery.resets(formatUpcomingTimestamp(resetAt, props.timestampFormat))
               : t.chat.limitRecovery.resetTimeUnavailableRetryManually}
           </span>
         </div>
@@ -67,23 +72,20 @@ export function usageLimitRecoveryBannerItem(props: RecoveryProps): ComposerBann
  */
 function RecoveryActions({ runId, resetAt, recovery, snoozedUntil, onChange }: RecoveryProps) {
   const [pending, setPending] = useState(false);
-  const [nowMs, setNowMs] = useState(() => Date.now());
-  useEffect(() => {
-    const delay = Date.parse(resetAt ?? "") - Math.max(nowMs, Date.now());
-    if (!Number.isFinite(delay) || delay <= 0) return;
-    const timer = window.setTimeout(() => setNowMs(Date.now()), Math.min(delay + 1, 2_147_483_647));
-    return () => window.clearTimeout(timer);
-  }, [resetAt, nowMs]);
 
   const scheduled =
     recovery?.runId === runId && recovery.resetAt === resetAt && recovery.autoResume;
+  // The server leaves snoozedUntil in place after the timer wakes the thread,
+  // so a snooze whose reset has passed is no longer active.
+  const resetPassed = useDeadlinePassed(resetAt === null ? null : Date.parse(resetAt));
   const snoozed =
     recovery?.snooze === true &&
     recovery.runId === runId &&
     recovery.resetAt === resetAt &&
     resetAt !== null &&
     snoozedUntil !== null &&
-    Date.parse(snoozedUntil) === Date.parse(resetAt);
+    Date.parse(snoozedUntil) === Date.parse(resetAt) &&
+    !resetPassed;
   async function toggle(action: "resume" | "snooze") {
     if (resetAt === null) return;
     if (action === "snooze" && !snoozed && Date.parse(resetAt) <= Date.now()) {
@@ -92,7 +94,8 @@ function RecoveryActions({ runId, resetAt, recovery, snoozedUntil, onChange }: R
         title: t.chat.limitRecovery.snoozeError,
         description: t.chat.limitRecovery.theResetTimeHasPassedRetryThe,
       });
-      setNowMs(Date.now());
+      // The deadline timer can lag after a throttled tab or sleep; disable now.
+      deadlineStore(Date.parse(resetAt)).refresh();
       return;
     }
     setPending(true);
@@ -115,8 +118,7 @@ function RecoveryActions({ runId, resetAt, recovery, snoozedUntil, onChange }: R
     }
     setPending(false);
   }
-  // Failures go to a toast: the actions column is auto-sized, so inline error
-  // text would widen it and crush the title.
+  // Inline errors would widen the actions column and crush the title.
   return (
     <div
       className="timeline-limit-actions flex flex-wrap items-center gap-1.5"
@@ -143,7 +145,7 @@ function RecoveryActions({ runId, resetAt, recovery, snoozedUntil, onChange }: R
           <Button
             size="toolbar"
             variant="secondary"
-            disabled={pending || Date.parse(resetAt!) <= nowMs}
+            disabled={pending || resetPassed}
             onClick={() => void toggle("snooze")}
           >
             {pending ? t.chat.limitRecovery.saving : t.chat.limitRecovery.snoozeUntilReset}
