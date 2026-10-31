@@ -1,5 +1,9 @@
 /** Today membership and ordering contracts use fixed local dates, not the wall clock. */
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
+import {
+  createInboxReturnTracker,
+  isThreadWorking,
+} from "@t3tools/client-runtime/state/thread-inbox";
 import { ProviderInstanceId, ThreadId } from "@t3tools/contracts";
 import type {
   EnvironmentThreadShell,
@@ -50,6 +54,8 @@ describe("Today membership", () => {
     const rows = buildTodayView(
       [thread("before", { latestUserAuthoredMessageAt: yesterday }), thread("after")],
       now,
+      undefined,
+      isThreadWorking,
     );
     expect(rows.waiting.map((row) => row.id)).toEqual(["after"]);
     expect(rows.working).toEqual([]);
@@ -79,6 +85,8 @@ describe("Today membership", () => {
     const rows = buildTodayView(
       [thread("old", { latestUserAuthoredMessageAt: yesterday, ...overrides })],
       now,
+      undefined,
+      isThreadWorking,
     );
     expect(rows.working.map((row) => row.id)).toEqual(working);
     expect(rows.waiting.map((row) => row.id)).toEqual(waiting);
@@ -94,6 +102,8 @@ describe("Today membership", () => {
         }),
       ],
       now,
+      undefined,
+      isThreadWorking,
     );
     expect(rows).toEqual({ working: [], waiting: [] });
   });
@@ -107,6 +117,8 @@ describe("Today membership", () => {
         thread("background-message", { latestUserAuthoredMessageAt: yesterday }),
       ],
       now,
+      undefined,
+      isThreadWorking,
     );
     expect(rows.waiting.map((row) => row.id)).toEqual(["legacy"]);
     expect(rows.working).toEqual([]);
@@ -114,6 +126,57 @@ describe("Today membership", () => {
 });
 
 describe("Today shelves", () => {
+  it("keeps a completed thread in Working during the shared exit grace", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+    const tracker = createInboxReturnTracker();
+    try {
+      const running = thread("review-thread", { runtime: runtime("running") });
+      const initial = tracker.observe([running]);
+      expect(buildTodayView([running], now, initial.returnedAt, initial.isWorking).working).toEqual(
+        [running],
+      );
+      const completed = { ...running, runtime: null };
+      const observation = tracker.observe([completed]);
+      const rows = buildTodayView([completed], now, observation.returnedAt, observation.isWorking);
+      expect(rows.working.map((row) => row.id)).toEqual(["review-thread"]);
+      expect(rows.waiting).toEqual([]);
+      vi.advanceTimersByTime(2_000);
+      const expired = tracker.observe([completed]);
+      expect(buildTodayView([completed], now, expired.returnedAt, expired.isWorking)).toEqual({
+        working: [],
+        waiting: [completed],
+      });
+
+      tracker.observe([running]);
+      const approval = { ...completed, hasPendingApprovals: true };
+      const actionable = tracker.observe([approval]);
+      expect(buildTodayView([approval], now, actionable.returnedAt, actionable.isWorking)).toEqual({
+        working: [],
+        waiting: [approval],
+      });
+
+      tracker.observe([running]);
+      const input = { ...completed, hasPendingUserInput: true };
+      const requested = tracker.observe([input]);
+      expect(buildTodayView([input], now, requested.returnedAt, requested.isWorking)).toEqual({
+        working: [],
+        waiting: [input],
+      });
+
+      tracker.observe([running]);
+      const moved = { ...completed, activeOrderKey: "manual-order" };
+      const manual = tracker.observe([moved]);
+      expect(buildTodayView([moved], now, manual.returnedAt, manual.isWorking)).toEqual({
+        working: [],
+        waiting: [moved],
+      });
+    } finally {
+      tracker.observe(null);
+      vi.useRealTimers();
+    }
+  });
+
   it("orders running and today's idle conversations by user send time", () => {
     const rows = buildTodayView(
       [
@@ -125,6 +188,8 @@ describe("Today shelves", () => {
         thread("approval", { runtime: runtime("running"), hasPendingApprovals: true }),
       ],
       now,
+      undefined,
+      isThreadWorking,
     );
     expect(rows.working.map((row) => row.id)).toEqual(["idle", "running"]);
     expect(rows.waiting.map((row) => row.id)).toEqual(["approval"]);
@@ -139,6 +204,7 @@ describe("Today shelves", () => {
       ],
       now,
       (row) => (row.id === "observed" ? new Date(2026, 9, 19, 10).getTime() : undefined),
+      isThreadWorking,
     );
     expect(rows.waiting.map((row) => row.id)).toEqual(["observed", "returned", "ordinary"]);
     expect(rows.working).toEqual([]);

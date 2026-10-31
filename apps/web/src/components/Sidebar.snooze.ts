@@ -19,14 +19,6 @@ export { type SnoozePreset };
 
 const DAY_MS = 24 * 60 * 60 * 1_000;
 
-const SNOOZE_PRESET_LABELS: Record<SnoozePreset["id"], string> = {
-  hour: t.sidebar.snooze.inOneHour,
-  "three-hours": t.sidebar.snooze.inThreeHours,
-  evening: t.sidebar.snooze.thisEvening,
-  tomorrow: t.sidebar.snooze.tomorrow,
-  "next-week": t.sidebar.snooze.nextWeek,
-};
-
 function timeOfDayLabel(date: Date, timestampFormat: TimestampFormat): string {
   return formatShortTimestamp(date.toISOString(), timestampFormat);
 }
@@ -42,9 +34,19 @@ export function resolveSnoozePresets(
   );
 }
 
-/** Keeps custom labels while translating only the built-in presets. */
+/** Translates known default ID/label pairs; custom and more precise calendar labels remain authoritative. */
 function localizeSnoozePreset(preset: SnoozePreset): SnoozePreset {
-  return { ...preset, label: SNOOZE_PRESET_LABELS[preset.id] ?? preset.label };
+  const labels: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+    "after:60": { "In 1 hour": t.sidebar.snooze.inOneHour },
+    "after:180": { "In 3 hours": t.sidebar.snooze.inThreeHours },
+    "at:today:18:00": { "This evening": t.sidebar.snooze.thisEvening },
+    "at:tomorrow:09:00": { Tomorrow: t.sidebar.snooze.tomorrow },
+    "at:monday:09:00": {
+      "Next week": t.sidebar.snooze.nextWeek,
+      Tomorrow: t.sidebar.snooze.tomorrow,
+    },
+  };
+  return { ...preset, label: labels[preset.id]?.[preset.label] ?? preset.label };
 }
 
 /** Revalidates a displayed choice at click time; expired choices prompt the user to choose again. */

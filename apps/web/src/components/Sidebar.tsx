@@ -43,7 +43,6 @@ import {
 import {
   createInboxReturnTracker,
   isThreadWorking,
-  isThreadWorking as isSidebarThreadWorking,
 } from "@t3tools/client-runtime/state/thread-inbox";
 import { sortSettledThreads } from "@t3tools/client-runtime/state/thread-sort";
 import {
@@ -382,6 +381,7 @@ function partitionSidebarThreads(input: {
       : active;
   const snoozed: EnvironmentThreadShell[] = [];
   const settled: EnvironmentThreadShell[] = [];
+  const todayVisible: EnvironmentThreadShell[] = [];
   const { draggableThreadKeys, activeReorderableThreadKeys } = resolveSidebarReorderableThreadKeys({
     threads: visible,
     serverConfigs,
@@ -397,6 +397,7 @@ function partitionSidebarThreads(input: {
         optimisticDrop.occurredAt,
         optimisticDrop.assignedKeys.get(threadKey),
       );
+      todayVisible.push(projected);
       (optimisticDrop.section === "pinned"
         ? pinned
         : optimisticDrop.section === "settled"
@@ -408,6 +409,7 @@ function partitionSidebarThreads(input: {
           : { ...projected, snoozedAt: thread.snoozedAt, snoozedUntil: thread.snoozedUntil },
       );
     } else {
+      todayVisible.push(thread);
       const section = resolveSidebarThreadSection({
         snoozed: configLoaded && effectiveSnoozed(thread, { now: preciseNow }),
         settled: configLoaded && thread.settledOverride === "settled",
@@ -434,7 +436,15 @@ function partitionSidebarThreads(input: {
     : sortThreadsForSidebar(active);
   return {
     todayRows: isTodayView
-      ? buildTodayView(visible, Date.parse(preciseNow), inboxReturns.returnedAt)
+      ? buildTodayView(
+          todayVisible,
+          Date.parse(preciseNow),
+          inboxObservation.returnedAt,
+          (thread) =>
+            optimisticDrop?.key === scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id))
+              ? isThreadWorking(thread)
+              : inboxObservation.isWorking(thread),
+        )
       : { working: [], waiting: [] },
     pinnedThreads:
       optimisticDrop?.section !== "pinned" || optimisticDrop.order === null
@@ -1279,8 +1289,15 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   /** Reveal the result's shelf before closing search, without waking or reopening the thread. */
   const selectThreadSearchResult = (thread: EnvironmentThreadShell) => {
     const threadRef = scopeThreadRef(thread.environmentId, thread.id);
-    if (isTodayView && (todayRows.working.includes(thread) || todayRows.waiting.includes(thread))) {
-      handleTodayTabChange(isSidebarThreadWorking(thread) ? "working" : "waiting");
+    const matchesThread = (row: EnvironmentThreadShell) =>
+      row.id === thread.id && row.environmentId === thread.environmentId;
+    const todayShelf = todayRows.working.some(matchesThread)
+      ? "working"
+      : todayRows.waiting.some(matchesThread)
+        ? "waiting"
+        : null;
+    if (isTodayView && todayShelf !== null) {
+      handleTodayTabChange(todayShelf);
     } else {
       // Older and settled search results need their project shelf to remain visible after search closes.
       if (isTodayView) {

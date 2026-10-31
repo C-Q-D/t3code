@@ -20,7 +20,9 @@ import { deriveActiveWorkStartedAt } from "../session-logic.ts";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { defaultAnimateLayoutChanges, type AnimateLayoutChanges } from "@dnd-kit/sortable";
 import * as Cause from "effect/Cause";
-import { AsyncResult } from "effect/reactivity";
+import { AsyncResult, Atom } from "effect/reactivity";
+import type { SnoozePresetSetting } from "@t3tools/contracts/settings";
+import { appAtomRegistry } from "../rpc/atomRegistry";
 import {
   useThreadJumpHintsVisible,
   sidebarThreadStatusLabel,
@@ -103,6 +105,45 @@ import {
 import { getProjectOrderKey } from "@t3tools/client-runtime/state/project-grouping";
 
 const localEnvironmentId = EnvironmentId.make("environment-local");
+
+it("localizes default snooze presets without replacing custom or actual-day labels", async () => {
+  const settings = Atom.make<{ snoozePresets: readonly SnoozePresetSetting[] } | undefined>(
+    undefined,
+  );
+  // Only the environment settings source is replaced; preset resolution and localization stay real.
+  vi.doMock("../state/server", () => ({
+    serverEnvironment: { settingsValueAtom: () => settings },
+  }));
+  try {
+    installMessages("zh-CN", zhCN);
+    const { resolveSnoozePresets } = await import("./Sidebar.snooze");
+    const defaults = resolveSnoozePresets(new Date(2026, 9, 19, 12), "24-hour", localEnvironmentId);
+    expect(defaults.map(({ id, label }) => [id, label])).toEqual([
+      ["after:60", "1小时后"],
+      ["after:180", "3小时后"],
+      ["at:today:18:00", "今晚"],
+      ["at:tomorrow:09:00", "明天"],
+      ["at:monday:09:00", "下周"],
+    ]);
+    appAtomRegistry.set(settings, {
+      snoozePresets: [
+        { kind: "after", minutes: 90 },
+        { kind: "at", day: "today", time: "16:00" },
+        { kind: "at", day: "monday", time: "09:00" },
+      ],
+    });
+    const custom = resolveSnoozePresets(new Date(2026, 9, 18, 12), "24-hour", localEnvironmentId);
+    expect(custom.map(({ id, label }) => [id, label])).toEqual([
+      ["after:90", "In 90 minutes"],
+      ["at:today:16:00", "This afternoon"],
+      ["at:monday:09:00", "明天"],
+    ]);
+  } finally {
+    appAtomRegistry.set(settings, undefined);
+    vi.doUnmock("../state/server");
+    installMessages("en", en);
+  }
+});
 
 describe("resolveSidebarNewThreadDestination", () => {
   const remoteEnvironmentId = EnvironmentId.make("environment-remote");

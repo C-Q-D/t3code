@@ -4,7 +4,6 @@ import {
   type EnvironmentThreadShell,
 } from "@t3tools/client-runtime/state/models";
 import {
-  isThreadWorking,
   sortInboxThreadsByReturn,
   sortWorkingThreadsBySend,
 } from "@t3tools/client-runtime/state/thread-inbox";
@@ -26,12 +25,14 @@ export function startOfLocalDay(now: number): number {
 }
 
 /** Project shells at `now` (epoch milliseconds) into newest-first working and waiting rows.
+ * isWorking uses the caller's shared observation, including exit grace and manual moves.
  * Optional observedReturnAt supplies client return times in milliseconds. No input is mutated;
  * explicit settlement excludes a row regardless of activity, and idle work cannot carry it across days. */
 export function buildTodayView<T extends EnvironmentThreadShell>(
   threads: readonly T[],
   now: number,
-  observedReturnAt?: (thread: T) => number | undefined,
+  observedReturnAt: ((thread: T) => number | undefined) | undefined,
+  isWorking: (thread: T) => boolean,
 ) {
   const midnight = startOfLocalDay(now);
   const working: T[] = [];
@@ -50,7 +51,7 @@ export function buildTodayView<T extends EnvironmentThreadShell>(
       !thread.hasPendingUserInput
     )
       continue;
-    (isThreadWorking(thread) ? working : waiting).push(thread);
+    (isWorking(thread) ? working : waiting).push(thread);
   }
   return {
     working: sortWorkingThreadsBySend(working),
