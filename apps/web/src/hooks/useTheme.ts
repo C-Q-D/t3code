@@ -1,8 +1,9 @@
 /** Owns client theme preferences, one-time migration, and synchronous initial theme application. */
+import { pipe } from "effect/Function";
 import type { DesktopBridge } from "@t3tools/contracts";
 import { safeErrorLogAttributes } from "@t3tools/client-runtime/errors";
 import * as Schema from "effect/Schema";
-import { useEffect, useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 import {
   applyThemePalette,
   CUSTOM_THEMES_STORAGE_KEY,
@@ -54,11 +55,7 @@ export function readThemeHalves(): ThemeHalves | null {
   return readStoredThemeHalves();
 }
 
-/**
- * Flows that rebuild the whole mix must capture this before a `setTheme` clears
- * it: a published id resolves only once its set has streamed in, and treating
- * "not resolvable yet" as "absent" silently rewrites that half.
- */
+/** Capture before setTheme clears the mix; unresolved published ids may still be valid. */
 export function readThemeHalvesRaw(): { light?: string; dark?: string } {
   if (typeof window === "undefined") return {};
   return readStoredThemeHalvesRaw();
@@ -73,11 +70,7 @@ function readStoredThemeHalves(): ThemeHalves | null {
   }
 }
 
-/**
- * An environment published id resolves only once its set has streamed in, so a
- * write that merged over the pruned parse would silently erase that half
- * whenever the other one changed before the set arrived.
- */
+// Pruning unresolved published palettes would erase their halves when merging.
 function readStoredThemeHalvesRaw(): { light?: string; dark?: string } {
   try {
     const value: unknown = JSON.parse(
@@ -444,10 +437,10 @@ if (typeof document !== "undefined" && typeof window !== "undefined") {
   applyTheme(getStored());
 }
 
+/** Returns the cached preference snapshot, refreshing storage only after a theme change invalidates it. */
 function getSnapshot(): ThemeSnapshot {
   if (typeof window === "undefined") return DEFAULT_THEME_SNAPSHOT;
-  // Reading the preference hits localStorage, so only recompute after a
-  // change was signalled; useTheme consumers call this on every render.
+  // Cache localStorage reads until signalled; useTheme calls this every render.
   if (!snapshotStale && lastSnapshot) return lastSnapshot;
   snapshotStale = false;
   const theme = getStored();
@@ -536,6 +529,26 @@ function subscribe(listener: () => void): () => void {
   };
 }
 
+/** For shortcuts and other handlers outside React that read the theme at event time. */
+export function getThemeSnapshot(): ThemeSnapshot {
+  return getSnapshot();
+}
+
+/** For code outside React (worker pools) that follows the rendered appearance. */
+export function subscribeRenderedAppearance(listener: () => void): () => void {
+  const unsubscribeTheme = subscribe(listener);
+  const unsubscribePreview = subscribeToThemePreview(listener);
+  return () => {
+    unsubscribeTheme();
+    unsubscribePreview();
+  };
+}
+
+/** Returns the active preview appearance, otherwise the resolved stored theme appearance. */
+export function getRenderedAppearance(): ThemeAppearance {
+  return getThemePreviewAppearance() ?? getSnapshot().resolvedTheme;
+}
+
 export function useRenderedAppearance() {
   const { resolvedTheme } = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const previewAppearance = useSyncExternalStore(
@@ -546,16 +559,13 @@ export function useRenderedAppearance() {
   return previewAppearance ?? resolvedTheme;
 }
 
-function setTheme(next: Theme): boolean {
+/** Persists a whole theme and clears split-mode overrides; restores prior halves on storage failure and returns success. */
+export function setTheme(next: Theme): boolean {
   if (typeof window === "undefined") return false;
   try {
-    // Preserve the current mode before replacing a legacy or inferred theme
-    // preference. Otherwise a fresh System preference is re-inferred from
-    // the new theme's base appearance, which can switch a dark UI to light.
-    writeAppearanceModePreference(readAppearanceModePreference(getStored()));
-    // Choosing a whole theme replaces any automatic-mode mix. The mix is
-    // captured first so a failed preference write can put it back instead
-    // of erasing it or leaving it attached to the new theme.
+    // Save the current mode first; inferring it from the new theme can switch dark to light.
+    pipe(getStored(), readAppearanceModePreference, writeAppearanceModePreference);
+    // A whole theme replaces the mix; retain it to restore on a failed preference write.
     const previousHalvesRaw = window.localStorage.getItem(THEME_HALVES_STORAGE_KEY);
     window.localStorage.removeItem(THEME_HALVES_STORAGE_KEY);
     try {
@@ -590,7 +600,8 @@ function setTheme(next: Theme): boolean {
   return true;
 }
 
-function setAppearanceMode(nextAppearanceMode: ThemePreferenceMode): boolean {
+/** Persists the requested appearance mode and reapplies the theme; returns false when storage is unavailable or fails. */
+export function setAppearanceMode(nextAppearanceMode: ThemePreferenceMode): boolean {
   if (typeof window === "undefined") return false;
   try {
     writeAppearanceModePreference(nextAppearanceMode);
@@ -667,13 +678,15 @@ function clearThemeHalves(): boolean {
   return true;
 }
 
-function refreshTheme({ preservePreview = false } = {}): void {
+/** Reapplies stored preferences without transitions; preservePreview keeps the active editor preview when requested. */
+export function refreshTheme({ preservePreview = false } = {}): void {
   if (typeof window === "undefined") return;
   lastAppliedTheme = null;
   applyTheme(getStored(), { suppressTransitions: true, preservePreview });
   emitChange();
 }
 
+/** Subscribes to the stable theme snapshot and exposes preference mutations for React consumers. */
 export function useTheme() {
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const { theme, resolvedTheme } = snapshot;
@@ -687,12 +700,6 @@ export function useTheme() {
         : currentMode;
     return setAppearanceMode(nextMode);
   };
-
-  // applyTheme reads the appearance mode and halves from storage, so it keys on the
-  // whole snapshot; getSnapshot keeps one object until one of those changes.
-  useEffect(() => {
-    applyTheme(snapshot.theme);
-  }, [snapshot]);
 
   return {
     theme,

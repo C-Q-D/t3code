@@ -2,7 +2,8 @@
 import { t } from "~/i18n";
 import { DownloadIcon } from "lucide-react";
 import type { ChangeEvent, DragEvent } from "react";
-import { useEffect, useRef, useState } from "react";
+import { settlePromise } from "@t3tools/client-runtime/state/runtime";
+import { useRef, useState } from "react";
 import { cn } from "../../lib/utils";
 import {
   getCustomThemes,
@@ -80,19 +81,73 @@ function ThemeJsonEditor({
 /** What the import pipeline needs from a file; DOM File satisfies it. */
 type ImportableThemeFile = { name: string; size: number; text: () => Promise<string> };
 
-/** Coordinates controlled visibility, single-theme activation, batch imports, and conflict decisions. */
+interface ThemeImportCallbacks {
+  onImported: (theme: ThemeDefinition) => boolean;
+  onImportedMany: (themes: ReadonlyArray<ThemeDefinition>, context: { updated: boolean }) => void;
+}
+
+/** Controls a fresh abortable import session per opening; successful imports reach the supplied activation or batch callbacks. */
 export function ThemeImportDialog({
   open,
   onOpenChange,
   onImported,
   onImportedMany,
-}: {
+}: ThemeImportCallbacks & {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onImported: (theme: ThemeDefinition) => boolean;
-  /** Batch imports install without activating; the caller reports them. */
-  onImportedMany: (themes: ReadonlyArray<ThemeDefinition>, context: { updated: boolean }) => void;
 }) {
+  // Each opening is a fresh session: its body remounts with clean state, and
+  // closing aborts every read, search, and install the session started.
+  const [session, setSession] = useState(() => ({
+    open,
+    id: 0,
+    controller: new AbortController(),
+  }));
+  if (session.open !== open) {
+    setSession(
+      open ? { open, id: session.id + 1, controller: new AbortController() } : { ...session, open },
+    );
+  }
+  const close = () => {
+    session.controller.abort();
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (nextOpen) onOpenChange(true);
+        else close();
+      }}
+    >
+      <DialogPopup size="wide">
+        <DialogHeader>
+          <DialogTitle>{t.settings.themeImport.importTitle}</DialogTitle>
+        </DialogHeader>
+        <ThemeImportBody
+          key={session.id}
+          session={session.controller}
+          onClose={close}
+          onImported={onImported}
+          onImportedMany={onImportedMany}
+        />
+      </DialogPopup>
+    </Dialog>
+  );
+}
+
+/** Owns file drafts and conflict choices for one session; ignores results after cancellation and reports read or install failures inline. */
+function ThemeImportBody({
+  session,
+  onClose,
+  onImported,
+  onImportedMany,
+}: ThemeImportCallbacks & {
+  session: AbortController;
+  onClose: () => void;
+}) {
+  const { signal } = session;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [json, setJson] = useState("");
   const [importMode, setImportMode] = useState<"json" | "file">("json");
@@ -103,29 +158,10 @@ export function ThemeImportDialog({
   // Imports whose id is already installed wait here for an update-or-copy
   // decision instead of failing.
   const [conflicts, setConflicts] = useState<ReadonlyArray<ThemeDefinition> | null>(null);
+  // A newer read supersedes an older one still in flight.
   const importRequestRef = useRef(0);
-
-  const [renderedOpen, setRenderedOpen] = useState(open);
-  if (renderedOpen !== open) {
-    setRenderedOpen(open);
-    setIsDropTarget(false);
-    if (open) {
-      setJson("");
-      setImportMode("json");
-      setFileName(null);
-      setError(null);
-      setIsReading(false);
-      setConflicts(null);
-    }
-  }
-  // A visibility change invalidates reads still in flight, including unmounts.
-  useEffect(() => {
-    if (!open) return;
-    importRequestRef.current += 1;
-    return () => {
-      importRequestRef.current += 1;
-    };
-  }, [open]);
+  const isCurrentRequest = (requestId: number) =>
+    requestId === importRequestRef.current && !signal.aborted;
 
   const readThemeFile = async (file: ImportableThemeFile) => {
     // Check the size first: reading a large file is what locks the UI, so it
@@ -138,84 +174,81 @@ export function ThemeImportDialog({
 
     const requestId = ++importRequestRef.current;
     setIsReading(true);
-    return await (async () => {
-      try {
-        const fileText = await file.text();
-        if (requestId !== importRequestRef.current) return;
-        setJson(fileText);
-        setFileName(file.name);
-        setError(null);
-      } catch {
-        if (requestId !== importRequestRef.current) return;
-        setError(t.settings.themeImport.readFilePasteJsonBelowError);
-      }
-    })().finally(() => {
-      if (requestId === importRequestRef.current) setIsReading(false);
+    const fileText = await settlePromise(() => file.text());
+    if (!isCurrentRequest(requestId)) return;
+    setIsReading(false);
+    if (fileText._tag === "Failure") {
+      setError(t.settings.themeImport.readFilePasteJsonBelowError);
+      return;
+    }
+    setJson(fileText.value);
+    setFileName(file.name);
+    setError(null);
+  };
+
+  const readThemeBatch = (files: ReadonlyArray<ImportableThemeFile>) => {
+    const requestId = ++importRequestRef.current;
+    setIsReading(true);
+    return installThemeBatch(files, requestId).finally(() => {
+      if (isCurrentRequest(requestId)) setIsReading(false);
     });
   };
 
-  // Several files at once import as a batch: VS Code families pair their
-  // light and dark variants, everything installs without activating, and the
-  // single-file flow keeps filling the editor for review.
-  const readThemeBatch = async (files: ReadonlyArray<ImportableThemeFile>) => {
-    const requestId = ++importRequestRef.current;
-    setIsReading(true);
+  const installThemeBatch = async (
+    files: ReadonlyArray<ImportableThemeFile>,
+    requestId: number,
+  ) => {
     const failures: string[] = [];
     const parsed: Array<{ theme: ThemeDefinition; sourceName: string }> = [];
-    return await (async () => {
-      for (const file of files) {
-        const oversized = describeOversizedThemeFile(file.size);
-        if (oversized) {
-          failures.push(t.settings.themeImport.tooLarge(file.name));
-          continue;
-        }
-        try {
-          const value: unknown = JSON.parse(await file.text());
-          parsed.push({
-            sourceName: file.name,
-            theme: isVsCodeThemeFile(value) ? parseVsCodeThemeFile(value) : parseThemeFile(value),
-          });
-        } catch (cause) {
-          failures.push(
-            t.settings.themeImport.fileReadError(
-              file.name,
-              Boolean(cause instanceof Error),
-              cause instanceof Error ? cause.message : undefined,
-            ),
-          );
-        }
+    for (const file of files) {
+      const oversized = describeOversizedThemeFile(file.size);
+      if (oversized) {
+        failures.push(t.settings.themeImport.tooLarge(file.name));
+        continue;
       }
-      if (requestId !== importRequestRef.current) return;
-      const installed: ThemeDefinition[] = [];
-      const conflicting: ThemeDefinition[] = [];
-      for (const theme of pairVsCodeThemes(resolveThemeLabelCollisions(parsed))) {
-        if (getCustomThemes().some((existing) => existing.id === theme.id)) {
-          conflicting.push(theme);
-          continue;
-        }
-        try {
-          installed.push(installCustomTheme(theme));
-        } catch (cause) {
-          failures.push(
-            t.settings.themeImport.installError(
-              theme.label,
-              Boolean(cause instanceof Error),
-              cause instanceof Error ? cause.message : undefined,
-            ),
-          );
-        }
+      try {
+        const value: unknown = JSON.parse(await file.text());
+        parsed.push({
+          sourceName: file.name,
+          theme: isVsCodeThemeFile(value) ? parseVsCodeThemeFile(value) : parseThemeFile(value),
+        });
+      } catch (cause) {
+        failures.push(
+          t.settings.themeImport.fileReadError(
+            file.name,
+            Boolean(cause instanceof Error),
+            cause instanceof Error ? cause.message : undefined,
+          ),
+        );
       }
-      if (installed.length > 0) onImportedMany(installed, { updated: false });
-      if (failures.length > 0) {
-        setError(failures.join("; "));
-      } else if (conflicting.length > 0) {
-        setConflicts(conflicting);
-      } else if (installed.length > 0) {
-        onOpenChange(false);
+    }
+    if (!isCurrentRequest(requestId)) return;
+    const installed: ThemeDefinition[] = [];
+    const conflicting: ThemeDefinition[] = [];
+    for (const theme of pairVsCodeThemes(resolveThemeLabelCollisions(parsed))) {
+      if (getCustomThemes().some((existing) => existing.id === theme.id)) {
+        conflicting.push(theme);
+        continue;
       }
-    })().finally(() => {
-      if (requestId === importRequestRef.current) setIsReading(false);
-    });
+      try {
+        installed.push(installCustomTheme(theme));
+      } catch (cause) {
+        failures.push(
+          t.settings.themeImport.installError(
+            theme.label,
+            Boolean(cause instanceof Error),
+            cause instanceof Error ? cause.message : undefined,
+          ),
+        );
+      }
+    }
+    if (installed.length > 0) onImportedMany(installed, { updated: false });
+    setError(failures.length > 0 ? failures.join("; ") : null);
+    if (conflicting.length > 0) {
+      setConflicts(conflicting);
+    } else if (installed.length > 0 && failures.length === 0) {
+      onClose();
+    }
   };
 
   const readThemeFiles = (files: ReadonlyArray<ImportableThemeFile>) => {
@@ -229,7 +262,7 @@ export function ThemeImportDialog({
   // the fallback everywhere else.
   const openFilePicker = () => {
     const bridge = window.desktopBridge;
-    if (bridge?.pickThemeFiles) {
+    if (bridge) {
       void bridge.pickThemeFiles().then((picked) => {
         if (!picked || picked.length === 0) return;
         readThemeFiles(
@@ -323,8 +356,8 @@ export function ThemeImportDialog({
     }
     if (resolved.length > 0) onImportedMany(resolved, { updated: mode === "update" });
     setConflicts(null);
-    if (failures.length > 0) setError(failures.join("; "));
-    else onOpenChange(false);
+    if (failures.length > 0) setError([error, ...failures].filter(Boolean).join("; "));
+    else if (!error) onClose();
   };
 
   const handleSubmit = () => {
@@ -358,7 +391,7 @@ export function ThemeImportDialog({
         setError(t.settings.themeImport.themeAddedButSelectedTryError);
         return;
       }
-      onOpenChange(false);
+      onClose();
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : t.settings.themeImport.thatThemeFileIsInvalid,
@@ -367,166 +400,146 @@ export function ThemeImportDialog({
   };
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(nextOpen) => {
-        if (!nextOpen) setError(null);
-        onOpenChange(nextOpen);
-      }}
-    >
-      <DialogPopup size="wide">
-        <DialogHeader>
-          <DialogTitle>{t.settings.themeImport.importTitle}</DialogTitle>
-        </DialogHeader>
-        <DialogPanel>
-          <ThemeSearchSection
-            onInstalled={(themes, context) => {
-              onImportedMany(themes, context);
-              onOpenChange(false);
-            }}
-            open={open}
+    <DialogPanel>
+      <ThemeSearchSection
+        onInstalled={(themes, context) => {
+          onImportedMany(themes, context);
+          onClose();
+        }}
+        signal={signal}
+      />
+
+      <div className="flex items-center gap-3" aria-hidden>
+        <div className="h-px flex-1 bg-border" />
+        <span className="text-muted-foreground text-2xs uppercase tracking-wider">
+          {t.settings.themeImport.orImportAFile}
+        </span>
+        <div className="h-px flex-1 bg-border" />
+      </div>
+
+      {(() => {
+        const dropHandlers = {
+          onDragEnter: (event: DragEvent<HTMLDivElement>) => {
+            event.preventDefault();
+            setIsDropTarget(true);
+          },
+          onDragOver: (event: DragEvent<HTMLDivElement>) => {
+            event.preventDefault();
+            setIsDropTarget(true);
+          },
+          onDragLeave: (event: DragEvent<HTMLDivElement>) => {
+            // Ignore moves between children of the drop zone.
+            if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+            setIsDropTarget(false);
+          },
+          onDrop: handleDrop,
+        };
+        const fileInput = (
+          <input
+            ref={fileInputRef}
+            accept=".json,application/json"
+            className="sr-only"
+            onChange={handleFileChange}
+            multiple
+            type="file"
           />
-
-          <div className="flex items-center gap-3" aria-hidden>
-            <div className="h-px flex-1 bg-border" />
-            <span className="text-muted-foreground text-2xs uppercase tracking-wider">
-              {t.settings.themeImport.orImportAFile}
-            </span>
-            <div className="h-px flex-1 bg-border" />
+        );
+        const chooseButton = (label = t.settings.themeImport.chooseFiles) => (
+          <Button disabled={isReading} size="sm" variant="outline" onClick={openFilePicker}>
+            <DownloadIcon />
+            {isReading ? t.settings.themeImport.reading : label}
+          </Button>
+        );
+        const editorSection = () => (
+          <div className="space-y-2">
+            <div className="flex items-baseline justify-between gap-3">
+              <label className="sr-only" htmlFor="theme-json-editor">
+                {t.settings.themeImport.themeJson}
+              </label>
+            </div>
+            <ThemeJsonEditor id="theme-json-editor" onChange={setJson} value={json} />
           </div>
-
-          {(() => {
-            const dropHandlers = {
-              onDragEnter: (event: DragEvent<HTMLDivElement>) => {
-                event.preventDefault();
-                setIsDropTarget(true);
-              },
-              onDragOver: (event: DragEvent<HTMLDivElement>) => {
-                event.preventDefault();
-                setIsDropTarget(true);
-              },
-              onDragLeave: (event: DragEvent<HTMLDivElement>) => {
-                // Ignore moves between children of the drop zone.
-                if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
-                setIsDropTarget(false);
-              },
-              onDrop: handleDrop,
-            };
-            const fileInput = (
-              <input
-                ref={fileInputRef}
-                accept=".json,application/json"
-                className="sr-only"
-                onChange={handleFileChange}
-                multiple
-                type="file"
-              />
-            );
-            const chooseButton = (label = t.settings.themeImport.chooseFiles) => (
-              <Button disabled={isReading} size="sm" variant="outline" onClick={openFilePicker}>
-                <DownloadIcon />
-                {isReading ? t.settings.themeImport.reading : label}
-              </Button>
-            );
-            const editorSection = () => (
-              <div className="space-y-2">
-                <div className="flex items-baseline justify-between gap-3">
-                  <label className="sr-only" htmlFor="theme-json-editor">
-                    {t.settings.themeImport.themeJson}
-                  </label>
-                </div>
-                <ThemeJsonEditor id="theme-json-editor" onChange={setJson} value={json} />
+        );
+        if (conflicts) {
+          return (
+            <div className="space-y-3">
+              <div className="rounded-ov1-option bg-ov1-option-surface p-3">
+                <p className="text-sm font-medium">{t.settings.themeImport.alreadyInstalled}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {conflicts.map((theme) => theme.label).join(", ")}
+                </p>
               </div>
-            );
-            if (conflicts) {
-              return (
-                <div className="space-y-3">
-                  <div className="rounded-ov1-option bg-ov1-option-surface p-3">
-                    <p className="text-sm font-medium">{t.settings.themeImport.alreadyInstalled}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {conflicts.map((theme) => theme.label).join(", ")}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button size="sm" onClick={() => resolveConflicts("update")}>
-                      {t.settings.themeImport.updateExisting}
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => resolveConflicts("copy")}>
-                      {t.settings.themeImport.keepBoth}
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => setConflicts(null)}>
-                      {t.settings.actions.back}
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => onOpenChange(false)}>
-                      {t.settings.actions.cancel}
-                    </Button>
-                  </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button size="sm" onClick={() => resolveConflicts("update")}>
+                  {t.settings.themeImport.updateExisting}
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => resolveConflicts("copy")}>
+                  {t.settings.themeImport.keepBoth}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setConflicts(null)}>
+                  {t.settings.actions.back}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => onClose()}>
+                  {t.settings.actions.cancel}
+                </Button>
+              </div>
+            </div>
+          );
+        }
+        return (
+          <div className="space-y-3">
+            <ToggleGroup
+              size="dialog"
+              aria-label={t.settings.themeImport.importSource}
+              value={[importMode]}
+              onValueChange={(next) => {
+                if (next[0] === "json" || next[0] === "file") setImportMode(next[0]);
+              }}
+            >
+              <Toggle value="json">{t.settings.themeImport.themeJson}</Toggle>
+              <Toggle value="file">{t.settings.themeImport.themeFile}</Toggle>
+            </ToggleGroup>
+            <div hidden={importMode !== "file"}>
+              <div
+                className={cn("ov1-theme-file", isDropTarget && "inset-shadow-selected-control")}
+                {...dropHandlers}
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">{t.settings.themeImport.themeFile}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {fileName ?? t.settings.themeImport.dropT3CodeOrVsCodeJsonFiles}
+                  </p>
                 </div>
-              );
-            }
-            return (
-              <div className="space-y-3">
-                <ToggleGroup
-                  size="dialog"
-                  aria-label={t.settings.themeImport.importSource}
-                  value={[importMode]}
-                  onValueChange={(next) => {
-                    if (next[0] === "json" || next[0] === "file") setImportMode(next[0]);
-                  }}
-                >
-                  <Toggle value="json">{t.settings.themeImport.themeJson}</Toggle>
-                  <Toggle value="file">{t.settings.themeImport.themeFile}</Toggle>
-                </ToggleGroup>
-                <div hidden={importMode !== "file"}>
-                  <div
-                    className={cn(
-                      "ov1-theme-file",
-                      isDropTarget && "inset-shadow-selected-control",
-                    )}
-                    {...dropHandlers}
-                  >
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium">{t.settings.themeImport.themeFile}</p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {fileName ?? t.settings.themeImport.dropT3CodeOrVsCodeJsonFiles}
-                      </p>
-                    </div>
-                    {chooseButton()}
-                    {fileInput}
-                  </div>
-                </div>
-                <div hidden={importMode !== "json"}>{editorSection()}</div>
-                {/* The actions live with the import section, not in a DialogFooter,
+                {chooseButton()}
+                {fileInput}
+              </div>
+            </div>
+            <div hidden={importMode !== "json"}>{editorSection()}</div>
+            {/* The actions live with the import section, not in a DialogFooter,
                     because Import only applies to the file in this section. Pinning
                     them at the modal bottom would read as a modal-scoped action when
                     the dialog also has the search and conflict views. */}
-                <div className="flex justify-end gap-2">
-                  <Button
-                    variant="outline"
-                    size="dialog-action"
-                    onClick={() => onOpenChange(false)}
-                  >
-                    {t.settings.actions.cancel}
-                  </Button>
-                  <Button
-                    size="dialog-action-wide"
-                    disabled={!json.trim() || isReading}
-                    onClick={handleSubmit}
-                  >
-                    {t.settings.themeImport.importAction}
-                  </Button>
-                </div>
-              </div>
-            );
-          })()}
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="dialog-action" onClick={() => onClose()}>
+                {t.settings.actions.cancel}
+              </Button>
+              <Button
+                size="dialog-action-wide"
+                disabled={!json.trim() || isReading}
+                onClick={handleSubmit}
+              >
+                {t.settings.themeImport.importAction}
+              </Button>
+            </div>
+          </div>
+        );
+      })()}
 
-          {error ? (
-            <Alert aria-live="polite" variant="error">
-              {error}
-            </Alert>
-          ) : null}
-        </DialogPanel>
-      </DialogPopup>
-    </Dialog>
+      {error ? (
+        <Alert aria-live="polite" variant="error">
+          {error}
+        </Alert>
+      ) : null}
+    </DialogPanel>
   );
 }

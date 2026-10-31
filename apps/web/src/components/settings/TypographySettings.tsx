@@ -310,20 +310,25 @@ const ADVANCED_TYPOGRAPHY_TARGET_IDS: ReadonlySet<string> = new Set([
     : []),
 ]);
 
+/** Renders local basic or advanced font controls; search targets reveal and persist advanced rows before editing. */
 export function TypographySection() {
   const [advanced, setAdvanced] = useLocalStorage(
     TYPOGRAPHY_ADVANCED_STORAGE_KEY,
     false,
     Schema.Boolean,
   );
+  // A deep link or history step must persist the flag too: the terminal reads it, so advanced
+  // rows without it would make terminal font edits do nothing. The rows follow the target
+  // directly so its row mounts in the first commit; the target clears once handled.
   const searchTargetId = useSettingsSearchTargetId();
-  const lastExpandedTargetRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (searchTargetId === null || !ADVANCED_TYPOGRAPHY_TARGET_IDS.has(searchTargetId)) return;
-    if (lastExpandedTargetRef.current === searchTargetId) return;
-    lastExpandedTargetRef.current = searchTargetId;
-    setAdvanced(true);
+    if (searchTargetId !== null && ADVANCED_TYPOGRAPHY_TARGET_IDS.has(searchTargetId)) {
+      setAdvanced(true);
+    }
   }, [searchTargetId, setAdvanced]);
+  const showAdvanced =
+    advanced || (searchTargetId !== null && ADVANCED_TYPOGRAPHY_TARGET_IDS.has(searchTargetId));
   return (
     <SettingsSection
       id="typography"
@@ -339,7 +344,7 @@ export function TypographySection() {
         </label>
       }
     >
-      {advanced ? <FontSettingsGroup /> : <SimpleFontRows />}
+      {showAdvanced ? <FontSettingsGroup /> : <SimpleFontRows />}
       <WordWrapRow />
     </SettingsSection>
   );
@@ -397,6 +402,7 @@ function FontFamilySettingsRow({
     setDraftSettled(true);
   }
   const readAdoptedGeneration = useEffectEvent(() => adopted.generation);
+
   useEffect(
     () => () => {
       if (commitTimerRef.current !== null) window.clearTimeout(commitTimerRef.current.id);
