@@ -28,11 +28,16 @@ vi.mock("~/localApi", () => ({
     },
   }),
 }));
-// The page only reads the keybinding atom; this scenario has no conflicting shortcuts.
-vi.mock("@effect/atom-react", async (importOriginal) => ({
-  ...(await importOriginal<AtomReactModule>()),
-  useAtomValue: () => [],
-}));
+// Capture availability is fixture data; the sound toggle still uses real settings persistence.
+vi.mock("@effect/atom-react", async (importOriginal) => {
+  const actual = await importOriginal<AtomReactModule>();
+  const { desktopSnapShotAtom } = await import("../../state/desktopSnapShot");
+  return {
+    ...actual,
+    useAtomValue: (atom: unknown) =>
+      atom === desktopSnapShotAtom ? { state: desktopState, refreshError: null } : [],
+  };
+});
 vi.mock("../../lib/desktopSnapShot", () => ({
   getDesktopSnapShotBridge: () => desktopBridge,
 }));

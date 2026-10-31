@@ -18,6 +18,7 @@ import { resolveSettingsScope, type SettingsScopeSearch } from "./settingsScope"
 
 import { deriveProviderInstanceEntries } from "../../providerInstances";
 import {
+  defaultScheduledTaskProjectId,
   scheduledTaskCreationEnvironment,
   scheduledTaskDefaultModel,
   scheduledTaskModelSelection,
@@ -55,6 +56,7 @@ const second = member("second", laptopId);
 const third = member("third", serverId);
 const other = member("other", serverId);
 
+/** Builds a scope fixture with one stable root so checkout filtering can be tested independently. */
 function group(
   projectKey: string,
   members: readonly SidebarProjectGroupMember[],
@@ -73,6 +75,8 @@ function group(
     allRemoteMembersAreDesktopLocal: false,
     allRemoteMembersAreWsl: false,
     remoteEnvironmentLabels: [],
+    pinned: false,
+    archived: false,
   };
 }
 
@@ -102,6 +106,22 @@ describe("scheduled task settings scope", () => {
         .filter((task) => matchesScheduledTaskScope(scope, task.environmentId, task.projectId))
         .map((task) => task.id),
     ).toEqual(expected);
+  });
+
+  it("defaults a new task to a pinned open project, and to an archived one only when scoped to it", () => {
+    const at = "2026-01-01T00:00:00.000Z";
+    const project = (id: string, pinnedAt: string | null, archivedAt: string | null) => ({
+      id: ProjectId.make(id),
+      pinnedAt,
+      archivedAt,
+    });
+    const all = resolveSettingsScope({}, groups, environments);
+    const scoped = resolveSettingsScope({ project: "t3code" }, groups, environments);
+    expect(
+      defaultScheduledTaskProjectId([project("a", null, null), project("b", at, null)], all),
+    ).toBe("b");
+    expect(defaultScheduledTaskProjectId([project("x", null, at)], all)).toBe("");
+    expect(defaultScheduledTaskProjectId([project("x", null, at)], scoped)).toBe("x");
   });
 
   it("keeps tasks with removed projects manageable at environment scope", () => {

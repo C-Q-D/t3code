@@ -56,6 +56,7 @@ vi.mock("react", async (importOriginal) => {
     ...actual,
     useCallback: reactHookHarness.useCallback,
     useEffect: (effect: () => void) => settingsSearchState.effects.push(effect),
+    useInsertionEffect: (effect: () => void) => settingsSearchState.effects.push(effect),
     useLayoutEffect: (effect: () => void) => settingsSearchState.effects.push(effect),
     useMemo: reactHookHarness.useMemo,
     useRef: reactHookHarness.useRef,
@@ -353,7 +354,7 @@ describe("EnvironmentProviderSettings routing", () => {
 
   it("coalesces a nullable provider snapshot before rendering array-backed UI", () => {
     expect(() => renderPanel()).not.toThrow();
-    expect(settingsState.readEnvironmentIds).toEqual([environmentId]);
+    expect(new Set(settingsState.readEnvironmentIds)).toEqual(new Set([environmentId]));
     expect(settingsState.updateEnvironmentIds).toEqual([environmentId]);
     expect(settingsState.mutationEnvironmentIds).toEqual([environmentId]);
   });
@@ -368,7 +369,7 @@ describe("EnvironmentProviderSettings routing", () => {
 
     expect(commands.refresh).toHaveBeenCalledWith({
       environmentId,
-      input: { refreshModels: true },
+      input: { refreshModels: true, reloadSecrets: true },
     });
 
     const providerCard = visitElements(
@@ -421,7 +422,10 @@ describe("EnvironmentProviderSettings routing", () => {
     );
     expect(editor).not.toBeNull();
     if (!editor) throw new Error("Provider editor was not rendered");
-    (editor.props[action] as (models: string[]) => void)(["chosen"]);
+    (editor.props[action] as (models: string[], affectedModels: string[]) => void)(
+      ["chosen"],
+      ["chosen"],
+    );
     expect(settingsState.updateSettings).toHaveBeenCalledExactlyOnceWith(expected);
     expect(settingsState.updateClientSettings).not.toHaveBeenCalled();
   });

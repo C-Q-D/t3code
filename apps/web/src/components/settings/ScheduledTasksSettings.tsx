@@ -2,6 +2,8 @@
 import { t } from "~/i18n";
 import { cn } from "~/lib/utils";
 import { useAtomValue } from "@effect/atom-react";
+import { connectionStatusTitle } from "@t3tools/client-runtime/connection";
+import { AsyncResult } from "effect/reactivity";
 import {
   Clock3Icon,
   CalendarClockIcon,
@@ -15,7 +17,7 @@ import {
   PlusIcon,
   Trash2Icon,
 } from "lucide-react";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import type {
   EnvironmentId,
   ModelSelection,
@@ -51,15 +53,11 @@ import {
 import { formatRelativeTime } from "../../timestampFormat";
 import { useEnvironmentSettings } from "../../hooks/useSettings";
 import { getCustomModelOptionsByInstance } from "../../modelSelection";
-import {
-  applyProviderInstanceSettings,
-  deriveProviderInstanceEntries,
-  sortProviderInstanceEntries,
-} from "../../providerInstances";
+import { providerInstanceEntriesFor } from "../../providerInstances";
 import { usePrimaryCloudLinkState } from "../../cloud/primaryCloudLinkState";
 import { requestConfirmDialog } from "../../confirmDialog";
 import { webhookAddress } from "@t3tools/client-runtime/webhook-address";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { useNowMinute } from "../../hooks/useNowMinute";
 import {
@@ -67,24 +65,26 @@ import {
   useEnvironmentHttpBaseUrl,
   type EnvironmentPresentation,
 } from "../../state/environments";
-import { useProjects } from "../../state/entities";
-import { formatEnvironmentQueryError, useEnvironmentQuery } from "../../state/query";
+import { useProjects, useThreadShell } from "../../state/entities";
+import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { environmentAtomList, environmentIdsKey } from "../../state/environmentAtomList";
-import * as Option from "effect/Option";
-import { AsyncResult } from "effect/reactivity";
-import { connectionStatusTitle } from "@t3tools/client-runtime/connection";
+import { formatEnvironmentQueryError, useEnvironmentQuery } from "../../state/query";
+
 import { settingsScopeEnvironmentLabel, settingsScopeEnvironmentLabels } from "./settingsScopeAxis";
 import { EMPTY_SERVER_PROVIDERS, serverEnvironment } from "../../state/server";
+import { threadFamilies } from "../../state/threads";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { WorktreeBaseBranchPicker } from "../WorktreeBaseBranchPicker";
 import { EnvironmentMachineIcon } from "../EnvironmentMachineIcon";
 import { AuthOrchestrationOperateScope } from "@t3tools/contracts";
 import { readEnvironmentScope } from "~/state/session";
+import { useEnvironmentTransportLabel } from "./EnvironmentRow";
 import { useSettingsScope } from "./SettingsScopeContext";
 import {
   WEBHOOK_SIGNATURE_DEFAULTS,
   webhookDraftErrors,
   webhookDeliveryLabel,
+  defaultScheduledTaskProjectId,
   matchesScheduledTaskScope,
   scheduleFromDraft,
   scheduledTaskRunRecords,
@@ -427,6 +427,45 @@ export function ScheduledTasksSettings(target: {
     })),
     defaultEnvironment?.environmentId,
   );
+  const linkedEnvironmentId = target.environmentId ?? defaultEnvironment?.environmentId;
+  const linkedEnvironmentConnected = environments.some(
+    (entry) =>
+      entry.environmentId === linkedEnvironmentId &&
+      entry.connection.phase === "connected" &&
+      entry.serverConfig !== null,
+  );
+  const linkedTasksQuery = useEnvironmentQuery(
+    target.taskId !== undefined && linkedEnvironmentId !== undefined && linkedEnvironmentConnected
+      ? serverEnvironment.scheduledTasksLive({ environmentId: linkedEnvironmentId, input: {} })
+      : null,
+  );
+  const linkedTask = linkedTasksQuery.data?.tasks.find(
+    (task) =>
+      task.id === target.taskId &&
+      linkedEnvironmentId !== undefined &&
+      matchesScheduledTaskScope(scope, linkedEnvironmentId, task.projectId),
+  );
+  // A `taskId` link opens its editor once, the first time the task loads. The editor then owns
+  // the session until close, so a disconnect that disables the query cannot drop unsaved edits.
+  // An editor the user already opened wins: a late-loading link must not replace its draft.
+  const [openedLinkTaskId, setOpenedLinkTaskId] = useState<ScheduledTaskId | undefined>();
+  if (target.taskId === undefined && openedLinkTaskId !== undefined) {
+    setOpenedLinkTaskId(undefined);
+  }
+  if (linkedTask && linkedEnvironmentId !== undefined && openedLinkTaskId !== target.taskId) {
+    setOpenedLinkTaskId(target.taskId);
+    if (editor === null) setEditor({ environmentId: linkedEnvironmentId, task: linkedTask });
+  }
+  const navigate = useNavigate({ from: "/settings/scheduled-tasks" });
+  const closeEditor = () => {
+    setEditor(null);
+    if (target.taskId === undefined) return;
+    void navigate({
+      to: "/settings/scheduled-tasks",
+      search: ({ taskId: _closed, ...rest }) => rest,
+      replace: true,
+    });
+  };
   return (
     <SettingsPageContainer>
       <SettingsSearchTarget id="scheduled-tasks" className="space-y-5.5">
@@ -498,7 +537,7 @@ export function ScheduledTasksSettings(target: {
           key={`${editor.environmentId}:${editor.task?.id ?? "new"}`}
           initialEnvironmentId={editor.environmentId}
           task={editor.task}
-          onClose={() => setEditor(null)}
+          onClose={closeEditor}
         />
       ) : null}
     </SettingsPageContainer>
@@ -539,7 +578,7 @@ function ScheduledTaskEnvironmentList({
   const states = environments.map((environment) => {
     const index = connectedIds.indexOf(environment.environmentId);
     const query = index < 0 ? null : queries[index]!;
-    const data = query === null ? null : Option.getOrNull(AsyncResult.value(query));
+    const data = query === null ? null : AsyncResult.getOrElse(query, () => null);
     return {
       environment,
       connected: index >= 0,
@@ -551,13 +590,6 @@ function ScheduledTaskEnvironmentList({
   });
   const linkedState = states.find((state) => state.environment.environmentId === environmentId);
   const linkedTask = linkedState?.tasks?.find((task) => task.id === taskId);
-  const openedLink = useRef(false);
-  useEffect(() => {
-    if (!openedLink.current && environmentId && linkedTask) {
-      openedLink.current = true;
-      onEdit(environmentId, linkedTask);
-    }
-  }, [environmentId, linkedTask, onEdit]);
 
   const loaded = states.filter((state) => state.connected && state.error === null && state.tasks);
   const populated = loaded.filter((state) => state.tasks && state.tasks.length > 0);
@@ -589,7 +621,10 @@ function ScheduledTaskEnvironmentList({
         const records = scheduledTaskRunRecords(tasks ?? []);
         return (
           <div key={environment.environmentId} className="space-y-5.5">
-            <SettingsSection title={secondary ? primary + " · " + secondary : primary}>
+            <SettingsSection
+              title={secondary ? primary + " · " + secondary : primary}
+              description={<ScheduledTaskEnvironmentTransport environment={environment} />}
+            >
               <div className="space-y-0.5 px-3.5 pt-2.5">
                 {tasks?.map((task) => (
                   <ScheduledTaskRow
@@ -645,6 +680,15 @@ function ScheduledTaskEnvironmentList({
   );
 }
 
+/** Names the active transport without replacing the local environment heading. */
+function ScheduledTaskEnvironmentTransport({
+  environment,
+}: {
+  readonly environment: EnvironmentPresentation;
+}) {
+  return useEnvironmentTransportLabel(environment);
+}
+
 /** Subscribe to one environment and filter by the selected scope; open a linked task once and expose only real records. */
 function ScheduledTaskEnvironmentSection({
   environment,
@@ -680,13 +724,6 @@ function ScheduledTaskEnvironmentSection({
   );
   const records = scheduledTaskRunRecords(tasks ?? []);
   const linkedTask = tasks?.find((task) => task.id === taskId);
-  const openedLink = useRef(false);
-  useEffect(() => {
-    if (!openedLink.current && linkedTask) {
-      openedLink.current = true;
-      onEdit(environment.environmentId, linkedTask);
-    }
-  }, [environment.environmentId, linkedTask, onEdit]);
   return (
     <div className="space-y-5.5">
       <SettingsSection
@@ -1303,6 +1340,39 @@ function ScheduledTaskEditorDialog({
   );
 }
 
+/** Names bound threads even after they leave the active shell, so scheduled runs have an explicit destination. */
+function ScheduledTaskDestination({
+  environmentId,
+  threadId,
+}: {
+  readonly environmentId: EnvironmentId;
+  readonly threadId: ThreadId | null;
+}) {
+  const ref = threadId === null ? null : scopeThreadRef(environmentId, threadId);
+  const shell = useThreadShell(ref);
+  // The shell can omit older settled threads; their family read still carries the title.
+  const family = useEnvironmentQuery(
+    ref !== null && shell === null ? threadFamilies.familyAtom(environmentId, ref.threadId) : null,
+  );
+  const thread = shell ?? family.data?.threads.find((row) => row.id === threadId);
+  return (
+    <Field label="Destination">
+      {ref === null ? (
+        <p className="text-sm text-muted-foreground">
+          Each run starts a new thread with the workspace and model below.
+        </p>
+      ) : (
+        <div className="space-y-1 text-sm">
+          <p className="wrap-anywhere">{thread?.title.trim() || `Thread ${ref.threadId}`}</p>
+          <p className="text-muted-foreground">
+            Each run continues this conversation, in its workspace and with its current model.
+          </p>
+        </div>
+      )}
+    </Field>
+  );
+}
+
 /**
  * Owns the draft so typing does not re-render the dialog chrome; validates webhook filters and dedupe before saving.
  * @param props.initialEnvironmentId Initial destination; a new-task draft can select another connected machine.
@@ -1334,11 +1404,11 @@ function ScheduledTaskEditorForm({
     connected ? serverEnvironment.scheduledTasksLive({ environmentId, input: {} }) : null,
   );
   const allProjects = useProjects();
-  const projects = allProjects.filter(
-    (project) =>
-      project.environmentId === environmentId &&
-      matchesScheduledTaskScope(scope, environmentId, project.id),
-  );
+  const projectsOn = (id: EnvironmentId) =>
+    allProjects.filter(
+      (project) => project.environmentId === id && matchesScheduledTaskScope(scope, id, project.id),
+    );
+  const scopedProjects = projectsOn(environmentId);
   const settings = useEnvironmentSettings(environmentId);
   const providers =
     useAtomValue(serverEnvironment.providersValueAtom(environmentId)) ?? EMPTY_SERVER_PROVIDERS;
@@ -1349,8 +1419,22 @@ function ScheduledTaskEditorForm({
     label: "scheduled task upsert",
   });
   const [draft, setDraft] = useState<DraftState>(() =>
-    task ? taskToDraft(task) : { ...EMPTY_DRAFT, projectId: projects[0]?.id ?? "" },
+    task
+      ? taskToDraft(task)
+      : {
+          ...EMPTY_DRAFT,
+          projectId: defaultScheduledTaskProjectId(scopedProjects, scope),
+        },
   );
+  // Pinned first. The chosen project stays listed after it is archived.
+  const projects = scopedProjects
+    .filter(
+      (project) =>
+        project.archivedAt == null ||
+        project.id === draft.projectId ||
+        project.id === task?.projectId,
+    )
+    .sort((left, right) => Number(right.pinnedAt != null) - Number(left.pinnedAt != null));
   const submissionPending = useRef(false);
   const editingTaskMissing =
     draft.editingId !== null &&
@@ -1361,12 +1445,10 @@ function ScheduledTaskEditorForm({
     : task;
   const selectedProjectId = draft.projectId || projects[0]?.id || "";
   const selectedProject = projects.find((project) => project.id === selectedProjectId);
-  const instanceEntries = sortProviderInstanceEntries(
-    applyProviderInstanceSettings(
-      deriveProviderInstanceEntries(providers),
-      settings,
-      selectedProject?.id ?? null,
-    ),
+  const instanceEntries = providerInstanceEntriesFor(
+    providers,
+    settings,
+    selectedProject?.id ?? null,
   );
 
   const firstInstance = instanceEntries[0];
@@ -1887,7 +1969,7 @@ function ScheduledTaskEditorForm({
                 setEnvironmentId(next.environmentId);
                 setDraft((current) => ({
                   ...current,
-                  projectId: "",
+                  projectId: defaultScheduledTaskProjectId(projectsOn(next.environmentId), scope),
                   modelKey: "",
                   baseModelSelection: null,
                   baseRef: "main",
@@ -1941,6 +2023,11 @@ function ScheduledTaskEditorForm({
               }
             />
           </Field>
+
+          <ScheduledTaskDestination
+            environmentId={environmentId}
+            threadId={draft.threadId ? (draft.threadId as ThreadId) : null}
+          />
 
           <div className="space-y-4">
             <Field label={t.settings.pages.projects} htmlFor="scheduled-task-project">
