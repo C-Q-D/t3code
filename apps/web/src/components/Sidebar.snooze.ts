@@ -1,12 +1,19 @@
+/** Adapts environment snooze presets to local labels; the shared runtime owns wake-time calculations. */
+import type { EnvironmentId } from "@t3tools/contracts";
+import { parseTimestampDate } from "../timestampFormat";
 import { activeLocale, t } from "~/i18n";
 import type { TimestampFormat } from "@t3tools/contracts/settings";
 import {
+  pickSnoozePreset as pickSharedSnoozePreset,
   resolveSnoozePresets as resolveSharedSnoozePresets,
   snoozeWakeLabel as resolveSharedSnoozeWakeLabel,
   type SnoozePreset,
 } from "@t3tools/client-runtime/state/thread-settled";
 
-import { formatShortTimestamp, parseTimestampDate } from "../timestampFormat";
+import { appAtomRegistry } from "../rpc/atomRegistry";
+import { serverEnvironment } from "../state/server";
+import { formatShortTimestamp } from "../timestampFormat";
+import { toastManager } from "./ui/toast";
 
 export { type SnoozePreset };
 
@@ -28,21 +35,50 @@ function timeOfDayLabel(date: Date, timestampFormat: TimestampFormat): string {
 export function resolveSnoozePresets(
   now: Date,
   timestampFormat: TimestampFormat,
+  environmentId: EnvironmentId,
 ): ReadonlyArray<SnoozePreset> {
-  return resolveSharedSnoozePresets(now).map((preset) => {
-    const wake = parseTimestampDate(preset.snoozedUntil);
-    const label = SNOOZE_PRESET_LABELS[preset.id];
-    if (wake === null) return { ...preset, label };
-    const time = timeOfDayLabel(wake, timestampFormat);
-    return {
-      ...preset,
-      label,
-      whenLabel:
-        preset.id === "next-week"
-          ? `${wake.toLocaleDateString(activeLocale === "zh-CN" ? activeLocale : undefined, { weekday: "short" })} ${time}`
-          : time,
-    };
+  return resolveSharedSnoozePresets(now, snoozeOptions(timestampFormat, environmentId)).map(
+    localizeSnoozePreset,
+  );
+}
+
+/** Keeps custom labels while translating only the built-in presets. */
+function localizeSnoozePreset(preset: SnoozePreset): SnoozePreset {
+  return { ...preset, label: SNOOZE_PRESET_LABELS[preset.id] ?? preset.label };
+}
+
+/** Revalidates a displayed choice at click time; expired choices prompt the user to choose again. */
+export function pickSnoozePreset(
+  shown: ReadonlyArray<SnoozePreset>,
+  id: string,
+  timestampFormat: TimestampFormat,
+  environmentId: EnvironmentId,
+): SnoozePreset | undefined {
+  const picked = pickSharedSnoozePreset({
+    shown,
+    id,
+    now: new Date(),
+    ...snoozeOptions(timestampFormat, environmentId),
   });
+  if (!picked) {
+    toastManager.add({
+      type: "warning",
+      title: "Could not snooze thread",
+      description: "That snooze time has passed. Choose another time.",
+    });
+  }
+  return picked ? localizeSnoozePreset(picked) : undefined;
+}
+
+/** Reads presets from the target environment and formats times using the selected clock format; absent settings use shared defaults. */
+function snoozeOptions(timestampFormat: TimestampFormat, environmentId: EnvironmentId) {
+  const presets = appAtomRegistry.get(
+    serverEnvironment.settingsValueAtom(environmentId),
+  )?.snoozePresets;
+  return {
+    ...(presets ? { presets } : {}),
+    formatTime: (date: Date) => formatShortTimestamp(date.toISOString(), timestampFormat),
+  };
 }
 
 /** Localizes the shared remaining-time label without changing its rounding or wake-time rules. */

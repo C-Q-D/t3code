@@ -6,6 +6,7 @@ export function isAppModalPage(pathname: string) {
   return pathname === "/settings" || pathname.startsWith("/settings/") || pathname === "/usage";
 }
 
+/** Identifies full-page utilities that must preserve the last code destination for the project rail. */
 export function isSidebarUtilityPage(pathname: string) {
   return (
     isAppModalPage(pathname) || pathname.startsWith("/projects/") || pathname === "/pull-requests"

@@ -1159,6 +1159,49 @@ describe("searchSidebarThreads", () => {
       ),
     );
 
+  it("matches thread titles case-insensitively in relevance order", () => {
+    expect(searchSidebarThreads(threads, "WORK", new Set(), now)).toEqual({
+      titleMatches: [threads[0], threads[2], threads[3]],
+      contentMatches: [],
+    });
+  });
+
+  it("does not match project metadata", () => {
+    const withProjects = threads.map((thread) => ({ ...thread, projectTitle: "workspace" }));
+    expect(searchSidebarThreads(withProjects, "workspace", new Set(), now)).toEqual({
+      titleMatches: [withProjects[0]],
+      contentMatches: [],
+    });
+  });
+
+  it("returns no results for an empty query", () => {
+    expect(searchSidebarThreads(threads, "   ", contentKeys("thread-2"), now)).toEqual({
+      titleMatches: [],
+      contentMatches: [],
+    });
+  });
+
+  it("appends content-only matches after every title match", () => {
+    expect(searchSidebarThreads(threads, "work", contentKeys("thread-2"), now)).toEqual({
+      titleMatches: [threads[0], threads[2], threads[3]],
+      contentMatches: [threads[1]],
+    });
+  });
+
+  it("lists a thread matching both title and content once", () => {
+    expect(searchSidebarThreads(threads, "work", contentKeys("thread-1"), now)).toEqual({
+      titleMatches: [threads[0], threads[2], threads[3]],
+      contentMatches: [],
+    });
+  });
+
+  it("ignores content matches for threads outside the sidebar collection", () => {
+    expect(searchSidebarThreads(threads, "work", contentKeys("thread-missing"), now)).toEqual({
+      titleMatches: [threads[0], threads[2], threads[3]],
+      contentMatches: [],
+    });
+  });
+
   it("ranks word matches by recent use, then lists message matches once", () => {
     expect(searchSidebarThreads(threads, "work", contentKeys("thread-1", "thread-2"), now)).toEqual(
       {

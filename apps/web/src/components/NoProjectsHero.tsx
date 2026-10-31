@@ -1,4 +1,5 @@
 /** Presents entry actions when the current workspace has no projects. */
+import { workspaceAreaProps } from "../lib/workspaceFocus";
 import { t } from "~/i18n";
 import { FolderOpenIcon, FolderPlusIcon } from "lucide-react";
 
@@ -11,12 +12,17 @@ import { WorkspacePageHeader } from "./WorkspacePageHeader";
 
 /** Offers project creation and, when an eligible environment exists, starting a scratch conversation. */
 export function NoProjectsHero() {
+  const contentArea = workspaceAreaProps("home", 1, "Home");
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const { scratchEnvironmentId, startScratchThread } = useScratchProject();
   const scratchTargetEnvironmentId = scratchEnvironmentId(primaryEnvironmentId);
 
   return (
-    <SidebarInset className="h-full min-h-0 overflow-hidden overscroll-y-none">
+    <SidebarInset
+      {...contentArea}
+      role="main"
+      className="h-full min-h-0 overflow-hidden overscroll-y-none"
+    >
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden stone-base">
         {/* The desktop window only moves where CSS opts in, so keep a titlebar strip. */}
         {isElectron ? <WorkspacePageHeader electron /> : null}

@@ -124,6 +124,7 @@ export function resolveSidebarRowAccessibility(input: {
 // Each prewarm retains growing thread detail and a live subscription, multiplying heap and server load.
 const SIDEBAR_ROW_SUBSCRIPTION_OVERSCAN_PX = 160;
 
+/** Keeps active rows subscribed and leases nearby rows within the sidebar scroller. Attach rowRef to receive observer cleanup; unavailable observers permit subscription. */
 export function useSidebarRowSubscriptionLease(isActive: boolean): {
   readonly leaseLiveStatus: boolean;
   readonly rowRef: (row: HTMLElement | null) => (() => void) | undefined;
@@ -147,6 +148,7 @@ export function useSidebarRowSubscriptionLease(isActive: boolean): {
 }
 
 const fileDragClears = new Set<(active: false) => void>();
+/** Clears registered row hover state when a native file drag ends outside a drop target. */
 function clearFileDrags() {
   const clears = [...fileDragClears];
   fileDragClears.clear();
@@ -393,6 +395,7 @@ export function sidebarThreadKeyAtY(list: HTMLElement, y: number): string | null
   return key;
 }
 
+/** Returns writable row keys only for connected environments with configuration; cached offline configuration never grants write eligibility. */
 export function resolveSidebarReorderableThreadKeys(input: {
   readonly threads: ReadonlyArray<Pick<SidebarThreadSummary, "environmentId" | "id">>;
   readonly serverConfigs: ReadonlyMap<EnvironmentId, Pick<EnvironmentServerConfig, "environment">>;
@@ -419,6 +422,7 @@ export function resolveSidebarReorderableThreadKeys(input: {
   return { draggableThreadKeys, activeReorderableThreadKeys };
 }
 
+/** Plans a lifecycle or ordering mutation from the visible order and writable keys. Returns none when frozen rows make the requested position unrealizable; never writes state. */
 export function planSidebarThreadDrop(input: {
   readonly activeKey: string;
   readonly activeSection: SidebarSection;
@@ -672,6 +676,7 @@ export async function archiveSelectedThreadEntries<
   return { archivedThreadKeys, mutationFailure: null, followupFailures };
 }
 
+/** Uses shared lineage rules so side chats and delegated threads do not appear as independent sidebar rows. */
 export function isSidebarHiddenThread(thread: Pick<SidebarThreadSummary, "lineage">): boolean {
   return !isListedThreadLineage(thread.lineage);
 }
@@ -826,6 +831,7 @@ export function useThreadJumpHintsVisible(shouldShow: boolean): boolean {
   return useDeadlinePassed(showAt);
 }
 
+/** Prefers the server watermark, including explicit null for never visited; only missing server support falls back to the local watermark. */
 export function resolveThreadLastVisitedAt(
   serverLastVisitedAt: string | null | undefined,
   localLastVisitedAt: string | undefined,
@@ -1032,6 +1038,7 @@ export type SidebarThreadStatus =
   | "limited"
   | "ready";
 
+/** Determines whether a settled row should recede without hiding threads whose live status still needs attention. */
 export function shouldRecedeSidebarThread(input: {
   status: SidebarThreadStatus;
   isUnread: boolean;
@@ -1064,6 +1071,7 @@ type SidebarThreadStatusInput = Pick<
   | "blockedOnThreadWait"
 >;
 
+/** Resolves one primary row status from approvals, input and run state in attention priority order. */
 export function resolveSidebarThreadStatus(thread: SidebarThreadStatusInput): SidebarThreadStatus {
   if (thread.hasPendingApprovals || thread.pendingSubagentRequest === "approval") {
     return "approval";
@@ -1228,6 +1236,7 @@ export function formatWorkingDurationLabel(elapsedMs: number): string {
   return t.sidebar.duration.hoursMinutes(Math.floor(minutes / 60), minutes % 60);
 }
 
+/** Builds the status pill from current thread activity; null leaves idle rows without a status accessory. */
 export function resolveThreadStatusPill(input: {
   thread: ThreadStatusInput;
 }): ThreadStatusPill | null {
@@ -1399,6 +1408,7 @@ function getProjectSortTimestamp(
   return toSortableTimestamp(project.updatedAt ?? project.createdAt) ?? Number.NEGATIVE_INFINITY;
 }
 
+/** Preserves manual input order; otherwise computes each project timestamp once and applies the supplied stable tie-breaker. */
 function sortProjectsByActivity<TProject extends SidebarProject>(
   projects: readonly TProject[],
   sortOrder: SidebarProjectSortOrder,
@@ -1446,6 +1456,7 @@ export function sortProjectsForSidebar<
   );
 }
 
+/** Orders project groups by activity across their physical members, excluding archived threads; manual order stays unchanged. */
 export function sortLogicalProjectsForSidebar<
   TProject extends LogicalSidebarProject,
   TThread extends ScopedSidebarThread,
@@ -1484,6 +1495,7 @@ export function sortLogicalProjectsForSidebar<
   );
 }
 
+/** Orders groups using only visible threads so hidden side chats and delegated work cannot move a project. */
 export function sortSidebarV2ProjectGroups<
   TProject extends LogicalSidebarProject,
   TThread extends ScopedSidebarThread &

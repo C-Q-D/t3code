@@ -194,11 +194,16 @@ import {
 } from "./Sidebar.drag";
 import { SidebarDragLifecycle, SidebarPointerSensor } from "./Sidebar.pointer";
 import { createSidebarListMotion } from "./Sidebar.motion";
-import { resolveSnoozePresets, snoozeWakeLabel, type SnoozePreset } from "./Sidebar.snooze";
+import {
+  pickSnoozePreset,
+  resolveSnoozePresets,
+  snoozeWakeLabel,
+  type SnoozePreset,
+} from "./Sidebar.snooze";
 import { deriveProviderEntriesByEnvironment } from "../providerInstances";
 import { useStableCallback } from "../hooks/useStableCallback";
 import {
-  pendingSidebarRouteReveal,
+  resolveSidebarRouteReveal,
   completeSidebarRouteReveal,
   type SidebarRouteReveal,
 } from "./sidebar/routeReveal";
@@ -463,6 +468,7 @@ function partitionSidebarThreads(input: {
   };
 }
 
+/** Releases optimistic placement once live row state reflects the requested lifecycle or order; snooze comparison uses the supplied clock. */
 function isOptimisticDropReleased(input: {
   readonly optimisticDrop: SidebarOptimisticDrop;
   readonly threads: readonly EnvironmentThreadShell[];
@@ -940,7 +946,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       return thread ? threadSearchSubject(thread, null) : undefined;
     },
     foldSearchQuery(threadSearchQuery),
-    Date.parse(nowMinute),
+    Date.parse(`${nowMinute}Z`),
     { picks: false },
   );
   const serverMatchByKey = new Map(
@@ -958,7 +964,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     searchableThreads,
     threadSearchQuery,
     new Set(messageOrder.keys),
-    Date.parse(nowMinute),
+    Date.parse(`${nowMinute}Z`),
   );
   const threadSearchResults = [...titleMatches, ...contentMatches];
   const threadSearchMatchByKey = new Map(
@@ -1083,7 +1089,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           searchResults: threadSearchResults,
         }))();
   const orderedThreads = sidebarView.rows;
-  const hiddenSettledCount = sidebarTabs.hiddenSettledCount + unloadedSettledCount;
+  const settledCount = settledThreads.length + unloadedSettledCount;
+  const hiddenSettledCount = Math.max(0, settledCount - sidebarTabs.rowsByTab.settled.length);
   const showMoreSettled = () => {
     olderSettledShelf.retry();
     setSettledVisibleCount(nextSidebarSettledVisibleCount);
@@ -1129,8 +1136,19 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   // History navigation must reveal the route inside the fork's Today/project tabs.
   // A manual scope change with an unchanged route must keep the chosen filter.
   const mountRevealOwed = useRef(true);
+  const routeRevealState = resolveSidebarRouteReveal({
+    reveal: routeReveal,
+    routeKey: routeRowThreadKey,
+    isSearching: isSearchingThreads,
+    scopedProjectKeys,
+    delegatedUnderParent,
+    findThread: (key) =>
+      threads.find(
+        (thread) => scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)) === key,
+      ),
+  });
   const revealRouteRow = useStableCallback(() => {
-    const pendingKey = pendingSidebarRouteReveal(routeReveal, routeRowThreadKey);
+    const pendingKey = routeRevealState.pendingKey;
     if (isSearchingThreads) return;
     const revealKey = pendingKey ?? (mountRevealOwed.current ? routeRowThreadKey : null);
     if (revealKey === null) return;
@@ -1143,18 +1161,14 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       if (filterSidebarV2VisibleThreads([thread], null).length === 0) return;
       const inTodayWorking = todayRows.working.includes(thread);
       const inTodayWaiting = todayRows.waiting.includes(thread);
-      if (
-        (isTodayView && !inTodayWorking && !inTodayWaiting) ||
-        (scopedProjectKeys !== null &&
-          filterSidebarV2VisibleThreads([thread], scopedProjectKeys).length === 0)
-      ) {
+      if ((isTodayView && !inTodayWorking && !inTodayWaiting) || routeRevealState.widensScope) {
         const group = projectGroups.find((candidate) =>
           candidate.memberProjectRefs.some(
             (ref) =>
               ref.environmentId === thread.environmentId && ref.projectId === thread.projectId,
           ),
         );
-        if (!group) return;
+        if (!group || group.archived) return;
         setProjectScopeKey(group.projectKey);
         return;
       }
@@ -2204,7 +2218,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       void (async () => {
         const api = readLocalApi();
         if (!api) return;
-        const presets = resolveSnoozePresets(new Date(), timestampFormat);
+        const presets = resolveSnoozePresets(new Date(), timestampFormat, thread.environmentId);
         const clicked = await settlePromise(() =>
           api.contextMenu.show(
             [
@@ -2221,7 +2235,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         const preset =
           clicked.value === "custom"
             ? await requestCustomSnooze()
-            : presets.find((candidate) => candidate.id === clicked.value);
+            : pickSnoozePreset(presets, clicked.value, timestampFormat, thread.environmentId);
         const current = threadByKeyRef.current.get(key);
         if (preset && current && checkThreadOperations([current])) attemptSnooze(threadRef, preset);
       })();
@@ -2243,7 +2257,12 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       const selectedThreadKeys = [...useThreadSelectionStore.getState().selectedThreadKeys];
       // oxlint-disable-next-line react/purity -- Presets resolve when the user opens the bulk menu.
       const now = new Date();
-      const snoozePresets = resolveSnoozePresets(now, timestampFormat);
+      const firstSelected = selectedThreadKeys
+        .map((key) => threadByKeyRef.current.get(key))
+        .find((thread) => thread !== undefined);
+      if (!firstSelected) return;
+      // Shared presets use the first selected environment, as in the upstream bulk menu.
+      const snoozePresets = resolveSnoozePresets(now, timestampFormat, firstSelected.environmentId);
       const {
         threadKeys,
         selectedThreads,
@@ -2290,7 +2309,12 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         const preset =
           action === "snooze:custom"
             ? await requestCustomSnooze()
-            : snoozePresets.find((candidate) => `snooze:${candidate.id}` === action);
+            : pickSnoozePreset(
+                snoozePresets,
+                action.slice("snooze:".length),
+                timestampFormat,
+                firstSelected.environmentId,
+              );
         if (preset) {
           // Post-snooze navigation must skip threads snoozing in this same
           // batch — they are all leaving the card block together.
@@ -2512,7 +2536,11 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         const isSnoozed = snoozedThreadKeysRef.current.has(threadKey);
         const isPinned = thread.pinnedAt != null;
         // Presets resolve at menu-open time (same as the popover).
-        const snoozePresets = resolveSnoozePresets(new Date(), timestampFormat);
+        const snoozePresets = resolveSnoozePresets(
+          new Date(),
+          timestampFormat,
+          thread.environmentId,
+        );
         const threadProjectGroup =
           projectGroupsRef.current.find((project) =>
             project.memberProjectRefs.some(
@@ -2567,7 +2595,12 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           const preset =
             clicked.value === "snooze:custom"
               ? await requestCustomSnooze()
-              : snoozePresets.find((candidate) => `snooze:${candidate.id}` === clicked.value);
+              : pickSnoozePreset(
+                  snoozePresets,
+                  clicked.value.slice("snooze:".length),
+                  timestampFormat,
+                  thread.environmentId,
+                );
           if (preset) attemptSnooze(threadRef, preset);
           return;
         }
@@ -2965,7 +2998,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                   : null
               }
               currentTab={currentTab}
-              tabCounts={sidebarTabs.counts}
+              tabCounts={{ ...sidebarTabs.counts, settled: settledCount }}
               onTabChange={handleSidebarTabChange}
               hasProjects={projectGroups.length > 0}
               onOpenDiscussions={() => void router.navigate({ to: "/discussions" })}
@@ -3305,9 +3338,13 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                           onClick={showMoreSettled}
                           className="mx-3 mt-2 inline-flex cursor-pointer rounded-keycap text-left text-secondary-copy-medium text-secondary-label outline-none hover:text-foreground focus-visible:inset-shadow-focus"
                         >
-                          {t.sidebar.sections.showMoreCount(
-                            Math.min(hiddenSettledCount, SIDEBAR_SETTLED_PAGE_COUNT),
-                          )}
+                          {olderSettledShelf.loading
+                            ? "Loading"
+                            : olderSettledShelf.failed
+                              ? "Could not load older threads. Retry"
+                              : t.sidebar.sections.showMoreCount(
+                                  Math.min(hiddenSettledCount, SIDEBAR_SETTLED_PAGE_COUNT),
+                                )}
                         </button>
                       </li>
                     ) : null}

@@ -1,11 +1,11 @@
 /** Shows the latest reversible thread action and registers its visible footer slot. */
 import { t } from "~/i18n";
 import { useAtomValue } from "@effect/atom-react";
+import { shortcutLabelForCommand } from "../../keybindings";
+import { Alert, AlertDescription } from "../ui/alert";
 
 import { undoLatestThreadAction, useThreadUndoNotice } from "../../hooks/showThreadUndoNotice";
-import { shortcutLabelForCommand } from "../../keybindings";
 import { primaryServerKeybindingsAtom } from "../../state/server";
-import { Alert, AlertDescription } from "../ui/alert";
 import { InlineButton } from "../ui/button";
 import { sidebarNoticeRegistry } from "./SidebarChrome";
 

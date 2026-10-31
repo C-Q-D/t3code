@@ -234,14 +234,17 @@ function readInitialThreadSidebarWidth(): number {
   }
 }
 
+/** Reads the current router location at keypress time so usage-specific bindings cannot become stale. */
 function readUsagePageOpen(router: AnyRouter) {
   return router.state.location.pathname === "/usage";
 }
 
+/** Keeps shell shortcuts out of the settings control that is recording a new binding. */
 function isKeybindingCaptureTarget(event: KeyboardEvent) {
   return event.target instanceof HTMLElement && event.target.closest("[data-keybinding-capture]");
 }
 
+/** Builds shortcut context from the current thread and its panel stores; non-thread routes have no panels. */
 function readRoutePanelsOpen(router: AnyRouter) {
   const routeThreadRef = resolveThreadRouteRef(router.state.matches.at(-1)?.params ?? {});
   if (!routeThreadRef) return { terminalOpen: false, previewOpen: false };
@@ -256,6 +259,7 @@ function readRoutePanelsOpen(router: AnyRouter) {
   };
 }
 
+/** Registers back and forward against live router context; returns the disposer for the shell lifetime. */
 export function registerNavigationHistoryCommands(router: AnyRouter): () => void {
   return registerCommands(
     {
@@ -281,6 +285,7 @@ export function registerNavigationHistoryCommands(router: AnyRouter): () => void
 }
 
 // Capture phase, so F6 also leaves widgets that swallow keys, such as the terminal.
+/** Registers F6 traversal and desktop menu forwarding; capture lets focus leave terminal widgets. Returns cleanup. */
 function registerWorkspaceFocusCommands(router: AnyRouter): () => void {
   const move = (direction: 1 | -1) => (event: KeyboardEvent) => {
     if (event.isComposing) return false;
@@ -309,6 +314,7 @@ function registerWorkspaceFocusCommands(router: AnyRouter): () => void {
 
 // Escape leaves the pull requests page when no scope (a selection, a dialog,
 // a drag) claimed it, so it observes after every other scope.
+/** Leaves the pull-request page only after other shortcut scopes decline Escape; returns cleanup. */
 function registerPullRequestsEscapeCommand(router: AnyRouter): () => void {
   return registerCommands(
     {},
@@ -338,6 +344,7 @@ let heldUndoKey: string | null = null;
 // Undoes the thread actions in the sidebar's notice. Settings and Usage own
 // mod+z while open. Captured so mod+z reaches it before the composer's own
 // undo handler consumes the key.
+/** Owns held-key suppression and input invalidation for sidebar undo. The visibility reader preserves editor undo when the sidebar is hidden; returns cleanup. */
 function registerThreadUndoCommands(
   router: AnyRouter,
   readSidebarVisible: () => boolean,
@@ -423,6 +430,7 @@ function registerAppShellCommands(router: AnyRouter, shellElement: Element): () 
   };
 }
 
+/** Keeps the localized toggle in the frame while owning shell command registration for its mounted lifetime. */
 function SidebarControl() {
   const router = useRouter();
   const usagePageOpen = useLocation({ select: (location) => location.pathname === "/usage" });

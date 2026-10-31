@@ -32,6 +32,7 @@ import { scopeThreadRef, scopedThreadKey } from "@t3tools/client-runtime/environ
 import {
   AuthOrchestrationOperateScope,
   type EnvironmentMachineKind,
+  type EnvironmentId,
   type ScopedThreadRef,
 } from "@t3tools/contracts";
 import { type TimestampFormat } from "@t3tools/contracts/settings";
@@ -92,7 +93,7 @@ import {
   sidebarSearchTextSegments,
 } from "../Sidebar.logic";
 import { resolveLocalCheckoutBranchMismatch } from "../BranchToolbar.logic";
-import { resolveSnoozePresets, type SnoozePreset } from "../Sidebar.snooze";
+import { pickSnoozePreset, resolveSnoozePresets, type SnoozePreset } from "../Sidebar.snooze";
 import { useThreadShell } from "../../state/entities";
 import { ProjectFavicon, type ProjectFaviconProject } from "../ProjectFavicon";
 import { makeWorkspaceFileDropHandlers } from "../chat/workspaceFileDrop";
@@ -387,17 +388,18 @@ function SidebarThreadTooltip({
  * actions while the menu is up).
  */
 function SnoozeMenuButton(props: {
+  environmentId: EnvironmentId;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSnooze: (preset: Pick<SnoozePreset, "snoozedUntil">) => void;
   timestampFormat: TimestampFormat;
 }) {
-  const { open, onOpenChange, onSnooze, timestampFormat } = props;
+  const { open, onOpenChange, onSnooze, timestampFormat, environmentId } = props;
   // Presets resolve at open time so "In 1 hour" is relative to the click,
   // not to when the row mounted.
   const presets = open
     ? // oxlint-disable-next-line react/purity -- Reopening the menu resolves relative presets from a fresh clock.
-      resolveSnoozePresets(new Date(), timestampFormat)
+      resolveSnoozePresets(new Date(), timestampFormat, environmentId)
     : [];
   return (
     <Menu open={open} onOpenChange={onOpenChange}>
@@ -427,7 +429,8 @@ function SnoozeMenuButton(props: {
             key={preset.id}
             onClick={(event) => {
               event.stopPropagation();
-              onSnooze(preset);
+              const picked = pickSnoozePreset(presets, preset.id, timestampFormat, environmentId);
+              if (picked) onSnooze(picked);
             }}
           >
             {preset.label}
@@ -631,6 +634,7 @@ type SidebarThreadRowProps = {
 };
 
 // Mounted only while renaming, so each rename starts uncommitted.
+/** Mounts a fresh title draft for each rename session; composition guards prevent Enter from committing an unfinished IME conversion. */
 function ThreadRenameInput(props: {
   title: string;
   onTitleChange: (title: string) => void;
@@ -1253,6 +1257,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
       ) : null}
       {showSnoozeButton ? (
         <SnoozeMenuButton
+          environmentId={thread.environmentId}
           open={snoozeMenuOpen}
           onOpenChange={setSnoozeMenuOpen}
           onSnooze={handleSnoozePreset}

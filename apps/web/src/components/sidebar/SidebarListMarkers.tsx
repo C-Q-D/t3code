@@ -1,7 +1,7 @@
 /** Keeps sidebar drag targets in the sortable geometry. */
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { type ReactNode } from "react";
+import { type ReactNode, useLayoutEffect } from "react";
 import { cn } from "~/lib/utils";
 import {
   animateSidebarLayoutChanges,
@@ -15,13 +15,19 @@ export function SortableSidebarMarker(props: {
   marker: SidebarListMarker;
   className?: string;
   children?: ReactNode;
+  revealOverflow?: boolean;
   "data-testid"?: string;
 }) {
-  const { setNodeRef, transform, transition } = useSortable({
+  const { node, setNodeRef, transform, transition } = useSortable({
     id: sidebarMarkerId(props.marker),
     disabled: SIDEBAR_SORTABLE_DRAG_DISABLED,
     animateLayoutChanges: animateSidebarLayoutChanges,
   });
+  useLayoutEffect(() => {
+    if (props.revealOverflow && transform?.y !== undefined) {
+      node.current?.firstElementChild?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
+  }, [node, props.revealOverflow, transform?.y]);
   return (
     <li
       ref={setNodeRef}

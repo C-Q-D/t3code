@@ -6,7 +6,7 @@ import { isPhysicsEnabled } from "../lib/motion/preference";
 import { type SensorProps } from "@dnd-kit/core";
 import { getOwnerDocument, getWindow } from "@dnd-kit/utilities";
 
-// Search unmounts the drag context while its owning Sidebar remains mounted.
+/** Cancels an active gesture when search removes its drag context but leaves Sidebar mounted. */
 export function SidebarDragLifecycle({ onUnmount }: { onUnmount: () => void }) {
   useLayoutEffect(() => onUnmount, [onUnmount]);
   return null;
@@ -164,9 +164,8 @@ export class SidebarPointerSensor {
     this.document.removeEventListener("dragstart", this.preventDefault);
     this.document.removeEventListener("contextmenu", this.preventDefault);
     this.document.removeEventListener("selectionchange", this.clearSelection);
-    // Cancellation can precede release by an arbitrary amount of time. Consume that release
-    // click, or let a fresh pointerdown end suppression if release happened outside the
-    // document.
+    // Suppress the eventual click after cancellation; a fresh pointerdown clears suppression after
+    // out-of-document release.
     if (!aborted || cancelled) {
       this.document.addEventListener("click", this.suppressClick, { capture: true });
       this.document.addEventListener("pointerdown", this.clearClickSuppression, { capture: true });
