@@ -679,10 +679,7 @@ it.effect("reports localized pairing validation before any network request", () 
         ...englishRemotePairingMessages,
         RemotePairingCodeMissingError: "请输入配对码。",
       },
-    ).pipe(
-      Effect.provide(Layer.mergeAll(layerClientPresentation, layerPairingHttp(calls))),
-      Effect.flip,
-    );
+    ).pipe(Effect.provide(layerPairingOnboarding(undefined, calls)), Effect.flip);
     expect(error).toMatchObject({ reason: "configuration", detail: "请输入配对码。" });
     expect(calls).toEqual([]);
   }),

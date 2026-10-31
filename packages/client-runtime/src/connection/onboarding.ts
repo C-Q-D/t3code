@@ -137,19 +137,8 @@ export const preparePairingRegistration = Effect.fn(
   ) {
     return yield* differentMachineError(descriptor.label, messages);
   }
-  const compatibilityError = orchestrationProtocolCompatibilityError(descriptor);
-  // An outdated server is still saved so it can be updated from this client.
-  if (compatibilityError !== null && compatibilityError.serverUpdateRequired !== true) {
-    return yield* compatibilityError;
-  }
-  const access = yield* bootstrapRemoteBearerSession({
-    httpBaseUrl: target.httpBaseUrl,
-    credential: target.credential,
-    clientMetadata: presentation.metadata,
-  }).pipe(Effect.mapError(mapRemoteEnvironmentError));
   const connectionId = bearerConnectionId(descriptor.environmentId, target.httpBaseUrl);
-
-  return new BearerConnectionRegistration({
+  const route = {
     target: new BearerConnectionTarget({
       environmentId: descriptor.environmentId,
       label: descriptor.label,
@@ -162,6 +151,25 @@ export const preparePairingRegistration = Effect.fn(
       httpBaseUrl: target.httpBaseUrl,
       wsBaseUrl: target.wsBaseUrl,
     }),
+  };
+  // The registry checks again under its lease; this early check keeps a refused code unspent.
+  if (input.expectedEnvironmentId === undefined) {
+    const registry = yield* EnvironmentRegistry.EnvironmentRegistry;
+    yield* registry.assertKnownAddress({ ...route, profile: Option.some(route.profile) });
+  }
+  const compatibilityError = orchestrationProtocolCompatibilityError(descriptor);
+  // An outdated server is still saved so it can be updated from this client.
+  if (compatibilityError !== null && compatibilityError.serverUpdateRequired !== true) {
+    return yield* compatibilityError;
+  }
+  const access = yield* bootstrapRemoteBearerSession({
+    httpBaseUrl: target.httpBaseUrl,
+    credential: target.credential,
+    clientMetadata: presentation.metadata,
+  }).pipe(Effect.mapError(mapRemoteEnvironmentError));
+
+  return new BearerConnectionRegistration({
+    ...route,
     credential: new BearerConnectionCredential({
       token: access.access_token,
     }),
@@ -176,7 +184,10 @@ const registerPairingConnection = Effect.fn(
 ) {
   const registration = yield* preparePairingRegistration(input, messages);
   const registry = yield* EnvironmentRegistry.EnvironmentRegistry;
-  if (!(yield* registry.register(registration))) return registration.target.environmentId;
+  const knownAddressOnly = input.expectedEnvironmentId === undefined;
+  if (!(yield* registry.register(registration, { knownAddressOnly }))) {
+    return registration.target.environmentId;
+  }
   yield* registry.setCompatibility(registration.target.environmentId, null);
   yield* registry
     .setEnabled(registration.target.environmentId, true)
@@ -316,7 +327,7 @@ const registerSshConnection = Effect.fn(
   return registration.target.environmentId;
 });
 
-/** @public Service construction is part of the canonical Effect module API. */
+/** @public */
 export const make = Effect.gen(function* () {
   const registry = yield* EnvironmentRegistry.EnvironmentRegistry;
   const presentation = yield* ClientCapabilities.ClientPresentation;
@@ -324,23 +335,30 @@ export const make = Effect.gen(function* () {
   const ssh = yield* ClientCapabilities.SshEnvironmentGateway;
   const credentials = yield* ConnectionCredentialStore.ConnectionCredentialStore;
 
+  // Provisioning retains the delegated onboarding operation spans.
   return ConnectionOnboarding.of({
-    registerPairing: (input, messages) =>
-      registerPairingConnection(input, messages).pipe(
-        Effect.provideService(EnvironmentRegistry.EnvironmentRegistry, registry),
-        Effect.provideService(ClientCapabilities.ClientPresentation, presentation),
-        Effect.provideService(HttpClient.HttpClient, httpClient),
-      ),
-    registerSsh: (input, messages) =>
-      registerSshConnection(input, messages).pipe(
-        Effect.provideService(EnvironmentRegistry.EnvironmentRegistry, registry),
-        Effect.provideService(ClientCapabilities.SshEnvironmentGateway, ssh),
-      ),
-    updateBearer: (input) =>
-      updateBearerConnection(input).pipe(
-        Effect.provideService(EnvironmentRegistry.EnvironmentRegistry, registry),
-        Effect.provideService(ConnectionCredentialStore.ConnectionCredentialStore, credentials),
-      ),
+    registerPairing: Effect.fnUntraced(
+      function* (input, messages) {
+        return yield* registerPairingConnection(input, messages);
+      },
+      Effect.provideService(EnvironmentRegistry.EnvironmentRegistry, registry),
+      Effect.provideService(ClientCapabilities.ClientPresentation, presentation),
+      Effect.provideService(HttpClient.HttpClient, httpClient),
+    ),
+    registerSsh: Effect.fnUntraced(
+      function* (input, messages) {
+        return yield* registerSshConnection(input, messages);
+      },
+      Effect.provideService(EnvironmentRegistry.EnvironmentRegistry, registry),
+      Effect.provideService(ClientCapabilities.SshEnvironmentGateway, ssh),
+    ),
+    updateBearer: Effect.fnUntraced(
+      function* (input) {
+        return yield* updateBearerConnection(input);
+      },
+      Effect.provideService(EnvironmentRegistry.EnvironmentRegistry, registry),
+      Effect.provideService(ConnectionCredentialStore.ConnectionCredentialStore, credentials),
+    ),
   });
 });
 

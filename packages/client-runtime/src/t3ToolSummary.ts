@@ -241,6 +241,28 @@ export function summarizeT3ToolCalls(
     case "read-pr-guide":
       label = messages.readReviewGuides(selected.length, succeeded);
       break;
+    case "background-wait":
+      label = succeeded
+        ? `Updated background waits ${count} ${count === 1 ? "time" : "times"}`
+        : `Tried to update background waits ${count} ${count === 1 ? "time" : "times"}`;
+      break;
+    case "environment-links":
+      label = succeeded
+        ? `Listed linked environments ${count} ${count === 1 ? "time" : "times"}`
+        : `Tried to list linked environments ${count} ${count === 1 ? "time" : "times"}`;
+      break;
+    case "environment-link":
+      label = succeeded
+        ? `Asked to link ${count} ${count === 1 ? "environment" : "environments"}`
+        : `Tried to link ${count} ${count === 1 ? "environment" : "environments"}`;
+      break;
+    case "environment-unlink": {
+      const environments = countEntities(entityIds("environmentId"));
+      label = succeeded
+        ? `Forgot ${environments} linked ${environments === 1 ? "environment" : "environments"}`
+        : `Tried to forget ${environments} linked ${environments === 1 ? "environment" : "environments"}`;
+      break;
+    }
     case "delegate":
     case "thread-list":
     case "thread-interrupt":

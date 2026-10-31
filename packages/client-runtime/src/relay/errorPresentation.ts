@@ -1,6 +1,9 @@
 import { englishRelayMessages, type RelayMessages } from "./messages.ts";
 import type { DpopFailureReason } from "@t3tools/contracts";
-import type { RelayEnvironmentStatusResponse, RelayProtectedError } from "@t3tools/contracts/relay";
+import {
+  type RelayEnvironmentStatusResponse,
+  type RelayProtectedError,
+} from "@t3tools/contracts/relay";
 
 export const DPOP_CLOCK_HINT = englishRelayMessages.clockHint;
 /** Older servers may omit the DPoP category; the hint must not imply a confirmed clock issue. */
