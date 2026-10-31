@@ -7,11 +7,19 @@ import { DECEL } from "../lib/motion/tokens";
 import { Spring } from "../lib/motion/spring";
 import { VelocityTracker } from "../lib/motion/velocity";
 import { shouldCollapsePanel } from "../lib/motion/panelFling";
+import { useStableCallback } from "./useStableCallback";
+
+/** Inclusive committed-size limits in CSS pixels; physics may paint beyond them during a gesture. */
+export interface ResizeBounds {
+  readonly min: number;
+  readonly max: number;
+}
 
 /** An edge sizing transaction (width, or height for a top edge). Physical bounds are CSS pixels; velocity follows increasing size. */
 interface ResizeSession {
   width: number;
   edge: "left" | "right" | "top";
+  bounds: ResizeBounds;
   resize: (width: number) => number;
   finish: (width: number, moved: boolean) => void;
   /** Paints a transient size without persisting or clamping it. */
@@ -80,7 +88,13 @@ export function useResizeDrag<T extends HTMLElement>(
     if (!active.moved) active.moved = Math.abs(delta) > 2;
     const raw = active.origin + delta;
     active.raw = raw;
-    active.width = session.resize(raw);
+    active.width = Math.max(
+      session.bounds.min,
+      Math.min(
+        session.resize(Math.max(session.bounds.min, Math.min(raw, session.bounds.max))),
+        session.bounds.max,
+      ),
+    );
     active.visual =
       active.physical && session.physics
         ? rubberClamp(
@@ -112,7 +126,10 @@ export function useResizeDrag<T extends HTMLElement>(
     active.stop?.();
     release(active);
     active.session.cleanup?.(commit);
-    if (commit) active.session.finish(active.width, active.moved);
+    if (commit) {
+      const { bounds } = active.session;
+      active.session.finish(Math.max(bounds.min, Math.min(active.width, bounds.max)), active.moved);
+    }
   };
 
   const finish = (commit = true, allowFling = false) => {
@@ -197,14 +214,21 @@ export function useResizeDrag<T extends HTMLElement>(
     finish(usePosition || !active.physical, usePosition);
   };
 
-  const refresh = () => {
+  const refresh = (bounds?: ResizeBounds) => {
     const active = drag.current;
+    if (active && bounds) active.session.bounds = bounds;
     // Geometry changes invalidate a rebound; restoring the owner's bounded size is immediate.
     if (active?.settling) complete(active, false);
     else flush();
   };
 
+  const cancel = useStableCallback(() => finish(false));
+  // A changing ref would detach the handle on every render and abandon a live gesture.
+  const ref = useStableCallback((node: T | null) => (node === null ? undefined : cancel));
+
   return {
+    ref,
+    cancel,
     refresh,
     onPointerDown(event: PointerEvent<T>) {
       if (event.button !== 0 || (drag.current && !drag.current.settling)) return;
