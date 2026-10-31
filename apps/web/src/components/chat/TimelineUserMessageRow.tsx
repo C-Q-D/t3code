@@ -1,3 +1,6 @@
+/** Renders user inputs and attachments while keeping automation and agent messages foldable. */
+import { PencilLineIcon } from "lucide-react";
+import { t } from "~/i18n";
 import { InlineAudioPreview } from "../files/InlineAudioPreview";
 import { filePreviewKind } from "@t3tools/shared/filePreview";
 import { findRevealRef } from "./markdownFindContext";
@@ -34,7 +37,6 @@ import {
   type LucideIcon,
   MessagesSquareIcon,
   Redo2Icon,
-  PencilIcon,
 } from "lucide-react";
 import { Link as LinkIconNode } from "lucide";
 import { Button, InlineButton } from "../ui/button";
@@ -50,7 +52,6 @@ import {
   SNAP_SHOT_ATTACHMENT_FRAME_CLASS,
   SnapShotAttachmentDetails,
 } from "./SnapShotAttachmentDetails";
-import { GuestMessageName, guestBubbleClassName } from "./guestMessageStyle";
 import { MessageCopyButton } from "./MessageCopyButton";
 import { promptLinkFor } from "../promptLinks/copyPromptLink";
 import { PierreEntryIcon } from "./PierreEntryIcon";
@@ -276,14 +277,17 @@ function AutomationMessageRow({ row }: { row: Extract<TimelineRow, { kind: "mess
   const bodyMounted = expanded || ctx.findActive;
 
   return (
-    <div className="group flex flex-col items-end gap-1" data-user-message-attribution="automation">
+    <div
+      className="group flex flex-col items-end gap-1.5"
+      data-user-message-attribution="automation"
+    >
       {row.message.inputIntent === "steer" ||
       row.message.inputIntent === "promoted_queued_to_steer" ? (
         <UserMessageIntentMarker intent={row.message.inputIntent} />
       ) : null}
       <div
         className={cn(
-          "min-w-0 max-w-[80%] rounded-2xl bg-message text-message-foreground",
+          "min-w-0 max-w-timeline-user rounded-timeline-user bg-message text-body leading-timeline-user text-message-foreground shadow-timeline-user",
           BUBBLE_CHIP_CLASS_NAME,
           expanded && "w-full",
         )}
@@ -291,7 +295,7 @@ function AutomationMessageRow({ row }: { row: Extract<TimelineRow, { kind: "mess
         <MessageAuthorHeading>Automation</MessageAuthorHeading>
         <FoldedMessageHeader
           icon={CalendarClockIcon}
-          label="Automation"
+          label={t.chat.timeline.sentByAutomation}
           summary={summary}
           expanded={expanded}
           onToggle={() => setExpanded((value) => !value)}
@@ -310,7 +314,7 @@ function AutomationMessageRow({ row }: { row: Extract<TimelineRow, { kind: "mess
       </div>
       <UserMessageProjectedStatus row={row} />
       {expanded ? (
-        <div className="flex w-full max-w-[80%] items-center justify-end pe-1 text-xs tabular-nums opacity-0 transition-opacity duration-200 pointer-coarse:opacity-100 focus-within:opacity-100 group-hover:opacity-100">
+        <div className="flex w-full max-w-timeline-user items-center justify-end text-secondary-copy tabular-nums opacity-0 transition-opacity duration-150 pointer-coarse:opacity-100 focus-within:opacity-100 group-hover:opacity-100 motion-reduce:transition-none">
           <div className="flex shrink-0 items-center gap-2">
             {scheduledTaskId ? (
               <Link
@@ -318,7 +322,7 @@ function AutomationMessageRow({ row }: { row: Extract<TimelineRow, { kind: "mess
                 search={{ environmentId: ctx.activeThreadEnvironmentId, taskId: scheduledTaskId }}
                 className="rounded-sm text-xs text-muted-foreground hover:underline focus-visible:outline-2 focus-visible:outline-ring"
               >
-                Open automation
+                {t.chat.timeline.openAutomation}
               </Link>
             ) : null}
             <TimelineRowTimestamp
@@ -334,7 +338,7 @@ function AutomationMessageRow({ row }: { row: Extract<TimelineRow, { kind: "mess
               {promptLink !== null && (
                 <MessageCopyButton
                   text={promptLink}
-                  label="Copy prompt link"
+                  label={t.chat.timelineUi.copyLink}
                   icon={LinkIconNode}
                   variant="ghost"
                 />
@@ -371,7 +375,7 @@ export function FoldedMessageHeader(props: {
       aria-expanded={props.expanded}
       data-scroll-anchor-ignore
       onClick={props.onToggle}
-      className="flex w-full min-w-0 items-center gap-1.5 rounded-2xl px-3 py-2 text-left text-sm focus-visible:outline-2 focus-visible:outline-ring"
+      className="flex w-full min-w-0 items-center gap-1.5 rounded-timeline-user px-4.5 py-2 text-left text-body focus-visible:outline-2 focus-visible:outline-ring"
     >
       <Icon className="size-4 shrink-0 stroke-2 text-muted-foreground" />
       <span className="max-w-1/2 shrink-0 truncate text-muted-foreground">{props.label}</span>
@@ -397,13 +401,20 @@ function UserMessageProjectedStatus({ row }: { row: Extract<TimelineRow, { kind:
     return null;
   return (
     <div className="me-1 flex items-center gap-1.5">
-      <span className="rounded-full border border-destructive/25 bg-destructive/8 px-1.5 py-0.5 text-3xs font-medium text-destructive">
+      <span className="flex h-5 items-center whitespace-nowrap rounded-tag bg-error-surface px-2.25 text-meta-large font-semibold text-error shadow-tag">
         {status}
       </span>
     </div>
   );
 }
 
+/**
+ * Renders a user message with attachments, context chips, and available message actions.
+ * @param props - Required message row, including any optional attachment/context metadata. Requires
+ * TimelineRowCtx from the parent timeline.
+ * @returns The user-message row; never null. User actions may open media, files, or context
+ * details.
+ */
 function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" }> }) {
   const ctx = use(TimelineRowCtx);
   const { onImageExpand, onFileOpen } = ctx;
@@ -443,7 +454,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
       ? { environmentId: ctx.activeThreadEnvironmentId, threadId: senderThreadId }
       : null,
   );
-  const senderLabel = senderShell?.title.trim() || "Agent";
+  const senderLabel = senderShell?.title.trim() || t.chat.timeline.sentByAnotherAgent;
   const resolvedContext = resolveUserMessageContext({ ...row.message, text: userMessage.text });
   const previewImages = userImages.filter((image) => image.name.startsWith("preview-annotation-"));
   const revertTurnCount = row.revertTurnCount;
@@ -813,17 +824,11 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
     >
       {userMessage.attribution === "t3code" ? (
         <p
-          className="me-1 text-2xs text-muted-foreground/70"
+          className="flex h-5 items-center whitespace-nowrap rounded-tag bg-timeline-file px-2.25 text-meta-large font-semibold text-code-foreground"
           data-user-message-attribution="t3code"
         >
-          Sent by T3 Code
+          {t.chat.timeline.sentByT3Code}
         </p>
-      ) : null}
-      {/* The row's heading already names the guest for screen readers. */}
-      {userMessage.guestName !== undefined ? (
-        <div aria-hidden>
-          <GuestMessageName name={userMessage.guestName} />
-        </div>
       ) : null}
       {(row.message.inputIntent === "steer" ||
         row.message.inputIntent === "promoted_queued_to_steer") &&
@@ -831,34 +836,26 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
         <UserMessageIntentMarker intent={row.message.inputIntent} />
       ) : null}
       {mediaAboveText ? (
-        <div className="flex max-w-[80%] justify-end">
+        <div className="flex max-w-timeline-user justify-end">
           {/* The heading leads the media so screen readers reach it before the images. */}
-          <MessageAuthorHeading>You</MessageAuthorHeading>
+          <MessageAuthorHeading>{t.chat.timeline.you}</MessageAuthorHeading>
           {mediaBlock}
         </div>
       ) : null}
       <div
         className={cn(
-          "relative min-w-0 max-w-[80%] rounded-2xl text-message-foreground",
+          "relative min-w-0 max-w-timeline-user rounded-timeline-user text-body leading-timeline-user text-message-foreground",
           (mediaAboveText || row.groupedWithPrevious) && "rounded-tr-md",
           row.groupedWithNext && "rounded-br-md",
           BUBBLE_CHIP_CLASS_NAME,
-          userMessage.attribution === "guest"
-            ? guestBubbleClassName(false)
-            : !mediaOnly && !fileCardsOnly && !audioOnly && "bg-message",
-          !folded && !mediaOnly && !fileCardsOnly && !audioOnly && "p-3",
+          !mediaOnly && !fileCardsOnly && !audioOnly && "bg-message shadow-timeline-user",
+          !folded && !mediaOnly && !fileCardsOnly && !audioOnly && "px-4.5 py-3",
           folded && expanded && "w-full",
         )}
       >
         {/* Outside the fold so a collapsed message still has a heading to navigate to. */}
         {mediaAboveText ? null : (
-          <MessageAuthorHeading>
-            {folded
-              ? senderLabel
-              : userMessage.guestName === undefined
-                ? "You"
-                : `${userMessage.guestName} (guest)`}
-          </MessageAuthorHeading>
+          <MessageAuthorHeading>{folded ? senderLabel : t.chat.timeline.you}</MessageAuthorHeading>
         )}
         {folded ? (
           <FoldedMessageHeader
@@ -875,10 +872,12 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
             ref={folded ? revealFoldRef : undefined}
             hidden={folded && !expanded}
             className={cn(
-              folded && "px-3 pb-3",
+              "flex flex-col gap-2.5",
+              folded && "px-4.5 pb-3",
               folded && !ctx.findActive && "max-h-96 overflow-auto",
             )}
           >
+            <UserMessageProjectedStatus row={row} />
             {!mediaAboveText && mediaBlock}
             {userAudio.length > 0 ? (
               <div className={cn("flex max-w-full flex-col gap-1", !audioOnly && "mb-2")}>
@@ -925,6 +924,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
                         pathValue={file.name}
                         kind="file"
                         theme={ctx.resolvedTheme}
+                        className="size-3.5"
                       />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate">{label}</span>
@@ -938,12 +938,15 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
                   );
                   if (file.downloadable !== false) {
                     return (
-                      <div key={file.id} className="flex min-w-0 items-center gap-1">
+                      <div
+                        key={file.id}
+                        className="flex h-8.5 min-w-0 max-w-full items-center gap-1 rounded-tag bg-timeline-file ps-2.5 pe-3 font-mono text-secondary-copy text-fg-detail shadow-timeline-file"
+                      >
                         <button
                           type="button"
-                          aria-label={`Preview ${label}`}
+                          aria-label={t.chat.timeline.preview(label)}
                           onClick={() => ctx.onFileOpen(file)}
-                          className="focus-visible:ring-ring/70 flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md py-1 text-left text-sm hover:underline focus-visible:ring-2 focus-visible:ring-inset focus-visible:outline-none"
+                          className="flex h-full min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-tag text-left hover:underline focus-visible:inset-shadow-focus focus-visible:outline-none"
                         >
                           {fileIdentity}
                           <EyeIcon className="size-4 shrink-0" />
@@ -954,31 +957,38 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
                               <Button
                                 size="icon-xs"
                                 variant="ghost-muted"
-                                aria-label={`Download ${label}`}
+                                aria-label={t.chat.timeline.download(label)}
                                 onClick={() => ctx.onFileDownload(file)}
                               />
                             }
                           >
                             <DownloadIcon />
                           </TooltipTrigger>
-                          <TooltipPopup side="top">Download {label}</TooltipPopup>
+                          <TooltipPopup side="top">{t.chat.timeline.download(label)}</TooltipPopup>
                         </Tooltip>
                       </div>
                     );
                   }
 
                   return (
-                    <div key={file.id} className="flex min-w-0 items-center gap-2 py-1 text-sm">
+                    <div
+                      key={file.id}
+                      className="flex h-8.5 min-w-0 max-w-full items-center gap-2 rounded-tag bg-timeline-file ps-2.5 pe-3 font-mono text-secondary-copy text-fg-detail shadow-timeline-file"
+                    >
                       {fileIdentity}
                     </div>
                   );
                 })}
                 {unknownAttachments.map((attachment) => (
-                  <div key={attachment.id} className="flex min-w-0 items-center gap-2 py-1 text-sm">
+                  <div
+                    key={attachment.id}
+                    className="flex h-8.5 min-w-0 max-w-full items-center gap-2 rounded-tag bg-timeline-file ps-2.5 pe-3 font-mono text-secondary-copy text-fg-detail shadow-timeline-file"
+                  >
                     <PierreEntryIcon
                       pathValue={attachment.name}
                       kind="file"
                       theme={ctx.resolvedTheme}
+                      className="size-3.5"
                     />
                     <span className="min-w-0 flex-1 truncate">{attachment.name}</span>
                   </div>
@@ -1009,11 +1019,11 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
           </div>
         ) : null}
       </div>
-      <UserMessageProjectedStatus row={row} />
+      {folded && !expanded ? <UserMessageProjectedStatus row={row} /> : null}
       {!folded || expanded ? (
         <div
           className={cn(
-            "flex w-full max-w-[80%] justify-end pe-1",
+            "flex w-full max-w-timeline-user justify-end pe-1",
             floatActions && "@min-[37rem]:hidden",
             ACTIONS_REVEAL_CLASS_NAME,
           )}
@@ -1026,8 +1036,9 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
 }
 
 const ACTIONS_REVEAL_CLASS_NAME =
-  "items-center text-xs tabular-nums opacity-0 transition-opacity duration-200 pointer-coarse:opacity-100 focus-within:opacity-100 group-hover:opacity-100";
+  "items-center text-xs tabular-nums opacity-0 transition-opacity duration-150 motion-reduce:transition-none pointer-coarse:opacity-100 focus-within:opacity-100 group-hover:opacity-100";
 
+/** Renders the steer marker on a sent user message; the tooltip says whether it began queued. */
 function UserMessageIntentMarker({
   intent,
 }: {
@@ -1038,23 +1049,29 @@ function UserMessageIntentMarker({
       <TooltipTrigger
         render={
           <div
-            className="me-1 flex items-center justify-end gap-1 text-xs leading-none text-muted-foreground"
+            className="flex h-5 items-center gap-1 whitespace-nowrap rounded-tag bg-update-surface px-2.25 text-meta-large font-semibold text-update-foreground shadow-tag"
             data-user-message-intent={intent}
           />
         }
       >
         <Redo2Icon aria-hidden="true" className="size-3" />
-        Steer
+        {t.chat.timeline.steer}
       </TooltipTrigger>
       <TooltipPopup side="top">
         {intent === "promoted_queued_to_steer"
-          ? "Originally queued, then promoted to steer the active turn"
-          : "Steered the active turn"}
+          ? t.chat.timeline.originallyQueuedThenPromotedToSteerThe
+          : t.chat.timeline.steeredTheActiveTurn}
       </TooltipPopup>
     </Tooltip>
   );
 }
 
+/**
+ * Renders the action to revert the conversation to a user-message boundary.
+ * @param props - Required target turnCount and messageId; neither may be null. Uses TimelineRowCtx
+ * for pending state and the revert callback.
+ * @returns The revert button; never null. Invokes the host revert action only after a user click.
+ */
 function RevertUserMessageButton({
   turnCount,
   messageId,
@@ -1071,25 +1088,26 @@ function RevertUserMessageButton({
         render={
           <Button
             type="button"
-            size="xs"
-            variant="ghost"
+            size="icon-md"
+            variant="ghost-muted"
             disabled={activity.isRevertingCheckpoint || activity.isWorking}
             onClick={() => ctx.onRevertToTurnCount(turnCount, messageId)}
-            aria-label="Edit from here"
+            aria-label={t.chat.timeline.editFromHere}
           />
         }
       >
-        <PencilIcon className="size-3" />
+        <PencilLineIcon className="size-3.75" />
       </TooltipTrigger>
-      <TooltipPopup side="top">Edit from here</TooltipPopup>
+      <TooltipPopup side="top">{t.chat.timeline.editFromHere}</TooltipPopup>
     </Tooltip>
   );
 }
 
-const COLLAPSED_USER_MESSAGE_FADE_HEIGHT_REM = 1.75;
-
-const COLLAPSED_USER_MESSAGE_FADE_MASK = `linear-gradient(to bottom, black calc(100% - ${COLLAPSED_USER_MESSAGE_FADE_HEIGHT_REM}rem), transparent)`;
-
+/**
+ * Clips D1 previews to three lines without changing the length policy or find-reveal behavior.
+ * @param props - Message text, context renderer, skills, working directory.
+ * @returns The complete body in the DOM, with a local expand/collapse control for long messages.
+ */
 const CollapsibleUserMessageBody = memo(function CollapsibleUserMessageBody(props: {
   text: string;
   renderContextReference: (reference: ChatMarkdownContextReference) => ReactNode;
@@ -1111,21 +1129,12 @@ const CollapsibleUserMessageBody = memo(function CollapsibleUserMessageBody(prop
       {hasVisibleBody ? (
         <div
           ref={revealRef}
-          className={cn("relative", isCollapsed && "max-h-44 overflow-hidden")}
+          className={cn("relative", isCollapsed && "line-clamp-3")}
           data-user-message-body="true"
           data-thread-find-text="true"
           data-thread-find-fold={isCollapsed ? "" : undefined}
           data-user-message-collapsed={isCollapsed ? "true" : "false"}
           data-user-message-collapsible={canCollapse ? "true" : "false"}
-          data-user-message-fade={isCollapsed ? "true" : "false"}
-          style={
-            isCollapsed
-              ? {
-                  WebkitMaskImage: COLLAPSED_USER_MESSAGE_FADE_MASK,
-                  maskImage: COLLAPSED_USER_MESSAGE_FADE_MASK,
-                }
-              : undefined
-          }
         >
           <UserMessageBody
             text={props.text}
@@ -1136,19 +1145,23 @@ const CollapsibleUserMessageBody = memo(function CollapsibleUserMessageBody(prop
         </div>
       ) : null}
       {showCollapseControl ? (
-        <div className="mt-1.5 flex items-center justify-end gap-2" data-user-message-footer="true">
+        <div
+          className={cn(
+            "mt-2 flex items-center gap-2",
+            showCollapseControl ? "justify-between" : "justify-end",
+          )}
+          data-user-message-footer="true"
+        >
           {showCollapseControl ? (
-            <Button
+            <button
               type="button"
-              size="xs"
-              variant="ghost-muted"
               aria-expanded={expanded}
               data-scroll-anchor-ignore
               onClick={() => setExpanded((value) => !value)}
-              className="-ml-1"
+              className="cursor-pointer self-start rounded-sm text-secondary-copy-medium font-semibold text-code-foreground underline decoration-border underline-offset-3 hover:text-message-foreground focus-visible:outline-2 focus-visible:outline-ring"
             >
-              {expanded ? "Show less" : "Show full message"}
-            </Button>
+              {expanded ? t.chat.timeline.showLess : t.chat.timeline.showFullMessage}
+            </button>
           ) : null}
         </div>
       ) : null}
@@ -1156,6 +1169,11 @@ const CollapsibleUserMessageBody = memo(function CollapsibleUserMessageBody(prop
   );
 });
 
+/**
+ * Renders user Markdown with D1 typography, context links and literal HTML.
+ * @param props - Message text, optional context renderer, skills and working directory.
+ * @returns Markdown content, or null for empty text; uses TimelineRowCtx for thread navigation.
+ */
 const UserMessageBody = memo(function UserMessageBody(props: {
   text: string;
   renderContextReference?: (reference: ChatMarkdownContextReference) => ReactNode;
@@ -1172,7 +1190,7 @@ const UserMessageBody = memo(function UserMessageBody(props: {
       cwd={props.markdownCwd}
       threadRef={ctx.threadRef ?? undefined}
       skills={props.skills}
-      className="text-foreground"
+      className="text-body leading-timeline-user text-message-foreground"
       lineBreaks
       parseRawHtml={false}
       renderContextReference={props.renderContextReference}
