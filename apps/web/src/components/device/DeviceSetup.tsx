@@ -58,7 +58,7 @@ function deviceHostDiagnostics(
 }
 
 /** Displays the supplied readiness diagnostics for the selected host; command execution remains with the device service. */
-function DeviceHostDiagnostics(props: {
+export function DeviceHostDiagnostics(props: {
   readonly hosts: ReadonlyArray<Pick<DeviceServiceState["hosts"][number], "id" | "label">>;
   readonly hostStatuses: DeviceServiceState["hostStatuses"];
   readonly className?: string;

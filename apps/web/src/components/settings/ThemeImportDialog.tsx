@@ -3,7 +3,7 @@ import { t } from "~/i18n";
 import { DownloadIcon } from "lucide-react";
 import type { ChangeEvent, DragEvent } from "react";
 import { settlePromise } from "@t3tools/client-runtime/state/runtime";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "../../lib/utils";
 import {
   getCustomThemes,
@@ -96,20 +96,17 @@ export function ThemeImportDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  // Each opening is a fresh session: its body remounts with clean state, and
-  // closing aborts every read, search, and install the session started.
-  const [session, setSession] = useState(() => ({
-    open,
-    id: 0,
-    controller: new AbortController(),
-  }));
-  if (session.open !== open) {
-    setSession(
-      open ? { open, id: session.id + 1, controller: new AbortController() } : { ...session, open },
-    );
-  }
+  const [session, setSession] = useState<{ id: number; controller: AbortController } | null>(null);
+  // Parent closure and unmount must cancel too; each setup gets a fresh controller after StrictMode cleanup.
+  useEffect(() => {
+    if (!open) return;
+    const controller = new AbortController();
+    // oxlint-disable-next-line react/set-state-in-effect -- Publish a fresh session because effect cleanup irreversibly aborts its controller.
+    setSession((previous) => ({ id: (previous?.id ?? 0) + 1, controller }));
+    return () => controller.abort();
+  }, [open]);
   const close = () => {
-    session.controller.abort();
+    session?.controller.abort();
     onOpenChange(false);
   };
 
@@ -125,13 +122,15 @@ export function ThemeImportDialog({
         <DialogHeader>
           <DialogTitle>{t.settings.themeImport.importTitle}</DialogTitle>
         </DialogHeader>
-        <ThemeImportBody
-          key={session.id}
-          session={session.controller}
-          onClose={close}
-          onImported={onImported}
-          onImportedMany={onImportedMany}
-        />
+        {session && (
+          <ThemeImportBody
+            key={session.id}
+            session={session.controller}
+            onClose={close}
+            onImported={onImported}
+            onImportedMany={onImportedMany}
+          />
+        )}
       </DialogPopup>
     </Dialog>
   );

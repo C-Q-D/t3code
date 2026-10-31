@@ -1,5 +1,19 @@
 /** Tests theme migration, initial application, and storage or desktop failure handling. */
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import type { EnvironmentTheme } from "@t3tools/contracts";
+import type * as ReactModule from "react";
+
+const publishedThemes = vi.hoisted(() => ({
+  atom: null as unknown as import("effect/reactivity").Atom.Writable<
+    ReadonlyArray<EnvironmentTheme>
+  >,
+}));
+
+vi.mock("../state/server", async () => {
+  const { Atom } = await import("effect/reactivity");
+  publishedThemes.atom = Atom.make<ReadonlyArray<EnvironmentTheme>>([]);
+  return { primaryServerEnvironmentThemesAtom: publishedThemes.atom };
+});
 
 function createStorage(overrides: Partial<Storage> = {}): Storage {
   const store = new Map<string, string>();
@@ -22,7 +36,8 @@ function createStorage(overrides: Partial<Storage> = {}): Storage {
 
 /** Expose the hook's public commands without mounting a client; effects are driven explicitly. */
 function mockThemeHook() {
-  vi.doMock("react", () => ({
+  vi.doMock("react", async (importOriginal) => ({
+    ...(await importOriginal<typeof ReactModule>()),
     useCallback: <A>(callback: A) => callback,
     useEffect: () => undefined,
     useSyncExternalStore: (_subscribe: unknown, snapshot: () => unknown) => snapshot(),
@@ -125,11 +140,13 @@ describe("Graphite theme migration", () => {
     const palette = await import("../themePalette");
     const nightfall = {
       id: "nightfall",
-      label: "Nightfall",
+      name: "Nightfall",
       appearance: "dark" as const,
       colors: palette.getDefaultThemeColors("dark"),
     };
-    palette.setEnvironmentThemes([nightfall]);
+    const { appAtomRegistry } = await import("../rpc/atomRegistry");
+    appAtomRegistry.set(publishedThemes.atom, [nightfall]);
+    expect(palette.getThemeDefinition("nightfall")?.label).toBe("Nightfall");
 
     mockThemeHook();
     installThemeDocument();
@@ -142,7 +159,9 @@ describe("Graphite theme migration", () => {
     expect(useTheme().setTheme("nightfall")).toBe(true);
     vi.resetModules();
     const reloadedPalette = await import("../themePalette");
-    reloadedPalette.setEnvironmentThemes([nightfall]);
+    const { appAtomRegistry: reloadedRegistry } = await import("../rpc/atomRegistry");
+    reloadedRegistry.set(publishedThemes.atom, [nightfall]);
+    expect(reloadedPalette.getThemeDefinition("nightfall")?.label).toBe("Nightfall");
     const reloadedTheme = await import("./useTheme");
 
     expect(storage.getItem("t3code:theme")).toBe("nightfall");

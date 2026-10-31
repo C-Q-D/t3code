@@ -234,7 +234,7 @@ export function createThemeSearch(
 
 /**
  * Keeps Open VSX query and install state separate so a completed install cannot erase a newer search or its error.
- * @param props.open Whether the search surface is visible.
+ * @param props.signal Cancels pending searches and installs when the owning import session ends.
  * @param props.onInstalled Receives imported themes and whether existing themes were updated.
  * @returns Search/install controls. Existing request cancellation and error states own failures; no extra retry loop is added.
  */
