@@ -7,6 +7,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { ProviderDriverKind, ProviderInstanceId, type ServerProvider } from "@t3tools/contracts";
 import { t } from "~/i18n";
+import { ProviderModelsSection } from "./ProviderModelsSection";
 import { ProviderInstanceCard } from "./ProviderInstanceCard";
 
 let container: HTMLDivElement;
@@ -71,6 +72,45 @@ afterEach(async () => {
 });
 
 describe("provider card selection", () => {
+  it("keeps the Reasoning label for models with an effort control", async () => {
+    await act(() =>
+      root.render(
+        <ProviderModelsSection
+          instanceId={ProviderInstanceId.make("cursor")}
+          driverKind={ProviderDriverKind.make("cursor")}
+          models={[
+            {
+              slug: "test-model",
+              name: "Test model",
+              isCustom: false,
+              capabilities: {
+                optionDescriptors: [
+                  {
+                    id: "effort",
+                    label: "Effort",
+                    type: "select",
+                    options: [{ id: "high", label: "High" }],
+                  },
+                ],
+              },
+            },
+          ]}
+          customModels={[]}
+          canManageCustomModels={false}
+          hiddenModels={[]}
+          favoriteModels={[]}
+          modelOrder={[]}
+          onChange={() => undefined}
+          onHiddenModelsChange={() => undefined}
+          onFavoriteModelsChange={() => undefined}
+          onToggleFavorite={() => undefined}
+          onModelOrderChange={() => undefined}
+        />,
+      ),
+    );
+    expect(container.textContent).toContain(t.settings.providerModels.reasoning);
+    expect(container.textContent).not.toContain("No reasoning");
+  });
   it.each(["model", "empty", "space"] as const)(
     "selects through the %s area but keeps the enable switch independent",
     async (target) => {

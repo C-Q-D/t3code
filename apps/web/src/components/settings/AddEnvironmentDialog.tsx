@@ -152,6 +152,7 @@ export function AddEnvironmentDialog({
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
       savedBackendSessionRef.current += 1;
+      setIsAddingSavedBackend(false);
       setSavedBackendMode("remote");
       setSavedBackendHost("");
       setSavedBackendPairingCode("");
@@ -170,26 +171,11 @@ export function AddEnvironmentDialog({
       label: "",
       ...(routeTarget ? { expectedEnvironmentId: routeTarget.environmentId } : {}),
     });
+    if (session !== savedBackendSessionRef.current) return;
     if (result._tag === "Failure") {
-      if (session === savedBackendSessionRef.current && !isAtomCommandInterrupted(result)) {
+      if (!isAtomCommandInterrupted(result)) {
         pipe(squashAtomCommandFailure(result), formatDesktopSshConnectionError, onErrorChange);
       }
-
-      setSavedBackendHost("");
-      setSavedBackendPairingCode("");
-      setSavedBackendSshHost("");
-      setSavedBackendSshUsername("");
-      setSavedBackendSshPort("");
-      onOpenChange(false);
-      toastManager.add({
-        type: "success",
-        title: routeTarget
-          ? t.settings.connections.environment.routeAddedToast
-          : t.settings.connections.environment.connectedToast,
-        description: routeTarget
-          ? t.settings.connections.ssh.routeAddedHint(routeTarget.label, target.alias)
-          : t.settings.connections.ssh.connectedHint(target.alias),
-      });
       setIsAddingSavedBackend(false);
       return;
     }
@@ -225,6 +211,7 @@ export function AddEnvironmentDialog({
       return;
     }
 
+    const session = savedBackendSessionRef.current;
     setIsAddingSavedBackend(true);
     onErrorChange(null);
     let remotePairingInput: ReturnType<typeof parseRemotePairingFields>;
@@ -254,6 +241,7 @@ export function AddEnvironmentDialog({
       ...remotePairingInput,
       ...(routeTarget ? { expectedEnvironmentId: routeTarget.environmentId } : {}),
     });
+    if (session !== savedBackendSessionRef.current) return;
     if (result._tag === "Failure") {
       if (!isAtomCommandInterrupted(result)) {
         const error = squashAtomCommandFailure(result);
@@ -310,16 +298,12 @@ export function AddEnvironmentDialog({
     try {
       resolved = await desktopBridge.resolveSshHost(target.alias);
     } catch (error) {
-      if (session === savedBackendSessionRef.current) {
-        onErrorChange(formatDesktopSshConnectionError(error));
-      }
+      if (session !== savedBackendSessionRef.current) return;
+      onErrorChange(formatDesktopSshConnectionError(error));
       setIsAddingSavedBackend(false);
       return;
     }
-    if (session !== savedBackendSessionRef.current) {
-      setIsAddingSavedBackend(false);
-      return;
-    }
+    if (session !== savedBackendSessionRef.current) return;
     setSavedBackendSshUsername(resolved.username ?? "");
     setSavedBackendSshPort(resolved.port === null ? "" : String(resolved.port));
     await connectSavedBackendSshTarget(resolved);
@@ -459,6 +443,7 @@ export function AddEnvironmentDialog({
       : null;
   const addRelayRoute = async () => {
     if (relayRouteOffer === null || routeTarget === null) return;
+    const session = savedBackendSessionRef.current;
     setIsAddingSavedBackend(true);
     const result = await registerEnvironment(
       new RelayConnectionRegistration({
@@ -468,6 +453,7 @@ export function AddEnvironmentDialog({
         }),
       }),
     );
+    if (session !== savedBackendSessionRef.current) return;
     setIsAddingSavedBackend(false);
     if (result._tag === "Failure") {
       if (!isAtomCommandInterrupted(result)) {

@@ -66,6 +66,7 @@ function describeModelCapabilities(
         descriptor.type === "select" &&
         (descriptor.id === "reasoningEffort" ||
           descriptor.id === "reasoning" ||
+          descriptor.id === "effort" ||
           descriptor.id === "variant"),
     )
   ) {
