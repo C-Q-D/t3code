@@ -1,6 +1,8 @@
 /** Owns the graphite settings navigation and search; child routes own setting controls. */
 import { splitThreadSearchText } from "@t3tools/shared/threadSearch";
 import { PixelAgentIcon } from "../icons/PixelLucideIcon";
+import { workspaceAreaProps } from "../../lib/workspaceFocus";
+import { useSettingsSectionNavigation } from "./useSettingsSectionNavigation";
 import { t } from "~/i18n";
 import { lazy, Suspense, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import {
@@ -92,6 +94,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
     (item) => item.to !== "/settings/projects" || isSettingsOverviewVisible(scopeSearch),
   );
   const { isMobile, setOpenMobile, open, setOpen } = useSidebar();
+  const sectionNavigation = useSettingsSectionNavigation(pathname);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
   const [activeResultIndex, setActiveResultIndex] = useState(0);
@@ -215,7 +218,11 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col text-control leading-normal text-foreground text-shadow-stone">
+    <div
+      {...workspaceAreaProps("settings-nav", 0, "Settings sections")}
+      {...sectionNavigation.containerProps}
+      className="flex h-full min-h-0 flex-col text-control leading-normal text-foreground text-shadow-stone"
+    >
       <div className="shrink-0 px-3 pt-3 pb-2">
         <div
           className="flex h-9.5 items-center gap-2 rounded-full bg-sidebar-control-surface pr-1.5 pl-3.5 shadow-settings-search focus-within:inset-shadow-focus data-searching:inset-shadow-focus"
@@ -333,6 +340,8 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                     type="button"
                     aria-current={isActive ? "page" : undefined}
                     className="flex h-9 w-full cursor-pointer items-center gap-2.5 rounded-compact-row px-3 text-left text-code-foreground outline-none hover:bg-sidebar-row-hover hover:text-foreground focus-visible:inset-shadow-focus aria-current:bg-sidebar-row-active aria-current:font-bold aria-current:text-foreground aria-current:shadow-settings-nav"
+                    data-settings-section={item.to}
+                    tabIndex={sectionNavigation.tabIndexFor(item.to)}
                     onClick={() => handleSectionClick(item.to)}
                   >
                     <Icon aria-hidden="true" className="size-4 shrink-0" strokeWidth={1.75} />
