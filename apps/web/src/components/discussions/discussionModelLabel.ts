@@ -28,5 +28,5 @@ export function discussionModelLabel(
   instance: Pick<ProviderInstanceEntry, "displayName" | "driverKind"> | undefined,
   model: ModelEsque | undefined,
 ): string {
-  return `${discussionProviderLabel(selection, instance)} · ${model ? getTriggerDisplayModelName({ ...model, subProvider: instance?.driverKind === "claudeAgent" ? "Claude" : model.subProvider }) : selection.model}`;
+  return `${discussionProviderLabel(selection, instance)} · ${model ? getTriggerDisplayModelName({ ...model, subProvider: instance?.driverKind === "claudeAgent" ? "Claude" : model.subProvider }, instance?.driverKind) : selection.model}`;
 }

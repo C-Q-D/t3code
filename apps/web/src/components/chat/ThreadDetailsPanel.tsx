@@ -233,8 +233,8 @@ export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
 
                     {show.scripts && props.activeProjectScripts ? (
                       <ProjectScriptsControl
-                        environmentId={props.environmentId}
                         displayMode="panel"
+                        environmentId={props.environmentId}
                         scripts={props.activeProjectScripts}
                         fileScripts={fileScripts}
                         preferredScriptId={props.preferredScriptId}
@@ -283,7 +283,6 @@ export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
                         panelActions={
                           show.git ? (
                             <GitActionsControl
-                              displayMode="panel"
                               compact={density !== "full"}
                               showActions={visible.gitActions}
                               showChanges={visible.changes && density !== "full"}
@@ -299,7 +298,6 @@ export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
                       />
                     ) : show.git ? (
                       <GitActionsControl
-                        displayMode="panel"
                         compact={density !== "full"}
                         showActions={visible.gitActions}
                         showChanges={visible.changes && density !== "full"}

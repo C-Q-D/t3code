@@ -292,6 +292,8 @@ export const settings = {
 
       options: {
         artwork: "Artwork",
+        "dev-artwork": "Dev artwork",
+        "nightly-artwork": "Nightly artwork",
         pill: "Version pill",
         none: "None",
       } satisfies Record<EnvironmentIdentificationMode, string>,

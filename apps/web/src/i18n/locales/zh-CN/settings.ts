@@ -266,6 +266,8 @@ export const settings: Messages["settings"] = {
       title: "环境标识",
 
       options: {
+        "dev-artwork": "开发版图案",
+        "nightly-artwork": "每日构建版图案",
         artwork: "插画",
         pill: "版本标记",
         none: "无",

@@ -89,7 +89,6 @@ import {
   resolveServerConfigVersionMismatch,
   resolveServerSelfUpdateCapability,
   supportsDesktopAppUpdate,
-  supportsServerUpdateThreadContinuation,
 } from "~/versionSkew";
 import { hasCloudPublicConfig } from "~/cloud/publicConfig";
 import { RemoveT3ConnectEnvironmentDialog } from "../clerk/RemoveT3ConnectEnvironmentDialog";
@@ -1533,7 +1532,6 @@ export function ConnectionsSettings() {
                   selfUpdate={resolveServerSelfUpdateCapability(primaryServerConfig)}
                   installation={primaryServerConfig?.environment.capabilities.serverInstallation}
                   desktopAppUpdate={supportsDesktopAppUpdate(primaryServerConfig)}
-                  threadContinuation={supportsServerUpdateThreadContinuation(primaryServerConfig)}
                   targetVersion={primaryVersionMismatch.clientVersion}
                   label={
                     primaryServerUpdateState.status === "failed"

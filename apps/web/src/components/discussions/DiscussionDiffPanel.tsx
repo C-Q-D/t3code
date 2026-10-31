@@ -1,6 +1,5 @@
 /** Displays one persisted statement in the H1/H2 slab, retaining the shared virtualized diff viewer. */
 import type { CodeViewDiffItem } from "@pierre/diffs";
-import type { CodeViewHandle } from "@pierre/diffs/react";
 import type { Discussion, EnvironmentId } from "@t3tools/contracts";
 import { useEffect, useState } from "react";
 import { XIcon, ChevronDownIcon, ChevronRightIcon } from "lucide-react";
@@ -104,7 +103,9 @@ export function DiscussionDiffPanel({
   );
   const { resolvedTheme } = useTheme();
   const settings = useEnvironmentSettings(environmentId);
+  const reveal = useCodeViewFileReveal();
   const options = {
+    onPostRender: reveal.flush,
     diffStyle: settings.diffLayout === "split" ? "split" : "unified",
     lineDiffType: "none",
     overflow: settings.wordWrap ? "wrap" : "scroll",
@@ -113,7 +114,6 @@ export function DiscussionDiffPanel({
     themeType: resolvedTheme,
     stickyHeaders: true,
   } satisfies StyledDiffCodeViewOptions<undefined>;
-  const [viewer, setViewer] = useState<CodeViewHandle<undefined, undefined> | null>(null);
   const [foldState, setFoldState] = useState({ selection, ids: new Set<string>() });
   const files = parsed?.kind === "files" ? parsed.files : null;
   const selectedIndex = view.kind === "files" ? view.selectedIndex : -1;
@@ -140,23 +140,13 @@ export function DiscussionDiffPanel({
     items = calculateItems();
     setItemsCache({ inputs: [files, foldState, selection, selectedIndex] as const, value: items });
   }
-  const calculateReady = () => items.filter((item) => !item.collapsed).map((item) => item.id);
-  const [readyCache, setReadyCache] = useState(() => ({
-    inputs: [items] as const,
-    value: calculateReady(),
-  }));
-  let ready = readyCache.value;
-  if (!Object.is(readyCache.inputs[0], items)) {
-    ready = calculateReady();
-    setReadyCache({ inputs: [items] as const, value: ready });
-  }
-  const reveal = useCodeViewFileReveal(viewer, selection, ready);
   useEffect(() => {
     if (selectedIndex < 0) return;
     const id = String(selectedIndex);
     // A fresh selection object also re-reveals the same row without closing the panel.
-    reveal(id);
-  }, [selectedIndex, reveal]);
+    reveal.request(id);
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- A new selection must reveal the same file again after manual scrolling.
+  }, [selectedIndex, selection, reveal]);
   return (
     <aside
       aria-label={t.discussions.diff.panelTitle}
@@ -256,7 +246,7 @@ export function DiscussionDiffPanel({
               <StyledDiffCodeView
                 discussion
                 className="discussion-diff-view @container h-full overflow-auto"
-                viewerRef={setViewer}
+                viewerRef={reveal.attach}
                 items={items}
                 options={options}
                 unsafeCSSExtra={DISCUSSION_DIFF_CSS}

@@ -357,13 +357,16 @@ export function DiscussionSeats({
                                         />
                                         <span className="min-w-0 flex-1 truncate">
                                           {instance.displayName} ·{" "}
-                                          {getTriggerDisplayModelName({
-                                            ...option,
-                                            subProvider:
-                                              instance.driverKind === "claudeAgent"
-                                                ? "Claude"
-                                                : option.subProvider,
-                                          })}
+                                          {getTriggerDisplayModelName(
+                                            {
+                                              ...option,
+                                              subProvider:
+                                                instance.driverKind === "claudeAgent"
+                                                  ? "Claude"
+                                                  : option.subProvider,
+                                            },
+                                            instance.driverKind,
+                                          )}
                                         </span>
                                         {selected ? (
                                           <CheckIcon className="size-4 shrink-0" />

@@ -1194,6 +1194,14 @@ export const chat: Messages["chat"] = {
       },
       t3Tools: {
         labels: {
+          t3_background_wait: ["等待", "正在等待", "已等待", "后台工作"],
+          preview_act: ["操作", "正在操作", "已操作", "预览浏览器"],
+          t3_queue: ["管理", "正在管理", "已管理", "排队消息"],
+          t3_pending_request: ["处理", "正在处理", "已处理", "待回答问题"],
+          t3_thread_transfer: ["操作", "正在操作", "已操作", "对话转移"],
+          t3_environment_links: ["读取", "正在读取", "已读取", "环境连接"],
+          t3_environment_link: ["连接", "正在连接", "已连接", "环境"],
+          t3_environment_unlink: ["断开", "正在断开", "已断开", "环境连接"],
           t3_workflow_stop: ["停止", "正在停止", "已请求停止", "工作流"],
           link_pull_request: ["关联", "正在关联", "已关联", "PR"],
           unlink_pull_request: ["取消关联", "正在取消关联", "已取消关联", "PR"],

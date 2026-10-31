@@ -3563,6 +3563,7 @@ export default function ChatView(props: ChatViewProps) {
 
               {showScrollToBottom && !isThreadFindActive && (
                 <ScrollToEndButton
+                  summary={null}
                   bottom={scrollToEndClearance + 4}
                   onScrollToEnd={() => scrollToEnd(true)}
                 />
@@ -3878,24 +3879,30 @@ export default function ChatView(props: ChatViewProps) {
                                     ? onAutoEnvironmentStable
                                     : undefined
                                 }
-                                composerControlsHostRef={setRestingComposerControlsHost}
-                                contextStripVisible={showComposerContextStrip}
                                 availableEnvironments={logicalProjectEnvironments}
-                                {...(isServerThread
-                                  ? {}
-                                  : {
-                                      trailing: (
-                                        <ComposerContextPermissions
-                                          runtimeMode={
-                                            resolveCompatibleRuntimeMode(
-                                              runtimeMode,
-                                              activeProviderStatus?.supportedRuntimeModes,
-                                            ).mode
-                                          }
-                                          onOpen={openComposerPermissionsStable}
-                                        />
-                                      ),
-                                    })}
+                                trailing={
+                                  <>
+                                    {!embedded ? (
+                                      <div
+                                        ref={setRestingComposerControlsHost}
+                                        data-composer-context-control
+                                        data-chat-resting-composer-controls-host="true"
+                                        className="flex min-w-0 flex-1 items-center justify-start overflow-x-clip overflow-y-visible"
+                                      />
+                                    ) : null}
+                                    {!isServerThread ? (
+                                      <ComposerContextPermissions
+                                        runtimeMode={
+                                          resolveCompatibleRuntimeMode(
+                                            runtimeMode,
+                                            activeProviderStatus?.supportedRuntimeModes,
+                                          ).mode
+                                        }
+                                        onOpen={openComposerPermissionsStable}
+                                      />
+                                    ) : null}
+                                  </>
+                                }
                               />
                             </div>
                           )}
