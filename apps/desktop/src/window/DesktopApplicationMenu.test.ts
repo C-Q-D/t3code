@@ -166,9 +166,7 @@ describe("DesktopApplicationMenu", () => {
           (window.submenu as Electron.MenuItemConstructorOptions[]).map(
             (item) => item.role ?? item.type,
           ),
-          platform === "darwin"
-            ? ["minimize", "zoom", "separator", "front"]
-            : ["minimize", "zoom", "close"],
+          platform === "darwin" ? ["minimize", "zoom", "separator", "front"] : ["minimize", "zoom"],
         );
       }),
   );
@@ -346,39 +344,41 @@ describe("DesktopApplicationMenu", () => {
     }),
   );
 
-  it.effect("never binds Cmd/Ctrl+W to closing the window", () =>
-    Effect.gen(function* () {
-      for (const platform of ["darwin", "linux", "win32"] as const) {
-        const applicationMenuTemplate =
-          yield* Deferred.make<readonly Electron.MenuItemConstructorOptions[]>();
-        yield* configureMenu(yield* Deferred.make<string>(), applicationMenuTemplate, {
-          platform,
-        });
+  it.effect.each(["en", "zh-CN"] as const)(
+    "never binds Cmd/Ctrl+W to closing the window in %s",
+    (locale) =>
+      Effect.gen(function* () {
+        for (const platform of ["darwin", "linux", "win32"] as const) {
+          const applicationMenuTemplate =
+            yield* Deferred.make<readonly Electron.MenuItemConstructorOptions[]>();
+          yield* configureMenu(yield* Deferred.make<string>(), applicationMenuTemplate, locale, {
+            platform,
+          });
 
-        const items: Electron.MenuItemConstructorOptions[] = [];
-        const collect = (template: readonly Electron.MenuItemConstructorOptions[]) => {
-          for (const item of template) {
-            items.push(item);
-            if (Array.isArray(item.submenu)) collect(item.submenu);
-          }
-        };
-        collect(yield* Deferred.await(applicationMenuTemplate));
+          const items: Electron.MenuItemConstructorOptions[] = [];
+          const collect = (template: readonly Electron.MenuItemConstructorOptions[]) => {
+            for (const item of template) {
+              items.push(item);
+              if (Array.isArray(item.submenu)) collect(item.submenu);
+            }
+          };
+          collect(yield* Deferred.await(applicationMenuTemplate));
 
-        assert.isUndefined(
-          items.find((item) => item.role === "close"),
-          platform,
-        );
-        // Electron's default windowMenu submenu includes a close role.
-        assert.isUndefined(
-          items.find((item) => item.role === "windowMenu" && item.submenu === undefined),
-          platform,
-        );
-        assert.isUndefined(
-          items.find((item) => item.accelerator?.toLowerCase().endsWith("+w")),
-          platform,
-        );
-      }
-    }),
+          assert.isUndefined(
+            items.find((item) => item.role === "close"),
+            platform,
+          );
+          // Electron's default windowMenu submenu includes a close role.
+          assert.isUndefined(
+            items.find((item) => item.role === "windowMenu" && item.submenu === undefined),
+            platform,
+          );
+          assert.isUndefined(
+            items.find((item) => item.accelerator?.toLowerCase().endsWith("+w")),
+            platform,
+          );
+        }
+      }),
   );
 
   it.effect("reloads the main window even while a browser page has focus", () =>
