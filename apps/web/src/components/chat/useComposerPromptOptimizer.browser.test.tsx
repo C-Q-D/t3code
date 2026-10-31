@@ -20,7 +20,10 @@ import { messages as zhCN } from "~/i18n/locales/zh-CN";
 import { expect, it, vi } from "vite-plus/test";
 import { page, userEvent } from "vite-plus/test/browser";
 import { act, fakeTimers, render } from "../../../test/render";
-import { ComposerPromptEditor, type ComposerPromptEditorHandle } from "../ComposerPromptEditor";
+import {
+  ComposerPromptEditorTiptap as ComposerPromptEditor,
+  type ComposerPromptEditorHandle,
+} from "../ComposerPromptEditorTiptap";
 import {
   useComposerPromptOptimizer,
   type ComposerPromptOptimizerInput,

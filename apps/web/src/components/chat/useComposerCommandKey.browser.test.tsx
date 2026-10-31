@@ -5,8 +5,11 @@ import { DEFAULT_RESOLVED_KEYBINDINGS } from "@t3tools/shared/keybindings";
 import { expect, it } from "vite-plus/test";
 import { userEvent } from "vite-plus/test/browser";
 import { act, render } from "../../../test/render";
-import { ComposerPromptEditor, type ComposerPromptEditorHandle } from "../ComposerPromptEditor";
-import { useComposerCommandKey } from "./useComposerCommandKey";
+import {
+  ComposerPromptEditorTiptap as ComposerPromptEditor,
+  type ComposerPromptEditorHandle,
+} from "../ComposerPromptEditorTiptap";
+import { composerCommandKeyHandler } from "./composerCommandKey";
 import type { ComposerCommandItem } from "./ComposerCommandMenu";
 
 /** Owns draft and plan state; all decisions about keyboard priority come from the production hook. */
@@ -41,43 +44,44 @@ function Composer({ menu = false }: { menu?: boolean }) {
   const composerMenuOpenRef = useRef(menu);
   const composerMenuItemsRef = useRef([item]);
   const activeComposerMenuItemRef = useRef(item);
-  const { onComposerCommandKey } = useComposerCommandKey({
-    keybindings: DEFAULT_RESOLVED_KEYBINDINGS,
-    sendShortcut: "enter",
-    routeKind: "server",
-    phase: "ready",
-    isCompacting: false,
-    followUpBehavior: "queue",
-    isSoftwareKeyboardOpen: false,
-    planModeUiEnabled: true,
-    isLiteralPendingAnswer: false,
-    pendingUserInputs: [],
-    promptHistoryMessages: [],
-    promptHistoryPositionRef,
-    composerDraftTarget: target,
-    promptRef,
-    composerImagesRef,
-    composerFilesRef,
-    composerTerminalContextsRef,
-    composerPreviewAnnotations: [],
-    composerReviewComments: [],
-    composerEditorRef: editorRef,
-    composerMenuOpenRef,
-    composerMenuItemsRef,
-    activeComposerMenuItemRef,
-    setComposerDraftPrompt: (_target, value) => updateDraft(value),
-    setComposerCursor: setCursor,
-    setComposerTrigger: () => {},
-    setComposerHighlightedItemId: () => {},
-    dismissComposerTrigger: () => {},
-    toggleInteractionMode: () => setPlan((value) => !value),
-    nudgeComposerMenuHighlight: () => {},
-    onSelectComposerItem: (selected) => updateDraft(selected.label),
-    resolveActiveComposerTrigger: () => ({ trigger: null }),
-    readComposerSnapshot: () => ({ value: promptRef.current }),
-    applyPromptReplacement: () => false,
-    submitComposer: () => setSent(true),
-  });
+  const onComposerCommandKey: ReturnType<typeof composerCommandKeyHandler> = (...args) =>
+    composerCommandKeyHandler({
+      keybindings: DEFAULT_RESOLVED_KEYBINDINGS,
+      sendShortcut: "enter",
+      routeKind: "server",
+      phase: "ready",
+      isCompacting: false,
+      followUpBehavior: "queue",
+      isSoftwareKeyboardOpen: false,
+      planModeUiEnabled: true,
+      isLiteralPendingAnswer: false,
+      pendingUserInputs: [],
+      promptHistoryMessages: [],
+      promptHistoryPositionRef,
+      composerDraftTarget: target,
+      promptRef,
+      composerImagesRef,
+      composerFilesRef,
+      composerTerminalContextsRef,
+      composerPreviewAnnotations: [],
+      composerReviewComments: [],
+      composerEditorRef: editorRef,
+      composerMenuOpenRef,
+      composerMenuItemsRef,
+      activeComposerMenuItemRef,
+      setComposerDraftPrompt: (_target, value) => updateDraft(value),
+      setComposerCursor: setCursor,
+      setComposerTrigger: () => {},
+      setComposerHighlightedItemId: () => {},
+      dismissComposerTrigger: () => {},
+      toggleInteractionMode: () => setPlan((value) => !value),
+      nudgeComposerMenuHighlight: () => {},
+      onSelectComposerItem: (selected) => updateDraft(selected.label),
+      resolveActiveComposerTrigger: () => ({ trigger: null }),
+      readComposerSnapshot: () => ({ value: promptRef.current }),
+      applyPromptReplacement: () => false,
+      submitComposer: () => setSent(true),
+    })(...args);
   return (
     <>
       <ComposerPromptEditor

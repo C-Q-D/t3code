@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import type { ThreadStructure } from "@t3tools/client-runtime/state/shell";
 import {
   EnvironmentId,
@@ -82,6 +83,7 @@ function setRuns(ref: ScopedThreadRef, status: string) {
   appAtomRegistry.set(mocks.threadRuns(runsKey(ref)), [{ id: RUN, status }]);
 }
 
+/** Drives queue edits through the real draft store and save control with a supplied server projection. */
 function Harness(props: {
   readonly threadRef: ScopedThreadRef;
   readonly runStatus: string;
@@ -106,6 +108,7 @@ function Harness(props: {
   });
   return result.isEditing ? (
     <ComposerPrimaryActions
+      isConnecting={false}
       compact={false}
       canOperateThread
       pendingAction={null}
@@ -217,7 +220,7 @@ describe("useQueuedRunEdit", () => {
       expect(requireHook(hook).isEditing).toBe(false);
       await act(() => setRuns(THREAD_A, "queued"));
       await act(() => requireHook(hook).beginEdit(request));
-      const update = screen.getByRole("button", { name: "Update queued message" });
+      const update = screen.getByRole("button", { name: t.composer.primaryActions.saveQueued });
       await expect.element(update).toBeEnabled();
       await update.click();
       await vi.waitFor(() => expect(mocks.editQueuedRun).toHaveBeenCalledOnce());
@@ -253,7 +256,7 @@ describe("useQueuedRunEdit", () => {
       }),
     );
     await act(() => requireHook(hook).removeEditingAttachment("removed"));
-    await screen.getByRole("button", { name: "Update queued message" }).click();
+    await screen.getByRole("button", { name: t.composer.primaryActions.saveQueued }).click();
     await vi.waitFor(() => expect(mocks.editQueuedRun).toHaveBeenCalledOnce());
     expect(mocks.editQueuedRun).toHaveBeenCalledWith(
       expect.objectContaining({

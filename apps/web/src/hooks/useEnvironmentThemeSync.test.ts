@@ -69,21 +69,32 @@ async function setupThemeSync(mode: "dark" | "system" = "dark") {
       return getSnapshot();
     },
   }));
-  vi.doMock("@effect/atom-react", () => ({ useAtomValue: () => published }));
-  vi.doMock("../state/server", () => ({ primaryServerEnvironmentThemesAtom: {} }));
+  vi.doMock("@effect/atom-react", () => ({
+    useAtomValue: () => published,
+    useAtomRefresh: () => () => {},
+  }));
+  const { Atom } = await import("effect/reactivity");
+  const publishedAtom = Atom.make<ReadonlyArray<EnvironmentTheme>>([NIGHTFALL_THEME]);
+  vi.doMock("../state/server", () => ({ primaryServerEnvironmentThemesAtom: publishedAtom }));
+  const { appAtomRegistry } = await import("../rpc/atomRegistry");
 
   const palette = await import("../themePalette");
   storage.set(palette.THEME_APPEARANCE_MODE_STORAGE_KEY, mode);
   // useTheme.ts migration marker: migration finished before the user reselected Nightfall.
   storage.set("t3code:theme-migrated-graphite", "true");
   const { useTheme } = await import("./useTheme");
-  const { useEnvironmentThemeSync } = await import("./useEnvironmentTheme");
+  const { startEnvironmentThemeRepaint } = await import("./useEnvironmentTheme");
+  const stopRepaint = startEnvironmentThemeRepaint();
+  cleanups.push(() => {
+    stopRepaint();
+    appAtomRegistry.dispose();
+  });
   const flushEffects = () => {
     for (const effect of effects.splice(0)) effect();
   };
   const publish = (themes: ReadonlyArray<EnvironmentTheme>) => {
     published = themes;
-    useEnvironmentThemeSync();
+    appAtomRegistry.set(publishedAtom, themes);
     flushEffects();
     // A changed store snapshot also runs the consumer's passive theme effect.
     const theme = useTheme();
@@ -95,7 +106,10 @@ async function setupThemeSync(mode: "dark" | "system" = "dark") {
   return { publish, palette, root, styles, readSnapshot: () => readSnapshot?.() };
 }
 
+const cleanups: Array<() => void> = [];
+
 afterEach(() => {
+  for (const cleanup of cleanups.splice(0)) cleanup();
   vi.doUnmock("react");
   vi.doUnmock("@effect/atom-react");
   vi.doUnmock("../state/server");

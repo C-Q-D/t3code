@@ -1,3 +1,4 @@
+import { resolveThreadDetailsCardLayout } from "./threadDetailsCardLayout";
 /**
  * Verifies pointer gestures against hand-calculated canvas coordinates, without browser layout.
  * @vitest-environment jsdom
@@ -25,7 +26,6 @@ const threadRef = {
 let now = 0;
 let container: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
-const report = vi.fn();
 const content = vi.fn(() => (
   <>
     <p>Workspace</p>
@@ -47,7 +47,6 @@ beforeEach(() => {
   store.getState().reset();
   store.persist.clearStorage();
   useRightPanelStore.setState({ threadPanelVisibilityByThreadKey: {} });
-  report.mockClear();
   content.mockClear();
   vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(200);
   vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(200);
@@ -219,15 +218,25 @@ async function renderCard(width = 1200, inset = 0) {
           reportPreview: vi.fn(),
           clearPreview: vi.fn(),
           registerTimeline: vi.fn(),
-          reportDetailsCard: report,
+          measureDetailsCard: vi.fn(),
+          preferredDetailsCard: resolveThreadDetailsCardLayout({
+            container: { width, height: 800 },
+            lane: { padding: 48, minChatWidth: 640 },
+            frame: null,
+          }),
+          detailsCardPlacement: resolveThreadDetailsCardLayout({
+            container: { width, height: 800 },
+            lane: { padding: 48, minChatWidth: 640 },
+            frame: null,
+          }),
           detailsCardTopInset: inset,
         }}
       >
         <ThreadDetailsCard
+          contentKey="fixture"
           threadRef={threadRef}
           anchor={{ current: null }}
           handle={handle}
-          onPresentationChange={vi.fn()}
         >
           {content}
         </ThreadDetailsCard>
@@ -276,7 +285,6 @@ it("commits the release position without rerendering content during pointer move
   expect(element.style.top).toBe("100px");
   expect(element.style.right).toBe("");
   expect(element.style.transform).toBe("");
-  expect(report).toHaveBeenLastCalledWith(null);
 });
 
 it.each([
@@ -292,7 +300,6 @@ it.each([
   await pointer(control, "pointermove", 242, 128);
   await pointer(control, "pointerup", 242, 128);
   expect(store.getState().placement).toBeNull();
-  expect(report).toHaveBeenLastCalledWith({ left: 908, right: 1188, bottom: 212 });
 });
 
 it("does not publish movements of at most three pixels", async () => {
@@ -322,7 +329,6 @@ it("resets on blank double click but preserves placement on controls", async () 
   await act(async () => card().dispatchEvent(new MouseEvent("dblclick", { bubbles: true })));
   expect(store.getState().placement).toBeNull();
   expect(card().style.right).toBe("12px");
-  expect(report).toHaveBeenLastCalledWith({ left: 908, right: 1188, bottom: 212 });
 });
 
 it.each(["pointercancel", "lostpointercapture"])(
@@ -357,7 +363,6 @@ it("ignores search inset and restores placement after a narrow presentation", as
   expect(card().style.left).toBe("800px");
   expect(card().style.top).toBe("100px");
   expect(card().style.maxHeight).toBe("688px");
-  expect(report).toHaveBeenLastCalledWith(null);
   await renderCard(924, 48);
   expect(card()).toBeNull();
   await renderCard(1400, 48);

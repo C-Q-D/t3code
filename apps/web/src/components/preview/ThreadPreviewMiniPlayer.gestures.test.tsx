@@ -31,6 +31,19 @@ vi.mock("~/browser/browserRecording", () => ({
 }));
 vi.mock("~/browser/previewRuntimeTabId", () => ({ previewRuntimeTabId: () => "runtime-tab" }));
 vi.mock("~/browser/previewRuntime", () => ({ useRendersServerTabNatively: () => true }));
+const nativeSurface = vi.hoisted(() => ({ enabled: false }));
+vi.mock("~/browser/BrowserSurfaceSlot", async (importOriginal) => {
+  const { BrowserSurfaceSlot } =
+    await importOriginal<typeof import("~/browser/BrowserSurfaceSlot")>();
+  return {
+    BrowserSurfaceSlot: (props: React.ComponentProps<typeof BrowserSurfaceSlot>) =>
+      nativeSurface.enabled ? (
+        <BrowserSurfaceSlot {...props} />
+      ) : (
+        <div data-browser-surface-slot={props.tabId} />
+      ),
+  };
+});
 vi.mock("~/browser/ServerBrowserSurface", () => ({ ServerBrowserSurface: "server-surface" }));
 vi.mock("~/browser/serverPictureInPicture", () => ({
   useServerPictureInPictureKey: () => null,
@@ -98,7 +111,9 @@ function Harness({
         reportPreview,
         clearPreview,
         registerTimeline: () => {},
-        reportDetailsCard: () => {},
+        measureDetailsCard: () => {},
+        preferredDetailsCard: null,
+        detailsCardPlacement: null,
         detailsCardTopInset: 0,
       }}
     >
@@ -161,6 +176,7 @@ async function movePointer(
   return { handle, event };
 }
 beforeEach(() => {
+  nativeSurface.enabled = false;
   setPhysicsEnabled(false);
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   usePreviewMiniPlayerStore.setState({ byThreadKey: {} });
@@ -243,6 +259,7 @@ it("takes over a gliding preview from its current position", async () => {
 });
 
 it("keeps native surface bounds aligned while the shell rebounds at the wall", async () => {
+  nativeSurface.enabled = true;
   setPhysicsEnabled(true);
   const clock = installTestRaf();
   let now = 0;

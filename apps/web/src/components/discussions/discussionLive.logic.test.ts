@@ -22,7 +22,7 @@ import {
 const decodeEntry = Schema.decodeUnknownSync(DiscussionEntry);
 const decodeProjection = Schema.decodeUnknownSync(OrchestrationV2ProjectedTurnItem);
 const runId = RunId.make("current");
-const discussion = Schema.decodeUnknownSync(Discussion)({
+const discussion = Schema.decodeSync(Discussion)({
   id: "d",
   projectId: "p",
   title: "题",

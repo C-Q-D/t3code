@@ -3,7 +3,10 @@ import { createRef, useState } from "react";
 import { expect, it } from "vite-plus/test";
 import { userEvent } from "vite-plus/test/browser";
 import { act, render } from "../../test/render";
-import { ComposerPromptEditor, type ComposerPromptEditorHandle } from "./ComposerPromptEditor";
+import {
+  ComposerPromptEditorTiptap as ComposerPromptEditor,
+  type ComposerPromptEditorHandle,
+} from "./ComposerPromptEditorTiptap";
 
 /** Controlled editor owner; menu selection and send are external editor commands. */
 function Composer({

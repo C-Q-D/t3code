@@ -16,7 +16,9 @@ import { create, type ReactTestRenderer } from "react-test-renderer";
 import { describe, expect, it, vi } from "vite-plus/test";
 
 import { getSyntaxHighlighterPromise } from "../lib/syntaxHighlighting";
-import { GitHubIcon } from "./Icons";
+import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
+import { sourceControlIcon } from "../sourceControlPresentation";
+const GitHubIcon = sourceControlIcon(sourceControlClients.findByPublicDomain("github.com")!);
 import { Button } from "./ui/button";
 import { setMarkdownTaskChecked } from "./files/filePreviewMode";
 import { ProposedPlanCard } from "./chat/ProposedPlanCard";
@@ -371,7 +373,7 @@ describe("ChatMarkdown streaming", () => {
 
   it("does not retokenize completed lines when streaming finishes", async () => {
     const highlighter = await getSyntaxHighlighterPromise("typescript");
-    const highlight = vi.spyOn(highlighter, "codeToHast");
+    const highlight = vi.spyOn(highlighter, "codeToTokens");
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     let renderer: ReactTestRenderer | undefined;
     const text = "```typescript\nconst completed = 1;\nconst current = 2;";
@@ -394,11 +396,11 @@ describe("ChatMarkdown streaming", () => {
 
   it("recovers highlighting after a failed fence changes without resetting its controls", async () => {
     const highlighter = await getSyntaxHighlighterPromise("text");
-    const codeToHast = highlighter.codeToHast.bind(highlighter);
+    const codeToTokens = highlighter.codeToTokens.bind(highlighter);
     let fail = true;
-    vi.spyOn(highlighter, "codeToHast").mockImplementation((...args) => {
+    vi.spyOn(highlighter, "codeToTokens").mockImplementation((...args) => {
       if (fail) throw new Error("Temporary highlighter failure");
-      return codeToHast(...args);
+      return codeToTokens(...args);
     });
     vi.spyOn(console, "error").mockImplementation(() => {});
     vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -438,7 +440,7 @@ describe("ChatMarkdown streaming", () => {
 
   it("preserves code controls and details without highlighting an unchanged fence again", async () => {
     const highlighter = await getSyntaxHighlighterPromise("text");
-    const highlight = vi.spyOn(highlighter, "codeToHast");
+    const highlight = vi.spyOn(highlighter, "createStreamTokenizer");
     const writeText = vi.fn(async (_text: string) => {});
     vi.stubGlobal("navigator", { clipboard: { writeText } });
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
@@ -640,8 +642,18 @@ describe("ChatMarkdown skill chips", () => {
             cwd="/tmp/project"
             text={text}
             skills={[
-              { name: "2spec", displayName: "2Spec" },
-              { name: "20k", displayName: "MoneySkill" },
+              {
+                name: "2spec",
+                displayName: "2Spec",
+                path: "/skills/2spec/SKILL.md",
+                enabled: true,
+              },
+              {
+                name: "20k",
+                displayName: "MoneySkill",
+                path: "/skills/20k/SKILL.md",
+                enabled: true,
+              },
             ]}
           />,
         );
@@ -1276,7 +1288,14 @@ it.each([
 ])(
   "highlights the indexed occurrences of $query in $text",
   async ({ text, query, count, lineBreaks, user, templateEnabled }) => {
-    const skills = [{ name: "test-t3-app", displayName: "T3 App Testing" }];
+    const skills = [
+      {
+        name: "test-t3-app",
+        displayName: "T3 App Testing",
+        path: "/skills/test-t3-app/SKILL.md",
+        enabled: true,
+      },
+    ];
     const highlights = new Map<string, Set<Range>>();
     vi.stubGlobal(
       "Highlight",
@@ -1694,6 +1713,14 @@ vi.mock("../assets/assetUrls", () => ({
     failed: false,
   }),
   useAssetUrlRefresh: () => htmlAsset.refresh,
+}));
+vi.mock("../assets/longLivedAssetUrls", () => ({
+  useLongLivedAssetUrl: () => ({
+    _tag: "Success",
+    url: "https://example.test/cached",
+    expiresAt: 1_000_000,
+    failed: false,
+  }),
 }));
 vi.mock("./files/BrowserDocumentFrame", () => ({
   HtmlRenderDocument: ({ src }: { src: string }) => (

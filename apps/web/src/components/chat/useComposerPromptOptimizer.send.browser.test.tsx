@@ -4,7 +4,10 @@ import { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import { Atom, AsyncResult } from "effect/reactivity";
 import { it, expect, vi } from "vite-plus/test";
 import { act, render } from "../../../test/render";
-import { ComposerPromptEditor, type ComposerPromptEditorHandle } from "../ComposerPromptEditor";
+import {
+  ComposerPromptEditorTiptap as ComposerPromptEditor,
+  type ComposerPromptEditorHandle,
+} from "../ComposerPromptEditorTiptap";
 import { useComposerPromptOptimizer } from "./useComposerPromptOptimizer";
 import {
   ComposerPromptOptimizeTab,
@@ -63,6 +66,7 @@ function SendHarness() {
       previewAnnotations: [],
       reviewComments: [],
       threadContexts: [],
+      environmentContexts: [],
       shownPendingApprovalIds: [],
       selectedProvider: "codex",
       selectedModel: "gpt-5",
@@ -115,6 +119,7 @@ function SendHarness() {
     composerFilesRef: { current: [] },
     composerTerminalContextsRef: { current: [] },
     feedbackUploadsInFlightRef: { current: new Set() },
+    optimisticBlobPreviews: { track: noop, release: noop },
     queuedRunEdit: { isEditing: false },
     isConnecting: false,
     isRevertingCheckpoint: false,

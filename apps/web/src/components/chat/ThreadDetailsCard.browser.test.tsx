@@ -38,6 +38,7 @@ const popoverOpen = (threadRef: ScopedThreadRef) =>
     "popover",
   );
 
+/** Supplies canvas geometry while the real card owns focus and popover lifecycle. */
 function Card({
   threadRef,
   inline,
@@ -59,6 +60,9 @@ function Card({
           lane: { padding: 48, minChatWidth: 640 },
           layout: resolveChatCanvasLayout({ container, preview: null }),
           previewKey: null,
+          resolvePreviewFrame: () => null,
+          reportPreview: () => {},
+          clearPreview: () => {},
           registerTimeline: () => {},
           measureDetailsCard: () => {},
           detailsCardTopInset: 0,

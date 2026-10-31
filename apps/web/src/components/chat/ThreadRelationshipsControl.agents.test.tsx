@@ -1,5 +1,10 @@
+/** @vitest-environment jsdom */
 import { act, cloneElement, type ReactElement, type ReactNode } from "react";
-import { create, type ReactTestInstance, type ReactTestRenderer } from "react-test-renderer";
+import {
+  create as createRenderer,
+  type ReactTestInstance,
+  type ReactTestRenderer,
+} from "react-test-renderer";
 import {
   EnvironmentId,
   ThreadId,
@@ -72,6 +77,29 @@ vi.mock("../ui/tooltip", () => ({
 
 import { ThreadRelationshipsPanel } from "./ThreadRelationshipsControl";
 
+// Text tickers write through host refs without rerendering; expose those writes to this renderer.
+const hostNodes = new WeakMap<object, HTMLElement>();
+/** Gives imperative labels real host nodes while gestures still use renderer handlers. */
+function create(element: ReactElement) {
+  return createRenderer(element, {
+    createNodeMock: ({ props, type }) => {
+      const key = props as object;
+      let node = hostNodes.get(key);
+      if (!node) {
+        node = document.createElement(typeof type === "string" ? type : "span");
+        hostNodes.set(key, node);
+      }
+      return node;
+    },
+  });
+}
+/** Includes ref-written labels alongside React children when reading visible host text. */
+function hostText(node: ReactTestInstance) {
+  return [
+    ...node.children.filter((child) => typeof child === "string"),
+    ...(hostNodes.get(node.props)?.textContent ? [hostNodes.get(node.props)!.textContent!] : []),
+  ];
+}
 let renderer: ReactTestRenderer;
 
 afterEach(async () => {
@@ -139,6 +167,8 @@ it("stops the entire native workflow through its parent without changing state b
   await act(async () => {
     renderer = create(
       <ThreadRelationshipsPanel
+        showLineage
+        showSideChats
         environmentId={EnvironmentId.make("remote")}
         threadId={ThreadId.make("parent")}
       />,
@@ -231,6 +261,8 @@ it.each([
   await act(async () => {
     renderer = create(
       <ThreadRelationshipsPanel
+        showLineage
+        showSideChats
         environmentId={EnvironmentId.make("remote")}
         threadId={ThreadId.make("parent")}
       />,
@@ -315,6 +347,8 @@ it("opens the correct chat for every workflow phase and unphased member", async 
   state.shells = memberShells.map((source) => ({ environmentId: "other", source }));
   const panel = (
     <ThreadRelationshipsPanel
+      showLineage
+      showSideChats
       environmentId={EnvironmentId.make("remote")}
       threadId={ThreadId.make("parent")}
     />
@@ -367,7 +401,12 @@ it("opens the correct chat for every workflow phase and unphased member", async 
       params: { environmentId: "remote", threadId: agent.childThreadId },
     });
   }
-  const rendered = JSON.stringify(renderer.toJSON());
+  const rendered = JSON.stringify([
+    renderer.toJSON(),
+    ...renderer.root
+      .findAll((node) => typeof node.type === "string")
+      .map((node) => hostNodes.get(node.props)?.textContent),
+  ]);
   expect(rendered.match(/Sonnet · Work account/g)).toHaveLength(7);
   expect(rendered).not.toContain("Personal account");
   for (const phase of phases) expect(rendered).toContain(phase.title);
@@ -450,6 +489,8 @@ it("groups and counts a workflow by its run status instead of its coordinator ch
   state.shells = [{ environmentId: "test", source: child }];
   const panel = (
     <ThreadRelationshipsPanel
+      showLineage
+      showSideChats
       environmentId={EnvironmentId.make("test")}
       threadId={ThreadId.make("parent")}
     />
@@ -460,7 +501,7 @@ it("groups and counts a workflow by its run status instead of its coordinator ch
   const text = () =>
     renderer.root
       .findAll((node) => typeof node.type === "string")
-      .flatMap((node) => node.children.filter((child) => typeof child === "string"))
+      .flatMap(hostText)
       .join("");
   expect(renderer.root.findByType("h3").children).toEqual(["Lineage"]);
   expect(
@@ -549,6 +590,8 @@ it.each([
     state.projection = projection;
     const panel = (
       <ThreadRelationshipsPanel
+        showLineage
+        showSideChats
         environmentId={EnvironmentId.make("test")}
         threadId={ThreadId.make("parent")}
       />
@@ -661,6 +704,8 @@ it("shows the matching child agent details and refreshes them when the agent set
   state.projection = projection;
   const panel = (
     <ThreadRelationshipsPanel
+      showLineage
+      showSideChats
       environmentId={EnvironmentId.make("test")}
       threadId={ThreadId.make("parent")}
     />
@@ -671,7 +716,7 @@ it("shows the matching child agent details and refreshes them when the agent set
   const text = () =>
     renderer.root
       .findAll((node) => typeof node.type === "string")
-      .flatMap((node) => node.children.filter((child) => typeof child === "string"))
+      .flatMap(hostText)
       .join(" ")
       .replace(/\s+/g, " ");
   expect(text()).toContain("Checker");
@@ -832,6 +877,8 @@ it("shows readable models and only differing workspace details in agent tooltips
   state.projection = projection;
   const panel = (
     <ThreadRelationshipsPanel
+      showLineage
+      showSideChats
       environmentId={EnvironmentId.make("test")}
       threadId={ThreadId.make("parent")}
     />
@@ -1212,7 +1259,12 @@ it("shows the parent's own visible status as parent and child activity change", 
   ];
   state.shells = shells(parent, child);
   const panel = (
-    <ThreadRelationshipsPanel environmentId={environmentId} threadId={ThreadId.make("child")} />
+    <ThreadRelationshipsPanel
+      showLineage
+      showSideChats
+      environmentId={environmentId}
+      threadId={ThreadId.make("child")}
+    />
   );
   await act(async () => {
     renderer = create(panel);
@@ -1220,7 +1272,7 @@ it("shows the parent's own visible status as parent and child activity change", 
   const visibleText = () =>
     renderer.root
       .findAll((node) => typeof node.type === "string" && node.props.className !== "sr-only")
-      .flatMap((node) => node.children.filter((child) => typeof child === "string"))
+      .flatMap(hostText)
       .join(" ");
   expect(visibleText()).toContain("Parent conversation");
   expect(visibleText()).toContain("Running");
@@ -1256,6 +1308,8 @@ it.each(["source", "target"])(
     };
     const panel = (
       <ThreadRelationshipsPanel
+        showLineage
+        showSideChats
         environmentId={environmentId}
         threadId={ThreadId.make(currentThreadId)}
       />
@@ -1278,7 +1332,7 @@ it.each(["source", "target"])(
       });
       const visibleText = renderer.root
         .findAll((node) => typeof node.type === "string")
-        .flatMap((node) => node.children.filter((child) => typeof child === "string"))
+        .flatMap(hostText)
         .join(" ");
       expect(visibleText).toContain(
         currentThreadId === "source" ? "target conversation" : "source conversation",

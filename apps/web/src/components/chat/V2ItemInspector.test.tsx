@@ -80,8 +80,6 @@ describe("timeline command results", () => {
           projectedItem={commandItem(exitCode)}
           environmentId={EnvironmentId.make("local")}
           presentation="timeline"
-          onOpenThread={() => undefined}
-          onOpenTurnDiff={() => undefined}
         />,
       ),
     );
@@ -96,8 +94,6 @@ describe("timeline command results", () => {
           projectedItem={commandItem(undefined)}
           environmentId={EnvironmentId.make("local")}
           presentation="timeline"
-          onOpenThread={() => undefined}
-          onOpenTurnDiff={() => undefined}
         />,
       ),
     );
@@ -111,8 +107,6 @@ describe("timeline command results", () => {
         <V2ItemInspector
           projectedItem={commandItem(0)}
           environmentId={EnvironmentId.make("local")}
-          onOpenThread={() => undefined}
-          onOpenTurnDiff={() => undefined}
         />,
       ),
     );

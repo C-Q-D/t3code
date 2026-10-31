@@ -1,3 +1,4 @@
+import { resolveThreadDetailsCardLayout } from "./threadDetailsCardLayout";
 /**
  * Verifies scoped card visibility, overlapping collapse ownership, and overlay dismissal.
  * @vitest-environment jsdom
@@ -73,15 +74,25 @@ it("removes the visible card while collapsed and renders it again on restore", a
           reportPreview: vi.fn(),
           clearPreview: vi.fn(),
           registerTimeline: vi.fn(),
-          reportDetailsCard: vi.fn(),
+          measureDetailsCard: vi.fn(),
+          preferredDetailsCard: resolveThreadDetailsCardLayout({
+            container: { width: 1600, height: 900 },
+            lane: { padding: 48, minChatWidth: 640 },
+            frame: null,
+          }),
+          detailsCardPlacement: resolveThreadDetailsCardLayout({
+            container: { width: 1600, height: 900 },
+            lane: { padding: 48, minChatWidth: 640 },
+            frame: null,
+          }),
           detailsCardTopInset: 0,
         }}
       >
         <ThreadDetailsCard
+          contentKey="fixture"
           threadRef={threadRef}
           anchor={{ current: null }}
           handle={PopoverCreateHandle()}
-          onPresentationChange={vi.fn()}
         >
           {() => <p>Workspace controls</p>}
         </ThreadDetailsCard>
@@ -118,15 +129,25 @@ it.each(["Escape", "outside press"])(
               reportPreview: vi.fn(),
               clearPreview: vi.fn(),
               registerTimeline: vi.fn(),
-              reportDetailsCard: vi.fn(),
+              measureDetailsCard: vi.fn(),
+              preferredDetailsCard: resolveThreadDetailsCardLayout({
+                container: { width: 924, height: 700 },
+                lane: { padding: 48, minChatWidth: 640 },
+                frame: null,
+              }),
+              detailsCardPlacement: resolveThreadDetailsCardLayout({
+                container: { width: 924, height: 700 },
+                lane: { padding: 48, minChatWidth: 640 },
+                frame: null,
+              }),
               detailsCardTopInset: 0,
             }}
           >
             <ThreadDetailsCard
+              contentKey="fixture"
               threadRef={threadRef}
               anchor={{ current: anchor }}
               handle={PopoverCreateHandle()}
-              onPresentationChange={vi.fn()}
             >
               {(density) => <p>Workspace controls: {density}</p>}
             </ThreadDetailsCard>

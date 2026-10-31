@@ -15,7 +15,7 @@ import { t } from "~/i18n";
 import { GhosttyTerminalSurface } from "./ghostty/surface";
 
 const transport = vi.hoisted(() => ({ write: vi.fn(), other: vi.fn() }));
-vi.mock("@effect/atom-react", () => ({ useAtomValue: () => null }));
+vi.mock("@effect/atom-react", () => ({ useAtomValue: () => null, useAtomMount: () => {} }));
 vi.mock("~/hooks/useSettings", () => ({
   useClientSettings: (select: (settings: typeof DEFAULT_CLIENT_SETTINGS) => unknown) =>
     select({ ...DEFAULT_CLIENT_SETTINGS, fontSizeCode: 12 }),
@@ -32,18 +32,21 @@ vi.mock("~/state/session", () => ({
   useEnvironmentScope: () => true,
   readEnvironmentScope: () => true,
 }));
-vi.mock("~/state/terminalSessions", () => ({ useAttachedTerminalSession: () => session }));
+vi.mock("~/state/terminalSessions", async () => {
+  const { Atom } = await import("effect/reactivity");
+  return { attachedTerminalSessionAtom: () => Atom.make(session) };
+});
 vi.mock("./ghostty/vendor/ghostty-vt.wasm?url", async () => {
   const { readFile } = await import("node:fs/promises");
   const { resolve } = await import("node:path");
-  const bytes = await readFile(resolve("apps/web/src/terminal/ghostty/vendor/ghostty-vt.wasm"));
+  const bytes = await readFile(resolve(import.meta.dirname, "ghostty/vendor/ghostty-vt.wasm"));
   return { default: `data:application/wasm;base64,${bytes.toString("base64")}` };
 });
 vi.mock("./ghostty/vendor/ghostty-write-pty.wasm?url&no-inline", async () => {
   const { readFile } = await import("node:fs/promises");
   const { resolve } = await import("node:path");
   const bytes = await readFile(
-    resolve("apps/web/src/terminal/ghostty/vendor/ghostty-write-pty.wasm"),
+    resolve(import.meta.dirname, "ghostty/vendor/ghostty-write-pty.wasm"),
   );
   return { default: `data:application/wasm;base64,${bytes.toString("base64")}` };
 });
@@ -242,11 +245,8 @@ beforeEach(async () => {
         cwd="/repo"
         onSessionExited={transport.other}
         onAddTerminalContext={addContext}
-        focusRequestId={0}
         autoFocus={false}
         visible={true}
-        resizeEpoch={0}
-        drawerHeight={300}
         keybindings={[]}
       />,
     ),

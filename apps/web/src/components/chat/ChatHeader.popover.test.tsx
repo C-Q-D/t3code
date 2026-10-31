@@ -62,12 +62,7 @@ function DraftDetailsFixture() {
         popoverAnchorRef={anchor}
         actions={<button type="button">Draft panel controls</button>}
       />
-      <ThreadDetailsCard
-        anchor={anchor}
-        handle={handle}
-        threadRef={threadRef}
-        onPresentationChange={() => {}}
-      >
+      <ThreadDetailsCard contentKey="fixture" anchor={anchor} handle={handle} threadRef={threadRef}>
         {() => "Draft details content"}
       </ThreadDetailsCard>
     </TitlebarSlotProvider>

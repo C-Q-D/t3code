@@ -15,7 +15,10 @@ import { userEvent } from "vite-plus/test/browser";
 import { expect, it, vi } from "vite-plus/test";
 import { act, render } from "../../../test/render";
 import { useComposerSuggestion } from "./useComposerSuggestion";
-import { ComposerPromptEditor, type ComposerPromptEditorHandle } from "../ComposerPromptEditor";
+import {
+  ComposerPromptEditorTiptap as ComposerPromptEditor,
+  type ComposerPromptEditorHandle,
+} from "../ComposerPromptEditorTiptap";
 import { installMessages, t, activeLocale } from "../../i18n";
 import { messages as chineseMessages } from "../../i18n/locales/zh-CN";
 import { GeneralSettingsPanel, useSettingsRestore } from "../settings/SettingsPanels";

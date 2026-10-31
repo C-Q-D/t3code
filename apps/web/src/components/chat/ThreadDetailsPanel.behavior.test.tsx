@@ -20,6 +20,7 @@ vi.mock("./ThreadDetailsCard", () => ({
 }));
 vi.mock("../BranchToolbar", () => ({ BranchToolbar: () => null }));
 vi.mock("../ProjectScriptsControl", () => ({ default: () => null }));
+vi.mock("./ThreadServersPanel", () => ({ ThreadServersPanel: () => null }));
 vi.mock("./ThreadAutomationsPanel", () => ({ ThreadAutomationsPanel: () => null }));
 vi.mock("./ThreadRelationshipsControl", () => ({ ThreadRelationshipsPanel: () => null }));
 vi.mock("../../hooks/useT3ProjectFileScripts", () => ({ useT3ProjectFileScripts: () => [] }));
@@ -28,6 +29,7 @@ vi.mock("~/hooks/useSupportsMultiplePullRequests", () => ({
 }));
 vi.mock("@tanstack/react-router", () => ({ useNavigate: () => vi.fn() }));
 vi.mock("@effect/atom-react", () => ({
+  useAtomMount: () => {},
   useAtomValue: (atom: unknown) => (atom === "vcs-state" ? { isRunning: false } : null),
 }));
 vi.mock("~/state/entities", () => ({
@@ -40,9 +42,11 @@ vi.mock("~/state/entities", () => ({
     runtime: null,
   }),
   useThreadProjection: () => null,
+  useQuietThreadProjection: () => null,
   useProject: () => ({ id: "project", workspaceRoot: "/project" }),
 }));
 vi.mock("~/state/session", () => ({
+  environmentSession: { preparedConnectionValueAtom: () => null },
   useEnvironmentScope: () => true,
   readEnvironmentScope: () => true,
 }));
@@ -53,8 +57,9 @@ vi.mock("~/state/sourceControl", () => ({
   sourceControlEnvironment: { discovery: () => "discovery" },
 }));
 vi.mock("~/state/vcs", () => ({
+  vcsStatusRevalidation: () => null,
   vcsEnvironment: { status: () => "status", listRefs: () => "refs", switchRef: state.switchRef },
-  vcsActionManager: { stateAtom: () => "vcs-state" },
+  vcsActionManager: { stateAtom: () => "vcs-state", runStackedAction: () => vi.fn() },
 }));
 vi.mock("~/state/query", () => ({
   useEnvironmentQuery: (atom: unknown) => ({
@@ -143,9 +148,9 @@ async function render(overrides: Partial<ThreadDetailsPanelProps> = {}) {
   await act(async () =>
     root.render(
       <ThreadDetailsPanel
+        usage={{ providerInstanceId: null, providers: [], sources: [], contextWindow: null }}
         anchor={{ current: null }}
         handle={{} as ThreadDetailsPanelProps["handle"]}
-        onPresentationChange={vi.fn()}
         environmentId={EnvironmentId.make("environment")}
         threadId={ThreadId.make("thread")}
         projectId={ProjectId.make("project")}

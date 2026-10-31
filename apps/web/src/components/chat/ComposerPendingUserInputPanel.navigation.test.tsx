@@ -10,7 +10,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
 import {
   togglePendingUserInputOptionSelection,
   type PendingUserInputDraftAnswer,
-} from "../../pendingUserInput";
+} from "@t3tools/client-runtime/state/pending-user-input";
 
 vi.mock("../ui/collapsible", () => {
   const Children = ({ children }: { children: ReactNode }) => <>{children}</>;
