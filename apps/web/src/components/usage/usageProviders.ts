@@ -3,6 +3,7 @@ import type { UsageProviderKind } from "@t3tools/contracts";
 
 import { ProviderDriverKind } from "@t3tools/contracts";
 
+/** Usage history identity links each provider to its label, chart color and limit driver. */
 type UsageProviderPresentation = {
   readonly label: string;
   readonly color: string;
@@ -50,6 +51,7 @@ export const PROVIDER_PRESENTATION = {
 
 export const PROVIDER_ORDER = Object.keys(PROVIDER_PRESENTATION) as UsageProviderKind[];
 
+/** Keep providers with positive tokens or cost in presentation order, including history-only drivers. */
 export function providersWithUsage(
   totals: readonly {
     readonly provider: UsageProviderKind;
