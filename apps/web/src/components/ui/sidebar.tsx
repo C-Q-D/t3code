@@ -836,6 +836,7 @@ function SidebarHeader({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
+/** Aligns footer content with the sidebar inset, including the bottom edge; forwards native div props. */
 function SidebarFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
