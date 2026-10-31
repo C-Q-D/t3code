@@ -33,6 +33,7 @@ import {
 } from "../components/settings/settingsScopeNavigation";
 import {
   getSettingsSearchTargetScope,
+  movedSettingsPath,
   getThreadAutoSettlementSearchAvailability,
   isSettingsSearchScopeAvailable,
 } from "../components/settings/settingsSearch";
@@ -265,6 +266,11 @@ export const Route = createFileRoute("/settings")({
       context.authGateState.status !== "hosted-static"
     ) {
       throw redirect({ to: "/pair", replace: true });
+    }
+
+    const moved = movedSettingsPath(location.pathname, location.hash);
+    if (moved) {
+      throw redirect({ to: moved, search: location.search, hash: location.hash, replace: true });
     }
 
     if (location.pathname === "/settings") {

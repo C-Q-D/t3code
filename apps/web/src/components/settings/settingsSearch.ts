@@ -163,6 +163,35 @@ const SOURCE_CONTROL_HOST_SEARCH_ITEMS = sourceControlClients.definitions.flatMa
 
 export const SETTINGS_SEARCH_ITEMS = [
   {
+    id: "keep-threads-with-pull-requests",
+    title: "Keep threads with a PR",
+    to: "/settings/general",
+    targetId: "auto-settle-inactive-threads",
+    searchTerms: ["pull request inactivity auto-settle merge close sidebar"],
+    requiresThreadAutoSettlement: true,
+    scope: "project-defaults",
+  },
+  {
+    id: "thread-details-items",
+    title: "Thread details",
+    to: "/settings/appearance",
+    searchTerms: [
+      "customize show hide panel card environment editor scripts branch pull request git changes servers automations lineage usage limits 5 hour weekly quota tokens context window",
+    ],
+  },
+  ...(SNOOZE_UI_ENABLED
+    ? [
+        {
+          id: "snooze-options",
+          title: "Snooze options",
+          to: "/settings/general",
+          searchTerms: ["snooze presets times later tonight tomorrow next week remind"],
+          environmentOnly: true,
+          scope: "environment-defaults",
+        },
+      ]
+    : []),
+  {
     id: "discussion-personas",
     title: t.settings.discussions.title,
     to: "/settings/discussions",
@@ -695,12 +724,6 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["composer meter usage tokens circle old"],
   },
   {
-    id: "legacy-sidebar",
-    title: t.settings.rows.legacySidebar.title,
-    to: "/settings/general",
-    searchTerms: ["project thread tree old flat list"],
-  },
-  {
     id: "keybindings",
     title: t.settings.rows.keybindings.title,
     to: "/settings/keybindings",
@@ -944,6 +967,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "git-fetch-interval",
+    targetId: "background-activity",
     title: t.settings.rows.gitFetchInterval.title,
     to: "/settings/source-control",
     searchTerms: [
@@ -1139,7 +1163,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     ],
   },
   {
-    id: "github-routing",
+    id: "pull-request-routing",
     title: t.settings.rows.githubRouting.title,
     to: "/settings/connections",
     searchTerms: ["pull request trusted environments shared credentials permissions read actions"],
@@ -1172,6 +1196,45 @@ const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScop
   "/settings/discussions": null,
   "/settings/archived": "project-defaults",
 };
+
+/** Upstream split pages resolve to the fork's full-page settings destinations. */
+const MOVED_SETTINGS_PAGES: Readonly<Record<string, SettingsPath>> = {
+  "/settings/chat": "/settings/general",
+  "/settings/diffs": "/settings/general",
+  "/settings/threads": "/settings/general",
+  "/settings/maintenance": "/settings/general",
+  "/settings/about": "/settings/general",
+  "/settings/worktrees": "/settings/storage",
+  "/settings/access": "/settings/connections",
+  "/settings/browser": "/settings/integrations",
+  "/settings/devices": "/settings/integrations",
+  "/settings/labs": "/settings/general",
+  "/settings/beta": "/settings/general",
+};
+
+/** Resolves a split upstream pathname and optional row hash; null leaves existing or unknown pages untouched. */
+export function movedSettingsPath(pathname: string, hash: string): SettingsPath | null {
+  const fallback = MOVED_SETTINGS_PAGES[pathname];
+  if (!fallback) return null;
+  const items: ReadonlyArray<SettingsSearchItem> = SETTINGS_SEARCH_ITEMS;
+  const anchored =
+    items.find((item) => item.id === hash) ?? items.find((item) => item.targetId === hash);
+  return anchored?.to ?? fallback;
+}
+
+/** Filters supplied settings to controls supported by the current platform and release channel. */
+export function settingsForThisPlatform(
+  items: ReadonlyArray<SettingsSearchItem>,
+): ReadonlyArray<SettingsSearchItem> {
+  const platform = typeof navigator === "undefined" ? "" : navigator.platform;
+  return items.filter(
+    (item) =>
+      (isElectron || item.desktopOnly !== true) &&
+      (!item.releaseChannelOnly || isElectron || HOSTED_APP_CHANNEL !== null) &&
+      (!item.macOnly || isMacPlatform(platform)) &&
+      (!item.windowsOnly || isWindowsPlatform(platform)),
+  );
+}
 
 export function getSettingsSearchTargetScope(targetId: string) {
   const items: readonly SettingsSearchItem[] = SETTINGS_SEARCH_ITEMS;

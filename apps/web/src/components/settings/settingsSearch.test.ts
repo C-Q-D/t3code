@@ -11,6 +11,7 @@ import {
   getSettingsSearchTargetScope,
   getThreadAutoSettlementSearchAvailability,
   isSettingsSearchScopeAvailable,
+  movedSettingsPath,
   searchSettings,
   searchableSetting,
   SETTINGS_SEARCH_ITEMS,
@@ -222,6 +223,7 @@ describe("searchSettings", () => {
       "auto-settle-inactive-threads",
       "auto-settle-merged-threads",
       "days-before-auto-settle",
+      "keep-threads-with-pull-requests",
     ]);
     expect(available.map((item) => item.id).filter((id) => gatedIds.has(id))).toEqual([]);
   });
@@ -332,6 +334,7 @@ describe("searchSettings", () => {
       "auto-settle-inactive-threads",
       "auto-settle-merged-threads",
       "days-before-auto-settle",
+      "keep-threads-with-pull-requests",
     ]);
   });
 
@@ -451,7 +454,7 @@ describe("searchSettings", () => {
       hasThreadAutoSettlement: true,
     });
     expect(searchSettings("writing style", available)[0]?.id).toBe("source-control-writing-style");
-    expect(searchSettings("auto-settle", available)).toHaveLength(3);
+    expect(searchSettings("auto-settle", available)).toHaveLength(4);
   });
 });
 
@@ -475,7 +478,7 @@ describe("settings search targets", () => {
     const streaming = getSettingsSearchTargetScope("response-streaming")!;
     expect(streaming.scope).toBe("project-defaults");
     expect(isSettingsSearchScopeAvailable(streaming.scope, "project")).toBe(true);
-    for (const id of ["legacy-plan-mode", "legacy-context-window-indicator", "legacy-sidebar"]) {
+    for (const id of ["legacy-plan-mode", "legacy-context-window-indicator"]) {
       expect(getSettingsSearchTargetScope(id)!.scope).toBeNull();
     }
   });
@@ -514,6 +517,7 @@ describe("auto-settlement search availability", () => {
       "auto-settle-inactive-threads",
       "auto-settle-merged-threads",
       "days-before-auto-settle",
+      "keep-threads-with-pull-requests",
     ]);
   });
 
@@ -614,5 +618,29 @@ describe("EAS representative device availability", () => {
     expect(getEasSearchEnvironmentId({}, [], connected, a)).toBe(a);
     expect(getEasSearchEnvironmentId({ machine: b }, [], connected, a)).toBe(b);
     expect(getEasSearchEnvironmentId({ machine: "missing" }, [], connected, a)).toBeNull();
+  });
+});
+
+describe("upstream settings links", () => {
+  it("does not advertise the removed legacy sidebar", () => {
+    expect(SETTINGS_SEARCH_ITEMS.map((item) => item.id)).not.toContain("legacy-sidebar");
+  });
+
+  it("resolves split pages and anchors to the retained full pages without redirect loops", () => {
+    expect(movedSettingsPath("/settings/threads", "text-generation-model")).toBe(
+      "/settings/general",
+    );
+    expect(movedSettingsPath("/settings/worktrees", "storage-worktrees-location")).toBe(
+      "/settings/storage",
+    );
+    expect(movedSettingsPath("/settings/worktrees", "worktree-branch-naming")).toBe(
+      "/settings/source-control",
+    );
+    expect(movedSettingsPath("/settings/access", "authorized-clients")).toBe(
+      "/settings/connections",
+    );
+    expect(movedSettingsPath("/settings/devices", "")).toBe("/settings/integrations");
+    expect(movedSettingsPath("/settings/general", "time-format")).toBeNull();
+    expect(movedSettingsPath("/unknown", "time-format")).toBeNull();
   });
 });
