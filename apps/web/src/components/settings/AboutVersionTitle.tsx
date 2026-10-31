@@ -1,3 +1,5 @@
+/** Shows the installed version and copies it through the shared clipboard feedback. */
+import { t } from "~/i18n";
 import { useRef } from "react";
 
 import { APP_VERSION } from "../../branding";
@@ -7,6 +9,7 @@ import { InlineButton } from "../ui/button";
 import { stackedThreadToast, toastManager } from "../ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
+/** Renders the version action; clipboard failures appear in a toast. */
 export function AboutVersionTitle() {
   const copyButtonRef = useRef<HTMLButtonElement>(null);
   const { copyToClipboard } = useCopyToClipboard<void>({
@@ -25,7 +28,7 @@ export function AboutVersionTitle() {
 
   return (
     <span className="inline-flex items-baseline gap-2">
-      <span>Version</span>
+      <span>{t.settings.about.versionTitle}</span>
       <code className="text-2xs font-medium">
         <Tooltip>
           <TooltipTrigger

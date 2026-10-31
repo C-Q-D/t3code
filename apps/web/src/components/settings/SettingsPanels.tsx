@@ -1,4 +1,6 @@
 /** Renders general settings and restores scoped defaults through the existing settings commands. */
+import { AboutVersionTitle } from "./AboutVersionTitle";
+import { SnoozePresetsRow } from "./SnoozePresetsSettings";
 import { SettingsGroup } from "./SettingsGroup";
 import { LanguageSetting } from "./LanguageSetting";
 import { t } from "~/i18n";
@@ -22,7 +24,7 @@ import {
 import { createModelSelection } from "@t3tools/shared/model";
 import * as Equal from "effect/Equal";
 import * as Schema from "effect/Schema";
-import { APP_VERSION, HOSTED_APP_CHANNEL, HOSTED_APP_CHANNEL_LABEL } from "../../branding";
+import { HOSTED_APP_CHANNEL, HOSTED_APP_CHANNEL_LABEL } from "../../branding";
 import { CliCommandSettingsRow } from "./CliCommandSettingsRow";
 import { MobileAppSettingsRow } from "./MobileAppSettingsRow";
 import {
@@ -62,11 +64,7 @@ import {
   resolveAppModelSelectionState,
   selectsPlanAgent,
 } from "../../modelSelection";
-import {
-  applyProviderInstanceSettings,
-  deriveProviderInstanceEntries,
-  sortProviderInstanceEntries,
-} from "../../providerInstances";
+import { providerInstanceEntriesFor } from "../../providerInstances";
 import { ensureLocalApi, readLocalApi } from "../../localApi";
 import { isMacPlatform } from "../../lib/utils";
 import { useEnvironmentProviders } from "../../state/environments";
@@ -123,15 +121,6 @@ const DIFF_LAYOUT_LABELS = t.settings.rows.diffLayout.options;
 const QUIT_CONFIRMATION_MODE_LABELS = t.settings.rows.quitConfirmation.options;
 
 const DEFAULT_DRIVER_KIND = ProviderDriverKind.make("codex");
-
-function AboutVersionTitle() {
-  return (
-    <span className="inline-flex items-baseline gap-2">
-      <span>{t.settings.about.versionTitle}</span>
-      <code className="text-2xs font-medium text-muted-foreground">{APP_VERSION}</code>
-    </span>
-  );
-}
 
 /** Shows version/update actions; desktop channel selection preserves the bridge's save/error lifecycle. */
 function AboutVersionSection() {
@@ -425,9 +414,6 @@ export function useSettingsRestore(onRestored?: () => void) {
     ...(settings.inAppNotificationsEnabled !== DEFAULT_UNIFIED_SETTINGS.inAppNotificationsEnabled
       ? [t.settings.rows.inAppNotifications.title]
       : []),
-    ...(settings.sidebarThreadPreviewCount !== DEFAULT_UNIFIED_SETTINGS.sidebarThreadPreviewCount
-      ? [t.settings.restore.visibleThreadsLabel]
-      : []),
     ...(settings.sidebarProjectGroupingMode !== DEFAULT_UNIFIED_SETTINGS.sidebarProjectGroupingMode
       ? [t.settings.restore.projectGroupingLabel]
       : []),
@@ -449,6 +435,10 @@ export function useSettingsRestore(onRestored?: () => void) {
     ...(SNOOZE_UI_ENABLED &&
     settings.snoozeLimitedThreads !== DEFAULT_UNIFIED_SETTINGS.snoozeLimitedThreads
       ? [t.settings.rows.snoozeLimitedThreads.title]
+      : []),
+    ...(SNOOZE_UI_ENABLED &&
+    !Equal.equals(settings.snoozePresets, DEFAULT_UNIFIED_SETTINGS.snoozePresets)
+      ? ["Snooze options"]
       : []),
     ...(settings.wordWrap !== DEFAULT_UNIFIED_SETTINGS.wordWrap
       ? [t.settings.rows.wordWrap.title]
@@ -634,7 +624,6 @@ export function useSettingsRestore(onRestored?: () => void) {
       glassOpacity: DEFAULT_UNIFIED_SETTINGS.glassOpacity,
       panelAnimationDurationMs: DEFAULT_UNIFIED_SETTINGS.panelAnimationDurationMs,
       physicsMotion: DEFAULT_UNIFIED_SETTINGS.physicsMotion,
-      sidebarThreadPreviewCount: DEFAULT_UNIFIED_SETTINGS.sidebarThreadPreviewCount,
       sidebarProjectGroupingMode: DEFAULT_UNIFIED_SETTINGS.sidebarProjectGroupingMode,
       sidebarProjectSortOrder: DEFAULT_UNIFIED_SETTINGS.sidebarProjectSortOrder,
       sidebarWorkingShelfEnabled: DEFAULT_UNIFIED_SETTINGS.sidebarWorkingShelfEnabled,
@@ -644,7 +633,10 @@ export function useSettingsRestore(onRestored?: () => void) {
       autoResumeLimitedThreads: DEFAULT_UNIFIED_SETTINGS.autoResumeLimitedThreads,
       // Hidden controls must not be silently reset by the visible settings confirmation.
       ...(SNOOZE_UI_ENABLED
-        ? { snoozeLimitedThreads: DEFAULT_UNIFIED_SETTINGS.snoozeLimitedThreads }
+        ? {
+            snoozeLimitedThreads: DEFAULT_UNIFIED_SETTINGS.snoozeLimitedThreads,
+            snoozePresets: DEFAULT_UNIFIED_SETTINGS.snoozePresets,
+          }
         : {}),
       responseStreamingMode: DEFAULT_UNIFIED_SETTINGS.responseStreamingMode,
       enableProviderUpdateChecks: DEFAULT_UNIFIED_SETTINGS.enableProviderUpdateChecks,
@@ -702,7 +694,6 @@ const AUTO_SETTLE_DEFAULT_DAYS = DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleAfter
 const LEGACY_FEATURE_TARGET_IDS: ReadonlySet<string> = new Set([
   "legacy-plan-mode",
   "legacy-context-window-indicator",
-  "legacy-sidebar",
 ]);
 
 /**
@@ -762,19 +753,6 @@ function LegacyFeaturesSection() {
                     updateSettings({ contextWindowMeterEnabled: Boolean(checked) })
                   }
                   aria-label={t.settings.rows.legacyContextWindowIndicator.title}
-                />
-              }
-            />
-            <SettingsRow
-              {...searchableSetting("legacy-sidebar")}
-              description={t.settings.rows.legacySidebar.description}
-              control={
-                <Switch
-                  checked={settings.legacySidebarEnabled}
-                  onCheckedChange={(checked) =>
-                    updateSettings({ legacySidebarEnabled: Boolean(checked) })
-                  }
-                  aria-label={t.settings.rows.legacySidebar.title}
                 />
               }
             />
@@ -911,12 +889,10 @@ export function GeneralSettingsPanel() {
   const textGenInstanceId = textGenerationModelSelection.instanceId;
   const textGenModel = textGenerationModelSelection.model;
   const textGenModelOptions = textGenerationModelSelection.options;
-  const textGenerationModelInstanceEntries = sortProviderInstanceEntries(
-    applyProviderInstanceSettings(
-      deriveProviderInstanceEntries(textGenerationProviders),
-      settings,
-      target?.projectId ?? null,
-    ),
+  const textGenerationModelInstanceEntries = providerInstanceEntriesFor(
+    textGenerationProviders,
+    settings,
+    target?.projectId ?? null,
   );
   const hasTextGenerationProvider = textGenerationModelInstanceEntries.some(
     (entry) => entry.enabled && entry.isAvailable,
@@ -1244,6 +1220,7 @@ export function GeneralSettingsPanel() {
               <SettingsRow
                 serverScoped
                 settingKeys={["sidebarAutoSettleKeepPullRequests"]}
+                id="keep-threads-with-pull-requests"
                 title={t.settings.conversationRenderingUi.keepPr}
                 description={t.settings.conversationRenderingUi.keepPrHint}
                 control={
@@ -1260,6 +1237,7 @@ export function GeneralSettingsPanel() {
             ) : null}
           </>
         ) : null}
+        {SNOOZE_UI_ENABLED ? <SnoozePresetsRow /> : null}
         <NotificationSettings />
         <SettingsRow
           {...searchableSetting("in-app-notifications")}
