@@ -1,5 +1,5 @@
 /**
- * Exercises settings search shortcuts through the real closed frame drawer.
+ * Exercises settings drawer shortcuts and category keyboard entry through the real navigation.
  * @vitest-environment jsdom
  */
 import { act } from "react";
@@ -91,3 +91,38 @@ it.each([
     }
   },
 );
+
+it.each([
+  ["/settings/open-source-licenses", "/settings/general"],
+  ["/settings/diagnostics", "/settings/general"],
+  ["/settings/providers/example-instance", "/settings/providers"],
+  ["/settings/providers/", "/settings/providers"],
+])("keeps one category Tab stop for %s on %s", async (pathname, expectedSection) => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  vi.stubGlobal("matchMedia", () => ({
+    matches: false,
+    addEventListener() {},
+    removeEventListener() {},
+  }));
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  try {
+    await act(async () =>
+      root.render(
+        <SidebarProvider>
+          <SettingsSidebarNav pathname={pathname} />
+        </SidebarProvider>,
+      ),
+    );
+    const tabStops = container.querySelectorAll<HTMLButtonElement>(
+      '[data-settings-section][tabindex="0"]',
+    );
+    expect(tabStops).toHaveLength(1);
+    expect(tabStops[0]?.dataset.settingsSection).toBe(expectedSection);
+    expect(tabStops[0]?.getAttribute("aria-current")).toBe("page");
+  } finally {
+    await act(() => root.unmount());
+    container.remove();
+  }
+});

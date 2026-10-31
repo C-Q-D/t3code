@@ -80,6 +80,12 @@ const SETTINGS_NAV_ITEMS: ReadonlyArray<{
     icon: SETTINGS_SECTION_ICONS[to],
   }));
 
+/** Detail pages share the category that exposes their entry point. */
+const SETTINGS_DETAIL_PAGE_PARENTS: Readonly<Record<string, SettingsPath>> = {
+  "/settings/open-source-licenses": "/settings/general",
+  "/settings/diagnostics": "/settings/general",
+};
+
 /** Keeps a newly active result visible without scrolling again on unrelated renders; null denotes unmount. */
 function scrollResultIntoView(row: HTMLLIElement | null) {
   row?.scrollIntoView({ block: "nearest" });
@@ -99,7 +105,12 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
     (item) => item.to !== "/settings/projects" || isSettingsOverviewVisible(scopeSearch),
   );
   const { isMobile, setOpenMobile, open, setOpen } = useSidebar();
-  const sectionNavigation = useSettingsSectionNavigation(pathname);
+  const activePath = SETTINGS_DETAIL_PAGE_PARENTS[pathname] ?? pathname;
+  const currentSection =
+    navItems.find((item) => activePath === item.to || activePath.startsWith(`${item.to}/`))?.to ??
+    navItems[0]?.to ??
+    "";
+  const sectionNavigation = useSettingsSectionNavigation(currentSection);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
   const [activeResultIndex, setActiveResultIndex] = useState(0);
@@ -330,10 +341,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
           <ul className="flex flex-col gap-0.5 px-2 py-0.5">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const isGeneralDetailPage =
-                item.to === "/settings/general" && pathname === "/settings/open-source-licenses";
-              const isActive =
-                isGeneralDetailPage || pathname === item.to || pathname.startsWith(`${item.to}/`);
+              const isActive = currentSection === item.to;
               return (
                 <li key={item.to}>
                   {/* SettingsNav8a uses raised 36px navigation rows, not pill action controls. */}
