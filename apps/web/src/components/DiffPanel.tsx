@@ -1,3 +1,5 @@
+/** Owns repository and turn diff display; composer references keep their English context titles. */
+import { t } from "~/i18n";
 import { RefreshIcon } from "~/components/ui/refresh-icon";
 import { useAtomValue } from "@effect/atom-react";
 import type { FileDiffContentsLoader, FileDiffMetadata } from "@pierre/diffs";
@@ -11,12 +13,11 @@ import {
   ArrowRightIcon,
   CheckIcon,
   ChevronDownIcon,
-  Columns2Icon,
   FlaskConicalOffIcon,
   FolderTreeIcon,
   PilcrowIcon,
-  Rows3Icon,
   TextWrapIcon,
+  TextSearchIcon,
 } from "lucide-react";
 import { ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown } from "lucide";
 import * as Schema from "effect/Schema";
@@ -46,7 +47,6 @@ import { useStableCallback } from "../hooks/useStableCallback";
 import {
   buildFileDiffContentVersion,
   buildFileDiffIdentityKey,
-  getDiffLineStat,
   getRenderablePatch,
   resolveDiffThemeName,
   resolveFileDiffPath,
@@ -65,7 +65,7 @@ import { formatRelativeTimeLabel, formatShortTimestamp } from "../timestampForma
 import { DiffFilePathCopyButton } from "./DiffFilePathCopyButton";
 import { DiffPanelLoadingState, DiffPanelShell, type DiffPanelMode } from "./DiffPanelShell";
 import { DiffStatLabel } from "./chat/DiffStatLabel";
-import { AnnotatableCodeView } from "./diffs/AnnotatableCodeView";
+import { AnnotatableCodeView, type AnnotatableCodeViewHandle } from "./diffs/AnnotatableCodeView";
 import { DiffFileTree } from "./diffs/DiffFileTree";
 import { diffFileTreeEntries } from "./diffs/diffFileTree.logic";
 import { Button } from "./ui/button";
@@ -130,6 +130,10 @@ function getCachedFileEntry(fileDiff: FileDiffMetadata) {
 
 const EMPTY_COLLAPSED_DIFF_FILE_KEYS: ReadonlySet<string> = new Set();
 
+/** Collapse control for one file header; re-renders only when its own file changes.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 function DiffFileCollapseToggle({
   filePath,
   fileKey,
@@ -151,7 +155,9 @@ function DiffFileCollapseToggle({
             size="icon-micro"
             variant="ghost"
             className="-ms-0.5"
-            aria-label={collapsed ? `Expand ${filePath}` : `Collapse ${filePath}`}
+            aria-label={
+              collapsed ? t.git.diff.expandFile(filePath) : t.git.diff.collapseFile(filePath)
+            }
             aria-expanded={!collapsed}
             disabled={unavailable}
             onClick={(event) => {
@@ -166,7 +172,9 @@ function DiffFileCollapseToggle({
           icon={collapsed ? ChevronRight : ChevronDown}
         />
       </TooltipTrigger>
-      <TooltipPopup side="top">{collapsed ? "Expand diff" : "Collapse diff"}</TooltipPopup>
+      <TooltipPopup side="top">
+        {collapsed ? t.git.diff.expandDiff : t.git.diff.collapseDiff}
+      </TooltipPopup>
     </Tooltip>
   );
 }
@@ -203,6 +211,11 @@ interface DiffPanelProps {
   visible: boolean;
 }
 
+/**
+ * Renders thread or repository diffs and comment controls; keeps agent section titles independent of display titles.
+ * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
+ * @returns The rendered surface.
+ */
 export default function DiffPanel({
   mode = "inline",
   composerDraftTarget,
@@ -296,7 +309,6 @@ export default function DiffPanel({
     return right.completedAt.localeCompare(left.completedAt);
   });
 
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- rewrites the persisted diff store selection to the latest turn when the selected turn disappears
   useEffect(() => {
     if (!routeThreadRef || diffSelection.kind !== "turn") return;
     useDiffPanelStore.getState().reconcileTurnSelection(
@@ -418,15 +430,26 @@ export default function DiffPanel({
     : selectedRunId === null
       ? selectedCommitSha !== null
         ? (selectedCommitSubject ?? "Commit")
-        : selectedGitScopeLabel
+        : selectedGitScope === "unstaged"
+          ? t.git.diff.uncommitted
+          : t.git.diff.changes
       : selectedTurn?.runId === latestTurn?.runId
-        ? "Latest turn"
-        : `Turn ${selectedCheckpointTurnCount ?? "?"}`;
+        ? t.git.diff.latestTurn
+        : t.git.diff.turnTitle(selectedCheckpointTurnCount ?? "?");
   const reviewSectionTitle = toolCallSelection
     ? "Tool call"
     : selectedTurn
       ? `Turn ${selectedCheckpointTurnCount ?? "?"}`
       : selectedGitScopeLabel;
+  // Agent references keep the source title; localization only changes visible labels.
+  const reviewSectionDisplayTitle =
+    toolCallSelection || selectedCommitSha !== null
+      ? reviewSectionTitle
+      : selectedTurn
+        ? t.git.diff.turnTitle(selectedCheckpointTurnCount ?? "?")
+        : selectedGitScope === "unstaged"
+          ? t.git.diff.uncommitted
+          : t.git.diff.changes;
   const headerCommitSha = selectedRunId === null ? selectedCommitSha : null;
   const selectedCommitUrl =
     headerCommitSha !== null
@@ -491,16 +514,6 @@ export default function DiffPanel({
       ? Math.max(0, recordedToolCallFileCount - renderablePatch.files.length)
       : 0;
   const fileStats = new Map(lazySource?.files?.map((file) => [file.path, file]));
-  const sourceLineStat =
-    isGitSelection && selectedGitSource?.files
-      ? selectedGitSource.files.reduce(
-          (total, file) => ({
-            additions: total.additions + file.additions,
-            deletions: total.deletions + file.deletions,
-          }),
-          { additions: 0, deletions: 0 },
-        )
-      : null;
   const currentLoadDiffFiles =
     isGitSelection && activeThread && preview && selectedGitSource && canReadFiles
       ? createGitDiffFileContentsLoader(getDiffFileContents, {
@@ -514,7 +527,7 @@ export default function DiffPanel({
       : undefined;
   const loadDiffFiles: FileDiffContentsLoader = useStableCallback(async (fileDiff) => {
     if (!currentLoadDiffFiles) {
-      throw new Error("Diff file contents are unavailable for this selection.");
+      throw new Error(t.git.diff.diffFileContentsAreUnavailableForThisSelection);
     }
     return currentLoadDiffFiles(fileDiff);
   });
@@ -655,9 +668,13 @@ export default function DiffPanel({
     (file) => file.cacheKey?.endsWith(":pending") && isFileShown(file),
   );
   const allDiffFilesCollapsed = areAllDiffFilesCollapsed(shownFileKeys, collapsedDiffFileKeys);
-  const diffLineStat = sourceLineStat ?? getDiffLineStat(renderableFiles);
   const fileTreeEntries = diffFileTreeEntries(renderableFiles.filter(isFileShown));
   const codeViewReveal = useCodeViewFileReveal();
+  const codeViewRef = useRef<AnnotatableCodeViewHandle | null>(null);
+  const attachCodeView = useStableCallback((viewer: AnnotatableCodeViewHandle | null) => {
+    codeViewRef.current = viewer;
+    codeViewReveal.attach(viewer);
+  });
   const revealDiffFile = (filePath: string) => {
     const index = renderableFileEntries.findIndex(
       (candidate) => resolveFileDiffPath(candidate.fileDiff) === filePath,
@@ -679,7 +696,6 @@ export default function DiffPanel({
   // A file another view asked to reveal (a chat diff link): retried as the diff loads until it
   // holds the file, then not again until a new request, so it does not undo what the user did since.
   const externalRevealRef = useRef<string | null>(null);
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- reveals an externally requested file in the diff viewer, retrying as the diff DOM loads
   useEffect(() => {
     if (!selectedFilePath) {
       externalRevealRef.current = null;
@@ -783,12 +799,12 @@ export default function DiffPanel({
 
   const headerRow = (
     <>
-      <div className="@container/diff-refs flex min-w-0 flex-1 items-center gap-3 [-webkit-app-region:no-drag]">
+      <div className="@container/diff-refs flex min-w-0 flex-1 items-center gap-2 [-webkit-app-region:no-drag]">
         <DropdownMenu>
           <DropdownMenuTrigger
-            render={<Button size="xs" variant="secondary" />}
+            render={<Button size="md" variant="secondary" />}
             className={cn("max-w-full", headerCommitSha !== null && "min-w-0 shrink")}
-            aria-label={`Diff scope: ${selectedScopeLabel}`}
+            aria-label={t.git.diff.scopeLabel(selectedScopeLabel)}
             data-workspace-focus-default
           >
             <span className="truncate">{selectedScopeLabel}</span>
@@ -821,17 +837,17 @@ export default function DiffPanel({
           <DropdownMenuContent align="start">
             <DropdownMenuRadioGroup value={selectedScopeValue} onValueChange={selectScopeValue}>
               <DropdownMenuRadioItem value="branch" closeOnClick>
-                <span>Changes</span>
+                <span>{t.git.diff.changes}</span>
               </DropdownMenuRadioItem>
               <DropdownMenuRadioItem value="unstaged" closeOnClick>
-                <span>Uncommitted</span>
+                <span>{t.git.diff.uncommitted}</span>
               </DropdownMenuRadioItem>
               <DropdownMenuRadioItem value="latest" closeOnClick>
-                <span>Latest turn</span>
+                <span>{t.git.diff.latestTurn}</span>
               </DropdownMenuRadioItem>
             </DropdownMenuRadioGroup>
             <DropdownMenuSub>
-              <DropdownMenuSubTrigger>Turn</DropdownMenuSubTrigger>
+              <DropdownMenuSubTrigger>{t.git.diff.turn}</DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
                 <DropdownMenuRadioGroup value={selectedTurnValue} onValueChange={selectScopeValue}>
                   {orderedTurnDiffSummaries.map((summary) => {
@@ -843,7 +859,10 @@ export default function DiffPanel({
                         closeOnClick
                       >
                         <span className="flex items-center gap-2">
-                          <span>Turn {turnCount}</span>
+                          <span>
+                            {t.git.diff.turn2}
+                            {turnCount}
+                          </span>
                           <span className="ml-auto text-xs tabular-nums text-muted-foreground">
                             {formatShortTimestamp(summary.completedAt, settings.timestampFormat)}
                           </span>
@@ -877,7 +896,7 @@ export default function DiffPanel({
                       <div
                         key={commit.sha}
                         className={cn(
-                          "flex items-center rounded-sm hover:bg-accent has-data-highlighted:bg-accent has-focus-visible:bg-accent [&_[data-checked]]:bg-transparent [&_[data-highlighted]]:bg-transparent",
+                          "flex items-center rounded-sm hover:bg-accent focus-within:bg-accent",
                           selectedCommitSha === commit.sha && "bg-foreground/[0.08]",
                         )}
                       >
@@ -952,7 +971,10 @@ export default function DiffPanel({
         {isGitSelection && selectedGitScope === "branch" && selectedGitSource?.baseRef && (
           <div
             className="flex min-w-0 max-w-full items-center gap-2 overflow-hidden text-xs text-muted-foreground"
-            aria-label={`Comparing ${selectedGitSource.headRef ?? "HEAD"} against ${selectedGitSource.baseRef}`}
+            aria-label={t.git.diff.compareRefs(
+              selectedGitSource.headRef ?? "HEAD",
+              selectedGitSource.baseRef,
+            )}
           >
             <Tooltip>
               <TooltipTrigger
@@ -996,7 +1018,7 @@ export default function DiffPanel({
               <ComboboxTrigger
                 render={<Button variant="ghost-muted" size="xs" />}
                 className="min-w-9 max-w-48 shrink-0"
-                aria-label={`Change comparison target. Currently ${selectedGitSource.baseRef}`}
+                aria-label={t.git.diff.changeTarget(selectedGitSource.baseRef)}
               >
                 <span className="min-w-0 truncate">{selectedGitSource.baseRef}</span>
                 <ChevronDownIcon className="size-3.5 shrink-0 opacity-70" />
@@ -1006,24 +1028,24 @@ export default function DiffPanel({
                 className="w-72 min-w-0 max-w-[calc(100vw-1rem)] overflow-hidden"
               >
                 <ComboboxSearchInput
-                  placeholder="Search refs..."
+                  placeholder={t.git.branch.searchRefs}
                   value={baseRefQuery}
                   onChange={(event) => setBaseRefQuery(event.target.value)}
                 />
                 <div className="grid shrink-0 grid-cols-[1rem_minmax(0,1fr)] items-center gap-2 border-b border-border/70 ps-3 pe-6.5 pt-2 pb-1.5 font-medium text-3xs text-muted-foreground uppercase tracking-wide">
                   <span aria-hidden="true" />
                   <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_2rem] items-center">
-                    <span>Branch</span>
-                    <span className="text-right">Remote</span>
+                    <span>{t.common.threadActions.branch}</span>
+                    <span className="text-right">{t.git.diff.remote}</span>
                   </div>
                 </div>
-                <ComboboxEmpty>No matching refs.</ComboboxEmpty>
+                <ComboboxEmpty>{t.git.diff.noMatchingRefs}</ComboboxEmpty>
                 <ComboboxList className="max-h-64 min-w-0 overflow-x-hidden">
                   <ComboboxItem
                     className="w-full min-w-0 grid-cols-[1rem_minmax(0,1fr)]"
                     value={AUTOMATIC_BASE_REF}
                   >
-                    <span className="block min-w-0 truncate">Automatic</span>
+                    <span className="block min-w-0 truncate">{t.git.diff.automatic}</span>
                   </ComboboxItem>
                   {baseRefChoices.map((choice) => {
                     const item = valueForBaseRefChoice(choice);
@@ -1044,7 +1066,7 @@ export default function DiffPanel({
                               onPointerDown={(event) => event.stopPropagation()}
                             >
                               <Switch
-                                aria-label={`Use remote version of ${choice.label}`}
+                                aria-label={t.git.diff.remoteVersion(choice.label)}
                                 checked={useRemote}
                                 className="[--thumb-size:--spacing(3)]"
                                 onCheckedChange={(checked) => {
@@ -1062,13 +1084,13 @@ export default function DiffPanel({
                                   <span className="flex justify-end text-muted-foreground">
                                     <CheckIcon
                                       role="img"
-                                      aria-label="Remote only"
+                                      aria-label={t.git.diff.remoteOnly}
                                       className="size-3"
                                     />
                                   </span>
                                 }
                               />
-                              <TooltipPopup side="top">Remote only</TooltipPopup>
+                              <TooltipPopup side="top">{t.git.diff.remoteOnly}</TooltipPopup>
                             </Tooltip>
                           ) : null}
                         </div>
@@ -1081,29 +1103,16 @@ export default function DiffPanel({
           </div>
         )}
       </div>
-      <div
-        className={cn(
-          "flex shrink-0 items-center gap-1 [-webkit-app-region:no-drag]",
-          headerCommitSha !== null && "gap-0",
-        )}
-      >
-        {codeViewFiles.length > 0 || (isGitSelection && selectedGitSource?.files?.length) ? (
-          <DiffStatLabel
-            additions={diffLineStat.additions}
-            deletions={diffLineStat.deletions}
-            className="mr-1 text-2xs"
-            layout="inline"
-          />
-        ) : null}
+      <div className="flex shrink-0 items-center gap-0.5">
         {canRefreshGitDiff && (
           <Tooltip>
             <TooltipTrigger
               render={
                 <Button
                   type="button"
-                  size="icon-sm"
+                  size="icon-compact-key"
                   variant="ghost"
-                  aria-label={isRefreshingDiff ? "Refreshing diff" : "Refresh diff"}
+                  aria-label={isRefreshingDiff ? t.git.diff.refreshingDiff : t.git.diff.refreshDiff}
                   onClick={refreshDiffFromUserAction}
                 />
               }
@@ -1111,7 +1120,7 @@ export default function DiffPanel({
               <RefreshIcon size="sm" refreshing={isRefreshingDiff} />
             </TooltipTrigger>
             <TooltipPopup side="top">
-              {isRefreshingDiff ? "Refreshing diff…" : "Refresh diff"}
+              {isRefreshingDiff ? t.git.diff.refreshingDiff2 : t.git.diff.refreshDiff}
             </TooltipPopup>
           </Tooltip>
         )}
@@ -1121,9 +1130,11 @@ export default function DiffPanel({
               render={
                 <Button
                   type="button"
-                  size="icon-sm"
+                  size="icon-compact-key"
                   variant="ghost"
-                  aria-label={allDiffFilesCollapsed ? "Expand all files" : "Collapse all files"}
+                  aria-label={
+                    allDiffFilesCollapsed ? t.git.diff.expandAllFiles : t.git.diff.collapseAllFiles
+                  }
                   onClick={toggleDiffFileCollapse}
                 />
               }
@@ -1134,14 +1145,15 @@ export default function DiffPanel({
               />
             </TooltipTrigger>
             <TooltipPopup side="top">
-              {allDiffFilesCollapsed ? "Expand all files" : "Collapse all files"}
+              {allDiffFilesCollapsed ? t.git.diff.expandAllFiles : t.git.diff.collapseAllFiles}
             </TooltipPopup>
           </Tooltip>
         )}
         <ToggleGroup
-          aria-label="Diff layout"
+          aria-label={t.git.diff.diffLayout}
           className="shrink-0"
           variant="segmented"
+          size="panel"
           value={[diffLayout]}
           onValueChange={(value) => {
             const next = value[0];
@@ -1150,20 +1162,22 @@ export default function DiffPanel({
             }
           }}
         >
-          <Toggle aria-label="Stacked diff view" value="stacked">
-            <Rows3Icon className="size-3.5" />
+          <Toggle aria-label={t.git.diff.stackedDiffView} value="stacked">
+            {t.git.diff.stacked}
           </Toggle>
-          <Toggle aria-label="Split diff view" value="split">
-            <Columns2Icon className="size-3.5" />
+          <Toggle aria-label={t.git.diff.splitDiffView} value="split">
+            {t.git.diff.split}
           </Toggle>
         </ToggleGroup>
         <Tooltip>
           <TooltipTrigger
             render={
               <Toggle
-                aria-label={wordWrap ? "Disable diff line wrapping" : "Enable diff line wrapping"}
+                aria-label={
+                  wordWrap ? t.git.diff.disableDiffLineWrapping : t.git.diff.enableDiffLineWrapping
+                }
                 variant="ghost"
-                size="sm"
+                size="panel-icon"
                 pressed={wordWrap}
                 onPressedChange={(pressed) => {
                   setWordWrap(Boolean(pressed));
@@ -1173,19 +1187,19 @@ export default function DiffPanel({
           >
             <TextWrapIcon className="size-3.5" />
           </TooltipTrigger>
-          <TooltipPopup side="top">
-            {wordWrap ? "Disable line wrapping" : "Enable line wrapping"}
-          </TooltipPopup>
+          <TooltipPopup side="top">{t.git.diff.wrapLines}</TooltipPopup>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger
             render={
               <Toggle
                 aria-label={
-                  diffIgnoreWhitespace ? "Show whitespace changes" : "Hide whitespace changes"
+                  diffIgnoreWhitespace
+                    ? t.git.diff.showWhitespaceChanges
+                    : t.git.diff.hideWhitespaceChanges
                 }
                 variant="ghost"
-                size="sm"
+                size="panel-icon"
                 pressed={diffIgnoreWhitespace}
                 onPressedChange={(pressed) => {
                   setDiffIgnoreWhitespace(Boolean(pressed));
@@ -1195,9 +1209,23 @@ export default function DiffPanel({
           >
             <PilcrowIcon className="size-3.5" />
           </TooltipTrigger>
-          <TooltipPopup side="top">
-            {diffIgnoreWhitespace ? "Show whitespace changes" : "Hide whitespace changes"}
-          </TooltipPopup>
+          <TooltipPopup side="top">{t.git.diff.whitespaceChanges}</TooltipPopup>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                size="icon-compact-key"
+                variant="ghost-muted"
+                aria-label={t.git.diff.findAndReplace}
+                disabled={codeViewFiles.length === 0}
+                onClick={() => codeViewRef.current?.getInstance()?.openSearch()}
+              />
+            }
+          >
+            <TextSearchIcon className="size-3.5" />
+          </TooltipTrigger>
+          <TooltipPopup side="top">{t.git.diff.findAndReplace}</TooltipPopup>
         </Tooltip>
         {testFileCount > 0 && (
           <Tooltip>
@@ -1226,9 +1254,9 @@ export default function DiffPanel({
             <TooltipTrigger
               render={
                 <Toggle
-                  aria-label={fileTreeOpen ? "Hide file tree" : "Show file tree"}
+                  aria-label={fileTreeOpen ? t.git.diff.hideFileTree : t.git.diff.showFileTree}
                   variant="ghost"
-                  size="sm"
+                  size="panel-icon"
                   pressed={fileTreeOpen}
                   onPressedChange={(pressed) => setFileTreeOpen(Boolean(pressed))}
                 />
@@ -1236,9 +1264,7 @@ export default function DiffPanel({
             >
               <FolderTreeIcon className="size-3.5" />
             </TooltipTrigger>
-            <TooltipPopup side="top">
-              {fileTreeOpen ? "Hide file tree" : "Show file tree"}
-            </TooltipPopup>
+            <TooltipPopup side="top">{t.git.diff.fileTree}</TooltipPopup>
           </Tooltip>
         )}
       </div>
@@ -1249,31 +1275,33 @@ export default function DiffPanel({
     <DiffPanelShell mode={mode} header={headerRow}>
       {!activeThread ? (
         <div className="flex flex-1 items-center justify-center px-5 text-center text-xs text-muted-foreground/70">
-          Select a thread to inspect turn diffs.
+          {t.git.diff.selectAThreadToInspectTurnDiffs}
         </div>
       ) : !isGitRepo && !toolCallSelection ? (
         <div className="flex flex-1 items-center justify-center px-5 text-center text-xs text-muted-foreground/70">
-          Turn diffs are unavailable because this project is not a git repository.
+          {t.git.diff.turnDiffsAreUnavailableBecauseThisProjectIsNotAGitRepository}
         </div>
       ) : selectedRunId !== null && orderedTurnDiffSummaries.length === 0 ? (
         <div className="flex flex-1 items-center justify-center px-5 text-center text-xs text-muted-foreground/70">
-          No completed turns yet.
+          {t.git.diff.noCompletedTurnsYet}
         </div>
       ) : isGitSelection && !canReadFiles ? (
         fileAccess.isPending ? (
-          <DiffPanelLoadingState label="Checking file access..." />
+          <DiffPanelLoadingState label={t.git.diff.checkingFileAccess} />
         ) : (
           <div className="flex flex-1 items-center justify-center px-5 text-center text-xs text-muted-foreground/70">
-            {fileAccess.error ?? "This connection cannot read local diffs."}
+            {fileAccess.error ?? t.git.diff.thisConnectionCannotReadLocalDiffs}
           </div>
         )
       ) : (
         <>
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-transparent">
             {isSelectedPatchTruncated && !lazySource && (
               <p className="shrink-0 border-b border-border/70 bg-muted/40 px-3 py-1.5 text-2xs text-muted-foreground">
-                This preview exceeds the size limit. Changes shown are incomplete.
-                {isGitSelection && selectedGitSource?.files ? " Totals include all changes." : ""}
+                {t.git.diff.thisPreviewExceedsTheSizeLimitChangesShownAreIncomplete}
+                {isGitSelection && selectedGitSource?.files
+                  ? t.git.diff.totalsIncludeAllChanges
+                  : ""}
               </p>
             )}
             {omittedToolCallFiles > 0 && (
@@ -1313,20 +1341,20 @@ export default function DiffPanel({
                     toolCallSelection
                       ? "Loading tool call diff..."
                       : selectedTurn
-                        ? "Loading checkpoint diff..."
+                        ? t.git.diff.loadingCheckpointDiff
                         : selectedGitScope === "unstaged"
-                          ? "Loading uncommitted changes..."
+                          ? t.git.diff.loadingUncommittedChanges
                           : selectedGitScope === "commit"
                             ? "Loading commit..."
-                            : "Loading changes..."
+                            : t.git.diff.loadingChanges
                   }
                 />
               ) : (
                 <div className="flex h-full items-center justify-center px-3 py-2 text-xs text-muted-foreground/70">
                   <p>
                     {hasNoNetChanges
-                      ? "No net changes in this selection."
-                      : "No patch available for this selection."}
+                      ? t.git.diff.noNetChangesInThisSelection
+                      : t.git.diff.noPatchAvailableForThisSelection}
                   </p>
                 </div>
               )
@@ -1385,7 +1413,7 @@ export default function DiffPanel({
                 >
                   <AnnotatableCodeView
                     key={collapseScopeKey ?? reviewSectionId}
-                    viewerRef={codeViewReveal.attach}
+                    viewerRef={attachCodeView}
                     codeViewKey={`${codeViewMountKey}:${lazySource ? filePatchScope : "preview"}`}
                     className="h-full min-h-0 overflow-auto"
                     files={codeViewFiles}
@@ -1449,9 +1477,9 @@ export default function DiffPanel({
                   />
                 </div>
                 {fileTreeOpen ? (
-                  <aside className="flex w-[min(16rem,40%)] min-w-40 shrink-0 border-l border-border/60">
+                  <aside className="pn3-file-tree-aside flex min-w-40 shrink-0 pl-2">
                     <DiffFileTree
-                      ariaLabel={`${reviewSectionTitle} files`}
+                      ariaLabel={t.git.diff.sectionFiles(reviewSectionDisplayTitle)}
                       entries={fileTreeEntries}
                       selectedPath={selectedFilePath}
                       revealRequestId={selectedFileRevealRequestId}
