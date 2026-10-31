@@ -69,12 +69,18 @@ vi.mock("~/state/use-atom-query-runner", () => ({ useAtomQueryRunner: () => vi.f
 vi.mock("~/assets/assetUrls", () => ({
   useAssetUrlState: () => ({ _tag: "Success", url: "https://environment.test/document" }),
 }));
-vi.mock("./projectFilesQueryState", () => ({
-  useProjectFileQuery: () => fileState,
-  getProjectFileContents: () => fileState.data?.contents,
-}));
-vi.mock("./useFileSaveCoordinator", () => ({
-  useFileSaveCoordinator: () => ({ change: vi.fn() }),
+vi.mock("./projectFilesQueryState", async () => {
+  const { Atom } = await import("effect/reactivity");
+  const query = Atom.make(null);
+  return {
+    useProjectFileQuery: () => fileState,
+    getProjectFileContents: () => fileState.data?.contents,
+    getProjectFileQueryAtom: () => query,
+  };
+});
+vi.mock("./fileSaveSessions", () => ({
+  useFileSaveSession: () => {},
+  changeFileSaveSession: vi.fn(),
 }));
 vi.mock("~/components/DiffWorkerPoolProvider", () => ({
   DiffWorkerPoolProvider: ({ children }: { children: ReactNode }) => children,
@@ -163,7 +169,9 @@ describe("workspace preview toolbar", () => {
 
   /** Finds the real toolbar button, failing explicitly if the expected action is absent. */
   function wrapButton(): HTMLButtonElement {
-    const button = host.querySelector<HTMLButtonElement>('button[aria-label="Word wrap"]');
+    const button = host.querySelector<HTMLButtonElement>(
+      `button[aria-label="${t.tools.files.wordWrap}"]`,
+    );
     if (!button) throw new Error("Word wrap action was not rendered");
     return button;
   }
@@ -263,17 +271,18 @@ describe("workspace preview toolbar", () => {
     },
   );
 
-  it("still toggles the setting after switching from rendered Markdown to source", async () => {
+  it("toggles only this preview after switching from rendered Markdown to source", async () => {
     await openFile("README.md");
     const source = [...host.querySelectorAll("button")].find(
-      (button) => button.textContent === "Source",
+      (button) => button.textContent === t.tools.files.sourceTab,
     );
     if (!source) throw new Error("Source mode action was not rendered");
     await act(() => source.click());
     const button = wrapButton();
     expect(button.disabled).toBe(false);
     await act(() => button.click());
-    expect(settings.wordWrap).toBe(true);
-    expect(settings.update).toHaveBeenCalledExactlyOnceWith({ wordWrap: true });
+    expect(button.getAttribute("aria-pressed")).toBe("true");
+    expect(settings.wordWrap).toBe(false);
+    expect(settings.update).not.toHaveBeenCalled();
   });
 });

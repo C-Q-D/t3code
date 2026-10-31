@@ -14,9 +14,12 @@ import {
   useRef,
   useState,
 } from "react";
+import { create } from "zustand";
+import { useAtomValue } from "@effect/atom-react";
+import { scopedThreadKey } from "@t3tools/client-runtime/environment";
 
-import type { ChatCanvasPreview } from "../chat/chatCanvasLayout";
 import { useChatCanvas } from "../chat/ChatCanvasContext";
+import type { ChatCanvasPreview } from "../chat/chatCanvasLayout";
 import { BrowserSurfaceSlot } from "~/browser/BrowserSurfaceSlot";
 import {
   findActiveBrowserRecordingRuntimeTabId,
@@ -25,7 +28,8 @@ import {
 import { useBrowserSurfaceStore } from "~/browser/browserSurfaceStore";
 import type { BrowserViewportResizeDirection } from "~/browser/browserViewportLayout";
 import { previewRuntimeTabId } from "~/browser/previewRuntimeTabId";
-import { useRendersServerTabNatively } from "~/browser/previewRuntime";
+import { rendersServerTabNatively } from "~/browser/previewRuntime";
+import { primaryEnvironmentIdAtom } from "~/state/primaryEnvironment";
 import { type ServerBrowserHandle, ServerBrowserSurface } from "~/browser/ServerBrowserSurface";
 import {
   closeServerPictureInPicture,
@@ -51,6 +55,7 @@ import {
   type PreviewMiniPlayerSize,
   type PreviewMiniPlayerSource,
   type PreviewMiniPlayerState,
+  browserMiniPlayerSource,
   previewMiniPlayerSourceKey,
   usePreviewMiniPlayerStore,
 } from "~/previewMiniPlayerStore";
@@ -59,6 +64,8 @@ import { useDeviceState } from "~/state/device";
 
 import { DeviceStreamView } from "../device/DeviceStreamView";
 import type { DeviceScreenSize } from "@t3tools/client-runtime/device/stream";
+import { Atom } from "effect/reactivity";
+import { deviceScreenKey, deviceStreamScreenAtom } from "../device/deviceStreamSession";
 import type { PreviewStreamViewport } from "@t3tools/client-runtime/preview/server-browser-stream";
 import { previewBridge } from "./previewBridge";
 import { showPreviewPopup } from "./showPreviewPopup";
@@ -120,6 +127,99 @@ const RESIZE_HANDLES: ReadonlyArray<{
   { direction: "southeast", className: "-bottom-2 -right-2 size-4 cursor-nwse-resize" },
 ];
 
+// What the stream reports about its source. It lives outside the player so the
+// chat canvas lays out the frame from the same source size the player uses. One
+// slot is enough, since only the shown thread renders a player, and it keeps the
+// store from collecting an entry for every tab a session ever streamed.
+const useStreamedSourceSize = create<{
+  readonly key: string;
+  readonly viewport: PreviewStreamViewport;
+} | null>(() => null);
+
+const NO_DEVICE_SCREEN_ATOM = Atom.make<DeviceScreenSize | null>(null).pipe(
+  Atom.withLabel("device-stream-screen:none"),
+);
+
+/** Scopes stream measurements to their owning thread and floating source. */
+const streamedSourceKey = (threadRef: ScopedThreadRef, sourceKey: string) =>
+  `${scopedThreadKey(threadRef)}\u0000${sourceKey}`;
+
+// The mini player's device stream view, named so the canvas can read the
+// screen size that view reports.
+/** Names the floating device view so the canvas consumes the same reported screen size. */
+const miniPlayerDeviceViewId = (
+  threadRef: ScopedThreadRef,
+  source: Extract<PreviewMiniPlayerSource, { kind: "device" }>,
+) =>
+  `preview-mini-player\u0000${scopedThreadKey(threadRef)}\u0000${deviceScreenKey(threadRef.environmentId, source.hostId, source.deviceId)}`;
+
+/** Resolves native or streamed source dimensions for the selected tab; null tabs have no live source. */
+function useBrowserMiniPlayerSource(threadRef: ScopedThreadRef | null, tabId: string | null) {
+  const previewState = useThreadPreviewState(threadRef);
+  const snapshot = tabId === null ? null : (previewState.sessions[tabId] ?? null);
+  const runtimeTabId =
+    threadRef && tabId !== null
+      ? previewRuntimeTabId(threadRef, previewState.serverEpoch, tabId)
+      : null;
+  const desktopOverlay = tabId === null ? null : (previewState.desktopByTabId[tabId] ?? null);
+  const layoutZoomFactor = useBrowserLayoutZoomFactor(desktopOverlay?.zoomFactor ?? 1);
+  const fittedSourceContent = useBrowserSurfaceStore((state) =>
+    runtimeTabId === null ? null : (state.byTabId[runtimeTabId]?.fittedSourceContent ?? null),
+  );
+  const primaryEnvironmentId = useAtomValue(primaryEnvironmentIdAtom);
+  const serverTab =
+    threadRef !== null &&
+    snapshot?.runtime === "server" &&
+    !rendersServerTabNatively(threadRef.environmentId, primaryEnvironmentId, snapshot);
+  const streamViewport = useStreamedSourceSize((state) =>
+    threadRef &&
+    tabId !== null &&
+    state?.key ===
+      streamedSourceKey(threadRef, previewMiniPlayerSourceKey(browserMiniPlayerSource(tabId)))
+      ? state.viewport
+      : null,
+  );
+  const sourceSize: PreviewMiniPlayerSize =
+    serverTab && streamViewport
+      ? streamViewport
+      : resolvePreviewMiniPlayerSourceSize(
+          snapshot?.viewport ?? FILL_PREVIEW_VIEWPORT,
+          fittedSourceContent,
+          layoutZoomFactor,
+        );
+  return { serverEpoch: previewState.serverEpoch, snapshot, desktopOverlay, serverTab, sourceSize };
+}
+
+/** The mini player as the chat canvas lays it out; null when no player renders. */
+export function useThreadPreviewCanvasSource(
+  threadRef: ScopedThreadRef | null,
+  miniPlayer: PreviewMiniPlayerState | null,
+): ChatCanvasPreview | null {
+  const source = miniPlayer?.source ?? null;
+  const browser = useBrowserMiniPlayerSource(
+    threadRef,
+    source?.kind === "browser" ? source.tabId : null,
+  );
+  const sourceKey = source ? previewMiniPlayerSourceKey(source) : null;
+  const screen = useAtomValue(
+    threadRef && source?.kind === "device"
+      ? deviceStreamScreenAtom(miniPlayerDeviceViewId(threadRef, source))
+      : NO_DEVICE_SCREEN_ATOM,
+  );
+  if (!miniPlayer || !source || sourceKey === null) return null;
+  if (source.kind === "browser" && !browser.snapshot) return null;
+  return {
+    key: sourceKey,
+    width: miniPlayer.width,
+    position: miniPlayer.position,
+    lastInteraction: miniPlayer.lastInteraction,
+    source:
+      source.kind === "browser"
+        ? browser.sourceSize
+        : resolveDeviceMiniPlayerSourceSize(source.platform, screen),
+  };
+}
+
 export function ThreadPreviewMiniPlayer({ threadRef, miniPlayer }: Props) {
   const { source } = miniPlayer;
   return source.kind === "browser" ? (
@@ -146,32 +246,20 @@ export function ThreadPreviewMiniPlayer({ threadRef, miniPlayer }: Props) {
  */
 function BrowserMiniPlayer({ threadRef, tabId, miniPlayer }: Props & { readonly tabId: string }) {
   const httpBaseUrl = useEnvironmentHttpBaseUrl(threadRef.environmentId);
-  const previewState = useThreadPreviewState(threadRef);
-  const snapshot = previewState.sessions[tabId] ?? null;
-  const runtimeTabId = previewRuntimeTabId(threadRef, previewState.serverEpoch, tabId);
+  const { serverEpoch, snapshot, desktopOverlay, serverTab, sourceSize } =
+    useBrowserMiniPlayerSource(threadRef, tabId);
+  const runtimeTabId = previewRuntimeTabId(threadRef, serverEpoch, tabId);
   const recordingTabIds = useActiveBrowserRecordingTabIds();
   const recording =
     recordingTabIds.has(runtimeTabId) ||
     findActiveBrowserRecordingRuntimeTabId(threadRef, tabId) !== null;
-  const desktopOverlay = previewState.desktopByTabId[tabId] ?? null;
-  const layoutZoomFactor = useBrowserLayoutZoomFactor(desktopOverlay?.zoomFactor ?? 1);
-  const fittedSourceContent = useBrowserSurfaceStore(
-    (state) => state.byTabId[runtimeTabId]?.fittedSourceContent ?? null,
-  );
-  const nativeServerTab = useRendersServerTabNatively(threadRef.environmentId, snapshot);
-  const serverTab = snapshot?.runtime === "server" && !nativeServerTab;
-  const [streamViewport, setStreamViewport] = useState<PreviewStreamViewport | null>(null);
   const serverSurfaceRef = useRef<ServerBrowserHandle | null>(null);
   const serverPictureInPicture =
     useServerPictureInPictureKey() === serverPictureInPictureKey(threadRef.threadId, tabId);
-  const sourceSize =
-    serverTab && streamViewport
-      ? streamViewport
-      : resolvePreviewMiniPlayerSourceSize(
-          snapshot?.viewport ?? FILL_PREVIEW_VIEWPORT,
-          fittedSourceContent,
-          layoutZoomFactor,
-        );
+  const viewportKey = streamedSourceKey(
+    threadRef,
+    previewMiniPlayerSourceKey(browserMiniPlayerSource(tabId)),
+  );
 
   const openInPanel = () => {
     usePreviewMiniPlayerStore.getState().close(threadRef);
@@ -263,7 +351,17 @@ function BrowserMiniPlayer({ threadRef, tabId, miniPlayer }: Props & { readonly 
               visible
               followSize={false}
               controlPosition="bottom"
-              onViewport={setStreamViewport}
+              onViewport={(viewport) =>
+                useStreamedSourceSize.setState(
+                  (state) =>
+                    state?.key === viewportKey &&
+                    state.viewport.width === viewport.width &&
+                    state.viewport.height === viewport.height
+                      ? state
+                      : { key: viewportKey, viewport },
+                  true,
+                )
+              }
               onPopup={(popupTabId) => showPreviewPopup(threadRef, popupTabId, "floating")}
               className="size-full"
             />
@@ -302,14 +400,14 @@ function DeviceMiniPlayer({
   miniPlayer,
 }: Props & { readonly source: Extract<PreviewMiniPlayerSource, { kind: "device" }> }) {
   const { state: deviceState } = useDeviceState(threadRef.environmentId);
-  const [screen, setScreen] = useState<DeviceScreenSize | null>(null);
+  const viewId = miniPlayerDeviceViewId(threadRef, source);
+  const screen = useAtomValue(deviceStreamScreenAtom(viewId));
   const sourceSize = resolveDeviceMiniPlayerSourceSize(source.platform, screen);
   const device = deviceState.devices.find(
     (entry) => entry.hostId === source.hostId && entry.id === source.deviceId,
   );
-  const hostLabel =
-    deviceState.hosts.find((host) => host.id === source.hostId)?.label ??
-    t.tools.preview.deviceHost;
+  const host = deviceState.hosts.find((entry) => entry.id === source.hostId);
+  const hostLabel = host?.label ?? t.tools.preview.deviceHost;
   const cornerRadius = (player: PreviewMiniPlayerSize) =>
     resolveDeviceMiniPlayerCornerRadius(source.platform, player);
 
@@ -345,7 +443,8 @@ function DeviceMiniPlayer({
             deviceName={device?.name ?? source.name}
             deviceDescription={`${hostLabel} · ${device?.version ?? source.platform}`}
             visible
-            onScreen={setScreen}
+            viewId={viewId}
+            serveSimOnly={host?.kind === "simlock"}
           />
         </div>
       )}

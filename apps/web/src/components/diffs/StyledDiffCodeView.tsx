@@ -284,6 +284,7 @@ type StyledDiffCodeViewProps<LAnnotation> = (
   readonly discussion?: boolean;
 };
 
+/** Applies local diff metrics and themes while forwarding renderer lifecycle and comment props. */
 export function StyledDiffCodeView<LAnnotation = undefined>({
   options,
   viewerRef,
@@ -348,11 +349,8 @@ export function StyledDiffCodeView<LAnnotation = undefined>({
             // reintroduce the library's default 8px gap above its header.
             spacing: 0,
             paddingTop: 0,
-            // Unlike the gap above, the 8px under a file's last line is painted
-            // unconditionally by Pierre's stylesheet (`--diffs-gap-fallback`), so the metric has
-            // to count it: at zero every expanded file's virtual height ran 8px short of its
-            // rendered height, and the end of the list sat past the reachable scroll range —
-            // one clipped file row per expanded file above it.
+            // Include Pierre's 8px --diffs-gap-fallback in metrics or each expanded file loses a scrollable
+            // row.
             paddingBottom: 8,
           },
           layout: { paddingTop: 0, paddingBottom: 0, gap: 0 },

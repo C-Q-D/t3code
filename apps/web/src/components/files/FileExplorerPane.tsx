@@ -1,3 +1,4 @@
+/** Keeps the local left-hand explorer resizable without consuming the file preview minimum. */
 import { type CSSProperties, type ReactNode, useState } from "react";
 
 import { RightPanelResizeHandle } from "~/components/preview/RightPanelResizeHandle";
@@ -9,6 +10,7 @@ const MIN_WIDTH = 160;
 const MAX_WIDTH = 560;
 const FILE_CONTENT_MIN_WIDTH = 256;
 
+/** Persists completed pointer and keyboard resizes; a lone explorer fills its row. */
 export function FileExplorerPane({
   resizable,
   children,
@@ -19,10 +21,10 @@ export function FileExplorerPane({
   const [maxWidth, setMaxWidth] = useState(MAX_WIDTH);
   const { width, setWidth, handlers } = useResizableWidth({
     storageKey: "t3code.fileExplorerWidth",
-    defaultWidth: 256,
+    defaultWidth: 196,
     minWidth: MIN_WIDTH,
     maxWidth,
-    edge: "left",
+    edge: "right",
   });
 
   return (
@@ -38,10 +40,7 @@ export function FileExplorerPane({
         return observeResize(row, measure);
       }}
       aria-label="File explorer"
-      className={cn(
-        "relative flex min-h-0 min-w-0 shrink-0 bg-background",
-        resizable ? "border-l border-border/60" : "flex-1",
-      )}
+      className={cn("relative flex min-h-0 min-w-0 shrink-0", !resizable && "flex-1")}
       style={
         resizable
           ? ({
@@ -54,6 +53,7 @@ export function FileExplorerPane({
       {resizable ? (
         <RightPanelResizeHandle
           handlers={handlers}
+          className="left-auto -right-1"
           label="Resize file explorer"
           tabIndex={0}
           aria-valuenow={width}
@@ -64,10 +64,10 @@ export function FileExplorerPane({
             let nextWidth: number;
             switch (event.key) {
               case "ArrowLeft":
-                nextWidth = width + 16;
+                nextWidth = width - 16;
                 break;
               case "ArrowRight":
-                nextWidth = width - 16;
+                nextWidth = width + 16;
                 break;
               case "Home":
                 nextWidth = MIN_WIDTH;

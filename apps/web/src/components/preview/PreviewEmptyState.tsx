@@ -29,6 +29,7 @@ export function PreviewEmptyState({
 }: Props) {
   const servers = useDiscoveredLocalServers({ environmentId, configuredUrls });
   const recents = recentEntries.filter((entry) => URL.canParse(entry.url)).slice(0, 8);
+
   return (
     <div className="scrollbar-gutter-both flex h-full min-h-0 w-full overflow-y-auto bg-code py-6">
       <div className="pn6-preview-empty m-auto flex max-w-95 flex-col gap-3.5">

@@ -1,5 +1,5 @@
 /** Keeps inline panel widths within their host while reserving usable sibling space. */
-import { type RefObject, useLayoutEffect, useState } from "react";
+import { useState } from "react";
 
 import { type ResizableWidthHandlers, useResizableWidth } from "./useResizableWidth";
 import { observeResize } from "../lib/observeResize";
@@ -8,15 +8,14 @@ import { observeResize } from "../lib/observeResize";
 export interface PreviewPanelInlineSize {
   readonly width: number;
   readonly handlers: ResizableWidthHandlers;
+  /** Ref-callback body for the panel host: measures the row the panel shares. */
+  readonly observeRow: (host: HTMLElement) => () => void;
 }
 
 const PREVIEW_PANEL_WIDTH_STORAGE_KEY = "t3code:preview-panel-width";
 const PREVIEW_PANEL_MIN_WIDTH = 360;
 const PREVIEW_PANEL_MAX_WIDTH_FRACTION = 0.7;
-/**
- * Floor for the column beside the panel: below this the chat column's
- * composer overflows, so the panel yields instead.
- */
+/** Below this, the sibling chat column's composer overflows. */
 const SIBLING_COLUMN_MIN_WIDTH = 360;
 const PREVIEW_PANEL_DEFAULT_WIDTH = 540;
 
@@ -26,7 +25,6 @@ const PREVIEW_PANEL_DEFAULT_WIDTH = 540;
  * Returns a clamped pixel width and handlers that persist completed resizes.
  */
 export function usePreviewPanelInlineSize(
-  hostRef?: RefObject<HTMLElement | null>,
   options: {
     readonly enabled?: boolean | undefined;
     /** Collapse using the host action while keeping its last saved width. */
@@ -38,13 +36,12 @@ export function usePreviewPanelInlineSize(
     readonly standalone?: boolean | undefined;
   } = {},
 ): PreviewPanelInlineSize {
-  const maxWidth = useViewportClampedMaxWidth(
-    hostRef,
-    options.enabled ?? true,
-    options.container,
-    options.standalone ?? false,
+  const enabled = options.enabled ?? true;
+  const container = options.container;
+  const [maxWidth, setMaxWidth] = useState(() =>
+    getPreviewPanelMaxWidth(typeof window === "undefined" ? 1280 : window.innerWidth),
   );
-  return useResizableWidth({
+  const { width, handlers } = useResizableWidth({
     storageKey: options.widthStorageKey ?? PREVIEW_PANEL_WIDTH_STORAGE_KEY,
     defaultWidth: options.defaultWidth ?? PREVIEW_PANEL_DEFAULT_WIDTH,
     minWidth: PREVIEW_PANEL_MIN_WIDTH,
@@ -52,31 +49,17 @@ export function usePreviewPanelInlineSize(
     edge: "left",
     onCollapse: options.onCollapse,
   });
-}
-
-function useViewportClampedMaxWidth(
-  hostRef: RefObject<HTMLElement | null> | undefined,
-  enabled: boolean,
-  container: HTMLElement | null | undefined,
-  standalone: boolean,
-): number {
-  const [maxWidth, setMaxWidth] = useState(() =>
-    getPreviewPanelMaxWidth(typeof window === "undefined" ? 1280 : window.innerWidth),
-  );
-  useLayoutEffect(() => {
-    if (typeof window === "undefined") return;
-    const row = container ?? (enabled ? hostRef?.current?.parentElement : null) ?? null;
-    // Measure before first paint: the persisted width must be clamped against
-    // the row on the initial render, not one observer tick later (the panel
-    // would flash over-wide on every mount). Only the derived cap is stored: the
-    // row resizes every frame of a sidebar drag, but the cap rarely moves, and an
-    // unchanged cap skips re-rendering the panel's owner.
+  const observeRow = (host: HTMLElement) => {
+    const row = container ?? (enabled ? host.parentElement : null) ?? null;
+    // Ref callbacks run before paint, so the width is clamped without an over-wide
+    // flash on mount. Only the derived cap is stored: the row resizes every frame
+    // of a sidebar drag, but an unchanged cap skips re-rendering the owner.
     const measure = () => {
       // Read the same inherited pixel token as the shell's margin, rather than
       // duplicating the theme's spacing value in the resize calculation.
-      const gapSource = hostRef?.current ?? row;
+      const gapSource = host;
       const gap =
-        standalone && gapSource
+        options.standalone && gapSource
           ? Number.parseFloat(getComputedStyle(gapSource).getPropertyValue("--frame-slab-gap")) || 0
           : 0;
       setMaxWidth(getPreviewPanelMaxWidth(window.innerWidth, row?.clientWidth, gap));
@@ -97,8 +80,8 @@ function useViewportClampedMaxWidth(
       if (frame !== 0) window.cancelAnimationFrame(frame);
       stopObserving?.();
     };
-  }, [container, hostRef, enabled, standalone]);
-  return maxWidth;
+  };
+  return { width, handlers, observeRow };
 }
 /**
  * Returns the panel cap in CSS pixels from viewport, optional row width, and sibling gap (default 0).

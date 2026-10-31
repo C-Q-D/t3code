@@ -26,8 +26,8 @@ vi.mock("../chat/ChatCanvasContext", () => ({
     clearPreview: state.clearPreview,
   }),
 }));
-vi.mock("~/previewMiniPlayerStore", () => ({
-  previewMiniPlayerSourceKey: () => "browser:tab",
+vi.mock("~/previewMiniPlayerStore", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("~/previewMiniPlayerStore")>()),
   usePreviewMiniPlayerStore: { getState: () => state },
 }));
 vi.mock("~/previewStateStore", () => ({
