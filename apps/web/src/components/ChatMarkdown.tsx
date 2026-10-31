@@ -1,3 +1,6 @@
+/** Renders chat Markdown and media controls while preserving authored and exported content. */
+import { t } from "~/i18n";
+import { Alert, AlertTitle, AlertDescription } from "./ui/alert";
 import { buildFileLinkParentSuffixByPath, fileLinkLabel } from "@t3tools/shared/fileLinks";
 import {
   isWindowsDrivePathHref,
@@ -188,7 +191,11 @@ import {
 } from "../browser/openFileInPreview";
 import { resolveLinkTarget } from "../browser/browserLinkTarget";
 import { PullRequestLinkPreview } from "./pullRequest/PullRequestLinkPreview";
-import { MarkdownCodeBlock, SuspenseShikiCodeBlock } from "./chat/MarkdownCodeBlock";
+import {
+  MarkdownTimelineContext,
+  MarkdownCodeBlock,
+  SuspenseShikiCodeBlock,
+} from "./chat/MarkdownCodeBlock";
 import { createMarkdownRenderer } from "./chat/markdownRenderer";
 import { splitMarkdownBlocks } from "./chat/markdownStreamBlocks";
 import { MarkdownMermaidCodeBlock } from "./chat/MarkdownMermaidCodeBlock";
@@ -206,8 +213,8 @@ import {
 import { MarkdownExternalLinkContent } from "./chat/MarkdownExternalLink";
 import { MarkdownFileLink } from "./chat/MarkdownFileLink";
 import { canUseMarkdownFileShellActions } from "./chat/MarkdownFileLink.logic";
-import { rehypeChipPunctuation } from "./chat/markdownChipPunctuation";
 import { handleMarkdownFragmentClick, rehypeHeadingIds } from "./chat/markdownFragments";
+import { rehypeChipPunctuation } from "./chat/markdownChipPunctuation";
 import { rehypeTextDirection } from "./chat/markdownTextDirection";
 import { hastHasText, hastPlainTextDeep, plainHastText } from "./chat/markdownHast.logic";
 import {
@@ -223,6 +230,8 @@ import { reportMarkdownActionFailure } from "./chat/markdownActionFailure";
 const isAssetNotFoundError = Schema.is(AssetWorkspaceAssetNotFoundError);
 
 interface ChatMarkdownProps {
+  /** Opt into timeline code/table/callout chrome; other surfaces keep their existing look. */
+  presentation?: "timeline" | undefined;
   /** Compact markdown transforms remove blocks before rendering inside a label. */
   inline?: boolean;
   text: string;
@@ -272,6 +281,12 @@ const ARTIFACT_TEMPLATE_ICON_BY_KIND = {
   slack: MessageSquareIcon,
 } satisfies Record<CodexArtifactTemplateKind, LucideIcon>;
 
+/**
+ * Renders an artifact-template summary with an optional apply action.
+ * @param props - Required template metadata and optional onUse callback; omitting the callback
+ * hides the action.
+ * @returns The template card element; never null.
+ */
 function CodexArtifactTemplateCard(props: {
   readonly template: CodexArtifactTemplate;
   readonly onUse?: ((template: CodexArtifactTemplate) => void) | undefined;
@@ -282,7 +297,7 @@ function CodexArtifactTemplateCard(props: {
   return (
     <div
       role="group"
-      aria-label={`${props.template.displayName} template`}
+      aria-label={t.chat.markdown.templateLabel(props.template.displayName)}
       data-chat-markdown-artifact-template
       className="my-[0.65rem] flex w-full min-w-0 items-center gap-3 rounded-xl border border-border/70 bg-card/60 px-3 py-2.5 text-foreground shadow-xs"
       data-artifact-kind={props.template.artifactKind}
@@ -312,7 +327,7 @@ function CodexArtifactTemplateCard(props: {
           className="shrink-0"
           onClick={() => props.onUse?.(props.template)}
         >
-          Use template
+          {t.chat.markdown.applyTemplate}
         </Button>
       ) : null}
     </div>
@@ -346,37 +361,48 @@ function orderedListGutterStyle(
 
 const GITHUB_ALERT_PRESENTATIONS: Record<
   string,
-  { label: string; Icon: typeof InfoIcon; borderClassName: string; titleClassName: string }
+  {
+    label: string;
+    Icon: typeof InfoIcon;
+    borderClassName: string;
+    titleClassName: string;
+    timelineClassName: string;
+  }
 > = {
   note: {
-    label: "Note",
+    label: t.chat.markdown.note,
     Icon: InfoIcon,
     borderClassName: "border-blue-500/70",
     titleClassName: "text-blue-600 dark:text-blue-400",
+    timelineClassName: "bg-timeline-callout-note text-secondary-label shadow-well-pressed",
   },
   tip: {
-    label: "Tip",
+    label: t.chat.markdown.tip,
     Icon: LightbulbIcon,
     borderClassName: "border-emerald-500/70",
     titleClassName: "text-emerald-600 dark:text-emerald-400",
+    timelineClassName: "bg-status-success text-success-foreground",
   },
   important: {
-    label: "Important",
+    label: t.chat.markdown.important,
     Icon: MessageSquareWarningIcon,
     borderClassName: "border-purple-500/70",
     titleClassName: "text-purple-600 dark:text-purple-400",
+    timelineClassName: "bg-status-emphasis text-status-emphasis-foreground",
   },
   warning: {
-    label: "Warning",
+    label: t.chat.markdown.warning,
     Icon: TriangleAlertIcon,
     borderClassName: "border-amber-500/70",
     titleClassName: "text-amber-600 dark:text-amber-500",
+    timelineClassName: "",
   },
   caution: {
-    label: "Caution",
+    label: t.chat.markdown.caution,
     Icon: OctagonAlertIcon,
     borderClassName: "border-red-500/70",
     titleClassName: "text-red-600 dark:text-red-400",
+    timelineClassName: "bg-error-surface text-error",
   },
 };
 
@@ -486,6 +512,16 @@ function resolveFileLinkSources(
   return { markdownFileLinkMetaByHref, inlineCodeFileLinkMetaByText, fileLinkParentSuffixByPath };
 }
 
+/**
+ * Prepares Markdown renderers and permission-aware media, file, and task-list actions.
+ * @param props - Required text (possibly empty) and cwd (undefined when unknown). Optional
+ * threadRef, pullRequestPanelRef, and environmentId select the host context; imageBaseDir defaults
+ * to cwd. Optional callbacks handle task changes, templates, shell execution, media expansion, and
+ * context references. Streaming and GitHub media default to false, skills to an empty list, and
+ * headingLevelOffset to zero. Presentation and plugin options are passed by the caller.
+ * @returns Renderer state, container ref, and local media preview controls; the preview is null
+ * until opened. Registers hooks and cleans up stale media requests when the context changes.
+ */
 function useChatMarkdownState({
   text,
   inline = false,
@@ -594,9 +630,7 @@ function useChatMarkdownState({
       (error: unknown) => {
         if (mediaRequestId.current !== requestId) return;
         let description =
-          error instanceof Error
-            ? error.message
-            : "The file could not be loaded. It may have been moved or deleted.";
+          error instanceof Error ? error.message : t.chat.markdown.theFileCouldNotBeLoadedIt;
         if (
           isAssetNotFoundError(error) &&
           error.resource._tag === "media-file" &&
@@ -613,13 +647,16 @@ function useChatMarkdownState({
               isDesktopRenderer: window.desktopBridge !== undefined,
             }).mode !== "local-exec"
           ) {
-            description = `The file was not found on ${target.label} at ${error.checkedPath ?? error.resource.path}.`;
+            description = t.chat.remoteFileErrorText.missing(
+              target.label,
+              error.checkedPath ?? error.resource.path,
+            );
           }
         }
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Media unavailable",
+            title: t.chat.markdown.mediaUnavailable,
             description,
           }),
         );
@@ -647,7 +684,7 @@ function useChatMarkdownState({
     if (!readEnvironmentScope(environmentId, AuthOrchestrationOperateScope)) {
       return Promise.resolve(
         AsyncResult.failure<void, Error>(
-          Cause.fail(new Error("This connection cannot reveal files on this environment.")),
+          Cause.fail(new Error(t.chat.markdown.thisConnectionCannotRevealFilesOnThis)),
         ),
       );
     }
@@ -712,7 +749,7 @@ function useChatMarkdownState({
         AsyncResult.failure<void, BrowserPreviewUnavailableError>(
           Cause.fail(
             new BrowserPreviewUnavailableError({
-              message: "Preview access is unavailable for this client.",
+              message: t.chat.markdown.previewAccessIsUnavailableForThisClient,
             }),
           ),
         ),
@@ -726,7 +763,7 @@ function useChatMarkdownState({
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "Unable to open link in browser",
+              title: t.chat.markdown.unableToOpenLinkInBrowser,
               description: error.message,
             }),
           );
@@ -742,7 +779,7 @@ function useChatMarkdownState({
         AsyncResult.failure<void, BrowserPreviewUnavailableError>(
           Cause.fail(
             new BrowserPreviewUnavailableError({
-              message: "Environment is not connected.",
+              message: t.chat.markdown.environmentIsNotConnected,
             }),
           ),
         ),
@@ -959,6 +996,26 @@ function markdownHeadingRenderer(level: 1 | 2 | 3 | 4 | 5 | 6) {
   };
 }
 
+/** Match the math renderer before mounting so table sizing does not need DOM observers. */
+function cellContainsMath(
+  node: NonNullable<ReactMarkdownExtraProps["node"]>,
+  mathEnabled: boolean,
+): boolean {
+  if (node.properties.dataMarkdownMath != null || node.properties["data-markdown-math"] != null)
+    return true;
+  const classes = node.properties.className;
+  const className = Array.isArray(classes)
+    ? classes.join(" ")
+    : typeof classes === "string"
+      ? classes
+      : undefined;
+  if (mathEnabled && node.tagName === "code" && mathKind(className)) return true;
+  return node.children.some(
+    (child) => child.type === "element" && cellContainsMath(child, mathEnabled),
+  );
+}
+
+// Keep component types stable when streaming changes the message state.
 // Native word selection stops at hyphens and dots, so a double-click takes the whole span.
 function selectInlineCode(event: ReactMouseEvent<HTMLElement>) {
   window.getSelection()?.selectAllChildren(event.currentTarget);
@@ -986,11 +1043,60 @@ const CHAT_MARKDOWN_COMPONENTS = {
     return <p {...props}>{renderSkillInlineMarkdownChildren(children, skills, threadRef)}</p>;
   },
   blockquote: function MarkdownBlockquote({ node: _node, children, ...props }) {
-    const alert =
-      GITHUB_ALERT_PRESENTATIONS[String((props as Record<string, unknown>)["data-alert"] ?? "")];
+    const isTimeline = use(MarkdownTimelineContext);
+    const alertType = String((props as Record<string, unknown>)["data-alert"] ?? "");
+    const alert = GITHUB_ALERT_PRESENTATIONS[alertType];
     if (!alert) {
       return <blockquote {...props}>{children}</blockquote>;
     }
+    if (isTimeline) {
+      // W7 is also used by status banners; the other T3 colors belong to Markdown.
+      if (alertType === "warning") {
+        return (
+          <Alert variant="sand" role="note" dir={props.dir} data-markdown-callout={alertType}>
+            <alert.Icon aria-hidden />
+            <AlertTitle data-thread-find-ignore="true">{alert.label}</AlertTitle>
+            <AlertDescription>
+              <span aria-hidden data-thread-find-ignore="true">
+                {" "}
+                ·{" "}
+              </span>
+              {children}
+            </AlertDescription>
+          </Alert>
+        );
+      }
+      return (
+        <div
+          role="note"
+          dir={props.dir}
+          data-markdown-callout={alertType}
+          className={cn(
+            "timeline-markdown-callout flex items-start gap-2.5 rounded-notice px-3.5 py-2.5 text-body leading-callout",
+            alert.timelineClassName,
+          )}
+        >
+          <alert.Icon aria-hidden className="mt-0.75 size-4 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <span
+              className={cn("font-bold", alertType === "note" && "text-foreground")}
+              data-thread-find-ignore="true"
+            >
+              {alert.label}
+            </span>
+            <div className="timeline-callout-body inline text-fg-detail">
+              <span aria-hidden data-thread-find-ignore="true">
+                {" "}
+                ·{" "}
+              </span>
+              {children}
+            </div>
+          </div>
+        </div>
+      );
+    }
+    // Not a <blockquote>: the stylesheet mutes those, and an alert's body is ordinary
+    // text under a colored title — which is how the host renders it.
     return (
       <div
         role="note"
@@ -1046,7 +1152,7 @@ const CHAT_MARKDOWN_COMPONENTS = {
         {...props}
         type="checkbox"
         name="markdown-task"
-        aria-label="Toggle task"
+        aria-label={t.chat.markdown.toggleTask}
         checked={checked}
         onChange={(event) => {
           const listItemStart = Number(event.currentTarget.closest("li")?.dataset.listItemOffset);
@@ -1260,9 +1366,10 @@ const CHAT_MARKDOWN_COMPONENTS = {
                       type: "error",
                       title:
                         operation === "link-pull-request-to-thread"
-                          ? "Unable to link pull request"
-                          : "Unable to unlink pull request",
-                      description: cause instanceof Error ? cause.message : "The request failed.",
+                          ? t.chat.markdown.unableToLinkPullRequest
+                          : t.chat.markdown.unableToUnlinkPullRequest,
+                      description:
+                        cause instanceof Error ? cause.message : t.chat.markdown.theRequestFailed,
                     }),
                   );
                 }
@@ -1553,6 +1660,15 @@ const CHAT_MARKDOWN_COMPONENTS = {
     }
     return <ChatMarkdownImageFallback alt={altText} copyMarkdown={copyMarkdown} kind={kind} />;
   },
+  td: function MarkdownTableCell({ node, ...props }) {
+    const { mathEnabled } = use(ChatMarkdownRendererContext);
+    return (
+      <td
+        {...props}
+        data-has-markdown-math={node && cellContainsMath(node, mathEnabled) ? "true" : undefined}
+      />
+    );
+  },
   table: function MarkdownTableRenderer({ node: _node, ...props }) {
     return <MarkdownTable {...props} />;
   },
@@ -1614,7 +1730,9 @@ const CHAT_MARKDOWN_COMPONENTS = {
           fenceTitle={fenceTitle}
           theme={resolvedTheme}
           isStreaming={isStreaming && !isClosedCodeFence(node, text, codeBlock.code)}
-          onExpand={(src) => expandMedia({ images: [{ src, name: "Mermaid diagram" }], index: 0 })}
+          onExpand={(src) =>
+            expandMedia({ images: [{ src, name: t.chat.markdown.mermaidDiagram }], index: 0 })
+          }
         >
           {highlightedCode}
         </MarkdownMermaidCodeBlock>
@@ -1687,6 +1805,7 @@ const MarkdownSource = memo(function MarkdownSource({
   rehypePlugins,
   shared,
   cache,
+  lastBlock,
 }: {
   text: string;
   remarkPlugins: PluggableList;
@@ -1695,6 +1814,7 @@ const MarkdownSource = memo(function MarkdownSource({
   shared: boolean;
   /** The text will not change again; streamed text would only fill the cache with prefixes. */
   cache: boolean;
+  lastBlock: { current: string | null } | undefined;
 }) {
   // Per-instance plugins, such as the incremental parser, set up their state on every render.
   const render = shared
@@ -1706,13 +1826,22 @@ const MarkdownSource = memo(function MarkdownSource({
         urlTransform: markdownUrlTransform,
       });
   return (
-    <ChatMarkdownTextContext value={text}>{render(text, shared && cache)}</ChatMarkdownTextContext>
+    <ChatMarkdownTextContext value={text}>
+      {render(text, shared && cache, lastBlock)}
+    </ChatMarkdownTextContext>
   );
 });
 
+/**
+ * Render Markdown with the host's existing interactions and an optional timeline presentation.
+ * @param props Required text and optional cwd/context. presentation defaults to the shared look;
+ * timeline enables D1 typography and code/table chrome without changing Markdown actions.
+ * @returns Markdown plus the existing local media preview, when opened.
+ */
 function ChatMarkdown({
   text,
   className,
+  presentation,
   inline = false,
   lineBreaks = false,
   parseRawHtml = true,
@@ -1754,6 +1883,11 @@ function ChatMarkdown({
     ? [...sharedRemarkPlugins, ...extraRemarkPlugins, createIncrementalMarkdownPlugin()]
     : withExtraPlugins(sharedRemarkPlugins, extraRemarkPlugins);
   const blocks = streamingBlocks ?? [text];
+  const lastBlockRef = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    if (lastBlockRef.current === null) markdownRef.current?.removeAttribute("data-last-block");
+    else markdownRef.current?.setAttribute("data-last-block", lastBlockRef.current);
+  });
 
   return (
     <Root
@@ -1761,30 +1895,35 @@ function ChatMarkdown({
       className={cn(
         "chat-markdown w-full min-w-0 [overflow-wrap:anywhere] [word-break:break-word]",
         !inline &&
-          "text-sm leading-relaxed text-foreground/[calc(90%+var(--appearance-contrast-boost)/10)]",
+          (presentation === "timeline"
+            ? "text-reply text-fg-detail"
+            : "text-sm leading-relaxed text-foreground/[calc(80%+var(--appearance-contrast-boost)/5)]"),
         className,
       )}
       data-streaming={componentState.isStreaming ? "" : undefined}
       onCopy={handleCopy}
     >
-      <ChatMarkdownRendererContext value={componentState}>
-        {blocks.map((source, index) => (
-          <MarkdownSource
-            // oxlint-disable-next-line react/no-array-index-key -- streamed blocks only change at the end
-            key={index}
-            text={source}
-            remarkPlugins={remarkPlugins}
-            rehypePlugins={
-              parseRawHtml
-                ? CHAT_MARKDOWN_RENDER_REHYPE_PLUGINS
-                : CHAT_MARKDOWN_LITERAL_HTML_REHYPE_PLUGINS
-            }
-            shared={!uncachedPlugins}
-            // Every block before the last is finished, so its parse can be reused.
-            cache={!props.isStreaming || index < blocks.length - 1}
-          />
-        ))}
-      </ChatMarkdownRendererContext>
+      <MarkdownTimelineContext value={presentation === "timeline"}>
+        <ChatMarkdownRendererContext value={componentState}>
+          {blocks.map((source, index) => (
+            <MarkdownSource
+              // oxlint-disable-next-line react/no-array-index-key -- streamed blocks only change at the end
+              key={index}
+              text={source}
+              lastBlock={index === blocks.length - 1 ? lastBlockRef : undefined}
+              remarkPlugins={remarkPlugins}
+              rehypePlugins={
+                parseRawHtml
+                  ? CHAT_MARKDOWN_RENDER_REHYPE_PLUGINS
+                  : CHAT_MARKDOWN_LITERAL_HTML_REHYPE_PLUGINS
+              }
+              shared={!uncachedPlugins}
+              // Every block before the last is finished, so its parse can be reused.
+              cache={!props.isStreaming || index < blocks.length - 1}
+            />
+          ))}
+        </ChatMarkdownRendererContext>
+      </MarkdownTimelineContext>
       {localMediaPreview ? (
         <ExpandedImageDialog preview={localMediaPreview} onClose={closeLocalMediaPreview} />
       ) : null}

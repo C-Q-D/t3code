@@ -1,3 +1,4 @@
+/** Shares parsed Markdown blocks while retaining per-render cursor metadata. */
 import type { Element, Nodes, Root } from "hast";
 import { toJsxRuntime, type Components } from "hast-util-to-jsx-runtime";
 import { urlAttributes } from "html-url-attributes";
@@ -23,7 +24,7 @@ interface MarkdownRendererOptions {
 // reuses one instead of parsing again. Parsing is most of the cost of rendering markdown.
 // An element and the hast it keeps hold about 20 bytes per source character, so ~10 MB.
 const MAX_CACHED_CHARS = 500_000;
-const rendered = new Map<string, ReactElement>();
+const rendered = new Map<string, { element: ReactElement; lastBlock: string | null }>();
 let cachedChars = 0;
 let nextRendererId = 0;
 
@@ -31,10 +32,11 @@ let nextRendererId = 0;
 const ENTRY_OVERHEAD_CHARS = 200;
 const entrySize = (key: string) => key.length + ENTRY_OVERHEAD_CHARS;
 
-function remember(key: string, element: ReactElement) {
+/** Bounds cached trees by source size, evicting the least recently used blocks. */
+function remember(key: string, element: ReactElement, lastBlock: string | null) {
   // One huge message would otherwise evict everything else.
   if (entrySize(key) > MAX_CACHED_CHARS / 4) return;
-  rendered.set(key, element);
+  rendered.set(key, { element, lastBlock });
   cachedChars += entrySize(key);
   for (const oldest of rendered.keys()) {
     if (cachedChars <= MAX_CACHED_CHARS) break;
@@ -82,18 +84,21 @@ export function createMarkdownRenderer({
     }
   };
 
-  return (text: string, cache: boolean): ReactElement => {
+  return (text: string, cache: boolean, lastBlock?: { current: string | null }): ReactElement => {
     const key = keyPrefix + text;
     const cached = rendered.get(key);
     if (cached !== undefined) {
       // Refresh its place in the eviction order.
       rendered.delete(key);
       rendered.set(key, cached);
-      return cached;
+      if (lastBlock) lastBlock.current = cached.lastBlock;
+      return cached.element;
     }
     const file = new VFile(text);
     const tree = processor.runSync(processor.parse(file), file) as Root;
     prepare(tree);
+    const ending = tree.children.findLast((node) => node.type === "element")?.tagName ?? null;
+    if (lastBlock) lastBlock.current = ending;
     const element = toJsxRuntime(tree, {
       Fragment,
       components,
@@ -103,7 +108,7 @@ export function createMarkdownRenderer({
       passKeys: true,
       passNode: true,
     });
-    if (cache) remember(key, element);
+    if (cache) remember(key, element, ending);
     return element;
   };
 }
