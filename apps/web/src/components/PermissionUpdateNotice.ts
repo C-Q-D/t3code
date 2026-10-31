@@ -1,3 +1,7 @@
+/** Notifies legacy-permission sessions once per environment for the app lifetime. */
+import { t } from "~/i18n";
+import { createElement } from "react";
+import { ShieldCheckIcon } from "lucide-react";
 import { sessionHasLegacyPermissions, type EnvironmentId } from "@t3tools/contracts";
 import type { AnyRouter } from "@tanstack/react-router";
 import * as Schema from "effect/Schema";
@@ -27,6 +31,7 @@ const legacyPermissionEnvironmentsAtom = Atom.make((get) =>
 const dismissalKey = (environmentId: EnvironmentId) =>
   `t3code:permission-update:v1:${environmentId}`;
 
+/** Persists dismissal per environment; the action opens the fork connection settings page. */
 function showPermissionNotice(
   router: AnyRouter,
   { environmentId, label }: LegacyPermissionEnvironment,
@@ -42,21 +47,22 @@ function showPermissionNotice(
     toastManager.close(id);
   };
   const id = toastManager.add({
-    title: `Permissions have changed for ${label}`,
-    description:
-      "This connection still uses the old permissions, so some actions may no longer be available. Pair again using a new link with the permissions you need.",
+    title: t.app.permissions.changed(label),
+    description: t.app.permissions.changedHint,
     timeout: 0,
     onClose: persistDismissal,
     actionProps: {
-      children: "Open Sharing & access",
+      children: t.app.permissions.openConnections,
       onClick: () => {
         dismiss();
-        void router.navigate({ to: "/settings/access" });
+        void router.navigate({ to: "/settings/connections" });
       },
     },
     data: {
+      leadingIcon: createElement(ShieldCheckIcon, { "aria-hidden": true, className: "size-3.75" }),
+      iconTone: "success",
       actionLayout: "stacked-end",
-      secondaryActionProps: { children: "Dismiss", onClick: dismiss },
+      secondaryActionProps: { children: t.app.actions.dismiss, onClick: dismiss },
       secondaryActionVariant: "ghost",
     },
   });

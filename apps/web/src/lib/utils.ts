@@ -469,7 +469,15 @@ const twMerge = extendTailwindMerge({
     },
     classGroups: {
       "bg-image": [
-        { bg: ["discussion-seat-plate", "discussion-long-capsule", "discussion-long-connection"] },
+        {
+          bg: [
+            "discussion-seat-plate",
+            "discussion-long-capsule",
+            "discussion-long-connection",
+            "composer-seam-below",
+            "composer-seam-above",
+          ],
+        },
       ],
     },
   },

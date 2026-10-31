@@ -4,6 +4,14 @@ import { cn, getLocalFileManagerName, isWindowsPlatform } from "./utils";
 
 describe("cn", () => {
   it.each([
+    [
+      "dark:before:bg-transparent dark:before:bg-composer-seam-below",
+      "dark:before:bg-transparent dark:before:bg-composer-seam-below",
+    ],
+    [
+      "before:bg-red-500 before:bg-composer-seam-above",
+      "before:bg-red-500 before:bg-composer-seam-above",
+    ],
     ["text-body text-pr-linked-heading", "text-pr-linked-heading"],
     ["shadow-raise-xs-control shadow-pr-linked-watching", "shadow-pr-linked-watching"],
     ["rounded-card-row rounded-pr-linked-row", "rounded-pr-linked-row"],
