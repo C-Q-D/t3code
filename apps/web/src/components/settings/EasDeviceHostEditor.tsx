@@ -1,19 +1,16 @@
 import { t } from "~/i18n";
-import { useEffect, useEffectEvent, useId, useRef, useState } from "react";
+import { useAtomValue } from "@effect/atom-react";
+import { useId, useRef, useState } from "react";
 import * as Cause from "effect/Cause";
 import * as Option from "effect/Option";
 import {
-  AuthSettingsWriteScope,
   type DeviceEasAccount,
   type EasDeviceHostConfig,
   type EnvironmentId,
 } from "@t3tools/contracts";
-import { CloudIcon, PlusIcon, XIcon } from "lucide-react";
+import { XIcon } from "lucide-react";
 
-import { randomUUID } from "../../lib/utils";
-import { deviceEnvironment } from "../../state/device";
-import { serverEnvironment } from "../../state/server";
-import { readEnvironmentScope, useEnvironmentScope } from "../../state/session";
+import { deviceEasAccountCheck, deviceEnvironment } from "../../state/device";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { Button } from "../ui/button";
 import {
@@ -28,16 +25,8 @@ import {
 import { Input } from "../ui/input";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { Spinner } from "../ui/spinner";
-import { toastManager } from "../ui/toast";
-import {
-  easSessionLimits,
-  newEasDeviceHost,
-  parseEasDeviceHostDraft,
-  updateEasDeviceHosts,
-} from "./easDeviceHostsSettings.logic";
+import { parseEasDeviceHostDraft } from "./easDeviceHostsSettings.logic";
 import { SecretInput } from "./SecretInput";
-import { useSettingsScope } from "./SettingsScopeContext";
-import { SettingsRow } from "./settingsLayout";
 
 const FROM_THREAD_PROJECT = "thread-project";
 
@@ -53,110 +42,14 @@ const failureMessage = (cause: Cause.Cause<unknown>) => {
   return error instanceof Error ? error.message : String(error);
 };
 
-/** EAS hosts belong to one environment: its server holds the Expo credential and runs the sessions. */
-export function EasDeviceHostsSettings(props: { environmentId: EnvironmentId | null }) {
-  const { scope, connectedEnvironments } = useSettingsScope();
-  const canConfigure = useEnvironmentScope(props.environmentId, AuthSettingsWriteScope);
-  const projectScope = scope.kind === "project" || scope.kind === "checkout";
-  const update = useAtomCommand(serverEnvironment.updateSettings, { reportFailure: false });
-  const environment = connectedEnvironments.find(
-    (candidate) => candidate.environmentId === props.environmentId,
-  );
-  const hosts = environment?.serverConfig?.settings.easDeviceHosts ?? [];
-  const [editing, setEditing] = useState<{ host: EasDeviceHostConfig; isNew: boolean } | null>(
-    null,
-  );
-  const [busy, setBusy] = useState(false);
-  const disabled = !canConfigure || projectScope || busy || !props.environmentId;
+type AccountCheck =
+  | { status: "idle" }
+  | { status: "checking" }
+  | { status: "signed-in"; account: DeviceEasAccount }
+  | { status: "failed"; error: string };
 
-  const save = async (host: EasDeviceHostConfig, remove: boolean) => {
-    if (!props.environmentId || !readEnvironmentScope(props.environmentId, AuthSettingsWriteScope))
-      return;
-    setBusy(true);
-    const result = await update({
-      environmentId: props.environmentId,
-      input: { patch: { easDeviceHosts: updateEasDeviceHosts(hosts, host, remove) } },
-    });
-    setBusy(false);
-    if (result._tag === "Success") setEditing(null);
-    else
-      toastManager.add({
-        type: "error",
-        title: remove ? t.settings.easHostsUi.removeFailed : t.settings.easHostsUi.saveFailed,
-        description: failureMessage(result.cause),
-      });
-  };
-
-  return (
-    <SettingsRow
-      id="eas-device-hosts"
-      title={t.settings.easHostsUi.title}
-      serverScoped
-      settingKeys={["easDeviceHosts"]}
-      description={t.settings.easHostsUi.description}
-      control={
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={disabled || editing !== null}
-          onClick={() => setEditing({ host: newEasDeviceHost(randomUUID()), isNew: true })}
-        >
-          <PlusIcon className="size-3.5" /> {t.settings.easHostsUi.add}
-        </Button>
-      }
-    >
-      <div className="pt-3 pb-2">
-        {hosts.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t.settings.easHostsUi.empty}</p>
-        ) : (
-          <ul className="divide-y divide-border/40">
-            {hosts.map((host) => (
-              <li key={host.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
-                <div className="min-w-0">
-                  <p className="flex items-center gap-1.5 truncate font-medium">
-                    <CloudIcon className="size-3.5 shrink-0" /> {host.label}
-                  </p>
-                  <p className="truncate text-xs text-muted-foreground">{easSessionLimits(host)}</p>
-                </div>
-                <div className="flex shrink-0 gap-1">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled={disabled}
-                    onClick={() => setEditing({ host, isNew: false })}
-                  >
-                    {t.settings.actions.edit}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost-destructive"
-                    disabled={disabled}
-                    onClick={() => void save(host, true)}
-                  >
-                    {t.settings.deviceHosts.remove}
-                  </Button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-        {editing && props.environmentId ? (
-          <EasDeviceHostEditor
-            key={editing.host.id}
-            environmentId={props.environmentId}
-            host={editing.host}
-            isNew={editing.isNew}
-            busy={busy}
-            onSave={(host) => void save(host, false)}
-            onClose={() => setEditing(null)}
-          />
-        ) : null}
-      </div>
-    </SettingsRow>
-  );
-}
-
-function EasDeviceHostEditor(props: {
+/** Keeps Expo credentials on the selected server while editing its session limits. */
+export function EasDeviceHostEditor(props: {
   environmentId: EnvironmentId;
   host: EasDeviceHostConfig;
   isNew: boolean;
@@ -171,13 +64,26 @@ function EasDeviceHostEditor(props: {
   const [token, setToken] = useState<
     { kind: "saved" } | { kind: "new"; value: string } | { kind: "cleared" }
   >(props.host.accessToken ? { kind: "saved" } : { kind: "cleared" });
-  const [account, setAccount] = useState<
-    | { status: "idle" }
-    | { status: "checking" }
-    | { status: "signed-in"; account: DeviceEasAccount }
-    | { status: "failed"; error: string }
-    // The editor checks the account as it opens.
-  >({ status: "checking" });
+  // Checking on open names the saved project and shows a rejected credential
+  // before anything is changed. A manual check or a token edit replaces it.
+  const openCheck = useAtomValue(
+    deviceEasAccountCheck({
+      environmentId: props.environmentId,
+      input: props.host.accessToken
+        ? props.isNew
+          ? {}
+          : { hostId: props.host.id }
+        : { accessToken: "" },
+    }),
+  );
+  const [checked, setAccount] = useState<AccountCheck | null>(null);
+  const account: AccountCheck =
+    checked ??
+    (openCheck._tag === "Initial" || openCheck.waiting
+      ? { status: "checking" }
+      : openCheck._tag === "Success"
+        ? { status: "signed-in", account: openCheck.value }
+        : { status: "failed", error: failureMessage(openCheck.cause) });
   const next: EasDeviceHostConfig = {
     ...draft,
     label: draft.label.trim(),
@@ -226,13 +132,6 @@ function EasDeviceHostEditor(props: {
     setAccount({ status: "checking" });
     void requestCheck();
   };
-
-  // Checking on open names the saved project and shows a rejected credential
-  // before anything is changed.
-  const checkOnOpen = useEffectEvent(() => void requestCheck());
-  useEffect(() => {
-    checkOnOpen();
-  }, []);
 
   const limit = (
     field: "maxSessionMinutes" | "idleMinutes" | "maxConcurrentSessions",
