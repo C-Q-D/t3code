@@ -1,3 +1,4 @@
+/** Applies the ordered fork migration ledger without replaying recorded schema changes. */
 import * as Migrator from "effect/sql/Migrator";
 import * as Effect from "effect/Effect";
 import * as SqlClient from "effect/sql/SqlClient";
@@ -76,6 +77,14 @@ import Migration0070 from "./Migrations/070_CodexUsageNativeTurnIndex.ts";
 import Migration0071 from "./Migrations/071_RepairClientSettlementTimestamps.ts";
 import Migration0072 from "./Migrations/072_WebhookDedupe.ts";
 import Migration0073 from "./Migrations/073_ShellStopRequestIndex.ts";
+import Migration0074 from "./Migrations/074_ThreadMessageSearch.ts";
+import Migration0075 from "./Migrations/075_PeerLinks.ts";
+import Migration0076 from "./Migrations/076_PeerLinkFence.ts";
+import Migration0077 from "./Migrations/077_WaitingLinkRequestIndex.ts";
+import Migration0078 from "./Migrations/078_ActiveTurnItemIndexes.ts";
+import Migration0079 from "./Migrations/079_ExcludeAttachmentPlaceholdersFromSearch.ts";
+import Migration0080 from "./Migrations/080_SubagentDeliveryState.ts";
+import Migration0081 from "./Migrations/081_ProjectionProjectsPinArchive.ts";
 
 const migrationEntries = [
   [1, "OrchestrationEvents", Migration0001],
@@ -152,6 +161,14 @@ const migrationEntries = [
   [71, "RepairClientSettlementTimestamps", Migration0071],
   [72, "WebhookDedupe", Migration0072],
   [73, "ShellStopRequestIndex", Migration0073],
+  [74, "ThreadMessageSearch", Migration0074],
+  [75, "PeerLinks", Migration0075],
+  [76, "PeerLinkFence", Migration0076],
+  [77, "WaitingLinkRequestIndex", Migration0077],
+  [78, "ActiveTurnItemIndexes", Migration0078],
+  [79, "ExcludeAttachmentPlaceholdersFromSearch", Migration0079],
+  [80, "SubagentDeliveryState", Migration0080],
+  [81, "ProjectionProjectsPinArchive", Migration0081],
 ] as const;
 
 export const migrationManifest = migrationEntries.map(([id, name]) => [id, name] as const);
@@ -167,12 +184,7 @@ const makeMigrationLoader = (throughId?: number) =>
 
 const FIRST_V2_MIGRATION_ID = 55;
 
-/**
- * Fail before migrating when the migrator would skip one of V2's own
- * migrations. It skips every id up to the highest recorded one, whatever name
- * was recorded, so a database that took a V2 id for another migration would
- * start without V2's schema and fail on first use.
- */
+// Migrators skip ids up to the highest recorded; reject collisions that would skip V2 schema.
 const assertV2MigrationsCanRun = Effect.fn("assertV2MigrationsCanRun")(function* (
   throughId?: number,
 ) {

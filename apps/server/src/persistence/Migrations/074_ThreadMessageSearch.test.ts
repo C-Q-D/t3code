@@ -1,3 +1,4 @@
+/** Verifies search migration backfills, live indexing, and attachment-placeholder exclusion. */
 import { assert, it } from "@effect/vitest";
 import { ATTACHMENT_ONLY_BOOTSTRAP_PROMPT } from "@t3tools/shared/composerContextReferences";
 import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
@@ -9,11 +10,11 @@ import { runMigrations } from "../Migrations.ts";
 
 const layer = it.layer(NodeSqliteClient.layer({ filename: ":memory:" }));
 
-layer("069_ThreadMessageSearch", (it) => {
+layer("074_ThreadMessageSearch", (it) => {
   it.effect("backfills what users wrote and agents answered, then follows deletes", () =>
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;
-      yield* runMigrations({ toMigrationInclusive: 68 });
+      yield* runMigrations({ toMigrationInclusive: 73 });
       const insert = (
         id: string,
         role: string,
@@ -61,7 +62,7 @@ it.effect.each(["inserted", "updated", "backfilled", "rebuilt"])(
   (path) =>
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;
-      yield* runMigrations({ toMigrationInclusive: path === "backfilled" ? 68 : 73 });
+      yield* runMigrations({ toMigrationInclusive: path === "backfilled" ? 73 : 78 });
       if (path !== "backfilled") {
         // Pre-upgrade triggers indexed user text even when it was an attachment placeholder.
         yield* sql`DROP TRIGGER orchestration_v2_message_search_insert`;
@@ -124,7 +125,7 @@ it.effect.each(["inserted", "updated", "backfilled", "rebuilt"])(
           `;
         }
       }
-      yield* runMigrations({ toMigrationInclusive: path === "backfilled" ? 69 : undefined });
+      yield* runMigrations({ toMigrationInclusive: path === "backfilled" ? 74 : undefined });
       if (path === "rebuilt") yield* rebuildMessageSearch(sql);
       const indexed = yield* sql<{ readonly messageId: string }>`
         SELECT messages.message_id AS "messageId"

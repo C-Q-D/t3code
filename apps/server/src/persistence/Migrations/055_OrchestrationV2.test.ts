@@ -1,3 +1,4 @@
+/** Verifies released V2 schemas upgrade through every registered fork migration without data loss. */
 import { assert, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -13,7 +14,7 @@ layer("055_OrchestrationV2", (it) => {
     Effect.sync(() => {
       assert.deepStrictEqual(
         migrationManifest.map(([id]) => id),
-        Array.from({ length: 73 }, (_, index) => index + 1),
+        Array.from({ length: 81 }, (_, index) => index + 1),
       );
     }),
   );
@@ -45,6 +46,14 @@ layer("055_OrchestrationV2", (it) => {
         [71, "RepairClientSettlementTimestamps"],
         [72, "WebhookDedupe"],
         [73, "ShellStopRequestIndex"],
+        [74, "ThreadMessageSearch"],
+        [75, "PeerLinks"],
+        [76, "PeerLinkFence"],
+        [77, "WaitingLinkRequestIndex"],
+        [78, "ActiveTurnItemIndexes"],
+        [79, "ExcludeAttachmentPlaceholdersFromSearch"],
+        [80, "SubagentDeliveryState"],
+        [81, "ProjectionProjectsPinArchive"],
       ]);
       assert.deepStrictEqual(yield* runMigrations(), []);
 
@@ -84,6 +93,14 @@ layer("055_OrchestrationV2", (it) => {
         { migration_id: 71, name: "RepairClientSettlementTimestamps" },
         { migration_id: 72, name: "WebhookDedupe" },
         { migration_id: 73, name: "ShellStopRequestIndex" },
+        { migration_id: 74, name: "ThreadMessageSearch" },
+        { migration_id: 75, name: "PeerLinks" },
+        { migration_id: 76, name: "PeerLinkFence" },
+        { migration_id: 77, name: "WaitingLinkRequestIndex" },
+        { migration_id: 78, name: "ActiveTurnItemIndexes" },
+        { migration_id: 79, name: "ExcludeAttachmentPlaceholdersFromSearch" },
+        { migration_id: 80, name: "SubagentDeliveryState" },
+        { migration_id: 81, name: "ProjectionProjectsPinArchive" },
       ]);
 
       const tables = yield* sql<{ readonly name: string }>`

@@ -1,3 +1,4 @@
+/** Applies the PeerLinkFence schema change once through the migration ledger. */
 import * as Effect from "effect/Effect";
 import * as SqlClient from "effect/sql/SqlClient";
 

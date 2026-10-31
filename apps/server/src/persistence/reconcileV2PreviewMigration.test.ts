@@ -1,3 +1,4 @@
+/** Verifies preview upgrades preserve data and advance the fork migration ledger atomically. */
 import { assert, describe, it } from "@effect/vitest";
 import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
 import * as Effect from "effect/Effect";
@@ -53,6 +54,14 @@ describe("V2 preview upgrade", () => {
         [71, "RepairClientSettlementTimestamps"],
         [72, "WebhookDedupe"],
         [73, "ShellStopRequestIndex"],
+        [74, "ThreadMessageSearch"],
+        [75, "PeerLinks"],
+        [76, "PeerLinkFence"],
+        [77, "WaitingLinkRequestIndex"],
+        [78, "ActiveTurnItemIndexes"],
+        [79, "ExcludeAttachmentPlaceholdersFromSearch"],
+        [80, "SubagentDeliveryState"],
+        [81, "ProjectionProjectsPinArchive"],
       ]);
       assert.deepStrictEqual(yield* runMigrations(), []);
       assert.deepStrictEqual(yield* sql`SELECT * FROM orchestration_v2_legacy_imports`, imports);
@@ -149,6 +158,14 @@ describe("V2 preview upgrade", () => {
         [71, "RepairClientSettlementTimestamps"],
         [72, "WebhookDedupe"],
         [73, "ShellStopRequestIndex"],
+        [74, "ThreadMessageSearch"],
+        [75, "PeerLinks"],
+        [76, "PeerLinkFence"],
+        [77, "WaitingLinkRequestIndex"],
+        [78, "ActiveTurnItemIndexes"],
+        [79, "ExcludeAttachmentPlaceholdersFromSearch"],
+        [80, "SubagentDeliveryState"],
+        [81, "ProjectionProjectsPinArchive"],
       ]);
     }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
   );

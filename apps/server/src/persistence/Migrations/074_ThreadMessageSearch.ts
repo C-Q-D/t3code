@@ -1,3 +1,4 @@
+/** Applies the ThreadMessageSearch schema change once through the migration ledger. */
 import * as Effect from "effect/Effect";
 import * as Predicate from "effect/Predicate";
 import * as SqlClient from "effect/sql/SqlClient";
