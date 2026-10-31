@@ -1,50 +1,25 @@
+/** Applies local Cursor field labels to the shared provider registry. */
 import { t } from "~/i18n";
-import {
-  AntigravitySettings,
-  ClaudeSettings,
-  CodexSettings,
-  ProviderDriverKind,
-} from "@t3tools/contracts";
-import { acpRegistryClient } from "@t3tools/provider-acp-registry/client";
+import { providerClients as sharedProviderClients } from "@t3tools/client-runtime/provider-clients";
 import { makeProviderClientRegistry } from "@t3tools/provider-core/client";
-import { cursorClient } from "@t3tools/provider-cursor/client";
-import { grokClient } from "@t3tools/provider-grok/client";
-import { museClient } from "@t3tools/provider-muse/client";
-import { openCodeClient } from "@t3tools/provider-opencode/client";
-import { piClient } from "@t3tools/provider-pi/client";
 
-export const providerClients = makeProviderClientRegistry([
-  {
-    driverKind: ProviderDriverKind.make("codex"),
-    label: "Codex",
-    settingsSchema: CodexSettings,
-  },
-  {
-    driverKind: ProviderDriverKind.make("claudeAgent"),
-    label: "Claude",
-    settingsSchema: ClaudeSettings,
-  },
-  {
-    ...cursorClient,
-    environmentFields: cursorClient.environmentFields?.map((field) =>
-      field.name === "CURSOR_API_KEY"
-        ? {
-            ...field,
-            label: t.settings.providerDriverMeta.cursorApiKey,
-            description: t.settings.providerDriverMeta.optionalOverridesBrowserSignProviderHint,
-            placeholder: t.settings.providerDriverMeta.pasteApiKey,
-          }
-        : field,
-    ),
-  },
-  grokClient,
-  openCodeClient,
-  {
-    driverKind: ProviderDriverKind.make("antigravity"),
-    label: "Antigravity",
-    settingsSchema: AntigravitySettings,
-  },
-  museClient,
-  piClient,
-  acpRegistryClient,
-]);
+export const providerClients = makeProviderClientRegistry(
+  sharedProviderClients.definitions.map((definition) =>
+    definition.driverKind === "cursor" && definition.environmentFields !== undefined
+      ? {
+          ...definition,
+          environmentFields: definition.environmentFields.map((field) =>
+            field.name === "CURSOR_API_KEY"
+              ? {
+                  ...field,
+                  label: t.settings.providerDriverMeta.cursorApiKey,
+                  description:
+                    t.settings.providerDriverMeta.optionalOverridesBrowserSignProviderHint,
+                  placeholder: t.settings.providerDriverMeta.pasteApiKey,
+                }
+              : field,
+          ),
+        }
+      : definition,
+  ),
+);

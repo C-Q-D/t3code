@@ -28,6 +28,7 @@ import { RedactedSensitiveText } from "./RedactedSensitiveText";
 
 const ProviderAuthTerminal = lazy(() => import("./ProviderAuthTerminal"));
 
+/** Runs authentication for the target instance, renders command failures and prevents controls from writing when readOnly. */
 export function ProviderAuthenticationSection({
   environmentId,
   environmentLabel,
@@ -76,7 +77,7 @@ export function ProviderAuthenticationSection({
       (provider.driver === "acpRegistry" && auth?.methods?.length === 0));
   const accountDescription = active
     ? auth?.phase === "starting"
-      ? t.settings.providerAuthentication.startingSignIn
+      ? (auth.message ?? t.settings.providerAuthentication.startingSignIn)
       : auth?.phase === "verifying"
         ? t.settings.providerAuthentication.checkingYourAccount
         : interaction?.type === "terminal"
@@ -138,8 +139,7 @@ export function ProviderAuthenticationSection({
   async function openBrowser() {
     if (!url || readOnly) return;
     const requiresConsent = interaction?.type === "browser" && interaction.requiresConsent;
-    // Browsers block tabs opened after an await, so the web build reserves one
-    // while the environment records consent.
+    // Reserve tabs before awaiting consent; browsers block later opens.
     const pending = requiresConsent && !window.desktopBridge ? window.open("", "_blank") : null;
     if (pending) pending.opener = null;
     try {

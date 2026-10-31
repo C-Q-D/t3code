@@ -151,29 +151,31 @@ function ProviderSetupActions({
   const queryError = authQuery.error ?? installQuery.error;
   const actionsDisabled = pendingLabel !== null || queryError !== null;
   const installationStatusMessage =
-    installation?.phase === "downloading"
-      ? t.settings.providerSetup.downloadingMbMb(
-          (installation.downloadedBytes / 1_000_000).toFixed(1),
-          Boolean(installation.totalBytes === null),
-          !(installation.totalBytes === null)
-            ? (installation.totalBytes / 1_000_000).toFixed(1)
-            : undefined,
-        )
-      : installation?.phase === "extracting"
-        ? t.settings.providerSetup.extractingAntigravity
-        : installation?.phase === "verifying"
-          ? t.settings.providerSetup.checkingTheDownloadedRuntime
-          : installed
-            ? t.settings.providerSetup.installed
-            : usesCustomBinary
-              ? enabled
-                ? t.settings.providerSetup.configuredAntigravityRuntimeUnavailableHint
-                : t.settings.providerSetup.configuredAntigravityRuntimeCheckedHint
-              : installation?.totalBytes
-                ? t.settings.providerSetup.mbDownload(
-                    Math.ceil(installation.totalBytes / 1_000_000),
-                  )
-                : t.settings.providerSetup.notInstalled;
+    installation === null
+      ? "Checking the Antigravity runtime."
+      : installation?.phase === "downloading"
+        ? t.settings.providerSetup.downloadingMbMb(
+            (installation.downloadedBytes / 1_000_000).toFixed(1),
+            Boolean(installation.totalBytes === null),
+            !(installation.totalBytes === null)
+              ? (installation.totalBytes / 1_000_000).toFixed(1)
+              : undefined,
+          )
+        : installation?.phase === "extracting"
+          ? t.settings.providerSetup.extractingAntigravity
+          : installation?.phase === "verifying"
+            ? t.settings.providerSetup.checkingTheDownloadedRuntime
+            : installed
+              ? t.settings.providerSetup.installed
+              : usesCustomBinary
+                ? enabled
+                  ? t.settings.providerSetup.configuredAntigravityRuntimeUnavailableHint
+                  : t.settings.providerSetup.configuredAntigravityRuntimeCheckedHint
+                : installation?.totalBytes
+                  ? t.settings.providerSetup.mbDownload(
+                      Math.ceil(installation.totalBytes / 1_000_000),
+                    )
+                  : t.settings.providerSetup.notInstalled;
 
   async function runCommand<A, E>(
     label: string,
@@ -214,7 +216,8 @@ function ProviderSetupActions({
 
   return (
     <div className="divide-y divide-border/50">
-      {/* Keep the live region first so the last visible row is not followed by a sibling that adds its divider. */}
+      {/* Keep the live region first so sibling divider rules do not add a divider after the last visible
+       * row. */}
       <p className="sr-only" role="status">
         {pendingLabel ? `${pendingLabel}.` : null}
       </p>
@@ -285,7 +288,7 @@ function ProviderSetupActions({
                   <Button
                     size="sm"
                     variant="outline"
-                    disabled={actionsDisabled || installation === null || authActive}
+                    disabled={actionsDisabled || authActive}
                     onClick={() =>
                       void runCommand(t.settings.providerSetup.startingInstallation, () =>
                         startInstall(target),

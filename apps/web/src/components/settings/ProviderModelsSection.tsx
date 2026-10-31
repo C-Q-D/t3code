@@ -8,6 +8,7 @@ import {
   type ProviderInstanceId,
   type ServerProviderModel,
 } from "@t3tools/contracts";
+import { REASONING_SELECT_DESCRIPTOR_IDS } from "@t3tools/client-runtime/model-traits";
 import { type CustomModelDefinition, normalizeCustomModelSlug } from "@t3tools/shared/model";
 
 import { useStableCallback } from "../../hooks/useStableCallback";
@@ -30,7 +31,23 @@ const CUSTOM_MODEL_PLACEHOLDER_BY_KIND: Partial<Record<ProviderDriverKind, strin
 
 const FILTER_THRESHOLD = 8;
 
-function describeModelCapabilities(model: ServerProviderModel): string[] {
+const PROVIDER_ALIAS_SLUGS = new Set(["default", "auto"]);
+
+/** Checks discovered option descriptors against the shared reasoning-control ids; unknown capabilities return false. */
+function hasReasoningControl(model: ServerProviderModel): boolean {
+  return (model.capabilities?.optionDescriptors ?? []).some((descriptor) =>
+    REASONING_SELECT_DESCRIPTOR_IDS.has(descriptor.id),
+  );
+}
+
+// Reasoning is the norm, so only its absence is labeled, and only when other models have it.
+// Custom and null capabilities are fallbacks or user-written, not discovered, so they prove nothing.
+// Alias slugs ("default", Cursor's "auto") defer to the provider's own model choice, so reasoning is unknown.
+/** Labels fast mode and, when requested, missing reasoning only for discovered non-alias models. */
+function describeModelCapabilities(
+  model: ServerProviderModel,
+  flagMissingReasoning: boolean,
+): string[] {
   const descriptors = model.capabilities?.optionDescriptors ?? [];
   const labels: string[] = [];
   const hasFastMode = descriptors.some(
@@ -41,19 +58,14 @@ function describeModelCapabilities(model: ServerProviderModel): string[] {
         descriptor.options.some((option) => option.id === "fast" || option.label === "Fast")),
   );
   if (hasFastMode) labels.push(t.settings.providerModels.fastMode);
-  if (descriptors.some((descriptor) => descriptor.id === "thinking"))
-    labels.push(t.settings.providerModels.thinking);
   if (
-    descriptors.some(
-      (descriptor) =>
-        descriptor.type === "select" &&
-        (descriptor.id === "reasoningEffort" ||
-          descriptor.id === "effort" ||
-          descriptor.id === "reasoning" ||
-          descriptor.id === "variant"),
-    )
+    flagMissingReasoning &&
+    !model.isCustom &&
+    model.capabilities &&
+    !PROVIDER_ALIAS_SLUGS.has(model.slug) &&
+    !hasReasoningControl(model)
   ) {
-    labels.push(t.settings.providerModels.reasoning);
+    labels.push("No reasoning");
   }
   return labels;
 }
@@ -107,7 +119,7 @@ interface ProviderModelsSectionProps {
   readonly onChange: (next: ReadonlyArray<CustomModelDefinition>) => void;
   readonly onHiddenModelsChange: (
     next: ReadonlyArray<string>,
-    affectedModels?: ReadonlyArray<string>,
+    affectedModels: ReadonlyArray<string>,
   ) => void;
   readonly onFavoriteModelsChange: (next: ReadonlyArray<string>) => void;
   readonly onToggleFavorite: (model: string) => void;
@@ -153,6 +165,7 @@ export function ProviderModelsSection({
   const hiddenCount = displayModels.filter(
     (model) => !model.isCustom && hiddenModelSet.has(model.slug),
   ).length;
+  const flagMissingReasoning = models.some(hasReasoningControl);
   const showFilter = models.length > FILTER_THRESHOLD;
   const normalizedFilter = filter.trim().toLowerCase();
   const isFiltering = showFilter && normalizedFilter.length > 0;
@@ -176,8 +189,7 @@ export function ProviderModelsSection({
     row.scrollIntoView({ block: "nearest" });
   });
 
-  // CustomModelEditor keys its option list on this array. Derived after the effect and
-  // checked against `hiddenModels` rather than the set built above it, so it stays cached.
+  // Derive after the effect and use hiddenModels directly to preserve the editor's option-array cache.
   const builtInModels = models.filter((model) => !model.isCustom);
   const allBuiltInModelsHidden =
     builtInModels.length > 0 && builtInModels.every((model) => hiddenModels.includes(model.slug));
@@ -289,6 +301,7 @@ export function ProviderModelsSection({
         canMoveUp={!isFiltering && previousModel !== undefined && groupOf(previousModel) === group}
         canMoveDown={!isFiltering && nextModel !== undefined && groupOf(nextModel) === group}
         isFiltering={isFiltering}
+        flagMissingReasoning={flagMissingReasoning}
         canWritePreferences={canWritePreferences}
         canManageCustomModels={canManageCustomModels}
         {...rowHandlers}
@@ -347,7 +360,8 @@ export function ProviderModelsSection({
             type="button"
             size="xs"
             variant="ghost-muted"
-            className="ml-auto"
+            // The ghost padding would inset the label from the column edge the toggles align to.
+            className="-me-2 ml-auto"
             onClick={() => setIsAdding(true)}
           >
             <PlusIcon className="size-3" />
@@ -470,6 +484,7 @@ function ProviderModelRow({
   canMoveUp,
   canMoveDown,
   isFiltering,
+  flagMissingReasoning,
   canWritePreferences,
   canManageCustomModels,
   onToggleFavorite,
@@ -484,6 +499,7 @@ function ProviderModelRow({
   readonly canMoveUp: boolean;
   readonly canMoveDown: boolean;
   readonly isFiltering: boolean;
+  readonly flagMissingReasoning: boolean;
   readonly canWritePreferences: boolean;
   readonly canManageCustomModels: boolean;
   readonly onToggleFavorite: (slug: string) => void;
@@ -492,7 +508,7 @@ function ProviderModelRow({
   readonly onToggleEdit: (slug: string) => void;
   readonly onRemove: (slug: string) => void;
 }) {
-  const capLabels = describeModelCapabilities(model);
+  const capLabels = describeModelCapabilities(model, flagMissingReasoning);
   const nameClassName = cn("text-xs", isHidden ? "text-muted-foreground" : "text-foreground/90");
   const pickerTooltip = model.isCustom
     ? t.settings.providerModels.customModelsAlwaysShownPicker
@@ -634,8 +650,7 @@ function ProviderModelRow({
           </>
         ) : null}
       </span>
-      {/* The trigger is a wrapper span: a disabled switch gets no pointer events,
-          so it could not open the tooltip itself. */}
+      {/* Disabled switches receive no pointer events; wrap the tooltip trigger. */}
       <Tooltip>
         <TooltipTrigger render={<span className="flex shrink-0 items-center" />}>
           <Switch
