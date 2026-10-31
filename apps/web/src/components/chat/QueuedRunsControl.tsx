@@ -1,10 +1,18 @@
+import { resolveUserMessagePresentation } from "@t3tools/client-runtime/user-message";
+import { Link } from "@tanstack/react-router";
+import * as DateTime from "effect/DateTime";
+import { TimelineRowTimestamp } from "./TimelineRowParts";
+import { InlineButton } from "../ui/button";
 import type { TimestampFormat } from "@t3tools/contracts/settings";
 /** Displays queued messages and their edit, reorder, steer and removal actions. */
 import { t } from "~/i18n";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { deriveThreadQueueWorkflowState } from "@t3tools/client-runtime/state/thread-workflows";
 import { assistantCitationsToPlainText } from "@t3tools/shared/assistantCitations";
-import { replaceComposerContextReferences } from "@t3tools/shared/composerContextReferences";
+import {
+  isAttachmentOnlyBootstrapPrompt,
+  replaceComposerContextReferences,
+} from "@t3tools/shared/composerContextReferences";
 import type {
   ChatAttachment as ContractChatAttachment,
   EnvironmentId,
@@ -143,7 +151,9 @@ export function QueuedRunsControl({
     (message) => message.inputIntent === "queued_turn" && !acknowledgedMessageIds.has(message.id),
   );
   const items = [
-    ...queued.map(({ run, text, attachments }, serverIndex) => ({
+    ...queued.map(({ run, text, attachments, message, context }, serverIndex) => ({
+      message,
+      editable: context?.guest === undefined,
       key: run.id,
       runId: run.id,
       messageId: run.userMessageId,
@@ -161,6 +171,8 @@ export function QueuedRunsControl({
     })),
     ...optimisticQueued.map((message) => ({
       key: message.id,
+      message: undefined,
+      editable: true,
       runId: null,
       messageId: null,
       serverIndex: null,
@@ -228,6 +240,7 @@ export function QueuedRunsControl({
       const latest = queued.at(-1);
       if (
         !latest ||
+        latest.context?.guest !== undefined ||
         props.editBlockedReason != null ||
         props.editingRunId !== null ||
         busyRunId !== null
@@ -302,11 +315,15 @@ export function QueuedRunsControl({
         )}
       >
         {items.map((item, index) => {
-          const previewText = assistantCitationsToPlainText(
-            replaceComposerContextReferences(item.text, (reference) =>
-              reference.kind === "image" && item.thumbnails.length > 0 ? "" : reference.label,
-            ),
-          ).trim();
+          const presentation = item.message ? resolveUserMessagePresentation(item.message) : null;
+          const senderThreadId = item.message?.senderThreadId;
+          const previewText = isAttachmentOnlyBootstrapPrompt(item.text)
+            ? ""
+            : assistantCitationsToPlainText(
+                replaceComposerContextReferences(item.text, (reference) =>
+                  reference.kind === "image" && item.thumbnails.length > 0 ? "" : reference.label,
+                ),
+              ).trim();
           const rowRunId = item.runId;
           const rowServerIndex = item.serverIndex;
           const isEditing = rowRunId !== null && rowRunId === props.editingRunId;
@@ -458,6 +475,38 @@ export function QueuedRunsControl({
                 </Tooltip>
               </div>
               <div className="flex shrink-0 items-center">
+                {presentation?.attribution === "t3code" ? (
+                  <span className="text-secondary-copy text-secondary-label">Sent by T3 Code</span>
+                ) : null}
+                {presentation?.attribution === "agent" && senderThreadId && props.onOpenThread ? (
+                  <InlineButton tone="muted" onClick={() => props.onOpenThread?.(senderThreadId)}>
+                    Open thread
+                  </InlineButton>
+                ) : null}
+                {presentation?.scheduledTaskId ? (
+                  <InlineButton
+                    tone="muted"
+                    render={
+                      <Link
+                        to="/settings/scheduled-tasks"
+                        search={{
+                          environmentId: props.environmentId,
+                          taskId: presentation.scheduledTaskId,
+                        }}
+                      />
+                    }
+                  >
+                    Open automation
+                  </InlineButton>
+                ) : null}
+                {item.message && props.timestampFormat ? (
+                  <TimelineRowTimestamp
+                    createdAt={DateTime.formatIso(item.message.createdAt)}
+                    timestampFormat={props.timestampFormat}
+                    alwaysVisible
+                  />
+                ) : null}
+
                 {isEditing ? (
                   <>
                     <button
@@ -503,6 +552,7 @@ export function QueuedRunsControl({
                             aria-label={t.chat.queue.editQueuedMessage}
                             disabled={
                               item.runId === null ||
+                              !item.editable ||
                               busyRunId !== null ||
                               props.editBlockedReason != null
                             }

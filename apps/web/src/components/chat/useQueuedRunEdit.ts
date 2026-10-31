@@ -88,6 +88,8 @@ function queuedEditDraftTarget(routeThreadRef: ScopedThreadRef, runId: RunId) {
   return DraftId.make(`queued-edit:${scopedThreadKey(routeThreadRef)}:${runId}`);
 }
 
+/** Prepares uploads before replacing a queued message, retaining context for attachments that remain.
+ * Returns null on success or a displayable failure; failed saves leave the edit draft intact. */
 async function submitQueuedRunEdit(input: {
   readonly environmentId: EnvironmentId;
   readonly draftTarget: ComposerThreadTarget;
@@ -271,15 +273,15 @@ export function useQueuedRunEdit(input: {
           const title = appAtomRegistry.get(
             environmentThreadShells.threadShellAtom(threadRef),
           )?.title;
-          const where = title === undefined ? "" : ` in “${title}”`;
+          const where = title === undefined ? "" : ` (${title})`;
           toastManager.add(
             stackedThreadToast({
               type: recovery === "kept" ? "info" : "warning",
-              title: "Queued message is no longer queued",
+              title: t.chat.view.messageNoLongerQueued,
               description:
                 recovery === "kept"
-                  ? `Your unsaved edit${where} was kept in the composer.`
-                  : `Your unsaved edit${where} was discarded.`,
+                  ? `${t.chat.view.unsavedEditKept}${where}`
+                  : `${t.chat.view.unsavedEditDiscarded}${where}`,
             }),
           );
         },

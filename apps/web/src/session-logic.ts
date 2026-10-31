@@ -100,6 +100,7 @@ export interface WorkLogEntry {
 export type PendingApproval = ThreadPendingApproval;
 export type PendingUserInput = ThreadPendingUserInput;
 
+/** Local task-drawer projection; runId may be absent for retained provider plans. */
 export interface ActivePlanState {
   readonly createdAt: string;
   readonly runId: RunId | null;
@@ -252,6 +253,8 @@ export function derivePendingUserInputs(
   return [...inputs].toSorted((left, right) => left.createdAt.localeCompare(right.createdAt));
 }
 
+/** Selects the latest usable todo list by run ordinal, since snapshot plan order is not chronological.
+ * Returns null for missing or empty plans and preserves per-step durations for the local task drawer. */
 export function deriveActivePlanState(
   projection: ThreadStructure | null,
   latestRunId: RunId | undefined,
@@ -287,6 +290,8 @@ export function deriveActivePlanState(
 }
 
 // Claude's unfinished tasks belong to the provider session, not just the turn.
+/** Retains unfinished Claude tasks across turns only while the same provider session remains current.
+ * Queued runs without a start cannot clear that session; completed retained plans return null. */
 export function selectComposerTasksPlan(
   projection: ThreadStructure | null,
   plan: ActivePlanState | null,

@@ -169,6 +169,7 @@ export function environmentContextReference(
   return { kind: "environment", contextId: record.contextId, label: record.label };
 }
 
+/** Scopes machine references by their producer ID so imported context survives a different destination draft. */
 export function environmentContextRecord(
   environmentId: EnvironmentId,
   label: string,
@@ -317,6 +318,7 @@ export function attachmentContextRecord(
   return attachment.type === "image" ? { ...base, kind: "image" } : { ...base, kind: "file" };
 }
 
+/** Bundles serializable context with kind-scoped IDs; an empty draft returns undefined rather than an empty payload. */
 export function buildMessageContext(input: {
   terminalContexts: ReadonlyArray<TerminalContextDraft>;
   reviewComments: ReadonlyArray<ReviewCommentContext>;
@@ -345,6 +347,7 @@ export function buildMessageContext(input: {
   return records.length === 0 ? undefined : { version: 1, records };
 }
 
+/** Rejects extensible payload records before local renderers access fields of a known context kind. */
 export function asKnownContextRecord(
   record: ComposerContextRecord | undefined,
 ): KnownComposerContextRecord | undefined {

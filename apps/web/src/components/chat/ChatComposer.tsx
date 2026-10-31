@@ -520,6 +520,7 @@ export interface ChatComposerProps {
   onPageScrollRelease: () => void;
 
   queuedRunsControl?: ReactNode;
+  embedded?: boolean;
   onRestingChange: (resting: boolean) => void;
   editingQueuedAttachments: ReadonlyArray<{
     readonly attachment: ContractChatAttachment;
@@ -1151,6 +1152,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   // A pending question stays expanded: its card moves into the banner dock,
   // so collapsing would leave the surface empty and squashed beneath it.
   const isComposerCollapsedMobile =
+    !props.embedded &&
     isMobileViewport &&
     !forceExpandedOnMobile &&
     !isComposerFocused &&
@@ -2494,7 +2496,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     providerInputSubmissionError !== null ||
     hasImageAttachmentAttention;
   const isComposerResting = shouldUseRestingComposerLayout({
-    isExistingThread: routeKind === "server" && activeThreadId !== null,
+    isExistingThread: !props.embedded && routeKind === "server" && activeThreadId !== null,
     isMobileViewport,
     isScrollCollapsed: isComposerScrollCollapsed,
     hasExpandedChrome: composerHasExpandedChrome,
@@ -2548,14 +2550,15 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   const {
     active: panelAnimationsActive,
     durationMs: panelAnimationDurationMs,
-    physics,
+    physics: configuredPhysics,
   } = usePanelAnimationSettings();
+  const physics = configuredPhysics && !props.embedded;
   const composerMainSurfaceRef = useComposerRestingTransition(
     composerControlsCollapsed,
     isComposerResting,
     restingComposerControlsRef,
     onComposerOverlayHeightChange,
-    panelAnimationsActive,
+    panelAnimationsActive && !props.embedded,
     panelAnimationDurationMs,
     physics,
   );
@@ -3131,7 +3134,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   }, []);
 
   const canTrackComposerScrollGesture =
-    routeKind === "server" && activeThreadId !== null && !isMobileViewport;
+    !props.embedded && routeKind === "server" && activeThreadId !== null && !isMobileViewport;
   const canScrollCollapseComposer =
     canTrackComposerScrollGesture &&
     settings.composerCollapseOnScroll &&

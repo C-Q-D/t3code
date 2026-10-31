@@ -13,6 +13,8 @@ import { showThreadUndoNotice } from "../hooks/showThreadUndoNotice";
 import * as ThreadUndo from "@t3tools/client-runtime/state/thread-undo";
 import { releaseDraftAttachments } from "./attachmentUploadQueue";
 
+/** Claims undo ownership before clearing a draft; undo refuses to overwrite new content and releases abandoned uploads.
+ * Missing targets are a no-op. Draft sessions are removed, while existing threads lose composer content only. */
 export function discardComposerDraft(target: ComposerThreadTarget): void {
   const store = useComposerDraftStore.getState();
   const key = resolveComposerDraftKey(store, target);

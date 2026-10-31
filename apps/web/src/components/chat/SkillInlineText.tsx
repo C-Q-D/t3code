@@ -97,15 +97,15 @@ export function SkillChipPopover(props: {
       kind="skill"
       icon={<SkillChipIcon />}
       label={props.label}
-      accessibleLabel={`${t.chat.timeline.skill} ${props.label}`}
-      copyMarkdown={props.copyMarkdown}
+      accessibleLabel={t.app.composer.skill(props.label)}
+      {...(props.copyMarkdown === undefined ? {} : { copyMarkdown: props.copyMarkdown })}
     >
       <div className="space-y-3 p-2 text-sm">
         <p className="font-medium">{props.label}</p>
-        <p>{props.description || "No description is available for this skill."}</p>
+        <p>{props.description || t.app.composer.noSkillDescription}</p>
         {props.onViewInstructions ? (
           <Button variant="outline" size="sm" onClick={props.onViewInstructions}>
-            View instructions
+            {t.app.composer.viewInstructions}
           </Button>
         ) : null}
       </div>

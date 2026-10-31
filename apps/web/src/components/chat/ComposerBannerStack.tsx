@@ -286,6 +286,8 @@ export function ComposerBannerStack({
  * @returns Inline text and an overflow action when measurement detects hidden content. */
 const SUBPIXEL_ROUNDING = 0.001;
 
+/** Measures laid-out text rather than positioned hit areas; details remain available while a banner is clipped.
+ * Overflow observers are owned by this mounted text, and the caller supplies accessible detail labels. */
 export function NoticeText({
   children,
   className,

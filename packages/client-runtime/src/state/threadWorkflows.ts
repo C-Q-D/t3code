@@ -129,6 +129,7 @@ export function getUserQueuedThreadRuns(
   );
 }
 
+/** Derives queue actions from execution and provider capabilities; unavailable runtime state never grants actions. */
 export function deriveThreadQueueWorkflowState(projection: Projection): ThreadQueueWorkflowState {
   const activeRun = resolveActiveThreadRun(projection);
   const session = resolveThreadProviderSession(projection);

@@ -80,6 +80,7 @@ export function withInfoStringLanguage(info: string, language: string): string {
   return rest.trim() ? `${leading}text${rest}` : "";
 }
 
+/** Resolves known fence aliases without inventing highlighting support; unknown identifiers return null. */
 export function codeLanguageEntry(language: string): CodeBlockLanguage | null {
   const id = LANGUAGE_ALIASES[language.toLowerCase()] ?? language;
   return CODE_BLOCK_LANGUAGES.find((entry) => entry.id === id.toLowerCase()) ?? null;

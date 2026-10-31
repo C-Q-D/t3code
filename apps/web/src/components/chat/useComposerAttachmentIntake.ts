@@ -270,8 +270,8 @@ export function useComposerAttachmentIntake(input: {
         compressionErrors.set(
           id,
           result.reason === "unreadable"
-            ? `'${file.name}' could not be read as an image.`
-            : `'${file.name}' is too large to attach, even after compression.`,
+            ? t.composer.attachments.unreadableImageError(file.name)
+            : t.composer.attachments.imageTooLargeError(file.name),
         );
         continue;
       }

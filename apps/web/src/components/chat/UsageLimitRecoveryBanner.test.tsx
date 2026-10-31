@@ -7,6 +7,7 @@ import { usageLimitRecoveryBannerItem } from "./UsageLimitRecoveryBanner";
 
 const stoppedAt = new Date(2026, 9, 20, 12, 0);
 
+/** Reads the rendered local card because recovery information is not a standard banner description. */
 function bannerDescription(resetAt: Date, timestampFormat: TimestampFormat) {
   return renderToStaticMarkup(
     usageLimitRecoveryBannerItem({

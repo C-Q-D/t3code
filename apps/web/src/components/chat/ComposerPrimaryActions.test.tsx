@@ -17,7 +17,8 @@ vi.mock("~/hooks/useSettings", () => ({
 }));
 vi.mock("../SidebarStageBackdrop", () => ({
   StageBackdropButtonArt: ({ variant }: { variant: string }) => `stage-${variant}`,
-  useSidebarStageBackdropVariant: (enabled = true) => (enabled ? stageArtworkState.variant : null),
+  useSidebarStageBackdropVariant: (mode: "artwork" | "none") =>
+    mode === "artwork" ? stageArtworkState.variant : null,
 }));
 
 import { ComposerPrimaryActions } from "./ComposerPrimaryActions";

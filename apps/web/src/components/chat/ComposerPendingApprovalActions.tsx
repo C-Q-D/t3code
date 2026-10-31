@@ -44,11 +44,9 @@ export const ComposerPendingApprovalActions = memo(function ComposerPendingAppro
     (option) => option.decision !== "decline" && option.decision !== "accept",
   );
 
-  // Session and cancel keep their menu availability; main decisions still require a live request.
   const renderDecision = (option: ProviderApprovalOption) => {
     const isPrimary = option.decision === "accept";
-    const isMainDecision = isPrimary || option.decision === "decline";
-    const buttonDisabled = disabled || isResponding || (isMainDecision && !canRespond);
+    const buttonDisabled = disabled || isResponding || !canRespond;
     const button = (
       <button
         type="button"
@@ -67,7 +65,7 @@ export const ComposerPendingApprovalActions = memo(function ComposerPendingAppro
         disabled={buttonDisabled}
         aria-description={option.warning}
         onClick={() => {
-          if (!disabled && !isResponding) {
+          if (!disabled && !isResponding && canRespond) {
             void onRespondToApproval(requestId, option.decision);
           }
         }}
@@ -93,7 +91,7 @@ export const ComposerPendingApprovalActions = memo(function ComposerPendingAppro
         {moreOptions.length > 0 ? (
           <Menu>
             <MenuTrigger
-              disabled={disabled || isResponding}
+              disabled={disabled || isResponding || !canRespond}
               render={
                 <button
                   type="button"
@@ -109,10 +107,10 @@ export const ComposerPendingApprovalActions = memo(function ComposerPendingAppro
                 const item = (
                   <MenuItem
                     key={option.decision}
-                    disabled={disabled || isResponding}
+                    disabled={disabled || isResponding || !canRespond}
                     aria-description={option.warning}
                     onClick={() => {
-                      if (!disabled && !isResponding)
+                      if (!disabled && !isResponding && canRespond)
                         void onRespondToApproval(requestId, option.decision);
                     }}
                     variant="ghost"

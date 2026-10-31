@@ -1674,22 +1674,24 @@ export default function ChatView(props: ChatViewProps) {
   if (draftHeroDockRequested && timelineEntries.length > 0) {
     setDockedDraftHeroThreadKey(null);
   }
-  const isDraftHeroState = resolveDraftHeroState({
-    isLocalDraftThread,
-    isLoadedServerThread: isServerThread && serverProjection !== null,
-    hasTimelineEntries: !timelineEmpty,
-    isWorking,
-    draftHeroDockRequested,
-    backgroundSubmissionPending,
-    hasWorktreeSetupCard: worktreeSetup !== null,
-  });
+  const isDraftHeroState =
+    !embedded &&
+    resolveDraftHeroState({
+      isLocalDraftThread,
+      isLoadedServerThread: isServerThread && serverProjection !== null,
+      hasTimelineEntries: !timelineEmpty,
+      isWorking,
+      draftHeroDockRequested,
+      backgroundSubmissionPending,
+      hasWorktreeSetupCard: worktreeSetup !== null,
+    });
   const {
     transitionGroupRef: draftHeroTransitionGroupRef,
     composerAnchorRef: draftHeroComposerAnchorRef,
     captureComposerRect: captureDraftHeroComposerRect,
   } = useDraftHeroLayoutTransition(
     isDraftHeroState,
-    panelAnimationsActive,
+    panelAnimationsActive && !embedded,
     panelAnimationDurationMs,
   );
   const turnDiffSummaries = useThreadCheckpointSummaries(routeThreadDetailRef);
@@ -2224,10 +2226,14 @@ export default function ChatView(props: ChatViewProps) {
       }),
     );
   });
-  // oxlint-disable-next-line react/exhaustive-effect-dependencies -- New rows and composer size can change overflow without a scroll event.
   useLayoutEffect(() => {
     measureTimelineOverflow();
-  }, [timelineEntries, composerTimelineInset, measureTimelineOverflow]);
+  }, [
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- New rows and composer size can change overflow without a scroll event.
+    timelineEntries,
+    composerTimelineInset,
+    measureTimelineOverflow,
+  ]);
   const isTimelineAtLogicalEndStable = useStableCallback(() => {
     return resolveTimelineIsAtEnd(legendListRef.current?.getState()) ?? timelineLiveFollowEnabled;
   });
@@ -3086,7 +3092,7 @@ export default function ChatView(props: ChatViewProps) {
     isSendBusy,
     sendQueuesBehindSetup,
     isDraftHeroState,
-    panelAnimationsActive,
+    panelAnimationsActive: panelAnimationsActive && !embedded,
     panelAnimationDurationMs,
     keepFullHistory,
     resumeCompactionTokens,
@@ -3649,6 +3655,7 @@ export default function ChatView(props: ChatViewProps) {
                           ) : null}
                           {!composerMounted ? null : (
                             <ChatComposer
+                              embedded={Boolean(embedded)}
                               queuedRunsControl={queuedRunsControl}
                               canOperateThread={canOperateThread}
                               reportedModelSelection={reportedModelSelection}
@@ -3829,7 +3836,7 @@ export default function ChatView(props: ChatViewProps) {
                           data-terminal-open={terminalUiState.terminalOpen ? "true" : undefined}
                           className="relative z-0"
                         >
-                          {!showComposerContextStrip && routeKind === "server" ? (
+                          {!embedded && !showComposerContextStrip && routeKind === "server" ? (
                             <ComposerSurface.ContextStrip
                               className={cn(
                                 !restingComposerControlsVisible &&

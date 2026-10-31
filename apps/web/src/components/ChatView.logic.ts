@@ -643,6 +643,8 @@ export function resolveTerminalWorktreePath(input: {
   return input.threadWorktreePath;
 }
 
+/** Requests an environment-scoped attachment URL so remote clients never receive a local filesystem path.
+ * Rejects when the asset command fails; the caller owns the user-facing error. */
 export async function resolveFileAttachmentUrl(input: {
   attachment: ChatFileAttachment;
   environmentId: EnvironmentId;
@@ -1324,6 +1326,7 @@ export type LocalThreadErrorEntry = {
   readonly at: number;
 };
 
+/** Keeps provider error details when available and supplies a localized fallback for non-Error failures. */
 export function chatActionErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : t.chat.view.genericError;
 }

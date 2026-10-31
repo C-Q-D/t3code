@@ -12,7 +12,7 @@ import { CornerDownRight, ListPlus } from "lucide";
 import { MorphIcon } from "~/components/MorphIcon";
 import { useEnvironmentIdentificationMode } from "~/hooks/useSettings";
 import { formatContextWindowTokens } from "~/lib/contextWindow";
-import { cn } from "~/lib/utils";
+import { cn, isMacPlatform } from "~/lib/utils";
 import { useShortcutModifierState } from "../../shortcutModifierState";
 import { StageBackdropButtonArt, useSidebarStageBackdropVariant } from "../SidebarStageBackdrop";
 import { Spinner } from "../ui/spinner";
@@ -137,9 +137,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
     }) === "queue";
   const alternateAction = alternateComposerDispatchAction(followUpBehavior);
   const isSendDisabled = !canOperateThread || sendDisabledReason !== null;
-  const stageBackdropVariant = useSidebarStageBackdropVariant(
-    environmentIdentificationMode === "artwork",
-  );
+  const stageBackdropVariant = useSidebarStageBackdropVariant(environmentIdentificationMode);
 
   const renderStopGenerationButton = (insidePendingAction: boolean) => (
     <Tooltip key="interrupt">
@@ -329,11 +327,9 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
     (compactsBeforeSend
       ? t.composer.primaryActions.summarizeHistory(compactTokens)
       : isRunning && !isEditingQueuedMessage && canSteer
-        ? t.composer.primaryActions.dispatchTooltip(
-            followUpBehavior,
-            alternateShortcutLabel,
-            alternateAction,
-          )
+        ? t.composer.primaryActions
+            .dispatchTooltip(followUpBehavior, alternateShortcutLabel, alternateAction)
+            .replace("Ctrl/⌘", isMacPlatform(navigator.platform) ? "⌘" : "Ctrl")
         : submitLabel);
 
   const sendButton = (
@@ -410,9 +406,11 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
           }
         >
           <Minimize2Icon aria-hidden="true" />
-          {keepFullHistory
-            ? t.composer.primaryActions.fullLabel
-            : t.composer.primaryActions.compactLabel}
+          <span className="@max-[480px]/composer-surface:hidden">
+            {keepFullHistory
+              ? t.composer.primaryActions.fullLabel
+              : t.composer.primaryActions.compactLabel}
+          </span>
           <span>{compactTokens}</span>
         </TooltipTrigger>
         <TooltipPopup>

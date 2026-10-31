@@ -141,6 +141,7 @@ export function resolveScrollToEndClearance(input: {
   return Math.ceil(input.overlayHeight - (top - contentTop));
 }
 
+/** Limits resting geometry to overflowing desktop conversations; multiline input and expanded chrome stay readable. */
 export function shouldUseRestingComposerLayout(input: {
   isExistingThread: boolean;
   isMobileViewport: boolean;

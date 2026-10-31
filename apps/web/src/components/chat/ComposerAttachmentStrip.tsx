@@ -69,6 +69,8 @@ function ComposerVideoThumbnail({ file }: { file: File }) {
   );
 }
 
+/** Registers the mounted tile as the capture destination; absent animation IDs still allow ordinary attachments.
+ * Registration is released on unmount so a late capture cannot target a removed tile. */
 function SnapShotAttachmentFrame({
   animationId,
   animationSource,
@@ -261,9 +263,12 @@ export function ComposerAttachmentMediaRow({
               )}
               {(ready ? upload?.status === "uploading" : supportsAttachmentUploads) && (
                 <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-background/85 px-1 text-center text-3xs text-foreground">
-                  {formatAttachmentUploadProgress(
-                    upload?.status === "uploading" ? upload.progress : 0,
-                  )}
+                  <progress
+                    className="composer-attachment-progress"
+                    aria-label={t.composer.attachments.uploadProgress}
+                    value={upload?.status === "uploading" ? upload.progress : 0}
+                    max={1}
+                  />
                 </span>
               )}
               {ready && upload?.status === "failed" && (

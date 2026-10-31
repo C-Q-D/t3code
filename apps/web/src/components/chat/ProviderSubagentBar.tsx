@@ -6,12 +6,13 @@ import {
 } from "@t3tools/client-runtime/state/thread-execution";
 import { isOrchestrationV2WorkActive } from "@t3tools/contracts";
 import { ArrowUpLeftIcon } from "lucide-react";
-import { useLayoutEffect, useRef } from "react";
+import { tickTextContent } from "~/lib/tickTextContent";
 
 import type { ProviderInstanceEntry } from "../../providerInstances";
 import { Button } from "../ui/button";
 import { ProviderInstanceIcon } from "./ProviderInstanceIcon";
 
+/** Uses the shared DOM clock so each active subagent does not allocate a separate timer. */
 export function ProviderSubagentBar(props: {
   readonly provider: ProviderInstanceEntry | null;
   readonly showInstanceBadge: boolean;
@@ -20,7 +21,6 @@ export function ProviderSubagentBar(props: {
   readonly status: ProviderSubagentStatus | null;
   readonly onOpenParent: (() => void) | null;
 }) {
-  const statusRef = useRef<HTMLSpanElement>(null);
   const { status } = props;
   const statusMessages = t.chat.workLog.shared.subagentExecution;
   const live = status !== null && isOrchestrationV2WorkActive(status.status);
@@ -31,24 +31,6 @@ export function ProviderSubagentBar(props: {
     0,
     statusMessages,
   );
-
-  // The label is written from an effect, and live bars tick through DOM
-  // writes, so a running timer never re-renders the chat view.
-  useLayoutEffect(() => {
-    const update = () => {
-      if (statusRef.current) {
-        statusRef.current.textContent = formatProviderSubagentStatus(
-          status,
-          Date.now(),
-          statusMessages,
-        );
-      }
-    };
-    update();
-    if (!live) return;
-    const id = setInterval(update, 1_000);
-    return () => clearInterval(id);
-  }, [live, status, statusMessages]);
 
   // Sized by the composer, not the viewport: a docked side panel narrows the
   // chat column on a wide window, and one row there squeezes out the model
@@ -76,7 +58,10 @@ export function ProviderSubagentBar(props: {
           )}
         </span>
         <span
-          ref={statusRef}
+          ref={tickTextContent(
+            (nowMs) => formatProviderSubagentStatus(status, nowMs, statusMessages),
+            live,
+          )}
           aria-hidden
           className="min-w-0 max-w-full truncate text-muted-foreground tabular-nums @max-[560px]/composer-surface:text-xs"
         />

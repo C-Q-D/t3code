@@ -9,6 +9,7 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { ComposerBanner } from "./ComposerBanner";
 
 // Static on purpose: the title says when an update is running, and spinners repaint every frame.
+/** Uses a static status icon because the adjacent text conveys progress without continuous repainting. */
 export function ComposerServerUpdateIcon({
   status,
 }: {

@@ -45,6 +45,8 @@ function AccountSummary({ account }: { readonly account: UsageLimitsReport["acco
   );
 }
 
+/** Keeps account labels redacted while exposing usage windows and explicit dismissal.
+ * The report may contain no accounts; environmentId scopes account actions to the reporting server. */
 export function usageLimitsBannerItem(
   id: string,
   report: UsageLimitsReport,

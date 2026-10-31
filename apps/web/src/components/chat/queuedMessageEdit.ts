@@ -10,6 +10,7 @@ import {
   type ComposerThreadTarget,
 } from "../../composerDraftStore";
 
+/** Preserves an unfinished queue edit without overwriting a newer thread draft; returns its recovery destination. */
 export function recoverQueuedMessageEdit(input: {
   readonly editTarget: ComposerThreadTarget;
   readonly threadTarget: ComposerThreadTarget;

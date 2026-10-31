@@ -88,9 +88,9 @@ export function goalBannerItem(input: {
     description: presentation.objective,
     // Use only the current run's plan counts; goal token budgets are not task completion.
     progress: input.progress ?? null,
-    actions: isWorking ? undefined : (
+    actions: (
       <>
-        {presentation.canResume ? (
+        {!isWorking && presentation.canResume ? (
           <Button
             size="xs"
             variant="ghost"
@@ -150,9 +150,8 @@ export function backgroundWorkBannerItem(input: {
     title: presentation.title,
     description:
       presentation.items.length === 1 && presentation.items[0]?.childThreadId === undefined
-        ? undefined
-        : presentation.items.map((item, index) => {
-            const childThreadId = item.childThreadId;
+        ? (only?.activity ?? undefined)
+        : rows.map(({ task: item, childThreadId, activity }, index) => {
             const separator = index < presentation.items.length - 1 ? "," : null;
             return (
               <Fragment key={item.taskId}>
@@ -180,6 +179,7 @@ export function backgroundWorkBannerItem(input: {
                     {separator}
                   </span>
                 )}
+                {activity ? <span className="text-muted-foreground"> · {activity}</span> : null}
               </Fragment>
             );
           }),

@@ -403,6 +403,7 @@ const ComposerCitationExtension = Node.create({
   },
 });
 
+/** Keeps citation comments attached to the current editor node; stale positions cannot overwrite another token. */
 function ComposerCitationNodeView({ node, editor, getPos }: NodeViewProps) {
   const commentContext = use(ComposerCitationCommentContext);
   const citation = node.attrs.citation as AssistantCitation;

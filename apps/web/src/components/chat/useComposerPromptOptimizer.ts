@@ -25,7 +25,7 @@ import { isRpcClientError } from "@t3tools/client-runtime/rpc";
 import { isTransportConnectionErrorMessage } from "@t3tools/client-runtime/errors";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import type { AtomCommand, AtomCommandResult } from "@t3tools/client-runtime/state/runtime";
-import type { ComposerPromptEditorHandle } from "../ComposerPromptEditor";
+import type { ComposerPromptEditorHandle } from "../ComposerPromptEditorTiptap";
 
 /** One in-flight operation survives editor remounts; entries disappear on every settlement. */
 type PendingOptimization = {
