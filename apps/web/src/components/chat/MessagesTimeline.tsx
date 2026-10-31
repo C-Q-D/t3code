@@ -1,3 +1,8 @@
+/** Renders virtualized conversation rows; row modules own presentation and local interaction. */
+import { ChevronsUpIcon, FlagIcon, HandIcon, MessageSquareIcon, SparklesIcon } from "lucide-react";
+import { PixelSubagentIcon } from "../icons/PixelLucideIcon";
+import { WorkLogButton } from "./WorkLog";
+import { t } from "~/i18n";
 import { threadEnvironment } from "../../state/threads";
 import { useAtomCommand } from "../../state/use-atom-command";
 import type { ToolCallDiffTarget } from "../../diffPanelStore";
@@ -6,7 +11,6 @@ import { ThreadFindTimelineContext } from "./ThreadFindProvider";
 import { MarkdownFindContext } from "./markdownFindContext";
 import { useChatCanvas } from "./ChatCanvasContext";
 import { WorkLogBlock } from "./WorkLog";
-import { TimelinePendingApprovalRow } from "./TimelinePendingApprovalRow";
 import type { WorktreeSetupSnapshot } from "@t3tools/contracts";
 import { deriveTimelineMinimapItems } from "./timelineMinimapItems";
 import {
@@ -53,13 +57,7 @@ import {
 import { type PendingApproval, type TimelineEntry } from "../../session-logic";
 import type { CodexArtifactTemplate } from "@t3tools/shared/codexArtifactTemplates";
 import { type ChatFileAttachment, type TurnDiffSummary } from "../../types";
-import {
-  ArrowRightIcon,
-  BotIcon,
-  CircleAlertIcon,
-  MessagesSquareIcon,
-  Minimize2Icon,
-} from "lucide-react";
+import { ArrowRightIcon, CircleAlertIcon, MessagesSquareIcon, Minimize2Icon } from "lucide-react";
 import { ChevronDown, ChevronRight } from "lucide";
 import { MorphIcon } from "~/components/MorphIcon";
 import { Skeleton } from "../ui/skeleton";
@@ -328,7 +326,7 @@ export function MessagesTimeline(props: MessagesTimelineProps) {
 }
 
 const ConversationTimeline = memo(function ConversationTimeline({
-  pendingApprovals = EMPTY_PENDING_APPROVALS,
+  pendingApprovals: _pendingApprovals,
   heldApprovalRequestIds,
   respondingRequestIds = EMPTY_RESPONDING_REQUEST_IDS,
   canOperateThread = false,
@@ -670,6 +668,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
       ? new Set(paintedExpandedAttemptIds).add(activeFindAttemptId)
       : paintedExpandedAttemptIds;
 
+  const pendingApprovals = EMPTY_PENDING_APPROVALS;
   const isVisiblePendingApproval = (approval: PendingApproval) =>
     !heldApprovalRequestIds?.has(approval.requestId);
   const pendingApprovalRequestIds = new Set(
@@ -693,19 +692,6 @@ const ConversationTimeline = memo(function ConversationTimeline({
     worktreeSetup,
   });
   const rows = useStableRows(rawRows, listIdentityKey);
-  const matchedApprovalRequestIds = new Set<string>();
-  for (const row of pendingApprovalRequestIds.size > 0 ? rows : []) {
-    const entries =
-      row.kind === "work" ? row.groupedEntries : row.kind === "work-live" ? [row.entry] : [];
-    for (const entry of entries) {
-      const item = entry.projectedItem?.item;
-      if (item?.type === "approval_request") matchedApprovalRequestIds.add(item.requestId);
-    }
-  }
-  const unmatchedPendingApprovals = pendingApprovals.filter(
-    (approval) =>
-      isVisiblePendingApproval(approval) && !matchedApprovalRequestIds.has(approval.requestId),
-  );
   // Run status/timestamps change per stream event; keep them out of shared row context.
   const runs = useStableHandoffRuns(runsProp);
   const minimapItems = deriveTimelineMinimapItems(rows);
@@ -718,7 +704,6 @@ const ConversationTimeline = memo(function ConversationTimeline({
     restoringThreadPosition && restoreRowIndex >= 0 ? { indices: [restoreRowIndex] } : undefined;
   const showsEmptyState =
     rows.length === 0 &&
-    unmatchedPendingApprovals.length === 0 &&
     !isWorking &&
     parentThreadLink === null &&
     historyControls === undefined &&
@@ -963,7 +948,11 @@ const ConversationTimeline = memo(function ConversationTimeline({
   };
 
   const measureTimelineGutter = (viewportElement: HTMLElement) => {
-    const viewportWidth = viewportElement.getBoundingClientRect().width;
+    const viewportStyle = getComputedStyle(viewportElement);
+    const viewportWidth =
+      viewportElement.getBoundingClientRect().width -
+      (parseFloat(viewportStyle.getPropertyValue("--chat-lane-inset-start")) || 0) -
+      (parseFloat(viewportStyle.getPropertyValue("--chat-lane-inset-end")) || 0);
     const contentWidth =
       viewportElement.querySelector<HTMLElement>("[data-timeline-root]")?.getBoundingClientRect()
         .width ?? viewportWidth;
@@ -1109,16 +1098,16 @@ const ConversationTimeline = memo(function ConversationTimeline({
       <div className="messages-timeline-row-frame">
         <div className="chat-content-lane pt-1 sm:pt-2">
           <TimelineSystemDivider
-            label={parentThreadLink.sideChat ? "Context from" : "Subagent of"}
+            label={parentThreadLink.sideChat ? "Context from" : t.chat.timeline.subagentOf}
             detail={
               parentThreadLink.environmentLabel === undefined
                 ? parentThreadLink.title
                 : `${parentThreadLink.title} on ${parentThreadLink.environmentLabel}`
             }
-            icon={parentThreadLink.sideChat ? MessagesSquareIcon : BotIcon}
+            icon={parentThreadLink.sideChat ? MessagesSquareIcon : PixelSubagentIcon}
             {...(parentThreadLink.open === undefined
               ? {}
-              : { actionLabel: "Open parent thread", onAction: parentThreadLink.open })}
+              : { actionLabel: t.chat.timeline.openParentThread, onAction: parentThreadLink.open })}
           />
         </div>
       </div>
@@ -1257,19 +1246,6 @@ const ConversationTimeline = memo(function ConversationTimeline({
       onGrow={onFooterGrow}
     >
       {footer}
-      {unmatchedPendingApprovals.length > 0 ? (
-        <TimelineRowCtx value={sharedState}>
-          <div className="messages-timeline-row-frame">
-            <div className="chat-content-lane overflow-x-clip" data-timeline-root="true">
-              <WorkLogBlock>
-                {unmatchedPendingApprovals.map((approval) => (
-                  <TimelinePendingApprovalRow key={approval.requestId} approval={approval} />
-                ))}
-              </WorkLogBlock>
-            </div>
-          </div>
-        </TimelineRowCtx>
-      ) : null}
     </TimelineListFooter>
   );
 
@@ -1294,7 +1270,12 @@ const ConversationTimeline = memo(function ConversationTimeline({
           className="flex h-full items-center justify-center ps-(--chat-lane-inset-start) pe-(--chat-lane-inset-end)"
           style={{ paddingBottom: emptyPlaceholderInset }}
         >
-          <p className="text-sm text-muted-foreground">Send a message to start the conversation.</p>
+          <div className="flex h-42.5 w-full max-w-composer flex-col items-center justify-center gap-2.5 rounded-card-surface bg-timeline-empty-surface text-secondary-copy-large text-secondary-label shadow-timeline-empty-well">
+            <span className="flex size-11 items-center justify-center rounded-timeline-empty-icon shadow-timeline-empty-icon">
+              <MessageSquareIcon className="size-5" strokeWidth={1.75} aria-hidden />
+            </span>
+            <p>{t.chat.timeline.sendAMessageToStartTheConversation}</p>
+          </div>
         </div>
       </>
     );
@@ -1323,6 +1304,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
               extraData={listExtraData}
               keyExtractor={keyExtractor}
               getItemType={getItemType}
+              getFixedItemSize={getFixedItemSize}
               renderItem={renderItem}
               estimatedItemSize={90}
               initialScrollAtEnd={
@@ -1386,6 +1368,12 @@ const ConversationTimeline = memo(function ConversationTimeline({
   );
 });
 
+/**
+ * Renders earlier-history loading and retry controls.
+ * @param props - Required availability/loading flags and load callback; error is null when no load
+ * failure exists.
+ * @returns History controls, or null when there is neither more history nor an error.
+ */
 function TimelineHistoryControl(props: MessagesTimelineHistoryControls) {
   if (!props.hasMoreHistory && props.error === null) {
     return null;
@@ -1397,15 +1385,12 @@ function TimelineHistoryControl(props: MessagesTimelineHistoryControls) {
           <button
             type="button"
             disabled={props.loading}
-            aria-label="Load earlier turns"
+            aria-label={t.chat.timeline.loadEarlierTurns}
             onClick={() => props.onLoadEarlier()}
-            className="flex w-full cursor-pointer items-center gap-3 py-1.5 text-muted-foreground text-xs hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring disabled:cursor-default"
+            className="timeline-history-button"
           >
-            <span aria-hidden="true" className="h-px flex-1 bg-border/70" />
-            <span className="shrink-0">
-              {props.loading ? "Loading earlier turns…" : "Load earlier turns"}
-            </span>
-            <span aria-hidden="true" className="h-px flex-1 bg-border/70" />
+            <ChevronsUpIcon aria-hidden="true" className="size-3.5" />
+            {props.loading ? t.chat.timeline.loadingEarlierTurns : t.chat.timeline.loadEarlierTurns}
           </button>
         ) : null}
         {props.error !== null ? (
@@ -1426,11 +1411,26 @@ function keyExtractor(item: MessagesTimelineRow) {
   return item.id;
 }
 
-// LegendList averages by type; length buckets prevent inflated estimates and nested-update loops.
+// LegendList estimates unmeasured rows from the running average size of their
+// type. One type for every assistant reply lets a few very long replies, or
+// one that is streaming, lift the estimate for short replies to thousands of
+// pixels. Rows then mount one at a time, each measurement shrinks the list
+// and mounts the next row in the same commit, and scrolling into unmeasured
+// history exceeds React's nested update limit. Doubling-length buckets keep
+// each average within about 2x of the rows it estimates.
+/** Keeps the virtualizer's measurement pools separate for event kinds and message sizes.
+ * @param item Timeline row; message length is bucketed without measuring DOM.
+ * @returns Stable pool key, not a row identity. */
 function getItemType(item: MessagesTimelineRow) {
+  if (item.kind === "event") return `event:${item.projectedItem.item.type}`;
   if (item.kind !== "message") return item.kind;
   const lengthBucket = Math.max(0, Math.floor(Math.log2(item.message.text.length / 1000)));
   return `message:${item.message.role}:${lengthBucket}`;
+}
+
+/** Checkpoint tags have a fixed 28px face plus 16px of inset and row spacing. */
+function getFixedItemSize(item: MessagesTimelineRow) {
+  return item.kind === "checkpoint" ? 44 : undefined;
 }
 
 const TimelineRowContent = memo(function TimelineRowContent({ row }: { row: TimelineRow }) {
@@ -1459,6 +1459,7 @@ const TimelineRowContent = memo(function TimelineRowContent({ row }: { row: Time
                     !row.showAssistantMeta) ||
                   row.kind === "worktree-setup" ||
                   row.kind === "event" ||
+                  row.kind === "checkpoint" ||
                   row.kind === "attempt-fold" ||
                   row.kind === "html-render" ||
                   row.kind === "mcp-app"
@@ -1503,6 +1504,9 @@ const TimelineRowContent = memo(function TimelineRowContent({ row }: { row: Time
       {row.kind === "turn-fold" ? <TurnFoldTimelineRow key={row.id} row={row} /> : null}
       {row.kind === "attempt-fold" ? <AttemptFoldTimelineRow row={row} /> : null}
       {row.kind === "context-compaction" ? <ContextCompactionTimelineRow row={row} /> : null}
+      {row.kind === "checkpoint" ? (
+        <TimelineSystemDivider label={t.chat.workLog.checkpointCaptured} icon={FlagIcon} />
+      ) : null}
       {row.kind === "message" && row.message.role === "user" ? <UserMessageRow row={row} /> : null}
       {row.kind === "message" && row.message.role === "assistant" ? (
         <AssistantTimelineRow row={row} />
@@ -1540,6 +1544,7 @@ function WorktreeSetupTimelineRow({
   );
 }
 
+/** Render the existing compaction status as a static D1 tag without a repainting shimmer. */
 function ContextCompactionTimelineRow({
   row,
 }: {
@@ -1558,7 +1563,7 @@ function ContextCompactionTimelineRow({
       )}
       {row.tokenCounts ? (
         <>
-          {row.title ?? "Context compacted"} {row.tokenCounts.before}
+          {row.title ?? t.chat.timeline.contextCompacted} {row.tokenCounts.before}
           <ArrowRightIcon aria-hidden="true" className="size-3" />
           {row.tokenCounts.after} tokens
         </>
@@ -1647,40 +1652,79 @@ function WorkHistorySkeleton() {
   );
 }
 
+/**
+ * Render a turn disclosure, using the D1 hand tag for an interrupted turn.
+ * @param props Derived turn-fold row, with its current expansion state, label and optional summary.
+ * @returns A disclosure that calls TimelineRowCtx.onToggleTurnFold with the existing run ID.
+ */
 function TurnFoldTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "turn-fold" }> }) {
   const ctx = use(TimelineRowCtx);
   const { loading, error, toggle } = useDeferredWorkLoading(row, () =>
     ctx.onToggleTurnFold(row.runId),
   );
 
-  return (
-    <div className="group/timeline-row border-b border-border/60 pb-2 pe-0.5 pt-1">
-      <div className="relative flex items-center gap-1">
-        <button
-          type="button"
-          aria-expanded={row.expanded}
-          data-scroll-anchor-ignore
-          onClick={toggle}
-          aria-busy={loading}
-          className="flex cursor-pointer select-none items-center gap-1 rounded-md px-1 text-sm leading-relaxed text-muted-foreground tabular-nums transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70"
-        >
-          <span>
-            {row.label}
-            {error ? ` · ${error}` : ""}
-          </span>
-          <MorphIcon className="size-3.5" icon={row.expanded ? ChevronDown : ChevronRight} />
-        </button>
-        <TimelineRowTimestamp
-          createdAt={row.createdAt}
-          timestampFormat={ctx.timestampFormat}
-          className="ms-auto"
+  if (row.interrupted) {
+    return (
+      <>
+        <TimelineSystemDivider
+          label={error ? `${row.label} · ${error}` : row.label}
+          detail={row.summary}
+          icon={HandIcon}
+          actionLabel={row.label}
+          expanded={row.expanded}
+          onAction={toggle}
         />
-      </div>
+        {loading ? <WorkHistorySkeleton /> : null}
+      </>
+    );
+  }
+
+  return (
+    <>
+      <WorkLogButton
+        presentation="summary"
+        aria-expanded={row.expanded}
+        data-scroll-anchor-ignore
+        onClick={toggle}
+        aria-busy={loading}
+        icon={<SparklesIcon aria-hidden className="size-3.75 text-secondary-label" />}
+        label={
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="shrink-0 font-semibold text-foreground tabular-nums">
+              {row.label}
+              {error ? ` · ${error}` : ""}
+            </span>
+            {row.summary ? (
+              <>
+                <span aria-hidden className="text-placeholder">
+                  ·
+                </span>
+                <span className="min-w-0 truncate">{row.summary}</span>
+              </>
+            ) : null}
+          </span>
+        }
+        trailing={
+          <>
+            <TimelineRowTimestamp createdAt={row.createdAt} timestampFormat={ctx.timestampFormat} />
+            <MorphIcon
+              className="size-3.5 text-muted-foreground"
+              icon={row.expanded ? ChevronDown : ChevronRight}
+            />
+          </>
+        }
+      />
       {loading ? <WorkHistorySkeleton /> : null}
-    </div>
+    </>
   );
 }
 
+/**
+ * Renders an attempt disclosure and toggles its expansion through the timeline context.
+ * @param props - Required attempt-fold row; requires TimelineRowCtx with disclosure state and
+ * callbacks.
+ * @returns The attempt disclosure row; never null.
+ */
 function AttemptFoldTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "attempt-fold" }> }) {
   const ctx = use(TimelineRowCtx);
   const { loading, error, toggle } = useDeferredWorkLoading(row, () =>
@@ -1706,7 +1750,7 @@ function AttemptFoldTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "at
           {row.label}
           {error ? ` · ${error}` : ""}
         </span>
-        <span className="text-2xs text-muted-foreground">Cut off by a steer</span>
+        <span className="text-2xs text-muted-foreground">{t.chat.timeline.cutOffBySteer}</span>
       </button>
       {loading ? <WorkHistorySkeleton /> : null}
     </div>
