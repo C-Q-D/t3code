@@ -45,6 +45,7 @@ function Harness({
                 providerDisplayName="Codex"
                 isFavorite={current.has(item)}
                 isSelected={selected?.has(item) ?? false}
+                showInstanceBadge={false}
                 showProvider
                 onToggleFavorite={(_instance, slug) =>
                   setLocalFavorites((previous) => {

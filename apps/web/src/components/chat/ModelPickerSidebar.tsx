@@ -1,5 +1,4 @@
 /** Renders provider model-picker navigation with shared pixel artwork. */
-import { PixelSparkIcon } from "../icons/PixelLucideIcon";
 import { t } from "~/i18n";
 import { Toolbar } from "@base-ui/react/toolbar";
 import { type ProviderInstanceId } from "@t3tools/contracts";
@@ -34,10 +33,6 @@ function describeUnavailableInstance(entry: ProviderInstanceEntry): string {
   return t.composer.modelPicker.statusHint(label, kind, msg);
 }
 
-const BADGE_BASE_CLASS =
-  "pointer-events-none absolute -right-0.5 top-0.5 z-10 flex size-3.5 items-center justify-center rounded-full bg-transparent shadow-sm ";
-const NEW_BADGE_CLASS = `${BADGE_BASE_CLASS} text-update-foreground `;
-
 const PICKER_TOOLTIP_SIDE = "left" as const;
 const PICKER_TOOLTIP_SIDE_OFFSET = 8;
 
@@ -51,7 +46,6 @@ export const ModelPickerSidebar = memo(function ModelPickerSidebar(props: {
   disabledInstanceIds?: ReadonlySet<ProviderInstanceId>;
   selectableUnavailableInstanceIds?: ReadonlySet<ProviderInstanceId>;
   getDisabledInstanceTooltip?: (entry: ProviderInstanceEntry) => string;
-  newBadgeInstanceIds?: ReadonlySet<ProviderInstanceId>;
 }) {
   const handleSelect = (instanceId: ProviderInstanceId | "favorites") => {
     props.onSelectInstance(instanceId);
@@ -231,16 +225,13 @@ export const ModelPickerSidebar = memo(function ModelPickerSidebar(props: {
               (isUnavailable && !unavailableSelectionIsReachable) || isContextDisabled;
             const isSelected = props.selectedInstanceId === entry.instanceId;
             const isHovered = hoveredInstanceId === entry.instanceId;
-            const showNewBadge = props.newBadgeInstanceIds?.has(entry.instanceId) ?? false;
             const showInstanceBadge = shouldShowInstanceBadge(entry, props.instanceEntries);
 
             const tooltip = isUnavailable
               ? describeUnavailableInstance(entry)
               : isContextDisabled
                 ? (props.getDisabledInstanceTooltip?.(entry) ?? entry.displayName)
-                : showNewBadge
-                  ? t.composer.modelPicker.newProviderTooltip(entry.displayName)
-                  : entry.displayName;
+                : entry.displayName;
 
             const button = (
               <Toolbar.Button
@@ -262,13 +253,7 @@ export const ModelPickerSidebar = memo(function ModelPickerSidebar(props: {
                 focusableWhenDisabled={!isDisabled}
                 aria-pressed={isSelected}
                 type="button"
-                aria-label={
-                  isUnavailable || isContextDisabled
-                    ? tooltip
-                    : showNewBadge
-                      ? t.composer.modelPicker.newProviderAriaLabel(entry.displayName)
-                      : entry.displayName
-                }
+                aria-label={isUnavailable || isContextDisabled ? tooltip : entry.displayName}
               >
                 <ProviderInstanceIcon
                   driverKind={entry.driverKind}
@@ -288,11 +273,6 @@ export const ModelPickerSidebar = memo(function ModelPickerSidebar(props: {
                   }
                   {...(entry.accentColor ? { badgeClassName: "h-3 min-w-3 px-0.5 text-5xs" } : {})}
                 />
-                {showNewBadge ? (
-                  <span className={NEW_BADGE_CLASS} aria-hidden>
-                    <PixelSparkIcon className="size-2" />
-                  </span>
-                ) : null}
               </Toolbar.Button>
             );
 

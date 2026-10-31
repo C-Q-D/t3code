@@ -3,7 +3,7 @@ import { RegistryProvider } from "@effect/atom-react";
 import { ProviderDriverKind, ProviderInstanceId } from "@t3tools/contracts";
 import { expect, it, vi } from "vite-plus/test";
 import { userEvent } from "vite-plus/test/browser";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { t } from "~/i18n";
 import { ProviderModelPicker } from "./ProviderModelPicker";
 import { render } from "../../../test/render";
@@ -48,10 +48,12 @@ function Harness({
       skills: [],
     },
   ]);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const Picker = popup ? ProviderModelPicker : ModelPickerContent;
   return (
     <RegistryProvider>
       <Picker
+        searchInputRef={searchInputRef}
         environmentId={null}
         activeInstanceId={instanceId}
         model="model-00"

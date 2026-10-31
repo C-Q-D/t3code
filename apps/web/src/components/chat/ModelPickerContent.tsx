@@ -41,6 +41,7 @@ import { rankModelPickerSearch } from "./modelPickerSearch";
 import { Combobox, ComboboxEmpty, ComboboxItem, ComboboxListVirtualized } from "../ui/combobox";
 import { ModelEsque } from "./providerIconUtils";
 import { isCommandPaletteOpen } from "../../commandPaletteBus";
+import { registerModelPickerContent } from "../../modelPickerVisibility";
 import { primaryServerKeybindingsAtom } from "../../state/server";
 import {
   modelPickerJumpCommandForIndex,
@@ -52,6 +53,7 @@ import {
   useEnvironmentModelPreferences,
   useToggleEnvironmentModelFavorite,
 } from "~/hooks/useSettings";
+import { announce } from "~/lib/announce";
 import { cn } from "~/lib/utils";
 import { createSpringIndicator } from "~/lib/motion/springIndicator";
 import { observeResize } from "~/lib/observeResize";
@@ -61,6 +63,7 @@ import { InlineButton } from "../ui/button";
 import {
   isProviderInstancePickerReady,
   isProviderInstancePickerVisible,
+  shouldShowInstanceBadge,
   type ProviderInstanceEntry,
 } from "../../providerInstances";
 import { providerModelKey, sortProviderModelItems } from "../../modelOrdering";
@@ -204,10 +207,12 @@ function modelJumpLabelsByKey(
 function ModelPickerProviderNotices({
   setupEntries,
   updateRequiredNotices,
+  emptyLabel,
   onRequestClose,
   onOpenProviderSetup,
 }: {
   setupEntries: ReadonlyArray<ProviderInstanceEntry>;
+  emptyLabel: string;
   updateRequiredNotices: ReadonlyArray<{ instanceId: ProviderInstanceId; notice: string }>;
   onRequestClose: (() => void) | undefined;
   onOpenProviderSetup: ((instanceId: ProviderInstanceId) => void) | undefined;
@@ -237,7 +242,7 @@ function ModelPickerProviderNotices({
           ))}
         </div>
       ) : (
-        <ComboboxEmpty className="empty:h-0">{t.composer.modelPicker.empty}</ComboboxEmpty>
+        <ComboboxEmpty className="empty:h-0">{emptyLabel}</ComboboxEmpty>
       )}
       {updateRequiredNotices.map(({ instanceId, notice }) => (
         <p
@@ -320,7 +325,7 @@ function ModelPickerList({
     setShowBottomScrollFade(maxScrollOffset - scrollElement.scrollTop > 1);
   };
 
-  // Keyed by content: a new disabled-reason closure rebuilds an identical key array.
+  // Disabled-reason closures rebuild identical key arrays; compare contents.
   const itemListKey = JSON.stringify(itemKeys);
   useLayoutEffect(() => {
     const container = containerRef.current;
@@ -464,7 +469,7 @@ function ModelPickerList({
   );
 }
 
-// Capture phase, so model and provider shortcuts win over the composer underneath.
+// Capture gives picker shortcuts priority over the composer.
 function WindowKeyDownListener({ onKeyDown }: { onKeyDown: (event: KeyboardEvent) => void }) {
   const handleKeyDown = useEffectEvent(onKeyDown);
   useEffect(() => {
@@ -494,8 +499,11 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
   onOpenProviderSetup?: (instanceId: ProviderInstanceId) => void;
   getModelDisabledReason?: (instanceId: ProviderInstanceId, model: string) => string | null;
   onInstanceModelChange: (instanceId: ProviderInstanceId, model: string) => void;
+  /** The owning popup moves focus here when it opens (its `initialFocus`). */
+  searchInputRef: RefObject<HTMLInputElement | null>;
 }) {
   const {
+    searchInputRef,
     keybindings: providedKeybindings,
     modelOptionsByInstance,
     instanceEntries,
@@ -506,9 +514,9 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
     onOpenProviderSetup,
   } = props;
   const [searchQuery, setSearchQuery] = useState("");
-  const searchInputRef = useRef<HTMLInputElement>(null);
   const modelListRef = useRef<LegendListRef | null>(null);
   const pickerContentRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => registerModelPickerContent(), []);
   const highlightedModelKeyRef = useRef<string | null>(null);
   const alignModelHighlightRef = useRef<((animate: boolean) => void) | null>(null);
   const prepareLegacyResizeRef = useRef<(() => void) | null>(null);
@@ -595,20 +603,6 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
     });
   };
 
-  useLayoutEffect(() => {
-    focusSearchInput();
-    const frame = window.requestAnimationFrame(() => {
-      focusSearchInput();
-    });
-    const timeout = window.setTimeout(() => {
-      focusSearchInput();
-    }, 0);
-    return () => {
-      window.cancelAnimationFrame(frame);
-      window.clearTimeout(timeout);
-    };
-  }, [focusSearchInput]);
-
   const toggleLegacySection = (instanceId: ProviderInstanceId) => {
     prepareLegacyResizeRef.current?.();
     setExpandedLegacyInstances((expanded) => {
@@ -626,17 +620,17 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
     modelSlug: string,
     instanceId: ProviderInstanceId,
     additive = false,
-  ) => {
+  ): string | null => {
     if (getModelDisabledReason?.(instanceId, modelSlug)) {
-      return;
+      return null;
     }
     const options = modelOptionsByInstance.get(instanceId);
     if (!options) {
-      return;
+      return null;
     }
     const entry = instanceEntries.find((candidate) => candidate.instanceId === instanceId);
     if (!entry) {
-      return;
+      return null;
     }
     const resolvedModel = resolveSelectableModel(entry.driverKind, modelSlug, options);
     if (resolvedModel) {
@@ -647,6 +641,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
         onInstanceModelChange(instanceId, resolvedModel);
       }
     }
+    return resolvedModel;
   };
 
   const modelJumpShortcutContext = {
@@ -858,7 +853,6 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
     return notice ? [{ instanceId: entry.instanceId, notice }] : [];
   });
 
-  // The first selectable models get the numbered jump shortcuts, in list order.
   const modelJumpModelKeys = visibleModels
     .filter((model) => !getModelDisabledReason?.(model.instanceId, model.slug))
     .slice(0, MODEL_PICKER_JUMP_KEYBINDING_COMMANDS.length)
@@ -893,7 +887,13 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
     keybindings,
     props.terminalOpen,
   );
+  const badgedInstanceIds = new Set(
+    instanceEntries
+      .filter((entry) => shouldShowInstanceBadge(entry, instanceEntries))
+      .map((entry) => entry.instanceId),
+  );
   const modelListExtraData = {
+    badgedInstanceIds,
     favoritesSet,
     modelJumpLabelByKey,
     activeModelKey,
@@ -902,7 +902,13 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
   };
 
   const onWindowKeyDown = (event: globalThis.KeyboardEvent) => {
-    if (event.defaultPrevented || event.repeat || isCommandPaletteOpen()) {
+    if (
+      event.defaultPrevented ||
+      event.repeat ||
+      event.isComposing ||
+      event.keyCode === 229 ||
+      isCommandPaletteOpen()
+    ) {
       return;
     }
 
@@ -922,6 +928,12 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
       });
       setSearchQuery("");
       handleSelectInstance(next);
+      announce(
+        next === "favorites"
+          ? t.composer.modelPicker.favorites
+          : (entryByInstanceId.get(next)?.displayName ?? next),
+        "model-picker",
+      );
       return;
     }
     const jumpIndex = modelPickerJumpIndexFromCommand(command ?? "");
@@ -939,7 +951,12 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
     if (!model) {
       return;
     }
-    handleModelSelect(model.slug, model.instanceId);
+    const selectedSlug = handleModelSelect(model.slug, model.instanceId);
+    if (selectedSlug === null) return;
+    const name = flatModels.find(
+      (item) => item.slug === selectedSlug && item.instanceId === model.instanceId,
+    )?.name;
+    announce(`Model: ${name ?? selectedSlug}`, "model-picker");
   };
 
   return (
@@ -1027,6 +1044,13 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
                   setSearchQuery(e.target.value);
                 }}
                 onKeyDown={(e) => {
+                  if (e.nativeEvent.isComposing || e.keyCode === 229) {
+                    (
+                      e as typeof e & { preventBaseUIHandler?: () => void }
+                    ).preventBaseUIHandler?.();
+                    e.stopPropagation();
+                    return;
+                  }
                   if (
                     showSidebar &&
                     !e.altKey &&
@@ -1123,7 +1147,6 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
                     index={index}
                     slug={model.slug}
                     name={model.name}
-                    shortName={model.shortName}
                     subProvider={model.subProvider}
                     instanceId={model.instanceId}
                     driverKind={model.driverKind}
@@ -1140,9 +1163,8 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
                         ? selectedModelKeySet.has(modelKey)
                         : modelKey === activeModelKey
                     }
+                    showInstanceBadge={badgedInstanceIds.has(model.instanceId)}
                     showProvider
-                    preferShortName={!isLocked}
-                    useTriggerLabel={false}
                     showNewBadge={model.badge === "new"}
                     unavailable={model.isUnavailable === true}
                     jumpLabel={modelJumpLabelByKey.get(modelKey) ?? null}
@@ -1155,6 +1177,11 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
             <ModelPickerProviderNotices
               setupEntries={providerSetupEntries}
               updateRequiredNotices={updateRequiredNotices}
+              emptyLabel={
+                selectedInstanceId === "favorites" && !isSearching
+                  ? "No favorites yet"
+                  : t.composer.modelPicker.empty
+              }
               onRequestClose={onRequestClose}
               onOpenProviderSetup={onOpenProviderSetup}
             />

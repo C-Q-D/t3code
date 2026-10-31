@@ -3,11 +3,7 @@ import { t } from "~/i18n";
 import { type ProviderDriverKind, type ProviderInstanceId } from "@t3tools/contracts";
 import { memo } from "react";
 import { ModelSelectionCheck } from "./ModelSelectionCheck";
-import {
-  getDisplayModelName,
-  getProviderRowLabel,
-  getTriggerDisplayModelLabel,
-} from "./providerIconUtils";
+import { getDisplayModelName, getProviderRowLabel } from "./providerIconUtils";
 import { ComboboxItem } from "../ui/combobox";
 import { ModelFavoriteButton } from "./ModelFavoriteButton";
 import { Badge } from "../ui/badge";
@@ -22,7 +18,6 @@ export const ModelListRow = memo(function ModelListRow(props: {
   index: number;
   slug: string;
   name: string;
-  shortName?: string | undefined;
   subProvider?: string | undefined;
   instanceId: ProviderInstanceId;
   driverKind: ProviderDriverKind;
@@ -34,8 +29,7 @@ export const ModelListRow = memo(function ModelListRow(props: {
   isSelected: boolean;
   selectionRequest?: object | undefined;
   showProvider: boolean;
-  preferShortName?: boolean;
-  useTriggerLabel?: boolean;
+  showInstanceBadge: boolean;
   showNewBadge?: boolean;
   unavailable?: boolean;
   jumpLabel?: string | null;
@@ -45,7 +39,6 @@ export const ModelListRow = memo(function ModelListRow(props: {
   const model = {
     slug: props.slug,
     name: props.name,
-    shortName: props.shortName,
     subProvider: props.subProvider,
   };
   const providerLabel = getProviderRowLabel(props.providerDisplayName, props.subProvider);
@@ -71,12 +64,7 @@ export const ModelListRow = memo(function ModelListRow(props: {
       <div className={cn("min-w-0 flex-1 text-left", props.unavailable && "text-placeholder")}>
         <div className="flex min-w-0 items-center gap-2">
           <div className={cn("min-w-0 truncate", props.isSelected && "font-semibold")}>
-            {props.useTriggerLabel
-              ? getTriggerDisplayModelLabel(model)
-              : getDisplayModelName(
-                  model,
-                  props.preferShortName ? { preferShortName: true } : undefined,
-                )}
+            {getDisplayModelName(model)}
           </div>
           {props.showNewBadge ? (
             <Badge variant="action" size="sm" aria-label={t.composer.modelPicker.newAriaLabel}>
@@ -99,6 +87,8 @@ export const ModelListRow = memo(function ModelListRow(props: {
             <ProviderInstanceIcon
               driverKind={props.driverKind}
               displayName={props.providerDisplayName}
+              accentColor={props.providerAccentColor}
+              showBadge={props.showInstanceBadge}
               acpRegistryAgentId={props.acpRegistryAgentId}
               acpRegistryIconUrl={props.acpRegistryIconUrl}
               className="size-3"

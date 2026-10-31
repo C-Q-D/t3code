@@ -24,6 +24,7 @@ export const CompactComposerControlsMenu = memo(function CompactComposerControls
   }>;
   showInteractionModeToggle: boolean;
   traitsMenuContent?: ReactNode;
+  showPermissions?: boolean;
   size?: "sm" | "xs";
   /**
    * The resting strip keeps this menu mounted out of flow while every block
@@ -47,7 +48,12 @@ export const CompactComposerControlsMenu = memo(function CompactComposerControls
             className="shrink-0"
             aria-label={t.chat.runtimeMode.moreComposerControls}
             data-composer-shortcut={
-              props.traitsMenuContent ? "composer.mode composer.effort" : "composer.mode"
+              [
+                props.showPermissions !== false && "composer.mode",
+                props.traitsMenuContent && "composer.effort",
+              ]
+                .filter(Boolean)
+                .join(" ") || undefined
             }
           />
         }
@@ -76,25 +82,29 @@ export const CompactComposerControlsMenu = memo(function CompactComposerControls
               <MenuRadioItem value="default">{t.chat.runtimeMode.chat}</MenuRadioItem>
               <MenuRadioItem value="plan">{t.chat.runtimeMode.plan}</MenuRadioItem>
             </MenuRadioGroup>
-            <MenuDivider />
+            {props.showPermissions !== false ? <MenuDivider /> : null}
           </>
         ) : null}
-        <div className="px-2 py-1.5 font-medium text-muted-foreground text-xs">
-          {t.chat.runtimeMode.access}
-        </div>
-        <MenuRadioGroup
-          value={props.runtimeMode}
-          onValueChange={(value) => {
-            if (!value || value === props.runtimeMode) return;
-            props.onRuntimeModeChange(value as RuntimeMode);
-          }}
-        >
-          {props.runtimeModeOptions.map((option) => (
-            <MenuRadioItem key={option.mode} value={option.mode}>
-              {option.label}
-            </MenuRadioItem>
-          ))}
-        </MenuRadioGroup>
+        {props.showPermissions !== false ? (
+          <>
+            <div className="px-2 py-1.5 font-medium text-muted-foreground text-xs">
+              {t.chat.runtimeMode.access}
+            </div>
+            <MenuRadioGroup
+              value={props.runtimeMode}
+              onValueChange={(value) => {
+                if (!value || value === props.runtimeMode) return;
+                props.onRuntimeModeChange(value as RuntimeMode);
+              }}
+            >
+              {props.runtimeModeOptions.map((option) => (
+                <MenuRadioItem key={option.mode} value={option.mode}>
+                  {option.label}
+                </MenuRadioItem>
+              ))}
+            </MenuRadioGroup>
+          </>
+        ) : null}
       </MenuPopup>
     </Menu>
   );

@@ -7,7 +7,6 @@ import {
   getTraitSelectChange,
   replaceDescriptorCurrentValue,
   REASONING_SELECT_DESCRIPTOR_IDS,
-  ULTRATHINK_PROMPT_PREFIX,
 } from "@t3tools/client-runtime/model-traits";
 import {
   type ModelSelection,
@@ -19,6 +18,7 @@ import {
   type ServerProviderModel,
 } from "@t3tools/contracts";
 import {
+  applyClaudePromptEffortPrefix,
   buildProviderOptionSelectionsFromDescriptors,
   getProviderOptionCurrentLabel,
   getProviderOptionCurrentValue,
@@ -45,6 +45,26 @@ import {
 } from "./ComposerControl";
 import { useComposerMenuProps } from "./composerEventScope";
 import { useComposerMenuState } from "./useComposerMenuState";
+
+const ULTRATHINK_PROMPT_PREFIX = "Ultrathink:\n";
+
+/** Keeps the fork's prompt switch separate from persisted provider options; slash commands reject injection. */
+function getLocalTraitSelectChange(
+  selected: Parameters<typeof getTraitSelectChange>[0],
+  descriptor: Parameters<typeof getTraitSelectChange>[1],
+  prompt: string,
+  value: string,
+) {
+  if (descriptor.promptInjectedValues?.includes(value)) {
+    return {
+      prompt:
+        prompt.trim().length === 0
+          ? ULTRATHINK_PROMPT_PREFIX
+          : applyClaudePromptEffortPrefix(prompt, "ultrathink"),
+    };
+  }
+  return getTraitSelectChange(selected, descriptor, prompt, value);
+}
 
 type ProviderOptions = ReadonlyArray<ProviderOptionSelection>;
 
@@ -195,12 +215,12 @@ function getSelectedTraits(
 }
 
 /** Derives visible controls, including read-only saved options for unavailable OpenCode models. */
-function getTraitsSectionVisibility(input: {
+export function getTraitsSectionVisibility(input: {
   provider: ProviderDriverKind;
   models: ReadonlyArray<ServerProviderModel>;
   model: string | null | undefined;
   promptUltrathink?: PromptUltrathink | undefined;
-  modelOptions: ProviderOptions | null | undefined;
+  modelOptions?: ProviderOptions | null | undefined;
   allowPromptInjectedEffort?: boolean;
   planModeEnabled: boolean;
 }) {
@@ -287,7 +307,7 @@ export function getReasoningTraitStep(input: {
     ...ordered.slice(position + 1),
     ...ordered.slice(0, Math.max(position, 0)),
   ]) {
-    const change = getTraitSelectChange(selected, descriptor, input.prompt, option.id);
+    const change = getLocalTraitSelectChange(selected, descriptor, input.prompt, option.id);
     if (!change) return null;
     if ("modelOptions" in change) {
       return change.modelOptions
@@ -306,7 +326,7 @@ export function shouldRenderTraitsControls(input: {
   models: ReadonlyArray<ServerProviderModel>;
   model: string | null | undefined;
   promptUltrathink?: PromptUltrathink | undefined;
-  modelOptions: ProviderOptions | null | undefined;
+  modelOptions?: ProviderOptions | null | undefined;
   allowPromptInjectedEffort?: boolean;
   planModeEnabled: boolean;
 }): boolean {
@@ -329,6 +349,9 @@ export interface TraitsMenuContentProps {
   triggerClassName?: string;
   isComposerOwned?: boolean;
 }
+
+/** Combines capability inputs with either a draft target or an explicit persistence callback. */
+export type TraitsSelectionInput = TraitsMenuContentProps & TraitsPersistence;
 
 /** Uses provider descriptors for every segment and switch, preserving prompt-injected effort rules. */
 export const TraitsMenuContent = memo(function TraitsMenuContentImpl({
@@ -390,10 +413,10 @@ export const TraitsMenuContent = memo(function TraitsMenuContentImpl({
     value: string,
   ) => {
     // Whether a pick applies, and the options it writes, do not depend on the prompt text.
-    const change = getTraitSelectChange(selected, descriptor, "", value);
+    const change = getLocalTraitSelectChange(selected, descriptor, "", value);
     if (!change) return;
     onPromptEdit?.(
-      (prompt) => getTraitSelectChange(selected, descriptor, prompt, value)?.prompt ?? prompt,
+      (prompt) => getLocalTraitSelectChange(selected, descriptor, prompt, value)?.prompt ?? prompt,
     );
     if ("modelOptions" in change) updateModelOptions(change.modelOptions);
   };
