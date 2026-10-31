@@ -58,6 +58,12 @@ import {
   THREAD_HISTORY_TURN_SNAPSHOT_ROW_LIMIT,
 } from "./threadHistoryPaging.ts";
 
+const decodeCommand = Schema.decodeEffect(OrchestrationV2Command);
+const decodeDomainEvent = Schema.decodeEffect(OrchestrationV2DomainEvent);
+const encodeDomainEvent = Schema.encodeEffect(OrchestrationV2DomainEvent);
+const decodeThreadShell = Schema.decodeEffect(OrchestrationV2ThreadShell);
+const encodeThreadShell = Schema.encodeEffect(OrchestrationV2ThreadShell);
+
 const layerTest = Layer.mergeAll(
   ProjectionStore.layer.pipe(Layer.provideMerge(SqlitePersistence.layerMemory)),
   SqlitePersistence.layerMemory,
@@ -6868,7 +6874,7 @@ it.effect.each([true, false])(
     return Effect.gen(function* () {
       const orchestrator = yield* Orchestrator.OrchestratorV2;
       const threadId = ThreadId.make("thread:discussion-ownership");
-      const command = yield* Schema.decodeEffect(OrchestrationV2Command)({
+      const command = yield* decodeCommand({
         type: "thread.create",
         commandId: CommandId.make("command:discussion-ownership"),
         threadId,
@@ -6902,9 +6908,7 @@ it.effect.each([true, false])(
       )?.event;
       if (created?.type !== "thread.created") return assert.fail("Missing thread.created");
       assert.equal(Object.hasOwn(created.payload, "discussion"), isSeat);
-      const decodedEvent = yield* Schema.decodeEffect(OrchestrationV2DomainEvent)(
-        yield* Schema.encodeEffect(OrchestrationV2DomainEvent)(created),
-      );
+      const decodedEvent = yield* decodeDomainEvent(yield* encodeDomainEvent(created));
       if (decodedEvent.type !== "thread.created") return assert.fail("Expected thread.created");
       const payload = decodedEvent.payload;
       assert.deepEqual(
@@ -6916,9 +6920,7 @@ it.effect.each([true, false])(
       const storedShell = yield* orchestrator.getThreadShell(threadId);
       if (storedShell === null) return assert.fail("Missing persisted shell");
       assert.equal(Object.hasOwn(storedShell, "discussion"), isSeat);
-      const decodedShell = yield* Schema.decodeEffect(OrchestrationV2ThreadShell)(
-        yield* Schema.encodeEffect(OrchestrationV2ThreadShell)(storedShell),
-      );
+      const decodedShell = yield* decodeThreadShell(yield* encodeThreadShell(storedShell));
       assert.deepEqual(
         Object.hasOwn(decodedShell, "discussion") ? decodedShell.discussion : "absent",
         isSeat ? { discussionId: "discussion-ownership", seatId: "seat-ownership" } : "absent",

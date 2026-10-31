@@ -2,7 +2,6 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { buildPeriodColumns } from "./UsageProviderChart";
 import { bandShare, chartScale, niceScale } from "./usageChart.logic";
-import { providersWithUsage } from "./usageProviders";
 
 describe("chartScale", () => {
   it("fits the combined height of a stacked provider column", () => {

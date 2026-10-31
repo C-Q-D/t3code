@@ -20,7 +20,18 @@ describe("rehypeChipPunctuation", () => {
     const link = element("a", [text("a.ts")]);
     expect(paired(element("p", [text("See "), link, text("... next")]))).toEqual([
       text("See "),
-      expect.objectContaining({ tagName: "span", children: [link, text("...")] }),
+      expect.objectContaining({
+        tagName: "span",
+        children: [
+          link,
+          {
+            type: "element",
+            tagName: "span",
+            properties: { className: ["before:content-['\\2060']"] },
+            children: [text("...")],
+          },
+        ],
+      }),
       text(" next"),
     ]);
   });

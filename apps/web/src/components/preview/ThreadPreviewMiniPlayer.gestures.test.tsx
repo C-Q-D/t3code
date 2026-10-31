@@ -34,7 +34,7 @@ vi.mock("~/browser/previewRuntime", () => ({ useRendersServerTabNatively: () => 
 const nativeSurface = vi.hoisted(() => ({ enabled: false }));
 vi.mock("~/browser/BrowserSurfaceSlot", async (importOriginal) => {
   const { BrowserSurfaceSlot } =
-    await importOriginal<typeof import("~/browser/BrowserSurfaceSlot")>();
+    (await importOriginal()) as typeof import("~/browser/BrowserSurfaceSlot");
   return {
     BrowserSurfaceSlot: (props: React.ComponentProps<typeof BrowserSurfaceSlot>) =>
       nativeSurface.enabled ? (

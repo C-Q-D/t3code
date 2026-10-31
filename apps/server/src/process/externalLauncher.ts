@@ -1,4 +1,3 @@
-import * as NodePath from "@effect/platform-node/NodePath";
 import {
   EDITORS,
   ExternalLauncherError,

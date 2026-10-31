@@ -1,6 +1,6 @@
 /** Trusted persona resolution uses durable seat snapshots and degrades safely when reads fail. */
 import { assert, it } from "@effect/vitest";
-import { CommandId, ThreadId, DiscussionError } from "@t3tools/contracts";
+import { CommandId, ThreadId } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Projection from "../orchestration-v2/ProjectionStore.ts";

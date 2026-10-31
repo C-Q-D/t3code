@@ -8,7 +8,7 @@ type HastNode = {
 
 const LEADING_PUNCTUATION = /^[.,:;!?…)\]}"'’”]+/;
 
-// Browsers allow a wrap after inline-flex chips even before punctuation.
+/** Keeps punctuation beside inline chips without an ancestor-dependent style selector. */
 export function rehypeChipPunctuation() {
   const visit = (node: HastNode): void => {
     if (node.tagName === "pre" || !node.children) return;
@@ -27,10 +27,17 @@ export function rehypeChipPunctuation() {
       children[children.length - 1] = {
         type: "element",
         tagName: "span",
-        properties: {
-          className: ["has-[[data-slot=context-chip-label]]:whitespace-nowrap"],
-        },
-        children: [previous, { type: "text", value: punctuation }],
+        properties: {},
+        // A generated word joiner prevents the boundary break without changing copied text.
+        children: [
+          previous,
+          {
+            type: "element",
+            tagName: "span",
+            properties: { className: ["before:content-['\\2060']"] },
+            children: [{ type: "text", value: punctuation }],
+          },
+        ],
       };
       const rest = (child.value ?? "").slice(punctuation.length);
       if (rest) children.push({ ...child, value: rest });

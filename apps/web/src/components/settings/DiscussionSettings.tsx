@@ -53,6 +53,17 @@ import {
 } from "./discussionSettings.logic";
 import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settingsLayout";
 
+/** Duplicate persona/model seats are valid; occurrence keys keep unrelated reordered seats stable. */
+function keyedTemplateSeats(seats: DiscussionTemplate["seats"]) {
+  const occurrences = new Map<string, number>();
+  return seats.map((seat) => {
+    const identity = JSON.stringify([seat.personaPromptId, seat.modelSelection]);
+    const occurrence = occurrences.get(identity) ?? 0;
+    occurrences.set(identity, occurrence + 1);
+    return { seat, key: identity + ":" + occurrence };
+  });
+}
+
 /** A prompt editor starts with either a server snapshot or an empty custom prompt of the chosen kind. */
 type PromptEditor = {
   readonly kind: "persona" | "summary";
@@ -364,11 +375,8 @@ function DiscussionEnvironmentSettings({
           templatesQuery.data.templates.map((template) => (
             <div key={template.id} className="discussion-settings-row">
               <div className="flex min-w-15.5 shrink-0 items-center -space-x-1.5">
-                {template.seats.map((seat, index) => (
-                  <span
-                    key={`${index}:${seat.personaPromptId}`}
-                    className="rounded-tag ring-2 ring-surface-raised"
-                  >
+                {keyedTemplateSeats(template.seats).map(({ seat, key }, index) => (
+                  <span key={key} className="rounded-tag ring-2 ring-surface-raised">
                     <PixelSeat
                       role={
                         personas.find((prompt) => prompt.id === seat.personaPromptId)?.avatar ??
