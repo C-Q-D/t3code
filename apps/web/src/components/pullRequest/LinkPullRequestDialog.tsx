@@ -1,4 +1,4 @@
-import { parseChangeRequestUrl } from "~/lib/openPullRequestLink";
+import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import type { ScopedThreadRef } from "@t3tools/contracts";
 import {
   parsePullRequestReference,
@@ -6,7 +6,7 @@ import {
 } from "@t3tools/client-runtime/pull-request-link-input";
 import { useAtomValue } from "@effect/atom-react";
 import { settlePromise, squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { t } from "~/i18n";
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 
@@ -24,11 +24,7 @@ import {
 } from "../ui/dialog";
 import { Input } from "../ui/input";
 
-/**
- * Which thread has the link dialog open, set by whichever entry point asked (command palette,
- * pull-requests surface, detail panel) and rendered once by the chat view so the dialog outlives
- * a palette that closes the moment its command runs.
- */
+// Host in chat to survive command palette dismissal.
 const linkPullRequestDialogThreadAtom = Atom.make<ScopedThreadRef | null>(null).pipe(
   Atom.keepAlive,
   Atom.withLabel("pull-requests:link-dialog-thread"),
@@ -83,11 +79,11 @@ export function resolveLinkPullRequestInput(input: {
   readonly hasProject: (reference: ResolvedLink) => boolean;
 }): { link: ResolvedLink } | { error: string } | null {
   const parsed =
-    parseChangeRequestUrl(input.reference.trim()) !== null
+    sourceControlClients.parseChangeRequestUrl(input.reference.trim()) !== null
       ? input.reference.trim()
       : parsePullRequestReference(input.reference);
   if (parsed === null) return null;
-  const url = parseChangeRequestUrl(parsed);
+  const url = sourceControlClients.parseChangeRequestUrl(parsed)?.link ?? null;
   if (url !== null) {
     if (!input.hasProject({ ...url, url: parsed })) {
       return { error: t.git.pullRequest.noReadableProject(url.host, url.repository) };
@@ -102,7 +98,8 @@ export function resolveLinkPullRequestInput(input: {
     return { error: t.git.pullRequest.pasteAFullURLToLinkAPullRequestFromAnotherRepository };
   }
   const webUrl = input.project.webUrl(number);
-  const webReference = webUrl === null ? null : parseChangeRequestUrl(webUrl);
+  const webReference =
+    webUrl === null ? null : (sourceControlClients.parseChangeRequestUrl(webUrl)?.link ?? null);
   if (webUrl === null || webReference === null) {
     return { error: t.git.pullRequest.pasteAFullURLThisProjectSHostHasNoKnownPullRequestURL };
   }
@@ -144,11 +141,6 @@ function LinkPullRequestDialog({
       setSubmitError(null);
     }
   }
-  useEffect(() => {
-    if (!open) return;
-    const frame = window.requestAnimationFrame(() => inputRef.current?.focus());
-    return () => window.cancelAnimationFrame(frame);
-  }, [open]);
 
   const resolved = resolveLinkPullRequestInput({
     reference,
@@ -191,7 +183,10 @@ function LinkPullRequestDialog({
         <DialogBackdrop />
         <DialogViewport>
           {/* L6's compact shell belongs to linking; Base UI retains the existing modal/focus behavior. */}
-          <DialogPrimitive.Popup className="dialog-glass pr-popup relative row-start-2 flex min-h-0 max-h-full w-43/50 max-w-95 flex-col gap-3 rounded-pr-link-dialog p-4.5 outline-none">
+          <DialogPrimitive.Popup
+            initialFocus={inputRef}
+            className="dialog-glass pr-popup relative row-start-2 flex min-h-0 max-h-full w-43/50 max-w-95 flex-col gap-3 rounded-pr-link-dialog p-4.5 outline-none"
+          >
             <DialogPrimitive.Title className="shrink-0 font-serif text-pr-link-title font-bold">
               {t.git.pullRequest.linkPullRequest}
             </DialogPrimitive.Title>

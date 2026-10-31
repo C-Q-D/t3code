@@ -21,6 +21,7 @@ import { Button } from "../ui/button";
 import { ScrollArea } from "../ui/scroll-area";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { toastManager } from "../ui/toast";
+import { keyedPullRequestChecks } from "./pullRequestCheckKeys";
 import { groupPullRequestChecks } from "./pullRequestDetail.logic";
 import {
   PullRequestCheckStatusIcon,
@@ -91,11 +92,9 @@ function ChecksBody({
     <>
       <ScrollArea className="max-h-64">
         <ul className="flex flex-col gap-0.5 pr-2">
-          {/* Keyed by position as well as by name: the host is the one that decides how many runs
-          share a name, and a repeated key is a rendering fault rather than a wrong list. */}
-          {visibleChecks.map((check, index) => (
+          {keyedPullRequestChecks(visibleChecks).map(({ check, key }) => (
             <li
-              key={`${index}:${check.name}`}
+              key={key}
               className="flex min-h-7.5 items-center gap-2 px-2 text-secondary-copy-medium"
             >
               <PullRequestCheckStatusIcon status={check.status} />
@@ -188,9 +187,6 @@ export function PullRequestChecksPopover({
   const summary = checks === undefined || stale ? null : summarizePullRequestChecks(checks);
   return (
     <Popover>
-      {/* A listing row is itself a button, so the trigger renders as a span: a nested button is
-          not valid inside one. The click is stopped here so opening the checks does not also
-          select the row it sits on. */}
       <PopoverTrigger
         nativeButton={variant === "count"}
         aria-label={
@@ -216,7 +212,7 @@ export function PullRequestChecksPopover({
           <>
             {checks !== undefined && incompleteCount > 0 ? (
               <span className="tabular-nums">
-                {checks.length - incompleteCount}/{checks.length}
+                {checks.length - incompleteCount}/{checks.length} checks
               </span>
             ) : failedCount > 0 ? (
               <span className="tabular-nums">

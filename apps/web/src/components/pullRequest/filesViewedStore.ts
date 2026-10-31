@@ -1,3 +1,5 @@
+/** Owns scoped viewed-file batches and retires optimistic overlays after host acknowledgement. */
+import { t } from "~/i18n";
 import {
   type AtomCommandResult,
   isAtomCommandInterrupted,
@@ -248,7 +250,8 @@ const filesViewedStore = createFilesViewedStore({
       { reportFailure: false },
     ),
   refresh: (target) => appAtomRegistry.refresh(filesViewedAtom(target)),
-  reportFailure: () => toastManager.add({ type: "error", title: "Could not update viewed files" }),
+  reportFailure: () =>
+    toastManager.add({ type: "error", title: t.git.pullRequest.couldNotUpdateViewedFiles }),
 });
 
 export function filesViewedScope(target: FilesViewedTarget): FilesViewedScopeHandle {

@@ -4,6 +4,7 @@ import type { PullRequestAction } from "@t3tools/contracts";
 import { XIcon } from "lucide-react";
 import { use, type PointerEvent as ReactPointerEvent } from "react";
 
+import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import { t } from "~/i18n";
 import { cn } from "~/lib/utils";
 import { pullRequestEnvironment } from "~/state/pullRequests";
@@ -11,7 +12,10 @@ import { useUiStateStore } from "~/uiStateStore";
 import { Button } from "../ui/button";
 import { Spinner } from "../ui/spinner";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
-import { resolvePullRequestMergeMethod } from "./pullRequestDetail.logic";
+import {
+  allowedPullRequestMergeMethods,
+  resolvePullRequestMergeMethod,
+} from "./pullRequestDetail.logic";
 import { PullRequestGlyph } from "./pullRequestIcons";
 import { pullRequestQuickActions, type EnvironmentPullRequestEntry } from "./pullRequestList.logic";
 import {
@@ -52,6 +56,7 @@ export function PullRequestListActions({
   );
   const { actionPending, perform } = usePullRequestActionRunner({
     environmentId: entry.environmentId,
+    terminology: sourceControlClients.get(entry.provider).changeRequest,
     reference: {
       projectId: entry.projectId,
       host: entry.host,
@@ -60,9 +65,7 @@ export function PullRequestListActions({
     },
     onSuccess: (action) => onActed({ entry, action }),
     resolveMergeMethod: (detail) => {
-      const allowed = detail.capabilities.mergeMethods.filter(
-        (method) => detail.mergeCapabilities[method],
-      );
+      const allowed = allowedPullRequestMergeMethods(detail);
       if (allowed.length === 0)
         throw new Error(t.git.pullRequest.noMergeMethodIsAvailableForThisRepository);
       return resolvePullRequestMergeMethod(
