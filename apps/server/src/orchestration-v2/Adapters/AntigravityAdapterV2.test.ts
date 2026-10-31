@@ -1,3 +1,4 @@
+/** Verifies Antigravity protocol mapping and workspace confinement using isolated provider fixtures. */
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, it } from "@effect/vitest";
 import {
@@ -529,7 +530,10 @@ describe("AntigravityAdapterV2 workspace changes", () => {
           },
         ],
       );
-      assert.include(JSON.stringify(sent.prompt), host.resolveAttachmentPath(document)!);
+      assert.include(
+        JSON.stringify(sent.prompt),
+        JSON.stringify(host.resolveAttachmentPath(document)!).slice(1, -1),
+      );
       if (readTextFile === undefined) {
         return yield* Effect.die("Antigravity sessions must serve client file requests");
       }
