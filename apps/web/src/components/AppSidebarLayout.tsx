@@ -52,13 +52,12 @@ import { useThreadRouteRef } from "../hooks/useThreadRouteTarget";
 import { resolveThreadRouteTarget } from "../threadRoutes";
 import { cn, isMacPlatform } from "../lib/utils";
 import { primaryServerKeybindingsAtom } from "../state/server";
-import { useEnvironmentIdentificationMode, useLegacySidebarEnabled } from "../hooks/useSettings";
+import { useEnvironmentIdentificationMode } from "../hooks/useSettings";
 import {
   PanelAnimationSuppressionProvider,
   usePanelAnimationSettings,
   usePanelNavigationSuppression,
 } from "../panelAnimations";
-import LegacyThreadSidebar from "./LegacySidebar";
 import { useThreadVisitedMigration } from "../hooks/useThreadVisitedMigration";
 import ThreadSidebar from "./Sidebar";
 import { SettingsSidebarNav } from "./settings/SettingsSidebarNav";
@@ -450,7 +449,6 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
 function AppShell({ children }: { children: ReactNode }) {
   const { active: titlebarPanelActive } = useTitlebarPanelLayout();
   const navigate = useNavigate();
-  const legacySidebarEnabled = useLegacySidebarEnabled();
   const [sidebarRouteReveal] = useState<SidebarRouteReveal>(() => ({
     observedKey: null,
     pendingKey: null,
@@ -605,8 +603,6 @@ function AppShell({ children }: { children: ReactNode }) {
                 <WebPagesSidebar />
               ) : isOnSettings ? (
                 <SettingsSidebarNav pathname={pathname} />
-              ) : legacySidebarEnabled ? (
-                <LegacyThreadSidebar routeReveal={sidebarRouteReveal} />
               ) : (
                 <ThreadSidebar routeReveal={sidebarRouteReveal} />
               )}
