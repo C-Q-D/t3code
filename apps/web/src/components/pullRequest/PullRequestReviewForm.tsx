@@ -6,10 +6,12 @@ import { CheckIcon, MessageSquareIcon, XCircleIcon } from "lucide-react";
 import type { ReactNode, RefObject } from "react";
 
 import { pullRequestEnvironment } from "~/state/pullRequests";
+import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 
 import { Button } from "../ui/button";
 import { Toggle, ToggleGroup } from "../ui/toggle-group";
 import { toastManager } from "../ui/toast";
+import { readableFailure } from "./pullRequestDetail.logic";
 import {
   pullRequestReviewKey,
   usePendingReviewComments,
@@ -65,9 +67,6 @@ export function PullRequestReviewForm({
 }) {
   const comments = usePendingReviewComments(reference);
   const reviewKey = pullRequestReviewKey(reference);
-  // The panel stays mounted while the selected pull request changes. Keeping summaries beside
-  // the keyed line-comment drafts makes the selected pull request's body correct on the first
-  // render, before an effect could reset state left behind by the previous one.
   const body = usePullRequestReviewStore((store) => store.summaries[reviewKey] ?? "");
   const requestedVerdict = usePullRequestReviewStore(
     (store) => store.verdicts[reviewKey] ?? "comment",
@@ -108,11 +107,17 @@ export function PullRequestReviewForm({
     usePullRequestReviewStore.getState().endSubmission(reviewKey);
     if (result._tag === "Failure") {
       // The draft is kept: whatever went wrong, retyping the review is not the answer.
-      toastManager.add({ type: "error", title: t.git.pullRequest.theReviewCouldNotBeSubmitted });
+      toastManager.add({
+        type: "error",
+        title: t.git.pullRequest.theReviewCouldNotBeSubmitted,
+        description: readableFailure(
+          squashAtomCommandFailure(result),
+          "The host refused the review. Your draft is still here to try again.",
+        ),
+      });
       return;
     }
-    // More remarks may have been added while the host was accepting this snapshot. Leave those,
-    // and any summary revised in the meantime, ready for the next review.
+    // Preserve comments and summary edits made during submission.
     removeComments(
       reviewKey,
       submittedComments.map((comment) => comment.id),

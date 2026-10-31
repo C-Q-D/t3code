@@ -11,7 +11,6 @@ import { Alert, AlertAction, AlertDescription } from "../ui/alert";
 import { Button } from "../ui/button";
 import { Spinner } from "../ui/spinner";
 import type { ExcerptCommenting } from "./guide/GuideExcerpt";
-import { guideRunKey, useGuideRunStore } from "./guide/guideRunStore";
 import { GuideProseContext } from "./guide/GuideProse";
 import { GuideTour } from "./guide/GuideTour";
 import { useReviewGuideWriter } from "./guide/useReviewGuideWriter";
@@ -22,6 +21,7 @@ import {
   usePullRequestReviewStore,
 } from "./pullRequestReviewStore";
 
+/** Keeps generated guide content readable during rewrites and exposes retry details without losing review context. */
 export function PullRequestGuideTab({
   environmentId,
   reference,
@@ -29,6 +29,7 @@ export function PullRequestGuideTab({
   workspaceRoot,
   active,
   canComment,
+  rangeComments,
   onAskAboutLines,
   onAskAboutStop,
   onFinishReview,
@@ -41,6 +42,7 @@ export function PullRequestGuideTab({
   workspaceRoot: string;
   active: boolean;
   canComment: boolean;
+  rangeComments: boolean;
   onAskAboutLines: ((comment: ReviewCommentContext, request: string) => void) | null;
   onAskAboutStop:
     | ((stop: PullRequestReviewGuideStop, index: number, question: string) => void)
@@ -54,7 +56,6 @@ export function PullRequestGuideTab({
     reference,
     title,
   });
-  const runKey = guideRunKey(environmentId, reference);
   const reviewKey = pullRequestReviewKey(reference);
   const pending = usePendingReviewComments(reference);
   const addComment = usePullRequestReviewStore((store) => store.addComment);
@@ -64,30 +65,24 @@ export function PullRequestGuideTab({
       ? null
       : {
           canComment,
+          rangeComments,
           pending,
-          onComment: ({ path, oldPath, position, body }) =>
+          onComment: ({ path, oldPath, position, startPosition, body }) =>
             addComment(reviewKey, {
               id: nextPendingReviewCommentId(),
               path,
               ...(oldPath === null ? {} : { oldPath }),
+              ...(startPosition === undefined ? {} : { startPosition }),
               position,
               body,
             }),
           onRemove: (commentId) => removeComment(reviewKey, commentId),
           onAskAgent: onAskAboutLines,
         };
-  useEffect(() => {
-    if (!active) return;
-    useGuideRunStore.getState().setShown(runKey);
-    return () => {
-      if (useGuideRunStore.getState().shownKey === runKey)
-        useGuideRunStore.getState().setShown(null);
-    };
-  }, [active, runKey]);
-
   const guide = data?.guide ?? null;
   const tourShown = active && guide !== null;
   const reportTourShown = useEffectEvent(() => onTourShown?.());
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- tells the parent once the loaded guide tour is on screen, which data arrival can cause
   useEffect(() => {
     if (tourShown) reportTourShown();
   }, [tourShown]);
@@ -113,15 +108,20 @@ export function PullRequestGuideTab({
       );
     }
     return (
-      <div className="flex min-h-48 flex-col items-center justify-center gap-2 px-4 py-10 text-center">
+      <div className="scrollbar-gutter-both flex h-full flex-col items-center justify-center-safe gap-2 overflow-y-auto px-4 py-10 text-center">
         <p className="text-sm font-medium text-foreground">
-          {running ? t.git.guideTabUi.writing : t.git.guideTabUi.empty}
+          {running
+            ? t.git.guideTabUi.writing
+            : failure === null
+              ? t.git.guideTabUi.empty
+              : "Could not write a review guide"}
         </p>
         <p className="max-w-md text-xs text-muted-foreground">
-          {failure ??
-            query.error ??
-            (running ? t.git.guideTabUi.progress : t.git.guideTabUi.description)}
+          {failure !== null
+            ? FAILURE_HINT
+            : (query.error ?? (running ? t.git.guideTabUi.progress : t.git.guideTabUi.description))}
         </p>
+        {failure !== null ? <FailureDetails detail={failure} /> : null}
         {writeButton(failure === null ? t.git.guideTabUi.write : t.git.guideTabUi.retry, "sm")}
       </div>
     );
@@ -132,7 +132,16 @@ export function PullRequestGuideTab({
       <Alert variant={running ? "info" : "warning"}>
         {running ? <Spinner /> : <TriangleAlertIcon />}
         <AlertDescription>
-          {running ? t.git.guideTabUi.rewriting : (failure ?? t.git.guideTabUi.stale)}
+          {running ? (
+            t.git.guideTabUi.rewriting
+          ) : failure === null ? (
+            t.git.guideTabUi.stale
+          ) : (
+            <>
+              Could not rewrite this guide. {FAILURE_HINT}
+              <FailureDetails detail={failure} />
+            </>
+          )}
         </AlertDescription>
         {!running && canWrite ? (
           <AlertAction>{writeButton(t.git.guideTabUi.rewrite, "xs")}</AlertAction>
@@ -161,5 +170,21 @@ export function PullRequestGuideTab({
         onOpenFile={onOpenFile}
       />
     </GuideProseContext>
+  );
+}
+
+const FAILURE_HINT = "Check the review guide model in Settings → Source control.";
+
+/** Keeps provider diagnostics available without replacing the reader-facing failure guidance. */
+function FailureDetails({ detail }: { detail: string }) {
+  return (
+    <details className="w-full max-w-lg text-xs text-muted-foreground">
+      <summary className="cursor-pointer rounded-sm -outline-offset-2 hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring">
+        Technical details
+      </summary>
+      <pre className="scrollbar-gutter-both mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-border bg-muted/40 p-3 text-left font-mono text-xs">
+        {detail}
+      </pre>
+    </details>
   );
 }

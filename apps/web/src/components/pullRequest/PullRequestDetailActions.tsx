@@ -98,6 +98,8 @@ export function PullRequestCheckoutMenu({
   pickableEnvironments: ReadonlyArray<PickableEnvironment>;
   actingEnvironmentId: EnvironmentId;
   onActingEnvironmentChange: (environmentId: EnvironmentId) => void;
+  /** The host's word for a change request, as in "pull request". */
+  term: string;
 }) {
   return (
     <Menu>

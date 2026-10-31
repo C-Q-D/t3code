@@ -165,8 +165,7 @@ export function PullRequestComposer({
             </PopoverClose>
           </div>
         </div>
-        {/* Keep both forms mounted across toggles and dismissal so drafts and in-flight
-            submit guards survive closing and reopening the composer. */}
+        {/* Keep forms mounted to preserve drafts and submit guards across dismissal. */}
         {verdicts.length > 0 ? (
           <div hidden={mode !== "review"}>
             <PullRequestReviewForm
