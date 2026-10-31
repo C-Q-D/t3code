@@ -1,6 +1,7 @@
 /** Holds the fixed search/filter/count strip above the scrolling PR rows. */
 import { useRef, useEffect, type ReactNode, type RefObject } from "react";
 import { t } from "~/i18n";
+import { workspaceAreaProps } from "../../lib/workspaceFocus";
 import { cn } from "~/lib/utils";
 import { Button } from "../ui/button";
 import { RefreshIcon } from "../ui/refresh-icon";
@@ -29,6 +30,7 @@ export function PullRequestsColumn({
   listBody: ReactNode;
   scrollRef: RefObject<HTMLDivElement | null>;
 }) {
+  const contentArea = workspaceAreaProps("pull-requests", 1, "Pull requests");
   const searchRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -45,6 +47,8 @@ export function PullRequestsColumn({
 
   return (
     <div
+      {...contentArea}
+      inert={maximizedAway}
       className={cn(
         "@container/pr-list flex h-full min-h-0 min-w-0 flex-col gap-2.5 overflow-hidden",
         maximizedAway ? "w-0 flex-none" : rightPanelOpen ? "basis-pr-list flex-1" : "flex-1",

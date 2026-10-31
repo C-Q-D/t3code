@@ -1,4 +1,15 @@
 /** Renders overflow actions; the panel owns command execution and confirmation state. */
+import {
+  canEditPullRequestMaintainerEdits,
+  maintainerEditsChoiceInForce,
+  type MaintainerEditsChoice,
+} from "@t3tools/client-runtime/pull-request-editing";
+import type { ChangeRequestTerminology } from "@t3tools/client-runtime/source-control-clients";
+import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
+import { pullRequestEnvironment } from "~/state/pullRequests";
+import { useAtomCommand } from "~/state/use-atom-command";
+import { toastManager } from "../ui/toast";
+import { readableFailure } from "./pullRequestDetail.logic";
 import { PixelSparkIcon } from "../icons/PixelLucideIcon";
 import { t } from "~/i18n";
 import { RefreshIcon } from "~/components/ui/refresh-icon";
@@ -19,12 +30,20 @@ import {
   Undo2Icon,
   Trash2Icon,
 } from "lucide-react";
+import { useId, useState } from "react";
 
 import { readLocalApi } from "~/localApi";
 import { PullRequestThreadLinks } from "./PullRequestThreadLinks";
 
 import { Button } from "../ui/button";
-import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "../ui/menu";
+import {
+  Menu,
+  MenuCheckboxItem,
+  MenuItem,
+  MenuPopup,
+  MenuSeparator,
+  MenuTrigger,
+} from "../ui/menu";
 import { resolvePullRequestActionGroups } from "./pullRequestDetail.logic";
 import { type PickableEnvironment } from "./pullRequestProjectAssignment.logic";
 import { PullRequestGlyph } from "./pullRequestIcons";
@@ -36,6 +55,7 @@ export function PullRequestActionsMenu({
   environmentId,
   reference,
   detail,
+  pullRequestKey,
   linkThreadRef,
   onThreadPickerOpenChange,
   refreshing,
@@ -56,6 +76,8 @@ export function PullRequestActionsMenu({
   selectedMergeMethod,
   showsDeleteBranch,
   environmentConnected,
+  canWriteSourceControl,
+  onMaintainerEditsSaved,
   confirmDeleteBranch,
   pendingAction,
   perform,
@@ -69,6 +91,8 @@ export function PullRequestActionsMenu({
   environmentId: EnvironmentId;
   reference: PullRequestRef;
   detail: PullRequestDetail;
+  pullRequestKey: string;
+  terminology: ChangeRequestTerminology;
   linkThreadRef: ScopedThreadRef | null;
   onThreadPickerOpenChange: (open: boolean) => void;
   refreshing: boolean;
@@ -89,6 +113,8 @@ export function PullRequestActionsMenu({
   selectedMergeMethod: PullRequestMergeMethod;
   showsDeleteBranch: boolean;
   environmentConnected: boolean;
+  canWriteSourceControl: boolean;
+  onMaintainerEditsSaved: () => void;
   confirmDeleteBranch: () => Promise<void>;
   pendingAction: PullRequestAction | null;
   perform: PerformPullRequestAction;
@@ -100,6 +126,47 @@ export function PullRequestActionsMenu({
   inlineConfirm: ReturnType<typeof useInlineActionConfirm>;
 }) {
   const actionPending = pendingAction !== null;
+  const maintainerEditsHintId = useId();
+  const updatePullRequest = useAtomCommand(pullRequestEnvironment.update, {
+    reportFailure: false,
+  });
+  const [maintainerEditsChoice, setMaintainerEditsChoice] = useState<MaintainerEditsChoice | null>(
+    null,
+  );
+  const [maintainerEditsSaving, setMaintainerEditsSaving] = useState(false);
+  const maintainerEditsChoiceKept = maintainerEditsChoiceInForce(
+    maintainerEditsChoice,
+    pullRequestKey,
+    detail.observedAt,
+    maintainerEditsSaving,
+  );
+  if (maintainerEditsChoiceKept !== maintainerEditsChoice) {
+    setMaintainerEditsChoice(maintainerEditsChoiceKept);
+  }
+  const maintainerCanModify = maintainerEditsChoiceKept?.value ?? detail.maintainerCanModify;
+  const canSaveMaintainerEdits =
+    canWriteSourceControl && environmentConnected && !maintainerEditsSaving;
+  const saveMaintainerEdits = async (value: boolean) => {
+    if (!canSaveMaintainerEdits) return;
+    const previousChoice = maintainerEditsChoice;
+    setMaintainerEditsChoice({ key: pullRequestKey, observedAt: detail.observedAt, value });
+    setMaintainerEditsSaving(true);
+    const result = await updatePullRequest({
+      environmentId,
+      input: { ...reference, maintainerCanModify: value },
+    });
+    setMaintainerEditsSaving(false);
+    if (result._tag === "Failure") {
+      setMaintainerEditsChoice(previousChoice);
+      toastManager.add({
+        type: "error",
+        title: "Could not save maintainer access",
+        description: readableFailure(squashAtomCommandFailure(result), "Try again."),
+      });
+      return;
+    }
+    onMaintainerEditsSaved();
+  };
   return (
     <Menu>
       <MenuTrigger
@@ -118,6 +185,34 @@ export function PullRequestActionsMenu({
         )}
       </MenuTrigger>
       <MenuPopup align="end" className="w-42.5">
+        {canEditPullRequestMaintainerEdits(detail) ? (
+          <>
+            <MenuCheckboxItem
+              variant="icon"
+              checked={maintainerCanModify === true}
+              disabled={!canSaveMaintainerEdits}
+              closeOnClick={false}
+              aria-label="Allow edits from maintainers"
+              aria-describedby={maintainerEditsHintId}
+              onCheckedChange={(value) => void saveMaintainerEdits(value)}
+            >
+              <span className="flex max-w-xs flex-col gap-0.5">
+                <span>Allow edits from maintainers</span>
+                <span id={maintainerEditsHintId} className="text-xs text-muted-foreground">
+                  Maintainers can push to this branch. If your fork has workflows, this can also
+                  give access to its secrets.
+                </span>
+                {maintainerEditsSaving ? (
+                  <span role="status" className="text-xs text-muted-foreground">
+                    Saving…
+                  </span>
+                ) : null}
+              </span>
+            </MenuCheckboxItem>
+            <MenuSeparator />
+          </>
+        ) : null}
+
         <MenuItem
           density="compact"
           closeOnClick={

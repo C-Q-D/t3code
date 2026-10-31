@@ -20,6 +20,7 @@ import {
   UsersIcon,
 } from "lucide-react";
 import type { ReactNode } from "react";
+import { type ChangeRequestTerminology } from "@t3tools/client-runtime/source-control-clients";
 
 import { readLocalApi } from "~/localApi";
 import { cn } from "~/lib/utils";
@@ -139,7 +140,7 @@ export function PullRequestDetailGhost({
         isDraft: seed.isDraft ?? false,
       })
     : null;
-  // Passing list rollups can omit workflows awaiting approval; wait for detail to claim success.
+  // Passing list rollups can omit workflows awaiting approval; wait for detail.
   const checksPresentation =
     seed?.checksState === "failing" || seed?.checksState === "pending"
       ? pullRequestChecksStatePresentation(seed.checksState)
@@ -454,7 +455,12 @@ export function PullRequestTimelineGhost({ rows = 6 }: { rows?: number }) {
  * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
  * @returns The rendered surface.
  */
-export function PullRequestConversationGhost({ rows = 3 }: { rows?: number }) {
+export function PullRequestConversationGhost({
+  rows = 3,
+}: {
+  rows?: number;
+  terminology?: ChangeRequestTerminology;
+}) {
   return (
     <div
       role="status"

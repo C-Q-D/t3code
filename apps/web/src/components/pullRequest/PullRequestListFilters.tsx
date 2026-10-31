@@ -5,6 +5,7 @@ import { Spinner } from "~/components/ui/spinner";
 import type {
   EnvironmentId,
   ProjectId,
+  PullRequestFilterOptionsInput,
   PullRequestInvolvement,
   PullRequestListFilters,
   PullRequestListState,
@@ -24,6 +25,8 @@ import {
 import { type ElementType, type ReactNode, useState } from "react";
 
 import { getSourceControlPresentationForKind } from "~/sourceControlPresentation";
+import { useDebouncedValue } from "~/state/queries";
+import { type EnvironmentQueryTarget, usePullRequestFilterOptions } from "~/state/pullRequests";
 import { ProjectFavicon, type ProjectFaviconProject } from "../ProjectFavicon";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "../ui/input-group";
 import { Well } from "../ui/well";
@@ -41,6 +44,9 @@ import {
 } from "../ui/menu";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import {
+  pullRequestAuthorChoices,
+  selectedPullRequestAuthor,
+  pullRequestLabelChoices,
   pullRequestLabelColor,
   type PullRequestAuthorFacet,
   type PullRequestLabelFacet,
@@ -92,10 +98,12 @@ export function PullRequestSearchInput({
   value,
   busy,
   onChange,
+  onSubmit,
 }: {
   value: string;
   busy?: boolean;
   onChange: (value: string) => void;
+  onSubmit: (value: string) => void;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
   return (
@@ -113,6 +121,14 @@ export function PullRequestSearchInput({
           onChange={(event) => {
             setDraft(event.currentTarget.value);
             onChange(event.currentTarget.value);
+            if ((event.nativeEvent as InputEvent).inputType === "insertFromPaste") {
+              onSubmit(event.currentTarget.value);
+            }
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+              onSubmit(event.currentTarget.value);
+            }
           }}
           placeholder={t.git.pullRequest.searchPullRequestsOrLabelBug}
           aria-label={t.git.pullRequest.searchPullRequests}
@@ -128,14 +144,10 @@ export function PullRequestSearchInput({
 
 /** Radio sentinel for the unscoped project; actual projects use composite environment/id keys. */
 const ALL_PROJECTS_VALUE = "all";
-/** MenuRadioGroup wants a string, so "every host" wears the one value no host can be. */
 const ALL_HOSTS_VALUE = "";
 const ALL_SERVERS_VALUE = "";
 const UNFILTERED_VALUE = "all";
-/**
- * A project's own radio value, carrying the server along with the id: the id alone is only
- * unique within its own server, so two rows sharing one would otherwise both read as checked.
- */
+/** Project ids are unique only within an environment. */
 export const pullRequestProjectKey = (project: {
   readonly id: ProjectId;
   readonly environmentId: EnvironmentId;
@@ -363,31 +375,55 @@ export function PullRequestFilterSelect<Value extends string>({
  * @param props Display data, state, options, and interaction callbacks defined by this surface's props type.
  * @returns The rendered surface.
  */
+/** The listing's own scope, which the pickers search the host within. */
+export type PullRequestFilterOptionScope = EnvironmentQueryTarget<
+  Omit<PullRequestFilterOptionsInput, "kind" | "query">
+>;
+
+const OPTION_SEARCH_DEBOUNCE_MS = 250;
+
+/** Debounces host searches and hides answers for an older query until the current query settles. */
+function useHostedFilterOptions(
+  scope: ReadonlyArray<PullRequestFilterOptionScope>,
+  kind: PullRequestFilterOptionsInput["kind"],
+  query: string,
+) {
+  const typed = query.trim().slice(0, 100);
+  const sent = useDebouncedValue(typed, OPTION_SEARCH_DEBOUNCE_MS);
+  const hosted = usePullRequestFilterOptions(
+    scope.map(({ environmentId, input }) => ({
+      environmentId,
+      input: { ...input, kind, ...(sent ? { query: sent } : {}) },
+    })),
+  );
+  // Until the search catches up with the typing, the host's answers are for older text.
+  return sent === typed ? hosted : { labels: [], authors: [], error: null, isPending: true };
+}
+
+/** Keeps the independent author chip while searching both loaded rows and the selected host scopes. */
 function PullRequestAuthorFilter({
   value,
   options,
+  scope,
   onChange,
   onOpenChange,
 }: {
   onOpenChange?: ((open: boolean) => void) | undefined;
   value: string | undefined;
   options: ReadonlyArray<PullRequestAuthorFacet>;
+  scope: ReadonlyArray<PullRequestFilterOptionScope>;
   onChange: (author: string | undefined) => void;
 }) {
   const [query, setQuery] = useState("");
-  const needle = query.trim().toLowerCase();
+  const hosted = useHostedFilterOptions(scope, "authors", query);
   const login = value?.toLowerCase() ?? "";
-  const selected = options.find((option) => option.actor.login.toLowerCase() === login);
+  const selected = selectedPullRequestAuthor(options, hosted.authors, value);
   const visible = [
     ...(selected ? [selected] : []),
-    ...options.filter(
-      (option) =>
-        option !== selected &&
-        (needle.length === 0 ||
-          option.actor.login.toLowerCase().includes(needle) ||
-          option.actor.name?.toLowerCase().includes(needle)),
+    ...pullRequestAuthorChoices(options, hosted.authors, query).filter(
+      (option) => option.actor.login.toLowerCase() !== login,
     ),
-  ].slice(0, 10);
+  ].slice(0, 30);
   const select = (next: string) => next.toLowerCase() !== login && onChange(next || undefined);
   return (
     <Menu onOpenChange={onOpenChange}>
@@ -438,8 +474,12 @@ function PullRequestAuthorFilter({
               </span>
             </MenuRadioItem>
           ))}
-          {visible.length === 0 ? (
-            <MenuItem disabled>{t.git.pullRequest.noAuthorsFound}</MenuItem>
+          {visible.length === 0 && !hosted.isPending ? (
+            <MenuItem disabled>
+              {hosted.error
+                ? "Couldn't search authors on the host"
+                : t.git.pullRequest.noAuthorsFound}
+            </MenuItem>
           ) : null}
         </MenuRadioGroup>
       </MenuPopup>
@@ -455,20 +495,25 @@ function PullRequestAuthorFilter({
 function PullRequestLabelFilter({
   value,
   options,
+  scope,
   onChange,
   onOpenChange,
 }: {
   onOpenChange?: ((open: boolean) => void) | undefined;
   value: ReadonlyArray<string>;
   options: ReadonlyArray<PullRequestLabelFacet>;
+  scope: ReadonlyArray<PullRequestFilterOptionScope>;
   onChange: (labels: ReadonlyArray<string>) => void;
 }) {
+  const [query, setQuery] = useState("");
+  const hosted = useHostedFilterOptions(scope, "labels", query);
   const selected = new Set(value.map((name) => name.toLowerCase()));
+  const choices = pullRequestLabelChoices(options, hosted.labels, query);
   const visible = [
     ...value
-      .filter((name) => !options.some((option) => option.name.toLowerCase() === name.toLowerCase()))
+      .filter((name) => !choices.some((option) => option.name.toLowerCase() === name.toLowerCase()))
       .map((name) => ({ name, color: null, count: 0 })),
-    ...options,
+    ...choices,
   ];
   return (
     <Menu onOpenChange={onOpenChange}>
@@ -481,6 +526,24 @@ function PullRequestLabelFilter({
           : t.git.pullRequest.labels}
       </PullRequestFilterTrigger>
       <MenuPopup align="start" side="bottom">
+        <InputGroup>
+          <InputGroupAddon>
+            <SearchIcon aria-hidden />
+          </InputGroupAddon>
+          <InputGroupInput
+            autoFocus
+            size="compact"
+            value={query}
+            onChange={(event) => setQuery(event.currentTarget.value)}
+            onKeyDown={(event) => {
+              if (event.key !== "ArrowDown" && event.key !== "Escape") event.stopPropagation();
+            }}
+            placeholder="Search labels"
+            aria-label="Search labels"
+          />
+        </InputGroup>
+        {hosted.isPending ? <MenuItem disabled>Searching…</MenuItem> : null}
+        {hosted.error ? <MenuItem disabled>Couldn't search labels on the host</MenuItem> : null}
         {visible.length === 0 ? (
           <MenuItem disabled>{t.git.pullRequest.noLabelsInThisView}</MenuItem>
         ) : (
@@ -541,6 +604,7 @@ export function PullRequestFiltersMenu({
   onFilters,
   authorOptions = EMPTY_AUTHORS,
   labelOptions = EMPTY_LABELS,
+  optionScope,
   host,
   hostOptions,
   onHost,
@@ -564,6 +628,7 @@ export function PullRequestFiltersMenu({
   onFilters: (filters: PullRequestListFilters) => void;
   authorOptions?: ReadonlyArray<PullRequestAuthorFacet>;
   labelOptions?: ReadonlyArray<PullRequestLabelFacet>;
+  optionScope: ReadonlyArray<PullRequestFilterOptionScope>;
   host: string | undefined;
   /**
    * Includes the "all hosts" entry, whose value is the empty string. The chip is hidden
@@ -682,12 +747,14 @@ export function PullRequestFiltersMenu({
         onOpenChange={onOpenChange}
         value={filters.author}
         options={authorOptions}
+        scope={optionScope}
         onChange={(author) => updateFilters({ author })}
       />
       <PullRequestLabelFilter
         onOpenChange={onOpenChange}
         value={selectedLabels}
         options={labelOptions}
+        scope={optionScope}
         onChange={(labels) =>
           updateFilters({
             labels: labels.length === 0 ? undefined : labels.slice(0, 10).map((label) => [label]),
