@@ -1,5 +1,18 @@
 /** Owns window chrome geometry; routes supply content and the shell reserves caption controls. */
 import { useRef, type ReactNode } from "react";
+import { useAtomValue } from "@effect/atom-react";
+import { ArrowLeftIcon, ArrowRightIcon } from "lucide-react";
+import { isElectron } from "../../env";
+import { shortcutLabelForCommand } from "../../keybindings";
+import {
+  navigateHistory,
+  useCanNavigateHistory,
+  type HistoryDirection,
+} from "../../navigationHistory";
+import { primaryServerKeybindingsAtom } from "../../state/server";
+import { cn } from "../../lib/utils";
+import { Button } from "../ui/button";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
 import { t } from "~/i18n";
 import { useEnvironmentIdentificationMode } from "~/hooks/useSettings";
@@ -45,10 +58,7 @@ export function WindowTitlebar({
   };
   const stageLabel = useEnvironmentStageLabel();
   const identificationMode = useEnvironmentIdentificationMode();
-  const backdropVariant = resolveSidebarStageBackdropVariant(
-    stageLabel,
-    identificationMode === "artwork",
-  );
+  const backdropVariant = resolveSidebarStageBackdropVariant(stageLabel, identificationMode);
   const pillLabel =
     identificationMode === "pill" ? resolveEnvironmentIdentificationPillLabel(stageLabel) : null;
   // Observe the real control/brand/pill, not a hidden duplicate of the removed sidebar brand.
@@ -84,6 +94,12 @@ export function WindowTitlebar({
         <div className="no-drag flex size-8 shrink-0 items-center" data-titlebar-sidebar-control="">
           {sidebarControl}
         </div>
+        {isElectron ? (
+          <div className="no-drag flex shrink-0 items-center">
+            <HistoryNavigationButton direction="back" onBackdrop={backdropVariant !== null} />
+            <HistoryNavigationButton direction="forward" onBackdrop={backdropVariant !== null} />
+          </div>
+        ) : null}
         <div className="ml-2 flex shrink-0 items-center gap-2" data-titlebar-brand="">
           <span className="drag-region shrink-0 font-window-brand text-window-brand font-semibold tracking-brand whitespace-nowrap text-foreground">
             {t.sidebar.chrome.titlebarBrandName}
@@ -103,5 +119,48 @@ export function WindowTitlebar({
       <TitlebarSlotOutlet name="actions" />
       <div className="window-titlebar-system-controls shrink-0 self-stretch" aria-hidden="true" />
     </header>
+  );
+}
+
+/** Uses Chromium history availability only inside the desktop titlebar; clicks remain outside window dragging. */
+function HistoryNavigationButton({
+  direction,
+  onBackdrop,
+}: {
+  direction: HistoryDirection;
+  onBackdrop: boolean;
+}) {
+  const keybindings = useAtomValue(primaryServerKeybindingsAtom);
+  const enabled = useCanNavigateHistory(direction);
+  const label = direction === "back" ? "Go back" : "Go forward";
+  const shortcutLabel = shortcutLabelForCommand(
+    keybindings,
+    direction === "back" ? "navigation.back" : "navigation.forward",
+  );
+  const Icon = direction === "back" ? ArrowLeftIcon : ArrowRightIcon;
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            aria-label={label}
+            className={cn(
+              "[-webkit-app-region:no-drag]",
+              onBackdrop && "relative top-auto translate-y-0",
+            )}
+            disabled={!enabled}
+            onClick={() => navigateHistory(direction)}
+            size="icon-sm"
+            variant={onBackdrop ? "media-navigation" : "ghost"}
+          />
+        }
+      >
+        <Icon className="size-3.5" />
+      </TooltipTrigger>
+      <TooltipPopup side="bottom">
+        {label}
+        {shortcutLabel ? ` (${shortcutLabel})` : ""}
+      </TooltipPopup>
+    </Tooltip>
   );
 }
