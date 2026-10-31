@@ -1,9 +1,17 @@
-import { type ChatFileAttachment, type ChatImageAttachment } from "../../types";
+/** Derives user-message labels, attachment presentation and annotation matching without rendering. */
+import { isVideoAttachment, type ChatFileAttachment, type ChatImageAttachment } from "../../types";
+import { isSvgAttachment } from "@t3tools/shared/image";
 import type { ComposerContextRecord, KnownComposerContextRecord } from "@t3tools/contracts";
 import { asKnownContextRecord } from "~/lib/composerContextRecords";
 
 export function userMessageFileLabel(file: Pick<ChatFileAttachment, "name" | "source">) {
   return file.source?._tag === "pasted-text" ? "Pasted text" : file.name;
+}
+
+/** Selects the sent-message file surface and its display label; the filename still identifies the resource. */
+export function userMessageFilePresentation(file: ChatFileAttachment) {
+  const isVideo = isVideoAttachment(file);
+  return { label: userMessageFileLabel(file), useFileWell: !isVideo && !isSvgAttachment(file) };
 }
 
 export function resolvePreviewAnnotationImage(input: {

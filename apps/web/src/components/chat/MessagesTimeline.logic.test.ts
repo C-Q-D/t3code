@@ -1,3 +1,4 @@
+import { userMessageFilePresentation } from "./TimelineUserMessageRow.logic";
 import { installMessages } from "../../i18n";
 import { en } from "../../i18n/locales/en";
 import { messages } from "../../i18n/locales/zh-CN";
@@ -4956,5 +4957,34 @@ describe("shouldCollapseUserMessage", () => {
 
     expect(shouldCollapseUserMessage(`${citation} Can you expand on this?`)).toBe(false);
     expect(shouldCollapseUserMessage(`${citation} ${"More text. ".repeat(60)}`)).toBe(true);
+  });
+});
+
+describe("sent file presentation", () => {
+  it("keeps the pasted-text label when the attachment uses the local file well", () => {
+    const file = {
+      type: "file",
+      id: "paste",
+      name: "pasted-content.txt",
+      mimeType: "text/plain",
+      sizeBytes: 24,
+      source: { _tag: "pasted-text" },
+    } as const;
+    expect(userMessageFilePresentation(file)).toEqual({ label: "Pasted text", useFileWell: true });
+  });
+
+  it("routes SVG files to the preview-capable chip while ordinary files keep the local well", () => {
+    const svg = {
+      type: "file",
+      id: "drawing",
+      name: "drawing.svg",
+      mimeType: "image/svg+xml",
+      sizeBytes: 48,
+    } as const;
+    expect(userMessageFilePresentation(svg)).toEqual({ label: "drawing.svg", useFileWell: false });
+    expect(
+      userMessageFilePresentation({ ...svg, name: "notes.txt", mimeType: "text/plain" })
+        .useFileWell,
+    ).toBe(true);
   });
 });

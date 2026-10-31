@@ -63,7 +63,7 @@ import {
   type ReviewCommentContext,
 } from "../../reviewCommentContext";
 import { TimelineRowCtx } from "./timelineRowContext";
-import { userMessageFileLabel } from "./TimelineUserMessageRow.logic";
+import { userMessageFilePresentation } from "./TimelineUserMessageRow.logic";
 
 /**
  * Renders a user-message file mention and its available open actions.
@@ -405,13 +405,13 @@ const userMessageContextPresentationRegistry = createContextPresentationRegistry
         }
         const attachment = context.attachment;
         const isVideo = isVideoAttachment(attachment);
-        const label = userMessageFileLabel(attachment);
+        const { label, useFileWell } = userMessageFilePresentation(attachment);
         const disabled =
           attachment.downloadable === false && (!isVideo || attachment.previewUrl === undefined);
         const size =
           attachment.downloadable === false ? "Sending…" : formatAttachmentSize(record.sizeBytes);
         // D1's file well belongs to sent messages; the composer keeps its inline chip.
-        if (!isVideo) {
+        if (useFileWell) {
           return (
             <Tooltip>
               <TooltipTrigger
@@ -419,7 +419,7 @@ const userMessageContextPresentationRegistry = createContextPresentationRegistry
                   <button
                     type="button"
                     disabled={disabled}
-                    aria-label={t.chat.timeline.attachment(false, record.name, size)}
+                    aria-label={t.chat.timeline.attachment(false, label, size)}
                     data-markdown-copy={context.copyMarkdown}
                     onClick={() => context.onOpenFile(attachment)}
                     className="inline-flex h-8.5 max-w-full cursor-pointer items-center gap-2 rounded-tag bg-timeline-file ps-2.5 pe-3 align-middle font-mono text-secondary-copy text-fg-detail shadow-timeline-file hover:underline focus-visible:inset-shadow-focus focus-visible:outline-none disabled:cursor-default"
@@ -432,10 +432,10 @@ const userMessageContextPresentationRegistry = createContextPresentationRegistry
                   theme={context.resolvedTheme}
                   className="size-3.5"
                 />
-                <span className="min-w-0 truncate">{record.name}</span>
+                <span className="min-w-0 truncate">{label}</span>
               </TooltipTrigger>
               <TooltipPopup side="top">
-                {record.name}
+                {label}
                 <br />
                 {size}
               </TooltipPopup>
@@ -454,7 +454,7 @@ const userMessageContextPresentationRegistry = createContextPresentationRegistry
             isVideo={isVideo}
             theme={context.resolvedTheme}
             disabled={disabled}
-            accessibleLabel={t.chat.timeline.attachment(isVideo, record.name, size)}
+            accessibleLabel={t.chat.timeline.attachment(isVideo, label, size)}
             copyMarkdown={context.copyMarkdown}
             onOpen={() =>
               isVideo ? context.onExpandVideo(attachment) : context.onOpenFile(attachment)

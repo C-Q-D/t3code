@@ -1,5 +1,6 @@
 /** Hosts embedded MCP apps and localized user controls; protocol refusals remain unchanged. */
 import { t } from "~/i18n";
+import { attachMcpAppFullscreenDismissal } from "./mcpAppFullscreen";
 import type { EnvironmentId, ThreadId, TurnItemId } from "@t3tools/contracts";
 import {
   makeMcpAppHost,
@@ -21,7 +22,7 @@ import {
   type McpAppReference,
 } from "@t3tools/shared/mcpApp";
 import { Minimize2Icon, PlugIcon } from "lucide-react";
-import { useEffect, useRef, useState, type FocusEvent, type ToggleEvent } from "react";
+import { useEffect, useRef, useState, type ToggleEvent } from "react";
 import { flushSync } from "react-dom";
 
 import { useLongLivedAssetUrl } from "~/assets/longLivedAssetUrls";
@@ -191,27 +192,18 @@ export function McpAppFrame(props: {
   const attachFullscreenChrome = (chrome: HTMLDivElement) => {
     const box = chrome.parentElement;
     if (box === null) return;
+    const stopDismissal = attachMcpAppFullscreenDismissal(box, () => setDisplayMode("inline"));
     if (!box.matches(":popover-open")) box.showPopover();
     readLive().props.onFullscreenChange?.(true);
     return () => {
+      stopDismissal();
       if (box.matches(":popover-open")) box.hidePopover();
       readLive().props.onFullscreenChange?.(false);
     };
   };
-  // Light dismiss (Escape) closes the popover without React.
+  // Keep React state aligned if the top-layer box closes outside the display-mode transition.
   const onBoxToggle = (event: ToggleEvent<HTMLDivElement>) => {
     if (event.newState === "closed") setDisplayMode("inline");
-  };
-  const onBoxBlur = (event: FocusEvent<HTMLDivElement>) => {
-    const next = event.relatedTarget;
-    if (next instanceof Element && next.closest(".windows-window-controls")) return;
-    if (
-      displayMode === "fullscreen" &&
-      next instanceof Node &&
-      !event.currentTarget.contains(next)
-    ) {
-      setDisplayMode("inline");
-    }
   };
 
   // Navigation retains the frame window; reject second loads to prevent impersonation.
@@ -448,9 +440,7 @@ export function McpAppFrame(props: {
         <div
           ref={attachBox}
           // Preserve the frame's parent to avoid reloads; the top layer escapes timeline containment.
-          {...(fullscreenSupported
-            ? { popover: "auto" as const, onToggle: onBoxToggle, onBlur: onBoxBlur }
-            : {})}
+          {...(fullscreenSupported ? { onToggle: onBoxToggle } : {})}
           data-mcp-app-fullscreen={fullscreen ? "" : undefined}
           className={cn(
             "relative size-full overflow-hidden",

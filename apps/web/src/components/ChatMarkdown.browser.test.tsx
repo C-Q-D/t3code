@@ -1,6 +1,8 @@
 import { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import { AsyncResult } from "effect/reactivity";
-import { type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
+import { createPortal } from "react-dom";
+import { attachMcpAppFullscreenDismissal } from "./chat/mcpAppFullscreen";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { page, userEvent } from "vite-plus/test/browser";
 
@@ -441,4 +443,73 @@ describe("ChatMarkdown Windows file links", () => {
       expect(fileHrefs(container)).toEqual([]);
     }
   });
+});
+
+/** Uses native top-layer behavior with a separate caption portal and an opaque embedded document. */
+function McpFullscreenDismissalFixture() {
+  const [open, setOpen] = useState(true);
+  return (
+    <>
+      {open ? (
+        <div
+          data-testid="mcp-fullscreen-probe"
+          ref={(box) => {
+            if (!box) return;
+            const stop = attachMcpAppFullscreenDismissal(box, () => setOpen(false));
+            box.showPopover();
+            return () => {
+              stop();
+              if (box.matches(":popover-open")) box.hidePopover();
+            };
+          }}
+          style={{ position: "fixed", inset: "60px", margin: 0 }}
+        >
+          <iframe
+            title="MCP opaque app"
+            sandbox="allow-scripts"
+            srcDoc="<button autofocus>App content</button>"
+          />
+        </div>
+      ) : (
+        <p>Fullscreen closed</p>
+      )}
+      {createPortal(
+        <div
+          className="windows-window-controls"
+          popover="manual"
+          ref={(controls) => {
+            if (!controls) return;
+            controls.showPopover();
+            return () => {
+              if (controls.matches(":popover-open")) controls.hidePopover();
+            };
+          }}
+          style={{
+            position: "fixed",
+            inset: "0 0 auto auto",
+            margin: 0,
+            display: "flex",
+            height: 40,
+          }}
+        >
+          <button type="button" aria-label="Caption maximize probe">
+            Maximize
+          </button>
+        </div>,
+        document.body,
+      )}
+    </>
+  );
+}
+
+it("keeps native MCP fullscreen after a caption click and closes on Escape from the embedded app", async () => {
+  setup();
+  await using screen = await render(<McpFullscreenDismissalFixture />);
+  const box = screen.container.querySelector<HTMLElement>('[data-testid="mcp-fullscreen-probe"]')!;
+  await userEvent.click(page.getByRole("button", { name: "Caption maximize probe" }));
+  expect(box.matches(":popover-open")).toBe(true);
+  const frame = screen.container.querySelector("iframe")!;
+  frame.focus();
+  await userEvent.keyboard("{Escape}");
+  await expect.element(screen.getByText("Fullscreen closed")).toBeVisible();
 });
