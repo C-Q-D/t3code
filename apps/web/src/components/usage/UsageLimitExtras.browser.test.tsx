@@ -1,3 +1,4 @@
+/** Checks connected account names through the real extras card; only environment data is supplied. */
 import {
   EnvironmentId,
   ProviderDriverKind,
@@ -5,13 +6,18 @@ import {
   type ServerProvider,
 } from "@t3tools/contracts";
 import { CHATGPT_USAGE_URL } from "@t3tools/shared/usageLimits";
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
 
 import { render } from "../../../test/render";
-import { UsageLimitsPooled } from "./UsageLimitsPooled";
+import { t } from "../../i18n";
+import { UsageLimitExtras } from "./UsageLimitExtras";
+import { useLimitPresentations } from "./UsageLimits";
+
+vi.mock("./UsageLimits", () => ({ useLimitPresentations: vi.fn() }));
 
 const checkedAt = "2026-10-25T16:00:00.000Z";
 
+/** Build a managed connection whose external usage destination is shared by both accounts. */
 function managedChatGpt(instanceId: string, displayName: string): ServerProvider {
   return {
     instanceId: ProviderInstanceId.make(instanceId),
@@ -35,8 +41,14 @@ function managedChatGpt(instanceId: string, displayName: string): ServerProvider
   };
 }
 
-describe("UsageLimitsPooled ChatGPT usage card", () => {
+/** Reset the environment source without replacing account aggregation or card rendering. */
+function setup() {
+  return vi.mocked(useLimitPresentations).mockReset();
+}
+
+describe("UsageLimitExtras ChatGPT usage card", () => {
   it("names the managed connections it covers", async () => {
+    const source = setup();
     const presentations = new Map([
       [
         EnvironmentId.make("desk"),
@@ -51,15 +63,19 @@ describe("UsageLimitsPooled ChatGPT usage card", () => {
         },
       ],
     ]);
+    source.mockReturnValue(presentations);
     await using screen = await render(
-      <UsageLimitsPooled presentations={presentations} now={Date.parse(checkedAt)} />,
+      <UsageLimitExtras
+        selectedEnvironmentIds={null}
+        hiddenProviders={new Set()}
+        cursorEnvironments={[]}
+        onCursorEnabled={() => {}}
+      />,
     );
 
     await expect
       .element(screen.getByText("ChatGPT Work on Desk, ChatGPT Personal on Desk"))
       .toBeVisible();
-    await expect
-      .element(screen.getByText("View usage in ChatGPT with your connected account."))
-      .toBeVisible();
+    await expect.element(screen.getByText(t.tools.usage.chatgptUsageHint)).toBeVisible();
   });
 });
