@@ -19,8 +19,7 @@ for (const [network, prefix] of [
 ] as const) {
   LOCAL_ADDRESSES.addSubnet(network, prefix, "ipv4");
 }
-// Also the IPv6 ranges that carry an IPv4 address a translator may route to
-// without checking it: IPv4-compatible, local-use NAT64, and Teredo.
+// Block IPv4-carrying IPv6 ranges that translators may route without checking.
 for (const [network, prefix] of [
   ["::", 96],
   ["64:ff9b:1::", 48],
@@ -59,11 +58,7 @@ const ipv6Groups = (address: string) => {
   );
 };
 
-/**
- * The IPv4 address a NAT64 or 6to4 address stands for, which a translator
- * will route to, so it is checked as well. Public NAT64 targets stay
- * reachable, as on IPv6-only networks.
- */
+// Check the translated IPv4 too, while allowing public NAT64 targets on IPv6-only networks.
 const embeddedIPv4 = (address: string) => {
   const at = NAT64.check(address, "ipv6") ? 6 : SIX_TO_FOUR.check(address, "ipv6") ? 1 : -1;
   if (at === -1) return undefined;
@@ -221,8 +216,7 @@ export const publicProxy = Effect.acquireRelease(
           client.off("data", holdEarly);
           if (addresses === undefined) return refuse(client, 2);
           client.pause();
-          // Tries every checked address, IPv6 and IPv4 alike, so a host is
-          // still reached on a network whose IPv6 route is broken.
+          // Try all checked addresses so broken IPv6 routes do not block IPv4 access.
           const upstream = track(
             NodeNet.connect({
               host: request.host,

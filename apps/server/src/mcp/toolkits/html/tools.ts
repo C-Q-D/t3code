@@ -3,7 +3,6 @@ import { OrchestratorMcpFailure } from "@t3tools/contracts";
 import {
   HTML_RENDER_COLUMN_WIDTH,
   HTML_RENDER_LAYOUT_GUIDE,
-  HTML_RENDER_MAX_FIT_HEIGHT,
   HTML_RENDER_MAX_HEIGHT,
   HTML_RENDER_MAX_TITLE_LENGTH,
   HTML_RENDER_MIN_HEIGHT,
@@ -22,7 +21,7 @@ const Html = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512_0
 });
 
 const PAGE_RULES =
-  'Write one self-contained document with inline <style> and <script>. Local images written as absolute file paths (src="/abs/shot.png", CSS url(/abs/bg.webp), or a JS string) are inlined automatically; remote http(s) URLs, such as a CDN chart library, load as-is.';
+  "Inline <style> and <script>. Local images as absolute paths are inlined. Remote URLs load as-is.";
 
 export const HtmlPreviewTool = Tool.make("html_preview", {
   description: `Render an HTML page in T3's headless browser and get back a PNG screenshot, contentHeight (the height the page needs at this width), and its console output: log, info, warning, error, and uncaught exceptions, with stack traces pointing into page.html. Only you see the screenshot, contentHeight, and console output; the reader sees nothing from this tool. Call html_render to show the page to the reader. console.log is a fine way to report your own checks. Use it to check and iterate on a page before html_render. The first preview on a machine can report that T3 is still installing its preview browser; call again a minute later. ${PAGE_RULES} The page gets the theme variables and layout described in html_render.`,
@@ -30,12 +29,12 @@ export const HtmlPreviewTool = Tool.make("html_preview", {
     html: Html,
     width: Schema.optional(
       Schema.Int.annotate({
-        description: `Viewport width in CSS pixels, 240-1600. Defaults to ${HTML_RENDER_COLUMN_WIDTH}, the reply column; use about 390 to check phones.`,
+        description: `CSS pixels, 240 to 1600. Default ${HTML_RENDER_COLUMN_WIDTH}. Use about 390 for phones.`,
       }),
     ),
     appearance: Schema.optional(
       Schema.Literals(["dark", "light"]).annotate({
-        description: "Theme to preview. Defaults to dark.",
+        description: "Default dark.",
       }),
     ),
   }),
@@ -70,8 +69,7 @@ export const HtmlPreviewTool = Tool.make("html_preview", {
   .annotate(Tool.Idempotent, true)
   .annotate(Tool.OpenWorld, true);
 
-// Read-only in the MCP sense: it shows a page in the caller's own thread and
-// touches no workspace, so plan mode and read-only sandboxes can use it.
+// This affects only the caller's thread, not its workspace, so read-only sandboxes and plan mode may use it.
 const HtmlRenderTool = Tool.make(HTML_RENDER_TOOL_NAME, {
   description: `Show a finished HTML page (chart, table, diagram, collage, mockup) inline in this thread at the point where you call this tool, directly below the text you just wrote. When the turn ends, the immediately preceding text stays visible with the page; other intermediate text folds into the work log. Write the sentence or paragraph the page explains, call html_render, then continue writing. Do not restate the page's content or say "see above" or "see below"; add only what the page doesn't say. Check with html_preview first; the reader cannot see previews. T3 fits the frame to the page's height at each reader's width, up to ${HTML_RENDER_MAX_HEIGHT} CSS pixels. Pass maxHeight only when you want a long page to scroll inside a shorter frame. The page can write to the clipboard after a reader click, so copy buttons work. ${PAGE_RULES} ${HTML_RENDER_LAYOUT_GUIDE} ${HTML_RENDER_THEME_GUIDE}`,
   parameters: Schema.Struct({
