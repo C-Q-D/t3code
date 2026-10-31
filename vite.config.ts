@@ -600,7 +600,9 @@ export default defineConfig({
       },
       {
         files: ["apps/web/src/**", "apps/mobile/src/**", "packages/*/src/**"],
-        rules: { "t3code/no-unreasoned-state-sync": "error" },
+        // This fork does not enforce it. Stays a warning because `off` would turn upstream's
+        // disable directives into errors under reportUnusedDisableDirectives.
+        rules: { "t3code/no-unreasoned-state-sync": "warn" },
       },
       {
         // React Compiler caches use* functions only if they call a hook.
