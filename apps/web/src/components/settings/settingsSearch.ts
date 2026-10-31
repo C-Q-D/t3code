@@ -182,12 +182,12 @@ export const SETTINGS_SEARCH_ITEMS = [
   ...(SNOOZE_UI_ENABLED
     ? [
         {
-          id: "snooze-options",
+          id: "snooze-options" as const,
           title: "Snooze options",
-          to: "/settings/general",
+          to: "/settings/general" as const,
           searchTerms: ["snooze presets times later tonight tomorrow next week remind"],
           environmentOnly: true,
-          scope: "environment-defaults",
+          scope: "environment-defaults" as const,
         },
       ]
     : []),
