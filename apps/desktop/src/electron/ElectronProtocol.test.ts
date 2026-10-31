@@ -215,6 +215,7 @@ describe("ElectronProtocol", () => {
           const protocol = yield* ElectronProtocol.ElectronProtocol;
           yield* protocol.registerDesktopProtocol({
             scheme: "t3code-dev",
+            stateDir: "/unused-state",
             targetOrigin: new URL("http://127.0.0.1:5733/"),
             clerkFrontendApiHostname: undefined,
           });

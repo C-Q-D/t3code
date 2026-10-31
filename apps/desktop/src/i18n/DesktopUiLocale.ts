@@ -38,8 +38,11 @@ const make = Effect.gen(function* () {
   return DesktopUiLocale.of({
     current,
     messages: current.pipe(Effect.map(desktopMessages)),
-    setPreference: (preference) =>
-      settings.setUiLocalePreference(preference).pipe(Effect.map((change) => change.changed)),
+    setPreference: Effect.fn("DesktopUiLocale.setPreference")(function (preference) {
+      return settings
+        .setUiLocalePreference(preference)
+        .pipe(Effect.map((change) => change.changed));
+    }),
   });
 });
 export const layer = Layer.effect(DesktopUiLocale, make);
@@ -49,5 +52,7 @@ export const layerTest = (locale: UiLocale = "en") =>
   Layer.succeed(DesktopUiLocale, {
     current: Effect.succeed(locale),
     messages: Effect.succeed(desktopMessages(locale)),
-    setPreference: () => Effect.succeed(false),
+    setPreference: Effect.fn("DesktopUiLocale.setPreference")(function () {
+      return Effect.succeed(false);
+    }),
   });

@@ -554,10 +554,11 @@ export const make = Effect.gen(function* () {
     });
 
   return DesktopAppSettings.of({
-    setUiLocalePreference: (preference) =>
-      persist((settings) => setUiLocalePreference(settings, preference)).pipe(
-        Effect.withSpan("desktop.settings.setUiLocalePreference"),
-      ),
+    setUiLocalePreference: Effect.fn("desktop.settings.setUiLocalePreference")(
+      function (preference) {
+        return persist((settings) => setUiLocalePreference(settings, preference));
+      },
+    ),
     get: SynchronizedRef.get(settingsRef),
     load: Effect.gen(function* () {
       const settings = yield* readSettings(
@@ -647,8 +648,11 @@ export const layerTest = (initialSettings: DesktopSettings = DEFAULT_DESKTOP_SET
         });
 
       return DesktopAppSettings.of({
-        setUiLocalePreference: (preference) =>
-          update((settings) => setUiLocalePreference(settings, preference)),
+        setUiLocalePreference: Effect.fn("DesktopAppSettings.setUiLocalePreference")(
+          function (preference) {
+            return update((settings) => setUiLocalePreference(settings, preference));
+          },
+        ),
         get: SynchronizedRef.get(settingsRef),
         load: SynchronizedRef.get(settingsRef),
         setMainWindowBounds: Effect.fn("DesktopAppSettings.setMainWindowBounds")(
