@@ -10,7 +10,9 @@ import {
   type ProviderOptionSelection,
   type ServerProviderModel,
 } from "@t3tools/contracts";
-import { MenuPopup, MenuTrigger } from "../ui/menu";
+import { MenuPopup, MenuRadioGroup, MenuRadioItem, MenuTrigger } from "../ui/menu";
+import { CompactComposerControlsMenu } from "./CompactComposerControlsMenu";
+import { markOpenToPermissions } from "./composerEventScope";
 import { TraitsMenu as Menu } from "./TraitsMenu";
 import { setPhysicsEnabled } from "~/lib/motion/preference";
 import { MOTION_SNAP_DURATION_MS } from "~/lib/motion/springToLinear";
@@ -92,6 +94,45 @@ afterEach(async () => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
   setPhysicsEnabled(false);
+});
+
+it("focuses the checked permission after the compact menu opens from composer.mode", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  container = document.createElement("div");
+  document.body.append(container);
+  root = createRoot(container);
+  await act(async () =>
+    root?.render(
+      <CompactComposerControlsMenu
+        interactionMode="default"
+        runtimeMode="full-access"
+        runtimeModeOptions={[
+          { mode: "approval-required", label: "Supervised" },
+          { mode: "full-access", label: "Full access" },
+        ]}
+        showInteractionModeToggle
+        traitsMenuContent={
+          <MenuRadioGroup value="high">
+            <MenuRadioItem value="high">High effort</MenuRadioItem>
+          </MenuRadioGroup>
+        }
+        onToggleInteractionMode={() => {}}
+        onRuntimeModeChange={() => {}}
+      />,
+    ),
+  );
+  const trigger = container.querySelector<HTMLButtonElement>(
+    '[data-composer-shortcut~="composer.mode"]',
+  )!;
+  await act(async () => {
+    trigger.focus();
+    markOpenToPermissions(trigger);
+    trigger.click();
+  });
+  expect(document.querySelector('[role="menu"]')).not.toBeNull();
+  expect(document.activeElement?.textContent).toBe("Full access");
+  expect(document.activeElement?.getAttribute("aria-checked")).toBe("true");
+  expect(trigger.dataset.openToPermissions).toBeUndefined();
 });
 
 it.each(["Research", "Ultrathink", "Provider thinking"])(

@@ -1,7 +1,7 @@
 /** Displays compact composer mode and access controls. */
 import { t } from "~/i18n";
 import { ProviderInteractionMode, RuntimeMode } from "@t3tools/contracts";
-import { memo, type ReactNode } from "react";
+import { memo, type ReactNode, useRef } from "react";
 import { EllipsisIcon } from "lucide-react";
 import {
   MenuPopup,
@@ -11,7 +11,7 @@ import {
   MenuTrigger,
 } from "../ui/menu";
 import { ComposerControl, ComposerControlIcon } from "./ComposerControl";
-import { useComposerMenuProps } from "./composerEventScope";
+import { focusRequestedPermission, useComposerMenuProps } from "./composerEventScope";
 import { useComposerMenuState } from "./useComposerMenuState";
 import { TraitsMenu as Menu } from "./TraitsMenu";
 
@@ -38,12 +38,18 @@ export const CompactComposerControlsMenu = memo(function CompactComposerControls
   const composerFloatingLayerProps = useComposerMenuProps();
   const size = props.size ?? "sm";
   const [open, setOpen] = useComposerMenuState(props.hidden);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   return (
-    <Menu open={open} onOpenChange={setOpen}>
+    <Menu
+      open={open}
+      onOpenChange={setOpen}
+      onOpenChangeComplete={(isOpen) => focusRequestedPermission(isOpen, triggerRef.current)}
+    >
       <MenuTrigger
         render={
           <ComposerControl
+            ref={triggerRef}
             size={size}
             className="shrink-0"
             aria-label={t.chat.runtimeMode.moreComposerControls}
@@ -64,7 +70,9 @@ export const CompactComposerControlsMenu = memo(function CompactComposerControls
         {props.traitsMenuContent ? (
           <>
             {props.traitsMenuContent}
-            <MenuDivider />
+            {props.showInteractionModeToggle || props.showPermissions !== false ? (
+              <MenuDivider />
+            ) : null}
           </>
         ) : null}
         {props.showInteractionModeToggle ? (
@@ -91,6 +99,7 @@ export const CompactComposerControlsMenu = memo(function CompactComposerControls
               {t.chat.runtimeMode.access}
             </div>
             <MenuRadioGroup
+              data-composer-permissions
               value={props.runtimeMode}
               onValueChange={(value) => {
                 if (!value || value === props.runtimeMode) return;
