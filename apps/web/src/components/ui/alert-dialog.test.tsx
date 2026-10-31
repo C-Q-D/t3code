@@ -25,7 +25,7 @@ it.each([
   { Control: Input, slot: "input-control", present: null, disabledOverride: "true" },
   { Control: Textarea, slot: "textarea-control", present: "true", disabledOverride: "false" },
 ])(
-  "preserves Field defaults and explicit overrides for $slot in dialogs",
+  "applies explicit ARIA overrides and Base UI 1.9 disabled validation for $slot",
   async ({ Control, slot, present, disabledOverride }) => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     const container = document.createElement("div");
@@ -54,8 +54,12 @@ it.each([
       expect(wrapper.getAttribute("data-invalid")).toBe("true");
       expect(wrapper.getAttribute("data-invalid-present")).toBe(present);
       expect(wrapper.getAttribute("data-disabled")).toBe("false");
+      expect(wrapper.querySelector("input, textarea")?.getAttribute("aria-invalid")).toBe("true");
 
       wrapper = await renderField({ invalid: true }, { "aria-invalid": false });
+      expect
+        .soft(wrapper.querySelector("input, textarea")?.getAttribute("aria-invalid"))
+        .toBe("false");
       expect(wrapper.getAttribute("data-invalid")).toBe("false");
       expect(wrapper.getAttribute("data-invalid-present")).toBe(present);
 
@@ -65,6 +69,9 @@ it.each([
       } as unknown as ComponentProps<typeof Input>);
       expect(wrapper.getAttribute("data-invalid")).toBe("false");
       expect(wrapper.getAttribute("data-invalid-present")).toBe(present === null ? null : "false");
+      expect
+        .soft(wrapper.querySelector("input, textarea")?.getAttribute("aria-invalid"))
+        .toBeNull();
 
       wrapper = await renderField({ invalid: false }, {});
       expect(wrapper.getAttribute("data-invalid")).toBe("false");
@@ -72,6 +79,7 @@ it.each([
       wrapper = await renderField({ invalid: true, disabled: true }, {});
       expect(wrapper.getAttribute("data-disabled")).toBe("true");
       expect(wrapper.getAttribute("data-invalid")).toBe("false");
+      expect(wrapper.getAttribute("data-invalid-present")).toBe(present === null ? null : "false");
       wrapper = await renderField({ disabled: true }, { disabled: false });
       expect(wrapper.getAttribute("data-disabled")).toBe(disabledOverride);
     } finally {

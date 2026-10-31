@@ -2,6 +2,7 @@
 "use client";
 
 import { Input as InputPrimitive } from "@base-ui/react/input";
+import { cloneElement } from "react";
 import type * as React from "react";
 
 import { useFieldRootContext } from "@base-ui/react/internals/field-root-context";
@@ -46,6 +47,7 @@ function Input({
   const { disabled: fieldDisabled, validation } = useFieldRootContext();
   // Native compositions already receive resolved props from their owning Base UI control.
   const disabled = props.disabled || (!nativeInput && fieldDisabled);
+  // Accept Base UI 1.9's omission of default invalid state for disabled controls.
   const { invalid } = getInputControlState(
     nativeInput ? {} : validation.getValidationProps(Boolean(disabled)),
     props,
@@ -85,12 +87,24 @@ function Input({
       />
     );
   } else {
+    const render = props.render;
+    // Field validation runs after input props; render overrides must reach the native element last.
+    const explicitInvalid = Object.hasOwn(props, "aria-invalid")
+      ? { "aria-invalid": props["aria-invalid"] }
+      : undefined;
     inputElement = (
       <InputPrimitive
         className={inputClassName}
         data-slot="input"
         size={typeof size === "number" ? size : undefined}
         {...props}
+        render={
+          explicitInvalid
+            ? typeof render === "function"
+              ? (defaultProps, state) => render({ ...defaultProps, ...explicitInvalid }, state)
+              : cloneElement(render ?? <input />, explicitInvalid)
+            : render
+        }
       />
     );
   }
