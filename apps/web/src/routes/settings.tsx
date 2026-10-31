@@ -1,4 +1,5 @@
 /** Owns settings window chrome and the single scrollable page shell; child routes own settings content. */
+import { workspaceAreaProps } from "../lib/workspaceFocus";
 import { t } from "~/i18n";
 import { Outlet, createFileRoute, redirect, useLocation } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
@@ -175,7 +176,10 @@ function SettingsContentLayout() {
   });
 
   return (
-    <main className="settings-page-shell flex h-full min-h-0 min-w-0 flex-col text-control leading-normal text-foreground text-shadow-stone">
+    <main
+      {...workspaceAreaProps("settings", 1, "Settings content")}
+      className="settings-page-shell flex h-full min-h-0 min-w-0 flex-col text-control leading-normal text-foreground text-shadow-stone"
+    >
       {titlebar}
       {/* Reset scroll before the new category's target refs run. Keep hash changes
           out of this identity so clearing a handled search target preserves its scroll. */}

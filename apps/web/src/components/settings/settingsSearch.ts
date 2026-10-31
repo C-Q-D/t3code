@@ -340,7 +340,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "environment-identification",
     title: t.settings.rows.environmentIdentification.title,
     to: "/settings/appearance",
-    searchTerms: ["dev nightly artwork pill label hide none"],
+    searchTerms: ["dev nightly latest channel artwork pill label hide none"],
     targetId: "appearance-interface",
   },
   {
@@ -378,7 +378,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "word-wrap",
     title: t.settings.rows.wordWrap.title,
     to: "/settings/appearance",
-    searchTerms: ["long lines code blocks tables diffs file previews"],
+    searchTerms: ["long lines code blocks diffs file previews"],
   },
   {
     id: "composer-context",
@@ -559,7 +559,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "provider-update-checks",
     title: t.settings.rows.providerUpdateChecks.title,
     to: "/settings/general",
-    searchTerms: ["installed cli versions newer available codex claude cursor grok opencode"],
+    searchTerms: ["installed cli versions newer available codex claude cursor grok fx opencode"],
     scope: "environment-defaults",
   },
   {
@@ -774,7 +774,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: t.settings.rows.providers.title,
     to: "/settings/providers",
     searchTerms: [
-      "agents cli codex claude cursor grok opencode antigravity google sign in sign out install subscription instances authentication api key models configuration binary path config directory endpoint arguments environment variables display name accent color custom favorite hidden auto compact",
+      "agents cli codex claude cursor grok fx opencode antigravity google sign in sign out install subscription instances authentication api key models configuration binary path config directory endpoint arguments environment variables display name accent color custom favorite hidden auto compact",
     ],
   },
   {
@@ -926,7 +926,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     },
     to: "/settings/integrations",
     get searchTerms() {
-      return [t.settings.searchNewUi.prTerms];
+      return [t.settings.searchNewUi.prTerms, "commit"];
     },
   },
   {

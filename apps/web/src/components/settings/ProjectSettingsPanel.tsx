@@ -54,6 +54,7 @@ import { ProjectDefaultsSettings } from "./ProjectDefaultsSettings";
 import {
   defaultProjectIcon,
   hasDefaultProjectIcon,
+  SCRATCH_PROJECT_TITLE,
   projectGroupTitleNeedsUpdate,
 } from "./ProjectSettingsPanel.logic";
 import { useSettingsProjectGroups } from "./useSettingsProjectGroups";
@@ -367,6 +368,9 @@ function ProjectDetail({
     });
   };
 
+  const canResetScratchTitle =
+    group.memberProjects.every((member) => member.isScratch) &&
+    group.memberProjects.some((member) => member.title !== SCRATCH_PROJECT_TITLE);
   const hasMultipleCheckouts = group.memberProjects.length > 1;
 
   const removeMembers = async (members: ReadonlyArray<SidebarProjectGroupMember>) => {
@@ -543,6 +547,20 @@ function ProjectDetail({
           <SettingsRow
             title={t.settings.diagnostics.columns.name}
             description={t.settings.projectSettings.sharedNameProjectGroupSidebarHint}
+            resetAction={
+              canResetScratchTitle ? (
+                <SettingResetButton
+                  label="project name"
+                  disabled={!canEditGroup}
+                  onClick={() =>
+                    void updateAllMembers(
+                      { title: SCRATCH_PROJECT_TITLE },
+                      t.settings.projectSettings.failedToRenameProject,
+                    )
+                  }
+                />
+              ) : null
+            }
             control={
               <Input
                 key={`${group.projectKey}:${group.displayName}`}

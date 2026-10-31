@@ -80,6 +80,11 @@ const SETTINGS_NAV_ITEMS: ReadonlyArray<{
     icon: SETTINGS_SECTION_ICONS[to],
   }));
 
+/** Keeps a newly active result visible without scrolling again on unrelated renders; null denotes unmount. */
+function scrollResultIntoView(row: HTMLLIElement | null) {
+  row?.scrollIntoView({ block: "nearest" });
+}
+
 /**
  * Renders settings navigation, search, and the account footer under the app router and sidebar provider.
  * @param pathname Current route path; detail routes keep their parent section selected.
@@ -107,14 +112,6 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
   if (activeResultIndex > maxResultIndex) {
     setActiveResultIndex(maxResultIndex);
   }
-
-  useEffect(() => {
-    const result = results[activeResultIndex];
-    if (!result) return;
-    document
-      .getElementById(`settings-search-result-${result.id}`)
-      ?.scrollIntoView({ block: "nearest" });
-  }, [activeResultIndex, results]);
 
   useEffect(() => {
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
@@ -292,7 +289,11 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
             className="flex flex-col gap-0.5 px-2 py-0.5"
           >
             {results.map((item, index) => (
-              <li key={item.id} role="presentation">
+              <li
+                key={item.id}
+                role="presentation"
+                ref={index === activeResultIndex ? scrollResultIntoView : undefined}
+              >
                 {/* Search options are two-line navigation rows, rather than action buttons. */}
                 <button
                   type="button"
