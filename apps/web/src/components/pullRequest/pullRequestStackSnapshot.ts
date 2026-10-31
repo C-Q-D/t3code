@@ -2,7 +2,7 @@
 import { t } from "~/i18n";
 import type { PullRequestRef, PullRequestStack, ThreadPullRequestLink } from "@t3tools/contracts";
 
-/** Saved native membership is enough for navigation, but never supplies action head SHAs. */
+/** Saved membership supports navigation, never action head SHAs. */
 export function savedPullRequestStack(
   links: ReadonlyArray<ThreadPullRequestLink>,
   reference: PullRequestRef,

@@ -78,6 +78,7 @@ export function useSnapShotShortcutRecorder({
       );
     }
   };
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- releases the desktop bridge's SnapShot shortcut suppression on unmount
   useEffect(
     () => () => {
       requests.clear();

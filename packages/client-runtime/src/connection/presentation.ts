@@ -101,12 +101,6 @@ export function connectionStatusTitle(
   return connectionStatusText({ ...connection, error: null }, messages);
 }
 
-export function presentEnvironmentConnection(
-  state: SupervisorConnectionState,
-): EnvironmentConnectionPresentation {
-  return presentConnectionState(state);
-}
-
 /**
  * SSH connections ride a local forward that disappears with the client, so they have no stable
  * address.
