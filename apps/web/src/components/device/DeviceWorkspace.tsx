@@ -1,15 +1,14 @@
-/** Localized device UI and interactions; preserves user data, commands, and protocol values. */
+/** Device screen, quick controls and drawer share one device session. */
 import { t } from "~/i18n";
-import type { DeviceSummary, EnvironmentId } from "@t3tools/contracts";
-import { useEffect, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import type { DeviceHostSummary, DeviceSummary, EnvironmentId } from "@t3tools/contracts";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   captureDeviceScreenshot,
   DeviceScreenshotError,
 } from "@t3tools/client-runtime/device/screenshot";
 import { refreshDeviceHubAccess, useDeviceHubAccess } from "~/state/device";
 import { DeviceControlsRail } from "./DeviceControlsRail";
-import { DeviceStreamView, type DeviceStreamHandle } from "./DeviceStreamView";
+import { DeviceStreamView } from "./DeviceStreamView";
 import { DeviceToolsPanel } from "./DeviceToolsPanel";
 import { useDeviceControls } from "./useDeviceControls";
 
@@ -21,6 +20,7 @@ export function DeviceWorkspace(props: {
   environmentId: EnvironmentId;
   device: DeviceSummary;
   hostLabel: string;
+  hostKind: DeviceHostSummary["kind"] | undefined;
   hostDiagnostics: string | undefined;
   visible: boolean;
   onFloat: () => void;
@@ -28,7 +28,6 @@ export function DeviceWorkspace(props: {
   onPowerOff: () => void;
   devicePicker: ReactNode;
 }) {
-  const [handle, setHandle] = useState<DeviceStreamHandle | null>(null);
   const [toolsOpen, setToolsOpen] = useState(true);
   const [toolsExpanded, setToolsExpanded] = useState(false);
   const [axOverlay, setAxOverlay] = useState(false);
@@ -37,7 +36,12 @@ export function DeviceWorkspace(props: {
   const captureRef = useRef<AbortController | null>(null);
   const downloadRef = useRef<string | null>(null);
   const access = useDeviceHubAccess(props.environmentId, props.device.hostId);
-  const controls = useDeviceControls({ ...props, access });
+  const runsHostCommands = props.hostKind === "local" || props.hostKind === "ssh";
+  const controls = useDeviceControls({
+    ...props,
+    access,
+    visible: props.visible && runsHostCommands,
+  });
   useEffect(() => {
     if (!access || !props.visible) captureRef.current?.abort();
     return () => {
@@ -101,18 +105,21 @@ export function DeviceWorkspace(props: {
             deviceId={props.device.id}
             hostId={props.device.hostId}
             visible={props.visible}
+            serveSimOnly={props.hostKind === "simlock"}
             axOverlay={axOverlay}
             allowPhoneView
-            onHandle={setHandle}
             renderControls={(view) => (
               <DeviceControlsRail
                 platform={props.device.platform}
-                handle={handle}
+                hostKind={props.hostKind}
+                handle={view.handle}
                 view={view}
                 controls={controls}
                 screenshotPending={screenshotPending}
                 onScreenshot={() => void saveScreenshot()}
-                tools={toolsOpen ? (toolsExpanded ? "expanded" : "open") : "closed"}
+                tools={
+                  toolsOpen && runsHostCommands ? (toolsExpanded ? "expanded" : "open") : "closed"
+                }
                 onTools={() => setToolsOpen(!toolsOpen)}
                 onFloat={props.onFloat}
                 onClose={props.onClose}
@@ -123,7 +130,7 @@ export function DeviceWorkspace(props: {
           />
         </div>
       </div>
-      {toolsOpen ? (
+      {toolsOpen && runsHostCommands ? (
         <DeviceToolsPanel
           device={props.device}
           controls={controls}

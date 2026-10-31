@@ -18,7 +18,7 @@ import { toastManager } from "./ui/toast";
 
 // Orchestrator V2 ships to Nightly first. The App Store and Google Play apps are
 // still V1 and cannot connect to a V2 server, so Nightly users need the V2 beta
-// app. Delete this file when the store apps move to V2. See #14871.
+// app. Delete this file when the store apps move to V2.
 
 /** True on Nightly desktop, `npx t3@nightly`, and the hosted Nightly app. */
 export const IS_NIGHTLY_BUILD =

@@ -1,6 +1,6 @@
 /** Localized device UI and interactions; preserves user data, commands, and protocol values. */
 import { t } from "~/i18n";
-import type { DevicePlatform } from "@t3tools/contracts";
+import type { DeviceHostSummary, DevicePlatform } from "@t3tools/contracts";
 import {
   Camera,
   ChevronLeft,
@@ -39,6 +39,7 @@ import type { DeviceControls } from "./useDeviceControls";
  */
 export function DeviceControlsRail(props: {
   platform: DevicePlatform;
+  hostKind: DeviceHostSummary["kind"] | undefined;
   handle: DeviceStreamHandle | null;
   view: DeviceViewControls;
   controls: DeviceControls;
@@ -54,6 +55,7 @@ export function DeviceControlsRail(props: {
 }) {
   const { view, handle, controls } = props;
   const popupSide = "top";
+  const runsHostCommands = props.hostKind === "local" || props.hostKind === "ssh";
   const settings = controls.detail?.settings;
   const inputDisabled = !handle?.inputConnected;
   const nextAppearance = settings?.appearance === "dark" ? "light" : "dark";
@@ -127,7 +129,7 @@ export function DeviceControlsRail(props: {
                       size="icon-compact-key"
                       variant="ghost"
                       aria-label={t.tools.device.rotate}
-                      disabled={controls.disabled}
+                      disabled={controls.disabled || !runsHostCommands}
                     />
                   }
                 >
@@ -215,11 +217,15 @@ export function DeviceControlsRail(props: {
               <MoreHorizontal />
             </MenuTrigger>
             <MenuPopup side={popupSide} align="end">
-              <MenuCheckboxItem checked={props.tools !== "closed"} onCheckedChange={props.onTools}>
+              <MenuCheckboxItem
+                disabled={!runsHostCommands}
+                checked={props.tools !== "closed"}
+                onCheckedChange={props.onTools}
+              >
                 {t.tools.device.tools}
               </MenuCheckboxItem>
               <MenuItem
-                disabled={controls.disabled || !settings?.appearance}
+                disabled={controls.disabled || !runsHostCommands || !settings?.appearance}
                 onClick={() => void controls.act({ type: "setAppearance", value: nextAppearance })}
               >
                 <MorphIcon icon={settings?.appearance === "dark" ? Sun : Moon} />
@@ -252,7 +258,7 @@ export function DeviceControlsRail(props: {
                   <MenuRadioItem
                     key={value}
                     value={value}
-                    disabled={controls.disabled || !settings?.textSize}
+                    disabled={controls.disabled || !runsHostCommands || !settings?.textSize}
                   >
                     <span className="flex-1">{label}</span>
                     <MenuRadioItemIndicator />

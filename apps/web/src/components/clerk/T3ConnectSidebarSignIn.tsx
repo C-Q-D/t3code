@@ -95,7 +95,7 @@ function ConfiguredT3ConnectSidebarAvatar({ variant }: { variant: "default" | "s
           userButtonTrigger:
             variant === "settings"
               ? "rounded-full p-0 focus-visible:inset-shadow-focus"
-              : "rounded-lg p-1 hover:bg-sidebar-row-hover",
+              : "mb-1! rounded-lg! p-1! hover:bg-sidebar-row-hover!",
         },
       }}
     >
@@ -120,30 +120,22 @@ function ConfiguredT3ConnectSidebarAvatar({ variant }: { variant: "default" | "s
  */
 function ConfiguredT3ConnectSidebarSignIn({ variant }: { variant: "default" | "settings" }) {
   const { isLoaded, isSignedIn } = useAuth();
-  const { authPrompt, openAuthPrompt } = useT3ConnectAuthPrompt();
+  const { openAuthPrompt } = useT3ConnectAuthPrompt();
 
   if (!isLoaded || isSignedIn) return null;
 
   if (variant === "settings") {
-    return (
-      <>
-        <SettingsConnectCard onSignIn={openAuthPrompt} />
-        {authPrompt}
-      </>
-    );
+    return <SettingsConnectCard onSignIn={openAuthPrompt} />;
   }
 
   return (
-    <>
-      <SidebarMenu>
-        <SidebarMenuItem>
-          <SidebarMenuButton onClick={openAuthPrompt}>
-            <LogInIcon />
-            <span>{t.account.clerk.signIn}</span>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
-      </SidebarMenu>
-      {authPrompt}
-    </>
+    <SidebarMenu>
+      <SidebarMenuItem>
+        <SidebarMenuButton onClick={openAuthPrompt}>
+          <LogInIcon />
+          <span>{t.account.clerk.signIn}</span>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    </SidebarMenu>
   );
 }

@@ -3,7 +3,8 @@ import { t } from "~/i18n";
 import type { DeviceHubAccess } from "@t3tools/client-runtime/state/deviceHubAccess";
 import type { DevicePermission, DeviceSummary, DeviceTextSize } from "@t3tools/contracts";
 import { ChevronDown, X } from "lucide-react";
-import { useEffect, useLayoutEffect, useState, type ReactNode } from "react";
+import { useAtomValue } from "@effect/atom-react";
+import { useState, useLayoutEffect, type ReactNode } from "react";
 
 import { Button } from "~/components/ui/button";
 import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "~/components/ui/collapsible";
@@ -21,7 +22,7 @@ import { Toggle, ToggleGroup } from "~/components/ui/toggle-group";
 import { cn } from "~/lib/utils";
 import { createPresenceRegistry } from "~/lib/presenceRegistry";
 import type { DeviceControls } from "./useDeviceControls";
-import { type DeviceEventLogEntry, subscribeDeviceEventLog } from "./deviceHubApi";
+import { deviceEventLogAtom } from "./deviceHubAtoms";
 
 const deviceToolRegistry = createPresenceRegistry<"expanded">();
 
@@ -712,37 +713,13 @@ function PermissionsSection(props: {
   );
 }
 
-const EVENT_LOG_LIMIT = 100;
-
-/**
- * Subscribes to the selected device event log and renders its entries while mounted.
- * @param props Component properties and callbacks defined by the parameter type.
- * @returns Rendered UI for the supplied props.
- */
+/** Tracks expansion for the local drawer and mounts the event subscription only while its panel is open. */
 function EventLogSection(props: {
   readonly access: DeviceHubAccess;
   readonly device: DeviceSummary;
 }) {
   const [open, setOpen] = useState(false);
-  const [entries, setEntries] = useState<ReadonlyArray<DeviceEventLogEntry>>([]);
   deviceToolRegistry.useRegister("expanded", open);
-
-  useEffect(() => {
-    if (!open) return;
-    const unsubscribe = subscribeDeviceEventLog(
-      { access: props.access, platform: props.device.platform, deviceId: props.device.id },
-      (incoming, reset) => {
-        setEntries((current) => {
-          const merged = reset ? [...incoming] : [...current, ...incoming];
-          return merged.length > EVENT_LOG_LIMIT ? merged.slice(-EVENT_LOG_LIMIT) : merged;
-        });
-      },
-    );
-    return () => {
-      unsubscribe();
-      setEntries([]);
-    };
-  }, [open, props.access, props.device.id, props.device.platform]);
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
@@ -753,21 +730,37 @@ function EventLogSection(props: {
         />
       </CollapsibleTrigger>
       <CollapsiblePanel>
-        <ol className="max-h-64 overflow-y-auto px-3 py-2 font-mono text-2xs leading-relaxed">
-          {entries.length === 0 ? (
-            <li className="text-muted-foreground">{t.tools.device.noEvents}</li>
-          ) : (
-            entries.map((entry) => (
-              <li key={entry.id} className="flex gap-2">
-                <span className="shrink-0 text-muted-foreground">
-                  {entry.timestamp.slice(11, 19)}
-                </span>
-                <span className="truncate">{entry.summary}</span>
-              </li>
-            ))
-          )}
-        </ol>
+        <EventLogEntries access={props.access} device={props.device} />
       </CollapsiblePanel>
     </Collapsible>
+  );
+}
+
+// The panel unmounts while closed, so the log streams only while it is open.
+/** Reads the selected device event-log atom; unmounting releases its subscription and the atom bounds retained entries. */
+function EventLogEntries(props: {
+  readonly access: DeviceHubAccess;
+  readonly device: DeviceSummary;
+}) {
+  const entries = useAtomValue(
+    deviceEventLogAtom({
+      access: props.access,
+      platform: props.device.platform,
+      deviceId: props.device.id,
+    }),
+  );
+  return (
+    <ol className="max-h-64 overflow-y-auto px-3 py-2 font-mono text-2xs leading-relaxed">
+      {entries.length === 0 ? (
+        <li className="text-muted-foreground">{t.tools.device.noEvents}</li>
+      ) : (
+        entries.map((entry) => (
+          <li key={entry.id} className="flex gap-2">
+            <span className="shrink-0 text-muted-foreground">{entry.timestamp.slice(11, 19)}</span>
+            <span className="truncate">{entry.summary}</span>
+          </li>
+        ))
+      )}
+    </ol>
   );
 }

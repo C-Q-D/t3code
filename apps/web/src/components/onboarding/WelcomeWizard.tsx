@@ -17,6 +17,7 @@ import {
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
 import {
+  AgentSessionSource,
   AuthTerminalOperateScope,
   CommandId,
   defaultInstanceIdForDriver,
@@ -59,7 +60,7 @@ import {
 } from "../../onboarding/providerReadiness.logic";
 import { newProjectId, randomUUID } from "../../lib/utils";
 import { agentSessionImport } from "../../state/agentSessions";
-import { readProjects, useProjects } from "../../state/entities";
+import { readProjects, waitForProject } from "../../state/entities";
 import { useEnvironments, usePrimaryEnvironment } from "../../state/environments";
 import {
   isOnboardingRelayEnvironment,
@@ -131,8 +132,7 @@ export function WelcomeWizard({
   const [step, setStep] = useState<WizardStep>(resumeEnvironmentId ? "agents" : "connection");
   const { environments } = useEnvironments();
   const [selection, setSelection] = useState<ReadonlySet<EnvironmentId> | null>(null);
-  // One registry for the wizard's lifetime, shared with the connect list, so a computer is
-  // auto-selected once even after the user unchecks it.
+  // Share the registry for the wizard's lifetime so unchecked computers are not auto-selected again.
   const [autoSelectedComputers] = useState(() => new Set<EnvironmentId>());
   const [setupIds, setSetupIds] = useState<readonly EnvironmentId[]>(
     resumeEnvironmentId ? [resumeEnvironmentId] : [],
@@ -141,6 +141,7 @@ export function WelcomeWizard({
   const finishingPromiseRef = useRef<Promise<boolean> | null>(null);
   const completionErrorToastIdRef = useRef<ReturnType<typeof toastManager.add> | null>(null);
   const primaryEnvironment = usePrimaryEnvironment();
+
   useEffect(() => {
     const newComputers = environments.filter(
       (environment) => !autoSelectedComputers.has(environment.environmentId),
@@ -329,6 +330,7 @@ function ConnectionStep({
     .filter((environment) => skippedIds.includes(environment.environmentId))
     .map((environment) => environment.label);
   const continueRef = useRef<HTMLButtonElement>(null);
+
   useEffect(() => {
     if (
       ready &&
@@ -553,6 +555,7 @@ function ConnectAccountOption({
   );
 }
 
+/** Validates the submitted pairing URL or code and reports connection failures while retaining host setup guidance. */
 function PairingForm({
   isPairing,
   setIsPairing,
@@ -652,12 +655,12 @@ function PairingForm({
           </div>
           <CollapsiblePanel>
             <p className="pt-3 text-control text-muted-foreground">
-              {t.account.onboarding.runOnHost}
+              {t.account.onboarding.runOnHost} {t.account.onboarding.startCodePrefix}
+              <code className="font-mono">npx t3 serve</code>
             </p>
             <CommandBlock command="npx t3 pair" className="mt-2" />
             <p className="mt-2 text-secondary-copy leading-relaxed text-muted-foreground">
-              {t.account.onboarding.startCodePrefix}
-              <code className="font-mono">npx t3 serve</code>
+              <code className="font-mono">npx t3 pair</code>
               {t.account.onboarding.addFlag} <code className="font-mono">--tailscale</code>
               {t.account.onboarding.tailnetSuffix}
             </p>
@@ -1061,6 +1064,7 @@ function AgentCard({
   );
 }
 
+/** Runs the chosen setup command in its temporary terminal and hands focus to that terminal; cleanup closes only the owned session. */
 function AgentInstallTerminal({
   session,
   onClose,
@@ -1089,9 +1093,9 @@ function AgentInstallTerminal({
   >("preparing");
   const terminalReady = setupState === "ready" || setupState === "writeFailed";
 
-  // In Strict Mode, a canceled open can finish after the replacement setup
-  // starts; it must not close or pre-type into the replacement session that
-  // shares this terminal id.
+  // StrictMode can finish a cancelled open after replacement setup; it must not close or pre-type into that
+  // session.
+
   useEffect(() => {
     const generation = setupGenerationRef.current + 1;
     setupGenerationRef.current = generation;
@@ -1133,8 +1137,7 @@ function AgentInstallTerminal({
       setSetupState(wrote._tag === "Success" ? "ready" : "writeFailed");
     });
 
-    // Close the PTY only while this connection still has terminal access;
-    // revocation leaves it running.
+    // Revocation leaves the PTY running; close only while terminal access remains.
     return () => {
       if (activeSetupGenerationRef.current === generation) {
         activeSetupGenerationRef.current = null;
@@ -1213,11 +1216,8 @@ function AgentInstallTerminal({
             providerInstanceId={providerInstanceId}
             advancedTypography={advancedTypography}
             onSessionExited={onClose}
-            focusRequestId={1}
             autoFocus
             visible
-            resizeEpoch={0}
-            drawerHeight={256}
             keybindings={keybindings}
           />
         ) : null}
@@ -1252,11 +1252,9 @@ function ImportStep({
   const writableEnvironments = useEnvironmentsWithScope(scans, AuthOrchestrationOperateScope);
   const createProject = useAtomCommand(projectEnvironment.create, { reportFailure: false });
   const importThreads = useAtomCommand(agentSessionImport, { reportFailure: false });
-  const projects = useProjects();
   const [selectedPaths, setSelectedPaths] = useState<ReadonlySet<string> | null>(null);
   const importWarningRef = useRef("");
   const importedThreadCountRef = useRef(0);
-  const [landingProject, setLandingProject] = useState<ScopedProjectRef | null>(null);
   const importedProjectsRef = useRef(new Map<string, ScopedProjectRef>());
   const projectsWithImportedHistoryRef = useRef(new Map<string, ScopedProjectRef>());
   const lastImportSelectionRef = useRef<ReadonlyArray<string>>([]);
@@ -1271,25 +1269,6 @@ function ImportStep({
       importGenerationRef.current += 1;
     };
   }, []);
-
-  useEffect(() => {
-    if (
-      landingProject !== null &&
-      projects.some(
-        (project) =>
-          project.id === landingProject.projectId &&
-          project.environmentId === landingProject.environmentId,
-      )
-    ) {
-      // oxlint-disable-next-line react/set-state-in-effect -- The landing project is known only once the projects subscription delivers it.
-      setLandingProject(null);
-      void onDone(landingProject, importWarningRef.current, importedThreadCountRef.current).then(
-        (completed) => {
-          if (!completed) setIsImporting(false);
-        },
-      );
-    }
-  }, [landingProject, onDone, projects, setIsImporting]);
 
   const { available: candidates, recent } = partitionOnboardingProjects(
     scans.flatMap((scan) =>
@@ -1324,7 +1303,23 @@ function ImportStep({
       return;
     }
     setIsImporting(true);
-    setLandingProject(projectRef);
+    const importGeneration = importGenerationRef.current;
+    // waitForProject gives up after its timeout, so a project that never reaches the client
+    // still finishes setup, just without landing in it.
+    void waitForProject(projectRef)
+      .then(
+        () => projectRef,
+        () => undefined,
+      )
+      .then(async (landing) => {
+        if (importGeneration !== importGenerationRef.current) return;
+        const completed = await onDone(
+          landing,
+          importWarningRef.current,
+          importedThreadCountRef.current,
+        );
+        if (!completed) setIsImporting(false);
+      });
   };
 
   const runImport = async (selection: typeof candidates) => {
@@ -1792,6 +1787,12 @@ function ImportCandidateRow({
   );
 }
 
+const IMPORT_SOURCE_NAMES: Record<AgentSessionSource, string> = {
+  claudeAgent: "Claude Code",
+  codex: "Codex",
+  pi: "Pi",
+};
+
 /**
  * Shows the real discovery sources; history count and age stay accessible without
  * adding columns absent from Q2. Repository clone grouping remains unchanged.
@@ -1801,7 +1802,7 @@ function ImportRowMeta({
   threadCount,
   lastActiveAt,
 }: {
-  readonly sources: ReadonlyArray<"claudeAgent" | "codex"> | null;
+  readonly sources: ReadonlyArray<AgentSessionSource> | null;
   readonly threadCount: number;
   readonly lastActiveAt: string | null;
 }) {
@@ -1809,7 +1810,7 @@ function ImportRowMeta({
   const age = relative === null ? "" : relative.suffix === null ? "now" : relative.value;
   return (
     <span className="ml-auto shrink-0 text-meta-large whitespace-nowrap text-muted-foreground">
-      {sources?.map((source) => (source === "claudeAgent" ? "Claude Code" : "Codex")).join(" · ")}
+      {sources?.map((source) => IMPORT_SOURCE_NAMES[source]).join(" · ")}
       <span className="sr-only">
         {threadCount} · {age}
       </span>
