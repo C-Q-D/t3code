@@ -3,7 +3,7 @@ import { useStore } from "zustand";
 import { createBackgroundImageStore } from "../backgroundImage";
 
 const bridge = typeof window === "undefined" ? undefined : window.desktopBridge;
-const backgroundImageStore = createBackgroundImageStore(bridge);
+export const backgroundImageStore = createBackgroundImageStore(bridge);
 
 /** Returns the shared image and serialized native actions; callers report rejected IPC operations. */
 export function useBackgroundImage() {

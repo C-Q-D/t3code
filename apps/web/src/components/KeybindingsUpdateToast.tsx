@@ -1,3 +1,5 @@
+/** Reports server keybinding reloads through one app-lifetime subscription. */
+import { t } from "~/i18n";
 import { appAtomRegistry, subscribeAtomChanges } from "../rpc/atomRegistry";
 import { primaryEnvironmentIdAtom } from "../state/primaryEnvironment";
 import { primaryServerConfigAtom, primaryServerConfigEventAtom } from "../state/server";
@@ -15,8 +17,8 @@ export function startKeybindingsUpdateToasts(): () => void {
     if (decision._tag === "Success") {
       toastManager.add({
         type: "success",
-        title: "Keybindings updated",
-        description: "Keybindings configuration reloaded successfully.",
+        title: t.account.routes.keybindingsUpdated,
+        description: t.account.routes.keybindingsReloaded,
       });
       return;
     }
@@ -25,7 +27,8 @@ export function startKeybindingsUpdateToasts(): () => void {
     toastManager.add(
       stackedThreadToast({
         type: "warning",
-        title: "Invalid keybindings configuration",
+        title: t.account.routes.invalidKeybindings,
+        data: { appearance: "keybindings-warning" },
         description: (
           <KeybindingsConfigWarning
             message={decision.message}
