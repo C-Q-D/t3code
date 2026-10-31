@@ -44,12 +44,17 @@ const decodeClaudeSettings = Schema.decodeUnknownSync(ClaudeSettings);
 describe("composer assistance settings", () => {
   it("enables both features when decoding old client settings", () => {
     expect(decodeClientSettings({ composerRichTextEnabled: false })).toMatchObject({
+      composerCollapseOnScroll: true,
       composerSuggestionsEnabled: true,
       composerPromptOptimizeEnabled: true,
     });
   });
   it("preserves explicit disabled preferences in snapshots and patches", () => {
-    const settings = { composerSuggestionsEnabled: false, composerPromptOptimizeEnabled: false };
+    const settings = {
+      composerCollapseOnScroll: false,
+      composerSuggestionsEnabled: false,
+      composerPromptOptimizeEnabled: false,
+    };
     expect(decodeClientSettings(settings)).toMatchObject(settings);
     expect(decodeClientSettingsPatch(settings)).toEqual(settings);
   });
