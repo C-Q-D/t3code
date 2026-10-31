@@ -1,3 +1,4 @@
+/** Checks native launcher ownership and PATH discovery with isolated filesystem fixtures. */
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { afterEach, beforeEach, expect, it } from "@effect/vitest";
 import * as HostProcess from "@t3tools/shared/HostProcess";
@@ -84,6 +85,14 @@ const fakePowerShell = (initial: string) => {
   return { registry, spawner };
 };
 
+/** Keeps simulated Linux PATH entries on the current drive without a drive-letter colon. */
+const makeUnixHome = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const temporary = yield* fs.makeTempDirectoryScoped({ directory: "." });
+  const absolute = path.resolve(temporary);
+  return path.sep === "\\" ? absolute.slice(2) : absolute;
+});
 const machinePath = process.env.PATH;
 beforeEach(() => {
   process.env.PATH = "";
@@ -123,19 +132,20 @@ it.layer(NodeServices.layer)("DesktopCliCommand", (it) => {
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
-      const home = yield* fs.makeTempDirectoryScoped();
+      const home = yield* makeUnixHome;
       const command = yield* commandIn({ home });
       const theirs = path.join(home, ".local", "bin", "t3");
       yield* fs.makeDirectory(path.dirname(theirs), { recursive: true });
       yield* fs.writeFileString(theirs, "npm's t3\n");
       yield* fs.makeDirectory(path.join(home, "bin"), { recursive: true });
-      yield* fs.symlink(path.join(home, "gone"), path.join(home, "bin", "t3"));
+      const missingTarget = path.resolve(home, "gone");
+      yield* fs.symlink(missingTarget, path.join(home, "bin", "t3"));
 
       const error = yield* Effect.flip(command.install);
       expect(error.message).toContain("Another t3 command is already installed");
       yield* command.uninstall;
       expect(yield* fs.readFileString(theirs)).toBe("npm's t3\n");
-      expect(yield* fs.readLink(path.join(home, "bin", "t3"))).toBe(path.join(home, "gone"));
+      expect(yield* fs.readLink(path.join(home, "bin", "t3"))).toBe(missingTarget);
 
       const launcher = path.join(home, ".t3", "bin", "t3");
       yield* fs.writeFileString(launcher, "npm's t3\n");
@@ -169,10 +179,7 @@ it.layer(NodeServices.layer)("DesktopCliCommand", (it) => {
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
-      const temporary = yield* fs.makeTempDirectoryScoped({ directory: "." });
-      // A simulated Unix PATH uses ':'; a host drive letter would split the fixture.
-      const absolute = path.resolve(temporary);
-      const home = path.sep === "\\" ? absolute.slice(2) : absolute;
+      const home = yield* makeUnixHome;
       const shadow = path.join(home, "shadow");
       yield* fs.makeDirectory(shadow);
       yield* fs.writeFileString(path.join(shadow, "t3"), "#!/bin/sh\n", { mode: 0o755 });
@@ -232,7 +239,7 @@ it.layer(NodeServices.layer)("DesktopCliCommand", (it) => {
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
-      const home = yield* fs.makeTempDirectoryScoped();
+      const home = yield* makeUnixHome;
       const launcher = path.join(home, ".t3", "bin", "t3");
       process.env.PATH = [path.dirname(launcher), path.join(home, ".local", "bin")].join(":");
 

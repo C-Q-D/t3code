@@ -1,6 +1,12 @@
+/** Verifies pool lifecycle and shared startup health without launching native processes or windows. */
 import * as DesktopUiLocale from "../i18n/DesktopUiLocale.ts";
 import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
+import * as Deferred from "effect/Deferred";
+import * as Duration from "effect/Duration";
+import * as Sink from "effect/Sink";
+import * as SubscriptionRef from "effect/SubscriptionRef";
+import * as TestClock from "effect/testing/TestClock";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Logger from "effect/Logger";
@@ -8,7 +14,7 @@ import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
 import * as References from "effect/References";
 import * as Stream from "effect/Stream";
-import { HttpClient } from "effect/http";
+import { HttpClient, HttpClientResponse } from "effect/http";
 import { ChildProcessSpawner } from "effect/process";
 
 import * as DesktopObservability from "../app/DesktopObservability.ts";
@@ -18,33 +24,82 @@ import * as DesktopTelemetryPublisher from "../telemetry/DesktopTelemetryPublish
 import * as DesktopBrowserHost from "../preview/DesktopBrowserHost.ts";
 import * as ElectronDialog from "../electron/ElectronDialog.ts";
 import * as ElectronApp from "../electron/ElectronApp.ts";
+import * as ElectronWindow from "../electron/ElectronWindow.ts";
 import * as DesktopWindow from "../window/DesktopWindow.ts";
 import * as DesktopWslEnvironment from "../wsl/DesktopWslEnvironment.ts";
 import * as DesktopBackendConfiguration from "./DesktopBackendConfiguration.ts";
 import * as DesktopBackendPool from "./DesktopBackendPool.ts";
 import type { DesktopBackendStartConfig } from "./DesktopBackendManager.ts";
 
-/** Builds a pool with an observable label and inert external resources; no backends are spawned. */
+const startupConfig: DesktopBackendStartConfig = {
+  executablePath: "/electron",
+  args: [],
+  entryPath: "/server/bin.mjs",
+  cwd: "/server",
+  env: {},
+  bootstrap: {
+    mode: "desktop",
+    noBrowser: true,
+    port: 3773,
+    t3Home: "/tmp/t3",
+    host: "127.0.0.1",
+    desktopBootstrapToken: "token",
+    tailscaleServeEnabled: false,
+    tailscaleServePort: 443,
+  },
+  bootstrapDelivery: "fd3",
+  extendEnv: true,
+  httpBaseUrl: new URL("http://127.0.0.1:3773"),
+  captureOutput: false,
+  preflightFailure: Option.none(),
+  // Runtime pruning follows the complete readiness callback, including its handled window error.
+  runningDistro: "Ubuntu",
+  wslRuntimeId: "test-runtime",
+};
+
+/** Builds the real pool and manager with controlled process, HTTP and window boundaries. */
 function layerPool(
   labelRef: Ref.Ref<string>,
   options: {
     primaryConfig?: DesktopBackendStartConfig;
     locale?: "en" | "zh-CN";
     showErrorBox?: ElectronDialog.ElectronDialog["Service"]["showErrorBox"];
+    readyWindow?: DesktopWindow.DesktopWindow["Service"]["handleBackendReady"];
+    readinessFinished?: Effect.Effect<void>;
   } = {},
-): Layer.Layer<DesktopBackendPool.DesktopBackendPool> {
+): Layer.Layer<DesktopBackendPool.DesktopBackendPool | DesktopState.DesktopState> {
   return DesktopBackendPool.layer.pipe(
     Layer.provide(DesktopUiLocale.layerTest(options.locale)),
     Layer.provideMerge(
       Layer.mergeAll(
-        FileSystem.layerNoop({}),
+        FileSystem.layerNoop({ exists: () => Effect.succeed(options.readyWindow !== undefined) }),
         Layer.succeed(
           ChildProcessSpawner.ChildProcessSpawner,
-          ChildProcessSpawner.make(() => Effect.die("unexpected child process spawn")),
+          ChildProcessSpawner.make(() =>
+            Effect.succeed(
+              ChildProcessSpawner.makeHandle({
+                pid: ChildProcessSpawner.ProcessId(123),
+                exitCode: Effect.never,
+                isRunning: Effect.succeed(false),
+                kill: () => Effect.void,
+                unref: Effect.succeed(Effect.void),
+                stdin: Sink.drain,
+                stdout: Stream.empty,
+                stderr: Stream.empty,
+                all: Stream.empty,
+                getInputFd: () => Sink.drain,
+                getOutputFd: () => Stream.empty,
+              }),
+            ),
+          ),
         ),
         Layer.succeed(
           HttpClient.HttpClient,
-          HttpClient.make(() => Effect.die("unexpected HTTP request")),
+          HttpClient.make((request) =>
+            Effect.succeed(
+              HttpClientResponse.fromWeb(request, new Response(null, { status: 200 })),
+            ),
+          ),
         ),
         Layer.succeed(DesktopObservability.DesktopBackendOutputLogFactory, {
           forInstance: () =>
@@ -78,7 +133,9 @@ function layerPool(
         } satisfies DesktopBackendConfiguration.DesktopBackendConfiguration["Service"]),
         DesktopAppSettings.layerTest(),
         DesktopState.layer,
-        DesktopWslEnvironment.layerTest(),
+        DesktopWslEnvironment.layerTest({
+          pruneRuntimes: () => options.readinessFinished ?? Effect.void,
+        }),
         Layer.succeed(ElectronDialog.ElectronDialog, {
           ...ElectronDialog.make,
           showErrorBox: options.showErrorBox ?? ElectronDialog.make.showErrorBox,
@@ -91,7 +148,7 @@ function layerPool(
           activate: Effect.die("unexpected window activate"),
           createMainIfBackendReady: Effect.die("unexpected window create"),
           showConnectingSplash: Effect.void,
-          handleBackendReady: () => Effect.void,
+          handleBackendReady: options.readyWindow ?? (() => Effect.void),
           handleBackendNotReady: Effect.void,
           flushMainWindowBounds: Effect.void,
           prepareCaptureReveal: Effect.void,
@@ -107,6 +164,100 @@ function layerPool(
 }
 
 describe("DesktopBackendPool", () => {
+  it.effect("publishes repeated startup failures to shared recovery state", () =>
+    Effect.gen(function* () {
+      const pool = yield* DesktopBackendPool.DesktopBackendPool;
+      const state = yield* DesktopState.DesktopState;
+      const primary = yield* pool.primary;
+      yield* primary.start;
+      yield* TestClock.adjust(Duration.seconds(4));
+      assert.deepEqual(yield* SubscriptionRef.get(state.primaryBackendStartup), {
+        _tag: "Failing",
+        reason: "The server could not start (missing server entry at /server/bin.mjs).",
+        output: "",
+      });
+    }).pipe(Effect.provide(layerPool(Ref.makeUnsafe("Windows"), { primaryConfig: startupConfig }))),
+  );
+
+  it.effect("publishes Ready only after the main window finishes opening", () =>
+    Effect.gen(function* () {
+      const entered = yield* Deferred.make<void>();
+      const release = yield* Deferred.make<void>();
+      const finished = yield* Deferred.make<void>();
+      yield* Effect.gen(function* () {
+        const pool = yield* DesktopBackendPool.DesktopBackendPool;
+        const state = yield* DesktopState.DesktopState;
+        yield* (yield* pool.primary).start;
+        yield* Deferred.await(entered);
+        assert.deepEqual(yield* SubscriptionRef.get(state.primaryBackendStartup), {
+          _tag: "Starting",
+        });
+        yield* Deferred.succeed(release, undefined);
+        yield* Deferred.await(finished);
+        assert.deepEqual(yield* SubscriptionRef.get(state.primaryBackendStartup), {
+          _tag: "Ready",
+        });
+      }).pipe(
+        Effect.provide(
+          layerPool(Ref.makeUnsafe("Windows"), {
+            primaryConfig: startupConfig,
+            readyWindow: () =>
+              Deferred.succeed(entered, undefined).pipe(Effect.andThen(Deferred.await(release))),
+            readinessFinished: Deferred.succeed(finished, undefined).pipe(Effect.asVoid),
+          }),
+        ),
+      );
+    }),
+  );
+
+  it.effect("keeps recovery state non-Ready when main window creation fails", () =>
+    Effect.gen(function* () {
+      const finished = yield* Deferred.make<void>();
+      yield* Effect.gen(function* () {
+        const pool = yield* DesktopBackendPool.DesktopBackendPool;
+        const state = yield* DesktopState.DesktopState;
+        yield* (yield* pool.primary).start;
+        yield* Deferred.await(finished);
+        assert.deepEqual(yield* SubscriptionRef.get(state.primaryBackendStartup), {
+          _tag: "Starting",
+        });
+      }).pipe(
+        Effect.provide(
+          layerPool(Ref.makeUnsafe("Windows"), {
+            primaryConfig: startupConfig,
+            readyWindow: () =>
+              Effect.fail(
+                new ElectronWindow.ElectronWindowCreateError({
+                  cause: new Error("native window creation failed"),
+                  options: {
+                    title: null,
+                    width: null,
+                    height: null,
+                    minWidth: null,
+                    minHeight: null,
+                    show: null,
+                    modal: null,
+                    frame: null,
+                    transparent: null,
+                    backgroundColor: null,
+                    webPreferences: {
+                      preload: null,
+                      partition: null,
+                      backgroundThrottling: null,
+                      sandbox: null,
+                      contextIsolation: null,
+                      nodeIntegration: null,
+                      webviewTag: null,
+                    },
+                  },
+                }),
+              ),
+            readinessFinished: Deferred.succeed(finished, undefined).pipe(Effect.asVoid),
+          }),
+        ),
+      );
+    }),
+  );
   it.effect.each([
     {
       name: "translates dependency failures without translating diagnostic reasons",
