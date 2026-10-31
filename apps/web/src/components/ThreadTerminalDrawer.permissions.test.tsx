@@ -28,7 +28,7 @@ const state = vi.hoisted(() => ({
     >(),
 }));
 
-vi.mock("@effect/atom-react", () => ({ useAtomValue: () => null }));
+vi.mock("@effect/atom-react", () => ({ useAtomValue: () => null, useAtomMount: () => undefined }));
 vi.mock("../hooks/useSettings", () => ({
   getClientSettings: () => DEFAULT_CLIENT_SETTINGS,
   useClientSettings: (select: (settings: typeof DEFAULT_CLIENT_SETTINGS) => unknown) =>
@@ -45,7 +45,10 @@ vi.mock("../state/use-atom-command", () => ({
   useAtomCommand: (command: string) => (command === "resize" ? state.resize : state.otherCommand),
 }));
 vi.mock("../state/terminalSessions", () => ({
-  useAttachedTerminalSession: () => session,
+  attachedTerminalSessionAtom: () => "terminal-session",
+}));
+vi.mock("../rpc/atomRegistry", () => ({
+  appAtomRegistry: { get: () => session, subscribe: () => () => undefined },
 }));
 vi.mock("~/terminal/ghostty/surface", () => ({
   GhosttyTerminalSurface: { create: state.createSurface },
@@ -116,11 +119,8 @@ it("rechecks the target terminal grant when a retained surface callback reports 
         terminalId="terminal-1"
         cwd="/repo"
         onSessionExited={state.otherCommand}
-        focusRequestId={0}
         autoFocus={false}
         visible={true}
-        resizeEpoch={0}
-        drawerHeight={200}
         keybindings={[]}
       />,
       { createNodeMock: () => ({ closest: () => null, contains: () => false }) },

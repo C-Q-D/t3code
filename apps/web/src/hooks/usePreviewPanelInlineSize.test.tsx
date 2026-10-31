@@ -14,7 +14,9 @@ let width: number;
 
 /** Runs the real resize hook with a persisted width above either host's limit. */
 function Panel({ standalone }: { standalone: boolean }) {
-  const size = usePreviewPanelInlineSize(undefined, { container, standalone });
+  const size = usePreviewPanelInlineSize({ container, standalone });
+  const { observeRow } = size;
+  useLayoutEffect(() => observeRow(container), [observeRow]);
   useLayoutEffect(() => {
     width = size.width;
   });

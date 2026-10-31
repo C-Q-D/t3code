@@ -3,6 +3,7 @@
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, expect, it, vi } from "vite-plus/test";
 import { resolveChatCanvasLayout, type ChatCanvasPreview } from "../chat/chatCanvasLayout";
+import type * as PreviewMiniPlayerStore from "~/previewMiniPlayerStore";
 import { EnvironmentId, ThreadId } from "@t3tools/contracts";
 
 const state = vi.hoisted(() => ({
@@ -27,7 +28,7 @@ vi.mock("../chat/ChatCanvasContext", () => ({
   }),
 }));
 vi.mock("~/previewMiniPlayerStore", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("~/previewMiniPlayerStore")>()),
+  ...(await importOriginal<typeof PreviewMiniPlayerStore>()),
   usePreviewMiniPlayerStore: { getState: () => state },
 }));
 vi.mock("~/previewStateStore", () => ({

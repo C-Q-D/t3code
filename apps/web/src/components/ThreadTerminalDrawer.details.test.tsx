@@ -35,7 +35,6 @@ const drawerProps = {
   activeTerminalId: "",
   terminalGroups: [],
   activeTerminalGroupId: "",
-  focusRequestId: 0,
   keybindings: [],
   onSplitTerminal: () => {},
   onSplitTerminalVertical: () => {},
@@ -246,7 +245,8 @@ it("keeps the existing hard-clamped drawer drag when physics is disabled", async
   const { drawer, handle } = drawerGesture();
   await resizePointer(handle, "pointerdown", 100, 0);
   await resizePointer(handle, "pointermove", 320, 30);
-  expect(drawer.style.height).toBe("180px");
+  expect(drawer.style.height).toBe("var(--terminal-drawer-drag-height, 300px)");
+  expect(drawer.style.getPropertyValue("--terminal-drawer-drag-height")).toBe("180px");
   await resizePointer(handle, "pointerup", 320, 40);
   expect(activeJobs()).toBe(0);
   expect(
