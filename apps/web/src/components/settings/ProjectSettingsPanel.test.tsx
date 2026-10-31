@@ -74,7 +74,12 @@ vi.mock("~/state/environments", () => ({
   useEnvironments: () => ({ environments }),
   usePrimaryEnvironmentId: () => primaryId,
 }));
+vi.mock("~/state/olderSettledShelf", () => ({ readUnloadedThreadCount: () => 0 }));
 vi.mock("~/state/entities", () => ({
+  useServerConfigs: () =>
+    new Map(
+      environments.map((environment) => [environment.environmentId, environment.serverConfig]),
+    ),
   useProjects: () => state.projects,
   useThreadShells: () => [],
   waitForProjectRemoval: async () => true,
@@ -218,7 +223,10 @@ const environments = [primaryId, remoteId].map((environmentId) => ({
   environmentId,
   label: environmentId,
   connection: { phase: "connected" },
-  serverConfig: { keybindings: DEFAULT_RESOLVED_KEYBINDINGS },
+  serverConfig: {
+    keybindings: DEFAULT_RESOLVED_KEYBINDINGS,
+    environment: { capabilities: { projectOrganization: true } },
+  },
 }));
 const session = (scopes: ReadonlyArray<AuthEnvironmentScope>): AuthSessionState => ({
   authenticated: true,

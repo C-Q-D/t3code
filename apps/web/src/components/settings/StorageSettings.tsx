@@ -17,6 +17,8 @@ import { formatBytes } from "../../lib/formatBytes";
 import { environmentAtomList, environmentIdsKey } from "../../state/environmentAtomList";
 import { serverEnvironment } from "../../state/server";
 import { useAtomCommand } from "../../state/use-atom-command";
+import { useDebouncedValue } from "../../state/queries";
+import { useNowMinute } from "../../hooks/useNowMinute";
 import { formatRelativeTimeLabel } from "../../timestampFormat";
 import { Button } from "../ui/button";
 import { toastManager } from "../ui/toast";
@@ -31,7 +33,6 @@ import {
   SettingsPageContainer,
   SettingsRow,
   SettingsSection,
-  useRelativeTimeTick,
 } from "./settingsLayout";
 import { DatabaseStorageNotice } from "./DatabaseStorageNotice";
 import { SettingsScopeNotice } from "./SettingsScopeNotice";
@@ -347,7 +348,8 @@ const storageCleanupPermissionsAtom = environmentAtomList(
  * @returns The P1 artifacts row and an expandable report, or null when cleanup is unsupported.
  */
 function CleanupSection() {
-  useRelativeTimeTick(60_000);
+  const nowMinute = useNowMinute();
+  const nowMs = Date.parse(`${nowMinute}:00.000Z`);
   const { connectedEnvironments } = useSettingsScope();
   const [pending, setPending] = useState(false);
   const run = useAtomCommand(serverEnvironment.runStorageCleanup);
@@ -403,7 +405,7 @@ function CleanupSection() {
         : "",
       description: report
         ? t.settings.merge.storageRunSummary(
-            formatRelativeTimeLabel(report.finishedAt),
+            formatRelativeTimeLabel(report.finishedAt, nowMs),
             formatBytes(report.bytesFreed),
             report.counts.failed,
           )
@@ -809,36 +811,72 @@ export function StorageSettingsPanel() {
         )}
       </SettingsSection>
 
-      {!isProjectScope && (
-        <SettingsSection id="storage-artifacts" title={t.settings.rows.storageArtifacts.title}>
-          <SettingsRow
-            title={t.settings.storage.deleteOldBrowserArtifacts}
-            status={ruleStatus("browserArtifactsAfterDays")}
-            description={t.settings.storage.deleteSavedBrowserCapturesAfterHint}
-            serverScoped
-            control={
-              <RetentionControl
-                label={t.settings.storage.deleteOldBrowserArtifacts}
-                value={settings.browserArtifactsAfterDays}
-                onChange={(browserArtifactsAfterDays) => update({ browserArtifactsAfterDays })}
-              />
-            }
-          />
-          <SettingsRow
-            title={t.settings.storage.deleteOldRotatedLogs}
-            status={ruleStatus("logsAfterDays")}
-            description={t.settings.storage.deleteInactiveRotatedLogFilesHint}
-            serverScoped
-            control={
-              <RetentionControl
-                label={t.settings.storage.deleteOldRotatedLogs}
-                value={settings.logsAfterDays}
-                onChange={(logsAfterDays) => update({ logsAfterDays })}
-              />
-            }
-          />
-        </SettingsSection>
-      )}
+      <StorageCleanupSections />
     </SettingsPageContainer>
+  );
+}
+
+/** Edits server artifact retention independently of worktree cleanup; project scopes have no artifact overrides. */
+export function StorageCleanupSections() {
+  const { scope, targets } = useSettingsScope();
+  const scopedSettings = useScopedSettings();
+  const updateSettings = useUpdateScopedSettings();
+  const settings = scopedSettings.storageCleanup;
+  const targetIdsKey = environmentIdsKey(targets.map((target) => target.environmentId).sort());
+  const artifactsMixed =
+    targets.length > 1 &&
+    targets.some(
+      (target) =>
+        target.settings.storageCleanup.browserArtifactsAfterDays !==
+        settings.browserArtifactsAfterDays,
+    );
+  const logsMixed =
+    targets.length > 1 &&
+    targets.some(
+      (target) => target.settings.storageCleanup.logsAfterDays !== settings.logsAfterDays,
+    );
+  const settledArtifactsStatus = useDebouncedValue(`${targetIdsKey}:${artifactsMixed}`, 300);
+  const settledLogsStatus = useDebouncedValue(`${targetIdsKey}:${logsMixed}`, 300);
+  const artifactsStatus =
+    targets.length > 1 && settledArtifactsStatus === `${targetIdsKey}:true`
+      ? t.settings.storage.mixedAcrossSelectedMachines
+      : undefined;
+  const logsStatus =
+    targets.length > 1 && settledLogsStatus === `${targetIdsKey}:true`
+      ? t.settings.storage.mixedAcrossSelectedMachines
+      : undefined;
+  if (scope.kind === "project" || scope.kind === "checkout") return null;
+  const update = (patch: Partial<StorageCleanupSettings>) =>
+    updateSettings({ storageCleanup: patch });
+
+  return (
+    <SettingsSection id="storage-artifacts" title={t.settings.rows.storageArtifacts.title}>
+      <SettingsRow
+        title={t.settings.storage.deleteOldBrowserArtifacts}
+        status={artifactsStatus}
+        description={t.settings.storage.deleteSavedBrowserCapturesAfterHint}
+        serverScoped
+        control={
+          <RetentionControl
+            label={t.settings.storage.deleteOldBrowserArtifacts}
+            value={settings.browserArtifactsAfterDays}
+            onChange={(browserArtifactsAfterDays) => update({ browserArtifactsAfterDays })}
+          />
+        }
+      />
+      <SettingsRow
+        title={t.settings.storage.deleteOldRotatedLogs}
+        status={logsStatus}
+        description={t.settings.storage.deleteInactiveRotatedLogFilesHint}
+        serverScoped
+        control={
+          <RetentionControl
+            label={t.settings.storage.deleteOldRotatedLogs}
+            value={settings.logsAfterDays}
+            onChange={(logsAfterDays) => update({ logsAfterDays })}
+          />
+        }
+      />
+    </SettingsSection>
   );
 }

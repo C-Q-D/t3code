@@ -11,16 +11,15 @@ import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import { useNavigate } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
-import { mergeEnvironmentSettings } from "../../hooks/useSettings";
 import {
   getCustomModelOptionsByInstance,
   resolveEffectiveDefaultModelSelection,
 } from "../../modelSelection";
 import {
+  providerInstanceEntriesFor,
   applyProviderInstanceSettings,
   deriveProviderInstanceEntries,
   resolveDefaultProviderModelSelection,
-  sortProviderInstanceEntries,
 } from "../../providerInstances";
 import { useEnvironmentProviders, useEnvironments } from "../../state/environments";
 import { EMPTY_SERVER_PROVIDERS } from "../../state/server";
@@ -41,6 +40,7 @@ import {
   SettingsRow,
   SettingsSection,
 } from "./settingsLayout";
+import { mergeEnvironmentSettings } from "../../hooks/useSettings";
 import {
   useScopedSettings,
   useScopedSettingsMixed,
@@ -78,13 +78,7 @@ export function DefaultModelSetting({
   const selection = storedSelection
     ? resolveEffectiveDefaultModelSelection(settings, providers, storedSelection)
     : null;
-  const entries = sortProviderInstanceEntries(
-    applyProviderInstanceSettings(
-      deriveProviderInstanceEntries(providers),
-      settings,
-      target?.projectId ?? null,
-    ),
-  );
+  const entries = providerInstanceEntriesFor(providers, settings, target?.projectId ?? null);
   const modelOptions = getCustomModelOptionsByInstance(
     settings,
     providers,
@@ -93,6 +87,14 @@ export function DefaultModelSetting({
   );
   const activeEntry = entries.find((entry) => entry.instanceId === selection?.instanceId);
   const mixedModel = useScopedSettingsMixed(["defaultModelSelection"]);
+  const mixedFallback = useScopedSettingsMixed(["fallbackModelSelection"]);
+  const fallbackSelection = settings.fallbackModelSelection ?? selection;
+  const fallbackModelOptions = getCustomModelOptionsByInstance(
+    settings,
+    providers,
+    fallbackSelection?.instanceId,
+    fallbackSelection?.model,
+  );
   const modelSource = useScopedSettingSource(["defaultModelSelection"]);
   const isProjectScope = scope.kind === "project" || scope.kind === "checkout";
   const unavailable = connectedEnvironments.length === 0;
@@ -142,79 +144,135 @@ export function DefaultModelSetting({
     updateSettings({ defaultModelSelection: value });
   };
 
-  return (
+  const fallbackRow = !isProjectScope ? (
     <SettingsRow
       serverScoped
-      settingKeys={["defaultModelSelection"]}
-      mixed={mixedModel}
-      id="default-model"
-      title={title}
-      description={
-        isProjectScope
-          ? t.settings.projectDefaults.modelForNewThreadsInThisProject
-          : t.settings.projectDefaults.defaultModelThreadsProjectsOverrideHint
-      }
-      status={
-        unavailable || mixedModel || modelSource === "project"
-          ? undefined
-          : settings.defaultModelSelection === null
-            ? t.settings.projectDefaults.automatic
-            : undefined
-      }
+      settingKeys={["fallbackModelSelection"]}
+      mixed={mixedFallback}
+      id="fallback-model"
+      title="Fallback model"
+      description="Used for new threads when the default model's provider is out of usage."
       resetAction={
-        settings.defaultModelSelection !== null ? (
+        mixedFallback || settings.fallbackModelSelection !== null ? (
           <SettingResetButton
-            label={t.settings.projectDefaults.defaultModel}
-            onClick={() => setModel(null)}
+            label="fallback model"
+            onClick={() => updateSettings({ fallbackModelSelection: null })}
           />
         ) : null
       }
       control={
-        selection && activeEntry ? (
-          <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
-            <ProviderModelPicker
-              environmentId={representative?.environmentId ?? null}
-              activeInstanceId={selection.instanceId}
-              model={selection.model}
-              lockedProvider={null}
-              instanceEntries={entries}
-              modelOptionsByInstance={modelOptions}
-              triggerClassName={SETTINGS_PICKER_TRIGGER_CLASSNAME}
-              {...(mixedModel ? { triggerLabel: t.settings.general.mixed } : {})}
-              getModelDisabledReason={modelDisabledReason}
-              onOpenProviderSetup={(instanceId) => {
-                if (representative)
-                  void navigate({
-                    to: "/settings/providers",
-                    search: { environmentId: representative.environmentId, instanceId },
-                  });
-              }}
-              onInstanceModelChange={(instanceId, model) =>
-                setModel(createModelSelection(instanceId, model))
+        fallbackSelection ? (
+          <ProviderModelPicker
+            environmentId={representative?.environmentId ?? null}
+            activeInstanceId={fallbackSelection.instanceId}
+            model={fallbackSelection.model}
+            lockedProvider={null}
+            instanceEntries={entries}
+            modelOptionsByInstance={fallbackModelOptions}
+            triggerClassName={SETTINGS_PICKER_TRIGGER_CLASSNAME}
+            triggerAriaLabel="Fallback model"
+            {...(mixedFallback
+              ? { triggerLabel: "Mixed" }
+              : settings.fallbackModelSelection === null
+                ? { triggerLabel: "None" }
+                : {})}
+            getModelDisabledReason={modelDisabledReason}
+            onInstanceModelChange={(instanceId, model) => {
+              const reason = modelDisabledReason(instanceId, model);
+              if (reason) {
+                toastManager.add({
+                  type: "error",
+                  title: "Fallback model not saved",
+                  description: reason,
+                });
+                return;
               }
-            />
-            {!mixedModel ? (
-              <TraitsPicker
-                provider={activeEntry.driverKind}
-                models={activeEntry.models}
-                model={selection.model}
-                modelOptions={selection.options ?? []}
-                allowPromptInjectedEffort={false}
-                planModeEnabled={settings.planModeEnabled}
-                triggerClassName={SETTINGS_PICKER_TRIGGER_CLASSNAME}
-                onModelOptionsChange={(options) =>
-                  setModel(createModelSelection(selection.instanceId, selection.model, options))
-                }
-              />
-            ) : null}
-          </div>
+              updateSettings({ fallbackModelSelection: createModelSelection(instanceId, model) });
+            }}
+          />
         ) : (
-          <span className="text-sm text-muted-foreground">
-            {t.settings.projectDefaults.noProvidersAvailable}
-          </span>
+          <span className="text-sm text-muted-foreground">No providers available</span>
         )
       }
     />
+  ) : null;
+
+  return (
+    <>
+      <SettingsRow
+        serverScoped
+        settingKeys={["defaultModelSelection"]}
+        mixed={mixedModel}
+        id="default-model"
+        title={title}
+        description={
+          isProjectScope
+            ? t.settings.projectDefaults.modelForNewThreadsInThisProject
+            : t.settings.projectDefaults.defaultModelThreadsProjectsOverrideHint
+        }
+        status={
+          unavailable || mixedModel || modelSource === "project"
+            ? undefined
+            : settings.defaultModelSelection === null
+              ? t.settings.projectDefaults.automatic
+              : undefined
+        }
+        resetAction={
+          settings.defaultModelSelection !== null ? (
+            <SettingResetButton
+              label={t.settings.projectDefaults.defaultModel}
+              onClick={() => setModel(null)}
+            />
+          ) : null
+        }
+        control={
+          selection && activeEntry ? (
+            <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
+              <ProviderModelPicker
+                environmentId={representative?.environmentId ?? null}
+                activeInstanceId={selection.instanceId}
+                model={selection.model}
+                lockedProvider={null}
+                instanceEntries={entries}
+                modelOptionsByInstance={modelOptions}
+                triggerClassName={SETTINGS_PICKER_TRIGGER_CLASSNAME}
+                {...(mixedModel ? { triggerLabel: t.settings.general.mixed } : {})}
+                getModelDisabledReason={modelDisabledReason}
+                onOpenProviderSetup={(instanceId) => {
+                  if (representative)
+                    void navigate({
+                      to: "/settings/providers",
+                      search: { environmentId: representative.environmentId, instanceId },
+                    });
+                }}
+                onInstanceModelChange={(instanceId, model) =>
+                  setModel(createModelSelection(instanceId, model))
+                }
+              />
+              {!mixedModel ? (
+                <TraitsPicker
+                  provider={activeEntry.driverKind}
+                  models={activeEntry.models}
+                  model={selection.model}
+                  modelOptions={selection.options ?? []}
+                  allowPromptInjectedEffort={false}
+                  planModeEnabled={settings.planModeEnabled}
+                  triggerClassName={SETTINGS_PICKER_TRIGGER_CLASSNAME}
+                  onModelOptionsChange={(options) =>
+                    setModel(createModelSelection(selection.instanceId, selection.model, options))
+                  }
+                />
+              ) : null}
+            </div>
+          ) : (
+            <span className="text-sm text-muted-foreground">
+              {t.settings.projectDefaults.noProvidersAvailable}
+            </span>
+          )
+        }
+      />
+      {fallbackRow}
+    </>
   );
 }
 
