@@ -29,6 +29,8 @@ import { FRAME_SIDEBAR_DRAWER_GEOMETRY } from "~/components/frame/sidebarDrawerG
 import { getLocalStorageItem, setLocalStorageItem } from "~/hooks/useLocalStorage";
 import { resolveSidebarState, type ResponsiveSidebarState } from "./sidebarState";
 import * as Schema from "effect/Schema";
+import { announceSidebarVisibility } from "~/lib/accessibilityAnnouncements";
+import { useStableCallback } from "~/hooks/useStableCallback";
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state";
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
@@ -50,6 +52,8 @@ type SidebarContextProps = {
   setOpenMobile: (open: boolean) => void;
   isMobile: boolean;
   toggleSidebar: () => void;
+  /** Runs before desktop collapse so active drags can release ownership. */
+  onCollapse: (listener: () => void) => () => void;
   /** Captures visibility in memory once, until restore consumes the snapshot. */
   saveSidebarState: () => void;
   /** Restores both visibility modes; does nothing without a saved snapshot. */
@@ -108,6 +112,45 @@ function useSidebarVisibility() {
   return isMobile ? openMobile : open;
 }
 
+/** Moves focus to the outside trigger before a collapsing offcanvas sidebar becomes inert. */
+function moveFocusOutOfCollapsingSidebar() {
+  const sidebar = document.activeElement?.closest<HTMLElement>(
+    '[data-slot="sidebar"][data-collapsible-mode="offcanvas"]',
+  );
+  const wrapper = sidebar?.closest<HTMLElement>('[data-slot="sidebar-wrapper"]');
+  if (!sidebar || !wrapper) return;
+  const trigger = Array.from(
+    wrapper.querySelectorAll<HTMLElement>('[data-sidebar="trigger"]'),
+  ).find((element) => !sidebar.contains(element));
+  trigger?.focus({ preventScroll: true });
+}
+
+/** Keeps shortcut reads current between React commits; each provider owns its own visibility. */
+function createSidebarOpenStore(defaultOpen: boolean) {
+  let state = { open: defaultOpen, openMobile: false };
+  const listeners = new Set<() => void>();
+  const publish = (next: typeof state) => {
+    state = next;
+    for (const listener of listeners) listener();
+  };
+  return {
+    getSnapshot: () => state,
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    setOpen: (open: boolean) => {
+      if (open !== state.open) publish({ ...state, open });
+    },
+    setOpenMobile: (value: boolean | ((open: boolean) => boolean)) => {
+      const openMobile = typeof value === "function" ? value(state.openMobile) : value;
+      if (openMobile !== state.openMobile) publish({ ...state, openMobile });
+    },
+  };
+}
+
 /**
  * Owns desktop and drawer visibility, toggle actions, and an in-memory panel snapshot.
  * defaultOpen seeds uncontrolled desktop visibility; open/onOpenChange allow control.
@@ -128,24 +171,44 @@ function SidebarProvider({
   onOpenChange?: (open: boolean) => void;
 }) {
   const isMobile = useMediaQuery(FRAME_NARROW_MEDIA_QUERY);
-  const [openMobile, setOpenMobile] = React.useState(false);
+  const [store] = React.useState(() => createSidebarOpenStore(defaultOpen));
+  const visibility = React.useSyncExternalStore(
+    store.subscribe,
+    store.getSnapshot,
+    store.getSnapshot,
+  );
+  const { openMobile } = visibility;
+  const setOpenMobile = store.setOpenMobile;
   const [mobileSheetMounted, setMobileSheetMounted] = React.useState(false);
   const setMobileSheetElement = (element: HTMLDivElement | null) => {
     setMobileSheetMounted(element !== null);
   };
 
-  const [_open, _setOpen] = React.useState(defaultOpen);
-  const open = openProp ?? _open;
-  const setOpenTemporarily = (value: boolean | ((value: boolean) => boolean)) => {
-    const openState = typeof value === "function" ? value(open) : value;
+  const open = openProp ?? visibility.open;
+  const [collapseListeners] = React.useState(() => new Set<() => void>());
+  const onCollapse = useStableCallback((listener: () => void) => {
+    collapseListeners.add(listener);
+    return () => {
+      collapseListeners.delete(listener);
+    };
+  });
+  const setOpenTemporarily = useStableCallback((value: boolean | ((value: boolean) => boolean)) => {
+    const currentOpen = openProp ?? store.getSnapshot().open;
+    const openState = typeof value === "function" ? value(currentOpen) : value;
+    if (!openState && currentOpen) {
+      for (const listener of collapseListeners) listener();
+      moveFocusOutOfCollapsingSidebar();
+    }
+    if (openState !== currentOpen && !isMobile) announceSidebarVisibility(openState);
     if (setOpenProp) {
       setOpenProp(openState);
     } else {
-      _setOpen(openState);
+      store.setOpen(openState);
     }
-  };
-  const setOpen = async (value: boolean | ((value: boolean) => boolean)) => {
-    const openState = typeof value === "function" ? value(open) : value;
+  });
+  const setOpen = useStableCallback(async (value: boolean | ((value: boolean) => boolean)) => {
+    const currentOpen = openProp ?? store.getSnapshot().open;
+    const openState = typeof value === "function" ? value(currentOpen) : value;
     setOpenTemporarily(openState);
 
     // This sets the cookie to keep the sidebar state.
@@ -155,11 +218,11 @@ function SidebarProvider({
       path: "/",
       value: String(openState),
     });
-  };
+  });
 
-  const toggleSidebar = () => {
+  const toggleSidebar = useStableCallback(() => {
     return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open);
-  };
+  });
 
   const state = resolveSidebarState({ isMobile, open, openMobile });
   const savedVisibility = React.useRef<{ open: boolean; openMobile: boolean } | null>(null);
@@ -175,6 +238,7 @@ function SidebarProvider({
     setOpenMobile,
     state,
     toggleSidebar,
+    onCollapse,
     saveSidebarState() {
       // Preserve the first snapshot if a panel changes tabs while the sidebar is hidden.
       if (savedVisibility.current === null) savedVisibility.current = { open, openMobile };
@@ -326,7 +390,7 @@ function Sidebar({
                   data-slot="sidebar"
                 >
                   <SheetHeader className="sr-only">
-                    <SheetTitle>{t.app.sidebar.title}</SheetTitle>
+                    <SheetTitle>{props["aria-label"] ?? t.app.sidebar.title}</SheetTitle>
                     <SheetDescription>{t.app.sidebar.description}</SheetDescription>
                   </SheetHeader>
                   <div className="flex h-full min-h-0 w-full flex-col" {...props}>
@@ -360,7 +424,7 @@ function Sidebar({
             }
           >
             <SheetHeader className="sr-only">
-              <SheetTitle>{t.app.sidebar.title}</SheetTitle>
+              <SheetTitle>{props["aria-label"] ?? t.app.sidebar.title}</SheetTitle>
               <SheetDescription>{t.app.sidebar.description}</SheetDescription>
             </SheetHeader>
             <div
@@ -385,6 +449,7 @@ function Sidebar({
         ref={desktopSidebarRef}
         className="group peer hidden text-sidebar-foreground md:block"
         data-collapsible={state === "collapsed" ? collapsible : ""}
+        data-collapsible-mode={collapsible}
         data-side={side}
         data-slot="sidebar"
         data-state={state}
@@ -489,7 +554,7 @@ function SidebarRail({
   onPointerUp,
   ...props
 }: React.ComponentProps<"button">) {
-  const { open, setOpen, toggleSidebar } = useSidebar();
+  const { open, setOpen, toggleSidebar, onCollapse } = useSidebar();
   const sidebarInstance = React.use(SidebarInstanceContext);
   const railRef = React.useRef<HTMLButtonElement | null>(null);
   const widthReadoutRef = React.useRef<HTMLSpanElement | null>(null);
@@ -514,6 +579,7 @@ function SidebarRail({
       // Only visible icon rails probe outward travel; offcanvas rails leave native scrollbars unobstructed.
       return {
         width: 0,
+        bounds: { min: 0, max: Number.POSITIVE_INFINITY },
         physicalInteraction: true,
         edge: side === "left" ? "right" : "left",
         resize: (distance) => distance,
@@ -559,17 +625,19 @@ function SidebarRail({
     setIsResizing(true);
 
     let acceptedFrame = true;
+    const physics = createResizePhysics(
+      () => latestResizable.current?.minWidth ?? resolvedResizable.minWidth,
+      () => latestResizable.current?.maxWidth ?? resolvedResizable.maxWidth,
+      () => {
+        if (!acceptedFrame) return;
+        suppressClickRef.current = true;
+        setOpen(false);
+      },
+    );
     return {
       width,
-      physics: createResizePhysics(
-        () => latestResizable.current?.minWidth ?? resolvedResizable.minWidth,
-        () => latestResizable.current?.maxWidth ?? resolvedResizable.maxWidth,
-        () => {
-          if (!acceptedFrame) return;
-          suppressClickRef.current = true;
-          setOpen(false);
-        },
-      ),
+      bounds: physics,
+      physics,
       paint(value) {
         if (acceptedFrame) setTargetWidth(value);
       },
@@ -617,6 +685,17 @@ function SidebarRail({
       },
     };
   }, String(open));
+  const attachRail = useStableCallback((node: HTMLButtonElement | null) => {
+    railRef.current = node;
+    const releaseDrag = resize.ref(node);
+    if (!releaseDrag) return undefined;
+    const unsubscribe = onCollapse(resize.cancel);
+    return () => {
+      unsubscribe();
+      releaseDrag();
+      railRef.current = null;
+    };
+  });
   const refreshResize = React.useEffectEvent(() => resize.refresh());
   React.useLayoutEffect(() => {
     latestResizable.current = resolvedResizable;
@@ -700,7 +779,7 @@ function SidebarRail({
               onPointerUp?.(event);
               if (!event.defaultPrevented) resize.onPointerUp(event);
             }}
-            ref={railRef}
+            ref={attachRail}
             tabIndex={-1}
             type="button"
             {...props}
@@ -760,7 +839,10 @@ function SidebarHeader({ className, ...props }: React.ComponentProps<"div">) {
 function SidebarFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
-      className={cn("flex flex-col gap-2 px-[var(--sidebar-content-inset)] py-1", className)}
+      className={cn(
+        "flex flex-col gap-2 px-[var(--sidebar-content-inset)] pt-1 pb-[var(--sidebar-content-inset)]",
+        className,
+      )}
       data-sidebar="footer"
       data-slot="sidebar-footer"
       {...props}
@@ -851,8 +933,8 @@ const sidebarMenuButtonVariants = cva(
         default:
           "h-8 rounded-[var(--control-radius)] px-[var(--sidebar-row-content-inset)] py-1.5 text-sm",
         icon: "size-8 justify-center rounded-[var(--control-radius)] p-0",
-        lg: "h-12 rounded-lg p-2 text-sm group-data-[collapsible=icon]:p-0!",
-        sm: "h-7 rounded-lg p-2 text-xs",
+        lg: "h-12 rounded-[var(--control-radius)] px-[var(--sidebar-row-content-inset)] py-2 text-sm group-data-[collapsible=icon]:p-0!",
+        sm: "h-7 rounded-[var(--control-radius)] px-[var(--sidebar-row-content-inset)] py-2 text-xs",
       },
       variant: {
         default: "font-medium text-sidebar-muted-foreground/80",

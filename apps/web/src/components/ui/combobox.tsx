@@ -225,14 +225,18 @@ function ComboboxItem({
   className,
   children,
   hideIndicator: _hideIndicator = false,
+  selectedFill = true,
   ...props
 }: ComboboxPrimitive.Item.Props & {
   hideIndicator?: boolean;
+  /** Off for rows that mark selection themselves, so a fill only means hover or highlight. */
+  selectedFill?: boolean;
 }) {
   return (
     <ComboboxPrimitive.Item
       className={cn(
-        "flex min-h-8.5 shrink-0 in-data-[side=none]:min-w-[calc(var(--anchor-width)+1.25rem)] cursor-pointer items-center rounded-menu-row px-2.5 py-1 text-control text-foreground outline-none not-data-disabled:not-active:data-selected:bg-accent not-data-disabled:not-active:hover:bg-accent not-data-disabled:not-active:data-highlighted:bg-accent not-data-disabled:active:bg-sidebar not-data-disabled:active:shadow-well-pressed data-disabled:pointer-events-none data-disabled:cursor-not-allowed data-disabled:text-fg-icon-disabled [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
+        "flex min-h-8.5 shrink-0 in-data-[side=none]:min-w-[calc(var(--anchor-width)+1.25rem)] cursor-pointer items-center rounded-menu-row px-2.5 py-1 text-control text-foreground outline-none not-data-disabled:not-active:hover:bg-accent not-data-disabled:not-active:data-highlighted:bg-accent not-data-disabled:active:bg-sidebar not-data-disabled:active:shadow-well-pressed data-disabled:pointer-events-none data-disabled:cursor-not-allowed data-disabled:text-fg-icon-disabled [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
+        selectedFill && "not-data-disabled:not-active:data-selected:bg-accent",
         className,
       )}
       data-slot="combobox-item"
@@ -275,10 +279,7 @@ function ComboboxList({ className, ...props }: ComboboxPrimitive.List.Props) {
   );
 }
 
-/**
- * A variant of `ComboboxList` without `ScrollArea`, for use when
- * an external virtualizer (e.g. LegendList) owns the scroll container.
- */
+/** Omits ScrollArea when an external virtualizer owns scrolling. */
 function ComboboxListVirtualized({ className, ...props }: ComboboxPrimitive.List.Props) {
   return (
     <ComboboxPrimitive.List

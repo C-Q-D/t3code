@@ -2,10 +2,13 @@
 "use client";
 
 import { Menu as MenuPrimitive } from "@base-ui/react/menu";
-import { CheckIcon, ChevronRightIcon } from "lucide-react";
+import { CheckIcon, ChevronRightIcon, SearchIcon } from "lucide-react";
 import type * as React from "react";
 
 import { cn } from "~/lib/utils";
+import { renderClosingPositioner } from "./closing-positioner";
+import { Input, type InputProps } from "./input";
+import { Spinner } from "./spinner";
 
 const Menu = MenuPrimitive.Root;
 const MenuCreateHandle = MenuPrimitive.createHandle;
@@ -53,6 +56,7 @@ function MenuPopup({
         anchor={anchor}
         className="z-[130]"
         data-slot="menu-positioner"
+        render={renderClosingPositioner}
         side={side}
         sideOffset={sideOffset}
       >
@@ -76,6 +80,44 @@ function MenuPopup({
         </MenuPrimitive.Popup>
       </MenuPrimitive.Positioner>
     </MenuPrimitive.Portal>
+  );
+}
+
+/** A menu's filter field, drawn like `ComboboxSearchInput` so every searchable popup matches. */
+function MenuSearchInput({
+  busy = false,
+  onKeyDown,
+  ...props
+}: Omit<InputProps, "className" | "size" | "unstyled" | "nativeInput"> & { busy?: boolean }) {
+  return (
+    <div className="min-w-0 shrink-0 px-2 pt-1.5 pb-1">
+      <div className="relative -translate-y-px border-b border-border/70 pb-1.5 transition-colors focus-within:border-ring">
+        {busy ? (
+          <Spinner
+            aria-hidden="true"
+            size="md"
+            tone="muted"
+            className="pointer-events-none absolute top-1.5 left-0"
+          />
+        ) : (
+          <SearchIcon
+            aria-hidden="true"
+            className="pointer-events-none absolute top-1.5 left-0 size-4 shrink-0 text-muted-foreground/55"
+          />
+        )}
+        <Input
+          {...props}
+          className="rounded-none bg-transparent text-sm [&_input]:h-6.5 [&_input]:ps-5 [&_input]:font-sans [&_input]:leading-6.5"
+          size="sm"
+          unstyled
+          onKeyDown={(event) => {
+            // Menu typeahead would otherwise take the letters; arrows still reach the items.
+            if (event.key !== "ArrowDown" && event.key !== "Escape") event.stopPropagation();
+            onKeyDown?.(event);
+          }}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -143,7 +185,7 @@ function MenuCheckboxItem({
   density = "default",
   ...props
 }: MenuPrimitive.CheckboxItem.Props & {
-  variant?: "default" | "switch";
+  variant?: "default" | "icon" | "switch";
   density?: "default" | "compact";
 }) {
   return (
@@ -155,6 +197,7 @@ function MenuCheckboxItem({
         variant === "switch"
           ? "grid-cols-[1fr_auto] gap-4 pe-1.5"
           : "grid-cols-[0.875rem_minmax(0,1fr)]",
+        variant === "icon" && "grid-cols-[0.625rem_minmax(0,1fr)]",
         density === "compact" && "min-h-8 text-secondary-copy-large",
         className,
       )}
@@ -173,14 +216,17 @@ function MenuCheckboxItem({
         </>
       ) : (
         <>
-          <MenuPrimitive.CheckboxItemIndicator className="col-start-1">
+          <MenuPrimitive.CheckboxItemIndicator
+            className={cn("col-start-1", variant === "icon" && "-mx-0.5")}
+          >
             <svg
+              className={variant === "icon" ? "size-3.5" : undefined}
               fill="none"
               height="24"
               stroke="currentColor"
               strokeLinecap="round"
               strokeLinejoin="round"
-              strokeWidth="2"
+              strokeWidth={variant === "icon" ? "1.75" : "2"}
               viewBox="0 0 24 24"
               width="24"
               xmlns="http://www.w3.org/2000/svg"
@@ -360,6 +406,7 @@ export {
   MenuTrigger as DropdownMenuTrigger,
   MenuPopup,
   MenuPopup as DropdownMenuContent,
+  MenuSearchInput,
   MenuGroup,
   MenuGroup as DropdownMenuGroup,
   MenuItem,

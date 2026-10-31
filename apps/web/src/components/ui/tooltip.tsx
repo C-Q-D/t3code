@@ -20,8 +20,7 @@ const TooltipProvider = TooltipPrimitive.Provider;
 
 type TooltipActionsRef = RefObject<TooltipPrimitive.Root.Actions | null>;
 
-// Context values are frozen to the compiler, so consumers update the hovered
-// tooltip through these calls rather than by writing to a shared ref.
+// The compiler freezes context values; update hovered tooltips through calls instead of shared ref writes.
 function createTooltipHoverTracker() {
   let hovered: { trigger: HTMLElement; actionsRef: TooltipActionsRef } | null = null;
   return {
@@ -101,11 +100,12 @@ function TooltipTrigger(props: TooltipPrimitive.Trigger.Props) {
   );
 }
 
+/** Keeps bubbles clear of the native titlebar while forwarding Base UI positioning props. */
 function TooltipPositioner(props: TooltipPrimitive.Positioner.Props) {
   const titlebarHeight = useNativeTitlebarHeight();
   return (
     <TooltipPrimitive.Positioner
-      className="pointer-events-none z-[140] h-(--positioner-height) w-(--positioner-width) max-w-(--available-width) transition-[top,left,right,bottom,transform] physics:duration-(--motion-snap-duration) physics:ease-(--ease-snap) data-instant:transition-none"
+      className="pointer-events-none z-[140] max-w-(--available-width) transition-[top,left,right,bottom,transform] physics:duration-(--motion-snap-duration) physics:ease-(--ease-snap) data-instant:transition-none"
       collisionPadding={{
         top: COLLISION_PADDING + titlebarHeight,
         right: COLLISION_PADDING,
@@ -153,7 +153,7 @@ function TooltipPopup({
       >
         <TooltipPrimitive.Popup
           className={cn(
-            "relative flex h-(--popup-height,auto) w-(--popup-width,auto) origin-(--transform-origin) text-balance rounded-tag font-sans text-secondary-copy-medium font-semibold text-shadow-none transition-[width,height,scale,opacity] physics:duration-(--popup-motion-duration) physics:ease-(--popup-motion-ease) physics:data-instant:duration-0 data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0 data-instant:duration-0",
+            "relative flex origin-(--transform-origin) text-balance rounded-tag font-sans text-secondary-copy-medium font-semibold text-shadow-none transition-[scale,opacity] physics:duration-(--popup-motion-duration) physics:ease-(--popup-motion-ease) physics:data-instant:duration-0 data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0 data-instant:duration-0",
             variant === "glass"
               ? "dropdown-glass text-popover-foreground"
               : "bg-primary text-primary-foreground shadow-primary-edge-control [--lucide-hue-override:currentColor]",
@@ -166,12 +166,9 @@ function TooltipPopup({
           data-slot="tooltip-popup"
           {...props}
         >
-          <TooltipPrimitive.Viewport
-            className="relative size-full overflow-clip px-(--viewport-inline-padding) py-1.5 [--viewport-inline-padding:--spacing(2.5)] data-instant:transition-none **:data-current:data-ending-style:opacity-0 **:data-current:data-starting-style:opacity-0 **:data-previous:data-ending-style:opacity-0 **:data-previous:data-starting-style:opacity-0 **:data-current:w-[calc(var(--popup-width)-2*var(--viewport-inline-padding))] **:data-previous:w-[calc(var(--popup-width)-2*var(--viewport-inline-padding))] **:data-previous:truncate **:data-current:opacity-100 **:data-previous:opacity-100 **:data-current:transition-opacity **:data-previous:transition-opacity"
-            data-slot="tooltip-viewport"
-          >
+          <div className="min-w-0 px-2.5 py-1.5" data-slot="tooltip-viewport">
             {children}
-          </TooltipPrimitive.Viewport>
+          </div>
         </TooltipPrimitive.Popup>
       </TooltipPositioner>
     </TooltipPrimitive.Portal>

@@ -4,6 +4,7 @@
 
 import { Dialog as CommandDialogPrimitive } from "@base-ui/react/dialog";
 import { SearchIcon } from "lucide-react";
+import { useRef } from "react";
 import type * as React from "react";
 import { cn } from "~/lib/utils";
 import {
@@ -65,11 +66,15 @@ function CommandDialogPopup({
   onBackdropPointerDown?: React.PointerEventHandler<HTMLDivElement>;
   paletteMode?: "command" | "files" | "content";
 }) {
+  const popupRef = useRef<HTMLDivElement>(null);
   return (
     <CommandDialogPortal>
       <CommandDialogBackdrop onPointerDown={onBackdropPointerDown} />
       <CommandDialogViewport data-palette-mode={paletteMode}>
         <CommandDialogPrimitive.Popup
+          // The first tabbable can be an input addon, such as a submenu's Back button.
+          initialFocus={() => popupRef.current?.querySelector("input") ?? true}
+          ref={popupRef}
           className={cn(
             DIALOG_POPUP_CLASS,
             "pointer-events-auto max-h-105 max-w-xl rounded-overlay text-foreground",
