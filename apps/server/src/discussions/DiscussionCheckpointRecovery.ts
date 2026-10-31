@@ -36,7 +36,9 @@ export const layer = Layer.effect(
     const queue = yield* PubSub.unbounded<ExhaustedDiscussionCapture>();
     yield* Effect.addFinalizer(() => PubSub.shutdown(queue));
     return DiscussionCheckpointRecovery.of({
-      exhausted: (capture) => PubSub.publish(queue, capture).pipe(Effect.asVoid),
+      exhausted: Effect.fn("DiscussionCheckpointRecovery.exhausted")((capture) =>
+        PubSub.publish(queue, capture).pipe(Effect.asVoid),
+      ),
       subscribe: PubSub.subscribe(queue).pipe(Effect.map(Stream.fromSubscription)),
     });
   }),
@@ -54,7 +56,7 @@ export const layerExecutor = Layer.effect(
     const executor = yield* EffectWorker.OrchestrationEffectExecutorV2;
     const recovery = yield* DiscussionCheckpointRecovery;
     return EffectWorker.OrchestrationEffectExecutorV2.of({
-      execute: (effect, options) =>
+      execute: Effect.fn("EffectWorker.OrchestrationEffectExecutorV2.execute")((effect, options) =>
         executor
           .execute(effect, options)
           .pipe(
@@ -66,6 +68,7 @@ export const layerExecutor = Layer.effect(
                 : Effect.void,
             ),
           ),
+      ),
     });
   }),
 );

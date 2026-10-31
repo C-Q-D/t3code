@@ -18,8 +18,13 @@ import * as SqlClient from "effect/sql/SqlClient";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import * as DiscussionStore from "./DiscussionStore.ts";
 
+const decodePrompt = Schema.decodeEffect(DiscussionPrompt);
+const decodeTemplate = Schema.decodeEffect(DiscussionTemplate);
+const decodePromptId = Schema.decodeEffect(DiscussionPrompt.fields.id);
+const decodeProjectId = Schema.decodeEffect(Discussion.fields.projectId);
+
 const timestamp = "2026-10-12T01:00:00.000Z";
-const discussion = Schema.decodeUnknownSync(Discussion)({
+const discussion = Schema.decodeSync(Discussion)({
   id: "discussion:test",
   projectId: "project:test",
   title: "实现边界",
@@ -113,7 +118,7 @@ it.effect("final attribution survives entry enrichment and old cursor JSON remai
 it.effect("prompt and ordered template records persist edits and deletion", () =>
   Effect.gen(function* () {
     const store = yield* DiscussionStore.DiscussionStore;
-    const prompt = yield* Schema.decodeUnknownEffect(DiscussionPrompt)({
+    const prompt = yield* decodePrompt({
       id: "prompt:custom",
       kind: "persona",
       name: "定制审查",
@@ -124,7 +129,7 @@ it.effect("prompt and ordered template records persist edits and deletion", () =
       createdAt: timestamp,
       updatedAt: timestamp,
     });
-    const template = yield* Schema.decodeUnknownEffect(DiscussionTemplate)({
+    const template = yield* decodeTemplate({
       id: "template:custom",
       name: "双席",
       seats: [
@@ -163,7 +168,7 @@ it.effect("prompt and ordered template records persist edits and deletion", () =
     );
     const summary = {
       ...prompt,
-      id: yield* Schema.decodeUnknownEffect(DiscussionPrompt.fields.id)("prompt:summary"),
+      id: yield* decodePromptId("prompt:summary"),
       kind: "summary" as const,
       avatar: null,
       description: "梳理简介",
@@ -193,7 +198,7 @@ it.effect(
       yield* store.createDiscussion({
         ...discussion,
         id: DiscussionId.make("discussion:other"),
-        projectId: yield* Schema.decodeUnknownEffect(Discussion.fields.projectId)("project:other"),
+        projectId: yield* decodeProjectId("project:other"),
       });
       assert.deepEqual(yield* store.getDiscussion(discussion.id), discussion);
       assert.equal((yield* store.getDiscussion(discussion.id))?.seats[0]?.avatar, "reviewer");

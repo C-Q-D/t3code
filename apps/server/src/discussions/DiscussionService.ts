@@ -12,7 +12,6 @@ import {
   DEFAULT_PROVIDER_INTERACTION_MODE,
   PROVIDER_SEND_TURN_MAX_INPUT_CHARS,
   type ChatAttachment,
-  type CheckpointRef,
   type Discussion,
   type DiscussionCreateInput,
   type DiscussionEndInput,
@@ -67,6 +66,8 @@ import {
   discussionBriefPhaseMarker,
   type DiscussionBriefPhase,
 } from "./discussionBrief.ts";
+
+const isDiscussionError = Schema.is(DiscussionError);
 
 /** All transport and future agent entry points share this service; writes are serialized per discussion. */
 export class DiscussionService extends Context.Service<
@@ -126,7 +127,7 @@ export class DiscussionService extends Context.Service<
 const domain = <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, DiscussionError, R> =>
   effect.pipe(
     Effect.mapError((cause) =>
-      Schema.is(DiscussionError)(cause)
+      isDiscussionError(cause)
         ? cause
         : new DiscussionError({
             reason: "orchestration_error",
@@ -184,17 +185,12 @@ const make = Effect.gen(function* () {
 
   /** Reads required state; missing identity never silently creates a new discussion. */
   const requireDiscussion = (id: DiscussionId) =>
-    store
-      .getDiscussion(id)
-      .pipe(
-        Effect.flatMap((value) =>
-          value
-            ? Effect.succeed(value)
-            : Effect.fail(
-                new DiscussionError({ reason: "not_found", message: "Discussion not found." }),
-              ),
-        ),
-      );
+    store.getDiscussion(id).pipe(
+      Effect.filterOrFail(
+        (value) => value !== null,
+        () => new DiscussionError({ reason: "not_found", message: "Discussion not found." }),
+      ),
+    );
 
   const list: DiscussionService["Service"]["list"] = () =>
     store.listDiscussions().pipe(
@@ -258,14 +254,15 @@ const make = Effect.gen(function* () {
   const requireProject = (discussion: Pick<Discussion, "projectId">) =>
     domain(projects.getById(discussion.projectId)).pipe(
       Effect.flatMap((project) =>
-        Option.isSome(project)
-          ? Effect.succeed(project.value)
-          : Effect.fail(
+        Effect.fromOption(project).pipe(
+          Effect.mapError(
+            () =>
               new DiscussionError({
                 reason: "not_found",
                 message: "Discussion project not found.",
               }),
-            ),
+          ),
+        ),
       ),
     );
 
@@ -803,7 +800,7 @@ const make = Effect.gen(function* () {
           }),
         ),
       ),
-    providerSupport: () =>
+    providerSupport: Effect.fn("DiscussionService.providerSupport")(() =>
       domain(
         Effect.gen(function* () {
           const instanceIds = yield* adapters.list();
@@ -820,7 +817,8 @@ const make = Effect.gen(function* () {
           return { instances };
         }),
       ),
-    getEntryDiff: (input) =>
+    ),
+    getEntryDiff: Effect.fn("DiscussionService.getEntryDiff")((input) =>
       domain(
         Effect.gen(function* () {
           const discussion = yield* requireDiscussion(input.discussionId);
@@ -845,7 +843,8 @@ const make = Effect.gen(function* () {
           return { ...input, diff };
         }),
       ),
-    create: (input) =>
+    ),
+    create: Effect.fn("DiscussionService.create")((input) =>
       domain(
         Effect.gen(function* () {
           const project = yield* requireProject(input);
@@ -1007,7 +1006,8 @@ const make = Effect.gen(function* () {
           );
         }),
       ),
-    interject: ({ discussionId, text }) =>
+    ),
+    interject: Effect.fn("DiscussionService.interject")(({ discussionId, text }) =>
       locks.withLock(
         discussionId,
         Effect.gen(function* () {
@@ -1044,7 +1044,8 @@ const make = Effect.gen(function* () {
           );
         }),
       ),
-    stop: ({ discussionId }) =>
+    ),
+    stop: Effect.fn("DiscussionService.stop")(({ discussionId }) =>
       locks.withLock(
         discussionId,
         domain(
@@ -1074,7 +1075,8 @@ const make = Effect.gen(function* () {
           }),
         ),
       ),
-    continue: ({ discussionId }) =>
+    ),
+    continue: Effect.fn("DiscussionService.continue")(({ discussionId }) =>
       locks.withLock(
         discussionId,
         domain(
@@ -1099,7 +1101,8 @@ const make = Effect.gen(function* () {
           }),
         ),
       ),
-    end: (input) =>
+    ),
+    end: Effect.fn("DiscussionService.end")((input) =>
       locks.withLock(
         input.discussionId,
         domain(
@@ -1193,7 +1196,8 @@ const make = Effect.gen(function* () {
           }),
         ),
       ),
-    delete: ({ discussionId }) =>
+    ),
+    delete: Effect.fn("DiscussionService.delete")(({ discussionId }) =>
       locks.withLock(
         discussionId,
         domain(
@@ -1229,7 +1233,8 @@ const make = Effect.gen(function* () {
           }),
         ),
       ),
-    start: () =>
+    ),
+    start: Effect.fn("DiscussionService.start")(() =>
       domain(
         Effect.gen(function* () {
           if (started) return;
@@ -1325,6 +1330,7 @@ const make = Effect.gen(function* () {
           ).pipe(Effect.provideService(Scope.Scope, scope));
         }),
       ),
+    ),
   });
 });
 

@@ -19,6 +19,16 @@ import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/sql/SqlClient";
 
+const isDiscussionError = Schema.is(DiscussionError);
+const decodePromptValue = Schema.decodeUnknownEffect(DiscussionPrompt);
+const decodeTemplateValue = Schema.decodeEffect(DiscussionTemplate);
+const decodeDiscussionValue = Schema.decodeUnknownEffect(Discussion);
+const decodeEntryValue = Schema.decodeUnknownEffect(DiscussionEntry);
+const encodeDiscussionValue = Schema.encodeEffect(Discussion);
+const encodePromptValue = Schema.encodeEffect(DiscussionPrompt);
+const encodeTemplateValue = Schema.encodeEffect(DiscussionTemplate);
+const encodeEntryValue = Schema.encodeEffect(DiscussionEntry);
+
 /** Input omits seq because allocation and insertion must be one atomic database operation. */
 export type DiscussionEntryAppend = Omit<DiscussionEntry, "seq">;
 
@@ -163,7 +173,7 @@ const filesJson = Schema.fromJsonString(DiscussionEntry.fields.files);
 const storageFailure = <A, E, R>(operation: string, effect: Effect.Effect<A, E, R>) =>
   effect.pipe(
     Effect.mapError((cause) =>
-      Schema.is(DiscussionError)(cause)
+      isDiscussionError(cause)
         ? cause
         : new DiscussionError({
             reason: "orchestration_error",
@@ -175,7 +185,7 @@ const storageFailure = <A, E, R>(operation: string, effect: Effect.Effect<A, E, 
 
 /** Maps SQL names to the prompt contract and validates stored values. */
 const decodePrompt = (row: PromptRow) =>
-  Schema.decodeUnknownEffect(DiscussionPrompt)({
+  decodePromptValue({
     id: row.prompt_id,
     kind: row.kind,
     name: row.name,
@@ -190,10 +200,10 @@ const decodePrompt = (row: PromptRow) =>
 /** Decodes the ordered seat configuration through its schema before validating the whole template. */
 const decodeTemplate = Effect.fn("DiscussionStore.decodeTemplate")((row: TemplateRow) =>
   Effect.gen(function* () {
-    return yield* Schema.decodeUnknownEffect(DiscussionTemplate)({
+    return yield* decodeTemplateValue({
       id: row.template_id,
       name: row.name,
-      seats: yield* Schema.decodeUnknownEffect(templateSeatsJson)(row.seats_json),
+      seats: yield* Schema.decodeEffect(templateSeatsJson)(row.seats_json),
       summaryPromptId: row.summary_prompt_id,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -204,22 +214,19 @@ const decodeTemplate = Effect.fn("DiscussionStore.decodeTemplate")((row: Templat
 /** Restores snapshots; SQL NULL remains null instead of becoming a missing state. */
 const decodeDiscussion = Effect.fn("DiscussionStore.decodeDiscussion")((row: DiscussionRow) =>
   Effect.gen(function* () {
-    return yield* Schema.decodeUnknownEffect(Discussion)({
+    return yield* decodeDiscussionValue({
       id: row.discussion_id,
       projectId: row.project_id,
       title: row.title,
       topic: row.topic,
       status: row.status,
-      seats: yield* Schema.decodeUnknownEffect(seatsJson)(row.seats_json),
-      cursor: yield* Schema.decodeUnknownEffect(cursorJson)(row.cursor_json),
-      pause:
-        row.pause_json === null
-          ? null
-          : yield* Schema.decodeUnknownEffect(pauseJson)(row.pause_json),
+      seats: yield* Schema.decodeEffect(seatsJson)(row.seats_json),
+      cursor: yield* Schema.decodeEffect(cursorJson)(row.cursor_json),
+      pause: row.pause_json === null ? null : yield* Schema.decodeEffect(pauseJson)(row.pause_json),
       closing:
         row.closing_json === null
           ? null
-          : yield* Schema.decodeUnknownEffect(closingJson)(row.closing_json),
+          : yield* Schema.decodeEffect(closingJson)(row.closing_json),
       createdBy: row.created_by,
       creationSource: row.creation_source,
       createdAt: row.created_at,
@@ -232,7 +239,7 @@ const decodeDiscussion = Effect.fn("DiscussionStore.decodeDiscussion")((row: Dis
 /** Validates transcript data and maps nullable SQL identifiers back to optional contract fields. */
 const decodeEntry = Effect.fn("DiscussionStore.decodeEntry")((row: EntryRow) =>
   Effect.gen(function* () {
-    return yield* Schema.decodeUnknownEffect(DiscussionEntry)({
+    return yield* decodeEntryValue({
       id: row.entry_id,
       discussionId: row.discussion_id,
       seq: row.seq,
@@ -247,10 +254,7 @@ const decodeEntry = Effect.fn("DiscussionStore.decodeEntry")((row: EntryRow) =>
         ? {}
         : { dispatchedEntrySeq: row.dispatched_entry_seq }),
       text: row.text,
-      files:
-        row.files_json === null
-          ? null
-          : yield* Schema.decodeUnknownEffect(filesJson)(row.files_json),
+      files: row.files_json === null ? null : yield* Schema.decodeEffect(filesJson)(row.files_json),
       status: row.status,
       checkpointRef: row.checkpoint_ref,
       createdAt: row.created_at,
@@ -261,7 +265,7 @@ const decodeEntry = Effect.fn("DiscussionStore.decodeEntry")((row: EntryRow) =>
 /** Encodes JSON columns using their contract codecs; provider model transformations must also run on writes. */
 const encodeDiscussion = Effect.fn("DiscussionStore.encodeDiscussion")((value: Discussion) =>
   Effect.gen(function* () {
-    yield* Schema.encodeEffect(Discussion)(value);
+    yield* encodeDiscussionValue(value);
     return {
       discussion_id: value.id,
       project_id: value.projectId,
@@ -286,25 +290,27 @@ const encodeDiscussion = Effect.fn("DiscussionStore.encodeDiscussion")((value: D
 const make = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
   return DiscussionStore.of({
-    listPrompts: () =>
+    listPrompts: Effect.fn("DiscussionStore.listPrompts")(() =>
       storageFailure(
         "list discussion prompts",
         sql<PromptRow>`SELECT * FROM discussion_prompts ORDER BY created_at, prompt_id`.pipe(
           Effect.flatMap((rows) => Effect.forEach(rows, decodePrompt)),
         ),
       ),
-    getPrompt: (id) =>
+    ),
+    getPrompt: Effect.fn("DiscussionStore.getPrompt")((id) =>
       storageFailure(
         "read discussion prompt",
         sql<PromptRow>`SELECT * FROM discussion_prompts WHERE prompt_id = ${id}`.pipe(
           Effect.flatMap((rows) => (rows[0] ? decodePrompt(rows[0]) : Effect.succeed(null))),
         ),
       ),
-    upsertPrompt: (prompt) =>
+    ),
+    upsertPrompt: Effect.fn("DiscussionStore.upsertPrompt")((prompt) =>
       storageFailure(
         "save discussion prompt",
         Effect.gen(function* () {
-          yield* Schema.encodeEffect(DiscussionPrompt)(prompt);
+          yield* encodePromptValue(prompt);
           yield* sql`INSERT INTO discussion_prompts ${sql.insert({
             prompt_id: prompt.id,
             kind: prompt.kind,
@@ -319,30 +325,34 @@ const make = Effect.gen(function* () {
         prompt = excluded.prompt, avatar = excluded.avatar, description = excluded.description, builtin = excluded.builtin, created_at = excluded.created_at, updated_at = excluded.updated_at`;
         }),
       ),
-    deletePrompt: (id) =>
+    ),
+    deletePrompt: Effect.fn("DiscussionStore.deletePrompt")((id) =>
       storageFailure(
         "delete discussion prompt",
         sql`DELETE FROM discussion_prompts WHERE prompt_id = ${id}`.pipe(Effect.asVoid),
       ),
-    listTemplates: () =>
+    ),
+    listTemplates: Effect.fn("DiscussionStore.listTemplates")(() =>
       storageFailure(
         "list discussion templates",
         sql<TemplateRow>`SELECT * FROM discussion_templates ORDER BY created_at, template_id`.pipe(
           Effect.flatMap((rows) => Effect.forEach(rows, decodeTemplate)),
         ),
       ),
-    getTemplate: (id) =>
+    ),
+    getTemplate: Effect.fn("DiscussionStore.getTemplate")((id) =>
       storageFailure(
         "read discussion template",
         sql<TemplateRow>`SELECT * FROM discussion_templates WHERE template_id = ${id}`.pipe(
           Effect.flatMap((rows) => (rows[0] ? decodeTemplate(rows[0]) : Effect.succeed(null))),
         ),
       ),
-    upsertTemplate: (template) =>
+    ),
+    upsertTemplate: Effect.fn("DiscussionStore.upsertTemplate")((template) =>
       storageFailure(
         "save discussion template",
         Effect.gen(function* () {
-          yield* Schema.encodeEffect(DiscussionTemplate)(template);
+          yield* encodeTemplateValue(template);
           yield* sql`INSERT INTO discussion_templates ${sql.insert({
             template_id: template.id,
             name: template.name,
@@ -354,12 +364,14 @@ const make = Effect.gen(function* () {
         summary_prompt_id = excluded.summary_prompt_id, created_at = excluded.created_at, updated_at = excluded.updated_at`;
         }),
       ),
-    deleteTemplate: (id) =>
+    ),
+    deleteTemplate: Effect.fn("DiscussionStore.deleteTemplate")((id) =>
       storageFailure(
         "delete discussion template",
         sql`DELETE FROM discussion_templates WHERE template_id = ${id}`.pipe(Effect.asVoid),
       ),
-    createDiscussion: (discussion) =>
+    ),
+    createDiscussion: Effect.fn("DiscussionStore.createDiscussion")((discussion) =>
       storageFailure(
         "create discussion",
         Effect.gen(function* () {
@@ -367,7 +379,8 @@ const make = Effect.gen(function* () {
           yield* sql`INSERT INTO discussions ${sql.insert(row)}`;
         }),
       ),
-    updateDiscussion: (discussion) =>
+    ),
+    updateDiscussion: Effect.fn("DiscussionStore.updateDiscussion")((discussion) =>
       storageFailure(
         "update discussion",
         Effect.gen(function* () {
@@ -375,19 +388,22 @@ const make = Effect.gen(function* () {
           const updated =
             yield* sql`UPDATE discussions SET ${sql.update(row)} WHERE discussion_id = ${discussion_id} RETURNING discussion_id`;
           if (updated.length === 0)
-            return yield* Effect.fail(
-              new DiscussionError({ reason: "not_found", message: "Discussion not found." }),
-            );
+            return yield* new DiscussionError({
+              reason: "not_found",
+              message: "Discussion not found.",
+            });
         }),
       ),
-    getDiscussion: (id) =>
+    ),
+    getDiscussion: Effect.fn("DiscussionStore.getDiscussion")((id) =>
       storageFailure(
         "read discussion",
         sql<DiscussionRow>`SELECT * FROM discussions WHERE discussion_id = ${id}`.pipe(
           Effect.flatMap((rows) => (rows[0] ? decodeDiscussion(rows[0]) : Effect.succeed(null))),
         ),
       ),
-    listDiscussions: (projectId) =>
+    ),
+    listDiscussions: Effect.fn("DiscussionStore.listDiscussions")((projectId) =>
       storageFailure(
         "list discussions",
         (projectId === undefined
@@ -395,7 +411,8 @@ const make = Effect.gen(function* () {
           : sql<DiscussionRow>`SELECT * FROM discussions WHERE project_id = ${projectId} ORDER BY updated_at DESC, discussion_id`
         ).pipe(Effect.flatMap((rows) => Effect.forEach(rows, decodeDiscussion))),
       ),
-    deleteDiscussion: (id) =>
+    ),
+    deleteDiscussion: Effect.fn("DiscussionStore.deleteDiscussion")((id) =>
       storageFailure(
         "delete discussion",
         sql.withTransaction(
@@ -407,11 +424,12 @@ const make = Effect.gen(function* () {
           }),
         ),
       ),
-    appendEntry: (entry) =>
+    ),
+    appendEntry: Effect.fn("DiscussionStore.appendEntry")((entry) =>
       storageFailure(
         "append discussion entry",
         Effect.gen(function* () {
-          yield* Schema.encodeEffect(DiscussionEntry)({ ...entry, seq: 1 });
+          yield* encodeEntryValue({ ...entry, seq: 1 });
           const files =
             entry.files === null ? null : yield* Schema.encodeEffect(filesJson)(entry.files);
           // One statement owns allocation and insertion, so concurrent writers cannot both claim the same seq.
@@ -423,30 +441,32 @@ const make = Effect.gen(function* () {
         FROM discussion_entries WHERE discussion_id = ${entry.discussionId} RETURNING *`;
           const row = rows[0];
           if (!row)
-            return yield* Effect.fail(
-              new DiscussionError({
-                reason: "orchestration_error",
-                message: "Entry insertion returned no record.",
-              }),
-            );
+            return yield* new DiscussionError({
+              reason: "orchestration_error",
+              message: "Entry insertion returned no record.",
+            });
           return yield* decodeEntry(row);
         }),
       ),
-    listEntries: (id, afterSeq = 0, throughSeq = Number.MAX_SAFE_INTEGER) =>
-      storageFailure(
-        "read discussion entries",
-        sql<EntryRow>`SELECT * FROM discussion_entries WHERE discussion_id = ${id} AND seq > ${afterSeq} AND seq <= ${throughSeq} ORDER BY seq`.pipe(
-          Effect.flatMap((rows) => Effect.forEach(rows, decodeEntry)),
+    ),
+    listEntries: Effect.fn("DiscussionStore.listEntries")(
+      (id, afterSeq = 0, throughSeq = Number.MAX_SAFE_INTEGER) =>
+        storageFailure(
+          "read discussion entries",
+          sql<EntryRow>`SELECT * FROM discussion_entries WHERE discussion_id = ${id} AND seq > ${afterSeq} AND seq <= ${throughSeq} ORDER BY seq`.pipe(
+            Effect.flatMap((rows) => Effect.forEach(rows, decodeEntry)),
+          ),
         ),
-      ),
-    getEntryByRunId: (id) =>
+    ),
+    getEntryByRunId: Effect.fn("DiscussionStore.getEntryByRunId")((id) =>
       storageFailure(
         "read discussion run entry",
         sql<EntryRow>`SELECT * FROM discussion_entries WHERE run_id = ${id}`.pipe(
           Effect.flatMap((rows) => (rows[0] ? decodeEntry(rows[0]) : Effect.succeed(null))),
         ),
       ),
-    updateEntry: (id, changes) =>
+    ),
+    updateEntry: Effect.fn("DiscussionStore.updateEntry")((id, changes) =>
       storageFailure(
         "update discussion entry",
         sql.withTransaction(
@@ -459,7 +479,7 @@ const make = Effect.gen(function* () {
                 message: "Discussion entry not found.",
               });
             const entry = { ...(yield* decodeEntry(rows[0])), ...changes };
-            yield* Schema.encodeEffect(DiscussionEntry)(entry);
+            yield* encodeEntryValue(entry);
             const files =
               entry.files === null ? null : yield* Schema.encodeEffect(filesJson)(entry.files);
             yield* sql`UPDATE discussion_entries SET files_json = ${files}, checkpoint_ref = ${entry.checkpointRef}, read_by_seat_id = ${entry.readBySeatId ?? null} WHERE entry_id = ${id}`;
@@ -467,7 +487,8 @@ const make = Effect.gen(function* () {
           }),
         ),
       ),
-    getSeatDelivery: (id, seatId) =>
+    ),
+    getSeatDelivery: Effect.fn("DiscussionStore.getSeatDelivery")((id, seatId) =>
       storageFailure(
         "read discussion seat delivery",
         sql<{
@@ -476,17 +497,17 @@ const make = Effect.gen(function* () {
           Effect.map((rows) => rows[0]?.delivered_through_seq ?? null),
         ),
       ),
-    setSeatDelivery: (id, seatId, seq) =>
+    ),
+    setSeatDelivery: Effect.fn("DiscussionStore.setSeatDelivery")((id, seatId, seq) =>
       storageFailure(
         "save discussion seat delivery",
         Effect.gen(function* () {
-          yield* Schema.decodeUnknownEffect(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))(
-            seq,
-          );
+          yield* Schema.decodeEffect(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))(seq);
           yield* sql`INSERT INTO discussion_seat_delivery ${sql.insert({ discussion_id: id, seat_id: seatId, delivered_through_seq: seq })}
         ON CONFLICT(discussion_id, seat_id) DO UPDATE SET delivered_through_seq = excluded.delivered_through_seq`;
         }),
       ),
+    ),
   });
 });
 

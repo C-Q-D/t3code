@@ -2,7 +2,6 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import {
   CommandId,
-  EventId,
   MessageId,
   ProjectId,
   ProviderDriverKind,
@@ -10,7 +9,6 @@ import {
   ProviderThreadId,
   ProviderTurnId,
   type Discussion,
-  type OrchestrationV2DomainEvent,
   type OrchestrationV2ProviderFailure,
   type OrchestrationV2Run,
   type RunId,
@@ -24,7 +22,6 @@ import * as Path from "effect/Path";
 import * as Queue from "effect/Queue";
 import * as Deferred from "effect/Deferred";
 import * as Stream from "effect/Stream";
-import * as SqlClient from "effect/sql/SqlClient";
 import type * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
 import type { ProviderInstance } from "@t3tools/provider-core/server/driver";
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
@@ -45,7 +42,6 @@ import * as McpSessionTestkit from "../mcp/McpSessionRegistry.testkit.ts";
 import { CodexProviderCapabilitiesV2 } from "../orchestration-v2/Adapters/CodexAdapterV2.ts";
 import * as Runtime from "../orchestration-v2/runtimeLayer.ts";
 import * as Adapters from "../orchestration-v2/ProviderAdapterRegistry.ts";
-import * as Orchestrator from "../orchestration-v2/Orchestrator.ts";
 import * as EventSink from "../orchestration-v2/EventSink.ts";
 import * as Worker from "../orchestration-v2/EffectWorker.ts";
 import * as Projection from "../orchestration-v2/ProjectionStore.ts";
@@ -426,6 +422,7 @@ export function withDiscussionHarness<A, E, R>(
         ),
         Layer.provide(
           Layer.succeed(Enrichment.ProjectEnrichmentService, {
+            readRepositoryIdentity: () => Effect.succeed(null),
             peek: () =>
               Effect.succeed({
                 repositoryIdentity: null,

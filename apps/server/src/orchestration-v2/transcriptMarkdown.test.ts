@@ -230,6 +230,16 @@ const variants = {
     targetProviderInstanceId: "codex",
     targetModel: "created-model",
   },
+  link_request: {
+    url: "https://example.test/link",
+    reason: "Link reason",
+    environmentId: "environment-requested",
+    label: "Requested machine",
+    hint: "test-machine",
+    linkStatus: "linked",
+    linkedEnvironmentId: "environment-linked",
+    linkedLabel: "Linked machine",
+  },
   secret_request: {
     label: "Secret label",
     reason: "Secret reason",

@@ -95,7 +95,6 @@ it.effect(
           attemptCount: 1,
           availableAt: "2026-10-12T00:00:00.000Z",
           leaseOwner: "t4",
-          leaseExpiresAt: null,
           createdAt: "2026-10-12T00:00:00.000Z",
           updatedAt: "2026-10-12T00:00:00.000Z",
           completedAt: null,

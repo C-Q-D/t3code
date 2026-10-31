@@ -29,6 +29,10 @@ import * as SqlClient from "effect/sql/SqlClient";
 import * as DiscussionStore from "./DiscussionStore.ts";
 import { builtinPrompts } from "./builtinPrompts.ts";
 
+const isDiscussionError = Schema.is(DiscussionError);
+const decodePromptInput = Schema.decodeEffect(DiscussionPromptUpsertInput);
+const decodeTemplateInput = Schema.decodeEffect(DiscussionTemplateUpsertInput);
+
 /** All user template writes pass here so future MCP callers share validation and notifications. */
 export class DiscussionTemplateService extends Context.Service<
   DiscussionTemplateService,
@@ -123,7 +127,7 @@ const make = Effect.gen(function* () {
       Effect.uninterruptibleMask((restore) =>
         sql.withTransaction(restore(effect)).pipe(
           Effect.mapError((cause) =>
-            Schema.is(DiscussionError)(cause)
+            isDiscussionError(cause)
               ? cause
               : new DiscussionError({
                   reason: "orchestration_error",
@@ -155,31 +159,21 @@ const make = Effect.gen(function* () {
 
   /** Looks up a prompt for user operations; missing ids have a stable domain failure. */
   const requirePrompt = (id: DiscussionPromptId) =>
-    store
-      .getPrompt(id)
-      .pipe(
-        Effect.flatMap((prompt) =>
-          prompt === null
-            ? Effect.fail(
-                new DiscussionError({ reason: "not_found", message: `Prompt ${id} not found.` }),
-              )
-            : Effect.succeed(prompt),
-        ),
-      );
+    store.getPrompt(id).pipe(
+      Effect.filterOrFail(
+        (prompt) => prompt !== null,
+        () => new DiscussionError({ reason: "not_found", message: `Prompt ${id} not found.` }),
+      ),
+    );
 
   /** Looks up a template selected for update/delete without silently recreating a missing id. */
   const requireTemplate = (id: DiscussionTemplateId) =>
-    store
-      .getTemplate(id)
-      .pipe(
-        Effect.flatMap((template) =>
-          template === null
-            ? Effect.fail(
-                new DiscussionError({ reason: "not_found", message: `Template ${id} not found.` }),
-              )
-            : Effect.succeed(template),
-        ),
-      );
+    store.getTemplate(id).pipe(
+      Effect.filterOrFail(
+        (template) => template !== null,
+        () => new DiscussionError({ reason: "not_found", message: `Template ${id} not found.` }),
+      ),
+    );
 
   return DiscussionTemplateService.of({
     listPrompts,
@@ -218,10 +212,10 @@ const make = Effect.gen(function* () {
           return Stream.concat(Stream.succeed(initial), Stream.fromSubscription(subscription));
         }),
       ),
-    upsertPrompt: (input) =>
+    upsertPrompt: Effect.fn("DiscussionTemplateService.upsertPrompt")((input) =>
       mutate(
         Effect.gen(function* () {
-          const value = yield* Schema.decodeUnknownEffect(DiscussionPromptUpsertInput)(input).pipe(
+          const value = yield* decodePromptInput(input).pipe(
             Effect.mapError(
               (cause) =>
                 new DiscussionError({
@@ -235,21 +229,17 @@ const make = Effect.gen(function* () {
             (value.kind === "persona" && value.avatar === null) ||
             (value.kind === "summary" && value.avatar !== null)
           ) {
-            return yield* Effect.fail(
-              new DiscussionError({
-                reason: "invalid_state",
-                message: "Persona prompts require an avatar; summary prompts must not have one.",
-              }),
-            );
+            return yield* new DiscussionError({
+              reason: "invalid_state",
+              message: "Persona prompts require an avatar; summary prompts must not have one.",
+            });
           }
           const existing = value.id === undefined ? null : yield* requirePrompt(value.id);
           if (existing !== null && existing.kind !== value.kind)
-            return yield* Effect.fail(
-              new DiscussionError({
-                reason: "invalid_state",
-                message: "A prompt's kind cannot be changed.",
-              }),
-            );
+            return yield* new DiscussionError({
+              reason: "invalid_state",
+              message: "A prompt's kind cannot be changed.",
+            });
           const timestamp = yield* now;
           const prompt = {
             ...value,
@@ -263,58 +253,53 @@ const make = Effect.gen(function* () {
         }),
         "prompt",
       ),
-    deletePrompt: (input) =>
+    ),
+    deletePrompt: Effect.fn("DiscussionTemplateService.deletePrompt")((input) =>
       mutate(
         Effect.gen(function* () {
           const prompt = yield* requirePrompt(input.id);
           if (prompt.builtin)
-            return yield* Effect.fail(
-              new DiscussionError({
-                reason: "invalid_state",
-                message: "Builtin prompts cannot be deleted.",
-              }),
-            );
+            return yield* new DiscussionError({
+              reason: "invalid_state",
+              message: "Builtin prompts cannot be deleted.",
+            });
           const references = (yield* store.listTemplates()).filter(
             (template) =>
               template.summaryPromptId === input.id ||
               template.seats.some((seat) => seat.personaPromptId === input.id),
           );
           if (references.length > 0)
-            return yield* Effect.fail(
-              new DiscussionError({
-                reason: "in_use",
-                message: `Prompt is used by templates: ${references.map((template) => `${template.name} (${template.id})`).join(", ")}.`,
-              }),
-            );
+            return yield* new DiscussionError({
+              reason: "in_use",
+              message: `Prompt is used by templates: ${references.map((template) => `${template.name} (${template.id})`).join(", ")}.`,
+            });
           yield* store.deletePrompt(input.id);
           return { id: input.id };
         }),
         "prompt",
       ),
-    restoreBuiltin: (input) =>
+    ),
+    restoreBuiltin: Effect.fn("DiscussionTemplateService.restoreBuiltin")((input) =>
       mutate(
         Effect.gen(function* () {
           const existing = yield* requirePrompt(input.id);
           const builtin = builtinPrompts.find((prompt) => prompt.id === input.id);
           if (!existing.builtin || !builtin)
-            return yield* Effect.fail(
-              new DiscussionError({
-                reason: "invalid_state",
-                message: "Only builtin prompts can be restored.",
-              }),
-            );
+            return yield* new DiscussionError({
+              reason: "invalid_state",
+              message: "Only builtin prompts can be restored.",
+            });
           const prompt = { ...existing, ...builtin, updatedAt: yield* now };
           yield* store.upsertPrompt(prompt);
           return { prompt: withModified(prompt) };
         }),
         "prompt",
       ),
-    upsertTemplate: (input) =>
+    ),
+    upsertTemplate: Effect.fn("DiscussionTemplateService.upsertTemplate")((input) =>
       mutate(
         Effect.gen(function* () {
-          const value = yield* Schema.decodeUnknownEffect(DiscussionTemplateUpsertInput)(
-            input,
-          ).pipe(
+          const value = yield* decodeTemplateInput(input).pipe(
             Effect.mapError(
               (cause) =>
                 new DiscussionError({
@@ -328,22 +313,18 @@ const make = Effect.gen(function* () {
           for (const seat of value.seats) {
             const persona = yield* requirePrompt(seat.personaPromptId);
             if (persona.kind !== "persona")
-              return yield* Effect.fail(
-                new DiscussionError({
-                  reason: "invalid_state",
-                  message: `Prompt ${persona.id} is not a persona.`,
-                }),
-              );
+              return yield* new DiscussionError({
+                reason: "invalid_state",
+                message: `Prompt ${persona.id} is not a persona.`,
+              });
           }
           if (value.summaryPromptId !== null) {
             const summary = yield* requirePrompt(value.summaryPromptId);
             if (summary.kind !== "summary")
-              return yield* Effect.fail(
-                new DiscussionError({
-                  reason: "invalid_state",
-                  message: `Prompt ${summary.id} is not a summary.`,
-                }),
-              );
+              return yield* new DiscussionError({
+                reason: "invalid_state",
+                message: `Prompt ${summary.id} is not a summary.`,
+              });
           }
           const timestamp = yield* now;
           const template = {
@@ -357,7 +338,8 @@ const make = Effect.gen(function* () {
         }),
         "template",
       ),
-    deleteTemplate: (input) =>
+    ),
+    deleteTemplate: Effect.fn("DiscussionTemplateService.deleteTemplate")((input) =>
       mutate(
         Effect.gen(function* () {
           yield* requireTemplate(input.id);
@@ -366,6 +348,7 @@ const make = Effect.gen(function* () {
         }),
         "template",
       ),
+    ),
   });
 });
 
