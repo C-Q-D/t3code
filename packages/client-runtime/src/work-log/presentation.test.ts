@@ -120,6 +120,64 @@ describe("workEntryIndicatesToolFailure", () => {
 });
 
 describe("resolveWorkEntryToolPresentation", () => {
+  it.each([
+    ["t3_queue", "cancel", "Requested cancellation of a queued run"],
+    ["preview_act", "click", "Clicked in the preview browser"],
+    ["t3_pending_request", "respond", "Answered pending questions"],
+    ["t3_thread_transfer", "merge_back", "Requested a merge of thread context"],
+  ])("keeps the resolved action with default messages: %s/%s", (label, action, expected) => {
+    expect(
+      resolveWorkEntryToolPresentation({
+        label,
+        toolLifecycleStatus: "completed",
+        toolData: { arguments: { action } },
+      })?.displayName,
+    ).toBe(expected);
+  });
+
+  it.each([
+    ["t3_queue", "cancel", "t3_queue_cancel"],
+    ["preview_act", "click", "preview_click"],
+    ["t3_pending_request", "respond", "t3_pending_request_respond"],
+    ["t3_thread_transfer", "merge_back", "t3_thread_merge_back"],
+  ] as const)("localizes the resolved action: %s/%s", (label, action, translatedId) => {
+    const messages = {
+      ...englishWorkLogMessages.t3Tools,
+      labels: {
+        ...englishWorkLogMessages.t3Tools.labels,
+        [translatedId]: ["执行", "正在执行", "已执行", "具体动作"] as const,
+        [label]: ["管理", "正在管理", "已管理", "通用工具"] as const,
+      },
+    };
+    expect(
+      resolveWorkEntryToolPresentation(
+        {
+          label,
+          toolLifecycleStatus: "completed",
+          toolData: { arguments: { action } },
+        },
+        undefined,
+        messages,
+      )?.displayName,
+    ).toBe("已执行 具体动作");
+  });
+
+  it("keeps the resolved label when a locale has no action translation", () => {
+    const labels = { ...englishWorkLogMessages.t3Tools.labels };
+    Reflect.deleteProperty(labels, "preview_click");
+    expect(
+      resolveWorkEntryToolPresentation(
+        {
+          label: "preview_act",
+          toolLifecycleStatus: "completed",
+          toolData: { arguments: { action: "click" } },
+        },
+        undefined,
+        { ...englishWorkLogMessages.t3Tools, labels },
+      )?.displayName,
+    ).toBe("Clicked in the preview browser");
+  });
+
   it("shows returned MCP errors as failures even in the live activity row", () => {
     const entry: WorkLogPresentationEntry = {
       id: "clone",

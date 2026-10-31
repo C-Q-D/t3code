@@ -291,7 +291,12 @@ describe("resolveSnoozePresets", () => {
         { kind: "after", minutes: 360 },
         { kind: "after", minutes: 180 },
       ]),
-    ).toEqual(["In 3 hours 23:00", "In 6 hours Thu 2:00", "Tomorrow 21:00", "Next week Mon 18:00"]);
+    ).toEqual([
+      "In 3 hours 23:00",
+      `In 6 hours ${localDate(2026, 4, 9, 2).toLocaleDateString(undefined, { weekday: "short" })} 2:00`,
+      "Tomorrow 21:00",
+      `Next week ${localDate(2026, 4, 13, 18).toLocaleDateString(undefined, { weekday: "short" })} 18:00`,
+    ]);
   });
 
   it("drops a today preset once its time passes and moves a weekday on that day to next week", () => {
@@ -322,7 +327,7 @@ describe("resolveSnoozePresets", () => {
     // Friday 10:00: today's 17:00 is a week away.
     expect(menu(localDate(2026, 9, 4, 10), theo)).toEqual([
       "Tomorrow 21:00",
-      "Next week Mon 18:00",
+      `Next week ${localDate(2026, 9, 7, 18).toLocaleDateString(undefined, { weekday: "short" })} 18:00`,
       "Next Friday 17:00",
     ]);
   });

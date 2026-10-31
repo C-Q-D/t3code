@@ -102,7 +102,7 @@ describe("thread execution presentation", () => {
     ).toMatchObject({ status: "running", lastError: null, lastErrorClass: null });
   });
 
-  // regression: #15029 working timers no longer reset on every background wake
+  // Working timers no longer reset on every background wake
   it("counts a wake run's activity from the start of the work it continues", () => {
     const workStartedAt = DateTime.makeUnsafe("2026-07-28T09:20:00.000Z");
     const wake = { ...run("wake", 2, "running"), workStartedAt };

@@ -407,9 +407,16 @@ function resolveT3McpToolName(value: string): string | null {
   return longest;
 }
 
-export function resolveT3McpToolId(toolName: string | null | undefined): string | null {
+/** Resolves a known protocol identity, using input.action when an action tool replaces a single-purpose tool. */
+export function resolveT3McpToolId(
+  toolName: string | null | undefined,
+  input?: unknown,
+): string | null {
   const name = toolName == null ? null : resolveT3McpToolName(toolName);
-  return name !== null && Object.hasOwn(T3_MCP_TOOLS, name) ? name : null;
+  if (name === null || !Object.hasOwn(T3_MCP_TOOLS, name)) return null;
+  const action = asSummaryInput(input)?.action;
+  const actionTool = typeof action === "string" ? ACTION_TOOLS[name]?.(action) : undefined;
+  return actionTool !== undefined && Object.hasOwn(T3_MCP_TOOLS, actionTool) ? actionTool : name;
 }
 
 type SummaryInput = Readonly<Record<string, unknown>>;
@@ -433,13 +440,8 @@ export function resolveT3McpToolDefinition(
   toolName: string | null | undefined,
   input?: unknown,
 ): T3McpToolDefinition | null {
-  const name = toolName == null ? null : resolveT3McpToolName(toolName);
-  if (name === null || !Object.hasOwn(T3_MCP_TOOLS, name)) return null;
-  const action = asSummaryInput(input)?.action;
-  const actionTool = typeof action === "string" ? ACTION_TOOLS[name]?.(action) : undefined;
-  return actionTool !== undefined && Object.hasOwn(T3_MCP_TOOLS, actionTool)
-    ? T3_MCP_TOOLS[actionTool]!
-    : T3_MCP_TOOLS[name]!;
+  const name = resolveT3McpToolId(toolName, input);
+  return name === null ? null : T3_MCP_TOOLS[name]!;
 }
 
 /** Tools whose summary depends on which fields a call sets. */

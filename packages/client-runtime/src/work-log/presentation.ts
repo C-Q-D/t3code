@@ -272,7 +272,7 @@ export function resolveWorkEntryToolPresentation(
     workEntryToolInput(entry),
   );
   const status = entry.toolLifecycleStatus ?? fallbackStatus;
-  const name = resolveT3McpToolId(workEntryToolName(entry));
+  const name = resolveT3McpToolId(workEntryToolName(entry), workEntryToolInput(entry));
   const localizedDefinition =
     definition && name && Object.hasOwn(messages.labels, name)
       ? { ...definition, labels: messages.labels[name as keyof typeof messages.labels] }
