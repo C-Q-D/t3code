@@ -1,13 +1,12 @@
 /** Displays queued client confirmations and localized controls; message content belongs to the caller. */
 import { t } from "~/i18n";
-import { useEffect, useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 
 import {
   completeConfirmDialogClose,
   readConfirmDialogState,
-  registerConfirmDialogHost,
   respondToConfirmDialog,
-  subscribeConfirmDialog,
+  subscribeConfirmDialogHost,
 } from "../confirmDialog";
 import {
   AlertDialog,
@@ -24,12 +23,10 @@ import { resolveConfirmDialogCopy } from "./ConfirmDialogHost.logic";
 /** Resolves user responses before closing the dialog and advances the queue after it closes. */
 export function ConfirmDialogHost() {
   const state = useSyncExternalStore(
-    subscribeConfirmDialog,
+    subscribeConfirmDialogHost,
     readConfirmDialogState,
     readConfirmDialogState,
   );
-
-  useEffect(() => registerConfirmDialogHost(), []);
 
   const copy = resolveConfirmDialogCopy(state.status === "idle" ? "" : state.message);
   const confirmVariant = state.status === "idle" ? "default" : state.variant;

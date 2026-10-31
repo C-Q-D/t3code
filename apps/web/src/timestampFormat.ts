@@ -22,15 +22,13 @@ function getTimestampFormatOptions(
   };
 }
 
+/** Rejects invalid locale tags before they reach timestamp formatters. */
 function resolveTimestampLocale(systemLocale: string | null | undefined): string | undefined {
   const tag = systemLocale?.trim();
   if (!tag) return undefined;
 
   try {
-    // Every timestamp in the UI runs through this formatter, so a tag the host
-    // could not normalize falls back rather than throwing. Throws on a
-    // structurally invalid tag; a well-formed tag ICU has no data for resolves
-    // here and is left to ICU's own fallback.
+    // Reject structurally invalid tags; let ICU fall back for valid tags it lacks data for.
     Intl.DateTimeFormat.supportedLocalesOf([tag]);
     return tag;
   } catch {
@@ -38,9 +36,10 @@ function resolveTimestampLocale(systemLocale: string | null | undefined): string
   }
 }
 
+/** Keeps desktop clock formatting tied to the host instead of the UI language. */
 function readHostSystemLocale(): string | null {
   if (typeof window === "undefined") return null;
-  return window.desktopBridge?.getSystemLocale?.() ?? null;
+  return window.desktopBridge?.getSystemLocale() ?? null;
 }
 
 const timestampLocale = resolveTimestampLocale(readHostSystemLocale());
@@ -202,10 +201,7 @@ function relativeTimeUnitMs(elapsedMs: number): number {
   return DAY_MS;
 }
 
-/**
- * Elapsed time floored to the precision `formatRelativeTime` shows, so two
- * instants with the same label return the same number.
- */
+/** Elapsed time floored to formatRelativeTime precision; equal labels yield equal values. */
 export function relativeTimeElapsedMs(isoDate: string, nowMs: number = Date.now()): number | null {
   const date = parseTimestampDate(isoDate);
   if (!date) return null;
@@ -214,7 +210,7 @@ export function relativeTimeElapsedMs(isoDate: string, nowMs: number = Date.now(
   return Math.floor(elapsedMs / unitMs) * unitMs;
 }
 
-/** Milliseconds until the `formatRelativeTime` label for `isoDate` next changes. */
+/** Schedules the next label boundary instead of polling relative timestamps. */
 export function msUntilRelativeTimeChange(
   isoDate: string,
   nowMs: number = Date.now(),
@@ -224,8 +220,7 @@ export function msUntilRelativeTimeChange(
   const elapsedMs = Math.max(0, nowMs - date.getTime());
   const unitMs = relativeTimeUnitMs(elapsedMs);
   const nextChangeMs = date.getTime() + (Math.floor(elapsedMs / unitMs) + 1) * unitMs;
-  // setTimeout fires at once past 2^31-1 ms, which would loop on a far-future
-  // timestamp. Waking early is harmless: the caller re-reads and re-schedules.
+  // Delays above 2^31-1 fire immediately; cap safely and let callers reschedule.
   return Math.min(nextChangeMs - nowMs, DAY_MS);
 }
 

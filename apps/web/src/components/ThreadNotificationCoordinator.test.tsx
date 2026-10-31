@@ -2,8 +2,9 @@
 import type { ClientSettings } from "@t3tools/contracts/settings";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
-import { act } from "react";
-import { create, type ReactTestRenderer } from "react-test-renderer";
+import { WORKING_EXIT_GRACE_MS } from "@t3tools/client-runtime/state/thread-inbox";
+import type { AnyRouter } from "@tanstack/react-router";
+import { Atom, AtomRegistry } from "effect/reactivity";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 const state = vi.hoisted(() => ({
@@ -90,32 +91,42 @@ function mockThreadShell() {
   };
 }
 
-vi.mock("@effect/atom-react", () => ({
-  useAtomValue: () => ({
-    status: state.live ? "live" : "disconnected",
-    snapshot: Option.some({ threads: [mockThreadShell()] }),
-  }),
-}));
-vi.mock("@tanstack/react-router", () => ({
-  useNavigate: () => state.navigate,
-  useParams: () => state.active,
-}));
+const shellAtom = Atom.make<unknown>(null);
+const environmentIdsAtom = Atom.make<ReadonlyArray<string>>(["env-1"]);
+const noRequestsAtom = Atom.make(new Map());
+const noDelegatedAtom = Atom.make<ReadonlySet<string>>(new Set<string>());
+const settingsListeners = new Set<() => void>();
+
 vi.mock("../hooks/useSettings", () => ({
-  useClientSettings: (
-    select: (
-      settings: Pick<ClientSettings, "notificationMode" | "inAppNotificationsEnabled">,
-    ) => unknown,
-  ) => select({ notificationMode: state.mode, inAppNotificationsEnabled: state.inApp }),
-  getClientSettings: () => ({ notificationMode: state.mode }),
+  getClientSettings: () => ({
+    notificationMode: state.mode,
+    inAppNotificationsEnabled: state.inApp,
+  }),
+  subscribeClientSettings: (listener: () => void) => {
+    settingsListeners.add(listener);
+    return () => settingsListeners.delete(listener);
+  },
 }));
-vi.mock("../state/environments", () => ({
-  useEnvironmentIds: () => ["env-1"],
+vi.mock("../state/presentation", () => ({
+  environmentSummaries: {
+    get environmentIdsAtom() {
+      return environmentIdsAtom;
+    },
+  },
 }));
 vi.mock("../state/shell", () => ({
-  environmentShell: { stateValueAtom: vi.fn() },
+  environmentShell: { stateValueAtom: () => shellAtom },
 }));
-vi.mock("../threadNotifications", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../threadNotifications")>()),
+vi.mock("../state/threads", () => ({
+  environmentThreadShells: {
+    pendingSubagentRequestsAtom: () => noRequestsAtom,
+    get delegatedUnderParentAtom() {
+      return noDelegatedAtom;
+    },
+  },
+}));
+vi.mock(import("../threadNotifications"), async (importOriginal) => ({
+  ...(await importOriginal()),
   playNotificationSound: state.sound,
   setNotificationBadge: vi.fn(),
 }));
@@ -123,15 +134,31 @@ vi.mock("./ui/toast", () => ({
   toastManager: { add: state.add, close: state.close },
 }));
 
-import { ThreadNotificationCoordinator } from "./ThreadNotificationCoordinator";
+import { startThreadNotifications } from "./ThreadNotificationCoordinator";
 
-let renderer: ReactTestRenderer | undefined;
+let registry: AtomRegistry.AtomRegistry;
+let stop: (() => void) | undefined;
 
+/** Drives the same shell and settings subscriptions as app initialization. */
 async function render() {
-  await act(() => {
-    if (renderer) renderer.update(<ThreadNotificationCoordinator />);
-    else renderer = create(<ThreadNotificationCoordinator />);
+  registry.set(shellAtom, {
+    status: state.live ? "live" : "disconnected",
+    snapshot: Option.some({ threads: [mockThreadShell()] }),
   });
+  if (!stop) {
+    const router = {
+      state: {
+        get matches() {
+          return [{ params: state.active }];
+        },
+      },
+      navigate: state.navigate,
+    } as unknown as AnyRouter;
+    stop = startThreadNotifications(registry, router);
+  } else {
+    for (const listener of settingsListeners) listener();
+  }
+  await vi.advanceTimersByTimeAsync(WORKING_EXIT_GRACE_MS);
 }
 
 async function complete() {
@@ -141,6 +168,9 @@ async function complete() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.useFakeTimers();
+  registry = AtomRegistry.make();
+  settingsListeners.clear();
   Object.assign(state, {
     mode: "off",
     inApp: true,
@@ -159,7 +189,7 @@ beforeEach(() => {
     subagent: false,
     background: [],
   });
-  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  vi.stubGlobal("navigator", { platform: "Win32" });
   vi.stubGlobal("window", new EventTarget());
   vi.stubGlobal("document", {
     get visibilityState() {
@@ -172,9 +202,11 @@ beforeEach(() => {
   vi.stubGlobal("Notification", Object.assign(state.notification, { permission: "granted" }));
 });
 
-afterEach(async () => {
-  await act(() => renderer?.unmount());
-  renderer = undefined;
+afterEach(() => {
+  stop?.();
+  stop = undefined;
+  registry.dispose();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
@@ -284,6 +316,7 @@ describe("thread notifications", () => {
         body: "Fix the login form",
         tag: "987fa5ec10182b3e",
         silent: true,
+        requireInteraction: false,
       });
     },
   );
@@ -358,6 +391,7 @@ describe("thread notifications", () => {
       body: "Fix the login form",
       tag: "987fa5ec10182b3e",
       silent: true,
+      requireInteraction: true,
     });
   });
 });

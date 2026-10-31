@@ -3,7 +3,7 @@ import { t } from "~/i18n";
 import { Spinner } from "~/components/ui/spinner";
 import { AuthFilesystemReadScope, type ProjectContentMatch } from "@t3tools/contracts";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { CaseSensitive, ChevronDown, Regex, WholeWord } from "lucide-react";
 
 import { useActiveProjectTarget, type ActiveProjectTarget } from "~/hooks/useActiveProjectTarget";
@@ -23,10 +23,7 @@ interface ProjectContentSearchDialogProps {
   readonly onOpenChange: (open: boolean) => void;
 }
 
-/**
- * Result rows are syntax highlighted, so mounting all 500 possible rows at once
- * stalls the UI.
- */
+/** Syntax-highlighting all 500 result rows at once stalls the UI. */
 const VISIBLE_MATCH_WINDOW = 100;
 
 /** File group retaining original result indices for keyboard navigation across windows. */
@@ -103,6 +100,11 @@ function EmptyContentSearchDialog() {
 }
 
 /** Searches props' project with the current query/options and opens the selected result; shows permission, regex and empty-result states. */
+const scrollSelectedRowIntoView = (row: HTMLElement | null) => {
+  row?.scrollIntoView({ block: "nearest" });
+};
+
+/** Owns search and keyboard selection only while the dialog is open. */
 function OpenContentSearchDialog(props: {
   readonly onOpenChange: (open: boolean) => void;
   readonly target: ActiveProjectTarget;
@@ -127,25 +129,17 @@ function OpenContentSearchDialog(props: {
   });
   const canOpenMatches = search.canReadFiles && !search.isPending && search.error === null;
   const matches = search.matches;
-  // New results restart the selection and the rendered window.
   const [resultsFor, setResultsFor] = useState(matches);
   if (resultsFor !== matches) {
     setResultsFor(matches);
     setSelectedIndex(0);
     setVisibleCount(VISIBLE_MATCH_WINDOW);
   }
-  // Keyboard selection past the window grows it before the row has to scroll into view.
   if (selectedIndex >= visibleCount) {
     setVisibleCount(selectedIndex + VISIBLE_MATCH_WINDOW);
   }
   const visibleMatches = matches.slice(0, visibleCount);
   const groups = groupMatches(visibleMatches);
-
-  useEffect(() => {
-    document
-      .querySelector<HTMLElement>(`[data-content-search-result="${selectedIndex}"]`)
-      ?.scrollIntoView({ block: "nearest" });
-  }, [selectedIndex]);
 
   const observeLoadMoreSentinel = (sentinel: HTMLElement | null) => {
     if (!sentinel) return;
@@ -278,7 +272,9 @@ function OpenContentSearchDialog(props: {
                     <button
                       type="button"
                       key={`${match.path}:${match.lineNumber}:${match.resultIndex}`}
-                      data-content-search-result={match.resultIndex}
+                      ref={
+                        match.resultIndex === selectedIndex ? scrollSelectedRowIntoView : undefined
+                      }
                       className={cn(
                         "flex h-6.5 w-full min-w-0 items-center rounded-keycap pr-2 pl-6.5 text-left font-mono text-secondary-copy text-secondary-label outline-none hover:bg-secondary focus-visible:inset-shadow-focus disabled:pointer-events-none",
                         match.resultIndex === selectedIndex && "bg-secondary text-code-foreground",

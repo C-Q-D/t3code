@@ -5,8 +5,10 @@ import type { ContextMenuItem } from "@t3tools/contracts";
 import type { SnoozePreset } from "@t3tools/client-runtime/state/thread-settled";
 
 export type ThreadActionMenuId =
+  | "find"
   | "new-thread-on-branch"
   | "filter-by-project"
+  | "turn-into-project"
   | "project-settings"
   | "pin"
   | "unpin"
@@ -21,10 +23,12 @@ export type ThreadActionMenuId =
   | "rename"
   | "regenerate-title"
   | "mark-unread"
+  | "share-guest"
   | "copy"
   | "copy-path"
   | "copy-branch"
   | "export-transcript"
+  | "copy-thread"
   | "copy-thread-id"
   | "discard-draft"
   | "archive"
@@ -85,6 +89,7 @@ export function buildDraftActionMenuItems(options: {
 /** Snapshot of thread state and server capabilities used only to build menu availability. */
 export interface ThreadActionMenuState {
   readonly canOperate: boolean;
+  readonly canFind?: boolean;
   readonly branch: string | null;
   readonly projectFilter: {
     readonly label: string;
@@ -96,7 +101,7 @@ export interface ThreadActionMenuState {
   readonly isSnoozed: boolean;
   readonly canSnoozeNow: boolean;
   readonly isRegeneratingTitle: boolean;
-  /** Archive rejects a thread with an attached provider, so disable it here rather than let the action fail. */
+  /** Archive rejects attached providers, so disable it while running. */
   readonly isRunning: boolean;
   readonly supports: {
     readonly settlement: boolean;
@@ -106,6 +111,10 @@ export interface ThreadActionMenuState {
     readonly titleRegeneration: boolean;
   };
   readonly snoozePresets: ReadonlyArray<SnoozePreset>;
+  /** Guest links need their own grant, so the caller checks it instead of `canOperate`. */
+  readonly canShareWithGuest?: boolean;
+  /** A No project thread with its own folder, on a server that can promote it. */
+  readonly canTurnIntoProject?: boolean;
 }
 
 /**
@@ -115,12 +124,15 @@ export interface ThreadActionMenuState {
  */
 export function threadActionRequiresOperate(action: ThreadActionMenuId): boolean {
   return ![
+    "find",
     "new-thread-on-branch",
     "project-settings",
     "mark-unread",
+    "share-guest",
     "copy",
     "copy-path",
     "copy-branch",
+    "copy-thread",
     "copy-thread-id",
     "discard-draft",
   ].includes(action);
@@ -137,6 +149,9 @@ export function buildThreadActionMenuItems(
   state: ThreadActionMenuState,
 ): ReadonlyArray<ContextMenuItem<ThreadActionMenuId>> {
   const items: ReadonlyArray<ContextMenuItem<ThreadActionMenuId>> = [
+    ...(state.canFind
+      ? [{ id: "find" as const, label: "Find in thread", icon: "text-search" }]
+      : []),
     ...(state.branch
       ? [
           {
@@ -181,7 +196,7 @@ export function buildThreadActionMenuItems(
                   {
                     id: "snooze:custom" as const,
                     label: t.common.threadActions.customSnooze,
-                    separatorBefore: true,
+                    separatorBefore: state.snoozePresets.length > 0,
                   },
                 ],
               },
@@ -209,6 +224,16 @@ export function buildThreadActionMenuItems(
               ? t.common.threadActions.showAllProjects
               : t.common.threadActions.filterByProject(state.projectFilter.label),
             icon: "folder-tree",
+          },
+        ]
+      : []),
+    ...(state.canTurnIntoProject
+      ? [
+          {
+            id: "turn-into-project" as const,
+            label: "Turn into project",
+            icon: "folder-plus",
+            disabled: state.isRunning,
           },
         ]
       : []),
@@ -250,6 +275,7 @@ export function buildThreadActionMenuItems(
             ]
           : []),
         { id: "copy-thread-id", label: t.common.threadActions.threadId, icon: "hash" },
+        { id: "copy-thread", label: "Thread", icon: "message-square" },
       ],
     },
     { id: "export-transcript", label: t.common.threadActions.exportTranscript, icon: "download" },

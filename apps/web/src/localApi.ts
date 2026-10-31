@@ -8,8 +8,8 @@ import { readBrowserClientSettings, writeBrowserClientSettings } from "./clientP
 
 let cachedApi: LocalApi | undefined;
 
-/** Creates browser-backed dialogs and navigation APIs; operations reject when the corresponding host action fails. */
-function createBrowserLocalApi(): LocalApi {
+/** Chooses native desktop capabilities while retaining browser fallbacks. */
+export function createLocalApi(): LocalApi {
   return {
     dialogs: {
       pickFolder: async (options) => {
@@ -53,9 +53,7 @@ function createBrowserLocalApi(): LocalApi {
         }
         return showContextMenuFallback(items, position);
       },
-      // A native desktop menu blocks keyboard input and closes on outside
-      // interaction, so nothing to do there; the DOM fallback needs an explicit
-      // dismiss when the state behind it goes away.
+      // Unlike native menus, the DOM fallback needs dismissal when underlying state disappears.
       close: async () => {
         if (!window.desktopBridge) {
           dismissContextMenu();
@@ -77,10 +75,6 @@ function createBrowserLocalApi(): LocalApi {
       },
     },
   };
-}
-
-export function createLocalApi(): LocalApi {
-  return createBrowserLocalApi();
 }
 
 export function readLocalApi(): LocalApi | undefined {

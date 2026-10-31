@@ -38,7 +38,7 @@ const CHAT_ROUTE_ID = "/_chat";
 
 /**
  * New-thread and preview commands, live while a chat route is showing and no
- * modal page (Settings, Usage) covers it. Everything is read at event time, so
+ * full-page utility (Settings, Usage) is active. Everything is read at event time, so
  * the scope is registered once instead of re-registering on every store change.
  */
 export function installChatRouteCommands(router: AnyRouter): () => void {

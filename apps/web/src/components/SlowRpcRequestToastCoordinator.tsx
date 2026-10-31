@@ -1,9 +1,8 @@
 /** Shows a consolidated warning for slow RPC acknowledgements and their start times. */
 import { t } from "~/i18n";
-import { useEffect, useRef } from "react";
 import { HourglassIcon } from "lucide-react";
 
-import { type SlowRpcAckRequest, useSlowRpcAckRequests } from "../rpc/requestLatencyState";
+import { type SlowRpcAckRequest, subscribeSlowRpcAckRequests } from "../rpc/requestLatencyState";
 import { toastManager } from "./ui/toast";
 
 /** Describes the nonempty requests batch using its count and lowest elapsed warning threshold, in seconds. */
@@ -36,16 +35,15 @@ function SlowRequestDetails({ requests }: { requests: ReadonlyArray<SlowRpcAckRe
   );
 }
 
-/** Maintains one warning toast for outstanding slow RPC requests and closes it when none remain or on unmount. */
-export function SlowRpcRequestToastCoordinator() {
-  const slowRequests = useSlowRpcAckRequests();
-  const toastIdRef = useRef<ReturnType<typeof toastManager.add> | null>(null);
+/** One warning toast that tracks the set of slow requests while any are outstanding. */
+export function startSlowRpcRequestToasts(): () => void {
+  let toastId: ReturnType<typeof toastManager.add> | null = null;
 
-  useEffect(() => {
+  const unsubscribe = subscribeSlowRpcAckRequests((slowRequests) => {
     if (slowRequests.length === 0) {
-      if (toastIdRef.current !== null) {
-        toastManager.close(toastIdRef.current);
-        toastIdRef.current = null;
+      if (toastId !== null) {
+        toastManager.close(toastId);
+        toastId = null;
       }
       return;
     }
@@ -64,21 +62,15 @@ export function SlowRpcRequestToastCoordinator() {
       type: "warning" as const,
     };
 
-    if (toastIdRef.current === null) {
-      toastIdRef.current = toastManager.add(nextToast);
+    if (toastId === null) {
+      toastId = toastManager.add(nextToast);
     } else {
-      toastManager.update(toastIdRef.current, nextToast);
+      toastManager.update(toastId, nextToast);
     }
-  }, [slowRequests]);
+  });
 
-  useEffect(
-    () => () => {
-      if (toastIdRef.current !== null) {
-        toastManager.close(toastIdRef.current);
-      }
-    },
-    [],
-  );
-
-  return null;
+  return () => {
+    unsubscribe();
+    if (toastId !== null) toastManager.close(toastId);
+  };
 }
