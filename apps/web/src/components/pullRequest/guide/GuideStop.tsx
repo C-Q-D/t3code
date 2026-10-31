@@ -41,6 +41,7 @@ const attentionLabels = () =>
     accessibility: t.git.guideStopUi.accessibility,
   }) as const satisfies Record<PullRequestReviewGuideAttention["kind"], string>;
 
+/** Keeps navigation beside the reviewed excerpt so long stop titles remain reachable on narrow panels. */
 export function GuideStop({
   stop,
   index,
@@ -273,8 +274,8 @@ export function GuideStop({
 
         <footer className="flex flex-wrap items-center justify-end gap-3 border-t border-border/60 pt-4">
           {nextTitle !== null ? (
-            <Button className="min-w-0" onClick={() => onStep(1)}>
-              <span className="min-w-0 truncate">{t.git.guideProgressText.next(nextTitle)}</span>
+            <Button size="multiline" className="max-w-full" onClick={() => onStep(1)}>
+              <span className="min-w-0 break-words">{t.git.guideProgressText.next(nextTitle)}</span>
               <ArrowRightIcon aria-hidden />
             </Button>
           ) : onFinish !== null ? (

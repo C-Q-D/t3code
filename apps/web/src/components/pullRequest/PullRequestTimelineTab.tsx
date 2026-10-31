@@ -176,7 +176,7 @@ function OpenOnHostButton({ url, onOpen }: { url: string | null; onOpen: (url: s
     <Button
       size="icon-xs"
       variant="ghost-muted"
-      className="-mr-1 -mt-1 shrink-0"
+      className="-mr-1 shrink-0"
       aria-label={t.git.pullRequest.openActivityOnHost}
       onClick={() => onOpen(url)}
     >
@@ -251,7 +251,6 @@ function ConversationCard({
           </div>
           {editable !== null && !editing ? (
             <PullRequestEditButton
-              className="-mt-1"
               aria-label={t.git.pullRequest.editComment}
               onClick={() => setEditing(true)}
             />

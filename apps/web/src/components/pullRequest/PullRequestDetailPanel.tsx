@@ -1438,7 +1438,7 @@ export function PullRequestDetailPanel({
                   {t.git.pullRequest.mergeConflictsWith(detail.baseBranch)}
                 </p>
               ) : null}
-              <div className="flex flex-wrap items-center gap-1.5">
+              <div className="flex select-none flex-wrap items-center gap-1.5">
                 <PullRequestPrimaryAction
                   headerActions={headerActions}
                   inlineConfirm={inlineConfirm}

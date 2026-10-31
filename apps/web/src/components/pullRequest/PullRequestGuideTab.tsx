@@ -117,12 +117,14 @@ export function PullRequestGuideTab({
               : "Could not write a review guide"}
         </p>
         <p className="max-w-md text-xs text-muted-foreground">
-          {failure !== null
-            ? FAILURE_HINT
-            : (query.error ?? (running ? t.git.guideTabUi.progress : t.git.guideTabUi.description))}
+          {running
+            ? t.git.guideTabUi.progress
+            : failure !== null
+              ? FAILURE_HINT
+              : (query.error ?? t.git.guideTabUi.description)}
         </p>
-        {failure !== null ? <FailureDetails detail={failure} /> : null}
         {writeButton(failure === null ? t.git.guideTabUi.write : t.git.guideTabUi.retry, "sm")}
+        {failure === null || running ? null : <FailureDetails detail={failure} />}
       </div>
     );
   }

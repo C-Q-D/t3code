@@ -15,7 +15,7 @@ import { CloudUploadIcon, GitCommitIcon } from "lucide-react";
 import { installMessages } from "~/i18n";
 import { en } from "~/i18n/locales/en";
 import { messages } from "~/i18n/locales/zh-CN";
-import { resolveQuickAction, type GitQuickAction } from "./GitActionsControl.logic";
+import { buildMenuItems, type GitActionIconName } from "./GitActionsControl.logic";
 
 const state = vi.hoisted(() => ({
   scopes: new Set<string>(),
@@ -30,10 +30,11 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock("@effect/atom-react", () => ({
+  useAtomMount: () => {},
   useAtomValue: (atom: unknown) => (atom === "vcs-state" ? { isRunning: false } : null),
 }));
 vi.mock("~/state/entities", () => ({
-  useThreadProjection: (ref: unknown) =>
+  useQuietThreadProjection: (ref: unknown) =>
     ref === null || state.detail === null ? null : { projection: { thread: state.detail } },
   useQuietThreadShell: () => state.shell,
 }));
@@ -47,6 +48,7 @@ vi.mock("~/state/use-atom-command", () => ({ useAtomCommand: (command: unknown) 
 vi.mock("~/state/server", () => ({ serverEnvironment: { configValueAtom: () => null } }));
 vi.mock("~/state/sourceControl", () => ({ sourceControlEnvironment: { discovery: () => null } }));
 vi.mock("~/state/vcs", () => ({
+  vcsStatusRevalidation: () => null,
   vcsEnvironment: { status: () => null },
   vcsActionManager: { stateAtom: () => "vcs-state" },
 }));
@@ -100,7 +102,7 @@ vi.mock("~/composerDraftStore", () => ({
       },
     }),
 }));
-vi.mock("~/lib/sourceControlActions", () => ({
+vi.mock("~/state/sourceControlActions", () => ({
   useSourceControlActionRunning: () => false,
   useVcsInitAction: () => ({}),
   useVcsPullAction: () => ({}),
@@ -113,6 +115,7 @@ vi.mock("~/lib/sourceControlActions", () => ({
       return {
         _tag: "Success",
         value: {
+          pr: { status: "skipped_not_requested" },
           branch: featureBranch
             ? { status: "created", name: "feature" }
             : { status: "skipped_not_requested" },
@@ -196,9 +199,24 @@ function mountActions(active = true) {
   return renderer;
 }
 
-describe("localized disabled quick action icons", () => {
+describe("localized action menu icons", () => {
   it.each([
-    ["commit", null, GitCommitIcon],
+    [
+      "commit",
+      {
+        isRepo: true,
+        hasPrimaryRemote: true,
+        isDefaultRef: false,
+        refName: "feature",
+        hasWorkingTreeChanges: true,
+        workingTree: { files: [], insertions: 0, deletions: 0 },
+        hasUpstream: true,
+        aheadCount: 0,
+        behindCount: 0,
+        pr: null,
+      },
+      GitCommitIcon,
+    ],
     [
       "push",
       {
@@ -215,24 +233,24 @@ describe("localized disabled quick action icons", () => {
       },
       CloudUploadIcon,
     ],
-  ] as const)("keeps the %s icon for a Chinese hint label", (_name, status, expectedIcon) => {
+  ] as const)("keeps the %s menu icon under Chinese labels", (name, status, expectedIcon) => {
     installMessages("zh-CN", messages);
     try {
       const renderer = mountActions(false);
       const renderIcon = renderer.root.findAll(
-        (node) => typeof node.type === "function" && node.type.name === "GitQuickActionIcon",
+        (node) => typeof node.type === "function" && node.type.name === "GitActionItemIcon",
       )[0]?.type as
         | ((props: {
-            quickAction: GitQuickAction;
+            icon: GitActionIconName;
             SourceControlIcon: typeof GitCommitIcon;
           }) => ReturnType<typeof createElement>)
         | undefined;
-      expect(renderIcon).not.toBeNull();
+      expect(renderIcon).toBeDefined();
       let icon!: ReactTestRenderer;
       act(() => {
         icon = create(
           createElement(renderIcon!, {
-            quickAction: resolveQuickAction(status, false),
+            icon: buildMenuItems(status, false).find((item) => item.id === name)!.icon,
             SourceControlIcon: GitCommitIcon,
           }),
         );

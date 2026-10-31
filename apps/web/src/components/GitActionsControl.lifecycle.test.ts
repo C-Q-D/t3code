@@ -14,10 +14,11 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock("@effect/atom-react", () => ({
+  useAtomMount: () => {},
   useAtomValue: (atom: unknown) => (atom === "vcs-state" ? { isRunning: false } : null),
 }));
 vi.mock("~/state/entities", () => ({
-  useThreadProjection: () => null,
+  useQuietThreadProjection: () => null,
   useQuietThreadShell: (ref: { threadId: string }) => ({ branch: "main", id: ref.threadId }),
 }));
 vi.mock("~/state/session", () => ({
@@ -30,6 +31,7 @@ vi.mock("~/state/use-atom-command", () => ({ useAtomCommand: (command: unknown) 
 vi.mock("~/state/server", () => ({ serverEnvironment: { configValueAtom: () => null } }));
 vi.mock("~/state/sourceControl", () => ({ sourceControlEnvironment: { discovery: () => null } }));
 vi.mock("~/state/vcs", () => ({
+  vcsStatusRevalidation: () => null,
   vcsEnvironment: { status: () => null },
   vcsActionManager: { stateAtom: () => "vcs-state" },
 }));
@@ -67,7 +69,7 @@ vi.mock("~/composerDraftStore", () => ({
       setDraftThreadContext: () => {},
     }),
 }));
-vi.mock("~/lib/sourceControlActions", () => ({
+vi.mock("~/state/sourceControlActions", () => ({
   useSourceControlActionRunning: () => false,
   useVcsInitAction: () => ({}),
   useVcsPullAction: () => ({}),
@@ -78,6 +80,7 @@ vi.mock("~/lib/sourceControlActions", () => ({
       return {
         _tag: "Success",
         value: {
+          pr: { status: "skipped_not_requested" },
           branch: { status: "skipped_not_requested" },
           toast: {
             title: "Committed",
@@ -176,10 +179,11 @@ async function renderActions(thread: string, cwd: string) {
   return renderer;
 }
 
+/** Selects the submit action so the separate local commit-message dialog cannot mask navigation regressions. */
 async function clickQuickAction(renderer: ReturnType<typeof create>) {
   const button = renderer.root
     .findAllByType("button")
-    .find((button) => button.props.onClick && !button.props.disabled);
+    .find((button) => button.children.includes("Commit & push") && !button.props.disabled);
   expect(button).toBeDefined();
   await act(async () => {
     button!.props.onClick({});
@@ -206,7 +210,6 @@ describe("Git action targets across thread navigation", () => {
       renderer = create(
         createElement(MemoGitActionsControl, {
           ...props("details-thread", "/details-checkout"),
-          displayMode: "panel",
         }),
       );
     });
@@ -223,20 +226,22 @@ describe("Git action targets across thread navigation", () => {
     });
   });
 
-  it("runs a retained PR toast in the thread that produced it", async () => {
+  it("keeps inline success feedback scoped to the thread that produced it", async () => {
     const renderer = await renderActions("first", "/first");
     await clickQuickAction(renderer);
-    const toast = state.toasts.find((toast) => toast.actionProps)!;
-    expect(toast).toBeDefined();
+    expect(
+      renderer.root.findAllByType("p").some((node) => node.children.includes("Committed")),
+    ).toBe(true);
     await act(async () => {
       renderer.update(createElement(MemoGitActionsControl, props("second", "/second")));
     });
-    await act(async () => {
-      toast.actionProps!.onClick();
-    });
+    expect(
+      renderer.root.findAllByType("p").some((node) => node.children.includes("Committed")),
+    ).toBe(false);
+    await clickQuickAction(renderer);
     expect(state.actions.at(-1)).toMatchObject({
-      scope: { cwd: "/first" },
-      input: { threadId: "first", action: "commit_push_pr" },
+      scope: { cwd: "/second" },
+      input: { threadId: "second" },
     });
   });
 
