@@ -18,14 +18,14 @@ export function PullRequestsUnavailableState({
   error,
   onRetry,
   refreshing = false,
-  gitHubUrl,
+  host,
   variant = "default",
 }: {
   title?: string;
   error: string;
   onRetry?: () => void;
   refreshing?: boolean;
-  gitHubUrl?: string;
+  host?: { readonly url: string; readonly openLabel: string };
   /** Only the list opts into L6; detail and linked-panel callers keep their current surface. */
   variant?: "default" | "list";
 }) {
@@ -44,14 +44,14 @@ export function PullRequestsUnavailableState({
             {t.git.pullRequest.retry}
           </Button>
         ) : null}
-        {gitHubUrl ? (
+        {host ? (
           <Button
             size="md"
             variant="outline"
-            render={<a href={gitHubUrl} target="_blank" rel="noopener noreferrer" />}
+            render={<a href={host.url} target="_blank" rel="noopener noreferrer" />}
           >
             <ExternalLinkIcon aria-hidden className="size-3.5" />
-            {t.git.pullRequest.openOnGitHub}
+            {host.openLabel}
           </Button>
         ) : null}
       </PullRequestListStatus>
@@ -64,11 +64,9 @@ export function PullRequestsUnavailableState({
       </EmptyMedia>
       <EmptyHeader>
         <EmptyTitle>{title}</EmptyTitle>
-        {/* The caller names the fix — update the environment, install gh, sign in — so this
-            shows its message rather than trying to infer one from the failure text. */}
         <EmptyDescription>{error}</EmptyDescription>
       </EmptyHeader>
-      {onRetry || gitHubUrl ? (
+      {onRetry || host ? (
         <div className="flex flex-wrap justify-center gap-2">
           {onRetry ? (
             <Button
@@ -82,14 +80,14 @@ export function PullRequestsUnavailableState({
               {t.git.pullRequest.retry}
             </Button>
           ) : null}
-          {gitHubUrl ? (
+          {host ? (
             <Button
               size="sm"
               variant="outline"
-              render={<a href={gitHubUrl} target="_blank" rel="noopener noreferrer" />}
+              render={<a href={host.url} target="_blank" rel="noopener noreferrer" />}
             >
               <ExternalLinkIcon aria-hidden className="size-3.5" />
-              {t.git.pullRequest.openOnGitHub}
+              {host.openLabel}
             </Button>
           ) : null}
         </div>

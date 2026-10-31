@@ -1,5 +1,6 @@
 /** Exercise two real review forms against the same draft store and the host submission boundary. */
 import { EnvironmentId, ProjectId, type PullRequestReviewVerdict } from "@t3tools/contracts";
+import { Cause } from "effect";
 import { act } from "react";
 import { create, type ReactTestInstance, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
@@ -134,7 +135,10 @@ it.each(["inline", "floating"] as const)(
 );
 
 it("keeps the shared review after a host rejection", async () => {
-  submitReview.mockResolvedValue({ _tag: "Failure" });
+  submitReview.mockResolvedValue({
+    _tag: "Failure",
+    cause: Cause.fail(new Error("Host rejected review")),
+  });
   await mount();
   await write(surface("inline"), "Keep this review");
   await choose(surface("floating"), "approve");

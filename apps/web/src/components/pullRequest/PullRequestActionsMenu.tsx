@@ -90,7 +90,18 @@ export function PullRequestActionsMenu({
 }: {
   environmentId: EnvironmentId;
   reference: PullRequestRef;
-  detail: PullRequestDetail;
+  detail: Pick<
+    PullRequestDetail,
+    | "url"
+    | "repository"
+    | "state"
+    | "isDraft"
+    | "headBranch"
+    | "maintainerCanModify"
+    | "observedAt"
+    | "capabilities"
+    | "viewerPermissions"
+  >;
   pullRequestKey: string;
   terminology: ChangeRequestTerminology;
   linkThreadRef: ScopedThreadRef | null;

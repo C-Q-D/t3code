@@ -40,6 +40,7 @@ type Detail = Parameters<typeof PullRequestActionsMenu>[0]["detail"];
 
 const openDetail: Detail = {
   url: "https://github.com/owner/repo/pull/7",
+  repository: "owner/repo",
   state: "open",
   isDraft: false,
   headBranch: "feature",
@@ -65,6 +66,7 @@ const openDetail: Detail = {
   },
 };
 
+/** Isolates the host save boundary while exercising the real maintainer menu state. */
 function setup() {
   mocks.update.mockReset().mockResolvedValue({ _tag: "Success" });
   mocks.notify.mockReset();
@@ -80,9 +82,6 @@ function setup() {
       refreshing={false}
       refreshFromHost={async () => {}}
       handoff={null}
-      attachesToComposer={false}
-      askAboutPullRequest={() => {}}
-      explainPullRequest={() => {}}
       canFixFindings={false}
       startFixFindings={() => {}}
       handoffLabels={{ fixFindings: "Fix review findings" }}
@@ -94,14 +93,23 @@ function setup() {
       actingEnvironmentId={environmentId}
       onActingEnvironmentChange={() => {}}
       can={() => false}
-      autoMergeArmed={false}
-      showsDraftToggle={false}
-      showsMergeNow={false}
-      showsAutoMerge={false}
-      showsMergeMethods={false}
-      allowedMergeMethods={[]}
+      headerActions={{
+        merge: false,
+        ready: false,
+        draft: false,
+        enableAutoMerge: false,
+        disableAutoMerge: false,
+        mergeMethods: false,
+      }}
+      repositoryUrl={null}
+      conflicting={false}
+      conflictsUnavailable={true}
+      startResolveConflicts={() => {}}
+      inlineConfirm={{
+        isArmed: () => false,
+        props: (_action, onConfirm) => ({ ref: undefined, onClick: onConfirm, onBlur: () => {} }),
+      }}
       selectedMergeMethod="squash"
-      onSelectMergeMethod={() => {}}
       showsDeleteBranch={false}
       environmentConnected={true}
       canWriteSourceControl={true}
@@ -110,7 +118,6 @@ function setup() {
       pendingAction={null}
       perform={async () => true}
       openOnHostText="Open on GitHub"
-      copyReference={() => {}}
     />
   );
 }

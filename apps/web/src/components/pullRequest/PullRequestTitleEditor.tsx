@@ -13,7 +13,7 @@ import { PullRequestDetailTitleRow } from "./PullRequestDetailLayout";
 import { PencilIcon } from "lucide-react";
 import { t } from "~/i18n";
 import { readableFailure } from "./pullRequestDetail.logic";
-import { canEditPullRequestChangeRequest } from "./pullRequestEditing.logic";
+import { canEditPullRequestChangeRequest } from "@t3tools/client-runtime/pull-request-editing";
 
 /** The pull request title, which the reader can rename in place when the host allows it. */
 export function PullRequestTitleEditor({

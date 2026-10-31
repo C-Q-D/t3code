@@ -24,6 +24,7 @@ import {
   DialogFooter,
 } from "../ui/dialog";
 import { toastManager } from "../ui/toast";
+import type { ChangeRequestTerminology } from "~/sourceControlPresentation";
 import { PullRequestStackLayers } from "./PullRequestStackLayers";
 import { PullRequestStackHeader } from "./PullRequestStackHeader";
 import { PullRequestStackLayerContent } from "./PullRequestStackLayerContent";
@@ -48,6 +49,7 @@ export function PullRequestStackMenu({
   onRetry,
 }: {
   hostLabel: string;
+  terminology: ChangeRequestTerminology;
   notice?: string | null;
   onRetry?: (() => void) | undefined;
   stack: PullRequestStack;

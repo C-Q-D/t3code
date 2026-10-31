@@ -2,7 +2,7 @@
 import { t } from "~/i18n";
 import type { ContextMenuItem } from "@t3tools/contracts";
 import {
-  type SourceControlClientDefinition,
+  type SourceControlDefinition,
   UNKNOWN_SOURCE_CONTROL_CLIENT,
 } from "@t3tools/client-runtime/source-control-clients";
 
@@ -13,7 +13,8 @@ import { toastManager } from "../ui/toast";
 
 export type PullRequestLinkContextMenuAction = "copy-link" | "open-external";
 
-export const openOnHostLabel = (host: SourceControlClientDefinition): string =>
+/** Uses the detected host label without assuming every request belongs to GitHub. */
+export const openOnHostLabel = (host: SourceControlDefinition): string =>
   host === UNKNOWN_SOURCE_CONTROL_CLIENT
     ? t.git.pullRequest.openOnHost
     : t.git.pullRequest.openOnHostName(host.label);

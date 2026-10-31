@@ -1,3 +1,4 @@
+import type { ChangeRequestTerminology } from "@t3tools/client-runtime/source-control-clients";
 /** Owns pull request speed actions on the web pull-request surface; host data and agent context remain unchanged. */
 import { t } from "~/i18n";
 import { createContext, use, useLayoutEffect, type ReactNode } from "react";
@@ -9,7 +10,10 @@ import { useUiStateStore } from "~/uiStateStore";
 import { Button } from "../ui/button";
 import { Spinner } from "../ui/spinner";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
-import { resolvePullRequestMergeMethod } from "./pullRequestDetail.logic";
+import {
+  allowedPullRequestMergeMethods,
+  resolvePullRequestMergeMethod,
+} from "./pullRequestDetail.logic";
 import { PullRequestGlyph } from "./pullRequestIcons";
 import { pullRequestQuickActions, type EnvironmentPullRequestEntry } from "./pullRequestList.logic";
 import {
@@ -34,6 +38,7 @@ export interface PullRequestSpeedActionResult<Entry = EnvironmentPullRequestEntr
 export function PullRequestSpeedActions<Entry extends PullRequestSpeedActionEntry>({
   entry,
   hostActions,
+  terminology,
   onActed,
   closing = false,
   sweeping = false,
@@ -42,6 +47,7 @@ export function PullRequestSpeedActions<Entry extends PullRequestSpeedActionEntr
 }: {
   entry: Entry;
   hostActions: ReadonlySet<PullRequestAction>;
+  terminology: ChangeRequestTerminology;
   onActed?: (result: PullRequestSpeedActionResult<Entry>) => void;
   closing?: boolean;
   sweeping?: boolean;
@@ -65,11 +71,10 @@ export function PullRequestSpeedActions<Entry extends PullRequestSpeedActionEntr
   const { actionPending, perform } = usePullRequestActionRunner({
     environmentId: entry.environmentId,
     reference,
+    terminology,
     onSuccess: (action) => onActed?.({ entry, action }),
     resolveMergeMethod: (detail) => {
-      const allowed = detail.capabilities.mergeMethods.filter(
-        (method) => detail.mergeCapabilities[method],
-      );
+      const allowed = allowedPullRequestMergeMethods(detail);
       if (allowed.length === 0)
         throw new Error(t.git.pullRequest.noMergeMethodIsAvailableForThisRepository);
       return resolvePullRequestMergeMethod(

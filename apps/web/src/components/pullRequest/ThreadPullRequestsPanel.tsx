@@ -379,6 +379,7 @@ function LinkRowImpl({
         <PullRequestSpeedActions
           entry={actionEntry}
           hostActions={linkHostActions}
+          terminology={linkHost.changeRequest}
           onPendingChange={setActionPending}
         />
       ) : null}

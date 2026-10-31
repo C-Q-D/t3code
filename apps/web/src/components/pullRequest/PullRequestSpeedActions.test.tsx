@@ -4,6 +4,7 @@
  * @vitest-environment jsdom
  */
 import { EnvironmentId, ProjectId, type PullRequestAction } from "@t3tools/contracts";
+import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import { act } from "react";
 import * as Cause from "effect/Cause";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
@@ -62,6 +63,7 @@ async function renderActions(hostActions = closeActions) {
         <PullRequestSpeedModeContext value={true}>
           <PullRequestSpeedActions
             entry={entry}
+            terminology={sourceControlClients.get("github").changeRequest}
             hostActions={hostActions}
             onPendingChange={reportPending}
           />
