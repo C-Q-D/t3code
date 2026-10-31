@@ -2494,7 +2494,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     environmentUnavailable !== null ||
     composerSubmissionError !== null ||
     providerInputSubmissionError !== null ||
-    hasImageAttachmentAttention;
+    hasImageAttachmentAttention ||
+    preparingComposerImages.length > 0;
   const isComposerResting = shouldUseRestingComposerLayout({
     isExistingThread: !props.embedded && routeKind === "server" && activeThreadId !== null,
     isMobileViewport,
@@ -4042,7 +4043,11 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                 <ComposerContextActionsContext value={composerContextActions}>
                   <ComposerPromptEditor
                     draftKey={composerDraftTargetKey}
-                    ariaLabel={t.composer.placeholder.message}
+                    ariaLabel={
+                      activeThread
+                        ? `${t.composer.placeholder.message} ${activeThread.title}`
+                        : t.composer.placeholder.message
+                    }
                     suggestionListId={composerSuggestionListId}
                     activeSuggestionId={
                       composerSuggestionListVisible && activeComposerMenuItem

@@ -1,3 +1,12 @@
+import { copyThreadReference as copyChatThreadReference } from "../lib/copyThreadReference";
+import { isRelatedThreadUnavailable, resolveRightPanelMaximizeState } from "./ChatView.logic";
+import { resolveThreadReferenceCopyTarget } from "@t3tools/client-runtime/thread-reference";
+import {
+  COMPOSER_CONTEXT_CLIPBOARD_MIME,
+  decodeComposerContextFragment,
+} from "@t3tools/shared/composerContextClipboard";
+import * as clipboard from "../hooks/useCopyToClipboard";
+import { toastManager } from "./ui/toast";
 import {
   boundAttachmentIds,
   buildExpiredTerminalContextToastCopy,
@@ -1220,5 +1229,75 @@ describe("deriveWorkspaceMutationId", () => {
     expect(deriveWorkspaceMutationId([item("reply", "assistant_message", "completed")], null)).toBe(
       null,
     );
+  });
+});
+
+describe("upstream merge regressions", () => {
+  it.each([
+    { live: true, families: true, deletedAt: null, missing: true, unavailable: false },
+    { live: true, families: false, deletedAt: null, missing: true, unavailable: true },
+    { live: false, families: false, deletedAt: null, missing: true, unavailable: false },
+    {
+      live: true,
+      families: true,
+      deletedAt: "2026-10-31T00:00:00Z",
+      missing: false,
+      unavailable: true,
+    },
+    { live: true, families: true, deletedAt: null, missing: false, unavailable: false },
+  ])(
+    "routes a related thread using shell authority: $live/$families/$missing/$deletedAt",
+    ({ live, families, deletedAt, missing, unavailable }) => {
+      expect(
+        isRelatedThreadUnavailable({
+          shell: missing ? null : { deletedAt },
+          isEnvironmentLive: live,
+          shellOmitsChildren: families,
+        }),
+      ).toBe(unavailable);
+    },
+  );
+
+  it.each([false, true])("keeps maximize reachable from an open panel, sheet=%s", (sheet) => {
+    expect(
+      resolveRightPanelMaximizeState({ open: true, sheet, embedded: false, maximized: false }),
+    ).toEqual({ canMaximize: true, maximized: false, showControl: true });
+    expect(
+      resolveRightPanelMaximizeState({
+        open: true,
+        sheet: false,
+        embedded: false,
+        maximized: true,
+      }),
+    ).toEqual({ canMaximize: true, maximized: true, showControl: true });
+  });
+
+  it("copies a same-environment thread as pasteable context and shows its title", async () => {
+    using write = vi.spyOn(clipboard, "writeTextToClipboard").mockResolvedValue(true);
+    using notice = vi.spyOn(toastManager, "add");
+    const target = resolveThreadReferenceCopyTarget({
+      threadRef: { environmentId, threadId },
+      title: "Review the parser",
+    });
+    if (!target) throw new Error("The thread has no copy target");
+    await copyChatThreadReference(target);
+    const flavors = write.mock.calls[0]?.[2];
+    expect
+      .soft(decodeComposerContextFragment(flavors?.[COMPOSER_CONTEXT_CLIPBOARD_MIME]))
+      .toMatchObject({
+        version: 1,
+        source: { environmentId: "environment-local" },
+        records: [
+          {
+            kind: "thread",
+            environmentId: "environment-local",
+            threadId: "thread-1",
+            title: "Review the parser",
+          },
+        ],
+      });
+    expect
+      .soft(notice.mock.calls[0]?.[0])
+      .toMatchObject({ type: "success", description: "Review the parser" });
   });
 });

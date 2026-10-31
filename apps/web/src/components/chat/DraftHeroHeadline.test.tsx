@@ -17,11 +17,11 @@ const effects = vi.hoisted(() => ({
   addProject: vi.fn(),
 }));
 vi.mock("@effect/atom-react", () => ({ useAtomValue: () => [] }));
-vi.mock("~/state/server", () => ({ primaryServerKeybindingsAtom: {} }));
 vi.mock("~/state/entities", () => ({ useProjects: () => projects, useThreadShells: () => [] }));
 vi.mock("~/state/environments", () => ({
   useEnvironments: () => ({ environments: [] }),
   usePrimaryEnvironmentId: () => environmentId,
+  useEnvironmentProviders: () => new Map(),
 }));
 vi.mock("~/hooks/useSettings", () => ({
   useClientSettings: (select: (settings: typeof DEFAULT_CLIENT_SETTINGS) => unknown) =>
@@ -34,6 +34,10 @@ vi.mock("~/hooks/useScratchProject", () => ({
     scratchWorkspaceRootFor: () => "F:/scratch",
     openScratchProject: effects.openScratch,
   }),
+}));
+// Project pinning is outside these picker tests; project selection and draft writes stay real.
+vi.mock("~/hooks/useProjectGroupUpdate", () => ({
+  useProjectPin: () => ({ canPinProjectGroup: () => false, toggleProjectGroupPin: vi.fn() }),
 }));
 vi.mock("~/commandPaletteBus", () => ({ openCommandPalette: effects.addProject }));
 vi.mock("../ProjectFavicon", () => ({ ProjectFavicon: () => null }));

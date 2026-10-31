@@ -1,3 +1,4 @@
+import { copyThreadReference } from "../lib/copyThreadReference";
 import {
   timelineContentOverflowsViewport,
   CHAT_TIMELINE_ANCHOR_OFFSET,
@@ -19,6 +20,7 @@ import { ScrollToEndButton, WorkspaceFileDropOverlay } from "./chat/TimelineOver
 import { usePasteToFocusComposer } from "./chat/usePasteToFocusComposer";
 import { announcedRun, isDetailBehindShell } from "./chat/threadActivityAnnouncement";
 import {
+  resolveRightPanelMaximizeState,
   deriveAvailableRevertTurnCounts,
   deriveThreadPendingBackgroundTasks,
   deriveWorkspaceMutationId,
@@ -156,7 +158,6 @@ import { useWorkspaceMutationRefresh } from "../hooks/useWorkspaceMutationRefres
 import { DEFAULT_INTERACTION_MODE, type ChatMessage } from "../types";
 import { buildThreadRouteParams } from "../threadRoutes";
 import { useTheme } from "../hooks/useTheme";
-import { writeTextToClipboard } from "../hooks/useCopyToClipboard";
 import { subscribeSnapShotComposerFocus } from "../lib/desktopSnapShot";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { FileMetadataThreadProvider } from "../hooks/FileMetadataThreadProvider";
@@ -195,7 +196,7 @@ import { isEditableFocused } from "../lib/editableFocus";
 import { DEFAULT_RESOLVED_KEYBINDINGS } from "@t3tools/shared/keybindings";
 import { shortcutLabelForCommand } from "../keybindings";
 import { cn } from "~/lib/utils";
-import { stackedThreadToast, toastManager } from "./ui/toast";
+import { toastManager } from "./ui/toast";
 import { projectScriptIdFromCommand } from "~/projectScripts";
 import { newMessageId } from "~/lib/utils";
 import { isInSideChatPane, type SideChatParentPanel } from "~/lib/sideChatPane";
@@ -1137,9 +1138,16 @@ export default function ChatView(props: ChatViewProps) {
     activePreviewMiniPlayer?.source ?? null,
     renderedRightPanelSurface,
   );
-  const canMaximizeRightPanel = rightPanelOpen && !shouldUsePlanSidebarSheet;
-  const rightPanelMaximized =
-    !embedded && canMaximizeRightPanel && rightPanelState.maximized === true;
+  const {
+    canMaximize: canMaximizeRightPanel,
+    maximized: rightPanelMaximized,
+    showControl: showRightPanelMaximizeControl,
+  } = resolveRightPanelMaximizeState({
+    open: rightPanelOpen,
+    sheet: shouldUsePlanSidebarSheet,
+    embedded: Boolean(embedded),
+    maximized: rightPanelState.maximized === true,
+  });
   const [threadPanelPopoverHandle] = useState(PopoverCreateHandle);
   const [chatCanvasStore] = useState(createChatCanvasStore);
 
@@ -2447,26 +2455,7 @@ export default function ChatView(props: ChatViewProps) {
   const copyActiveThreadReference = () => {
     const target = activeThreadReferenceCopyTarget;
     if (target === null) return;
-    void writeTextToClipboard(target.value, target.clipboardTarget).then(
-      (didCopy) => {
-        if (!didCopy) return;
-        toastManager.add({
-          type: "success",
-          title: target.successTitle,
-          description: target.value,
-        });
-      },
-      (error) => {
-        console.error(error);
-        toastManager.add(
-          stackedThreadToast({
-            type: "error",
-            title: target.failureTitle,
-            description: error instanceof Error ? error.message : t.chat.view.genericError,
-          }),
-        );
-      },
-    );
+    void copyThreadReference(target);
   };
   const pullRequestPanelTarget = activeThread
     ? threadPullRequestPanelTarget({
@@ -3346,7 +3335,7 @@ export default function ChatView(props: ChatViewProps) {
   const panelToggleControls = <PanelLayoutControls {...panelToggleControlProps} />;
   const panelLayoutControls = (
     <div className="flex items-center gap-1" data-workspace-titlebar-controls>
-      {!shouldUsePlanSidebarSheet ? (
+      {showRightPanelMaximizeControl ? (
         <span
           aria-hidden={!rightPanelOpen}
           className={cn(

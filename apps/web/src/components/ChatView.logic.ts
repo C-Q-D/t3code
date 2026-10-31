@@ -1689,3 +1689,29 @@ export function deriveWorkspaceMutationId(
     ? null
     : JSON.stringify([itemId, latestCheckpointCompletedAt]);
 }
+
+/** A live full shell can establish absence; family shells leave idle children to detail routing. */
+export function isRelatedThreadUnavailable(input: {
+  readonly shell: Pick<EnvironmentThreadShell, "deletedAt"> | null;
+  readonly isEnvironmentLive: boolean;
+  readonly shellOmitsChildren: boolean;
+}): boolean {
+  return input.shell === null
+    ? !input.shellOmitsChildren && input.isEnvironmentLive
+    : input.shell.deletedAt != null;
+}
+
+/** Keeps the maximize action and its control consistent with the panel's current presentation. */
+export function resolveRightPanelMaximizeState(input: {
+  readonly open: boolean;
+  readonly sheet: boolean;
+  readonly embedded: boolean;
+  readonly maximized: boolean;
+}) {
+  const canMaximize = input.open;
+  return {
+    canMaximize,
+    maximized: !input.embedded && canMaximize && input.maximized,
+    showControl: !input.sheet || input.open,
+  };
+}

@@ -7,6 +7,7 @@ import type { Dispatch } from "react";
 import type { ComposerThreadTarget } from "../../composerDraftStore";
 import type { ComposerHandleRef } from "../../composerHandleContext";
 import {
+  isRelatedThreadUnavailable,
   isThreadWokeUnseen,
   branchMismatchKey,
   isBranchMismatchDismissedForSession,
@@ -451,7 +452,13 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
       }
     }
     const shell = readThreadShell(threadRef);
-    if (shell === null ? isEnvironmentLive() : shell.deletedAt != null) {
+    if (
+      isRelatedThreadUnavailable({
+        shell,
+        isEnvironmentLive: isEnvironmentLive(),
+        shellOmitsChildren,
+      })
+    ) {
       toastManager.add({ type: "info", title: t.chat.machineThreadUi.unavailable });
       return;
     }
