@@ -38,32 +38,30 @@ import { PanelAnimationsPreview } from "./PanelAnimationsPreview";
 import { ThreadDetailsItemsRow } from "./ThreadDetailsItemsRow";
 import { TypographySection } from "./TypographySettings";
 
-const ENVIRONMENT_IDENTIFICATION_LABELS = t.settings.rows.environmentIdentification.options;
-
 /** Lists channel-aware artwork choices; Latest also offers fixed Dev and Nightly artwork. */
 function environmentIdentificationOptions(
   stageVariant: SidebarStageBackdropVariant | null,
 ): ReadonlyArray<readonly [EnvironmentIdentificationMode, string]> {
   if (stageVariant === "dev") {
     return [
-      ["artwork", "Dev artwork"],
-      ["nightly-artwork", "Nightly artwork"],
-      ["pill", ENVIRONMENT_IDENTIFICATION_LABELS.pill],
-      ["none", ENVIRONMENT_IDENTIFICATION_LABELS.none],
+      ["artwork", t.settings.artworkAdditions.dev],
+      ["nightly-artwork", t.settings.artworkAdditions.nightly],
+      ["pill", t.settings.rows.environmentIdentification.options.pill],
+      ["none", t.settings.rows.environmentIdentification.options.none],
     ];
   }
   if (stageVariant === "nightly") {
     return [
-      ["artwork", "Nightly artwork"],
-      ["dev-artwork", "Dev artwork"],
-      ["pill", ENVIRONMENT_IDENTIFICATION_LABELS.pill],
-      ["none", ENVIRONMENT_IDENTIFICATION_LABELS.none],
+      ["artwork", t.settings.artworkAdditions.nightly],
+      ["dev-artwork", t.settings.artworkAdditions.dev],
+      ["pill", t.settings.rows.environmentIdentification.options.pill],
+      ["none", t.settings.rows.environmentIdentification.options.none],
     ];
   }
   return [
-    ["artwork", ENVIRONMENT_IDENTIFICATION_LABELS.none],
-    ["nightly-artwork", "Nightly artwork"],
-    ["dev-artwork", "Dev artwork"],
+    ["artwork", t.settings.rows.environmentIdentification.options.none],
+    ["nightly-artwork", t.settings.artworkAdditions.nightly],
+    ["dev-artwork", t.settings.artworkAdditions.dev],
   ];
 }
 

@@ -427,7 +427,11 @@ export function ProjectRail() {
                       {project && canPinProjectGroup(project) ? (
                         <button
                           type="button"
-                          aria-label={project.pinned ? "Unpin project" : "Pin project"}
+                          aria-label={
+                            project.pinned
+                              ? t.app.paletteAdditions.unpinProject
+                              : t.app.paletteAdditions.pinProject
+                          }
                           className="flex size-6.5 shrink-0 cursor-pointer items-center justify-center rounded-project-rail-settings bg-secondary text-fg-detail outline-none focus-visible:inset-shadow-focus"
                           onPointerDown={(event) => event.stopPropagation()}
                           onClick={(event) => {

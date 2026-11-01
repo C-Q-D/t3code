@@ -676,7 +676,11 @@ function QueuedRunPreview({
       {fold ? (
         <FoldedMessageHeader
           icon={attribution === "automation" ? CalendarClockIcon : MessagesSquareIcon}
-          label={attribution === "automation" ? "Automation" : senderShell?.title.trim() || "Agent"}
+          label={
+            attribution === "automation"
+              ? t.chat.queuedActions.automation
+              : senderShell?.title.trim() || t.chat.queuedActions.agent
+          }
           summary={
             attribution === "automation"
               ? (taskTitle ?? previewText.split(/\r?\n/, 1)[0] ?? "")

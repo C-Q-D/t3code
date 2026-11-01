@@ -18,7 +18,7 @@ export type OfficeWorkerResult =
   | {
       readonly type: "document";
       readonly navigation: "page" | "slide" | "chapter";
-      readonly pages: { title: string; html: string }[];
+      readonly pages: { title: string; html: string; generatedTitle?: boolean }[];
     }
   | { readonly type: "notebook"; readonly language: string; readonly cells: NotebookCell[] }
   | { readonly type: "error"; readonly message: string }

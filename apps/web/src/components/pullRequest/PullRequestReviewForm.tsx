@@ -112,7 +112,7 @@ export function PullRequestReviewForm({
         title: t.git.pullRequest.theReviewCouldNotBeSubmitted,
         description: readableFailure(
           squashAtomCommandFailure(result),
-          "The host refused the review. Your draft is still here to try again.",
+          t.git.reviewAdditions.refused,
         ),
       });
       return;

@@ -17,6 +17,31 @@ import type {
 import type { ThemeColorRole } from "@t3tools/shared/themePalettes";
 
 export const settings = {
+  backgroundProfileLabels: {
+    balanced: "Balanced",
+    performance: "Performance",
+    battery_saver: "Battery saver",
+    custom: "Advanced",
+  },
+  navigationAdditions: {
+    sections: "Settings sections",
+    content: "Settings content",
+  },
+  secretValidation: {
+    name: "Enter a name.",
+    account: "Enter the 1Password account.",
+    nameCharacters: "The name needs at least one letter or digit.",
+    duplicate: "A secret provider with this name exists.",
+    reference: "Enter a valid secret reference.",
+  },
+  modelAdditions: {
+    noReasoning: "No reasoning",
+    checkingAntigravity: "Checking the Antigravity runtime.",
+  },
+  artworkAdditions: {
+    dev: "Dev artwork",
+    nightly: "Nightly artwork",
+  },
   snoozeWhen: {
     after: "In",
     today: "Today",
@@ -40,6 +65,10 @@ export const settings = {
     days: "days",
   },
   sourceControlSignIn: {
+    stale: (cliName: string) =>
+      `The chosen login is no longer signed in, so the active ${cliName} login is used.`,
+    noToken: (envVar: string, cliName: string) =>
+      `No token saved; the server uses ${envVar} or the ${cliName} login.`,
     ownCredentials: "Or use your own credentials",
     signedInAs: "Signed in as",
     account: "Signed-in GitHub account",
@@ -62,9 +91,9 @@ export const settings = {
     waiting: (time: string) => `Waiting for approval · code expires at ${time}`,
   },
   searchAdditions: {
+    snooze: "Snooze options",
     keepPr: "Keep threads with a PR",
     threadDetails: "Thread details",
-    snooze: "Snooze options",
   },
   threadDetailsItems: {
     description: "Choose what the thread details card shows. You can also right-click the card.",
@@ -128,6 +157,8 @@ export const settings = {
     noProviders: "No providers available",
   },
   accountsHelp: {
+    multiple: (providerName: string) =>
+      `We do not recommend managing multiple ${providerName} accounts in T3 Code.`,
     moreInfo: "More info",
   },
   versionCopy: {

@@ -1,5 +1,28 @@
 /** English tool labels; excludes user data, persisted values, and protocol strings. */
 export const tools = {
+  usageMappingErrors: {
+    mapped: (label: string) =>
+      `${label} maps this model. Remove it from "Apply to" or clear its mapping first.`,
+    cycle: (label: string) => `Model mappings cannot form a cycle on ${label}.`,
+  },
+  terminalErrors: {
+    invalidInput: "Invalid terminal launch input",
+  },
+  audioPreview: {
+    open: "Open",
+    retry: "Retry",
+    loading: "Loading",
+    pause: "Pause",
+    play: "Play",
+    preview: "Preview",
+    unavailable: "Unavailable",
+    unavailableHint: "Audio unavailable. Open the file or retry playback.",
+    unavailablePrefix: "Audio unavailable. ",
+  },
+  recordedContent: {
+    before: "Recorded content before",
+    after: "Recorded content after",
+  },
   previewErrors: {
     invalidXml: "This document contains invalid or unsupported XML.",
     documentNesting: "This document is nested too deeply to preview.",
@@ -89,6 +112,8 @@ export const tools = {
     error: "An error occurred.",
   },
   officeNavigation: {
+    position: (navigation: "slide" | "page" | "sheet" | "chapter", page: number, count: number) =>
+      `${navigation === "slide" ? "Slide" : "Page"} ${page} of ${count}`,
     previous: (navigation: "sheet" | "chapter" | "slide" | "page") => `Previous ${navigation}`,
     next: (navigation: "sheet" | "chapter" | "slide" | "page") => `Next ${navigation}`,
     chapterCount: (page: number, count: number) => `Chapter ${page} of ${count}`,

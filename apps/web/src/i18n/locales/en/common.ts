@@ -4,6 +4,13 @@ import type { PullRequestState } from "@t3tools/contracts";
 const monthNameFormatter = new Intl.DateTimeFormat("en-US", { month: "long" });
 
 export const common = {
+  threadActionAdditions: {
+    projectFailed: "Could not turn thread into a project",
+    find: "Find in thread",
+    turnIntoProject: "Turn into project",
+    thread: "Thread",
+    copyThread: "Copy thread",
+  },
   productName: "T3 Code",
   windowControls: {
     minimize: "Minimize window",
@@ -50,6 +57,8 @@ export const common = {
     delete: "Delete",
   },
   threadStatus: {
+    stackTerminology: (count: number, plural: string, state: string) =>
+      `Stack of ${count} ${plural}, ${state}`,
     states: {
       open: "Open",
       draft: "Draft",

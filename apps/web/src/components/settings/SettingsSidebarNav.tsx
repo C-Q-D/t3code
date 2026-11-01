@@ -227,7 +227,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
 
   return (
     <div
-      {...workspaceAreaProps("settings-nav", 0, "Settings sections")}
+      {...workspaceAreaProps("settings-nav", 0, t.settings.navigationAdditions.sections)}
       {...sectionNavigation.containerProps}
       className="flex h-full min-h-0 flex-col text-control leading-normal text-foreground text-shadow-stone"
     >

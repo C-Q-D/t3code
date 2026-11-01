@@ -2,6 +2,9 @@
 import type { Messages } from "../en";
 
 export const sidebar: Messages["sidebar"] = {
+  snoozeEditor: {
+    edit: "编辑稍后处理选项",
+  },
   snoozeLabels: {
     morning: "今天上午",
     afternoon: "今天下午",
@@ -36,6 +39,7 @@ export const sidebar: Messages["sidebar"] = {
     passed: "稍后处理的时间已过。请选择其他时间。",
   },
   statusAdditions: {
+    olderThreads: "无法加载更早的对话。重试",
     guest: "访客请求",
   },
   actions: {
@@ -307,6 +311,11 @@ export const sidebar: Messages["sidebar"] = {
     presetLabel: (label: string, time: string) => `${label}（${time}）`,
   },
   undo: {
+    summary: (
+      action: "Settled" | "Snoozed" | "Unpinned" | "Archived" | "Discarded",
+      count: number,
+    ) =>
+      `${{ Settled: "已完结", Snoozed: "已暂缓", Unpinned: "已取消置顶", Archived: "已归档", Discarded: "已丢弃" }[action]}${count}个${action === "Discarded" ? "草稿对话" : "对话"}`,
     undo: "撤销",
     shortcutHint: (shortcut: string) => `${shortcut} 撤销`,
     actionNotice: (

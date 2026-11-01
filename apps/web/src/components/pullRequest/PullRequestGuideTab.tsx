@@ -114,13 +114,13 @@ export function PullRequestGuideTab({
             ? t.git.guideTabUi.writing
             : failure === null
               ? t.git.guideTabUi.empty
-              : "Could not write a review guide"}
+              : t.git.guideDetails.failed}
         </p>
         <p className="max-w-md text-xs text-muted-foreground">
           {running
             ? t.git.guideTabUi.progress
             : failure !== null
-              ? FAILURE_HINT
+              ? t.git.guideDetails.failureHint
               : (query.error ?? t.git.guideTabUi.description)}
         </p>
         {writeButton(failure === null ? t.git.guideTabUi.write : t.git.guideTabUi.retry, "sm")}
@@ -140,7 +140,7 @@ export function PullRequestGuideTab({
             t.git.guideTabUi.stale
           ) : (
             <>
-              Could not rewrite this guide. {FAILURE_HINT}
+              {t.git.guideDetails.rewriteFailed} {t.git.guideDetails.failureHint}
               <FailureDetails detail={failure} />
             </>
           )}
@@ -175,14 +175,12 @@ export function PullRequestGuideTab({
   );
 }
 
-const FAILURE_HINT = "Check the review guide model in Settings → Source control.";
-
 /** Keeps provider diagnostics available without replacing the reader-facing failure guidance. */
 function FailureDetails({ detail }: { detail: string }) {
   return (
     <details className="w-full max-w-lg text-xs text-muted-foreground">
       <summary className="cursor-pointer rounded-sm -outline-offset-2 hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring">
-        Technical details
+        {t.git.guideDetails.title}
       </summary>
       <pre className="scrollbar-gutter-both mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-border bg-muted/40 p-3 text-left font-mono text-xs">
         {detail}

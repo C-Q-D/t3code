@@ -1,5 +1,114 @@
 /** App shell and shared UI messages; excludes protocol and persisted values. */
 export const app = {
+  projectPin: {
+    action: (pinned: boolean, name: string) => `${pinned ? "Unpin" : "Pin"} ${name}`,
+  },
+  replayCopy: {
+    recorded: "Replay a recorded turn",
+    needsProvider: "Needs a project and the Replay (dev) provider, which dev servers start.",
+    inProject: (title: string) => `Replay in ${title}`,
+  },
+  cliErrors: {
+    unavailable: "The t3 command is unavailable.",
+    load: "Failed to load the t3 command state.",
+  },
+  navigationAdditions: {
+    contextMenu: "Context menu",
+  },
+  notificationAdditions: {
+    guest: "Guest request",
+  },
+  workspaceFocus: {
+    next: "Focus Next Workspace Area",
+    previous: "Focus Previous Workspace Area",
+  },
+  historyNavigation: {
+    back: "Go back",
+    forward: "Go forward",
+  },
+  bootRecovery: {
+    offline: "This browser appears to be offline. Check the connection, then reload.",
+    retry: "We are not sure why. Try a reload first.",
+    copyCommand: "Copy command",
+    copied: "Copied",
+    clipboardCopied: "Copied to clipboard.",
+    copyDetails: "Copy error details",
+    moreOptions: "More options if it keeps failing",
+    reinstallNightly: "Download and reinstall the latest nightly build",
+    reinstall: "Download and reinstall T3 Code",
+    triageHint:
+      "Run this on the computer that runs T3 Code. Your agent can check the local logs and help you file a bug report.",
+    sharingHint: "Details may include local file paths and names. Check before sharing.",
+    report: "File a bug report on GitHub",
+    copyMac: "Press ⌘C to copy",
+    copyWindows: "Press Ctrl+C to copy",
+    download: "Download update",
+    install: "Restart to update",
+    copyBlocked: "Copy was blocked. The text is selected so you can copy it manually.",
+    downloadFailed: "The update download failed. Try Download update again.",
+    installFailed: "The update install failed. Try Restart to update again.",
+    downloading: (percent: number) => `Downloading update (${percent}%)`,
+  },
+  releaseLookup: {
+    connectServer: "Connect to this server to check releases.",
+    unsupported:
+      "This server does not support registry lookups. Update it before switching tracks.",
+    connect: "Connect to a server to check releases.",
+    registryFailed:
+      "Could not check this environment's npm registry. Check the connection and registry settings.",
+  },
+  snapShotErrors: {
+    retry: "Try again.",
+  },
+  triage: {
+    failed: "Could not start triage",
+    error: "An error occurred.",
+    starting: "Starting triage…",
+    copyCommand: "Copy command",
+    openFailed: "T3 Code could not open a new thread.",
+    noProject: "This machine cannot start threads without a project.",
+    copyFailed: (command: string) => `Could not copy. Type ${command} instead.`,
+    terminalHint: (description: string, command: string) =>
+      `${description} Run ${command} in a terminal on that machine instead.`,
+  },
+  projectGroupErrors: {
+    unarchive: "Failed to unarchive project",
+    pin: "Failed to pin project",
+    unpin: "Failed to unpin project",
+    environment: "this environment",
+    denied: (environment: string) => `This connection cannot change projects in ${environment}.`,
+    error: "An error occurred.",
+  },
+  promptLinkErrors: {
+    open: "Could not open the link",
+  },
+  backendLink: {
+    confirm: (origin: string) => `Add the backend at ${origin}?`,
+    failed: "Could not add backend",
+    failedDescription: "Failed to add backend.",
+    added: "Backend added",
+    saved: "The environment is saved and will reconnect on app startup.",
+  },
+  environmentActions: {
+    environment: "T3 Code environment",
+    externalMachine: "Machine not in this app",
+    open: "Open Environments",
+    machine: (label: string) => `Machine, ${label}`,
+  },
+  replayErrors: {
+    failed: "Replay failed",
+  },
+  paletteAdditions: {
+    unpinProject: "Unpin project",
+    pinProject: "Pin project",
+    suggestions: "Suggestions",
+    inMessages: "In messages",
+    connect: "Connect an environment",
+    cannotAddProject: "No connected environment can add a project",
+    triage: "Triage an issue",
+    triageDescription: "An agent investigates a T3 Code problem and helps file an issue",
+    projects: "Projects",
+  },
   desktopWebLinkCouldNotOpen: "Could not open the link",
   quitHoldOverlay: {
     /** Formats the hold-or-double-press hint using the platform's quit shortcut. */

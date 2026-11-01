@@ -2,6 +2,60 @@
 import type { Messages } from "../en";
 
 export const git: Messages["git"] = {
+  diffAdditions: {
+    toolCall: "工具调用",
+    checkingAccess: "正在检查文件访问权限…",
+    cannotRead: "此连接无法读取本地差异。",
+    emptyContent: "内容为空。",
+    loadingToolDiff: "正在加载工具调用差异…",
+    loadingCommit: "正在加载提交…",
+  },
+  reviewAdditions: {
+    refused: "托管平台拒绝了审阅提交。草稿已保留，可重试。",
+    pullRequests: "拉取请求",
+    loading: "正在加载拉取请求…",
+  },
+  commitLinks: {
+    notInWorkspace: "此提交不在对话的工作区中",
+    open: "打开链接",
+  },
+  appAccess: {
+    install: "安装",
+    title: (app: string, owner: string) => `允许 ${app} 访问 ${owner}`,
+    description: (repository: string) =>
+      `该位置尚未安装此应用，因此对 ${repository} 的 GitHub 请求会使用你的个人登录，调用额度较低。`,
+  },
+  labelSearch: {
+    placeholder: "搜索标签",
+    searching: "正在搜索…",
+    failed: "无法在托管平台搜索标签",
+  },
+  guideDetails: {
+    failed: "无法编写审阅指南",
+    failureHint: "请检查设置 → 源代码管理中的审阅指南模型。",
+    rewriteFailed: "无法重写此审阅指南。",
+    title: "技术详情",
+  },
+  maintainerEdits: {
+    failed: "无法保存维护者访问权限",
+    retry: "请重试。",
+    allow: "允许维护者编辑",
+    description: "维护者可以推送到此分支。如果你的 fork 有工作流，此权限还可能让其访问工作流密钥。",
+  },
+  commitReview: {
+    omittedFiles: (total: number, omitted: number) =>
+      `此工具调用更改了 ${total} 个文件，记录的补丁省略了其中 ${omitted} 个。`,
+    hiddenTests: (count: number) => `已隐藏 ${count} 个测试文件`,
+    showTests: "显示测试文件",
+    showHiddenTests: (count: number) => `显示 ${count} 个隐藏的测试文件`,
+    commits: "提交",
+    loading: "正在加载提交…",
+    empty: "此分支没有提交。",
+    hideTests: "隐藏测试文件",
+    recordedContent: "提供方记录了文件内容，但没有差异。",
+    openCommit: (sha: string) => `打开提交 ${sha}`,
+    latest: (count: number) => `显示最近 ${count} 个提交`,
+  },
   diffSearch: {
     noResults: "无结果",
     /** Formats the total number of matching results. */

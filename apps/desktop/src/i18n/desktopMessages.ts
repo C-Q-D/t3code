@@ -29,6 +29,10 @@ const en = {
         : {},
   },
   preview: {
+    clipboardAllow: "Allow",
+    clipboardBlock: "Block",
+    clipboardRead: (origin: string) =>
+      `${origin} wants to see text and images copied to the clipboard`,
     open: "Open",
     cancel: "Cancel",
     openLink: (protocol: string) => `Open this ${protocol} link?`,
@@ -38,6 +42,9 @@ const en = {
     unnamedPasskey: "Unnamed passkey",
   },
   updates: {
+    wslRemoteSwitch:
+      "This desktop app also runs WSL backends, whose databases a remote switch cannot check. Switch it on that machine.",
+    noBuild: (version: string) => `The desktop app found no build of ${version}.`,
     upToDateTitle: "You're up to date!",
     upToDateMessage: (version: string) =>
       `T3 Code ${version} is currently the newest version available.`,
@@ -49,6 +56,22 @@ const en = {
     ok: "OK",
   },
   startup: {
+    recoveryTitle: "T3 Code could not start",
+    checking: "Checking for a newer version…",
+    updateAvailable: (version: string) => `Version ${version} is available. It can contain a fix.`,
+    updateTo: (version: string) => `Update to ${version}`,
+    downloading: (version: string, percent: number | null) =>
+      `Downloading ${version}${percent === null ? "" : ` (${Math.floor(percent / 10) * 10}%)`}. T3 Code restarts when the download is done.`,
+    reinstall: (version: string) =>
+      `Version ${version} started correctly on this computer. Download it and install it to go back.`,
+    download: (version: string) => `Download ${version}`,
+    releasesHint: "Get a different version from the releases page.",
+    releases: "Open releases",
+    copyDetails: "Copy details",
+    quit: "Quit",
+    noOutput: "The server wrote no output.",
+    retryHint: (version: string, logDir: string) =>
+      `Version ${version}. T3 Code tries again in the background. Logs: ${logDir}`,
     failedTitle: "T3 Code failed to start",
     stage: (stage: string) => `Stage: ${stage}`,
     connecting: "Connecting to WSL…",
@@ -120,6 +143,9 @@ const zhCN: DesktopMessages = {
     }),
   },
   preview: {
+    clipboardAllow: "允许",
+    clipboardBlock: "阻止",
+    clipboardRead: (origin) => `${origin} 想要查看剪贴板中的文字和图片`,
     open: "打开",
     cancel: "取消",
     openLink: (protocol) => `打开此 ${protocol} 链接？`,
@@ -128,6 +154,8 @@ const zhCN: DesktopMessages = {
     unnamedPasskey: "未命名的通行密钥",
   },
   updates: {
+    wslRemoteSwitch: "此桌面应用还运行着 WSL 后端，远程切换无法检查其数据库。请在该计算机上切换。",
+    noBuild: (version) => `桌面应用未找到 ${version} 的构建版本。`,
     upToDateTitle: "已是最新版本",
     upToDateMessage: (version) => `T3 Code ${version} 已是当前最新版本。`,
     failedTitle: "检查更新失败",
@@ -138,6 +166,20 @@ const zhCN: DesktopMessages = {
     ok: "确定",
   },
   startup: {
+    recoveryTitle: "T3 Code 无法启动",
+    checking: "正在检查更新版本…",
+    updateAvailable: (version) => `版本 ${version} 已可用，可能包含修复。`,
+    updateTo: (version) => `更新至 ${version}`,
+    downloading: (version, percent) =>
+      `正在下载 ${version}${percent === null ? "" : `（${Math.floor(percent / 10) * 10}%）`}。下载完成后，T3 Code 将重新启动。`,
+    reinstall: (version) => `版本 ${version} 曾在此计算机上正常启动。下载并安装该版本即可回退。`,
+    download: (version) => `下载 ${version}`,
+    releasesHint: "从发布页面获取其他版本。",
+    releases: "打开发布页面",
+    copyDetails: "复制详情",
+    quit: "退出",
+    noOutput: "服务端没有输出。",
+    retryHint: (version, logDir) => `版本 ${version}。T3 Code 正在后台重试。日志：${logDir}`,
     failedTitle: "T3 Code 启动失败",
     stage: (stage) => `阶段：${stage}`,
     connecting: "正在连接 WSL…",

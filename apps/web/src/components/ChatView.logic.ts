@@ -818,12 +818,12 @@ export function buildExpiredTerminalContextToastCopy(
   if (variant === "empty") {
     return {
       title: t.chat.view.expiredContextNotSent(noun),
-      description: t.chat.view.expiredContextRemoveHint,
+      description: t.chat.view.expiredContextRemoveHint(count),
     };
   }
   return {
     title: t.chat.view.expiredContextOmitted(noun),
-    description: t.chat.view.expiredContextReaddHint,
+    description: t.chat.view.expiredContextReaddHint(count),
   };
 }
 

@@ -2,6 +2,49 @@
 import type { Messages } from "../en";
 
 export const chat: Messages["chat"] = {
+  sideTabStates: {
+    approval: "需要批准",
+    input: "需要输入",
+    running: "运行中",
+  },
+  compactionAdditions: {
+    tokens: "token",
+    beforeTitle: "已在缓存过期前自动压缩上下文",
+    returnTitle: "已在发送前压缩上下文",
+    beforeLabel: "正在缓存过期前压缩上下文…",
+    returnLabel: "正在压缩…",
+    afterIdle: (age: string) => `空闲 ${age} 后已压缩上下文`,
+    compacting: "正在压缩上下文",
+    compaction: "上下文压缩",
+  },
+  activityAnnouncements: {
+    approval: "需要批准",
+    input: "需要你输入",
+    done: "已完成",
+    failed: "失败",
+    stopped: "已停止",
+    working: "正在处理",
+  },
+  mediaAdditions: {
+    audio: "音频不可用",
+  },
+  navigationCopy: {
+    openedIn: (label: string) => `已在 ${label} 中打开`,
+    messageInput: "消息输入",
+    worktreeNotReady: "对话工作树就绪后可用。",
+    details: "对话详情",
+    workspacePanel: "工作区面板",
+    panelTitle: (title: string) => `工作区面板：${title}`,
+  },
+  taskProgress: {
+    label: (done: number, total: number, current: string | undefined) =>
+      `任务 ${done}/${total}${current ? ` · ${current}` : ""}`,
+  },
+  panelSideChat: {
+    available: "发送第一条消息后可用。",
+    title: "侧聊",
+    description: "此对话继续工作时，可通过侧聊提问。",
+  },
   sideChatBlocked: {
     nested: "侧聊中无法再启动侧聊。",
     subagent: "子代理对话无法启动侧聊。",
@@ -10,6 +53,7 @@ export const chat: Messages["chat"] = {
     firstMessage: "发送第一条消息后才能启动侧聊。",
   },
   relationshipLinks: {
+    parentThread: "父对话",
     openParent: "打开父代理",
     linkedEnvironment: "关联环境",
     remoteHint: (label: string) => `运行于 ${label}。连接后可在该环境中打开对话。`,
@@ -52,6 +96,11 @@ export const chat: Messages["chat"] = {
     send: "无法发送侧聊消息。",
   },
   forceStop: {
+    unresponsive: "Agent 未响应停止请求",
+    stopping: "正在停止",
+    memoryHint: "可能是内存不足。强制停止会结束其进程。",
+    forcing: "正在强制停止…",
+    force: "强制停止",
     failed: "无法强制停止代理",
     shuttingDown: "本轮已停止，代理仍在关闭",
     shared: "本轮已停止，代理进程仍在运行",
@@ -75,6 +124,7 @@ export const chat: Messages["chat"] = {
     description: "代理会读取此处的 T3 Code 日志和源码，并在应用修复或发布任何内容前询问你。",
   },
   messageLabels: {
+    pastedText: "粘贴的文本",
     sending: "正在发送附件",
     automation: "自动任务",
   },
@@ -133,6 +183,8 @@ export const chat: Messages["chat"] = {
     bringBackHint: "将此侧聊附到主对话的下一条消息中。",
   },
   queuedActions: {
+    senderAutomation: "自动化",
+    agent: "Agent",
     attribution: "由 T3 Code 发送",
     thread: "打开对话",
     automation: "打开自动任务",
@@ -399,8 +451,9 @@ export const chat: Messages["chat"] = {
     attachmentCannotRestore: "此消息中有无法恢复的附件。",
     expiredTerminalContext: "过期的终端上下文",
     expiredTerminalContexts: "过期的终端上下文",
-    expiredContextRemoveHint: "请移除它，或重新添加以包含终端输出。",
-    expiredContextReaddHint: "若要包含该终端输出，请重新添加。",
+    expiredContextRemoveHint: (_count: number) =>
+      "请移除或重新添加这些终端上下文，以包含终端输出。",
+    expiredContextReaddHint: (_count: number) => "若要包含终端输出，请重新添加终端上下文。",
     switchProviderNewChat: "请新建对话以切换 Provider",
     switchProviderUnsupported: "此对话启动后不支持切换 Provider。",
     changeModelNewChat: "请新建对话以更改模型",

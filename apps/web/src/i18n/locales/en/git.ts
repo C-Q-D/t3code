@@ -1,5 +1,61 @@
 /** English UI labels for PRs, Git operations, diffs, and branches; excludes persisted values and protocol strings. */
 export const git = {
+  diffAdditions: {
+    toolCall: "Tool call",
+    checkingAccess: "Checking file access...",
+    cannotRead: "This connection cannot read local diffs.",
+    emptyContent: "Empty content.",
+    loadingToolDiff: "Loading tool call diff...",
+    loadingCommit: "Loading commit...",
+  },
+  reviewAdditions: {
+    refused: "The host refused the review. Your draft is still here to try again.",
+    pullRequests: "Pull requests",
+    loading: "Loading pull requests…",
+  },
+  commitLinks: {
+    notInWorkspace: "This commit is not in the thread's workspace",
+    open: "Open link",
+  },
+  appAccess: {
+    install: "Install",
+    title: (app: string, owner: string) => `Give ${app} access to ${owner}`,
+    description: (repository: string) =>
+      `It isn't installed there, so GitHub requests for ${repository} use your own login and its lower rate limit.`,
+  },
+  labelSearch: {
+    placeholder: "Search labels",
+    searching: "Searching…",
+    failed: "Couldn't search labels on the host",
+  },
+  guideDetails: {
+    failed: "Could not write a review guide",
+    failureHint: "Check the review guide model in Settings → Source control.",
+    rewriteFailed: "Could not rewrite this guide.",
+    title: "Technical details",
+  },
+  maintainerEdits: {
+    failed: "Could not save maintainer access",
+    retry: "Try again.",
+    allow: "Allow edits from maintainers",
+    description:
+      "Maintainers can push to this branch. If your fork has workflows, this can also give access to its secrets.",
+  },
+  commitReview: {
+    omittedFiles: (total: number, omitted: number) =>
+      `This tool call changed ${total} files. The recorded patch omits ${omitted} of them.`,
+    hiddenTests: (count: number) => `${count} test ${count === 1 ? "file" : "files"} hidden`,
+    showTests: "Show test files",
+    showHiddenTests: (count: number) =>
+      `Show ${count} hidden test ${count === 1 ? "file" : "files"}`,
+    commits: "Commits",
+    loading: "Loading commits...",
+    empty: "No commits on this branch.",
+    hideTests: "Hide test files",
+    recordedContent: "The provider recorded file content without a diff.",
+    openCommit: (sha: string) => `Open commit ${sha}`,
+    latest: (count: number) => `Showing latest ${count} commits`,
+  },
   diffSearch: {
     noResults: "No results",
     /** Formats the total number of matching results. */

@@ -187,7 +187,11 @@ function resolveThreadPullRequestBadgePresentation({
       toneClassName: aggregate.toneClassName,
       label:
         terminology.shortLabel !== "PR"
-          ? `Stack of ${badge.layers} ${terminology.plural}, ${aggregate.label.toLowerCase()}`
+          ? t.common.threadStatus.stackTerminology(
+              badge.layers,
+              terminology.plural,
+              aggregate.label.toLowerCase(),
+            )
           : t.common.threadStatus.stackSummary(
               badge.layers,
               t.common.threadStatus.states[badge.state].toLowerCase(),

@@ -3,6 +3,49 @@ import { englishWorkLogMessages } from "@t3tools/client-runtime/work-log/message
 import type { SourceControlProviderKind, WorktreeSubmodules } from "@t3tools/contracts";
 
 export const chat = {
+  sideTabStates: {
+    approval: "needs approval",
+    input: "needs input",
+    running: "running",
+  },
+  compactionAdditions: {
+    tokens: "tokens",
+    beforeTitle: "Context automatically compacted before cache expiry",
+    returnTitle: "Context compacted before sending",
+    beforeLabel: "Compacting before the cache expires…",
+    returnLabel: "Compacting…",
+    afterIdle: (age: string) => `Context compacted after ${age} idle`,
+    compacting: "Compacting context",
+    compaction: "Context compaction",
+  },
+  activityAnnouncements: {
+    approval: "Needs approval",
+    input: "Needs your input",
+    done: "Done",
+    failed: "Failed",
+    stopped: "Stopped",
+    working: "Working",
+  },
+  mediaAdditions: {
+    audio: "Audio unavailable",
+  },
+  navigationCopy: {
+    openedIn: (label: string) => `Opened in ${label}`,
+    messageInput: "Message input",
+    worktreeNotReady: "Available once the thread's worktree is set up.",
+    details: "Thread details",
+    workspacePanel: "Workspace panel",
+    panelTitle: (title: string) => `Workspace panel: ${title}`,
+  },
+  taskProgress: {
+    label: (done: number, total: number, current: string | undefined) =>
+      `Tasks ${done}/${total}${current ? ` · ${current}` : ""}`,
+  },
+  panelSideChat: {
+    available: "Available after the first message.",
+    title: "Side chat",
+    description: "Ask a side question while this thread keeps working.",
+  },
   sideChatBlocked: {
     nested: "Side chats cannot start side chats.",
     subagent: "Subagent threads cannot start side chats.",
@@ -11,6 +54,7 @@ export const chat = {
     firstMessage: "Side chats start after the first message.",
   },
   relationshipLinks: {
+    parentThread: "Parent thread",
     openParent: "Open parent agent",
     linkedEnvironment: "a linked environment",
     remoteHint: (label: string) => `Runs on ${label}. Connect to it to open the thread there.`,
@@ -54,6 +98,11 @@ export const chat = {
     send: "Could not send the side chat message.",
   },
   forceStop: {
+    unresponsive: "Agent not responding to Stop",
+    stopping: "Stopping",
+    memoryHint: "It may be short on memory. Force stop kills its processes.",
+    forcing: "Force stopping...",
+    force: "Force stop",
     failed: "Could not force stop the agent",
     shuttingDown: "Turn stopped; the agent is still shutting down",
     shared: "Turn stopped; the agent process kept running",
@@ -78,6 +127,7 @@ export const chat = {
       "The agent reads T3 Code's logs and source here, and asks before it applies a fix or posts anything.",
   },
   messageLabels: {
+    pastedText: "Pasted text",
     sending: "Sending attachment",
     automation: "Automation",
   },
@@ -136,9 +186,11 @@ export const chat = {
     bringBackHint: "Adds this side chat to the main thread's next message.",
   },
   queuedActions: {
+    senderAutomation: "Automation",
+    automation: "Open automation",
+    agent: "Agent",
     attribution: "Sent by T3 Code",
     thread: "Open thread",
-    automation: "Open automation",
   },
   workHistory: {
     contextFrom: "Context from",
@@ -427,8 +479,10 @@ export const chat = {
     attachmentCannotRestore: "This message has an attachment that cannot be restored.",
     expiredTerminalContext: "Expired terminal context",
     expiredTerminalContexts: "Expired terminal contexts",
-    expiredContextRemoveHint: "Remove it or re-add it to include terminal output.",
-    expiredContextReaddHint: "Re-add it if you want that terminal output included.",
+    expiredContextRemoveHint: (count: number) =>
+      `Remove ${count === 1 ? "it" : "them"} or re-add ${count === 1 ? "it" : "them"} to include terminal output.`,
+    expiredContextReaddHint: (count: number) =>
+      `Re-add ${count === 1 ? "it" : "them"} if you want that terminal output included.`,
     switchProviderNewChat: "Start a new chat to switch providers",
     switchProviderUnsupported:
       "This thread does not support switching providers after it has started.",

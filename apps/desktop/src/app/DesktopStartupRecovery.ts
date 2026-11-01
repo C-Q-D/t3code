@@ -8,6 +8,8 @@ import * as Stream from "effect/Stream";
 import * as SubscriptionRef from "effect/SubscriptionRef";
 import type * as Electron from "electron";
 
+import * as DesktopUiLocale from "../i18n/DesktopUiLocale.ts";
+import type { DesktopMessages } from "../i18n/desktopMessages.ts";
 import * as ElectronApp from "../electron/ElectronApp.ts";
 import * as ElectronShell from "../electron/ElectronShell.ts";
 import * as ElectronTheme from "../electron/ElectronTheme.ts";
@@ -74,42 +76,47 @@ const escapeHtml = (value: string) =>
 const actionLink = (action: StartupRecoveryAction, label: string, primary = false) =>
   `<a class="button${primary ? " primary" : ""}" href="${ACTION_ORIGIN}/${action}">${escapeHtml(label)}</a>`;
 
-function describeOffer(offer: StartupRecoveryOffer): { text: string; action: string } {
+function describeOffer(
+  offer: StartupRecoveryOffer,
+  m: DesktopMessages["startup"],
+): { text: string; action: string } {
   switch (offer._tag) {
     case "Checking":
-      return { text: "Checking for a newer version…", action: "" };
+      return { text: m.checking, action: "" };
     case "Update":
       return {
-        text: `Version ${offer.version} is available. It can contain a fix.`,
-        action: actionLink("update", `Update to ${offer.version}`, true),
+        text: m.updateAvailable(offer.version),
+        action: actionLink("update", m.updateTo(offer.version), true),
       };
     case "Downloading":
       return {
-        text: `Downloading ${offer.version}${offer.percent === null ? "" : ` (${Math.floor(offer.percent / 10) * 10}%)`}. T3 Code restarts when the download is done.`,
+        text: m.downloading(offer.version, offer.percent),
         action: "",
       };
     case "Reinstall":
       return {
-        text: `Version ${offer.version} started correctly on this computer. Download it and install it to go back.`,
-        action: actionLink("reinstall", `Download ${offer.version}`, true),
+        text: m.reinstall(offer.version),
+        action: actionLink("reinstall", m.download(offer.version), true),
       };
     case "Releases":
       return {
-        text: "Get a different version from the releases page.",
-        action: actionLink("releases", "Open releases", true),
+        text: m.releasesHint,
+        action: actionLink("releases", m.releases, true),
       };
   }
 }
 
 function buildStartupRecoveryHtml(input: {
+  readonly messages: DesktopMessages["startup"];
   readonly appVersion: string;
   readonly failure: BackendStartupFailure;
   readonly offer: StartupRecoveryOffer;
   readonly logDir: string;
 }): string {
-  const offer = describeOffer(input.offer);
+  const m = input.messages;
+  const offer = describeOffer(input.offer, m);
   const output = input.failure.output.trim();
-  return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><title>T3 Code could not start</title><style>
+  return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><title>${escapeHtml(m.recoveryTitle)}</title><style>
 :root{color-scheme:light dark;--bg:#fff;--fg:#111;--muted:#666;--line:#ddd;--code:#f4f4f4}
 @media (prefers-color-scheme:dark){:root{--bg:#000;--fg:#fff;--muted:#999;--line:#333;--code:#111}}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--fg)}
@@ -120,12 +127,12 @@ h1{font-size:18px;margin:0}p{margin:0}.muted{color:var(--muted)}
 .button.primary{background:var(--fg);color:var(--bg);border-color:var(--fg)}
 pre{flex:1;min-height:60px;margin:0;overflow:auto;background:var(--code);border:1px solid var(--line);border-radius:6px;padding:10px;font:11px/1.4 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-word}
 </style></head><body>
-<h1>T3 Code could not start</h1>
+<h1>${escapeHtml(m.recoveryTitle)}</h1>
 <p>${escapeHtml(input.failure.reason)}</p>
 <p>${escapeHtml(offer.text)}</p>
-<div class="actions">${offer.action}${actionLink("copy", "Copy details")}${actionLink("quit", "Quit")}</div>
-<pre>${escapeHtml(output.length > 0 ? output : "The server wrote no output.")}</pre>
-<p class="muted">Version ${escapeHtml(input.appVersion)}. T3 Code tries again in the background. Logs: ${escapeHtml(input.logDir)}</p>
+<div class="actions">${offer.action}${actionLink("copy", m.copyDetails)}${actionLink("quit", m.quit)}</div>
+<pre>${escapeHtml(output.length > 0 ? output : m.noOutput)}</pre>
+<p class="muted">${escapeHtml(m.retryHint(input.appVersion, input.logDir))}</p>
 </body></html>`;
 }
 
@@ -133,6 +140,7 @@ pre{flex:1;min-height:60px;margin:0;overflow:auto;background:var(--code);border:
 export const listen: Effect.Effect<
   void,
   never,
+  | DesktopUiLocale.DesktopUiLocale
   | DesktopState.DesktopState
   | DesktopUpdates.DesktopUpdates
   | DesktopEnvironment.DesktopEnvironment
@@ -144,6 +152,7 @@ export const listen: Effect.Effect<
   | Scope.Scope
 > = Effect.gen(function* () {
   const { primaryBackendStartup, quitting } = yield* DesktopState.DesktopState;
+  const locale = yield* DesktopUiLocale.DesktopUiLocale;
   const updates = yield* DesktopUpdates.DesktopUpdates;
   const environment = yield* DesktopEnvironment.DesktopEnvironment;
   const electronApp = yield* ElectronApp.ElectronApp;
@@ -179,6 +188,7 @@ export const listen: Effect.Effect<
     const failure = yield* Ref.get(failureRef);
     if (Option.isNone(window) || Option.isNone(failure) || window.value.isDestroyed()) return;
     const html = buildStartupRecoveryHtml({
+      messages: (yield* locale.messages).startup,
       appVersion: environment.appVersion,
       failure: failure.value,
       offer: yield* offer,
@@ -245,7 +255,7 @@ export const listen: Effect.Effect<
           minWidth: 420,
           minHeight: 320,
           show: false,
-          title: "T3 Code could not start",
+          title: (yield* locale.messages).startup.recoveryTitle,
           autoHideMenuBar: true,
           backgroundColor: shouldUseDarkColors ? "#000000" : "#ffffff",
           webPreferences: {

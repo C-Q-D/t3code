@@ -144,7 +144,7 @@ export function ThreadDetailsCard({
   onContextMenu?: MouseEventHandler<HTMLDivElement>;
   children: (density: "full" | "compact" | "essential") => ReactNode;
 }) {
-  const detailsArea = workspaceAreaProps("details", 3, "Thread details");
+  const detailsArea = workspaceAreaProps("details", 3, t.chat.navigationCopy.details);
   const canvas = useChatCanvas();
   const threadKey = scopedThreadKey(threadRef);
   const savedPlacement = useThreadDetailsCardPlacementStore((state) => state.placement);

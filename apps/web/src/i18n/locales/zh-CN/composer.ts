@@ -2,6 +2,17 @@
 import type { Messages } from "../en";
 
 export const composer: Messages["composer"] = {
+  contextAdditions: {
+    unreachable: "当前无法访问来源环境。",
+  },
+  modelAdditions: {
+    emptyFavorites: "尚无收藏",
+    disabled: "模型选择器已禁用",
+  },
+  sideCommands: {
+    side: "在新的侧聊中提问",
+    btw: "与 /side 相同",
+  },
   assist: {
     suggestion: {
       /** Announces the prediction and its insert-only keyboard action. */

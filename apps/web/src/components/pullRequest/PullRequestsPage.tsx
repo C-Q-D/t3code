@@ -1182,7 +1182,7 @@ export function PullRequestsPage() {
   const listBody = (
     <>
       {!capabilityKnown ? (
-        <PullRequestListGhost rows={7} caption="Loading pull requests…" />
+        <PullRequestListGhost rows={7} caption={t.git.reviewAdditions.loading} />
       ) : !pullRequestsSupported ? (
         <PullRequestsUnavailableState
           variant="list"
@@ -1190,7 +1190,7 @@ export function PullRequestsPage() {
           error={t.git.pullRequest.updateYourT3CodeServersToBrowsePullRequests}
         />
       ) : firstLoad ? (
-        <PullRequestListGhost rows={7} caption="Loading pull requests…" />
+        <PullRequestListGhost rows={7} caption={t.git.reviewAdditions.loading} />
       ) : listQuery.error && shownCount === 0 ? (
         <PullRequestsUnavailableState
           variant="list"

@@ -99,7 +99,7 @@ export function startThreadNotifications(
             : status === "failed"
               ? t.app.thread.failed
               : status === "request"
-                ? "Guest request"
+                ? t.app.notificationAdditions.guest
                 : t.app.thread.inputNeeded;
     if (hasNotificationSound(mode)) {
       void playNotificationSound(kind, () =>

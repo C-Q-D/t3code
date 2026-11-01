@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 /**
  * Verifies visible opt-out feedback against the real browser preference store.
  * @vitest-environment jsdom
@@ -68,7 +69,7 @@ async function toggleOnThenOff() {
     auth.userId = "onboarding-test-account";
     root.render(<ConnectOnboardingDialog />);
   });
-  const toggle = button("Don't show this again");
+  const toggle = button(t.account.onboarding.dontShowAgain);
   expect(toggle.getAttribute("aria-pressed")).toBe("false");
   expect(toggle.querySelector("svg")).toBeNull();
   await act(async () => toggle.click());
@@ -83,7 +84,7 @@ async function toggleOnThenOff() {
 
 it("does not opt out after the visible check is toggled on and off", async () => {
   await toggleOnThenOff();
-  await act(async () => button("Done").click());
+  await act(async () => button(t.account.onboarding.done).click());
   expect(localStorage.getItem(CONNECT_ONBOARDING_OPT_OUT_STORAGE_KEY)).toBeNull();
 });
 
@@ -92,7 +93,7 @@ it("persists opt-out when completion follows the visible checked state", async (
   await act(async () => toggle.click());
   expect(toggle.getAttribute("aria-pressed")).toBe("true");
   expect(toggle.querySelector("svg")).not.toBeNull();
-  await act(async () => button("Done").click());
+  await act(async () => button(t.account.onboarding.done).click());
   expect(JSON.parse(localStorage.getItem(CONNECT_ONBOARDING_OPT_OUT_STORAGE_KEY)!)).toEqual({
     optOutAccounts: ["onboarding-test-account"],
   });

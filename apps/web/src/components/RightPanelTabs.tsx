@@ -195,7 +195,9 @@ const SURFACE_DISABLED_REASONS = {
   pullRequest: t.chat.rightPanel.pullRequestDisabled,
   pullRequests: t.chat.rightPanel.pullRequestsDisabled,
   device: t.chat.rightPanel.deviceDisabled,
-  sideChat: "Side chats start after the first message.",
+  get sideChat() {
+    return t.chat.sideChatBlocked.firstMessage;
+  },
 };
 
 /** Overlays that must win over the launcher's letter shortcuts. */
@@ -221,7 +223,9 @@ const SURFACE_UNAVAILABLE_HINTS = {
   pullRequest: t.chat.rightPanel.pullRequestHint,
   pullRequests: t.chat.rightPanel.pullRequestsHint,
   device: t.chat.rightPanel.deviceHint,
-  sideChat: "Available after the first message.",
+  get sideChat() {
+    return t.chat.panelSideChat.available;
+  },
 };
 
 type TabContextMenuAction =
@@ -439,8 +443,8 @@ function RightPanelEmptyState(props: {
     ...(props.onAddSideChat
       ? [
           {
-            label: "Side chat",
-            description: "Ask a side question while this thread keeps working.",
+            label: t.chat.panelSideChat.title,
+            description: t.chat.panelSideChat.description,
             icon: MessagesSquare,
             shortcut: "S",
             available: props.sideChatAvailable && !props.sideChatDisabledReason,
@@ -655,7 +659,7 @@ function surfaceTitle(
     case "device":
       return surface.title ?? surface.target?.name ?? t.chat.rightPanel.device;
     case "side-chat":
-      return "Side chat";
+      return t.chat.panelSideChat.title;
     case "preview": {
       const snapshot = surface.resourceId ? sessions[surface.resourceId] : null;
       if (!snapshot || snapshot.navStatus._tag === "Idle") return t.chat.rightPanel.browser;
@@ -1025,6 +1029,12 @@ function RightPanelTab(
   );
   const title = sideChatShell?.title ?? props.title;
   const sideChatState = sideChatTabState(sideChatShell);
+  const sideChatStateLabel =
+    sideChatState === "needs approval"
+      ? t.chat.sideTabStates.approval
+      : sideChatState === "needs input"
+        ? t.chat.sideTabStates.input
+        : t.chat.sideTabStates.running;
   return (
     <SortableTab
       surfaceId={surface.id}
@@ -1091,7 +1101,7 @@ function RightPanelTab(
                   if (surface.kind === "device" && props.canRename) props.onStartRename(surface.id);
                 }}
                 className="flex min-w-0 cursor-pointer items-center self-stretch rounded-panel-tab-action outline-none focus-visible:inset-shadow-focus"
-                aria-label={sideChatState === null ? undefined : `${title}, ${sideChatState}`}
+                aria-label={sideChatState === null ? undefined : `${title}, ${sideChatStateLabel}`}
                 onClick={() => props.onActivate(surface)}
               >
                 <span className="truncate">{title}</span>
@@ -1290,7 +1300,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
     ...(props.onAddSideChat
       ? [
           {
-            label: "Side chat",
+            label: t.chat.panelSideChat.title,
             icon: MessagesSquare,
             shortcut: "S",
             available: props.sideChatAvailable === true && !props.sideChatDisabledReason,
@@ -1476,8 +1486,10 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       workspaceFocusKey={`panel:${props.environmentId}:${props.activeSurfaceId ?? "empty"}`}
       workspaceLabel={
         focusedSurface
-          ? `Workspace panel: ${surfaceTitle(focusedSurface, props.previewSessions, props.terminalLabelsById)}`
-          : "Workspace panel"
+          ? t.chat.navigationCopy.panelTitle(
+              surfaceTitle(focusedSurface, props.previewSessions, props.terminalLabelsById),
+            )
+          : t.chat.navigationCopy.workspacePanel
       }
       mode={props.mode}
       {...(props.standalone !== undefined ? { standalone: props.standalone } : {})}

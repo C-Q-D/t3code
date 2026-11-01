@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 /** Validates secret provider drafts and classifies saved configs without mounting a settings page. */
 import {
   SecretProviderId,
@@ -77,11 +78,11 @@ export function secretProviderFromDraft(
   { readonly id: SecretProviderId; readonly config: SecretProviderConfig },
   SecretProviderDraftIssues
 > {
-  const label = decodeField(SecretProviderLabel, draft.name, "Enter a name.");
+  const label = decodeField(SecretProviderLabel, draft.name, t.settings.secretValidation.name);
   const account = decodeField(
     OnePasswordSecretProviderConfig.fields.account,
     draft.account,
-    "Enter the 1Password account.",
+    t.settings.secretValidation.account,
   );
 
   let id: SecretProviderId | null = null;
@@ -90,9 +91,9 @@ export function secretProviderFromDraft(
     nameIssue = label.failure;
   } else {
     id = target.mode === "edit" ? target.id : secretProviderIdFromName(label.success);
-    if (id === null) nameIssue = "The name needs at least one letter or digit.";
+    if (id === null) nameIssue = t.settings.secretValidation.nameCharacters;
     else if (target.mode === "add" && existingIds.has(id))
-      nameIssue = "A secret provider with this name exists.";
+      nameIssue = t.settings.secretValidation.duplicate;
   }
 
   if (

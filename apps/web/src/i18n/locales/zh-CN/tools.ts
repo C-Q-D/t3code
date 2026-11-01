@@ -2,6 +2,28 @@
 import type { Messages } from "../en";
 
 export const tools: Messages["tools"] = {
+  usageMappingErrors: {
+    mapped: (label: string) => `${label} 映射了此模型。请先从“应用到”中移除，或清除其映射。`,
+    cycle: (label: string) => `${label} 的模型映射不能形成循环。`,
+  },
+  terminalErrors: {
+    invalidInput: "终端启动参数无效。",
+  },
+  audioPreview: {
+    open: "打开",
+    retry: "重试",
+    loading: "正在加载",
+    pause: "暂停",
+    play: "播放",
+    preview: "预览",
+    unavailable: "不可用",
+    unavailableHint: "音频不可用。请打开文件或重试播放。",
+    unavailablePrefix: "音频不可用。",
+  },
+  recordedContent: {
+    before: "记录的修改前内容",
+    after: "记录的修改后内容",
+  },
   previewErrors: {
     invalidXml: "此文档包含无效或不受支持的 XML。",
     documentNesting: "文档嵌套层级过深，无法预览。",
@@ -91,6 +113,8 @@ export const tools: Messages["tools"] = {
     error: "发生错误。",
   },
   officeNavigation: {
+    position: (navigation: "slide" | "page" | "sheet" | "chapter", page: number, count: number) =>
+      `第 ${page} ${navigation === "slide" ? "张幻灯片" : "页"}，共 ${count} ${navigation === "slide" ? "张" : "页"}`,
     previous: (navigation: "sheet" | "chapter" | "slide" | "page") =>
       `上一${{ sheet: "张工作表", chapter: "章", slide: "张幻灯片", page: "页" }[navigation]}`,
     next: (navigation: "sheet" | "chapter" | "slide" | "page") =>

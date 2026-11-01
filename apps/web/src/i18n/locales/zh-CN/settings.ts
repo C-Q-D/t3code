@@ -2,6 +2,31 @@
 import type { Messages } from "../en";
 
 export const settings: Messages["settings"] = {
+  backgroundProfileLabels: {
+    balanced: "均衡",
+    performance: "性能优先",
+    battery_saver: "省电",
+    custom: "高级",
+  },
+  navigationAdditions: {
+    sections: "设置分区",
+    content: "设置内容",
+  },
+  secretValidation: {
+    name: "请输入名称。",
+    account: "请输入 1Password 账户。",
+    nameCharacters: "名称至少需要一个字母或数字。",
+    duplicate: "已有同名的密钥提供方。",
+    reference: "请输入有效的密钥引用。",
+  },
+  modelAdditions: {
+    noReasoning: "不推理",
+    checkingAntigravity: "正在检查 Antigravity 运行时。",
+  },
+  artworkAdditions: {
+    dev: "开发版背景图",
+    nightly: "Nightly 背景图",
+  },
   snoozeWhen: {
     after: "之后",
     today: "今天",
@@ -25,6 +50,9 @@ export const settings: Messages["settings"] = {
     days: "天",
   },
   sourceControlSignIn: {
+    stale: (cliName: string) => `所选账户已退出登录，将使用当前 ${cliName} 登录账户。`,
+    noToken: (envVar: string, cliName: string) =>
+      `未保存令牌，服务端使用 ${envVar} 或 ${cliName} 登录账户。`,
     ownCredentials: "或使用你自己的凭据",
     signedInAs: "已登录为",
     account: "已登录的 GitHub 账号",
@@ -47,9 +75,9 @@ export const settings: Messages["settings"] = {
     waiting: (time: string) => `等待批准 · 验证码将在 ${time} 过期`,
   },
   searchAdditions: {
+    snooze: "暂缓选项",
     keepPr: "保留有 PR 的对话",
     threadDetails: "对话详情",
-    snooze: "稍后处理选项",
   },
   threadDetailsItems: {
     description: "选择对话详情卡片显示的内容。也可右键点击卡片设置。",
@@ -111,6 +139,7 @@ export const settings: Messages["settings"] = {
     noProviders: "没有可用的提供方",
   },
   accountsHelp: {
+    multiple: (providerName: string) => `不建议在 T3 Code 中管理多个 ${providerName} 账户。`,
     moreInfo: "更多信息",
   },
   versionCopy: {

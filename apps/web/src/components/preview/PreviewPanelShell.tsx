@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 /** Hosts panel sizing and resize handles; standalone chat panels own a separate slab below the titlebar. */
 import { type CSSProperties, type ReactNode, useLayoutEffect, useRef, useState } from "react";
 
@@ -63,7 +64,11 @@ function ResizablePreviewPanelShell(props: PreviewPanelShellProps) {
 function PreviewPanelShellFrame(
   props: PreviewPanelShellProps & { inlineSize: PreviewPanelInlineSize },
 ) {
-  const panelArea = workspaceAreaProps("panel", 4, props.workspaceLabel ?? "Workspace panel");
+  const panelArea = workspaceAreaProps(
+    "panel",
+    4,
+    props.workspaceLabel ?? t.chat.navigationCopy.workspacePanel,
+  );
   const isInline = props.mode === "inline";
   const collapsible = isInline && props.open !== undefined;
   const open = props.open ?? true;

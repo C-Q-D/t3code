@@ -232,7 +232,7 @@ function CustomSnoozeDialog() {
               }}
             >
               <Settings2Icon />
-              Edit snooze options
+              {t.sidebar.snoozeEditor.edit}
             </Button>
             <Button
               type="button"

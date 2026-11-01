@@ -426,7 +426,7 @@ export default function DiffPanel({
         ? "Uncommitted"
         : "Changes";
   const selectedScopeLabel = toolCallSelection
-    ? "Tool call"
+    ? t.git.diffAdditions.toolCall
     : selectedRunId === null
       ? selectedCommitSha !== null
         ? (selectedCommitSubject ?? "Commit")
@@ -437,7 +437,7 @@ export default function DiffPanel({
         ? t.git.diff.latestTurn
         : t.git.diff.turnTitle(selectedCheckpointTurnCount ?? "?");
   const reviewSectionTitle = toolCallSelection
-    ? "Tool call"
+    ? t.git.diffAdditions.toolCall
     : selectedTurn
       ? `Turn ${selectedCheckpointTurnCount ?? "?"}`
       : selectedGitScopeLabel;
@@ -881,7 +881,7 @@ export default function DiffPanel({
                 branchCommitsQuery.refresh();
               }}
             >
-              <DropdownMenuSubTrigger>Commits</DropdownMenuSubTrigger>
+              <DropdownMenuSubTrigger>{t.git.commitReview.commits}</DropdownMenuSubTrigger>
               <DropdownMenuSubContent className="max-h-80 max-w-96">
                 <DropdownMenuRadioGroup
                   value={selectedCommitValue}
@@ -929,7 +929,7 @@ export default function DiffPanel({
                                 href={commitUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                aria-label={`Open commit ${commit.sha.slice(0, 7)}`}
+                                aria-label={t.git.commitReview.openCommit(commit.sha.slice(0, 7))}
                               />
                             }
                             onClick={(event) => openCommitUrl(event, commitUrl)}
@@ -952,16 +952,16 @@ export default function DiffPanel({
                 ) : !canReadFiles ? (
                   <DropdownMenuItem disabled>
                     {fileAccess.isPending
-                      ? "Checking file access..."
-                      : (fileAccess.error ?? "This connection cannot read local diffs.")}
+                      ? t.git.diffAdditions.checkingAccess
+                      : (fileAccess.error ?? t.git.diffAdditions.cannotRead)}
                   </DropdownMenuItem>
                 ) : branchCommits === null ? (
-                  <DropdownMenuItem disabled>Loading commits...</DropdownMenuItem>
+                  <DropdownMenuItem disabled>{t.git.commitReview.loading}</DropdownMenuItem>
                 ) : branchCommits.commits.length === 0 ? (
-                  <DropdownMenuItem disabled>No commits on this branch.</DropdownMenuItem>
+                  <DropdownMenuItem disabled>{t.git.commitReview.empty}</DropdownMenuItem>
                 ) : branchCommits.truncated ? (
                   <DropdownMenuItem disabled>
-                    {`Showing latest ${branchCommits.commits.length} commits`}
+                    {t.git.commitReview.latest(branchCommits.commits.length)}
                   </DropdownMenuItem>
                 ) : null}
               </DropdownMenuSubContent>
@@ -1232,7 +1232,7 @@ export default function DiffPanel({
             <TooltipTrigger
               render={
                 <Toggle
-                  aria-label="Hide test files"
+                  aria-label={t.git.commitReview.hideTests}
                   variant="ghost"
                   size="sm"
                   pressed={hideTestFiles}
@@ -1244,8 +1244,8 @@ export default function DiffPanel({
             </TooltipTrigger>
             <TooltipPopup side="top">
               {hideTestFiles
-                ? `Show ${testFileCount} hidden test ${testFileCount === 1 ? "file" : "files"}`
-                : "Hide test files"}
+                ? t.git.commitReview.showHiddenTests(testFileCount)
+                : t.git.commitReview.hideTests}
             </TooltipPopup>
           </Tooltip>
         )}
@@ -1306,8 +1306,7 @@ export default function DiffPanel({
             )}
             {omittedToolCallFiles > 0 && (
               <p className="shrink-0 border-b border-border/70 bg-muted/40 px-3 py-1.5 text-2xs text-muted-foreground">
-                This tool call changed {recordedToolCallFileCount} files. The recorded patch omits{" "}
-                {omittedToolCallFiles} of them.
+                {t.git.commitReview.omittedFiles(recordedToolCallFileCount, omittedToolCallFiles)}
               </p>
             )}
             {selectedPatchError && !renderablePatch && (
@@ -1317,9 +1316,7 @@ export default function DiffPanel({
             )}
             {!renderablePatch && toolCallPreview && toolCallPreview.content.length > 0 ? (
               <div className="min-h-0 flex-1 space-y-3 overflow-auto p-3 text-xs">
-                <p className="text-muted-foreground">
-                  The provider recorded file content without a diff.
-                </p>
+                <p className="text-muted-foreground">{t.git.commitReview.recordedContent}</p>
                 {toolCallPreview.content.map(({ label, text }) => (
                   <div key={label} className="space-y-1">
                     <p className="text-muted-foreground">{label}</p>
@@ -1329,7 +1326,7 @@ export default function DiffPanel({
                         wordWrap && "whitespace-pre-wrap wrap-break-word",
                       )}
                     >
-                      {text === "" ? "Empty content." : text}
+                      {text === "" ? t.git.diffAdditions.emptyContent : text}
                     </pre>
                   </div>
                 ))}
@@ -1339,13 +1336,13 @@ export default function DiffPanel({
                 <DiffPanelLoadingState
                   label={
                     toolCallSelection
-                      ? "Loading tool call diff..."
+                      ? t.git.diffAdditions.loadingToolDiff
                       : selectedTurn
                         ? t.git.diff.loadingCheckpointDiff
                         : selectedGitScope === "unstaged"
                           ? t.git.diff.loadingUncommittedChanges
                           : selectedGitScope === "commit"
-                            ? "Loading commit..."
+                            ? t.git.diffAdditions.loadingCommit
                             : t.git.diff.loadingChanges
                   }
                 />

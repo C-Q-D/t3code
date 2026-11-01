@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { useAuth } from "@clerk/react";
 import type { EnvironmentId } from "@t3tools/contracts";
 import { Link } from "@tanstack/react-router";
@@ -49,7 +50,7 @@ export function HostedEmptyState() {
           <EmptyContent>
             {localEnvironmentOff ? (
               <Button render={<Link to="/settings/connections" />} size="sm">
-                Open Environments
+                {t.app.environmentActions.open}
               </Button>
             ) : (
               <ol className="w-full space-y-4 text-left">

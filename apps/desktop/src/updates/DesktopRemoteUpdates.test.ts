@@ -15,6 +15,7 @@ import * as Ref from "effect/Ref";
 import * as Stream from "effect/Stream";
 import * as TestClock from "effect/testing/TestClock";
 
+import * as DesktopUiLocale from "../i18n/DesktopUiLocale.ts";
 import * as ElectronUpdater from "../electron/ElectronUpdater.ts";
 import * as DesktopState from "../app/DesktopState.ts";
 import * as DesktopTelemetryPublisher from "../telemetry/DesktopTelemetryPublisher.ts";
@@ -70,6 +71,7 @@ function runRemoteUpdatesTest(
       yield* updates.configure;
       yield* DesktopRemoteUpdates.listen.pipe(
         Effect.provideService(DesktopTelemetryPublisher.DesktopTelemetryPublisher, publisher),
+        Effect.provide(DesktopUiLocale.layerTest()),
       );
       yield* settle;
       yield* body({ reports, requests, commits, cancellations });

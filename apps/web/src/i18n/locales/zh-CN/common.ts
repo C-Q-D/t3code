@@ -2,6 +2,13 @@
 import type { Messages } from "../en";
 
 export const common: Messages["common"] = {
+  threadActionAdditions: {
+    projectFailed: "无法将对话转为项目",
+    find: "在对话中查找",
+    turnIntoProject: "转为项目",
+    thread: "对话",
+    copyThread: "复制对话",
+  },
   productName: "T3 Code",
   windowControls: {
     minimize: "最小化窗口",
@@ -48,6 +55,8 @@ export const common: Messages["common"] = {
     delete: "删除",
   },
   threadStatus: {
+    stackTerminology: (count: number, plural: string, state: string) =>
+      `${count} 个${plural}的堆栈，${state}`,
     states: {
       open: "开放",
       draft: "草稿",

@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { AuthOrchestrationOperateScope, type ProjectIconOverride } from "@t3tools/contracts";
 import {
   isAtomCommandInterrupted,
@@ -115,7 +116,7 @@ export function useProjectPin() {
     void updateProjectGroup(
       group.memberProjects,
       { pinned },
-      pinned ? "Failed to pin project" : "Failed to unpin project",
+      pinned ? t.app.projectGroupErrors.pin : t.app.projectGroupErrors.unpin,
     );
   };
   return {
@@ -136,7 +137,9 @@ function checkProjectAccess(
   return denied
     ? failWith(
         failureTitle,
-        `This connection cannot change projects in ${denied.environmentLabel ?? "this environment"}.`,
+        t.app.projectGroupErrors.denied(
+          denied.environmentLabel ?? t.app.projectGroupErrors.environment,
+        ),
       )
     : null;
 }
@@ -148,7 +151,7 @@ export function reportProjectFailure(title: string, result: AtomCommandResult<un
     stackedThreadToast({
       type: "error",
       title,
-      description: error instanceof Error ? error.message : "An error occurred.",
+      description: error instanceof Error ? error.message : t.app.projectGroupErrors.error,
     }),
   );
 }

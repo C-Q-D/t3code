@@ -150,7 +150,7 @@ export function buildThreadActionMenuItems(
 ): ReadonlyArray<ContextMenuItem<ThreadActionMenuId>> {
   const items: ReadonlyArray<ContextMenuItem<ThreadActionMenuId>> = [
     ...(state.canFind
-      ? [{ id: "find" as const, label: "Find in thread", icon: "text-search" }]
+      ? [{ id: "find" as const, label: t.common.threadActionAdditions.find, icon: "text-search" }]
       : []),
     ...(state.branch
       ? [
@@ -231,7 +231,7 @@ export function buildThreadActionMenuItems(
       ? [
           {
             id: "turn-into-project" as const,
-            label: "Turn into project",
+            label: t.common.threadActionAdditions.turnIntoProject,
             icon: "folder-plus",
             disabled: state.isRunning,
           },
@@ -275,7 +275,7 @@ export function buildThreadActionMenuItems(
             ]
           : []),
         { id: "copy-thread-id", label: t.common.threadActions.threadId, icon: "hash" },
-        { id: "copy-thread", label: "Thread", icon: "message-square" },
+        { id: "copy-thread", label: t.common.threadActionAdditions.thread, icon: "message-square" },
       ],
     },
     { id: "export-transcript", label: t.common.threadActions.exportTranscript, icon: "download" },
@@ -381,7 +381,7 @@ export function buildSidebarThreadActionMenuItems(
       disabled: !state.branch,
     },
     { id: "copy-thread-id", label: t.sidebar.actions.copyThreadId, icon: "hash" },
-    { ...command("copy-thread"), label: "Copy thread" },
+    { ...command("copy-thread"), label: t.common.threadActionAdditions.copyThread },
     command("export-transcript"),
     {
       id: "new-thread-on-branch",

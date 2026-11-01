@@ -1104,7 +1104,7 @@ function PullRequestCodeTab({
           </span>
           {hiddenTestFileCount > 0 ? (
             <Button type="button" size="xs" variant="link" onClick={() => setHideTestFiles(false)}>
-              {hiddenTestFileCount} test {hiddenTestFileCount === 1 ? "file" : "files"} hidden
+              {t.git.commitReview.hiddenTests(hiddenTestFileCount)}
             </Button>
           ) : null}
           {filesViewed.enabled && files.length > 0 ? (
@@ -1345,7 +1345,7 @@ function PullRequestCodeTab({
             <TooltipTrigger
               render={
                 <Toggle
-                  aria-label="Hide test files"
+                  aria-label={t.git.commitReview.hideTests}
                   variant="ghost"
                   size="sm"
                   pressed={hideTestFiles}
@@ -1356,7 +1356,7 @@ function PullRequestCodeTab({
               <FlaskConicalOffIcon className="size-3.5" />
             </TooltipTrigger>
             <TooltipPopup side="top">
-              {hideTestFiles ? "Show test files" : "Hide test files"}
+              {hideTestFiles ? t.git.commitReview.showTests : t.git.commitReview.hideTests}
             </TooltipPopup>
           </Tooltip>
         ) : null}

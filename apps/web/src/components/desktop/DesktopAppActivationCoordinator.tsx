@@ -87,7 +87,7 @@ export function DesktopAppActivationCoordinator() {
           void updateProject({
             environmentId: projectRef.environmentId,
             input: { projectId: projectRef.projectId, archived: false },
-          }).then((result) => reportProjectFailure("Failed to unarchive project", result));
+          }).then((result) => reportProjectFailure(t.app.projectGroupErrors.unarchive, result));
         }
         return openThread(projectRef);
       },

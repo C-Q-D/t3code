@@ -131,7 +131,10 @@ export function SourceControlTokenSettings({
             {savedHosts.length === 0
               ? definition.kind === "github"
                 ? t.settings.gitHubToken.tokenSavedServerUsesGhHint
-                : `No token saved; the server uses ${credentials.tokenEnvVar} or the ${credentials.cliName} login.`
+                : t.settings.sourceControlSignIn.noToken(
+                    credentials.tokenEnvVar,
+                    credentials.cliName,
+                  )
               : t.settings.gitHubToken.savedFor(savedHosts.join(", "))}
           </p>
           <div className="flex shrink-0 gap-2">

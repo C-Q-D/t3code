@@ -274,10 +274,8 @@ export function runStopBannerItem(input: {
     ) : (
       <CircleStopIcon />
     ),
-    title: unresponsive ? "Agent not responding to Stop" : "Stopping",
-    description: unresponsive
-      ? "It may be short on memory. Force stop kills its processes."
-      : undefined,
+    title: unresponsive ? t.chat.forceStop.unresponsive : t.chat.forceStop.stopping,
+    description: unresponsive ? t.chat.forceStop.memoryHint : undefined,
     actions: (
       <>
         <span
@@ -289,7 +287,7 @@ export function runStopBannerItem(input: {
         />
         {unresponsive && input.canForceStop ? (
           <InlineButton disabled={input.forceStopping} onClick={input.onForceStop}>
-            {input.forceStopping ? "Force stopping..." : "Force stop"}
+            {input.forceStopping ? t.chat.forceStop.forcing : t.chat.forceStop.force}
           </InlineButton>
         ) : null}
       </>

@@ -35,7 +35,7 @@ export function MultipleAccountsNote({
       <InfoIcon aria-hidden />
       <AlertDescription>
         <p>
-          We do not recommend managing multiple {providerName} accounts in T3 Code.{" "}
+          {t.settings.accountsHelp.multiple(providerName)}
           <a
             href={MULTIPLE_ACCOUNTS_FAQ_URL}
             target="_blank"

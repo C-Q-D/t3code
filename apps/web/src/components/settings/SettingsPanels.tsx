@@ -437,7 +437,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       : []),
     ...(SNOOZE_UI_ENABLED &&
     !Equal.equals(settings.snoozePresets, DEFAULT_UNIFIED_SETTINGS.snoozePresets)
-      ? ["Snooze options"]
+      ? [t.settings.searchAdditions.snooze]
       : []),
     ...(settings.wordWrap !== DEFAULT_UNIFIED_SETTINGS.wordWrap
       ? [t.settings.rows.wordWrap.title]

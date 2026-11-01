@@ -152,7 +152,7 @@ function ProviderSetupActions({
   const actionsDisabled = pendingLabel !== null || queryError !== null;
   const installationStatusMessage =
     installation === null
-      ? "Checking the Antigravity runtime."
+      ? t.settings.modelAdditions.checkingAntigravity
       : installation?.phase === "downloading"
         ? t.settings.providerSetup.downloadingMbMb(
             (installation.downloadedBytes / 1_000_000).toFixed(1),

@@ -1569,7 +1569,7 @@ function ContextCompactionTimelineRow({
         <>
           {row.title ?? t.chat.timeline.contextCompacted} {row.tokenCounts.before}
           <ArrowRightIcon aria-hidden="true" className="size-3" />
-          {row.tokenCounts.after} tokens
+          {row.tokenCounts.after} {t.chat.compactionAdditions.tokens}
         </>
       ) : (
         label

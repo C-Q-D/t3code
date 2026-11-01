@@ -79,7 +79,7 @@ function describeModelCapabilities(
     !PROVIDER_ALIAS_SLUGS.has(model.slug) &&
     !hasReasoningControl(model)
   ) {
-    labels.push("No reasoning");
+    labels.push(t.settings.modelAdditions.noReasoning);
   }
   return labels;
 }

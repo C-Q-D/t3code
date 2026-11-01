@@ -207,9 +207,9 @@ export function useOpenChangeRequestLink(
             const toastId = toastManager.add(
               stackedThreadToast({
                 type: "info",
-                title: "This commit is not in the thread's workspace",
+                title: t.git.commitLinks.notInWorkspace,
                 actionProps: {
-                  children: "Open link",
+                  children: t.git.commitLinks.open,
                   onClick: () => {
                     toastManager.close(toastId);
                     window.open(targetUrl, "_blank", "noopener,noreferrer");

@@ -2,6 +2,112 @@
 import type { Messages } from "../en";
 
 export const app: Messages["app"] = {
+  projectPin: {
+    action: (pinned: boolean, name: string) => `${pinned ? "取消置顶" : "置顶"} ${name}`,
+  },
+  replayCopy: {
+    recorded: "重放已记录的轮次",
+    needsProvider: "需要一个项目和由开发服务器启动的 Replay (dev) 提供方。",
+    inProject: (title: string) => `在 ${title} 中重放`,
+  },
+  cliErrors: {
+    unavailable: "t3 命令不可用。",
+    load: "无法加载 t3 命令状态。",
+  },
+  navigationAdditions: {
+    contextMenu: "上下文菜单",
+  },
+  notificationAdditions: {
+    guest: "访客请求",
+  },
+  workspaceFocus: {
+    next: "聚焦下一个工作区区域",
+    previous: "聚焦上一个工作区区域",
+  },
+  historyNavigation: {
+    back: "后退",
+    forward: "前进",
+  },
+  bootRecovery: {
+    offline: "此浏览器似乎已离线。请检查连接后重新加载。",
+    retry: "原因尚不明确。请先尝试重新加载。",
+    copyCommand: "复制命令",
+    copied: "已复制",
+    clipboardCopied: "已复制到剪贴板。",
+    copyDetails: "复制错误详情",
+    moreOptions: "持续失败时的其他选项",
+    reinstallNightly: "下载并重新安装最新 Nightly 版本",
+    reinstall: "下载并重新安装 T3 Code",
+    triageHint: "请在运行 T3 Code 的电脑上执行此命令。代理可以检查本地日志，并协助提交问题报告。",
+    sharingHint: "详情可能包含本地文件路径和名称。分享前请检查。",
+    report: "在 GitHub 上报告问题",
+    copyMac: "按 ⌘C 复制",
+    copyWindows: "按 Ctrl+C 复制",
+    download: "下载更新",
+    install: "重启以更新",
+    copyBlocked: "复制被阻止。文本已选中，你可以手动复制。",
+    downloadFailed: "更新下载失败。请再次点击下载更新。",
+    installFailed: "更新安装失败。请再次点击重启以更新。",
+    downloading: (percent: number) => `正在下载更新（${percent}%）`,
+  },
+  releaseLookup: {
+    connectServer: "请连接此服务器以检查版本。",
+    unsupported: "此服务器不支持查询包注册表。请先更新服务器，再切换更新通道。",
+    connect: "请连接服务器以检查版本。",
+    registryFailed: "无法检查此环境的 npm 注册表。请检查连接和注册表设置。",
+  },
+  snapShotErrors: {
+    retry: "请重试。",
+  },
+  triage: {
+    failed: "无法开始排查",
+    error: "发生错误。",
+    starting: "正在开始排查…",
+    copyCommand: "复制命令",
+    openFailed: "T3 Code 无法打开新对话。",
+    noProject: "此机器无法在未选择项目时启动对话。",
+    copyFailed: (command: string) => `无法复制。请手动输入 ${command}。`,
+    terminalHint: (description: string, command: string) =>
+      `${description} 请改为在该机器的终端中运行 ${command}。`,
+  },
+  projectGroupErrors: {
+    unarchive: "无法取消归档项目",
+    pin: "无法置顶项目",
+    unpin: "无法取消置顶项目",
+    environment: "此环境",
+    denied: (environment: string) => `此连接无法更改${environment}中的项目。`,
+    error: "发生错误。",
+  },
+  promptLinkErrors: {
+    open: "无法打开链接",
+  },
+  backendLink: {
+    confirm: (origin: string) => `添加位于 ${origin} 的后端？`,
+    failed: "无法添加后端",
+    failedDescription: "添加后端失败。",
+    added: "后端已添加",
+    saved: "环境已保存，应用启动时会重新连接。",
+  },
+  environmentActions: {
+    environment: "T3 Code 环境",
+    externalMachine: "此应用外的计算机",
+    open: "打开环境",
+    machine: (label: string) => `机器，${label}`,
+  },
+  replayErrors: {
+    failed: "回放失败",
+  },
+  paletteAdditions: {
+    unpinProject: "取消置顶项目",
+    pinProject: "置顶项目",
+    suggestions: "建议",
+    inMessages: "消息内",
+    connect: "连接环境",
+    cannotAddProject: "已连接的环境均无法添加项目",
+    triage: "排查问题",
+    triageDescription: "代理会排查 T3 Code 问题，并协助提交问题报告",
+    projects: "项目",
+  },
   desktopWebLinkCouldNotOpen: "无法打开链接",
   quitHoldOverlay: {
     holdOrPressTwice: (shortcut) => `按住${shortcut}或连按两次以退出`,

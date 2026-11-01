@@ -116,8 +116,8 @@ export function DesktopWebLinkCoordinator() {
     toastManager.add(
       stackedThreadToast({
         type: "error",
-        title: "Could not add backend",
-        description: error instanceof Error ? error.message : "Failed to add backend.",
+        title: t.app.backendLink.failed,
+        description: error instanceof Error ? error.message : t.app.backendLink.failedDescription,
       }),
     );
 
@@ -133,7 +133,7 @@ export function DesktopWebLinkCoordinator() {
       reportPairingFailure(error);
       return;
     }
-    const confirmed = (await requestConfirmDialog(`Add the backend at ${origin}?`)) ?? false;
+    const confirmed = (await requestConfirmDialog(t.app.backendLink.confirm(origin))) ?? false;
     if (!confirmed) return;
     const result = await connectPairingEnvironment({ pairingUrl });
     if (result._tag === "Failure") {
@@ -143,8 +143,8 @@ export function DesktopWebLinkCoordinator() {
     pairedUrlsRef.current.add(pairingUrl);
     toastManager.add({
       type: "success",
-      title: "Backend added",
-      description: "The environment is saved and will reconnect on app startup.",
+      title: t.app.backendLink.added,
+      description: t.app.backendLink.saved,
     });
   };
 

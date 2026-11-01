@@ -539,12 +539,12 @@ function PullRequestLabelFilter({
             onKeyDown={(event) => {
               if (event.key !== "ArrowDown" && event.key !== "Escape") event.stopPropagation();
             }}
-            placeholder="Search labels"
-            aria-label="Search labels"
+            placeholder={t.git.labelSearch.placeholder}
+            aria-label={t.git.labelSearch.placeholder}
           />
         </InputGroup>
-        {hosted.isPending ? <MenuItem disabled>Searching…</MenuItem> : null}
-        {hosted.error ? <MenuItem disabled>Couldn't search labels on the host</MenuItem> : null}
+        {hosted.isPending ? <MenuItem disabled>{t.git.labelSearch.searching}</MenuItem> : null}
+        {hosted.error ? <MenuItem disabled>{t.git.labelSearch.failed}</MenuItem> : null}
         {visible.length === 0 ? (
           <MenuItem disabled>{t.git.pullRequest.noLabelsInThisView}</MenuItem>
         ) : (

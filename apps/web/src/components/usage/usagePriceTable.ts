@@ -87,10 +87,7 @@ export function usagePriceTableChanges(
     const alias = (draft.alias ?? currentAlias ?? "").trim();
     if (alias !== "") {
       if (draft.alias === undefined && Object.keys(draft.values).length > 0) {
-        errors.set(
-          draft.id,
-          `${target.label} maps this model. Remove it from "Apply to" or clear its mapping first.`,
-        );
+        errors.set(draft.id, t.tools.usageMappingErrors.mapped(target.label));
         continue;
       }
       if (model === "") errors.set(draft.id, t.tools.usage.enterModelId);
@@ -143,7 +140,7 @@ export function usagePriceTableChanges(
     const seen = new Set<string>();
     while (aliases.has(model)) {
       if (seen.has(model)) {
-        errors.set(draft.id, `Model mappings cannot form a cycle on ${target.label}.`);
+        errors.set(draft.id, t.tools.usageMappingErrors.cycle(target.label));
         break;
       }
       seen.add(model);

@@ -32,14 +32,13 @@ export const useThreadUndoNotice = create<{ notice: UndoNotice | null }>(() => (
 
 /** Distinguishes discarded drafts from durable threads in the undo announcement. */
 function threadUndoNoticeSummary(notice: Pick<UndoNotice, "action" | "count">): string {
-  const noun = notice.action === "Discarded" ? "draft" : "thread";
-  return `${notice.action} ${notice.count} ${noun}${notice.count === 1 ? "" : "s"}`;
+  return t.sidebar.undo.summary(notice.action, notice.count);
 }
 
 /** Includes the configured undo shortcut so keyboard users can act on the notice. */
 function threadUndoLabel(keybindings: Parameters<typeof shortcutLabelForCommand>[0]) {
   const shortcut = shortcutLabelForCommand(keybindings, "thread.undo");
-  return shortcut ? `${shortcut} to undo` : "Undo";
+  return shortcut ? t.sidebar.undo.shortcutHint(shortcut) : t.sidebar.undo.undo;
 }
 
 let announcedSummary: string | null = null;

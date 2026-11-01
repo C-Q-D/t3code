@@ -1,5 +1,8 @@
 /** English messages for sidebar controls, thread lists, and notices. */
 export const sidebar = {
+  snoozeEditor: {
+    edit: "Edit snooze options",
+  },
   snoozeLabels: {
     morning: "This morning",
     afternoon: "This afternoon",
@@ -34,6 +37,7 @@ export const sidebar = {
     passed: "That snooze time has passed. Choose another time.",
   },
   statusAdditions: {
+    olderThreads: "Could not load older threads. Retry",
     guest: "Guest Request",
   },
   actions: {
@@ -312,6 +316,11 @@ export const sidebar = {
     presetLabel: (label: string, time: string) => `${label} (${time})`,
   },
   undo: {
+    summary: (
+      action: "Settled" | "Snoozed" | "Unpinned" | "Archived" | "Discarded",
+      count: number,
+    ) =>
+      `${action} ${count} ${action === "Discarded" ? "draft" : "thread"}${count === 1 ? "" : "s"}`,
     undo: "Undo",
     shortcutHint: (shortcut: string) => `${shortcut} to undo`,
     actionNotice: (

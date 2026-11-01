@@ -30,7 +30,7 @@ export function PullRequestsColumn({
   listBody: ReactNode;
   scrollRef: RefObject<HTMLDivElement | null>;
 }) {
-  const contentArea = workspaceAreaProps("pull-requests", 1, "Pull requests");
+  const contentArea = workspaceAreaProps("pull-requests", 1, t.git.reviewAdditions.pullRequests);
   const searchRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

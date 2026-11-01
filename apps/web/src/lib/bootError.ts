@@ -9,9 +9,6 @@ const LAST_FAILURE_KEY = "t3code:boot-failed-at";
 const REPEAT_FAILURE_MS = 5 * 60_000;
 const MAX_CAUSES = 3;
 const MAX_ERROR_CHARS = 6_000;
-const COPY_BLOCKED = "Copy was blocked. The text is selected so you can copy it manually.";
-const UPDATE_DOWNLOAD_FAILED = "The update download failed. Try Download update again.";
-const UPDATE_INSTALL_FAILED = "The update install failed. Try Restart to update again.";
 
 /** The Windows launcher is a `.cmd` run from PowerShell, which needs `&` to run a quoted path. */
 function launcherCommand(launcherPath: string) {
@@ -201,7 +198,9 @@ function copyText(target: HTMLElement, onCopied: () => void, onBlocked: (hint: s
     selectContents(target);
     if (copySelection()) return onCopied();
     onBlocked(
-      /Mac|iPhone|iPad/.test(navigator.platform) ? "Press ⌘C to copy" : "Press Ctrl+C to copy",
+      /Mac|iPhone|iPad/.test(navigator.platform)
+        ? t.app.bootRecovery.copyMac
+        : t.app.bootRecovery.copyWindows,
     );
   };
   const clipboard = window.isSecureContext ? navigator.clipboard : undefined;
@@ -222,16 +221,16 @@ function mountUpdateButton(
     button.hidden = action === null;
     // aria-disabled keeps keyboard focus on the button while the download runs.
     button.setAttribute("aria-disabled", String(action?.kind === "downloading"));
-    if (action?.kind === "download") button.textContent = "Download update";
+    if (action?.kind === "download") button.textContent = t.app.bootRecovery.download;
     if (action?.kind === "downloading")
-      button.textContent = `Downloading update (${action.percent}%)`;
-    if (action?.kind === "install") button.textContent = "Restart to update";
+      button.textContent = t.app.bootRecovery.downloading(action.percent);
+    if (action?.kind === "install") button.textContent = t.app.bootRecovery.install;
     const failure = !action
       ? ""
       : state.errorContext === "download"
-        ? UPDATE_DOWNLOAD_FAILED
+        ? t.app.bootRecovery.downloadFailed
         : state.errorContext === "install"
-          ? UPDATE_INSTALL_FAILED
+          ? t.app.bootRecovery.installFailed
           : "";
     if (failure === note.textContent) return;
     note.textContent = failure;
@@ -289,9 +288,7 @@ export function showBootError(error: unknown) {
   const message = element("div", {}, [
     element("h1", { textContent: t.app.boot.loadError }),
     element("p", {
-      textContent: offline
-        ? "This browser appears to be offline. Check the connection, then reload."
-        : "We are not sure why. Try a reload first.",
+      textContent: offline ? t.app.bootRecovery.offline : t.app.bootRecovery.retry,
     }),
   ]);
   message.setAttribute("role", "alert");
@@ -310,24 +307,24 @@ export function showBootError(error: unknown) {
   const copyCommand = element("button", {
     className: "boot-error-icon",
     type: "button",
-    title: "Copy command",
+    title: t.app.bootRecovery.copyCommand,
     innerHTML: COPY_ICON,
   });
-  copyCommand.setAttribute("aria-label", "Copy command");
+  copyCommand.setAttribute("aria-label", t.app.bootRecovery.copyCommand);
   copyCommand.addEventListener("click", () =>
     copyText(
       command,
       () => {
         copyCommand.innerHTML = CHECK_ICON;
-        copyCommand.title = "Copied";
-        copyCommand.setAttribute("aria-label", "Copied");
-        announce("Copied to clipboard.");
+        copyCommand.title = t.app.bootRecovery.copied;
+        copyCommand.setAttribute("aria-label", t.app.bootRecovery.copied);
+        announce(t.app.bootRecovery.clipboardCopied);
       },
       (hint) => {
         copyCommand.textContent = hint;
         copyCommand.title = hint;
         copyCommand.setAttribute("aria-label", hint);
-        announce(COPY_BLOCKED);
+        announce(t.app.bootRecovery.copyBlocked);
       },
     ),
   );
@@ -340,17 +337,20 @@ export function showBootError(error: unknown) {
     console.warn("Could not describe the startup error.", reportError);
   }
   const details = element("pre", { id: "boot-error-details", tabIndex: 0, textContent: report });
-  const copyDetails = element("button", { type: "button", textContent: "Copy error details" });
+  const copyDetails = element("button", {
+    type: "button",
+    textContent: t.app.bootRecovery.copyDetails,
+  });
   copyDetails.addEventListener("click", () =>
     copyText(
       details,
       () => {
-        copyDetails.textContent = "Copied";
-        announce("Copied to clipboard.");
+        copyDetails.textContent = t.app.bootRecovery.copied;
+        announce(t.app.bootRecovery.clipboardCopied);
       },
       (hint) => {
         copyDetails.textContent = hint;
-        announce(COPY_BLOCKED);
+        announce(t.app.bootRecovery.copyBlocked);
       },
     ),
   );
@@ -366,32 +366,29 @@ export function showBootError(error: unknown) {
   const nightly = environment.channel === "nightly";
 
   const more = element("details", { open: isRepeatFailure(Date.now()) }, [
-    element("summary", { textContent: "More options if it keeps failing" }),
+    element("summary", { textContent: t.app.bootRecovery.moreOptions }),
     ...(bridge
       ? [
           link(
             nightly ? `${DOWNLOAD_URL}?channel=nightly` : DOWNLOAD_URL,
-            nightly
-              ? "Download and reinstall the latest nightly build"
-              : "Download and reinstall T3 Code",
+            nightly ? t.app.bootRecovery.reinstallNightly : t.app.bootRecovery.reinstall,
           ),
         ]
       : []),
     element("div", {}, [
       element("p", {
-        textContent:
-          "Run this on the computer that runs T3 Code. Your agent can check the local logs and help you file a bug report.",
+        textContent: t.app.bootRecovery.triageHint,
       }),
       element("div", { id: "boot-error-command" }, [command, copyCommand]),
     ]),
     element("div", {}, [
       details,
       element("p", {
-        textContent: "Details may include local file paths and names. Check before sharing.",
+        textContent: t.app.bootRecovery.sharingHint,
       }),
       element("div", { id: "boot-error-report" }, [
         copyDetails,
-        link(issue.href, "File a bug report on GitHub"),
+        link(issue.href, t.app.bootRecovery.report),
       ]),
     ]),
   ]);

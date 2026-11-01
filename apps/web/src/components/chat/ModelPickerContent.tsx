@@ -1179,7 +1179,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
               updateRequiredNotices={updateRequiredNotices}
               emptyLabel={
                 selectedInstanceId === "favorites" && !isSearching
-                  ? "No favorites yet"
+                  ? t.composer.modelAdditions.emptyFavorites
                   : t.composer.modelPicker.empty
               }
               onRequestClose={onRequestClose}

@@ -3359,7 +3359,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                           {olderSettledShelf.loading
                             ? "Loading"
                             : olderSettledShelf.failed
-                              ? "Could not load older threads. Retry"
+                              ? t.sidebar.statusAdditions.olderThreads
                               : t.sidebar.sections.showMoreCount(
                                   Math.min(hiddenSettledCount, SIDEBAR_SETTLED_PAGE_COUNT),
                                 )}

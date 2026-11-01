@@ -219,7 +219,7 @@ function ExtendedOfficeViewer(props: {
                 <SelectTrigger aria-label={t.tools.filePreview.chapter} size="xs">
                   <SelectValue>
                     {documentPage &&
-                      (props.kind === "rtf"
+                      (documentPage.generatedTitle
                         ? t.tools.filePreview.pageNumber(page + 1)
                         : documentPage.title)}
                   </SelectValue>
@@ -227,9 +227,7 @@ function ExtendedOfficeViewer(props: {
                 <SelectPopup>
                   {previewDocument.pages.map((item, index) => (
                     <SelectItem key={index} value={index}>
-                      {props.kind === "rtf"
-                        ? t.tools.filePreview.pageNumber(index + 1)
-                        : item.title}
+                      {item.generatedTitle ? t.tools.filePreview.pageNumber(index + 1) : item.title}
                     </SelectItem>
                   ))}
                 </SelectPopup>
@@ -237,7 +235,7 @@ function ExtendedOfficeViewer(props: {
             </div>
           ) : (
             <span className="flex-1 text-center tabular-nums" aria-live="polite">
-              {navigation === "slide" ? "Slide" : "Page"} {page + 1} of {count}
+              {t.tools.officeNavigation.position(navigation, page + 1, count)}
             </span>
           )}
           <FileSurfaceAction
@@ -273,7 +271,7 @@ function ExtendedOfficeViewer(props: {
           <Suspense fallback={<FileSurfaceLoading />}>
             <DocumentPages
               html={documentPage.html}
-              name={`${props.name}: ${props.kind === "rtf" ? t.tools.filePreview.pageNumber(page + 1) : documentPage.title}`}
+              name={`${props.name}: ${documentPage.generatedTitle ? t.tools.filePreview.pageNumber(page + 1) : documentPage.title}`}
               details={`${documentDetails}${fileSize !== undefined ? ` · ${fileSize === 0 ? t.tools.filePreview.zeroBytes : formatAttachmentSize(fileSize)}` : ""}`}
             />
           </Suspense>

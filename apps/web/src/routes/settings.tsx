@@ -177,7 +177,7 @@ function SettingsContentLayout() {
 
   return (
     <main
-      {...workspaceAreaProps("settings", 1, "Settings content")}
+      {...workspaceAreaProps("settings", 1, t.settings.navigationAdditions.content)}
       className="settings-page-shell flex h-full min-h-0 min-w-0 flex-col text-control leading-normal text-foreground text-shadow-stone"
     >
       {titlebar}

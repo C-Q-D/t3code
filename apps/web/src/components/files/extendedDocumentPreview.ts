@@ -375,6 +375,7 @@ export async function openDocument(
   for (const [index, page] of pages.entries()) {
     rendered.push({
       title: page.attrs["draw:name"] || `Page ${index + 1}`,
+      generatedTitle: !page.attrs["draw:name"],
       html: await odfHtml(page, archive),
     });
   }
@@ -486,11 +487,11 @@ export function openRtf(bytes: ArrayBuffer): OfficeWorkerResult {
   let defaultFont = 0;
   const stack: (typeof state)[] = [];
   let html = "";
-  const pages: { title: string; html: string }[] = [];
+  const pages: { title: string; html: string; generatedTitle: boolean }[] = [];
   let completedLength = 0;
   const finishPage = () => {
     if (pages.length >= 500) throw new Error("Rich text preview limited to 500 pages.");
-    pages.push({ title: `Page ${pages.length + 1}`, html: `<p>${html}</p>` });
+    pages.push({ title: `Page ${pages.length + 1}`, html: `<p>${html}</p>`, generatedTitle: true });
     completedLength += html.length;
     html = "";
   };

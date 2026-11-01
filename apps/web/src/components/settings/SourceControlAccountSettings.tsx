@@ -237,7 +237,7 @@ export function SourceControlAccountSettings({
                 <p className="text-xs text-warning">
                   {definition.kind === "github"
                     ? t.settings.gitHubAccount.chosenLoginLongerSignedActiveHint
-                    : `The chosen login is no longer signed in, so the active ${cliName} login is used.`}
+                    : t.settings.sourceControlSignIn.stale(cliName)}
                 </p>
                 <Button
                   size="settings-list"

@@ -40,10 +40,18 @@ const WRITING_STYLE_LABELS: Record<string, string> = {
 };
 
 const BACKGROUND_ACTIVITY_PROFILE_LABELS: Record<string, string> = {
-  balanced: "Balanced",
-  performance: "Performance",
-  "battery-saver": "Battery saver",
-  custom: "Advanced",
+  get balanced() {
+    return t.settings.backgroundProfileLabels.balanced;
+  },
+  get performance() {
+    return t.settings.backgroundProfileLabels.performance;
+  },
+  get "battery-saver"() {
+    return t.settings.backgroundProfileLabels.battery_saver;
+  },
+  get custom() {
+    return t.settings.backgroundProfileLabels.custom;
+  },
 };
 
 function formatValue(key: keyof ServerSettings, value: unknown): string {

@@ -313,16 +313,22 @@ export const make = Effect.gen(function* BrowserSessionMake() {
               callback(remembered);
               return;
             }
-            promptPermission(
-              requester,
-              {
-                buttons: ["Allow", "Block"],
-                message: `${truncateForPrompt(origin)} wants to see text and images copied to the clipboard`,
-              },
-              (answer) => {
-                if (answer !== undefined) clipboardReadDecisions.set(origin, answer);
-                callback(answer === true);
-              },
+            runFork(
+              locale.messages.pipe(
+                Effect.map((m) =>
+                  promptPermission(
+                    requester,
+                    {
+                      buttons: [m.preview.clipboardAllow, m.preview.clipboardBlock],
+                      message: m.preview.clipboardRead(truncateForPrompt(origin)),
+                    },
+                    (answer) => {
+                      if (answer !== undefined) clipboardReadDecisions.set(origin, answer);
+                      callback(answer === true);
+                    },
+                  ),
+                ),
+              ),
             );
           };
           // Rewriting Electron's native User-Agent makes Turnstile fail integrity checks with error 600010.

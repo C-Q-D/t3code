@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { useAtomValue } from "@effect/atom-react";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
@@ -113,7 +114,7 @@ export function DevReplayHost() {
     replay(scenario).catch((error: unknown) =>
       toastManager.add({
         type: "error",
-        title: "Replay failed",
+        title: t.app.replayErrors.failed,
         description: error instanceof Error ? error.message : String(error),
       }),
     );
@@ -124,14 +125,14 @@ export function DevReplayHost() {
       <DialogPopup className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>
-            {project === undefined ? "Replay a recorded turn" : `Replay in ${project.title}`}
+            {project === undefined
+              ? t.app.replayCopy.recorded
+              : t.app.replayCopy.inProject(project.title)}
           </DialogTitle>
         </DialogHeader>
         <DialogPanel>
           {scenarios.length === 0 || project === undefined ? (
-            <p className="text-sm text-muted-foreground">
-              Needs a project and the Replay (dev) provider, which dev servers start.
-            </p>
+            <p className="text-sm text-muted-foreground">{t.app.replayCopy.needsProvider}</p>
           ) : (
             <div className="flex flex-col items-start gap-1">
               {scenarios.map((scenario) => (

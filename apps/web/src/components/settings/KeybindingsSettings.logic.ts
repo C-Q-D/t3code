@@ -402,8 +402,8 @@ export function commandLabel(command: KeybindingCommand): string {
   if (command === "thread.copyReference") return t.settings.keybindings.commandLabels.copyReference;
   if (command === "usage.limits")
     return t.settings.keybindings.usageCommand(t.tools.usage.refreshLimits);
-  if (command === "workspace.focusNext") return "Focus Next Workspace Area";
-  if (command === "workspace.focusPrevious") return "Focus Previous Workspace Area";
+  if (command === "workspace.focusNext") return t.app.workspaceFocus.next;
+  if (command === "workspace.focusPrevious") return t.app.workspaceFocus.previous;
   const usageMetric = METRIC_OPTIONS.find((option) => option.command === command);
   if (usageMetric) return t.settings.keybindings.usageCommand(t.tools.usage[usageMetric.value]);
   const usagePeriod = WINDOW_OPTIONS.find((option) => option.command === command);

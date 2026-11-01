@@ -15,6 +15,7 @@ import { compareSemverVersions } from "@t3tools/shared/semver";
 import type * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 
+import * as DesktopUiLocale from "../i18n/DesktopUiLocale.ts";
 import * as DesktopObservability from "../app/DesktopObservability.ts";
 import * as DesktopBackendPool from "../backend/DesktopBackendPool.ts";
 import * as DesktopTelemetryPublisher from "../telemetry/DesktopTelemetryPublisher.ts";
@@ -47,11 +48,13 @@ type CommitClaim =
 export const listen: Effect.Effect<
   void,
   never,
+  | DesktopUiLocale.DesktopUiLocale
   | DesktopUpdates.DesktopUpdates
   | DesktopTelemetryPublisher.DesktopTelemetryPublisher
   | DesktopBackendPool.DesktopBackendPool
   | Scope.Scope
 > = Effect.gen(function* () {
+  const locale = yield* DesktopUiLocale.DesktopUiLocale;
   const updates = yield* DesktopUpdates.DesktopUpdates;
   const backends = yield* DesktopBackendPool.DesktopBackendPool;
   const publisher = yield* DesktopTelemetryPublisher.DesktopTelemetryPublisher;
@@ -197,8 +200,7 @@ export const listen: Effect.Effect<
               current,
               {
                 outcome: "failed",
-                reason:
-                  "This desktop app also runs WSL backends, whose databases a remote switch cannot check. Switch it on that machine.",
+                reason: (yield* locale.messages).updates.wslRemoteSwitch,
               },
               request.requestId,
             );
@@ -321,7 +323,7 @@ export const listen: Effect.Effect<
                   compareSemverVersions(state.currentVersion, request.targetVersion) < 0)
                   ? {
                       outcome: "failed" as const,
-                      reason: `The desktop app found no build of ${request.targetVersion}.`,
+                      reason: (yield* locale.messages).updates.noBuild(request.targetVersion),
                     }
                   : next;
               yield* publishReport(

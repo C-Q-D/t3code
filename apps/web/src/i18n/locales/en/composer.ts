@@ -2,6 +2,17 @@ import { englishApprovalMessages } from "@t3tools/client-runtime/work-log/messag
 
 /** English composer labels and messages; functions format display data only. */
 export const composer = {
+  contextAdditions: {
+    unreachable: "The environment it came from is not reachable right now.",
+  },
+  modelAdditions: {
+    emptyFavorites: "No favorites yet",
+    disabled: "Model picker is disabled",
+  },
+  sideCommands: {
+    side: "Ask a side question in a new side chat",
+    btw: "Same as /side",
+  },
   assist: {
     suggestion: {
       /** Announces the prediction and its insert-only keyboard action. */

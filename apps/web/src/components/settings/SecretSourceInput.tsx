@@ -178,7 +178,7 @@ export function SecretSourceInput({
         />
         {rejectedReference !== null ? (
           <p className="text-2xs text-destructive">
-            {definition?.invalidReferenceMessage ?? "Enter a valid secret reference."}
+            {definition?.invalidReferenceMessage ?? t.settings.secretValidation.reference}
           </p>
         ) : null}
       </div>

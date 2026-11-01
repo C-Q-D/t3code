@@ -756,7 +756,7 @@ export default function ChatView(props: ChatViewProps) {
     composerRestingRef.current = resting;
   });
   const conversationArea = workspaceAreaProps("conversation", 1, "Conversation");
-  const composerArea = workspaceAreaProps("composer", 2, "Message input");
+  const composerArea = workspaceAreaProps("composer", 2, t.chat.navigationCopy.messageInput);
   const [composerOverlayElement, setComposerOverlayElement] = useState<HTMLDivElement | null>(null);
   const [composerTimelineInset, setComposerTimelineInset] = useState(0);
   const composerTimelineInsetRef = useRef(0);
@@ -922,7 +922,7 @@ export default function ChatView(props: ChatViewProps) {
   const parentThreadLink = (() => {
     if (sideChatParentRef !== null) {
       return {
-        title: sideChatParent?.title ?? "Parent thread",
+        title: sideChatParent?.title ?? t.chat.relationshipLinks.parentThread,
         sideChat: true,
         // Embedded, the parent is the view around it.
         ...(embedded
@@ -939,7 +939,7 @@ export default function ChatView(props: ChatViewProps) {
     }
     if (parentSubagentThreadRef !== null) {
       return {
-        title: parentSubagentThread?.title ?? "Parent thread",
+        title: parentSubagentThread?.title ?? t.chat.relationshipLinks.parentThread,
         open: (): void => {
           void navigate({
             to: "/$environmentId/$threadId",
@@ -2949,7 +2949,7 @@ export default function ChatView(props: ChatViewProps) {
                     activeThread?.worktreePath ?? null,
                     serverProjection?.runs ?? [],
                   )
-                ? "Available once the thread's worktree is set up."
+                ? t.chat.navigationCopy.worktreeNotReady
                 : null;
   const openSideChatStable = useStableCallback(() => void sideChat.open());
   const sendSideChatStable = useStableCallback((prompt: string) => sideChat.open(prompt));

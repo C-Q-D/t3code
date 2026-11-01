@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import {
   type LinkedPrompt,
   parseNewThreadLink,
@@ -114,7 +115,7 @@ function HostedPromptLinkLanding({
   if (!summary.ok) {
     return (
       <StandalonePage>
-        <StandalonePageHeader title="Could not open the link" description={summary.error} />
+        <StandalonePageHeader title={t.app.promptLinkErrors.open} description={summary.error} />
       </StandalonePage>
     );
   }

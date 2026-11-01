@@ -117,7 +117,7 @@ function ChatMarkdownMediaUnavailableLabel(props: {
 }) {
   const label =
     props.kind === "audio"
-      ? "Audio unavailable"
+      ? t.chat.mediaAdditions.audio
       : props.kind === "video"
         ? t.chat.markdown.videoUnavailable
         : t.chat.markdown.imageUnavailable;

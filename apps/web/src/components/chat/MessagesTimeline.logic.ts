@@ -12,10 +12,7 @@ import {
 } from "@t3tools/shared/assistantCitations";
 import { shallow } from "zustand/vanilla/shallow";
 import { claudeResumeCompactionAge } from "@t3tools/shared/claudeCompaction";
-import {
-  IDLE_COMPACTING_LABELS,
-  IDLE_COMPACTION_TITLES,
-} from "@t3tools/client-runtime/user-message";
+
 import type { HandoffTimelineRun } from "@t3tools/client-runtime/handoff";
 import { renderCodexDirectivesForCopy } from "@t3tools/shared/codexMarkdownDirectives";
 import {
@@ -1773,9 +1770,12 @@ export function deriveMessagesTimelineRows(input: {
   const compactionTitle = (runId: RunId | null | undefined, entryId: string) => {
     if (runId == null) return undefined;
     const reason = compactionRuns.get(runId);
-    if (reason !== undefined) return IDLE_COMPACTION_TITLES[reason];
+    if (reason !== undefined)
+      return reason === "beforeCacheExpires"
+        ? t.chat.compactionAdditions.beforeTitle
+        : t.chat.compactionAdditions.returnTitle;
     const age = resumeCompactionAgeByEntryId.get(entryId);
-    return age ? `Context compacted after ${age} idle` : undefined;
+    return age ? t.chat.compactionAdditions.afterIdle(age) : undefined;
   };
   const activeCompactionEntry = timelineEntries.find(
     (entry): entry is Extract<TimelineEntry, { kind: "work" }> =>
@@ -1942,7 +1942,12 @@ export function deriveMessagesTimelineRows(input: {
         ...(failed ? { failed: true } : {}),
         ...(failure ? { failure } : {}),
         createdAt: timelineEntry.createdAt,
-        label: active && reason ? IDLE_COMPACTING_LABELS[reason] : timelineEntry.entry.label,
+        label:
+          active && reason
+            ? reason === "beforeCacheExpires"
+              ? t.chat.compactionAdditions.beforeLabel
+              : t.chat.compactionAdditions.returnLabel
+            : timelineEntry.entry.label,
         tokenCounts:
           compaction?.type === "compaction" ? contextCompactionTokenCounts(compaction) : null,
         active,
@@ -2178,9 +2183,11 @@ export function deriveMessagesTimelineRows(input: {
           createdAt: timelineEntry.createdAt,
           label: pending
             ? reason
-              ? IDLE_COMPACTING_LABELS[reason]
-              : "Compacting context"
-            : "Context compaction",
+              ? reason === "beforeCacheExpires"
+                ? t.chat.compactionAdditions.beforeLabel
+                : t.chat.compactionAdditions.returnLabel
+              : t.chat.compactionAdditions.compacting
+            : t.chat.compactionAdditions.compaction,
           tokenCounts: null,
           active: pending,
         });
