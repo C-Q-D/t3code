@@ -1,6 +1,5 @@
 import { flushSync } from "react-dom";
 import { AudioPreview } from "../files/AudioPreview";
-import { page } from "vite-plus/test/browser";
 import {
   ComposerContextId,
   EnvironmentId,
@@ -1268,7 +1267,7 @@ describe("ChangedFilesCard", () => {
   );
 });
 
-it("keeps concurrent approvals actionable outside collapsed work and restores settled rows", async () => {
+it("restores settled approval rows inside completed work", async () => {
   setup();
   const fixture = makeStreamingTimelineFixture();
   const source = fixture.visibleTurnItems[4]!;
@@ -1325,110 +1324,20 @@ it("keeps concurrent approvals actionable outside collapsed work and restores se
       ],
       optimisticMessages: [],
     });
-  const props = baseProps();
-  const onRespondToApproval = vi.fn(async () => {});
-  const ui = (overrides: Partial<TimelineProps> = {}) => (
+  await using screen = await renderElement(
     <MessagesTimeline
-      {...props}
-      timelineEntries={entries()}
-      pendingApprovals={approvals}
-      canOperateThread
-      onRespondToApproval={onRespondToApproval}
-      isWorking
-      runningRunId={fixture.runId}
-      {...overrides}
-    />
-  );
-  await using screen = await renderElement(ui());
-  await expect.element(screen.getByRole("group", { name: "Command approval" })).toBeVisible();
-  await expect
-    .element(screen.getByRole("group", { name: "App permission approval" }))
-    .toBeVisible();
-  await expect.element(screen.getByText(approvals[0]!.detail!, { exact: true })).toBeVisible();
-  await expect.element(screen.getByText("Needs permission to run the command")).toBeVisible();
-  await vi.waitFor(() => {
-    expect(
-      getComputedStyle(screen.getByLabelText("Command", { exact: true }).element()).userSelect,
-    ).toBe("text");
-    expect(
-      getComputedStyle(screen.getByText("Needs permission to run the command").element())
-        .userSelect,
-    ).toBe("text");
-  });
-  await expect.element(screen.getByText("Safari", { exact: true })).toBeVisible();
-  await click(screen.button("Why am I being asked this?"));
-  await expect.element(page.getByText(/an ask rule in the agent's own settings/)).toBeVisible();
-  await click(screen.button("Why am I being asked this?"));
-  await click(screen.buttons("More approval options")[1]!);
-  await expect.element(page.getByRole("menuitem", { name: "Always allow Safari" })).toBeVisible();
-  await page.getByRole("menuitem", { name: "Always allow Safari" }).click();
-  expect(onRespondToApproval).toHaveBeenLastCalledWith(appRequest, "acceptAlways");
-  await click(screen.buttons("More approval options")[0]!);
-  await expect.element(page.getByRole("menuitem", { name: "Cancel", exact: true })).toBeVisible();
-  await page.getByRole("menuitem", { name: "Always allow this session" }).click();
-  expect(onRespondToApproval).toHaveBeenLastCalledWith(commandRequest, "acceptForSession");
-  await click(screen.button("Decline"));
-  expect(onRespondToApproval).toHaveBeenLastCalledWith(commandRequest, "decline");
-  await click(screen.button("Allow once"));
-  expect(onRespondToApproval).toHaveBeenLastCalledWith(appRequest, "accept");
-  for (const timelineEntries of [entries(), []]) {
-    await screen.rerender(
-      ui({ timelineEntries, heldApprovalRequestIds: new Set([commandRequest]) }),
-    );
-    await expect
-      .element(screen.getByRole("group", { name: "Command approval" }))
-      .not.toBeInTheDocument();
-    await vi.waitFor(() => expect(screen.buttons("Approve")).toHaveLength(0));
-    await expect
-      .element(screen.getByRole("button", { name: "Allow once", exact: true }))
-      .toBeVisible();
-    await screen.rerender(ui({ timelineEntries }));
-    await expect.element(screen.getByRole("group", { name: "Command approval" })).toBeVisible();
-    await vi.waitFor(() => expect(screen.buttons("Approve")).toHaveLength(1));
-  }
-  await screen.rerender(ui({ timelineEntries: [], isWorking: false }));
-  await expect.element(screen.getByRole("group", { name: "Command approval" })).toBeVisible();
-  await click(screen.button("Approve"));
-  expect(onRespondToApproval).toHaveBeenLastCalledWith(commandRequest, "accept");
-  await click(screen.button("Deny"));
-  expect(onRespondToApproval).toHaveBeenLastCalledWith(appRequest, "decline");
-  await screen.rerender(
-    ui({
-      timelineEntries: [],
-      isWorking: false,
-      pendingApprovals: [{ ...approvals[0]!, detail: "" }],
-    }),
-  );
-  await expect
-    .element(screen.getByLabelText("Command", { exact: true }))
-    .toHaveTextContent("Command approval");
-  await screen.rerender(ui({ canOperateThread: false }));
-  await expect.element(screen.getByRole("button", { name: "Approve", exact: true })).toBeDisabled();
-  await vi.waitFor(() =>
-    expect(
-      screen.buttons("More approval options").every((button) => button.hasAttribute("disabled")),
-    ).toBe(true),
-  );
-  await screen.rerender(ui({ respondingRequestIds: [commandRequest] }));
-  await expect.element(screen.getByRole("button", { name: "Approve", exact: true })).toBeDisabled();
-  await expect
-    .element(screen.getByRole("button", { name: "Allow once", exact: true }))
-    .toBeEnabled();
-  await screen.rerender(
-    ui({ pendingApprovals: [{ ...approvals[0]!, responseCapability: "not_resumable" }] }),
-  );
-  await expect
-    .element(screen.getByText("Provider process is gone. Interrupt or restart the run to respond."))
-    .toBeVisible();
-  await vi.waitFor(() => expect(screen.buttons("Approve")).toHaveLength(0));
-  await screen.rerender(
-    ui({ pendingApprovals: [], timelineEntries: entries(true), isWorking: false }),
+      {...baseProps()}
+      timelineEntries={entries(true)}
+      pendingApprovals={[]}
+      isWorking={false}
+    />,
   );
   await expect
     .element(screen.getByRole("group", { name: "Command approval" }))
     .not.toBeInTheDocument();
   await vi.waitFor(() => expect(screen.text()).not.toContain("Waiting for approval"));
   await screen.getByRole("button", { expanded: false }).click();
+  await screen.getByRole("button", { name: "Read 1 file and used 2 tools", exact: true }).click();
   await expect
     .element(screen.getByRole("button", { name: approvals[0]!.detail!, exact: true }))
     .toBeVisible();

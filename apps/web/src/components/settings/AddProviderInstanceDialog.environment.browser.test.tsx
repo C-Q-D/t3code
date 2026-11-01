@@ -189,14 +189,11 @@ describe("AddProviderInstanceDialog environment routing", () => {
     });
   });
 
-  it("keeps fx and the ACP Registry under Show more", async () => {
+  it("makes fx and the ACP Registry directly selectable from the local provider cards", async () => {
     setup();
     await using _screen = await render(dialog());
     expect(radio("Codex")).toBeDefined();
-    expect(radio("fx")).toBeUndefined();
-    expect(document.body.textContent).not.toContain("Use Kilo Code");
-
-    await click("Show more");
+    expect(radio("fx")).toBeDefined();
     button("Use Kilo Code");
     await act(async () => radio("fx")!.click());
     await click("Next");
@@ -206,6 +203,18 @@ describe("AddProviderInstanceDialog environment routing", () => {
       operation: "create",
       instanceId: "fx",
       instance: { driver: "fx", enabled: true, displayName: "fx" },
+    });
+    await _screen.rerender(null);
+    await _screen.rerender(dialog());
+    await click("Use Kilo Code");
+    await click("Continue to sign-in");
+    expect(settingsHooks.mutate).toHaveBeenLastCalledWith({
+      operation: "create",
+      instanceId: "acpRegistry_kilo_code",
+      instance: expect.objectContaining({
+        driver: ProviderDriverKind.make("acpRegistry"),
+        config: expect.objectContaining({ agentId: "kilo" }),
+      }),
     });
   });
 

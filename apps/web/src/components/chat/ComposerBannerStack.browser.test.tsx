@@ -1,6 +1,8 @@
 import { InfoIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { expect, it, vi } from "vite-plus/test";
+import { userEvent } from "vite-plus/test/browser";
+import { t } from "~/i18n";
 
 import "~/index.css";
 
@@ -16,12 +18,34 @@ function notice(title: string, group?: ComposerBannerStackItem["group"]): Compos
   return { id: title, variant: "default", icon: <InfoIcon />, title, ...(group ? { group } : {}) };
 }
 
-it("puts machine notices first, whatever order the notices arrive in", async () => {
+it("prioritizes urgent then activity notices and exposes every remaining notice on expansion", async () => {
   await using screen = await render(
-    <ComposerBannerStack items={[notice("Branch changed"), notice("Offline", "environment")]} />,
+    <ComposerBannerStack
+      items={[
+        notice("Branch changed"),
+        { ...notice("Running"), priority: "activity" },
+        notice("Offline", "environment"),
+        { ...notice("Permission needed"), priority: "urgent" },
+      ]}
+    />,
   );
-
-  expect(screen.container.textContent).toBe("OfflineBranch changed");
+  await expect.element(screen.getByText("Permission needed", { exact: true })).toBeVisible();
+  await expect.element(screen.getByText("Running", { exact: true })).not.toBeVisible();
+  await expect.element(screen.getByText("Branch changed", { exact: true })).not.toBeVisible();
+  await expect.element(screen.getByText("Offline", { exact: true })).not.toBeVisible();
+  await userEvent.keyboard("{Tab}");
+  await expect
+    .element(screen.getByRole("button", { name: t.composer.bannerStack.showOtherNotices }))
+    .toHaveFocus();
+  await userEvent.keyboard("{Enter}");
+  await expect.element(screen.getByText("Running", { exact: true })).toBeVisible();
+  await expect.element(screen.getByText("Branch changed", { exact: true })).toBeVisible();
+  await expect.element(screen.getByText("Offline", { exact: true })).toBeVisible();
+  const remaining = screen.container.querySelector("[data-composer-banner-stack-expanded-items]")!;
+  expect(remaining.textContent).toBe("RunningBranch changedOffline");
+  await userEvent.keyboard("{Escape}");
+  await expect.element(screen.getByText("Permission needed", { exact: true })).toBeVisible();
+  await expect.element(screen.getByText("Running", { exact: true })).not.toBeVisible();
 });
 
 it("leaves the next attachment its own top edge when there are no notices", async () => {

@@ -28,6 +28,8 @@ import { serverEnvironment, updateOutdatedServer } from "~/state/server";
 import { appAtomRegistry } from "~/rpc/atomRegistry";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { manualServerUpdateCommand } from "~/versionSkew";
+import { useServerConfigs } from "~/state/entities";
+import { crossesReleaseTrack } from "@t3tools/shared/cliRelease";
 import { Button } from "./ui/button";
 import { toastManager } from "./ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
@@ -38,6 +40,19 @@ const UPDATE_STAGE_LABELS: Record<ServerUpdateStage, string> = {
   resuming: t.app.server.restarting,
 };
 const pendingUpdateEnvironmentIds = new Set<EnvironmentId>();
+
+/** Desktop-managed servers follow their own app feed; other automatic updates must stay on track. */
+function refusedCrossing(
+  target: Pick<ServerUpdateTarget, "selfUpdate" | "targetVersion">,
+  serverVersion: string | undefined,
+) {
+  return (
+    target.selfUpdate !== null &&
+    target.selfUpdate !== "desktop-managed" &&
+    serverVersion !== undefined &&
+    crossesReleaseTrack(serverVersion, target.targetVersion)
+  );
+}
 
 export function serverUpdateStageLabel(stage: ServerUpdateStage): string {
   return UPDATE_STAGE_LABELS[stage];
@@ -69,6 +84,7 @@ export type ServerUpdateOutcome =
 /** Toasts its success or failure unless `quiet`; never rejects. */
 export function useServerUpdate() {
   const updateServer = useAtomCommand(serverEnvironment.updateServer, { reportFailure: false });
+  const serverConfigs = useServerConfigs();
   return async (
     target: ServerUpdateTarget,
     { quiet = false }: { readonly quiet?: boolean } = {},
@@ -76,7 +92,8 @@ export function useServerUpdate() {
     const { environmentId, serverLabel, selfUpdate, targetVersion } = target;
     if (
       !canUpdateServer(appAtomRegistry.get(environmentSession.sessionStateAtom(environmentId))) ||
-      pendingUpdateEnvironmentIds.has(environmentId)
+      pendingUpdateEnvironmentIds.has(environmentId) ||
+      refusedCrossing(target, serverConfigs.get(environmentId)?.environment.serverVersion)
     )
       return { status: "skipped" };
     pendingUpdateEnvironmentIds.add(environmentId);
@@ -128,12 +145,14 @@ export function ServerUpdatesAction({
   readonly targets: ReadonlyArray<ServerUpdateTarget>;
 }) {
   const update = useServerUpdate();
+  const serverConfigs = useServerConfigs();
   const pending = useRef(false);
   const [isPending, setIsPending] = useState(false);
   const eligible = targets.filter(
     (target) =>
       target.selfUpdate !== null &&
-      (target.selfUpdate !== "desktop-managed" || target.desktopAppUpdate),
+      (target.selfUpdate !== "desktop-managed" || target.desktopAppUpdate) &&
+      !refusedCrossing(target, serverConfigs.get(target.environmentId)?.environment.serverVersion),
   );
   const handleUpdate = async () => {
     if (pending.current) return;
@@ -217,8 +236,11 @@ export function ServerUpdateAction({
   appearance = "button",
 }: ServerUpdateTarget & UpdateButtonProps) {
   const isDesktopAppUpdate = selfUpdate === "desktop-managed";
+  const serverVersion = useServerConfigs().get(environmentId)?.environment.serverVersion;
   const sessionStateAtom = environmentSession.sessionStateAtom(environmentId);
-  const canUpdate = canUpdateServer(useAtomValue(sessionStateAtom));
+  const canUpdate =
+    canUpdateServer(useAtomValue(sessionStateAtom)) &&
+    !refusedCrossing({ selfUpdate, targetVersion }, serverVersion);
   const update = useServerUpdate();
   const { copyToClipboard } = useCopyToClipboard<{ command: string }>({
     target:

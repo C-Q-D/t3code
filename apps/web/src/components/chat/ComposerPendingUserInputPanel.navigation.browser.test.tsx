@@ -1,6 +1,7 @@
 import {
   EnvironmentId,
   NodeId,
+  ProviderSessionId,
   RuntimeRequestId,
   ThreadId,
   TurnItemId,
@@ -9,7 +10,19 @@ import {
 import { makeThreadRequestsResolvedAnnouncer } from "@t3tools/client-runtime/state/thread-requests";
 import { useLayoutEffect, useRef, type ComponentProps } from "react";
 import { expect, it, vi } from "vite-plus/test";
-import { userEvent } from "vite-plus/test/browser";
+import { page, userEvent } from "vite-plus/test/browser";
+import { t } from "~/i18n";
+import "~/index.css";
+
+const approvalCommands = vi.hoisted(() => ({ respond: vi.fn() }));
+vi.mock(import("../../state/use-orchestration-command"), async (original) => ({
+  ...(await original()),
+  useOrchestrationCommand: (() => approvalCommands.respond) as never,
+}));
+vi.mock(import("../../state/session"), async (original) => ({
+  ...(await original()),
+  readEnvironmentScope: () => true,
+}));
 
 vi.mock(import("../ChatMarkdown"), async (importOriginal) => ({
   ...(await importOriginal()),
@@ -19,6 +32,9 @@ vi.mock(import("../ChatMarkdown"), async (importOriginal) => ({
 import { act, fakeTimers, render } from "../../../test/render";
 import { makeThreadProjectionFixture } from "../../test-fixtures";
 import { usePendingThreadRequests } from "./usePendingThreadRequests";
+import { ComposerPendingApprovalActions } from "./ComposerPendingApprovalActions";
+import { ComposerPendingApprovalPanel } from "./ComposerPendingApprovalPanel";
+import type { PendingApproval } from "../../session-logic";
 
 const threadRef = { environmentId: EnvironmentId.make("env"), threadId: ThreadId.make("thread") };
 
@@ -224,4 +240,212 @@ it("isolates drafts by environment, thread and request and discards only resolve
       index === 0 ? undefined : `Answer ${index}`,
     );
   }
+});
+
+/** Mounts the pending request hook with the same approval panel/actions used beside ChatComposer. */
+function ComposerApprovalProbe(props: ProbeProps & { disabled?: boolean }) {
+  const state = useProbeRequests(props);
+  const approval = state.activePendingApproval;
+  return approval ? (
+    <>
+      <ComposerPendingApprovalPanel
+        approval={approval}
+        pendingCount={state.pendingApprovals.length}
+      />
+      <ComposerPendingApprovalActions
+        requestId={approval.requestId}
+        disabled={props.disabled ?? false}
+        isResponding={state.respondingRequestIds.includes(approval.requestId)}
+        canRespond={approval.responseCapability === "live"}
+        options={approval.options}
+        onRespondToApproval={state.onRespondToApproval}
+      />
+    </>
+  ) : (
+    <p>Composer ready</p>
+  );
+}
+
+it("keeps concurrent composer approvals actionable and restores the input after both settle", async () => {
+  approvalCommands.respond.mockReset().mockResolvedValue({ _tag: "Success", value: {} });
+  const commandRequest = RuntimeRequestId.make("command-approval");
+  const appRequest = RuntimeRequestId.make("app-approval");
+  const approvals: PendingApproval[] = [
+    {
+      requestId: commandRequest,
+      requestKind: "command",
+      createdAt: "2026-10-09T00:00:00.000Z",
+      detail: "printf '" + "long-command ".repeat(80) + "'",
+      reason: "Needs permission to run the command",
+      fullAccessOverride: "ask_rule",
+      responseCapability: "live",
+    },
+    {
+      requestId: appRequest,
+      requestKind: "permission",
+      createdAt: "2026-10-09T00:00:00.000Z",
+      detail: "Open the current tab",
+      appName: "Safari",
+      options: [
+        { decision: "decline", label: "Deny" },
+        { decision: "accept", label: "Allow once" },
+        {
+          decision: "acceptAlways",
+          label: "Always allow Safari",
+          warning: "Applies to future requests",
+        },
+      ],
+      responseCapability: "live",
+    },
+  ];
+  const base = questionProjection(threadRef.threadId, ["command-approval", "app-approval"]);
+  const projection = {
+    ...base,
+    runtimeRequests: base.runtimeRequests.map((request, index) => ({
+      ...request,
+      kind: approvals[index]!.requestKind,
+      responseCapability: {
+        type: "live" as const,
+        providerSessionId: ProviderSessionId.make("approvals"),
+      },
+    })),
+    turnItems: base.turnItems.map(({ questions: _questions, ...item }, index) => ({
+      ...item,
+      type: "approval_request" as const,
+      requestKind: approvals[index]!.requestKind,
+      prompt: approvals[index]!.detail,
+      reason: approvals[index]!.reason,
+      fullAccessOverride: approvals[index]!.fullAccessOverride,
+      appName: approvals[index]!.appName,
+      options: approvals[index]!.options,
+    })),
+  } satisfies OrchestrationV2ThreadProjection;
+  const ui = (current: OrchestrationV2ThreadProjection = projection, disabled = false) => (
+    <ComposerApprovalProbe
+      environmentId={threadRef.environmentId}
+      projection={current}
+      disabled={disabled}
+    />
+  );
+  await using screen = await render(ui());
+  await expect
+    .element(screen.getByRole("group", { name: t.composer.approval.commandTitle }))
+    .toBeVisible();
+  await expect.element(screen.getByText("1/2", { exact: true })).toBeVisible();
+  await expect.element(screen.getByText(approvals[0]!.detail!, { exact: false })).toBeVisible();
+  await expect.element(screen.getByText("Needs permission to run the command")).toBeVisible();
+  await userEvent.click(
+    screen.getByRole("button", { name: t.composer.approval.fullAccessOverride.question }),
+  );
+  await expect
+    .element(page.getByText(t.composer.approval.fullAccessOverride.askRule))
+    .toBeVisible();
+  await userEvent.keyboard("{Escape}");
+  await userEvent.click(screen.getByRole("button", { name: t.composer.approval.moreOptions }));
+  await userEvent.click(page.getByRole("menuitem", { name: t.composer.approval.allowSession }));
+  expect(approvalCommands.respond).toHaveBeenLastCalledWith({
+    environmentId: threadRef.environmentId,
+    input: {
+      threadId: threadRef.threadId,
+      requestId: commandRequest,
+      decision: "acceptForSession",
+    },
+  });
+  await userEvent.click(
+    screen.getByRole("button", { name: t.composer.approval.decline, exact: true }),
+  );
+  expect(approvalCommands.respond).toHaveBeenLastCalledWith({
+    environmentId: threadRef.environmentId,
+    input: { threadId: threadRef.threadId, requestId: commandRequest, decision: "decline" },
+  });
+  await screen.rerender(ui(projection, true));
+  await expect
+    .element(screen.getByRole("button", { name: t.composer.approval.approve, exact: true }))
+    .toBeDisabled();
+  await expect
+    .element(screen.getByRole("button", { name: t.composer.approval.moreOptions }))
+    .toBeDisabled();
+  await screen.rerender(
+    ui({
+      ...projection,
+      runtimeRequests: projection.runtimeRequests.map((request) => ({
+        ...request,
+        responseCapability: { type: "not_resumable", reason: "Provider exited" },
+      })),
+    }),
+  );
+  await expect.element(screen.getByText(t.composer.approval.processGoneHint)).toBeVisible();
+  await expect
+    .element(screen.getByRole("button", { name: t.composer.approval.approve, exact: true }))
+    .toBeDisabled();
+  await screen.rerender(ui());
+  let finishResponse!: () => void;
+  const pending = new Promise<{ _tag: "Success"; value: object }>((resolve) => {
+    finishResponse = () => resolve({ _tag: "Success", value: {} });
+  });
+  approvalCommands.respond.mockReturnValueOnce(pending);
+  await userEvent.click(
+    screen.getByRole("button", { name: t.composer.approval.approve, exact: true }),
+  );
+  await expect
+    .element(screen.getByRole("button", { name: t.composer.approval.approve, exact: true }))
+    .toBeDisabled();
+  expect(approvalCommands.respond).toHaveBeenLastCalledWith({
+    environmentId: threadRef.environmentId,
+    input: { threadId: threadRef.threadId, requestId: commandRequest, decision: "accept" },
+  });
+  await act(finishResponse);
+  await expect
+    .element(screen.getByRole("button", { name: t.composer.approval.approve, exact: true }))
+    .toBeEnabled();
+  const commandResolved = {
+    ...projection,
+    runtimeRequests: [
+      {
+        ...projection.runtimeRequests[0]!,
+        status: "resolved" as const,
+        resolvedAt: projection.updatedAt,
+      },
+      projection.runtimeRequests[1]!,
+    ],
+  };
+  await screen.rerender(ui(commandResolved));
+  await expect
+    .element(screen.getByRole("group", { name: t.composer.approval.commandTitle }))
+    .not.toBeInTheDocument();
+  await expect.element(screen.getByText("Safari", { exact: true })).toBeVisible();
+  await userEvent.click(screen.getByRole("button", { name: t.composer.approval.moreOptions }));
+  await userEvent.click(page.getByRole("menuitem", { name: "Always allow Safari" }));
+  expect(approvalCommands.respond).toHaveBeenLastCalledWith({
+    environmentId: threadRef.environmentId,
+    input: { threadId: threadRef.threadId, requestId: appRequest, decision: "acceptAlways" },
+  });
+  await userEvent.click(screen.getByRole("button", { name: "Allow once", exact: true }));
+  expect(approvalCommands.respond).toHaveBeenLastCalledWith({
+    environmentId: threadRef.environmentId,
+    input: { threadId: threadRef.threadId, requestId: appRequest, decision: "accept" },
+  });
+  await userEvent.click(screen.getByRole("button", { name: "Deny", exact: true }));
+  expect(approvalCommands.respond).toHaveBeenLastCalledWith({
+    environmentId: threadRef.environmentId,
+    input: { threadId: threadRef.threadId, requestId: appRequest, decision: "decline" },
+  });
+  await screen.rerender(
+    ui({
+      ...projection,
+      runtimeRequests: projection.runtimeRequests.map((request) => ({
+        ...request,
+        status: "resolved",
+        resolvedAt: projection.updatedAt,
+      })),
+    }),
+  );
+  await expect.element(screen.getByText("Composer ready")).toBeVisible();
+  await expect
+    .element(screen.getByRole("button", { name: "Allow once", exact: true }))
+    .not.toBeInTheDocument();
+  await screen.rerender(ui());
+  await expect
+    .element(screen.getByRole("button", { name: t.composer.approval.approve, exact: true }))
+    .toBeEnabled();
 });

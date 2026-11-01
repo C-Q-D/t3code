@@ -179,6 +179,15 @@ describe("ServerUpdateAction", () => {
     await click(screen, "Update");
     expect(testState.updateServer).not.toHaveBeenCalled();
   });
+
+  it("disables a standalone server update that crosses Stable and Nightly", async () => {
+    using _state = setup();
+    testState.serverVersions.set("env-test", "0.0.30-nightly.20261001.1");
+    await using screen = await renderAction();
+    expect(button(screen, "Update")!.disabled).toBe(true);
+    await click(screen, "Update");
+    expect(testState.updateServer).not.toHaveBeenCalled();
+  });
 });
 
 describe("ServerUpdatesAction", () => {
@@ -236,5 +245,21 @@ describe("ServerUpdatesAction", () => {
     expect(testState.toast).toHaveBeenCalledWith(
       expect.objectContaining({ type: "success", title: "Office updated" }),
     );
+  });
+
+  it("lets a desktop-managed server follow its own feed across Stable and Nightly", async () => {
+    using _state = setup();
+    testState.serverVersions.set("batch-a", "0.0.30-nightly.20261001.1");
+    testState.updateServer.mockResolvedValue(success());
+    await using screen = await mount([
+      { ...targets[0]!, selfUpdate: "desktop-managed", desktopAppUpdate: true },
+      targets[1]!,
+    ]);
+    await click(screen, "Update all");
+    expect(testState.updateServer).toHaveBeenCalledTimes(2);
+    expect(testState.updateServer).toHaveBeenCalledWith({
+      environmentId: "batch-a",
+      input: { targetVersion: "0.0.31" },
+    });
   });
 });
