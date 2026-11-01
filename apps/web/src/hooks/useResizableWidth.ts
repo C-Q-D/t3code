@@ -95,14 +95,10 @@ export function useResizableWidth(options: UseResizableWidthOptions): {
     return {
       width: startWidth,
       edge,
-      bounds: {
-        get min() {
-          return latestOptions.current.minWidth;
-        },
-        get max() {
-          return latestOptions.current.maxWidth;
-        },
-      },
+      bounds: createResizePhysics(
+        () => latestOptions.current.minWidth,
+        () => latestOptions.current.maxWidth,
+      ),
       physics: createResizePhysics(
         () => latestOptions.current.minWidth,
         () => latestOptions.current.maxWidth,

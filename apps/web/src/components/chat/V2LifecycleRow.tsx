@@ -58,7 +58,7 @@ import {
   type ProviderInstanceEntry,
 } from "../../providerInstances";
 import { formatShortTimestamp } from "../../timestampFormat";
-import { getTriggerDisplayModelName } from "./providerIconUtils";
+import { getDisplayModelName } from "./providerIconUtils";
 import { ProviderInstanceIcon, providerTextColor } from "./ProviderInstanceIcon";
 import { cn } from "~/lib/utils";
 import { TimelineSystemDivider } from "./TimelineSystemDivider";
@@ -645,7 +645,7 @@ function HandoffEndpoint(props: {
       : entry?.models.find((candidate) => candidate.slug === model);
   const label =
     providerModel !== undefined
-      ? getTriggerDisplayModelName(providerModel, entry?.driverKind)
+      ? getDisplayModelName(providerModel)
       : model !== undefined && model.length > 0
         ? model
         : (entry?.displayName ?? props.instanceId);

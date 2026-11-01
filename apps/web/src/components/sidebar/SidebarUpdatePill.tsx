@@ -48,7 +48,7 @@ type SidebarUpdatePopoverChangeDetails = Parameters<
 >[1];
 type SidebarUpdatePopoverHandle = ReturnType<typeof PopoverCreateHandle>;
 
-/** Show previews only when update details include nonempty nightly release notes. */
+/** Show previews when update details include nonempty release notes on either channel. */
 export function shouldUseSidebarUpdateReleaseNotesPopover(
   showUpdateDetails: boolean,
   state: DesktopUpdateState | null,

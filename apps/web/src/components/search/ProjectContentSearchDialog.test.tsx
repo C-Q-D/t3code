@@ -102,7 +102,12 @@ it("enables search after access resolves and opens a result in its own environme
   await act(() => renderer!.update(<ProjectContentSearchDialog onOpenChange={onOpenChange} />));
   expect(root.findByType("section").props.inputProps.disabled).toBe(false);
   await act(() => root.findByType("section").props.onValueChange("match"));
-  await act(() => root.findByProps({ "data-content-search-result": 0 }).props.onClick());
+  await act(() =>
+    root
+      .findAllByType("button")
+      .find((button) => button.props.onMouseEnter)!
+      .props.onClick(),
+  );
 
   expect(state.readScope).toHaveBeenCalledWith(target.environmentId, AuthFilesystemReadScope);
   expect(state.openFile).toHaveBeenCalledWith(target.threadRef, "src/index.ts", 3);
@@ -114,7 +119,8 @@ it.each(["pointer", "keyboard"])(
   async (action) => {
     const root = await openSearch();
     await act(() => root.findByType("section").props.onValueChange("match"));
-    const openResult = root.findByProps({ "data-content-search-result": 0 }).props.onClick;
+    const openResult = root.findAllByType("button").find((button) => button.props.onMouseEnter)!
+      .props.onClick;
     const onKeyDown = root.findByType("section").props.inputProps.onKeyDown;
 
     state.readScope.mockReturnValue(false);

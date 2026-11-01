@@ -90,6 +90,7 @@ vi.mock("../../state/entities", async () => {
   return {
     useProjects: () => useAtomValue(state.projects!),
     readProjects: () => state.registry!.get(state.projects!),
+    waitForProject: () => Promise.resolve(),
   };
 });
 vi.mock("../../state/projects", () => ({ projectEnvironment: { create: "createProject" } }));

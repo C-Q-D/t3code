@@ -1,6 +1,7 @@
 /** Owns pull request detail logic on the web pull-request surface; host data and agent context remain unchanged. */
 import { t } from "~/i18n";
 import {
+  capitalizeTerm,
   sourceControlClients,
   type ChangeRequestTerminology,
 } from "@t3tools/client-runtime/source-control-clients";
@@ -741,12 +742,14 @@ export function buildPullRequestTimeline(
   > &
     Partial<Pick<PullRequestDetailView, "reviewThreads">>,
 ): ReadonlyArray<PullRequestTimelineEvent> {
+  const term = sourceControlClients.get(detail.provider).changeRequest.singular;
   return [
     {
       id: "created",
       at: detail.createdAt,
       kind: "opened" as const,
-      title: t.git.pullRequest.openedThisPullRequest,
+      title:
+        term === "pull request" ? t.git.pullRequest.openedThisPullRequest : `opened this ${term}`,
       body: null,
       markdown: false,
       url: null,
@@ -796,7 +799,10 @@ export function buildPullRequestTimeline(
             id: "merged",
             at: detail.mergedAt,
             kind: "merged" as const,
-            title: t.git.pullRequest.pullRequestMerged,
+            title:
+              term === "pull request"
+                ? t.git.pullRequest.pullRequestMerged
+                : `${capitalizeTerm(term)} merged`,
             body: null,
             markdown: false,
             url: null,
@@ -816,7 +822,10 @@ export function buildPullRequestTimeline(
             id: "closed",
             at: detail.closedAt,
             kind: "closed" as const,
-            title: t.git.pullRequest.pullRequestClosed,
+            title:
+              term === "pull request"
+                ? t.git.pullRequest.pullRequestClosed
+                : `${capitalizeTerm(term)} closed`,
             body: null,
             markdown: false,
             url: null,

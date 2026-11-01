@@ -28,6 +28,7 @@ vi.mock("~/assets/assetUrls", () => ({
   useAssetUrlState: assetState,
   useAssetUrlRefresh: () => refresh,
 }));
+vi.mock("~/assets/longLivedAssetUrls", () => ({ useLongLivedAssetUrl: assetState }));
 vi.mock("../ui/toast", () => ({ toastManager: { add: showError } }));
 
 vi.mock("~/hooks/useHtmlRenderTheme", () => ({

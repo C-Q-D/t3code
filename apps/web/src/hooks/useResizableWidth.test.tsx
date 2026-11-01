@@ -14,6 +14,7 @@ vi.mock("../components/ui/tooltip", () => ({
   TooltipTrigger: ({ render }: { render: ReactNode }) => render,
   TooltipPopup: () => null,
 }));
+vi.mock("../lib/accessibilityAnnouncements", () => ({ announceSidebarVisibility: () => {} }));
 vi.mock("./useMediaQuery", () => ({ useMediaQuery: () => false }));
 
 import { RESIZABLE_WIDTH_PROPERTY, useResizableWidth } from "./useResizableWidth";

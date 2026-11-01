@@ -173,9 +173,9 @@ it("requires a new merge click after passing checks become pending and pass agai
 it.each<[PullRequestCheck["status"], PullRequestCheck["status"], string]>([
   ["success", "skipped", ""],
   ["failure", "cancelled", ""],
-  ["success", "action-required", "1/2"],
-  ["success", "pending", "1/2"],
-  ["failure", "pending", "1/2"],
+  ["success", "action-required", "1/2 checks"],
+  ["success", "pending", "1/2 checks"],
+  ["failure", "pending", "1/2 checks"],
 ])(
   "shows completed check counts while checks are incomplete (%s, %s)",
   (status, extraStatus, count) => {
@@ -199,6 +199,6 @@ it.each<[PullRequestCheck["status"], PullRequestCheck["status"], string]>([
     const text = renderer.root
       .findAllByType("span")
       .map((span) => span.children.filter((child) => typeof child === "string").join(""));
-    expect(text.filter((value) => /^\d+\/\d+$/.test(value))).toEqual(count ? [count] : []);
+    expect(text.filter((value) => /^\d+\/\d+ checks$/.test(value))).toEqual(count ? [count] : []);
   },
 );

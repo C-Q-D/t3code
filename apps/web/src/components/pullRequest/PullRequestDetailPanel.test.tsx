@@ -34,7 +34,11 @@ vi.mock("~/state/session", async (original) => ({
 }));
 vi.mock("@effect/atom-react", () => ({ useAtomValue: () => [] }));
 vi.mock("~/state/server", () => ({ primaryServerKeybindingsAtom: {} }));
-vi.mock("~/state/entities", () => ({ useProjects: () => [], useServerConfigs: () => new Map() }));
+vi.mock("~/state/entities", () => ({
+  useProjects: () => [],
+  useServerConfigs: () => new Map(),
+  waitForProject: vi.fn(),
+}));
 vi.mock("~/state/environments", () => ({
   useEnvironments: () => ({ environments: [] }),
   usePrimaryEnvironmentId: () => EnvironmentId.make("env-1"),
@@ -46,7 +50,7 @@ vi.mock("~/hooks/useSettings", () => ({
 }));
 vi.mock("~/hooks/useLiveRefresh", () => ({ useLiveRefresh: () => {} }));
 vi.mock("~/hooks/useHandleNewThread", () => ({ useNewThreadHandler: () => newThread }));
-vi.mock("~/lib/sourceControlActions", () => ({
+vi.mock("~/state/sourceControlActions", () => ({
   usePreparePullRequestThreadAction: () => ({ run: prepareThread, isAllowed: true, error: null }),
 }));
 vi.mock("~/state/use-atom-command", () => ({ useAtomCommand: () => runAction }));
@@ -54,6 +58,7 @@ vi.mock("~/state/pullRequests", async (importOriginal) => ({
   ...(await importOriginal<typeof import("~/state/pullRequests")>()),
   pullRequestEnvironment: {
     detail: () => "detail",
+    changeBreakdown: () => "change-breakdown",
     activity: () => "activity",
     // The header menu reads the stored guide to label "Write guide" or "Rewrite guide".
     reviewGuide: () => "review-guide",

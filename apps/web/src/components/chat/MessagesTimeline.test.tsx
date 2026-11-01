@@ -84,6 +84,8 @@ vi.mock("./MessagesTimeline.logic", async (importOriginal) => {
 });
 
 beforeEach(() => {
+  legendListTestState.list = null;
+  legendListTestState.scroll = null;
   activityTestState.subagentTooltips = false;
   activityTestState.expanded = false;
   activityTestState.expandedRuns = false;
@@ -91,13 +93,18 @@ beforeEach(() => {
 
 const legendListTestState = vi.hoisted(() => ({
   data: undefined as unknown,
+  list: null as LegendListRef | null,
+  scroll: null as (() => void) | null,
   onScroll: undefined as (() => void) | undefined,
 }));
 
 vi.mock("@legendapp/list/react", async () => {
   const legendListTestId = "legend-list";
 
-  const LegendList = (props: {
+  const LegendList = ({
+    ref: listHandleRef,
+    ...props
+  }: {
     data: Array<{ id: string }>;
     keyExtractor: (item: { id: string }) => string;
     renderItem: (args: { item: { id: string } }) => ReactNode;
@@ -134,8 +141,16 @@ vi.mock("@legendapp/list/react", async () => {
   }) => {
     useLayoutEffect(() => {
       legendListTestState.data = props.data;
-      legendListTestState.onScroll = props.onScroll;
-    }, [props.data, props.onScroll]);
+      legendListTestState.onScroll = () => {
+        props.onScroll?.();
+        legendListTestState.scroll?.();
+      };
+    }, [props]);
+    useLayoutEffect(() => {
+      if (legendListTestState.list && typeof listHandleRef === "function") {
+        return listHandleRef(legendListTestState.list);
+      }
+    }, [listHandleRef]);
     if (props.anchoredEndSpace) {
       props.anchoredEndSpace.onSizeChanged?.(240);
       props.anchoredEndSpace.onReady?.({ anchorIndex: props.anchoredEndSpace.anchorIndex });
@@ -200,7 +215,7 @@ vi.mock("@legendapp/list/react", async () => {
     );
   };
 
-  return { LegendList };
+  return { LegendList, useSyncLayout: () => () => {} };
 });
 
 function MockFileDiff(props: {
@@ -711,16 +726,23 @@ describe("MessagesTimeline", () => {
           callbacks.forEach((callback) => callback(0));
         }),
     };
+    const events = new EventTarget();
+    legendListTestState.scroll = () => events.dispatchEvent(new Event("scroll"));
     const viewport = {
       get scrollTop() {
         return timeline.scrollTop;
       },
       getBoundingClientRect: () => ({ top: 0 }),
+      scrollHeight: 2000,
+      clientHeight: 600,
+      addEventListener: events.addEventListener.bind(events),
+      removeEventListener: events.removeEventListener.bind(events),
     };
     props.listRef.current = {
       getScrollableNode: () => viewport,
       getState: () => ({
         data: legendListTestState.data,
+        listen: () => () => {},
         scroll: timeline.scrollTop,
         scrollLength: 600,
         contentLength: 2000,
@@ -730,6 +752,7 @@ describe("MessagesTimeline", () => {
         elementAtIndex: () => ({ getBoundingClientRect: () => ({ top: -timeline.scrollTop }) }),
       }),
     } as unknown as LegendListRef;
+    legendListTestState.list = props.listRef.current;
     return timeline;
   }
 

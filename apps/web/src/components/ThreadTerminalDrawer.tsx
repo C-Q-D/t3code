@@ -191,12 +191,10 @@ export function useTerminalDrawerResize({
     return {
       width: startHeight,
       edge: "top",
-      bounds: {
-        min: MIN_DRAWER_HEIGHT,
-        get max() {
-          return current.current.maxDrawerHeight;
-        },
-      },
+      bounds: createResizePhysics(
+        () => MIN_DRAWER_HEIGHT,
+        () => current.current.maxDrawerHeight,
+      ),
       physics: createResizePhysics(
         () => MIN_DRAWER_HEIGHT,
         () => current.current.maxDrawerHeight,
