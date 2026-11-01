@@ -173,7 +173,6 @@ describe("AddProviderInstanceDialog environment routing", () => {
   it("includes the explicitly added default accent color when creating a provider", async () => {
     setup();
     await using _screen = await render(dialog());
-    await click("Show more");
     await click("Use Kilo Code");
     await act(async () =>
       document
@@ -215,7 +214,6 @@ describe("AddProviderInstanceDialog environment routing", () => {
     const mutation = deferred<{ readonly _tag: "Success"; readonly value: unknown }>();
     settingsHooks.mutate.mockReturnValueOnce(mutation.promise);
     await using _screen = await render(dialog());
-    await click("Show more");
     await click("Use Kilo Code");
 
     expect(document.body.textContent).toContain("v4.2.0 · binary");
@@ -247,7 +245,6 @@ describe("AddProviderInstanceDialog environment routing", () => {
   it("creates a local command in the selected environment without a sign-in step", async () => {
     setup();
     await using _screen = await render(dialog());
-    await click("Show more");
     await click("Use local command");
     await click("Next");
     expect(document.body.textContent).toContain("Executable is required.");

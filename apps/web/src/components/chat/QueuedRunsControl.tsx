@@ -1,6 +1,7 @@
 import { resolveUserMessagePresentation } from "@t3tools/client-runtime/user-message";
 import { Link } from "@tanstack/react-router";
 import * as DateTime from "effect/DateTime";
+import { FoldedMessageHeader, useScheduledTaskTitle } from "./TimelineUserMessageRow";
 import { TimelineRowTimestamp } from "./TimelineRowParts";
 import { InlineButton } from "../ui/button";
 import type { TimestampFormat } from "@t3tools/contracts/settings";
@@ -21,6 +22,8 @@ import type {
   ThreadId,
 } from "@t3tools/contracts";
 import {
+  CalendarClockIcon,
+  MessagesSquareIcon,
   Clock3Icon,
   CheckIcon,
   ChevronDownIcon,
@@ -35,7 +38,7 @@ import { useContext, useId, useImperativeHandle, useRef, useState, type Ref } fr
 import { useCountPop } from "../../hooks/useCountPop";
 import { useAssetUrls } from "../../assets/assetUrls";
 import { threadEnvironment } from "../../state/threads";
-import { useThreadProjection } from "../../state/entities";
+import { useQuietThreadShell, useThreadProjection } from "../../state/entities";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { isImageAttachment, type ChatMessage } from "../../types";
 import { cn } from "~/lib/utils";
@@ -465,14 +468,11 @@ export function QueuedRunsControl({
                     ))}
                   </span>
                 ) : null}
-                <Tooltip>
-                  <TooltipTrigger render={<span className="min-w-0 flex-1 truncate" />}>
-                    {previewText}
-                  </TooltipTrigger>
-                  <TooltipPopup side="top" className="max-w-96 break-words">
-                    {previewText}
-                  </TooltipPopup>
-                </Tooltip>
+                <QueuedRunPreview
+                  environmentId={props.environmentId}
+                  message={item.message}
+                  previewText={previewText}
+                />
               </div>
               <div className="flex shrink-0 items-center">
                 {presentation?.attribution === "t3code" ? (
@@ -644,6 +644,60 @@ export function QueuedRunsControl({
           );
         })}
       </ol>
+    </div>
+  );
+}
+
+/** Keeps automation and agent attribution readable without expanding the local queue controls.
+ * The caller supplies the queued message, or undefined for an optimistic user draft. */
+function QueuedRunPreview({
+  environmentId,
+  message,
+  previewText,
+}: {
+  environmentId: EnvironmentId;
+  message: ThreadQueueProjection["messages"][number] | undefined;
+  previewText: string;
+}) {
+  const presentation = message ? resolveUserMessagePresentation(message) : null;
+  const attribution = presentation?.attribution;
+  const taskTitle = useScheduledTaskTitle(environmentId, presentation?.scheduledTaskId);
+  const senderShell = useQuietThreadShell(
+    attribution === "agent" && message?.senderThreadId
+      ? { environmentId, threadId: message.senderThreadId }
+      : null,
+  );
+  const [expanded, setExpanded] = useState(false);
+  const fold = attribution === "automation" || attribution === "agent";
+  return (
+    <div className="min-w-0 flex-1">
+      {fold ? (
+        <FoldedMessageHeader
+          icon={attribution === "automation" ? CalendarClockIcon : MessagesSquareIcon}
+          label={attribution === "automation" ? "Automation" : senderShell?.title.trim() || "Agent"}
+          summary={
+            attribution === "automation"
+              ? (taskTitle ?? previewText.split(/\r?\n/, 1)[0] ?? "")
+              : (previewText.split(/\r?\n/).find((line) => line.trim()) ?? "")
+          }
+          expanded={expanded}
+          onToggle={() => setExpanded((value) => !value)}
+        />
+      ) : null}
+      {fold ? (
+        expanded ? (
+          <p className="max-h-96 overflow-auto whitespace-pre-wrap wrap-anywhere">{previewText}</p>
+        ) : null
+      ) : (
+        <Tooltip>
+          <TooltipTrigger render={<span className="block min-w-0 truncate" />}>
+            {previewText}
+          </TooltipTrigger>
+          <TooltipPopup side="top" className="max-w-96 break-words">
+            {previewText}
+          </TooltipPopup>
+        </Tooltip>
+      )}
     </div>
   );
 }

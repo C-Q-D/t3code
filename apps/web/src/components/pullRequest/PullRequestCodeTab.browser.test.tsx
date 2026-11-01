@@ -162,9 +162,10 @@ it("keeps the diff after a refresh that brings back the same page", async () => 
   await expect.element(screen.getByText("1 file", { exact: true })).toBeVisible();
 });
 
+/** Supplies a fixed viewport because test-only Tailwind dimensions are not generated. */
 function pagedContainer() {
   const container = document.createElement("div");
-  container.className = "flex h-[500px] w-[900px]";
+  container.style.cssText = "display: flex; height: 500px; width: 900px;";
   return container;
 }
 

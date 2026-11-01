@@ -940,7 +940,7 @@ describe("MessagesTimeline attachments", () => {
           },
           "audio",
         ),
-        ...Array.from({ length: 40 }, (_, index) =>
+        ...Array.from({ length: 80 }, (_, index) =>
           message("Conversation history. ".repeat(40), { role: "user" }, `history-${index}`),
         ),
       ],

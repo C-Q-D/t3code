@@ -353,7 +353,7 @@ function AutomationMessageRow({ row }: { row: Extract<TimelineRow, { kind: "mess
 }
 
 /** Subscribes only for scheduled messages; unavailable or removed tasks leave the title undefined. */
-function useScheduledTaskTitle(
+export function useScheduledTaskTitle(
   environmentId: EnvironmentId,
   scheduledTaskId: ScheduledTaskId | undefined,
 ): string | undefined {
@@ -364,7 +364,7 @@ function useScheduledTaskTitle(
 }
 
 /** Keeps agent attribution visible while its message body is folded. */
-function FoldedMessageHeader(props: {
+export function FoldedMessageHeader(props: {
   icon: LucideIcon;
   label: string;
   summary: string;

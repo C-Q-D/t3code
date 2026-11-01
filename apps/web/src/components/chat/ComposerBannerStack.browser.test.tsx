@@ -109,7 +109,9 @@ it("shows the details button while text or nested text is cut, until it fits aga
   await screen.rerender(
     noticeRow(
       "40rem",
-      <span className="inline-block max-w-16 truncate align-bottom">A long nested name</span>,
+      <span className="inline-block truncate align-bottom" style={{ maxWidth: "4rem" }}>
+        A long nested name
+      </span>,
     ),
   );
   await expect.element(details).toBeInTheDocument();

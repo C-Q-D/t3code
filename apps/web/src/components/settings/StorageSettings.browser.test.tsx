@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { act, fakeTimers, render } from "../../../test/render";
 import { RegistryProvider } from "@effect/atom-react";
 import { DEFAULT_SERVER_SETTINGS, type StorageCleanupReport } from "@t3tools/contracts";
@@ -53,7 +54,7 @@ vi.mock(import("./SettingsScopeContext"), async (original) => ({
       scope: { kind: "all" },
       environments,
       connectedEnvironments: environments,
-      targets: state.targets,
+      targets: state.targets.map((target) => ({ ...target, sources: {} })),
       target: null,
     };
   }) as never,
@@ -90,7 +91,7 @@ vi.mock(import("../ui/toast"), async (original) => {
   return { ...actual, toastManager: { ...actual.toastManager, add: vi.fn() } };
 });
 
-import { StorageCleanupSections } from "./StorageSettings";
+import { StorageCleanupSections, StorageSettingsPanel } from "./StorageSettings";
 
 function setup() {
   state.settings = {
@@ -139,14 +140,19 @@ const panel = () => (
     <StorageCleanupSections />
   </RegistryProvider>
 );
+/** Uses the localized cleanup label while retaining the full delete confirmation flow. */
 const deleteButton = (container: HTMLElement) =>
   Array.from(container.querySelectorAll("button")).find(
-    (button) => button.textContent === "Delete now",
+    (button) => button.textContent === t.settings.merge.storageDeleteNow,
   )!;
 
 it("keeps cleanup disabled when settled retention and all other rules are off", async () => {
   setup();
-  await using screen = await render(panel());
+  await using screen = await render(
+    <RegistryProvider>
+      <StorageSettingsPanel />
+    </RegistryProvider>,
+  );
   const button = deleteButton(screen.container);
 
   expect(button.disabled).toBe(true);

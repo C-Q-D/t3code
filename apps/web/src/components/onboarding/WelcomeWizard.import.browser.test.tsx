@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { RegistryContext } from "@effect/atom-react";
 import {
   AuthOrchestrationOperateScope,
@@ -232,6 +233,7 @@ async function click(label: string) {
   await act(async () => target.click());
 }
 
+/** Mounts the routed import flow so completion can navigate after the final write. */
 async function mountImport(remote = false) {
   state.selectedEnvironment = remote ? "remote" : "primary";
   await using stack = new AsyncDisposableStack();
@@ -242,8 +244,8 @@ async function mountImport(remote = false) {
       </RegistryContext.Provider>,
     ),
   );
-  await click("Continue");
-  await click("Continue");
+  await click(t.account.onboarding.next);
+  await click(t.account.onboarding.next);
   expect(pageText()).toContain("Import your projects");
   stack.move();
   return screen;

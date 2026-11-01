@@ -124,7 +124,7 @@ it.each([false, true])(
     using captured = captureAnimations();
     const input = screen.getByRole("combobox");
     await input.click();
-    await userEvent.keyboard("{ArrowDown}");
+    await userEvent.keyboard("{Home}");
     await expect
       .element(screen.getByRole("option", { name: /Model 00/ }))
       .toHaveAttribute("data-highlighted");
@@ -167,7 +167,7 @@ it("preserves in-flight springs for unchanged or subpixel layout but snaps real 
   await using screen = await render(<Harness />);
   using captured = captureAnimations();
   await screen.getByRole("combobox").click();
-  await userEvent.keyboard("{ArrowDown}");
+  await userEvent.keyboard("{Home}");
   await vi.waitFor(() => expectAligned(screen.container));
   await userEvent.keyboard("{ArrowDown}");
   await vi.waitFor(() => expect(captured.animations).toHaveLength(2));
@@ -228,7 +228,7 @@ it("springs between keys but snaps scrolling, recycled rows and search changes",
   using captured = captureAnimations();
   const input = screen.getByRole("combobox");
   await input.click();
-  await userEvent.keyboard("{ArrowDown}");
+  await userEvent.keyboard("{Home}");
   await expect
     .element(screen.getByRole("option", { name: /Model 00/ }))
     .toHaveAttribute("data-highlighted");
@@ -301,7 +301,7 @@ it("springs between keys but snaps scrolling, recycled rows and search changes",
 /** Selects through the real keyboard path that keeps the multi-model picker open. */
 async function shiftSelectSecond(screen: Awaited<ReturnType<typeof render>>) {
   await screen.getByRole("combobox").click();
-  await userEvent.keyboard("{ArrowDown}{ArrowDown}{Shift>}{Enter}{/Shift}");
+  await userEvent.keyboard("{Home}{ArrowDown}{Shift>}{Enter}{/Shift}");
 }
 
 /** Isolates checkbox feedback from the independent shared highlight animations. */

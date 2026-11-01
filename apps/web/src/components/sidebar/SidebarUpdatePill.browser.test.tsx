@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import type { DesktopUpdateState } from "@t3tools/contracts";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { page, userEvent } from "vite-plus/test/browser";
@@ -81,7 +82,8 @@ function publish(update: DesktopUpdateState | null) {
   });
 }
 
-const releaseNotes = () => document.querySelector('[aria-label="Update release notes"]');
+const releaseNotes = () =>
+  document.querySelector(`[aria-label="${t.sidebar.updates.releaseNotesAriaLabel}"]`);
 
 describe("SidebarUpdatePill release notes", () => {
   it("closes when the release notes stop applying", async () => {

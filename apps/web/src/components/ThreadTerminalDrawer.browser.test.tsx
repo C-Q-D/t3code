@@ -37,6 +37,7 @@ vi.mock("../state/terminalSessions", async () => {
     ),
   );
   return {
+    useKnownTerminalSessions: () => [],
     attachedTerminalSessionAtom: (environmentId: EnvironmentId, terminal: { threadId: ThreadId }) =>
       sessions(environmentId)(terminal.threadId),
   };
@@ -62,6 +63,7 @@ vi.mock("~/localApi", () => ({ readLocalApi: () => null }));
 vi.mock("../hooks/useSettings", async () => {
   const { DEFAULT_CLIENT_SETTINGS } = await import("@t3tools/contracts/settings");
   return {
+    getClientSettings: () => DEFAULT_CLIENT_SETTINGS,
     useClientSettings: <T,>(select: (settings: typeof DEFAULT_CLIENT_SETTINGS) => T) =>
       select(DEFAULT_CLIENT_SETTINGS),
   };

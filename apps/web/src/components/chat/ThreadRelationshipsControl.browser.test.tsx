@@ -11,7 +11,8 @@ vi.mock(import("@effect/atom-react"), async (original) => ({
   useAtomValue: (() => false) as never,
 }));
 
-vi.mock(import("../../state/entities"), () => ({
+vi.mock(import("../../state/entities"), async (original) => ({
+  ...(await original()),
   useQuietThreadShell: (() => null) as never,
   useThreadProjection: ((ref: unknown) =>
     ref === null ? null : { projection: state.projection }) as never,
@@ -20,6 +21,9 @@ vi.mock(import("../../state/entities"), () => ({
   useProjects: (() => []) as never,
 }));
 vi.mock(import("../../state/environments"), () => ({
+  useEnvironments: (() => ({ environments: [] })) as never,
+  usePrimaryEnvironment: () => null,
+  usePrimaryEnvironmentId: () => null,
   useEnvironment: (() => null) as never,
   useEnvironmentProviders: (() => new Map()) as never,
 }));

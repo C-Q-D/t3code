@@ -15,6 +15,9 @@ vi.mock(import("~/assets/assetUrls"), async (original) => ({
   useAssetUrlRefresh: () => refresh,
   useAssetUrlState: assetUrlState,
 }));
+vi.mock(import("~/assets/longLivedAssetUrls"), () => ({
+  useLongLivedAssetUrl: assetUrlState,
+}));
 // The real source view highlights through a worker pool; the text it receives is what matters here.
 // Never load the original: its highlighter graph can outlast waitFor on a cold CI browser.
 vi.mock(import("./ReadOnlySourcePreview"), () => ({
@@ -2475,7 +2478,7 @@ async function workspacePdfPreview() {
       expiresAt: Date.now() + 3_600_000,
     });
     return (
-      <div className="flex h-[600px] w-[320px]">
+      <div style={{ display: "flex", height: 600, width: 320 }}>
         <WorkspaceBrowserPreview
           environmentId={EnvironmentId.make("test")}
           threadRef={{ environmentId: EnvironmentId.make("test"), threadId: ThreadId.make("test") }}

@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { render } from "../../../test/render";
 import { DEFAULT_UNIFIED_SETTINGS } from "@t3tools/contracts/settings";
 import { StrictMode, type ReactNode } from "react";
@@ -59,8 +60,9 @@ vi.mock(import("./settingsLayout"), async (original) => ({
 
 import { SourceControlWritingSettingsSection } from "./SourceControlWritingSettings";
 
+/** Finds the reset action through its localized template label. */
 const resetButton = (label: string) =>
-  page.getByRole("button", { name: `Reset ${label} to default` });
+  page.getByRole("button", { name: t.common.resetLabelToDefault(label) });
 
 const content = () => (
   <StrictMode>
@@ -99,8 +101,7 @@ describe("mixed source control instructions", () => {
       customInstructions,
     }));
 
-    await userEvent.click(page.getByRole("button", { name: "Advanced" }));
-    await userEvent.click(resetButton("change request templates"));
+    await userEvent.click(resetButton(t.settings.sourceControlWriting.changeRequestTemplates));
 
     expect(state.updateSettings).toHaveBeenCalledTimes(1);
     expect(state.styles.map((style) => style.followChangeRequestTemplates)).toEqual([

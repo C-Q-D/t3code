@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import "~/index.css";
 import { EnvironmentId, ProjectId } from "@t3tools/contracts";
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
@@ -125,7 +126,7 @@ function setup() {
 it("saves maintainer edits, locks while saving, and restores the saved value when a save fails", async () => {
   const control = setup();
   await using screen = await render(control());
-  await screen.getByRole("button", { name: "More pull request actions" }).click();
+  await screen.getByRole("button", { name: t.git.pullRequest.morePullRequestActions }).click();
   const checkbox = page.getByRole("menuitemcheckbox", { name: "Allow edits from maintainers" });
   await expect.element(checkbox).toBeChecked();
   await checkbox.click();
@@ -162,7 +163,7 @@ it("saves maintainer edits, locks while saving, and restores the saved value whe
 it("keeps a saved choice through a stale refresh, then follows the host", async () => {
   const control = setup();
   await using screen = await render(control());
-  await screen.getByRole("button", { name: "More pull request actions" }).click();
+  await screen.getByRole("button", { name: t.git.pullRequest.morePullRequestActions }).click();
   const checkbox = page.getByRole("menuitemcheckbox", { name: "Allow edits from maintainers" });
   let settle!: (value: { _tag: "Success" }) => void;
   mocks.update.mockReturnValueOnce(
@@ -185,7 +186,7 @@ it("keeps a saved choice through a stale refresh, then follows the host", async 
 it("follows the host's first reading after a save, even when it matches the old value", async () => {
   const control = setup();
   await using screen = await render(control());
-  await screen.getByRole("button", { name: "More pull request actions" }).click();
+  await screen.getByRole("button", { name: t.git.pullRequest.morePullRequestActions }).click();
   const checkbox = page.getByRole("menuitemcheckbox", { name: "Allow edits from maintainers" });
   await checkbox.click();
   await expect.element(page.getByRole("status")).not.toBeInTheDocument();
@@ -213,7 +214,7 @@ it.each<[string, Detail]>([
 ])("hides maintainer edits on a pull request that is %s", async (_, detail) => {
   const control = setup();
   await using screen = await render(control(detail));
-  await screen.getByRole("button", { name: "More pull request actions" }).click();
+  await screen.getByRole("button", { name: t.git.pullRequest.morePullRequestActions }).click();
   await expect.element(page.getByRole("menuitem", { name: "Open on GitHub" })).toBeVisible();
   expect(document.querySelector('[role="menuitemcheckbox"]')).toBeNull();
 });

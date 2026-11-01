@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { RegistryContext } from "@effect/atom-react";
 import type {
   DeleteProjectInput,
@@ -136,6 +137,7 @@ import { useComposerDraftStore } from "../../composerDraftStore";
 import { appAtomRegistry } from "../../rpc/atomRegistry";
 import { buildSidebarProjectSnapshots } from "../../sidebarProjectGrouping";
 import { ProjectSettingsPanel } from "./ProjectSettingsPanel";
+import { SettingsScopeSentence } from "./SettingsScopeSentence";
 import { ProjectsSettings } from "./ProjectsSettings";
 import { SettingsScopeProvider } from "./SettingsScopeContext";
 import { validateSettingsScopeSearch, type SettingsScopeSearch } from "./settingsScope";
@@ -268,6 +270,7 @@ async function mountPanel(search: Omit<SettingsScopeSearch, "project"> = {}) {
   return { ...screen, router };
 }
 
+/** Includes the scope sentence owned by the local settings layout, outside ProjectsSettings. */
 async function mountSettings(search: SettingsScopeSearch) {
   const searchParams = new URLSearchParams(
     Object.entries(search).flatMap(([key, value]) => (value === undefined ? [] : [[key, value]])),
@@ -279,6 +282,7 @@ async function mountSettings(search: SettingsScopeSearch) {
         search={route.useSearch()}
         onChange={(next) => void router.navigate({ to: "/settings/projects", search: () => next })}
       >
+        <SettingsScopeSentence />
         <ProjectsSettings />
       </SettingsScopeProvider>
     ),
@@ -534,7 +538,10 @@ describe("project identity reset", () => {
 });
 
 describe("project settings scope", () => {
-  const environmentMenu = () => page.getByRole("button", { name: /^Environment scope:/ });
+  const environmentMenu = () =>
+    page.getByRole("button", {
+      name: new RegExp(`^${t.settings.scopeSentence.environmentAriaLabel}:`),
+    });
   const primaryOption = () => page.getByRole("menuitemradio", { name: /^primary/ });
   const remoteOption = () => page.getByRole("menuitemradio", { name: /^remote/ });
 
@@ -553,7 +560,9 @@ describe("project settings scope", () => {
     state.projects = state.projects.filter((project) => project.environmentId === primaryId);
     await using _screen = await mountSettings({ project: projectKey() });
 
-    await expect.element(page.getByRole("textbox", { name: "Project name" })).toBeVisible();
+    await expect
+      .element(page.getByRole("textbox", { name: t.settings.projectSettings.projectName }))
+      .toBeVisible();
     await userEvent.click(environmentMenu());
     await expect.element(primaryOption()).toBeVisible();
     await expect.element(remoteOption()).not.toBeInTheDocument();
@@ -576,41 +585,65 @@ describe("project settings scope", () => {
     );
   });
 
-  it.each([
-    [undefined, "This project has no checkout on this environment."],
-    [
-      "removed-checkout",
-      "This checkout is no longer available in the selected project and environment.",
-    ],
-  ])("recovers a stale environment link with checkout %s", async (checkout, message) => {
-    setup();
-    state.projects = state.projects.filter((project) => project.environmentId === primaryId);
-    const key = projectKey();
-    await using screen = await mountSettings({
-      project: key,
-      machine: remoteId,
-      ...(checkout ? { checkout } : {}),
-    });
+  it.each([undefined, "removed-checkout"])(
+    "recovers a stale environment link with checkout %s",
+    async (checkout) => {
+      setup();
+      state.projects = state.projects.filter((project) => project.environmentId === primaryId);
+      const key = projectKey();
+      await using screen = await mountSettings({
+        project: key,
+        machine: remoteId,
+        ...(checkout ? { checkout } : {}),
+      });
 
-    await expect.element(page.getByText(message, { exact: true })).toBeVisible();
-    await expect.element(page.getByRole("button", { name: /^Project scope:/ })).toBeVisible();
-    await expect
-      .element(page.getByRole("button", { name: "Environment scope: remote" }))
-      .toBeVisible();
-    await userEvent.click(page.getByRole("button", { name: "Show all environments" }));
+      const message = checkout
+        ? t.settings.settingsScope.checkoutLongerAvailableSelectedProjectHint
+        : t.settings.settingsScope.projectCheckoutEnvironmentHint;
+      await expect.element(page.getByText(message, { exact: true })).toBeVisible();
+      await expect
+        .element(
+          page.getByRole("button", {
+            name: new RegExp(`^${t.settings.scopeSentence.projectAriaLabel}:`),
+          }),
+        )
+        .toBeVisible();
+      await expect
+        .element(
+          page.getByRole("button", {
+            name: t.settings.scopeSentence.pickerAriaLabel(
+              t.settings.scopeSentence.environmentAriaLabel,
+              "remote",
+            ),
+          }),
+        )
+        .toBeVisible();
+      await userEvent.click(
+        page.getByRole("button", { name: t.settings.projectEnvironmentsUi.all }),
+      );
 
-    await expect
-      .element(page.getByRole("textbox", { name: "Project name" }))
-      .toHaveValue("Shared repo");
-    expect(screen.router.state.location.search).toEqual({ project: key });
-    await expect
-      .element(page.getByRole("button", { name: "Environment scope: All environments" }))
-      .toBeVisible();
-    await expect.element(page.getByText(message, { exact: true })).not.toBeInTheDocument();
-    await expect
-      .element(page.getByRole("button", { name: "Remove project", exact: true }))
-      .toBeEnabled();
-  });
+      await expect
+        .element(page.getByRole("textbox", { name: t.settings.projectSettings.projectName }))
+        .toHaveValue("Shared repo");
+      expect(screen.router.state.location.search).toEqual({ project: key });
+      await expect
+        .element(
+          page.getByRole("button", {
+            name: t.settings.scopeSentence.pickerAriaLabel(
+              t.settings.scopeSentence.environmentAriaLabel,
+              t.settings.scopeSentence.allEnvironments,
+            ),
+          }),
+        )
+        .toBeVisible();
+      await expect.element(page.getByText(message, { exact: true })).not.toBeInTheDocument();
+      await expect
+        .element(
+          page.getByRole("button", { name: t.settings.projectSettings.removeProject, exact: true }),
+        )
+        .toBeEnabled();
+    },
+  );
 });
 
 it("returns to the project overview after removal, clearing the selection but keeping the environment", async () => {
