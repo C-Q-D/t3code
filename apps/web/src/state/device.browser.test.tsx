@@ -29,6 +29,7 @@ vi.mock(import("./presentation"), async (original) => ({
   },
 }));
 vi.mock(import("../hooks/useSettings"), () => ({
+  useClientSettingsHydrated: () => true,
   getClientSettings: (() => ({ browserAutoShowFloatingPreview: true })) as never,
   useClientSettings: ((
     select: (settings: { browserAutoShowFloatingPreview: boolean }) => unknown,

@@ -1,4 +1,5 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
+import * as NodePath from "@effect/platform-node/NodePath";
 import { expect, it, vi } from "vite-plus/test";
 import { it as effectIt } from "@effect/vitest";
 import {
@@ -65,9 +66,13 @@ const normalize = (target: string) => {
   }
   return `/${parts.join("/")}`;
 };
-const layerWorktreeLocation = (worktreesDir = managedWorktreesDir) =>
+/** Keeps synthetic paths POSIX while real-filesystem recovery uses the host path service. */
+const layerWorktreeLocation = (
+  worktreesDir = managedWorktreesDir,
+  pathLayer: Layer.Layer<Path.Path> = Path.layer,
+) =>
   Layer.mergeAll(
-    Path.layer,
+    pathLayer,
     Layer.mock(ServerConfig.ServerConfig)({ worktreesDir } as ServerConfig.ServerConfig["Service"]),
     ServerSettings.layerTest(),
   );
@@ -265,6 +270,7 @@ it.each([
   expect(harness.createWorktree).toHaveBeenCalledTimes(input.recreated ? 1 : 0);
 });
 
+/** Isolates local commands and worktree recovery from real provider sessions. */
 function makeLocalCommandHarness(input: {
   readonly text: string;
   readonly worktreePath?: string;
@@ -893,7 +899,10 @@ function makeLocalCommandHarness(input: {
             }),
         }),
         IdAllocator.layer,
-        layerWorktreeLocation(input.worktreesDir),
+        layerWorktreeLocation(
+          input.worktreesDir,
+          input.fileSystem === undefined ? Path.layer : NodePath.layer,
+        ),
         input.fileSystem === undefined
           ? FileSystem.layerNoop({ exists: () => Effect.succeed(true) })
           : Layer.succeed(FileSystem.FileSystem, input.fileSystem),

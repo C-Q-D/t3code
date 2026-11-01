@@ -1,4 +1,5 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
+import { SpawnExecutableResolution } from "@t3tools/shared/shell";
 import { assert, describe, it } from "@effect/vitest";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
@@ -226,7 +227,11 @@ describe("PiProvider", () => {
       assert.equal(snapshot.auth.status, "authenticated");
       if (row.message === undefined) assert.isUndefined(snapshot.message);
       else assert.include(snapshot.message ?? "", row.message);
-    }).pipe(Effect.provide(NodeServices.layer)),
+    }).pipe(
+      Effect.provide(NodeServices.layer),
+      // A host-installed pi.CMD must not turn the fake process argv into a shell string.
+      Effect.provideService(SpawnExecutableResolution, () => undefined),
+    ),
   );
 
   // regression: #18498 a malformed model inventory must not restore stale Pi models

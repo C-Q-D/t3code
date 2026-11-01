@@ -4,6 +4,7 @@ import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Crypto from "effect/Crypto";
 import type * as Duration from "effect/Duration";
 import * as DateTime from "effect/DateTime";
+import * as TestClock from "effect/testing/TestClock";
 import * as Effect from "effect/Effect";
 import * as Hex from "effect/encoding/Hex";
 import * as FileSystem from "effect/FileSystem";
@@ -124,6 +125,8 @@ const makeHarness = Effect.fn("test.makePreviewBrowser")(function* (
 it.layer(NodeServices.layer)("PreviewBrowser", (it) => {
   it.effect.each(["0.8.0", "1.2.3"])("retains another version when installing %s", (current) =>
     Effect.gen(function* () {
+      // NTFS wraps pre-epoch mtimes, so stale staging needs a positive test-clock date.
+      yield* TestClock.setTime(Date.parse("2026-01-02T00:00:00Z"));
       const { browser, fs, path, installRoot, requests } = yield* makeHarness({ version: current });
       yield* fs.makeDirectory(path.join(installRoot, "0.9.0"), { recursive: true });
       yield* fs.makeDirectory(path.join(installRoot, "0.10.0"));

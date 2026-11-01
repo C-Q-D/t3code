@@ -5,6 +5,7 @@ import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
+import * as Path from "effect/Path";
 import { describe, expect, it } from "@effect/vitest";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Effect from "effect/Effect";
@@ -249,7 +250,9 @@ it.effect("counts memory.min as protection and names the first cgroup that grant
   write(5, "memory.low", "1610612736");
   return Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
+    // The mocked cgroup tree uses Linux paths even when NodeServices runs on Windows.
     const read = ServiceProtection.readProtection("/home/theo/.config/systemd/user").pipe(
+      Effect.provide(Path.layer),
       Effect.provideService(FileSystem.FileSystem, {
         ...fs,
         readFileString: (path, encoding) =>
