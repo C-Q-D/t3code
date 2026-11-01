@@ -12,7 +12,7 @@ import { WorkspacePageHeader } from "./WorkspacePageHeader";
 
 /** Offers project creation and, when an eligible environment exists, starting a scratch conversation. */
 export function NoProjectsHero() {
-  const contentArea = workspaceAreaProps("home", 1, "Home");
+  const contentArea = workspaceAreaProps("home", 1, t.common.workspaceAreas.home);
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const { scratchEnvironmentId, startScratchThread } = useScratchProject();
   const scratchTargetEnvironmentId = scratchEnvironmentId(primaryEnvironmentId);

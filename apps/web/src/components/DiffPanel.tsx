@@ -429,7 +429,7 @@ export default function DiffPanel({
     ? t.git.diffAdditions.toolCall
     : selectedRunId === null
       ? selectedCommitSha !== null
-        ? (selectedCommitSubject ?? "Commit")
+        ? (selectedCommitSubject ?? t.git.diffAdditions.commit)
         : selectedGitScope === "unstaged"
           ? t.git.diff.uncommitted
           : t.git.diff.changes
@@ -997,7 +997,7 @@ export default function DiffPanel({
               <TooltipTrigger
                 render={<span aria-hidden className="hidden @max-[20rem]/diff-refs:inline" />}
               >
-                vs
+                {t.git.diffAdditions.versus}
               </TooltipTrigger>
               <TooltipPopup side="top">
                 {`${selectedGitSource.headRef ?? "HEAD"} → ${selectedGitSource.baseRef}`}

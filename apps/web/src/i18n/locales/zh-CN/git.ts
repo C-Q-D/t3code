@@ -3,6 +3,8 @@ import type { Messages } from "../en";
 
 export const git: Messages["git"] = {
   diffAdditions: {
+    versus: "对比",
+    commit: "提交",
     toolCall: "工具调用",
     checkingAccess: "正在检查文件访问权限…",
     cannotRead: "此连接无法读取本地差异。",

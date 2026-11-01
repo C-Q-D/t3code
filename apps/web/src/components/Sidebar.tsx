@@ -3357,7 +3357,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                           className="mx-3 mt-2 inline-flex cursor-pointer rounded-keycap text-left text-secondary-copy-medium text-secondary-label outline-none hover:text-foreground focus-visible:inset-shadow-focus"
                         >
                           {olderSettledShelf.loading
-                            ? "Loading"
+                            ? t.common.loading
                             : olderSettledShelf.failed
                               ? t.sidebar.statusAdditions.olderThreads
                               : t.sidebar.sections.showMoreCount(

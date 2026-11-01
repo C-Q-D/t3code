@@ -328,7 +328,7 @@ export function DevicePanel(props: {
             >
               {loadError !== null ? (
                 <Button size="sm" variant="outline" onClick={refreshState}>
-                  Retry
+                  {t.tools.device.retry}
                 </Button>
               ) : null}
             </DeviceLoadingView>

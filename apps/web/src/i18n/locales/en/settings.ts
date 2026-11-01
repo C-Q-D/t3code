@@ -123,6 +123,7 @@ export const settings = {
     at: "at",
   },
   secretValue: {
+    secret: "Secret",
     label: "Value",
   },
   taskDestination: {
@@ -150,6 +151,7 @@ export const settings = {
     unarchiveFailed: "Failed to unarchive project",
   },
   fallbackModel: {
+    none: "None",
     title: "Fallback model",
     description: "Used for new threads when the default model's provider is out of usage.",
     reset: "fallback model",
@@ -1077,6 +1079,7 @@ export const settings = {
     searchProjects: "Search projects",
   },
   scopeNotice: {
+    archived: "Archived",
     projectChanges: (project: string) =>
       `You are changing settings for ${project}. Changes apply only to this project.`,
     environment: "Environment",

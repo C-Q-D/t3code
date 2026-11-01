@@ -1519,7 +1519,7 @@ export default function FilePreviewPanel({
                           ...(isDocument ? {} : { disposition: "attachment" as const }),
                         },
                 }}
-                origin="File"
+                origin={t.tools.files.file}
               />
             ) : relativePath && file.error && file.data === null ? (
               <div

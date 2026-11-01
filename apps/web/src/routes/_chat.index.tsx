@@ -95,7 +95,7 @@ function IndexDraftLanding() {
 
 /** Renders a failed draft-start state and invokes onRetry only when the user requests another attempt. */
 function DraftStartError({ onRetry }: { readonly onRetry: () => void }) {
-  const contentArea = workspaceAreaProps("home", 1, "Home");
+  const contentArea = workspaceAreaProps("home", 1, t.common.workspaceAreas.home);
   return (
     <SidebarInset
       {...contentArea}

@@ -24,6 +24,31 @@ function expectMatchingTree(english: unknown, translated: unknown): void {
 
 it("matches every namespace, nested key, and leaf type", () => {
   expectMatchingTree(en, messages);
+  for (const dictionary of [en, messages]) {
+    for (const label of [
+      dictionary.settings.general.mixed,
+      dictionary.settings.fallbackModel.none,
+      dictionary.chat.searchExcerpt.user,
+      dictionary.chat.searchExcerpt.agent,
+      dictionary.tools.files.file,
+      dictionary.tools.files.audio,
+      dictionary.tools.files.sending,
+      dictionary.tools.filePreview.searching,
+      dictionary.common.loading,
+      dictionary.common.workspaceAreas.conversation,
+      dictionary.common.workspaceAreas.home,
+      dictionary.settings.secretValue.secret,
+      dictionary.settings.scopeNotice.archived,
+      dictionary.git.diffAdditions.commit,
+      dictionary.git.diffAdditions.versus,
+      dictionary.chat.contextPermissions.title,
+      dictionary.tools.device.retry,
+      dictionary.chat.codeLanguage.assembly,
+    ]) {
+      expect(label).toEqual(expect.any(String));
+      expect(label.length).toBeGreaterThan(0);
+    }
+  }
   expect(en.chat.threadCount(1)).toBe("1 thread");
   expect(en.chat.threadCount(2)).toBe("2 threads");
   expect(messages.chat.threadCount(2)).toBe("2 个对话");

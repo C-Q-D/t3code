@@ -172,9 +172,9 @@ export function DefaultModelSetting({
             triggerClassName={SETTINGS_PICKER_TRIGGER_CLASSNAME}
             triggerAriaLabel={t.settings.fallbackModel.title}
             {...(mixedFallback
-              ? { triggerLabel: "Mixed" }
+              ? { triggerLabel: t.settings.general.mixed }
               : settings.fallbackModelSelection === null
-                ? { triggerLabel: "None" }
+                ? { triggerLabel: t.settings.fallbackModel.none }
                 : {})}
             getModelDisabledReason={modelDisabledReason}
             onInstanceModelChange={(instanceId, model) => {

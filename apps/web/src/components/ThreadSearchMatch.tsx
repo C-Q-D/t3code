@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import {
   findSearchTokenRanges,
   splitSearchText,
@@ -29,6 +30,7 @@ export function SearchMatchHintLine(props: { hint: SearchMatchHint }) {
   );
 }
 
+/** Keeps sender labels separate from searchable message text and highlight ranges. */
 export function ThreadSearchMatchExcerpt(props: {
   match: {
     readonly source: "user" | "assistant";
@@ -40,7 +42,7 @@ export function ThreadSearchMatchExcerpt(props: {
   return (
     <span className="truncate text-xs text-muted-foreground/85">
       <span className={isUser ? "text-info-foreground" : "text-success-foreground"}>
-        {isUser ? "You:" : "Agent:"}
+        {isUser ? t.chat.searchExcerpt.user : t.chat.searchExcerpt.agent}
       </span>{" "}
       <HighlightedSearchText
         text={props.match.snippet}

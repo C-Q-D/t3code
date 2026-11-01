@@ -755,7 +755,11 @@ export default function ChatView(props: ChatViewProps) {
   const onComposerRestingChangeStable = useStableCallback((resting: boolean) => {
     composerRestingRef.current = resting;
   });
-  const conversationArea = workspaceAreaProps("conversation", 1, "Conversation");
+  const conversationArea = workspaceAreaProps(
+    "conversation",
+    1,
+    t.common.workspaceAreas.conversation,
+  );
   const composerArea = workspaceAreaProps("composer", 2, t.chat.navigationCopy.messageInput);
   const [composerOverlayElement, setComposerOverlayElement] = useState<HTMLDivElement | null>(null);
   const [composerTimelineInset, setComposerTimelineInset] = useState(0);

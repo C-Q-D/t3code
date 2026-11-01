@@ -128,6 +128,7 @@ function PdfPage(props: {
   );
 }
 
+/** Restores the supplied view once; later reloads keep the user's current page and zoom. */
 export default function PdfViewer(props: {
   src: string;
   title: string;
@@ -390,7 +391,7 @@ export default function PdfViewer(props: {
           <>
             <span role="status">
               {finding
-                ? "Searching…"
+                ? t.tools.filePreview.searching
                 : (findError ?? `${matches.length ? match + 1 : 0}/${matches.length}`)}
             </span>
             <FileSurfaceAction

@@ -398,7 +398,9 @@ const userMessageContextPresentationRegistry = createContextPresentationRegistry
         const disabled =
           attachment.downloadable === false && (!isVideo || attachment.previewUrl === undefined);
         const size =
-          attachment.downloadable === false ? "Sending…" : formatAttachmentSize(record.sizeBytes);
+          attachment.downloadable === false
+            ? t.tools.files.sending
+            : formatAttachmentSize(record.sizeBytes);
         // D1's file well belongs to sent messages; the composer keeps its inline chip.
         if (useFileWell) {
           return (

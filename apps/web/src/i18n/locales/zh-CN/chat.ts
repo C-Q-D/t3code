@@ -2,6 +2,7 @@
 import type { Messages } from "../en";
 
 export const chat: Messages["chat"] = {
+  searchExcerpt: { user: "你：", agent: "Agent：" },
   sideTabStates: {
     approval: "需要批准",
     input: "需要输入",
@@ -87,6 +88,7 @@ export const chat: Messages["chat"] = {
     context: "上下文窗口",
   },
   contextPermissions: {
+    title: "权限",
     approvalTextOnly: "请移除附件和附加上下文后发送审批反馈。",
     label: (label: string) => `权限：${label}`,
   },
@@ -218,6 +220,7 @@ export const chat: Messages["chat"] = {
     threadUnavailable: "线程已不可用",
   },
   codeLanguage: {
+    assembly: "汇编",
     plainText: "纯文本",
     search: "搜索语言",
     empty: "没有匹配的语言。",

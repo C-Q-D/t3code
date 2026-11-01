@@ -207,7 +207,7 @@ function relationshipLabel(edge: ThreadRelationshipEdge, currentThreadId: Thread
   if (edge.kind === "transfer") return t.chat.relationships.contextTransfer;
   if (edge.kind === "subagent") {
     return edge.sourceThreadId === currentThreadId
-      ? t.chat.relationships.subagent
+      ? t.chat.timeline.subagent
       : t.chat.relationships.parentAgent;
   }
   return edge.sourceThreadId === currentThreadId
@@ -320,7 +320,7 @@ function RemoteSubagentRow(props: {
   const status = props.agent.status;
   const failed = status === "failed";
   const title = relationshipThreadTitle({
-    title: props.agent.title ?? "Subagent",
+    title: props.agent.title ?? t.chat.timeline.subagent,
     isSubagent: true,
   });
   return (

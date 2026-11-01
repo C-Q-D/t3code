@@ -11,6 +11,8 @@ export const common = {
     thread: "Thread",
     copyThread: "Copy thread",
   },
+  loading: "Loading",
+  workspaceAreas: { conversation: "Conversation", home: "Home" },
   productName: "T3 Code",
   windowControls: {
     minimize: "Minimize window",

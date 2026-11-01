@@ -3,6 +3,7 @@ import { englishWorkLogMessages } from "@t3tools/client-runtime/work-log/message
 import type { SourceControlProviderKind, WorktreeSubmodules } from "@t3tools/contracts";
 
 export const chat = {
+  searchExcerpt: { user: "You:", agent: "Agent:" },
   sideTabStates: {
     approval: "needs approval",
     input: "needs input",
@@ -89,6 +90,7 @@ export const chat = {
     context: "Context window",
   },
   contextPermissions: {
+    title: "Permissions",
     approvalTextOnly: "Send approval feedback without attachments or added context.",
     label: (label: string) => `Permissions: ${label}`,
   },
@@ -224,6 +226,7 @@ export const chat = {
     threadUnavailable: "Thread no longer available",
   },
   codeLanguage: {
+    assembly: "Assembly",
     plainText: "Plain text",
     search: "Search languages",
     empty: "No matching languages.",

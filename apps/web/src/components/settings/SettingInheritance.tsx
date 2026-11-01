@@ -54,6 +54,7 @@ const BACKGROUND_ACTIVITY_PROFILE_LABELS: Record<string, string> = {
   },
 };
 
+/** Inheritance summaries translate UI states while preserving user-authored model names and values. */
 function formatValue(key: keyof ServerSettings, value: unknown): string {
   if (value === null || value === undefined) {
     return key === "pullRequestMergeMethod"
@@ -99,7 +100,10 @@ function formatValue(key: keyof ServerSettings, value: unknown): string {
     }
     if ("model" in value && typeof value.model === "string") return value.model;
     if ("mode" in value && typeof value.mode === "string") {
-      if (key === "worktreeCleanup") return value.mode === "off" ? "Off" : "Custom";
+      if (key === "worktreeCleanup")
+        return value.mode === "off"
+          ? t.settings.connections.status.off
+          : t.settings.settingInheritance.custom;
       return key === "sourceControlWritingStyle"
         ? (WRITING_STYLE_LABELS[value.mode] ?? value.mode)
         : value.mode;

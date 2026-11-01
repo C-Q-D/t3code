@@ -542,7 +542,7 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
 /** Reads route panel ownership below the titlebar provider and lays out the shared shell. */
 function AppShell({ children }: { children: ReactNode }) {
   const { active: titlebarPanelActive } = useTitlebarPanelLayout();
-  const sidebarArea = workspaceAreaProps("sidebar", 0, "Threads");
+  const sidebarArea = workspaceAreaProps("sidebar", 0, t.sidebar.chrome.threads);
   const [sidebarRouteReveal] = useState<SidebarRouteReveal>(() => ({
     observedKey: null,
     pendingKey: null,

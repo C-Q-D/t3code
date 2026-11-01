@@ -126,6 +126,7 @@ export const tools: Messages["tools"] = {
       `第 ${page} / ${count} 张工作表 · ${rows} 行 · ${columns} 列`,
   },
   filePreview: {
+    searching: "正在搜索…",
     showMermaid: "显示 Mermaid 源码",
     showDiagram: "显示图表",
     preparing: "正在准备文件…",
@@ -1136,6 +1137,9 @@ export const tools: Messages["tools"] = {
     modelPriceLabel: (field, model) => `${model || "新模型"}的${field}价格`,
   },
   files: {
+    file: "文件",
+    audio: "音频",
+    sending: "正在发送…",
     previewMode: "预览方式",
     sourceTab: "源码",
     renderedTab: "渲染",

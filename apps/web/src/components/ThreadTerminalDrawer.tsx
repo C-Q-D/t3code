@@ -1419,7 +1419,7 @@ export default function ThreadTerminalDrawer({
     environmentId: threadRef.environmentId,
     threadId,
   });
-  const terminalArea = workspaceAreaProps("terminal", 5, "Terminal");
+  const terminalArea = workspaceAreaProps("terminal", 5, t.tools.terminal.terminal);
   const isPanel = mode === "panel";
   const [advancedTypography] = useLocalStorage(
     TYPOGRAPHY_ADVANCED_STORAGE_KEY,

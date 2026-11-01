@@ -6,7 +6,12 @@ export const CODE_BLOCK_LANGUAGES = [
       return t.chat.codeLanguage.plainText;
     },
   },
-  { id: "asm", label: "Assembly" },
+  {
+    id: "asm",
+    get label() {
+      return t.chat.codeLanguage.assembly;
+    },
+  },
   { id: "bash", label: "Bash" },
   { id: "c", label: "C" },
   { id: "cpp", label: "C++" },

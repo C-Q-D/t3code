@@ -123,6 +123,7 @@ export const tools = {
       `Sheet ${page} of ${count} · ${rows} rows · ${columns} columns`,
   },
   filePreview: {
+    searching: "Searching…",
     showMermaid: "Show Mermaid source",
     showDiagram: "Show rendered diagram",
     preparing: "Preparing file…",
@@ -1198,6 +1199,9 @@ export const tools = {
     videoFailed: "Unable to load video.",
     imageFailed: "Unable to load image.",
     noPreview: "No preview for this file",
+    file: "File",
+    audio: "Audio",
+    sending: "Sending…",
     attachment: "Attachment",
     disableWrap: "Disable word wrap",
     enableWrap: "Enable word wrap",

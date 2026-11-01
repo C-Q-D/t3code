@@ -2,6 +2,8 @@
 import type { Messages } from "../en";
 
 export const common: Messages["common"] = {
+  loading: "正在加载",
+  workspaceAreas: { conversation: "对话", home: "主页" },
   threadActionAdditions: {
     projectFailed: "无法将对话转为项目",
     find: "在对话中查找",

@@ -106,6 +106,7 @@ export const settings: Messages["settings"] = {
     at: "于",
   },
   secretValue: {
+    secret: "密钥",
     label: "值",
   },
   taskDestination: {
@@ -132,6 +133,7 @@ export const settings: Messages["settings"] = {
     unarchiveFailed: "无法取消归档项目",
   },
   fallbackModel: {
+    none: "无",
     title: "备用模型",
     description: "新对话的默认模型提供方额度用尽时，使用此模型。",
     reset: "备用模型",
@@ -1024,6 +1026,7 @@ export const settings: Messages["settings"] = {
     searchProjects: "搜索项目",
   },
   scopeNotice: {
+    archived: "已归档",
     projectChanges: (project: string) => `你正在修改 ${project} 的设置，改动只对这个项目生效。`,
     environment: "环境",
     openAllEnvironments: "打开全部环境",

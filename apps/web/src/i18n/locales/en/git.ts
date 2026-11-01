@@ -1,6 +1,8 @@
 /** English UI labels for PRs, Git operations, diffs, and branches; excludes persisted values and protocol strings. */
 export const git = {
   diffAdditions: {
+    versus: "vs",
+    commit: "Commit",
     toolCall: "Tool call",
     checkingAccess: "Checking file access...",
     cannotRead: "This connection cannot read local diffs.",
