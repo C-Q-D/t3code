@@ -106,6 +106,7 @@ function describeOffer(
   }
 }
 
+/** Escapes server diagnostics before embedding them in the recovery page; only fixed action URLs may navigate. */
 function buildStartupRecoveryHtml(input: {
   readonly messages: DesktopMessages["startup"];
   readonly appVersion: string;

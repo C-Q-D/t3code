@@ -65,6 +65,8 @@ import { ComposerSurface } from "./chat/ComposerSurface";
 import { useComposerMenuProps } from "./chat/composerEventScope";
 import { cn } from "~/lib/utils";
 import { observeResize } from "~/lib/observeResize";
+import { measureRestingComposerControls } from "./chat/restingComposerControlsMeasurement";
+import { resolveRestingComposerControlsNaturalWidth } from "./composerFooterLayout";
 
 export interface BranchToolbarHandle {
   openBranchPicker: () => void;
@@ -534,7 +536,16 @@ function useLabelsOverflow(): readonly [
       let groups = 0;
       for (const child of current.children) {
         if (!(child instanceof HTMLElement)) continue;
-        const width = contentWidth(child);
+        // Reserve hidden and squeezed controls so labels cannot reclaim their space and hide them again.
+        const hostedControls = child.matches('[data-chat-resting-composer-controls-host="true"]')
+          ? child.querySelector<HTMLElement>('[data-chat-composer-resting-controls="true"]')
+          : null;
+        const hostedMeasurement = hostedControls
+          ? measureRestingComposerControls(hostedControls)
+          : null;
+        const width = hostedMeasurement
+          ? resolveRestingComposerControlsNaturalWidth(hostedMeasurement)
+          : contentWidth(hostedControls ?? child);
         if (width <= 1) continue;
         groups += 1;
         needed += width;

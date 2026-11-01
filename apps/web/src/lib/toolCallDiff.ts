@@ -57,6 +57,7 @@ function recordedText(value: string | undefined) {
   return { text: truncated ? value.slice(0, -suffix.length) : value, truncated };
 }
 
+/** Falls back to recorded before/after content when no patch exists, preserving the truncation warning. */
 export function toolCallDiff(
   item: Pick<FileChange, "diffStr" | "fileName" | "changes" | "oldStr" | "newStr">,
 ) {

@@ -12,6 +12,7 @@ import { OFFICE_PREVIEW_MAX_BYTES, type OfficeWorkerResult } from "./officePrevi
 const WordDocument = lazy(() => import("./office/WordDocument"));
 const Spreadsheet = lazy(() => import("./office/Spreadsheet"));
 const Presentation = lazy(() => import("./office/Presentation"));
+/** Enforces the preview byte cap even without Content-Length; the caller owns cancellation and timeout. */
 async function readOfficeFile(src: string, signal: AbortSignal) {
   const response = await fetch(src, { signal });
   if (!response.ok) throw new Error(t.tools.filePreview.fileLoadFailed);

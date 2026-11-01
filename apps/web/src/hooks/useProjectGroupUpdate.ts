@@ -144,6 +144,7 @@ function checkProjectAccess(
     : null;
 }
 
+/** Surfaces command failures without toasting interruptions caused by navigation or cancellation. */
 export function reportProjectFailure(title: string, result: AtomCommandResult<unknown, unknown>) {
   if (result._tag !== "Failure" || isAtomCommandInterrupted(result)) return;
   const error = squashAtomCommandFailure(result);

@@ -240,6 +240,7 @@ export function dismissContextMenu(restoreFocus = true): void {
   activeContextMenuDismiss = null;
 }
 
+/** Replaces the active menu and resolves selection or null on dismissal, restoring the original focus on cleanup. */
 export function showContextMenuFallback<T extends string>(
   items: readonly ContextMenuItem<T>[],
   position?: { x: number; y: number },

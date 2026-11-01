@@ -46,6 +46,7 @@ function isHostedByThisApp(
 
 export type ReportLocalUpdateError = (title: string, description: string) => void;
 
+/** Plans ordinary updates against the local target version and tracks provider/server handoff before installation. */
 export function useUpdateEverything(localUpdateVersion: string | null) {
   const targetVersion = localUpdateVersion ?? APP_VERSION;
   const { environments } = useEnvironments();

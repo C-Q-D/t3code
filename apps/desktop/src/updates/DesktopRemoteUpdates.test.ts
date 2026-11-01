@@ -37,6 +37,7 @@ const request = (requestId: string): DesktopTelemetryRequestDesktopUpdate => ({
   requestId,
 });
 
+/** Scopes telemetry queues with the update harness so tests cannot leak listeners or pending control work. */
 function runRemoteUpdatesTest(
   harness: ReturnType<typeof makeHarness>,
   body: (context: {

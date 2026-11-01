@@ -80,6 +80,7 @@ function threadShowingBrowser(
   return surface?.kind === "preview" ? threadRef : null;
 }
 
+/** Serializes desktop links after connection selection is ready; disabling local hosting permits saved remote targets. */
 export function DesktopWebLinkCoordinator() {
   const router = useRouter();
   const primaryEnvironment = usePrimaryEnvironment();

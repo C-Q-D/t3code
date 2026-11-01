@@ -8,6 +8,7 @@ import { FileSurfaceLoading } from "./fileSurfaceChrome";
 
 const MAX_FONT_BYTES = 10 * 1024 * 1024;
 
+/** Bounds streamed font bytes before decoding; the caller owns cancellation and the request deadline. */
 async function readFont(src: string, signal: AbortSignal) {
   const response = await fetch(src, { signal });
   if (!response.ok) throw new Error(t.tools.filePreview.fontLoadFailed);

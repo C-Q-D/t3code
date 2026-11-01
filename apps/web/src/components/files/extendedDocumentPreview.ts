@@ -296,6 +296,7 @@ function repeat(value: string | undefined, max: number) {
     throw new Error("This spreadsheet contains invalid repeated cells.");
   return Math.min(count, max);
 }
+/** Bounds expanded sheet content before returning worker-safe preview data; malformed documents reject. */
 export async function openDocument(
   archive: JSZip,
   kind: "odt" | "ods" | "odp",
@@ -464,6 +465,7 @@ export function openNotebook(bytes: ArrayBuffer): OfficeWorkerResult {
   return { type: "notebook", language, cells };
 }
 
+/** Preserves byte-oriented RTF code pages while producing preview blocks; oversized or invalid RTF throws. */
 export function openRtf(bytes: ArrayBuffer): OfficeWorkerResult {
   if (bytes.byteLength > 8 * 1024 * 1024)
     throw new Error("Rich text preview limited to files under 8 MB.");

@@ -1601,6 +1601,7 @@ function ContextCompactionTimelineRow({
   );
 }
 
+/** Loads history anchors only for expanded work, retaining a retry action when any anchor fails. */
 function useDeferredWorkLoading(
   row: { expanded: boolean; deferredWorkItemIds?: ReadonlyArray<string> },
   onToggle: () => void,

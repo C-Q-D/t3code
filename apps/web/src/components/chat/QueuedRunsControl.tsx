@@ -678,7 +678,7 @@ function QueuedRunPreview({
           icon={attribution === "automation" ? CalendarClockIcon : MessagesSquareIcon}
           label={
             attribution === "automation"
-              ? t.chat.queuedActions.automation
+              ? t.chat.queuedActions.senderAutomation
               : senderShell?.title.trim() || t.chat.queuedActions.agent
           }
           summary={

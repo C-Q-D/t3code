@@ -41,6 +41,7 @@ export function registerOpenFavoriteEditorCommand(): () => void {
   );
 }
 
+/** Shares the picker's preferred editor and remote routing so the shortcut opens the same workspace. */
 export function useOpenFavoriteEditorShortcut({
   enabled,
   environmentId,

@@ -161,6 +161,7 @@ export function providerInstanceEntriesFor(
   );
 }
 
+/** Keeps driver and custom-instance order stable while promoting each driver's default instance. */
 export function sortProviderInstanceEntries(
   entries: ReadonlyArray<ProviderInstanceEntry>,
 ): ReadonlyArray<ProviderInstanceEntry> {

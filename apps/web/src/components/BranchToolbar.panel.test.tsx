@@ -140,3 +140,65 @@ it.each([
     }
   },
 );
+
+it("compacts strip labels before squeezed resting controls lose their natural width", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  vi.stubGlobal("matchMedia", () => ({ matches: true }));
+  const originalFonts = Object.getOwnPropertyDescriptor(document, "fonts");
+  Object.defineProperty(document, "fonts", { configurable: true, value: new EventTarget() });
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  try {
+    await act(async () => {
+      root.render(
+        <BranchToolbar
+          environmentId={EnvironmentId.make("local")}
+          threadId={ThreadId.make("thread")}
+          projectId={ProjectId.make("project")}
+          worktreePath={null}
+          isServerThread
+          showGitControls={false}
+          envMode="local"
+          envLocked={false}
+          startFromOrigin={false}
+          onStartFromOriginChange={vi.fn()}
+          onEnvModeChange={vi.fn()}
+          trailing={
+            <div data-chat-resting-composer-controls-host="true">
+              <div data-chat-composer-resting-controls="true" className="max-w-full">
+                <button data-chat-provider-model-picker>
+                  <span data-chat-provider-model-picker-label="true">A wide model name</span>
+                </button>
+              </div>
+            </div>
+          }
+        />,
+      );
+    });
+    const strip = container.querySelector<HTMLElement>('[data-slot="composer-context-strip"]')!;
+    const controls = container.querySelector<HTMLElement>("[data-chat-composer-resting-controls]")!;
+    const picker = controls.querySelector<HTMLElement>("button")!;
+    const label = picker.querySelector<HTMLElement>("span")!;
+    let stripWidth = 200;
+    Object.defineProperty(strip, "clientWidth", { get: () => stripWidth });
+    Object.defineProperty(controls, "offsetWidth", { value: 100 });
+    Object.defineProperties(label, { clientWidth: { value: 60 }, scrollWidth: { value: 260 } });
+    picker.getBoundingClientRect = () => DOMRect.fromRect({ width: 100, height: 24 });
+    await act(async () => {
+      label.append(" changed");
+    });
+    expect(strip.hasAttribute("data-compact")).toBe(true);
+    stripWidth = 500;
+    await act(async () => {
+      label.append(" again");
+    });
+    expect(strip.hasAttribute("data-compact")).toBe(false);
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+    if (originalFonts) Object.defineProperty(document, "fonts", originalFonts);
+    else Reflect.deleteProperty(document, "fonts");
+    vi.unstubAllGlobals();
+  }
+});

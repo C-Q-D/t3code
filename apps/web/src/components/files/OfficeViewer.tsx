@@ -26,6 +26,7 @@ type Workbook = Extract<OfficeWorkerResult, { type: "ods" }>;
 
 const OpenXmlOfficeViewer = lazy(() => import("./OpenXmlOfficeViewer"));
 
+/** Enforces the preview byte cap even without Content-Length; the caller owns cancellation and timeout. */
 async function readOfficeFile(src: string, signal: AbortSignal) {
   const response = await fetch(src, { signal });
   if (!response.ok) throw new Error(t.tools.filePreview.fileLoadFailed);

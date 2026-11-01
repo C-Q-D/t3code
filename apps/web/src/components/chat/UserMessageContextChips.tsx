@@ -25,7 +25,6 @@ import {
 } from "../../lib/diffRendering";
 import { PREFERRED_HIGHLIGHTER } from "../../lib/syntaxHighlighting";
 import ChatMarkdown from "../ChatMarkdown";
-import { EnvironmentContextChip } from "../EnvironmentContextChip";
 import { ThreadContextChip } from "../ThreadContextChip";
 import { MessageCircleIcon, MousePointerClickIcon, PaintbrushIcon } from "lucide-react";
 import type { ComposerContextId, KnownComposerContextRecord } from "@t3tools/contracts";
@@ -323,7 +322,7 @@ const userMessageContextPresentationRegistry = createContextPresentationRegistry
   UserMessageContextRenderContext,
   ReactNode
 >({
-  requiredKinds: COMPOSER_CONTEXT_KINDS,
+  requiredKinds: COMPOSER_CONTEXT_KINDS.filter((kind) => kind !== "environment"),
   handlers: [
     {
       kind: "mention",
@@ -351,16 +350,6 @@ const userMessageContextPresentationRegistry = createContextPresentationRegistry
       render: (record, context) =>
         record.kind === "thread" ? (
           <ThreadContextChip record={record} copyMarkdown={context.copyMarkdown} />
-        ) : (
-          <UnavailableUserMessageContextChip {...context} />
-        ),
-    },
-    {
-      kind: "environment",
-      canRender: (record) => record.kind === "environment",
-      render: (record, context) =>
-        record.kind === "environment" ? (
-          <EnvironmentContextChip record={record} copyMarkdown={context.copyMarkdown} />
         ) : (
           <UnavailableUserMessageContextChip {...context} />
         ),
