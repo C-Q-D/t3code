@@ -2,7 +2,10 @@ import { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import { AsyncResult } from "effect/reactivity";
 import { type ReactElement, useState } from "react";
 import { createPortal } from "react-dom";
+import { Minimize2Icon } from "lucide-react";
+import { t } from "~/i18n";
 import { attachMcpAppFullscreenDismissal } from "./chat/mcpAppFullscreen";
+import { Button } from "./ui/button";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { page, userEvent } from "vite-plus/test/browser";
 
@@ -453,6 +456,7 @@ function McpFullscreenDismissalFixture() {
       {open ? (
         <div
           data-testid="mcp-fullscreen-probe"
+          tabIndex={-1}
           ref={(box) => {
             if (!box) return;
             const stop = attachMcpAppFullscreenDismissal(box, () => setOpen(false));
@@ -464,6 +468,14 @@ function McpFullscreenDismissalFixture() {
           }}
           style={{ position: "fixed", inset: "60px", margin: 0 }}
         >
+          <Button
+            aria-label={t.chat.mcpApp.exitFullscreen}
+            size="icon-sm"
+            variant="ghost"
+            onClick={() => setOpen(false)}
+          >
+            <Minimize2Icon className="size-4" />
+          </Button>
           <iframe
             title="MCP opaque app"
             sandbox="allow-scripts"
@@ -502,14 +514,22 @@ function McpFullscreenDismissalFixture() {
   );
 }
 
-it("keeps native MCP fullscreen after a caption click and closes on Escape from the embedded app", async () => {
+it("keeps MCP fullscreen on caption clicks and exits with parent Escape or the exit button", async () => {
   setup();
   await using screen = await render(<McpFullscreenDismissalFixture />);
   const box = screen.container.querySelector<HTMLElement>('[data-testid="mcp-fullscreen-probe"]')!;
   await userEvent.click(page.getByRole("button", { name: "Caption maximize probe" }));
   expect(box.matches(":popover-open")).toBe(true);
+  box.focus();
+  expect(document.activeElement).toBe(box);
+  await userEvent.keyboard("{Escape}");
+  await expect.element(screen.getByText("Fullscreen closed")).toBeVisible();
+
+  await screen.rerender(null);
+  await screen.rerender(<McpFullscreenDismissalFixture />);
   const frame = screen.container.querySelector("iframe")!;
   frame.focus();
-  await userEvent.keyboard("{Escape}");
+  expect(document.activeElement).toBe(frame);
+  await userEvent.click(screen.getByRole("button", { name: t.chat.mcpApp.exitFullscreen }));
   await expect.element(screen.getByText("Fullscreen closed")).toBeVisible();
 });

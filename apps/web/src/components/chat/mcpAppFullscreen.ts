@@ -20,7 +20,7 @@ export function attachMcpAppFullscreenDismissal(box: HTMLElement, dismiss: () =>
       dismiss();
     }
   };
-  // CloseWatcher receives Escape even while the opaque app iframe owns keyboard focus.
+  // Escape closes from parent-page focus; opaque iframe focus requires the fullscreen exit button.
   const watcher = typeof CloseWatcher === "undefined" ? null : new CloseWatcher();
   watcher?.addEventListener("close", dismiss);
   if (!watcher) document.addEventListener("keydown", onKeyDown);
