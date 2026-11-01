@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import type { EnvironmentId, SourceControlSignInPrompt } from "@t3tools/contracts";
 import {
   readHostCredentialSettings,
@@ -109,7 +110,7 @@ export function SourceControlAppSignInSettings({
   const wait = useAtomCommand(sourceControlEnvironment.waitForSignIn, { reportFailure: false });
   const cancel = useAtomCommand(sourceControlEnvironment.cancelSignIn, { reportFailure: false });
   const updateSettings = useAtomCommand(serverEnvironment.updateSettings, {
-    label: `sign out of ${appSignIn.appName}`,
+    label: t.settings.sourceControlSignIn.signOutApp(appSignIn.appName),
   });
   const { copyToClipboard, isCopied } = useCopyToClipboard({
     timeout: 1500,
@@ -160,26 +161,26 @@ export function SourceControlAppSignInSettings({
     subtitle =
       account !== null && !tokenOverrides ? (
         <span className="flex min-w-0 items-center gap-1">
-          Signed in as
+          {t.settings.sourceControlSignIn.signedInAs}
           <RedactedSensitiveText
             value={account}
-            ariaLabel="Signed-in GitHub account"
-            revealTooltip="Show account"
-            hideTooltip="Hide account"
+            ariaLabel={t.settings.sourceControlSignIn.account}
+            revealTooltip={t.settings.sourceControlSignIn.showAccount}
+            hideTooltip={t.settings.sourceControlSignIn.hideAccount}
           />
         </span>
       ) : tokenOverrides ? (
-        "Signed in, but the token saved below is used until you remove it."
+        t.settings.sourceControlSignIn.tokenOverride
       ) : (
-        "Signed in"
+        t.settings.sourceControlSignIn.signedIn
       );
     action = (
       <Button size="xs" variant="outline" disabled={!canSignIn} onClick={() => void signOut()}>
-        Sign out
+        {t.settings.sourceControlSignIn.signOut}
       </Button>
     );
   } else if (waiting !== null) {
-    subtitle = "Approve the app on GitHub to finish signing in.";
+    subtitle = t.settings.sourceControlSignIn.approve;
     action = (
       <Button
         size="xs"
@@ -189,11 +190,11 @@ export function SourceControlAppSignInSettings({
           void cancel({ environmentId, input: { provider: definition.kind, host } });
         }}
       >
-        Cancel
+        {t.settings.sourceControlSignIn.cancel}
       </Button>
     );
   } else {
-    subtitle = "A far higher GitHub API rate limit than a personal token or gh login.";
+    subtitle = t.settings.sourceControlSignIn.rateLimit;
     action = (
       <Button
         size="xs"
@@ -201,7 +202,9 @@ export function SourceControlAppSignInSettings({
         onClick={() => void signIn()}
       >
         {state.status === "starting" ? <Spinner /> : null}
-        {state.status === "failed" ? "Try again" : "Sign in with GitHub"}
+        {state.status === "failed"
+          ? t.settings.sourceControlSignIn.retry
+          : t.settings.sourceControlSignIn.signIn}
       </Button>
     );
   }
@@ -229,7 +232,7 @@ export function SourceControlAppSignInSettings({
             <Button
               size="icon-xs"
               variant="ghost"
-              aria-label="Copy code"
+              aria-label={t.settings.sourceControlSignIn.copyCode}
               onClick={() => copyToClipboard(waiting.userCode, undefined)}
             >
               <MorphIcon className="size-3.5" icon={isCopied ? Check : Copy} />
@@ -243,12 +246,12 @@ export function SourceControlAppSignInSettings({
               }
               onClick={() => copyToClipboard(waiting.userCode, undefined)}
             >
-              Copy code & open GitHub
+              {t.settings.sourceControlSignIn.copyAndOpen}
               <ExternalLinkIcon aria-hidden className="size-3.5" />
             </Button>
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <span aria-hidden className="size-1.5 rounded-full bg-warning" />
-              Waiting for approval · code expires at {expiryTime(waiting.expiresAt)}
+              {t.settings.sourceControlSignIn.waiting(expiryTime(waiting.expiresAt))}
             </p>
           </div>
         </div>
@@ -256,11 +259,13 @@ export function SourceControlAppSignInSettings({
 
       {signedIn ? (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-          <span className="min-w-0 flex-1">
-            Reaches repositories in accounts and organizations that installed the app.
-          </span>
-          <ExternalLink href={appSignIn.installUrl}>Install on an organization</ExternalLink>
-          <ExternalLink href={appSignIn.revokeUrl}>Manage on GitHub</ExternalLink>
+          <span className="min-w-0 flex-1">{t.settings.sourceControlSignIn.access}</span>
+          <ExternalLink href={appSignIn.installUrl}>
+            {t.settings.sourceControlSignIn.install}
+          </ExternalLink>
+          <ExternalLink href={appSignIn.revokeUrl}>
+            {t.settings.sourceControlSignIn.manage}
+          </ExternalLink>
         </div>
       ) : null}
 

@@ -1356,17 +1356,15 @@ function ScheduledTaskDestination({
   );
   const thread = shell ?? family.data?.threads.find((row) => row.id === threadId);
   return (
-    <Field label="Destination">
+    <Field label={t.settings.taskDestination.title}>
       {ref === null ? (
-        <p className="text-sm text-muted-foreground">
-          Each run starts a new thread with the workspace and model below.
-        </p>
+        <p className="text-sm text-muted-foreground">{t.settings.taskDestination.newThread}</p>
       ) : (
         <div className="space-y-1 text-sm">
-          <p className="wrap-anywhere">{thread?.title.trim() || `Thread ${ref.threadId}`}</p>
-          <p className="text-muted-foreground">
-            Each run continues this conversation, in its workspace and with its current model.
+          <p className="wrap-anywhere">
+            {thread?.title.trim() || t.settings.taskDestination.thread(ref.threadId)}
           </p>
+          <p className="text-muted-foreground">{t.settings.taskDestination.existingThread}</p>
         </div>
       )}
     </Field>

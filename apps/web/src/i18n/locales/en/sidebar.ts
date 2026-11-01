@@ -1,5 +1,41 @@
 /** English messages for sidebar controls, thread lists, and notices. */
 export const sidebar = {
+  snoozeLabels: {
+    morning: "This morning",
+    afternoon: "This afternoon",
+    evening: "This evening",
+    tomorrow: "Tomorrow",
+    nextWeek: "Next week",
+    Monday: "Monday",
+    Tuesday: "Tuesday",
+    Wednesday: "Wednesday",
+    Thursday: "Thursday",
+    Friday: "Friday",
+    Saturday: "Saturday",
+    Sunday: "Sunday",
+    next: (day: string) => `Next ${day}`,
+    duration: (count: number, unit: "minute" | "hour" | "day") =>
+      `In ${count} ${unit}${count === 1 ? "" : "s"}`,
+  },
+  updateTable: {
+    machine: "Machine",
+    providers: "Providers",
+    skipped: "Skipped",
+    server: "Server",
+    restartsLast: "restarts last",
+  },
+  projectConversion: {
+    created: "Project created",
+    failed: "Could not turn thread into a project",
+    error: "An error occurred.",
+  },
+  snoozeErrors: {
+    failed: "Could not snooze thread",
+    passed: "That snooze time has passed. Choose another time.",
+  },
+  statusAdditions: {
+    guest: "Guest Request",
+  },
   actions: {
     archive: "Archive",
     confirm: "Confirm",

@@ -34,8 +34,8 @@ export function resolveSnoozePresets(
   );
 }
 
-/** Translates known default ID/label pairs; custom and more precise calendar labels remain authoritative. */
-function localizeSnoozePreset(preset: SnoozePreset): SnoozePreset {
+/** Localizes generated preset labels without changing their IDs or resolved wake times. */
+export function localizeSnoozePreset(preset: SnoozePreset): SnoozePreset {
   const labels: Readonly<Record<string, Readonly<Record<string, string>>>> = {
     "after:60": { "In 1 hour": t.sidebar.snooze.inOneHour },
     "after:180": { "In 3 hours": t.sidebar.snooze.inThreeHours },
@@ -46,7 +46,31 @@ function localizeSnoozePreset(preset: SnoozePreset): SnoozePreset {
       Tomorrow: t.sidebar.snooze.tomorrow,
     },
   };
-  return { ...preset, label: labels[preset.id]?.[preset.label] ?? preset.label };
+  const days: Readonly<Record<string, string>> = {
+    Monday: t.sidebar.snoozeLabels.Monday,
+    Tuesday: t.sidebar.snoozeLabels.Tuesday,
+    Wednesday: t.sidebar.snoozeLabels.Wednesday,
+    Thursday: t.sidebar.snoozeLabels.Thursday,
+    Friday: t.sidebar.snoozeLabels.Friday,
+    Saturday: t.sidebar.snoozeLabels.Saturday,
+    Sunday: t.sidebar.snoozeLabels.Sunday,
+  };
+  const calendar: Readonly<Record<string, string>> = {
+    "This morning": t.sidebar.snoozeLabels.morning,
+    "This afternoon": t.sidebar.snoozeLabels.afternoon,
+    "This evening": t.sidebar.snoozeLabels.evening,
+    Tomorrow: t.sidebar.snoozeLabels.tomorrow,
+    "Next week": t.sidebar.snoozeLabels.nextWeek,
+  };
+  const duration = /^In (\d+) (minute|hour|day)s?$/.exec(preset.label);
+  const unit = duration?.[2];
+  const label =
+    duration && (unit === "minute" || unit === "hour" || unit === "day")
+      ? t.sidebar.snoozeLabels.duration(Number(duration[1]), unit)
+      : preset.label.startsWith("Next ") && days[preset.label.slice(5)]
+        ? t.sidebar.snoozeLabels.next(days[preset.label.slice(5)]!)
+        : (days[preset.label] ?? calendar[preset.label] ?? preset.label);
+  return { ...preset, label: labels[preset.id]?.[preset.label] ?? label };
 }
 
 /** Revalidates a displayed choice at click time; expired choices prompt the user to choose again. */
@@ -65,8 +89,8 @@ export function pickSnoozePreset(
   if (!picked) {
     toastManager.add({
       type: "warning",
-      title: "Could not snooze thread",
-      description: "That snooze time has passed. Choose another time.",
+      title: t.sidebar.snoozeErrors.failed,
+      description: t.sidebar.snoozeErrors.passed,
     });
   }
   return picked ? localizeSnoozePreset(picked) : undefined;

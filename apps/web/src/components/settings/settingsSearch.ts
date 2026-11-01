@@ -164,7 +164,7 @@ const SOURCE_CONTROL_HOST_SEARCH_ITEMS = sourceControlClients.definitions.flatMa
 export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "keep-threads-with-pull-requests",
-    title: "Keep threads with a PR",
+    title: t.settings.searchAdditions.keepPr,
     to: "/settings/general",
     targetId: "auto-settle-inactive-threads",
     searchTerms: ["pull request inactivity auto-settle merge close sidebar"],
@@ -173,7 +173,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "thread-details-items",
-    title: "Thread details",
+    title: t.settings.searchAdditions.threadDetails,
     to: "/settings/appearance",
     searchTerms: [
       "customize show hide panel card environment editor scripts branch pull request git changes servers automations lineage usage limits 5 hour weekly quota tokens context window",
@@ -183,7 +183,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     ? [
         {
           id: "snooze-options" as const,
-          title: "Snooze options",
+          title: t.settings.searchAdditions.snooze,
           to: "/settings/general" as const,
           searchTerms: ["snooze presets times later tonight tomorrow next week remind"],
           environmentOnly: true,

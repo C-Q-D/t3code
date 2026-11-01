@@ -87,11 +87,12 @@ export function UpdateEverythingDialog({
   );
 }
 
-const APP_LABELS = {
-  "this-app": t.sidebar.updateRunUi.thisApp,
-  server: "Server",
-  "desktop-app": t.sidebar.updateRunUi.desktopUpdate,
-} as const;
+const appLabels = () =>
+  ({
+    "this-app": t.sidebar.updateRunUi.thisApp,
+    server: t.sidebar.updateTable.server,
+    "desktop-app": t.sidebar.updateRunUi.desktopUpdate,
+  }) as const;
 
 /** Shows per-machine update and restart consequences before confirmation. Busy or blocked plans disable confirmation; execution stays with the caller. */
 function UpdateEverythingDialogContent({
@@ -159,9 +160,9 @@ function UpdateEverythingDialogContent({
           {/* Machine names truncate first. Provider lists wrap between names, never inside one. */}
           <div className="grid grid-cols-[minmax(4rem,max-content)_max-content_minmax(min-content,1fr)_max-content] gap-x-4 text-sm">
             <div className="col-span-full grid grid-cols-subgrid border-b pb-1.5 text-muted-foreground text-xs">
-              <span>Machine</span>
+              <span>{t.sidebar.updateTable.machine}</span>
               <span>T3 Code</span>
-              <span>Providers</span>
+              <span>{t.sidebar.updateTable.providers}</span>
               <span />
             </div>
             {updating.map((row) => (
@@ -173,12 +174,14 @@ function UpdateEverythingDialogContent({
                   <MiddleTruncate value={row.label} />
                 </span>
                 <span>
-                  {row.app !== null ? APP_LABELS[row.app] : null}
+                  {row.app !== null ? appLabels()[row.app] : null}
                   {row.app === null && row.skipped !== null ? (
-                    <span className="text-muted-foreground">Skipped</span>
+                    <span className="text-muted-foreground">{t.sidebar.updateTable.skipped}</span>
                   ) : null}
                   {row.app === "this-app" ? (
-                    <span className="block text-muted-foreground text-xs">restarts last</span>
+                    <span className="block text-muted-foreground text-xs">
+                      {t.sidebar.updateTable.restartsLast}
+                    </span>
                   ) : null}
                 </span>
                 <span>

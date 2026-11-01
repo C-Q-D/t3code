@@ -106,7 +106,7 @@ import { getProjectOrderKey } from "@t3tools/client-runtime/state/project-groupi
 
 const localEnvironmentId = EnvironmentId.make("environment-local");
 
-it("localizes default snooze presets without replacing custom or actual-day labels", async () => {
+it("localizes default and custom snooze presets while keeping actual-day labels", async () => {
   const settings = Atom.make<{ snoozePresets: readonly SnoozePresetSetting[] } | undefined>(
     undefined,
   );
@@ -134,8 +134,8 @@ it("localizes default snooze presets without replacing custom or actual-day labe
     });
     const custom = resolveSnoozePresets(new Date(2026, 9, 18, 12), "24-hour", localEnvironmentId);
     expect(custom.map(({ id, label }) => [id, label])).toEqual([
-      ["after:90", "In 90 minutes"],
-      ["at:today:16:00", "This afternoon"],
+      ["after:90", "90分钟后"],
+      ["at:today:16:00", "今天下午"],
       ["at:monday:09:00", "明天"],
     ]);
   } finally {

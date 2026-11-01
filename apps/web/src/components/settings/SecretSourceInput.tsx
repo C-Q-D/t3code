@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 /** Edits literal secrets or provider references without exposing a provider settings page. */
 import {
   SecretReference,
@@ -117,7 +118,7 @@ export function SecretSourceInput({
           size="sm"
           className="w-auto min-w-0 shrink-0"
           aria-label={`${label} source`}
-          title={provider === null ? "Value" : providerLabel(provider)}
+          title={provider === null ? t.settings.secretValue.label : providerLabel(provider)}
         >
           <SelectValue>
             <SourceIcon icon={provider === null ? TypeIcon : providerIcon(provider)} />
@@ -125,7 +126,7 @@ export function SecretSourceInput({
         </SelectTrigger>
         <SelectPopup align="start" alignItemWithTrigger={false}>
           <SelectItem value={STORED_VALUE}>
-            <SourceLabel icon={TypeIcon} label="Value" />
+            <SourceLabel icon={TypeIcon} label={t.settings.secretValue.label} />
           </SelectItem>
           {sources.map((source) => (
             <SelectItem key={source.id} value={source.id}>

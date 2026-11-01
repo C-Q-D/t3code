@@ -150,12 +150,12 @@ export function DefaultModelSetting({
       settingKeys={["fallbackModelSelection"]}
       mixed={mixedFallback}
       id="fallback-model"
-      title="Fallback model"
-      description="Used for new threads when the default model's provider is out of usage."
+      title={t.settings.fallbackModel.title}
+      description={t.settings.fallbackModel.description}
       resetAction={
         mixedFallback || settings.fallbackModelSelection !== null ? (
           <SettingResetButton
-            label="fallback model"
+            label={t.settings.fallbackModel.reset}
             onClick={() => updateSettings({ fallbackModelSelection: null })}
           />
         ) : null
@@ -170,7 +170,7 @@ export function DefaultModelSetting({
             instanceEntries={entries}
             modelOptionsByInstance={fallbackModelOptions}
             triggerClassName={SETTINGS_PICKER_TRIGGER_CLASSNAME}
-            triggerAriaLabel="Fallback model"
+            triggerAriaLabel={t.settings.fallbackModel.title}
             {...(mixedFallback
               ? { triggerLabel: "Mixed" }
               : settings.fallbackModelSelection === null
@@ -182,7 +182,7 @@ export function DefaultModelSetting({
               if (reason) {
                 toastManager.add({
                   type: "error",
-                  title: "Fallback model not saved",
+                  title: t.settings.fallbackModel.notSaved,
                   description: reason,
                 });
                 return;
@@ -191,7 +191,9 @@ export function DefaultModelSetting({
             }}
           />
         ) : (
-          <span className="text-sm text-muted-foreground">No providers available</span>
+          <span className="text-sm text-muted-foreground">
+            {t.settings.fallbackModel.noProviders}
+          </span>
         )
       }
     />

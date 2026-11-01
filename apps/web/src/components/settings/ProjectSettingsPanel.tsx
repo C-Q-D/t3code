@@ -550,7 +550,7 @@ function ProjectDetail({
             resetAction={
               canResetScratchTitle ? (
                 <SettingResetButton
-                  label="project name"
+                  label={t.settings.projectOrganization.name}
                   disabled={!canEditGroup}
                   onClick={() =>
                     void updateAllMembers(
@@ -632,8 +632,8 @@ function ProjectDetail({
           {canOrganize ? (
             <>
               <SettingsRow
-                title="Pin"
-                description="Pinned projects come first in project pickers."
+                title={t.settings.projectOrganization.pin}
+                description={t.settings.projectOrganization.pinDescription}
                 control={
                   <Switch
                     checked={group.pinned}
@@ -641,19 +641,21 @@ function ProjectDetail({
                     onCheckedChange={(checked) =>
                       void organize(
                         { pinned: Boolean(checked) },
-                        checked ? "Failed to pin project" : "Failed to unpin project",
+                        checked
+                          ? t.settings.projectOrganization.pinFailed
+                          : t.settings.projectOrganization.unpinFailed,
                       )
                     }
-                    aria-label="Pin project"
+                    aria-label={t.settings.projectOrganization.pinLabel}
                   />
                 }
               />
               <SettingsRow
-                title="Archive"
+                title={t.settings.projectOrganization.archive}
                 description={
                   group.archived
-                    ? "Hidden from project pickers. Threads and files are kept."
-                    : "Hides the project from project pickers. Threads and files are kept."
+                    ? t.settings.projectOrganization.archivedDescription
+                    : t.settings.projectOrganization.archiveDescription
                 }
                 control={
                   <Button
@@ -664,12 +666,14 @@ function ProjectDetail({
                       void organize(
                         { archived: !group.archived },
                         group.archived
-                          ? "Failed to unarchive project"
-                          : "Failed to archive project",
+                          ? t.settings.projectOrganization.unarchiveFailed
+                          : t.settings.projectOrganization.archiveFailed,
                       )
                     }
                   >
-                    {group.archived ? "Unarchive" : "Archive"}
+                    {group.archived
+                      ? t.settings.projectOrganization.unarchive
+                      : t.settings.projectOrganization.archive}
                   </Button>
                 }
               />

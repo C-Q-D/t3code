@@ -763,6 +763,7 @@ const THREAD_STATUS_PRIORITY: Record<string, number> = {
 /** Resolves labels against the installed messages; caching translated values would retain the previous locale. */
 export function sidebarThreadStatusLabel(label: string): string {
   const labels: Record<string, string> = {
+    "Guest Request": t.sidebar.statusAdditions.guest,
     "Pending Approval": t.sidebar.status.pendingApproval,
     "Awaiting Input": t.sidebar.status.awaitingInput,
     Working: t.sidebar.status.working,

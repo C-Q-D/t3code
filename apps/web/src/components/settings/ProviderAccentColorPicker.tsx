@@ -97,7 +97,7 @@ function ProviderCustomColorPanel(props: {
           <PopoverClose
             render={
               <Button type="button" size="compact" onClick={() => onCommit(currentColor)}>
-                Add color
+                {t.settings.providerColors.add}
               </Button>
             }
           />

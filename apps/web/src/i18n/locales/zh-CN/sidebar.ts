@@ -2,6 +2,42 @@
 import type { Messages } from "../en";
 
 export const sidebar: Messages["sidebar"] = {
+  snoozeLabels: {
+    morning: "今天上午",
+    afternoon: "今天下午",
+    evening: "今晚",
+    tomorrow: "明天",
+    nextWeek: "下周",
+    Monday: "星期一",
+    Tuesday: "星期二",
+    Wednesday: "星期三",
+    Thursday: "星期四",
+    Friday: "星期五",
+    Saturday: "星期六",
+    Sunday: "星期日",
+    next: (day: string) => `下个${day}`,
+    duration: (count: number, unit: "minute" | "hour" | "day") =>
+      `${count}${{ minute: "分钟", hour: "小时", day: "天" }[unit]}后`,
+  },
+  updateTable: {
+    machine: "机器",
+    providers: "提供方",
+    skipped: "已跳过",
+    server: "服务器",
+    restartsLast: "最后重启",
+  },
+  projectConversion: {
+    created: "项目已创建",
+    failed: "无法将对话转为项目",
+    error: "发生错误。",
+  },
+  snoozeErrors: {
+    failed: "无法将对话设为稍后处理",
+    passed: "稍后处理的时间已过。请选择其他时间。",
+  },
+  statusAdditions: {
+    guest: "访客请求",
+  },
   actions: {
     archive: "归档",
     confirm: "确认",
