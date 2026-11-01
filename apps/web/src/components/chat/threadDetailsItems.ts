@@ -1,19 +1,92 @@
+import { t } from "~/i18n";
 import type { ClientSettings } from "@t3tools/contracts";
 
 // Ids are stored in client settings, so never rename one.
 export const THREAD_DETAILS_ITEMS = [
-  { id: "environment", label: "Environment and worktree", defaultVisible: true },
-  { id: "openIn", label: "Open in editor", defaultVisible: true },
-  { id: "scripts", label: "Project scripts", defaultVisible: true },
-  { id: "branch", label: "Branch and pull request", defaultVisible: true },
-  { id: "gitActions", label: "Git actions", defaultVisible: true },
-  { id: "changes", label: "Changes", defaultVisible: true },
-  { id: "servers", label: "Servers", defaultVisible: true },
-  { id: "automations", label: "Automations", defaultVisible: true },
-  { id: "lineage", label: "Lineage", defaultVisible: true },
-  { id: "sideChats", label: "Side chats", defaultVisible: true },
-  { id: "usage", label: "Usage limits", defaultVisible: false },
-  { id: "context", label: "Context window", defaultVisible: false },
+  {
+    id: "environment",
+    get label() {
+      return t.chat.detailItems.environment;
+    },
+    defaultVisible: true,
+  },
+  {
+    id: "openIn",
+    get label() {
+      return t.chat.detailItems.openIn;
+    },
+    defaultVisible: true,
+  },
+  {
+    id: "scripts",
+    get label() {
+      return t.chat.detailItems.scripts;
+    },
+    defaultVisible: true,
+  },
+  {
+    id: "branch",
+    get label() {
+      return t.chat.detailItems.branch;
+    },
+    defaultVisible: true,
+  },
+  {
+    id: "gitActions",
+    get label() {
+      return t.chat.detailItems.gitActions;
+    },
+    defaultVisible: true,
+  },
+  {
+    id: "changes",
+    get label() {
+      return t.chat.detailItems.changes;
+    },
+    defaultVisible: true,
+  },
+  {
+    id: "servers",
+    get label() {
+      return t.chat.detailItems.servers;
+    },
+    defaultVisible: true,
+  },
+  {
+    id: "automations",
+    get label() {
+      return t.chat.detailItems.automations;
+    },
+    defaultVisible: true,
+  },
+  {
+    id: "lineage",
+    get label() {
+      return t.chat.detailItems.lineage;
+    },
+    defaultVisible: true,
+  },
+  {
+    id: "sideChats",
+    get label() {
+      return t.chat.detailItems.sideChats;
+    },
+    defaultVisible: true,
+  },
+  {
+    id: "usage",
+    get label() {
+      return t.chat.detailItems.usage;
+    },
+    defaultVisible: false,
+  },
+  {
+    id: "context",
+    get label() {
+      return t.chat.detailItems.context;
+    },
+    defaultVisible: false,
+  },
 ] as const;
 
 export type ThreadDetailsItemId = (typeof THREAD_DETAILS_ITEMS)[number]["id"];

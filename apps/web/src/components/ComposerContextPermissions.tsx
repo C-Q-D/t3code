@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import type { RuntimeMode } from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
 
@@ -25,7 +26,7 @@ export function ComposerContextPermissions(props: {
           <ComposerControl
             size="xs"
             className="ms-auto min-w-0 shrink-0"
-            aria-label={`Permissions: ${label}`}
+            aria-label={t.chat.contextPermissions.label(label)}
             aria-haspopup="menu"
             data-composer-context-control
             onClick={props.onOpen}

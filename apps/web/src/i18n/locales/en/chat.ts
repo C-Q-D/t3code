@@ -3,6 +3,148 @@ import { englishWorkLogMessages } from "@t3tools/client-runtime/work-log/message
 import type { SourceControlProviderKind, WorktreeSubmodules } from "@t3tools/contracts";
 
 export const chat = {
+  sideChatBlocked: {
+    nested: "Side chats cannot start side chats.",
+    subagent: "Subagent threads cannot start side chats.",
+    notReady: "Side chats are not ready yet. Try again in a moment.",
+    update: "Update this environment's T3 Code server to use side chats.",
+    firstMessage: "Side chats start after the first message.",
+  },
+  relationshipLinks: {
+    openParent: "Open parent agent",
+    linkedEnvironment: "a linked environment",
+    remoteHint: (label: string) => `Runs on ${label}. Connect to it to open the thread there.`,
+    openRemote: (label: string) => `Open on ${label}`,
+    delegated: (label: string) =>
+      `Delegated from ${label}. Connect to it to open the parent thread.`,
+  },
+  usagePace: {
+    ahead: "Ahead of pace",
+    on: "On pace",
+    under: "Under pace",
+  },
+  fallbackUsage: {
+    using: (name: string) => `Using ${name}`,
+    exhausted: (provider: string, reset: string | null) =>
+      `${provider} is out of usage${reset ? ` · resets ${reset}` : ""}`,
+    useDefault: (name: string) => `Use ${name}`,
+    dismiss: "Dismiss fallback model notice",
+  },
+  detailItems: {
+    environment: "Environment and worktree",
+    openIn: "Open in editor",
+    scripts: "Project scripts",
+    branch: "Branch and pull request",
+    gitActions: "Git actions",
+    changes: "Changes",
+    servers: "Servers",
+    automations: "Automations",
+    lineage: "Lineage",
+    sideChats: "Side chats",
+    usage: "Usage limits",
+    context: "Context window",
+  },
+  contextPermissions: {
+    approvalTextOnly: "Send approval feedback without attachments or added context.",
+    label: (label: string) => `Permissions: ${label}`,
+  },
+  sideChatErrors: {
+    start: "Could not start a side chat.",
+    notReceived: "The side chat was created, but it did not reach this client.",
+    send: "Could not send the side chat message.",
+  },
+  forceStop: {
+    failed: "Could not force stop the agent",
+    shuttingDown: "Turn stopped; the agent is still shutting down",
+    shared: "Turn stopped; the agent process kept running",
+    sharedDescription: (others: number) =>
+      `It is shared with ${others === 0 ? "other" : others} working ${others === 1 ? "thread" : "threads"}. Stop those to free it.`,
+  },
+  sideChatSend: {
+    notStarted: "Side chat not started",
+    textOnly: "Side chats take text only",
+    removeContext: "Remove the attachments and context, then send it again.",
+  },
+  citationErrors: {
+    load: "Could not load history.",
+  },
+  triageHero: {
+    title: "What went wrong?",
+    machine: "This machine",
+    copied: "Copied",
+    orRun: "or run",
+    copy: "Copy command, for a terminal",
+    description:
+      "The agent reads T3 Code's logs and source here, and asks before it applies a fix or posts anything.",
+  },
+  messageLabels: {
+    sending: "Sending attachment",
+    automation: "Automation",
+  },
+  servers: {
+    title: "Servers",
+    stop: "Stop server",
+    browserFailed: "Unable to open in browser",
+    previewFailed: "Unable to open preview",
+    stopFailed: "Could not stop server",
+    agent: "Agent",
+    terminal: "Terminal",
+    stopPort: (port: number) => `Stop localhost:${port}`,
+    openHint: (shortcut: string) => `Open in the browser panel. ${shortcut} for your browser.`,
+  },
+  relationshipErrors: {
+    merge: "Could not merge back",
+    disconnect: "Could not disconnect agent session",
+  },
+  detailsUsage: {
+    percentUsed: (used: number) => `${used}% used`,
+    tokensUsed: (tokens: string) => `${tokens} tokens used`,
+    contextPercent: (used: number) => `Context: ${used}% used`,
+    contextTokens: (tokens: string) => `Context: ${tokens} tokens used`,
+    left: (left: number) => `${left}% left`,
+    tokensTotal: (used: string, total: string) => `${used} of ${total} tokens`,
+    windowLeft: (label: string, left: number) => `${label}: ${left}% left`,
+    resetsIn: (duration: string, time: string) => `Resets in ${duration} · ${time}`,
+    title: "Usage limits",
+    limits: "Limits",
+    unavailable: "Unavailable",
+    window: "Context window",
+    context: "Context",
+  },
+  detailsMenu: {
+    title: "Show in thread details",
+    reset: "Reset to default",
+    choose: "Choose what to show",
+  },
+  sideChat: {
+    cannotChange: "This connection cannot change threads.",
+    idle: "Available when the main thread is idle.",
+    finishedReply: "Available after a finished reply.",
+    deleteHint: "This permanently clears its conversation history.",
+    title: "Side chat",
+    plural: "Side chats",
+    confirmDelete: (title: string) => `Delete side chat "${title}"?`,
+    running: (count: number) => `Side chats · ${count} running`,
+    broughtBack: "Brought back",
+    broughtBackDescription: "The main thread gets this side chat with your next message there.",
+    bringBackFailed: "Could not bring back the side chat",
+    deleteFailed: "Could not delete the side chat",
+    bringBack: "Bring back",
+    delete: "Delete side chat",
+    close: "Close side chat",
+    deleted: "This side chat was deleted.",
+    bringBackHint: "Adds this side chat to the main thread's next message.",
+  },
+  queuedActions: {
+    attribution: "Sent by T3 Code",
+    thread: "Open thread",
+    automation: "Open automation",
+  },
+  workHistory: {
+    contextFrom: "Context from",
+    loadFailed: "Couldn't load work. Click to retry.",
+    loading: "Loading work history",
+  },
   modelPicker: {
     updateRequiredMessages: {
       /** Joins provider-supplied model names for the update notice. */

@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { observeResize } from "~/lib/observeResize";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -65,9 +66,9 @@ export default function Spreadsheet(props: {
     void engine
       .call("open", { bytes }, { transfer: [bytes], signal: controller.signal })
       .then((value) => {
-        if (!value) throw new Error("This workbook has no visible sheets.");
+        if (!value) throw new Error(t.tools.filePreview.noVisibleSheets);
         setOpened({ ...value, engine });
-        onDetails(`${value.tabs.length} sheets`);
+        onDetails(t.tools.filePreview.sheetsCount(value.tabs.length));
       })
       .catch(fail);
     return () => {
@@ -89,7 +90,7 @@ export default function Spreadsheet(props: {
         setOpened({ ...opened, layout, target });
       })
       .catch(() => {
-        if (!controller.signal.aborted) setError("This sheet could not be opened.");
+        if (!controller.signal.aborted) setError(t.tools.filePreview.openSheetFailed);
       });
   };
   if (!opened) return <FileSurfaceLoading />;
@@ -108,7 +109,7 @@ export default function Spreadsheet(props: {
       />
       <div
         role="tablist"
-        aria-label="Sheets"
+        aria-label={t.tools.filePreview.sheets}
         className="flex h-9 shrink-0 items-center gap-1 overflow-x-auto border-t border-border px-2"
         onKeyDown={(event) => {
           const current = opened.tabs.findIndex(
@@ -254,7 +255,7 @@ function SpreadsheetGrid(props: {
             }
             received = order;
             if (!reply) {
-              setNotice("These cells could not be drawn. Try scrolling to another area.");
+              setNotice(t.tools.filePreview.cellsDrawRetry);
               return;
             }
             setNotice("");
@@ -265,7 +266,7 @@ function SpreadsheetGrid(props: {
           })
           .catch((cause: unknown) => {
             if (!(cause instanceof SupersededError) && !controller.signal.aborted)
-              setNotice("These cells could not be drawn.");
+              setNotice(t.tools.filePreview.cellsDrawFailed);
           });
       }
       if (
@@ -461,17 +462,17 @@ function SpreadsheetGrid(props: {
         right: Math.min(selected.right, Math.max(selected.left, used?.right ?? 0)),
       };
       if ((clipped.bottom - clipped.top + 1) * (clipped.right - clipped.left + 1) > 200_000) {
-        setNotice("Select fewer than 200,000 cells to copy.");
+        setNotice(t.tools.filePreview.copyLimit);
         return;
       }
       void engine
         .call("copy", { sheet, range: clipped }, { signal: controller.signal })
         .then((text) => {
-          if (text === undefined) throw new Error("No cells");
+          if (text === undefined) throw new Error(t.tools.filePreview.noCells);
           return navigator.clipboard.writeText(text);
         })
         .catch(() => {
-          if (!controller.signal.aborted) setNotice("The selected cells could not be copied.");
+          if (!controller.signal.aborted) setNotice(t.tools.filePreview.copyCellsFailed);
         });
     };
     const key = (event: KeyboardEvent) => {

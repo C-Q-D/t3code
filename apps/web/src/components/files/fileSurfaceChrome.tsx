@@ -1,3 +1,4 @@
+import { localizeFilePreviewError } from "./filePreviewErrors";
 /** Localized files presentation and existing interaction behavior. */
 import { t } from "~/i18n";
 import type { ReactNode } from "react";
@@ -140,7 +141,7 @@ export function FileSurfaceFailure(props: {
       role="alert"
       className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-6 text-center text-xs leading-relaxed"
     >
-      <p className="text-destructive">{props.message}</p>
+      <p className="text-destructive">{localizeFilePreviewError(props.message)}</p>
       {props.onRetry ? (
         <Button type="button" onClick={props.onRetry} variant="secondary" size="md">
           {t.tools.files.tryAgain}

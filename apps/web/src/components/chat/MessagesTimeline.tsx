@@ -1098,7 +1098,11 @@ const ConversationTimeline = memo(function ConversationTimeline({
       <div className="messages-timeline-row-frame">
         <div className="chat-content-lane pt-1 sm:pt-2">
           <TimelineSystemDivider
-            label={parentThreadLink.sideChat ? "Context from" : t.chat.timeline.subagentOf}
+            label={
+              parentThreadLink.sideChat
+                ? t.chat.workHistory.contextFrom
+                : t.chat.timeline.subagentOf
+            }
             detail={
               parentThreadLink.environmentLabel === undefined
                 ? parentThreadLink.title
@@ -1625,7 +1629,7 @@ function useDeferredWorkLoading(
   useEffect(() => {
     if (row.expanded && anchorsKey && environmentId && threadId) loadOnExpand();
   }, [row.expanded, anchorsKey, environmentId, threadId]);
-  const error = anchorsKey && failed ? "Couldn't load work. Click to retry." : null;
+  const error = anchorsKey && failed ? t.chat.workHistory.loadFailed : null;
   const loading = ref !== null && row.expanded && anchorsKey !== "" && !failed;
   const toggle = () => {
     setFailed(false);
@@ -1638,7 +1642,7 @@ function useDeferredWorkLoading(
 
 function WorkHistorySkeleton() {
   return (
-    <div role="status" aria-label="Loading work history" className="space-y-2 px-1 pb-1 pt-3">
+    <div role="status" aria-label={t.chat.workHistory.loading} className="space-y-2 px-1 pb-1 pt-3">
       {[0, 1, 2].map((index) => (
         <div key={index} className="flex items-center gap-2" aria-hidden="true">
           <Skeleton className="size-3 shrink-0" />

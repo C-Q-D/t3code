@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 /* oxlint-disable react/no-array-index-key -- Text spans retain their order within an immutable page. */
 /* oxlint-disable react/no-unstable-nested-components -- These callbacks return overlays, and are invoked as render functions. */
 import { Tooltip, TooltipTrigger, TooltipPopup } from "~/components/ui/tooltip";
@@ -63,15 +64,15 @@ export default function WordDocument(props: {
       .then(async (first) => {
         if (controller.signal.aborted) return;
         setOpened({ pages: first.pages, paint, engine });
-        onDetails(`${first.pages.length}${first.loading ? "+" : ""} pages`);
+        onDetails(t.tools.filePreview.loadingPages(first.pages.length, first.loading));
         if (!first.loading) return;
         await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
         while (!controller.signal.aborted) {
           const step = await engine.call("layout", undefined, { signal: controller.signal });
           if (!step.done) continue;
-          if (step.pages.length > 1000) throw new Error("Preview limited to 1,000 pages.");
+          if (step.pages.length > 1000) throw new Error(t.tools.filePreview.pageLimit);
           setOpened({ pages: step.pages, paint, engine });
-          onDetails(`${step.pages.length} pages`);
+          onDetails(t.tools.filePreview.pagesCount(step.pages.length));
           break;
         }
       })
@@ -98,7 +99,7 @@ export default function WordDocument(props: {
     <OfficePages
       pages={opened.pages}
       paint={opened.paint}
-      label="Page"
+      label={t.tools.filePreview.page}
       scrollRef={scroll}
       onError={onError}
       overlay={(index) => (

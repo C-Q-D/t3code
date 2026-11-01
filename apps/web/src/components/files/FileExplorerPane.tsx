@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 /** Keeps the local left-hand explorer resizable without consuming the file preview minimum. */
 import { type CSSProperties, type ReactNode, useState } from "react";
 
@@ -39,7 +40,7 @@ export function FileExplorerPane({
         measure();
         return observeResize(row, measure);
       }}
-      aria-label="File explorer"
+      aria-label={t.tools.filePreview.explorer}
       className={cn("relative flex min-h-0 min-w-0 shrink-0", !resizable && "flex-1")}
       style={
         resizable
@@ -54,7 +55,7 @@ export function FileExplorerPane({
         <RightPanelResizeHandle
           handlers={handlers}
           className="left-auto -right-1"
-          label="Resize file explorer"
+          label={t.tools.filePreview.resizeExplorer}
           tabIndex={0}
           aria-valuenow={width}
           aria-valuemin={MIN_WIDTH}

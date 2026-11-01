@@ -496,7 +496,7 @@ export function useComposerSend(input: ComposerSendInput) {
       toastManager.add(
         stackedThreadToast({
           type: "warning",
-          title: "Side chat not started",
+          title: t.chat.sideChatSend.notStarted,
           description: sideChatDisabledReason,
         }),
       );
@@ -515,8 +515,8 @@ export function useComposerSend(input: ComposerSendInput) {
         toastManager.add(
           stackedThreadToast({
             type: "warning",
-            title: "Side chats take text only",
-            description: "Remove the attachments and context, then send it again.",
+            title: t.chat.sideChatSend.textOnly,
+            description: t.chat.sideChatSend.removeContext,
           }),
         );
         return;
@@ -1069,10 +1069,7 @@ export function useComposerSend(input: ComposerSendInput) {
       );
       if (approvalFeedbackTarget !== undefined) {
         if (composerAttachmentsSnapshot.length > 0 || outgoingMessageContext !== undefined) {
-          setThreadError(
-            threadIdForSend,
-            "Send approval feedback without attachments or added context.",
-          );
+          setThreadError(threadIdForSend, t.chat.contextPermissions.approvalTextOnly);
           sendInFlightRef.current = false;
           return;
         }

@@ -139,7 +139,12 @@ function UserFileCard({
       {file.downloadable === false ? (
         <>
           <div className="flex min-w-0 flex-1 items-center gap-3">{identity}</div>
-          <Button size="icon-xs" variant="ghost-muted" disabled aria-label="Sending attachment">
+          <Button
+            size="icon-xs"
+            variant="ghost-muted"
+            disabled
+            aria-label={t.chat.messageLabels.sending}
+          >
             <DownloadIcon />
           </Button>
         </>
@@ -293,7 +298,7 @@ function AutomationMessageRow({ row }: { row: Extract<TimelineRow, { kind: "mess
           expanded && "w-full",
         )}
       >
-        <MessageAuthorHeading>Automation</MessageAuthorHeading>
+        <MessageAuthorHeading>{t.chat.messageLabels.automation}</MessageAuthorHeading>
         <FoldedMessageHeader
           icon={CalendarClockIcon}
           label={t.chat.timeline.sentByAutomation}

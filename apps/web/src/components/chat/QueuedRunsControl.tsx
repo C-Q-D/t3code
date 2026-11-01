@@ -476,11 +476,13 @@ export function QueuedRunsControl({
               </div>
               <div className="flex shrink-0 items-center">
                 {presentation?.attribution === "t3code" ? (
-                  <span className="text-secondary-copy text-secondary-label">Sent by T3 Code</span>
+                  <span className="text-secondary-copy text-secondary-label">
+                    {t.chat.queuedActions.attribution}
+                  </span>
                 ) : null}
                 {presentation?.attribution === "agent" && senderThreadId && props.onOpenThread ? (
                   <InlineButton tone="muted" onClick={() => props.onOpenThread?.(senderThreadId)}>
-                    Open thread
+                    {t.chat.queuedActions.thread}
                   </InlineButton>
                 ) : null}
                 {presentation?.scheduledTaskId ? (
@@ -496,7 +498,7 @@ export function QueuedRunsControl({
                       />
                     }
                   >
-                    Open automation
+                    {t.chat.queuedActions.automation}
                   </InlineButton>
                 ) : null}
                 {item.message && props.timestampFormat ? (

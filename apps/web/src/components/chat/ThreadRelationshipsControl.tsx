@@ -365,8 +365,8 @@ function RemoteSubagentRow(props: {
         </TooltipTrigger>
         <TooltipPopup side="left">
           {environment === null
-            ? `Runs on ${remoteChild.label}. Connect to it to open the thread there.`
-            : `Open on ${remoteChild.label}`}
+            ? t.chat.relationshipLinks.remoteHint(remoteChild.label)
+            : t.chat.relationshipLinks.openRemote(remoteChild.label)}
         </TooltipPopup>
       </Tooltip>
     </li>
@@ -421,8 +421,10 @@ function DelegatedFromRow(props: {
         </TooltipTrigger>
         <TooltipPopup side="left">
           {environment === null
-            ? `Delegated from ${label ?? "a linked environment"}. Connect to it to open the parent thread.`
-            : "Open parent agent"}
+            ? t.chat.relationshipLinks.delegated(
+                label ?? t.chat.relationshipLinks.linkedEnvironment,
+              )
+            : t.chat.relationshipLinks.openParent}
         </TooltipPopup>
       </Tooltip>
     </li>
@@ -613,7 +615,7 @@ export function ThreadRelationshipsPanel(props: {
     if (result._tag === "Failure") {
       mergeErrorToastId.current = toastManager.add({
         type: "error",
-        title: "Could not merge back",
+        title: t.chat.relationshipErrors.merge,
       });
       return;
     }
@@ -635,7 +637,7 @@ export function ThreadRelationshipsPanel(props: {
     if (result._tag === "Failure") {
       detachErrorToastId.current = toastManager.add({
         type: "error",
-        title: "Could not disconnect agent session",
+        title: t.chat.relationshipErrors.disconnect,
       });
     }
   };
@@ -692,7 +694,7 @@ export function ThreadRelationshipsPanel(props: {
           : GitForkIcon;
     const relationship =
       node?.thread?.lineage.sideChat === true && !isParent
-        ? "Side chat"
+        ? t.chat.sideChat.title
         : relationshipLabel(edge, props.threadId);
     const projectedAgent = isSubagent && !isParent ? subagentsByThreadId.get(threadId) : undefined;
     const workflowGroup =
@@ -1041,7 +1043,11 @@ export function ThreadRelationshipsPanel(props: {
       {sideChatsVisible ? (
         <ThreadDetailsSection
           headingId="thread-details-side-chats-heading"
-          title={runningSideChats > 0 ? `Side chats · ${runningSideChats} running` : "Side chats"}
+          title={
+            runningSideChats > 0
+              ? t.chat.sideChat.running(runningSideChats)
+              : t.chat.sideChat.plural
+          }
           data-thread-side-chats-panel
         >
           <ThreadLineageGroup

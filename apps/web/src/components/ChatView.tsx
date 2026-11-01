@@ -2935,15 +2935,15 @@ export default function ChatView(props: ChatViewProps) {
   // Main-thread surfaces show this reason; `/side` sent anyway gets it as a toast.
   const sideChatDisabledReason =
     activeThread?.lineage.sideChat === true
-      ? "Side chats cannot start side chats."
+      ? t.chat.sideChatBlocked.nested
       : isSubagentThread
-        ? "Subagent threads cannot start side chats."
+        ? t.chat.sideChatBlocked.subagent
         : serverConfig === null
-          ? "Side chats are not ready yet. Try again in a moment."
+          ? t.chat.sideChatBlocked.notReady
           : serverConfig.environment.capabilities.sideChats !== true
-            ? "Update this environment's T3 Code server to use side chats."
+            ? t.chat.sideChatBlocked.update
             : sideChatsOffered && !isServerThread
-              ? "Side chats start after the first message."
+              ? t.chat.sideChatBlocked.firstMessage
               : sideChat.available &&
                   orchestrationV2WorktreePending(
                     activeThread?.worktreePath ?? null,

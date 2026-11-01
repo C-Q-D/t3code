@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import type {
   ProviderInstanceId,
   ServerProvider,
@@ -7,7 +8,6 @@ import type {
 import {
   collectProviderUsageLimits,
   formatDuration,
-  type LimitPace,
   limitsNotice,
   paceOf,
   remainingPercent,
@@ -22,12 +22,6 @@ import { formatUpcomingTimestamp } from "../../timestampFormat";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { formatContextWindowCompactionMessage } from "./ContextWindowMeter.logic";
 import { ThreadDetailsSection } from "./ThreadDetailsSection";
-
-const PACE_LABEL: Record<LimitPace, string> = {
-  ahead: "Ahead of pace",
-  on: "On pace",
-  under: "Under pace",
-};
 
 export interface ThreadDetailsUsageInput {
   readonly providerInstanceId: ProviderInstanceId | null;
@@ -56,21 +50,21 @@ export function ThreadDetailsUsage({
     report?.accounts.find((entry) => entry.instanceId === providerInstanceId)?.limits ??
     providers.find((provider) => provider.instanceId === providerInstanceId)?.usageLimits;
   if (!limits) return null;
-  const notice = limitsNotice(limits);
+  const notice = limitsNotice(limits, t.chat.workLog.shared.usageLimits);
 
   return (
     <ThreadDetailsSection
       headingId="thread-details-usage-heading"
-      title="Usage limits"
+      title={t.chat.detailsUsage.title}
       showHeading={false}
     >
       <div className="grid grid-cols-[auto_minmax(3rem,1fr)_auto] gap-x-3 text-xs">
         {notice ? (
           <UsageRow
-            label="Limits"
+            label={t.chat.detailsUsage.limits}
             fill={null}
             tone={null}
-            value="Unavailable"
+            value={t.chat.detailsUsage.unavailable}
             tooltip={<span className="text-foreground">{notice}</span>}
           />
         ) : (
@@ -97,12 +91,12 @@ export function ThreadDetailsContext({ usage }: { readonly usage: ContextWindowS
   return (
     <ThreadDetailsSection
       headingId="thread-details-context-heading"
-      title="Context window"
+      title={t.chat.detailsUsage.window}
       showHeading={false}
     >
       <div className="grid grid-cols-[auto_minmax(3rem,1fr)_auto] gap-x-3 text-xs">
         <UsageRow
-          label="Context"
+          label={t.chat.detailsUsage.context}
           fill={used}
           tone={used === null ? null : used >= 90 ? "error" : used >= 80 ? "warning" : null}
           tick={tick}
@@ -112,16 +106,24 @@ export function ThreadDetailsContext({ usage }: { readonly usage: ContextWindowS
               ? `${usedTokens} / ${formatContextWindowTokens(maxTokens)}`
               : usedTokens
           }
-          ariaValue={used !== null ? `${used}% used` : `${usedTokens} tokens used`}
+          ariaValue={
+            used !== null
+              ? t.chat.detailsUsage.percentUsed(used)
+              : t.chat.detailsUsage.tokensUsed(usedTokens)
+          }
           tooltip={
             <>
               <span className="text-foreground">
-                {used !== null ? `Context: ${used}% used` : `Context: ${usedTokens} tokens used`}
+                {used !== null
+                  ? t.chat.detailsUsage.contextPercent(used)
+                  : t.chat.detailsUsage.contextTokens(usedTokens)}
               </span>
               {maxTokens !== null ? (
                 <span className="text-muted-foreground">
-                  {usage.usedTokens.toLocaleString("en-US")} of {maxTokens.toLocaleString("en-US")}{" "}
-                  tokens
+                  {t.chat.detailsUsage.tokensTotal(
+                    usage.usedTokens.toLocaleString("en-US"),
+                    maxTokens.toLocaleString("en-US"),
+                  )}
                 </span>
               ) : null}
               {threshold !== null && threshold > 0 ? (
@@ -154,19 +156,21 @@ function LimitRow({
       fill={left}
       tone={left <= 10 ? "error" : left <= 20 ? "warning" : null}
       value={`${left}%`}
-      ariaValue={`${left}% left`}
+      ariaValue={t.chat.detailsUsage.left(left)}
       tooltip={
         <>
           <span className="text-foreground">
-            {window.label}: {left}% left
+            {t.chat.detailsUsage.windowLeft(window.label, left)}
           </span>
           {window.resetsAt && resetsAt > now ? (
             <span className="text-muted-foreground">
-              Resets in {formatDuration(resetsAt - now)} ·{" "}
-              {formatUpcomingTimestamp(window.resetsAt, timestampFormat, now)}
+              {t.chat.detailsUsage.resetsIn(
+                formatDuration(resetsAt - now, t.chat.workLog.shared.usageLimits),
+                formatUpcomingTimestamp(window.resetsAt, timestampFormat, now),
+              )}
             </span>
           ) : null}
-          {pace ? <span className="text-muted-foreground">{PACE_LABEL[pace]}</span> : null}
+          {pace ? <span className="text-muted-foreground">{t.chat.usagePace[pace]}</span> : null}
         </>
       }
     />

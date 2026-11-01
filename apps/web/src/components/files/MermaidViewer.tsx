@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { useState } from "react";
 
 import { MermaidDiagram } from "../chat/MermaidDiagram";
@@ -15,8 +16,7 @@ export default function MermaidViewer(props: { readonly text: string }) {
   )
     return (
       <div role="alert" className="p-6 text-xs text-muted-foreground">
-        This diagram contains resource URLs, markup, node metadata, or custom configuration. Show
-        Mermaid source to inspect it safely.
+        {t.tools.filePreview.mermaidWarning}
       </div>
     );
   return (
@@ -24,7 +24,7 @@ export default function MermaidViewer(props: { readonly text: string }) {
       <MermaidDiagram source={props.text} onExpand={setExpanded} />
       {expanded ? (
         <ExpandedImageDialog
-          preview={{ images: [{ src: expanded, name: "Mermaid diagram" }], index: 0 }}
+          preview={{ images: [{ src: expanded, name: t.tools.filePreview.mermaidName }], index: 0 }}
           onClose={() => setExpanded(null)}
         />
       ) : null}

@@ -279,12 +279,12 @@ export function PreviewView({
     } catch (error) {
       toastManager.add({
         type: "error",
-        title: "Could not open this address",
+        title: t.tools.addressErrors.failed,
         description: isPreviewUrlNormalizationError(error)
-          ? "Enter an http or https URL."
+          ? t.tools.addressErrors.urlHint
           : error instanceof Error
             ? error.message
-            : "An error occurred.",
+            : t.tools.addressErrors.error,
       });
     }
   };
@@ -301,12 +301,12 @@ export function PreviewView({
     } catch (error) {
       toastManager.add({
         type: "error",
-        title: "Could not open this address",
+        title: t.tools.addressErrors.failed,
         description: isPreviewUrlNormalizationError(error)
-          ? "Enter an http or https URL."
+          ? t.tools.addressErrors.urlHint
           : error instanceof Error
             ? error.message
-            : "An error occurred.",
+            : t.tools.addressErrors.error,
       });
     }
   };

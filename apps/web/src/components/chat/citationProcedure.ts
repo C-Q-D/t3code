@@ -207,7 +207,7 @@ const citedHistoryAtom = Atom.family(
           );
           return result._tag === "Success"
             ? result.value
-            : { _tag: "error", message: "Could not load history." };
+            : { _tag: "error", message: t.chat.citationErrors.load };
         },
       }).then((outcome) => {
         if (outcome._tag === "aborted") return;

@@ -71,7 +71,8 @@ function renderedToggleLabel(
   mode: "markdown" | "mermaid" | "html" | "table",
   rendered: boolean,
 ): string {
-  if (mode === "mermaid") return rendered ? "Show Mermaid source" : "Show rendered diagram";
+  if (mode === "mermaid")
+    return rendered ? t.tools.filePreview.showMermaid : t.tools.filePreview.showDiagram;
   if (mode === "markdown")
     return rendered ? t.tools.files.markdownSource : t.tools.files.renderedMarkdown;
   if (mode === "table") return rendered ? t.tools.files.source : t.tools.files.table;
@@ -415,8 +416,8 @@ export function AttachmentFilePreview(props: {
               if (!copy) {
                 toastManager.add({
                   type: "error",
-                  title: "Could not copy file",
-                  description: "Wait for the file to finish loading before copying.",
+                  title: t.tools.filePreview.copyFailed,
+                  description: t.tools.filePreview.copyWait,
                 });
                 return;
               }
@@ -425,8 +426,8 @@ export function AttachmentFilePreview(props: {
                 .catch((cause: unknown) =>
                   toastManager.add({
                     type: "error",
-                    title: "Could not copy file",
-                    description: cause instanceof Error ? cause.message : "Try again.",
+                    title: t.tools.filePreview.copyFailed,
+                    description: cause instanceof Error ? cause.message : t.tools.filePreview.retry,
                   }),
                 );
             }}

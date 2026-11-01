@@ -161,14 +161,17 @@ export function modelFallbackBannerItem({
     id: "fallback-model",
     variant: "info",
     icon: <GaugeIcon />,
-    title: `Using ${fallbackModelName}`,
-    description: `${defaultProviderName} is out of usage${resetsAt ? ` · resets ${formatUpcomingTimestamp(resetsAt, timestampFormat)}` : ""}`,
+    title: t.chat.fallbackUsage.using(fallbackModelName),
+    description: t.chat.fallbackUsage.exhausted(
+      defaultProviderName,
+      resetsAt ? formatUpcomingTimestamp(resetsAt, timestampFormat) : null,
+    ),
     actions: (
       <Button size="xs" variant="ghost" onClick={onUseDefault}>
-        Use {defaultModelName}
+        {t.chat.fallbackUsage.useDefault(defaultModelName)}
       </Button>
     ),
-    dismissLabel: "Dismiss fallback model notice",
+    dismissLabel: t.chat.fallbackUsage.dismiss,
     onDismiss,
   };
 }
