@@ -224,3 +224,19 @@ Architecture and its constraints: `docs/internals/overview.md`. Glossary: `docs/
 ## Additional tips
 
 - Security is important, but should not be over-indexed on, especially for dev mode/maintainer-only features.
+
+## Merging upstream (常犯问题)
+
+This fork keeps local code when it merges `upstream/main`. Types and lint do not catch the mistakes below, so check for them while resolving a merge.
+
+- **Local code hides the upstream fix.** A local wrapper, early return, or localized shell can keep upstream's symbols while its new branch never runs. Confirm that branch is reachable from the local path before calling it integrated.
+- **Lists rebuilt locally.** A local list or map built from a base function (menus, capability labels) silently drops what upstream adds. Compare it with the base function's current output.
+- **Half a change.** Read the upstream commit's full diff, not the conflicting hunk. A display condition and its focus handling, or two counts computed side by side, land together.
+- **Local branches skipping new invariants.** A kept local branch must meet what upstream added: failure paths stay out of the success path, and every close runs the reset.
+- **Local display paths.** A kept display path carries upstream's new meaning: forge-specific terms, full names, new data sources.
+- **Tests of replaced components.** Port an upstream test aimed at a component local code replaced, or delete it with a reason. Never keep a test or comment claiming behavior the platform can't deliver.
+
+Run both scanners after the merge commit and again before integrating:
+
+- `node scripts/merge-lost-symbols.ts <merge base> <local before merge> <head>` lists symbols local code used that are gone or have no caller left, which upstream can do without a conflict. Restore each one, or confirm the feature was meant to go.
+- `node scripts/scan-english-copy.ts <local before merge>` lists English strings added to web and desktop code. It over-reports on purpose. Route real copy through `t` with `en` and `zh-CN` entries.
