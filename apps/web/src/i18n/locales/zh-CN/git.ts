@@ -594,6 +594,7 @@ export const git: Messages["git"] = {
     searchAuthors: "搜索作者",
     mergesLoaded: " 已加载合并记录",
     noAuthorsFound: "未找到作者",
+    authorSearchFailed: "无法在代码托管平台上搜索作者",
     any: "任意",
     noLabelsInThisView: "此视图没有标签",
     allProjects: "所有项目",

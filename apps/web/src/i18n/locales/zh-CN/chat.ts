@@ -139,7 +139,9 @@ export const chat: Messages["chat"] = {
     agent: "代理",
     terminal: "终端",
     stopPort: (port: number) => `停止 localhost:${port}`,
-    openHint: (shortcut: string) => `在浏览器面板中打开。按住 ${shortcut} 可在你的浏览器中打开。`,
+    openHint: (shortcut: string) => `在浏览器面板中打开。按住 ${shortcut}可在你的浏览器中打开。`,
+    externalClickMac: "⌘ 并点击",
+    externalClick: "Ctrl 并点击",
   },
   relationshipErrors: {
     merge: "无法合并回主对话",

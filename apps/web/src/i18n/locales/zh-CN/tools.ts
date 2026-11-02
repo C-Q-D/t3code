@@ -25,6 +25,8 @@ export const tools: Messages["tools"] = {
     after: "记录的修改后内容",
   },
   previewErrors: {
+    officeEngineStopped: "Office 引擎已停止运行",
+    officeEngineUnreadable: "Office 引擎返回了无法读取的响应",
     invalidXml: "此文档包含无效或不受支持的 XML。",
     documentNesting: "文档嵌套层级过深，无法预览。",
     documentContent: "文档内容过多，无法预览。",
@@ -129,6 +131,7 @@ export const tools: Messages["tools"] = {
     searching: "正在搜索…",
     showMermaid: "显示 Mermaid 源码",
     showDiagram: "显示图表",
+    loading: "正在加载…",
     preparing: "正在准备文件…",
     saveFile: "保存文件",
     reconnect: "请重新连接环境后重试。",

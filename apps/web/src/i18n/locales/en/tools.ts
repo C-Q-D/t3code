@@ -24,6 +24,8 @@ export const tools = {
     after: "Recorded content after",
   },
   previewErrors: {
+    officeEngineStopped: "The Office engine stopped",
+    officeEngineUnreadable: "The Office engine sent an unreadable reply",
     invalidXml: "This document contains invalid or unsupported XML.",
     documentNesting: "This document is nested too deeply to preview.",
     documentContent: "This document has too much content to preview.",
@@ -126,6 +128,7 @@ export const tools = {
     searching: "Searching…",
     showMermaid: "Show Mermaid source",
     showDiagram: "Show rendered diagram",
+    loading: "Loading…",
     preparing: "Preparing file…",
     saveFile: "Save file",
     reconnect: "Reconnect to the environment and try again.",

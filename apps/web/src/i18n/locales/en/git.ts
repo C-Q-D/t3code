@@ -628,6 +628,7 @@ export const git = {
     searchAuthors: "Search authors",
     mergesLoaded: " merges loaded",
     noAuthorsFound: "No authors found",
+    authorSearchFailed: "Couldn't search authors on the host",
     any: "Any",
     noLabelsInThisView: "No labels in this view",
     allProjects: "All projects",

@@ -51,7 +51,9 @@ export function ThreadServersPanel(props: {
   const [stoppingKey, setStoppingKey] = useState<string | null>(null);
 
   if (servers.length === 0) return null;
-  const externalClickLabel = isMacPlatform(navigator.platform) ? "⌘-click" : "Ctrl-click";
+  const externalClickLabel = isMacPlatform(navigator.platform)
+    ? t.chat.servers.externalClickMac
+    : t.chat.servers.externalClick;
   const threadRef = scopeThreadRef(props.environmentId, props.threadId);
 
   const reportFailure = (title: string, error: unknown) => {

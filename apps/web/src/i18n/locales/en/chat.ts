@@ -143,6 +143,8 @@ export const chat = {
     terminal: "Terminal",
     stopPort: (port: number) => `Stop localhost:${port}`,
     openHint: (shortcut: string) => `Open in the browser panel. ${shortcut} for your browser.`,
+    externalClickMac: "⌘-click",
+    externalClick: "Ctrl-click",
   },
   relationshipErrors: {
     merge: "Could not merge back",

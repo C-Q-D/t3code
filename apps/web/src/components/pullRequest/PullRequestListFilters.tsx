@@ -478,7 +478,7 @@ function PullRequestAuthorFilter({
           {visible.length === 0 && !hosted.isPending ? (
             <MenuItem disabled>
               {hosted.error
-                ? "Couldn't search authors on the host"
+                ? t.git.pullRequest.authorSearchFailed
                 : t.git.pullRequest.noAuthorsFound}
             </MenuItem>
           ) : null}
