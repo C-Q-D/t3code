@@ -484,9 +484,9 @@ export const settings = {
     wordWrap: {
       title: "Word wrap",
 
-      description: "Wrap long lines in code blocks, tables, diffs, and file previews by default.",
+      description: "Wrap long lines in code blocks, diffs, and file previews by default.",
       resetLabel: "word wrapping",
-      ariaLabel: "Wrap code, tables, diffs, and file previews by default",
+      ariaLabel: "Wrap code, diffs, and file previews by default",
     },
     composerContext: {
       title: "Composer context",

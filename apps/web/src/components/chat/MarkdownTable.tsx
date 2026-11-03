@@ -3,20 +3,16 @@ import { cn } from "../../lib/utils";
 import { FileTextIcon, FileSpreadsheetIcon } from "lucide-react";
 import { MarkdownTimelineContext } from "./MarkdownCodeBlock";
 import { t } from "~/i18n";
-import { Check, Copy, Maximize2, Minimize2 } from "lucide";
+import { Check, Copy } from "lucide";
 import React, {
   Children,
   isValidElement,
   use,
-  useLayoutEffect,
   useRef,
-  useState,
   type ReactNode,
   type ComponentProps,
 } from "react";
 
-import { getClientSettings } from "../../hooks/useSettings";
-import { observeResize } from "../../lib/observeResize";
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import {
   serializeTableElementToCsv,
@@ -30,46 +26,15 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { reportMarkdownActionFailure } from "./markdownActionFailure";
 
 /**
- * Whether any cell is clipped in the unwrapped layout. Only then does the wrap
- * toggle change anything, so short tables hide it. Measures with the container
- * briefly unwrapped and restores it before the browser paints.
- */
-function tableHasClippedCells(container: HTMLElement, table: HTMLTableElement): boolean {
-  const viewport = table.closest<HTMLElement>('[data-slot="scroll-area-viewport"]');
-  const scrollLeft = viewport?.scrollLeft ?? 0;
-  const previous = container.dataset.expanded;
-  container.dataset.expanded = "false";
-  try {
-    for (const row of table.rows) {
-      for (const cell of row.cells) {
-        if (cell.scrollWidth > cell.clientWidth) return true;
-      }
-    }
-    return false;
-  } finally {
-    if (previous === undefined) delete container.dataset.expanded;
-    else container.dataset.expanded = previous;
-    // The unwrapped layout can be narrower and clamp a sideways scroll.
-    if (viewport && scrollLeft > 0) viewport.scrollLeft = scrollLeft;
-  }
-}
-
-/**
- * Renders a Markdown table with cell expansion and clipboard export controls.
+ * Renders a Markdown table with clipboard export controls. Cells always wrap (see index.css).
  * @param props - Native table attributes and children; children may be null or empty. Copy actions
  * write Markdown or CSV to the clipboard and report failures to the console.
- * @returns The table and cell-expansion control; timeline exports sit in the last header, while
- * other surfaces retain the footer export menu. Never null.
+ * @returns The table; timeline exports sit in the last header, while other surfaces and
+ * headerless tables keep the footer export menu. Never null.
  */
 export function MarkdownTable({ children, ...props }: ComponentProps<"table">) {
   const timeline = use(MarkdownTimelineContext);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const tableRef = useRef<HTMLTableElement | null>(null);
-  const [expanded, setExpanded] = useState(() => getClientSettings().wordWrap);
-  const [hasClippedCells, setHasClippedCells] = useState(false);
-  const expandLabel = expanded
-    ? t.chat.markdown.collapseTableCells
-    : t.chat.markdown.expandTableCells;
   const { copyToClipboard, isCopied: copied } = useCopyToClipboard<"markdown" | "csv">({
     timeout: 1200,
     onError: (cause, format) =>
@@ -87,15 +52,6 @@ export function MarkdownTable({ children, ...props }: ComponentProps<"table">) {
       format,
     );
   };
-
-  useLayoutEffect(() => {
-    const container = containerRef.current;
-    const table = tableRef.current;
-    if (!container || !table) return;
-    const measure = () => setHasClippedCells(tableHasClippedCells(container, table));
-    measure();
-    return observeResize(container, measure);
-  });
 
   const copyMenu = (
     <Menu>
@@ -143,7 +99,6 @@ export function MarkdownTable({ children, ...props }: ComponentProps<"table">) {
     <div
       ref={containerRef}
       className={cn("chat-markdown-table-container", timeline && "timeline-markdown-table")}
-      data-expanded={expanded ? "true" : "false"}
     >
       <div
         className={
@@ -153,35 +108,12 @@ export function MarkdownTable({ children, ...props }: ComponentProps<"table">) {
         }
       >
         <ScrollArea radius="none" chainVerticalScroll scrollFade className="w-full max-w-full">
-          <table ref={tableRef} {...props}>
-            {headerTable?.children ?? children}
-          </table>
+          <table {...props}>{headerTable?.children ?? children}</table>
         </ScrollArea>
       </div>
-      <div className="mt-0.5 flex items-center justify-between select-none">
-        {hasClippedCells ? (
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  type="button"
-                  variant={expanded ? "secondary" : "ghost-muted"}
-                  size="icon-xs"
-                  aria-pressed={expanded}
-                  onClick={() => setExpanded((value) => !value)}
-                  aria-label={expandLabel}
-                />
-              }
-            >
-              <MorphIcon className="size-3" icon={expanded ? Minimize2 : Maximize2} />
-            </TooltipTrigger>
-            <TooltipPopup side="top">{expandLabel}</TooltipPopup>
-          </Tooltip>
-        ) : (
-          <span />
-        )}
-        {headerTable?.inserted ? null : copyMenu}
-      </div>
+      {headerTable?.inserted ? null : (
+        <div className="mt-0.5 flex items-center justify-end select-none">{copyMenu}</div>
+      )}
     </div>
   );
 }

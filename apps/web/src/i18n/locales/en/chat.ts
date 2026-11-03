@@ -812,8 +812,6 @@ export const chat = {
     important: "Important",
     warning: "Warning",
     caution: "Caution",
-    collapseTableCells: "Collapse table cells",
-    expandTableCells: "Expand table cells",
     copied: "Copied",
     copyTable: "Copy table",
     copyAsMarkdown: "Copy as Markdown",

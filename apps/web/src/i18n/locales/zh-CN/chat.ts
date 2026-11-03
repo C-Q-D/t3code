@@ -775,8 +775,6 @@ export const chat: Messages["chat"] = {
     important: "重要",
     warning: "警告",
     caution: "注意",
-    collapseTableCells: "折叠表格单元格",
-    expandTableCells: "展开表格单元格",
     copied: "已复制",
     copyTable: "复制表格",
     copyAsMarkdown: "复制为Markdown",

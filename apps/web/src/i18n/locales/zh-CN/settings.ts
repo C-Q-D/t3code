@@ -455,9 +455,9 @@ export const settings: Messages["settings"] = {
     wordWrap: {
       title: "自动换行",
 
-      description: "默认对代码块、表格、差异和文件预览中的长行换行。",
+      description: "默认对代码块、差异和文件预览中的长行换行。",
       resetLabel: "自动换行",
-      ariaLabel: "默认对代码、表格、差异和文件预览换行",
+      ariaLabel: "默认对代码、差异和文件预览换行",
     },
     composerContext: {
       title: "输入框上下文",
