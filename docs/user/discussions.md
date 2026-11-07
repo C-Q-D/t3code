@@ -18,6 +18,17 @@ changes. Seats run with the project's default [permission mode](permission-modes
 Each statement is a full agent turn, and the discussion does not stop on its own. Watch the round
 count and stop or end the discussion when you have what you need.
 
+## Let an agent run a discussion
+
+Discussions are experimental, so an agent uses them only when you ask for one, or when it suggests
+one with a reason and you agree. Before starting, the agent lists the topic, seats, models, and
+speaking order in the conversation and waits for your go-ahead. It then follows the discussion,
+interjects, answers seat questions, and stops or ends it.
+
+The agent approves or declines seat requests only in discussions it started, one request at a time.
+In discussions you started, approvals stay with you. The agent can also edit persona, summary, and
+discussion templates.
+
 ## During a discussion
 
 Use the composer to interject. Interjecting does not interrupt the seat that is speaking; the next
