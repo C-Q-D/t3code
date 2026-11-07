@@ -4,6 +4,8 @@ import { assert, it } from "@effect/vitest";
 import { AgentScope } from "@t3tools/shared/AgentScope";
 import {
   EnvironmentId,
+  DiscussionId,
+  DiscussionSeatId,
   type ModelSelection,
   type OrchestrationV2AppThread,
   type OrchestrationV2DomainEvent,
@@ -1735,11 +1737,12 @@ it.effect(
 );
 
 it.effect.each([
-  { relationshipToParent: null, subagent: false },
-  { relationshipToParent: "subagent", subagent: true },
+  { relationshipToParent: null, subagent: false, discussionSeat: false },
+  { relationshipToParent: "subagent", subagent: true, discussionSeat: false },
+  { relationshipToParent: null, subagent: false, discussionSeat: true },
 ] as const)(
-  "ProviderSessionManagerV2 marks MCP credentials of delegated children ($relationshipToParent)",
-  ({ relationshipToParent, subagent }) =>
+  "ProviderSessionManagerV2 marks MCP credentials of delegated children ($relationshipToParent), discussion seat=$discussionSeat",
+  ({ relationshipToParent, subagent, discussionSeat }) =>
     Effect.gen(function* () {
       const state = yield* Ref.make(emptyState);
       const mcpConfigs = yield* Ref.make<
@@ -1764,6 +1767,14 @@ it.effect.each([
               ...created,
               payload: {
                 ...created.payload,
+                ...(discussionSeat
+                  ? {
+                      discussion: {
+                        discussionId: DiscussionId.make("discussion-mcp-credential"),
+                        seatId: DiscussionSeatId.make("seat-mcp-credential"),
+                      },
+                    }
+                  : {}),
                 lineage:
                   relationshipToParent === null
                     ? created.payload.lineage
@@ -1779,7 +1790,9 @@ it.effect.each([
           "",
         );
         assert.isDefined(token);
-        assert.equal((yield* registry.resolve(token!))?.thread.subagent, subagent);
+        const scope = yield* registry.resolve(token!);
+        assert.equal(scope?.thread.subagent, subagent);
+        assert.equal(scope?.thread.discussionSeat, discussionSeat);
         yield* manager.close(providerSessionId);
       });
 
@@ -2209,9 +2222,9 @@ it.effect("ProviderSessionManagerV2 duplicate detach preserves replacement MCP c
   }),
 );
 
-it.effect(
-  "ProviderSessionManagerV2 keeps a thread's MCP credential stable across detach and re-attach on a shared session",
-  () =>
+it.effect.each([false, true])(
+  "ProviderSessionManagerV2 reuses a credential only while its seat attribution matches, then keeps it stable across re-attach (credential seat=%s)",
+  (credentialDiscussionSeat) =>
     Effect.gen(function* () {
       const state = yield* Ref.make(emptyState);
       const mcpConfigs = yield* Ref.make<
@@ -2233,6 +2246,12 @@ it.effect(
         yield* eventSink.write({
           events: [yield* makeThreadCreatedEvent({ idAllocator, threadId, now })],
         });
+        const seeded = yield* registry.issue({
+          threadId,
+          providerInstanceId: modelSelection.instanceId,
+          discussionSeat: credentialDiscussionSeat,
+        });
+        yield* mcpSessions.set(seeded.config);
         yield* manager.open({
           threadId,
           providerSessionId,
@@ -2242,6 +2261,11 @@ it.effect(
 
         const original = (yield* Ref.get(mcpConfigs)).at(-1);
         assert.isDefined(original);
+        assert.equal(
+          original?.providerSessionId === seeded.config.providerSessionId,
+          !credentialDiscussionSeat,
+          "reuse requires the credential's discussion seat attribution to match the stored thread",
+        );
         const originalToken = original?.authorizationHeader.replace(/^Bearer\s+/, "");
         assert.isDefined(originalToken);
 

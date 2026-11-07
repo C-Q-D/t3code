@@ -27,6 +27,7 @@ import { HttpBody, HttpClient, HttpClientRequest, HttpRouter } from "effect/http
 
 import * as ProjectService from "../project/ProjectService.ts";
 import * as DeviceService from "../device/DeviceService.ts";
+import * as DiscussionTemplates from "../discussions/DiscussionTemplateService.ts";
 import * as PullRequestReviewGuideService from "../pullRequest/PullRequestReviewGuideService.ts";
 import * as ServerConfig from "../config.ts";
 import * as ServerSettings from "../serverSettings.ts";
@@ -1070,12 +1071,13 @@ it.effect("hides tools for links and refuses another environment while the beta 
   ).pipe(Effect.provide(NodeHttpServer.layerTest)),
 );
 
-it.effect("lists pull request watch tools only to threads that are not delegated children", () =>
+it.effect("hides hosting tools from delegated children and discussion seats", () =>
   Effect.scoped(
     Effect.gen(function* () {
       const scopeFor = (
         token: string,
         subagent: boolean,
+        discussionSeat = false,
       ): McpInvocationContext.McpThreadInvocationScope => ({
         environmentId,
         requestNamespace: token,
@@ -1084,6 +1086,7 @@ it.effect("lists pull request watch tools only to threads that are not delegated
           providerSessionId: token,
           providerInstanceId: ProviderInstanceId.make("codex"),
           subagent,
+          discussionSeat,
         },
         client: undefined,
         capabilities: new Set(["pull-requests"]),
@@ -1092,8 +1095,12 @@ it.effect("lists pull request watch tools only to threads that are not delegated
       const scopes = new Map([
         ["parentToken", scopeFor("parentToken", false)],
         ["childToken", scopeFor("childToken", true)],
+        ["seatToken", scopeFor("seatToken", false, true)],
       ]);
-      const serverLayer = McpHttpServer.layerPullRequestsToolkit.pipe(
+      const serverLayer = Layer.mergeAll(
+        McpHttpServer.layerPullRequestsToolkit,
+        McpHttpServer.layerDiscussionToolkit,
+      ).pipe(
         Layer.provideMerge(
           McpHttpServer.layerMcpTransport.pipe(Layer.provide(ServerSettings.layerTest())),
         ),
@@ -1105,6 +1112,9 @@ it.effect("lists pull request watch tools only to threads that are not delegated
         Layer.provide(
           Layer.mergeAll(
             McpToolAccessTestkit.liveThreadsLayer,
+            Layer.mock(DiscussionTemplates.DiscussionTemplateService)({
+              listPrompts: () => Effect.succeed({ prompts: [] }),
+            }),
             Layer.mock(ProjectService.ProjectService)({}),
             Layer.mock(PullRequestReviewGuideService.PullRequestReviewGuideService)({}),
             Layer.mock(Orchestrator.OrchestratorV2)({}),
@@ -1130,31 +1140,57 @@ it.effect("lists pull request watch tools only to threads that are not delegated
               "application/json",
             ),
           });
-          const listed = yield* httpClient.post("/mcp", {
-            headers: {
-              ...headers,
-              "mcp-session-id": initialize.headers["mcp-session-id"]!,
-              "mcp-protocol-version": "2025-06-18",
-            },
-            body: HttpBody.text(
-              `{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}`,
-              "application/json",
-            ),
-          });
-          const body = (yield* listed.json) as {
+          const rpc = (method: string, params: Record<string, unknown>) =>
+            httpClient
+              .post("/mcp", {
+                headers: {
+                  ...headers,
+                  "mcp-session-id": initialize.headers["mcp-session-id"]!,
+                  "mcp-protocol-version": "2025-06-18",
+                },
+                body: HttpBody.text(
+                  JSON.stringify({ jsonrpc: "2.0", id: 2, method, params }),
+                  "application/json",
+                ),
+              })
+              .pipe(Effect.flatMap((response) => response.json));
+          const body = (yield* rpc("tools/list", {})) as {
             readonly result: { readonly tools: ReadonlyArray<{ readonly name: string }> };
           };
-          return body.result.tools.map((tool) => tool.name);
+          return {
+            names: body.result.tools.map((tool) => tool.name),
+            callRoles: rpc("tools/call", {
+              name: "t3_discussion_roles",
+              arguments: { action: "list_roles" },
+            }),
+          };
         });
 
       const parentTools = yield* listedTools("parentToken");
       const childTools = yield* listedTools("childToken");
-      expect(parentTools).toEqual(
-        expect.arrayContaining(["link_pull_request", "watch_pull_request", "unwatch_pull_request"]),
+      const seatTools = yield* listedTools("seatToken");
+      expect(parentTools.names).toEqual(
+        expect.arrayContaining([
+          "link_pull_request",
+          "watch_pull_request",
+          "unwatch_pull_request",
+          "t3_discussion_roles",
+        ]),
       );
-      expect(childTools).toContain("link_pull_request");
-      expect(childTools).not.toContain("watch_pull_request");
-      expect(childTools).not.toContain("unwatch_pull_request");
+      expect(childTools.names).toContain("link_pull_request");
+      expect(childTools.names).not.toContain("watch_pull_request");
+      expect(childTools.names).not.toContain("unwatch_pull_request");
+      expect(childTools.names).not.toContain("t3_discussion_roles");
+      expect(seatTools.names).not.toContain("t3_discussion_roles");
+      expect(yield* parentTools.callRoles).toMatchObject({
+        result: { structuredContent: { prompts: [] } },
+      });
+      expect(yield* childTools.callRoles).toMatchObject({
+        error: { message: expect.stringContaining("t3_discussion_roles") },
+      });
+      expect(yield* seatTools.callRoles).toMatchObject({
+        error: { message: expect.stringContaining("t3_discussion_roles") },
+      });
     }),
   ).pipe(Effect.provide(NodeHttpServer.layerTest)),
 );

@@ -315,6 +315,11 @@ function providerThreadLoadKey(input: {
   });
 }
 
+/**
+ * Builds scoped provider runtimes and MCP credentials; scope release closes owned sessions.
+ * @param options Optional idle timers in milliseconds and MCP setup switch; omitted values use server defaults.
+ * @returns Layer requiring persistence, adapters and MCP registries; operation failures remain on service methods.
+ */
 export const layerWithOptions = (
   options: ProviderSessionManagerV2LayerOptions = {},
 ): Layer.Layer<
@@ -457,10 +462,15 @@ export const layerWithOptions = (
                 >(["orchestration", "worktree", "pull-requests"]);
                 if (browserToolsAvailable) capabilities.add("preview");
                 if (deviceToolsAvailable) capabilities.add("device");
-                const subagent = yield* projectionStore.getThread(threadId).pipe(
-                  Effect.map((thread) => thread.lineage.relationshipToParent === "subagent"),
-                  Effect.orElseSucceed(() => false),
-                );
+                const { subagent, discussionSeat } = yield* projectionStore
+                  .getThread(threadId)
+                  .pipe(
+                    Effect.map((thread) => ({
+                      subagent: thread.lineage.relationshipToParent === "subagent",
+                      discussionSeat: thread.discussion !== undefined,
+                    })),
+                    Effect.orElseSucceed(() => ({ subagent: false, discussionSeat: false })),
+                  );
                 const existing = yield* mcpSessions.read(threadId);
                 if (existing !== undefined) {
                   // Reserve before async validation so release cannot revoke between validation and reservation.
@@ -482,8 +492,9 @@ export const layerWithOptions = (
                     resolved.thread.providerInstanceId === providerInstanceId &&
                     resolved.capabilities.has("preview") === browserToolsAvailable &&
                     resolved.capabilities.has("device") === deviceToolsAvailable &&
-                    // A credential issued while the lineage read failed is replaced once it works.
-                    (resolved.thread.subagent === true) === subagent
+                    // Replace credentials when a recovered shell read reveals restricted tool access.
+                    (resolved.thread.subagent === true) === subagent &&
+                    (resolved.thread.discussionSeat === true) === discussionSeat
                   ) {
                     return { mcpCredentialId: existing.providerSessionId, issued: false };
                   }
@@ -496,6 +507,7 @@ export const layerWithOptions = (
                   browserToolsAvailable,
                   capabilities,
                   subagent,
+                  discussionSeat,
                 });
                 yield* mcpSessions.set(credential.config);
                 reserveMcpCredential(threadId, credential.config.providerSessionId);

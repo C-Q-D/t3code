@@ -29,6 +29,8 @@ export interface McpThreadCaller {
   readonly providerInstanceId: ProviderInstanceId;
   /** A delegated child task; its parent owns the work it hands back. */
   readonly subagent?: boolean;
+  /** A discussion seat speaks in its assigned role and must not manage discussions. */
+  readonly discussionSeat?: boolean;
 }
 
 export interface McpClientCaller {
@@ -135,6 +137,13 @@ export const hiddenFromSubagents = (): boolean => {
   const fiber = Fiber.getCurrent();
   const scope = fiber && Context.getOrUndefined(fiber.context, McpInvocationContext);
   return scope?.thread?.subagent !== true;
+};
+
+/** EnabledWhen reads the request fiber so neither delegated children nor discussion seats can host discussions. */
+export const hiddenFromDiscussionSeatsAndSubagents = (): boolean => {
+  const fiber = Fiber.getCurrent();
+  const scope = fiber && Context.getOrUndefined(fiber.context, McpInvocationContext);
+  return scope?.thread?.subagent !== true && scope?.thread?.discussionSeat !== true;
 };
 
 /** `McpSchema.EnabledWhen` for tools that only serve links, hidden while the beta is off. */

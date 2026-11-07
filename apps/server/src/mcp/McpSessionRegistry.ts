@@ -19,6 +19,8 @@ export interface McpCredentialRequest {
   readonly browserToolsAvailable?: boolean;
   readonly capabilities?: ReadonlySet<McpInvocationContext.McpCapability>;
   readonly subagent?: boolean;
+  /** Server-owned seat attribution restricts discussion tool access without inspecting thread ids. */
+  readonly discussionSeat?: boolean;
 }
 
 export interface McpIssuedCredential {
@@ -107,6 +109,7 @@ const makeWithOptions = Effect.fn("McpSessionRegistry.make")(function* (
           providerSessionId,
           providerInstanceId: ProviderInstanceId.make(request.providerInstanceId),
           subagent: request.subagent === true,
+          discussionSeat: request.discussionSeat === true,
         },
         client: undefined,
         capabilities: new Set<McpInvocationContext.McpCapability>([
