@@ -2,7 +2,6 @@
 import {
   type DiscussionError,
   type DiscussionId,
-  type DiscussionSubscriptionEvent,
   OrchestratorMcpFailure,
   ProviderRequestKind,
   type OrchestrationV2RuntimeRequest,
@@ -110,13 +109,21 @@ const pendingRequest = (
   return { requestId: request.id, type: "other" as const, kind: request.kind };
 };
 
-/** Loads request and item records without fetching a full thread projection. */
+/** Loads requests and their supported detail item types, excluding unrelated text history. */
 const readSeatRequests = Effect.fn("mcp.discussion.readSeatRequests")(function* (
   threadId: ThreadId,
 ) {
   const threads = yield* Threads.ThreadManagementService;
   return yield* threads
-    .getThreadRecords(threadId, ["runtimeRequests", "turnItems"])
+    .getThreadRecords(threadId, ["runtimeRequests", "turnItems"], {
+      turnItemTypes: [
+        "approval_request",
+        "user_input_request",
+        "command_execution",
+        "dynamic_tool",
+        "file_change",
+      ],
+    })
     .pipe(Effect.mapError(unavailable));
 });
 
@@ -189,21 +196,40 @@ const waitForDiscussion = Effect.fn("mcp.discussion.wait")(function* (input: {
           Effect.mapError(unavailable),
         ),
       );
-      const evaluate = Effect.gen(function* () {
+      // Cache only for this wait; streamed text must not multiply history reads across seats.
+      const requestsByThread = new Map<ThreadId, Array<ReturnType<typeof pendingRequest>>>();
+      const relatedItemsByThread = new Map<ThreadId, Set<OrchestrationV2TurnItem["id"]>>();
+      /** Replaces one seat's request view; related parent items can supply late approval details. */
+      const refreshRequests = Effect.fn("mcp.discussion.refreshSeatRequests")(function* (
+        seats: typeof discussion.seats,
+      ) {
+        for (const seat of seats) {
+          const records = yield* readSeatRequests(seat.threadId);
+          requestsByThread.set(
+            seat.threadId,
+            records.runtimeRequests
+              .filter((request) => request.status === "pending")
+              .map((request) => pendingRequest(request, records.turnItems)),
+          );
+          const related = new Set<OrchestrationV2TurnItem["id"]>();
+          for (const item of records.turnItems) {
+            if (item.type !== "approval_request" && item.type !== "user_input_request") continue;
+            related.add(item.id);
+            if (item.parentItemId !== null) related.add(item.parentItemId);
+          }
+          relatedItemsByThread.set(seat.threadId, related);
+        }
+      });
+      const evaluate = () => {
         const pendingRequests = deleted
           ? []
-          : (yield* Effect.forEach(discussion.seats, (seat) =>
-              Effect.gen(function* () {
-                const records = yield* readSeatRequests(seat.threadId);
-                return {
-                  seatId: seat.id,
-                  threadId: seat.threadId,
-                  requests: records.runtimeRequests
-                    .filter((request) => request.status === "pending")
-                    .map((request) => pendingRequest(request, records.turnItems)),
-                };
-              }),
-            )).filter((seat) => seat.requests.length > 0);
+          : discussion.seats
+              .map((seat) => ({
+                seatId: seat.id,
+                threadId: seat.threadId,
+                requests: requestsByThread.get(seat.threadId) ?? [],
+              }))
+              .filter((seat) => seat.requests.length > 0);
         const transcript = [...entries.values()];
         const newEntrySeqs = transcript
           .filter((entry) => entry.seq > afterSeq && entry.status === "completed")
@@ -229,15 +255,22 @@ const waitForDiscussion = Effect.fn("mcp.discussion.wait")(function* (input: {
           pendingRequests,
           timedOut: reason === "timeout",
         };
-      });
+      };
       const threadChanges = Stream.mergeAll(
         cursors.map((cursor) =>
           threads.streamStoredEventsFrom(cursor).pipe(
             Stream.filter(
               ({ event }) =>
-                event.type === "runtime-request.updated" || event.type === "turn-item.updated",
+                event.type === "runtime-request.updated" ||
+                (event.type === "turn-item.updated" &&
+                  (event.payload.type === "approval_request" ||
+                    event.payload.type === "user_input_request" ||
+                    relatedItemsByThread.get(cursor.threadId)?.has(event.payload.id) === true)),
             ),
-            Stream.map(() => null),
+            Stream.map(() => ({
+              type: "seat.requests.changed" as const,
+              threadId: cursor.threadId,
+            })),
             Stream.mapError(unavailable),
           ),
         ),
@@ -248,13 +281,19 @@ const waitForDiscussion = Effect.fn("mcp.discussion.wait")(function* (input: {
         Stream.merge(Stream.fromPull(Effect.succeed(pull)), threadChanges),
       );
       const waited = yield* updates.pipe(
-        Stream.mapEffect((event: DiscussionSubscriptionEvent | null) => {
-          if (event?.type === "discussion.deleted") deleted = true;
-          else if (event?.type === "discussion.updated") discussion = event.discussion;
-          else if (event?.type === "entry.appended" || event?.type === "entry.updated")
-            entries.set(event.entry.id, event.entry);
-          return evaluate;
-        }),
+        Stream.mapEffect((event) =>
+          Effect.gen(function* () {
+            if (event.type === "snapshot") yield* refreshRequests(discussion.seats);
+            else if (event.type === "seat.requests.changed") {
+              const seat = discussion.seats.find((seat) => seat.threadId === event.threadId);
+              if (seat !== undefined) yield* refreshRequests([seat]);
+            } else if (event.type === "discussion.deleted") deleted = true;
+            else if (event.type === "discussion.updated") discussion = event.discussion;
+            else if (event.type === "entry.appended" || event.type === "entry.updated")
+              entries.set(event.entry.id, event.entry);
+            return evaluate();
+          }),
+        ),
         Stream.filter((result) => result.reason !== "timeout"),
         Stream.runHead,
         Effect.timeoutOption(
@@ -275,8 +314,9 @@ const waitForDiscussion = Effect.fn("mcp.discussion.wait")(function* (input: {
         discussion = snapshot.discussion;
         entries.clear();
         for (const entry of snapshot.entries) entries.set(entry.id, entry);
+        yield* refreshRequests(discussion.seats);
       }
-      return yield* evaluate;
+      return evaluate();
     }),
   ).pipe(
     Effect.catchTags({

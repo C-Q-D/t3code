@@ -462,6 +462,7 @@ const makeProviderAdapter = Effect.fnUntraced(function* (
   });
 });
 
+/** Builds isolated provider sessions; failThreadRead faults manager shell reads while ingestion keeps real projections. */
 function layerTest(input: {
   readonly state: Ref.Ref<TestProviderRuntimeState>;
   readonly idleTimeoutMs: number;
@@ -494,7 +495,21 @@ function layerTest(input: {
   readonly scopeCloseReached?: Deferred.Deferred<void>;
   readonly serverSettingsLayer?: ReturnType<typeof ServerSettings.layerTest>;
   readonly projectServiceLayer?: Layer.Layer<ProjectService.ProjectService>;
+  readonly failThreadRead?: boolean;
 }) {
+  const layerSessionProjections = input.failThreadRead
+    ? Layer.effect(
+        ProjectionStore.ProjectionStoreV2,
+        Effect.gen(function* () {
+          const store = yield* ProjectionStore.ProjectionStoreV2;
+          return {
+            ...store,
+            getThread: (threadId: ThreadId) =>
+              Effect.fail(new ProjectionStore.ProjectionStoreReadError({ threadId })),
+          };
+        }),
+      ).pipe(Layer.provide(layerTestStores))
+    : layerTestStores;
   const layerConfiguredEventSink =
     input.flakyReleaseWrites !== undefined
       ? layerFlakyReleaseEventSink(input.flakyReleaseWrites)
@@ -573,7 +588,7 @@ function layerTest(input: {
           IdAllocator.layer,
           layerProviderEventIngestorTest,
           layerConfiguredMcpRegistry,
-          layerTestStores,
+          layerSessionProjections,
           ...(input.serverSettingsLayer === undefined ? [] : [input.serverSettingsLayer]),
           ...(input.projectServiceLayer === undefined ? [] : [input.projectServiceLayer]),
         ),
@@ -1737,12 +1752,18 @@ it.effect(
 );
 
 it.effect.each([
-  { relationshipToParent: null, subagent: false, discussionSeat: false },
-  { relationshipToParent: "subagent", subagent: true, discussionSeat: false },
-  { relationshipToParent: null, subagent: false, discussionSeat: true },
+  { relationshipToParent: null, subagent: false, discussionSeat: false, failThreadRead: false },
+  {
+    relationshipToParent: "subagent",
+    subagent: true,
+    discussionSeat: false,
+    failThreadRead: false,
+  },
+  { relationshipToParent: null, subagent: false, discussionSeat: true, failThreadRead: false },
+  { relationshipToParent: null, subagent: false, discussionSeat: true, failThreadRead: true },
 ] as const)(
-  "ProviderSessionManagerV2 marks MCP credentials of delegated children ($relationshipToParent), discussion seat=$discussionSeat",
-  ({ relationshipToParent, subagent, discussionSeat }) =>
+  "ProviderSessionManagerV2 marks MCP credentials of delegated children ($relationshipToParent), discussion seat=$discussionSeat, failed read=$failThreadRead",
+  ({ relationshipToParent, subagent, discussionSeat, failThreadRead }) =>
     Effect.gen(function* () {
       const state = yield* Ref.make(emptyState);
       const mcpConfigs = yield* Ref.make<
@@ -1796,7 +1817,9 @@ it.effect.each([
         yield* manager.close(providerSessionId);
       });
 
-      yield* effect.pipe(Effect.provide(layerTest({ state, idleTimeoutMs: 1_000, mcpConfigs })));
+      yield* effect.pipe(
+        Effect.provide(layerTest({ state, idleTimeoutMs: 1_000, mcpConfigs, failThreadRead })),
+      );
     }),
 );
 
@@ -2222,9 +2245,13 @@ it.effect("ProviderSessionManagerV2 duplicate detach preserves replacement MCP c
   }),
 );
 
-it.effect.each([false, true])(
-  "ProviderSessionManagerV2 reuses a credential only while its seat attribution matches, then keeps it stable across re-attach (credential seat=%s)",
-  (credentialDiscussionSeat) =>
+it.effect.each([
+  { credentialDiscussionSeat: false, failThreadRead: false },
+  { credentialDiscussionSeat: true, failThreadRead: false },
+  { credentialDiscussionSeat: true, failThreadRead: true },
+])(
+  "ProviderSessionManagerV2 reuses a credential only while its seat attribution matches, then keeps it stable across re-attach (credential seat=$credentialDiscussionSeat, failed read=$failThreadRead)",
+  ({ credentialDiscussionSeat, failThreadRead }) =>
     Effect.gen(function* () {
       const state = yield* Ref.make(emptyState);
       const mcpConfigs = yield* Ref.make<
@@ -2263,11 +2290,15 @@ it.effect.each([false, true])(
         assert.isDefined(original);
         assert.equal(
           original?.providerSessionId === seeded.config.providerSessionId,
-          !credentialDiscussionSeat,
+          credentialDiscussionSeat === failThreadRead,
           "reuse requires the credential's discussion seat attribution to match the stored thread",
         );
         const originalToken = original?.authorizationHeader.replace(/^Bearer\s+/, "");
         assert.isDefined(originalToken);
+        assert.equal(
+          (yield* registry.resolve(originalToken!))?.thread.discussionSeat,
+          failThreadRead,
+        );
 
         yield* manager.detach({ providerSessionId, threadId, detail: "Workspace changed." });
         assert.equal(
@@ -2299,6 +2330,7 @@ it.effect.each([false, true])(
             state,
             idleTimeoutMs: 1_000,
             mcpConfigs,
+            failThreadRead,
           }),
         ),
       );

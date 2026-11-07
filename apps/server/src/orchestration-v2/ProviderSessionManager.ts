@@ -469,7 +469,8 @@ export const layerWithOptions = (
                       subagent: thread.lineage.relationshipToParent === "subagent",
                       discussionSeat: thread.discussion !== undefined,
                     })),
-                    Effect.orElseSucceed(() => ({ subagent: false, discussionSeat: false })),
+                    // Unknown seat ownership must not issue or rotate to discussion-enabled credentials.
+                    Effect.orElseSucceed(() => ({ subagent: false, discussionSeat: true })),
                   );
                 const existing = yield* mcpSessions.read(threadId);
                 if (existing !== undefined) {

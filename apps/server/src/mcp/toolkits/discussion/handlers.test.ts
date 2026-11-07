@@ -248,9 +248,9 @@ const beginWait = Effect.fn("test.discussion.beginWait")(function* (
   const fiber = yield* wait(input).pipe(
     Effect.provideService(Threads.ThreadManagementService, {
       ...threads,
-      getThreadRecords: (threadId, collections) =>
+      getThreadRecords: (threadId, collections, filter) =>
         threads
-          .getThreadRecords(threadId, collections)
+          .getThreadRecords(threadId, collections, filter)
           .pipe(Effect.tap(() => Deferred.succeed(read, undefined))),
     }),
     Effect.forkChild,
@@ -452,6 +452,105 @@ it.effect.each(["entries", "paused", "ended", "deleted", "request"] as const)(
         ),
       { git: false, startReactor: false },
     ),
+);
+
+it.effect("ignores streaming text and reloads requests only for the changed seat", () =>
+  withDiscussionHarness(
+    () =>
+      Effect.gen(function* () {
+        yield* seedDiscussion();
+        const threads = yield* Threads.ThreadManagementService;
+        const [textSeat, requestSeat] = discussionFixture.seats;
+        assert(textSeat !== undefined && requestSeat !== undefined);
+        const initialRead = yield* Deferred.make<void>();
+        const textQueued = yield* Deferred.make<void>();
+        const requestRead = yield* Deferred.make<void>();
+        const reads = new Map<ThreadId, number>();
+        const fiber = yield* wait().pipe(
+          Effect.provideService(Threads.ThreadManagementService, {
+            ...threads,
+            getThreadRecords: (threadId, collections, filter) =>
+              threads.getThreadRecords(threadId, collections, filter).pipe(
+                Effect.tap(() =>
+                  Effect.gen(function* () {
+                    reads.set(threadId, (reads.get(threadId) ?? 0) + 1);
+                    if (reads.size === discussionFixture.seats.length)
+                      yield* Deferred.succeed(initialRead, undefined);
+                    if (threadId === requestSeat.threadId && reads.get(threadId) === 2)
+                      yield* Deferred.succeed(requestRead, undefined);
+                  }),
+                ),
+              ),
+            streamStoredEventsFrom: (input) => {
+              const events = threads.streamStoredEventsFrom(input);
+              return input?.threadId !== textSeat.threadId
+                ? events
+                : Stream.concat(
+                    events.pipe(Stream.take(1)),
+                    // The merge enqueues this text event before the other seat's barrier is committed.
+                    Stream.fromEffect(Deferred.succeed(textQueued, undefined)).pipe(Stream.drain),
+                  );
+            },
+          }),
+          Effect.forkChild,
+        );
+        yield* Deferred.await(initialRead);
+        const now = DateTime.makeUnsafe("2026-10-12T08:00:00.000Z");
+        yield* (yield* EventSink.EventSinkV2).write({
+          events: [
+            {
+              id: EventId.make("wait:streaming-text"),
+              threadId: textSeat.threadId,
+              type: "turn-item.updated",
+              occurredAt: now,
+              payload: {
+                id: TurnItemId.make("wait:streaming-text"),
+                threadId: textSeat.threadId,
+                runId: null,
+                nodeId: NodeId.make("wait:streaming-text"),
+                providerThreadId: null,
+                providerTurnId: null,
+                nativeItemRef: null,
+                parentItemId: null,
+                ordinal: 1,
+                status: "running",
+                title: null,
+                startedAt: now,
+                completedAt: null,
+                updatedAt: now,
+                type: "assistant_message",
+                messageId: MessageId.make("wait:streaming-text"),
+                text: "Still speaking",
+                streaming: true,
+              },
+            },
+          ],
+        });
+        yield* Deferred.await(textQueued);
+        yield* seedRequest(requestSeat.threadId, "auth_refresh", "wait-read-barrier", "resolved");
+        yield* Deferred.await(requestRead);
+        expect(reads.get(textSeat.threadId)).toBe(1);
+        expect(reads.get(requestSeat.threadId)).toBe(2);
+        expect(fiber.pollUnsafe()).toBeUndefined();
+        const requestId = yield* seedRequest(requestSeat.threadId, "command", "wait-after-text");
+        const result = yield* Fiber.join(fiber);
+        expect(result.reason).toBe("pending_request");
+        expect(result.pendingRequests).toEqual([
+          {
+            seatId: requestSeat.id,
+            threadId: requestSeat.threadId,
+            requests: [
+              { requestId, type: "approval", content: expect.any(String), truncated: false },
+            ],
+          },
+        ]);
+        expect(reads.get(textSeat.threadId)).toBe(1);
+      }).pipe(
+        Effect.provide(Templates.layer),
+        Effect.provideService(McpInvocationContext.McpInvocationContext, scope),
+      ),
+    { git: false, startReactor: false },
+  ),
 );
 
 it.effect.each([
