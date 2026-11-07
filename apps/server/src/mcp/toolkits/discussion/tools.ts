@@ -13,6 +13,10 @@ import {
   DiscussionMutationResult,
   DiscussionProviderSupportResult,
   DiscussionSeat,
+  OrchestrationV2UserInputQuestion,
+  OrchestrationV2DispatchCommandResult,
+  ProviderUserInputAnswers,
+  RuntimeRequestId,
   DiscussionPromptDeleteInput,
   DiscussionPromptDeleteResult,
   DiscussionPromptListResult,
@@ -26,6 +30,7 @@ import {
   OrchestratorMcpFailure,
 } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
+import * as Crypto from "effect/Crypto";
 import { McpSchema, Tool, Toolkit } from "effect/ai";
 import * as DiscussionTemplates from "../../../discussions/DiscussionTemplateService.ts";
 import * as Discussions from "../../../discussions/DiscussionService.ts";
@@ -96,6 +101,26 @@ const DiscussionReadResult = Schema.Struct({
       modelSelection: DiscussionSeat.fields.modelSelection,
       threadId: DiscussionSeat.fields.threadId,
       link: Schema.String,
+      pendingRequests: Schema.Array(
+        Schema.Union([
+          Schema.Struct({
+            requestId: RuntimeRequestId,
+            type: Schema.Literal("approval"),
+            content: Schema.String,
+            truncated: Schema.Boolean,
+          }),
+          Schema.Struct({
+            requestId: RuntimeRequestId,
+            type: Schema.Literal("question"),
+            questions: Schema.Array(OrchestrationV2UserInputQuestion),
+          }),
+          Schema.Struct({
+            requestId: RuntimeRequestId,
+            type: Schema.Literal("other"),
+            kind: Schema.String,
+          }),
+        ]),
+      ),
     }),
   ),
   entries: Schema.Array(Schema.Struct({ ...DiscussionEntry.fields, truncated: Schema.Boolean })),
@@ -105,7 +130,7 @@ const DiscussionReadResult = Schema.Struct({
 
 const DiscussionTool = Tool.make("t3_discussion", {
   description:
-    "Discussions are experimental: use discussion tools only when the user asked for a discussion, or agreed to one you proposed with a reason. Before create, show the topic, roles, each model and speaking order in the conversation and wait for user agreement. After creation, give the user the link; follow progress with t3_discussion_wait. list: all discussions. read: discussionId; optional afterSeq and limit (default 20, max 100); texts capped at 16000 characters. provider_support: supported instances; use it and orchestrator_capabilities for model values. diff: discussionId, entryId. create: topic and exactly one of ordered seats or templateId; optional projectId defaults to the caller's project. interject: discussionId, text. stop, continue, delete: discussionId. end: discussionId, summarizerSeatId; optional summaryPromptId. Page links are null without a web origin.",
+    "Discussions are experimental: use discussion tools only when the user asked for a discussion, or agreed to one you proposed with a reason. Before create, show the topic, roles, each model and speaking order in the conversation and wait for user agreement. After creation, give the user the link; follow progress with t3_discussion_wait. list: all discussions. read: discussionId; optional afterSeq and limit (default 20, max 100); texts capped at 16000 characters. provider_support: supported instances; use it and orchestrator_capabilities for model values. diff: discussionId, entryId. create: topic and exactly one of ordered seats or templateId; optional projectId defaults to the caller's project. interject: discussionId, text. stop, continue, delete: discussionId. end: discussionId, summarizerSeatId; optional summaryPromptId. Page links are null without a web origin. When read or wait shows pending seat requests, use respond with discussionId, requestId and exactly one of decision (accept, decline, cancel) or answers. Only discussions you started allow approvals; leave approvals in user-started discussions to the user. Other request types cannot be answered here.",
   parameters: Schema.Struct({
     action: Schema.Literals([
       "list",
@@ -118,6 +143,7 @@ const DiscussionTool = Tool.make("t3_discussion", {
       "continue",
       "end",
       "delete",
+      "respond",
     ]),
     discussionId: Schema.optional(DiscussionIdInput.fields.discussionId),
     entryId: Schema.optional(DiscussionEntryDiffInput.fields.entryId),
@@ -128,6 +154,9 @@ const DiscussionTool = Tool.make("t3_discussion", {
     text: Schema.optional(DiscussionInterjectInput.fields.text),
     summarizerSeatId: Schema.optional(DiscussionEndInput.fields.summarizerSeatId),
     summaryPromptId: Schema.optional(DiscussionEndInput.fields.summaryPromptId),
+    requestId: Schema.optional(RuntimeRequestId),
+    decision: Schema.optional(Schema.Literals(["accept", "decline", "cancel"])),
+    answers: Schema.optional(ProviderUserInputAnswers),
     afterSeq: Schema.optional(
       Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
     ),
@@ -148,6 +177,7 @@ const DiscussionTool = Tool.make("t3_discussion", {
     DiscussionMutationResult,
     DiscussionInterjectResult,
     DiscussionIdInput,
+    OrchestrationV2DispatchCommandResult,
   ]),
   failure: OrchestratorMcpFailure,
   failureMode: "return" as const,
@@ -155,6 +185,7 @@ const DiscussionTool = Tool.make("t3_discussion", {
     McpInvocationContext.McpInvocationContext,
     Threads.ThreadManagementService,
     Discussions.DiscussionService,
+    Crypto.Crypto,
     DiscussionTemplates.DiscussionTemplateService,
   ],
 })

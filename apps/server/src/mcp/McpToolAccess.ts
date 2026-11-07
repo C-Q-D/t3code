@@ -1,3 +1,4 @@
+/** Enforces caller and target limits before local handlers or linked routing can mutate state. */
 import {
   type EnvironmentId,
   type OrchestrationV2LinkOrigin,
@@ -173,15 +174,22 @@ export const writesWithCapability = <P, A, E, R>(handle: (params: P) => Effect.E
     () => writingCaller,
   );
 
-export const writesThreads = <P, A, E, R>(
-  threads: (params: P) => ReadonlyArray<ThreadId | undefined>,
+/** Resolves targets before checking their modes and link ownership; resolution failures never enter the handler. */
+export const writesThreads = <P, A, E, R, EX = never, RX = never>(
+  threads: (
+    params: P,
+  ) =>
+    | ReadonlyArray<ThreadId | undefined>
+    | Effect.Effect<ReadonlyArray<ThreadId | undefined>, EX, RX>,
   handle: (params: P) => Effect.Effect<A, E, R>,
 ) =>
   declare(
     (params: P) =>
       Effect.gen(function* () {
         const caller = yield* writingCaller;
-        for (const threadId of threads(params)) {
+        const selected = threads(params);
+        const targets = Effect.isEffect(selected) ? yield* selected : selected;
+        for (const threadId of targets) {
           if (threadId === undefined || threadId === caller.scope.thread?.threadId) continue;
           const target = yield* caller.threads
             .getThreadShell(threadId)

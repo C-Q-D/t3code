@@ -1,3 +1,4 @@
+/** Probes access declarations through registered MCP tools rather than bypassing their guards. */
 import { expect, it } from "@effect/vitest";
 import {
   EnvironmentId,
@@ -119,7 +120,10 @@ const ProbeToolkit = Toolkit.make(
   Tool.make("writes_with_capability", probe),
   Tool.make("writes_threads", {
     ...probe,
-    parameters: Schema.Struct({ threadId: Schema.optional(ThreadId) }),
+    parameters: Schema.Struct({
+      threadId: Schema.optional(ThreadId),
+      asyncTarget: Schema.optional(Schema.Boolean),
+    }),
   }),
   Tool.make("starts_threads", {
     ...probe,
@@ -138,7 +142,7 @@ const probeHandlers: McpToolAccess.Handlers<typeof ProbeToolkit.tools> = {
   writes: McpToolAccess.writes(() => ran),
   writes_with_capability: McpToolAccess.writesWithCapability(() => ran),
   writes_threads: McpToolAccess.writesThreads(
-    (input) => [input.threadId],
+    (input) => (input.asyncTarget ? Effect.succeed([input.threadId]) : [input.threadId]),
     () => ran,
   ),
   starts_threads: McpToolAccess.startsThreads(
@@ -299,6 +303,18 @@ it.effect.each([
     "runtime_mode_escalation_denied",
   ],
   ["writes_threads", supervised, { threadId: "thread:missing" }, "ran"],
+  [
+    "writes_threads",
+    supervised,
+    { threadId: fullAccessThreadId, asyncTarget: true },
+    "runtime_mode_escalation_denied",
+  ],
+  [
+    "writes_threads",
+    linkedClient,
+    { threadId: supervisedThreadId, asyncTarget: true },
+    "capability_denied",
+  ],
 
   ["starts_threads", supervised, {}, "approval-required/default"],
   ["starts_threads", supervised, { runtimeMode: "full-access" }, "runtime_mode_escalation_denied"],
