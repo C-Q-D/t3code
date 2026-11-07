@@ -28,6 +28,8 @@ import {
   DiscussionTemplateMutationResult,
   DiscussionTemplateUpsertInput,
   OrchestratorMcpFailure,
+  OrchestratorMcpThreadWaitInput,
+  OrchestratorMcpThreadWaitResult,
 } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
 import * as Crypto from "effect/Crypto";
@@ -82,6 +84,25 @@ const DiscussionRolesTool = Tool.make("t3_discussion_roles", {
   .annotate(Tool.OpenWorld, false)
   .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenFromDiscussionSeatsAndSubagents);
 
+const DiscussionPendingRequest = Schema.Union([
+  Schema.Struct({
+    requestId: RuntimeRequestId,
+    type: Schema.Literal("approval"),
+    content: Schema.String,
+    truncated: Schema.Boolean,
+  }),
+  Schema.Struct({
+    requestId: RuntimeRequestId,
+    type: Schema.Literal("question"),
+    questions: Schema.Array(OrchestrationV2UserInputQuestion),
+  }),
+  Schema.Struct({
+    requestId: RuntimeRequestId,
+    type: Schema.Literal("other"),
+    kind: Schema.String,
+  }),
+]);
+
 const DiscussionReadResult = Schema.Struct({
   id: Discussion.fields.id,
   title: Discussion.fields.title,
@@ -101,26 +122,7 @@ const DiscussionReadResult = Schema.Struct({
       modelSelection: DiscussionSeat.fields.modelSelection,
       threadId: DiscussionSeat.fields.threadId,
       link: Schema.String,
-      pendingRequests: Schema.Array(
-        Schema.Union([
-          Schema.Struct({
-            requestId: RuntimeRequestId,
-            type: Schema.Literal("approval"),
-            content: Schema.String,
-            truncated: Schema.Boolean,
-          }),
-          Schema.Struct({
-            requestId: RuntimeRequestId,
-            type: Schema.Literal("question"),
-            questions: Schema.Array(OrchestrationV2UserInputQuestion),
-          }),
-          Schema.Struct({
-            requestId: RuntimeRequestId,
-            type: Schema.Literal("other"),
-            kind: Schema.String,
-          }),
-        ]),
-      ),
+      pendingRequests: Schema.Array(DiscussionPendingRequest),
     }),
   ),
   entries: Schema.Array(Schema.Struct({ ...DiscussionEntry.fields, truncated: Schema.Boolean })),
@@ -195,5 +197,57 @@ const DiscussionTool = Tool.make("t3_discussion", {
   .annotate(Tool.OpenWorld, false)
   .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenFromDiscussionSeatsAndSubagents);
 
+const DiscussionWaitTool = Tool.make("t3_discussion_wait", {
+  description:
+    "Discussions are experimental: use discussion tools only when the user asked for a discussion, or agreed to one you proposed with a reason. Wait for completed entries after afterSeq (default: latest on invocation), paused/ended/deleted state, or pending seat requests. Returns entry seqs; use t3_discussion read for text and respond for requests. timeoutMs defaults to 10 minutes, capped at 1 hour. On timeout, with next end your turn; without, call again. Deleted status is null.",
+  parameters: Schema.Struct({
+    discussionId: DiscussionIdInput.fields.discussionId,
+    afterSeq: Schema.optional(
+      Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+    ),
+    timeoutMs: OrchestratorMcpThreadWaitInput.fields.timeoutMs,
+  }),
+  success: Schema.Struct({
+    reason: Schema.Literals([
+      "new_entries",
+      "paused",
+      "ended",
+      "deleted",
+      "pending_request",
+      "timeout",
+    ]),
+    status: Schema.NullOr(Discussion.fields.status),
+    pause: Discussion.fields.pause,
+    latestSeq: Schema.Number,
+    newEntrySeqs: Schema.Array(Schema.Number),
+    pendingRequests: Schema.Array(
+      Schema.Struct({
+        seatId: DiscussionSeat.fields.id,
+        threadId: DiscussionSeat.fields.threadId,
+        requests: Schema.Array(DiscussionPendingRequest),
+      }),
+    ),
+    timedOut: Schema.Boolean,
+    next: OrchestratorMcpThreadWaitResult.fields.next,
+  }),
+  failure: OrchestratorMcpFailure,
+  failureMode: "return" as const,
+  dependencies: [
+    McpInvocationContext.McpInvocationContext,
+    Threads.ThreadManagementService,
+    Discussions.DiscussionService,
+  ],
+})
+  .annotate(Tool.Title, "Wait for discussion progress")
+  .annotate(Tool.Readonly, true)
+  .annotate(Tool.Destructive, false)
+  .annotate(Tool.Idempotent, true)
+  .annotate(Tool.OpenWorld, false)
+  .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenFromDiscussionSeatsAndSubagents);
+
 /** Shared registration point for local discussion tools. */
-export const DiscussionToolkit = Toolkit.make(DiscussionRolesTool, DiscussionTool);
+export const DiscussionToolkit = Toolkit.make(
+  DiscussionRolesTool,
+  DiscussionTool,
+  DiscussionWaitTool,
+);

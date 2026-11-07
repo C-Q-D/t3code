@@ -1171,6 +1171,10 @@ it.effect("hides hosting tools from delegated children and discussion seats", ()
               name: "t3_discussion",
               arguments: { action: "list" },
             }),
+            callDiscussionWait: rpc("tools/call", {
+              name: "t3_discussion_wait",
+              arguments: { discussionId: "discussion:visibility" },
+            }),
           };
         });
 
@@ -1184,6 +1188,7 @@ it.effect("hides hosting tools from delegated children and discussion seats", ()
           "unwatch_pull_request",
           "t3_discussion_roles",
           "t3_discussion",
+          "t3_discussion_wait",
         ]),
       );
       expect(childTools.names).toContain("link_pull_request");
@@ -1193,6 +1198,14 @@ it.effect("hides hosting tools from delegated children and discussion seats", ()
       expect(seatTools.names).not.toContain("t3_discussion_roles");
       expect(childTools.names).not.toContain("t3_discussion");
       expect(seatTools.names).not.toContain("t3_discussion");
+      expect(childTools.names).not.toContain("t3_discussion_wait");
+      expect(seatTools.names).not.toContain("t3_discussion_wait");
+      expect(yield* childTools.callDiscussionWait).toMatchObject({
+        error: { message: expect.stringContaining("t3_discussion_wait") },
+      });
+      expect(yield* seatTools.callDiscussionWait).toMatchObject({
+        error: { message: expect.stringContaining("t3_discussion_wait") },
+      });
       expect(yield* parentTools.callDiscussion).toMatchObject({
         result: { structuredContent: { discussions: [] } },
       });

@@ -2,6 +2,7 @@
 import {
   type DiscussionError,
   type DiscussionId,
+  type DiscussionSubscriptionEvent,
   OrchestratorMcpFailure,
   ProviderRequestKind,
   type OrchestrationV2RuntimeRequest,
@@ -10,7 +11,9 @@ import {
   type ThreadId,
 } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
+import * as Duration from "effect/Duration";
 import * as Option from "effect/Option";
+import * as Pull from "effect/Pull";
 import * as Stream from "effect/Stream";
 import * as Schema from "effect/Schema";
 import * as Threads from "../../../orchestration-v2/ThreadManagementService.ts";
@@ -20,6 +23,8 @@ import * as McpInvocationContext from "../../McpInvocationContext.ts";
 import * as McpToolAccess from "../../McpToolAccess.ts";
 import { dispatchFailure, newCommandId, readCaller, unavailable } from "../../threadAccess.ts";
 import { DiscussionToolkit } from "./tools.ts";
+
+const isApprovalKind = Schema.is(ProviderRequestKind);
 
 /** Requires an action's field; null remains a valid explicit avatar or summary selection. */
 const required = <A>(value: A | undefined, name: string) =>
@@ -75,7 +80,7 @@ const pendingRequest = (
   if (request.kind === "user_input" && item?.type === "user_input_request") {
     return { requestId: request.id, type: "question" as const, questions: item.questions };
   }
-  if (Schema.is(ProviderRequestKind)(request.kind)) {
+  if (isApprovalKind(request.kind)) {
     const parent =
       item?.parentItemId === null
         ? undefined
@@ -141,8 +146,161 @@ const findSeatRequest = Effect.fn("mcp.discussion.findSeatRequest")(function* (i
   });
 });
 
+/**
+ * Waits on a gap-free discussion subscription and replayable seat events; timeout closes both subscriptions.
+ * Missing afterSeq starts at the initial transcript tail; timeoutMs defaults to ten minutes, capped at one hour.
+ * Deleted discussions return null status; other failures propagate. No completion wake is registered, so next is absent.
+ */
+const waitForDiscussion = Effect.fn("mcp.discussion.wait")(function* (input: {
+  readonly discussionId: DiscussionId;
+  readonly afterSeq?: number | undefined;
+  readonly timeoutMs?: number | undefined;
+}) {
+  const service = yield* Discussions.DiscussionService;
+  const threads = yield* Threads.ThreadManagementService;
+  return yield* Effect.scoped(
+    Effect.gen(function* () {
+      const pull = yield* Stream.toPull(service.subscribe({ discussionId: input.discussionId }));
+      const first = yield* pull.pipe(
+        Pull.catchDone(() =>
+          Effect.fail(
+            new OrchestratorMcpFailure({
+              code: "orchestration_error",
+              message: "Discussion snapshot was unavailable.",
+            }),
+          ),
+        ),
+      );
+      const initial = first[0];
+      if (initial.type !== "snapshot")
+        return yield* new OrchestratorMcpFailure({
+          code: "orchestration_error",
+          message: "Discussion snapshot was unavailable.",
+        });
+      let discussion = initial.discussion;
+      const entries = new Map(initial.entries.map((entry) => [entry.id, entry]));
+      let deleted = false;
+      const afterSeq =
+        input.afterSeq ?? initial.entries.reduce((seq, entry) => Math.max(seq, entry.seq), 0);
+      // Capture cursors before reading requests: replay covers changes between the read and subscription.
+      const cursors = yield* Effect.forEach(discussion.seats, (seat) =>
+        threads.getThreadEventSequence(seat.threadId).pipe(
+          Effect.map((afterSequence) => ({ threadId: seat.threadId, afterSequence })),
+          Effect.mapError(unavailable),
+        ),
+      );
+      const evaluate = Effect.gen(function* () {
+        const pendingRequests = deleted
+          ? []
+          : (yield* Effect.forEach(discussion.seats, (seat) =>
+              Effect.gen(function* () {
+                const records = yield* readSeatRequests(seat.threadId);
+                return {
+                  seatId: seat.id,
+                  threadId: seat.threadId,
+                  requests: records.runtimeRequests
+                    .filter((request) => request.status === "pending")
+                    .map((request) => pendingRequest(request, records.turnItems)),
+                };
+              }),
+            )).filter((seat) => seat.requests.length > 0);
+        const transcript = [...entries.values()];
+        const newEntrySeqs = transcript
+          .filter((entry) => entry.seq > afterSeq && entry.status === "completed")
+          .map((entry) => entry.seq)
+          .sort((a, b) => a - b);
+        const reason = deleted
+          ? ("deleted" as const)
+          : discussion.status === "paused"
+            ? ("paused" as const)
+            : discussion.status === "ended"
+              ? ("ended" as const)
+              : pendingRequests.length > 0
+                ? ("pending_request" as const)
+                : newEntrySeqs.length > 0
+                  ? ("new_entries" as const)
+                  : ("timeout" as const);
+        return {
+          reason,
+          status: deleted ? null : discussion.status,
+          pause: deleted ? null : discussion.pause,
+          latestSeq: transcript.reduce((seq, entry) => Math.max(seq, entry.seq), 0),
+          newEntrySeqs,
+          pendingRequests,
+          timedOut: reason === "timeout",
+        };
+      });
+      const threadChanges = Stream.mergeAll(
+        cursors.map((cursor) =>
+          threads.streamStoredEventsFrom(cursor).pipe(
+            Stream.filter(
+              ({ event }) =>
+                event.type === "runtime-request.updated" || event.type === "turn-item.updated",
+            ),
+            Stream.map(() => null),
+            Stream.mapError(unavailable),
+          ),
+        ),
+        { concurrency: "unbounded" },
+      );
+      const updates = Stream.concat(
+        Stream.fromIterable(first),
+        Stream.merge(Stream.fromPull(Effect.succeed(pull)), threadChanges),
+      );
+      const waited = yield* updates.pipe(
+        Stream.mapEffect((event: DiscussionSubscriptionEvent | null) => {
+          if (event?.type === "discussion.deleted") deleted = true;
+          else if (event?.type === "discussion.updated") discussion = event.discussion;
+          else if (event?.type === "entry.appended" || event?.type === "entry.updated")
+            entries.set(event.entry.id, event.entry);
+          return evaluate;
+        }),
+        Stream.filter((result) => result.reason !== "timeout"),
+        Stream.runHead,
+        Effect.timeoutOption(
+          Duration.millis(Math.min(60 * 60_000, Math.max(1, input.timeoutMs ?? 10 * 60_000))),
+        ),
+      );
+      const result = Option.flatten(waited);
+      if (Option.isSome(result)) return result.value;
+      // A commit racing the deadline wins over a timeout, just as in thread waits.
+      const snapshot = yield* readSnapshot(input.discussionId).pipe(
+        Effect.catchTags({
+          DiscussionError: (error) =>
+            error.reason === "not_found" ? Effect.succeed(null) : Effect.fail(error),
+        }),
+      );
+      if (snapshot === null) deleted = true;
+      else {
+        discussion = snapshot.discussion;
+        entries.clear();
+        for (const entry of snapshot.entries) entries.set(entry.id, entry);
+      }
+      return yield* evaluate;
+    }),
+  ).pipe(
+    Effect.catchTags({
+      DiscussionError: (error) =>
+        error.reason === "not_found"
+          ? Effect.succeed({
+              reason: "deleted" as const,
+              status: null,
+              pause: null,
+              latestSeq: 0,
+              newEntrySeqs: [],
+              pendingRequests: [],
+              timedOut: false,
+            })
+          : Effect.fail(error),
+    }),
+  );
+});
+
 /** Reads remain available to read-only clients; mutations use the common local write policy. */
 export const layer = McpToolAccess.toLayer(DiscussionToolkit, {
+  t3_discussion_wait: McpToolAccess.reads((input) =>
+    waitForDiscussion(input).pipe(Effect.mapError(discussionFailure)),
+  ),
   t3_discussion: McpToolAccess.either(
     (input) => input.action === "respond",
     McpToolAccess.writesThreads(
