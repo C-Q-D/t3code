@@ -28,6 +28,7 @@ import { HttpBody, HttpClient, HttpClientRequest, HttpRouter } from "effect/http
 import * as ProjectService from "../project/ProjectService.ts";
 import * as DeviceService from "../device/DeviceService.ts";
 import * as DiscussionTemplates from "../discussions/DiscussionTemplateService.ts";
+import * as Discussions from "../discussions/DiscussionService.ts";
 import * as PullRequestReviewGuideService from "../pullRequest/PullRequestReviewGuideService.ts";
 import * as ServerConfig from "../config.ts";
 import * as ServerSettings from "../serverSettings.ts";
@@ -1115,6 +1116,9 @@ it.effect("hides hosting tools from delegated children and discussion seats", ()
             Layer.mock(DiscussionTemplates.DiscussionTemplateService)({
               listPrompts: () => Effect.succeed({ prompts: [] }),
             }),
+            Layer.mock(Discussions.DiscussionService)({
+              list: () => Effect.succeed({ discussions: [] }),
+            }),
             Layer.mock(ProjectService.ProjectService)({}),
             Layer.mock(PullRequestReviewGuideService.PullRequestReviewGuideService)({}),
             Layer.mock(Orchestrator.OrchestratorV2)({}),
@@ -1163,6 +1167,10 @@ it.effect("hides hosting tools from delegated children and discussion seats", ()
               name: "t3_discussion_roles",
               arguments: { action: "list_roles" },
             }),
+            callDiscussion: rpc("tools/call", {
+              name: "t3_discussion",
+              arguments: { action: "list" },
+            }),
           };
         });
 
@@ -1175,6 +1183,7 @@ it.effect("hides hosting tools from delegated children and discussion seats", ()
           "watch_pull_request",
           "unwatch_pull_request",
           "t3_discussion_roles",
+          "t3_discussion",
         ]),
       );
       expect(childTools.names).toContain("link_pull_request");
@@ -1182,6 +1191,17 @@ it.effect("hides hosting tools from delegated children and discussion seats", ()
       expect(childTools.names).not.toContain("unwatch_pull_request");
       expect(childTools.names).not.toContain("t3_discussion_roles");
       expect(seatTools.names).not.toContain("t3_discussion_roles");
+      expect(childTools.names).not.toContain("t3_discussion");
+      expect(seatTools.names).not.toContain("t3_discussion");
+      expect(yield* parentTools.callDiscussion).toMatchObject({
+        result: { structuredContent: { discussions: [] } },
+      });
+      expect(yield* childTools.callDiscussion).toMatchObject({
+        error: { message: expect.stringContaining("t3_discussion") },
+      });
+      expect(yield* seatTools.callDiscussion).toMatchObject({
+        error: { message: expect.stringContaining("t3_discussion") },
+      });
       expect(yield* parentTools.callRoles).toMatchObject({
         result: { structuredContent: { prompts: [] } },
       });
