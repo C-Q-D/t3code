@@ -20,11 +20,13 @@ import {
 } from "@t3tools/contracts";
 import { CodexProviderCapabilitiesV2 } from "../../../orchestration-v2/Adapters/CodexAdapterV2.ts";
 import * as DateTime from "effect/DateTime";
+import * as Context from "effect/Context";
 import * as Deferred from "effect/Deferred";
 import * as Fiber from "effect/Fiber";
 import * as Queue from "effect/Queue";
 import * as TestClock from "effect/testing/TestClock";
 import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
@@ -675,21 +677,87 @@ it.effect("ignores streaming text and reloads requests only for the changed seat
 );
 
 it.effect.each([
-  { label: "explicit", timeoutMs: 50, duration: 50 },
-  { label: "default", timeoutMs: undefined, duration: 10 * 60_000 },
-  { label: "capped", timeoutMs: 2 * 60 * 60_000, duration: 60 * 60_000 },
-])("times out at the $label limit and permits another wait", ({ timeoutMs, duration }) =>
+  { label: "explicit", timeoutMs: 50, duration: 50, holdLock: false },
+  { label: "default", timeoutMs: undefined, duration: 10 * 60_000, holdLock: false },
+  { label: "capped", timeoutMs: 2 * 60 * 60_000, duration: 60 * 60_000, holdLock: false },
+  { label: "locked", timeoutMs: 50, duration: 50, holdLock: true },
+])("times out at the $label limit and permits another wait", ({ timeoutMs, duration, holdLock }) =>
   withDiscussionHarness(
     () =>
       Effect.gen(function* () {
         yield* seedDiscussion();
-        const service = yield* Discussions.DiscussionService;
+        const store = yield* Store.DiscussionStore;
+        const lockHeld = yield* Deferred.make<void>();
+        const releaseLock = yield* Deferred.make<void>();
+        const service = yield* holdLock
+          ? Layer.build(Layer.fresh(Discussions.layer)).pipe(
+              Effect.map((context) => Context.get(context, Discussions.DiscussionService)),
+              Effect.provideService(Store.DiscussionStore, {
+                ...store,
+                getPrompt: (id) =>
+                  Effect.gen(function* () {
+                    // End reads its summary prompt under the real lifecycle lock, before publishing changes.
+                    yield* Deferred.succeed(lockHeld, undefined);
+                    yield* Deferred.await(releaseLock);
+                    return yield* store.getPrompt(id);
+                  }),
+              }),
+            )
+          : Discussions.DiscussionService;
         yield* service.interject({ discussionId: discussionFixture.id, text: "Existing" });
-        const fiber = yield* beginWait(timeoutMs === undefined ? {} : { timeoutMs });
+        let subscriptions = 0;
+        const subscribed = yield* Deferred.make<void>();
+        const onSubscribe = Effect.gen(function* () {
+          subscriptions++;
+          if (subscriptions === 3) yield* Deferred.succeed(subscribed, undefined);
+        });
+        const threads = yield* Threads.ThreadManagementService;
+        const fiber = yield* beginWait(timeoutMs === undefined ? {} : { timeoutMs }).pipe(
+          Effect.provideService(Discussions.DiscussionService, {
+            ...service,
+            subscribe: (input) =>
+              service
+                .subscribe(input)
+                .pipe(
+                  Stream.onStart(onSubscribe),
+                  Stream.ensuring(Effect.sync(() => subscriptions--)),
+                ),
+          }),
+          Effect.provideService(Threads.ThreadManagementService, {
+            ...threads,
+            streamStoredEventsFrom: (input) =>
+              threads
+                .streamStoredEventsFrom(input)
+                .pipe(
+                  Stream.onStart(onSubscribe),
+                  Stream.ensuring(Effect.sync(() => subscriptions--)),
+                ),
+          }),
+        );
+        yield* Deferred.await(subscribed);
+        const lockOwner = holdLock
+          ? yield* service
+              .end({
+                discussionId: discussionFixture.id,
+                summarizerSeatId: discussionFixture.seats[0]!.id,
+              })
+              .pipe(Effect.forkChild)
+          : undefined;
+        if (holdLock) yield* Deferred.await(lockHeld);
         yield* TestClock.adjust(duration - 1);
         expect(fiber.pollUnsafe()).toBeUndefined();
+        expect(subscriptions).toBe(3);
         yield* TestClock.adjust(1);
+        expect(
+          fiber.pollUnsafe(),
+          "wait must finish at the deadline while the lifecycle lock is held",
+        ).not.toBeUndefined();
         const result = yield* Fiber.join(fiber);
+        expect(subscriptions).toBe(0);
+        if (lockOwner !== undefined) {
+          expect(lockOwner.pollUnsafe()).toBeUndefined();
+          yield* Fiber.interrupt(lockOwner);
+        }
         expect(result).toEqual({
           reason: "timeout",
           timedOut: true,
@@ -703,7 +771,9 @@ it.effect.each([
           newEntrySeqs: [],
           pendingRequests: [],
         });
-        const second = yield* beginWait({ afterSeq: 1 });
+        const second = yield* beginWait({ afterSeq: 1 }).pipe(
+          Effect.provideService(Discussions.DiscussionService, service),
+        );
         yield* service.interject({ discussionId: discussionFixture.id, text: "After timeout" });
         expect(yield* Fiber.join(second)).toMatchObject({
           reason: "new_entries",

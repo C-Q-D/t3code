@@ -164,6 +164,7 @@ const findSeatRequest = Effect.fn("mcp.discussion.findSeatRequest")(function* (i
 
 /**
  * Waits on a gap-free discussion subscription and replayable seat events; timeout closes both subscriptions.
+ * One budget covers setup and reads: expiry returns the last observed state without another lock or I/O wait.
  * Missing afterSeq starts at the initial transcript tail; timeoutMs defaults to ten minutes, capped at one hour.
  * Deleted discussions return null status; other failures propagate. No completion wake is registered, so next is absent.
  */
@@ -174,6 +175,16 @@ const waitForDiscussion = Effect.fn("mcp.discussion.wait")(function* (input: {
 }) {
   const service = yield* Discussions.DiscussionService;
   const threads = yield* Threads.ThreadManagementService;
+  let latest: typeof DiscussionToolkit.tools.t3_discussion_wait.successSchema.Type = {
+    reason: "timeout",
+    status: null,
+    pause: null,
+    ...discussionPosition(null),
+    latestSeq: 0,
+    newEntrySeqs: [],
+    pendingRequests: [],
+    timedOut: true,
+  };
   return yield* Effect.scoped(
     Effect.gen(function* () {
       const pull = yield* Stream.toPull(service.subscribe({ discussionId: input.discussionId }));
@@ -198,13 +209,6 @@ const waitForDiscussion = Effect.fn("mcp.discussion.wait")(function* (input: {
       let deleted = false;
       const afterSeq =
         input.afterSeq ?? initial.entries.reduce((seq, entry) => Math.max(seq, entry.seq), 0);
-      // Capture cursors before reading requests: replay covers changes between the read and subscription.
-      const cursors = yield* Effect.forEach(discussion.seats, (seat) =>
-        threads.getThreadEventSequence(seat.threadId).pipe(
-          Effect.map((afterSequence) => ({ threadId: seat.threadId, afterSequence })),
-          Effect.mapError(unavailable),
-        ),
-      );
       // Cache only for this wait; streamed text must not multiply history reads across seats.
       const requestsByThread = new Map<ThreadId, Array<ReturnType<typeof pendingRequest>>>();
       const relatedItemsByThread = new Map<ThreadId, Set<OrchestrationV2TurnItem["id"]>>();
@@ -261,7 +265,7 @@ const waitForDiscussion = Effect.fn("mcp.discussion.wait")(function* (input: {
                   ? ("new_entries" as const)
                   : ("timeout" as const);
         const position = discussionPosition(discussion);
-        return {
+        const result = {
           reason,
           status: deleted ? null : discussion.status,
           pause: deleted ? null : discussion.pause,
@@ -272,7 +276,17 @@ const waitForDiscussion = Effect.fn("mcp.discussion.wait")(function* (input: {
           pendingRequests,
           timedOut: reason === "timeout",
         };
+        latest = result;
+        return result;
       };
+      evaluate();
+      // Capture cursors before reading requests: replay covers changes between the read and subscription.
+      const cursors = yield* Effect.forEach(discussion.seats, (seat) =>
+        threads.getThreadEventSequence(seat.threadId).pipe(
+          Effect.map((afterSequence) => ({ threadId: seat.threadId, afterSequence })),
+          Effect.mapError(unavailable),
+        ),
+      );
       const threadChanges = Stream.mergeAll(
         cursors.map((cursor) =>
           threads.streamStoredEventsFrom(cursor).pipe(
@@ -297,7 +311,7 @@ const waitForDiscussion = Effect.fn("mcp.discussion.wait")(function* (input: {
         Stream.fromIterable(first),
         Stream.merge(Stream.fromPull(Effect.succeed(pull)), threadChanges),
       );
-      const waited = yield* updates.pipe(
+      const result = yield* updates.pipe(
         Stream.mapEffect((event) =>
           Effect.gen(function* () {
             if (event.type === "snapshot") yield* refreshRequests(discussion.seats);
@@ -328,29 +342,16 @@ const waitForDiscussion = Effect.fn("mcp.discussion.wait")(function* (input: {
         ),
         Stream.filter((result) => result.reason !== "timeout"),
         Stream.runHead,
-        Effect.timeoutOption(
-          Duration.millis(Math.min(60 * 60_000, Math.max(1, input.timeoutMs ?? 10 * 60_000))),
-        ),
       );
-      const result = Option.flatten(waited);
-      if (Option.isSome(result)) return result.value;
-      // A commit racing the deadline wins over a timeout, just as in thread waits.
-      const snapshot = yield* readSnapshot(input.discussionId).pipe(
-        Effect.catchTags({
-          DiscussionError: (error) =>
-            error.reason === "not_found" ? Effect.succeed(null) : Effect.fail(error),
-        }),
-      );
-      if (snapshot === null) deleted = true;
-      else {
-        discussion = snapshot.discussion;
-        entries.clear();
-        for (const entry of snapshot.entries) entries.set(entry.id, entry);
-        yield* refreshRequests(discussion.seats);
-      }
-      return evaluate();
+      return Option.getOrElse(result, evaluate);
     }),
   ).pipe(
+    Effect.timeoutOption(
+      Duration.millis(Math.min(60 * 60_000, Math.max(1, input.timeoutMs ?? 10 * 60_000))),
+    ),
+    Effect.map((result) =>
+      Option.getOrElse(result, () => ({ ...latest, reason: "timeout" as const, timedOut: true })),
+    ),
     Effect.catchTags({
       DiscussionError: (error) =>
         error.reason === "not_found"
