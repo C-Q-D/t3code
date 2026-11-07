@@ -96,7 +96,10 @@ export class DiscussionService extends Context.Service<
      * orphan seat threads; this in-memory cleanup cannot recover them after a restart.
      */
     readonly create: (
-      input: DiscussionCreateInput,
+      input: DiscussionCreateInput & {
+        /** Trusted server attribution for discussion and seats; omission keeps UI user/server defaults. */
+        readonly initiator?: Pick<Discussion, "createdBy" | "creationSource"> | undefined;
+      },
     ) => Effect.Effect<DiscussionMutationResult, DiscussionError>;
     /** Records material for later deliveries without steering or interrupting the current run. */
     readonly interject: (
@@ -847,6 +850,7 @@ const make = Effect.gen(function* () {
     create: Effect.fn("DiscussionService.create")((input) =>
       domain(
         Effect.gen(function* () {
+          const { createdBy = "user", creationSource = "server" } = input.initiator ?? {};
           const project = yield* requireProject(input);
           const parsedSeats = yield* Effect.forEach(input.seats, (seat) =>
             Effect.gen(function* () {
@@ -904,8 +908,8 @@ const make = Effect.gen(function* () {
                     runtimeMode,
                     interactionMode: DEFAULT_PROVIDER_INTERACTION_MODE,
                     workspaceStrategy: { type: "root" },
-                    createdBy: "user",
-                    creationSource: "server",
+                    createdBy,
+                    creationSource,
                   }),
                 );
                 return {
@@ -938,8 +942,8 @@ const make = Effect.gen(function* () {
               },
               pause: null,
               closing: null,
-              createdBy: "user",
-              creationSource: "server",
+              createdBy,
+              creationSource,
               createdAt: timestamp,
               updatedAt: timestamp,
               endedAt: null,

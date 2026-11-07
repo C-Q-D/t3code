@@ -65,11 +65,17 @@ const input = {
  * Creates a discussion in the supplied harness; seats default to the two input seats and topic to
  * input.topic. Returns the create response's discussion snapshot and the first provider turn input
  * after draining the worker, persisting the run's running state and recording its provider attempt.
+ * Optional initiator supplies trusted server attribution; omission keeps user/server defaults.
  */
-const create = (harness: DiscussionHarness, seats = input.seats, topic = input.topic) =>
+const create = (
+  harness: DiscussionHarness,
+  seats = input.seats,
+  topic = input.topic,
+  initiator?: Pick<Discussion, "createdBy" | "creationSource">,
+) =>
   Effect.gen(function* () {
     const service = yield* Discussions.DiscussionService;
-    const { discussion } = yield* service.create({ ...input, seats, topic });
+    const { discussion } = yield* service.create({ ...input, seats, topic, initiator });
     yield* Worker.OrchestrationEffectWorkerV2.use((worker) => worker.drain());
     const turn = yield* Queue.take(harness.starts);
     yield* awaitRun(turn.threadId, turn.runId, "running");
@@ -2178,27 +2184,42 @@ it.effect("rejects one unsupported seat before creating any thread", () =>
   ),
 );
 
-it.effect(
-  "creates independent marked seat threads and sends the first complete material with trusted identity",
-  () =>
+it.effect.each([
+  { source: "default", initiator: undefined, createdBy: "user", creationSource: "server" },
+  {
+    source: "agent",
+    initiator: { createdBy: "agent", creationSource: "mcp" },
+    createdBy: "agent",
+    creationSource: "mcp",
+  },
+] as const)(
+  "creates independent marked seat threads and sends the first complete material with trusted identity ($source)",
+  ({ initiator, createdBy, creationSource }) =>
     withDiscussionHarness((h) =>
       Effect.gen(function* () {
-        const { discussion, turn } = yield* create(h);
+        const { discussion, turn } = yield* create(h, input.seats, input.topic, initiator);
         const threads = yield* Threads.ThreadManagementService;
+        const store = yield* Store.DiscussionStore;
+        assert.include(discussion, { createdBy, creationSource });
+        assert.include(yield* store.getDiscussion(discussion.id), { createdBy, creationSource });
         assert.equal(discussion.title, "原始议题标题");
         assert.equal(discussion.status, "speaking");
         assert.equal(discussion.cursor.round, 1);
         assert.equal(discussion.cursor.dispatchNo, 1);
         assert.equal(h.launched.length, 2);
         assert.notEqual(discussion.seats[0]!.threadId, discussion.seats[1]!.threadId);
-        assert.deepEqual(
-          (yield* threads.getThreadShell(discussion.seats[0]!.threadId))?.discussion,
-          { discussionId: discussion.id, seatId: discussion.seats[0]!.id },
-        );
-        assert.deepEqual(
-          (yield* threads.getThreadShell(discussion.seats[1]!.threadId))?.discussion,
-          { discussionId: discussion.id, seatId: discussion.seats[1]!.id },
-        );
+        const firstShell = yield* threads.getThreadShell(discussion.seats[0]!.threadId);
+        const secondShell = yield* threads.getThreadShell(discussion.seats[1]!.threadId);
+        assert.include(firstShell, { createdBy, creationSource });
+        assert.include(secondShell, { createdBy, creationSource });
+        assert.deepEqual(firstShell?.discussion, {
+          discussionId: discussion.id,
+          seatId: discussion.seats[0]!.id,
+        });
+        assert.deepEqual(secondShell?.discussion, {
+          discussionId: discussion.id,
+          seatId: discussion.seats[1]!.id,
+        });
         assert.include(turn.message.text, "议题全文第二行");
         assert.include(turn.message.text, "你是「架构师」（座位 1/2）");
         assert.deepEqual(turn.developerContext, [
