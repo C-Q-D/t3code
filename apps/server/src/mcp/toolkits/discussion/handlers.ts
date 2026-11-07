@@ -1,5 +1,6 @@
 /** Applies MCP access policy before discussion services own lifecycle and template validation. */
 import {
+  type Discussion,
   type DiscussionError,
   type DiscussionId,
   OrchestratorMcpFailure,
@@ -50,6 +51,21 @@ const discussionLink = (scope: McpInvocationContext.McpInvocationScope, id: Disc
   scope.client?.webOrigin === undefined
     ? null
     : `${scope.client.webOrigin}/discussions/${encodeURIComponent(scope.environmentId)}/${encodeURIComponent(id)}`;
+
+/** Shares cursor position across read and wait; missing snapshots have unknown round/phase and no seats. */
+const discussionPosition = (discussion: Discussion | null) =>
+  ({
+    round: discussion?.cursor.round ?? null,
+    phase:
+      discussion === null
+        ? null
+        : (discussion.cursor.phase ?? discussion.closing?.phase ?? "regular"),
+    seatCount: discussion?.seats.length ?? 0,
+    speakingSeatId:
+      discussion?.status === "speaking" || discussion?.status === "closing"
+        ? (discussion.seats[discussion.cursor.seatIndex]?.id ?? null)
+        : null,
+  }) as const;
 
 /** The subscription's first event holds state and transcript under the same publication permit. */
 const readSnapshot = Effect.fn("mcp.discussion.readSnapshot")(function* (
@@ -233,8 +249,13 @@ const waitForDiscussion = Effect.fn("mcp.discussion.wait")(function* (input: {
         const transcript = [...entries.values()];
         const newEntrySeqs = transcript
           .filter((entry) => entry.seq > afterSeq && entry.status === "completed")
-          .map((entry) => entry.seq)
-          .sort((a, b) => a - b);
+          .map((entry) => ({
+            seq: entry.seq,
+            round: entry.round ?? null,
+            seatId: entry.seatId ?? null,
+            kind: entry.kind,
+          }))
+          .sort((a, b) => a.seq - b.seq);
         const reason = deleted
           ? ("deleted" as const)
           : discussion.status === "paused"
@@ -246,10 +267,13 @@ const waitForDiscussion = Effect.fn("mcp.discussion.wait")(function* (input: {
                 : newEntrySeqs.length > 0
                   ? ("new_entries" as const)
                   : ("timeout" as const);
+        const position = discussionPosition(discussion);
         return {
           reason,
           status: deleted ? null : discussion.status,
           pause: deleted ? null : discussion.pause,
+          ...position,
+          speakingSeatId: deleted ? null : position.speakingSeatId,
           latestSeq: transcript.reduce((seq, entry) => Math.max(seq, entry.seq), 0),
           newEntrySeqs,
           pendingRequests,
@@ -326,6 +350,7 @@ const waitForDiscussion = Effect.fn("mcp.discussion.wait")(function* (input: {
               reason: "deleted" as const,
               status: null,
               pause: null,
+              ...discussionPosition(null),
               latestSeq: 0,
               newEntrySeqs: [],
               pendingRequests: [],
@@ -418,6 +443,7 @@ export const layer = McpToolAccess.toLayer(DiscussionToolkit, {
                 status: discussion.status,
                 pause: discussion.pause,
                 closing: discussion.closing,
+                ...discussionPosition(discussion),
                 cursor: { round: discussion.cursor.round, seatIndex: discussion.cursor.seatIndex },
                 createdBy: discussion.createdBy,
                 seats: yield* Effect.forEach(discussion.seats, (seat) =>

@@ -271,6 +271,22 @@ it.effect.each([
       Effect.gen(function* () {
         yield* seedDiscussion(trigger === "paused" || trigger === "ended" ? trigger : "speaking");
         const store = yield* Store.DiscussionStore;
+        if (trigger === "paused" || trigger === "ended") {
+          const snapshot = (yield* store.getDiscussion(discussionFixture.id))!;
+          yield* store.updateDiscussion({
+            ...snapshot,
+            closing: {
+              summarizerSeatId: discussionFixture.seats[0]!.id,
+              summaryPrompt: "Summarize",
+              remainingFinalSeatIds: trigger === "paused" ? [discussionFixture.seats[1]!.id] : [],
+              phase: trigger === "paused" ? "final_round" : "summarizing",
+            },
+            cursor: {
+              ...snapshot.cursor,
+              ...(trigger === "ended" ? { phase: "summarizing" as const } : {}),
+            },
+          });
+        }
         for (const [index, kind] of (
           ["statement", "summary", "system", "user"] as const
         ).entries()) {
@@ -278,6 +294,7 @@ it.effect.each([
             ...entryFixtures[0]!,
             id: DiscussionEntryId.make(`wait:${index}`),
             kind,
+            ...(index < 2 ? { round: 1, seatId: discussionFixture.seats[index]!.id } : {}),
           });
         }
         yield* store.appendEntry({
@@ -306,7 +323,26 @@ it.effect.each([
           status,
           timedOut: false,
           latestSeq: trigger === "deleted" ? 0 : 5,
-          newEntrySeqs: trigger === "entries" ? [2, 3, 4] : [],
+          round: trigger === "deleted" ? null : 3,
+          phase:
+            trigger === "deleted"
+              ? null
+              : trigger === "paused"
+                ? "final_round"
+                : trigger === "ended"
+                  ? "summarizing"
+                  : "regular",
+          seatCount: trigger === "deleted" ? 0 : 2,
+          speakingSeatId:
+            trigger === "entries" || trigger === "request" ? discussionFixture.seats[1]!.id : null,
+          newEntrySeqs:
+            trigger === "entries"
+              ? [
+                  { seq: 2, round: 1, seatId: discussionFixture.seats[1]!.id, kind: "summary" },
+                  { seq: 3, round: null, seatId: null, kind: "system" },
+                  { seq: 4, round: null, seatId: null, kind: "user" },
+                ]
+              : [],
           pause: trigger === "paused" ? { reason: "stopped" } : null,
         });
         expect(result.pendingRequests).toEqual(
@@ -425,7 +461,15 @@ it.effect.each(["entries", "paused", "ended", "deleted", "request"] as const)(
                   ? trigger
                   : "speaking",
             latestSeq: trigger === "ended" || trigger === "entries" ? 2 : 1,
-            newEntrySeqs: trigger === "entries" ? [2] : [],
+            round: 3,
+            phase: trigger === "ended" ? "summarizing" : "regular",
+            seatCount: 2,
+            speakingSeatId:
+              trigger === "entries" || trigger === "request"
+                ? discussionFixture.seats[1]!.id
+                : null,
+            newEntrySeqs:
+              trigger === "entries" ? [{ seq: 2, round: null, seatId: null, kind: "user" }] : [],
             pause: trigger === "paused" ? { reason: "stopped" } : null,
           });
           expect(result.pendingRequests).toEqual(
@@ -574,6 +618,10 @@ it.effect.each([
           timedOut: true,
           status: "speaking",
           pause: null,
+          round: 3,
+          phase: "regular",
+          seatCount: 2,
+          speakingSeatId: discussionFixture.seats[1]!.id,
           latestSeq: 1,
           newEntrySeqs: [],
           pendingRequests: [],
@@ -583,7 +631,11 @@ it.effect.each([
         expect(yield* Fiber.join(second)).toMatchObject({
           reason: "new_entries",
           timedOut: false,
-          newEntrySeqs: [2],
+          round: 3,
+          phase: "regular",
+          seatCount: 2,
+          speakingSeatId: discussionFixture.seats[1]!.id,
+          newEntrySeqs: [{ seq: 2, round: null, seatId: null, kind: "user" }],
         });
       }).pipe(
         Effect.provide(Templates.layer),
@@ -812,6 +864,12 @@ it.effect(
               .pipe(Stream.unwrap, Stream.runCollect);
             const result = events.at(-1)?.result;
             assert(result !== undefined && "entries" in result);
+            expect(result).toMatchObject({
+              round: 3,
+              phase: "regular",
+              seatCount: 2,
+              speakingSeatId: discussionFixture.seats[1]!.id,
+            });
             expect(result.entries.map((entry) => entry.seq)).toEqual(
               Array.from({ length: row.count }, (_, index) => row.first! + index),
             );

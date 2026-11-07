@@ -103,7 +103,16 @@ const DiscussionPendingRequest = Schema.Union([
   }),
 ]);
 
+/** Read and wait expose the same position; null round/phase means a deleted snapshot was unavailable. */
+const DiscussionPositionFields = {
+  round: Schema.NullOr(Discussion.fields.cursor.fields.round),
+  phase: Schema.NullOr(Schema.Literals(["regular", "final_round", "summarizing"])),
+  seatCount: Schema.Number,
+  speakingSeatId: Schema.NullOr(DiscussionSeat.fields.id),
+};
+
 const DiscussionReadResult = Schema.Struct({
+  ...DiscussionPositionFields,
   id: Discussion.fields.id,
   title: Discussion.fields.title,
   topic: Discussion.fields.topic,
@@ -199,7 +208,7 @@ const DiscussionTool = Tool.make("t3_discussion", {
 
 const DiscussionWaitTool = Tool.make("t3_discussion_wait", {
   description:
-    "Discussions are experimental: use discussion tools only when the user asked for a discussion, or agreed to one you proposed with a reason. Wait for completed entries after afterSeq (default: latest on invocation), paused/ended/deleted state, or pending seat requests. Returns entry seqs; use t3_discussion read for text and respond for requests. timeoutMs defaults to 10 minutes, capped at 1 hour. On timeout, with next end your turn; without, call again. Deleted status is null.",
+    "Discussions are experimental: use discussion tools only when the user asked for a discussion, or agreed to one you proposed with a reason. Wait for completed entries after afterSeq (default: latest on invocation), paused/ended/deleted state, or pending seat requests. Returns round, phase, seatCount, speakingSeatId and entry positions; use t3_discussion read for text and respond for requests. For a round limit, check round and entry positions, then call end after the last seat speaks in the last requested round; end adds one final statement per seat, then a summary. timeoutMs defaults to 10 minutes, capped at 1 hour. On timeout, with next end your turn; without, call again. Deleted status is null.",
   parameters: Schema.Struct({
     discussionId: DiscussionIdInput.fields.discussionId,
     afterSeq: Schema.optional(
@@ -208,6 +217,7 @@ const DiscussionWaitTool = Tool.make("t3_discussion_wait", {
     timeoutMs: OrchestratorMcpThreadWaitInput.fields.timeoutMs,
   }),
   success: Schema.Struct({
+    ...DiscussionPositionFields,
     reason: Schema.Literals([
       "new_entries",
       "paused",
@@ -219,7 +229,14 @@ const DiscussionWaitTool = Tool.make("t3_discussion_wait", {
     status: Schema.NullOr(Discussion.fields.status),
     pause: Discussion.fields.pause,
     latestSeq: Schema.Number,
-    newEntrySeqs: Schema.Array(Schema.Number),
+    newEntrySeqs: Schema.Array(
+      Schema.Struct({
+        seq: DiscussionEntry.fields.seq,
+        round: Schema.NullOr(Discussion.fields.cursor.fields.round),
+        seatId: Schema.NullOr(DiscussionSeat.fields.id),
+        kind: DiscussionEntry.fields.kind,
+      }),
+    ),
     pendingRequests: Schema.Array(
       Schema.Struct({
         seatId: DiscussionSeat.fields.id,
