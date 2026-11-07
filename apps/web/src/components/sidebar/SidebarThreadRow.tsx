@@ -1013,7 +1013,9 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
       ? "bg-sidebar-row-selected inset-shadow-selected-control"
       : props.isActive
         ? "bg-sidebar-row-active shadow-raise-m"
-        : "bg-transparent hover:bg-sidebar-row-hover hover:shadow-raise-xs-control",
+        : topStatus?.icon === "done"
+          ? "bg-transparent shadow-sidebar-row-unread hover:bg-sidebar-row-hover"
+          : "bg-transparent hover:bg-sidebar-row-hover hover:shadow-raise-xs-control",
     isFileDragOver && "inset-shadow-selected-control",
     props.sortable?.isDragging && "bg-sidebar-row-drag shadow-sidebar-row-drag",
   );

@@ -289,7 +289,7 @@ export const sidebar: Messages["sidebar"] = {
     limited: "受限",
     failed: "失败",
     woke: "已唤醒",
-    done: "完成",
+    done: "等你回复",
     connecting: "正在连接",
     completed: "已完成",
     pendingApproval: "等待批准",

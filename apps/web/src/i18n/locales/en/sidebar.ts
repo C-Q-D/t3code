@@ -294,7 +294,7 @@ export const sidebar = {
     limited: "Limited",
     failed: "Failed",
     woke: "Woke",
-    done: "Done",
+    done: "Needs reply",
     connecting: "Connecting",
     completed: "Completed",
     pendingApproval: "Pending Approval",

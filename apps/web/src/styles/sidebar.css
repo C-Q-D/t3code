@@ -21,6 +21,9 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 0 0 1px rgba(0, 0, 0, 0.5), 0 3px 0 #09090a,
     18px 26px 30px -6px rgba(0, 0, 0, 0.85), 30px 46px 60px -20px rgba(0, 0, 0, 0.7);
   --shadow-sidebar-jump: 0 2px 0 #8e8e96, 3px 5px 8px -2px rgba(0, 0, 0, 0.7);
+  /* AI 回完、用户还没看的行：成功绿描边加外光，静态不重绘。 */
+  --shadow-sidebar-row-unread:
+    inset 0 0 0 1.5px rgba(111, 216, 150, 0.85), 0 0 12px -2px rgba(111, 216, 150, 0.45);
 }
 
 /* B1's feature buttons use compact rounded keys rather than the shared pill recipe. */
