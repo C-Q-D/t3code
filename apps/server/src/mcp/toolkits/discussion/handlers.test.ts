@@ -14,6 +14,7 @@ import {
   TurnItemId,
   ProviderDriverKind,
   type ThreadId,
+  type DiscussionId,
   type Discussion,
   type OrchestrationV2DomainEvent,
 } from "@t3tools/contracts";
@@ -21,12 +22,14 @@ import { CodexProviderCapabilitiesV2 } from "../../../orchestration-v2/Adapters/
 import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
 import * as Fiber from "effect/Fiber";
+import * as Queue from "effect/Queue";
 import * as TestClock from "effect/testing/TestClock";
 import * as Effect from "effect/Effect";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import * as EventSink from "../../../orchestration-v2/EventSink.ts";
+import * as Worker from "../../../orchestration-v2/EffectWorker.ts";
 import * as Threads from "../../../orchestration-v2/ThreadManagementService.ts";
 import * as Discussions from "../../../discussions/DiscussionService.ts";
 import * as Templates from "../../../discussions/DiscussionTemplateService.ts";
@@ -35,6 +38,10 @@ import {
   model,
   projectId,
   withDiscussionHarness,
+  awaitRun,
+  awaitProviderTurn,
+  awaitDiscussion,
+  finish,
 } from "../../../discussions/DiscussionService.testkit.ts";
 import {
   discussionFixture,
@@ -218,6 +225,7 @@ const seedDiscussion = Effect.fn("test.discussion.seedDiscussion")(function* (
 /** Calls the real toolkit; assertions inspect the public wait result rather than a service stub. */
 const wait = Effect.fn("test.discussion.wait")(function* (
   input: {
+    readonly discussionId?: DiscussionId;
     readonly afterSeq?: number;
     readonly timeoutMs?: number;
   } = {},
@@ -239,6 +247,7 @@ const wait = Effect.fn("test.discussion.wait")(function* (
 /** Observes the initial real request read; replay must cover commits made before live listeners acquire. */
 const beginWait = Effect.fn("test.discussion.beginWait")(function* (
   input: {
+    readonly discussionId?: DiscussionId;
     readonly afterSeq?: number;
     readonly timeoutMs?: number;
   } = {},
@@ -364,138 +373,206 @@ it.effect.each([
   ),
 );
 
-it.effect.each(["entries", "paused", "ended", "deleted", "request"] as const)(
-  "wakes for subsequent %s without polling",
-  (trigger) =>
-    withDiscussionHarness(
-      () =>
-        Effect.gen(function* () {
-          if (trigger === "ended") yield* (yield* Discussions.DiscussionService).start();
-          yield* seedDiscussion();
+it.effect.each([
+  "entries",
+  "paused",
+  "ended",
+  "deleted",
+  "request",
+  "first_seat",
+  "last_seat",
+] as const)("wakes for subsequent %s without polling", (trigger) =>
+  withDiscussionHarness(
+    (h) =>
+      Effect.gen(function* () {
+        if (trigger === "first_seat" || trigger === "last_seat") {
           const service = yield* Discussions.DiscussionService;
-          yield* service.interject({ discussionId: discussionFixture.id, text: "Already seen" });
-          const threads = yield* Threads.ThreadManagementService;
-          const summary =
-            trigger === "ended"
-              ? yield* threads.sendToThread({
-                  projectId,
-                  threadId: discussionFixture.seats[0]!.threadId,
-                  commandId: CommandId.make("wait:summary"),
-                  messageId: MessageId.make("wait:summary"),
-                  text: "Summarize",
-                  attachments: [],
-                  modelSelection: model,
-                  mode: "queue",
-                  createdBy: "user",
-                  creationSource: "server",
-                })
-              : null;
-          if (summary !== null)
-            yield* (yield* Store.DiscussionStore).updateDiscussion({
-              ...discussionFixture,
-              projectId,
-              status: "closing",
-              closing: {
-                summarizerSeatId: discussionFixture.seats[0]!.id,
-                summaryPrompt: "Summarize",
-                remainingFinalSeatIds: [],
-                phase: "summarizing",
+          yield* service.start();
+          const { discussion } = yield* service.create({
+            projectId,
+            topic: "Wait reports the next speaker",
+            seats: [
+              ...seats,
+              {
+                personaPromptId: DiscussionPromptId.make("builtin:persona:implementer"),
+                modelSelection: model,
               },
-              cursor: {
-                ...discussionFixture.cursor,
-                seatIndex: 0,
-                phase: "summarizing",
-                runId: summary.run.id,
-              },
-            });
-          const fiber = yield* beginWait(trigger === "ended" ? { afterSeq: 100 } : {});
-          let requestId: RuntimeRequestId | undefined;
-          if (trigger === "entries")
-            yield* service.interject({ discussionId: discussionFixture.id, text: "New" });
-          else if (trigger === "paused")
-            yield* service.stop({ discussionId: discussionFixture.id });
-          else if (trigger === "deleted") {
-            const store = yield* Store.DiscussionStore;
-            // Prepare deletion's no-active-run precondition without publishing a competing pause trigger.
-            yield* store.updateDiscussion({
-              ...discussionFixture,
-              projectId,
-              status: "paused",
-              pause: { reason: "stopped" },
-            });
-            yield* service.delete({ discussionId: discussionFixture.id });
-          } else if (trigger === "ended") {
-            assert(summary !== null);
-            const now = DateTime.makeUnsafe("2026-10-12T08:00:00.000Z");
-            // Provider completion is the fixture input; the real discussion reactor publishes ended.
-            yield* (yield* EventSink.EventSinkV2).write({
-              events: [
-                {
-                  id: EventId.make("wait:summary-completed"),
-                  threadId: discussionFixture.seats[0]!.threadId,
-                  type: "run.updated",
-                  occurredAt: now,
-                  payload: { ...summary.run, status: "completed", completedAt: now },
-                },
-              ],
-            });
-          } else
-            requestId = yield* seedRequest(
-              discussionFixture.seats[0]!.threadId,
-              "command",
-              "wait-live",
-            );
-          const result = yield* Fiber.join(fiber);
-          expect(result).toMatchObject({
-            reason:
-              trigger === "entries"
-                ? "new_entries"
-                : trigger === "request"
-                  ? "pending_request"
-                  : trigger,
-            timedOut: false,
-            status:
-              trigger === "deleted"
-                ? null
-                : trigger === "ended" || trigger === "paused"
-                  ? trigger
-                  : "speaking",
-            latestSeq: trigger === "ended" || trigger === "entries" ? 2 : 1,
-            round: 3,
-            phase: trigger === "ended" ? "summarizing" : "regular",
-            seatCount: 2,
-            speakingSeatId:
-              trigger === "entries" || trigger === "request"
-                ? discussionFixture.seats[1]!.id
-                : null,
-            newEntrySeqs:
-              trigger === "entries" ? [{ seq: 2, round: null, seatId: null, kind: "user" }] : [],
-            pause: trigger === "paused" ? { reason: "stopped" } : null,
+            ],
           });
-          expect(result.pendingRequests).toEqual(
-            trigger === "request"
-              ? [
-                  {
-                    seatId: discussionFixture.seats[0]!.id,
-                    threadId: discussionFixture.seats[0]!.threadId,
-                    requests: [
-                      {
-                        requestId,
-                        type: "approval",
-                        content: expect.stringContaining(approvalPrompt.replaceAll('"', '\\"')),
-                        truncated: false,
-                      },
-                    ],
-                  },
-                ]
-              : [],
+          yield* Worker.OrchestrationEffectWorkerV2.use((worker) => worker.drain());
+          let turn = yield* Queue.take(h.starts);
+          yield* awaitRun(turn.threadId, turn.runId, "running");
+          yield* awaitProviderTurn(turn);
+          if (trigger === "last_seat") {
+            yield* finish(h, turn);
+            yield* awaitDiscussion(
+              discussion,
+              (value) => value.cursor.dispatchNo === 2 && value.cursor.runId !== null,
+            );
+            yield* Worker.OrchestrationEffectWorkerV2.use((worker) => worker.drain());
+            turn = yield* Queue.take(h.starts);
+            yield* awaitRun(turn.threadId, turn.runId, "running");
+            yield* awaitProviderTurn(turn);
+          }
+          const fiber = yield* beginWait({
+            discussionId: discussion.id,
+            afterSeq: trigger === "first_seat" ? 0 : 1,
+          });
+          yield* finish(h, turn);
+          const position = {
+            round: trigger === "first_seat" ? 1 : 2,
+            phase: "regular",
+            speakingSeatId: discussion.seats[trigger === "first_seat" ? 1 : 0]!.id,
+            seatCount: 2,
+          };
+          expect(yield* Fiber.join(fiber)).toMatchObject({
+            ...position,
+            reason: "new_entries",
+            newEntrySeqs: [
+              {
+                seq: trigger === "first_seat" ? 1 : 2,
+                round: 1,
+                seatId: discussion.seats[trigger === "first_seat" ? 0 : 1]!.id,
+                kind: "statement",
+              },
+            ],
+          });
+          const toolkit = yield* DiscussionToolkit.pipe(
+            Effect.provide(McpToolAccess.HandlersLayer.layer(Handlers.layer)),
           );
-        }).pipe(
-          Effect.provide(Templates.layer),
-          Effect.provideService(McpInvocationContext.McpInvocationContext, scope),
-        ),
-      { git: false, startReactor: false },
-    ),
+          const events = yield* toolkit
+            .handle("t3_discussion", { action: "read", discussionId: discussion.id })
+            .pipe(Stream.unwrap, Stream.runCollect);
+          expect(events.at(-1)?.result).toMatchObject(position);
+          return;
+        }
+        if (trigger === "ended") yield* (yield* Discussions.DiscussionService).start();
+        yield* seedDiscussion();
+        const service = yield* Discussions.DiscussionService;
+        yield* service.interject({ discussionId: discussionFixture.id, text: "Already seen" });
+        const threads = yield* Threads.ThreadManagementService;
+        const summary =
+          trigger === "ended"
+            ? yield* threads.sendToThread({
+                projectId,
+                threadId: discussionFixture.seats[0]!.threadId,
+                commandId: CommandId.make("wait:summary"),
+                messageId: MessageId.make("wait:summary"),
+                text: "Summarize",
+                attachments: [],
+                modelSelection: model,
+                mode: "queue",
+                createdBy: "user",
+                creationSource: "server",
+              })
+            : null;
+        if (summary !== null)
+          yield* (yield* Store.DiscussionStore).updateDiscussion({
+            ...discussionFixture,
+            projectId,
+            status: "closing",
+            closing: {
+              summarizerSeatId: discussionFixture.seats[0]!.id,
+              summaryPrompt: "Summarize",
+              remainingFinalSeatIds: [],
+              phase: "summarizing",
+            },
+            cursor: {
+              ...discussionFixture.cursor,
+              seatIndex: 0,
+              phase: "summarizing",
+              runId: summary.run.id,
+            },
+          });
+        const fiber = yield* beginWait();
+        let requestId: RuntimeRequestId | undefined;
+        if (trigger === "entries")
+          yield* service.interject({ discussionId: discussionFixture.id, text: "New" });
+        else if (trigger === "paused") yield* service.stop({ discussionId: discussionFixture.id });
+        else if (trigger === "deleted") {
+          const store = yield* Store.DiscussionStore;
+          // Prepare deletion's no-active-run precondition without publishing a competing pause trigger.
+          yield* store.updateDiscussion({
+            ...discussionFixture,
+            projectId,
+            status: "paused",
+            pause: { reason: "stopped" },
+          });
+          yield* service.delete({ discussionId: discussionFixture.id });
+        } else if (trigger === "ended") {
+          assert(summary !== null);
+          const now = DateTime.makeUnsafe("2026-10-12T08:00:00.000Z");
+          // Provider completion is the fixture input; the real discussion reactor publishes ended.
+          yield* (yield* EventSink.EventSinkV2).write({
+            events: [
+              {
+                id: EventId.make("wait:summary-completed"),
+                threadId: discussionFixture.seats[0]!.threadId,
+                type: "run.updated",
+                occurredAt: now,
+                payload: { ...summary.run, status: "completed", completedAt: now },
+              },
+            ],
+          });
+        } else
+          requestId = yield* seedRequest(
+            discussionFixture.seats[0]!.threadId,
+            "command",
+            "wait-live",
+          );
+        const result = yield* Fiber.join(fiber);
+        expect(result).toMatchObject({
+          reason:
+            trigger === "entries"
+              ? "new_entries"
+              : trigger === "request"
+                ? "pending_request"
+                : trigger,
+          timedOut: false,
+          status:
+            trigger === "deleted"
+              ? null
+              : trigger === "ended" || trigger === "paused"
+                ? trigger
+                : "speaking",
+          latestSeq: trigger === "ended" || trigger === "entries" ? 2 : 1,
+          round: 3,
+          phase: trigger === "ended" ? "summarizing" : "regular",
+          seatCount: 2,
+          speakingSeatId:
+            trigger === "entries" || trigger === "request" ? discussionFixture.seats[1]!.id : null,
+          newEntrySeqs:
+            trigger === "entries"
+              ? [{ seq: 2, round: null, seatId: null, kind: "user" }]
+              : trigger === "ended"
+                ? [{ seq: 2, round: 3, seatId: discussionFixture.seats[0]!.id, kind: "summary" }]
+                : [],
+          pause: trigger === "paused" ? { reason: "stopped" } : null,
+        });
+        expect(result.pendingRequests).toEqual(
+          trigger === "request"
+            ? [
+                {
+                  seatId: discussionFixture.seats[0]!.id,
+                  threadId: discussionFixture.seats[0]!.threadId,
+                  requests: [
+                    {
+                      requestId,
+                      type: "approval",
+                      content: expect.stringContaining(approvalPrompt.replaceAll('"', '\\"')),
+                      truncated: false,
+                    },
+                  ],
+                },
+              ]
+            : [],
+        );
+      }).pipe(
+        Effect.provide(Templates.layer),
+        Effect.provideService(McpInvocationContext.McpInvocationContext, scope),
+      ),
+    { git: false, startReactor: false },
+  ),
 );
 
 it.effect("ignores streaming text and reloads requests only for the changed seat", () =>

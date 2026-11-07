@@ -67,19 +67,12 @@ const discussionPosition = (discussion: Discussion | null) =>
         : null,
   }) as const;
 
-/** The subscription's first event holds state and transcript under the same publication permit. */
+/** Lifecycle locking prevents exposing an entry with the cursor from before its advancement. */
 const readSnapshot = Effect.fn("mcp.discussion.readSnapshot")(function* (
   discussionId: DiscussionId,
 ) {
   const service = yield* Discussions.DiscussionService;
-  const first = yield* service.subscribe({ discussionId }).pipe(Stream.runHead);
-  if (Option.isNone(first) || first.value.type !== "snapshot") {
-    return yield* new OrchestratorMcpFailure({
-      code: "orchestration_error",
-      message: "Discussion snapshot was unavailable.",
-    });
-  }
-  return first.value;
+  return yield* service.getSnapshot({ discussionId });
 });
 
 /** Keeps provider-supplied approval detail bounded while preserving the requested tool, arguments and paths. */
@@ -315,6 +308,21 @@ const waitForDiscussion = Effect.fn("mcp.discussion.wait")(function* (input: {
             else if (event.type === "discussion.updated") discussion = event.discussion;
             else if (event.type === "entry.appended" || event.type === "entry.updated")
               entries.set(event.entry.id, event.entry);
+            // Entries publish before advancement; read after its lifecycle lock releases.
+            if (evaluate().reason === "new_entries") {
+              const snapshot = yield* readSnapshot(input.discussionId).pipe(
+                Effect.catchTags({
+                  DiscussionError: (error) =>
+                    error.reason === "not_found" ? Effect.succeed(null) : Effect.fail(error),
+                }),
+              );
+              if (snapshot === null) deleted = true;
+              else {
+                discussion = snapshot.discussion;
+                entries.clear();
+                for (const entry of snapshot.entries) entries.set(entry.id, entry);
+              }
+            }
             return evaluate();
           }),
         ),

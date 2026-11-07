@@ -81,6 +81,10 @@ export class DiscussionService extends Context.Service<
     readonly subscribe: (
       input: DiscussionIdInput,
     ) => Stream.Stream<DiscussionSubscriptionEvent, DiscussionError>;
+    /** Waits for lifecycle advancement before reading state and transcript; missing discussions fail. */
+    readonly getSnapshot: (
+      input: DiscussionIdInput,
+    ) => Effect.Effect<Extract<DiscussionSubscriptionEvent, { type: "snapshot" }>, DiscussionError>;
     /** Current instance capability support; reads metadata without opening provider sessions. */
     readonly providerSupport: () => Effect.Effect<DiscussionProviderSupportResult, DiscussionError>;
     /** Unified delta from the nearest earlier transcript checkpoint, or first run's baseline. */
@@ -772,6 +776,20 @@ const make = Effect.gen(function* () {
 
   return DiscussionService.of({
     list,
+    getSnapshot: Effect.fn("DiscussionService.getSnapshot")(({ discussionId }) =>
+      locks.withLock(
+        discussionId,
+        publication.withPermit(
+          domain(
+            Effect.gen(function* () {
+              const discussion = yield* requireDiscussion(discussionId);
+              const entries = yield* store.listEntries(discussionId);
+              return { type: "snapshot" as const, discussion, entries };
+            }),
+          ),
+        ),
+      ),
+    ),
     subscribeList: () =>
       Stream.unwrap(
         publication.withPermit(
