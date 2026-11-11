@@ -676,6 +676,7 @@ export class GhosttyTerminalCore {
     return encoded;
   }
 
+  /** strictUtf8 rejects legacy mouse bytes that string transport cannot preserve; the default retains manual input behavior. */
   encodeMouse(input: GhosttyMouseInput, strictUtf8 = false): string {
     this.ensureActive();
     this.runtime.call(

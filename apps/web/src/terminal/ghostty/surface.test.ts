@@ -271,7 +271,7 @@ describe("GhosttyTerminalSurface visibility", () => {
     };
   }
 
-  it("scrolls automation locally without sending PTY bytes or invoking keyboard hooks", async () => {
+  it("plans local automation without scrolling and applies only a current authorized action", async () => {
     const harness = createHarness();
     const beforeKey = vi.fn(() => false);
     const surface = await harness.create({ beforeKey });
@@ -292,10 +292,34 @@ describe("GhosttyTerminalSurface visibility", () => {
         before.frameRevision,
       ),
     ).toEqual({ status: "local_action", action: "scroll", deltaRows: -1 });
+    expect(surface.automationFrame(1)).toEqual(before);
+    expect(
+      surface.applyAutomationLocalAction({ type: "scroll", deltaRows: -1 }, before.frameRevision),
+    ).toEqual({ status: "local_applied" });
     const after = surface.automationFrame(1);
     expect(after.viewportStartLine).toBe(before.viewportStartLine - 1);
+    expect(() =>
+      surface.applyAutomationLocalAction({ type: "scroll", deltaRows: -1 }, before.frameRevision),
+    ).toThrow("stale_request");
+    expect(surface.automationFrame(1)).toEqual(after);
+    surface.setVisible(false);
+    expect(() =>
+      surface.applyAutomationLocalAction({ type: "scroll", deltaRows: -1 }, after.frameRevision),
+    ).toThrow("not_ready");
+    expect(surface.automationFrame(1)).toEqual(after);
+    surface.setVisible(true);
+    harness.flushFrame();
+    const visible = surface.automationFrame(1);
+    const bounds = vi
+      .spyOn(harness.canvas, "getBoundingClientRect")
+      .mockReturnValue({ left: 0, top: 0, right: 1, bottom: 104, width: 1, height: 104 });
+    expect(() =>
+      surface.applyAutomationLocalAction({ type: "scroll", deltaRows: -1 }, visible.frameRevision),
+    ).toThrow("stale_request");
+    expect(surface.automationFrame(1)).toEqual(visible);
+    bounds.mockRestore();
     expect(
-      surface.encodeAutomationInput({ type: "text", text: "🙂" }, after.frameRevision),
+      surface.encodeAutomationInput({ type: "text", text: "🙂" }, visible.frameRevision),
     ).toEqual({ status: "encoded", encodedText: "🙂" });
     expect(harness.onData).not.toHaveBeenCalled();
     expect(beforeKey).not.toHaveBeenCalled();

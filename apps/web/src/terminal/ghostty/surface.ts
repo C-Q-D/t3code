@@ -1,11 +1,16 @@
 /** Localized terminal presentation and existing interaction behavior. */
 import { t } from "~/i18n";
-import type { TerminalAutomationAction, TerminalAutomationReadQuery } from "@t3tools/contracts";
+import type {
+  TerminalAutomationAction,
+  TerminalAutomationReadQuery,
+  TerminalAutomationLocalAction,
+} from "@t3tools/contracts";
 import {
   encodeGhosttyAutomation,
   ghosttyAutomationFrame,
   GhosttyAutomationError,
   readGhosttyAutomation,
+  validateGhosttyAutomationGeometry,
 } from "./automation";
 import { isMacPlatform } from "../../lib/utils";
 import { SELECTION_MULTI_CLICK_INTERVAL_MS } from "../../lib/selectionActions";
@@ -815,8 +820,38 @@ export class GhosttyTerminalSurface {
     return readGhosttyAutomation(this.core, query, sequence);
   }
 
-  /** Encodes without sending; local scroll uses the existing viewport path and returns no PTY bytes. */
+  /** Returns bytes or a local plan without applying it; keyboard replies retain the request's revision for correlation. */
   encodeAutomationInput(action: TerminalAutomationAction, frameRevision: number) {
+    return encodeGhosttyAutomation(
+      this.core,
+      action,
+      frameRevision,
+      this.automationInputGeometry(),
+    );
+  }
+
+  /** Applies one authorized local plan; the bridge must validate binding/epoch/request and deduplicate unknown or repeated requests. */
+  applyAutomationLocalAction(
+    localAction: TerminalAutomationLocalAction,
+    frameRevision: number,
+  ): { readonly status: "local_applied" } {
+    this.automationInputGeometry();
+    const metadata = this.core.automationMetadata();
+    if (frameRevision !== metadata.frameRevision || metadata.activeScreen !== "primary")
+      throw new GhosttyAutomationError("stale_request");
+    if (
+      localAction.type !== "scroll" ||
+      !Number.isInteger(localAction.deltaRows) ||
+      localAction.deltaRows === 0 ||
+      Math.abs(localAction.deltaRows) > 100
+    )
+      throw new GhosttyAutomationError("unsupported_client");
+    this.scrollViewport(localAction.deltaRows);
+    return { status: "local_applied" };
+  }
+
+  /** Reads current CSS bounds only when canvas and font geometry have finished applying. */
+  private automationInputGeometry() {
     if (this.disposed) throw new GhosttyAutomationError("target_invalid");
     if (
       !this.visible ||
@@ -826,7 +861,7 @@ export class GhosttyTerminalSurface {
     )
       throw new GhosttyAutomationError("not_ready");
     const bounds = this.canvas.getBoundingClientRect();
-    const result = encodeGhosttyAutomation(this.core, action, frameRevision, {
+    const geometry = {
       cellWidth: this.metrics.width,
       cellHeight: this.metrics.height,
       screenWidth: bounds.width,
@@ -835,9 +870,9 @@ export class GhosttyTerminalSurface {
       paddingRight: CONTENT_PADDING,
       paddingTop: this.originY,
       paddingBottom: Math.max(0, bounds.height - this.originY - this.rows * this.metrics.height),
-    });
-    if (result.status === "local_action") this.scrollViewport(result.deltaRows);
-    return result;
+    };
+    validateGhosttyAutomationGeometry(this.core.automationMetadata(), geometry);
+    return geometry;
   }
 
   resetAndWrite(data: string): void {

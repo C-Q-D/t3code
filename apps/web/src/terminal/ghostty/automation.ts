@@ -29,11 +29,35 @@ export interface GhosttyAutomationGeometry {
   readonly paddingBottom: number;
 }
 
-/** Local scroll needs surface execution and cannot be represented by A1's encodedText reply. */
+/** Local scroll is a plan; bridge authorization and deduplication must precede surface application. */
 export type GhosttyAutomationEncoding =
   | { readonly status: "encoded"; readonly encodedText: string }
   | { readonly status: "not_sent" }
   | { readonly status: "local_action"; readonly action: "scroll"; readonly deltaRows: number };
+
+/** Rejects geometry that cannot represent the current grid before a positional action is encoded or applied. */
+export function validateGhosttyAutomationGeometry(
+  metadata: Pick<GhosttyAutomationMetadata, "cols" | "rows">,
+  geometry: GhosttyAutomationGeometry | undefined,
+): asserts geometry is GhosttyAutomationGeometry {
+  if (
+    !geometry ||
+    !Object.values(geometry).every(Number.isFinite) ||
+    geometry.cellWidth <= 0 ||
+    geometry.cellHeight <= 0 ||
+    Math.min(
+      geometry.paddingLeft,
+      geometry.paddingRight,
+      geometry.paddingTop,
+      geometry.paddingBottom,
+    ) < 0 ||
+    geometry.screenWidth <
+      geometry.paddingLeft + geometry.paddingRight + metadata.cols * geometry.cellWidth ||
+    geometry.screenHeight <
+      geometry.paddingTop + geometry.paddingBottom + metadata.rows * geometry.cellHeight
+  )
+    throw new GhosttyAutomationError("stale_request");
+}
 
 /** Encodes without DOM dispatch or PTY writes; only positional input requires a current frame, while keys use current modes. */
 export function encodeGhosttyAutomation(
@@ -105,23 +129,7 @@ export function encodeGhosttyAutomation(
       row >= metadata.rows
     )
       throw new GhosttyAutomationError("stale_request");
-    if (
-      !geometry ||
-      !Object.values(geometry).every(Number.isFinite) ||
-      geometry.cellWidth <= 0 ||
-      geometry.cellHeight <= 0 ||
-      Math.min(
-        geometry.paddingLeft,
-        geometry.paddingRight,
-        geometry.paddingTop,
-        geometry.paddingBottom,
-      ) < 0 ||
-      geometry.screenWidth <
-        geometry.paddingLeft + geometry.paddingRight + metadata.cols * geometry.cellWidth ||
-      geometry.screenHeight <
-        geometry.paddingTop + geometry.paddingBottom + metadata.rows * geometry.cellHeight
-    )
-      throw new GhosttyAutomationError("stale_request");
+    validateGhosttyAutomationGeometry(metadata, geometry);
     const reporting = core.isMouseTracking() && !action.modifiers.shift;
     if (!reporting) {
       if (action.event !== "wheel" || action.deltaColumns !== 0)
