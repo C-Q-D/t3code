@@ -140,6 +140,7 @@ export interface GhosttyScrollbar {
 }
 
 export interface GhosttyAutomationMetadata {
+  readonly frameRevision: number;
   readonly cols: number;
   readonly rows: number;
   readonly activeScreen: "primary" | "alternate";
@@ -240,6 +241,7 @@ export class GhosttyTerminalCore {
   private scrollbar = 0;
   private rows: GhosttyRow[] = [];
   private disposed = false;
+  private frameRevision = 0;
   private keyboardLayoutMap: GhosttyKeyboardLayoutMap | undefined;
 
   private constructor(runtime: GhosttyRuntime) {
@@ -359,6 +361,7 @@ export class GhosttyTerminalCore {
     this.ensureActive();
     const bytes = typeof data === "string" ? encoder.encode(data) : data;
     if (bytes.length === 0) return;
+    this.frameRevision += 1;
     const pointer = this.runtime.alloc(bytes.length);
     this.runtime.bytes(pointer, bytes.length).set(bytes);
     // An existing render deadline belongs to one group. Observe Ghostty before
@@ -383,6 +386,7 @@ export class GhosttyTerminalCore {
 
   resetAndWrite(data: string): void {
     this.ensureActive();
+    this.frameRevision += 1;
     this.runtime.call("ghostty_terminal_reset", this.terminal);
     // RIS restores the built-in steady cursor; reapply the embedder default before replay.
     this.applyDefaultCursorBlink();
@@ -404,6 +408,7 @@ export class GhosttyTerminalCore {
 
   resize(cols: number, rows: number, cellWidth: number, cellHeight: number): void {
     this.ensureActive();
+    this.frameRevision += 1;
     this.assertSuccess(
       "ghostty_terminal_resize",
       this.runtime.call(
@@ -453,6 +458,7 @@ export class GhosttyTerminalCore {
 
   scroll(deltaRows: number): void {
     this.ensureActive();
+    this.frameRevision += 1;
     const layout = this.runtime.layout("GhosttyTerminalScrollViewport");
     const scroll = this.runtime.alloc(layout.size);
     this.runtime.setField(scroll, "GhosttyTerminalScrollViewport", "tag", 2);
@@ -464,6 +470,7 @@ export class GhosttyTerminalCore {
 
   scrollToBottom(): void {
     this.ensureActive();
+    this.frameRevision += 1;
     const layout = this.runtime.layout("GhosttyTerminalScrollViewport");
     const scroll = this.runtime.alloc(layout.size);
     this.runtime.setField(scroll, "GhosttyTerminalScrollViewport", "tag", 1);
@@ -854,7 +861,11 @@ export class GhosttyTerminalCore {
       pendingWrap,
       activeScreen,
       viewportStartLine: this.viewportPointToScreen(0, 0)?.y ?? scrollback,
-      retainedRange: { startLine: 0, endLineExclusive: total },
+      retainedRange: {
+        startLine: Math.max(0, total - MAX_SCROLLBACK_ROWS),
+        endLineExclusive: total,
+      },
+      frameRevision: this.frameRevision,
     };
   }
 
