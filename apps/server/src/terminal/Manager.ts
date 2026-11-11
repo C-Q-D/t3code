@@ -209,6 +209,21 @@ export class TerminalManager extends Context.Service<
 
     readonly write: (input: TerminalWriteInput) => Effect.Effect<void, TerminalError>;
 
+    readonly inspectExisting: (input: TerminalObserveInput) => Effect.Effect<
+      {
+        readonly terminalInstanceId: string;
+        readonly humanInputEpoch: number;
+      },
+      TerminalError
+    >;
+
+    readonly writeAutomation: (
+      input: TerminalWriteInput & {
+        readonly terminalInstanceId: string;
+        readonly humanInputEpoch: number;
+      },
+    ) => Effect.Effect<void, TerminalError>;
+
     readonly resize: (
       input: TerminalResizeInput,
       viewerId?: string,
@@ -295,6 +310,8 @@ interface TerminalSessionState {
   updatedAt: string;
   eventSequence: number;
   inputCount: number;
+  humanInputEpoch: number;
+  terminalInstanceId?: string;
   cols: number;
   rows: number;
   process: PtyAdapter.PtyProcess | null;
@@ -386,6 +403,7 @@ function terminalWireLabel(session: TerminalSessionState): string {
 
 function snapshot(session: TerminalSessionState): TerminalSessionSnapshot {
   return {
+    ...(session.terminalInstanceId ? { terminalInstanceId: session.terminalInstanceId } : {}),
     threadId: session.threadId,
     terminalId: session.terminalId,
     cwd: session.cwd,
@@ -405,6 +423,7 @@ function snapshot(session: TerminalSessionState): TerminalSessionSnapshot {
 
 function summary(session: TerminalSessionState): TerminalSummary {
   return {
+    ...(session.terminalInstanceId ? { terminalInstanceId: session.terminalInstanceId } : {}),
     threadId: session.threadId,
     terminalId: session.terminalId,
     cwd: session.cwd,
@@ -2523,6 +2542,7 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
             };
             yield* modifyManagerState((state) => {
               session.process = ptyProcess;
+              session.terminalInstanceId = NodeCrypto.randomUUID();
               session.shell = spawnResult.shell;
               session.pid = processPid;
               session.status = "running";
@@ -2897,6 +2917,7 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
         updatedAt: yield* nowIso,
         eventSequence: 0,
         inputCount: 0,
+        humanInputEpoch: 0,
         cols,
         rows,
         process: null,
@@ -3347,29 +3368,63 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
     );
   };
 
-  const write: TerminalManager["Service"]["write"] = Effect.fn("terminal.write")(function* (input) {
+  const inspectExisting: TerminalManager["Service"]["inspectExisting"] = Effect.fn(
+    "terminal.inspectExisting",
+  )(function* (input) {
+    const session = yield* requireSession(input.threadId, input.terminalId);
+    if (
+      !session.process ||
+      session.status !== "running" ||
+      !session.terminalInstanceId ||
+      session.pendingProcessEvents.some((event) => event?.type === "exit")
+    ) {
+      return yield* new TerminalNotRunningError(input);
+    }
+    return {
+      terminalInstanceId: session.terminalInstanceId,
+      humanInputEpoch: session.humanInputEpoch,
+    };
+  });
+
+  // Validation and native write share one synchronous section, including the human-input barrier.
+  const writeStrict = Effect.fn("terminal.writeStrict")(function* (
+    input: TerminalWriteInput,
+    expected?: { terminalInstanceId: string; humanInputEpoch: number },
+  ) {
     const terminalId = input.terminalId;
     const session = yield* requireSession(input.threadId, terminalId);
-    const process = session.process;
-    if (!process || session.status !== "running") {
-      if (session.status === "exited") return;
-      return yield* new TerminalNotRunningError({
-        threadId: input.threadId,
-        terminalId,
-      });
-    }
-    session.inputCount += 1;
     yield* Effect.try({
-      try: () => process.write(input.data),
+      try: () => {
+        const process = session.process;
+        if (
+          !process ||
+          session.status !== "running" ||
+          session.pendingProcessEvents.some((event) => event?.type === "exit") ||
+          (expected &&
+            (session.terminalInstanceId !== expected.terminalInstanceId ||
+              session.humanInputEpoch !== expected.humanInputEpoch))
+        ) {
+          throw new TerminalNotRunningError({ threadId: input.threadId, terminalId });
+        }
+        session.inputCount += 1;
+        if (!expected) session.humanInputEpoch += 1;
+        process.write(input.data);
+      },
       catch: (cause) =>
-        new TerminalWriteError({
-          threadId: input.threadId,
-          terminalId,
-          terminalPid: process.pid,
-          cause,
-        }),
+        Schema.is(TerminalNotRunningError)(cause)
+          ? cause
+          : new TerminalWriteError({
+              threadId: input.threadId,
+              terminalId,
+              terminalPid: session.pid ?? 0,
+              cause,
+            }),
     });
   });
+  const write: TerminalManager["Service"]["write"] = (input) =>
+    withThreadLock(input.threadId, writeStrict(input));
+  const writeAutomation: TerminalManager["Service"]["writeAutomation"] = (input) =>
+    withThreadLock(input.threadId, writeStrict(input, input));
 
   const resizeLocked = Effect.fn("terminal.resize")(function* (
     input: TerminalResizeInput,
@@ -3496,6 +3551,8 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
     observeStream,
     resyncStream,
     write,
+    inspectExisting,
+    writeAutomation,
     resize,
     clear,
     close,

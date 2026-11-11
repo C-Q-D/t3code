@@ -409,6 +409,56 @@ it.layer(
   Layer.merge(NodeServices.layer, ProcessRunner.layer.pipe(Layer.provide(NodeServices.layer))),
   { excludeTestServices: true },
 )("TerminalManager", (it) => {
+  it.effect("rejects stale instances and human input without spawning or writing", () =>
+    Effect.gen(function* () {
+      const { manager, ptyAdapter } = yield* createManager();
+      const target = { threadId: "thread-1", terminalId: DEFAULT_TERMINAL_ID };
+      expect(yield* Effect.flip(manager.inspectExisting(target))).toMatchObject({
+        _tag: "TerminalSessionLookupError",
+      });
+      expect(ptyAdapter.processes).toHaveLength(0);
+      const first = yield* manager.open(openInput());
+      const inspected = yield* manager.inspectExisting(target);
+      expect(inspected.terminalInstanceId).toBe(first.terminalInstanceId);
+      yield* manager.writeAutomation({ ...target, ...inspected, data: "auto" });
+      expect((yield* manager.inspectExisting(target)).humanInputEpoch).toBe(0);
+      yield* manager.write({ ...target, data: "human" });
+      expect(
+        yield* Effect.flip(manager.writeAutomation({ ...target, ...inspected, data: "stale" })),
+      ).toMatchObject({ _tag: "TerminalNotRunningError" });
+      yield* manager.close(target);
+      yield* manager.open(openInput());
+      expect((yield* manager.inspectExisting(target)).terminalInstanceId).not.toBe(
+        first.terminalInstanceId,
+      );
+      expect(
+        yield* Effect.flip(manager.writeAutomation({ ...target, ...inspected, data: "old" })),
+      ).toMatchObject({ _tag: "TerminalNotRunningError" });
+      expect(ptyAdapter.processes[0]!.writes).toEqual(["auto", "human"]);
+      expect(ptyAdapter.processes[1]!.writes).toEqual([]);
+    }),
+  );
+
+  it.effect("rejects writes after process exit", () =>
+    Effect.gen(function* () {
+      const { manager, ptyAdapter } = yield* createManager();
+      const exited = yield* Deferred.make<void>();
+      yield* manager.subscribe((event) =>
+        event.type === "exited"
+          ? Deferred.succeed(exited, undefined).pipe(Effect.asVoid)
+          : Effect.void,
+      );
+      yield* manager.open(openInput());
+      ptyAdapter.processes[0]!.emitExit({ exitCode: 0, signal: null });
+      yield* Deferred.await(exited);
+      expect(
+        yield* Effect.flip(
+          manager.write({ threadId: "thread-1", terminalId: DEFAULT_TERMINAL_ID, data: "x" }),
+        ),
+      ).toMatchObject({ _tag: "TerminalNotRunningError" });
+    }),
+  );
+
   it.effect("spawns lazily and reuses running terminal per thread", () =>
     Effect.gen(function* () {
       const { manager, ptyAdapter } = yield* createManager();
