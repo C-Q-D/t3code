@@ -117,6 +117,37 @@ const setup = Effect.gen(function* () {
   };
 });
 
+it.effect(
+  "selection queue overflow rolls back invitations already delivered to another window",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* setup;
+      const second = yield* f.service.connect(scope, "second");
+      yield* f.service.registerViews("client", { version: 1, views: [view()] });
+      yield* f.service.registerViews("second", { version: 1, views: [view("two")] });
+      const filler: A.TerminalAutomationSelectionRequest = {
+        version: 1,
+        selectionRequestId: "filler",
+        candidateVersion: 0,
+        candidates: [],
+      };
+      const queue = second as Queue.Queue<
+        A.TerminalAutomationSelectionRequest | A.TerminalAutomationClientRequest
+      >;
+      for (let i = 0; i < 128; i += 1) expect(Queue.offerUnsafe(queue, filler)).toBe(true);
+      const model = { scope, callerId: "model" };
+      expect(yield* f.service.bind(model, { mode: "auto" }).pipe(Effect.flip)).toEqual({
+        code: "budget_exceeded",
+      });
+      expect(yield* Queue.clear(f.messages)).toEqual([]);
+      expect((yield* f.service.status(model)).state.status).toBe("unbound");
+      expect(yield* Queue.clear(second)).toHaveLength(128);
+      expect((yield* f.service.bind(model, { mode: "auto" })).state.status).toBe(
+        "selection_required",
+      );
+    }),
+);
+
 it.effect("routes model selection to real views and accepts only the first invited reply", () =>
   Effect.gen(function* () {
     const { service, messages, beforeInspect } = yield* setup;

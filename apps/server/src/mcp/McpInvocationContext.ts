@@ -16,6 +16,7 @@ import { formatThreadLink } from "@t3tools/shared/threadLinks";
 import type { DispatchAuthorization } from "../auth/DispatchAuthorization.ts";
 
 const ALL_MCP_CAPABILITIES = [
+  "terminal",
   "preview",
   "orchestration",
   "worktree",

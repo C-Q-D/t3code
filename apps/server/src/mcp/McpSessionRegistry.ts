@@ -123,6 +123,7 @@ const makeWithOptions = Effect.fn("McpSessionRegistry.make")(function* (
         },
         client: undefined,
         capabilities: new Set<McpInvocationContext.McpCapability>([
+          "terminal",
           "orchestration",
           "worktree",
           "pull-requests",
