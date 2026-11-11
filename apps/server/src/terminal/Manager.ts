@@ -3421,10 +3421,9 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
             }),
     });
   });
-  const write: TerminalManager["Service"]["write"] = (input) =>
-    withThreadLock(input.threadId, writeStrict(input));
+  const write: TerminalManager["Service"]["write"] = (input) => writeStrict(input);
   const writeAutomation: TerminalManager["Service"]["writeAutomation"] = (input) =>
-    withThreadLock(input.threadId, writeStrict(input, input));
+    writeStrict(input, input);
 
   const resizeLocked = Effect.fn("terminal.resize")(function* (
     input: TerminalResizeInput,
