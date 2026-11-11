@@ -139,6 +139,26 @@ export interface GhosttyScrollbar {
   readonly len: number;
 }
 
+export interface GhosttyAutomationMetadata {
+  readonly cols: number;
+  readonly rows: number;
+  readonly activeScreen: "primary" | "alternate";
+  readonly viewportStartLine: number;
+  readonly retainedRange: { readonly startLine: number; readonly endLineExclusive: number };
+  readonly cursorColumn: number;
+  readonly cursorLine: number;
+  readonly pendingWrap: boolean;
+}
+
+export interface GhosttyAutomationRows {
+  readonly metadata: GhosttyAutomationMetadata;
+  readonly lines: readonly {
+    readonly line: number;
+    readonly text: string;
+    readonly softWrapAfter: boolean;
+  }[];
+}
+
 export interface GhosttyPointInput {
   readonly x: number;
   readonly y: number;
@@ -805,6 +825,151 @@ export class GhosttyTerminalCore {
   clearSelection(): void {
     this.ensureActive();
     this.runtime.call("ghostty_terminal_set", this.terminal, 21, 0);
+  }
+
+  /** Reads the active grid without consuming render dirty state or moving the viewport. */
+  automationMetadata(): GhosttyAutomationMetadata {
+    this.ensureActive();
+    const get = (id: number) => {
+      this.runtime.bytes(this.scratch, 4).fill(0);
+      this.assertSuccess(
+        "ghostty_terminal_get",
+        this.runtime.call("ghostty_terminal_get", this.terminal, id, this.scratch),
+      );
+      return this.runtime.view(this.scratch, 4).getUint32(0, true);
+    };
+    const cols = get(1);
+    const rows = get(2);
+    const cursorColumn = get(3);
+    const cursorRow = get(4);
+    const pendingWrap = get(5) !== 0;
+    const activeScreen = get(6) === 1 ? "alternate" : "primary";
+    const total = get(14);
+    const scrollback = get(15);
+    return {
+      cols,
+      rows,
+      cursorColumn,
+      cursorLine: scrollback + cursorRow,
+      pendingWrap,
+      activeScreen,
+      viewportStartLine: this.viewportPointToScreen(0, 0)?.y ?? scrollback,
+      retainedRange: { startLine: 0, endLineExclusive: total },
+    };
+  }
+
+  /** Formats physical rows in [startLine, endLineExclusive); rejects ranges outside the active screen. */
+  readAutomationRows(startLine: number, endLineExclusive: number): GhosttyAutomationRows {
+    const metadata = this.automationMetadata();
+    if (
+      !Number.isInteger(startLine) ||
+      !Number.isInteger(endLineExclusive) ||
+      startLine < 0 ||
+      endLineExclusive < startLine ||
+      endLineExclusive > metadata.retainedRange.endLineExclusive
+    ) {
+      throw new RangeError("Ghostty automation range is outside the active screen");
+    }
+    const lines: GhosttyAutomationRows["lines"][number][] = [];
+    for (let line = startLine; line < endLineExclusive; line += 1) {
+      const ref = this.gridRef(0, line, 2);
+      try {
+        this.assertSuccess(
+          "ghostty_grid_ref_row",
+          this.runtime.call("ghostty_grid_ref_row", ref, this.scratch),
+        );
+        const raw = this.runtime.view(this.scratch, 8).getBigUint64(0, true);
+        this.assertSuccess(
+          "ghostty_row_get",
+          this.runtime.call("ghostty_row_get", raw, 1, this.scratch + 8),
+        );
+        const softWrapAfter = this.runtime.bytes(this.scratch + 8, 1)[0] !== 0;
+        lines.push({ line, text: this.formatAutomationRow(line, metadata.cols), softWrapAfter });
+      } finally {
+        this.runtime.free(ref, this.runtime.layout("GhosttyGridRef").size);
+      }
+    }
+    return { metadata, lines };
+  }
+
+  // A borrowed selection bounds formatting without installing a user selection.
+  private formatAutomationRow(line: number, cols: number): string {
+    const layout = this.runtime.layout("GhosttyFormatterTerminalOptions");
+    const selectionLayout = this.runtime.layout("GhosttySelection");
+    const options = this.runtime.alloc(layout.size);
+    let selection = 0;
+    let slot = 0;
+    let written = 0;
+    let formatter = 0;
+    const refs: number[] = [];
+    try {
+      selection = this.runtime.alloc(selectionLayout.size);
+      slot = this.runtime.allocOpaque();
+      written = this.runtime.call("ghostty_wasm_alloc_usize");
+      this.runtime.setField(options, "GhosttyFormatterTerminalOptions", "size", layout.size);
+      this.runtime.setField(options, "GhosttyFormatterTerminalOptions", "trim", 0);
+      const extra = options + layout.fields.extra!.offset;
+      this.runtime.setField(
+        extra,
+        "GhosttyFormatterTerminalExtra",
+        "size",
+        this.runtime.layout("GhosttyFormatterTerminalExtra").size,
+      );
+      this.runtime.setField(
+        extra + this.runtime.layout("GhosttyFormatterTerminalExtra").fields.screen!.offset,
+        "GhosttyFormatterScreenExtra",
+        "size",
+        this.runtime.layout("GhosttyFormatterScreenExtra").size,
+      );
+      this.runtime.setField(selection, "GhosttySelection", "size", selectionLayout.size);
+      for (const [field, column] of [
+        ["start", 0],
+        ["end", cols - 1],
+      ] as const) {
+        const ref = this.gridRef(column, line, 2);
+        refs.push(ref);
+        const target = selectionLayout.fields[field]!;
+        this.runtime
+          .bytes(selection + target.offset, target.size)
+          .set(this.runtime.bytes(ref, target.size));
+      }
+      this.runtime.view(options + layout.fields.selection!.offset, 4).setUint32(0, selection, true);
+      this.assertSuccess(
+        "ghostty_formatter_terminal_new",
+        this.runtime.call("ghostty_formatter_terminal_new", 0, slot, this.terminal, options),
+      );
+      formatter = this.runtime.readPointer(slot);
+      const sizeResult = this.runtime.call(
+        "ghostty_formatter_format_buf",
+        formatter,
+        0,
+        0,
+        written,
+      );
+      const size = this.runtime.view(written, 4).getUint32(0, true);
+      if (sizeResult !== GHOSTTY_OUT_OF_SPACE)
+        this.assertSuccess("ghostty_formatter_format_buf", sizeResult);
+      if (size === 0) return "";
+      const output = this.runtime.alloc(size);
+      try {
+        this.assertSuccess(
+          "ghostty_formatter_format_buf",
+          this.runtime.call("ghostty_formatter_format_buf", formatter, output, size, written),
+        );
+        return decoder.decode(
+          this.runtime.bytes(output, this.runtime.view(written, 4).getUint32(0, true)),
+        );
+      } finally {
+        this.runtime.free(output, size);
+      }
+    } finally {
+      if (formatter !== 0) this.runtime.call("ghostty_formatter_free", formatter);
+      for (const ref of refs) this.runtime.free(ref, this.runtime.layout("GhosttyGridRef").size);
+      if (written !== 0) this.runtime.call("ghostty_wasm_free_usize", written);
+      if (slot !== 0) this.runtime.freeOpaque(slot);
+      this.runtime.free(selection, selectionLayout.size);
+      this.runtime.free(options, layout.size);
+    }
   }
 
   snapshot(): GhosttySnapshot {
