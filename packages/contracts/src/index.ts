@@ -74,3 +74,4 @@ export * from "./settingsSecretValue.ts";
 export * from "./clientRpcPermissions.ts";
 
 export * from "./discussion.ts";
+export * from "./terminalAutomation.ts";
