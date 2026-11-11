@@ -15,7 +15,7 @@ import * as Manager from "./Manager.ts";
 export interface Caller {
   readonly scope: A.TerminalAutomationScope;
   readonly callerId: string;
-  readonly selectionConnectionId: string;
+  readonly selectionConnectionId?: string;
 }
 
 type Message = A.TerminalAutomationSelectionRequest | A.TerminalAutomationClientRequest;
@@ -32,6 +32,7 @@ interface Owner {
   state: A.TerminalAutomationState;
   connectionId?: string;
   humanInputEpoch?: number;
+  invited?: ReadonlySet<string>;
 }
 interface Receipt {
   readonly payload: string;
@@ -142,16 +143,35 @@ const make = Effect.gen(function* () {
         .filter((client) => sameScope(client.scope, scope))
         .map((client) => client.version),
     );
-  const changeCandidates = (scope: A.TerminalAutomationScope) => {
+  const clearSelection = Effect.fn("TerminalAutomation.clearSelection")(function* (
+    requestId: string,
+    invited: ReadonlySet<string> | undefined,
+  ) {
+    for (const id of invited ?? []) {
+      const client = connections.get(id);
+      if (!client) continue;
+      const messages = yield* Queue.clear(client.messages);
+      for (const message of messages)
+        if (!("selectionRequestId" in message) || message.selectionRequestId !== requestId)
+          Queue.offerUnsafe(client.messages, message);
+    }
+  }, Effect.uninterruptible);
+  const changeCandidates = Effect.fn("TerminalAutomation.changeCandidates")(function* (
+    scope: A.TerminalAutomationScope,
+  ) {
     const version = versionFor(scope) + 1;
     for (const client of connections.values())
       if (sameScope(client.scope, scope)) client.version = version;
     for (const owner of owners.values())
       if (sameScope(owner.caller.scope, scope) && owner.state.status === "selection_required") {
+        const requestId = owner.state.selectionRequestId;
+        const invited = owner.invited;
+        delete owner.invited;
         owner.state = { status: "unbound" };
         if (owner.busy === 0) owners.delete(ownerKey(owner.caller));
+        yield* clearSelection(requestId, invited);
       }
-  };
+  });
   const pruneRetired = () => {
     const now = clock.currentTimeMillisUnsafe();
     for (const [id, work] of retired) if (now - work.retiredAt! >= 300_000) retired.delete(id);
@@ -315,7 +335,7 @@ const make = Effect.gen(function* () {
   const disconnect = Effect.fn("TerminalAutomation.disconnect")(function* (id: string) {
     const client = connections.get(id);
     if (!client) return;
-    changeCandidates(client.scope);
+    yield* changeCandidates(client.scope);
     connections.delete(id);
     for (const entry of pending.values())
       if (entry.connectionId === id)
@@ -369,7 +389,7 @@ const make = Effect.gen(function* () {
     if (views.length + otherCount > 64) return yield* Effect.fail(failure("budget_exceeded"));
     if (connections.get(id) !== client) return yield* Effect.fail(failure("client_unavailable"));
     client.views = views;
-    changeCandidates(client.scope);
+    yield* changeCandidates(client.scope);
     for (const owner of owners.values())
       if (sameScope(client.scope, owner.caller.scope)) yield* refresh(owner);
   });
@@ -388,6 +408,10 @@ const make = Effect.gen(function* () {
     if (owner.state !== previousState) return yield* Effect.fail(failure("stale_request"));
     if (connections.get(entry[0]) !== entry[1])
       return yield* Effect.fail(failure("client_unavailable"));
+    const selectionRequestId =
+      previousState.status === "selection_required" ? previousState.selectionRequestId : undefined;
+    const invited = owner.invited;
+    delete owner.invited;
     owner.connectionId = entry[0];
     owner.humanInputEpoch = current.humanInputEpoch;
     owner.state = {
@@ -404,6 +428,7 @@ const make = Effect.gen(function* () {
       receipts: new Map(),
       stop: Deferred.makeUnsafe<never, Failure>(),
     });
+    if (selectionRequestId) yield* clearSelection(selectionRequestId, invited);
   });
   const bind = Effect.fn("TerminalAutomation.bind")(function* (
     caller: Caller,
@@ -419,14 +444,23 @@ const make = Effect.gen(function* () {
           if (owner.state.status !== "unbound") return yield* status(caller);
           owner.caller = caller;
           const previousState = owner.state;
+          const candidateVersion = versionFor(caller.scope);
           const available = yield* candidates(caller.scope);
-          if (owner.state !== previousState) return yield* Effect.fail(failure("stale_request"));
+          if (owner.state !== previousState || candidateVersion !== versionFor(caller.scope))
+            return yield* Effect.fail(failure("stale_request"));
           if (available.length === 0) return yield* Effect.fail(failure("not_ready"));
           if (available.length === 1 && input.mode === "auto") yield* select(owner, available[0]!);
           else {
-            const client = yield* connection(caller.selectionConnectionId);
-            if (!sameScope(client.scope, caller.scope))
-              return yield* Effect.fail(failure("client_unavailable"));
+            const recipients = [...connections.entries()].filter(
+              ([id, client]) =>
+                (caller.selectionConnectionId === undefined ||
+                  caller.selectionConnectionId === id) &&
+                sameScope(client.scope, caller.scope) &&
+                client.views.some((view) =>
+                  available.some((candidate) => candidate.candidateId === view.candidateId),
+                ),
+            );
+            if (recipients.length === 0) return yield* Effect.fail(failure("client_unavailable"));
             const selectionRequestId = NodeCrypto.randomUUID();
             const request: A.TerminalAutomationSelectionRequest = {
               version: 1,
@@ -434,13 +468,22 @@ const make = Effect.gen(function* () {
               candidateVersion: versionFor(caller.scope),
               candidates: available,
             };
-            if (!Queue.offerUnsafe(client.messages, request))
-              return yield* Effect.fail(failure("budget_exceeded"));
             owner.state = {
               status: "selection_required",
               selectionRequestId,
               candidateVersion: request.candidateVersion,
             };
+            const invited = new Set<string>();
+            owner.invited = invited;
+            for (const [id, client] of recipients) {
+              if (!Queue.offerUnsafe(client.messages, request)) {
+                delete owner.invited;
+                owner.state = { status: "unbound" };
+                yield* clearSelection(selectionRequestId, invited);
+                return yield* Effect.fail(failure("budget_exceeded"));
+              }
+              invited.add(id);
+            }
           }
           return yield* status(caller);
         }),
@@ -460,7 +503,7 @@ const make = Effect.gen(function* () {
     const client = yield* connection(id);
     const owner = [...owners.values()].find(
       (item) =>
-        item.caller.selectionConnectionId === id &&
+        item.invited?.has(id) === true &&
         sameScope(item.caller.scope, client.scope) &&
         item.state.status === "selection_required" &&
         item.state.selectionRequestId === input.selectionRequestId,
@@ -473,8 +516,11 @@ const make = Effect.gen(function* () {
     )
       return yield* Effect.fail(failure("stale_request"));
     if (input.choice.status === "cancelled") {
+      const invited = owner.invited;
+      delete owner.invited;
       owner.state = { status: "unbound" };
       owners.delete(ownerKey(owner.caller));
+      yield* clearSelection(input.selectionRequestId, invited);
       return;
     }
     const candidateId = input.choice.candidateId;
@@ -521,7 +567,7 @@ const make = Effect.gen(function* () {
     }
     if (input.event !== "human_intervened") {
       client.views = client.views.filter((view) => !sameTarget(view.target, input.target));
-      changeCandidates(client.scope);
+      yield* changeCandidates(client.scope);
     }
   });
   const resumeConfirmed = Effect.fn("TerminalAutomation.resumeConfirmed")(function* (

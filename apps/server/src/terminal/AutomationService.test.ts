@@ -112,6 +112,101 @@ const setup = Effect.gen(function* () {
   };
 });
 
+it.effect("routes model selection to real views and accepts only the first invited reply", () =>
+  Effect.gen(function* () {
+    const { service, messages, beforeInspect } = yield* setup;
+    const model = { scope, callerId: "model" };
+    const second = yield* service.connect(scope, "second");
+    yield* service.connect(scope, "empty");
+    yield* service.connect({ ...scope, threadId: A.ThreadId.make("elsewhere") }, "foreign");
+    yield* service.registerViews("client", { version: 1, views: [view()] });
+    yield* service.registerViews("second", { version: 1, views: [view("two")] });
+    expect((yield* service.bind(model, { mode: "auto" })).state.status).toBe("selection_required");
+    const request = yield* Queue.take(messages);
+    expect(yield* Queue.take(second)).toEqual(request);
+    if (!("selectionRequestId" in request)) throw new Error("expected selection");
+    const reply: A.TerminalAutomationSelectionReply = {
+      version: 1,
+      selectionRequestId: request.selectionRequestId,
+      candidateVersion: request.candidateVersion,
+      choice: { status: "selected", candidateId: request.candidates[0]!.candidateId },
+    };
+    expect(yield* Effect.flip(service.replySelection("empty", reply))).toEqual({
+      code: "stale_request",
+    });
+    expect(yield* Effect.flip(service.replySelection("foreign", reply))).toEqual({
+      code: "stale_request",
+    });
+    const racing = yield* Deferred.make<void>();
+    const proceed = yield* Deferred.make<void>();
+    let inspections = 0;
+    beforeInspect(
+      Effect.gen(function* () {
+        inspections += 1;
+        if (inspections === 2) yield* Deferred.succeed(racing, undefined);
+        yield* Deferred.await(proceed);
+      }),
+    );
+    const first = yield* service
+      .replySelection("second", reply)
+      .pipe(Effect.result, Effect.forkChild);
+    const next = yield* service
+      .replySelection("client", reply)
+      .pipe(Effect.result, Effect.forkChild);
+    yield* Deferred.await(racing);
+    beforeInspect(Effect.void);
+    yield* Deferred.succeed(proceed, undefined);
+    const results = [yield* Fiber.join(first), yield* Fiber.join(next)];
+    expect(results.filter((result) => result._tag === "Success")).toHaveLength(1);
+    expect(results.filter((result) => result._tag === "Failure")).toMatchObject([
+      { failure: { code: "stale_request" } },
+    ]);
+    expect((yield* service.status(model)).state.status).toBe("bound");
+  }),
+);
+
+it.effect("model selection cleans queued invitations on candidate changes and disconnect", () =>
+  Effect.gen(function* () {
+    const { service, messages } = yield* setup;
+    const model = { scope, callerId: "model" };
+    const second = yield* service.connect(scope, "second");
+    yield* service.registerViews("client", { version: 1, views: [view()] });
+    yield* service.registerViews("second", { version: 1, views: [view("two")] });
+    yield* service.bind(model, { mode: "auto" });
+    const old = yield* Queue.take(messages);
+    if (!("selectionRequestId" in old)) throw new Error("expected selection");
+    yield* service.registerViews("second", { version: 1, views: [view("two")] });
+    expect(yield* Queue.clear(second)).toEqual([]);
+    expect(
+      yield* Effect.flip(
+        service.replySelection("client", {
+          version: 1,
+          selectionRequestId: old.selectionRequestId,
+          candidateVersion: old.candidateVersion,
+          choice: { status: "selected", candidateId: old.candidates[0]!.candidateId },
+        }),
+      ),
+    ).toEqual({ code: "stale_request" });
+    yield* service.bind(model, { mode: "auto" });
+    yield* service.disconnect("second");
+    expect(yield* Queue.clear(messages)).toEqual([]);
+    expect((yield* service.status(model)).state.status).toBe("unbound");
+    expect((yield* service.bind(model, { mode: "auto" })).state.status).toBe("bound");
+  }),
+);
+
+it.effect("an undeliverable trusted selection route fails without a pending selection", () =>
+  Effect.gen(function* () {
+    const { service } = yield* setup;
+    yield* service.registerViews("client", { version: 1, views: [view(), view("two")] });
+    const missing = { ...caller, selectionConnectionId: "missing" };
+    expect(yield* Effect.flip(service.bind(missing, { mode: "auto" }))).toEqual({
+      code: "client_unavailable",
+    });
+    expect((yield* service.status(missing)).state.status).toBe("unbound");
+  }),
+);
+
 it.effect("connection confirmation resumes the original model owner only", () =>
   Effect.gen(function* () {
     const { service } = yield* setup;
