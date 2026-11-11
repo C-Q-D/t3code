@@ -284,7 +284,7 @@ it("validates mouse frames and cell geometry and distinguishes local wheel actio
   }
 });
 
-it("pages bounded history and rejects stale frames and budgets smaller than one row", async () => {
+it("pages bounded history and rejects stale frames", async () => {
   const core = await createCore();
   try {
     core.write("中🙂ab\r\ntwo\r\nthree\r\nfour");
@@ -300,6 +300,7 @@ it("pages bounded history and rejects stale frames and budgets smaller than one 
       source: "history",
       activeScreen: "primary",
       nextLine: 1,
+      codeUnitOffset: 0,
       frameRevision: first.frame.frameRevision,
     });
     const next = readGhosttyAutomation(
@@ -312,9 +313,9 @@ it("pages bounded history and rejects stale frames and budgets smaller than one 
       7,
     );
     expect(next.text).toBe("two");
-    expect(() =>
+    expect(
       readGhosttyAutomation(core, { ...query, budget: { maxLines: 1, maxCodeUnits: 1 } }, 7),
-    ).toThrow("budget_exceeded");
+    ).toMatchObject({ text: "中", nextCursor: { nextLine: 0, codeUnitOffset: 1 } });
     const scroll = core.scrollbarState();
     expect(
       readGhosttyAutomation(
@@ -414,6 +415,74 @@ it("stops before a row that exceeds the remaining UTF-16 budget", async () => {
       readGhosttyAutomation(core, { ...query, range: { startLine: 1, endLineExclusive: 2 } }, 0)
         .text,
     ).toBe("🙂");
+  } finally {
+    core.dispose();
+  }
+});
+
+it("continues A😀B at codepoint boundaries and reports wraps only after completing the row", async () => {
+  const core = await createCore();
+  try {
+    core.resize(4, 3, 8, 16);
+    core.write("\r\n".repeat(10) + "A😀Bx");
+    expect(core.readAutomationRows(10, 11).lines).toEqual([
+      { line: 10, text: "A😀B", softWrapAfter: true },
+    ]);
+    const query = {
+      source: "history",
+      activeScreen: "primary",
+      range: { startLine: 10, endLineExclusive: 12 },
+      frameRevision: core.automationMetadata().frameRevision,
+      budget: { maxLines: 1, maxCodeUnits: 2 },
+    } as const;
+    const first = readGhosttyAutomation(core, query, 0);
+    expect(first).toMatchObject({
+      text: "A",
+      returnedRange: { startLine: 10, endLineExclusive: 11 },
+      nextCursor: { nextLine: 10, codeUnitOffset: 1 },
+      softWrapAfterLines: [],
+    });
+    const second = readGhosttyAutomation(core, { ...query, codeUnitOffset: 1 }, 0);
+    expect(second).toMatchObject({
+      text: "😀",
+      returnedRange: { startLine: 10, endLineExclusive: 11 },
+      nextCursor: { nextLine: 10, codeUnitOffset: 3 },
+      softWrapAfterLines: [],
+    });
+    const third = readGhosttyAutomation(core, { ...query, codeUnitOffset: 3 }, 0);
+    expect(third).toMatchObject({
+      text: "B",
+      returnedRange: { startLine: 10, endLineExclusive: 11 },
+      nextCursor: { nextLine: 11, codeUnitOffset: 0 },
+      softWrapAfterLines: [10],
+    });
+    expect(
+      readGhosttyAutomation(
+        core,
+        { ...query, codeUnitOffset: 3, range: { startLine: 10, endLineExclusive: 11 } },
+        0,
+      ).nextCursor,
+    ).toBeNull();
+    expect(() =>
+      readGhosttyAutomation(
+        core,
+        { ...query, codeUnitOffset: 1, budget: { maxLines: 1, maxCodeUnits: 1 } },
+        0,
+      ),
+    ).toThrow("budget_exceeded");
+    expect(() => readGhosttyAutomation(core, { ...query, codeUnitOffset: 2 }, 0)).toThrow(
+      "stale_request",
+    );
+    expect(() => readGhosttyAutomation(core, { ...query, codeUnitOffset: 5 }, 0)).toThrow(
+      "stale_request",
+    );
+    expect(() => readGhosttyAutomation(core, { ...query, codeUnitOffset: -1 }, 0)).toThrow(
+      "stale_request",
+    );
+    expect(() =>
+      readGhosttyAutomation(core, { ...query, codeUnitOffset: Number.MAX_SAFE_INTEGER }, 0),
+    ).toThrow("stale_request");
+    expect(first.text + second.text + third.text).toBe("A😀B");
   } finally {
     core.dispose();
   }

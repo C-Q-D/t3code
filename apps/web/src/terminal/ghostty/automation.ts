@@ -217,7 +217,7 @@ export function ghosttyAutomationFrame(
   };
 }
 
-/** Reads whole physical rows within A1 budgets; oversized first rows fail rather than lose text or repeat a cursor. */
+/** Reads bounded physical rows; history continues within rows at complete UTF-16 codepoint boundaries. */
 export function readGhosttyAutomation(
   core: GhosttyTerminalCore,
   query: TerminalAutomationReadQuery,
@@ -261,18 +261,51 @@ export function readGhosttyAutomation(
   )
     throw new GhosttyAutomationError("stale_request");
   let nextLine = start;
+  let codeUnitOffset = query.source === "history" ? (query.codeUnitOffset ?? 0) : 0;
+  if (
+    !Number.isSafeInteger(codeUnitOffset) ||
+    codeUnitOffset < 0 ||
+    (start === end && codeUnitOffset !== 0)
+  )
+    throw new GhosttyAutomationError("stale_request");
+  let touchedLines = 0;
   let text = "";
   const softWrapAfterLines: number[] = [];
-  while (nextLine < end && nextLine - start < budget.maxLines) {
+  while (nextLine < end && touchedLines < budget.maxLines) {
     const line = core.readAutomationRows(nextLine, nextLine + 1).lines[0]!;
-    const separator = nextLine === start ? "" : "\n";
-    if (text.length + separator.length + line.text.length > budget.maxCodeUnits) {
-      if (nextLine === start) throw new GhosttyAutomationError("budget_exceeded");
+    if (
+      codeUnitOffset > line.text.length ||
+      (codeUnitOffset > 0 &&
+        /[\uD800-\uDBFF]/.test(line.text[codeUnitOffset - 1]!) &&
+        /[\uDC00-\uDFFF]/.test(line.text[codeUnitOffset] ?? ""))
+    )
+      throw new GhosttyAutomationError("stale_request");
+    const separator = touchedLines === 0 ? "" : "\n";
+    const remaining = budget.maxCodeUnits - text.length - separator.length;
+    let sliceEnd = Math.min(line.text.length, codeUnitOffset + Math.max(0, remaining));
+    if (
+      sliceEnd < line.text.length &&
+      /[\uD800-\uDBFF]/.test(line.text[sliceEnd - 1] ?? "") &&
+      /[\uDC00-\uDFFF]/.test(line.text[sliceEnd]!)
+    )
+      sliceEnd -= 1;
+    if (
+      remaining < 0 ||
+      (query.source === "screen" && sliceEnd < line.text.length) ||
+      (sliceEnd === codeUnitOffset && codeUnitOffset < line.text.length)
+    ) {
+      if (touchedLines === 0) throw new GhosttyAutomationError("budget_exceeded");
       break;
     }
-    text += separator + line.text;
+    text += separator + line.text.slice(codeUnitOffset, sliceEnd);
+    touchedLines += 1;
+    if (sliceEnd < line.text.length) {
+      codeUnitOffset = sliceEnd;
+      break;
+    }
     if (line.softWrapAfter) softWrapAfterLines.push(nextLine);
     nextLine += 1;
+    codeUnitOffset = 0;
   }
   const truncated = nextLine < end;
   return {
@@ -283,13 +316,14 @@ export function readGhosttyAutomation(
       query.source === "screen" ? start : metadata.viewportStartLine,
     ),
     text,
-    returnedRange: { startLine: start, endLineExclusive: nextLine },
+    returnedRange: { startLine: start, endLineExclusive: start + touchedLines },
     nextCursor:
       truncated && query.source === "history"
         ? {
             source: "history",
             activeScreen: metadata.activeScreen,
             nextLine,
+            codeUnitOffset,
             frameRevision: metadata.frameRevision,
           }
         : null,
