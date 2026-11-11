@@ -6,6 +6,8 @@ import {
   TerminalError,
   TerminalOpenInput,
   TerminalProviderEnvironmentError,
+  TerminalSessionSnapshot,
+  TerminalSummary,
 } from "./terminal.ts";
 import { ProviderInstanceId } from "./providerInstance.ts";
 
@@ -49,3 +51,27 @@ describe("TerminalOpenInput", () => {
     expect(parsed.env).toEqual({ GOOD_KEY: "2" });
   });
 });
+
+it.each([TerminalSessionSnapshot, TerminalSummary])(
+  "accepts older terminal records and preserves instance identity when supplied",
+  (schema) => {
+    const record = {
+      threadId: "thread",
+      terminalId: "terminal",
+      cwd: "/workspace",
+      worktreePath: null,
+      status: "running",
+      pid: 12,
+      history: "",
+      exitCode: null,
+      exitSignal: null,
+      hasRunningSubprocess: false,
+      label: "terminal",
+      updatedAt: "2026-11-11T00:00:00Z",
+    };
+    expect(decodeSync(schema, record)).not.toHaveProperty("terminalInstanceId");
+    expect(decodeSync(schema, { ...record, terminalInstanceId: "instance" })).toMatchObject({
+      terminalInstanceId: "instance",
+    });
+  },
+);

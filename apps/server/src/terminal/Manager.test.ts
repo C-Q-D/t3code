@@ -459,6 +459,47 @@ it.layer(
     }),
   );
 
+  it.effect("does not inspect or write an instance before its PTY has spawned", () =>
+    Effect.gen(function* () {
+      const ptyAdapter = new GatedPtyAdapter();
+      const { manager } = yield* createManager(5, { ptyAdapter });
+      const spawning = yield* Deferred.make<void>();
+      const release = yield* Deferred.make<void>();
+      ptyAdapter.gate = { spawning, release };
+      const opening = yield* manager.open(openInput()).pipe(Effect.forkChild);
+      yield* Deferred.await(spawning);
+      const target = { threadId: "thread-1", terminalId: DEFAULT_TERMINAL_ID };
+      expect(yield* Effect.flip(manager.inspectExisting(target))).toMatchObject({
+        _tag: "TerminalNotRunningError",
+      });
+      expect(
+        yield* Effect.flip(
+          manager.writeAutomation({
+            ...target,
+            terminalInstanceId: "forged",
+            humanInputEpoch: 0,
+            data: "bad",
+          }),
+        ),
+      ).toMatchObject({ _tag: "TerminalNotRunningError" });
+      yield* Deferred.succeed(release, undefined);
+      yield* Fiber.join(opening);
+      expect(ptyAdapter.processes[0]!.writes).toEqual([]);
+      const instance = yield* manager.inspectExisting(target);
+      expect(
+        yield* Effect.flip(
+          manager.writeAutomation({
+            ...target,
+            ...instance,
+            data: "revoked",
+            canWrite: () => false,
+          }),
+        ),
+      ).toMatchObject({ _tag: "TerminalNotRunningError" });
+      expect(ptyAdapter.processes[0]!.writes).toEqual([]);
+    }),
+  );
+
   it.effect("spawns lazily and reuses running terminal per thread", () =>
     Effect.gen(function* () {
       const { manager, ptyAdapter } = yield* createManager();

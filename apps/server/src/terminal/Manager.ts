@@ -129,6 +129,7 @@ const nowIso = Effect.map(DateTime.now, DateTime.formatIso);
 const MAX_TERMINAL_LABEL_LENGTH = 128;
 const decodeClaudeSettings = Schema.decodeUnknownOption(ClaudeSettings);
 const decodeCodexSettings = Schema.decodeUnknownOption(CodexSettings);
+const isTerminalNotRunningError = Schema.is(TerminalNotRunningError);
 
 class TerminalSubprocessCheckError extends Schema.TaggedError<TerminalSubprocessCheckError>()(
   "TerminalSubprocessCheckError",
@@ -209,6 +210,7 @@ export class TerminalManager extends Context.Service<
 
     readonly write: (input: TerminalWriteInput) => Effect.Effect<void, TerminalError>;
 
+    /** Inspect only a running PTY; never recover a missing session from history. */
     readonly inspectExisting: (input: TerminalObserveInput) => Effect.Effect<
       {
         readonly terminalInstanceId: string;
@@ -217,10 +219,12 @@ export class TerminalManager extends Context.Service<
       TerminalError
     >;
 
+    /** Validate instance, human epoch and the optional synchronous authorization guard immediately before PTY write. */
     readonly writeAutomation: (
       input: TerminalWriteInput & {
         readonly terminalInstanceId: string;
         readonly humanInputEpoch: number;
+        readonly canWrite?: () => boolean;
       },
     ) => Effect.Effect<void, TerminalError>;
 
@@ -3389,7 +3393,7 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
   // Validation and native write share one synchronous section, including the human-input barrier.
   const writeStrict = Effect.fn("terminal.writeStrict")(function* (
     input: TerminalWriteInput,
-    expected?: { terminalInstanceId: string; humanInputEpoch: number },
+    expected?: { terminalInstanceId: string; humanInputEpoch: number; canWrite?: () => boolean },
   ) {
     const terminalId = input.terminalId;
     const session = yield* requireSession(input.threadId, terminalId);
@@ -3402,7 +3406,8 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
           session.pendingProcessEvents.some((event) => event?.type === "exit") ||
           (expected &&
             (session.terminalInstanceId !== expected.terminalInstanceId ||
-              session.humanInputEpoch !== expected.humanInputEpoch))
+              session.humanInputEpoch !== expected.humanInputEpoch ||
+              expected.canWrite?.() === false))
         ) {
           throw new TerminalNotRunningError({ threadId: input.threadId, terminalId });
         }
@@ -3411,7 +3416,7 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
         process.write(input.data);
       },
       catch: (cause) =>
-        Schema.is(TerminalNotRunningError)(cause)
+        isTerminalNotRunningError(cause)
           ? cause
           : new TerminalWriteError({
               threadId: input.threadId,
