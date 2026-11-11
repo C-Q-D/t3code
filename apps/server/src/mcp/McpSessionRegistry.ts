@@ -11,6 +11,7 @@ import * as NetAddress from "effect/net/NetAddress";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 import * as McpInvocationContext from "./McpInvocationContext.ts";
 import * as McpProviderSession from "@t3tools/provider-core/server/mcpSession";
+import * as DispatchAuthorization from "../auth/DispatchAuthorization.ts";
 
 export interface McpCredentialRequest {
   readonly threadId: ThreadId;
@@ -44,6 +45,8 @@ export class McpSessionRegistry extends Context.Service<
 >()("t3/mcp/McpSessionRegistry") {}
 
 interface CredentialRecord {
+  readonly authorization: ReturnType<typeof DispatchAuthorization.make>;
+  readonly lifetime: { lastAliveAt: number };
   readonly tokenHash: string;
   readonly scope: McpInvocationContext.McpThreadInvocationScope;
   readonly lastAliveAt: number;
@@ -84,6 +87,8 @@ const makeWithOptions = Effect.fn("McpSessionRegistry.make")(function* (
   const httpServer = yield* HttpServer.HttpServer;
   const state = yield* SynchronizedRef.make<RegistryState>({ records: new Map() });
   const currentTimeMillis = options.now ? Effect.sync(options.now) : Clock.currentTimeMillis;
+  const clock = yield* Clock.Clock;
+  const nowUnsafe = options.now ?? (() => clock.currentTimeMillisUnsafe());
   const livenessWindowMs = options.livenessWindowMs ?? DEFAULT_LIVENESS_WINDOW_MS;
   const endpoint = NetAddress.isInetAddress(httpServer.address)
     ? `http://${getHttpMcpEndpointHost(httpServer.address.address)}:${httpServer.address.port}/mcp`
@@ -101,7 +106,12 @@ const makeWithOptions = Effect.fn("McpSessionRegistry.make")(function* (
       const rawToken = yield* crypto.randomBytes(32).pipe(Effect.map(tokenFromBytes), Effect.orDie);
       const tokenHash = yield* hashToken(rawToken);
       const browserToolsAvailable = request.browserToolsAvailable ?? true;
+      const lifetime = { lastAliveAt: issuedAt };
+      const authorization = DispatchAuthorization.make(
+        () => nowUnsafe() - lifetime.lastAliveAt <= livenessWindowMs,
+      );
       const scope: McpInvocationContext.McpThreadInvocationScope = {
+        credentialAuthorization: authorization,
         environmentId,
         requestNamespace: providerSessionId,
         thread: {
@@ -122,7 +132,7 @@ const makeWithOptions = Effect.fn("McpSessionRegistry.make")(function* (
       };
       yield* SynchronizedRef.update(state, ({ records }) => {
         const next = new Map(records);
-        next.set(tokenHash, { tokenHash, scope, lastAliveAt: issuedAt });
+        next.set(tokenHash, { tokenHash, scope, lastAliveAt: issuedAt, lifetime, authorization });
         return { records: next };
       });
       return {
@@ -151,6 +161,7 @@ const makeWithOptions = Effect.fn("McpSessionRegistry.make")(function* (
           return [undefined, { records }] as const;
         }
         const next = new Map(records);
+        record.lifetime.lastAliveAt = timestamp;
         next.set(tokenHash, { ...record, lastAliveAt: timestamp });
         return [record.scope, { records: next }] as const;
       });
@@ -164,6 +175,7 @@ const makeWithOptions = Effect.fn("McpSessionRegistry.make")(function* (
         const next = new Map(records);
         for (const [tokenHash, record] of records) {
           if (record.scope.thread.threadId === threadId) {
+            record.lifetime.lastAliveAt = timestamp;
             next.set(tokenHash, { ...record, lastAliveAt: timestamp });
           }
         }
@@ -173,9 +185,15 @@ const makeWithOptions = Effect.fn("McpSessionRegistry.make")(function* (
   );
 
   const revokeWhere = (predicate: (record: CredentialRecord) => boolean) =>
-    SynchronizedRef.update(state, ({ records }) => ({
-      records: new Map(Array.from(records).filter(([, record]) => !predicate(record))),
-    }));
+    SynchronizedRef.update(state, ({ records }) => {
+      const next = new Map(records);
+      for (const [key, record] of records)
+        if (predicate(record)) {
+          record.authorization.invalidate();
+          next.delete(key);
+        }
+      return { records: next };
+    });
 
   return McpSessionRegistry.of({
     issue,
@@ -189,7 +207,7 @@ const makeWithOptions = Effect.fn("McpSessionRegistry.make")(function* (
     revokeThread: Effect.fn("McpSessionRegistry.revokeThread")(function* (threadId) {
       yield* revokeWhere((record) => record.scope.thread.threadId === threadId);
     }),
-    revokeAll: SynchronizedRef.set(state, { records: new Map() }),
+    revokeAll: revokeWhere(() => true),
   });
 });
 
@@ -204,11 +222,15 @@ const make = Effect.acquireRelease(
     ),
   ),
   (registry) =>
-    Effect.sync(() => {
-      if (activeMcpSessionRegistry === registry) {
-        activeMcpSessionRegistry = undefined;
-      }
-    }),
+    registry.revokeAll.pipe(
+      Effect.andThen(
+        Effect.sync(() => {
+          if (activeMcpSessionRegistry === registry) {
+            activeMcpSessionRegistry = undefined;
+          }
+        }),
+      ),
+    ),
 );
 
 export const layer = Layer.effect(McpSessionRegistry, make);

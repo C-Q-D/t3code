@@ -9,6 +9,11 @@ import * as TestClock from "effect/testing/TestClock";
 import { expect } from "vite-plus/test";
 import * as Automation from "./AutomationService.ts";
 import * as Manager from "./Manager.ts";
+import * as McpSessionRegistry from "../mcp/McpSessionRegistry.ts";
+import * as NodeServices from "@effect/platform-node/NodeServices";
+import { HttpServer } from "effect/http";
+import * as NetAddress from "effect/net/NetAddress";
+import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 
 const scope: A.TerminalAutomationScope = {
   environmentId: A.EnvironmentId.make("env"),
@@ -426,6 +431,29 @@ const frame: A.TerminalAutomationFrame = {
   pendingWrap: null,
 };
 const permission = Effect.void;
+const credential = Effect.gen(function* () {
+  const registry = yield* McpSessionRegistry.__testing.make().pipe(
+    Effect.provideService(ServerEnvironment.ServerEnvironment, {
+      getEnvironmentId: Effect.succeed(scope.environmentId),
+      getDescriptor: Effect.die("unused"),
+    }),
+    Effect.provideService(HttpServer.HttpServer, {
+      address: NetAddress.inetAddressFromIpStringUnsafe("127.0.0.1", 43123),
+      serve: (() => Effect.void) as HttpServer.HttpServer["Service"]["serve"],
+    }),
+    Effect.provide(NodeServices.layer),
+  );
+  const issued = yield* registry.issue({
+    threadId: scope.threadId,
+    providerInstanceId: A.ProviderInstanceId.make("codex"),
+  });
+  const invocation = yield* registry.resolve(issued.config.authorizationHeader.slice(7));
+  if (!invocation?.credentialAuthorization) throw new Error("missing credential authorization");
+  return {
+    authorization: invocation.credentialAuthorization,
+    revoke: registry.revokeThread(scope.threadId),
+  };
+});
 
 const startBindAtAcquisition = (service: Automation.TerminalAutomationService["Service"]) => {
   let operations = 0;
@@ -1046,6 +1074,117 @@ it.effect(
       });
       expect(writes).toEqual([]);
     }),
+);
+
+it.effect("revocation after the final async check prevents the native write", () =>
+  Effect.gen(function* () {
+    const f = yield* setup;
+    const bindingId = yield* bindOne(f.service);
+    const { authorization, revoke } = yield* credential;
+    f.beforeNativeWrite(revoke);
+    // Delay notification delivery so only the synchronous guard can prevent this write.
+    const running = yield* f.service
+      .input(
+        caller,
+        { bindingId, requestId: "request", action: { type: "text", text: "x" } },
+        { ...authorization, invalidated: Effect.never, check: Effect.void },
+      )
+      .pipe(Effect.forkChild);
+    const encode = yield* prepareToEncode(f.service, f.messages);
+    yield* f.service.replyBridge("client", {
+      version: 1,
+      bridgeRequestId: encode.bridgeRequestId,
+      binding: encode.binding,
+      result: {
+        operation: "encode_input",
+        inputRequestId: "request",
+        frameRevision: 1,
+        encodedText: "x",
+      },
+    });
+    expect(yield* Fiber.join(running)).toMatchObject({ status: "not_sent" });
+    expect(f.writes).toEqual([]);
+  }),
+);
+
+it.effect("revocation ends a pending bridge without waiting for its reply", () =>
+  Effect.gen(function* () {
+    const f = yield* setup;
+    const bindingId = yield* bindOne(f.service);
+    const { authorization, revoke } = yield* credential;
+    const running = yield* f.service
+      .input(
+        caller,
+        { bindingId, requestId: "request", action: { type: "text", text: "x" } },
+        { ...authorization, check: Effect.void },
+      )
+      .pipe(Effect.forkChild);
+    yield* takeBridge(f.messages);
+    yield* revoke;
+    expect(yield* Fiber.join(running)).toMatchObject({ status: "not_sent" });
+    expect((yield* f.service.status(caller)).state.status).toBe("invalid");
+    expect(f.writes).toEqual([]);
+  }),
+);
+
+it.effect("revocation between local authorization and dispatch prevents apply_local", () =>
+  Effect.gen(function* () {
+    const f = yield* setup;
+    const bindingId = yield* bindOne(f.service);
+    const { authorization, revoke } = yield* credential;
+    const guard = { ...authorization, invalidated: Effect.never, check: Effect.void };
+    const running = yield* f.service
+      .input(caller, { bindingId, requestId: "request", action: wheel }, guard)
+      .pipe(Effect.forkChild);
+    const encode = yield* prepareToEncode(f.service, f.messages);
+    let inspections = 0;
+    f.beforeInspect(Effect.suspend(() => (++inspections === 2 ? revoke : Effect.void)));
+    yield* f.service.replyBridge("client", {
+      version: 1,
+      bridgeRequestId: encode.bridgeRequestId,
+      binding: encode.binding,
+      result: {
+        operation: "encode_input",
+        inputRequestId: "request",
+        frameRevision: 1,
+        status: "local_action",
+        localAction: { type: "scroll", deltaRows: 3 },
+      },
+    });
+    const outcome = yield* Effect.raceFirst(
+      Fiber.join(running),
+      takeBridge(f.messages).pipe(
+        Effect.map((message) => ({ status: "unexpected_dispatch", operation: message.operation })),
+      ),
+    );
+    expect(outcome).toMatchObject({ status: "not_sent" });
+    expect(yield* Queue.clear(f.messages)).toEqual([]);
+    expect(f.writes).toEqual([]);
+  }),
+);
+
+it.effect("revocation after local dispatch retains unknown and never replays", () =>
+  Effect.gen(function* () {
+    const f = yield* setup;
+    const bindingId = yield* bindOne(f.service);
+    const { authorization, revoke } = yield* credential;
+    const guard = { ...authorization, check: Effect.void };
+    const request = { bindingId, requestId: "request", action: wheel };
+    const running = yield* f.service.input(caller, request, guard).pipe(Effect.forkChild);
+    yield* encodeLocal(f.service, f.messages);
+    yield* revoke;
+    expect(yield* Fiber.join(running)).toEqual({ status: "unknown", requestId: "request" });
+    expect(
+      (yield* f.service.status(caller, { receipt: { bindingId, requestId: "request" } }))
+        .inputResult,
+    ).toEqual({ status: "unknown", requestId: "request" });
+    expect(yield* f.service.input(caller, request, guard)).toEqual({
+      status: "unknown",
+      requestId: "request",
+    });
+    expect(yield* Queue.clear(f.messages)).toEqual([]);
+    expect(f.writes).toEqual([]);
+  }),
 );
 
 it.effect("the Manager fake enforces final canWrite after a release at the native boundary", () =>

@@ -10,12 +10,24 @@ import * as Queue from "effect/Queue";
 import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
 import * as Manager from "./Manager.ts";
+import type { DispatchAuthorization } from "../auth/DispatchAuthorization.ts";
+
+export type Authorization =
+  | Effect.Effect<void, A.TerminalAutomationError>
+  | (DispatchAuthorization & {
+      readonly check: Effect.Effect<void, A.TerminalAutomationError>;
+    });
+const checkAuthorization = (authorization: Authorization) =>
+  Effect.isEffect(authorization) ? authorization : authorization.check;
+const canDispatch = (authorization: Authorization) =>
+  Effect.isEffect(authorization) || authorization.isValid();
 
 /** All fields come from the authenticated transport, never model arguments. */
 export interface Caller {
   readonly scope: A.TerminalAutomationScope;
   readonly callerId: string;
   readonly selectionConnectionId?: string;
+  readonly credentialAuthorization?: DispatchAuthorization;
 }
 
 type Message = A.TerminalAutomationSelectionRequest | A.TerminalAutomationClientRequest;
@@ -81,12 +93,12 @@ export class TerminalAutomationService extends Context.Service<
     readonly input: (
       caller: Caller,
       input: A.TerminalAutomationInput,
-      authorize: Effect.Effect<void, Failure>,
+      authorize: Authorization,
     ) => Effect.Effect<A.TerminalAutomationInputResult, Failure>;
     readonly read: (
       caller: Caller,
       input: A.TerminalAutomationReadInput,
-      authorize: Effect.Effect<void, Failure>,
+      authorize: Authorization,
     ) => Effect.Effect<A.TerminalAutomationReadResult, Failure>;
     readonly replyBridge: (
       connectionId: string,
@@ -249,6 +261,11 @@ const make = Effect.gen(function* () {
   });
   const refresh = Effect.fn("TerminalAutomation.refresh")(function* (owner: Owner) {
     const state = owner.state;
+    if ("binding" in state && owner.caller.credentialAuthorization?.isValid() === false) {
+      owner.state = { status: "invalid", binding: state.binding, reason: "target_invalid" };
+      yield* retire(state.binding.bindingId, failure("target_invalid"));
+      return;
+    }
     if (state.status === "invalid") {
       yield* retire(state.binding.bindingId, failure(state.reason));
       return;
@@ -405,6 +422,8 @@ const make = Effect.gen(function* () {
     );
     if (!entry) return yield* Effect.fail(failure("target_invalid"));
     const current = yield* inspect(owner.caller.scope, candidate.target);
+    if (owner.caller.credentialAuthorization?.isValid() === false)
+      return yield* Effect.fail(failure("target_invalid"));
     if (owner.state !== previousState) return yield* Effect.fail(failure("stale_request"));
     if (connections.get(entry[0]) !== entry[1])
       return yield* Effect.fail(failure("client_unavailable"));
@@ -435,6 +454,8 @@ const make = Effect.gen(function* () {
     raw: A.TerminalAutomationBindInput,
   ) {
     const input = yield* decode(A.TerminalAutomationBindInput, raw);
+    if (caller.credentialAuthorization?.isValid() === false)
+      return yield* Effect.fail(failure("target_invalid"));
     return yield* Effect.acquireUseRelease(
       ensureOwner(caller, true),
       (owner) =>
@@ -728,7 +749,7 @@ const make = Effect.gen(function* () {
   const input = Effect.fn("TerminalAutomation.input")(function* (
     caller: Caller,
     raw: A.TerminalAutomationInput,
-    authorize: Effect.Effect<void, Failure>,
+    authorize: Authorization,
   ) {
     const request = yield* decode(A.TerminalAutomationInput, raw);
     return yield* Effect.uninterruptibleMask((restore) =>
@@ -787,7 +808,7 @@ const make = Effect.gen(function* () {
         };
         table.set(request.requestId, receipt);
         const operation = Effect.gen(function* () {
-          yield* authorize;
+          yield* checkAuthorization(authorize);
           const initial = yield* requireBinding(caller, request.bindingId);
           const binding = initial.binding;
           const fields = { version: 1 as const, binding };
@@ -838,7 +859,7 @@ const make = Effect.gen(function* () {
               plan.deltaRows !== action.deltaRows
             )
               return yield* Effect.fail(failure("stale_request"));
-            yield* authorize;
+            yield* checkAuthorization(authorize);
             const current = yield* requireBinding(caller, request.bindingId, binding.inputEpoch);
             const applied = yield* bridge(
               initial.connectionId,
@@ -851,6 +872,8 @@ const make = Effect.gen(function* () {
                 localAction: plan,
               },
               () =>
+                canDispatch(authorize) &&
+                caller.credentialAuthorization?.isValid() !== false &&
                 current.owner.state.status === "bound" &&
                 current.owner.state.binding.inputEpoch === binding.inputEpoch &&
                 receipt.result === undefined &&
@@ -875,7 +898,7 @@ const make = Effect.gen(function* () {
           )
             return yield* Effect.fail(failure("not_ready"));
           const encodedText = encoded.result.encodedText;
-          yield* authorize;
+          yield* checkAuthorization(authorize);
           const current = yield* requireBinding(caller, request.bindingId, binding.inputEpoch);
           // No interruptible step separates the final binding/permission check from the synchronous PTY write.
           yield* Effect.uninterruptible(
@@ -888,6 +911,8 @@ const make = Effect.gen(function* () {
                   humanInputEpoch: current.owner.humanInputEpoch!,
                   canWrite: () => {
                     const allowed =
+                      canDispatch(authorize) &&
+                      caller.credentialAuthorization?.isValid() !== false &&
                       current.owner.state.status === "bound" &&
                       receipt.result === undefined &&
                       bindings.get(binding.bindingId) === work &&
@@ -922,6 +947,16 @@ const make = Effect.gen(function* () {
           return receipt.result!;
         }).pipe(
           (effect) => Effect.raceFirst(effect, Deferred.await(work.stop)),
+          (effect) =>
+            Effect.isEffect(authorize)
+              ? effect
+              : Effect.raceFirst(
+                  effect,
+                  authorize.invalidated.pipe(
+                    Effect.andThen(revoke(caller, request.bindingId)),
+                    Effect.andThen(Effect.fail(failure("target_invalid"))),
+                  ),
+                ),
           Effect.timeoutOrElse({
             duration: Math.max(0, receipt.deadline - clock.currentTimeMillisUnsafe()),
             orElse: () => Effect.fail(failure("client_unavailable")),
@@ -949,20 +984,25 @@ const make = Effect.gen(function* () {
   const read = Effect.fn("TerminalAutomation.read")(function* (
     caller: Caller,
     raw: A.TerminalAutomationReadInput,
-    authorize: Effect.Effect<void, Failure>,
+    authorize: Authorization,
   ) {
     const request = yield* decode(A.TerminalAutomationReadInput, raw);
     return yield* Effect.gen(function* () {
-      yield* authorize;
+      yield* checkAuthorization(authorize);
       const initial = yield* requireBinding(caller, request.bindingId);
-      const response = yield* bridge(initial.connectionId, {
-        version: 1,
-        bridgeRequestId: NodeCrypto.randomUUID(),
-        binding: initial.binding,
-        operation: "read",
-        query: request.query,
-      });
-      yield* authorize;
+      const response = yield* bridge(
+        initial.connectionId,
+        {
+          version: 1,
+          bridgeRequestId: NodeCrypto.randomUUID(),
+          binding: initial.binding,
+          operation: "read",
+          query: request.query,
+        },
+        () => canDispatch(authorize) && caller.credentialAuthorization?.isValid() !== false,
+      );
+      yield* checkAuthorization(authorize);
+      if (!canDispatch(authorize)) return yield* Effect.fail(failure("target_invalid"));
       yield* requireBinding(caller, request.bindingId, initial.binding.inputEpoch);
       if (response.result.operation !== "read" || !("read" in response.result))
         return yield* Effect.fail(failure("stale_request"));
@@ -1043,6 +1083,16 @@ const make = Effect.gen(function* () {
       }
       return result;
     }).pipe(
+      (effect) =>
+        Effect.isEffect(authorize)
+          ? effect
+          : Effect.raceFirst(
+              effect,
+              authorize.invalidated.pipe(
+                Effect.andThen(revoke(caller, request.bindingId)),
+                Effect.andThen(Effect.fail(failure("target_invalid"))),
+              ),
+            ),
       Effect.timeoutOrElse({
         duration: "10 seconds",
         orElse: () => Effect.fail(failure("client_unavailable")),

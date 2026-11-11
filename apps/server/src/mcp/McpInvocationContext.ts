@@ -13,6 +13,7 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import { formatThreadLink } from "@t3tools/shared/threadLinks";
+import type { DispatchAuthorization } from "../auth/DispatchAuthorization.ts";
 
 const ALL_MCP_CAPABILITIES = [
   "preview",
@@ -100,6 +101,7 @@ export const clientModeCeiling = (client: McpClientCaller | undefined): ClientMo
 
 /** Thread callers default to their own thread; client callers need thread for tools that act as the caller. */
 export interface McpInvocationScope {
+  readonly credentialAuthorization?: DispatchAuthorization;
   readonly environmentId: EnvironmentId;
   readonly capabilities: ReadonlySet<McpCapability>;
   readonly issuedAt: number;

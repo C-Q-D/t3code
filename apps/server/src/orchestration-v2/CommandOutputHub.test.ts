@@ -104,6 +104,36 @@ const seedThread = Effect.gen(function* () {
   return threadId;
 });
 
+it.effect("projection writes invalidate dispatch leases before asynchronous consumers run", () =>
+  Effect.gen(function* () {
+    const threadId = yield* seedThread;
+    const sink = yield* EventSink.EventSinkV2;
+    const store = yield* ProjectionStore.ProjectionStoreV2;
+    const ids = yield* IdAllocator.IdAllocatorV2;
+    const projection = yield* store.getThread(threadId);
+    const watch = sink.watchDispatchAuthorization;
+    if (!watch) throw new Error("missing authorization boundary");
+    const authorization = yield* watch(
+      threadId,
+      (event) => event.type !== "thread.runtime-mode-updated",
+    );
+    if (!authorization) throw new Error("lease capacity exhausted");
+    yield* sink.write({
+      events: [
+        {
+          id: yield* ids.allocate.event({ threadId }),
+          threadId,
+          occurredAt: yield* DateTime.now,
+          type: "thread.runtime-mode-updated",
+          payload: { ...projection, runtimeMode: "approval-required" },
+        },
+      ],
+    });
+    assert.strictEqual(authorization.isValid(), false);
+    yield* authorization.invalidated;
+  }).pipe(Effect.provide(Layer.merge(layerTest, layerTestStores))),
+);
+
 const writeCommandItem = (
   threadId: ThreadId,
   fields: Pick<

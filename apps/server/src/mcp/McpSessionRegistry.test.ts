@@ -135,9 +135,37 @@ it.effect("expires credentials once their session stops showing signs of life", 
       capabilities: new Set(["preview"]),
     });
     const token = issued.config.authorizationHeader.replace(/^Bearer\s+/, "");
+    const invocation = yield* registry.resolve(token);
+    expect(invocation?.credentialAuthorization?.isValid()).toBe(true);
     timestamp += 101;
+    expect(invocation?.credentialAuthorization?.isValid()).toBe(false);
     expect(yield* registry.resolve(token)).toBeUndefined();
   }),
+);
+
+it.effect.each(["provider-session", "thread", "all"] as const)(
+  "invalidates the dispatch reference and its waiter on %s revocation",
+  (kind) =>
+    Effect.gen(function* () {
+      const registry = yield* makeRegistry(() => 1000);
+      const threadId = ThreadId.make("grant-thread");
+      const issued = yield* registry.issue({
+        threadId,
+        providerInstanceId: ProviderInstanceId.make("codex"),
+      });
+      const invocation = yield* registry.resolve(issued.config.authorizationHeader.slice(7));
+      const authorization = invocation?.credentialAuthorization;
+      if (!authorization) throw new Error("missing authorization");
+      yield* {
+        "provider-session": registry.revokeProviderSession(issued.config.providerSessionId),
+        thread: registry.revokeThread(threadId),
+        all: registry.revokeAll,
+      }[kind];
+      expect(authorization.isValid()).toBe(false);
+      yield* authorization.invalidated;
+      yield* registry.touch(threadId);
+      expect(authorization.isValid()).toBe(false);
+    }),
 );
 
 it.effect("does not keep credentials of other threads alive", () =>
