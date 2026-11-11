@@ -149,6 +149,38 @@ it.effect("connection confirmation resumes the original model owner only", () =>
   }),
 );
 
+it.effect("connection confirmation cannot clear a newer human pause", () =>
+  Effect.gen(function* () {
+    const f = yield* setup;
+    const bindingId = yield* bindOne(f.service);
+    const pause = f.service.reportEvent("client", {
+      version: 1,
+      target: view().target,
+      event: "human_intervened",
+    });
+    yield* pause;
+    f.beforeInspect(
+      Effect.gen(function* () {
+        f.beforeInspect(Effect.void);
+        f.humanInput();
+        yield* pause.pipe(Effect.orDie);
+      }),
+    );
+    expect(yield* Effect.flip(f.service.resumeFromConnection("client", bindingId))).toEqual({
+      code: "stale_request",
+    });
+    expect((yield* f.service.status(caller)).state.status).toBe("paused");
+    expect(
+      yield* f.service.input(
+        caller,
+        { bindingId, requestId: "after-pause", action: { type: "text", text: "x" } },
+        Effect.void,
+      ),
+    ).toMatchObject({ status: "not_sent", error: { code: "human_intervened" } });
+    expect(f.writes).toEqual([]);
+  }),
+);
+
 it.effect("connection confirmation cannot revive a binding disconnected during inspect", () =>
   Effect.gen(function* () {
     const fixture = yield* setup;

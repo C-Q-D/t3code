@@ -13,14 +13,17 @@ export const make = Effect.fn("TerminalAutomationRpc.make")(function* (
   checkThread: (threadId: A.ThreadId) => Effect.Effect<void, A.TerminalAutomationError>,
 ) {
   const service = yield* Automation.TerminalAutomationService;
-  const connections = new Set<string>();
+  const connections = new Map<string, string>();
+  let generation = 0;
   let closed = false;
   const connectionId = (threadId: A.ThreadId, metadata: Metadata) =>
     JSON.stringify([prefix, metadata.client.id, threadId]);
   yield* Effect.addFinalizer(() =>
     Effect.gen(function* () {
       closed = true;
-      yield* Effect.forEach(connections, (id) => service.disconnect(id), { discard: true });
+      yield* Effect.forEach(connections.values(), (id) => service.disconnect(id), {
+        discard: true,
+      });
     }),
   );
   const checked = Effect.fn("TerminalAutomationRpc.checked")(function* (
@@ -28,9 +31,12 @@ export const make = Effect.fn("TerminalAutomationRpc.make")(function* (
     metadata: Metadata,
   ) {
     if (closed) return yield* Effect.fail({ code: "client_unavailable" as const });
+    const key = connectionId(threadId, metadata);
+    const id = connections.get(key);
     yield* checkThread(threadId);
-    if (closed) return yield* Effect.fail({ code: "client_unavailable" as const });
-    return connectionId(threadId, metadata);
+    if (closed || !id || connections.get(key) !== id)
+      return yield* Effect.fail({ code: "client_unavailable" as const });
+    return id;
   });
   return {
     [A.WS_METHODS.terminalAutomationSubscribe]: (
@@ -39,16 +45,25 @@ export const make = Effect.fn("TerminalAutomationRpc.make")(function* (
     ) =>
       Stream.unwrap(
         Effect.gen(function* () {
-          const id = yield* checked(input.threadId, metadata);
-          const queue = yield* service.connect({ environmentId, threadId: input.threadId }, id);
-          if (closed) {
-            yield* service.disconnect(id);
-            return yield* Effect.fail({ code: "client_unavailable" as const });
-          }
-          connections.add(id);
-          yield* Effect.addFinalizer(() =>
-            Effect.sync(() => {
-              connections.delete(id);
+          if (closed) return yield* Effect.fail({ code: "client_unavailable" as const });
+          yield* checkThread(input.threadId);
+          const key = connectionId(input.threadId, metadata);
+          const queue = yield* Effect.uninterruptible(
+            Effect.gen(function* () {
+              if (closed) return yield* Effect.fail({ code: "client_unavailable" as const });
+              if (connections.has(key))
+                return yield* Effect.fail({ code: "request_conflict" as const });
+              const id = `${key}:${++generation}`;
+              yield* Effect.acquireRelease(
+                Effect.sync(() => {
+                  connections.set(key, id);
+                }),
+                () =>
+                  Effect.sync(() => {
+                    if (connections.get(key) === id) connections.delete(key);
+                  }),
+              );
+              return yield* service.connect({ environmentId, threadId: input.threadId }, id);
             }),
           );
           return Stream.concat(Stream.succeed({ type: "ready" as const }), Stream.fromQueue(queue));

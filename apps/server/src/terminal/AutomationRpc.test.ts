@@ -1,6 +1,7 @@
 import { expect, it } from "@effect/vitest";
 import * as A from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
+import * as Deferred from "effect/Deferred";
 import * as Layer from "effect/Layer";
 import * as Queue from "effect/Queue";
 import * as Scope from "effect/Scope";
@@ -65,8 +66,13 @@ const setup = Effect.fn("test.automationRpc.setup")(function* (
   );
   const socketScope = yield* Scope.make();
   yield* Effect.addFinalizer(() => Scope.close(socketScope, Exit.void));
+  let beforeThreadCheck: Effect.Effect<void> = Effect.void;
   const handlers = yield* Transport.make("socket-a", environmentId, (id) =>
-    id === threadId ? Effect.void : Effect.fail({ code: "target_invalid" as const }),
+    Effect.suspend(() => beforeThreadCheck).pipe(
+      Effect.andThen(
+        id === threadId ? Effect.void : Effect.fail({ code: "target_invalid" as const }),
+      ),
+    ),
   ).pipe(
     Effect.provideService(Automation.TerminalAutomationService, service),
     Effect.provideService(Scope.Scope, socketScope),
@@ -89,7 +95,7 @@ const setup = Effect.fn("test.automationRpc.setup")(function* (
   const caller: Automation.Caller = {
     scope: { environmentId, threadId },
     callerId: "model-original",
-    selectionConnectionId: JSON.stringify(["socket-a", 0, threadId]),
+    selectionConnectionId: `${JSON.stringify(["socket-a", 0, threadId])}:1`,
   };
   const bind = Effect.gen(function* () {
     yield* client[A.WS_METHODS.terminalAutomationRegisterViews]({
@@ -100,8 +106,54 @@ const setup = Effect.fn("test.automationRpc.setup")(function* (
     if (status.state.status !== "bound") throw new Error("expected original binding");
     return status.state.binding.bindingId;
   });
-  return { service, client, handlers, socketScope, messages, start, bind, caller, writes };
+  return {
+    service,
+    client,
+    handlers,
+    socketScope,
+    messages,
+    start,
+    bind,
+    caller,
+    writes,
+    beforeThreadCheck: (effect: Effect.Effect<void>) => {
+      beforeThreadCheck = effect;
+    },
+  };
 });
+
+it.effect("old registration cannot replace views after resubscription", () =>
+  Effect.gen(function* () {
+    const f = yield* setup();
+    const original = yield* f.start;
+    yield* f.bind;
+    const entered = yield* Deferred.make<void>();
+    const release = yield* Deferred.make<void>();
+    f.beforeThreadCheck(
+      Effect.gen(function* () {
+        f.beforeThreadCheck(Effect.void);
+        yield* Deferred.succeed(entered, undefined);
+        yield* Deferred.await(release);
+      }),
+    );
+    const old = yield* f.client[A.WS_METHODS.terminalAutomationRegisterViews]({
+      threadId,
+      registration: { version: 1, views: [view] },
+    }).pipe(Effect.result, Effect.forkChild);
+    yield* Deferred.await(entered);
+    yield* Fiber.interrupt(original);
+    yield* f.start;
+    yield* f.client[A.WS_METHODS.terminalAutomationRegisterViews]({
+      threadId,
+      registration: { version: 1, views: [{ ...view, title: "replacement" }] },
+    });
+    yield* Deferred.succeed(release, undefined);
+    expect(yield* Fiber.join(old)).toMatchObject({ _tag: "Failure" });
+    expect(
+      (yield* f.service.status(f.caller)).candidates.map((candidate) => candidate.title),
+    ).toEqual(["replacement"]);
+  }),
+);
 
 it.effect("authenticated RPC registration and replies reach the shared model service", () =>
   Effect.gen(function* () {

@@ -529,8 +529,13 @@ const make = Effect.gen(function* () {
     bindingId: string,
   ) {
     const owner = yield* ensureOwner(caller);
+    const confirmedState = owner.state;
     yield* refresh(owner);
-    if (owner.state.status !== "paused" || owner.state.binding.bindingId !== bindingId)
+    if (
+      owner.state !== confirmedState ||
+      owner.state.status !== "paused" ||
+      owner.state.binding.bindingId !== bindingId
+    )
       return yield* Effect.fail(failure("stale_request"));
     owner.state = { status: "bound", binding: owner.state.binding };
     return yield* status(caller);
@@ -542,10 +547,12 @@ const make = Effect.gen(function* () {
     const work = bindings.get(bindingId);
     const owner = work ? owners.get(work.ownerKey) : undefined;
     const client = connections.get(connectionId);
+    const confirmedState = owner?.state;
     const valid = () =>
       work !== undefined &&
       bindings.get(bindingId) === work &&
       owner !== undefined &&
+      owner.state === confirmedState &&
       owners.get(work.ownerKey) === owner &&
       client !== undefined &&
       connections.get(connectionId) === client &&
