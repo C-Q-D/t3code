@@ -24,6 +24,137 @@ async function createCore() {
   );
 }
 
+it("encodes keyboard input through intervening output using the current terminal modes", async () => {
+  const core = await createCore();
+  try {
+    const revision = core.automationMetadata().frameRevision;
+    core.write("log\r\n\x1b[?1h\x1b[?2004h");
+    expect(
+      encodeGhosttyAutomation(
+        core,
+        {
+          type: "key",
+          key: "c",
+          phase: "press",
+          modifiers: { shift: false, alt: false, ctrl: true, meta: false },
+        },
+        revision,
+      ),
+    ).toEqual({ status: "encoded", encodedText: "\x03" });
+    expect(
+      encodeGhosttyAutomation(
+        core,
+        {
+          type: "key",
+          key: "ArrowUp",
+          phase: "press",
+          modifiers: { shift: false, alt: false, ctrl: false, meta: false },
+        },
+        revision,
+      ),
+    ).toEqual({ status: "encoded", encodedText: "\x1bOA" });
+    expect(encodeGhosttyAutomation(core, { type: "paste", text: "�🙂" }, revision)).toEqual({
+      status: "encoded",
+      encodedText: "\x1b[200~�🙂\x1b[201~",
+    });
+  } finally {
+    core.dispose();
+  }
+});
+
+it.each([7.25, 7.5])(
+  "keeps fractional %s pixel cells aligned in cell and pixel mouse protocols",
+  async (width) => {
+    const core = await createCore();
+    try {
+      core.resize(80, 3, width, 16);
+      core.write("\x1b[?1000h\x1b[?1006h");
+      const revision = core.automationMetadata().frameRevision;
+      const geometry = {
+        cellWidth: width,
+        cellHeight: 16,
+        screenWidth: 80 * width + 8,
+        screenHeight: 56,
+        paddingLeft: 4,
+        paddingRight: 4,
+        paddingTop: 4,
+        paddingBottom: 4,
+      };
+      const press = (column: number, frameRevision = revision) =>
+        ({
+          type: "mouse",
+          event: "press",
+          position: { column, row: 1 },
+          button: "left",
+          modifiers: { shift: false, alt: false, ctrl: false, meta: false },
+          frameRevision,
+        }) as const;
+      expect(encodeGhosttyAutomation(core, press(0), revision, geometry)).toEqual({
+        status: "encoded",
+        encodedText: "\x1b[<0;1;2M",
+      });
+      expect(encodeGhosttyAutomation(core, press(40), revision, geometry)).toEqual({
+        status: "encoded",
+        encodedText: "\x1b[<0;41;2M",
+      });
+      expect(encodeGhosttyAutomation(core, press(79), revision, geometry)).toEqual({
+        status: "encoded",
+        encodedText: "\x1b[<0;80;2M",
+      });
+      core.write("\x1b[?1016h");
+      const pixels = core.automationMetadata().frameRevision;
+      expect(encodeGhosttyAutomation(core, press(40, pixels), pixels, geometry)).toEqual({
+        status: "encoded",
+        encodedText: width === 7.5 ? "\x1b[<0;304;24M" : "\x1b[<0;294;24M",
+      });
+    } finally {
+      core.dispose();
+    }
+  },
+);
+
+it("rejects lossy legacy mouse bytes while preserving UTF-8 and SGR modes", async () => {
+  const core = await createCore();
+  try {
+    core.resize(160, 3, 8, 16);
+    core.write("\x1b[?1000h");
+    const geometry = {
+      cellWidth: 8,
+      cellHeight: 16,
+      screenWidth: 1288,
+      screenHeight: 56,
+      paddingLeft: 4,
+      paddingRight: 4,
+      paddingTop: 4,
+      paddingBottom: 4,
+    };
+    const encode = (column: number) => {
+      const revision = core.automationMetadata().frameRevision;
+      return encodeGhosttyAutomation(
+        core,
+        {
+          type: "mouse",
+          event: "press",
+          position: { column, row: 1 },
+          button: "left",
+          modifiers: { shift: false, alt: false, ctrl: false, meta: false },
+          frameRevision: revision,
+        },
+        revision,
+        geometry,
+      );
+    };
+    expect(encode(94)).toEqual({ status: "encoded", encodedText: "\x1b[M \x7f\x22" });
+    expect(() => encode(95)).toThrow("unsupported_client");
+    core.write("\x1b[?1005h");
+    expect(encode(95)).toEqual({ status: "encoded", encodedText: "\x1b[M \x80\x22" });
+    core.write("\x1b[?1006h");
+    expect(encode(95)).toEqual({ status: "encoded", encodedText: "\x1b[<0;96;2M" });
+  } finally {
+    core.dispose();
+  }
+});
+
 it("reads formatter Unicode, wraps and spaces without changing selection, viewport or dirty", async () => {
   const core = await createCore();
   try {

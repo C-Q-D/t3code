@@ -35,7 +35,7 @@ export type GhosttyAutomationEncoding =
   | { readonly status: "not_sent" }
   | { readonly status: "local_action"; readonly action: "scroll"; readonly deltaRows: number };
 
-/** Encodes a validated A1 action synchronously, without DOM dispatch or PTY writes; local actions require the surface. */
+/** Encodes without DOM dispatch or PTY writes; only positional input requires a current frame, while keys use current modes. */
 export function encodeGhosttyAutomation(
   core: GhosttyTerminalCore,
   action: TerminalAutomationAction,
@@ -43,7 +43,6 @@ export function encodeGhosttyAutomation(
   geometry?: GhosttyAutomationGeometry,
 ): GhosttyAutomationEncoding {
   const metadata = core.automationMetadata();
-  if (frameRevision !== metadata.frameRevision) throw new GhosttyAutomationError("stale_request");
   let encodedText = "";
   if (action.type === "text" || action.type === "paste") {
     encodedText = core.encodePaste(action.text);
@@ -96,6 +95,7 @@ export function encodeGhosttyAutomation(
   } else {
     const { column, row } = action.position;
     if (
+      frameRevision !== metadata.frameRevision ||
       action.frameRevision !== frameRevision ||
       !Number.isInteger(column) ||
       !Number.isInteger(row) ||
@@ -138,17 +138,45 @@ export function encodeGhosttyAutomation(
         (action.modifiers.ctrl ? 2 : 0) |
         (action.modifiers.alt ? 4 : 0) |
         (action.modifiers.meta ? 8 : 0);
-      const encode = (button: number | null, event: "press" | "release" | "motion") =>
-        core.encodeMouse({
-          ...geometry,
-          x: geometry.paddingLeft + (column + 0.5) * geometry.cellWidth,
-          y: geometry.paddingTop + (row + 0.5) * geometry.cellHeight,
-          action: event,
-          button,
-          mods,
-          anyButtonPressed:
-            action.event !== "wheel" && action.button !== "none" && action.event !== "release",
-        });
+      // Cell protocols use the encoder's integer grid; pixel protocols keep actual CSS positions.
+      const grid = core.isPixelMouseReporting()
+        ? geometry
+        : {
+            cellWidth: Math.max(1, Math.round(geometry.cellWidth)),
+            cellHeight: Math.max(1, Math.round(geometry.cellHeight)),
+            paddingLeft: Math.round(geometry.paddingLeft),
+            paddingRight: Math.round(geometry.paddingRight),
+            paddingTop: Math.round(geometry.paddingTop),
+            paddingBottom: Math.round(geometry.paddingBottom),
+            screenWidth:
+              Math.round(geometry.paddingLeft) +
+              metadata.cols * Math.max(1, Math.round(geometry.cellWidth)) +
+              Math.round(geometry.paddingRight),
+            screenHeight:
+              Math.round(geometry.paddingTop) +
+              metadata.rows * Math.max(1, Math.round(geometry.cellHeight)) +
+              Math.round(geometry.paddingBottom),
+          };
+      const encode = (button: number | null, event: "press" | "release" | "motion") => {
+        try {
+          return core.encodeMouse(
+            {
+              ...grid,
+              x: grid.paddingLeft + (column + 0.5) * grid.cellWidth,
+              y: grid.paddingTop + (row + 0.5) * grid.cellHeight,
+              action: event,
+              button,
+              mods,
+              anyButtonPressed:
+                action.event !== "wheel" && action.button !== "none" && action.event !== "release",
+            },
+            true,
+          );
+        } catch (error) {
+          if (error instanceof TypeError) throw new GhosttyAutomationError("unsupported_client");
+          throw error;
+        }
+      };
       if (action.event === "wheel") {
         for (let index = 0; index < Math.abs(action.deltaRows); index += 1)
           encodedText += encode(action.deltaRows < 0 ? 4 : 5, "press");

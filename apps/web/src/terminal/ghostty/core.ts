@@ -524,6 +524,15 @@ export class GhosttyTerminalCore {
     );
   }
 
+  isPixelMouseReporting(): boolean {
+    this.ensureActive();
+    this.runtime.bytes(this.scratch, 1)[0] = 0;
+    return (
+      this.runtime.call("ghostty_terminal_mode_get", this.terminal, 1016, this.scratch) ===
+        GHOSTTY_SUCCESS && this.runtime.bytes(this.scratch, 1)[0] !== 0
+    );
+  }
+
   isSynchronizedOutput(): boolean {
     this.ensureActive();
     this.runtime.bytes(this.scratch, 1)[0] = 0;
@@ -667,7 +676,7 @@ export class GhosttyTerminalCore {
     return encoded;
   }
 
-  encodeMouse(input: GhosttyMouseInput): string {
+  encodeMouse(input: GhosttyMouseInput, strictUtf8 = false): string {
     this.ensureActive();
     this.runtime.call(
       "ghostty_mouse_encoder_setopt_from_terminal",
@@ -718,18 +727,23 @@ export class GhosttyTerminalCore {
     this.runtime.free(position, positionLayout.size);
 
     const written = this.runtime.call("ghostty_wasm_alloc_usize");
-    const encoded = this.encodeOutput(written, (output, outputSize) =>
-      this.runtime.call(
-        "ghostty_mouse_encoder_encode",
-        this.mouseEncoder,
-        this.mouseEvent,
-        output,
-        outputSize,
+    try {
+      return this.encodeOutput(
         written,
-      ),
-    );
-    this.runtime.call("ghostty_wasm_free_usize", written);
-    return encoded;
+        (output, outputSize) =>
+          this.runtime.call(
+            "ghostty_mouse_encoder_encode",
+            this.mouseEncoder,
+            this.mouseEvent,
+            output,
+            outputSize,
+            written,
+          ),
+        strictUtf8 ? new TextDecoder("utf-8", { fatal: true }) : decoder,
+      );
+    } finally {
+      this.runtime.call("ghostty_wasm_free_usize", written);
+    }
   }
 
   setSelection(anchor: GhosttyPointInput, end: GhosttyPointInput): void {
@@ -1178,6 +1192,7 @@ export class GhosttyTerminalCore {
   private encodeOutput(
     written: number,
     encode: (output: number, outputSize: number) => number,
+    outputDecoder = decoder,
   ): string {
     const sizeResult = encode(0, 0);
     const outputSize = this.runtime.view(written, 4).getUint32(0, true);
@@ -1185,12 +1200,15 @@ export class GhosttyTerminalCore {
     if (sizeResult !== GHOSTTY_OUT_OF_SPACE || outputSize === 0) return "";
 
     const output = this.runtime.alloc(outputSize);
-    const result = encode(output, outputSize);
-    const outputLength = this.runtime.view(written, 4).getUint32(0, true);
-    const encoded =
-      result === GHOSTTY_SUCCESS ? decoder.decode(this.runtime.bytes(output, outputLength)) : "";
-    this.runtime.free(output, outputSize);
-    return encoded;
+    try {
+      const result = encode(output, outputSize);
+      const outputLength = this.runtime.view(written, 4).getUint32(0, true);
+      return result === GHOSTTY_SUCCESS
+        ? outputDecoder.decode(this.runtime.bytes(output, outputLength))
+        : "";
+    } finally {
+      this.runtime.free(output, outputSize);
+    }
   }
 
   private readRow(
