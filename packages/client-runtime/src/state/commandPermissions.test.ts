@@ -75,6 +75,45 @@ const setup = Effect.gen(function* () {
   return registry;
 });
 
+it.effect("explicit terminal resume commands check the destination grant at execution", () =>
+  Effect.gen(function* () {
+    const registry = yield* setup;
+    let executions = 0;
+    const command = createEnvironmentRpcCommand(runtime, {
+      label: "terminalAutomation.resume",
+      tag: WS_METHODS.terminalAutomationResume,
+      execute: () =>
+        Effect.sync(() => {
+          executions += 1;
+          return {
+            version: 1 as const,
+            candidateVersion: 0,
+            candidates: [],
+            state: { status: "unbound" as const },
+          };
+        }),
+    });
+    const input = {
+      environmentId: env,
+      input: { threadId: ThreadId.make("thread"), bindingId: "original" },
+    };
+    registry.set(sessions(env), AsyncResult.success(grant(true)));
+    expect((yield* Effect.promise(() => command.run(registry, input)))._tag).toBe("Failure");
+    registry.set(
+      sessions(env),
+      AsyncResult.success({
+        ...grant(false),
+        scopes: ["terminal:operate"],
+        permissions: ["terminal:operate"],
+      }),
+    );
+    expect((yield* Effect.promise(() => command.run(registry, input)))._tag).toBe("Success");
+    registry.set(sessions(env), AsyncResult.success(grant(false)));
+    expect((yield* Effect.promise(() => command.run(registry, input)))._tag).toBe("Failure");
+    expect(executions).toBe(1);
+  }),
+);
+
 /** Supplies only the external RPC session; actual composer commands and both permission guards run. */
 const composerPermissionHarness = Effect.fn("ComposerPermissionTest.harness")(function* () {
   const calls: string[] = [];

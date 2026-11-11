@@ -50,6 +50,7 @@ export type EnvironmentRpcTag = keyof WsRpcProtocolClient & string;
 type RpcMethod<TTag extends EnvironmentRpcTag> = WsRpcProtocolClient[TTag];
 
 export type EnvironmentSubscriptionRpcTag =
+  | typeof WS_METHODS.terminalAutomationSubscribe
   | typeof WS_METHODS.providerAuthSubscribe
   | typeof WS_METHODS.providerInstallSubscribe
   | typeof ORCHESTRATION_V2_WS_METHODS.subscribeShell
@@ -129,9 +130,10 @@ export type EnvironmentRpcStreamValue<TTag extends EnvironmentStreamRpcTag> =
     : never;
 
 export type EnvironmentRpcStreamFailure<TTag extends EnvironmentStreamRpcTag> =
-  RpcMethod<TTag> extends (input: any, options?: any) => Stream.Stream<any, infer E, any>
-    ? E
-    : never;
+  | EnvironmentAuthorizationError
+  | (RpcMethod<TTag> extends (input: any, options?: any) => Stream.Stream<any, infer E, any>
+      ? E
+      : never);
 
 const currentSession = Effect.fn("EnvironmentRpc.currentSession")(function* () {
   const supervisor = yield* EnvironmentSupervisor.EnvironmentSupervisor;
@@ -299,6 +301,12 @@ function subscribeDynamicMapped<TTag extends EnvironmentSubscriptionRpcTag, A>(
                   Stream.unwrap(
                     Effect.gen(function* () {
                       const input = yield* makeInput(session);
+                      yield* authorizeRequest(tag, input).pipe(
+                        Effect.provideService(
+                          EnvironmentSupervisor.EnvironmentSupervisor,
+                          supervisor,
+                        ),
+                      );
                       const completeObservation = yield* observer.observe({
                         environmentId: supervisor.target.environmentId,
                         method: tag,

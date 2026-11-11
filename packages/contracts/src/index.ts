@@ -75,3 +75,4 @@ export * from "./clientRpcPermissions.ts";
 
 export * from "./discussion.ts";
 export * from "./terminalAutomation.ts";
+export * from "./terminalAutomationRpc.ts";

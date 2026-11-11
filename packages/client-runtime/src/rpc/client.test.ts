@@ -3,6 +3,7 @@ import {
   type RelayClientInstallProgressEvent,
   type ServerLifecycleStreamEvent,
   WS_METHODS,
+  ThreadId,
 } from "@t3tools/contracts";
 import { describe, expect, it } from "@effect/vitest";
 import * as Cause from "effect/Cause";
@@ -26,7 +27,7 @@ import {
 import * as EnvironmentSupervisor from "../connection/supervisor.ts";
 import * as RpcSession from "../rpc/session.ts";
 import type { WsRpcProtocolClient } from "../rpc/protocol.ts";
-import { runStream, subscribe, subscribeDynamicWithSession } from "./client.ts";
+import { runStream, subscribe, subscribeDynamicWithSession, RpcPermissionGuard } from "./client.ts";
 
 const TARGET = new PrimaryConnectionTarget({
   environmentId: EnvironmentId.make("environment-1"),
@@ -78,6 +79,37 @@ const makeHarness = Effect.fn("TestEnvironmentRpc.makeHarness")(function* () {
     supervisor,
   };
 });
+
+it.effect(
+  "automation subscription requires the destination permission boundary before opening",
+  () =>
+    Effect.gen(function* () {
+      const harness = yield* makeHarness();
+      let opens = 0;
+      const client = {
+        [WS_METHODS.terminalAutomationSubscribe]: () => {
+          opens += 1;
+          return Stream.succeed({ type: "ready" as const });
+        },
+      } as unknown as WsRpcProtocolClient;
+      yield* SubscriptionRef.set(harness.activeSession, Option.some(session(client)));
+      const read = subscribe(WS_METHODS.terminalAutomationSubscribe, {
+        threadId: ThreadId.make("thread"),
+      }).pipe(
+        Stream.take(1),
+        Stream.runCollect,
+        Effect.provideService(EnvironmentSupervisor.EnvironmentSupervisor, harness.supervisor),
+      );
+      expect(yield* Effect.flip(read)).toMatchObject({ _tag: "EnvironmentAuthorizationError" });
+      expect(opens).toBe(0);
+      expect(
+        yield* read.pipe(
+          Effect.provideService(RpcPermissionGuard, { authorize: () => Effect.void }),
+        ),
+      ).toEqual([{ type: "ready" }]);
+      expect(opens).toBe(1);
+    }),
+);
 
 describe("environment RPC", () => {
   it.effect("binds finite streaming commands to one active session", () =>

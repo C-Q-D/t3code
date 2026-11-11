@@ -96,6 +96,7 @@ import * as SourceControlSignIn from "./sourceControl/SourceControlSignIn.ts";
 import * as StorageCleanup from "./storageCleanup.ts";
 import * as DatabaseStorage from "./persistence/DatabaseStorage.ts";
 import * as TerminalManager from "./terminal/Manager.ts";
+import * as TerminalAutomation from "./terminal/AutomationService.ts";
 import * as ThreadLaunchService from "./orchestration-v2/ThreadLaunchService.ts";
 import * as ThreadSearch from "./orchestration-v2/ThreadSearch.ts";
 import * as UsageLimitSources from "./usage/UsageLimitSources.ts";
@@ -547,6 +548,7 @@ const layerUnusedConfigRpcServices = Layer.mergeAll(
   Layer.mock(StorageCleanup.StorageCleanup)({}),
   Layer.mock(DatabaseStorage.DatabaseStorage)({}),
   Layer.mock(TerminalManager.TerminalManager)({}),
+  TerminalAutomation.layer.pipe(Layer.provide(Layer.mock(TerminalManager.TerminalManager)({}))),
   Layer.mock(ThreadLaunchService.ThreadLaunchService)({}),
   Layer.mock(ThreadManagement.ThreadManagementService)({}),
   Layer.mock(ThreadSearch.ThreadSearch)({}),
@@ -617,6 +619,7 @@ it.effect(
         }),
         Layer.mock(ScratchThreadPromotion.ScratchThreadPromotion)({}),
         Layer.mock(ServerEnvironment.ServerEnvironment)({
+          getEnvironmentId: Effect.succeed(EnvironmentId.make("config-test")),
           getDescriptor: Effect.succeed({
             environmentId: EnvironmentId.make("config-test"),
             label: "Config test",
@@ -795,6 +798,7 @@ it.effect("on-demand clients get provider config without workspace snapshots", (
       }),
       Layer.mock(ScratchThreadPromotion.ScratchThreadPromotion)({}),
       Layer.mock(ServerEnvironment.ServerEnvironment)({
+        getEnvironmentId: Effect.succeed(EnvironmentId.make("config-test")),
         getDescriptor: Effect.succeed({
           environmentId: EnvironmentId.make("config-test"),
           label: "Config test",
