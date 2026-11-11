@@ -112,6 +112,60 @@ const setup = Effect.gen(function* () {
   };
 });
 
+it.effect("connection confirmation resumes the original model owner only", () =>
+  Effect.gen(function* () {
+    const { service } = yield* setup;
+    const bindingId = yield* bindOne(service);
+    yield* service.connect(scope, "other-window");
+    yield* service.connect({ ...scope, threadId: A.ThreadId.make("other") }, "other-thread");
+    yield* service.connect({ ...scope, environmentId: A.EnvironmentId.make("other") }, "other-env");
+    yield* service.reportEvent("client", {
+      version: 1,
+      target: view().target,
+      event: "human_intervened",
+    });
+    expect(yield* Effect.flip(service.resumeFromConnection("other-window", bindingId))).toEqual({
+      code: "stale_request",
+    });
+    expect(yield* Effect.flip(service.resumeFromConnection("other-thread", bindingId))).toEqual({
+      code: "stale_request",
+    });
+    expect(yield* Effect.flip(service.resumeFromConnection("other-env", bindingId))).toEqual({
+      code: "stale_request",
+    });
+    expect((yield* service.status(caller)).state.status).toBe("paused");
+    expect((yield* service.resumeFromConnection("client", bindingId)).state).toMatchObject({
+      status: "bound",
+      binding: { bindingId },
+    });
+    expect((yield* service.status(caller)).state).toMatchObject({
+      status: "bound",
+      binding: { bindingId },
+    });
+    yield* service.disconnect("client");
+    expect(yield* Effect.flip(service.resumeFromConnection("client", bindingId))).toEqual({
+      code: "stale_request",
+    });
+  }),
+);
+
+it.effect("connection confirmation cannot revive a binding disconnected during inspect", () =>
+  Effect.gen(function* () {
+    const fixture = yield* setup;
+    const bindingId = yield* bindOne(fixture.service);
+    yield* fixture.service.reportEvent("client", {
+      version: 1,
+      target: view().target,
+      event: "human_intervened",
+    });
+    fixture.beforeInspect(fixture.service.disconnect("client"));
+    expect(yield* Effect.flip(fixture.service.resumeFromConnection("client", bindingId))).toEqual({
+      code: "stale_request",
+    });
+    expect((yield* fixture.service.status(caller)).state.status).toBe("invalid");
+  }),
+);
+
 it.effect("release restores binding and owner capacity without replaying retired IDs", () =>
   Effect.gen(function* () {
     const { service, writes } = yield* setup;

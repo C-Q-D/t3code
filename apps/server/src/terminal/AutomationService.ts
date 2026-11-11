@@ -115,6 +115,10 @@ export class TerminalAutomationService extends Context.Service<
       caller: Caller,
       bindingId: string,
     ) => Effect.Effect<A.TerminalAutomationStatus, Failure>;
+    readonly resumeFromConnection: (
+      connectionId: string,
+      bindingId: string,
+    ) => Effect.Effect<A.TerminalAutomationStatus, Failure>;
     readonly release: (
       caller: Caller,
       input: A.TerminalAutomationReleaseInput,
@@ -530,6 +534,31 @@ const make = Effect.gen(function* () {
       return yield* Effect.fail(failure("stale_request"));
     owner.state = { status: "bound", binding: owner.state.binding };
     return yield* status(caller);
+  });
+  const resumeFromConnection = Effect.fn("TerminalAutomation.resumeFromConnection")(function* (
+    connectionId: string,
+    bindingId: string,
+  ) {
+    const work = bindings.get(bindingId);
+    const owner = work ? owners.get(work.ownerKey) : undefined;
+    const client = connections.get(connectionId);
+    const valid = () =>
+      work !== undefined &&
+      bindings.get(bindingId) === work &&
+      owner !== undefined &&
+      owners.get(work.ownerKey) === owner &&
+      client !== undefined &&
+      connections.get(connectionId) === client &&
+      owner.connectionId === connectionId &&
+      sameScope(owner.caller.scope, client.scope) &&
+      owner.state.status === "paused" &&
+      owner.state.binding.bindingId === bindingId;
+    if (!owner || !valid()) return yield* Effect.fail(failure("stale_request"));
+    yield* refresh(owner);
+    if (!valid() || owner.state.status !== "paused")
+      return yield* Effect.fail(failure("stale_request"));
+    owner.state = { status: "bound", binding: owner.state.binding };
+    return yield* status(owner.caller);
   });
   const release = Effect.fn("TerminalAutomation.release")(function* (
     caller: Caller,
@@ -998,6 +1027,7 @@ const make = Effect.gen(function* () {
     replySelection,
     reportEvent,
     resumeConfirmed,
+    resumeFromConnection,
     release,
     input,
     read,
