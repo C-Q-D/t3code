@@ -1,6 +1,6 @@
 import { expect, it, vi } from "vite-plus/test";
 import { GhosttyTerminalCore } from "./core";
-import { readGhosttyAutomation } from "./automation";
+import { readGhosttyAutomation, encodeGhosttyAutomation } from "./automation";
 
 vi.mock("./vendor/ghostty-vt.wasm?url", async () => ({
   default: (await import("./vendor/ghostty-vt.wasm?inline")).default,
@@ -46,6 +46,108 @@ it("reads formatter Unicode, wraps and spaces without changing selection, viewpo
     core.readAutomationRows(0, 3);
     expect(core.snapshot().dirtyRows.size).toBeGreaterThan(0);
     expect(first.lines[0]?.text).toBe("中🙂ab  ");
+  } finally {
+    core.dispose();
+  }
+});
+
+it("encodes mode-aware keys and Unicode paste without sending, and identifies empty releases", async () => {
+  const core = await createCore();
+  try {
+    const key = {
+      type: "key",
+      key: "ArrowUp",
+      phase: "press",
+      modifiers: { shift: false, alt: false, ctrl: false, meta: false },
+    } as const;
+    const encode = (action: Parameters<typeof encodeGhosttyAutomation>[1]) =>
+      encodeGhosttyAutomation(core, action, core.automationMetadata().frameRevision);
+    expect(encode(key)).toEqual({ status: "encoded", encodedText: "\x1b[A" });
+    expect(encode({ ...key, phase: "release" })).toEqual({ status: "not_sent" });
+    core.write("\x1b[?1h\x1b[?2004h");
+    expect(encode(key)).toEqual({ status: "encoded", encodedText: "\x1bOA" });
+    expect(encode({ type: "text", text: "中🙂" })).toEqual({
+      status: "encoded",
+      encodedText: "\x1b[200~中🙂\x1b[201~",
+    });
+    expect(
+      encode({
+        type: "key",
+        key: "c",
+        phase: "press",
+        modifiers: { shift: false, alt: false, ctrl: true, meta: false },
+      }),
+    ).toEqual({ status: "encoded", encodedText: "\x03" });
+  } finally {
+    core.dispose();
+  }
+});
+
+it("validates mouse frames and cell geometry and distinguishes local wheel actions", async () => {
+  const core = await createCore();
+  try {
+    const geometry = {
+      cellWidth: 8,
+      cellHeight: 16,
+      screenWidth: 72,
+      screenHeight: 56,
+      paddingLeft: 4,
+      paddingRight: 4,
+      paddingTop: 4,
+      paddingBottom: 4,
+    };
+    const revision = core.automationMetadata().frameRevision;
+    const wheel = {
+      type: "mouse",
+      event: "wheel",
+      position: { column: 1, row: 1 },
+      deltaColumns: 0,
+      deltaRows: -1,
+      modifiers: { shift: false, alt: false, ctrl: false, meta: false },
+      frameRevision: revision,
+    } as const;
+    expect(encodeGhosttyAutomation(core, wheel, revision, geometry)).toEqual({
+      status: "local_action",
+      action: "scroll",
+      deltaRows: -1,
+    });
+    core.write("\x1b[?1000h\x1b[?1006h");
+    expect(() => encodeGhosttyAutomation(core, wheel, revision, geometry)).toThrow("stale_request");
+    const current = core.automationMetadata().frameRevision;
+    const press = {
+      type: "mouse",
+      event: "press",
+      position: { column: 1, row: 1 },
+      button: "left",
+      modifiers: { shift: false, alt: false, ctrl: false, meta: false },
+      frameRevision: current,
+    } as const;
+    expect(encodeGhosttyAutomation(core, press, current, geometry)).toEqual({
+      status: "encoded",
+      encodedText: "\x1b[<0;2;2M",
+    });
+    expect(
+      encodeGhosttyAutomation(core, { ...press, event: "release" }, current, geometry),
+    ).toEqual({ status: "encoded", encodedText: "\x1b[<0;2;2m" });
+    expect(
+      encodeGhosttyAutomation(
+        core,
+        { ...wheel, frameRevision: current, deltaRows: 0, deltaColumns: 1 },
+        current,
+        geometry,
+      ),
+    ).toEqual({ status: "encoded", encodedText: "\x1b[<67;2;2M" });
+    expect(() =>
+      encodeGhosttyAutomation(
+        core,
+        { ...press, position: { column: 8, row: 1 } },
+        current,
+        geometry,
+      ),
+    ).toThrow("stale_request");
+    expect(() =>
+      encodeGhosttyAutomation(core, press, current, { ...geometry, screenWidth: 20 }),
+    ).toThrow("stale_request");
   } finally {
     core.dispose();
   }

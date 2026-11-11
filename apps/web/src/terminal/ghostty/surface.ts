@@ -1,5 +1,12 @@
 /** Localized terminal presentation and existing interaction behavior. */
 import { t } from "~/i18n";
+import type { TerminalAutomationAction, TerminalAutomationReadQuery } from "@t3tools/contracts";
+import {
+  encodeGhosttyAutomation,
+  ghosttyAutomationFrame,
+  GhosttyAutomationError,
+  readGhosttyAutomation,
+} from "./automation";
 import { isMacPlatform } from "../../lib/utils";
 import { SELECTION_MULTI_CLICK_INTERVAL_MS } from "../../lib/selectionActions";
 import { collectWrappedTerminalLinkLine, extractTerminalLinks } from "../../terminal-links";
@@ -794,6 +801,43 @@ export class GhosttyTerminalSurface {
     this.cursorOn = true;
     this.scrollbarDirty = true;
     this.requestRender();
+  }
+
+  /** Returns a detached frame; the owning bridge supplies the current PTY output sequence. */
+  automationFrame(sequence: number) {
+    if (this.disposed) throw new GhosttyAutomationError("target_invalid");
+    return ghosttyAutomationFrame(this.core.automationMetadata(), sequence);
+  }
+
+  /** Reads the active screen without consuming the surface's pending render. */
+  readAutomation(query: TerminalAutomationReadQuery, sequence: number) {
+    if (this.disposed) throw new GhosttyAutomationError("target_invalid");
+    return readGhosttyAutomation(this.core, query, sequence);
+  }
+
+  /** Encodes without sending; local scroll uses the existing viewport path and returns no PTY bytes. */
+  encodeAutomationInput(action: TerminalAutomationAction, frameRevision: number) {
+    if (this.disposed) throw new GhosttyAutomationError("target_invalid");
+    if (
+      !this.visible ||
+      !this.hasSize ||
+      this.pendingCanvasConfiguration !== null ||
+      this.pendingFontEpoch !== null
+    )
+      throw new GhosttyAutomationError("not_ready");
+    const bounds = this.canvas.getBoundingClientRect();
+    const result = encodeGhosttyAutomation(this.core, action, frameRevision, {
+      cellWidth: this.metrics.width,
+      cellHeight: this.metrics.height,
+      screenWidth: bounds.width,
+      screenHeight: bounds.height,
+      paddingLeft: CONTENT_PADDING,
+      paddingRight: CONTENT_PADDING,
+      paddingTop: this.originY,
+      paddingBottom: Math.max(0, bounds.height - this.originY - this.rows * this.metrics.height),
+    });
+    if (result.status === "local_action") this.scrollViewport(result.deltaRows);
+    return result;
   }
 
   resetAndWrite(data: string): void {

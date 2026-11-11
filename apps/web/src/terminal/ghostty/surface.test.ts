@@ -271,6 +271,38 @@ describe("GhosttyTerminalSurface visibility", () => {
     };
   }
 
+  it("scrolls automation locally without sending PTY bytes or invoking keyboard hooks", async () => {
+    const harness = createHarness();
+    const beforeKey = vi.fn(() => false);
+    const surface = await harness.create({ beforeKey });
+    surface.write("line\r\n".repeat(20));
+    harness.flushFrame();
+    const before = surface.automationFrame(1);
+    expect(
+      surface.encodeAutomationInput(
+        {
+          type: "mouse",
+          event: "wheel",
+          position: { column: 0, row: 0 },
+          deltaRows: -1,
+          deltaColumns: 0,
+          frameRevision: before.frameRevision,
+          modifiers: { shift: false, alt: false, ctrl: false, meta: false },
+        },
+        before.frameRevision,
+      ),
+    ).toEqual({ status: "local_action", action: "scroll", deltaRows: -1 });
+    const after = surface.automationFrame(1);
+    expect(after.viewportStartLine).toBe(before.viewportStartLine - 1);
+    expect(
+      surface.encodeAutomationInput({ type: "text", text: "🙂" }, after.frameRevision),
+    ).toEqual({ status: "encoded", encodedText: "🙂" });
+    expect(harness.onData).not.toHaveBeenCalled();
+    expect(beforeKey).not.toHaveBeenCalled();
+    surface.dispose();
+    expect(() => surface.automationFrame(1)).toThrow("target_invalid");
+  });
+
   it("clears the motion baseline when application mouse tracking changes", async () => {
     const harness = createHarness();
     const surface = await harness.create();

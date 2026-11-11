@@ -139,6 +139,7 @@ export interface GhosttyScrollbar {
   readonly len: number;
 }
 
+/** Detached active-screen coordinates; revision invalidates cursors after output or geometry changes. */
 export interface GhosttyAutomationMetadata {
   readonly frameRevision: number;
   readonly cols: number;
@@ -151,6 +152,7 @@ export interface GhosttyAutomationMetadata {
   readonly pendingWrap: boolean;
 }
 
+/** Physical rows with formatter text; soft wraps retain their explicit row boundary. */
 export interface GhosttyAutomationRows {
   readonly metadata: GhosttyAutomationMetadata;
   readonly lines: readonly {
@@ -557,7 +559,21 @@ export class GhosttyTerminalCore {
     );
   }
 
-  encodeKey(event: KeyboardEvent, action: "press" | "release" = "press"): string {
+  encodeKey(
+    event: Pick<
+      KeyboardEvent,
+      | "key"
+      | "code"
+      | "repeat"
+      | "shiftKey"
+      | "ctrlKey"
+      | "altKey"
+      | "metaKey"
+      | "getModifierState"
+      | "isComposing"
+    >,
+    action: "press" | "release" = "press",
+  ): string {
     this.ensureActive();
     this.runtime.call("ghostty_key_encoder_setopt_from_terminal", this.keyEncoder, this.terminal);
     this.runtime.call(

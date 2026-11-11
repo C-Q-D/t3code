@@ -4,14 +4,166 @@ import type {
   TerminalAutomationReadQuery,
   TerminalAutomationReadResult,
   TerminalAutomationErrorCode,
+  TerminalAutomationAction,
 } from "@t3tools/contracts";
 import { GhosttyTerminalCore, type GhosttyAutomationMetadata } from "./core";
+import { US_SHIFTED_TO_UNSHIFTED_KEYS } from "@t3tools/shared/keybindings";
 
+/** A1 failures the bridge can return without claiming a PTY write. */
 export class GhosttyAutomationError extends Error {
   constructor(readonly code: TerminalAutomationErrorCode) {
     super(code);
     this.name = "GhosttyAutomationError";
   }
+}
+
+/** Current CSS-pixel canvas geometry; cell coordinates are converted to cell centers. */
+export interface GhosttyAutomationGeometry {
+  readonly cellWidth: number;
+  readonly cellHeight: number;
+  readonly screenWidth: number;
+  readonly screenHeight: number;
+  readonly paddingLeft: number;
+  readonly paddingRight: number;
+  readonly paddingTop: number;
+  readonly paddingBottom: number;
+}
+
+/** Local scroll needs surface execution and cannot be represented by A1's encodedText reply. */
+export type GhosttyAutomationEncoding =
+  | { readonly status: "encoded"; readonly encodedText: string }
+  | { readonly status: "not_sent" }
+  | { readonly status: "local_action"; readonly action: "scroll"; readonly deltaRows: number };
+
+/** Encodes a validated A1 action synchronously, without DOM dispatch or PTY writes; local actions require the surface. */
+export function encodeGhosttyAutomation(
+  core: GhosttyTerminalCore,
+  action: TerminalAutomationAction,
+  frameRevision: number,
+  geometry?: GhosttyAutomationGeometry,
+): GhosttyAutomationEncoding {
+  const metadata = core.automationMetadata();
+  if (frameRevision !== metadata.frameRevision) throw new GhosttyAutomationError("stale_request");
+  let encodedText = "";
+  if (action.type === "text" || action.type === "paste") {
+    encodedText = core.encodePaste(action.text);
+  } else if (action.type === "key") {
+    const punctuation: Readonly<Record<string, string>> = {
+      " ": "Space",
+      "`": "Backquote",
+      "~": "Backquote",
+      "-": "Minus",
+      _: "Minus",
+      "=": "Equal",
+      "+": "Equal",
+      "[": "BracketLeft",
+      "{": "BracketLeft",
+      "]": "BracketRight",
+      "}": "BracketRight",
+      "\\": "Backslash",
+      "|": "Backslash",
+      ";": "Semicolon",
+      ":": "Semicolon",
+      "'": "Quote",
+      '"': "Quote",
+      ",": "Comma",
+      "<": "Comma",
+      ".": "Period",
+      ">": "Period",
+      "/": "Slash",
+      "?": "Slash",
+    };
+    const unshifted = US_SHIFTED_TO_UNSHIFTED_KEYS.get(action.key) ?? action.key;
+    const code = /^[a-z]$/i.test(action.key)
+      ? `Key${action.key.toUpperCase()}`
+      : /^[0-9]$/.test(unshifted)
+        ? `Digit${unshifted}`
+        : (punctuation[action.key] ?? action.key);
+    encodedText = core.encodeKey(
+      {
+        key: action.key,
+        code,
+        repeat: false,
+        shiftKey: action.modifiers.shift,
+        ctrlKey: action.modifiers.ctrl,
+        altKey: action.modifiers.alt,
+        metaKey: action.modifiers.meta,
+        getModifierState: () => false,
+        isComposing: false,
+      },
+      action.phase,
+    );
+  } else {
+    const { column, row } = action.position;
+    if (
+      action.frameRevision !== frameRevision ||
+      !Number.isInteger(column) ||
+      !Number.isInteger(row) ||
+      column < 0 ||
+      row < 0 ||
+      column >= metadata.cols ||
+      row >= metadata.rows
+    )
+      throw new GhosttyAutomationError("stale_request");
+    if (
+      !geometry ||
+      !Object.values(geometry).every(Number.isFinite) ||
+      geometry.cellWidth <= 0 ||
+      geometry.cellHeight <= 0 ||
+      Math.min(
+        geometry.paddingLeft,
+        geometry.paddingRight,
+        geometry.paddingTop,
+        geometry.paddingBottom,
+      ) < 0 ||
+      geometry.screenWidth <
+        geometry.paddingLeft + geometry.paddingRight + metadata.cols * geometry.cellWidth ||
+      geometry.screenHeight <
+        geometry.paddingTop + geometry.paddingBottom + metadata.rows * geometry.cellHeight
+    )
+      throw new GhosttyAutomationError("stale_request");
+    const reporting = core.isMouseTracking() && !action.modifiers.shift;
+    if (!reporting) {
+      if (action.event !== "wheel" || action.deltaColumns !== 0)
+        throw new GhosttyAutomationError("unsupported_client");
+      if (!core.isAlternateScreen())
+        return { status: "local_action", action: "scroll", deltaRows: action.deltaRows };
+      const prefix = core.isApplicationCursorKeys() ? "\x1bO" : "\x1b[";
+      encodedText = (prefix + (action.deltaRows < 0 ? "A" : "B")).repeat(
+        Math.abs(action.deltaRows),
+      );
+    } else {
+      const mods =
+        (action.modifiers.shift ? 1 : 0) |
+        (action.modifiers.ctrl ? 2 : 0) |
+        (action.modifiers.alt ? 4 : 0) |
+        (action.modifiers.meta ? 8 : 0);
+      const encode = (button: number | null, event: "press" | "release" | "motion") =>
+        core.encodeMouse({
+          ...geometry,
+          x: geometry.paddingLeft + (column + 0.5) * geometry.cellWidth,
+          y: geometry.paddingTop + (row + 0.5) * geometry.cellHeight,
+          action: event,
+          button,
+          mods,
+          anyButtonPressed:
+            action.event !== "wheel" && action.button !== "none" && action.event !== "release",
+        });
+      if (action.event === "wheel") {
+        for (let index = 0; index < Math.abs(action.deltaRows); index += 1)
+          encodedText += encode(action.deltaRows < 0 ? 4 : 5, "press");
+        for (let index = 0; index < Math.abs(action.deltaColumns); index += 1)
+          encodedText += encode(action.deltaColumns < 0 ? 6 : 7, "press");
+      } else {
+        const buttons = { none: null, left: 1, middle: 3, right: 2 };
+        encodedText = encode(
+          buttons[action.button],
+          action.event === "move" ? "motion" : action.event,
+        );
+      }
+    }
+  }
+  return encodedText.length > 0 ? { status: "encoded", encodedText } : { status: "not_sent" };
 }
 
 /** Projects current core metadata into a frame; sequence must come from the owning PTY stream. */
