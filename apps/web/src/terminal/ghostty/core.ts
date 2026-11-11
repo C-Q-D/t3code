@@ -526,11 +526,49 @@ export class GhosttyTerminalCore {
 
   isPixelMouseReporting(): boolean {
     this.ensureActive();
-    this.runtime.bytes(this.scratch, 1)[0] = 0;
-    return (
-      this.runtime.call("ghostty_terminal_mode_get", this.terminal, 1016, this.scratch) ===
-        GHOSTTY_SUCCESS && this.runtime.bytes(this.scratch, 1)[0] !== 0
-    );
+    const slot = this.runtime.allocOpaque();
+    let encoder = 0;
+    let event = 0;
+    try {
+      this.assertSuccess(
+        "ghostty_mouse_encoder_new",
+        this.runtime.call("ghostty_mouse_encoder_new", 0, slot),
+      );
+      encoder = this.runtime.readPointer(slot);
+      this.assertSuccess(
+        "ghostty_mouse_event_new",
+        this.runtime.call("ghostty_mouse_event_new", 0, slot),
+      );
+      event = this.runtime.readPointer(slot);
+      // DEC mode bits can outlive the active format; probe an isolated encoder to preserve mouse tracking.
+      return (
+        this.encodeMouseWithHandles(
+          {
+            action: "press",
+            button: 1,
+            mods: 0,
+            anyButtonPressed: false,
+            x: 16,
+            y: 16,
+            cellWidth: 8,
+            cellHeight: 8,
+            screenWidth: 32,
+            screenHeight: 32,
+            paddingLeft: 0,
+            paddingRight: 0,
+            paddingTop: 0,
+            paddingBottom: 0,
+          },
+          false,
+          encoder,
+          event,
+        ) === "\x1b[<0;16;16M"
+      );
+    } finally {
+      if (event !== 0) this.runtime.call("ghostty_mouse_event_free", event);
+      if (encoder !== 0) this.runtime.call("ghostty_mouse_encoder_free", encoder);
+      this.runtime.freeOpaque(slot);
+    }
   }
 
   isSynchronizedOutput(): boolean {
@@ -678,12 +716,17 @@ export class GhosttyTerminalCore {
 
   /** strictUtf8 rejects legacy mouse bytes that string transport cannot preserve; the default retains manual input behavior. */
   encodeMouse(input: GhosttyMouseInput, strictUtf8 = false): string {
+    return this.encodeMouseWithHandles(input, strictUtf8, this.mouseEncoder, this.mouseEvent);
+  }
+
+  private encodeMouseWithHandles(
+    input: GhosttyMouseInput,
+    strictUtf8: boolean,
+    encoder: number,
+    event: number,
+  ): string {
     this.ensureActive();
-    this.runtime.call(
-      "ghostty_mouse_encoder_setopt_from_terminal",
-      this.mouseEncoder,
-      this.terminal,
-    );
+    this.runtime.call("ghostty_mouse_encoder_setopt_from_terminal", encoder, this.terminal);
 
     const sizeLayout = this.runtime.layout("GhosttyMouseEncoderSize");
     const size = this.runtime.alloc(sizeLayout.size);
@@ -700,31 +743,31 @@ export class GhosttyTerminalCore {
     ] as const) {
       this.runtime.setField(size, "GhosttyMouseEncoderSize", field, Math.max(0, Math.round(value)));
     }
-    this.runtime.call("ghostty_mouse_encoder_setopt", this.mouseEncoder, 2, size);
+    this.runtime.call("ghostty_mouse_encoder_setopt", encoder, 2, size);
     this.runtime.free(size, sizeLayout.size);
 
     this.runtime.bytes(this.scratch, 1)[0] = input.anyButtonPressed ? 1 : 0;
-    this.runtime.call("ghostty_mouse_encoder_setopt", this.mouseEncoder, 3, this.scratch);
+    this.runtime.call("ghostty_mouse_encoder_setopt", encoder, 3, this.scratch);
     this.runtime.bytes(this.scratch, 1)[0] = 1;
-    this.runtime.call("ghostty_mouse_encoder_setopt", this.mouseEncoder, 4, this.scratch);
+    this.runtime.call("ghostty_mouse_encoder_setopt", encoder, 4, this.scratch);
 
     this.runtime.call(
       "ghostty_mouse_event_set_action",
-      this.mouseEvent,
+      event,
       input.action === "press" ? 0 : input.action === "release" ? 1 : 2,
     );
     if (input.button === null) {
-      this.runtime.call("ghostty_mouse_event_clear_button", this.mouseEvent);
+      this.runtime.call("ghostty_mouse_event_clear_button", event);
     } else {
-      this.runtime.call("ghostty_mouse_event_set_button", this.mouseEvent, input.button);
+      this.runtime.call("ghostty_mouse_event_set_button", event, input.button);
     }
-    this.runtime.call("ghostty_mouse_event_set_mods", this.mouseEvent, input.mods);
+    this.runtime.call("ghostty_mouse_event_set_mods", event, input.mods);
     const positionLayout = this.runtime.layout("GhosttyMousePosition");
     const position = this.runtime.alloc(positionLayout.size);
     const positionView = this.runtime.view(position, positionLayout.size);
     positionView.setFloat32(positionLayout.fields.x!.offset, input.x, true);
     positionView.setFloat32(positionLayout.fields.y!.offset, input.y, true);
-    this.runtime.call("ghostty_mouse_event_set_position", this.mouseEvent, position);
+    this.runtime.call("ghostty_mouse_event_set_position", event, position);
     this.runtime.free(position, positionLayout.size);
 
     const written = this.runtime.call("ghostty_wasm_alloc_usize");
@@ -734,8 +777,8 @@ export class GhosttyTerminalCore {
         (output, outputSize) =>
           this.runtime.call(
             "ghostty_mouse_encoder_encode",
-            this.mouseEncoder,
-            this.mouseEvent,
+            encoder,
+            event,
             output,
             outputSize,
             written,

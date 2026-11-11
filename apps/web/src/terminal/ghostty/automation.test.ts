@@ -107,6 +107,14 @@ it.each([7.25, 7.5])(
         status: "encoded",
         encodedText: width === 7.5 ? "\x1b[<0;304;24M" : "\x1b[<0;294;24M",
       });
+      core.write("\x1b[?1006h");
+      const cells = core.automationMetadata().frameRevision;
+      for (const column of [0, 40, 79]) {
+        expect(encodeGhosttyAutomation(core, press(column, cells), cells, geometry)).toEqual({
+          status: "encoded",
+          encodedText: `\x1b[<0;${column + 1};2M`,
+        });
+      }
     } finally {
       core.dispose();
     }
