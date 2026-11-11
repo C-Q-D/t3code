@@ -4,6 +4,32 @@ import { Tool } from "effect/ai";
 
 import { advertisedJsonSchema } from "./advertisedJsonSchema.ts";
 
+it.each([
+  { allowed: ["name"], closed: true },
+  { allowed: ["name", "extension"], closed: false },
+])(
+  "only closes propertyNames when every permitted name is declared: $closed",
+  ({ allowed, closed }) => {
+    const schema = advertisedJsonSchema(
+      Tool.dynamic("names", {
+        parameters: {
+          type: "object",
+          properties: { name: { type: "string" } },
+          propertyNames: { enum: allowed },
+          additionalProperties: true,
+        },
+      }),
+    );
+    if (closed) {
+      expect(schema.additionalProperties).toBe(false);
+      expect(schema.propertyNames).toBeUndefined();
+    } else {
+      expect(schema.additionalProperties).toBeUndefined();
+      expect(schema.propertyNames).toEqual({ enum: allowed });
+    }
+  },
+);
+
 it("drops JSON noise, merges tagged unions, and keeps null where it is required", () => {
   const Every = Schema.Struct({ ms: Schema.Int });
   const tool = Tool.make("example", {

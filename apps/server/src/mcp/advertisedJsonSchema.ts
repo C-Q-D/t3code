@@ -93,6 +93,22 @@ const compact = (schema: Json, optional: boolean): Json => {
     const only = branches.length === 1 ? branches[0] : mergeTaggedObjects(branches);
     result = Predicate.isObject(only) ? { ...only, ...rest } : { ...rest, anyOf: branches };
   }
+  if (
+    Predicate.isObject(result.properties) &&
+    Predicate.isObject(result.propertyNames) &&
+    Array.isArray(result.propertyNames.enum)
+  ) {
+    const keys = Object.keys(result.properties);
+    const allowed = result.propertyNames.enum;
+    if (
+      Object.keys(result.propertyNames).length === 1 &&
+      keys.length === allowed.length &&
+      keys.every((key) => allowed.includes(key))
+    ) {
+      const { propertyNames: _names, ...rest } = result;
+      result = { ...rest, additionalProperties: false };
+    }
+  }
   return result;
 };
 

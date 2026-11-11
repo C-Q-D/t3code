@@ -28,11 +28,11 @@ import * as Handlers from "./handlers.ts";
 const threadId = A.ThreadId.make("thread");
 const environmentId = A.EnvironmentId.make("env");
 const parameterDecoders = {
-  terminal_status: Schema.decodeSync(A.TerminalMcpStatusInput),
-  terminal_bind: Schema.decodeSync(A.TerminalMcpBindInput),
-  terminal_read: Schema.decodeSync(A.TerminalMcpReadInput),
-  terminal_input: Schema.decodeSync(A.TerminalMcpInput),
-  terminal_release: Schema.decodeSync(A.TerminalMcpReleaseInput),
+  terminal_status: Schema.decodeUnknownSync(A.TerminalMcpStatusInput),
+  terminal_bind: Schema.decodeUnknownSync(A.TerminalMcpBindInput),
+  terminal_read: Schema.decodeUnknownSync(A.TerminalMcpReadInput),
+  terminal_input: Schema.decodeUnknownSync(A.TerminalMcpInput),
+  terminal_release: Schema.decodeUnknownSync(A.TerminalMcpReleaseInput),
 };
 const frame: A.TerminalAutomationFrame = {
   activeScreen: "primary",
@@ -223,6 +223,10 @@ it("advertises object schemas and rejects injected identities and model resume",
   for (const tool of Object.values(TerminalToolkit.tools)) {
     expect(Tool.getJsonSchema(tool).type).toBe("object");
     expect(advertisedJsonSchema(tool).type).toBe("object");
+    expect(Tool.getJsonSchema(tool).propertyNames, tool.name).toMatchObject({
+      enum: expect.any(Array),
+    });
+    expect(advertisedJsonSchema(tool).additionalProperties, tool.name).toBe(false);
     const valid =
       tool.name === "terminal_status"
         ? {}
@@ -318,6 +322,24 @@ it.effect(
       expect(yield* f.call("terminal_release", { bindingId }, other)).toMatchObject({
         code: "target_invalid",
       });
+      const otherThread = {
+        ...f.invocation,
+        thread: { ...f.invocation.thread, threadId: A.ThreadId.make("another-thread") },
+      };
+      expect(
+        yield* f.call(
+          "terminal_read",
+          {
+            bindingId,
+            query: {
+              source: "screen",
+              view: "current_viewport",
+              budget: { maxCodeUnits: 10, maxLines: 1 },
+            },
+          },
+          otherThread,
+        ),
+      ).toMatchObject({ code: "target_invalid" });
       expect(yield* f.call("terminal_release", { bindingId })).toEqual({ status: "released" });
     }),
 );
@@ -354,6 +376,32 @@ it.effect.each(["credential", "mode", "run", "provider"] as const)(
         encodedText: "x",
       });
       expect(yield* Fiber.join(running)).toMatchObject({ status: "not_sent" });
+      expect(f.writes).toEqual([]);
+    }),
+);
+
+it.effect.each(["credential", "mode"] as const)(
+  "pending reads end on %s invalidation without terminal writes",
+  (kind) =>
+    Effect.gen(function* () {
+      const f = yield* setup;
+      const bound = yield* f.call("terminal_bind", { mode: "auto" });
+      if (!("state" in bound) || bound.state.status !== "bound") throw new Error("expected bound");
+      const running = yield* f
+        .call("terminal_read", {
+          bindingId: bound.state.binding.bindingId,
+          query: {
+            source: "screen",
+            view: "current_viewport",
+            budget: { maxCodeUnits: 100, maxLines: 1 },
+          },
+        })
+        .pipe(Effect.forkChild);
+      const request = yield* f.take;
+      expect(request.operation).toBe("read");
+      if (kind === "credential") yield* f.registry.revokeThread(threadId);
+      else f.change("mode");
+      expect(yield* Fiber.join(running)).toMatchObject({ code: "target_invalid" });
       expect(f.writes).toEqual([]);
     }),
 );

@@ -4,7 +4,14 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import { assert, expect, it } from "@effect/vitest";
-import { ComposerContextId, EnvironmentId, ThreadId } from "@t3tools/contracts";
+import {
+  ComposerContextId,
+  EnvironmentId,
+  ThreadId,
+  TerminalAutomationStatus,
+  TerminalAutomationReadResult,
+  TerminalAutomationInputResult,
+} from "@t3tools/contracts";
 import { projectComposerContextForProvider } from "@t3tools/shared/composerContextReferences";
 
 import {
@@ -425,6 +432,88 @@ it("stops a sample only once a must-not check has failed", () => {
 });
 
 const decodeDeviceCase = Schema.decodeSync(Schema.fromJsonString(McpToolUseCase));
+const terminalResultDecoders = {
+  terminal_status: Schema.decodeUnknownSync(TerminalAutomationStatus),
+  terminal_bind: Schema.decodeUnknownSync(TerminalAutomationStatus),
+  terminal_read: Schema.decodeUnknownSync(TerminalAutomationReadResult),
+  terminal_input: Schema.decodeUnknownSync(TerminalAutomationInputResult),
+};
+const terminalCases = () =>
+  NodeFS.readFileSync(new URL("./cases/terminal.ndjson", import.meta.url), "utf8")
+    .trim()
+    .split("\n")
+    .map((line) => decodeDeviceCase(line));
+
+it("builds terminal cases from actual tools and grades receipt, pause, selection and child boundaries", () => {
+  const cases = terminalCases();
+  assert.equal(new Set(cases.map((testCase) => testCase.id)).size, 6);
+  const base = buildBase(template, { model: "claude-sonnet-5-5", keepUserInstructions: false });
+  for (const name of [
+    "terminal_status",
+    "terminal_bind",
+    "terminal_read",
+    "terminal_input",
+    "terminal_release",
+  ]) {
+    const tool = base.t3.find((tool) => tool.name === `mcp__t3-code__${name}`);
+    assert.isDefined(tool);
+    assert.equal((tool!.input_schema as { type: string }).type, "object");
+    assert.equal(
+      (tool!.input_schema as { additionalProperties: boolean }).additionalProperties,
+      false,
+    );
+  }
+  const call = (tool: string, input: unknown = {}, step = 0) => ({ step, tool, input });
+  const good: Record<string, SampleRun["calls"]> = {
+    "TERM-UNKNOWN": [
+      call("terminal_status", { receipt: { bindingId: "binding", requestId: "original" } }),
+    ],
+    "TERM-PAUSED": [],
+    "TERM-CHOICE": [],
+    "TERM-HISTORY": [
+      call("terminal_read", {
+        bindingId: "binding",
+        query: { source: "history", budget: { maxCodeUnits: 1000, maxLines: 10 } },
+      }),
+    ],
+    "TERM-CHILD": [
+      call("terminal_bind", { mode: "auto" }),
+      call("terminal_read", { bindingId: "child-binding" }, 1),
+    ],
+    "TERM-ORDINARY": [],
+  };
+  const bad: Record<string, SampleRun["calls"]> = {
+    "TERM-UNKNOWN": [
+      call("terminal_status", { receipt: { bindingId: "binding", requestId: "new-request" } }),
+      call("terminal_input", { requestId: "new-request" }),
+    ],
+    "TERM-PAUSED": [call("terminal_bind", { mode: "resume" })],
+    "TERM-CHOICE": [call("terminal_input", { bindingId: "guessed" })],
+    "TERM-HISTORY": [call("terminal_input", { action: { type: "text", text: "history" } })],
+    "TERM-CHILD": [call("terminal_read", { bindingId: "parent-binding" })],
+    "TERM-ORDINARY": [call("terminal_status")],
+  };
+  for (const testCase of cases) {
+    assert.doesNotThrow(() => buildMessages(makeSample(testCase, base)));
+    const results = [
+      ...Object.entries(testCase.setup.mocks ?? {}),
+      ...(testCase.setup.priorTurns ?? []).flatMap((turn) =>
+        (turn.toolCalls ?? []).map((call) => [call.tool, call.result] as const),
+      ),
+    ];
+    for (const [name, result] of results) {
+      const decode = terminalResultDecoders[name as keyof typeof terminalResultDecoders];
+      if (decode) assert.doesNotThrow(() => decode(result), testCase.id + ":" + name);
+    }
+    const run = {
+      calls: good[testCase.id]!,
+      text: "You must select a window and confirm resume in the client.",
+      stopReason: "end_turn",
+    };
+    assert.deepEqual(failed(testCase.expect, run), [], testCase.id);
+    assert.isNotEmpty(failed(testCase.expect, { ...run, calls: bad[testCase.id]! }), testCase.id);
+  }
+});
 const deviceCases = () =>
   NodeFS.readFileSync(new URL("./cases/device-manager.ndjson", import.meta.url), "utf8")
     .trim()
