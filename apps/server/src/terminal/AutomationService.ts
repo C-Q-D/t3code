@@ -28,6 +28,7 @@ interface Connection {
 }
 interface Owner {
   caller: Caller;
+  busy: number;
   state: A.TerminalAutomationState;
   connectionId?: string;
   humanInputEpoch?: number;
@@ -75,6 +76,7 @@ export class TerminalAutomationService extends Context.Service<
       connectionId: string,
     ) => Effect.Effect<Queue.Dequeue<Message>, Failure, Scope.Scope>;
     readonly disconnect: (connectionId: string) => Effect.Effect<void>;
+    readonly revoke: (caller: Caller, bindingId: string) => Effect.Effect<void, Failure>;
     readonly input: (
       caller: Caller,
       input: A.TerminalAutomationInput,
@@ -143,7 +145,7 @@ const make = Effect.gen(function* () {
     for (const owner of owners.values())
       if (sameScope(owner.caller.scope, scope) && owner.state.status === "selection_required") {
         owner.state = { status: "unbound" };
-        owners.delete(ownerKey(owner.caller));
+        if (owner.busy === 0) owners.delete(ownerKey(owner.caller));
       }
   };
   const pruneRetired = () => {
@@ -177,7 +179,13 @@ const make = Effect.gen(function* () {
         pending.delete(id);
         yield* Deferred.fail(entry.done, error);
       }
-  });
+    for (const client of connections.values()) {
+      const messages = yield* Queue.clear(client.messages);
+      for (const message of messages)
+        if (!("binding" in message) || message.binding.bindingId !== bindingId)
+          Queue.offerUnsafe(client.messages, message);
+    }
+  }, Effect.uninterruptible);
   const getOwner = (caller: Caller): Owner | undefined => owners.get(ownerKey(caller));
   const ensureOwner = (caller: Caller) =>
     Effect.suspend(() => {
@@ -186,12 +194,13 @@ const make = Effect.gen(function* () {
       if (owners.size >= 128)
         for (const [key, owner] of owners)
           if (
-            owner.state.status === "unbound" ||
-            (owner.state.status === "invalid" && !bindings.has(owner.state.binding.bindingId))
+            owner.busy === 0 &&
+            (owner.state.status === "unbound" ||
+              (owner.state.status === "invalid" && !bindings.has(owner.state.binding.bindingId)))
           )
             owners.delete(key);
       if (owners.size >= 128) return Effect.fail(failure("budget_exceeded"));
-      const owner: Owner = { caller, state: { status: "unbound" } };
+      const owner: Owner = { caller, busy: 0, state: { status: "unbound" } };
       owners.set(ownerKey(caller), owner);
       return Effect.succeed(owner);
     });
@@ -276,7 +285,7 @@ const make = Effect.gen(function* () {
     input: A.TerminalAutomationStatusInput = {},
   ) {
     yield* decode(A.TerminalAutomationStatusInput, input);
-    const owner = getOwner(caller) ?? { caller, state: { status: "unbound" as const } };
+    const owner = getOwner(caller) ?? { caller, busy: 0, state: { status: "unbound" as const } };
     yield* refresh(owner);
     pruneRetired();
     const work = input.receipt
@@ -317,7 +326,7 @@ const make = Effect.gen(function* () {
         owner.state = { status: "unbound" };
     }
     yield* Queue.shutdown(client.messages);
-  });
+  }, Effect.uninterruptible);
   const connect = Effect.fn("TerminalAutomation.connect")(function* (
     scope: A.TerminalAutomationScope,
     id: string,
@@ -394,36 +403,53 @@ const make = Effect.gen(function* () {
     raw: A.TerminalAutomationBindInput,
   ) {
     const input = yield* decode(A.TerminalAutomationBindInput, raw);
-    const owner = yield* ensureOwner(caller);
-    yield* refresh(owner);
-    if (input.mode === "resume") return yield* Effect.fail(failure("human_intervened"));
-    if (owner.state.status !== "unbound") return yield* status(caller);
-    owner.caller = caller;
-    const previousState = owner.state;
-    const available = yield* candidates(caller.scope);
-    if (owner.state !== previousState) return yield* Effect.fail(failure("stale_request"));
-    if (available.length === 0) return yield* Effect.fail(failure("not_ready"));
-    if (available.length === 1 && input.mode === "auto") yield* select(owner, available[0]!);
-    else {
-      const client = yield* connection(caller.selectionConnectionId);
-      if (!sameScope(client.scope, caller.scope))
-        return yield* Effect.fail(failure("client_unavailable"));
-      const selectionRequestId = NodeCrypto.randomUUID();
-      const request: A.TerminalAutomationSelectionRequest = {
-        version: 1,
-        selectionRequestId,
-        candidateVersion: versionFor(caller.scope),
-        candidates: available,
-      };
-      if (!Queue.offerUnsafe(client.messages, request))
-        return yield* Effect.fail(failure("budget_exceeded"));
-      owner.state = {
-        status: "selection_required",
-        selectionRequestId,
-        candidateVersion: request.candidateVersion,
-      };
-    }
-    return yield* status(caller);
+    return yield* Effect.acquireUseRelease(
+      ensureOwner(caller).pipe(
+        Effect.tap((owner) =>
+          Effect.sync(() => {
+            owner.busy += 1;
+          }),
+        ),
+      ),
+      (owner) =>
+        Effect.gen(function* () {
+          yield* refresh(owner);
+          if (input.mode === "resume") return yield* Effect.fail(failure("human_intervened"));
+          if (owner.state.status !== "unbound") return yield* status(caller);
+          owner.caller = caller;
+          const previousState = owner.state;
+          const available = yield* candidates(caller.scope);
+          if (owner.state !== previousState) return yield* Effect.fail(failure("stale_request"));
+          if (available.length === 0) return yield* Effect.fail(failure("not_ready"));
+          if (available.length === 1 && input.mode === "auto") yield* select(owner, available[0]!);
+          else {
+            const client = yield* connection(caller.selectionConnectionId);
+            if (!sameScope(client.scope, caller.scope))
+              return yield* Effect.fail(failure("client_unavailable"));
+            const selectionRequestId = NodeCrypto.randomUUID();
+            const request: A.TerminalAutomationSelectionRequest = {
+              version: 1,
+              selectionRequestId,
+              candidateVersion: versionFor(caller.scope),
+              candidates: available,
+            };
+            if (!Queue.offerUnsafe(client.messages, request))
+              return yield* Effect.fail(failure("budget_exceeded"));
+            owner.state = {
+              status: "selection_required",
+              selectionRequestId,
+              candidateVersion: request.candidateVersion,
+            };
+          }
+          return yield* status(caller);
+        }),
+      (owner) =>
+        Effect.sync(() => {
+          owner.busy -= 1;
+          if (owner.busy === 0 && owner.state.status === "unbound" && getOwner(caller) === owner)
+            owners.delete(ownerKey(caller));
+        }),
+    );
   });
   const replySelection = Effect.fn("TerminalAutomation.replySelection")(function* (
     id: string,
@@ -544,6 +570,8 @@ const make = Effect.gen(function* () {
   const bridge = Effect.fn("TerminalAutomation.bridge")(function* (
     connectionId: string,
     request: A.TerminalAutomationClientRequest,
+    beforeDispatch?: () => boolean,
+    onDispatch?: () => void,
   ) {
     const client = yield* connection(connectionId);
     if (pending.size >= 1024) return yield* Effect.fail(failure("budget_exceeded"));
@@ -554,10 +582,12 @@ const make = Effect.gen(function* () {
         return done;
       }),
       (done) =>
-        Effect.gen(function* () {
+        Effect.suspend(() => {
+          if (beforeDispatch?.() === false) return Effect.fail(failure("stale_request"));
           if (!Queue.offerUnsafe(client.messages, request))
-            return yield* Effect.fail(failure("budget_exceeded"));
-          return yield* Deferred.await(done);
+            return Effect.fail(failure("budget_exceeded"));
+          onDispatch?.();
+          return Deferred.await(done);
         }),
       () => Effect.sync(() => pending.delete(request.bridgeRequestId)),
     );
@@ -589,6 +619,11 @@ const make = Effect.gen(function* () {
     if (pending.get(reply.bridgeRequestId) !== entry)
       return yield* Effect.fail(failure("stale_request"));
     const result = reply.result;
+    if (
+      expected.operation === "apply_local" &&
+      (!("inputRequestId" in result) || result.inputRequestId !== expected.inputRequestId)
+    )
+      return yield* Effect.fail(failure("stale_request"));
     if (!("error" in result)) {
       if (
         (expected.operation === "prepare_input" || expected.operation === "encode_input") &&
@@ -602,6 +637,12 @@ const make = Effect.gen(function* () {
         return yield* Effect.fail(failure("stale_request"));
     }
     pending.delete(reply.bridgeRequestId);
+    if (expected.operation === "apply_local" && "error" in result) {
+      const receipt = bindings
+        .get(expected.binding.bindingId)
+        ?.receipts.get(expected.inputRequestId);
+      if (receipt && !receipt.result) receipt.dispatched = false;
+    }
     if ("error" in result) yield* Deferred.fail(entry.done, result.error);
     else yield* Deferred.succeed(entry.done, reply);
   });
@@ -638,7 +679,9 @@ const make = Effect.gen(function* () {
                 Effect.timeoutOrElse({
                   duration: Math.max(0, old.deadline - clock.currentTimeMillisUnsafe()),
                   orElse: () =>
-                    complete(old, failure("client_unavailable")).pipe(Effect.as(old.result!)),
+                    complete(old, failure("client_unavailable")).pipe(
+                      Effect.andThen(() => Effect.succeed(old.result!)),
+                    ),
                 }),
               ),
             ))
@@ -702,6 +745,50 @@ const make = Effect.gen(function* () {
             frameRevision: frame.frameRevision,
             action: request.action,
           });
+          if (
+            encoded.result.operation === "encode_input" &&
+            "status" in encoded.result &&
+            encoded.result.status === "local_action"
+          ) {
+            const action = request.action;
+            const plan = encoded.result.localAction;
+            if (
+              action.type !== "mouse" ||
+              action.event !== "wheel" ||
+              action.deltaColumns !== 0 ||
+              plan.deltaRows !== action.deltaRows
+            )
+              return yield* Effect.fail(failure("stale_request"));
+            yield* authorize;
+            const current = yield* requireBinding(caller, request.bindingId, binding.inputEpoch);
+            const applied = yield* bridge(
+              initial.connectionId,
+              {
+                ...fields,
+                bridgeRequestId: NodeCrypto.randomUUID(),
+                operation: "apply_local",
+                inputRequestId: request.requestId,
+                frameRevision: frame.frameRevision,
+                localAction: plan,
+              },
+              () =>
+                current.owner.state.status === "bound" &&
+                current.owner.state.binding.inputEpoch === binding.inputEpoch &&
+                receipt.result === undefined &&
+                bindings.get(binding.bindingId) === work,
+              () => {
+                receipt.dispatched = true;
+              },
+            );
+            if (
+              applied.result.operation !== "apply_local" ||
+              !("status" in applied.result) ||
+              applied.result.status !== "local_applied"
+            )
+              return yield* Effect.fail(failure("stale_request"));
+            receipt.result ??= { status: "local_applied", requestId: request.requestId };
+            return receipt.result;
+          }
           if (
             encoded.result.operation !== "encode_input" ||
             !("encodedText" in encoded.result) ||
@@ -810,7 +897,7 @@ const make = Effect.gen(function* () {
       if (
         result.source !== query.source ||
         result.text.length > query.budget.maxCodeUnits ||
-        textLines > query.budget.maxLines ||
+        (query.source !== "history" && textLines > query.budget.maxLines) ||
         (range && range.endLineExclusive - range.startLine > query.budget.maxLines)
       )
         return yield* Effect.fail(failure("budget_exceeded"));
@@ -830,11 +917,75 @@ const make = Effect.gen(function* () {
               range.endLineExclusive > query.range.endLineExclusive)))
       )
         return yield* Effect.fail(failure("stale_request"));
+      if (query.source === "history") {
+        const next = result.nextCursor;
+        const offset = query.codeUnitOffset ?? 0;
+        if (
+          result.continuity === "complete" &&
+          query.range.startLine < query.range.endLineExclusive &&
+          (!range ||
+            range.startLine !== query.range.startLine ||
+            (next === null &&
+              (result.truncated || range.endLineExclusive !== query.range.endLineExclusive)))
+        )
+          return yield* Effect.fail(failure("stale_request"));
+        if (!result.text.isWellFormed()) return yield* Effect.fail(failure("stale_request"));
+        if (
+          result.continuity === "complete" &&
+          (query.range.startLine < result.frame.retainedRange.startLine ||
+            query.range.endLineExclusive > result.frame.retainedRange.endLineExclusive)
+        )
+          return yield* Effect.fail(failure("stale_request"));
+        if (next?.source === "history") {
+          if (
+            next.activeScreen !== query.activeScreen ||
+            next.frameRevision !== result.frame.frameRevision ||
+            next.nextLine < query.range.startLine ||
+            next.nextLine >= query.range.endLineExclusive ||
+            !range ||
+            next.nextLine < range.startLine ||
+            next.nextLine > range.endLineExclusive ||
+            (next.codeUnitOffset > 0 && next.nextLine >= range.endLineExclusive)
+          )
+            return yield* Effect.fail(failure("stale_request"));
+          if (
+            next.nextLine === query.range.startLine &&
+            (next.codeUnitOffset <= offset || next.codeUnitOffset - offset !== result.text.length)
+          )
+            return yield* Effect.fail(failure("stale_request"));
+          if (next.nextLine > query.range.startLine && next.codeUnitOffset > result.text.length)
+            return yield* Effect.fail(failure("stale_request"));
+          if (
+            range.endLineExclusive !== next.nextLine + (next.codeUnitOffset > 0 ? 1 : 0) ||
+            result.softWrapAfterLines.some((line) => line >= next.nextLine)
+          )
+            return yield* Effect.fail(failure("stale_request"));
+        }
+      }
       return result;
     }).pipe(
       Effect.timeoutOrElse({
         duration: "10 seconds",
         orElse: () => Effect.fail(failure("client_unavailable")),
+      }),
+    );
+  });
+  const revoke = Effect.fn("TerminalAutomation.revoke")(function* (
+    caller: Caller,
+    bindingId: string,
+  ) {
+    const owner = getOwner(caller);
+    if (!owner || !("binding" in owner.state) || owner.state.binding.bindingId !== bindingId)
+      return yield* Effect.fail(failure("target_invalid"));
+    yield* Effect.uninterruptible(
+      Effect.gen(function* () {
+        if ("binding" in owner.state)
+          owner.state = {
+            status: "invalid",
+            binding: owner.state.binding,
+            reason: "target_invalid",
+          };
+        yield* retire(bindingId, failure("target_invalid"));
       }),
     );
   });
@@ -854,6 +1005,7 @@ const make = Effect.gen(function* () {
     input,
     read,
     replyBridge,
+    revoke,
   });
 });
 
