@@ -213,6 +213,16 @@ export const TerminalAutomationAction = Schema.Union([
 );
 export type TerminalAutomationAction = typeof TerminalAutomationAction.Type;
 
+// A plan only: encoding must not apply this scroll before server authorization.
+export const TerminalAutomationLocalAction = strict({
+  type: Schema.Literal("scroll"),
+  deltaRows: Schema.Int.check(
+    Schema.isBetween({ minimum: -100, maximum: 100 }),
+    Schema.makeFilter((rows) => rows !== 0),
+  ),
+});
+export type TerminalAutomationLocalAction = typeof TerminalAutomationLocalAction.Type;
+
 export const TerminalAutomationInput = strict({
   bindingId: Id,
   requestId: Id,
@@ -229,6 +239,7 @@ export const TerminalAutomationInputResult = Schema.Union([
     writtenBytes: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 1_048_576 })),
   }),
   strict({ status: Schema.Literal("unknown"), requestId: Id }),
+  strict({ status: Schema.Literal("local_applied"), requestId: Id }),
 ]);
 export type TerminalAutomationInputResult = typeof TerminalAutomationInputResult.Type;
 
@@ -268,6 +279,8 @@ export const TerminalAutomationReadQuery = Schema.Union([
     source: Schema.Literal("history"),
     activeScreen: Schema.Literals(["primary", "alternate"]),
     range: Range,
+    // Omission starts at zero; runtime validates line length and codepoint boundaries.
+    codeUnitOffset: Schema.optional(Counter),
     frameRevision: Schema.optional(Counter),
     budget: Budget,
   }),
@@ -319,6 +332,7 @@ export const TerminalAutomationReadResult = strict({
         source: Schema.Literal("history"),
         activeScreen: Schema.Literals(["primary", "alternate"]),
         nextLine: Counter,
+        codeUnitOffset: Counter,
         frameRevision: Counter,
       }),
       strict({ source: Schema.Literal("output"), cursor: OutputCursor }),
@@ -337,6 +351,14 @@ export const TerminalAutomationReadResult = strict({
   Schema.makeFilter((result) => {
     if (result.change === "no_change" && result.text.length !== 0) return false;
     if (result.nextCursor !== null && result.nextCursor.source !== result.source) return false;
+    const cursor = result.nextCursor;
+    if (
+      cursor?.source === "history" &&
+      (cursor.activeScreen !== result.frame.activeScreen ||
+        cursor.frameRevision !== result.frame.frameRevision ||
+        result.softWrapAfterLines.some((line) => line >= cursor.nextLine))
+    )
+      return false;
     if (result.returnedRange === null) return result.softWrapAfterLines.length === 0;
     const range = result.returnedRange;
     return (
@@ -370,6 +392,14 @@ export const TerminalAutomationClientRequest = Schema.Union([
     frameRevision: Counter,
     action: TerminalAutomationAction,
   }),
+  // Both peers revalidate the binding/epoch/frame; unknown delivery must never replay a scroll.
+  strict({
+    ...BridgeFields,
+    operation: Schema.Literal("apply_local"),
+    inputRequestId: Id,
+    frameRevision: Counter,
+    localAction: TerminalAutomationLocalAction,
+  }),
 ]);
 export type TerminalAutomationClientRequest = typeof TerminalAutomationClientRequest.Type;
 
@@ -389,6 +419,23 @@ export const TerminalAutomationClientReply = strict({
       inputRequestId: Id,
       frameRevision: Counter,
       encodedText: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(262_144)),
+    }),
+    strict({
+      operation: Schema.Literal("encode_input"),
+      inputRequestId: Id,
+      frameRevision: Counter,
+      status: Schema.Literal("local_action"),
+      localAction: TerminalAutomationLocalAction,
+    }),
+    strict({
+      operation: Schema.Literal("apply_local"),
+      inputRequestId: Id,
+      status: Schema.Literal("local_applied"),
+    }),
+    strict({
+      operation: Schema.Literal("apply_local"),
+      inputRequestId: Id,
+      error: TerminalAutomationError,
     }),
     strict({
       operation: Schema.Literals(["show", "prepare_input", "read", "encode_input"]),

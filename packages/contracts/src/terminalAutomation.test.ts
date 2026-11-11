@@ -4,6 +4,7 @@ import {
   TerminalAutomationAction,
   TerminalAutomationBindInput,
   TerminalAutomationClientReply,
+  TerminalAutomationClientRequest,
   TerminalAutomationFrame,
   TerminalAutomationInputResult,
   TerminalAutomationReadQuery,
@@ -13,6 +14,10 @@ import {
 
 const decodeAction = Schema.decodeSync(TerminalAutomationAction);
 const decodeReadQuery = Schema.decodeSync(TerminalAutomationReadQuery);
+const decodeReadResult = Schema.decodeSync(TerminalAutomationReadResult);
+const decodeClientRequest = Schema.decodeSync(TerminalAutomationClientRequest);
+const decodeClientReply = Schema.decodeSync(TerminalAutomationClientReply);
+const decodeInputResult = Schema.decodeSync(TerminalAutomationInputResult);
 
 const frame = {
   activeScreen: "alternate",
@@ -37,8 +42,200 @@ const read = {
   softWrapAfterLines: [],
   process: { status: "unknown" },
 };
+const bridge = {
+  version: 1,
+  bridgeRequestId: "bridge",
+  binding: {
+    bindingId: "b",
+    alias: "terminal",
+    inputEpoch: 1,
+    target: { terminalId: "t", terminalInstanceId: "i", viewId: "v" },
+  },
+};
+const historyQuery = {
+  source: "history",
+  activeScreen: "alternate",
+  range: { startLine: 10, endLineExclusive: 12 },
+  frameRevision: 7,
+  budget: { maxCodeUnits: 2, maxLines: 1 },
+};
+const partialHistory = {
+  ...read,
+  source: "history",
+  text: "A",
+  change: "data",
+  truncated: true,
+  returnedRange: { startLine: 10, endLineExclusive: 11 },
+  nextCursor: {
+    source: "history",
+    activeScreen: "alternate",
+    nextLine: 10,
+    codeUnitOffset: 1,
+    frameRevision: 7,
+  },
+};
+const localEncoding = {
+  operation: "encode_input",
+  inputRequestId: "r",
+  frameRevision: 7,
+  status: "local_action",
+  localAction: { type: "scroll", deltaRows: -3 },
+};
+const applyLocal = {
+  ...bridge,
+  operation: "apply_local",
+  inputRequestId: "r",
+  frameRevision: 7,
+  localAction: { type: "scroll", deltaRows: -3 },
+};
 
 describe("terminal automation wire boundaries", () => {
+  it("preserves an intra-line history cursor at a complete codepoint boundary", () => {
+    const decode = Schema.decodeSync(TerminalAutomationReadResult);
+    expect(decodeReadQuery(historyQuery)).toEqual(historyQuery);
+    expect(decode(partialHistory).nextCursor).toEqual(partialHistory.nextCursor);
+    expect(decodeReadQuery({ ...historyQuery, codeUnitOffset: 1 })).toMatchObject({
+      codeUnitOffset: 1,
+    });
+    expect(decodeReadQuery({ ...historyQuery, codeUnitOffset: 0 })).toMatchObject({
+      codeUnitOffset: 0,
+    });
+    expect(
+      decodeReadQuery({ ...historyQuery, codeUnitOffset: Number.MAX_SAFE_INTEGER }),
+    ).toMatchObject({ codeUnitOffset: Number.MAX_SAFE_INTEGER });
+    expect(
+      decode({
+        ...partialHistory,
+        text: "😀",
+        nextCursor: { ...partialHistory.nextCursor, codeUnitOffset: 3 },
+      }).text,
+    ).toBe("😀");
+  });
+
+  it.each([-1, 0.5, Number.MAX_SAFE_INTEGER + 1])(
+    "rejects unsafe history offset %s in queries and cursors",
+    (codeUnitOffset) => {
+      expect(() => decodeReadQuery({ ...historyQuery, codeUnitOffset })).toThrow();
+      expect(() =>
+        decodeReadResult({
+          ...partialHistory,
+          nextCursor: { ...partialHistory.nextCursor, codeUnitOffset },
+        }),
+      ).toThrow();
+    },
+  );
+
+  it("rejects legacy ambiguous history cursors and incomplete-line wrap metadata", () => {
+    const decode = Schema.decodeSync(TerminalAutomationReadResult);
+    const { codeUnitOffset: _offset, ...legacyCursor } = partialHistory.nextCursor;
+    expect(() => decode({ ...partialHistory, nextCursor: legacyCursor })).toThrow();
+    expect(() => decode({ ...partialHistory, softWrapAfterLines: [10] })).toThrow();
+    expect(() =>
+      decode({
+        ...partialHistory,
+        nextCursor: { ...partialHistory.nextCursor, activeScreen: "primary" },
+      }),
+    ).toThrow();
+    expect(() =>
+      decode({ ...partialHistory, nextCursor: { ...partialHistory.nextCursor, frameRevision: 8 } }),
+    ).toThrow();
+    expect(
+      decode({
+        ...partialHistory,
+        softWrapAfterLines: [10],
+        nextCursor: { ...partialHistory.nextCursor, nextLine: 11, codeUnitOffset: 0 },
+      }).softWrapAfterLines,
+    ).toEqual([10]);
+  });
+
+  it("describes local scrolling before a separate correlated application and receipt", () => {
+    const decodeReply = Schema.decodeSync(TerminalAutomationClientReply);
+    expect(decodeReply({ ...bridge, result: localEncoding }).result).toEqual(localEncoding);
+    expect(
+      decodeReply({
+        ...bridge,
+        result: {
+          operation: "encode_input",
+          inputRequestId: "r",
+          frameRevision: 7,
+          encodedText: "\u001b[A",
+        },
+      }).result,
+    ).toMatchObject({ encodedText: "\u001b[A" });
+    expect(decodeClientRequest(applyLocal)).toEqual(applyLocal);
+    expect(
+      decodeClientRequest({ ...applyLocal, localAction: { type: "scroll", deltaRows: 100 } }),
+    ).toMatchObject({ localAction: { type: "scroll", deltaRows: 100 } });
+    expect(
+      decodeClientRequest({ ...applyLocal, localAction: { type: "scroll", deltaRows: -100 } }),
+    ).toMatchObject({ localAction: { type: "scroll", deltaRows: -100 } });
+    expect(
+      decodeReply({
+        ...bridge,
+        result: { operation: "apply_local", status: "local_applied", inputRequestId: "r" },
+      }).result,
+    ).toEqual({ operation: "apply_local", status: "local_applied", inputRequestId: "r" });
+    expect(
+      decodeReply({
+        ...bridge,
+        result: { operation: "apply_local", inputRequestId: "r", error: { code: "stale_request" } },
+      }).result,
+    ).toMatchObject({ error: { code: "stale_request" } });
+    expect(decodeInputResult({ status: "local_applied", requestId: "r" })).toEqual({
+      status: "local_applied",
+      requestId: "r",
+    });
+  });
+
+  it("rejects mixed encoded and local intent and premature application receipts", () => {
+    const decode = Schema.decodeSync(TerminalAutomationClientReply);
+    expect(() => decode({ ...bridge, result: { ...localEncoding, encodedText: "x" } })).toThrow();
+    expect(() =>
+      decodeClientRequest({ ...applyLocal, localAction: { type: "execute", command: "ls" } }),
+    ).toThrow();
+    expect(() =>
+      decode({ ...bridge, result: { ...localEncoding, status: "local_applied" } }),
+    ).toThrow();
+    expect(() =>
+      decodeInputResult({
+        status: "local_applied",
+        requestId: "r",
+        writtenBytes: 1,
+      }),
+    ).toThrow();
+  });
+
+  it.each([0, -101, 101, 0.5])("rejects local scroll deltaRows %s", (deltaRows) => {
+    expect(() =>
+      decodeClientRequest({
+        ...applyLocal,
+        localAction: { type: "scroll", deltaRows },
+      }),
+    ).toThrow();
+  });
+
+  it("requires application request identity, epoch, frame and correlated reply identity", () => {
+    const decode = Schema.decodeSync(TerminalAutomationClientRequest);
+    const { inputRequestId: _id, ...noId } = applyLocal;
+    const { frameRevision: _revision, ...noRevision } = applyLocal;
+    const { inputEpoch: _epoch, ...noEpoch } = bridge.binding;
+    expect(() => decode(noId)).toThrow();
+    expect(() => decode(noRevision)).toThrow();
+    expect(() => decode({ ...applyLocal, binding: noEpoch })).toThrow();
+    expect(() =>
+      decodeClientReply({
+        ...bridge,
+        result: { operation: "apply_local", status: "local_applied" },
+      }),
+    ).toThrow();
+    expect(() =>
+      decodeClientReply({
+        ...bridge,
+        result: { operation: "apply_local", error: { code: "stale_request" } },
+      }),
+    ).toThrow();
+  });
+
   it("accepts a full text budget but rejects one extra UTF-16 code unit", () => {
     const decode = Schema.decodeSync(TerminalAutomationAction);
     expect(decode({ type: "paste", text: "😀".repeat(32_768) }).type).toBe("paste");
