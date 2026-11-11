@@ -2,6 +2,7 @@
 import * as NodeCrypto from "node:crypto";
 import * as A from "@t3tools/contracts";
 import * as Context from "effect/Context";
+import * as Clock from "effect/Clock";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -23,6 +24,7 @@ interface Connection {
   readonly scope: A.TerminalAutomationScope;
   readonly messages: Queue.Queue<Message>;
   views: ReadonlyArray<A.TerminalAutomationCandidate>;
+  version: number;
 }
 interface Owner {
   caller: Caller;
@@ -32,8 +34,17 @@ interface Owner {
 }
 interface Receipt {
   readonly payload: string;
+  readonly requestId: string;
+  readonly deadline: number;
   readonly done: Deferred.Deferred<A.TerminalAutomationInputResult>;
+  dispatched: boolean;
   result?: A.TerminalAutomationInputResult;
+}
+interface BindingWork {
+  readonly ownerKey: string;
+  readonly receipts: Map<string, Receipt>;
+  readonly stop: Deferred.Deferred<never, Failure>;
+  retiredAt?: number;
 }
 interface Pending {
   readonly connectionId: string;
@@ -113,15 +124,72 @@ const make = Effect.gen(function* () {
   const manager = yield* Manager.TerminalManager;
   const connections = new Map<string, Connection>();
   const owners = new Map<string, Owner>();
-  // Retain every accepted ID for this service lifetime; full tables reject new work.
-  const receipts = new Map<string, Map<string, Receipt>>();
+  const clock = yield* Clock.Clock;
+  const bindings = new Map<string, BindingWork>();
+  // Retired bindings cannot execute; receipt eviction never makes their IDs executable again.
+  const retired = new Map<string, BindingWork>();
   const pending = new Map<string, Pending>();
-  let candidateVersion = 0;
+  const versionFor = (scope: A.TerminalAutomationScope) =>
+    Math.max(
+      0,
+      ...[...connections.values()]
+        .filter((client) => sameScope(client.scope, scope))
+        .map((client) => client.version),
+    );
+  const changeCandidates = (scope: A.TerminalAutomationScope) => {
+    const version = versionFor(scope) + 1;
+    for (const client of connections.values())
+      if (sameScope(client.scope, scope)) client.version = version;
+    for (const owner of owners.values())
+      if (sameScope(owner.caller.scope, scope) && owner.state.status === "selection_required") {
+        owner.state = { status: "unbound" };
+        owners.delete(ownerKey(owner.caller));
+      }
+  };
+  const pruneRetired = () => {
+    const now = clock.currentTimeMillisUnsafe();
+    for (const [id, work] of retired) if (now - work.retiredAt! >= 300_000) retired.delete(id);
+    while (retired.size > 128) retired.delete(retired.keys().next().value!);
+  };
+  const complete = Effect.fn("TerminalAutomation.complete")(function* (
+    receipt: Receipt,
+    error: Failure,
+  ) {
+    receipt.result ??= receipt.dispatched
+      ? { status: "unknown", requestId: receipt.requestId }
+      : { status: "not_sent", requestId: receipt.requestId, error };
+    yield* Deferred.succeed(receipt.done, receipt.result);
+  });
+  const retire = Effect.fn("TerminalAutomation.retire")(function* (
+    bindingId: string,
+    error: Failure,
+  ) {
+    const work = bindings.get(bindingId);
+    if (!work) return;
+    bindings.delete(bindingId);
+    work.retiredAt = clock.currentTimeMillisUnsafe();
+    retired.set(bindingId, work);
+    pruneRetired();
+    yield* Deferred.fail(work.stop, error);
+    for (const receipt of work.receipts.values()) yield* complete(receipt, error);
+    for (const [id, entry] of pending)
+      if (entry.request.binding.bindingId === bindingId) {
+        pending.delete(id);
+        yield* Deferred.fail(entry.done, error);
+      }
+  });
   const getOwner = (caller: Caller): Owner | undefined => owners.get(ownerKey(caller));
   const ensureOwner = (caller: Caller) =>
     Effect.suspend(() => {
       const existing = getOwner(caller);
       if (existing) return Effect.succeed(existing);
+      if (owners.size >= 128)
+        for (const [key, owner] of owners)
+          if (
+            owner.state.status === "unbound" ||
+            (owner.state.status === "invalid" && !bindings.has(owner.state.binding.bindingId))
+          )
+            owners.delete(key);
       if (owners.size >= 128) return Effect.fail(failure("budget_exceeded"));
       const owner: Owner = { caller, state: { status: "unbound" } };
       owners.set(ownerKey(caller), owner);
@@ -145,10 +213,15 @@ const make = Effect.gen(function* () {
   });
   const refresh = Effect.fn("TerminalAutomation.refresh")(function* (owner: Owner) {
     const state = owner.state;
+    if (state.status === "invalid") {
+      yield* retire(state.binding.bindingId, failure(state.reason));
+      return;
+    }
     if (state.status !== "bound" && state.status !== "paused") return;
     const client = owner.connectionId ? connections.get(owner.connectionId) : undefined;
     if (!client) {
       owner.state = { status: "invalid", binding: state.binding, reason: "client_unavailable" };
+      yield* retire(state.binding.bindingId, failure("client_unavailable"));
       return;
     }
     if (
@@ -162,11 +235,13 @@ const make = Effect.gen(function* () {
       )
     ) {
       owner.state = { status: "invalid", binding: state.binding, reason: "target_invalid" };
+      yield* retire(state.binding.bindingId, failure("target_invalid"));
       return;
     }
     const current = yield* inspect(owner.caller.scope, state.binding.target).pipe(Effect.result);
     if (current._tag === "Failure") {
       owner.state = { status: "invalid", binding: state.binding, reason: "target_invalid" };
+      yield* retire(state.binding.bindingId, failure("target_invalid"));
     } else if (current.success.humanInputEpoch !== owner.humanInputEpoch) {
       owner.humanInputEpoch = current.success.humanInputEpoch;
       owner.state = {
@@ -201,17 +276,22 @@ const make = Effect.gen(function* () {
     input: A.TerminalAutomationStatusInput = {},
   ) {
     yield* decode(A.TerminalAutomationStatusInput, input);
-    const owner = yield* ensureOwner(caller);
+    const owner = getOwner(caller) ?? { caller, state: { status: "unbound" as const } };
     yield* refresh(owner);
-    const receipt = input.receipt
-      ? receipts
-          .get(ownerKey(caller))
-          ?.get(fingerprint([input.receipt.bindingId, input.receipt.requestId]))?.result
+    pruneRetired();
+    const work = input.receipt
+      ? (bindings.get(input.receipt.bindingId) ?? retired.get(input.receipt.bindingId))
       : undefined;
+    if (
+      input.receipt &&
+      (!work || work.ownerKey !== ownerKey(caller) || !work.receipts.has(input.receipt.requestId))
+    )
+      return yield* Effect.fail(failure("stale_request"));
+    const receipt = input.receipt ? work?.receipts.get(input.receipt.requestId)?.result : undefined;
     return {
       ...(receipt ? { inputResult: receipt } : {}),
       version: 1 as const,
-      candidateVersion,
+      candidateVersion: versionFor(caller.scope),
       candidates: yield* candidates(caller.scope),
       state: owner.state,
     };
@@ -219,20 +299,20 @@ const make = Effect.gen(function* () {
   const disconnect = Effect.fn("TerminalAutomation.disconnect")(function* (id: string) {
     const client = connections.get(id);
     if (!client) return;
+    changeCandidates(client.scope);
     connections.delete(id);
     for (const entry of pending.values())
       if (entry.connectionId === id)
         yield* Deferred.fail(entry.done, failure("client_unavailable"));
-    candidateVersion += 1;
-    for (const owner of owners.values())
-      if (owner.state.status === "selection_required") owner.state = { status: "unbound" };
     for (const owner of owners.values()) {
-      if (owner.connectionId === id && "binding" in owner.state)
+      if (owner.connectionId === id && "binding" in owner.state) {
         owner.state = {
           status: "invalid",
           binding: owner.state.binding,
           reason: "client_unavailable",
         };
+        yield* retire(owner.state.binding.bindingId, failure("client_unavailable"));
+      }
       if (owner.caller.selectionConnectionId === id && owner.state.status === "selection_required")
         owner.state = { status: "unbound" };
     }
@@ -242,15 +322,18 @@ const make = Effect.gen(function* () {
     scope: A.TerminalAutomationScope,
     id: string,
   ) {
-    if (connections.has(id)) return yield* Effect.fail(failure("request_conflict"));
-    if (connections.size >= 128) return yield* Effect.fail(failure("budget_exceeded"));
-    const messages = yield* Queue.bounded<Message>(128);
-    const client: Connection = { scope, messages, views: [] };
-    connections.set(id, client);
-    yield* Effect.addFinalizer(() =>
-      connections.get(id) === client ? disconnect(id) : Effect.void,
+    const client = yield* Effect.acquireRelease(
+      Effect.gen(function* () {
+        if (connections.has(id)) return yield* Effect.fail(failure("request_conflict"));
+        if (connections.size >= 128) return yield* Effect.fail(failure("budget_exceeded"));
+        const messages = yield* Queue.bounded<Message>(128);
+        const created: Connection = { scope, messages, views: [], version: versionFor(scope) };
+        connections.set(id, created);
+        return created;
+      }),
+      (created) => (connections.get(id) === created ? disconnect(id) : Effect.void),
     );
-    return messages;
+    return client.messages;
   });
   const registerViews = Effect.fn("TerminalAutomation.registerViews")(function* (
     id: string,
@@ -270,9 +353,7 @@ const make = Effect.gen(function* () {
     if (views.length + otherCount > 64) return yield* Effect.fail(failure("budget_exceeded"));
     if (connections.get(id) !== client) return yield* Effect.fail(failure("client_unavailable"));
     client.views = views;
-    candidateVersion += 1;
-    for (const owner of owners.values())
-      if (owner.state.status === "selection_required") owner.state = { status: "unbound" };
+    changeCandidates(client.scope);
     for (const owner of owners.values())
       if (sameScope(client.scope, owner.caller.scope)) yield* refresh(owner);
   });
@@ -302,6 +383,11 @@ const make = Effect.gen(function* () {
         inputEpoch: 0,
       },
     };
+    bindings.set(owner.state.binding.bindingId, {
+      ownerKey: ownerKey(owner.caller),
+      receipts: new Map(),
+      stop: Deferred.makeUnsafe<never, Failure>(),
+    });
   });
   const bind = Effect.fn("TerminalAutomation.bind")(function* (
     caller: Caller,
@@ -326,12 +412,16 @@ const make = Effect.gen(function* () {
       const request: A.TerminalAutomationSelectionRequest = {
         version: 1,
         selectionRequestId,
-        candidateVersion,
+        candidateVersion: versionFor(caller.scope),
         candidates: available,
       };
       if (!Queue.offerUnsafe(client.messages, request))
         return yield* Effect.fail(failure("budget_exceeded"));
-      owner.state = { status: "selection_required", selectionRequestId, candidateVersion };
+      owner.state = {
+        status: "selection_required",
+        selectionRequestId,
+        candidateVersion: request.candidateVersion,
+      };
     }
     return yield* status(caller);
   });
@@ -352,11 +442,12 @@ const make = Effect.gen(function* () {
       !owner ||
       owner.state.status !== "selection_required" ||
       owner.state.candidateVersion !== input.candidateVersion ||
-      candidateVersion !== input.candidateVersion
+      versionFor(client.scope) !== input.candidateVersion
     )
       return yield* Effect.fail(failure("stale_request"));
     if (input.choice.status === "cancelled") {
       owner.state = { status: "unbound" };
+      owners.delete(ownerKey(owner.caller));
       return;
     }
     const candidateId = input.choice.candidateId;
@@ -365,7 +456,7 @@ const make = Effect.gen(function* () {
       (view) => view.candidateId === candidateId,
     );
     if (!candidate) return yield* Effect.fail(failure("target_invalid"));
-    if (owner.state !== previousState || candidateVersion !== input.candidateVersion)
+    if (owner.state !== previousState || versionFor(client.scope) !== input.candidateVersion)
       return yield* Effect.fail(failure("stale_request"));
     yield* select(owner, candidate);
   });
@@ -396,12 +487,14 @@ const make = Effect.gen(function* () {
           binding: { ...state.binding, inputEpoch: state.binding.inputEpoch + 1 },
           reason: "human_intervened",
         };
-      } else if (input.event !== "human_intervened")
+      } else if (input.event !== "human_intervened") {
         owner.state = { status: "invalid", binding: state.binding, reason: "target_invalid" };
+        yield* retire(state.binding.bindingId, failure("target_invalid"));
+      }
     }
     if (input.event !== "human_intervened") {
       client.views = client.views.filter((view) => !sameTarget(view.target, input.target));
-      candidateVersion += 1;
+      changeCandidates(client.scope);
     }
   });
   const resumeConfirmed = Effect.fn("TerminalAutomation.resumeConfirmed")(function* (
@@ -423,9 +516,15 @@ const make = Effect.gen(function* () {
     const owner = getOwner(caller);
     if (!owner || !("binding" in owner.state) || owner.state.binding.bindingId !== input.bindingId)
       return yield* Effect.fail(failure("target_invalid"));
-    owner.state = { status: "unbound" };
-    delete owner.connectionId;
-    return { status: "released" as const };
+    return yield* Effect.uninterruptible(
+      Effect.gen(function* () {
+        owner.state = { status: "unbound" };
+        delete owner.connectionId;
+        owners.delete(ownerKey(caller));
+        yield* retire(input.bindingId, failure("target_invalid"));
+        return { status: "released" as const };
+      }),
+    );
   });
   const requireBinding = Effect.fn("TerminalAutomation.requireBinding")(function* (
     caller: Caller,
@@ -448,13 +547,20 @@ const make = Effect.gen(function* () {
   ) {
     const client = yield* connection(connectionId);
     if (pending.size >= 1024) return yield* Effect.fail(failure("budget_exceeded"));
-    const done = yield* Deferred.make<A.TerminalAutomationClientReply, Failure>();
-    pending.set(request.bridgeRequestId, { connectionId, request, done });
-    return yield* Effect.gen(function* () {
-      if (!Queue.offerUnsafe(client.messages, request))
-        return yield* Effect.fail(failure("budget_exceeded"));
-      return yield* Deferred.await(done);
-    }).pipe(Effect.ensuring(Effect.sync(() => pending.delete(request.bridgeRequestId))));
+    return yield* Effect.acquireUseRelease(
+      Effect.sync(() => {
+        const done = Deferred.makeUnsafe<A.TerminalAutomationClientReply, Failure>();
+        pending.set(request.bridgeRequestId, { connectionId, request, done });
+        return done;
+      }),
+      (done) =>
+        Effect.gen(function* () {
+          if (!Queue.offerUnsafe(client.messages, request))
+            return yield* Effect.fail(failure("budget_exceeded"));
+          return yield* Deferred.await(done);
+        }),
+      () => Effect.sync(() => pending.delete(request.bridgeRequestId)),
+    );
   });
   const replyBridge = Effect.fn("TerminalAutomation.replyBridge")(function* (
     id: string,
@@ -505,143 +611,173 @@ const make = Effect.gen(function* () {
     authorize: Effect.Effect<void, Failure>,
   ) {
     const request = yield* decode(A.TerminalAutomationInput, raw);
-    yield* ensureOwner(caller);
-    const key = fingerprint([request.bindingId, request.requestId]);
-    const payload = fingerprint(request.action);
-    const table = receipts.get(ownerKey(caller)) ?? new Map<string, Receipt>();
-    receipts.set(ownerKey(caller), table);
-    const old = table.get(key);
-    if (old) {
-      if (old.payload !== payload)
-        return {
-          status: "not_sent" as const,
-          requestId: request.requestId,
-          error: failure("request_conflict"),
-        };
-      return old.result ?? (yield* Deferred.await(old.done));
-    }
-    if (table.size >= 256 || receipts.size > 128)
-      return {
-        status: "not_sent" as const,
-        requestId: request.requestId,
-        error: failure("budget_exceeded"),
-      };
-    const receipt: Receipt = {
-      payload,
-      done: Deferred.makeUnsafe<A.TerminalAutomationInputResult>(),
-    };
-    table.set(key, receipt);
-    let attempted = false;
-    const operation = Effect.gen(function* () {
-      yield* authorize;
-      const initial = yield* requireBinding(caller, request.bindingId);
-      const binding = initial.binding;
-      const fields = { version: 1 as const, binding };
-      const shown = yield* bridge(initial.connectionId, {
-        ...fields,
-        bridgeRequestId: NodeCrypto.randomUUID(),
-        operation: "show",
-      });
-      if (shown.result.operation !== "show" || !("status" in shown.result))
-        return yield* Effect.fail(failure("not_ready"));
-      yield* requireBinding(caller, request.bindingId, binding.inputEpoch);
-      const prepared = yield* bridge(initial.connectionId, {
-        ...fields,
-        bridgeRequestId: NodeCrypto.randomUUID(),
-        operation: "prepare_input",
-        inputRequestId: request.requestId,
-      });
-      if (prepared.result.operation !== "prepare_input" || !("frame" in prepared.result))
-        return yield* Effect.fail(failure("stale_request"));
-      const frame = prepared.result.frame;
-      if (
-        request.action.type === "mouse" &&
-        (request.action.position.column >= frame.cols || request.action.position.row >= frame.rows)
-      )
-        return yield* Effect.fail(failure("stale_request"));
-      yield* requireBinding(caller, request.bindingId, binding.inputEpoch);
-      const encoded = yield* bridge(initial.connectionId, {
-        ...fields,
-        bridgeRequestId: NodeCrypto.randomUUID(),
-        operation: "encode_input",
-        inputRequestId: request.requestId,
-        frameRevision: frame.frameRevision,
-        action: request.action,
-      });
-      if (
-        encoded.result.operation !== "encode_input" ||
-        !("encodedText" in encoded.result) ||
-        !encoded.result.encodedText.length
-      )
-        return yield* Effect.fail(failure("not_ready"));
-      const encodedText = encoded.result.encodedText;
-      yield* authorize;
-      const current = yield* requireBinding(caller, request.bindingId, binding.inputEpoch);
-      // No interruptible step separates the final binding/permission check from the synchronous PTY write.
-      yield* Effect.uninterruptible(
-        Effect.gen(function* () {
-          attempted = true;
-          yield* manager
-            .writeAutomation({
-              threadId: caller.scope.threadId,
-              terminalId: binding.target.terminalId,
-              terminalInstanceId: binding.target.terminalInstanceId,
-              humanInputEpoch: current.owner.humanInputEpoch!,
-              canWrite: () =>
-                current.owner.state.status === "bound" &&
-                current.owner.state.binding.bindingId === binding.bindingId &&
-                current.owner.state.binding.inputEpoch === binding.inputEpoch &&
-                connections
-                  .get(initial.connectionId)
-                  ?.views.some(
-                    (view) => sameTarget(view.target, binding.target) && view.readiness === "ready",
-                  ) === true,
-              data: encodedText,
-            })
-            .pipe(
-              Effect.mapError((error) => {
-                if (error._tag !== "TerminalWriteError") attempted = false;
-                return failure(
-                  error._tag === "TerminalWriteError" ? "client_unavailable" : "target_invalid",
-                );
-              }),
-            );
-          receipt.result = {
-            status: "written",
+    return yield* Effect.uninterruptibleMask((restore) =>
+      Effect.gen(function* () {
+        pruneRetired();
+        const work = bindings.get(request.bindingId) ?? retired.get(request.bindingId);
+        if (!work || work.ownerKey !== ownerKey(caller))
+          return {
+            status: "not_sent" as const,
             requestId: request.requestId,
-            writtenBytes: Buffer.byteLength(encodedText, "utf8"),
+            error: failure("target_invalid"),
           };
-        }),
-      );
-      return receipt.result!;
-    }).pipe(
-      Effect.timeoutOrElse({
-        duration: "10 seconds",
-        orElse: () => Effect.fail(failure("client_unavailable")),
+        const payload = fingerprint(request.action);
+        const table = work.receipts;
+        const old = table.get(request.requestId);
+        if (old) {
+          if (old.payload !== payload)
+            return {
+              status: "not_sent" as const,
+              requestId: request.requestId,
+              error: failure("request_conflict"),
+            };
+          return (
+            old.result ??
+            (yield* restore(
+              Deferred.await(old.done).pipe(
+                Effect.timeoutOrElse({
+                  duration: Math.max(0, old.deadline - clock.currentTimeMillisUnsafe()),
+                  orElse: () =>
+                    complete(old, failure("client_unavailable")).pipe(Effect.as(old.result!)),
+                }),
+              ),
+            ))
+          );
+        }
+        if (!bindings.has(request.bindingId))
+          return {
+            status: "not_sent" as const,
+            requestId: request.requestId,
+            error: failure("target_invalid"),
+          };
+        if (table.size >= 256)
+          return {
+            status: "not_sent" as const,
+            requestId: request.requestId,
+            error: failure("budget_exceeded"),
+          };
+        const receipt: Receipt = {
+          payload,
+          requestId: request.requestId,
+          deadline: clock.currentTimeMillisUnsafe() + 10_000,
+          dispatched: false,
+          done: Deferred.makeUnsafe<A.TerminalAutomationInputResult>(),
+        };
+        table.set(request.requestId, receipt);
+        const operation = Effect.gen(function* () {
+          yield* authorize;
+          const initial = yield* requireBinding(caller, request.bindingId);
+          const binding = initial.binding;
+          const fields = { version: 1 as const, binding };
+          const shown = yield* bridge(initial.connectionId, {
+            ...fields,
+            bridgeRequestId: NodeCrypto.randomUUID(),
+            operation: "show",
+          });
+          if (shown.result.operation !== "show" || !("status" in shown.result))
+            return yield* Effect.fail(failure("not_ready"));
+          yield* requireBinding(caller, request.bindingId, binding.inputEpoch);
+          const prepared = yield* bridge(initial.connectionId, {
+            ...fields,
+            bridgeRequestId: NodeCrypto.randomUUID(),
+            operation: "prepare_input",
+            inputRequestId: request.requestId,
+          });
+          if (prepared.result.operation !== "prepare_input" || !("frame" in prepared.result))
+            return yield* Effect.fail(failure("stale_request"));
+          const frame = prepared.result.frame;
+          if (
+            request.action.type === "mouse" &&
+            (request.action.frameRevision !== frame.frameRevision ||
+              request.action.position.column >= frame.cols ||
+              request.action.position.row >= frame.rows)
+          )
+            return yield* Effect.fail(failure("stale_request"));
+          yield* requireBinding(caller, request.bindingId, binding.inputEpoch);
+          const encoded = yield* bridge(initial.connectionId, {
+            ...fields,
+            bridgeRequestId: NodeCrypto.randomUUID(),
+            operation: "encode_input",
+            inputRequestId: request.requestId,
+            frameRevision: frame.frameRevision,
+            action: request.action,
+          });
+          if (
+            encoded.result.operation !== "encode_input" ||
+            !("encodedText" in encoded.result) ||
+            !encoded.result.encodedText.length
+          )
+            return yield* Effect.fail(failure("not_ready"));
+          const encodedText = encoded.result.encodedText;
+          yield* authorize;
+          const current = yield* requireBinding(caller, request.bindingId, binding.inputEpoch);
+          // No interruptible step separates the final binding/permission check from the synchronous PTY write.
+          yield* Effect.uninterruptible(
+            Effect.gen(function* () {
+              yield* manager
+                .writeAutomation({
+                  threadId: caller.scope.threadId,
+                  terminalId: binding.target.terminalId,
+                  terminalInstanceId: binding.target.terminalInstanceId,
+                  humanInputEpoch: current.owner.humanInputEpoch!,
+                  canWrite: () => {
+                    const allowed =
+                      current.owner.state.status === "bound" &&
+                      receipt.result === undefined &&
+                      bindings.get(binding.bindingId) === work &&
+                      current.owner.state.binding.bindingId === binding.bindingId &&
+                      current.owner.state.binding.inputEpoch === binding.inputEpoch &&
+                      connections
+                        .get(initial.connectionId)
+                        ?.views.some(
+                          (view) =>
+                            sameTarget(view.target, binding.target) && view.readiness === "ready",
+                        ) === true;
+                    if (allowed) receipt.dispatched = true;
+                    return allowed;
+                  },
+                  data: encodedText,
+                })
+                .pipe(
+                  Effect.mapError((error) => {
+                    if (error._tag !== "TerminalWriteError") receipt.dispatched = false;
+                    return failure(
+                      error._tag === "TerminalWriteError" ? "client_unavailable" : "target_invalid",
+                    );
+                  }),
+                );
+              receipt.result = {
+                status: "written",
+                requestId: request.requestId,
+                writtenBytes: Buffer.byteLength(encodedText, "utf8"),
+              };
+            }),
+          );
+          return receipt.result!;
+        }).pipe(
+          (effect) => Effect.raceFirst(effect, Deferred.await(work.stop)),
+          Effect.timeoutOrElse({
+            duration: Math.max(0, receipt.deadline - clock.currentTimeMillisUnsafe()),
+            orElse: () => Effect.fail(failure("client_unavailable")),
+          }),
+          Effect.catch((error) =>
+            Effect.succeed<A.TerminalAutomationInputResult>(
+              receipt.result ??
+                (receipt.dispatched
+                  ? { status: "unknown", requestId: request.requestId }
+                  : { status: "not_sent", requestId: request.requestId, error }),
+            ),
+          ),
+        );
+        return yield* restore(operation).pipe(
+          Effect.tap((result) =>
+            Effect.sync(() => {
+              receipt.result ??= result;
+            }),
+          ),
+          Effect.ensuring(complete(receipt, failure("stale_request"))),
+        );
       }),
-      Effect.catch((error) =>
-        Effect.succeed<A.TerminalAutomationInputResult>(
-          receipt.result ??
-            (attempted
-              ? { status: "unknown", requestId: request.requestId }
-              : { status: "not_sent", requestId: request.requestId, error }),
-        ),
-      ),
-    );
-    return yield* operation.pipe(
-      Effect.tap((result) =>
-        Effect.sync(() => {
-          receipt.result = result;
-        }),
-      ),
-      Effect.ensuring(
-        Effect.gen(function* () {
-          receipt.result ??= attempted
-            ? { status: "unknown", requestId: request.requestId }
-            : { status: "not_sent", requestId: request.requestId, error: failure("stale_request") };
-          yield* Deferred.succeed(receipt.done, receipt.result);
-        }),
-      ),
     );
   });
   const read = Effect.fn("TerminalAutomation.read")(function* (

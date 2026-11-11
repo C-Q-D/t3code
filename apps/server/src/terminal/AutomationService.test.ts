@@ -35,6 +35,7 @@ const setup = Effect.gen(function* () {
   ]);
   let humanInputEpoch = 0;
   let writeFailure = false;
+  let beforeWrite: Effect.Effect<void> = Effect.void;
   const manager = {
     inspectExisting: (input: A.TerminalObserveInput) =>
       Effect.suspend(() => {
@@ -44,26 +45,33 @@ const setup = Effect.gen(function* () {
           : Effect.fail(new A.TerminalNotRunningError(input));
       }),
     writeAutomation: (
-      input: A.TerminalWriteInput & { terminalInstanceId: string; humanInputEpoch: number },
+      input: Parameters<Manager.TerminalManager["Service"]["writeAutomation"]>[0],
     ) =>
-      Effect.suspend((): Effect.Effect<void, A.TerminalError> => {
-        if (
-          instances.get(input.terminalId) !== input.terminalInstanceId ||
-          humanInputEpoch !== input.humanInputEpoch
-        )
-          return Effect.fail(new A.TerminalNotRunningError(input));
-        writes.push(input.data);
-        if (writeFailure)
-          return Effect.fail(
-            new A.TerminalWriteError({
-              threadId: input.threadId,
-              terminalId: input.terminalId,
-              terminalPid: 1,
-              cause: "lost acknowledgement",
+      Effect.suspend(() =>
+        beforeWrite.pipe(
+          Effect.andThen(
+            Effect.suspend((): Effect.Effect<void, A.TerminalError> => {
+              if (
+                instances.get(input.terminalId) !== input.terminalInstanceId ||
+                humanInputEpoch !== input.humanInputEpoch ||
+                input.canWrite?.() === false
+              )
+                return Effect.fail(new A.TerminalNotRunningError(input));
+              writes.push(input.data);
+              if (writeFailure)
+                return Effect.fail(
+                  new A.TerminalWriteError({
+                    threadId: input.threadId,
+                    terminalId: input.terminalId,
+                    terminalPid: 1,
+                    cause: "lost acknowledgement",
+                  }),
+                );
+              return Effect.void;
             }),
-          );
-        return Effect.void;
-      }),
+          ),
+        ),
+      ),
   };
   // Only the two Manager operations used by automation are external process boundaries.
   const service = yield* Automation.TerminalAutomationService.pipe(
@@ -87,8 +95,132 @@ const setup = Effect.gen(function* () {
     loseWriteReceipt: () => {
       writeFailure = true;
     },
+    beforeNativeWrite: (effect: Effect.Effect<void>) => {
+      beforeWrite = effect;
+    },
   };
 });
+
+it.effect("release restores binding and owner capacity without replaying retired IDs", () =>
+  Effect.gen(function* () {
+    const { service, writes } = yield* setup;
+    const bindingId = yield* bindOne(service);
+    const denied = Effect.fail({ code: "target_invalid" as const });
+    yield* Effect.forEach(
+      Array.from({ length: 256 }, (_, index) => String(index)),
+      (requestId) =>
+        service.input(
+          caller,
+          { bindingId, requestId, action: { type: "text", text: "x" } },
+          denied,
+        ),
+    );
+    yield* service.release(caller, { bindingId });
+    const fresh = yield* service.bind(caller, { mode: "auto" });
+    if (fresh.state.status !== "bound") throw new Error("expected binding");
+    expect(
+      yield* service.input(
+        caller,
+        {
+          bindingId: fresh.state.binding.bindingId,
+          requestId: "new",
+          action: { type: "text", text: "x" },
+        },
+        denied,
+      ),
+    ).toMatchObject({ status: "not_sent", error: { code: "target_invalid" } });
+    expect(
+      yield* service.input(
+        caller,
+        { bindingId, requestId: "0", action: { type: "text", text: "x" } },
+        permission,
+      ),
+    ).toMatchObject({ status: "not_sent" });
+    yield* service.release(caller, { bindingId: fresh.state.binding.bindingId });
+    yield* Effect.forEach(
+      Array.from({ length: 129 }, (_, index) => `owner-${index}`),
+      (callerId) =>
+        Effect.gen(function* () {
+          const who = { ...caller, callerId };
+          const bound = yield* service.bind(who, { mode: "auto" });
+          if (bound.state.status !== "bound") throw new Error("expected binding");
+          yield* service.release(who, { bindingId: bound.state.binding.bindingId });
+        }),
+    );
+    expect((yield* service.status({ ...caller, callerId: "last" })).state.status).toBe("unbound");
+    expect(writes).toEqual([]);
+  }),
+);
+
+it.effect("other environments and threads do not invalidate a pending selection", () =>
+  Effect.gen(function* () {
+    const { service, messages } = yield* setup;
+    yield* service.registerViews("client", { version: 1, views: [view(), view("two")] });
+    yield* service.bind(caller, { mode: "auto" });
+    const request = yield* Queue.take(messages);
+    if (!("selectionRequestId" in request)) throw new Error("expected selection");
+    yield* service.connect({ ...scope, environmentId: A.EnvironmentId.make("other") }, "other-env");
+    yield* service.registerViews("other-env", { version: 1, views: [view()] });
+    yield* service.connect({ ...scope, threadId: A.ThreadId.make("other") }, "other-thread");
+    yield* service.registerViews("other-thread", { version: 1, views: [view()] });
+    yield* service.disconnect("other-env");
+    expect((yield* service.status(caller)).state).toMatchObject({
+      status: "selection_required",
+      selectionRequestId: request.selectionRequestId,
+    });
+    yield* service.replySelection("client", {
+      version: 1,
+      selectionRequestId: request.selectionRequestId,
+      candidateVersion: request.candidateVersion,
+      choice: { status: "selected", candidateId: request.candidates[0]!.candidateId },
+    });
+    expect((yield* service.status(caller)).state.status).toBe("bound");
+  }),
+);
+
+it.effect("an original stale mouse frame is rejected before encode", () =>
+  Effect.gen(function* () {
+    const { service, messages, writes } = yield* setup;
+    const bindingId = yield* bindOne(service);
+    const running = yield* service
+      .input(
+        caller,
+        {
+          bindingId,
+          requestId: "old",
+          action: {
+            type: "mouse",
+            event: "press",
+            button: "left",
+            position: { column: 1, row: 1 },
+            modifiers: { ctrl: false, alt: false, shift: false, meta: false },
+            frameRevision: 0,
+          },
+        },
+        permission,
+      )
+      .pipe(Effect.forkChild);
+    const show = yield* takeBridge(messages);
+    yield* service.replyBridge("client", {
+      version: 1,
+      bridgeRequestId: show.bridgeRequestId,
+      binding: show.binding,
+      result: { operation: "show", status: "visible" },
+    });
+    const prepare = yield* takeBridge(messages);
+    yield* service.replyBridge("client", {
+      version: 1,
+      bridgeRequestId: prepare.bridgeRequestId,
+      binding: prepare.binding,
+      result: { operation: "prepare_input", inputRequestId: "old", frame },
+    });
+    expect(yield* Effect.raceFirst(Fiber.join(running), Queue.take(messages))).toMatchObject({
+      status: "not_sent",
+      error: { code: "stale_request" },
+    });
+    expect(writes).toEqual([]);
+  }),
+);
 
 const frame: A.TerminalAutomationFrame = {
   activeScreen: "primary",
@@ -139,6 +271,68 @@ const prepareToEncode = Effect.fn("test.prepareToEncode")(function* (
   });
   return yield* takeBridge(messages);
 });
+
+it.effect(
+  "release resolves in-flight duplicates and expired receipts cannot revive old bindings",
+  () =>
+    Effect.gen(function* () {
+      const { service, messages, writes } = yield* setup;
+      const bindingId = yield* bindOne(service);
+      const request: A.TerminalAutomationInput = {
+        bindingId,
+        requestId: "cancel",
+        action: { type: "text", text: "x" },
+      };
+      const first = yield* service.input(caller, request, permission).pipe(Effect.forkChild);
+      yield* takeBridge(messages);
+      const duplicate = yield* service.input(caller, request, permission).pipe(Effect.forkChild);
+      yield* service.release(caller, { bindingId });
+      expect(yield* Fiber.join(first)).toMatchObject({ status: "not_sent" });
+      expect(yield* Fiber.join(duplicate)).toMatchObject({ status: "not_sent" });
+      expect(
+        (yield* service.status(caller, { receipt: { bindingId, requestId: "cancel" } }))
+          .inputResult,
+      ).toMatchObject({ status: "not_sent" });
+      yield* TestClock.adjust("5 minutes");
+      expect(
+        yield* Effect.flip(service.status(caller, { receipt: { bindingId, requestId: "cancel" } })),
+      ).toEqual({ code: "stale_request" });
+      expect(yield* service.input(caller, request, permission)).toMatchObject({
+        status: "not_sent",
+        error: { code: "target_invalid" },
+      });
+      expect(writes).toEqual([]);
+    }),
+);
+
+it.effect("the Manager fake enforces final canWrite after a release at the native boundary", () =>
+  Effect.gen(function* () {
+    const { service, messages, writes, beforeNativeWrite } = yield* setup;
+    const bindingId = yield* bindOne(service);
+    beforeNativeWrite(service.release(caller, { bindingId }).pipe(Effect.orDie, Effect.asVoid));
+    const running = yield* service
+      .input(
+        caller,
+        { bindingId, requestId: "request", action: { type: "text", text: "x" } },
+        permission,
+      )
+      .pipe(Effect.forkChild);
+    const encode = yield* prepareToEncode(service, messages);
+    yield* service.replyBridge("client", {
+      version: 1,
+      bridgeRequestId: encode.bridgeRequestId,
+      binding: encode.binding,
+      result: {
+        operation: "encode_input",
+        inputRequestId: "request",
+        frameRevision: 1,
+        encodedText: "x",
+      },
+    });
+    expect(yield* Fiber.join(running)).toMatchObject({ status: "not_sent" });
+    expect(writes).toEqual([]);
+  }),
+);
 
 it.effect(
   "human input defeats old encode, empty encoding is rejected, and late replies cannot write",
