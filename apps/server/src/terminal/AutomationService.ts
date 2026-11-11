@@ -187,10 +187,13 @@ const make = Effect.gen(function* () {
     }
   }, Effect.uninterruptible);
   const getOwner = (caller: Caller): Owner | undefined => owners.get(ownerKey(caller));
-  const ensureOwner = (caller: Caller) =>
+  const ensureOwner = (caller: Caller, reserve = false) =>
     Effect.suspend(() => {
       const existing = getOwner(caller);
-      if (existing) return Effect.succeed(existing);
+      if (existing) {
+        if (reserve) existing.busy += 1;
+        return Effect.succeed(existing);
+      }
       if (owners.size >= 128)
         for (const [key, owner] of owners)
           if (
@@ -200,7 +203,7 @@ const make = Effect.gen(function* () {
           )
             owners.delete(key);
       if (owners.size >= 128) return Effect.fail(failure("budget_exceeded"));
-      const owner: Owner = { caller, busy: 0, state: { status: "unbound" } };
+      const owner: Owner = { caller, busy: reserve ? 1 : 0, state: { status: "unbound" } };
       owners.set(ownerKey(caller), owner);
       return Effect.succeed(owner);
     });
@@ -404,13 +407,7 @@ const make = Effect.gen(function* () {
   ) {
     const input = yield* decode(A.TerminalAutomationBindInput, raw);
     return yield* Effect.acquireUseRelease(
-      ensureOwner(caller).pipe(
-        Effect.tap((owner) =>
-          Effect.sync(() => {
-            owner.busy += 1;
-          }),
-        ),
-      ),
+      ensureOwner(caller, true),
       (owner) =>
         Effect.gen(function* () {
           yield* refresh(owner);

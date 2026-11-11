@@ -246,6 +246,58 @@ const frame: A.TerminalAutomationFrame = {
 };
 const permission = Effect.void;
 
+const startBindAtAcquisition = (service: Automation.TerminalAutomationService["Service"]) => {
+  let operations = 0;
+  const tasks: Array<() => void> = [];
+  const firstCaller = { ...caller, callerId: "first" };
+  // oxlint-disable-next-line t3code/no-manual-effect-runtime-in-tests -- A separate scheduler must pause acquisition without pausing the competing test fiber.
+  const first = Effect.runFork(service.bind(firstCaller, { mode: "auto" }).pipe(Effect.result), {
+    scheduler: {
+      executionMode: "async",
+      shouldYield: () => ++operations === 13,
+      makeDispatcher: () => ({
+        scheduleTask: (task) => {
+          tasks.push(task);
+        },
+        flush: () => {
+          while (tasks.length) tasks.shift()!();
+        },
+      }),
+    },
+  });
+  return {
+    first,
+    flush: () => {
+      while (tasks.length) tasks.shift()!();
+    },
+  };
+};
+
+it.effect("owner acquisition reserves capacity before a scheduler handoff", () =>
+  Effect.gen(function* () {
+    const { service } = yield* setup;
+    yield* service.registerViews("client", { version: 1, views: [view()] });
+    for (let index = 0; index < 127; index++) {
+      yield* service.bind({ ...caller, callerId: `occupied-${index}` }, { mode: "auto" });
+    }
+    const { first, flush } = startBindAtAcquisition(service);
+    const second = yield* service
+      .bind({ ...caller, callerId: "second" }, { mode: "auto" })
+      .pipe(Effect.result);
+    // Drain the controlled scheduler, not a clock or a polled application condition.
+    flush();
+    const result = yield* Fiber.join(first);
+    const outcomes = [result, second];
+    expect(outcomes.filter((outcome) => outcome._tag === "Success")).toHaveLength(1);
+    expect(outcomes).toContainEqual(
+      expect.objectContaining({ _tag: "Failure", failure: { code: "budget_exceeded" } }),
+    );
+    for (const outcome of outcomes) {
+      if (outcome._tag === "Success") expect(outcome.success.state.status).toBe("bound");
+    }
+  }),
+);
+
 it.effect("in-flight binding owners retain their capacity reservation", () =>
   Effect.gen(function* () {
     const { service, beforeInspect } = yield* setup;
