@@ -722,6 +722,34 @@ describe("GhosttyTerminalSurface visibility", () => {
     expect(harness.onData.mock.calls).toEqual([["echo hi"]]);
   });
 
+  it("separates real WASM DSR responses and establishes the human barrier before clipboard awaits", async () => {
+    const harness = createHarness();
+    const onInputStart = vi.fn();
+    const onProtocolData = vi.fn();
+    let finish!: (text: string) => void;
+    const read = new Promise<string>((resolve) => {
+      finish = resolve;
+    });
+    vi.stubGlobal("navigator", { platform: "MacIntel", clipboard: { readText: () => read } });
+    const surface = await harness.create({ beforeKey: () => true, onInputStart, onProtocolData });
+    surface.write("\x1b[5n");
+    expect(onProtocolData.mock.calls).toEqual([["\x1b[0n"]]);
+    expect(onInputStart).not.toHaveBeenCalled();
+    expect(harness.onData).not.toHaveBeenCalled();
+    key(surface, "v", "KeyV", { metaKey: true });
+    expect(onInputStart).toHaveBeenCalledOnce();
+    expect(harness.onData).not.toHaveBeenCalled();
+    finish("paste");
+    await read;
+    expect(harness.onData.mock.calls).toEqual([["paste"]]);
+    onInputStart.mockClear();
+    const pending = surface.pasteFromClipboard(() => {
+      expect(onInputStart).toHaveBeenCalledOnce();
+      return Promise.resolve("menu paste");
+    });
+    await pending;
+  });
+
   it.each(["V keyup", "blur", "Meta keyup without V keyup"])(
     "accepts a later identical menu paste after %s",
     async (end) => {

@@ -8,11 +8,30 @@ import {
   TerminalProviderEnvironmentError,
   TerminalSessionSnapshot,
   TerminalSummary,
+  TerminalWriteInput,
 } from "./terminal.ts";
 import { ProviderInstanceId } from "./providerInstance.ts";
 
 const encodeTerminalError = Schema.encodeUnknownSync(TerminalError);
 const decodeTerminalError = Schema.decodeUnknownSync(TerminalError);
+const decodeTerminalWrite = Schema.decodeUnknownSync(TerminalWriteInput);
+
+it("requires exact same-instance protocol reply metadata while retaining ordinary human writes", () => {
+  const write = { threadId: "thread", terminalId: "terminal", data: "\x1b[0n" };
+  expect(decodeTerminalWrite(write)).toEqual(write);
+  expect(
+    decodeTerminalWrite({
+      ...write,
+      protocolReply: { terminalInstanceId: "instance" },
+    }),
+  ).toMatchObject({ protocolReply: { terminalInstanceId: "instance" } });
+  for (const protocolReply of [
+    {},
+    { terminalInstanceId: "" },
+    { terminalInstanceId: "instance", callerId: "forged" },
+  ])
+    expect(() => decodeTerminalWrite({ ...write, protocolReply })).toThrow();
+});
 
 function decodeSync<S extends Schema.Top>(schema: S, input: unknown): Schema.Schema.Type<S> {
   return Schema.decodeUnknownSync(schema as never)(input) as Schema.Schema.Type<S>;

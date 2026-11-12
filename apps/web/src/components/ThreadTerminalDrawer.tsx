@@ -710,14 +710,28 @@ function TerminalSessionViewport({
     (listener: (session: TerminalSessionState) => void) =>
       appAtomRegistry.subscribe(terminalSessionAtom, listener),
   );
-  const writeTerminal = useEffectEvent((data: string) => {
+  const beginHumanInput = useEffectEvent(() => {
+    if (!hasTerminalWriteAccess()) return;
     const automation = automationRef.current;
     automation?.controller.humanInput(automation.target);
+  });
+  const writeTerminal = useEffectEvent((data: string) => {
     return runTerminalWrite({
       environmentId,
       input: { threadId, terminalId, data },
     });
   });
+  const writeProtocolReply = useEffectEvent((data: string, terminalInstanceId: string) =>
+    runTerminalWrite({
+      environmentId,
+      input: {
+        threadId,
+        terminalId,
+        data,
+        protocolReply: { terminalInstanceId },
+      },
+    }),
+  );
   const resizeTerminal = useEffectEvent((cols: number, rows: number) => {
     if (writableSessionGeneration(readTerminalSession(), hasTerminalWriteAccess()) === null) {
       return;
@@ -810,6 +824,19 @@ function TerminalSessionViewport({
         theme: terminalThemeFromApp(mount),
         font: terminalFontOptions(setupFont.family, setupFont.size),
         onData: (data) => handleData(data),
+        onInputStart: beginHumanInput,
+        onProtocolData: (data) => {
+          const instance = readTerminalSession().automation?.terminalInstanceId;
+          if (cancelled || !instance || !hasTerminalWriteAccess()) return;
+          void writeProtocolReply(data, instance).then((result) => {
+            if (result._tag === "Success" || isAtomCommandInterrupted(result) || cancelled) return;
+            const error = squashAtomCommandFailure(result);
+            writeSystemMessage(
+              terminal,
+              error instanceof Error ? error.message : t.tools.terminal.writeFailed,
+            );
+          });
+        },
         onResize: (cols, rows) => void resizeTerminal(cols, rows),
         onSelectionChange: () => handleSelectionChange(),
         onScrollStateChange: setAtBottom,
@@ -1049,8 +1076,6 @@ function TerminalSessionViewport({
       };
 
       const pasteFromClipboard = async (requestId: number) => {
-        const automation = automationRef.current;
-        automation?.controller.humanInput(automation.target);
         if (!hasTerminalWriteAccess()) return;
         const activeTerminal = terminalRef.current;
         if (!activeTerminal) return;
@@ -1144,6 +1169,7 @@ function TerminalSessionViewport({
 
       const sendTerminalInput = async (data: string, fallbackError: string) => {
         if (!hasTerminalWriteAccess()) return;
+        beginHumanInput();
         const activeTerminal = terminalRef.current;
         if (!activeTerminal) return;
         const result = await writeTerminal(data);

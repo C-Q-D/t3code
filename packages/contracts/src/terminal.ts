@@ -64,8 +64,19 @@ export type TerminalObserveInput = Schema.Codec.Encoded<typeof TerminalObserveIn
 export const TerminalWriteInput = Schema.Struct({
   ...TerminalSessionInput.fields,
   data: Schema.String.check(Schema.isNonEmpty()).check(Schema.isMaxLength(65_536)),
+  protocolReply: Schema.optional(
+    Schema.Unknown.check(
+      Schema.makeFilter(
+        (value) =>
+          value === null ||
+          typeof value !== "object" ||
+          Object.keys(value).every((key) => key === "terminalInstanceId") ||
+          "Unexpected protocol reply field",
+      ),
+    ).pipe(Schema.decodeTo(Schema.Struct({ terminalInstanceId: TerminalIdSchema }))),
+  ),
 });
-export type TerminalWriteInput = Schema.Codec.Encoded<typeof TerminalWriteInput>;
+export type TerminalWriteInput = typeof TerminalWriteInput.Type;
 
 export const TerminalResizeInput = Schema.Struct({
   ...TerminalSessionInput.fields,

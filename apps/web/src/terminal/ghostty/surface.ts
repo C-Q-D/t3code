@@ -543,6 +543,8 @@ export interface GhosttyTerminalSurfaceOptions {
   /** Read after font and WASM loading. */
   readonly visible?: boolean;
   readonly onData: (data: string) => void;
+  readonly onInputStart?: () => void;
+  readonly onProtocolData?: (data: string) => void;
   readonly onResize: (cols: number, rows: number) => void;
   readonly onSelectionChange: () => void;
   /** Emits the initial bottom state and subsequent changes during existing scrollbar updates. */
@@ -763,7 +765,7 @@ export class GhosttyTerminalSurface {
       metrics.width,
       metrics.height,
       options.theme,
-      options.onData,
+      options.onProtocolData ?? options.onData,
     );
     const surface = new GhosttyTerminalSurface(
       mount,
@@ -1132,13 +1134,19 @@ export class GhosttyTerminalSurface {
     readText: () => Promise<string>,
     isCurrent: () => boolean = () => true,
   ): Promise<void> {
+    this.options.onInputStart?.();
     const token = ++this.pasteShortcutToken;
     const text = await readText();
     if (this.disposed || this.pasteShortcutToken !== token || !isCurrent()) return;
     this.pasteShortcutToken += 1;
     if (text.length === 0) return;
     const encoded = this.core.encodePaste(text);
-    if (encoded.length > 0) this.options.onData(encoded);
+    if (encoded.length > 0) this.sendInput(encoded);
+  }
+
+  private sendInput(data: string): void {
+    this.options.onInputStart?.();
+    this.options.onData(data);
   }
 
   // The terminal selection is the only browser-readable PRIMARY-like buffer.
@@ -1350,6 +1358,7 @@ export class GhosttyTerminalSurface {
       return;
     }
     if (isTerminalPasteShortcut(event)) {
+      this.options.onInputStart?.();
       const gesture = { code: event.code, readText: "" };
       this.pasteShortcutGesture = gesture;
       const clipboard = navigator.clipboard;
@@ -1363,7 +1372,7 @@ export class GhosttyTerminalSurface {
             this.pasteShortcutToken += 1;
             if (text.length === 0) return;
             if (this.pasteShortcutGesture === gesture) gesture.readText = text;
-            this.options.onData(this.core.encodePaste(text));
+            this.sendInput(this.core.encodePaste(text));
           },
           () => {},
         );
@@ -1376,7 +1385,7 @@ export class GhosttyTerminalSurface {
     this.encodedKeyCodes.add(event.code);
     event.preventDefault();
     event.stopPropagation();
-    this.options.onData(data);
+    this.sendInput(data);
   };
 
   private readonly onKeyUp = (event: KeyboardEvent) => {
@@ -1398,7 +1407,7 @@ export class GhosttyTerminalSurface {
     if (data.length === 0) return;
     event.preventDefault();
     event.stopPropagation();
-    this.options.onData(data);
+    this.sendInput(data);
   };
 
   // A release elsewhere must not leave a press for a later app shortcut to inherit.
@@ -1466,6 +1475,7 @@ export class GhosttyTerminalSurface {
   };
 
   private readonly onPaste = (event: ClipboardEvent) => {
+    this.options.onInputStart?.();
     // Default textarea insertion would bypass bracketed-paste encoding through onInput.
     event.preventDefault();
     const data = event.clipboardData?.getData("text/plain") ?? "";
@@ -1478,10 +1488,11 @@ export class GhosttyTerminalSurface {
     // The native paste won the race with actual text; a pending clipboard read
     // must not double. An empty native paste leaves the read as the only path.
     this.pasteShortcutToken += 1;
-    this.options.onData(this.core.encodePaste(data));
+    this.sendInput(this.core.encodePaste(data));
   };
 
   private readonly onCompositionStart = () => {
+    this.options.onInputStart?.();
     this.clearPrimedCopy();
     this.clearCompositionInputSuppression();
     this.composing = true;
@@ -1490,7 +1501,7 @@ export class GhosttyTerminalSurface {
   private readonly onCompositionEnd = (event: CompositionEvent) => {
     this.composing = false;
     const data = this.input.value || event.data;
-    if (data.length > 0) this.options.onData(data);
+    if (data.length > 0) this.sendInput(data);
     this.input.value = "";
     this.compositionInputToSuppress = data;
     this.compositionSuppressionTimer = window.setTimeout(() => {
@@ -1509,7 +1520,7 @@ export class GhosttyTerminalSurface {
       return;
     }
     this.clearCompositionInputSuppression();
-    if (data.length > 0) this.options.onData(data);
+    if (data.length > 0) this.sendInput(data);
     this.input.value = "";
   };
 
@@ -1878,7 +1889,7 @@ export class GhosttyTerminalSurface {
     }
     if (this.core.isAlternateScreen()) {
       // Alternate screens have no scrollback; send arrow keys like xterm.
-      this.options.onData(terminalWheelArrowData(rows, this.core.isApplicationCursorKeys()));
+      this.sendInput(terminalWheelArrowData(rows, this.core.isApplicationCursorKeys()));
       return;
     }
     this.scrollViewport(rows);
@@ -2352,7 +2363,7 @@ export class GhosttyTerminalSurface {
     });
     const resolution = resolveTerminalMouseData(action, data, this.lastMouseMotionData);
     this.lastMouseMotionData = resolution.nextMotionData;
-    if (resolution.send) this.options.onData(data);
+    if (resolution.send) this.sendInput(data);
   }
 
   /** Refreshes DEC mouse-tracking state and invalidates stale motion deduplication; returns whether any-event tracking is active. */

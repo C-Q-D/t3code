@@ -25,6 +25,7 @@ import * as PlatformError from "effect/PlatformError";
 import * as Path from "effect/Path";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import * as Ref from "effect/Ref";
+import * as Queue from "effect/Queue";
 import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
@@ -437,6 +438,57 @@ it.layer(
       expect(ptyAdapter.processes[0]!.writes).toEqual(["auto", "human"]);
       expect(ptyAdapter.processes[1]!.writes).toEqual([]);
     }),
+  );
+
+  it.effect(
+    "accepts only outstanding same-instance VT replies without advancing the human epoch",
+    () =>
+      Effect.gen(function* () {
+        const { manager, ptyAdapter } = yield* createManager(5, { processKillGraceMs: 0 });
+        const target = { threadId: "thread-1", terminalId: DEFAULT_TERMINAL_ID };
+        yield* manager.open(openInput());
+        const inspected = yield* manager.inspectExisting(target);
+        const protocolReply = { terminalInstanceId: inspected.terminalInstanceId };
+        const query = yield* Queue.unbounded<string>();
+        yield* manager.subscribe((event) =>
+          event.type === "output"
+            ? Queue.offer(query, event.data).pipe(Effect.asVoid)
+            : Effect.void,
+        );
+        ptyAdapter.processes[0]!.emitData("\x1b[");
+        ptyAdapter.processes[0]!.emitData("5n");
+        yield* Queue.take(query);
+        yield* Queue.take(query);
+        expect(
+          yield* Effect.exit(manager.write({ ...target, data: "commands", protocolReply })),
+        ).toMatchObject({ _tag: "Failure" });
+        yield* manager.write({ ...target, data: "\x1b[0n", protocolReply });
+        expect((yield* manager.inspectExisting(target)).humanInputEpoch).toBe(0);
+        expect(ptyAdapter.processes[0]!.writes).toEqual(["\x1b[0n"]);
+        expect(
+          yield* Effect.flip(manager.write({ ...target, data: "\x1b[0n", protocolReply })),
+        ).toMatchObject({ _tag: "TerminalWriteError" });
+        ptyAdapter.processes[0]!.emitData("\x1b]2;\x1b[5n\x07");
+        yield* Queue.take(query);
+        expect(
+          yield* Effect.exit(manager.write({ ...target, data: "\x1b[0n", protocolReply })),
+        ).toMatchObject({ _tag: "Failure" });
+        ptyAdapter.processes[0]!.emitData("\x1b[5n");
+        yield* Queue.take(query);
+        yield* TestClock.adjust("10 seconds");
+        expect(
+          yield* Effect.exit(manager.write({ ...target, data: "\x1b[0n", protocolReply })),
+        ).toMatchObject({ _tag: "Failure" });
+        ptyAdapter.processes[0]!.emitData("\x1b[5n");
+        yield* Queue.take(query);
+        yield* manager.close(target);
+        yield* manager.open(openInput());
+        expect(
+          yield* Effect.flip(manager.write({ ...target, data: "\x1b[0n", protocolReply })),
+        ).toMatchObject({ _tag: "TerminalWriteError" });
+        yield* manager.write({ ...target, data: "human" });
+        expect((yield* manager.inspectExisting(target)).humanInputEpoch).toBe(1);
+      }).pipe(Effect.provide(TestClock.layer())),
   );
 
   it.effect("rejects writes after process exit", () =>
