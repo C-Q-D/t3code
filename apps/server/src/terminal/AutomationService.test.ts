@@ -201,6 +201,83 @@ it.effect("routes model selection to real views and accepts only the first invit
   }),
 );
 
+it.effect.each([
+  ["authorization", "selected"],
+  ["authorization", "cancelled"],
+  ["authorization-failure", "selected"],
+  ["authorization-failure", "cancelled"],
+  ["authorization-failure", "replaced"],
+  ["authorization", "replaced"],
+  ["inspect", "selected"],
+  ["inspect", "cancelled"],
+  ["inspect", "replaced"],
+] as const)("rejects a late selection after %s yields to %s", ([stage, outcome]) =>
+  Effect.gen(function* () {
+    const f = yield* setup;
+    const entered = yield* Deferred.make<void>();
+    const proceed = yield* Deferred.make<void>();
+    const wait = Deferred.succeed(entered, undefined).pipe(Effect.andThen(Deferred.await(proceed)));
+    let authorizations = 0;
+    const model: Automation.Caller = {
+      scope,
+      callerId: "model",
+      authorizeSelection: (select) =>
+        Effect.gen(function* () {
+          authorizations += 1;
+          if (stage.startsWith("authorization") && authorizations === 1) {
+            yield* wait;
+            if (stage === "authorization-failure")
+              return yield* Effect.fail({ code: "target_invalid" as const });
+          }
+          return yield* select(Effect.void);
+        }),
+    };
+    yield* f.service.connect(scope, "second");
+    yield* f.service.registerViews("client", { version: 1, views: [view()] });
+    yield* f.service.registerViews("second", { version: 1, views: [view("two")] });
+    yield* f.service.bind(model, { mode: "auto" });
+    const request = yield* Queue.take(f.messages);
+    if (!("selectionRequestId" in request)) throw new Error("expected selection");
+    let inspections = 0;
+    f.beforeInspect(
+      Effect.suspend(() => {
+        inspections += 1;
+        return stage === "inspect" && inspections === 3 ? wait : Effect.void;
+      }),
+    );
+    const reply = {
+      version: 1 as const,
+      selectionRequestId: request.selectionRequestId,
+      candidateVersion: request.candidateVersion,
+    };
+    const late = yield* f.service
+      .replySelection("client", {
+        ...reply,
+        choice: { status: "selected", candidateId: request.candidates[0]!.candidateId },
+      })
+      .pipe(Effect.result, Effect.forkChild);
+    yield* Deferred.await(entered);
+    yield* f.service.replySelection("second", {
+      ...reply,
+      choice:
+        outcome === "selected"
+          ? { status: "selected", candidateId: request.candidates[1]!.candidateId }
+          : { status: "cancelled" },
+    });
+    if (outcome === "replaced") yield* f.service.bind(model, { mode: "auto" });
+    const winningState = (yield* f.service.status(model)).state;
+    expect(winningState.status).toBe(
+      outcome === "selected" ? "bound" : outcome === "replaced" ? "selection_required" : "unbound",
+    );
+    yield* Deferred.succeed(proceed, undefined);
+    expect(yield* Fiber.join(late)).toMatchObject({
+      _tag: "Failure",
+      failure: { code: "stale_request" },
+    });
+    expect((yield* f.service.status(model)).state).toEqual(winningState);
+  }),
+);
+
 it.effect("model selection cleans queued invitations on candidate changes and disconnect", () =>
   Effect.gen(function* () {
     const { service, messages } = yield* setup;

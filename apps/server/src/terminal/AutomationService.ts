@@ -455,7 +455,9 @@ const make = Effect.gen(function* () {
     owner: Owner,
     candidate: A.TerminalAutomationCandidate,
     authorize?: Authorization,
+    isCurrent?: () => boolean,
   ) {
+    if (isCurrent?.() === false) return yield* Effect.fail(failure("stale_request"));
     const previousState = owner.state;
     const entry = [...connections.entries()].find(
       ([, client]) =>
@@ -463,16 +465,20 @@ const make = Effect.gen(function* () {
         client.views.some((view) => view.candidateId === candidate.candidateId),
     );
     if (!entry) return yield* Effect.fail(failure("target_invalid"));
-    const current = yield* inspect(owner.caller.scope, candidate.target);
+    const inspected = yield* inspect(owner.caller.scope, candidate.target).pipe(Effect.result);
+    if (isCurrent?.() === false || owner.state !== previousState)
+      return yield* Effect.fail(failure("stale_request"));
+    if (inspected._tag === "Failure") return yield* Effect.fail(inspected.failure);
+    const current = inspected.success;
     if (owner.caller.credentialAuthorization?.isValid() === false)
       return yield* Effect.fail(failure("target_invalid"));
     if (authorize && !canDispatch(authorize)) return yield* Effect.fail(failure("target_invalid"));
-    if (owner.state !== previousState) return yield* Effect.fail(failure("stale_request"));
     if (connections.get(entry[0]) !== entry[1])
       return yield* Effect.fail(failure("client_unavailable"));
     const selectionRequestId =
       previousState.status === "selection_required" ? previousState.selectionRequestId : undefined;
     const invited = owner.invited;
+    if (isCurrent?.() === false) return yield* Effect.fail(failure("stale_request"));
     delete owner.invited;
     owner.connectionId = entry[0];
     owner.humanInputEpoch = current.humanInputEpoch;
@@ -593,27 +599,36 @@ const make = Effect.gen(function* () {
     }
     const candidateId = input.choice.candidateId;
     const previousState = owner.state;
+    const caller = owner.caller;
+    const invited = owner.invited;
+    const isCurrent = () =>
+      getOwner(caller) === owner &&
+      owner.caller === caller &&
+      owner.state === previousState &&
+      previousState.selectionRequestId === input.selectionRequestId &&
+      previousState.candidateVersion === input.candidateVersion &&
+      versionFor(client.scope) === input.candidateVersion &&
+      connections.get(id) === client &&
+      owner.invited === invited &&
+      invited?.has(id) === true;
     const candidate = (yield* candidates(owner.caller.scope)).find(
       (view) => view.candidateId === candidateId,
     );
+    if (!isCurrent()) return yield* Effect.fail(failure("stale_request"));
     if (!candidate) return yield* Effect.fail(failure("target_invalid"));
-    if (owner.state !== previousState || versionFor(client.scope) !== input.candidateVersion)
-      return yield* Effect.fail(failure("stale_request"));
     const selected = yield* (
       owner.caller.authorizeSelection
         ? owner.caller.authorizeSelection((authorization) =>
-            select(owner, candidate, authorization),
+            select(owner, candidate, authorization, isCurrent),
           )
-        : select(owner, candidate)
+        : select(owner, candidate, undefined, isCurrent)
     ).pipe(Effect.result);
     if (selected._tag === "Failure") {
-      if (owner.state === previousState) {
-        const invited = owner.invited;
-        delete owner.invited;
-        owner.state = { status: "unbound" };
-        deleteOwner(ownerKey(owner.caller));
-        yield* clearSelection(input.selectionRequestId, invited);
-      }
+      if (!isCurrent()) return yield* Effect.fail(failure("stale_request"));
+      delete owner.invited;
+      owner.state = { status: "unbound" };
+      deleteOwner(ownerKey(caller));
+      yield* clearSelection(input.selectionRequestId, invited);
       return yield* Effect.fail(selected.failure);
     }
   });
