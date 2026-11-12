@@ -498,11 +498,13 @@ it.layer(
         ["\x1b[>1c"],
         ["\x1b[05n"],
         ["\x1b[?02004$p"],
+        ["\x1b[?0002004$p"],
         ["\x1b]2;\x1b[5n\x07"],
         ["\x1b[1\x1b[5n"],
         ["\x1b]2;\x1b", "[05n\x07"],
         ["\x1b[1\x1b", "[5n"],
         ["\x1bPpayload\x1b", "[5n\x1b\\"],
+        ["\x1b[6n"],
         ["\x1b[>q"],
       ];
       const output = yield* (yield* ProcessRunner.ProcessRunner).run({
@@ -519,11 +521,13 @@ it.layer(
         ["\x1b[>1;0;0c"],
         ["\x1b[0n"],
         ["\x1b[?2004;2$y"],
+        ["\x1b[?2004;2$y"],
         ["\x1b[0n"],
         ["\x1b[0n"],
         ["\x1b[0n"],
         ["\x1b[0n"],
         ["\x1b[0n"],
+        ["\x1b[1;1R"],
         ["\x1bP>|libghostty\x1b\\"],
       ]);
       const { manager, ptyAdapter } = yield* createManager(5, { processKillGraceMs: 0 });
@@ -561,6 +565,11 @@ it.layer(
           const duplicate = (yield* Effect.exit(manager.write({ ...target, protocolReply, data })))
             ._tag;
           outcomes.push({ query: chunks, forwarded, duplicate });
+          if (data === "\x1b[1;1R") {
+            expect(
+              yield* Effect.exit(manager.write({ ...target, protocolReply, data: "\x1b[2;1R" })),
+            ).toMatchObject({ _tag: "Failure" });
+          }
         }
       }
       expect({ forged, outcomes }).toEqual({

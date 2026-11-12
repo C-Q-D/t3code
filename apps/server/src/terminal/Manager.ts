@@ -1399,7 +1399,7 @@ function terminalProtocolReplyPattern(sequence: string): RegExp | undefined {
   if (/^\u001b\[=[0-9]*c$/.test(normalized)) return /^\u001bP!\|[0-9a-fA-F]{8}\u001b\\$/;
   if (/^\u001b\[>[0-9]*q$/.test(normalized)) return /^\u001bP>\|libghostty\u001b\\$/;
   if (normalized === "\u001b[?u") return /^\u001b\[\?[0-9]{1,5}u$/;
-  const mode = /^\u001b\[(\??)([0-9]{1,5})\$p$/.exec(normalized);
+  const mode = /^\u001b\[(\??)(0*[0-9]{1,5})\$p$/.exec(normalized);
   if (mode) return new RegExp(`^\\x1b\\[${mode[1] ? "\\?" : ""}${Number(mode[2])};[0-4]\\$y$`);
   const color = /^\u001b\](10|11|12);\?(?:\u0007|\u001b\\|\u009c)$/.exec(normalized);
   if (color)
