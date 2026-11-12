@@ -178,7 +178,7 @@ export function createTerminalEnvironmentAtoms<R, E>(
               get.registry,
             ),
           )
-          .pipe(Atom.setIdleTTL(0)),
+          .pipe(Atom.setIdleTTL(0), Atom.withLabel("terminal-automation:driver")),
     },
     createSession: (options: TerminalSessionOptions) => createTerminalSession(atoms, options),
   };

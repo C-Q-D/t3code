@@ -5,6 +5,7 @@ export interface TerminalAutomationTransport {
     start: () => void,
     end: () => void,
     event: (event: typeof A.TerminalAutomationRpcEvent.Type) => void,
+    error: (error: unknown) => void,
   ) => () => void;
   registerViews: (views: readonly A.TerminalAutomationCandidate[]) => Promise<void>;
   replyBridge: (reply: A.TerminalAutomationClientReply, isCurrent: () => boolean) => Promise<void>;
@@ -127,7 +128,15 @@ export class TerminalAutomationController {
 
   start() {
     if (this.stop || this.disposed) return;
-    this.stop = this.transport.subscribe(this.invalidate, this.invalidate, this.receive);
+    this.stop = this.transport.subscribe(
+      this.invalidate,
+      this.invalidate,
+      this.receive,
+      (error) => {
+        this.invalidate();
+        this.fail(error);
+      },
+    );
   }
 
   suspend() {

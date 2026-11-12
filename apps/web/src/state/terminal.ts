@@ -6,6 +6,7 @@ import {
 } from "@t3tools/client-runtime/state/runtime";
 import type { ScopedThreadRef } from "@t3tools/contracts";
 import { Atom } from "effect/reactivity";
+import * as Cause from "effect/Cause";
 import { appAtomRegistry } from "../rpc/atomRegistry";
 import { TerminalAutomationController } from "../terminal/automationController";
 
@@ -61,9 +62,9 @@ export function acquireTerminalAutomation(threadRef: ScopedThreadRef) {
       return () => active && generation === captured;
     };
     const controller = new TerminalAutomationController({
-      subscribe: (start, end, receive) => {
+      subscribe: (start, end, receive, failed) => {
         const token = ++subscription;
-        const unmount = appAtomRegistry.mount(
+        const unmount = appAtomRegistry.subscribe(
           commands.driver(
             environmentId,
             threadId,
@@ -83,6 +84,13 @@ export function acquireTerminalAutomation(threadRef: ScopedThreadRef) {
               if (token === subscription) receive(event);
             },
           ),
+          (result) => {
+            if (token !== subscription || result._tag !== "Failure") return;
+            generation += 1;
+            active = false;
+            failed(Cause.squash(result.cause));
+          },
+          { immediate: true },
         );
         return () => {
           if (token === subscription) {

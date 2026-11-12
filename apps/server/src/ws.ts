@@ -2,6 +2,7 @@ import * as RpcGroup from "effect/rpc/RpcGroup";
 /** Adapts authenticated WebSocket RPCs to server services; domain operations belong in services. */
 import { OrchestrationDispatchCommandError } from "@t3tools/contracts";
 import * as Context from "effect/Context";
+import * as Scope from "effect/Scope";
 import * as Crypto from "effect/Crypto";
 import * as Orchestrator from "./orchestration-v2/Orchestrator.ts";
 import * as PeerLinkRequests from "./peer/PeerLinkRequests.ts";
@@ -1294,6 +1295,7 @@ export const subscribeOrchestrationV2Shell = Effect.fn("ws.orchestrationV2.subsc
  * @param clientAnalyticsProps Connection metadata attached to analytics events.
  * @param serverBrowser Browser service used by preview and browser RPC handlers.
  * @param reportProfiles Publishes browser profiles reported by this connection.
+ * @param connectionScope Owns connection state after the handler layer finishes building.
  * @returns Handler layer requiring the backing server services; RPC errors retain their declared schemas.
  */
 export const layerWsRpc = (
@@ -1301,6 +1303,7 @@ export const layerWsRpc = (
   clientAnalyticsProps: Readonly<Record<string, unknown>>,
   serverBrowser: ServerBrowser.ServerBrowser["Service"],
   reportProfiles: ServerBrowser.ProfileReporter,
+  connectionScope: Scope.Scope,
 ) =>
   Layer.effectContext(
     Effect.gen(function* () {
@@ -1435,7 +1438,7 @@ export const layerWsRpc = (
                 : Effect.void,
             ),
           ),
-      );
+      ).pipe(Scope.provide(connectionScope));
       const backgroundPolicy = yield* BackgroundPolicy.BackgroundPolicy;
       const rpcClientIds = yield* Ref.make(new Set<RpcClientId>());
       yield* Effect.addFinalizer(() =>
@@ -3497,7 +3500,13 @@ export const layer = Layer.unwrap(
         }).pipe(
           Effect.provide(
             Layer.merge(
-              layerWsRpc(session, clientAnalyticsProps, serverBrowser, reportProfiles),
+              layerWsRpc(
+                session,
+                clientAnalyticsProps,
+                serverBrowser,
+                reportProfiles,
+                yield* Effect.scope,
+              ),
               layerDiscussionWsRpc,
             ).pipe(
               Layer.provideMerge(RpcSerialization.layerJson),

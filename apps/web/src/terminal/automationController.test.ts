@@ -26,14 +26,16 @@ function setup() {
   let emit: (event: typeof A.TerminalAutomationRpcEvent.Type) => void = () => {};
   let start = () => {};
   let end = () => {};
+  let fail = (_error: unknown) => {};
   const reply = deferred<A.TerminalAutomationClientReply>();
   const registered = deferred<void>();
   const synchronized = deferred<void>();
   const transport: TerminalAutomationTransport = {
-    subscribe: (s, e, receive) => {
+    subscribe: (s, e, receive, failed) => {
       start = s;
       end = e;
       emit = receive;
+      fail = failed ?? (() => {});
       start();
       return end;
     },
@@ -84,11 +86,21 @@ function setup() {
     },
     emit: (event: typeof A.TerminalAutomationRpcEvent.Type) => emit(event),
     end: () => end(),
+    fail: (error: unknown) => fail(error),
     start: () => start(),
     reply,
     registered,
   };
 }
+
+it("preserves subscription failure in the controller snapshot and invalidates ready", async () => {
+  const f = setup();
+  await f.ready();
+  const error = { code: "client_unavailable" };
+  f.fail(error);
+  expect(f.controller.getSnapshot()).toMatchObject({ ready: false, bindings: [], error });
+  f.controller.dispose();
+});
 
 it("retains ready candidate resources even when a snapshot has no binding, until the connection ends", async () => {
   const harness = setup();
