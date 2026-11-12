@@ -18,6 +18,9 @@ const state = vi.hoisted(() => ({
   draftKey: null as string | null,
   mounts: 0,
   exits: 0,
+  allowed: true,
+  deleted: false,
+  listeners: new Set<() => void>(),
 }));
 vi.mock("@tanstack/react-router", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@tanstack/react-router")>()),
@@ -33,11 +36,27 @@ vi.mock("./threadFindStore", () => ({ retainThreadFindForRoute: () => {} }));
 vi.mock("../../state/entities", () => ({
   useThreadRefs: () => state.refs,
   useEnvironmentThreadRefs: () => state.refs,
-  useQuietThreadShell: () => ({ deletedAt: null }),
+  useQuietThreadShell: () => ({ deletedAt: state.deleted ? "2026-11-12" : null }),
 }));
 vi.mock("../../state/shell", () => ({ useEnvironmentShellStatus: () => "live" }));
 vi.mock("../../state/threads", () => ({ useEnvironmentThread: () => null }));
-vi.mock("../../state/session", () => ({ useEnvironmentScope: () => true }));
+vi.mock("../../state/session", async () => {
+  const { useSyncExternalStore } = await import("react");
+  return {
+    useEnvironmentScope: () => {
+      useSyncExternalStore(
+        (listener) => {
+          state.listeners.add(listener);
+          return () => {
+            state.listeners.delete(listener);
+          };
+        },
+        () => `${state.allowed}:${state.deleted}`,
+      );
+      return state.allowed;
+    },
+  };
+});
 vi.mock("../../state/terminal", () => ({
   subscribeTerminalAutomation: () => () => {},
   terminalAutomationRevision: () => 0,
@@ -99,17 +118,22 @@ it("keeps bottom drawer identity through the actual chat route home return and d
   state.draftKey = null;
   state.mounts = 0;
   state.exits = 0;
+  state.allowed = true;
+  state.deleted = false;
   useTerminalUiStateStore.getState().setTerminalOpen(ref, true);
   const ChatRoute = Route.options.component!;
   await ChatRoute.preload?.();
   const container = document.createElement("div");
   document.body.append(container);
   const root = createRoot(container);
-  const render = () => (
-    <ChatRightPanelTerminalProvider>
-      <ChatRoute />
-    </ChatRightPanelTerminalProvider>
-  );
+  const render = () => {
+    for (const listener of state.listeners) listener();
+    return (
+      <ChatRightPanelTerminalProvider>
+        <ChatRoute />
+      </ChatRightPanelTerminalProvider>
+    );
+  };
   try {
     await act(async () => root.render(render()));
     const original = container.querySelector("[data-drawer]");
@@ -126,10 +150,18 @@ it("keeps bottom drawer identity through the actual chat route home return and d
     await act(async () => root.render(render()));
     expect(container.querySelector("[data-drawer]")).toBe(original);
     expect(state.mounts).toBe(1);
+    state.allowed = false;
+    await act(async () => root.render(render()));
+    expect(state.exits).toBe(1);
+    state.allowed = true;
+    await act(async () => root.render(render()));
+    state.deleted = true;
+    await act(async () => root.render(render()));
+    expect(state.exits).toBe(2);
     state.refs = [];
     state.target = null;
     await act(async () => root.render(render()));
-    expect(state.exits).toBe(1);
+    expect(state.exits).toBe(2);
   } finally {
     await act(async () => root.unmount());
     container.remove();

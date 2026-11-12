@@ -1,4 +1,9 @@
-import type { ResolvedKeybindingsConfig } from "@t3tools/contracts";
+import {
+  AuthTerminalReadScope,
+  AuthTerminalOperateScope,
+  type ScopedThreadRef,
+  type ResolvedKeybindingsConfig,
+} from "@t3tools/contracts";
 import {
   parseScopedThreadKey,
   scopedThreadKey,
@@ -25,7 +30,8 @@ import { useShallow } from "zustand/react/shallow";
 import { useComposerDraftStore } from "../../composerDraftStore";
 import type { TerminalContextSelection } from "../../lib/terminalContext";
 import { usePanelAnimationSettings, usePanelPresence } from "../../panelAnimations";
-import { useThreadRefs } from "../../state/entities";
+import { useThreadRefs, useQuietThreadShell } from "../../state/entities";
+import { useEnvironmentScope } from "../../state/session";
 import { useTerminalUiStateStore } from "../../terminalUiStateStore";
 import {
   MAX_HIDDEN_MOUNTED_TERMINAL_THREADS,
@@ -112,7 +118,7 @@ function RetainedChatTerminalDrawers(props: ChatTerminalDrawersProps) {
   });
 
   return mountedTerminalThreadRefs.map(({ key: mountedThreadKey, threadRef: mountedThreadRef }) => (
-    <PersistentThreadTerminalDrawer
+    <RetainedThreadDrawer
       key={mountedThreadKey}
       threadRef={mountedThreadRef}
       threadId={mountedThreadRef.threadId}
@@ -127,6 +133,19 @@ function RetainedChatTerminalDrawers(props: ChatTerminalDrawersProps) {
       onAddTerminalContext={props.onAddTerminalContext}
     />
   ));
+}
+
+function RetainedThreadDrawer(
+  props: React.ComponentProps<typeof PersistentThreadTerminalDrawer> & {
+    threadRef: ScopedThreadRef;
+  },
+) {
+  const canRead = useEnvironmentScope(props.threadRef.environmentId, AuthTerminalReadScope);
+  const canOperate = useEnvironmentScope(props.threadRef.environmentId, AuthTerminalOperateScope);
+  const thread = useQuietThreadShell(props.threadRef);
+  return canRead && canOperate && thread?.deletedAt == null ? (
+    <PersistentThreadTerminalDrawer {...props} />
+  ) : null;
 }
 
 type Configuration = { props: ChatTerminalDrawersProps; element: HTMLDivElement | null };
