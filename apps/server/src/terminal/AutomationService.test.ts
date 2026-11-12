@@ -118,6 +118,35 @@ const setup = Effect.gen(function* () {
   };
 });
 
+it.effect.each(["cancelled", "selected"] as const)(
+  "keeps selection %s valid across stable registration and visibility changes",
+  (outcome) =>
+    Effect.gen(function* () {
+      const f = yield* setup;
+      yield* f.service.registerViews("client", { version: 1, views: [view(), view("two")] });
+      yield* f.service.bind(caller, { mode: "request_selection" });
+      const invitation = yield* Queue.take(f.messages);
+      if (!("selectionRequestId" in invitation)) throw new Error("expected invitation");
+      yield* f.service.registerViews("client", { version: 1, views: [view(), view("two")] });
+      yield* f.service.registerViews("client", {
+        version: 1,
+        views: [{ ...view(), visible: false }, view("two")],
+      });
+      yield* f.service.replySelection("client", {
+        version: 1,
+        selectionRequestId: invitation.selectionRequestId,
+        candidateVersion: invitation.candidateVersion,
+        choice:
+          outcome === "cancelled"
+            ? { status: "cancelled" }
+            : { status: "selected", candidateId: invitation.candidates[1]!.candidateId },
+      });
+      expect((yield* f.service.status(caller)).state.status).toBe(
+        outcome === "cancelled" ? "unbound" : "bound",
+      );
+    }),
+);
+
 it.effect(
   "publishes binding revisions before bridge work and clears delivered invitations on both clients",
   () =>
@@ -175,7 +204,7 @@ it.effect.each(["cancelled", "selected", "candidate change", "disconnect"] as co
         invitation,
       ]);
       if (outcome === "candidate change")
-        yield* f.service.registerViews("client", { version: 1, views: [view()] });
+        yield* f.service.registerViews("client", { version: 1, views: [] });
       else if (outcome === "disconnect") yield* f.service.disconnect("client");
       else
         yield* f.service.replySelection("client", {
@@ -485,7 +514,10 @@ it.effect("model selection cleans queued invitations on candidate changes and di
     yield* service.bind(model, { mode: "auto" });
     const old = yield* Queue.take(messages);
     if (!("selectionRequestId" in old)) throw new Error("expected selection");
-    yield* service.registerViews("second", { version: 1, views: [view("two")] });
+    yield* service.registerViews("second", {
+      version: 1,
+      views: [{ ...view("two"), readiness: "not_ready" }],
+    });
     expect(yield* Queue.clear(second)).toEqual([]);
     expect(
       yield* Effect.flip(
@@ -497,6 +529,7 @@ it.effect("model selection cleans queued invitations on candidate changes and di
         }),
       ),
     ).toEqual({ code: "stale_request" });
+    yield* service.registerViews("second", { version: 1, views: [view("two")] });
     yield* service.bind(model, { mode: "auto" });
     yield* service.disconnect("second");
     expect(yield* Queue.clear(messages)).toEqual([]);

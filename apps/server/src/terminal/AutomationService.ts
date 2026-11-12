@@ -561,8 +561,20 @@ const make = Effect.gen(function* () {
       .reduce((count, other) => count + other.views.length, 0);
     if (views.length + otherCount > 64) return yield* Effect.fail(failure("budget_exceeded"));
     if (connections.get(id) !== client) return yield* Effect.fail(failure("client_unavailable"));
+    const changed =
+      views.length !== client.views.length ||
+      views.some((view) => {
+        const previous = client.views.find((old) => old.candidateId === view.candidateId);
+        return (
+          !previous ||
+          previous.readiness !== view.readiness ||
+          previous.capabilities.read !== view.capabilities.read ||
+          previous.capabilities.input !== view.capabilities.input ||
+          previous.capabilities.show !== view.capabilities.show
+        );
+      });
     client.views = views;
-    yield* changeCandidates(client.scope);
+    if (changed) yield* changeCandidates(client.scope);
     for (const owner of owners.values())
       if (sameScope(client.scope, owner.caller.scope)) yield* refresh(owner);
   });
