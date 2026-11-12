@@ -278,8 +278,8 @@ const layerBase: Layer.Layer<
         // Cancellation may roll back the transaction's work. Once it commits,
         // every subscriber must hear about it before this writer can exit.
         // Otherwise a failed child run can leave its parent's task running.
-        return sql
-          .withTransaction(Effect.tap(restore(transaction), () => takeLane))
+        return dispatchAuthorizations
+          .transaction(sql.withTransaction(Effect.tap(restore(transaction), () => takeLane)))
           .pipe(
             Effect.tap(publish),
             Effect.ensuring(
@@ -362,10 +362,12 @@ const layerBase: Layer.Layer<
       Effect.fnUntraced(function* (storedEvents: ReadonlyArray<OrchestrationV2StoredEvent>) {
         yield* Effect.forEach(
           storedEvents,
-          (stored) => {
-            dispatchAuthorizations.beforeProjection(stored.event);
-            return projectionStore.apply(stored.event);
-          },
+          (stored) =>
+            Effect.gen(function* () {
+              yield* dispatchAuthorizations.projection(stored.event);
+              dispatchAuthorizations.beforeProjection(stored.event);
+              return yield* projectionStore.apply(stored.event);
+            }),
           {
             concurrency: 1,
           },
