@@ -20,6 +20,7 @@ import {
   createEnvironmentSubscriptionAtomFamily,
   followStreamInEnvironment,
   runAtomCommand,
+  withEnvironmentRpcPermissions,
 } from "./runtime.ts";
 import type { EnvironmentRegistry } from "../connection/registry.ts";
 import {
@@ -167,10 +168,14 @@ export function createTerminalEnvironmentAtoms<R, E>(
         ) => void,
       ) =>
         runtime
-          .atom(
-            followStreamInEnvironment(
-              environmentId,
-              followTerminalAutomation({ threadId }, onStart, onEnd, onEvent),
+          .atom((get) =>
+            withEnvironmentRpcPermissions(
+              followStreamInEnvironment(
+                environmentId,
+                followTerminalAutomation({ threadId }, onStart, onEnd, onEvent),
+              ),
+              runtime,
+              get.registry,
             ),
           )
           .pipe(Atom.setIdleTTL(0)),

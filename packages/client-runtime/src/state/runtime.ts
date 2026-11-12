@@ -941,6 +941,32 @@ export function createEnvironmentRpcSubscriptionAtomFamily<
   });
 }
 
+/** Checks each RPC against the current destination session in the owning atom registry. */
+function createEnvironmentRpcPermissionGuard<R, E>(
+  runtime: Atom.AtomRuntime<EnvironmentRegistry.EnvironmentRegistry | R, E>,
+  registry: AtomRegistry.AtomRegistry,
+) {
+  return RpcPermissionGuard.of({
+    authorize: Effect.fn("RpcPermissionGuard.authorize")((id, method, input) =>
+      createCommandPermissions(runtime, method).authorize(registry, id, input),
+    ),
+  });
+}
+
+/** Supplies the same destination permission boundary to persistent RPC streams and commands. */
+export function withEnvironmentRpcPermissions<A, E, R, ER, RR>(
+  stream: Stream.Stream<A, E, R>,
+  runtime: Atom.AtomRuntime<EnvironmentRegistry.EnvironmentRegistry | RR, ER>,
+  registry: AtomRegistry.AtomRegistry,
+) {
+  return stream.pipe(
+    Stream.provideService(
+      RpcPermissionGuard,
+      createEnvironmentRpcPermissionGuard(runtime, registry),
+    ),
+  );
+}
+
 export function createEnvironmentRpcCommand<
   R,
   ER,
@@ -994,10 +1020,10 @@ export function createEnvironmentRpcCommand<
       // The transport check below deliberately checks the destination again.
       return permissions.authorize(registry, environmentId, input).pipe(
         Effect.andThen(() => options.execute?.(input) ?? requestGuarded(options.tag, input)),
-        Effect.provideService(RpcPermissionGuard, {
-          authorize: (id, method, payload) =>
-            createCommandPermissions(runtime, method).authorize(registry, id, payload),
-        }),
+        Effect.provideService(
+          RpcPermissionGuard,
+          createEnvironmentRpcPermissionGuard(runtime, registry),
+        ),
         Effect.tap((result) => options.onSuccess?.(target, registry, result) ?? Effect.void),
         Effect.ensuring(options.onSettled?.(target, registry) ?? Effect.void),
       );
