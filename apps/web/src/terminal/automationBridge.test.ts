@@ -147,6 +147,95 @@ it("reads actual sequenced PTY chunks with UTF16 budgets, gaps and instance rese
   ).toThrow("stale_request");
 });
 
+it("reads hidden Ghostty buffers but rejects hidden input and invalid instances", async () => {
+  const core = await GhosttyTerminalCore.create(
+    8,
+    3,
+    8,
+    16,
+    {
+      foreground: { r: 255, g: 255, b: 255 },
+      background: { r: 0, g: 0, b: 0 },
+      cursor: { r: 255, g: 255, b: 255 },
+    },
+    () => {},
+  );
+  try {
+    core.write("hello");
+    let currentTarget: A.TerminalAutomationTarget | null = target;
+    const bridge = createTerminalAutomationBridge({
+      surface: {
+        automationFrame: (sequence) => ghosttyAutomationFrame(core.automationMetadata(), sequence),
+        readAutomation: (query, sequence) => readGhosttyAutomation(core, query, sequence),
+        encodeAutomationInput: () => {
+          throw new Error("hidden encoding must not run");
+        },
+        applyAutomationLocalAction: () => {
+          throw new Error("hidden local apply must not run");
+        },
+      },
+      output: () => ({
+        terminalInstanceId: "instance",
+        sequence: 4,
+        chunks: [{ sequence: 4, data: "hello" }],
+        gap: false,
+      }),
+      target: () => currentTarget,
+      ready: () => false,
+      show: async () => {},
+    });
+    const signal = new AbortController().signal;
+    const budget = { maxLines: 3, maxCodeUnits: 100 };
+    const queries: A.TerminalAutomationReadQuery[] = [
+      { source: "screen", view: "active_bottom", budget },
+      {
+        source: "history",
+        activeScreen: "primary",
+        range: { startLine: 0, endLineExclusive: 1 },
+        budget,
+      },
+      { source: "output", cursor: null, budget },
+    ];
+    for (const query of queries) {
+      const result = await bridge.perform(
+        { ...fields, operation: "read", query },
+        () => {},
+        signal,
+      );
+      expect(result).toMatchObject({
+        operation: "read",
+        read: { source: query.source, text: expect.stringContaining("hello") },
+      });
+    }
+    await expect(
+      bridge.perform(
+        { ...fields, operation: "prepare_input", inputRequestId: "hidden" },
+        () => {},
+        signal,
+      ),
+    ).rejects.toMatchObject({ code: "not_ready" });
+    await expect(
+      bridge.perform(
+        {
+          ...fields,
+          operation: "apply_local",
+          inputRequestId: "hidden",
+          frameRevision: 1,
+          localAction: { type: "scroll", deltaRows: 1 },
+        },
+        () => {},
+        signal,
+      ),
+    ).rejects.toMatchObject({ code: "not_ready" });
+    currentTarget = { ...target, terminalInstanceId: "replacement" };
+    await expect(
+      bridge.perform({ ...fields, operation: "read", query: queries[0]! }, () => {}, signal),
+    ).rejects.toMatchObject({ code: "target_invalid" });
+  } finally {
+    core.dispose();
+  }
+});
+
 it("encodes through real Ghostty modes without writing or emitting human input", async () => {
   const onData = vi.fn();
   const core = await GhosttyTerminalCore.create(

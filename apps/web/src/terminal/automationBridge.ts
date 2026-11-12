@@ -131,7 +131,8 @@ export function createTerminalAutomationBridge(options: {
           target.viewId !== request.binding.target.viewId
         )
           throw new TerminalBridgeError("target_invalid");
-        if (!options.ready()) throw new TerminalBridgeError("not_ready");
+        if (request.operation !== "read" && !options.ready())
+          throw new TerminalBridgeError("not_ready");
       };
       try {
         guard();
