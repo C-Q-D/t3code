@@ -896,6 +896,7 @@ function TerminalSessionViewport({
           canOperate: hasTerminalWriteAccess,
           perform: bridge.perform,
           invalidate: bridge.invalidate,
+          retainBindings: bridge.retainBindings,
         });
       };
       syncAutomationRef.current = syncAutomation;

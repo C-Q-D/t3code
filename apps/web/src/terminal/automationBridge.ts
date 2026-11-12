@@ -86,10 +86,14 @@ export function createTerminalAutomationBridge(options: {
   target: () => A.TerminalAutomationTarget | null;
   show: (signal: AbortSignal) => Promise<void>;
   ready: () => boolean;
+  now?: () => number;
 }) {
+  const now = options.now ?? Date.now;
+  let allowedBindings: Set<string> | null = null;
   const inputs = new Map<
     string,
     {
+      bindingId: string;
       frameRevision: number;
       epoch: number;
       expiresAt: number;
@@ -99,7 +103,17 @@ export function createTerminalAutomationBridge(options: {
     }
   >();
   return {
-    invalidate: () => inputs.clear(),
+    invalidate: () => {
+      for (const input of inputs.values()) {
+        input.failed = true;
+        delete input.plan;
+      }
+    },
+    retainBindings: (bindings: readonly A.TerminalAutomationBinding[]) => {
+      allowedBindings = new Set(bindings.map((binding) => binding.bindingId));
+      for (const [key, input] of inputs)
+        if (!allowedBindings.has(input.bindingId)) inputs.delete(key);
+    },
     async perform(
       request: A.TerminalAutomationClientRequest,
       guard: () => void,
@@ -107,6 +121,8 @@ export function createTerminalAutomationBridge(options: {
     ): Promise<A.TerminalAutomationClientReply["result"]> {
       const check = () => {
         guard();
+        if (allowedBindings !== null && !allowedBindings.has(request.binding.bindingId))
+          throw new TerminalBridgeError("target_invalid");
         const target = options.target();
         if (
           !target ||
@@ -140,13 +156,24 @@ export function createTerminalAutomationBridge(options: {
         }
         const key = JSON.stringify([request.binding.bindingId, request.inputRequestId]);
         if (request.operation === "prepare_input") {
-          if (inputs.size >= 128 && !inputs.has(key))
-            throw new TerminalBridgeError("budget_exceeded");
           if (inputs.has(key)) throw new TerminalBridgeError("request_conflict");
+          let active = 0;
+          let owned = 0;
+          for (const input of inputs.values()) {
+            if (now() >= input.expiresAt) {
+              input.failed = true;
+              delete input.plan;
+            }
+            if (!input.failed && !input.applied) active += 1;
+            if (input.bindingId === request.binding.bindingId) owned += 1;
+          }
+          // The service bounds each binding to 256 input IDs; retain those IDs for its full lifetime.
+          if (active >= 128 || owned >= 256) throw new TerminalBridgeError("budget_exceeded");
           inputs.set(key, {
+            bindingId: request.binding.bindingId,
             frameRevision: frame.frameRevision,
             epoch: request.binding.inputEpoch,
-            expiresAt: Date.now() + 10_000,
+            expiresAt: now() + 10_000,
             applied: false,
             failed: false,
           });
@@ -156,7 +183,7 @@ export function createTerminalAutomationBridge(options: {
         if (
           !prepared ||
           prepared.failed ||
-          Date.now() >= prepared.expiresAt ||
+          now() >= prepared.expiresAt ||
           prepared.epoch !== request.binding.inputEpoch ||
           prepared.frameRevision !== request.frameRevision
         )
@@ -178,7 +205,7 @@ export function createTerminalAutomationBridge(options: {
               localAction: prepared.plan,
             };
           }
-          inputs.delete(key);
+          prepared.failed = true;
           return {
             operation: "encode_input",
             inputRequestId: request.inputRequestId,

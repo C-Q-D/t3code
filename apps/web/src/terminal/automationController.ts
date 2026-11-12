@@ -27,6 +27,7 @@ export interface TerminalAutomationView {
     signal: AbortSignal,
   ) => Promise<A.TerminalAutomationClientReply["result"]>;
   invalidate: () => void;
+  retainBindings?: (bindings: readonly A.TerminalAutomationBinding[]) => void;
 }
 
 export class TerminalBridgeError extends Error {
@@ -108,6 +109,7 @@ export class TerminalAutomationController {
     this.registering = undefined;
     for (const entry of this.views.values()) {
       entry.view.invalidate();
+      entry.view.retainBindings?.([]);
       entry.permits.clear();
       entry.blocked = false;
       entry.blockedBindings.clear();
@@ -213,6 +215,15 @@ export class TerminalAutomationController {
     for (const entry of this.views.values()) {
       for (const id of entry.blockedBindings)
         if (!liveIds.has(id)) entry.blockedBindings.delete(id);
+      entry.view.retainBindings?.(
+        state.bindings
+          .filter(
+            (item) =>
+              item.status !== "invalid" &&
+              sameTarget(item.binding.target, entry.view.candidate.target),
+          )
+          .map((item) => item.binding),
+      );
     }
     this.publish({ bindings: state.bindings });
     return state;

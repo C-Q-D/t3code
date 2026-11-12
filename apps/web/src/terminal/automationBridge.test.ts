@@ -163,6 +163,7 @@ it("encodes through real Ghostty modes without writing or emitting human input",
   );
   try {
     let scrolls = 0;
+    let now = 0;
     const output: TerminalAutomationOutput = {
       terminalInstanceId: "instance",
       sequence: 4,
@@ -193,6 +194,7 @@ it("encodes through real Ghostty modes without writing or emitting human input",
       target: () => target,
       ready: () => true,
       show: async () => {},
+      now: () => now,
     });
     const signal = new AbortController().signal;
     const prepared = await bridge.perform(
@@ -261,8 +263,73 @@ it("encodes through real Ghostty modes without writing or emitting human input",
     await bridge.perform(apply, () => {}, signal);
     await bridge.perform(apply, () => {}, signal);
     expect(scrolls).toBe(1);
-    bridge.invalidate();
+    for (let index = 0; index < 129; index += 1) {
+      const inputRequestId = `completed-${index}`;
+      await bridge.perform(
+        { ...fields, operation: "prepare_input", inputRequestId },
+        () => {},
+        signal,
+      );
+      await bridge.perform(
+        {
+          ...fields,
+          operation: "encode_input",
+          inputRequestId,
+          frameRevision: scrollRevision,
+          action: {
+            type: "mouse",
+            event: "wheel",
+            position: { column: 0, row: 0 },
+            deltaRows: -1,
+            deltaColumns: 0,
+            frameRevision: scrollRevision,
+            modifiers: { shift: false, alt: false, ctrl: false, meta: false },
+          },
+        },
+        () => {},
+        signal,
+      );
+      await bridge.perform({ ...apply, inputRequestId }, () => {}, signal);
+    }
+    expect(scrolls).toBe(130);
+    for (let index = 0; index < 100; index += 1)
+      await bridge.perform(
+        { ...fields, operation: "prepare_input", inputRequestId: `expires-${index}` },
+        () => {},
+        signal,
+      );
+    now = 20_000;
+    await bridge.perform(
+      { ...fields, operation: "prepare_input", inputRequestId: "after-expiry" },
+      () => {},
+      signal,
+    );
     await expect(bridge.perform(apply, () => {}, signal)).rejects.toMatchObject({
+      code: "stale_request",
+    });
+    await expect(
+      bridge.perform(
+        { ...fields, operation: "prepare_input", inputRequestId: "wheel" },
+        () => {},
+        signal,
+      ),
+    ).rejects.toMatchObject({ code: "request_conflict" });
+    bridge.retainBindings([]);
+    const nextBinding = { ...binding, bindingId: "next-binding" };
+    bridge.retainBindings([nextBinding]);
+    await bridge.perform(
+      { ...fields, binding: nextBinding, operation: "prepare_input", inputRequestId: "next" },
+      () => {},
+      signal,
+    );
+    await expect(bridge.perform(apply, () => {}, signal)).rejects.toMatchObject({
+      code: "target_invalid",
+    });
+    expect(scrolls).toBe(130);
+    bridge.invalidate();
+    await expect(
+      bridge.perform({ ...apply, binding: nextBinding, inputRequestId: "next" }, () => {}, signal),
+    ).rejects.toMatchObject({
       code: "stale_request",
     });
   } finally {
