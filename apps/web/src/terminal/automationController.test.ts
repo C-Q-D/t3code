@@ -434,6 +434,110 @@ it("keeps a selection retryable after a transport failure", async () => {
   f.controller.dispose();
 });
 
+it.each([null, "local"])(
+  "reconciles acknowledged selection %s when a notification supersedes its query",
+  async (choice) => {
+    const f = setup();
+    await f.ready();
+    await f.controller.synchronize();
+    f.emit({
+      version: 1,
+      selectionRequestId: "acknowledged",
+      candidateVersion: 7,
+      candidates: [f.view.candidate],
+    });
+    const entered = deferred<void>();
+    const old = deferred<A.TerminalAutomationConnectionState>();
+    f.transport.replySelection = vi.fn(async () => {});
+    f.transport.getConnectionState = () => {
+      entered.resolve();
+      return old.promise;
+    };
+    const submitted = f.controller.submitSelection("acknowledged", choice);
+    const outcome = submitted.then(
+      () => "success",
+      (error: unknown) => error,
+    );
+    await entered.promise;
+    const bindings: A.TerminalAutomationConnectionState["bindings"] =
+      choice === null ? [] : [{ status: "bound", binding }];
+    f.transport.getConnectionState = async () => ({
+      version: 1,
+      revision: 1,
+      selections: [],
+      bindings,
+    });
+    f.emit({ type: "state_changed", revision: 1 });
+    old.resolve({ version: 1, revision: 0, bindings: [], selections: [] });
+    expect(await outcome).toBe("success");
+    expect(f.controller.getSnapshot()).toMatchObject({ bindings, selections: [], error: null });
+    expect(f.transport.replySelection).toHaveBeenCalledTimes(1);
+    f.controller.dispose();
+  },
+);
+
+it("keeps a current selection query failure observable without replaying the reply", async () => {
+  const f = setup();
+  await f.ready();
+  await f.controller.synchronize();
+  f.emit({
+    version: 1,
+    selectionRequestId: "query-failure",
+    candidateVersion: 7,
+    candidates: [f.view.candidate],
+  });
+  const error = new Error("query failed");
+  f.transport.replySelection = vi.fn(async () => {});
+  f.transport.getConnectionState = vi.fn(async () => {
+    throw error;
+  });
+  await expect(f.controller.submitSelection("query-failure", null)).rejects.toBe(error);
+  expect(f.transport.replySelection).toHaveBeenCalledTimes(1);
+  expect(f.transport.getConnectionState).toHaveBeenCalledTimes(1);
+  expect(f.controller.getSnapshot().selections).toEqual([]);
+  f.controller.dispose();
+});
+
+it.each(["reply", "query"] as const)(
+  "rejects a selection interrupted by reconnect during %s",
+  async (stage) => {
+    const f = setup();
+    await f.ready();
+    await f.controller.synchronize();
+    f.emit({
+      version: 1,
+      selectionRequestId: "reconnect",
+      candidateVersion: 7,
+      candidates: [f.view.candidate],
+    });
+    const entered = deferred<void>();
+    const proceed = deferred<void>();
+    f.transport.replySelection = vi.fn(async () => {
+      if (stage === "reply") {
+        entered.resolve();
+        await proceed.promise;
+      }
+    });
+    f.transport.getConnectionState = async () => {
+      entered.resolve();
+      await proceed.promise;
+      return { version: 1, bindings: [], selections: [] };
+    };
+    const outcome = f.controller
+      .submitSelection("reconnect", null)
+      .catch((error: unknown) => error);
+    await entered.promise;
+    f.end();
+    f.start();
+    f.transport.getConnectionState = async () => ({ version: 1, bindings: [], selections: [] });
+    f.emit({ type: "ready" });
+    proceed.resolve();
+    expect(await outcome).toMatchObject({ code: "stale_request" });
+    expect(f.transport.replySelection).toHaveBeenCalledTimes(1);
+    f.controller.dispose();
+  },
+);
+
 it("rejects duplicate resume while the original confirmation is pending", async () => {
   const f = setup();
   await f.ready();

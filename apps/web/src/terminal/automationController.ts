@@ -571,7 +571,9 @@ export class TerminalAutomationController {
     }
     if (generation === this.generation)
       this.publish({ selections: this.snapshot.selections.filter((item) => item !== selection) });
-    await this.refreshState();
+    if (generation !== this.generation) throw new TerminalBridgeError("stale_request");
+    await this.synchronize();
+    if (generation !== this.generation) throw new TerminalBridgeError("stale_request");
   }
 
   private async handle(request: A.TerminalAutomationClientRequest) {
