@@ -41,6 +41,7 @@ interface Connection {
   views: ReadonlyArray<A.TerminalAutomationCandidate>;
   version: number;
   revision: number;
+  registration: number;
   readonly changes: Queue.Queue<A.TerminalAutomationStateChanged>;
 }
 interface Owner {
@@ -534,6 +535,7 @@ const make = Effect.gen(function* () {
           messages,
           changes,
           revision: 0,
+          registration: 0,
           views: [],
           version: versionFor(scope),
         };
@@ -550,6 +552,7 @@ const make = Effect.gen(function* () {
   ) {
     const input = yield* decode(A.TerminalAutomationRegistration, raw);
     const client = yield* connection(id);
+    const registration = ++client.registration;
     const views: Array<A.TerminalAutomationCandidate> = [];
     for (const view of input.views) {
       yield* inspect(client.scope, view.target);
@@ -561,6 +564,7 @@ const make = Effect.gen(function* () {
       .reduce((count, other) => count + other.views.length, 0);
     if (views.length + otherCount > 64) return yield* Effect.fail(failure("budget_exceeded"));
     if (connections.get(id) !== client) return yield* Effect.fail(failure("client_unavailable"));
+    if (registration !== client.registration) return yield* Effect.fail(failure("stale_request"));
     const changed =
       views.length !== client.views.length ||
       views.some((view) => {

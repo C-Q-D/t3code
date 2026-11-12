@@ -118,6 +118,39 @@ const setup = Effect.gen(function* () {
   };
 });
 
+it.effect.each([false, true])(
+  "rejects a late registration after replacement (reconnect: %s)",
+  (reconnect) =>
+    Effect.gen(function* () {
+      const f = yield* setup;
+      const entered = yield* Deferred.make<void>();
+      const proceed = yield* Deferred.make<void>();
+      f.beforeInspect(
+        Deferred.succeed(entered, undefined).pipe(Effect.andThen(Deferred.await(proceed))),
+      );
+      const old = yield* f.service
+        .registerViews("client", { version: 1, views: [view()] })
+        .pipe(Effect.result, Effect.forkChild);
+      yield* Deferred.await(entered);
+      f.beforeInspect(Effect.void);
+      if (reconnect) {
+        yield* f.service.disconnect("client");
+        yield* f.service.connect(scope, "client");
+      }
+      yield* f.service.registerViews("client", { version: 1, views: [view("two")] });
+      yield* Deferred.succeed(proceed, undefined);
+      expect(yield* Fiber.join(old)).toMatchObject({
+        _tag: "Failure",
+        failure: { code: reconnect ? "client_unavailable" : "stale_request" },
+      });
+      expect(
+        (yield* f.service.status(caller)).candidates.map(
+          (candidate) => candidate.target.terminalId,
+        ),
+      ).toEqual(["two"]);
+    }),
+);
+
 it.effect.each(["cancelled", "selected"] as const)(
   "keeps selection %s valid across stable registration and visibility changes",
   (outcome) =>
