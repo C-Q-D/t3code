@@ -31,6 +31,7 @@ export interface TerminalGrid {
 }
 
 export interface TerminalSessionState {
+  readonly automation?: TerminalAutomationOutput;
   readonly summary: TerminalSummary | null;
   readonly output: TerminalOutputState;
   /** Null when the server predates shared terminal geometry. */
@@ -44,6 +45,7 @@ export interface TerminalSessionState {
 }
 
 export interface TerminalBufferState {
+  readonly automation?: TerminalAutomationOutput;
   readonly output: TerminalOutputState;
   readonly grid: TerminalGrid | null;
   readonly status: TerminalSessionSnapshot["status"] | "closed";
@@ -144,6 +146,7 @@ export function combineTerminalSessionState(
   buffer: TerminalBufferState,
 ): TerminalSessionState {
   return {
+    ...(buffer.automation ? { automation: buffer.automation } : {}),
     summary,
     output: buffer.output,
     grid: buffer.grid,
@@ -156,7 +159,54 @@ export function combineTerminalSessionState(
   };
 }
 
+export interface TerminalAutomationOutput {
+  readonly terminalInstanceId: string | null;
+  readonly sequence: number;
+  readonly chunks: readonly { readonly sequence: number; readonly data: string }[];
+  readonly gap: boolean;
+}
+
 export function applyTerminalAttachStreamEvent(
+  current: TerminalBufferState,
+  event: TerminalAttachStreamEvent,
+  maxBufferBytes = DEFAULT_MAX_TERMINAL_BUFFER_BYTES,
+): TerminalBufferState {
+  const next = reduceTerminalAttachStreamEvent(current, event, maxBufferBytes);
+  let automation = current.automation;
+  if (event.type === "snapshot" || event.type === "restarted") {
+    const snapshot = event.snapshot;
+    automation = {
+      terminalInstanceId:
+        snapshot.sequence === undefined ? null : (snapshot.terminalInstanceId ?? null),
+      sequence: snapshot.sequence ?? 0,
+      chunks:
+        snapshot.sequence === undefined
+          ? []
+          : [{ sequence: snapshot.sequence, data: snapshot.history }],
+      gap: snapshot.sequence === undefined,
+    };
+  } else if (automation && event.sequence !== undefined && event.sequence > automation.sequence) {
+    let chunks =
+      event.type === "output"
+        ? [...automation.chunks, { sequence: event.sequence, data: event.data }]
+        : automation.chunks;
+    let codeUnits = chunks.reduce((sum, chunk) => sum + chunk.data.length, 0);
+    while (chunks.length > 1024 || (codeUnits > maxBufferBytes && chunks.length > 1)) {
+      codeUnits -= chunks[0]!.data.length;
+      chunks = chunks.slice(1);
+    }
+    if (codeUnits > maxBufferBytes) chunks = [];
+    automation = {
+      ...automation,
+      chunks,
+      sequence: event.sequence,
+      gap: automation.gap || event.sequence !== automation.sequence + 1 || chunks.length === 0,
+    };
+  }
+  return automation && automation !== next.automation ? { ...next, automation } : next;
+}
+
+function reduceTerminalAttachStreamEvent(
   current: TerminalBufferState,
   event: TerminalAttachStreamEvent,
   maxBufferBytes = DEFAULT_MAX_TERMINAL_BUFFER_BYTES,
