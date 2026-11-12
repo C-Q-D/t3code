@@ -14,6 +14,35 @@ const binding = {
 };
 
 describe("terminal automation RPC wire", () => {
+  it("connection queries reject identity fields and require only read permission", () => {
+    const rpc = WsRpcGroup.requests.get(WS_METHODS.terminalAutomationGetConnectionState)!;
+    const decode = Schema.decodeSync(Schema.fromJsonString(rpc.payloadSchema));
+    expect(decode('{"threadId":"thread-a"}')).toEqual({ threadId: "thread-a" });
+    for (const field of ["callerId", "clientId", "connectionId", "environmentId"]) {
+      expect(() => decode(JSON.stringify({ threadId: "thread-a", [field]: "forged" }))).toThrow();
+    }
+    expect(clientRpcRequiredScopes(WS_METHODS.terminalAutomationGetConnectionState, {})).toEqual([
+      "terminal:read",
+    ]);
+    const result = Schema.decodeSync(Schema.fromJsonString(rpc.successSchema));
+    expect(
+      result(
+        JSON.stringify({
+          version: 1,
+          bindings: [{ status: "paused", binding, reason: "human_intervened" }],
+        }),
+      ),
+    ).toMatchObject({ bindings: [{ binding }] });
+    expect(() => result('{"version":1,"bindings":[{"status":"unbound"}]}')).toThrow();
+    expect(() =>
+      result(
+        JSON.stringify({
+          version: 1,
+          bindings: Array.from({ length: 129 }, () => ({ status: "bound", binding })),
+        }),
+      ),
+    ).toThrow();
+  });
   it("preserves strict bridge replies and rejects forged identities", () => {
     const rpc = WsRpcGroup.requests.get(WS_METHODS.terminalAutomationReplyBridge)!;
     const wire = Schema.fromJsonString(rpc.payloadSchema);

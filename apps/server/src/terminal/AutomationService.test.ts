@@ -5,6 +5,7 @@ import * as Deferred from "effect/Deferred";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Queue from "effect/Queue";
+import * as Scope from "effect/Scope";
 import * as TestClock from "effect/testing/TestClock";
 import { expect } from "vite-plus/test";
 import * as Automation from "./AutomationService.ts";
@@ -116,6 +117,76 @@ const setup = Effect.gen(function* () {
     },
   };
 });
+
+it.effect(
+  "connection state discovers paused owners before any bridge and omits released bindings",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* setup;
+      yield* f.service.registerViews("client", { version: 1, views: [view()] });
+      const first = yield* f.service.bind(caller, { mode: "auto" });
+      const secondCaller = { ...caller, callerId: "provider-b" };
+      yield* f.service.bind(secondCaller, { mode: "auto" });
+      expect(yield* Queue.clear(f.messages)).toEqual([]);
+      yield* f.service.reportEvent("client", {
+        version: 1,
+        target: view().target,
+        event: "human_intervened",
+      });
+      const state = yield* f.service.getConnectionState("client");
+      expect(state.bindings).toHaveLength(2);
+      expect(state.bindings.map((entry) => entry.status)).toEqual(["paused", "paused"]);
+      const bindingId = state.bindings[0]!.binding.bindingId;
+      expect(first.state).toMatchObject({ binding: { bindingId } });
+      expect((yield* f.service.resumeFromConnection("client", bindingId)).state.status).toBe(
+        "bound",
+      );
+      yield* f.service.release(caller, { bindingId });
+      expect((yield* f.service.getConnectionState("client")).bindings).toHaveLength(1);
+      yield* f.service.connect(scope, "other-window");
+      yield* f.service.connect({ ...scope, threadId: A.ThreadId.make("other") }, "other-thread");
+      yield* f.service.connect(
+        { ...scope, environmentId: A.EnvironmentId.make("other") },
+        "other-env",
+      );
+      for (const id of ["other-window", "other-thread", "other-env"]) {
+        expect(yield* f.service.getConnectionState(id)).toEqual({ version: 1, bindings: [] });
+      }
+      yield* f.service.disconnect("client");
+      expect(yield* Effect.flip(f.service.getConnectionState("client"))).toEqual({
+        code: "client_unavailable",
+      });
+    }),
+);
+
+it.effect("connection state rejects a disconnected generation while inspecting a binding", () =>
+  Effect.gen(function* () {
+    const f = yield* setup;
+    const testScope = yield* Scope.Scope;
+    yield* bindOne(f.service);
+    f.beforeInspect(
+      Effect.gen(function* () {
+        f.beforeInspect(Effect.void);
+        yield* f.service.disconnect("client");
+        yield* f.service.connect(scope, "client");
+      }).pipe(Effect.provideService(Scope.Scope, testScope), Effect.orDie),
+    );
+    expect(yield* Effect.flip(f.service.getConnectionState("client"))).toEqual({
+      code: "client_unavailable",
+    });
+  }),
+);
+
+it.effect("connection state queries do not allocate model owners", () =>
+  Effect.gen(function* () {
+    const f = yield* setup;
+    yield* f.service.registerViews("client", { version: 1, views: [view()] });
+    for (let index = 0; index < 130; index += 1) {
+      expect(yield* f.service.getConnectionState("client")).toEqual({ version: 1, bindings: [] });
+    }
+    expect((yield* f.service.bind(caller, { mode: "auto" })).state.status).toBe("bound");
+  }),
+);
 
 it.effect(
   "selection queue overflow rolls back invitations already delivered to another window",

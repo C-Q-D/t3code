@@ -122,6 +122,37 @@ const setup = Effect.fn("test.automationRpc.setup")(function* (
   };
 });
 
+it.effect("old connection query cannot read a replacement subscription generation", () =>
+  Effect.gen(function* () {
+    const f = yield* setup();
+    const original = yield* f.start;
+    yield* f.bind;
+    const entered = yield* Deferred.make<void>();
+    const release = yield* Deferred.make<void>();
+    f.beforeThreadCheck(
+      Effect.gen(function* () {
+        f.beforeThreadCheck(Effect.void);
+        yield* Deferred.succeed(entered, undefined);
+        yield* Deferred.await(release);
+      }),
+    );
+    const old = yield* f.client[A.WS_METHODS.terminalAutomationGetConnectionState]({
+      threadId,
+    }).pipe(Effect.result, Effect.forkChild);
+    yield* Deferred.await(entered);
+    yield* Fiber.interrupt(original);
+    yield* f.start;
+    yield* Deferred.succeed(release, undefined);
+    expect(yield* Fiber.join(old)).toMatchObject({
+      _tag: "Failure",
+      failure: { code: "client_unavailable" },
+    });
+    expect(
+      yield* f.client[A.WS_METHODS.terminalAutomationGetConnectionState]({ threadId }),
+    ).toEqual({ version: 1, bindings: [] });
+  }),
+);
+
 it.effect("old registration cannot replace views after resubscription", () =>
   Effect.gen(function* () {
     const f = yield* setup();

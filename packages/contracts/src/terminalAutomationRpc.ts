@@ -12,10 +12,12 @@ import {
   TerminalAutomationSelectionRequest,
   TerminalAutomationClientRequest,
   TerminalAutomationStatus,
+  TerminalAutomationConnectionState,
   TerminalAutomationError,
 } from "./terminalAutomation.ts";
 
 export const TERMINAL_AUTOMATION_WS_METHODS = {
+  terminalAutomationGetConnectionState: "terminalAutomation.getConnectionState",
   terminalAutomationSubscribe: "terminalAutomation.subscribe",
   terminalAutomationRegisterViews: "terminalAutomation.registerViews",
   terminalAutomationReplyBridge: "terminalAutomation.replyBridge",
@@ -64,6 +66,11 @@ export const TerminalAutomationRpcEvent = Schema.Union([
 const error = Schema.Union([TerminalAutomationError, EnvironmentAuthorizationError]);
 
 export const TerminalAutomationRpcGroup = RpcGroup.make(
+  Rpc.make(TERMINAL_AUTOMATION_WS_METHODS.terminalAutomationGetConnectionState, {
+    payload: TerminalAutomationSubscribeInput,
+    success: TerminalAutomationConnectionState,
+    error,
+  }),
   Rpc.make(TERMINAL_AUTOMATION_WS_METHODS.terminalAutomationSubscribe, {
     payload: TerminalAutomationSubscribeInput,
     success: TerminalAutomationRpcEvent,

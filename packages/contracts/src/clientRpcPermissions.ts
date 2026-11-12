@@ -18,6 +18,7 @@ import { TerminalAutomationReplyBridgeInput } from "./terminalAutomationRpc.ts";
 
 /** Incremental client enforcement; the server still authorizes every request. */
 export const CLIENT_GUARDED_RPC_SCOPES = {
+  [WS_METHODS.terminalAutomationGetConnectionState]: AuthTerminalReadScope,
   [WS_METHODS.terminalAutomationSubscribe]: AuthTerminalOperateScope,
   [WS_METHODS.terminalAutomationRegisterViews]: AuthTerminalOperateScope,
   [WS_METHODS.terminalAutomationReplyBridge]: AuthTerminalOperateScope,

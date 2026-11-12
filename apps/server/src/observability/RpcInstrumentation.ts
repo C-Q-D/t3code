@@ -212,6 +212,7 @@ const RPC_AGGREGATES = {
   [WS_METHODS.reviewGetDiffFileContents]: "review",
   [WS_METHODS.terminalOpen]: "terminal",
   [WS_METHODS.terminalAutomationSubscribe]: "terminal",
+  [WS_METHODS.terminalAutomationGetConnectionState]: "terminal",
   [WS_METHODS.terminalAutomationRegisterViews]: "terminal",
   [WS_METHODS.terminalAutomationReplyBridge]: "terminal",
   [WS_METHODS.terminalAutomationReplySelection]: "terminal",

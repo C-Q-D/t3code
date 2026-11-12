@@ -93,6 +93,9 @@ export class TerminalAutomationService extends Context.Service<
       connectionId: string,
     ) => Effect.Effect<Queue.Dequeue<Message>, Failure, Scope.Scope>;
     readonly disconnect: (connectionId: string) => Effect.Effect<void>;
+    readonly getConnectionState: (
+      connectionId: string,
+    ) => Effect.Effect<A.TerminalAutomationConnectionState, Failure>;
     readonly revoke: (caller: Caller, bindingId: string) => Effect.Effect<void, Failure>;
     readonly input: (
       caller: Caller,
@@ -328,6 +331,12 @@ const make = Effect.gen(function* () {
       return;
     }
     const current = yield* inspect(owner.caller.scope, state.binding.target).pipe(Effect.result);
+    if (
+      owner.state !== state ||
+      owners.get(ownerKey(owner.caller)) !== owner ||
+      connections.get(owner.connectionId!) !== client
+    )
+      return;
     if (current._tag === "Failure") {
       owner.state = { status: "invalid", binding: state.binding, reason: "target_invalid" };
       yield* retire(state.binding.bindingId, failure("target_invalid"));
@@ -339,6 +348,33 @@ const make = Effect.gen(function* () {
         reason: "human_intervened",
       };
     }
+  });
+  const getConnectionState = Effect.fn("TerminalAutomation.getConnectionState")(function* (
+    id: string,
+  ) {
+    const client = yield* connection(id);
+    const owned = () =>
+      [...owners.entries()].filter(
+        ([, owner]) =>
+          owner.connectionId === id &&
+          sameScope(client.scope, owner.caller.scope) &&
+          "binding" in owner.state,
+      );
+    for (const [key, owner] of owned()) {
+      yield* refresh(owner);
+      if (connections.get(id) !== client) return yield* Effect.fail(failure("client_unavailable"));
+      if (
+        owners.get(key) !== owner ||
+        owner.connectionId !== id ||
+        !sameScope(client.scope, owner.caller.scope)
+      )
+        continue;
+    }
+    if (connections.get(id) !== client) return yield* Effect.fail(failure("client_unavailable"));
+    return {
+      version: 1 as const,
+      bindings: owned().flatMap(([, owner]) => ("binding" in owner.state ? [owner.state] : [])),
+    };
   });
   const candidates = Effect.fn("TerminalAutomation.candidates")(function* (
     scope: A.TerminalAutomationScope,
@@ -1202,6 +1238,7 @@ const make = Effect.gen(function* () {
   return TerminalAutomationService.of({
     connect,
     disconnect,
+    getConnectionState,
     registerViews,
     status,
     bind,

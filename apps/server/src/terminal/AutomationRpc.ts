@@ -39,6 +39,13 @@ export const make = Effect.fn("TerminalAutomationRpc.make")(function* (
     return id;
   });
   return {
+    [A.WS_METHODS.terminalAutomationGetConnectionState]: (
+      input: typeof A.TerminalAutomationSubscribeInput.Type,
+      metadata: Metadata,
+    ) =>
+      checked(input.threadId, metadata).pipe(
+        Effect.flatMap((id) => service.getConnectionState(id)),
+      ),
     [A.WS_METHODS.terminalAutomationSubscribe]: (
       input: typeof A.TerminalAutomationSubscribeInput.Type,
       metadata: Metadata,

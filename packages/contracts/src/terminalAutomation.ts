@@ -85,13 +85,7 @@ export type TerminalAutomationErrorCode = typeof TerminalAutomationErrorCode.Typ
 export const TerminalAutomationError = strict({ code: TerminalAutomationErrorCode });
 export type TerminalAutomationError = typeof TerminalAutomationError.Type;
 
-export const TerminalAutomationState = Schema.Union([
-  strict({ status: Schema.Literal("unbound") }),
-  strict({
-    status: Schema.Literal("selection_required"),
-    selectionRequestId: Id,
-    candidateVersion: Counter,
-  }),
+const ConnectionBindingState = Schema.Union([
   strict({ status: Schema.Literal("bound"), binding: TerminalAutomationBinding }),
   strict({
     status: Schema.Literal("paused"),
@@ -104,7 +98,22 @@ export const TerminalAutomationState = Schema.Union([
     reason: Schema.Literals(["target_invalid", "client_unavailable"]),
   }),
 ]);
+export const TerminalAutomationState = Schema.Union([
+  strict({ status: Schema.Literal("unbound") }),
+  strict({
+    status: Schema.Literal("selection_required"),
+    selectionRequestId: Id,
+    candidateVersion: Counter,
+  }),
+  ConnectionBindingState,
+]);
 export type TerminalAutomationState = typeof TerminalAutomationState.Type;
+
+export const TerminalAutomationConnectionState = strict({
+  version,
+  bindings: Schema.Array(ConnectionBindingState).check(Schema.isMaxLength(128)),
+});
+export type TerminalAutomationConnectionState = typeof TerminalAutomationConnectionState.Type;
 
 export const TerminalAutomationBindInput = Schema.Union([
   strict({ mode: Schema.Literal("auto") }),
