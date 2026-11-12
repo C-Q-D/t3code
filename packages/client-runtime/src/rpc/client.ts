@@ -195,7 +195,7 @@ const authorizeRequest = Effect.fn("EnvironmentRpc.authorize")(function* (
 
 export const requestGuarded = Effect.fn("EnvironmentRpc.request")(function* <
   TTag extends EnvironmentUnaryRpcTag,
->(tag: TTag, input: EnvironmentRpcInput<TTag>) {
+>(tag: TTag, input: EnvironmentRpcInput<TTag>, isCurrent?: () => boolean) {
   const supervisor = yield* EnvironmentSupervisor.EnvironmentSupervisor;
   yield* Effect.annotateCurrentSpan({
     "environment.id": supervisor.target.environmentId,
@@ -212,8 +212,26 @@ export const requestGuarded = Effect.fn("EnvironmentRpc.request")(function* <
     environmentLabel: supervisor.target.label,
     method: tag,
   });
+  if (isCurrent?.() === false) {
+    yield* completeObservation;
+    return yield* new EnvironmentRpcUnavailableError({
+      environmentId: supervisor.target.environmentId,
+      message: "Terminal automation subscription changed.",
+    });
+  }
   return yield* method(input).pipe(Effect.ensuring(completeObservation));
 });
+
+export type TerminalAutomationCommandInput<TTag extends EnvironmentUnaryRpcTag> =
+  EnvironmentRpcInput<TTag> & { readonly isCurrent: () => boolean };
+
+/** The local generation check is stripped before encoding the strict RPC payload. */
+export function terminalAutomationCommand<TTag extends EnvironmentUnaryRpcTag>(tag: TTag) {
+  return (input: TerminalAutomationCommandInput<TTag>) => {
+    const { isCurrent, ...payload } = input;
+    return requestGuarded(tag, payload as EnvironmentRpcInput<TTag>, isCurrent);
+  };
+}
 
 export function runStreamGuarded<TTag extends EnvironmentStreamCommandRpcTag>(
   tag: TTag,
@@ -436,6 +454,9 @@ export function followTerminalAutomation(
   input: EnvironmentRpcInput<typeof WS_METHODS.terminalAutomationSubscribe>,
   onStart: () => void,
   onEnd: () => void,
+  onEvent: (
+    event: EnvironmentRpcStreamValue<typeof WS_METHODS.terminalAutomationSubscribe>,
+  ) => void,
 ) {
   let generation = 0;
   return subscribeDynamicMapped(
@@ -450,9 +471,17 @@ export function followTerminalAutomation(
       const current = generation;
       return stream.pipe(
         Stream.filter(() => current === generation),
+        Stream.tap((event) =>
+          Effect.sync(() => {
+            if (current === generation) onEvent(event);
+          }),
+        ),
         Stream.ensuring(
           Effect.sync(() => {
-            if (current === generation) onEnd();
+            if (current === generation) {
+              generation += 1;
+              onEnd();
+            }
           }),
         ),
       );

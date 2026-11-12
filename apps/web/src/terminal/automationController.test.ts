@@ -170,6 +170,67 @@ it("late resume success cannot clear a newer human pause", async () => {
   f.controller.dispose();
 });
 
+it("resumes only the explicitly confirmed owner recovered from a connection snapshot", async () => {
+  const f = setup();
+  await f.ready();
+  const first = { ...binding, inputEpoch: 1 };
+  const other = { ...first, bindingId: "other-owner" };
+  let state: A.TerminalAutomationConnectionState = {
+    version: 1,
+    bindings: [
+      { status: "paused", binding: first, reason: "human_intervened" },
+      { status: "paused", binding: other, reason: "human_intervened" },
+    ],
+  };
+  f.transport.getConnectionState = async () => state;
+  const reported = f.controller.humanInput(target);
+  expect(f.controller.getSnapshot().localPausedTargets).toEqual([target]);
+  await reported;
+  expect(f.transport.resume).not.toHaveBeenCalled();
+  f.transport.resume = vi.fn(async (id: string): Promise<A.TerminalAutomationStatus> => {
+    expect(id).toBe("binding");
+    state = { ...state, bindings: [{ status: "bound", binding: first }, state.bindings[1]!] };
+    return {
+      version: 1,
+      candidateVersion: 1,
+      candidates: [],
+      state: { status: "bound", binding: first },
+    };
+  });
+  await f.controller.resume("binding");
+  f.emit({ version: 1, operation: "show", bridgeRequestId: "chosen", binding: first });
+  expect((await f.reply.promise).result).toEqual({ operation: "show", status: "visible" });
+  const denied = deferred<A.TerminalAutomationClientReply>();
+  f.transport.replyBridge = async (reply) => {
+    denied.resolve(reply);
+  };
+  f.emit({ version: 1, operation: "show", bridgeRequestId: "other", binding: other });
+  expect((await denied.promise).result).toMatchObject({ error: { code: "human_intervened" } });
+  expect(f.transport.resume).toHaveBeenCalledTimes(1);
+  f.controller.dispose();
+});
+
+it("does not authorize resume when a new human input follows snapshot publication", async () => {
+  const f = setup();
+  await f.ready();
+  f.transport.getConnectionState = async () => paused;
+  let injected = false;
+  let reported: ReturnType<TerminalAutomationController["humanInput"]>;
+  const unsubscribe = f.controller.subscribe(() => {
+    if (!injected && f.controller.getSnapshot().bindings === paused.bindings) {
+      injected = true;
+      reported = f.controller.humanInput(target);
+    }
+  });
+  const work = f.controller.resume("binding");
+  await expect(work).rejects.toMatchObject({ code: "stale_request" });
+  expect(f.transport.resume).not.toHaveBeenCalled();
+  await reported;
+  expect(f.controller.getSnapshot().localPausedTargets).toEqual([target]);
+  unsubscribe();
+  f.controller.dispose();
+});
+
 it("reports invalid instances and cleans stale selection invitations", async () => {
   const f = setup();
   await f.ready();

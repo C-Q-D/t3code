@@ -26,6 +26,7 @@ import {
   subscribe,
   subscribeDynamic,
   followTerminalAutomation,
+  terminalAutomationCommand,
   type EnvironmentRpcInput,
   type EnvironmentRpcStreamValue,
 } from "../rpc/client.ts";
@@ -129,26 +130,32 @@ export function createTerminalEnvironmentAtoms<R, E>(
       registerViews: createEnvironmentRpcCommand(runtime, {
         label: "terminal-automation:register",
         tag: WS_METHODS.terminalAutomationRegisterViews,
+        execute: terminalAutomationCommand(WS_METHODS.terminalAutomationRegisterViews),
       }),
       replyBridge: createEnvironmentRpcCommand(runtime, {
         label: "terminal-automation:reply",
         tag: WS_METHODS.terminalAutomationReplyBridge,
+        execute: terminalAutomationCommand(WS_METHODS.terminalAutomationReplyBridge),
       }),
       replySelection: createEnvironmentRpcCommand(runtime, {
         label: "terminal-automation:select",
         tag: WS_METHODS.terminalAutomationReplySelection,
+        execute: terminalAutomationCommand(WS_METHODS.terminalAutomationReplySelection),
       }),
       reportEvent: createEnvironmentRpcCommand(runtime, {
         label: "terminal-automation:event",
         tag: WS_METHODS.terminalAutomationReportEvent,
+        execute: terminalAutomationCommand(WS_METHODS.terminalAutomationReportEvent),
       }),
       resume: createEnvironmentRpcCommand(runtime, {
         label: "terminal-automation:resume",
         tag: WS_METHODS.terminalAutomationResume,
+        execute: terminalAutomationCommand(WS_METHODS.terminalAutomationResume),
       }),
       getConnectionState: createEnvironmentRpcCommand(runtime, {
         label: "terminal-automation:state",
         tag: WS_METHODS.terminalAutomationGetConnectionState,
+        execute: terminalAutomationCommand(WS_METHODS.terminalAutomationGetConnectionState),
       }),
       driver: (
         environmentId: EnvironmentId,
@@ -163,9 +170,7 @@ export function createTerminalEnvironmentAtoms<R, E>(
           .atom(
             followStreamInEnvironment(
               environmentId,
-              followTerminalAutomation({ threadId }, onStart, onEnd).pipe(
-                Stream.tap((event) => Effect.sync(() => onEvent(event))),
-              ),
+              followTerminalAutomation({ threadId }, onStart, onEnd, onEvent),
             ),
           )
           .pipe(Atom.setIdleTTL(0)),

@@ -47,7 +47,7 @@ import { Popover, PopoverPopup, PopoverTrigger } from "~/components/ui/popover";
 import { Button } from "~/components/ui/button";
 import { stackedThreadToast, toastManager } from "~/components/ui/toast";
 import { readTextFromClipboard, writeTextToClipboard } from "~/hooks/useCopyToClipboard";
-import { cn } from "~/lib/utils";
+import { cn, randomUUID } from "~/lib/utils";
 import { type TerminalContextSelection } from "~/lib/terminalContext";
 import {
   observeSelectionActions,
@@ -94,7 +94,12 @@ import { appAtomRegistry } from "../rpc/atomRegistry";
 import { serverEnvironment } from "../state/server";
 import { previewEnvironment } from "../state/preview";
 import { readEnvironmentScope } from "../state/session";
-import { terminalEnvironment } from "../state/terminal";
+import { terminalEnvironment, acquireTerminalAutomation } from "../state/terminal";
+import { createTerminalAutomationBridge } from "../terminal/automationBridge";
+import type { TerminalAutomationTarget } from "@t3tools/contracts";
+import type { TerminalAutomationController } from "../terminal/automationController";
+import { useRouter } from "@tanstack/react-router";
+import { useRightPanelStore, selectThreadRightPanelState } from "../rightPanelStore";
 import { useEnvironmentScope } from "../state/session";
 import { openTerminalLinkInPreview } from "./preview/openTerminalLinkInPreview";
 import { collapseThreadDetailsCard } from "./chat/ThreadDetailsCard";
@@ -614,6 +619,12 @@ function TerminalSessionViewport({
   visible,
   keybindings,
 }: TerminalViewportProps) {
+  const router = useRouter();
+  const automationRef = useRef<{
+    controller: TerminalAutomationController;
+    target: TerminalAutomationTarget;
+  } | null>(null);
+  const syncAutomationRef = useRef<(() => void) | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const autoFocusedRef = useRef(false);
   const terminalRef = useRef<GhosttyTerminalSurface | null>(null);
@@ -699,12 +710,14 @@ function TerminalSessionViewport({
     (listener: (session: TerminalSessionState) => void) =>
       appAtomRegistry.subscribe(terminalSessionAtom, listener),
   );
-  const writeTerminal = useEffectEvent((data: string) =>
-    runTerminalWrite({
+  const writeTerminal = useEffectEvent((data: string) => {
+    const automation = automationRef.current;
+    automation?.controller.humanInput(automation.target);
+    return runTerminalWrite({
       environmentId,
       input: { threadId, terminalId, data },
-    }),
-  );
+    });
+  });
   const resizeTerminal = useEffectEvent((cols: number, rows: number) => {
     if (writableSessionGeneration(readTerminalSession(), hasTerminalWriteAccess()) === null) {
       return;
@@ -761,9 +774,11 @@ function TerminalSessionViewport({
     terminalRef.current?.refreshLinkActivation();
   }, [canOpenHostEditor]);
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- Syncs mounted surface visibility and registration with the existing drawer.
   useLayoutEffect(() => {
     visibleRef.current = visible;
     terminalRef.current?.setVisible(visible);
+    syncAutomationRef.current?.();
     if (!visible) dismissTerminalMenu();
   }, [visible, dismissTerminalMenu]);
   useLayoutEffect(() => {
@@ -777,6 +792,7 @@ function TerminalSessionViewport({
     void terminalRef.current?.setFont(terminalFontOptions(terminalFontFamily, terminalFontSize));
   }, [terminalFontFamily, terminalFontSize]);
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- Owns the imperative terminal surface, automation subscription, and DOM listeners.
   useEffect(() => {
     const mount = containerRef.current;
     if (!mount) return;
@@ -815,6 +831,81 @@ function TerminalSessionViewport({
       terminal.setTheme(terminalThemeFromApp(mount));
       setupTerminal = terminal;
       terminalRef.current = terminal;
+      const automation = acquireTerminalAutomation({ environmentId, threadId });
+      const automationThreadRef = { environmentId, threadId };
+      const viewId = randomUUID();
+      const currentTarget = () => {
+        const session = readTerminalSession();
+        const instance = session.automation?.terminalInstanceId;
+        return instance && session.status === "running"
+          ? { terminalId, terminalInstanceId: instance, viewId }
+          : null;
+      };
+      const bridge = createTerminalAutomationBridge({
+        surface: terminal,
+        output: () => readTerminalSession().automation,
+        target: currentTarget,
+        ready: () => visibleRef.current && terminal.isAutomationReady(),
+        show: async (signal) => {
+          const panels = useRightPanelStore.getState();
+          const panel = selectThreadRightPanelState(
+            panels.byThreadKey,
+            automationThreadRef,
+          ).surfaces.find(
+            (surface) => surface.kind === "terminal" && surface.terminalIds.includes(terminalId),
+          );
+          if (panel) {
+            panels.activateTerminal(automationThreadRef, panel.id, terminalId);
+            panels.show(automationThreadRef);
+          } else {
+            const ui = useTerminalUiStateStore.getState();
+            ui.setActiveTerminal(automationThreadRef, terminalId);
+            ui.setTerminalOpen(automationThreadRef, true);
+          }
+          await router.navigate({
+            to: "/$environmentId/$threadId",
+            params: { environmentId, threadId },
+          });
+          await terminal.waitForAutomationReady(signal);
+        },
+      });
+      let registered: TerminalAutomationTarget | null = null;
+      let registeredVisible: boolean | null = null;
+      const syncAutomation = () => {
+        const target = currentTarget();
+        if (registered && registered.terminalInstanceId !== target?.terminalInstanceId) {
+          automation.controller.removeView(registered, "instance_exited");
+          registered = null;
+          bridge.invalidate();
+          automationRef.current = null;
+        }
+        if (!target || (registered && registeredVisible === visibleRef.current)) return;
+        registered = target;
+        registeredVisible = visibleRef.current;
+        automationRef.current = { controller: automation.controller, target };
+        automation.controller.setView({
+          candidate: {
+            candidateId: viewId,
+            target,
+            title: readTerminalLabel(),
+            clientKind: window.desktopBridge ? "windows_desktop" : "web",
+            visible: visibleRef.current,
+            readiness: "ready",
+            capabilities: { read: true, input: true, show: true },
+          },
+          canOperate: hasTerminalWriteAccess,
+          perform: bridge.perform,
+          invalidate: bridge.invalidate,
+        });
+      };
+      syncAutomationRef.current = syncAutomation;
+      setupCleanups.push(() => {
+        syncAutomationRef.current = null;
+        automationRef.current = null;
+        if (registered) automation.controller.removeView(registered);
+        bridge.invalidate();
+        automation.release();
+      });
       terminal.input.setAttribute("data-workspace-focus-default", "");
       terminal.input.readOnly = !hasTerminalWriteAccess();
       // Reapply font settings hydrated during loading, when terminalRef was null.
@@ -835,6 +926,7 @@ function TerminalSessionViewport({
       if (latestSession.error !== null) writeSystemMessage(terminal, latestSession.error);
       synchronizedStatusRef.current = "closed";
       synchronizeTerminalStatus(terminal, latestSession.status, latestSession.version);
+      syncAutomation();
       // Read and subscribe in one synchronous step so no output lands between them.
       let previousSession = latestSession;
       let resizeGeneration = writableSessionGeneration(latestSession, hasTerminalWriteAccess());
@@ -857,6 +949,7 @@ function TerminalSessionViewport({
             session,
             outputCursorRef.current,
           );
+          syncAutomation();
         }),
       );
       if (
@@ -955,6 +1048,8 @@ function TerminalSessionViewport({
       };
 
       const pasteFromClipboard = async (requestId: number) => {
+        const automation = automationRef.current;
+        automation?.controller.humanInput(automation.target);
         if (!hasTerminalWriteAccess()) return;
         const activeTerminal = terminalRef.current;
         if (!activeTerminal) return;
@@ -1245,6 +1340,8 @@ function TerminalSessionViewport({
   }, [
     cwd,
     environmentId,
+    threadId,
+    router,
     terminalId,
     presentTerminalMenu,
     dismissTerminalMenu,

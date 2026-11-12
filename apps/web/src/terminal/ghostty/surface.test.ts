@@ -271,6 +271,30 @@ describe("GhosttyTerminalSurface visibility", () => {
     };
   }
 
+  it("waits for actual visible geometry and rejects abandoned surface waits", async () => {
+    const harness = createHarness();
+    const surface = await harness.create({ visible: false });
+    const abort = new AbortController();
+    let ready = false;
+    const pending = surface.waitForAutomationReady(abort.signal).then(() => {
+      ready = true;
+    });
+    expect(surface.isAutomationReady()).toBe(false);
+    expect(ready).toBe(false);
+    surface.setVisible(true);
+    harness.flushFrame();
+    await pending;
+    expect(ready).toBe(true);
+    expect(surface.isAutomationReady()).toBe(true);
+    surface.setVisible(false);
+    const cancelled = surface.waitForAutomationReady(abort.signal);
+    abort.abort();
+    await expect(cancelled).rejects.toThrow("client_unavailable");
+    const closed = surface.waitForAutomationReady(new AbortController().signal);
+    surface.dispose();
+    await expect(closed).rejects.toThrow("target_invalid");
+  });
+
   it("plans local automation without scrolling and applies only a current authorized action", async () => {
     const harness = createHarness();
     const beforeKey = vi.fn(() => false);

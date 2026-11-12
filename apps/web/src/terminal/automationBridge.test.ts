@@ -36,23 +36,24 @@ const binding = { bindingId: "binding", target, alias: "terminal", inputEpoch: 0
 const fields = { version: 1 as const, bridgeRequestId: "bridge", binding };
 
 it("reads actual sequenced PTY chunks with UTF16 budgets, gaps and instance resets", () => {
+  const snapshot: A.TerminalSessionSnapshot = {
+    terminalInstanceId: "instance",
+    threadId: "thread",
+    terminalId: "term",
+    cwd: "/",
+    worktreePath: null,
+    status: "running",
+    pid: 1,
+    history: "a😀b\n",
+    sequence: 2,
+    exitCode: null,
+    exitSignal: null,
+    label: "Terminal",
+    updatedAt: "2026-11-12T00:00:00Z",
+  };
   let state = applyTerminalAttachStreamEvent(EMPTY_TERMINAL_BUFFER_STATE, {
     type: "snapshot",
-    snapshot: {
-      terminalInstanceId: "instance",
-      threadId: "thread",
-      terminalId: "term",
-      cwd: "/",
-      worktreePath: null,
-      status: "running",
-      pid: 1,
-      history: "a😀b\n",
-      sequence: 2,
-      exitCode: null,
-      exitSignal: null,
-      label: "Terminal",
-      updatedAt: "2026-11-12T00:00:00Z",
-    },
+    snapshot,
   });
   state = applyTerminalAttachStreamEvent(state, {
     type: "output",
@@ -108,6 +109,31 @@ it("reads actual sequenced PTY chunks with UTF16 budgets, gaps and instance rese
       frame,
     ),
   ).toMatchObject({ continuity: "gap", text: "aft" });
+  state = applyTerminalAttachStreamEvent(state, {
+    type: "error",
+    threadId: "thread",
+    terminalId: "term",
+    message: "UI-only error",
+  });
+  expect(state.automation!.chunks.map((chunk) => chunk.data).join("")).not.toContain("UI-only");
+  state = applyTerminalAttachStreamEvent(state, {
+    type: "restarted",
+    threadId: "thread",
+    terminalId: "term",
+    snapshot: { ...snapshot, terminalInstanceId: "new-instance", sequence: 0, history: "new" },
+  });
+  expect(state.automation).toMatchObject({
+    terminalInstanceId: "new-instance",
+    sequence: 0,
+    chunks: [{ sequence: 0, data: "new" }],
+  });
+  expect(() =>
+    readAutomationOutput(
+      state.automation!,
+      { source: "output", cursor: { sequence: 5, codeUnitOffset: 0 }, budget },
+      frame,
+    ),
+  ).toThrow("stale_request");
 });
 
 it("encodes through real Ghostty modes without writing or emitting human input", async () => {

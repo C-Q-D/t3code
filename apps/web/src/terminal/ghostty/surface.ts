@@ -571,6 +571,7 @@ export class GhosttyTerminalSurface {
   private readonly options: GhosttyTerminalSurfaceOptions;
   private visible: boolean;
   private hasSize = false;
+  private automationReadyWaiters = new Set<() => void>();
   private metrics: GhosttyCellMetrics;
   private fontFamily: string;
   private requestedFontFamily: string | undefined;
@@ -812,6 +813,46 @@ export class GhosttyTerminalSurface {
   automationFrame(sequence: number) {
     if (this.disposed) throw new GhosttyAutomationError("target_invalid");
     return ghosttyAutomationFrame(this.core.automationMetadata(), sequence);
+  }
+
+  isAutomationReady(): boolean {
+    try {
+      this.automationInputGeometry();
+      return true;
+    } catch (error) {
+      if (error instanceof GhosttyAutomationError) return false;
+      throw error;
+    }
+  }
+
+  /** Resolves after the real surface applies its visible canvas and font geometry. */
+  waitForAutomationReady(signal: AbortSignal): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const cleanup = () => {
+        this.automationReadyWaiters.delete(check);
+        signal.removeEventListener("abort", abort);
+      };
+      const abort = () => {
+        cleanup();
+        reject(new GhosttyAutomationError("client_unavailable"));
+      };
+      const check = () => {
+        if (this.disposed) {
+          cleanup();
+          reject(new GhosttyAutomationError("target_invalid"));
+        } else if (this.isAutomationReady()) {
+          cleanup();
+          resolve();
+        }
+      };
+      if (signal.aborted) {
+        abort();
+        return;
+      }
+      signal.addEventListener("abort", abort, { once: true });
+      this.automationReadyWaiters.add(check);
+      check();
+    });
   }
 
   /** Reads the active screen without consuming the surface's pending render. */
@@ -1196,6 +1237,7 @@ export class GhosttyTerminalSurface {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    for (const check of this.automationReadyWaiters) check();
     this.stopObservingResize();
     document.fonts.removeEventListener("loadingdone", this.onFontsLoaded);
     this.dprMedia?.removeEventListener("change", this.onDevicePixelRatioChange);
@@ -2101,6 +2143,14 @@ export class GhosttyTerminalSurface {
 
   /** Paints a visible, sized surface from core state; applies pending canvas changes and honors synchronized output. */
   private renderFrame(): void {
+    try {
+      this.renderAutomationFrame();
+    } finally {
+      for (const check of this.automationReadyWaiters) check();
+    }
+  }
+
+  private renderAutomationFrame(): void {
     if (this.disposed || !this.visible) return;
     if (this.frame !== 0) {
       window.cancelAnimationFrame(this.frame);
