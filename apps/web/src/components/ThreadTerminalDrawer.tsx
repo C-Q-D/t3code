@@ -2080,9 +2080,10 @@ export default function ThreadTerminalDrawer({
                       }
                       className={cn(
                         "min-h-0 min-w-0 px-3 pt-0 pb-2",
-                        splitDirection === "vertical"
-                          ? "not-first:shadow-terminal-divider-row"
-                          : "not-first:shadow-terminal-divider-column",
+                        visibleTerminalIds.indexOf(terminalId) > 0 &&
+                          (splitDirection === "vertical"
+                            ? "shadow-terminal-divider-row"
+                            : "shadow-terminal-divider-column"),
                       )}
                       onPointerDown={() => {
                         if (terminalId !== resolvedActiveTerminalId) {

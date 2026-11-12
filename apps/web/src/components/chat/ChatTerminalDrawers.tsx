@@ -4,8 +4,12 @@ import {
   scopedThreadKey,
   scopeThreadRef,
 } from "@t3tools/client-runtime/environment";
-import { useEffect, useState } from "react";
-import { getTerminalAutomation } from "../../state/terminal";
+import { useState, useSyncExternalStore } from "react";
+import {
+  getTerminalAutomation,
+  subscribeTerminalAutomation,
+  terminalAutomationRevision,
+} from "../../state/terminal";
 import { terminalCanUnmount } from "../../terminal/mountRetention";
 import { useShallow } from "zustand/react/shallow";
 import { useComposerDraftStore } from "../../composerDraftStore";
@@ -41,6 +45,7 @@ interface ChatTerminalDrawersProps {
  * state feeds the reconcile, so it subscribes here instead of in ChatView.
  */
 export function ChatTerminalDrawers(props: ChatTerminalDrawersProps) {
+  useSyncExternalStore(subscribeTerminalAutomation, terminalAutomationRevision);
   const { activeThreadKey } = props;
   const openTerminalThreadKeys = useTerminalUiStateStore(
     useShallow((state) =>
@@ -66,41 +71,15 @@ export function ChatTerminalDrawers(props: ChatTerminalDrawersProps) {
     panelAnimationDurationMs,
   );
   const [mountedTerminalThreadKeys, setMountedTerminalThreadKeys] = useState<string[]>([]);
-  const [eviction, setEviction] = useState<{ revision: string; allowed: string[] }>({
-    revision: "",
-    allowed: [],
-  });
   const existingOpenTerminalThreadKeys = (() => {
     const existingThreadKeys = new Set<string>([...serverThreadKeys, ...draftThreadKeys]);
     return openTerminalThreadKeys.filter((nextThreadKey) => existingThreadKeys.has(nextThreadKey));
   })();
   const existing = new Set([...serverThreadKeys, ...draftThreadKeys]);
-  const revision = JSON.stringify([
-    activeThreadKey,
-    props.activeTerminalOpen,
-    existingOpenTerminalThreadKeys,
-    [...existing],
-  ]);
-  const retainedThreadIds = mountedTerminalThreadKeys.filter(
-    (key) =>
-      existing.has(key) && (eviction.revision !== revision || !eviction.allowed.includes(key)),
-  );
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- checks authenticated binding ownership before releasing hidden terminal resources
-  useEffect(() => {
-    let current = true;
-    const keys = mountedTerminalThreadKeys.filter((key) => key !== activeThreadKey);
-    void Promise.all(
-      keys.map(async (key) => {
-        const ref = parseScopedThreadKey(key);
-        return ref && (await terminalCanUnmount(getTerminalAutomation(ref))) ? key : null;
-      }),
-    ).then((allowed) => {
-      if (current) setEviction({ revision, allowed: allowed.filter((key) => key !== null) });
-    });
-    return () => {
-      current = false;
-    };
-  }, [revision, mountedTerminalThreadKeys, activeThreadKey]);
+  const retainedThreadIds = mountedTerminalThreadKeys.filter((key) => {
+    const ref = parseScopedThreadKey(key);
+    return existing.has(key) && ref && !terminalCanUnmount(getTerminalAutomation(ref));
+  });
   const reconciledMountedTerminalThreadKeys = reconcileMountedTerminalThreadIds({
     currentThreadIds: mountedTerminalThreadKeys,
     openThreadIds: existingOpenTerminalThreadKeys,

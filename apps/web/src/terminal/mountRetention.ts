@@ -1,11 +1,6 @@
 import type { TerminalAutomationController } from "./automationController";
 
-export async function terminalCanUnmount(controller: TerminalAutomationController | undefined) {
-  if (!controller?.getSnapshot().ready) return true;
-  try {
-    const state = await controller.refreshState();
-    return !state.bindings.some((binding) => binding.status !== "invalid");
-  } catch {
-    return !controller.getSnapshot().ready;
-  }
+export function terminalCanUnmount(controller: TerminalAutomationController | undefined) {
+  // A binding can appear after an empty query; ready subscriptions have a server limit of 128 per environment.
+  return !controller?.getSnapshot().ready;
 }

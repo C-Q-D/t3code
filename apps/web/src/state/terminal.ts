@@ -15,8 +15,26 @@ export const terminalEnvironment = createTerminalEnvironmentAtoms(connectionAtom
 
 const automationControllers = new Map<
   string,
-  { controller: TerminalAutomationController; references: number; stopPermissions: () => void }
+  {
+    controller: TerminalAutomationController;
+    references: number;
+    stopPermissions: () => void;
+    stopSnapshot: () => void;
+  }
 >();
+const automationListeners = new Set<() => void>();
+let automationRevision = 0;
+const notifyAutomation = () => {
+  automationRevision += 1;
+  for (const listener of automationListeners) listener();
+};
+export const terminalAutomationRevision = () => automationRevision;
+export const subscribeTerminalAutomation = (listener: () => void) => {
+  automationListeners.add(listener);
+  return () => {
+    automationListeners.delete(listener);
+  };
+};
 
 function unwrap<A, E>(result: AtomCommandResult<A, E>): A {
   if (result._tag === "Success") return result.value;
@@ -141,8 +159,14 @@ export function acquireTerminalAutomation(threadRef: ScopedThreadRef) {
       },
       { immediate: true },
     );
-    entry = { controller, references: 0, stopPermissions };
+    entry = {
+      controller,
+      references: 0,
+      stopPermissions,
+      stopSnapshot: controller.subscribe(notifyAutomation),
+    };
     automationControllers.set(key, entry);
+    notifyAutomation();
   }
   entry.references += 1;
   const owned = entry;
@@ -151,9 +175,11 @@ export function acquireTerminalAutomation(threadRef: ScopedThreadRef) {
     release: () => {
       owned.references -= 1;
       if (owned.references === 0) {
+        owned.stopSnapshot();
         owned.stopPermissions();
         owned.controller.dispose();
         if (automationControllers.get(key) === owned) automationControllers.delete(key);
+        notifyAutomation();
       }
     },
   };

@@ -90,7 +90,7 @@ function setup() {
   };
 }
 
-it("queries authenticated bindings before hidden resource eviction and fails closed while connected", async () => {
+it("retains ready candidate resources even when a snapshot has no binding, until the connection ends", async () => {
   const harness = setup();
   await harness.ready();
   expect(await terminalCanUnmount(harness.controller)).toBe(false);
@@ -99,7 +99,7 @@ it("queries authenticated bindings before hidden resource eviction and fails clo
   };
   expect(await terminalCanUnmount(harness.controller)).toBe(false);
   harness.transport.getConnectionState = async () => ({ version: 1, bindings: [] });
-  expect(await terminalCanUnmount(harness.controller)).toBe(true);
+  expect(await terminalCanUnmount(harness.controller)).toBe(false);
   harness.controller.dispose();
   expect(await terminalCanUnmount(harness.controller)).toBe(true);
 });
