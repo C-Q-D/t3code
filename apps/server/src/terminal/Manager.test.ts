@@ -40,6 +40,8 @@ import * as ServerSettings from "../serverSettings.ts";
 import * as ProjectService from "../project/ProjectService.ts";
 import * as ProjectSetupScriptRunner from "../project/ProjectSetupScriptRunner.ts";
 import * as TerminalManager from "./Manager.ts";
+import * as Automation from "./AutomationService.ts";
+import * as A from "@t3tools/contracts";
 import { terminalOutputStream } from "./OutputProtocol.ts";
 import * as PtyAdapter from "@t3tools/shared/PtyAdapter";
 
@@ -412,6 +414,133 @@ it.layer(
   Layer.merge(NodeServices.layer, ProcessRunner.layer.pipe(Layer.provide(NodeServices.layer))),
   { excludeTestServices: true },
 )("TerminalManager", (it) => {
+  it.effect(
+    "automation release rebind requires user confirmation before writing the original Manager instance",
+    () =>
+      Effect.gen(function* () {
+        const { manager, ptyAdapter } = yield* createManager();
+        yield* manager.open(openInput());
+        const opened = yield* manager.inspectExisting({
+          threadId: "thread-1",
+          terminalId: DEFAULT_TERMINAL_ID,
+        });
+        const scope = {
+          environmentId: A.EnvironmentId.make("env"),
+          threadId: A.ThreadId.make("thread-1"),
+        };
+        const caller = { scope, callerId: "provider" };
+        const service = yield* Automation.TerminalAutomationService.pipe(
+          Effect.provide(
+            Automation.layer.pipe(
+              Layer.provide(Layer.succeed(TerminalManager.TerminalManager, manager)),
+            ),
+          ),
+        );
+        const messages = yield* service.connect(scope, "client");
+        yield* service.registerViews("client", {
+          version: 1,
+          views: [
+            {
+              candidateId: "view",
+              target: {
+                terminalId: DEFAULT_TERMINAL_ID,
+                terminalInstanceId: opened.terminalInstanceId,
+                viewId: "original-view",
+              },
+              title: "original",
+              visible: true,
+              readiness: "ready",
+              clientKind: "web",
+              capabilities: { show: true, read: true, input: true },
+            },
+          ],
+        });
+        const initial = yield* service.bind(caller, { mode: "auto" });
+        if (!("binding" in initial.state)) throw new Error("expected binding");
+        yield* manager.write({
+          threadId: "thread-1",
+          terminalId: DEFAULT_TERMINAL_ID,
+          data: "human",
+        });
+        yield* service.release(caller, { bindingId: initial.state.binding.bindingId });
+        const rebound = yield* service.bind(caller, { mode: "auto" });
+        expect(rebound.state.status).toBe("paused");
+        if (!("binding" in rebound.state)) throw new Error("expected rebound binding");
+        const binding = rebound.state.binding;
+        expect(
+          yield* service.input(
+            caller,
+            {
+              bindingId: binding.bindingId,
+              requestId: "blocked",
+              action: { type: "text", text: "auto" },
+            },
+            Effect.void,
+          ),
+        ).toMatchObject({ status: "not_sent", error: { code: "human_intervened" } });
+        expect(ptyAdapter.processes[0]!.writes).toEqual(["human"]);
+        yield* service.resumeFromConnection("client", binding.bindingId, binding.inputEpoch);
+        const running = yield* service
+          .input(
+            caller,
+            {
+              bindingId: binding.bindingId,
+              requestId: "confirmed",
+              action: { type: "text", text: "auto" },
+            },
+            Effect.void,
+          )
+          .pipe(Effect.forkChild);
+        const show = yield* Queue.take(messages);
+        if (!("operation" in show) || show.operation !== "show") throw new Error("expected show");
+        yield* service.replyBridge("client", {
+          version: 1,
+          bridgeRequestId: show.bridgeRequestId,
+          binding: show.binding,
+          result: { operation: "show", status: "visible" },
+        });
+        const prepare = yield* Queue.take(messages);
+        if (!("operation" in prepare) || prepare.operation !== "prepare_input")
+          throw new Error("expected prepare");
+        yield* service.replyBridge("client", {
+          version: 1,
+          bridgeRequestId: prepare.bridgeRequestId,
+          binding: prepare.binding,
+          result: {
+            operation: "prepare_input",
+            inputRequestId: "confirmed",
+            frame: {
+              activeScreen: "primary",
+              cols: 80,
+              rows: 24,
+              viewportStartLine: 0,
+              retainedRange: { startLine: 0, endLineExclusive: 24 },
+              sequence: 0,
+              frameRevision: 1,
+              cursor: { status: "unknown" },
+              pendingWrap: null,
+            },
+          },
+        });
+        const encode = yield* Queue.take(messages);
+        if (!("operation" in encode) || encode.operation !== "encode_input")
+          throw new Error("expected encode");
+        yield* service.replyBridge("client", {
+          version: 1,
+          bridgeRequestId: encode.bridgeRequestId,
+          binding: encode.binding,
+          result: {
+            operation: "encode_input",
+            inputRequestId: "confirmed",
+            frameRevision: 1,
+            encodedText: "auto",
+          },
+        });
+        expect(yield* Fiber.join(running)).toMatchObject({ status: "written" });
+        expect(ptyAdapter.processes).toHaveLength(1);
+        expect(ptyAdapter.processes[0]!.writes).toEqual(["human", "auto"]);
+      }),
+  );
   it.effect("rejects stale instances and human input without spawning or writing", () =>
     Effect.gen(function* () {
       const { manager, ptyAdapter } = yield* createManager();

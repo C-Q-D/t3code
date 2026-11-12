@@ -1978,6 +1978,25 @@ it.effect("release and auto bind preserve unconfirmed human intervention", () =>
   }),
 );
 
+it.effect("selection cancellation cannot discard a released human pause barrier", () =>
+  Effect.gen(function* () {
+    const f = yield* setup;
+    const original = yield* bindOne(f.service);
+    f.humanInput();
+    yield* f.service.release(caller, { bindingId: original });
+    yield* f.service.bind(caller, { mode: "request_selection" });
+    const invitation = yield* Queue.take(f.messages);
+    if (!("selectionRequestId" in invitation)) throw new Error("expected selection");
+    yield* f.service.replySelection("client", {
+      version: 1,
+      selectionRequestId: invitation.selectionRequestId,
+      candidateVersion: invitation.candidateVersion,
+      choice: { status: "cancelled" },
+    });
+    expect((yield* f.service.bind(caller, { mode: "auto" })).state.status).toBe("paused");
+  }),
+);
+
 it.effect("released pause barriers reclaim owner capacity when their instances exit", () =>
   Effect.gen(function* () {
     const f = yield* setup;

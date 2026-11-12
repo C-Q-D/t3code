@@ -134,6 +134,31 @@ it("accepts a new binding after pre-binding human input while rejecting interrup
   f.controller.dispose();
 });
 
+it("keeps a replacement paused binding blocked after release refresh until explicit user resume", async () => {
+  const f = setup();
+  await f.ready();
+  await f.controller.humanInput(target);
+  f.transport.getConnectionState = async () => ({ version: 1, bindings: [] });
+  await f.controller.synchronize();
+  const rebound = { ...binding, bindingId: "rebound" };
+  f.transport.getConnectionState = async () => ({
+    version: 1,
+    bindings: [{ status: "paused", binding: rebound, reason: "human_intervened" }],
+  });
+  await f.controller.synchronize();
+  f.emit({ version: 1, operation: "show", bridgeRequestId: "blocked-rebound", binding: rebound });
+  expect((await f.reply.promise).result).toMatchObject({ error: { code: "human_intervened" } });
+  f.transport.resume = vi.fn(async (): Promise<A.TerminalAutomationStatus> => ({
+    version: 1,
+    candidateVersion: 1,
+    candidates: [],
+    state: { status: "bound", binding: rebound },
+  }));
+  await f.controller.resume(rebound.bindingId, rebound.inputEpoch);
+  expect(f.controller.getSnapshot().bindings).toEqual([{ status: "bound", binding: rebound }]);
+  f.controller.dispose();
+});
+
 it("rejects old instances and human input interleaved with asynchronous surface work", async () => {
   const f = setup();
   const entered = deferred<void>();

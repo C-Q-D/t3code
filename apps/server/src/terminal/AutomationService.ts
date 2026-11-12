@@ -187,8 +187,9 @@ const make = Effect.gen(function* () {
       )
         notify(client);
   };
-  const deleteOwner = (key: string) => {
+  const deleteOwner = (key: string, instanceExited = false) => {
     const owner = owners.get(key);
+    if (owner?.pauseTarget && !instanceExited) return;
     const client = owner?.connectionId ? connections.get(owner.connectionId) : undefined;
     if (client) notify(client);
     if (owner) Deferred.doneUnsafe(owner.released, Effect.void);
@@ -276,7 +277,13 @@ const make = Effect.gen(function* () {
   ) {
     // Released bindings do not own the human-confirmation barrier; the live instance does.
     for (const [key, owner] of owners) {
-      if (owner.busy !== 0 || !owner.pauseTarget || owner.state.status !== "unbound") continue;
+      if (
+        owner.busy !== 0 ||
+        !owner.pauseTarget ||
+        (owner.state.status !== "unbound" &&
+          (owner.state.status !== "invalid" || bindings.has(owner.state.binding.bindingId)))
+      )
+        continue;
       const state = owner.state;
       const live = yield* inspect(owner.caller.scope, owner.pauseTarget).pipe(Effect.result);
       if (
@@ -285,7 +292,7 @@ const make = Effect.gen(function* () {
         owner.state === state &&
         owner.busy === 0
       )
-        deleteOwner(key);
+        deleteOwner(key, true);
     }
     const existing = getOwner(caller);
     if (existing) {
@@ -566,6 +573,12 @@ const make = Effect.gen(function* () {
     isCurrent?: () => boolean,
   ) {
     if (isCurrent?.() === false) return yield* Effect.fail(failure("stale_request"));
+    if (
+      owner.pauseTarget &&
+      (owner.pauseTarget.terminalId !== candidate.target.terminalId ||
+        owner.pauseTarget.terminalInstanceId !== candidate.target.terminalInstanceId)
+    )
+      return yield* Effect.fail(failure("human_intervened"));
     const previousState = owner.state;
     const entry = [...connections.entries()].find(
       ([, client]) =>
