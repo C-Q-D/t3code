@@ -867,6 +867,12 @@ const make = Effect.gen(function* () {
     yield* refresh(owner);
     return yield* Effect.uninterruptible(
       Effect.gen(function* () {
+        if (
+          getOwner(caller) !== owner ||
+          !("binding" in owner.state) ||
+          owner.state.binding.bindingId !== input.bindingId
+        )
+          return yield* Effect.fail(failure("target_invalid"));
         setState(owner, { status: "unbound" });
         delete owner.connectionId;
         if (!owner.pauseTarget) deleteOwner(ownerKey(caller));

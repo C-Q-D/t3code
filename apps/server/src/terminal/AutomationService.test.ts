@@ -1978,6 +1978,37 @@ it.effect("release and auto bind preserve unconfirmed human intervention", () =>
   }),
 );
 
+it.effect("a delayed release cannot discard a replacement paused binding", () =>
+  Effect.gen(function* () {
+    const f = yield* setup;
+    const original = yield* bindOne(f.service);
+    f.humanInput();
+    expect((yield* f.service.status(caller)).state.status).toBe("paused");
+    const entered = yield* Deferred.make<void>();
+    const proceed = yield* Deferred.make<void>();
+    f.beforeInspect(
+      Deferred.succeed(entered, undefined).pipe(Effect.andThen(Deferred.await(proceed))),
+    );
+    const delayed = yield* f.service
+      .release(caller, { bindingId: original })
+      .pipe(Effect.result, Effect.forkChild);
+    yield* Deferred.await(entered);
+    f.beforeInspect(Effect.void);
+    yield* f.service.release(caller, { bindingId: original });
+    const rebound = yield* f.service.bind(caller, { mode: "auto" });
+    if (rebound.state.status !== "paused") throw new Error("expected paused binding");
+    const binding = rebound.state.binding;
+    expect(binding.bindingId).not.toBe(original);
+    yield* Deferred.succeed(proceed, undefined);
+    expect((yield* Fiber.join(delayed))._tag).toBe("Failure");
+    expect((yield* f.service.status(caller)).state).toEqual(rebound.state);
+    expect((yield* f.service.getConnectionState("client")).bindings).toHaveLength(1);
+    yield* f.service.resumeFromConnection("client", binding.bindingId, binding.inputEpoch);
+    yield* f.service.release(caller, { bindingId: binding.bindingId });
+    expect((yield* f.service.getConnectionState("client")).bindings).toEqual([]);
+  }),
+);
+
 it.effect("selection cancellation cannot discard a released human pause barrier", () =>
   Effect.gen(function* () {
     const f = yield* setup;
