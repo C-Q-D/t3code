@@ -317,21 +317,51 @@ it("encodes through real Ghostty modes without writing or emitting human input",
     bridge.retainBindings([]);
     const nextBinding = { ...binding, bindingId: "next-binding" };
     bridge.retainBindings([nextBinding]);
-    await bridge.perform(
+    const nextPrepared = await bridge.perform(
       { ...fields, binding: nextBinding, operation: "prepare_input", inputRequestId: "next" },
       () => {},
       signal,
     );
+    if (nextPrepared.operation !== "prepare_input" || !("frame" in nextPrepared))
+      throw new Error("expected frame");
+    const nextRevision = nextPrepared.frame.frameRevision;
+    expect(
+      await bridge.perform(
+        {
+          ...fields,
+          binding: nextBinding,
+          operation: "encode_input",
+          inputRequestId: "next",
+          frameRevision: nextRevision,
+          action: {
+            type: "mouse",
+            event: "wheel",
+            position: { column: 0, row: 0 },
+            deltaColumns: 0,
+            deltaRows: -1,
+            frameRevision: nextRevision,
+            modifiers: { shift: false, alt: false, ctrl: false, meta: false },
+          },
+        },
+        () => {},
+        signal,
+      ),
+    ).toMatchObject({ status: "local_action" });
     await expect(bridge.perform(apply, () => {}, signal)).rejects.toMatchObject({
       code: "target_invalid",
     });
     expect(scrolls).toBe(130);
     bridge.invalidate();
     await expect(
-      bridge.perform({ ...apply, binding: nextBinding, inputRequestId: "next" }, () => {}, signal),
+      bridge.perform(
+        { ...apply, binding: nextBinding, inputRequestId: "next", frameRevision: nextRevision },
+        () => {},
+        signal,
+      ),
     ).rejects.toMatchObject({
       code: "stale_request",
     });
+    expect(scrolls).toBe(130);
   } finally {
     core.dispose();
   }
