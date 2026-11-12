@@ -140,6 +140,81 @@ it("registers mounted instances only after ready and re-registers on reconnect",
   f.controller.dispose();
 });
 
+it.each(["registration", "synchronization"] as const)(
+  "sends final view changes received during %s without another manual registration",
+  async (stage) => {
+    const f = setup();
+    const entered = deferred<void>();
+    const proceed = deferred<void>();
+    const queried = deferred<void>();
+    let first = true;
+    let registered: readonly A.TerminalAutomationCandidate[] = [];
+    f.transport.registerViews = async (views) => {
+      if (stage === "registration" && first) {
+        first = false;
+        entered.resolve();
+        await proceed.promise;
+      }
+      registered = views;
+    };
+    f.transport.getConnectionState = async () => {
+      if (stage === "synchronization" && first) {
+        first = false;
+        entered.resolve();
+        await proceed.promise;
+      }
+      queried.resolve();
+      return { version: 1, bindings: [] };
+    };
+    const ready = f.ready();
+    await entered.promise;
+    const second = {
+      ...f.view,
+      candidate: { ...f.view.candidate, target: { ...target, viewId: "second" } },
+    };
+    f.controller.setView(second);
+    f.controller.removeView(target);
+    f.controller.setView({
+      ...f.view,
+      candidate: { ...f.view.candidate, title: "updated", visible: true },
+    });
+    proceed.resolve();
+    await queried.promise;
+    await ready;
+    await f.controller.synchronize();
+    expect(registered.map((candidate) => candidate.target.viewId).sort()).toEqual([
+      "second",
+      "view",
+    ]);
+    expect(registered.find((candidate) => candidate.target.viewId === "view")).toMatchObject({
+      title: "updated",
+      visible: true,
+    });
+    f.controller.dispose();
+  },
+);
+
+it("stops a failed registration even when views change while it waits", async () => {
+  const f = setup();
+  const proceed = deferred<void>();
+  const failed = deferred<void>();
+  const error = new Error("registration failed");
+  f.transport.registerViews = vi.fn(async () => {
+    await proceed.promise;
+    throw error;
+  });
+  const stop = f.controller.subscribe(() => {
+    if (f.controller.getSnapshot().error === error) failed.resolve();
+  });
+  f.emit({ type: "ready" });
+  f.controller.setView({ ...f.view, candidate: { ...f.view.candidate, visible: true } });
+  proceed.resolve();
+  await failed.promise;
+  expect(f.transport.registerViews).toHaveBeenCalledTimes(1);
+  stop();
+  f.controller.dispose();
+});
+
 it("accepts a new binding after pre-binding human input while rejecting interrupted old work", async () => {
   const f = setup();
   f.transport.getConnectionState = async () => ({ version: 1, bindings: [] });

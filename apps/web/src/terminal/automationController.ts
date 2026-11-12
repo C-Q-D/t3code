@@ -265,8 +265,9 @@ export class TerminalAutomationController {
           .filter(({ view }) => view.canOperate())
           .map(({ view }) => view.candidate);
         await this.transport.registerViews(views);
+        if (generation !== this.generation || this.disposed) return;
+        await this.synchronize();
       } while (version !== this.registrationVersion);
-      if (generation === this.generation) await this.synchronize();
     };
     const pending = work().finally(() => {
       if (this.registering === pending) this.registering = undefined;
