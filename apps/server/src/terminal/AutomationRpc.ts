@@ -73,7 +73,11 @@ export const make = Effect.fn("TerminalAutomationRpc.make")(function* (
               return yield* service.connect({ environmentId, threadId: input.threadId }, id);
             }),
           );
-          return Stream.concat(Stream.succeed({ type: "ready" as const }), Stream.fromQueue(queue));
+          const changes = yield* service.watchState(connections.get(key)!);
+          return Stream.concat(
+            Stream.succeed({ type: "ready" as const }),
+            Stream.merge(Stream.fromQueue(queue), Stream.fromQueue(changes)),
+          );
         }),
       ),
     [A.WS_METHODS.terminalAutomationRegisterViews]: (

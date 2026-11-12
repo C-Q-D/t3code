@@ -84,9 +84,14 @@ const setup = Effect.fn("test.automationRpc.setup")(function* (
     ),
   );
   const messages = yield* Queue.unbounded<typeof A.TerminalAutomationRpcEvent.Type>();
+  const changes = yield* Queue.unbounded<A.TerminalAutomationStateChanged>();
   const start = Effect.gen(function* () {
     const fiber = yield* client[A.WS_METHODS.terminalAutomationSubscribe]({ threadId }).pipe(
-      Stream.runForEach((event) => Queue.offer(messages, event)),
+      Stream.runForEach((event) =>
+        "type" in event && event.type === "state_changed"
+          ? Queue.offer(changes, event)
+          : Queue.offer(messages, event),
+      ),
       Effect.forkChild,
     );
     expect(yield* Queue.take(messages)).toEqual({ type: "ready" });
@@ -112,6 +117,7 @@ const setup = Effect.fn("test.automationRpc.setup")(function* (
     handlers,
     socketScope,
     messages,
+    changes,
     start,
     bind,
     caller,
@@ -149,8 +155,31 @@ it.effect("old connection query cannot read a replacement subscription generatio
     });
     expect(
       yield* f.client[A.WS_METHODS.terminalAutomationGetConnectionState]({ threadId }),
-    ).toEqual({ version: 1, bindings: [] });
+    ).toEqual({ version: 1, revision: 0, bindings: [], selections: [] });
   }),
+);
+
+it.effect(
+  "notifies the authenticated client of automatic binding and release before bridge work",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* setup();
+      yield* f.start;
+      const bindingId = yield* f.bind;
+      const boundEvent = yield* Queue.take(f.changes);
+      const bound = yield* f.client[A.WS_METHODS.terminalAutomationGetConnectionState]({
+        threadId,
+      });
+      expect(bound.revision).toBeGreaterThanOrEqual(boundEvent.revision);
+      expect(bound.bindings).toMatchObject([{ status: "bound", binding: { bindingId } }]);
+      yield* f.service.release(f.caller, { bindingId });
+      const releasedEvent = yield* Queue.take(f.changes);
+      const released = yield* f.client[A.WS_METHODS.terminalAutomationGetConnectionState]({
+        threadId,
+      });
+      expect(releasedEvent.revision).toBeGreaterThan(boundEvent.revision);
+      expect(released.bindings).toEqual([]);
+    }),
 );
 
 it.effect("old registration cannot replace views after resubscription", () =>

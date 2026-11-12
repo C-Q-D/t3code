@@ -44,6 +44,10 @@ const sameTarget = (a: A.TerminalAutomationTarget, b: A.TerminalAutomationTarget
 export class TerminalAutomationController {
   private generation = 0;
   private queryVersion = 0;
+  private notifiedRevision = 0;
+  private appliedRevision = 0;
+  private authoritativeSelections = false;
+  private synchronizing: Promise<A.TerminalAutomationConnectionState> | undefined;
   private disposed = false;
   private views = new Map<
     string,
@@ -114,6 +118,10 @@ export class TerminalAutomationController {
   private invalidate = () => {
     this.generation += 1;
     this.queryVersion += 1;
+    this.notifiedRevision = 0;
+    this.appliedRevision = 0;
+    this.authoritativeSelections = false;
+    this.synchronizing = undefined;
     for (const request of this.requests.values()) request.abort.abort();
     this.requests.clear();
     this.registering = undefined;
@@ -132,9 +140,20 @@ export class TerminalAutomationController {
   private receive = (event: typeof A.TerminalAutomationRpcEvent.Type) => {
     if (this.disposed) return;
     if ("type" in event) {
+      if (event.type === "state_changed") {
+        if (event.revision <= this.notifiedRevision) return;
+        this.notifiedRevision = event.revision;
+        this.queryVersion += 1;
+        void this.synchronize().catch(this.fail);
+        return;
+      }
       this.publish({ ready: true });
       void this.register().catch(this.fail);
     } else if ("selectionRequestId" in event) {
+      if (this.authoritativeSelections) {
+        void this.synchronize().catch(this.fail);
+        return;
+      }
       this.publish({
         selections: [
           ...this.snapshot.selections.filter(
@@ -202,7 +221,7 @@ export class TerminalAutomationController {
           .map(({ view }) => view.candidate);
         await this.transport.registerViews(views);
       } while (version !== this.registrationVersion);
-      if (generation === this.generation) await this.refreshState();
+      if (generation === this.generation) await this.synchronize();
     };
     const pending = work().finally(() => {
       if (this.registering === pending) this.registering = undefined;
@@ -211,12 +230,51 @@ export class TerminalAutomationController {
     return pending;
   }
 
+  synchronize(): Promise<A.TerminalAutomationConnectionState> {
+    if (this.synchronizing) return this.synchronizing;
+    const generation = this.generation;
+    const work = async (): Promise<A.TerminalAutomationConnectionState> => {
+      for (;;) {
+        try {
+          return await this.refreshState();
+        } catch (error) {
+          if (
+            !(error instanceof TerminalBridgeError) ||
+            error.code !== "stale_request" ||
+            generation !== this.generation ||
+            this.disposed
+          )
+            throw error;
+        }
+      }
+    };
+    let completed = false;
+    const pending = work()
+      .then((state) => {
+        completed = true;
+        return state;
+      })
+      .finally(() => {
+        if (this.synchronizing !== pending) return;
+        this.synchronizing = undefined;
+        if (completed && this.snapshot.ready && this.notifiedRevision > this.appliedRevision)
+          void this.synchronize().catch(this.fail);
+      });
+    this.synchronizing = pending;
+    return pending;
+  }
+
   async refreshState() {
     if (!this.snapshot.ready || this.disposed) throw new TerminalBridgeError("client_unavailable");
     const generation = this.generation;
     const version = ++this.queryVersion;
     const state = await this.transport.getConnectionState();
-    if (generation !== this.generation || version !== this.queryVersion || this.disposed)
+    if (
+      generation !== this.generation ||
+      version !== this.queryVersion ||
+      this.disposed ||
+      (state.revision ?? 0) < Math.max(this.notifiedRevision, this.appliedRevision)
+    )
       throw new TerminalBridgeError("stale_request");
     const liveIds = new Set([
       ...state.bindings.map((item) => item.binding.bindingId),
@@ -235,7 +293,13 @@ export class TerminalAutomationController {
           .map((item) => item.binding),
       );
     }
-    this.publish({ bindings: state.bindings, error: null });
+    this.appliedRevision = state.revision ?? 0;
+    this.authoritativeSelections = state.selections !== undefined;
+    this.publish({
+      bindings: state.bindings,
+      selections: state.selections ?? this.snapshot.selections,
+      error: null,
+    });
     return state;
   }
 

@@ -109,12 +109,6 @@ export const TerminalAutomationState = Schema.Union([
 ]);
 export type TerminalAutomationState = typeof TerminalAutomationState.Type;
 
-export const TerminalAutomationConnectionState = strict({
-  version,
-  bindings: Schema.Array(ConnectionBindingState).check(Schema.isMaxLength(128)),
-});
-export type TerminalAutomationConnectionState = typeof TerminalAutomationConnectionState.Type;
-
 export const TerminalAutomationBindInput = Schema.Union([
   strict({ mode: Schema.Literal("auto") }),
   strict({ mode: Schema.Literal("request_selection") }),
@@ -141,6 +135,22 @@ export const TerminalAutomationSelectionRequest = strict({
   candidates: Schema.Array(TerminalAutomationCandidate).check(Schema.isMaxLength(64)),
 });
 export type TerminalAutomationSelectionRequest = typeof TerminalAutomationSelectionRequest.Type;
+
+export const TerminalAutomationConnectionState = strict({
+  version,
+  revision: Schema.optional(Counter),
+  bindings: Schema.Array(ConnectionBindingState).check(Schema.isMaxLength(128)),
+  selections: Schema.optional(
+    Schema.Array(TerminalAutomationSelectionRequest).check(Schema.isMaxLength(128)),
+  ),
+});
+export type TerminalAutomationConnectionState = typeof TerminalAutomationConnectionState.Type;
+
+export const TerminalAutomationStateChanged = strict({
+  type: Schema.Literal("state_changed"),
+  revision: Counter,
+});
+export type TerminalAutomationStateChanged = typeof TerminalAutomationStateChanged.Type;
 
 const Modifiers = strict({
   shift: Schema.Boolean,

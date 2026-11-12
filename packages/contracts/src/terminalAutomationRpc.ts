@@ -14,6 +14,7 @@ import {
   TerminalAutomationStatus,
   TerminalAutomationConnectionState,
   TerminalAutomationError,
+  TerminalAutomationStateChanged,
 } from "./terminalAutomation.ts";
 
 export const TERMINAL_AUTOMATION_WS_METHODS = {
@@ -65,6 +66,7 @@ export const TerminalAutomationResumeInput = strict({
 });
 export const TerminalAutomationRpcEvent = Schema.Union([
   strict({ type: Schema.Literal("ready") }),
+  TerminalAutomationStateChanged,
   TerminalAutomationClientRequest,
   TerminalAutomationSelectionRequest,
 ]);

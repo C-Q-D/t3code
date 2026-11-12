@@ -359,3 +359,41 @@ it("does not resume an old displayed epoch while newer manual input is still bei
   expect(result).toMatchObject({ code: "human_intervened" });
   f.controller.dispose();
 });
+
+it("refreshes automatic bindings and release from revision notifications without bridge work", async () => {
+  const f = setup();
+  f.transport.getConnectionState = async () => ({
+    version: 1,
+    revision: 0,
+    bindings: [],
+    selections: [],
+  });
+  await f.ready();
+  const bound = deferred<void>();
+  const stop = f.controller.subscribe(() => {
+    if (f.controller.getSnapshot().bindings.length === 1) bound.resolve();
+  });
+  f.transport.getConnectionState = async () => ({
+    version: 1,
+    revision: 1,
+    bindings: [{ status: "bound", binding }],
+    selections: [],
+  });
+  f.emit({ type: "state_changed", revision: 1 });
+  await bound.promise;
+  stop();
+  const released = deferred<void>();
+  const stopReleased = f.controller.subscribe(() => {
+    if (f.controller.getSnapshot().bindings.length === 0) released.resolve();
+  });
+  f.transport.getConnectionState = async () => ({
+    version: 1,
+    revision: 2,
+    bindings: [],
+    selections: [],
+  });
+  f.emit({ type: "state_changed", revision: 2 });
+  await released.promise;
+  stopReleased();
+  f.controller.dispose();
+});

@@ -119,6 +119,105 @@ const setup = Effect.gen(function* () {
 });
 
 it.effect(
+  "publishes binding revisions before bridge work and clears delivered invitations on both clients",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* setup;
+      const second = yield* f.service.connect(scope, "second");
+      yield* f.service.registerViews("client", { version: 1, views: [view()] });
+      const before = yield* f.service.getConnectionState("client");
+      const changes = yield* f.service.watchState("client");
+      const bound = yield* f.service.bind(caller, { mode: "auto" });
+      const after = yield* f.service.getConnectionState("client");
+      expect(after).toHaveProperty("revision");
+      expect(after).not.toEqual(before);
+      expect(yield* Queue.take(changes)).toEqual({
+        type: "state_changed",
+        revision: after.revision,
+      });
+      if (!("binding" in bound.state)) throw new Error("expected binding");
+      yield* f.service.release(caller, { bindingId: bound.state.binding.bindingId });
+      const released = yield* f.service.getConnectionState("client");
+      expect(released.bindings).toEqual([]);
+      expect(yield* Queue.take(changes)).toEqual({
+        type: "state_changed",
+        revision: released.revision,
+      });
+      yield* f.service.registerViews("second", { version: 1, views: [view("two")] });
+      yield* f.service.bind({ scope, callerId: caller.callerId }, { mode: "request_selection" });
+      const request = yield* Queue.take(f.messages);
+      yield* Queue.take(second);
+      if (!("selectionRequestId" in request)) throw new Error("expected invitation");
+      expect(yield* f.service.getConnectionState("second")).toHaveProperty("selections", [request]);
+      yield* f.service.replySelection("client", {
+        version: 1,
+        selectionRequestId: request.selectionRequestId,
+        candidateVersion: request.candidateVersion,
+        choice: { status: "cancelled" },
+      });
+      expect(yield* f.service.getConnectionState("second")).toHaveProperty("selections", []);
+    }),
+);
+
+it.effect.each(["cancelled", "selected", "candidate change", "disconnect"] as const)(
+  "invalidates already delivered invitations after %s",
+  (outcome) =>
+    Effect.gen(function* () {
+      const f = yield* setup;
+      const second = yield* f.service.connect(scope, "second");
+      yield* f.service.registerViews("client", { version: 1, views: [view()] });
+      yield* f.service.registerViews("second", { version: 1, views: [view("two")] });
+      yield* f.service.bind({ scope, callerId: "model" }, { mode: "request_selection" });
+      const invitation = yield* Queue.take(f.messages);
+      expect(yield* Queue.take(second)).toEqual(invitation);
+      if (!("selectionRequestId" in invitation)) throw new Error("expected selection");
+      expect(yield* f.service.getConnectionState("second")).toHaveProperty("selections", [
+        invitation,
+      ]);
+      if (outcome === "candidate change")
+        yield* f.service.registerViews("client", { version: 1, views: [view()] });
+      else if (outcome === "disconnect") yield* f.service.disconnect("client");
+      else
+        yield* f.service.replySelection("client", {
+          version: 1,
+          selectionRequestId: invitation.selectionRequestId,
+          candidateVersion: invitation.candidateVersion,
+          choice:
+            outcome === "selected"
+              ? { status: "selected", candidateId: invitation.candidates[0]!.candidateId }
+              : { status: "cancelled" },
+        });
+      expect(yield* f.service.getConnectionState("second")).toHaveProperty("selections", []);
+    }),
+);
+
+it.effect("coalesces a full notification backlog and keeps unrelated scopes untouched", () =>
+  Effect.gen(function* () {
+    const f = yield* setup;
+    yield* f.service.connect({ ...scope, threadId: A.ThreadId.make("unrelated") }, "unrelated");
+    const unrelated = yield* f.service.watchState("unrelated");
+    const changes = yield* f.service.watchState("client");
+    yield* f.service.registerViews("client", { version: 1, views: [view()] });
+    yield* f.service.bind(caller, { mode: "auto" });
+    yield* Effect.forEach(Array.from({ length: 130 }), () =>
+      f.service.reportEvent("client", {
+        version: 1,
+        target: view().target,
+        event: "human_intervened",
+      }),
+    );
+    expect(yield* Queue.size(changes)).toBe(1);
+    const current = yield* f.service.getConnectionState("client");
+    expect(yield* Queue.take(changes)).toEqual({
+      type: "state_changed",
+      revision: current.revision,
+    });
+    expect(current.bindings).toMatchObject([{ status: "paused", binding: { inputEpoch: 130 } }]);
+    expect(yield* Queue.size(unrelated)).toBe(0);
+  }),
+);
+
+it.effect(
   "connection state discovers paused owners before any bridge and omits released bindings",
   () =>
     Effect.gen(function* () {
@@ -150,7 +249,12 @@ it.effect(
         "other-env",
       );
       for (const id of ["other-window", "other-thread", "other-env"]) {
-        expect(yield* f.service.getConnectionState(id)).toEqual({ version: 1, bindings: [] });
+        expect(yield* f.service.getConnectionState(id)).toEqual({
+          version: 1,
+          revision: 0,
+          bindings: [],
+          selections: [],
+        });
       }
       yield* f.service.disconnect("client");
       expect(yield* Effect.flip(f.service.getConnectionState("client"))).toEqual({
@@ -182,7 +286,12 @@ it.effect("connection state queries do not allocate model owners", () =>
     const f = yield* setup;
     yield* f.service.registerViews("client", { version: 1, views: [view()] });
     for (let index = 0; index < 130; index += 1) {
-      expect(yield* f.service.getConnectionState("client")).toEqual({ version: 1, bindings: [] });
+      expect(yield* f.service.getConnectionState("client")).toEqual({
+        version: 1,
+        revision: 0,
+        bindings: [],
+        selections: [],
+      });
     }
     expect((yield* f.service.bind(caller, { mode: "auto" })).state.status).toBe("bound");
   }),
