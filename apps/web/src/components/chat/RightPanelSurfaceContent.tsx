@@ -16,10 +16,7 @@ import type { ComposerImageAttachment, DraftId } from "../../composerDraftStore"
 import type { ShortcutMatchContext } from "../../keybindings";
 import type { SideChatParentPanel } from "../../lib/sideChatPane";
 import { type RightPanelSurface, useRightPanelStore } from "../../rightPanelStore";
-import {
-  PersistentThreadTerminalPanel,
-  type PersistentThreadTerminalPanelProps,
-} from "../PersistentThreadTerminals";
+import { RightPanelTerminalSlot } from "./ChatRightPanelTerminalHost";
 import { pullRequestPanelContext } from "../pullRequest/pullRequestDetail.logic";
 import { PullRequestDetailPanel } from "../pullRequest/PullRequestDetailPanel";
 import { PullRequestDetailGhost } from "../pullRequest/PullRequestGhosts";
@@ -34,11 +31,6 @@ const DevicePanel = lazy(() =>
   import("../device/DevicePanel").then((module) => ({ default: module.DevicePanel })),
 );
 const FilePreviewPanel = lazy(() => import("../files/FilePreviewPanel"));
-
-type RightPanelTerminalProps = Omit<
-  PersistentThreadTerminalPanelProps,
-  "visible" | "threadRef" | "surface"
->;
 
 interface RightPanelPullRequestProps {
   readonly capabilityKnown: boolean;
@@ -75,7 +67,6 @@ export function RightPanelSurfaceContent(props: {
     image: ComposerImageAttachment | null,
   ) => void;
   readonly onCloseSurface: (surface: RightPanelSurface) => void;
-  readonly terminal: RightPanelTerminalProps;
   readonly pullRequest: RightPanelPullRequestProps;
   readonly files: RightPanelFileProps;
   readonly sideChatParentPanel: SideChatParentPanel;
@@ -97,14 +88,7 @@ export function RightPanelSurfaceContent(props: {
         </Suspense>
       );
     case "terminal":
-      return (
-        <PersistentThreadTerminalPanel
-          {...props.terminal}
-          visible={visible}
-          threadRef={threadRef}
-          surface={surface}
-        />
-      );
+      return <RightPanelTerminalSlot threadRef={threadRef} surfaceId={surface.id} />;
     case "diff":
       return (
         <Suspense fallback={null}>
