@@ -31,6 +31,7 @@ const state = vi.hoisted(() => ({
   draftKey: null as string | null,
   renderRevision: 0,
   listeners: new Set<() => void>(),
+  deleted: new Set<ThreadId>(),
   render: (_ref: { environmentId: EnvironmentId; threadId: ThreadId }): ReactNode => null,
   mount:
     (_props: {
@@ -43,7 +44,9 @@ vi.mock("../../state/entities", () => ({
   useThreadRefs: () => state.refs,
   useEnvironmentThreadRefs: () => state.refs,
   useQuietThreadShell: (ref: { threadId: ThreadId } | null) =>
-    state.refs.some((entry) => entry.threadId === ref?.threadId) ? { deletedAt: null } : null,
+    state.refs.some((entry) => entry.threadId === ref?.threadId)
+      ? { deletedAt: ref && state.deleted.has(ref.threadId) ? "2026-11-12T00:00:00Z" : null }
+      : null,
 }));
 vi.mock("../../state/shell", () => ({ useEnvironmentShellStatus: () => "live" }));
 vi.mock("../../state/threads", () => ({ useEnvironmentThread: () => ({ status: "deleted" }) }));
@@ -114,6 +117,7 @@ it("preserves original candidates through outer panel removal, tab and thread sw
   state.draftKey = null;
   state.renderRevision = 0;
   state.listeners.clear();
+  state.deleted.clear();
   const terminalA: Extract<RightPanelSurface, { kind: "terminal" }> = {
     id: "terminal:a",
     kind: "terminal",
@@ -401,10 +405,11 @@ it("preserves original candidates through outer panel removal, tab and thread sw
       original.filter((target) => target.terminalId !== "b").map((target) => target.viewId),
     );
     expect(await requestOriginalBinding()).toMatchObject({ error: { code: "target_invalid" } });
-    state.refs = [];
+    state.deleted.add(b.threadId);
     await act(async () => root.render(render(false)));
     expect(candidates()).toEqual([]);
     expect(removed).toHaveLength(3);
+    state.deleted.clear();
     state.refs = [b];
     await act(async () => root.render(render(true, b, terminalB)));
     expect(candidates()).toHaveLength(1);

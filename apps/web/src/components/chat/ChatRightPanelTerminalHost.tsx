@@ -21,7 +21,7 @@ import {
 import { createPortal } from "react-dom";
 import { useComposerDraftStore } from "../../composerDraftStore";
 import { useRightPanelStore, type RightPanelSurface } from "../../rightPanelStore";
-import { useThreadRefs } from "../../state/entities";
+import { useQuietThreadShell, useThreadRefs } from "../../state/entities";
 import { useEnvironmentScope } from "../../state/session";
 import { useStableCallback } from "../../hooks/useStableCallback";
 import {
@@ -98,17 +98,17 @@ function ThreadTerminals({
 }) {
   const canRead = useEnvironmentScope(threadRef.environmentId, AuthTerminalReadScope);
   const canOperate = useEnvironmentScope(threadRef.environmentId, AuthTerminalOperateScope);
+  const thread = useQuietThreadShell(threadRef);
+  const canRetain = canRead && canOperate && thread?.deletedAt == null;
   const threadKey = scopedThreadKey(threadRef);
   const [mountedIds, setMountedIds] = useState<string[]>([]);
-  const retainedIds =
-    canRead && canOperate
-      ? mountedIds.filter((id) =>
-          surfaces.some((surface) => surface.kind === "terminal" && surface.id === id),
-        )
-      : [];
+  const retainedIds = canRetain
+    ? mountedIds.filter((id) =>
+        surfaces.some((surface) => surface.kind === "terminal" && surface.id === id),
+      )
+    : [];
   if (
-    canRead &&
-    canOperate &&
+    canRetain &&
     present &&
     activeThreadKey === threadKey &&
     slot?.threadKey === threadKey &&
