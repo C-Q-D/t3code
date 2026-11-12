@@ -431,6 +431,35 @@ export function subscribeDynamicWithSession<TTag extends EnvironmentSubscription
   );
 }
 
+/** Invalidates each automation generation when its authenticated stream ends, before reconnecting. */
+export function followTerminalAutomation(
+  input: EnvironmentRpcInput<typeof WS_METHODS.terminalAutomationSubscribe>,
+  onStart: () => void,
+  onEnd: () => void,
+) {
+  let generation = 0;
+  return subscribeDynamicMapped(
+    WS_METHODS.terminalAutomationSubscribe,
+    () =>
+      Effect.sync(() => {
+        generation += 1;
+        onStart();
+        return input;
+      }),
+    (_session, stream) => {
+      const current = generation;
+      return stream.pipe(
+        Stream.filter(() => current === generation),
+        Stream.ensuring(
+          Effect.sync(() => {
+            if (current === generation) onEnd();
+          }),
+        ),
+      );
+    },
+  );
+}
+
 export function subscribe<TTag extends EnvironmentSubscriptionRpcTag>(
   tag: TTag,
   input: EnvironmentRpcInput<TTag>,
