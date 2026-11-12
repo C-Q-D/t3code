@@ -268,6 +268,7 @@ export class TerminalAutomationController {
         if (generation !== this.generation || this.disposed) return;
         await this.synchronize();
       } while (version !== this.registrationVersion);
+      if (this.registering === pending) this.registering = undefined;
     };
     const pending = work().finally(() => {
       if (this.registering === pending) this.registering = undefined;

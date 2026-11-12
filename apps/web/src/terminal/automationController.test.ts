@@ -140,7 +140,7 @@ it("registers mounted instances only after ready and re-registers on reconnect",
   f.controller.dispose();
 });
 
-it.each(["registration", "synchronization"] as const)(
+it.each(["registration", "synchronization", "completion"] as const)(
   "sends final view changes received during %s without another manual registration",
   async (stage) => {
     const f = setup();
@@ -158,7 +158,7 @@ it.each(["registration", "synchronization"] as const)(
       registered = views;
     };
     f.transport.getConnectionState = async () => {
-      if (stage === "synchronization" && first) {
+      if (stage !== "registration" && first) {
         first = false;
         entered.resolve();
         await proceed.promise;
@@ -172,13 +172,17 @@ it.each(["registration", "synchronization"] as const)(
       ...f.view,
       candidate: { ...f.view.candidate, target: { ...target, viewId: "second" } },
     };
-    f.controller.setView(second);
-    f.controller.removeView(target);
-    f.controller.setView({
-      ...f.view,
-      candidate: { ...f.view.candidate, title: "updated", visible: true },
-    });
+    const update = () => {
+      f.controller.setView(second);
+      f.controller.removeView(target);
+      f.controller.setView({
+        ...f.view,
+        candidate: { ...f.view.candidate, title: "updated", visible: true },
+      });
+    };
+    const updated = stage === "completion" ? f.controller.synchronize().then(update) : update();
     proceed.resolve();
+    await updated;
     await queried.promise;
     await ready;
     await f.controller.synchronize();
