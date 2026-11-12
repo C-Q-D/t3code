@@ -1,6 +1,7 @@
 import { it, expect } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Deferred from "effect/Deferred";
+import * as Queue from "effect/Queue";
 import * as Option from "effect/Option";
 import * as SubscriptionRef from "effect/SubscriptionRef";
 import { EnvironmentId, ThreadId, WS_METHODS } from "@t3tools/contracts";
@@ -81,23 +82,32 @@ it.effect.each(["resume", "reply"] as const)(
         disconnect: Effect.void,
         retryNow: Effect.void,
       });
-      const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
+      const commands =
+        yield* Queue.unbounded<
+          Effect.Effect<void, never, EnvironmentSupervisor.EnvironmentSupervisor>
+        >();
       const run = <A, E>(
         effect: Effect.Effect<A, E, EnvironmentSupervisor.EnvironmentSupervisor>,
       ) =>
-        runPromise(
-          effect.pipe(
-            Effect.provideService(EnvironmentSupervisor.EnvironmentSupervisor, supervisor),
-            Effect.provideService(RpcPermissionGuard, { authorize: () => Effect.void }),
-            Effect.provideService(EnvironmentRpcRequestObserver, {
-              observe: () =>
-                Deferred.succeed(entered, undefined).pipe(
-                  Effect.andThen(Deferred.await(release)),
-                  Effect.as(Effect.void),
-                ),
-            }),
-          ),
-        );
+        new Promise<A>((resolve, reject) => {
+          Queue.offerUnsafe(
+            commands,
+            effect.pipe(Effect.match({ onSuccess: resolve, onFailure: reject })),
+          );
+        });
+      yield* Queue.take(commands).pipe(
+        Effect.flatMap((effect) => effect),
+        Effect.provideService(EnvironmentSupervisor.EnvironmentSupervisor, supervisor),
+        Effect.provideService(RpcPermissionGuard, { authorize: () => Effect.void }),
+        Effect.provideService(EnvironmentRpcRequestObserver, {
+          observe: () =>
+            Deferred.succeed(entered, undefined).pipe(
+              Effect.andThen(Deferred.await(release)),
+              Effect.as(Effect.void),
+            ),
+        }),
+        Effect.forkChild,
+      );
       let receive!: Parameters<TerminalAutomationTransport["subscribe"]>[2];
       let paused = action === "resume";
       const threadId = ThreadId.make("thread");
