@@ -368,6 +368,7 @@ import { useAtomQueryRunner } from "../state/use-atom-query-runner";
 import { observeResize } from "~/lib/observeResize";
 import { ThreadVisitWatermark } from "./chat/ThreadVisitWatermark";
 import { ChatTerminalDrawers } from "./chat/ChatTerminalDrawers";
+import { TerminalAutomationPanel } from "./chat/TerminalAutomationPanel";
 import { ChatRightPanel } from "./chat/ChatRightPanel";
 import { useDraftEnvironmentRouting } from "./chat/useDraftEnvironmentRouting";
 import { branchMismatchBannerItem } from "./chat/ThreadActivityBanners";
@@ -3376,6 +3377,11 @@ export default function ChatView(props: ChatViewProps) {
       className="relative flex min-h-0 min-w-0 flex-1"
       data-chat-workspace=""
     >
+      {!embedded && !backgroundThread && activeThreadRef ? (
+        <div className="absolute inset-x-0 top-0 z-20">
+          <TerminalAutomationPanel key={activeThreadKey} threadRef={activeThreadRef} />
+        </div>
+      ) : null}
       {embedded ? null : (
         <DeviceSetupDialogHost
           threadKey={activeThreadKey}

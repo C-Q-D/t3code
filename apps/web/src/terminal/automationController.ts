@@ -351,10 +351,17 @@ export class TerminalAutomationController {
         choice:
           candidateId === null ? { status: "cancelled" } : { status: "selected", candidateId },
       });
-    } finally {
-      if (generation === this.generation)
+    } catch (error) {
+      if (
+        generation === this.generation &&
+        (error instanceof Error ? error.message : (error as { code?: string } | null)?.code) ===
+          "stale_request"
+      )
         this.publish({ selections: this.snapshot.selections.filter((item) => item !== selection) });
+      throw error;
     }
+    if (generation === this.generation)
+      this.publish({ selections: this.snapshot.selections.filter((item) => item !== selection) });
     await this.refreshState();
   }
 

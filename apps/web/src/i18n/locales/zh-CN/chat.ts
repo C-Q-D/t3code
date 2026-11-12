@@ -2,6 +2,20 @@
 import type { Messages } from "../en";
 
 export const chat: Messages["chat"] = {
+  terminalAutomation: {
+    choose: "为 AI 选择终端",
+    description: "选择允许 AI 操作的原终端。确认后才会提交选择。",
+    web: "网页",
+    desktop: "桌面",
+    visible: "可见",
+    hidden: "隐藏",
+    confirm: "使用所选终端",
+    pending: "正在提交…",
+    selected: "已提交终端选择。",
+    cancelled: "已取消终端选择。",
+    stale: "请求已过期或终端已变化。请让 AI 重新请求终端。",
+    failed: "请求失败。请检查连接后重试。",
+  },
   searchExcerpt: { user: "你：", agent: "Agent：" },
   sideTabStates: {
     approval: "需要批准",

@@ -3,6 +3,22 @@ import { englishWorkLogMessages } from "@t3tools/client-runtime/work-log/message
 import type { SourceControlProviderKind, WorktreeSubmodules } from "@t3tools/contracts";
 
 export const chat = {
+  terminalAutomation: {
+    choose: "Choose a terminal for AI",
+    description:
+      "Select the existing terminal that AI can operate. No choice is sent until you confirm.",
+    web: "Web",
+    desktop: "Desktop",
+    visible: "Visible",
+    hidden: "Hidden",
+    confirm: "Use selected terminal",
+    pending: "Sending…",
+    selected: "Terminal choice sent.",
+    cancelled: "Terminal selection cancelled.",
+    stale:
+      "This request has expired or the terminal changed. Ask AI to request the terminal again.",
+    failed: "The request failed. Check the connection and try again.",
+  },
   searchExcerpt: { user: "You:", agent: "Agent:" },
   sideTabStates: {
     approval: "needs approval",

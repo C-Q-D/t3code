@@ -290,3 +290,22 @@ it("reports invalid instances and cleans stale selection invitations", async () 
   expect(f.controller.getSnapshot().selections).toEqual([]);
   f.controller.dispose();
 });
+
+it("keeps a selection retryable after a transport failure", async () => {
+  const f = setup();
+  await f.ready();
+  f.emit({
+    version: 1,
+    selectionRequestId: "retry",
+    candidateVersion: 7,
+    candidates: [f.view.candidate],
+  });
+  f.transport.replySelection = async () => {
+    throw new Error("connection lost");
+  };
+  await expect(f.controller.submitSelection("retry", null)).rejects.toThrow("connection lost");
+  expect(
+    f.controller.getSnapshot().selections.map((request) => request.selectionRequestId),
+  ).toEqual(["retry"]);
+  f.controller.dispose();
+});
