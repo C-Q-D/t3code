@@ -2044,11 +2044,14 @@ export default function ThreadTerminalDrawer({
                       }
                 }
               >
-                {visibleTerminalIds.map((terminalId) => {
+                {normalizedTerminalIds.map((terminalId) => {
                   const terminalLaunchLocation = resolveTerminalLaunchLocation(terminalId);
                   return (
                     <div
                       key={terminalId}
+                      style={
+                        visibleTerminalIds.includes(terminalId) ? undefined : { display: "none" }
+                      }
                       className={cn(
                         "min-h-0 min-w-0 px-3 pt-0 pb-2",
                         splitDirection === "vertical"
@@ -2077,7 +2080,7 @@ export default function ThreadTerminalDrawer({
                           onSessionExited={() => onCloseTerminal(terminalId, threadRef)}
                           onAddTerminalContext={onAddTerminalContext}
                           autoFocus={terminalId === resolvedActiveTerminalId}
-                          visible={visible}
+                          visible={visible && visibleTerminalIds.includes(terminalId)}
                           keybindings={keybindings}
                         />
                       </div>

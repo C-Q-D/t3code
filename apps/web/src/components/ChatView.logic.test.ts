@@ -1,5 +1,9 @@
 import { copyThreadReference as copyChatThreadReference } from "../lib/copyThreadReference";
-import { isRelatedThreadUnavailable, resolveRightPanelMaximizeState } from "./ChatView.logic";
+import {
+  isRelatedThreadUnavailable,
+  resolveRightPanelMaximizeState,
+  reconcileMountedTerminalThreadIds,
+} from "./ChatView.logic";
 import { resolveThreadReferenceCopyTarget } from "@t3tools/client-runtime/thread-reference";
 import {
   COMPOSER_CONTEXT_CLIPBOARD_MIME,
@@ -112,6 +116,29 @@ const readySession = {
   lastError: null,
   updatedAt: "2026-03-29T00:00:10.000Z",
 };
+
+it("retains authenticated bound threads outside the hidden MRU budget and removes closed resources", () => {
+  expect(
+    reconcileMountedTerminalThreadIds({
+      currentThreadIds: ["bound", "old", "recent", "active"],
+      openThreadIds: ["old", "recent", "active"],
+      retainedThreadIds: ["bound"],
+      activeThreadId: "active",
+      activeThreadTerminalOpen: true,
+      maxHiddenThreadCount: 1,
+    }),
+  ).toEqual(["bound", "recent", "active"]);
+  expect(
+    reconcileMountedTerminalThreadIds({
+      currentThreadIds: ["bound", "active"],
+      openThreadIds: ["active"],
+      retainedThreadIds: [],
+      activeThreadId: "active",
+      activeThreadTerminalOpen: true,
+      maxHiddenThreadCount: 0,
+    }),
+  ).toEqual(["active"]);
+});
 
 describe("deriveComposerSendState", () => {
   it("keeps text sendable while excluding expired terminal pills", () => {

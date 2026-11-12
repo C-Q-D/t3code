@@ -4,7 +4,9 @@ import {
   scopedThreadKey,
   scopeThreadRef,
 } from "@t3tools/client-runtime/environment";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { getTerminalAutomation } from "../../state/terminal";
+import { terminalCanUnmount } from "../../terminal/mountRetention";
 import { useShallow } from "zustand/react/shallow";
 import { useComposerDraftStore } from "../../composerDraftStore";
 import type { TerminalContextSelection } from "../../lib/terminalContext";
@@ -64,16 +66,48 @@ export function ChatTerminalDrawers(props: ChatTerminalDrawersProps) {
     panelAnimationDurationMs,
   );
   const [mountedTerminalThreadKeys, setMountedTerminalThreadKeys] = useState<string[]>([]);
+  const [eviction, setEviction] = useState<{ revision: string; allowed: string[] }>({
+    revision: "",
+    allowed: [],
+  });
   const existingOpenTerminalThreadKeys = (() => {
     const existingThreadKeys = new Set<string>([...serverThreadKeys, ...draftThreadKeys]);
     return openTerminalThreadKeys.filter((nextThreadKey) => existingThreadKeys.has(nextThreadKey));
   })();
+  const existing = new Set([...serverThreadKeys, ...draftThreadKeys]);
+  const revision = JSON.stringify([
+    activeThreadKey,
+    props.activeTerminalOpen,
+    existingOpenTerminalThreadKeys,
+    [...existing],
+  ]);
+  const retainedThreadIds = mountedTerminalThreadKeys.filter(
+    (key) =>
+      existing.has(key) && (eviction.revision !== revision || !eviction.allowed.includes(key)),
+  );
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- checks authenticated binding ownership before releasing hidden terminal resources
+  useEffect(() => {
+    let current = true;
+    const keys = mountedTerminalThreadKeys.filter((key) => key !== activeThreadKey);
+    void Promise.all(
+      keys.map(async (key) => {
+        const ref = parseScopedThreadKey(key);
+        return ref && (await terminalCanUnmount(getTerminalAutomation(ref))) ? key : null;
+      }),
+    ).then((allowed) => {
+      if (current) setEviction({ revision, allowed: allowed.filter((key) => key !== null) });
+    });
+    return () => {
+      current = false;
+    };
+  }, [revision, mountedTerminalThreadKeys, activeThreadKey]);
   const reconciledMountedTerminalThreadKeys = reconcileMountedTerminalThreadIds({
     currentThreadIds: mountedTerminalThreadKeys,
     openThreadIds: existingOpenTerminalThreadKeys,
     activeThreadId: activeThreadKey,
     activeThreadTerminalOpen: activeTerminalDrawerPresence.present,
     maxHiddenThreadCount: MAX_HIDDEN_MOUNTED_TERMINAL_THREADS,
+    retainedThreadIds,
   });
   if (
     reconciledMountedTerminalThreadKeys.length !== mountedTerminalThreadKeys.length ||

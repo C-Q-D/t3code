@@ -607,23 +607,26 @@ export function reconcileMountedTerminalThreadIds(input: {
   activeThreadId: string | null;
   activeThreadTerminalOpen: boolean;
   maxHiddenThreadCount?: number;
+  retainedThreadIds?: ReadonlyArray<string>;
 }): string[] {
   const openThreadIdSet = new Set(input.openThreadIds);
+  const retained = new Set(input.retainedThreadIds);
   const hiddenThreadIds = input.currentThreadIds.filter(
-    (threadId) => threadId !== input.activeThreadId && openThreadIdSet.has(threadId),
+    (threadId) =>
+      threadId !== input.activeThreadId &&
+      (openThreadIdSet.has(threadId) || retained.has(threadId)),
   );
   const maxHiddenThreadCount = Math.max(
     0,
     input.maxHiddenThreadCount ?? MAX_HIDDEN_MOUNTED_TERMINAL_THREADS,
   );
-  const nextThreadIds =
-    hiddenThreadIds.length > maxHiddenThreadCount
-      ? hiddenThreadIds.slice(-maxHiddenThreadCount)
-      : hiddenThreadIds;
+  const unbound = hiddenThreadIds.filter((id) => !retained.has(id));
+  const recent = new Set(maxHiddenThreadCount === 0 ? [] : unbound.slice(-maxHiddenThreadCount));
+  const nextThreadIds = hiddenThreadIds.filter((id) => retained.has(id) || recent.has(id));
 
   if (
     input.activeThreadId &&
-    input.activeThreadTerminalOpen &&
+    (input.activeThreadTerminalOpen || retained.has(input.activeThreadId)) &&
     !nextThreadIds.includes(input.activeThreadId)
   ) {
     nextThreadIds.push(input.activeThreadId);

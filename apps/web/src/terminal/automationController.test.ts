@@ -1,5 +1,6 @@
 import { expect, it, vi } from "vite-plus/test";
 import type * as A from "@t3tools/contracts";
+import { terminalCanUnmount } from "./mountRetention";
 import {
   TerminalAutomationController,
   type TerminalAutomationTransport,
@@ -88,6 +89,20 @@ function setup() {
     registered,
   };
 }
+
+it("queries authenticated bindings before hidden resource eviction and fails closed while connected", async () => {
+  const harness = setup();
+  await harness.ready();
+  expect(await terminalCanUnmount(harness.controller)).toBe(false);
+  harness.transport.getConnectionState = async () => {
+    throw new Error("offline query");
+  };
+  expect(await terminalCanUnmount(harness.controller)).toBe(false);
+  harness.transport.getConnectionState = async () => ({ version: 1, bindings: [] });
+  expect(await terminalCanUnmount(harness.controller)).toBe(true);
+  harness.controller.dispose();
+  expect(await terminalCanUnmount(harness.controller)).toBe(true);
+});
 
 it("registers mounted instances only after ready and re-registers on reconnect", async () => {
   const f = setup();
