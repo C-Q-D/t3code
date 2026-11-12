@@ -71,7 +71,17 @@ export class TerminalAutomationController {
     selections: readonly A.TerminalAutomationSelectionRequest[];
     localPausedTargets: readonly A.TerminalAutomationTarget[];
     error: unknown;
-  } = { ready: false, bindings: [], selections: [], localPausedTargets: [], error: null };
+    resumingBindingIds: readonly string[];
+    submittingSelectionIds: readonly string[];
+  } = {
+    ready: false,
+    bindings: [],
+    selections: [],
+    localPausedTargets: [],
+    error: null,
+    resumingBindingIds: [],
+    submittingSelectionIds: [],
+  };
 
   constructor(private readonly transport: TerminalAutomationTransport) {}
 
@@ -225,7 +235,7 @@ export class TerminalAutomationController {
           .map((item) => item.binding),
       );
     }
-    this.publish({ bindings: state.bindings });
+    this.publish({ bindings: state.bindings, error: null });
     return state;
   }
 
@@ -268,6 +278,19 @@ export class TerminalAutomationController {
   }
 
   async resume(bindingId: string, confirmedInputEpoch: number) {
+    if (this.snapshot.resumingBindingIds.includes(bindingId))
+      throw new TerminalBridgeError("request_conflict");
+    this.publish({ resumingBindingIds: [...this.snapshot.resumingBindingIds, bindingId] });
+    try {
+      await this.resumeConfirmed(bindingId, confirmedInputEpoch);
+    } finally {
+      this.publish({
+        resumingBindingIds: this.snapshot.resumingBindingIds.filter((id) => id !== bindingId),
+      });
+    }
+  }
+
+  private async resumeConfirmed(bindingId: string, confirmedInputEpoch: number) {
     const generation = this.generation;
     const queryVersion = this.queryVersion;
     const expiresAt = Date.now() + 10_000;
@@ -286,6 +309,8 @@ export class TerminalAutomationController {
       !entry.view.canOperate()
     )
       throw new TerminalBridgeError("target_invalid");
+    if (entry.pendingReports > 0 || entry.reportFailed)
+      throw new TerminalBridgeError("human_intervened");
     const barrier = entry.barrier;
     const result = await this.transport.resume(
       bindingId,
@@ -296,6 +321,8 @@ export class TerminalAutomationController {
         this.snapshot.ready &&
         this.views.get(paused.binding.target.viewId) === entry &&
         entry.barrier === barrier &&
+        entry.pendingReports === 0 &&
+        !entry.reportFailed &&
         entry.view.canOperate() &&
         Date.now() < expiresAt,
     );
@@ -338,6 +365,23 @@ export class TerminalAutomationController {
   }
 
   async submitSelection(selectionRequestId: string, candidateId: string | null) {
+    if (this.snapshot.submittingSelectionIds.includes(selectionRequestId))
+      throw new TerminalBridgeError("request_conflict");
+    this.publish({
+      submittingSelectionIds: [...this.snapshot.submittingSelectionIds, selectionRequestId],
+    });
+    try {
+      await this.submitSelectionConfirmed(selectionRequestId, candidateId);
+    } finally {
+      this.publish({
+        submittingSelectionIds: this.snapshot.submittingSelectionIds.filter(
+          (id) => id !== selectionRequestId,
+        ),
+      });
+    }
+  }
+
+  private async submitSelectionConfirmed(selectionRequestId: string, candidateId: string | null) {
     const selection = this.snapshot.selections.find(
       (item) => item.selectionRequestId === selectionRequestId,
     );

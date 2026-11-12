@@ -3377,11 +3377,6 @@ export default function ChatView(props: ChatViewProps) {
       className="relative flex min-h-0 min-w-0 flex-1"
       data-chat-workspace=""
     >
-      {!embedded && !backgroundThread && activeThreadRef ? (
-        <div className="absolute inset-x-0 top-0 z-20">
-          <TerminalAutomationPanel key={activeThreadKey} threadRef={activeThreadRef} />
-        </div>
-      ) : null}
       {embedded ? null : (
         <DeviceSetupDialogHost
           threadKey={activeThreadKey}
@@ -4126,7 +4121,12 @@ export default function ChatView(props: ChatViewProps) {
       cwd={activeWorkspaceRoot}
       checkpoints={serverProjection?.checkpoints}
     >
-      {content}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        {!embedded && !backgroundThread && activeThreadRef ? (
+          <TerminalAutomationPanel key={activeThreadKey} threadRef={activeThreadRef} />
+        ) : null}
+        {content}
+      </div>
     </FileMetadataThreadProvider>
   );
 }

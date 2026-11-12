@@ -309,3 +309,53 @@ it("keeps a selection retryable after a transport failure", async () => {
   ).toEqual(["retry"]);
   f.controller.dispose();
 });
+
+it("rejects duplicate resume while the original confirmation is pending", async () => {
+  const f = setup();
+  await f.ready();
+  f.transport.getConnectionState = async () => paused;
+  await f.controller.humanInput(target);
+  const entered = deferred<void>();
+  const firstReply = deferred<A.TerminalAutomationStatus>();
+  const result: A.TerminalAutomationStatus = {
+    version: 1,
+    candidateVersion: 1,
+    candidates: [],
+    state: { status: "bound", binding },
+  };
+  f.transport.resume = vi
+    .fn()
+    .mockImplementationOnce(() => {
+      entered.resolve();
+      return firstReply.promise;
+    })
+    .mockResolvedValue(result);
+  const first = f.controller.resume("binding", 0).catch((error: unknown) => error);
+  await entered.promise;
+  const second = await f.controller.resume("binding", 0).then(
+    () => "accepted",
+    (error: unknown) => error,
+  );
+  firstReply.resolve(result);
+  await first;
+  expect(second).toMatchObject({ code: "request_conflict" });
+  expect(f.controller.getSnapshot().resumingBindingIds).toEqual([]);
+  f.controller.dispose();
+});
+
+it("does not resume an old displayed epoch while newer manual input is still being reported", async () => {
+  const f = setup();
+  await f.ready();
+  f.transport.getConnectionState = async () => paused;
+  await f.controller.refreshState();
+  const reported = deferred<void>();
+  f.transport.reportEvent = () => reported.promise;
+  const input = f.controller.humanInput(target);
+  const resume = f.controller.resume("binding", 0).catch((error: unknown) => error);
+  const result = await resume;
+  reported.resolve();
+  await input;
+  expect(f.transport.resume).not.toHaveBeenCalled();
+  expect(result).toMatchObject({ code: "human_intervened" });
+  f.controller.dispose();
+});

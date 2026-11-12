@@ -4,6 +4,15 @@ import type { SourceControlProviderKind, WorktreeSubmodules } from "@t3tools/con
 
 export const chat = {
   terminalAutomation: {
+    staleResume:
+      "Manual input changed or the confirmation expired. Review the current terminal and confirm again.",
+    inputEpoch: (epoch: number) => `Manual input version ${epoch}`,
+    bound: "AI terminal bound",
+    paused: "AI paused after manual input",
+    unavailable: "AI terminal connection unavailable",
+    invalid: "AI terminal target is no longer valid",
+    resume: "Resume AI operation",
+    refresh: "Refresh status",
     choose: "Choose a terminal for AI",
     description:
       "Select the existing terminal that AI can operate. No choice is sent until you confirm.",

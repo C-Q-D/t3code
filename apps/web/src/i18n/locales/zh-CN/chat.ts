@@ -3,6 +3,14 @@ import type { Messages } from "../en";
 
 export const chat: Messages["chat"] = {
   terminalAutomation: {
+    staleResume: "人工输入已变化或确认已过期。请查看当前终端后重新确认。",
+    inputEpoch: (epoch: number) => `人工输入版本 ${epoch}`,
+    bound: "AI 已绑定终端",
+    paused: "人工输入后 AI 已暂停",
+    unavailable: "AI 终端连接不可用",
+    invalid: "AI 终端目标已失效",
+    resume: "恢复 AI 操作",
+    refresh: "刷新状态",
     choose: "为 AI 选择终端",
     description: "选择允许 AI 操作的原终端。确认后才会提交选择。",
     web: "网页",

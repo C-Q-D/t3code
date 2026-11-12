@@ -14,15 +14,17 @@ import {
 } from "../ui/dialog";
 import { Radio, RadioGroup } from "../ui/radio-group";
 
-function selectionError(error: unknown) {
+function selectionError(error: unknown, resuming = false) {
   const code =
     error instanceof Error
       ? error.message
       : typeof error === "object" && error !== null && "code" in error
         ? error.code
         : null;
-  return code === "stale_request"
-    ? t.chat.terminalAutomation.stale
+  return code === "stale_request" || (resuming && code === "human_intervened")
+    ? resuming
+      ? t.chat.terminalAutomation.staleResume
+      : t.chat.terminalAutomation.stale
     : t.chat.terminalAutomation.failed;
 }
 
@@ -30,17 +32,20 @@ function TerminalSelection({
   controller,
   request,
   onMessage,
+  submitting,
 }: {
   controller: TerminalAutomationController;
   request: TerminalAutomationSelectionRequest;
   onMessage: (message: string) => void;
+  submitting: boolean;
 }) {
   const [choice, setChoice] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
+  const [locallyPending, setPending] = useState(false);
+  const pending = locallyPending || submitting;
   const [errorMessage, setErrorMessage] = useState("");
   const busy = useRef(false);
   const submit = async (candidateId: string | null) => {
-    if (busy.current) return;
+    if (busy.current || pending) return;
     busy.current = true;
     setPending(true);
     try {
@@ -135,8 +140,72 @@ export function TerminalAutomationPanel({ threadRef }: { threadRef: ScopedThread
   const [message, setMessage] = useState("");
   if (!controller || !snapshot) return null;
   const request = snapshot.ready ? snapshot.selections[0] : undefined;
+  const refresh = async () => {
+    try {
+      await controller.refreshState();
+      setMessage("");
+    } catch (error) {
+      setMessage(selectionError(error));
+    }
+  };
+  const resume = async (bindingId: string, epoch: number) => {
+    try {
+      await controller.resume(bindingId, epoch);
+      setMessage("");
+    } catch (error) {
+      setMessage(selectionError(error, true));
+    }
+  };
   return (
-    <div className="shrink-0 text-sm">
+    <div className="max-h-40 shrink-0 overflow-y-auto bg-card text-sm">
+      {snapshot.bindings.map((state) => {
+        const binding = state.binding;
+        const locallyPaused = snapshot.localPausedTargets.some(
+          (target) =>
+            target.terminalId === binding.target.terminalId &&
+            target.terminalInstanceId === binding.target.terminalInstanceId &&
+            target.viewId === binding.target.viewId,
+        );
+        const status = !snapshot.ready
+          ? t.chat.terminalAutomation.unavailable
+          : state.status === "invalid"
+            ? state.reason === "client_unavailable"
+              ? t.chat.terminalAutomation.unavailable
+              : t.chat.terminalAutomation.invalid
+            : state.status === "paused" || locallyPaused
+              ? t.chat.terminalAutomation.paused
+              : t.chat.terminalAutomation.bound;
+        const pending = snapshot.resumingBindingIds.includes(binding.bindingId);
+        return (
+          <div key={binding.bindingId} className="flex flex-wrap items-center gap-2 px-3 py-1">
+            <span className="min-w-0 break-all">
+              {binding.alias} · {binding.target.terminalId} · {binding.target.terminalInstanceId} ·{" "}
+              {binding.target.viewId} · {t.chat.terminalAutomation.inputEpoch(binding.inputEpoch)} ·{" "}
+              <span role="status">{status}</span>
+            </span>
+            {snapshot.ready && state.status === "paused" ? (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={pending}
+                onClick={() => void resume(binding.bindingId, binding.inputEpoch)}
+              >
+                {pending ? t.chat.terminalAutomation.pending : t.chat.terminalAutomation.resume}
+              </Button>
+            ) : null}
+          </div>
+        );
+      })}
+      {!snapshot.ready || snapshot.error ? (
+        <div className="flex items-center gap-2 px-3 py-1">
+          <span>{t.chat.terminalAutomation.unavailable}</span>
+          {snapshot.ready ? (
+            <Button size="sm" variant="outline" onClick={() => void refresh()}>
+              {t.chat.terminalAutomation.refresh}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
       <p role="status" className="px-3 text-muted-foreground">
         {message}
       </p>
@@ -146,6 +215,7 @@ export function TerminalAutomationPanel({ threadRef }: { threadRef: ScopedThread
           controller={controller}
           request={request}
           onMessage={setMessage}
+          submitting={snapshot.submittingSelectionIds.includes(request.selectionRequestId)}
         />
       ) : null}
     </div>
