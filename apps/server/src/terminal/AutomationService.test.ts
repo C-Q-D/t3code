@@ -1942,6 +1942,65 @@ it.effect("bridges show prepare encode and deduplicates PTY writes", () =>
   }),
 );
 
+it.effect("release and auto bind preserve unconfirmed human intervention", () =>
+  Effect.gen(function* () {
+    const f = yield* setup;
+    f.humanInput();
+    const original = yield* bindOne(f.service);
+    expect((yield* f.service.status(caller)).state.status).toBe("bound");
+    f.humanInput();
+    expect((yield* f.service.status(caller)).state.status).toBe("paused");
+    yield* f.service.release(caller, { bindingId: original });
+    const rebound = yield* f.service.bind(caller, { mode: "auto" });
+    expect(rebound.state.status).toBe("paused");
+    if (!("binding" in rebound.state)) throw new Error("expected binding");
+    const binding = rebound.state.binding;
+    expect(binding.bindingId).not.toBe(original);
+    expect(
+      yield* f.service.input(
+        caller,
+        {
+          bindingId: binding.bindingId,
+          requestId: "blocked",
+          action: { type: "text", text: "hello" },
+        },
+        permission,
+      ),
+    ).toMatchObject({ status: "not_sent", error: { code: "human_intervened" } });
+    expect(f.writes).toEqual([]);
+    expect(
+      (yield* f.service.bind({ ...caller, callerId: "other" }, { mode: "auto" })).state.status,
+    ).toBe("bound");
+    expect(
+      (yield* f.service.resumeFromConnection("client", binding.bindingId, binding.inputEpoch)).state
+        .status,
+    ).toBe("bound");
+  }),
+);
+
+it.effect("released pause barriers reclaim owner capacity when their instances exit", () =>
+  Effect.gen(function* () {
+    const f = yield* setup;
+    for (let index = 0; index < 130; index += 1) {
+      const identity = { ...caller, callerId: `caller-${index}` };
+      f.instances.set("one", `instance-${index}`);
+      yield* f.service.registerViews("client", {
+        version: 1,
+        views: [
+          { ...view(), target: { ...view().target, terminalInstanceId: `instance-${index}` } },
+        ],
+      });
+      const bound = yield* f.service.bind(identity, { mode: "auto" });
+      if (!("binding" in bound.state)) throw new Error("expected binding");
+      f.humanInput();
+      yield* f.service.release(identity, { bindingId: bound.state.binding.bindingId });
+    }
+    f.instances.set("one", "instance-one");
+    yield* f.service.registerViews("client", { version: 1, views: [view()] });
+    expect((yield* f.service.bind(caller, { mode: "auto" })).state.status).toBe("bound");
+  }),
+);
+
 it.effect("uses explicit views, isolates providers, pauses and requires confirmed resume", () =>
   Effect.gen(function* () {
     const { service, instances, humanInput } = yield* setup;

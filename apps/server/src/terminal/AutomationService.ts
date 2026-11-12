@@ -49,6 +49,7 @@ interface Owner {
   state: A.TerminalAutomationState;
   connectionId?: string;
   humanInputEpoch?: number;
+  pauseTarget?: A.TerminalAutomationTarget;
   invited?: ReadonlySet<string>;
   selection?: A.TerminalAutomationSelectionRequest;
   readonly released: Deferred.Deferred<void>;
@@ -269,40 +270,56 @@ const make = Effect.gen(function* () {
     }
   }, Effect.uninterruptible);
   const getOwner = (caller: Caller): Owner | undefined => owners.get(ownerKey(caller));
-  const ensureOwner = (caller: Caller, reserve = false) =>
-    Effect.suspend(() => {
-      const existing = getOwner(caller);
-      if (existing) {
-        if (reserve) existing.busy += 1;
-        return Effect.succeed(existing);
-      }
-      if (owners.size >= 128)
-        for (const [key, owner] of owners)
-          if (
-            owner.busy === 0 &&
-            (owner.state.status === "unbound" ||
-              (owner.state.status === "invalid" && !bindings.has(owner.state.binding.bindingId)))
-          )
-            deleteOwner(key);
-      if (owners.size >= 128) return Effect.fail(failure("budget_exceeded"));
-      const owner: Owner = {
-        caller,
-        busy: reserve ? 1 : 0,
-        state: { status: "unbound" },
-        released: Deferred.makeUnsafe<void>(),
-      };
-      owners.set(ownerKey(caller), owner);
-      if (caller.credentialAuthorization)
-        return Effect.raceFirst(
-          caller.credentialAuthorization.invalidated.pipe(Effect.as(true)),
-          Deferred.await(owner.released).pipe(Effect.as(false)),
-        ).pipe(
-          Effect.flatMap((invalidated) => (invalidated ? refresh(owner) : Effect.void)),
-          Effect.forkIn(serviceScope),
-          Effect.as(owner),
-        );
-      return Effect.succeed(owner);
-    });
+  const ensureOwner = Effect.fn("TerminalAutomation.ensureOwner")(function* (
+    caller: Caller,
+    reserve = false,
+  ) {
+    // Released bindings do not own the human-confirmation barrier; the live instance does.
+    for (const [key, owner] of owners) {
+      if (owner.busy !== 0 || !owner.pauseTarget || owner.state.status !== "unbound") continue;
+      const state = owner.state;
+      const live = yield* inspect(owner.caller.scope, owner.pauseTarget).pipe(Effect.result);
+      if (
+        live._tag === "Failure" &&
+        owners.get(key) === owner &&
+        owner.state === state &&
+        owner.busy === 0
+      )
+        deleteOwner(key);
+    }
+    const existing = getOwner(caller);
+    if (existing) {
+      if (reserve) existing.busy += 1;
+      return existing;
+    }
+    if (owners.size >= 128)
+      for (const [key, owner] of owners)
+        if (
+          owner.busy === 0 &&
+          !owner.pauseTarget &&
+          (owner.state.status === "unbound" ||
+            (owner.state.status === "invalid" && !bindings.has(owner.state.binding.bindingId)))
+        )
+          deleteOwner(key);
+    if (owners.size >= 128) return yield* Effect.fail(failure("budget_exceeded"));
+    const owner: Owner = {
+      caller,
+      busy: reserve ? 1 : 0,
+      state: { status: "unbound" },
+      released: Deferred.makeUnsafe<void>(),
+    };
+    owners.set(ownerKey(caller), owner);
+    if (caller.credentialAuthorization)
+      return yield* Effect.raceFirst(
+        caller.credentialAuthorization.invalidated.pipe(Effect.as(true)),
+        Deferred.await(owner.released).pipe(Effect.as(false)),
+      ).pipe(
+        Effect.flatMap((invalidated) => (invalidated ? refresh(owner) : Effect.void)),
+        Effect.forkIn(serviceScope),
+        Effect.as(owner),
+      );
+    return owner;
+  });
   const connection = (id: string) =>
     Effect.suspend(() => {
       const found = connections.get(id);
@@ -373,6 +390,7 @@ const make = Effect.gen(function* () {
       setState(owner, { status: "invalid", binding: state.binding, reason: "target_invalid" });
       yield* retire(state.binding.bindingId, failure("target_invalid"));
     } else if (current.success.humanInputEpoch !== owner.humanInputEpoch) {
+      owner.pauseTarget = state.binding.target;
       owner.humanInputEpoch = current.success.humanInputEpoch;
       setState(owner, {
         status: "paused",
@@ -572,8 +590,13 @@ const make = Effect.gen(function* () {
     delete owner.invited;
     owner.connectionId = entry[0];
     owner.humanInputEpoch = current.humanInputEpoch;
+    const paused =
+      owner.pauseTarget?.terminalId === candidate.target.terminalId &&
+      owner.pauseTarget.terminalInstanceId === candidate.target.terminalInstanceId;
     setState(owner, {
-      status: "bound",
+      ...(paused
+        ? { status: "paused" as const, reason: "human_intervened" as const }
+        : { status: "bound" as const }),
       binding: {
         bindingId: NodeCrypto.randomUUID(),
         target: candidate.target,
@@ -607,7 +630,12 @@ const make = Effect.gen(function* () {
           owner.caller = caller;
           const previousState = owner.state;
           const candidateVersion = versionFor(caller.scope);
-          const available = yield* candidates(caller.scope);
+          const available = (yield* candidates(caller.scope)).filter(
+            (candidate) =>
+              !owner.pauseTarget ||
+              (candidate.target.terminalId === owner.pauseTarget.terminalId &&
+                candidate.target.terminalInstanceId === owner.pauseTarget.terminalInstanceId),
+          );
           if (authorize && !canDispatch(authorize))
             return yield* Effect.fail(failure("target_invalid"));
           if (owner.state !== previousState || candidateVersion !== versionFor(caller.scope))
@@ -657,7 +685,12 @@ const make = Effect.gen(function* () {
       (owner) =>
         Effect.sync(() => {
           owner.busy -= 1;
-          if (owner.busy === 0 && owner.state.status === "unbound" && getOwner(caller) === owner)
+          if (
+            owner.busy === 0 &&
+            !owner.pauseTarget &&
+            owner.state.status === "unbound" &&
+            getOwner(caller) === owner
+          )
             deleteOwner(ownerKey(caller));
         }),
     );
@@ -747,6 +780,7 @@ const make = Effect.gen(function* () {
       ) {
         const current = yield* inspect(client.scope, input.target).pipe(Effect.result);
         if (current._tag === "Success") owner.humanInputEpoch = current.success.humanInputEpoch;
+        owner.pauseTarget = state.binding.target;
         setState(owner, {
           status: "paused",
           binding: { ...state.binding, inputEpoch: state.binding.inputEpoch + 1 },
@@ -775,6 +809,7 @@ const make = Effect.gen(function* () {
       owner.state.binding.bindingId !== bindingId
     )
       return yield* Effect.fail(failure("stale_request"));
+    delete owner.pauseTarget;
     setState(owner, { status: "bound", binding: owner.state.binding });
     return yield* status(caller);
   });
@@ -804,6 +839,7 @@ const make = Effect.gen(function* () {
     yield* refresh(owner);
     if (!valid() || owner.state.status !== "paused")
       return yield* Effect.fail(failure("stale_request"));
+    delete owner.pauseTarget;
     setState(owner, { status: "bound", binding: owner.state.binding });
     return yield* status(owner.caller);
   });
@@ -815,11 +851,12 @@ const make = Effect.gen(function* () {
     const owner = getOwner(caller);
     if (!owner || !("binding" in owner.state) || owner.state.binding.bindingId !== input.bindingId)
       return yield* Effect.fail(failure("target_invalid"));
+    yield* refresh(owner);
     return yield* Effect.uninterruptible(
       Effect.gen(function* () {
         setState(owner, { status: "unbound" });
         delete owner.connectionId;
-        deleteOwner(ownerKey(caller));
+        if (!owner.pauseTarget) deleteOwner(ownerKey(caller));
         yield* retire(input.bindingId, failure("target_invalid"));
         return { status: "released" as const };
       }),
