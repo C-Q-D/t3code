@@ -180,7 +180,7 @@ it.effect.each(["resume", "reply"] as const)(
       };
       const work: Promise<unknown> =
         action === "resume"
-          ? controller.resume("binding").then(
+          ? controller.resume("binding", binding.inputEpoch).then(
               () => "success",
               () => "rejected",
             )

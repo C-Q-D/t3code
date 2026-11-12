@@ -187,7 +187,7 @@ it("late resume success cannot clear a newer human pause", async () => {
     entered.resolve();
     return resumed.promise;
   };
-  const work = f.controller.resume("binding");
+  const work = f.controller.resume("binding", binding.inputEpoch);
   await entered.promise;
   await f.controller.humanInput(target);
   resumed.resolve({
@@ -229,7 +229,9 @@ it("resumes only the explicitly confirmed owner recovered from a connection snap
       state: { status: "bound", binding: first },
     };
   });
-  await f.controller.resume("binding");
+  await expect(f.controller.resume("binding", 0)).rejects.toMatchObject({ code: "stale_request" });
+  expect(f.transport.resume).not.toHaveBeenCalled();
+  await f.controller.resume("binding", first.inputEpoch);
   f.emit({ version: 1, operation: "show", bridgeRequestId: "chosen", binding: first });
   expect((await f.reply.promise).result).toEqual({ operation: "show", status: "visible" });
   const denied = deferred<A.TerminalAutomationClientReply>();
@@ -254,7 +256,7 @@ it("does not authorize resume when a new human input follows snapshot publicatio
       reported = f.controller.humanInput(target);
     }
   });
-  const work = f.controller.resume("binding");
+  const work = f.controller.resume("binding", binding.inputEpoch);
   await expect(work).rejects.toMatchObject({ code: "stale_request" });
   expect(f.transport.resume).not.toHaveBeenCalled();
   await reported;

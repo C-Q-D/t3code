@@ -267,16 +267,18 @@ export class TerminalAutomationController {
     }
   }
 
-  async resume(bindingId: string) {
+  async resume(bindingId: string, confirmedInputEpoch: number) {
     const generation = this.generation;
     const queryVersion = this.queryVersion;
+    const expiresAt = Date.now() + 10_000;
     const state = await this.refreshState();
     if (generation !== this.generation || this.queryVersion !== queryVersion + 1)
       throw new TerminalBridgeError("stale_request");
     const paused = state.bindings.find(
       (item) => item.status === "paused" && item.binding.bindingId === bindingId,
     );
-    if (!paused) throw new TerminalBridgeError("stale_request");
+    if (!paused || paused.binding.inputEpoch !== confirmedInputEpoch)
+      throw new TerminalBridgeError("stale_request");
     const entry = this.views.get(paused.binding.target.viewId);
     if (
       !entry ||
@@ -285,10 +287,9 @@ export class TerminalAutomationController {
     )
       throw new TerminalBridgeError("target_invalid");
     const barrier = entry.barrier;
-    const expiresAt = Date.now() + 10_000;
     const result = await this.transport.resume(
       bindingId,
-      paused.binding.inputEpoch,
+      confirmedInputEpoch,
       () =>
         generation === this.generation &&
         !this.disposed &&
@@ -302,14 +303,32 @@ export class TerminalAutomationController {
       generation !== this.generation ||
       entry.barrier !== barrier ||
       this.disposed ||
-      this.views.get(paused.binding.target.viewId) !== entry
+      this.views.get(paused.binding.target.viewId) !== entry ||
+      !entry.view.canOperate() ||
+      Date.now() >= expiresAt
     )
       throw new TerminalBridgeError("stale_request");
-    if (result.state.status !== "bound" || result.state.binding.bindingId !== bindingId)
+    if (
+      result.state.status !== "bound" ||
+      result.state.binding.bindingId !== bindingId ||
+      result.state.binding.inputEpoch !== confirmedInputEpoch ||
+      !sameTarget(result.state.binding.target, paused.binding.target)
+    )
       throw new TerminalBridgeError("stale_request");
     entry.permits.set(bindingId, result.state.binding.inputEpoch);
     await this.refreshState();
-    if (generation !== this.generation || entry.barrier !== barrier || this.disposed)
+    if (
+      generation !== this.generation ||
+      entry.barrier !== barrier ||
+      this.disposed ||
+      Date.now() >= expiresAt ||
+      !this.snapshot.bindings.some(
+        (item) =>
+          item.status === "bound" &&
+          item.binding.bindingId === bindingId &&
+          item.binding.inputEpoch === confirmedInputEpoch,
+      )
+    )
       throw new TerminalBridgeError("stale_request");
     this.publish({
       localPausedTargets: this.snapshot.localPausedTargets.filter(
