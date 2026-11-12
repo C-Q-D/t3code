@@ -183,12 +183,7 @@ export function TerminalAutomationPanel({ threadRef }: { threadRef: ScopedThread
     <div className="max-h-40 shrink-0 overflow-y-auto bg-card text-sm">
       {snapshot.bindings.map((state) => {
         const binding = state.binding;
-        const locallyPaused = snapshot.localPausedTargets.some(
-          (target) =>
-            target.terminalId === binding.target.terminalId &&
-            target.terminalInstanceId === binding.target.terminalInstanceId &&
-            target.viewId === binding.target.viewId,
-        );
+        const locallyPaused = controller.isBindingLocallyPaused(binding);
         const status = !snapshot.ready
           ? t.chat.terminalAutomation.unavailable
           : state.status === "invalid"

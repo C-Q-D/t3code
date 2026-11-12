@@ -446,6 +446,79 @@ it.each(["lost reply", "parallel query", "failed query"])(
   },
 );
 
+it("keeps pause state separate for bindings sharing one target", async () => {
+  const f = setup();
+  await f.ready();
+  const other = { ...binding, bindingId: "other" };
+  f.transport.getConnectionState = async () => ({
+    version: 1,
+    bindings: [
+      { status: "paused", binding, reason: "human_intervened" },
+      { status: "paused", binding: other, reason: "human_intervened" },
+    ],
+  });
+  await f.controller.refreshState();
+  await f.controller.humanInput(target);
+  await f.controller.resume("binding", 0);
+  expect(f.controller.isBindingLocallyPaused(binding)).toBe(false);
+  expect(f.controller.isBindingLocallyPaused(other)).toBe(true);
+  f.controller.dispose();
+});
+
+it("rejects a paused query started before the successful resume reply", async () => {
+  const f = setup();
+  await f.ready();
+  f.transport.getConnectionState = async () => paused;
+  await f.controller.humanInput(target);
+  const entered = deferred<void>();
+  const response = deferred<A.TerminalAutomationStatus>();
+  f.transport.resume = () => {
+    entered.resolve();
+    return response.promise;
+  };
+  const resume = f.controller.resume("binding", 0);
+  await entered.promise;
+  const old = deferred<A.TerminalAutomationConnectionState>();
+  f.transport.getConnectionState = () => old.promise;
+  const query = f.controller.refreshState().catch((error: unknown) => error);
+  response.resolve({
+    version: 1,
+    candidateVersion: 1,
+    candidates: [],
+    state: { status: "bound", binding },
+  });
+  await resume;
+  old.resolve(paused);
+  expect(await query).toMatchObject({ code: "stale_request" });
+  expect(f.controller.getSnapshot().localPausedTargets).toEqual([]);
+  f.controller.dispose();
+});
+
+it("consumes a newer notification after the pending query fails once", async () => {
+  const f = setup();
+  await f.ready();
+  await f.controller.synchronize();
+  const failed = deferred<void>();
+  let calls = 0;
+  f.transport.getConnectionState = async () => {
+    calls += 1;
+    if (calls === 1) {
+      await failed.promise;
+      throw new Error("offline");
+    }
+    return { version: 1, revision: 2, selections: [], bindings: [] };
+  };
+  f.emit({ type: "state_changed", revision: 1 });
+  const pending = f.controller.synchronize().catch(() => {});
+  f.emit({ type: "state_changed", revision: 2 });
+  failed.resolve();
+  await pending;
+  expect(calls).toBe(2);
+  await f.controller.synchronize();
+  expect(f.controller.getSnapshot().bindings).toEqual([]);
+  f.controller.dispose();
+});
+
 it("cannot use a lost confirmation to authorize bound state after newer manual input", async () => {
   const f = setup();
   await f.ready();

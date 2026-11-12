@@ -101,6 +101,16 @@ export class TerminalAutomationController {
   constructor(private readonly transport: TerminalAutomationTransport) {}
 
   getSnapshot = () => this.snapshot;
+  isBindingLocallyPaused(binding: A.TerminalAutomationBinding) {
+    const entry = this.views.get(binding.target.viewId);
+    return (
+      !!entry &&
+      sameTarget(entry.view.candidate.target, binding.target) &&
+      (entry.pendingReports > 0 ||
+        entry.reportFailed ||
+        entry.blockedBindings.has(binding.bindingId))
+    );
+  }
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
     return () => {
@@ -253,14 +263,15 @@ export class TerminalAutomationController {
     const generation = this.generation;
     const work = async (): Promise<A.TerminalAutomationConnectionState> => {
       for (;;) {
+        const requestedRevision = this.notifiedRevision;
         try {
           return await this.refreshState();
         } catch (error) {
           if (
-            !(error instanceof TerminalBridgeError) ||
-            error.code !== "stale_request" ||
             generation !== this.generation ||
-            this.disposed
+            this.disposed ||
+            (!(error instanceof TerminalBridgeError && error.code === "stale_request") &&
+              this.notifiedRevision <= requestedRevision)
           )
             throw error;
         }
@@ -479,6 +490,7 @@ export class TerminalAutomationController {
       )
         throw new TerminalBridgeError("stale_request");
       const confirmedState = result.state;
+      this.queryVersion += 1;
       const bindings = this.snapshot.bindings.map((item) =>
         item.binding.bindingId === bindingId ? confirmedState : item,
       );
