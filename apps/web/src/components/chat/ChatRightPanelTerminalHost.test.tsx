@@ -20,7 +20,10 @@ import { scopedThreadKey } from "@t3tools/client-runtime/environment";
 import { expect, it, vi } from "vite-plus/test";
 import { TerminalAutomationController } from "../../terminal/automationController";
 import { useRightPanelStore, type RightPanelSurface } from "../../rightPanelStore";
-import { ChatRightPanelTerminalHost } from "./ChatRightPanelTerminalHost";
+import {
+  ChatRightPanelTerminalHost,
+  ChatRightPanelTerminalProvider,
+} from "./ChatRightPanelTerminalHost";
 import { ThreadRouteView } from "../ThreadRouteView";
 import { ChatRightPanel } from "./ChatRightPanel";
 import { RightPanelSurfaceContent } from "./RightPanelSurfaceContent";
@@ -326,7 +329,11 @@ it("preserves original candidates through outer panel removal, tab and thread sw
     );
     state.renderRevision += 1;
     for (const listener of state.listeners) listener();
-    return <ThreadRouteView target={{ kind: "server", threadRef: ref }} />;
+    return (
+      <ChatRightPanelTerminalProvider>
+        <ThreadRouteView target={{ kind: "server", threadRef: ref }} />
+      </ChatRightPanelTerminalProvider>
+    );
   };
   const candidates = () =>
     [...registered.values()]
@@ -343,6 +350,16 @@ it("preserves original candidates through outer panel removal, tab and thread sw
     await act(async () => root.render(render(true, b, terminalB)));
     await act(async () => root.render(render(true)));
     const original = candidates();
+    await act(async () =>
+      root.render(
+        <ChatRightPanelTerminalProvider>
+          <div>Home</div>
+        </ChatRightPanelTerminalProvider>,
+      ),
+    );
+    expect(candidates()).toEqual(original);
+    await act(async () => root.render(render(true)));
+    expect(candidates()).toEqual(original);
     expect(original).toHaveLength(3);
     const binding = {
       bindingId: "original-binding",

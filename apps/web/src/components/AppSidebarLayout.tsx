@@ -84,6 +84,7 @@ import {
   THREAD_SIDEBAR_WIDTH_STORAGE_KEY,
 } from "./threadSidebarWidth";
 import { Sidebar, SidebarProvider, SidebarRail, SidebarTrigger, useSidebar } from "./ui/sidebar";
+import { ChatRightPanelTerminalProvider } from "./chat/ChatRightPanelTerminalHost";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 import { WindowTitlebar } from "./frame/WindowTitlebar";
 import {
@@ -684,7 +685,9 @@ function AppShell({ children }: { children: ReactNode }) {
               {/* Keep the outlet under one component type across navigation;
                     changing div/Slab would remount the route subtree. Chat owns
                     its surfaces, so its enclosing slab has no visual variants. */}
-              <MainSlab chatOwnsSlabs={chatOwnsSlabs}>{children}</MainSlab>
+              <ChatRightPanelTerminalProvider>
+                <MainSlab chatOwnsSlabs={chatOwnsSlabs}>{children}</MainSlab>
+              </ChatRightPanelTerminalProvider>
               {pathname.startsWith("/discussions/") &&
               !shouldUseDiscussionPanelSheet(viewportWidth) ? (
                 <TitlebarSlotOutlet name="panel" />
