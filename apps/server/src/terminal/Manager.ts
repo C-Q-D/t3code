@@ -316,7 +316,8 @@ interface TerminalSessionState {
   eventSequence: number;
   inputCount: number;
   humanInputEpoch: number;
-  protocolReplies: Array<{ pattern: RegExp; expiresAt: number }>;
+  protocolReplies: Array<{ pattern: RegExp; expiresAt: number; response?: string }>;
+  pendingProtocolQuery: string;
   terminalInstanceId?: string;
   cols: number;
   rows: number;
@@ -1337,22 +1338,69 @@ function sanitizeTerminalHistoryChunk(
   return { visibleText, pendingControlSequence: "" };
 }
 
+function observeTerminalQueries(
+  pending: string,
+  data: string,
+  onSequence: (sequence: string) => void,
+): string {
+  for (const char of data) {
+    if (char === "\x18" || char === "\x1a") {
+      pending = "";
+      continue;
+    }
+    const string = /^\x1b[\]P^_]/.test(pending);
+    if (char === "\x1b") {
+      pending = string && !pending.endsWith("\x1b") ? pending + char : char;
+      continue;
+    }
+    if (string && pending.endsWith("\x1b")) {
+      if (char === "\\") {
+        onSequence(pending + char);
+        pending = "";
+        continue;
+      }
+      pending = "\x1b";
+    }
+    if (!pending) continue;
+    if (pending === "\x1b") {
+      pending += char;
+      if (!"[]P^_".includes(char)) {
+        onSequence(pending);
+        pending = "";
+      }
+      continue;
+    }
+    if (pending.startsWith("\x1b[") && char.charCodeAt(0) < 0x20) continue;
+    pending += char;
+    if (
+      (pending.startsWith("\x1b[") && isCsiFinalByte(char.charCodeAt(0))) ||
+      (string && char === "\x07")
+    ) {
+      onSequence(pending);
+      pending = "";
+    } else if (pending.length > 1024) {
+      pending = "";
+    }
+  }
+  return pending;
+}
+
 function terminalProtocolReplyPattern(sequence: string): RegExp | undefined {
   const normalized = sequence
     .replace(/^\u009b/, "\u001b[")
     .replace(/^\u009d/, "\u001b]")
     .replace(/^\u0090/, "\u001bP");
-  if (normalized === "\u001b[5n") return /^\u001b\[0n$/;
-  if (normalized === "\u001b[6n") return /^\u001b\[[1-9][0-9]{0,3};[1-9][0-9]{0,3}R$/;
+  if (/^\u001b\[0*5n$/.test(normalized)) return /^\u001b\[0n$/;
+  if (/^\u001b\[0*6n$/.test(normalized)) return /^\u001b\[[1-9][0-9]{0,3};[1-9][0-9]{0,3}R$/;
   if (normalized === "\u001b[?6n") return /^\u001b\[\?[1-9][0-9]{0,3};[1-9][0-9]{0,3}R$/;
-  if (/^\u001b\[(?:0)?c$/.test(normalized) || normalized === "\u001bZ")
+  if (/^\u001b\[[0-9]*c$/.test(normalized) || normalized === "\u001bZ")
     return /^\u001b\[\?[0-9;]{1,64}c$/;
-  if (/^\u001b\[>(?:0)?c$/.test(normalized)) return /^\u001b\[>[0-9;]{1,64}c$/;
-  if (/^\u001b\[=(?:0)?c$/.test(normalized)) return /^\u001bP!\|[0-9a-fA-F]{8}\u001b\\$/;
-  if (/^\u001b\[>[0-9]*q$/.test(normalized)) return /^\u001bP>\|[\x20-\x7e]{1,128}\u001b\\$/;
+  if (/^\u001b\[>[0-9]*c$/.test(normalized)) return /^\u001b\[>[0-9;]{1,64}c$/;
+  if (/^\u001b\[=[0-9]*c$/.test(normalized)) return /^\u001bP!\|[0-9a-fA-F]{8}\u001b\\$/;
+  if (/^\u001b\[>[0-9]*q$/.test(normalized)) return /^\u001bP>\|libghostty\u001b\\$/;
   if (normalized === "\u001b[?u") return /^\u001b\[\?[0-9]{1,5}u$/;
   const mode = /^\u001b\[(\??)([0-9]{1,5})\$p$/.exec(normalized);
-  if (mode) return new RegExp(`^\\x1b\\[${mode[1] ? "\\?" : ""}${mode[2]};[0-4]\\$y$`);
+  if (mode) return new RegExp(`^\\x1b\\[${mode[1] ? "\\?" : ""}${Number(mode[2])};[0-4]\\$y$`);
   const color = /^\u001b\](10|11|12);\?(?:\u0007|\u001b\\|\u009c)$/.exec(normalized);
   if (color)
     return new RegExp(
@@ -2324,8 +2372,8 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
         }
 
         if (nextEvent.type === "output") {
-          const sanitized = sanitizeTerminalHistoryChunk(
-            session.pendingHistoryControlSequence,
+          session.pendingProtocolQuery = observeTerminalQueries(
+            session.pendingProtocolQuery,
             nextEvent.data,
             (sequence) => {
               const pattern = terminalProtocolReplyPattern(sequence);
@@ -2335,6 +2383,10 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
                 .slice(-63);
               session.protocolReplies.push({ pattern, expiresAt: now + 10_000 });
             },
+          );
+          const sanitized = sanitizeTerminalHistoryChunk(
+            session.pendingHistoryControlSequence,
+            nextEvent.data,
           );
           session.pendingHistoryControlSequence = sanitized.pendingControlSequence;
           if (sanitized.visibleText.length > 0) {
@@ -2604,6 +2656,7 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
               session.process = ptyProcess;
               session.terminalInstanceId = NodeCrypto.randomUUID();
               session.protocolReplies = [];
+              session.pendingProtocolQuery = "";
               session.shell = spawnResult.shell;
               session.pid = processPid;
               session.status = "running";
@@ -2980,6 +3033,7 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
         inputCount: 0,
         humanInputEpoch: 0,
         protocolReplies: [],
+        pendingProtocolQuery: "",
         cols,
         rows,
         process: null,
@@ -3470,21 +3524,25 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
         ) {
           throw new TerminalNotRunningError({ threadId: input.threadId, terminalId });
         }
+        let matchedReply: (typeof session.protocolReplies)[number] | undefined;
         if (input.protocolReply) {
-          const index = session.protocolReplies.findIndex(
-            (reply) => reply.expiresAt > now && reply.pattern.test(input.data),
-          );
-          if (
-            expected ||
-            input.protocolReply.terminalInstanceId !== session.terminalInstanceId ||
-            index < 0
-          )
+          if (expected || input.protocolReply.terminalInstanceId !== session.terminalInstanceId)
             throw new Error("No outstanding same-instance terminal query matches this reply");
-          session.protocolReplies.splice(index, 1);
+          session.protocolReplies = session.protocolReplies.filter(
+            (reply) => reply.expiresAt > now,
+          );
+          matchedReply = session.protocolReplies.find(
+            (reply) => reply.response === undefined && reply.pattern.test(input.data),
+          );
+          if (!matchedReply) {
+            if (session.protocolReplies.some((reply) => reply.response === input.data)) return;
+            throw new Error("No outstanding same-instance terminal query matches this reply");
+          }
         }
         session.inputCount += 1;
         if (!expected && !input.protocolReply) session.humanInputEpoch += 1;
         process.write(input.data);
+        if (matchedReply) matchedReply.response = input.data;
       },
       catch: (cause) =>
         isTerminalNotRunningError(cause)

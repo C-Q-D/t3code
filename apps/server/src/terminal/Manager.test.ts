@@ -1,4 +1,5 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
+import * as NodeURL from "node:url";
 import { assert, it } from "@effect/vitest";
 import {
   DEFAULT_TERMINAL_ID,
@@ -47,9 +48,10 @@ vi.mock("effect/SynchronizedRef", async (importOriginal) => {
   return { ...original, make: vi.fn(original.make) };
 });
 
-// The server omits DOM types, which include TypeScript's WebAssembly declarations.
-
 const encodeUnknownJson = Schema.encodeUnknownSync(Schema.fromJsonString(Schema.Unknown));
+const decodeProtocolReplies = Schema.decodeUnknownSync(
+  Schema.fromJsonString(Schema.Array(Schema.Array(Schema.String))),
+);
 
 class FakePtyProcess implements PtyAdapter.PtyProcess {
   readonly writes: string[] = [];
@@ -465,14 +467,12 @@ it.layer(
         yield* manager.write({ ...target, data: "\x1b[0n", protocolReply });
         expect((yield* manager.inspectExisting(target)).humanInputEpoch).toBe(0);
         expect(ptyAdapter.processes[0]!.writes).toEqual(["\x1b[0n"]);
-        expect(
-          yield* Effect.flip(manager.write({ ...target, data: "\x1b[0n", protocolReply })),
-        ).toMatchObject({ _tag: "TerminalWriteError" });
+        yield* manager.write({ ...target, data: "\x1b[0n", protocolReply });
+        expect(ptyAdapter.processes[0]!.writes).toEqual(["\x1b[0n"]);
         ptyAdapter.processes[0]!.emitData("\x1b]2;\x1b[5n\x07");
         yield* Queue.take(query);
-        expect(
-          yield* Effect.exit(manager.write({ ...target, data: "\x1b[0n", protocolReply })),
-        ).toMatchObject({ _tag: "Failure" });
+        yield* manager.write({ ...target, data: "\x1b[0n", protocolReply });
+        expect(ptyAdapter.processes[0]!.writes).toEqual(["\x1b[0n", "\x1b[0n"]);
         ptyAdapter.processes[0]!.emitData("\x1b[5n");
         yield* Queue.take(query);
         yield* TestClock.adjust("10 seconds");
@@ -489,6 +489,87 @@ it.layer(
         yield* manager.write({ ...target, data: "human" });
         expect((yield* manager.inspectExisting(target)).humanInputEpoch).toBe(1);
       }).pipe(Effect.provide(TestClock.layer())),
+  );
+
+  it.effect("forwards bundled Ghostty replies once across interrupted and split queries", () =>
+    Effect.gen(function* () {
+      const queries = [
+        ["\x1b[1c"],
+        ["\x1b[>1c"],
+        ["\x1b[05n"],
+        ["\x1b[?02004$p"],
+        ["\x1b]2;\x1b[5n\x07"],
+        ["\x1b[1\x1b[5n"],
+        ["\x1b]2;\x1b", "[05n\x07"],
+        ["\x1b[1\x1b", "[5n"],
+        ["\x1bPpayload\x1b", "[5n\x1b\\"],
+        ["\x1b[>q"],
+      ];
+      const output = yield* (yield* ProcessRunner.ProcessRunner).run({
+        command: process.execPath,
+        args: [
+          NodeURL.fileURLToPath(new URL("./ghosttyProtocol.fixture.mjs", import.meta.url)),
+          JSON.stringify(queries),
+        ],
+      });
+      expect(output.code).toBe(0);
+      const replies = decodeProtocolReplies(output.stdout);
+      expect(replies).toEqual([
+        ["\x1b[?62;22c"],
+        ["\x1b[>1;0;0c"],
+        ["\x1b[0n"],
+        ["\x1b[?2004;2$y"],
+        ["\x1b[0n"],
+        ["\x1b[0n"],
+        ["\x1b[0n"],
+        ["\x1b[0n"],
+        ["\x1b[0n"],
+        ["\x1bP>|libghostty\x1b\\"],
+      ]);
+      const { manager, ptyAdapter } = yield* createManager(5, { processKillGraceMs: 0 });
+      const target = { threadId: "thread-1", terminalId: DEFAULT_TERMINAL_ID };
+      yield* manager.open(openInput());
+      let protocolReply = {
+        terminalInstanceId: (yield* manager.inspectExisting(target)).terminalInstanceId,
+      };
+      const outputs = yield* Queue.unbounded<void>();
+      yield* manager.subscribe((event) =>
+        event.type === "output" ? Queue.offer(outputs, undefined).pipe(Effect.asVoid) : Effect.void,
+      );
+      const outcomes: Array<{ query: string[]; forwarded: string; duplicate: string }> = [];
+      let forged: string | undefined;
+      for (const [index, chunks] of queries.entries()) {
+        if (index > 0) {
+          yield* manager.close(target);
+          yield* manager.open(openInput());
+          protocolReply = {
+            terminalInstanceId: (yield* manager.inspectExisting(target)).terminalInstanceId,
+          };
+        }
+        for (const chunk of chunks) {
+          ptyAdapter.processes.at(-1)!.emitData(chunk);
+          yield* Queue.take(outputs);
+        }
+        if (index === queries.length - 1) {
+          forged = (yield* Effect.exit(
+            manager.write({ ...target, protocolReply, data: "\x1bP>|echo forged\x1b\\" }),
+          ))._tag;
+        }
+        for (const data of replies[index]!) {
+          const forwarded = (yield* Effect.exit(manager.write({ ...target, protocolReply, data })))
+            ._tag;
+          const duplicate = (yield* Effect.exit(manager.write({ ...target, protocolReply, data })))
+            ._tag;
+          outcomes.push({ query: chunks, forwarded, duplicate });
+        }
+      }
+      expect({ forged, outcomes }).toEqual({
+        forged: "Failure",
+        outcomes: queries.map((query) => ({ query, forwarded: "Success", duplicate: "Success" })),
+      });
+      expect(ptyAdapter.processes.flatMap((process) => process.writes)).toEqual(replies.flat());
+      expect((yield* manager.inspectExisting(target)).humanInputEpoch).toBe(0);
+    }),
   );
 
   it.effect("rejects writes after process exit", () =>
