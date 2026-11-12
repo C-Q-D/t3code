@@ -256,6 +256,7 @@ export class TerminalAutomationController {
   private register(): Promise<void> {
     if (this.registering) return this.registering;
     const generation = this.generation;
+    let pending: Promise<void> | undefined;
     const work = async () => {
       let version: number;
       do {
@@ -264,13 +265,29 @@ export class TerminalAutomationController {
         const views = [...this.views.values()]
           .filter(({ view }) => view.canOperate())
           .map(({ view }) => view.candidate);
-        await this.transport.registerViews(views);
+        try {
+          await this.transport.registerViews(views);
+        } catch (error) {
+          if (
+            typeof error === "object" &&
+            error !== null &&
+            "code" in error &&
+            error.code === "target_invalid" &&
+            version !== this.registrationVersion &&
+            generation === this.generation &&
+            this.snapshot.ready &&
+            !this.disposed
+          )
+            continue;
+          if (this.registering === pending) this.registering = undefined;
+          throw error;
+        }
         if (generation !== this.generation || this.disposed) return;
         await this.synchronize();
       } while (version !== this.registrationVersion);
       if (this.registering === pending) this.registering = undefined;
     };
-    const pending = work().finally(() => {
+    pending = work().finally(() => {
       if (this.registering === pending) this.registering = undefined;
     });
     this.registering = pending;

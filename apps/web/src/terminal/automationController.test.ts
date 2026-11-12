@@ -16,10 +16,12 @@ const paused: A.TerminalAutomationConnectionState = {
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((done) => {
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((done, fail) => {
     resolve = done;
+    reject = fail;
   });
-  return { promise, resolve };
+  return { promise, resolve, reject };
 }
 
 function setup() {
@@ -214,6 +216,124 @@ it("stops a failed registration even when views change while it waits", async ()
   f.controller.setView({ ...f.view, candidate: { ...f.view.candidate, visible: true } });
   proceed.resolve();
   await failed.promise;
+  expect(f.transport.registerViews).toHaveBeenCalledTimes(1);
+  stop();
+  f.controller.dispose();
+});
+
+it.each(["waiting", "completion"] as const)(
+  "sends the latest views after an obsolete invalid registration fails during %s",
+  async (stage) => {
+    const f = setup();
+    const second = {
+      ...f.view,
+      candidate: { ...f.view.candidate, target: { ...target, viewId: "closing" } },
+    };
+    f.controller.setView(second);
+    await f.ready();
+    await f.controller.synchronize();
+    const proceed = deferred<void>();
+    const settled = deferred<void>();
+    let accepted: readonly A.TerminalAutomationCandidate[] = [];
+    let first = true;
+    const update = () => f.controller.removeView(second.candidate.target);
+    f.transport.registerViews = vi.fn((views) => {
+      if (first) {
+        first = false;
+        if (stage === "completion") void proceed.promise.catch(() => {}).then(update);
+        return proceed.promise;
+      }
+      accepted = views;
+      return Promise.resolve();
+    });
+    const stop = f.controller.subscribe(() => {
+      if (f.controller.getSnapshot().error || accepted.length > 0) settled.resolve();
+    });
+    f.controller.setView({ ...f.view, candidate: { ...f.view.candidate, visible: true } });
+    if (stage === "waiting") update();
+    proceed.reject({ code: "target_invalid" });
+    await settled.promise;
+    await f.controller.synchronize();
+    expect(accepted).toEqual([{ ...f.view.candidate, visible: true }]);
+    expect(f.transport.registerViews).toHaveBeenCalledTimes(2);
+    expect(f.transport.registerViews).toHaveBeenLastCalledWith(accepted);
+    stop();
+    f.controller.dispose();
+  },
+);
+
+it.each(["unchanged", "permission", "connection", "ended", "disposed"] as const)(
+  "does not resend a rejected registration when %s",
+  async (mode) => {
+    const f = setup();
+    await f.ready();
+    await f.controller.synchronize();
+    const proceed = deferred<void>();
+    const settled = deferred<void>();
+    const error =
+      mode === "permission"
+        ? { _tag: "EnvironmentAuthorizationError" }
+        : { code: mode === "connection" ? "client_unavailable" : "target_invalid" };
+    f.transport.registerViews = vi.fn(() => proceed.promise);
+    const stop = f.controller.subscribe(() => {
+      if (f.controller.getSnapshot().error === error) settled.resolve();
+    });
+    f.controller.setView(f.view);
+    if (mode !== "unchanged")
+      f.controller.setView({ ...f.view, candidate: { ...f.view.candidate, visible: true } });
+    if (mode === "ended") f.end();
+    if (mode === "disposed") f.controller.dispose();
+    proceed.reject(error);
+    if (mode === "ended" || mode === "disposed")
+      await proceed.promise.catch(() => {}).then(() => {});
+    else await settled.promise;
+    expect(f.transport.registerViews).toHaveBeenCalledTimes(1);
+    stop();
+    f.controller.dispose();
+  },
+);
+
+it("stops after the latest registration also rejects its target", async () => {
+  const f = setup();
+  await f.ready();
+  await f.controller.synchronize();
+  const proceed = deferred<void>();
+  const settled = deferred<void>();
+  const error = { code: "target_invalid" };
+  f.transport.registerViews = vi
+    .fn()
+    .mockImplementationOnce(() => proceed.promise)
+    .mockRejectedValue(error);
+  const stop = f.controller.subscribe(() => {
+    if (f.controller.getSnapshot().error === error) settled.resolve();
+  });
+  f.controller.setView(f.view);
+  f.controller.setView({ ...f.view, candidate: { ...f.view.candidate, visible: true } });
+  proceed.reject(error);
+  await settled.promise;
+  expect(f.transport.registerViews).toHaveBeenCalledTimes(2);
+  expect(f.transport.registerViews).toHaveBeenLastCalledWith([
+    { ...f.view.candidate, visible: true },
+  ]);
+  stop();
+  f.controller.dispose();
+});
+
+it("preserves a synchronous registration failure", async () => {
+  const f = setup();
+  await f.ready();
+  await f.controller.synchronize();
+  const failed = deferred<void>();
+  const error = new Error("send failed synchronously");
+  f.transport.registerViews = vi.fn(() => {
+    throw error;
+  });
+  const stop = f.controller.subscribe(() => {
+    if (f.controller.getSnapshot().error) failed.resolve();
+  });
+  f.controller.setView(f.view);
+  await failed.promise;
+  expect(f.controller.getSnapshot().error).toBe(error);
   expect(f.transport.registerViews).toHaveBeenCalledTimes(1);
   stop();
   f.controller.dispose();
