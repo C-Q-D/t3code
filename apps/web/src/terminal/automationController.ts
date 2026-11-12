@@ -46,10 +46,16 @@ export class TerminalAutomationController {
       view: TerminalAutomationView;
       barrier: number;
       blocked: boolean;
+      blockedBindings: Set<string>;
+      pendingReports: number;
+      reportFailed: boolean;
       permits: Map<string, number>;
     }
   >();
-  private requests = new Map<string, AbortController>();
+  private requests = new Map<
+    string,
+    { abort: AbortController; target: A.TerminalAutomationTarget; bindingId: string }
+  >();
   private listeners = new Set<() => void>();
   private stop: (() => void) | undefined;
   private registrationVersion = 0;
@@ -93,13 +99,15 @@ export class TerminalAutomationController {
   private invalidate = () => {
     this.generation += 1;
     this.queryVersion += 1;
-    for (const request of this.requests.values()) request.abort();
+    for (const request of this.requests.values()) request.abort.abort();
     this.requests.clear();
     this.registering = undefined;
     for (const entry of this.views.values()) {
       entry.view.invalidate();
       entry.permits.clear();
       entry.blocked = false;
+      entry.blockedBindings.clear();
+      entry.reportFailed = false;
       entry.barrier += 1;
     }
     this.publish({ ready: false, bindings: [], selections: [], localPausedTargets: [] });
@@ -131,7 +139,15 @@ export class TerminalAutomationController {
       current.view = view;
     } else {
       current?.view.invalidate();
-      this.views.set(id, { view, barrier: 0, blocked: false, permits: new Map() });
+      this.views.set(id, {
+        view,
+        barrier: 0,
+        blocked: false,
+        blockedBindings: new Set(),
+        pendingReports: 0,
+        reportFailed: false,
+        permits: new Map(),
+      });
     }
     this.registrationVersion += 1;
     if (this.snapshot.ready) void this.register().catch(this.fail);
@@ -186,6 +202,14 @@ export class TerminalAutomationController {
     const state = await this.transport.getConnectionState();
     if (generation !== this.generation || version !== this.queryVersion || this.disposed)
       throw new TerminalBridgeError("stale_request");
+    const liveIds = new Set([
+      ...state.bindings.map((item) => item.binding.bindingId),
+      ...[...this.requests.values()].map((item) => item.bindingId),
+    ]);
+    for (const entry of this.views.values()) {
+      for (const id of entry.blockedBindings)
+        if (!liveIds.has(id)) entry.blockedBindings.delete(id);
+    }
     this.publish({ bindings: state.bindings });
     return state;
   }
@@ -195,6 +219,14 @@ export class TerminalAutomationController {
     if (!entry || !sameTarget(entry.view.candidate.target, target)) return;
     entry.barrier += 1;
     entry.blocked = true;
+    entry.reportFailed = true;
+    for (const state of this.snapshot.bindings) {
+      if (sameTarget(state.binding.target, target))
+        entry.blockedBindings.add(state.binding.bindingId);
+    }
+    for (const request of this.requests.values()) {
+      if (sameTarget(request.target, target)) entry.blockedBindings.add(request.bindingId);
+    }
     entry.permits.clear();
     entry.view.invalidate();
     this.queryVersion += 1;
@@ -204,9 +236,17 @@ export class TerminalAutomationController {
         .map((item) => item.view.candidate.target),
     });
     if (this.snapshot.ready) {
+      entry.pendingReports += 1;
+      const barrier = entry.barrier;
       const reported = this.transport
         .reportEvent({ version: 1, target, event: "human_intervened" })
-        .then(() => this.refreshState());
+        .then(() => {
+          if (entry.barrier === barrier) entry.reportFailed = false;
+          return this.refreshState();
+        })
+        .finally(() => {
+          entry.pendingReports -= 1;
+        });
       void reported.catch(this.fail);
       return reported;
     }
@@ -292,7 +332,8 @@ export class TerminalAutomationController {
       });
       return;
     }
-    this.requests.set(request.bridgeRequestId, abort);
+    const pending = { abort, target: request.binding.target, bindingId: request.binding.bindingId };
+    this.requests.set(request.bridgeRequestId, pending);
     const timeout = setTimeout(() => abort.abort(), 10_000);
     const guard = () => {
       if (
@@ -311,7 +352,9 @@ export class TerminalAutomationController {
       if (!entry.view.canOperate()) throw new TerminalBridgeError("target_invalid");
       if (
         entry.barrier !== barrier ||
-        (entry.blocked &&
+        entry.pendingReports > 0 ||
+        entry.reportFailed ||
+        (entry.blockedBindings.has(request.binding.bindingId) &&
           entry.permits.get(request.binding.bindingId) !== request.binding.inputEpoch)
       )
         throw new TerminalBridgeError("human_intervened");
@@ -329,6 +372,15 @@ export class TerminalAutomationController {
     try {
       let result: A.TerminalAutomationClientReply["result"];
       try {
+        if (
+          !this.snapshot.bindings.some(
+            (item) => item.binding.bindingId === request.binding.bindingId,
+          )
+        ) {
+          const state = await this.refreshState();
+          if (!state.bindings.some((item) => item.binding.bindingId === request.binding.bindingId))
+            throw new TerminalBridgeError("target_invalid");
+        }
         guard();
         result = await entry!.view.perform(request, guard, abort.signal);
         guard();
@@ -349,7 +401,7 @@ export class TerminalAutomationController {
         });
     } finally {
       clearTimeout(timeout);
-      if (this.requests.get(request.bridgeRequestId) === abort)
+      if (this.requests.get(request.bridgeRequestId) === pending)
         this.requests.delete(request.bridgeRequestId);
     }
   }

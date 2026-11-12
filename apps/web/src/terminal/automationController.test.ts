@@ -44,7 +44,7 @@ function setup() {
     },
     replySelection: async () => {},
     reportEvent: async () => {},
-    getConnectionState: async () => ({ version: 1, bindings: [] }),
+    getConnectionState: async () => ({ version: 1, bindings: [{ status: "bound", binding }] }),
     resume: vi.fn(async (): Promise<A.TerminalAutomationStatus> => ({
       version: 1,
       candidateVersion: 1,
@@ -99,6 +99,20 @@ it("registers mounted instances only after ready and re-registers on reconnect",
   f.start();
   await f.ready();
   expect(f.transport.registerViews).toHaveBeenCalledTimes(2);
+  f.controller.dispose();
+});
+
+it("accepts a new binding after pre-binding human input while rejecting interrupted old work", async () => {
+  const f = setup();
+  f.transport.getConnectionState = async () => ({ version: 1, bindings: [] });
+  await f.ready();
+  await f.controller.humanInput(target);
+  f.transport.getConnectionState = async () => ({
+    version: 1,
+    bindings: [{ status: "bound", binding }],
+  });
+  f.emit({ version: 1, operation: "show", bridgeRequestId: "first-bind", binding });
+  expect((await f.reply.promise).result).toEqual({ operation: "show", status: "visible" });
   f.controller.dispose();
 });
 
