@@ -1370,7 +1370,7 @@ function observeTerminalQueries(
       }
       continue;
     }
-    if (pending.startsWith("\x1b[") && char.charCodeAt(0) < 0x20) continue;
+    if (pending.startsWith("\x1b[") && (char.charCodeAt(0) < 0x20 || char === "\x7f")) continue;
     pending += char;
     if (
       (pending.startsWith("\x1b[") && isCsiFinalByte(char.charCodeAt(0))) ||
@@ -1389,7 +1389,9 @@ function terminalProtocolReplyPattern(sequence: string): RegExp | undefined {
   const normalized = sequence
     .replace(/^\u009b/, "\u001b[")
     .replace(/^\u009d/, "\u001b]")
-    .replace(/^\u0090/, "\u001bP");
+    .replace(/^\u0090/, "\u001bP")
+    // Ghostty dispatches these queries using the first parameter.
+    .replace(/^(\u001b\[>?[0-9]*)(?:;[0-9]*)+([ncq])$/, "$1$2");
   if (/^\u001b\[0*5n$/.test(normalized)) return /^\u001b\[0n$/;
   if (/^\u001b\[0*6n$/.test(normalized)) return /^\u001b\[[1-9][0-9]{0,3};[1-9][0-9]{0,3}R$/;
   if (normalized === "\u001b[?6n") return /^\u001b\[\?[1-9][0-9]{0,3};[1-9][0-9]{0,3}R$/;

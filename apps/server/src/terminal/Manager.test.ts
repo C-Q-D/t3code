@@ -494,6 +494,12 @@ it.layer(
   it.effect("forwards bundled Ghostty replies once across interrupted and split queries", () =>
     Effect.gen(function* () {
       const queries = [
+        ["\x1b[5;n"],
+        ["\x1b[6;n"],
+        ["\x1b[1;2c"],
+        ["\x1b[>1;2c"],
+        ["\x1b[>0;1q"],
+        ["\x1b[5\x7fn"],
         ["\x1b[1c"],
         ["\x1b[>1c"],
         ["\x1b[05n"],
@@ -517,6 +523,12 @@ it.layer(
       expect(output.code).toBe(0);
       const replies = decodeProtocolReplies(output.stdout);
       expect(replies).toEqual([
+        ["\x1b[0n"],
+        ["\x1b[1;1R"],
+        ["\x1b[?62;22c"],
+        ["\x1b[>1;0;0c"],
+        ["\x1bP>|libghostty\x1b\\"],
+        ["\x1b[0n"],
         ["\x1b[?62;22c"],
         ["\x1b[>1;0;0c"],
         ["\x1b[0n"],
