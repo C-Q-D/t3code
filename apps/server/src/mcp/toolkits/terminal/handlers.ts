@@ -38,6 +38,7 @@ const withAuthorization = Effect.fn("TerminalToolkit.withAuthorization")(functio
         return false;
       case "run.created":
       case "run.updated":
+        if (activeRunId === undefined) return false;
         return event.payload.id === activeRunId
           ? ["preparing", "starting", "running", "waiting"].includes(event.payload.status)
           : !["preparing", "starting", "running", "waiting"].includes(event.payload.status);
