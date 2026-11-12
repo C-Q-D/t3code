@@ -175,16 +175,27 @@ export function applyTerminalAttachStreamEvent(
   let automation = current.automation;
   if (event.type === "snapshot" || event.type === "restarted") {
     const snapshot = event.snapshot;
-    automation = {
-      terminalInstanceId:
-        snapshot.sequence === undefined ? null : (snapshot.terminalInstanceId ?? null),
-      sequence: snapshot.sequence ?? 0,
-      chunks:
-        snapshot.sequence === undefined
-          ? []
-          : [{ sequence: snapshot.sequence, data: snapshot.history }],
-      gap: snapshot.sequence === undefined,
-    };
+    const sameInstance =
+      automation !== undefined &&
+      automation.terminalInstanceId !== null &&
+      automation?.terminalInstanceId === snapshot.terminalInstanceId;
+    if (
+      !(
+        sameInstance &&
+        snapshot.sequence !== undefined &&
+        snapshot.sequence <= automation!.sequence
+      )
+    )
+      automation = {
+        terminalInstanceId:
+          snapshot.sequence === undefined ? null : (snapshot.terminalInstanceId ?? null),
+        sequence: snapshot.sequence ?? 0,
+        chunks:
+          snapshot.sequence === undefined
+            ? []
+            : [{ sequence: snapshot.sequence, data: snapshot.history }],
+        gap: snapshot.sequence === undefined || sameInstance,
+      };
   } else if (automation && event.sequence !== undefined && event.sequence > automation.sequence) {
     let chunks =
       event.type === "output"

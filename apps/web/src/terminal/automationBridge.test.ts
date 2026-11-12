@@ -63,6 +63,17 @@ it("reads actual sequenced PTY chunks with UTF16 budgets, gaps and instance rese
     data: "tail",
   });
   const budget = { maxCodeUnits: 3, maxLines: 1 };
+  state = applyTerminalAttachStreamEvent(state, {
+    type: "snapshot",
+    snapshot: { ...snapshot, sequence: 3, history: "a😀b\ntail" },
+  });
+  expect(
+    readAutomationOutput(
+      state.automation!,
+      { source: "output", cursor: { sequence: 3, codeUnitOffset: 4 }, budget },
+      frame,
+    ),
+  ).toMatchObject({ text: "", change: "no_change", continuity: "complete" });
   const first = readAutomationOutput(
     state.automation!,
     { source: "output", cursor: null, budget },
