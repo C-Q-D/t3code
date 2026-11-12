@@ -28,6 +28,16 @@ import { ThreadRouteView } from "../ThreadRouteView";
 import { ChatRightPanel } from "./ChatRightPanel";
 import { RightPanelSurfaceContent } from "./RightPanelSurfaceContent";
 
+vi.mock("../../panelAnimations", () => ({
+  usePanelAnimationSettings: () => ({ active: false, durationMs: 0 }),
+  usePanelPresence: (present: boolean) => ({ present }),
+}));
+vi.mock("../../state/terminal", () => ({
+  subscribeTerminalAutomation: () => () => {},
+  terminalAutomationRevision: () => 0,
+  getTerminalAutomation: () => undefined,
+}));
+
 const state = vi.hoisted(() => ({
   refs: [] as Array<{ environmentId: EnvironmentId; threadId: ThreadId }>,
   allowed: true,

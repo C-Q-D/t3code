@@ -12,13 +12,13 @@ import {
   createContext,
   useContext,
   useLayoutEffect,
-  useRef,
   useState,
   type Dispatch,
   type ReactNode,
   type SetStateAction,
 } from "react";
-import { createPortal } from "react-dom";
+import { RetainedTerminalPortal } from "./RetainedTerminalPortal";
+import { ChatTerminalDrawersProvider } from "./ChatTerminalDrawers";
 import { useComposerDraftStore } from "../../composerDraftStore";
 import { useRightPanelStore, type RightPanelSurface } from "../../rightPanelStore";
 import { useQuietThreadShell, useThreadRefs } from "../../state/entities";
@@ -62,22 +62,10 @@ function RetainedTerminal({
   target,
   ...props
 }: PersistentThreadTerminalPanelProps & { target: HTMLDivElement | null }) {
-  const [container] = useState(() => {
-    const element = document.createElement("div");
-    element.className = "flex h-full min-h-0 flex-1 flex-col";
-    return element;
-  });
-  const parking = useRef<HTMLDivElement>(null);
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- moves the same portal container between the visible panel slot and hidden parking without replacing its terminal effects
-  useLayoutEffect(() => {
-    (target ?? parking.current)?.appendChild(container);
-    return () => container.remove();
-  }, [container, target]);
   return (
-    <>
-      <div hidden ref={parking} />
-      {createPortal(<PersistentThreadTerminalPanel {...props} />, container)}
-    </>
+    <RetainedTerminalPortal target={target}>
+      <PersistentThreadTerminalPanel {...props} />
+    </RetainedTerminalPortal>
   );
 }
 
@@ -196,7 +184,7 @@ export function ChatRightPanelTerminalProvider({ children }: { children: ReactNo
   return (
     <TerminalHostContext.Provider value={configureHost}>
       <TerminalSlotContext.Provider value={registerSlot}>
-        {children}
+        <ChatTerminalDrawersProvider>{children}</ChatTerminalDrawersProvider>
         {configuration
           ? Object.entries(panels).map(([key, panel]) => {
               const threadRef = existing.has(key) ? parseScopedThreadKey(key) : null;

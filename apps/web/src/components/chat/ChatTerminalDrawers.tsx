@@ -4,7 +4,17 @@ import {
   scopedThreadKey,
   scopeThreadRef,
 } from "@t3tools/client-runtime/environment";
-import { useState, useSyncExternalStore } from "react";
+import {
+  createContext,
+  useContext,
+  useLayoutEffect,
+  useState,
+  useSyncExternalStore,
+  type Dispatch,
+  type SetStateAction,
+  type ReactNode,
+} from "react";
+import { RetainedTerminalPortal } from "./RetainedTerminalPortal";
 import {
   getTerminalAutomation,
   subscribeTerminalAutomation,
@@ -44,7 +54,7 @@ interface ChatTerminalDrawersProps {
  * to one finds its sessions as they were. Every thread's terminal and draft
  * state feeds the reconcile, so it subscribes here instead of in ChatView.
  */
-export function ChatTerminalDrawers(props: ChatTerminalDrawersProps) {
+function RetainedChatTerminalDrawers(props: ChatTerminalDrawersProps) {
   useSyncExternalStore(subscribeTerminalAutomation, terminalAutomationRevision);
   const { activeThreadKey } = props;
   const openTerminalThreadKeys = useTerminalUiStateStore(
@@ -117,4 +127,44 @@ export function ChatTerminalDrawers(props: ChatTerminalDrawersProps) {
       onAddTerminalContext={props.onAddTerminalContext}
     />
   ));
+}
+
+type Configuration = { props: ChatTerminalDrawersProps; element: HTMLDivElement | null };
+const DrawerHostContext = createContext<Dispatch<SetStateAction<Configuration | null>> | null>(
+  null,
+);
+
+export function ChatTerminalDrawersProvider({ children }: { children: ReactNode }) {
+  const [configuration, configure] = useState<Configuration | null>(null);
+  return (
+    <DrawerHostContext.Provider value={configure}>
+      {children}
+      {configuration ? (
+        <RetainedTerminalPortal target={configuration.element} fill={false}>
+          <RetainedChatTerminalDrawers {...configuration.props} />
+        </RetainedTerminalPortal>
+      ) : null}
+    </DrawerHostContext.Provider>
+  );
+}
+
+export function ChatTerminalDrawers(props: ChatTerminalDrawersProps) {
+  const configure = useContext(DrawerHostContext);
+  const [element, setElement] = useState<HTMLDivElement | null>(null);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- publishes the layout slot to the stable terminal owner above keyed ChatViews
+  useLayoutEffect(() => {
+    if (!configure) return;
+    const configuration = { props, element };
+    configure(configuration);
+    return () =>
+      configure((current) =>
+        current === configuration
+          ? {
+              props: { ...current.props, activeThreadKey: null, activeTerminalOpen: false },
+              element: null,
+            }
+          : current,
+      );
+  }, [configure, element, props]);
+  return <div className="flex min-h-0 shrink-0 flex-col" ref={setElement} />;
 }
