@@ -96,8 +96,16 @@ function setup() {
 it("preserves subscription failure in the controller snapshot and invalidates ready", async () => {
   const f = setup();
   await f.ready();
+  await f.controller.synchronize();
+  const query = deferred<A.TerminalAutomationConnectionState>();
+  f.transport.getConnectionState = () => query.promise;
+  f.emit({ type: "state_changed", revision: 1 });
+  const pending = f.controller.synchronize();
   const error = { code: "client_unavailable" };
   f.fail(error);
+  expect(f.controller.getSnapshot()).toMatchObject({ ready: false, bindings: [], error });
+  query.resolve({ version: 1, revision: 1, bindings: [], selections: [] });
+  await expect(pending).rejects.toThrow("stale_request");
   expect(f.controller.getSnapshot()).toMatchObject({ ready: false, bindings: [], error });
   f.controller.dispose();
 });

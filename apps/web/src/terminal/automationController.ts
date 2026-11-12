@@ -125,6 +125,12 @@ export class TerminalAutomationController {
   private fail = (error: unknown) => {
     if (!this.disposed) this.publish({ error });
   };
+  private currentFailureHandler() {
+    const generation = this.generation;
+    return (error: unknown) => {
+      if (generation === this.generation) this.fail(error);
+    };
+  }
 
   start() {
     if (this.stop || this.disposed) return;
@@ -181,14 +187,14 @@ export class TerminalAutomationController {
         if (event.revision <= this.notifiedRevision) return;
         this.notifiedRevision = event.revision;
         this.queryVersion += 1;
-        void this.synchronize().catch(this.fail);
+        void this.synchronize().catch(this.currentFailureHandler());
         return;
       }
       this.publish({ ready: true });
-      void this.register().catch(this.fail);
+      void this.register().catch(this.currentFailureHandler());
     } else if ("selectionRequestId" in event) {
       if (this.authoritativeSelections) {
-        void this.synchronize().catch(this.fail);
+        void this.synchronize().catch(this.currentFailureHandler());
         return;
       }
       this.publish({
@@ -200,7 +206,7 @@ export class TerminalAutomationController {
         ].slice(-128),
       });
     } else {
-      void this.handle(event).catch(this.fail);
+      void this.handle(event).catch(this.currentFailureHandler());
     }
   };
 
@@ -222,7 +228,7 @@ export class TerminalAutomationController {
       });
     }
     this.registrationVersion += 1;
-    if (this.snapshot.ready) void this.register().catch(this.fail);
+    if (this.snapshot.ready) void this.register().catch(this.currentFailureHandler());
   }
 
   removeView(
@@ -240,8 +246,10 @@ export class TerminalAutomationController {
     });
     this.registrationVersion += 1;
     if (this.snapshot.ready) {
-      void this.transport.reportEvent({ version: 1, target, event }).catch(this.fail);
-      void this.register().catch(this.fail);
+      void this.transport
+        .reportEvent({ version: 1, target, event })
+        .catch(this.currentFailureHandler());
+      void this.register().catch(this.currentFailureHandler());
     }
   }
 
@@ -296,7 +304,7 @@ export class TerminalAutomationController {
         if (this.synchronizing !== pending) return;
         this.synchronizing = undefined;
         if (completed && this.snapshot.ready && this.notifiedRevision > this.appliedRevision)
-          void this.synchronize().catch(this.fail);
+          void this.synchronize().catch(this.currentFailureHandler());
       });
     this.synchronizing = pending;
     return pending;
@@ -378,7 +386,7 @@ export class TerminalAutomationController {
         .finally(() => {
           entry.pendingReports -= 1;
         });
-      void reported.catch(this.fail);
+      void reported.catch(this.currentFailureHandler());
       return reported;
     }
   }
@@ -647,7 +655,8 @@ export class TerminalAutomationController {
         guard();
       } catch (error) {
         const code = error instanceof TerminalBridgeError ? error.code : "client_unavailable";
-        if (!(error instanceof TerminalBridgeError)) this.fail(error);
+        if (generation === this.generation && !(error instanceof TerminalBridgeError))
+          this.fail(error);
         result =
           request.operation === "apply_local"
             ? { operation: "apply_local", inputRequestId: request.inputRequestId, error: { code } }
