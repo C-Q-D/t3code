@@ -97,8 +97,11 @@ it("retains ready candidate resources even when a snapshot has no binding, until
   harness.transport.getConnectionState = async () => {
     throw new Error("offline query");
   };
+  await expect(harness.controller.refreshState()).rejects.toThrow("offline query");
   expect(await terminalCanUnmount(harness.controller)).toBe(false);
   harness.transport.getConnectionState = async () => ({ version: 1, bindings: [] });
+  await harness.controller.refreshState();
+  expect(harness.controller.getSnapshot().bindings).toEqual([]);
   expect(await terminalCanUnmount(harness.controller)).toBe(false);
   harness.controller.dispose();
   expect(await terminalCanUnmount(harness.controller)).toBe(true);
