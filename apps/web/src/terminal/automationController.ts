@@ -42,6 +42,15 @@ const sameTarget = (a: A.TerminalAutomationTarget, b: A.TerminalAutomationTarget
   a.viewId === b.viewId;
 
 export class TerminalAutomationController {
+  private confirmations = new Map<
+    string,
+    {
+      binding: A.TerminalAutomationBinding;
+      current: () => boolean;
+      resolved: boolean;
+      pending: boolean;
+    }
+  >();
   private generation = 0;
   private queryVersion = 0;
   private notifiedRevision = 0;
@@ -77,6 +86,7 @@ export class TerminalAutomationController {
     error: unknown;
     resumingBindingIds: readonly string[];
     submittingSelectionIds: readonly string[];
+    unverifiedResumeBindingIds: readonly string[];
   } = {
     ready: false,
     bindings: [],
@@ -85,6 +95,7 @@ export class TerminalAutomationController {
     error: null,
     resumingBindingIds: [],
     submittingSelectionIds: [],
+    unverifiedResumeBindingIds: [],
   };
 
   constructor(private readonly transport: TerminalAutomationTransport) {}
@@ -122,6 +133,7 @@ export class TerminalAutomationController {
     this.appliedRevision = 0;
     this.authoritativeSelections = false;
     this.synchronizing = undefined;
+    this.confirmations.clear();
     for (const request of this.requests.values()) request.abort.abort();
     this.requests.clear();
     this.registering = undefined;
@@ -134,7 +146,13 @@ export class TerminalAutomationController {
       entry.reportFailed = false;
       entry.barrier += 1;
     }
-    this.publish({ ready: false, bindings: [], selections: [], localPausedTargets: [] });
+    this.publish({
+      ready: false,
+      bindings: [],
+      selections: [],
+      localPausedTargets: [],
+      unverifiedResumeBindingIds: [],
+    });
   };
 
   private receive = (event: typeof A.TerminalAutomationRpcEvent.Type) => {
@@ -296,6 +314,7 @@ export class TerminalAutomationController {
     this.appliedRevision = state.revision ?? 0;
     this.authoritativeSelections = state.selections !== undefined;
     this.publish({
+      ...this.reconcileConfirmations(state.bindings),
       bindings: state.bindings,
       selections: state.selections ?? this.snapshot.selections,
       error: null,
@@ -306,6 +325,8 @@ export class TerminalAutomationController {
   humanInput(target: A.TerminalAutomationTarget) {
     const entry = this.views.get(target.viewId);
     if (!entry || !sameTarget(entry.view.candidate.target, target)) return;
+    for (const [id, confirmation] of this.confirmations)
+      if (sameTarget(confirmation.binding.target, target)) this.confirmations.delete(id);
     entry.barrier += 1;
     entry.blocked = true;
     entry.reportFailed = true;
@@ -317,6 +338,7 @@ export class TerminalAutomationController {
       if (sameTarget(request.target, target)) entry.blockedBindings.add(request.bindingId);
     }
     entry.permits.clear();
+    this.publishConfirmationState();
     entry.view.invalidate();
     this.queryVersion += 1;
     this.publish({
@@ -354,14 +376,60 @@ export class TerminalAutomationController {
     }
   }
 
+  private confirmationState() {
+    return {
+      unverifiedResumeBindingIds: [...this.confirmations]
+        .filter(([, item]) => !item.resolved)
+        .map(([id]) => id),
+      localPausedTargets: [...this.views.values()]
+        .filter((entry) => entry.blocked)
+        .map((entry) => entry.view.candidate.target),
+    };
+  }
+
+  private publishConfirmationState() {
+    this.publish(this.confirmationState());
+  }
+
+  private reconcileConfirmations(states: A.TerminalAutomationConnectionState["bindings"]) {
+    for (const [id, confirmation] of this.confirmations) {
+      const state = states.find((item) => item.binding.bindingId === id);
+      const entry = this.views.get(confirmation.binding.target.viewId);
+      if (
+        !confirmation.current() ||
+        !entry ||
+        !state ||
+        state.status === "invalid" ||
+        state.binding.inputEpoch !== confirmation.binding.inputEpoch ||
+        !sameTarget(state.binding.target, confirmation.binding.target)
+      ) {
+        entry?.permits.delete(id);
+        this.confirmations.delete(id);
+        continue;
+      }
+      if (state.status === "bound") {
+        entry.permits.set(id, state.binding.inputEpoch);
+        entry.blockedBindings.delete(id);
+        entry.blocked = entry.blockedBindings.size > 0;
+        confirmation.resolved = true;
+      } else {
+        entry.permits.delete(id);
+        entry.blockedBindings.add(id);
+        entry.blocked = true;
+        confirmation.resolved = false;
+        if (!confirmation.pending) this.confirmations.delete(id);
+      }
+    }
+    return this.confirmationState();
+  }
+
   private async resumeConfirmed(bindingId: string, confirmedInputEpoch: number) {
     const generation = this.generation;
     const queryVersion = this.queryVersion;
-    const expiresAt = Date.now() + 10_000;
-    const state = await this.refreshState();
+    await this.refreshState();
     if (generation !== this.generation || this.queryVersion !== queryVersion + 1)
       throw new TerminalBridgeError("stale_request");
-    const paused = state.bindings.find(
+    const paused = this.snapshot.bindings.find(
       (item) => item.status === "paused" && item.binding.bindingId === bindingId,
     );
     if (!paused || paused.binding.inputEpoch !== confirmedInputEpoch)
@@ -376,10 +444,11 @@ export class TerminalAutomationController {
     if (entry.pendingReports > 0 || entry.reportFailed)
       throw new TerminalBridgeError("human_intervened");
     const barrier = entry.barrier;
-    const result = await this.transport.resume(
-      bindingId,
-      confirmedInputEpoch,
-      () =>
+    const confirmation = {
+      binding: paused.binding,
+      resolved: false,
+      pending: true,
+      current: () =>
         generation === this.generation &&
         !this.disposed &&
         this.snapshot.ready &&
@@ -387,45 +456,46 @@ export class TerminalAutomationController {
         entry.barrier === barrier &&
         entry.pendingReports === 0 &&
         !entry.reportFailed &&
-        entry.view.canOperate() &&
-        Date.now() < expiresAt,
-    );
-    if (
-      generation !== this.generation ||
-      entry.barrier !== barrier ||
-      this.disposed ||
-      this.views.get(paused.binding.target.viewId) !== entry ||
-      !entry.view.canOperate() ||
-      Date.now() >= expiresAt
-    )
-      throw new TerminalBridgeError("stale_request");
-    if (
-      result.state.status !== "bound" ||
-      result.state.binding.bindingId !== bindingId ||
-      result.state.binding.inputEpoch !== confirmedInputEpoch ||
-      !sameTarget(result.state.binding.target, paused.binding.target)
-    )
-      throw new TerminalBridgeError("stale_request");
-    entry.permits.set(bindingId, result.state.binding.inputEpoch);
-    await this.refreshState();
-    if (
-      generation !== this.generation ||
-      entry.barrier !== barrier ||
-      this.disposed ||
-      Date.now() >= expiresAt ||
-      !this.snapshot.bindings.some(
-        (item) =>
-          item.status === "bound" &&
-          item.binding.bindingId === bindingId &&
-          item.binding.inputEpoch === confirmedInputEpoch,
+        entry.view.canOperate(),
+    };
+    this.confirmations.set(bindingId, confirmation);
+    entry.blockedBindings.add(bindingId);
+    entry.blocked = true;
+    this.publishConfirmationState();
+    const expiresAt = Date.now() + 10_000;
+    try {
+      const result = await this.transport.resume(
+        bindingId,
+        confirmedInputEpoch,
+        () => confirmation.current() && Date.now() < expiresAt,
+      );
+      if (
+        !confirmation.current() ||
+        this.confirmations.get(bindingId) !== confirmation ||
+        result.state.status !== "bound" ||
+        result.state.binding.bindingId !== bindingId ||
+        result.state.binding.inputEpoch !== confirmedInputEpoch ||
+        !sameTarget(result.state.binding.target, paused.binding.target)
       )
-    )
-      throw new TerminalBridgeError("stale_request");
-    this.publish({
-      localPausedTargets: this.snapshot.localPausedTargets.filter(
-        (target) => !sameTarget(target, paused.binding.target),
-      ),
-    });
+        throw new TerminalBridgeError("stale_request");
+      const confirmedState = result.state;
+      const bindings = this.snapshot.bindings.map((item) =>
+        item.binding.bindingId === bindingId ? confirmedState : item,
+      );
+      this.publish({ ...this.reconcileConfirmations(bindings), bindings, error: null });
+    } catch (error) {
+      if (
+        confirmation.current() &&
+        this.confirmations.get(bindingId) === confirmation &&
+        confirmation.resolved
+      )
+        return;
+      this.publishConfirmationState();
+      throw error;
+    } finally {
+      confirmation.pending = false;
+      this.publishConfirmationState();
+    }
   }
 
   async submitSelection(selectionRequestId: string, candidateId: string | null) {

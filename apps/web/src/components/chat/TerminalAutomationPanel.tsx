@@ -1,5 +1,5 @@
 import type { ScopedThreadRef, TerminalAutomationSelectionRequest } from "@t3tools/contracts";
-import { useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { t } from "~/i18n";
 import { getTerminalAutomation, subscribeTerminalAutomation } from "../../state/terminal";
 import type { TerminalAutomationController } from "../../terminal/automationController";
@@ -138,11 +138,30 @@ export function TerminalAutomationPanel({ threadRef }: { threadRef: ScopedThread
     controller?.getSnapshot ?? emptySnapshot,
   );
   const [message, setMessage] = useState("");
+  const [verified, setVerified] = useState<TerminalAutomationController | null>(null);
+  const ready = snapshot?.ready ?? false;
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- checks server invitation validity when this foreground scope mounts or reconnects
+  useEffect(() => {
+    if (!controller || !ready) return;
+    let current = true;
+    void controller.synchronize().then(
+      () => {
+        if (current) setVerified(controller);
+      },
+      (error: unknown) => {
+        if (current) setMessage(selectionError(error));
+      },
+    );
+    return () => {
+      current = false;
+    };
+  }, [controller, ready]);
   if (!controller || !snapshot) return null;
-  const request = snapshot.ready ? snapshot.selections[0] : undefined;
+  const request = snapshot.ready && verified === controller ? snapshot.selections[0] : undefined;
   const refresh = async () => {
     try {
-      await controller.refreshState();
+      await controller.synchronize();
+      setVerified(controller);
       setMessage("");
     } catch (error) {
       setMessage(selectionError(error));
@@ -153,7 +172,11 @@ export function TerminalAutomationPanel({ threadRef }: { threadRef: ScopedThread
       await controller.resume(bindingId, epoch);
       setMessage("");
     } catch (error) {
-      setMessage(selectionError(error, true));
+      setMessage(
+        controller.getSnapshot().unverifiedResumeBindingIds.includes(bindingId)
+          ? ""
+          : selectionError(error, true),
+      );
     }
   };
   return (
@@ -176,6 +199,7 @@ export function TerminalAutomationPanel({ threadRef }: { threadRef: ScopedThread
               ? t.chat.terminalAutomation.paused
               : t.chat.terminalAutomation.bound;
         const pending = snapshot.resumingBindingIds.includes(binding.bindingId);
+        const unverified = snapshot.unverifiedResumeBindingIds.includes(binding.bindingId);
         return (
           <div key={binding.bindingId} className="flex flex-wrap items-center gap-2 px-3 py-1">
             <span className="min-w-0 break-all">
@@ -183,7 +207,11 @@ export function TerminalAutomationPanel({ threadRef }: { threadRef: ScopedThread
               {binding.target.viewId} · {t.chat.terminalAutomation.inputEpoch(binding.inputEpoch)} ·{" "}
               <span role="status">{status}</span>
             </span>
-            {snapshot.ready && state.status === "paused" ? (
+            {snapshot.ready && state.status !== "invalid" && unverified ? (
+              <Button size="sm" variant="outline" disabled={pending} onClick={() => void refresh()}>
+                {pending ? t.chat.terminalAutomation.pending : t.chat.terminalAutomation.verify}
+              </Button>
+            ) : snapshot.ready && state.status === "paused" ? (
               <Button
                 size="sm"
                 variant="outline"
@@ -196,9 +224,13 @@ export function TerminalAutomationPanel({ threadRef }: { threadRef: ScopedThread
           </div>
         );
       })}
-      {!snapshot.ready || snapshot.error ? (
+      {!snapshot.ready || snapshot.error || verified !== controller ? (
         <div className="flex items-center gap-2 px-3 py-1">
-          <span>{t.chat.terminalAutomation.unavailable}</span>
+          <span>
+            {!snapshot.ready || snapshot.error
+              ? t.chat.terminalAutomation.unavailable
+              : t.chat.terminalAutomation.checking}
+          </span>
           {snapshot.ready ? (
             <Button size="sm" variant="outline" onClick={() => void refresh()}>
               {t.chat.terminalAutomation.refresh}
@@ -207,7 +239,9 @@ export function TerminalAutomationPanel({ threadRef }: { threadRef: ScopedThread
         </div>
       ) : null}
       <p role="status" className="px-3 text-muted-foreground">
-        {message}
+        {snapshot.unverifiedResumeBindingIds.length > 0
+          ? t.chat.terminalAutomation.unknownResume
+          : message}
       </p>
       {request ? (
         <TerminalSelection

@@ -253,3 +253,44 @@ it("hides other environment and thread requests, and never reopens a completed i
   expect(document.body.textContent).not.toContain("SSH production shell");
   expect(f.replies).toHaveLength(1);
 });
+
+it("checks a cached invitation before displaying it on foreground return", async () => {
+  await using f = await setup();
+  await f.invite();
+  await f.showThread("other-environment", "thread");
+  let resolve!: (state: TerminalAutomationConnectionState) => void;
+  const query = new Promise<TerminalAutomationConnectionState>((done) => {
+    resolve = done;
+  });
+  f.transport.getConnectionState = () => query;
+  await f.showThread("environment", "thread");
+  expect(document.body.textContent).not.toContain("SSH production shell");
+  await act(async () => {
+    resolve({ version: 1, revision: 1, bindings: [], selections: [] });
+    await f.controller.synchronize();
+  });
+  expect(document.body.textContent).not.toContain("SSH production shell");
+  expect(f.controller.getSnapshot().selections).toEqual([]);
+});
+
+it("verifies a lost resume response without sending a second resume", async () => {
+  await using f = await setup();
+  let remote: TerminalAutomationConnectionState = {
+    version: 1,
+    bindings: [{ status: "paused", binding: f.binding, reason: "human_intervened" }],
+  };
+  await f.setState(remote);
+  let attempts = 0;
+  f.transport.getConnectionState = async () => remote;
+  f.transport.resume = async () => {
+    attempts += 1;
+    remote = { version: 1, bindings: [{ status: "bound", binding: f.binding }] };
+    throw new Error("reply lost");
+  };
+  await click("Resume AI operation");
+  expect(document.body.textContent).toContain("Verify status");
+  await click("Verify status");
+  expect(document.body.textContent).toContain("AI terminal bound");
+  expect(document.body.textContent).not.toContain("AI paused after manual input");
+  expect(attempts).toBe(1);
+});

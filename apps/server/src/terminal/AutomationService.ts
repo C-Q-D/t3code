@@ -170,6 +170,13 @@ const make = Effect.gen(function* () {
   };
   const setState = (owner: Owner, state: A.TerminalAutomationState) => {
     if (owner.state === state) return;
+    if (
+      owner.state.status === "invalid" &&
+      state.status === "invalid" &&
+      owner.state.binding === state.binding &&
+      owner.state.reason === state.reason
+    )
+      return;
     owner.state = state;
     if (state.status !== "selection_required") delete owner.selection;
     for (const [id, client] of connections)

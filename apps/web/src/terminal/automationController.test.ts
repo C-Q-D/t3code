@@ -397,3 +397,118 @@ it("refreshes automatic bindings and release from revision notifications without
   stopReleased();
   f.controller.dispose();
 });
+
+it.each(["lost reply", "parallel query", "failed query"])(
+  "reconciles the explicit resume confirmation after %s",
+  async (mode) => {
+    const f = setup();
+    await f.ready();
+    let state = paused;
+    f.transport.getConnectionState = async () => state;
+    await f.controller.humanInput(target);
+    f.transport.resume = async () => {
+      state = { version: 1, bindings: [{ status: "bound", binding }] };
+      if (mode === "lost reply") throw new Error("lost reply");
+      return {
+        version: 1,
+        candidateVersion: 1,
+        candidates: [],
+        state: { status: "bound", binding },
+      };
+    };
+    if (mode === "parallel query") {
+      const query = deferred<A.TerminalAutomationConnectionState>();
+      let count = 0;
+      f.transport.getConnectionState = () => {
+        count += 1;
+        if (count === 2) {
+          void f.controller.refreshState().then(() => query.resolve(state));
+          return query.promise;
+        }
+        return Promise.resolve(state);
+      };
+    }
+    await f.controller.resume("binding", 0).catch(() => {});
+    if (mode === "failed query") {
+      f.transport.getConnectionState = async () => {
+        throw new Error("query failed");
+      };
+      await expect(f.controller.synchronize()).rejects.toThrow("query failed");
+      expect(f.controller.getSnapshot().bindings).toEqual([{ status: "bound", binding }]);
+      expect(f.controller.getSnapshot().localPausedTargets).toEqual([]);
+      f.transport.getConnectionState = async () => state;
+    }
+    await f.controller.synchronize();
+    expect(f.controller.getSnapshot().localPausedTargets).toEqual([]);
+    f.emit({ version: 1, operation: "show", bridgeRequestId: "confirmed", binding });
+    expect((await f.reply.promise).result).toEqual({ operation: "show", status: "visible" });
+    f.controller.dispose();
+  },
+);
+
+it("cannot use a lost confirmation to authorize bound state after newer manual input", async () => {
+  const f = setup();
+  await f.ready();
+  f.transport.getConnectionState = async () => paused;
+  await f.controller.humanInput(target);
+  f.transport.resume = async () => {
+    throw new Error("lost reply");
+  };
+  await expect(f.controller.resume("binding", 0)).rejects.toThrow("lost reply");
+  expect(f.controller.getSnapshot().unverifiedResumeBindingIds).toEqual(["binding"]);
+  await f.controller.humanInput(target);
+  f.transport.getConnectionState = async () => ({
+    version: 1,
+    bindings: [{ status: "bound", binding }],
+  });
+  await f.controller.synchronize();
+  expect(f.controller.getSnapshot().unverifiedResumeBindingIds).toEqual([]);
+  expect(f.controller.getSnapshot().localPausedTargets).toEqual([target]);
+  f.emit({ version: 1, operation: "show", bridgeRequestId: "new-input", binding });
+  expect((await f.reply.promise).result).toMatchObject({ error: { code: "human_intervened" } });
+  f.controller.dispose();
+});
+
+it("rejects a query older than a notification and ignores an already invalidated invitation arriving late", async () => {
+  const f = setup();
+  f.transport.getConnectionState = async () => ({
+    version: 1,
+    revision: 0,
+    bindings: [],
+    selections: [],
+  });
+  await f.ready();
+  const old = deferred<A.TerminalAutomationConnectionState>();
+  f.transport.getConnectionState = () => old.promise;
+  const oldQuery = f.controller.refreshState().catch((error: unknown) => error);
+  const published = deferred<void>();
+  const stop = f.controller.subscribe(() => {
+    if (f.controller.getSnapshot().bindings[0]?.binding.bindingId === "new") published.resolve();
+  });
+  f.transport.getConnectionState = async () => ({
+    version: 1,
+    revision: 2,
+    bindings: [{ status: "bound", binding: { ...binding, bindingId: "new" } }],
+    selections: [],
+  });
+  f.emit({ type: "state_changed", revision: 2 });
+  await published.promise;
+  old.resolve({
+    version: 1,
+    revision: 1,
+    bindings: [{ status: "bound", binding }],
+    selections: [],
+  });
+  expect(await oldQuery).toMatchObject({ code: "stale_request" });
+  f.emit({
+    version: 1,
+    selectionRequestId: "expired",
+    candidateVersion: 1,
+    candidates: [f.view.candidate],
+  });
+  await f.controller.synchronize();
+  expect(f.controller.getSnapshot().bindings[0]?.binding.bindingId).toBe("new");
+  expect(f.controller.getSnapshot().selections).toEqual([]);
+  stop();
+  f.controller.dispose();
+});

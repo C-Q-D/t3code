@@ -4,6 +4,9 @@ import type { SourceControlProviderKind, WorktreeSubmodules } from "@t3tools/con
 
 export const chat = {
   terminalAutomation: {
+    unknownResume: "The resume result is unknown. Verify status before confirming again.",
+    verify: "Verify status",
+    checking: "Checking terminal state…",
     staleResume:
       "Manual input changed or the confirmation expired. Review the current terminal and confirm again.",
     inputEpoch: (epoch: number) => `Manual input version ${epoch}`,

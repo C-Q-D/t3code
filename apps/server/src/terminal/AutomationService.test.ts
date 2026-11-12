@@ -191,6 +191,23 @@ it.effect.each(["cancelled", "selected", "candidate change", "disconnect"] as co
     }),
 );
 
+it.effect("does not notify again when a revoked binding is already invalid", () =>
+  Effect.gen(function* () {
+    const f = yield* setup;
+    let allowed = true;
+    const authorizedCaller = {
+      ...caller,
+      credentialAuthorization: { isValid: () => allowed, invalidated: Effect.never },
+    };
+    yield* f.service.registerViews("client", { version: 1, views: [view()] });
+    yield* f.service.bind(authorizedCaller, { mode: "auto" });
+    allowed = false;
+    const invalid = yield* f.service.getConnectionState("client");
+    expect(invalid.bindings).toMatchObject([{ status: "invalid" }]);
+    expect(yield* f.service.getConnectionState("client")).toEqual(invalid);
+  }),
+);
+
 it.effect("coalesces a full notification backlog and keeps unrelated scopes untouched", () =>
   Effect.gen(function* () {
     const f = yield* setup;

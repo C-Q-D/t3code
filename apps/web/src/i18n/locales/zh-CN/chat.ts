@@ -3,6 +3,9 @@ import type { Messages } from "../en";
 
 export const chat: Messages["chat"] = {
   terminalAutomation: {
+    unknownResume: "恢复结果尚未确认。请先核实状态，再决定是否重新确认。",
+    verify: "核实状态",
+    checking: "正在核实终端状态…",
     staleResume: "人工输入已变化或确认已过期。请查看当前终端后重新确认。",
     inputEpoch: (epoch: number) => `人工输入版本 ${epoch}`,
     bound: "AI 已绑定终端",
