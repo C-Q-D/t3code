@@ -243,8 +243,11 @@ it.effect("authenticated RPC registration and replies reach the shared model ser
       event: { version: 1, target, event: "human_intervened" },
     });
     expect(
-      (yield* f.client[A.WS_METHODS.terminalAutomationResume]({ threadId, bindingId })).state
-        .status,
+      (yield* f.client[A.WS_METHODS.terminalAutomationResume]({
+        threadId,
+        bindingId,
+        inputEpoch: 1,
+      })).state.status,
     ).toBe("bound");
     expect((yield* f.service.status(f.caller)).state.status).toBe("bound");
   }),
@@ -396,7 +399,11 @@ it.effect("authorization rejects registration and subscription before the adapte
     ).toMatchObject({ _tag: "EnvironmentAuthorizationError" });
     expect(
       yield* Effect.flip(
-        f.client[A.WS_METHODS.terminalAutomationResume]({ threadId, bindingId: "forged" }),
+        f.client[A.WS_METHODS.terminalAutomationResume]({
+          threadId,
+          bindingId: "forged",
+          inputEpoch: 1,
+        }),
       ),
     ).toMatchObject({ _tag: "EnvironmentAuthorizationError" });
     expect(
@@ -465,12 +472,12 @@ it.effect("thread validation and RPC metadata isolate another client", () =>
     expect(
       yield* Effect.flip(
         f.handlers[A.WS_METHODS.terminalAutomationResume](
-          { threadId, bindingId },
+          { threadId, bindingId, inputEpoch: 1 },
           { client: { id: 1 } },
         ),
       ),
     ).toEqual({ code: "stale_request" });
-    yield* f.client[A.WS_METHODS.terminalAutomationResume]({ threadId, bindingId });
+    yield* f.client[A.WS_METHODS.terminalAutomationResume]({ threadId, bindingId, inputEpoch: 1 });
     const running = yield* f.service
       .input(
         f.caller,

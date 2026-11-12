@@ -95,7 +95,7 @@ it.effect("explicit terminal resume commands check the destination grant at exec
     });
     const input = {
       environmentId: env,
-      input: { threadId: ThreadId.make("thread"), bindingId: "original" },
+      input: { threadId: ThreadId.make("thread"), bindingId: "original", inputEpoch: 1 },
     };
     registry.set(sessions(env), AsyncResult.success(grant(true)));
     expect((yield* Effect.promise(() => command.run(registry, input)))._tag).toBe("Failure");

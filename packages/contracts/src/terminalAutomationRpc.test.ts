@@ -43,6 +43,19 @@ describe("terminal automation RPC wire", () => {
       ),
     ).toThrow();
   });
+  it("resume confirms exactly one nonnegative epoch and rejects identity extras", () => {
+    const rpc = WsRpcGroup.requests.get(WS_METHODS.terminalAutomationResume)!;
+    const decode = Schema.decodeSync(Schema.fromJsonString(rpc.payloadSchema));
+    expect(
+      decode(JSON.stringify({ threadId: "thread", bindingId: "binding", inputEpoch: 2 })),
+    ).toMatchObject({ inputEpoch: 2 });
+    for (const input of [
+      { threadId: "thread", bindingId: "binding" },
+      { threadId: "thread", bindingId: "binding", inputEpoch: -1 },
+      { threadId: "thread", bindingId: "binding", inputEpoch: 1, connectionId: "forged" },
+    ])
+      expect(() => decode(JSON.stringify(input))).toThrow();
+  });
   it("preserves strict bridge replies and rejects forged identities", () => {
     const rpc = WsRpcGroup.requests.get(WS_METHODS.terminalAutomationReplyBridge)!;
     const wire = Schema.fromJsonString(rpc.payloadSchema);

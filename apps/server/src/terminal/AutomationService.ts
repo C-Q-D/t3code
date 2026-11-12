@@ -139,6 +139,7 @@ export class TerminalAutomationService extends Context.Service<
     readonly resumeFromConnection: (
       connectionId: string,
       bindingId: string,
+      inputEpoch: number,
     ) => Effect.Effect<A.TerminalAutomationStatus, Failure>;
     readonly release: (
       caller: Caller,
@@ -724,6 +725,7 @@ const make = Effect.gen(function* () {
   const resumeFromConnection = Effect.fn("TerminalAutomation.resumeFromConnection")(function* (
     connectionId: string,
     bindingId: string,
+    inputEpoch: number,
   ) {
     const work = bindings.get(bindingId);
     const owner = work ? owners.get(work.ownerKey) : undefined;
@@ -740,7 +742,8 @@ const make = Effect.gen(function* () {
       owner.connectionId === connectionId &&
       sameScope(owner.caller.scope, client.scope) &&
       owner.state.status === "paused" &&
-      owner.state.binding.bindingId === bindingId;
+      owner.state.binding.bindingId === bindingId &&
+      owner.state.binding.inputEpoch === inputEpoch;
     if (!owner || !valid()) return yield* Effect.fail(failure("stale_request"));
     yield* refresh(owner);
     if (!valid() || owner.state.status !== "paused")

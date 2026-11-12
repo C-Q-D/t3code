@@ -87,11 +87,12 @@ export function acquireTerminalAutomation(threadRef: ScopedThreadRef) {
           }),
         );
       },
-      replyBridge: async (reply) => {
+      replyBridge: async (reply, isCurrent) => {
+        const connected = currentGeneration();
         unwrap(
           await runAtomCommand(appAtomRegistry, commands.replyBridge, {
             environmentId,
-            input: { threadId, reply, isCurrent: currentGeneration() },
+            input: { threadId, reply, isCurrent: () => connected() && isCurrent() },
           }),
         );
       },
@@ -118,13 +119,15 @@ export function acquireTerminalAutomation(threadRef: ScopedThreadRef) {
             input: { threadId, isCurrent: currentGeneration() },
           }),
         ),
-      resume: async (bindingId) =>
-        unwrap(
+      resume: async (bindingId, inputEpoch, isCurrent) => {
+        const connected = currentGeneration();
+        return unwrap(
           await runAtomCommand(appAtomRegistry, commands.resume, {
             environmentId,
-            input: { threadId, bindingId, isCurrent: currentGeneration() },
+            input: { threadId, bindingId, inputEpoch, isCurrent: () => connected() && isCurrent() },
           }),
-        ),
+        );
+      },
     });
     const stopPermissions = appAtomRegistry.subscribe(
       Atom.make(

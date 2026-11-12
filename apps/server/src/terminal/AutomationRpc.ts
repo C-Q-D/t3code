@@ -109,7 +109,7 @@ export const make = Effect.fn("TerminalAutomationRpc.make")(function* (
       metadata: Metadata,
     ) =>
       checked(input.threadId, metadata).pipe(
-        Effect.flatMap((id) => service.resumeFromConnection(id, input.bindingId)),
+        Effect.flatMap((id) => service.resumeFromConnection(id, input.bindingId, input.inputEpoch)),
       ),
   };
 });

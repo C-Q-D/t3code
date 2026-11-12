@@ -57,6 +57,11 @@ export const TerminalAutomationReportEventInput = strict({
 export const TerminalAutomationResumeInput = strict({
   threadId: ThreadId,
   bindingId: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(128)),
+  inputEpoch: Schema.Number.check(
+    Schema.isInt(),
+    Schema.isGreaterThanOrEqualTo(0),
+    Schema.isLessThanOrEqualTo(Number.MAX_SAFE_INTEGER),
+  ),
 });
 export const TerminalAutomationRpcEvent = Schema.Union([
   strict({ type: Schema.Literal("ready") }),

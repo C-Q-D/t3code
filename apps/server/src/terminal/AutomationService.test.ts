@@ -138,7 +138,7 @@ it.effect(
       expect(state.bindings.map((entry) => entry.status)).toEqual(["paused", "paused"]);
       const bindingId = state.bindings[0]!.binding.bindingId;
       expect(first.state).toMatchObject({ binding: { bindingId } });
-      expect((yield* f.service.resumeFromConnection("client", bindingId)).state.status).toBe(
+      expect((yield* f.service.resumeFromConnection("client", bindingId, 1)).state.status).toBe(
         "bound",
       );
       yield* f.service.release(caller, { bindingId });
@@ -403,17 +403,17 @@ it.effect("connection confirmation resumes the original model owner only", () =>
       target: view().target,
       event: "human_intervened",
     });
-    expect(yield* Effect.flip(service.resumeFromConnection("other-window", bindingId))).toEqual({
+    expect(yield* Effect.flip(service.resumeFromConnection("other-window", bindingId, 1))).toEqual({
       code: "stale_request",
     });
-    expect(yield* Effect.flip(service.resumeFromConnection("other-thread", bindingId))).toEqual({
+    expect(yield* Effect.flip(service.resumeFromConnection("other-thread", bindingId, 1))).toEqual({
       code: "stale_request",
     });
-    expect(yield* Effect.flip(service.resumeFromConnection("other-env", bindingId))).toEqual({
+    expect(yield* Effect.flip(service.resumeFromConnection("other-env", bindingId, 1))).toEqual({
       code: "stale_request",
     });
     expect((yield* service.status(caller)).state.status).toBe("paused");
-    expect((yield* service.resumeFromConnection("client", bindingId)).state).toMatchObject({
+    expect((yield* service.resumeFromConnection("client", bindingId, 1)).state).toMatchObject({
       status: "bound",
       binding: { bindingId },
     });
@@ -422,7 +422,7 @@ it.effect("connection confirmation resumes the original model owner only", () =>
       binding: { bindingId },
     });
     yield* service.disconnect("client");
-    expect(yield* Effect.flip(service.resumeFromConnection("client", bindingId))).toEqual({
+    expect(yield* Effect.flip(service.resumeFromConnection("client", bindingId, 1))).toEqual({
       code: "stale_request",
     });
   }),
@@ -445,7 +445,7 @@ it.effect("connection confirmation cannot clear a newer human pause", () =>
         yield* pause.pipe(Effect.orDie);
       }),
     );
-    expect(yield* Effect.flip(f.service.resumeFromConnection("client", bindingId))).toEqual({
+    expect(yield* Effect.flip(f.service.resumeFromConnection("client", bindingId, 1))).toEqual({
       code: "stale_request",
     });
     expect((yield* f.service.status(caller)).state.status).toBe("paused");
@@ -460,6 +460,26 @@ it.effect("connection confirmation cannot clear a newer human pause", () =>
   }),
 );
 
+it.effect("connection confirmation rejects an epoch from an earlier completed pause", () =>
+  Effect.gen(function* () {
+    const f = yield* setup;
+    const bindingId = yield* bindOne(f.service);
+    const pause = f.service.reportEvent("client", {
+      version: 1,
+      target: view().target,
+      event: "human_intervened",
+    });
+    yield* pause;
+    yield* pause;
+    expect(yield* Effect.flip(f.service.resumeFromConnection("client", bindingId, 1))).toEqual({
+      code: "stale_request",
+    });
+    expect((yield* f.service.resumeFromConnection("client", bindingId, 2)).state.status).toBe(
+      "bound",
+    );
+  }),
+);
+
 it.effect("connection confirmation cannot revive a binding disconnected during inspect", () =>
   Effect.gen(function* () {
     const fixture = yield* setup;
@@ -470,7 +490,9 @@ it.effect("connection confirmation cannot revive a binding disconnected during i
       event: "human_intervened",
     });
     fixture.beforeInspect(fixture.service.disconnect("client"));
-    expect(yield* Effect.flip(fixture.service.resumeFromConnection("client", bindingId))).toEqual({
+    expect(
+      yield* Effect.flip(fixture.service.resumeFromConnection("client", bindingId, 1)),
+    ).toEqual({
       code: "stale_request",
     });
     expect((yield* fixture.service.status(caller)).state.status).toBe("invalid");

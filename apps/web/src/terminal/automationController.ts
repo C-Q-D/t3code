@@ -7,11 +7,15 @@ export interface TerminalAutomationTransport {
     event: (event: typeof A.TerminalAutomationRpcEvent.Type) => void,
   ) => () => void;
   registerViews: (views: readonly A.TerminalAutomationCandidate[]) => Promise<void>;
-  replyBridge: (reply: A.TerminalAutomationClientReply) => Promise<void>;
+  replyBridge: (reply: A.TerminalAutomationClientReply, isCurrent: () => boolean) => Promise<void>;
   replySelection: (reply: A.TerminalAutomationSelectionReply) => Promise<void>;
   reportEvent: (event: A.TerminalAutomationClientEvent) => Promise<void>;
   getConnectionState: () => Promise<A.TerminalAutomationConnectionState>;
-  resume: (bindingId: string) => Promise<A.TerminalAutomationStatus>;
+  resume: (
+    bindingId: string,
+    inputEpoch: number,
+    isCurrent: () => boolean,
+  ) => Promise<A.TerminalAutomationStatus>;
 }
 
 export interface TerminalAutomationView {
@@ -270,7 +274,19 @@ export class TerminalAutomationController {
     )
       throw new TerminalBridgeError("target_invalid");
     const barrier = entry.barrier;
-    const result = await this.transport.resume(bindingId);
+    const expiresAt = Date.now() + 10_000;
+    const result = await this.transport.resume(
+      bindingId,
+      paused.binding.inputEpoch,
+      () =>
+        generation === this.generation &&
+        !this.disposed &&
+        this.snapshot.ready &&
+        this.views.get(paused.binding.target.viewId) === entry &&
+        entry.barrier === barrier &&
+        entry.view.canOperate() &&
+        Date.now() < expiresAt,
+    );
     if (
       generation !== this.generation ||
       entry.barrier !== barrier ||
@@ -321,26 +337,35 @@ export class TerminalAutomationController {
       const code = this.requests.has(request.bridgeRequestId)
         ? "request_conflict"
         : "budget_exceeded";
-      await this.transport.replyBridge({
-        version: 1,
-        bridgeRequestId: request.bridgeRequestId,
-        binding: request.binding,
-        result:
-          request.operation === "apply_local"
-            ? { operation: "apply_local", inputRequestId: request.inputRequestId, error: { code } }
-            : { operation: request.operation, error: { code } },
-      });
+      await this.transport.replyBridge(
+        {
+          version: 1,
+          bridgeRequestId: request.bridgeRequestId,
+          binding: request.binding,
+          result:
+            request.operation === "apply_local"
+              ? {
+                  operation: "apply_local",
+                  inputRequestId: request.inputRequestId,
+                  error: { code },
+                }
+              : { operation: request.operation, error: { code } },
+        },
+        () => generation === this.generation && !this.disposed && this.snapshot.ready,
+      );
       return;
     }
     const pending = { abort, target: request.binding.target, bindingId: request.binding.bindingId };
     this.requests.set(request.bridgeRequestId, pending);
     const timeout = setTimeout(() => abort.abort(), 10_000);
+    const expiresAt = Date.now() + 10_000;
     const guard = () => {
       if (
         this.disposed ||
         !this.snapshot.ready ||
         generation !== this.generation ||
-        abort.signal.aborted
+        abort.signal.aborted ||
+        Date.now() >= expiresAt
       )
         throw new TerminalBridgeError("client_unavailable");
       if (
@@ -393,12 +418,29 @@ export class TerminalAutomationController {
             : { operation: request.operation, error: { code } };
       }
       if (generation === this.generation && !this.disposed && this.snapshot.ready)
-        await this.transport.replyBridge({
-          version: 1,
-          bridgeRequestId: request.bridgeRequestId,
-          binding: request.binding,
-          result,
-        });
+        await this.transport.replyBridge(
+          {
+            version: 1,
+            bridgeRequestId: request.bridgeRequestId,
+            binding: request.binding,
+            result,
+          },
+          () => {
+            if ("error" in result)
+              return (
+                generation === this.generation &&
+                !this.disposed &&
+                this.snapshot.ready &&
+                Date.now() < expiresAt
+              );
+            try {
+              guard();
+              return true;
+            } catch {
+              return false;
+            }
+          },
+        );
     } finally {
       clearTimeout(timeout);
       if (this.requests.get(request.bridgeRequestId) === pending)
