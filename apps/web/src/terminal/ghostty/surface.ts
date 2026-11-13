@@ -1198,8 +1198,8 @@ export class GhosttyTerminalSurface {
     if (encoded.length > 0) this.sendInput(encoded);
   }
 
-  private sendInput(data: string): void {
-    this.options.onInputStart?.();
+  private sendInput(data: string, inputStarted = false): void {
+    if (!inputStarted) this.options.onInputStart?.();
     this.options.onData(data);
   }
 
@@ -1926,6 +1926,7 @@ export class GhosttyTerminalSurface {
   private readonly onWheel = (event: WheelEvent) => {
     if (event.deltaY === 0) return;
     this.cancelAutomationSelection();
+    this.options.onInputStart?.();
     event.preventDefault();
     const delta = terminalWheelDeltaRows(
       event,
@@ -1934,29 +1935,26 @@ export class GhosttyTerminalSurface {
       this.wheelRemainder,
     );
     this.wheelRemainder = delta.remainder;
-    if (
-      delta.rows === 0 ||
-      (!shouldReportTerminalMouse(this.core.isMouseTracking(), event) &&
-        !this.core.isAlternateScreen())
-    )
-      this.options.onInputStart?.();
-    this.scrollRows(delta.rows, event);
+    this.scrollRows(delta.rows, event, true);
   };
 
   /** Scrolls the core by signed rows and schedules a full redraw with updated scrollbar geometry. */
-  private scrollRows(rows: number, event: MouseEvent): void {
+  private scrollRows(rows: number, event: MouseEvent, inputStarted = false): void {
     if (rows === 0) return;
     const magnitude = Math.abs(rows);
     if (shouldReportTerminalMouse(this.core.isMouseTracking(), event)) {
       const button = rows < 0 ? 4 : 5;
       for (let index = 0; index < magnitude; index += 1) {
-        this.sendMouse("press", button, event);
+        this.sendMouse("press", button, event, inputStarted);
       }
       return;
     }
     if (this.core.isAlternateScreen()) {
       // Alternate screens have no scrollback; send arrow keys like xterm.
-      this.sendInput(terminalWheelArrowData(rows, this.core.isApplicationCursorKeys()));
+      this.sendInput(
+        terminalWheelArrowData(rows, this.core.isApplicationCursorKeys()),
+        inputStarted,
+      );
       return;
     }
     this.scrollViewport(rows);
@@ -2410,7 +2408,12 @@ export class GhosttyTerminalSurface {
     return terminalLinkAtPositionWithRange(this.snapshot.rowData, cell.y, cell.x);
   }
 
-  private sendMouse(action: TerminalMouseAction, button: number | null, event: MouseEvent): void {
+  private sendMouse(
+    action: TerminalMouseAction,
+    button: number | null,
+    event: MouseEvent,
+    inputStarted = false,
+  ): void {
     const bounds = this.canvas.getBoundingClientRect();
     const data = this.core.encodeMouse({
       action,
@@ -2434,7 +2437,7 @@ export class GhosttyTerminalSurface {
     });
     const resolution = resolveTerminalMouseData(action, data, this.lastMouseMotionData);
     this.lastMouseMotionData = resolution.nextMotionData;
-    if (resolution.send) this.sendInput(data);
+    if (resolution.send) this.sendInput(data, inputStarted);
   }
 
   /** Refreshes DEC mouse-tracking state and invalidates stale motion deduplication; returns whether any-event tracking is active. */

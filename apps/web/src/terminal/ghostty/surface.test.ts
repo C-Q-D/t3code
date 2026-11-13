@@ -933,6 +933,7 @@ describe("GhosttyTerminalSurface visibility", () => {
       ["", -16, 0],
       ["\x1b[?1049h", -1, 1],
       ["", -0.01, 0],
+      ["\x1b[?1049l\x1b[?9h", -1, 1],
     ] as const) {
       surface.write(mode);
       onInputStart.mockClear();
@@ -941,6 +942,9 @@ describe("GhosttyTerminalSurface visibility", () => {
           deltaY,
           deltaMode,
           shiftKey: false,
+          clientX: 20,
+          clientY: 20,
+          buttons: 0,
         }),
       );
       expect(onInputStart).toHaveBeenCalledOnce();
