@@ -1,6 +1,5 @@
 // @effect-diagnostics-next-line nodeBuiltinImport:off -- Effect's Crypto digest is effectful; a sync hash keeps historyPath a plain function.
 import * as NodeCrypto from "node:crypto";
-import * as Clock from "effect/Clock";
 
 import { withWorkspaceLease } from "../workspace/workspaceLease.ts";
 import {
@@ -130,7 +129,6 @@ const nowIso = Effect.map(DateTime.now, DateTime.formatIso);
 const MAX_TERMINAL_LABEL_LENGTH = 128;
 const decodeClaudeSettings = Schema.decodeUnknownOption(ClaudeSettings);
 const decodeCodexSettings = Schema.decodeUnknownOption(CodexSettings);
-const isTerminalNotRunningError = Schema.is(TerminalNotRunningError);
 
 class TerminalSubprocessCheckError extends Schema.TaggedError<TerminalSubprocessCheckError>()(
   "TerminalSubprocessCheckError",
@@ -210,24 +208,6 @@ export class TerminalManager extends Context.Service<
     ) => Effect.Effect<() => void, TerminalError>;
 
     readonly write: (input: TerminalWriteInput) => Effect.Effect<void, TerminalError>;
-
-    /** Inspect only a running PTY; never recover a missing session from history. */
-    readonly inspectExisting: (input: TerminalObserveInput) => Effect.Effect<
-      {
-        readonly terminalInstanceId: string;
-        readonly humanInputEpoch: number;
-      },
-      TerminalError
-    >;
-
-    /** Validate instance, human epoch and the optional synchronous authorization guard immediately before PTY write. */
-    readonly writeAutomation: (
-      input: TerminalWriteInput & {
-        readonly terminalInstanceId: string;
-        readonly humanInputEpoch: number;
-        readonly canWrite?: () => boolean;
-      },
-    ) => Effect.Effect<void, TerminalError>;
 
     readonly resize: (
       input: TerminalResizeInput,
@@ -315,10 +295,6 @@ interface TerminalSessionState {
   updatedAt: string;
   eventSequence: number;
   inputCount: number;
-  humanInputEpoch: number;
-  protocolReplies: Array<{ pattern: RegExp; expiresAt: number; response?: string }>;
-  pendingProtocolQuery: string;
-  terminalInstanceId?: string;
   cols: number;
   rows: number;
   process: PtyAdapter.PtyProcess | null;
@@ -410,7 +386,6 @@ function terminalWireLabel(session: TerminalSessionState): string {
 
 function snapshot(session: TerminalSessionState): TerminalSessionSnapshot {
   return {
-    ...(session.terminalInstanceId ? { terminalInstanceId: session.terminalInstanceId } : {}),
     threadId: session.threadId,
     terminalId: session.terminalId,
     cwd: session.cwd,
@@ -430,7 +405,6 @@ function snapshot(session: TerminalSessionState): TerminalSessionSnapshot {
 
 function summary(session: TerminalSessionState): TerminalSummary {
   return {
-    ...(session.terminalInstanceId ? { terminalInstanceId: session.terminalInstanceId } : {}),
     threadId: session.threadId,
     terminalId: session.terminalId,
     cwd: session.cwd,
@@ -1201,7 +1175,6 @@ const NEXT_HISTORY_SEQUENCE_START = new RegExp(HISTORY_SEQUENCE_START.source, "g
 function sanitizeTerminalHistoryChunk(
   pendingControlSequence: string,
   data: string,
-  onSequence?: (sequence: string) => void,
 ): { visibleText: string; pendingControlSequence: string } {
   if (pendingControlSequence.length === 0 && !HISTORY_SEQUENCE_START.test(data)) {
     return { visibleText: data, pendingControlSequence: "" };
@@ -1232,7 +1205,6 @@ function sanitizeTerminalHistoryChunk(
           const cancelled = isControlSequenceCancel(input.charCodeAt(cursor));
           if (cancelled || isCsiFinalByte(input.charCodeAt(cursor))) {
             const sequence = input.slice(index, cursor + 1);
-            if (!cancelled) onSequence?.(sequence);
             const body = input.slice(index + 2, cursor);
             if (cancelled || !shouldStripCsiSequence(body, input[cursor] ?? "")) {
               append(sequence);
@@ -1262,7 +1234,6 @@ function sanitizeTerminalHistoryChunk(
           return { visibleText, pendingControlSequence: input.slice(index) };
         }
         const sequence = input.slice(index, terminatorIndex);
-        onSequence?.(sequence);
         const content = stripStringTerminator(input.slice(index + 2, terminatorIndex));
         const strip =
           (nextCodePoint === 0x5d && shouldStripOscSequence(content)) ||
@@ -1278,9 +1249,7 @@ function sanitizeTerminalHistoryChunk(
       if (escapeSequenceEndIndex === null) {
         return { visibleText, pendingControlSequence: input.slice(index) };
       }
-      const sequence = input.slice(index, escapeSequenceEndIndex);
-      onSequence?.(sequence);
-      append(sequence);
+      append(input.slice(index, escapeSequenceEndIndex));
       index = escapeSequenceEndIndex;
       continue;
     }
@@ -1291,7 +1260,6 @@ function sanitizeTerminalHistoryChunk(
         const cancelled = isControlSequenceCancel(input.charCodeAt(cursor));
         if (cancelled || isCsiFinalByte(input.charCodeAt(cursor))) {
           const sequence = input.slice(index, cursor + 1);
-          if (!cancelled) onSequence?.(sequence);
           const body = input.slice(index + 1, cursor);
           if (cancelled || !shouldStripCsiSequence(body, input[cursor] ?? "")) {
             append(sequence);
@@ -1316,7 +1284,6 @@ function sanitizeTerminalHistoryChunk(
         return { visibleText, pendingControlSequence: input.slice(index) };
       }
       const sequence = input.slice(index, terminatorIndex);
-      onSequence?.(sequence);
       const content = stripStringTerminator(input.slice(index + 1, terminatorIndex));
       const strip =
         (codePoint === 0x9d && shouldStripOscSequence(content)) ||
@@ -1336,93 +1303,6 @@ function sanitizeTerminalHistoryChunk(
   }
 
   return { visibleText, pendingControlSequence: "" };
-}
-
-function observeTerminalQueries(
-  pending: string,
-  data: string,
-  onSequence: (sequence: string) => void,
-): string {
-  for (const char of data) {
-    if (char === "\x18" || char === "\x1a") {
-      pending = "";
-      continue;
-    }
-    const string = /^\x1b[\]P^_]/.test(pending);
-    if (char === "\x1b") {
-      pending = string && !pending.endsWith("\x1b") ? pending + char : char;
-      continue;
-    }
-    if (string && pending.endsWith("\x1b")) {
-      if (char === "\\") {
-        onSequence(pending + char);
-        pending = "";
-        continue;
-      }
-      pending = "\x1b";
-    }
-    if (!pending) continue;
-    if (pending === "\x1b") {
-      pending += char;
-      if (!"[]P^_".includes(char)) {
-        onSequence(pending);
-        pending = "";
-      }
-      continue;
-    }
-    if (pending.startsWith("\x1b[") && (char.charCodeAt(0) < 0x20 || char === "\x7f")) continue;
-    pending += char;
-    if (
-      (pending.startsWith("\x1b[") && isCsiFinalByte(char.charCodeAt(0))) ||
-      (string && char === "\x07")
-    ) {
-      onSequence(pending);
-      pending = "";
-    } else if (pending.length > 1024) {
-      pending = "";
-    }
-  }
-  return pending;
-}
-
-function terminalProtocolReplyPattern(sequence: string): RegExp | undefined {
-  const normalized = sequence
-    .replace(/^\u009b/, "\u001b[")
-    .replace(/^\u009d/, "\u001b]")
-    .replace(/^\u0090/, "\u001bP")
-    // Ghostty dispatches these queries using the first parameter.
-    .replace(/^(\u001b\[>?[0-9]*)(?:;[0-9]*)+([ncq])$/, "$1$2");
-  if (/^\u001b\[0*5n$/.test(normalized)) return /^\u001b\[0n$/;
-  if (/^\u001b\[0*6n$/.test(normalized)) return /^\u001b\[[1-9][0-9]{0,3};[1-9][0-9]{0,3}R$/;
-  if (normalized === "\u001b[?6n") return /^\u001b\[\?[1-9][0-9]{0,3};[1-9][0-9]{0,3}R$/;
-  if (/^\u001b\[[0-9]*c$/.test(normalized) || normalized === "\u001bZ")
-    return /^\u001b\[\?[0-9;]{1,64}c$/;
-  if (/^\u001b\[>[0-9]*c$/.test(normalized)) return /^\u001b\[>[0-9;]{1,64}c$/;
-  if (/^\u001b\[=[0-9]*c$/.test(normalized)) return /^\u001bP!\|[0-9a-fA-F]{8}\u001b\\$/;
-  if (/^\u001b\[>[0-9]*q$/.test(normalized)) return /^\u001bP>\|libghostty\u001b\\$/;
-  if (normalized === "\u001b[?u") return /^\u001b\[\?[0-9]{1,5}u$/;
-  const mode = /^\u001b\[(\??)(0*[0-9]{1,5})\$p$/.exec(normalized);
-  if (mode) return new RegExp(`^\\x1b\\[${mode[1] ? "\\?" : ""}${Number(mode[2])};[0-4]\\$y$`);
-  const color = /^\u001b\](10|11|12);\?(?:\u0007|\u001b\\|\u009c)$/.exec(normalized);
-  if (color)
-    return new RegExp(
-      `^\\x1b\\]${color[1]};rgb:[0-9a-fA-F]{1,4}/[0-9a-fA-F]{1,4}/[0-9a-fA-F]{1,4}(?:\\x07|\\x1b\\\\)$`,
-    );
-  const palette = /^\u001b\]4;([0-9]{1,3});\?(?:\u0007|\u001b\\|\u009c)$/.exec(normalized);
-  if (palette)
-    return new RegExp(
-      `^\\x1b\\]4;${palette[1]};rgb:[0-9a-fA-F]{1,4}/[0-9a-fA-F]{1,4}/[0-9a-fA-F]{1,4}(?:\\x07|\\x1b\\\\)$`,
-    );
-  const status = /^\u001bP\$q(m|r|s| q|"q|"p)(?:\u001b\\|\u009c)$/.exec(normalized);
-  if (status) return new RegExp(`^\\x1bP[01]\\$r[0-9;:]{0,128}${status[1]}\\x1b\\\\$`);
-  if (/^\u001bP\+q[0-9a-fA-F;]{1,128}(?:\u001b\\|\u009c)$/.test(normalized))
-    return /^\u001bP[01]\+r[0-9a-fA-F;=]{1,512}\u001b\\$/;
-  const size = /^\u001b\[(14|16|18|19)t$/.exec(normalized);
-  if (size)
-    return new RegExp(
-      `^\\x1b\\[${size[1] === "14" ? "4" : size[1] === "16" ? "6" : "8"};[0-9]{1,5};[0-9]{1,5}t$`,
-    );
-  return undefined;
 }
 
 function legacySafeThreadId(threadId: string): string {
@@ -2347,7 +2227,6 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
     expectedPid: number,
   ) {
     while (true) {
-      const now = yield* Clock.currentTimeMillis;
       const action: DrainProcessEventAction = yield* Effect.sync(() => {
         if (session.pid !== expectedPid || !session.process || session.status !== "running") {
           session.pendingProcessEvents = [];
@@ -2374,18 +2253,6 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
         }
 
         if (nextEvent.type === "output") {
-          session.pendingProtocolQuery = observeTerminalQueries(
-            session.pendingProtocolQuery,
-            nextEvent.data,
-            (sequence) => {
-              const pattern = terminalProtocolReplyPattern(sequence);
-              if (!pattern) return;
-              session.protocolReplies = session.protocolReplies
-                .filter((reply) => reply.expiresAt > now)
-                .slice(-63);
-              session.protocolReplies.push({ pattern, expiresAt: now + 10_000 });
-            },
-          );
           const sanitized = sanitizeTerminalHistoryChunk(
             session.pendingHistoryControlSequence,
             nextEvent.data,
@@ -2656,9 +2523,6 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
             };
             yield* modifyManagerState((state) => {
               session.process = ptyProcess;
-              session.terminalInstanceId = NodeCrypto.randomUUID();
-              session.protocolReplies = [];
-              session.pendingProtocolQuery = "";
               session.shell = spawnResult.shell;
               session.pid = processPid;
               session.status = "running";
@@ -3033,9 +2897,6 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
         updatedAt: yield* nowIso,
         eventSequence: 0,
         inputCount: 0,
-        humanInputEpoch: 0,
-        protocolReplies: [],
-        pendingProtocolQuery: "",
         cols,
         rows,
         process: null,
@@ -3486,80 +3347,29 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
     );
   };
 
-  const inspectExisting: TerminalManager["Service"]["inspectExisting"] = Effect.fn(
-    "terminal.inspectExisting",
-  )(function* (input) {
-    const session = yield* requireSession(input.threadId, input.terminalId);
-    if (
-      !session.process ||
-      session.status !== "running" ||
-      !session.terminalInstanceId ||
-      session.pendingProcessEvents.some((event) => event?.type === "exit")
-    ) {
-      return yield* new TerminalNotRunningError(input);
-    }
-    return {
-      terminalInstanceId: session.terminalInstanceId,
-      humanInputEpoch: session.humanInputEpoch,
-    };
-  });
-
-  // Validation and native write share one synchronous section, including the human-input barrier.
-  const writeStrict = Effect.fn("terminal.writeStrict")(function* (
-    input: TerminalWriteInput,
-    expected?: { terminalInstanceId: string; humanInputEpoch: number; canWrite?: () => boolean },
-  ) {
+  const write: TerminalManager["Service"]["write"] = Effect.fn("terminal.write")(function* (input) {
     const terminalId = input.terminalId;
     const session = yield* requireSession(input.threadId, terminalId);
-    const now = yield* Clock.currentTimeMillis;
+    const process = session.process;
+    if (!process || session.status !== "running") {
+      if (session.status === "exited") return;
+      return yield* new TerminalNotRunningError({
+        threadId: input.threadId,
+        terminalId,
+      });
+    }
+    session.inputCount += 1;
     yield* Effect.try({
-      try: () => {
-        const process = session.process;
-        if (
-          !process ||
-          session.status !== "running" ||
-          session.pendingProcessEvents.some((event) => event?.type === "exit") ||
-          (expected &&
-            (session.terminalInstanceId !== expected.terminalInstanceId ||
-              session.humanInputEpoch !== expected.humanInputEpoch ||
-              expected.canWrite?.() === false))
-        ) {
-          throw new TerminalNotRunningError({ threadId: input.threadId, terminalId });
-        }
-        let matchedReply: (typeof session.protocolReplies)[number] | undefined;
-        if (input.protocolReply) {
-          if (expected || input.protocolReply.terminalInstanceId !== session.terminalInstanceId)
-            throw new Error("No outstanding same-instance terminal query matches this reply");
-          session.protocolReplies = session.protocolReplies.filter(
-            (reply) => reply.expiresAt > now,
-          );
-          matchedReply = session.protocolReplies.find(
-            (reply) => reply.response === undefined && reply.pattern.test(input.data),
-          );
-          if (!matchedReply) {
-            if (session.protocolReplies.some((reply) => reply.response === input.data)) return;
-            throw new Error("No outstanding same-instance terminal query matches this reply");
-          }
-        }
-        session.inputCount += 1;
-        if (!expected && !input.protocolReply) session.humanInputEpoch += 1;
-        process.write(input.data);
-        if (matchedReply) matchedReply.response = input.data;
-      },
+      try: () => process.write(input.data),
       catch: (cause) =>
-        isTerminalNotRunningError(cause)
-          ? cause
-          : new TerminalWriteError({
-              threadId: input.threadId,
-              terminalId,
-              terminalPid: session.pid ?? 0,
-              cause,
-            }),
+        new TerminalWriteError({
+          threadId: input.threadId,
+          terminalId,
+          terminalPid: process.pid,
+          cause,
+        }),
     });
   });
-  const write: TerminalManager["Service"]["write"] = (input) => writeStrict(input);
-  const writeAutomation: TerminalManager["Service"]["writeAutomation"] = (input) =>
-    writeStrict(input, input);
 
   const resizeLocked = Effect.fn("terminal.resize")(function* (
     input: TerminalResizeInput,
@@ -3686,8 +3496,6 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
     observeStream,
     resyncStream,
     write,
-    inspectExisting,
-    writeAutomation,
     resize,
     clear,
     close,

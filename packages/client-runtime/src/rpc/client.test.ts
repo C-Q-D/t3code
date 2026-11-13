@@ -3,7 +3,6 @@ import {
   type RelayClientInstallProgressEvent,
   type ServerLifecycleStreamEvent,
   WS_METHODS,
-  ThreadId,
 } from "@t3tools/contracts";
 import { describe, expect, it } from "@effect/vitest";
 import * as Cause from "effect/Cause";
@@ -27,15 +26,7 @@ import {
 import * as EnvironmentSupervisor from "../connection/supervisor.ts";
 import * as RpcSession from "../rpc/session.ts";
 import type { WsRpcProtocolClient } from "../rpc/protocol.ts";
-import {
-  runStream,
-  subscribe,
-  subscribeDynamicWithSession,
-  RpcPermissionGuard,
-  terminalAutomationCommand,
-  EnvironmentRpcRequestObserver,
-  followTerminalAutomation,
-} from "./client.ts";
+import { runStream, subscribe, subscribeDynamicWithSession } from "./client.ts";
 
 const TARGET = new PrimaryConnectionTarget({
   environmentId: EnvironmentId.make("environment-1"),
@@ -88,157 +79,7 @@ const makeHarness = Effect.fn("TestEnvironmentRpc.makeHarness")(function* () {
   };
 });
 
-it.effect(
-  "automation subscription requires the destination permission boundary before opening",
-  () =>
-    Effect.gen(function* () {
-      const harness = yield* makeHarness();
-      let opens = 0;
-      const client = {
-        [WS_METHODS.terminalAutomationSubscribe]: () => {
-          opens += 1;
-          return Stream.succeed({ type: "ready" as const });
-        },
-      } as unknown as WsRpcProtocolClient;
-      yield* SubscriptionRef.set(harness.activeSession, Option.some(session(client)));
-      const read = subscribe(WS_METHODS.terminalAutomationSubscribe, {
-        threadId: ThreadId.make("thread"),
-      }).pipe(
-        Stream.take(1),
-        Stream.runCollect,
-        Effect.provideService(EnvironmentSupervisor.EnvironmentSupervisor, harness.supervisor),
-      );
-      expect(yield* Effect.flip(read)).toMatchObject({ _tag: "EnvironmentAuthorizationError" });
-      expect(opens).toBe(0);
-      expect(
-        yield* read.pipe(
-          Effect.provideService(RpcPermissionGuard, { authorize: () => Effect.void }),
-        ),
-      ).toEqual([{ type: "ready" }]);
-      expect(opens).toBe(1);
-    }),
-);
-
 describe("environment RPC", () => {
-  it.effect(
-    "delivers automation events in their producing generation before downstream buffering",
-    () =>
-      Effect.gen(function* () {
-        const harness = yield* makeHarness();
-        const blocked = yield* Deferred.make<void>();
-        const release = yield* Deferred.make<void>();
-        const replaced = yield* Deferred.make<void>();
-        const ready = { type: "ready" as const };
-        const nextReady = { type: "ready" as const };
-        const old = {
-          version: 1 as const,
-          selectionRequestId: "old",
-          candidateVersion: 1,
-          candidates: [],
-        };
-        const firstClient = {
-          [WS_METHODS.terminalAutomationSubscribe]: () =>
-            Stream.make(ready, old).pipe(Stream.concat(Stream.never)),
-        } as unknown as WsRpcProtocolClient;
-        const secondClient = {
-          [WS_METHODS.terminalAutomationSubscribe]: () =>
-            Stream.fromEffect(Deferred.succeed(replaced, undefined)).pipe(
-              Stream.drain,
-              Stream.concat(Stream.make(nextReady)),
-              Stream.concat(Stream.never),
-            ),
-        } as unknown as WsRpcProtocolClient;
-        let generation = 0;
-        let consumed = 0;
-        const deliveries: { generation: number; event: unknown }[] = [];
-        yield* SubscriptionRef.set(harness.activeSession, Option.some(session(firstClient)));
-        const fiber = yield* followTerminalAutomation(
-          { threadId: ThreadId.make("thread") },
-          () => {
-            generation += 1;
-          },
-          () => {},
-          (event) => {
-            deliveries.push({ generation, event });
-          },
-        ).pipe(
-          Stream.mapEffect((event) =>
-            consumed++ === 0
-              ? Deferred.succeed(blocked, undefined).pipe(
-                  Effect.andThen(Deferred.await(release)),
-                  Effect.as(event),
-                )
-              : Effect.succeed(event),
-          ),
-          Stream.takeUntil((event) => event === nextReady),
-          Stream.runCollect,
-          Effect.provideService(EnvironmentSupervisor.EnvironmentSupervisor, harness.supervisor),
-          Effect.provideService(RpcPermissionGuard, { authorize: () => Effect.void }),
-          Effect.forkChild,
-        );
-        yield* Deferred.await(blocked);
-        yield* SubscriptionRef.set(harness.activeSession, Option.some(session(secondClient)));
-        yield* Deferred.await(replaced);
-        yield* Deferred.succeed(release, undefined);
-        yield* Fiber.join(fiber);
-        expect(deliveries[0]).toEqual({ generation: 1, event: ready });
-        expect(deliveries.at(-1)).toEqual({ generation: 2, event: nextReady });
-        expect(
-          deliveries.filter((item) => item.event === old).every((item) => item.generation === 1),
-        ).toBe(true);
-      }),
-  );
-
-  it.effect(
-    "rejects an automation command queued across a subscription replacement before sending",
-    () =>
-      Effect.gen(function* () {
-        const harness = yield* makeHarness();
-        const entered = yield* Deferred.make<void>();
-        const release = yield* Deferred.make<void>();
-        let current = true;
-        let sends = 0;
-        let completed = 0;
-        const client = {
-          [WS_METHODS.terminalAutomationRegisterViews]: () => {
-            sends += 1;
-            return Effect.void;
-          },
-        } as unknown as WsRpcProtocolClient;
-        yield* SubscriptionRef.set(harness.activeSession, Option.some(session(client)));
-        const command = terminalAutomationCommand(WS_METHODS.terminalAutomationRegisterViews);
-        const fiber = yield* command({
-          threadId: ThreadId.make("thread"),
-          registration: { version: 1, views: [] },
-          isCurrent: () => current,
-        }).pipe(
-          Effect.provideService(EnvironmentSupervisor.EnvironmentSupervisor, harness.supervisor),
-          Effect.provideService(RpcPermissionGuard, { authorize: () => Effect.void }),
-          Effect.provideService(EnvironmentRpcRequestObserver, {
-            observe: () =>
-              Effect.gen(function* () {
-                yield* Deferred.succeed(entered, undefined);
-                yield* Deferred.await(release);
-                return Effect.sync(() => {
-                  completed += 1;
-                });
-              }),
-          }),
-          Effect.result,
-          Effect.forkChild,
-        );
-        yield* Deferred.await(entered);
-        current = false;
-        yield* Deferred.succeed(release, undefined);
-        expect(yield* Fiber.join(fiber)).toMatchObject({
-          _tag: "Failure",
-          failure: { _tag: "EnvironmentRpcUnavailableError" },
-        });
-        expect(sends).toBe(0);
-        expect(completed).toBe(1);
-      }),
-  );
-
   it.effect("binds finite streaming commands to one active session", () =>
     Effect.gen(function* () {
       const firstEvents = yield* Queue.unbounded<RelayClientInstallProgressEvent>();

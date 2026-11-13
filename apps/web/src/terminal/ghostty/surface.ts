@@ -1,17 +1,5 @@
 /** Localized terminal presentation and existing interaction behavior. */
 import { t } from "~/i18n";
-import type {
-  TerminalAutomationAction,
-  TerminalAutomationReadQuery,
-  TerminalAutomationLocalAction,
-} from "@t3tools/contracts";
-import {
-  encodeGhosttyAutomation,
-  ghosttyAutomationFrame,
-  GhosttyAutomationError,
-  readGhosttyAutomation,
-  validateGhosttyAutomationGeometry,
-} from "./automation";
 import { isMacPlatform } from "../../lib/utils";
 import { SELECTION_MULTI_CLICK_INTERVAL_MS } from "../../lib/selectionActions";
 import { collectWrappedTerminalLinkLine, extractTerminalLinks } from "../../terminal-links";
@@ -543,8 +531,6 @@ export interface GhosttyTerminalSurfaceOptions {
   /** Read after font and WASM loading. */
   readonly visible?: boolean;
   readonly onData: (data: string) => void;
-  readonly onInputStart?: () => void;
-  readonly onProtocolData?: (data: string) => void;
   readonly onResize: (cols: number, rows: number) => void;
   readonly onSelectionChange: () => void;
   /** Emits the initial bottom state and subsequent changes during existing scrollbar updates. */
@@ -573,7 +559,6 @@ export class GhosttyTerminalSurface {
   private readonly options: GhosttyTerminalSurfaceOptions;
   private visible: boolean;
   private hasSize = false;
-  private automationReadyWaiters = new Set<() => void>();
   private metrics: GhosttyCellMetrics;
   private fontFamily: string;
   private requestedFontFamily: string | undefined;
@@ -624,11 +609,6 @@ export class GhosttyTerminalSurface {
   private hoverPointer: { x: number; y: number } | null = null;
   private selectionClickSequence: TerminalSelectionClickSequence | null = null;
   private selectionMoved = false;
-  private automationSelection: {
-    owner: string;
-    expiresAt: number;
-    activeScreen: "primary" | "alternate";
-  } | null = null;
   private composing = false;
   private focused = false;
   private resizeNotified = false;
@@ -770,7 +750,7 @@ export class GhosttyTerminalSurface {
       metrics.width,
       metrics.height,
       options.theme,
-      options.onProtocolData ?? options.onData,
+      options.onData,
     );
     const surface = new GhosttyTerminalSurface(
       mount,
@@ -789,7 +769,6 @@ export class GhosttyTerminalSurface {
   }
 
   setVisible(visible: boolean): void {
-    if (!visible) this.cancelAutomationSelection();
     if (this.disposed || this.visible === visible) return;
     this.visible = visible;
     this.cursorOn = true;
@@ -815,161 +794,6 @@ export class GhosttyTerminalSurface {
     this.cursorOn = true;
     this.scrollbarDirty = true;
     this.requestRender();
-  }
-
-  /** Returns a detached frame; the owning bridge supplies the current PTY output sequence. */
-  automationFrame(sequence: number) {
-    if (this.disposed) throw new GhosttyAutomationError("target_invalid");
-    return ghosttyAutomationFrame(this.core.automationMetadata(), sequence);
-  }
-
-  isAutomationReady(): boolean {
-    try {
-      this.automationInputGeometry();
-      return true;
-    } catch (error) {
-      if (error instanceof GhosttyAutomationError) return false;
-      throw error;
-    }
-  }
-
-  /** Resolves after the real surface applies its visible canvas and font geometry. */
-  waitForAutomationReady(signal: AbortSignal): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const cleanup = () => {
-        this.automationReadyWaiters.delete(check);
-        signal.removeEventListener("abort", abort);
-      };
-      const abort = () => {
-        cleanup();
-        reject(new GhosttyAutomationError("client_unavailable"));
-      };
-      const check = () => {
-        if (this.disposed) {
-          cleanup();
-          reject(new GhosttyAutomationError("target_invalid"));
-        } else if (this.isAutomationReady()) {
-          cleanup();
-          resolve();
-        }
-      };
-      if (signal.aborted) {
-        abort();
-        return;
-      }
-      signal.addEventListener("abort", abort, { once: true });
-      this.automationReadyWaiters.add(check);
-      check();
-    });
-  }
-
-  /** Reads the active screen without consuming the surface's pending render. */
-  readAutomation(query: TerminalAutomationReadQuery, sequence: number) {
-    if (this.disposed) throw new GhosttyAutomationError("target_invalid");
-    return readGhosttyAutomation(this.core, query, sequence);
-  }
-
-  /** Returns bytes or a local plan without applying it; keyboard replies retain the request's revision for correlation. */
-  encodeAutomationInput(action: TerminalAutomationAction, frameRevision: number) {
-    return encodeGhosttyAutomation(
-      this.core,
-      action,
-      frameRevision,
-      this.automationInputGeometry(),
-    );
-  }
-
-  /** Applies one authorized local plan; the bridge must validate binding/epoch/request and deduplicate unknown or repeated requests. */
-  applyAutomationLocalAction(
-    localAction: TerminalAutomationLocalAction,
-    frameRevision: number,
-    owner = "",
-  ): { readonly status: "local_applied" } {
-    this.automationInputGeometry();
-    const metadata = this.core.automationMetadata();
-    if (frameRevision !== metadata.frameRevision) throw new GhosttyAutomationError("stale_request");
-    if (localAction.type === "selection") {
-      const { column, row } = localAction.position;
-      if (
-        !Number.isInteger(column) ||
-        !Number.isInteger(row) ||
-        column < 0 ||
-        row < 0 ||
-        column >= metadata.cols ||
-        row >= metadata.rows
-      )
-        throw new GhosttyAutomationError("stale_request");
-      const bounds = this.canvas.getBoundingClientRect();
-      const clientX = bounds.left + CONTENT_PADDING + (column + 0.5) * this.metrics.width;
-      const clientY = bounds.top + this.originY + (row + 0.5) * this.metrics.height;
-      if (localAction.phase === "press") {
-        this.cancelAutomationSelection();
-        this.beginSelection({ clientX, clientY }, 1);
-        this.automationSelection = {
-          owner,
-          expiresAt: Date.now() + 10_000,
-          activeScreen: metadata.activeScreen,
-        };
-      } else {
-        if (
-          this.automationSelection?.owner !== owner ||
-          Date.now() >= this.automationSelection.expiresAt ||
-          this.automationSelection.activeScreen !== metadata.activeScreen ||
-          this.core.selectionRange() === null
-        )
-          throw new GhosttyAutomationError("stale_request");
-        if (column !== this.selectionEnd?.x || row !== this.selectionEnd.y)
-          this.extendSelectionTo(clientX, clientY);
-        this.automationSelection.expiresAt = Date.now() + 10_000;
-        if (localAction.phase === "release") {
-          if (!this.selectionMoved) this.clearSelection();
-          this.cancelAutomationSelection();
-        }
-      }
-      this.options.onSelectionChange();
-      return { status: "local_applied" };
-    }
-    if (metadata.activeScreen !== "primary") throw new GhosttyAutomationError("stale_request");
-    if (
-      localAction.type !== "scroll" ||
-      !Number.isInteger(localAction.deltaRows) ||
-      localAction.deltaRows === 0 ||
-      Math.abs(localAction.deltaRows) > 100
-    )
-      throw new GhosttyAutomationError("unsupported_client");
-    this.scrollViewport(localAction.deltaRows);
-    return { status: "local_applied" };
-  }
-
-  /** Drops automation gesture ownership without erasing the visible selection. */
-  cancelAutomationSelection(owner?: string): void {
-    if (owner !== undefined && this.automationSelection?.owner !== owner) return;
-    this.automationSelection = null;
-  }
-
-  /** Reads current CSS bounds only when canvas and font geometry have finished applying. */
-  private automationInputGeometry() {
-    if (this.disposed) throw new GhosttyAutomationError("target_invalid");
-    if (
-      !this.visible ||
-      !this.hasSize ||
-      this.pendingCanvasConfiguration !== null ||
-      this.pendingFontEpoch !== null
-    )
-      throw new GhosttyAutomationError("not_ready");
-    const bounds = this.canvas.getBoundingClientRect();
-    const geometry = {
-      cellWidth: this.metrics.width,
-      cellHeight: this.metrics.height,
-      screenWidth: bounds.width,
-      screenHeight: bounds.height,
-      paddingLeft: CONTENT_PADDING,
-      paddingRight: CONTENT_PADDING,
-      paddingTop: this.originY,
-      paddingBottom: Math.max(0, bounds.height - this.originY - this.rows * this.metrics.height),
-    };
-    validateGhosttyAutomationGeometry(this.core.automationMetadata(), geometry);
-    return geometry;
   }
 
   resetAndWrite(data: string): void {
@@ -1188,19 +1012,13 @@ export class GhosttyTerminalSurface {
     readText: () => Promise<string>,
     isCurrent: () => boolean = () => true,
   ): Promise<void> {
-    this.options.onInputStart?.();
     const token = ++this.pasteShortcutToken;
     const text = await readText();
     if (this.disposed || this.pasteShortcutToken !== token || !isCurrent()) return;
     this.pasteShortcutToken += 1;
     if (text.length === 0) return;
     const encoded = this.core.encodePaste(text);
-    if (encoded.length > 0) this.sendInput(encoded);
-  }
-
-  private sendInput(data: string, inputStarted = false): void {
-    if (!inputStarted) this.options.onInputStart?.();
-    this.options.onData(data);
+    if (encoded.length > 0) this.options.onData(encoded);
   }
 
   // The terminal selection is the only browser-readable PRIMARY-like buffer.
@@ -1226,7 +1044,6 @@ export class GhosttyTerminalSurface {
 
   /** Selects core scrollback, resets drag bookkeeping and notifies the host before repainting selection. */
   selectAll(): void {
-    this.cancelAutomationSelection();
     this.clearPrimedCopy();
     const range = this.core.selectAll();
     this.selectionAnchorScreen = range?.start ?? null;
@@ -1272,7 +1089,6 @@ export class GhosttyTerminalSurface {
 
   /** Clears core and gesture selection, stops autoscroll and notifies the host before repainting. */
   clearSelection(): void {
-    this.cancelAutomationSelection();
     this.clearPrimedCopy();
     this.core.clearSelection();
     this.selectionEnd = null;
@@ -1299,10 +1115,8 @@ export class GhosttyTerminalSurface {
 
   /** Idempotently releases owned listeners, timers, DOM and core resources; flushes a pending resize notification. */
   dispose(): void {
-    this.cancelAutomationSelection();
     if (this.disposed) return;
     this.disposed = true;
-    for (const check of this.automationReadyWaiters) check();
     this.stopObservingResize();
     document.fonts.removeEventListener("loadingdone", this.onFontsLoaded);
     this.dprMedia?.removeEventListener("change", this.onDevicePixelRatioChange);
@@ -1415,7 +1229,6 @@ export class GhosttyTerminalSurface {
       return;
     }
     if (isTerminalPasteShortcut(event)) {
-      this.options.onInputStart?.();
       const gesture = { code: event.code, readText: "" };
       this.pasteShortcutGesture = gesture;
       const clipboard = navigator.clipboard;
@@ -1429,7 +1242,7 @@ export class GhosttyTerminalSurface {
             this.pasteShortcutToken += 1;
             if (text.length === 0) return;
             if (this.pasteShortcutGesture === gesture) gesture.readText = text;
-            this.sendInput(this.core.encodePaste(text));
+            this.options.onData(this.core.encodePaste(text));
           },
           () => {},
         );
@@ -1442,7 +1255,7 @@ export class GhosttyTerminalSurface {
     this.encodedKeyCodes.add(event.code);
     event.preventDefault();
     event.stopPropagation();
-    this.sendInput(data);
+    this.options.onData(data);
   };
 
   private readonly onKeyUp = (event: KeyboardEvent) => {
@@ -1464,7 +1277,7 @@ export class GhosttyTerminalSurface {
     if (data.length === 0) return;
     event.preventDefault();
     event.stopPropagation();
-    this.sendInput(data);
+    this.options.onData(data);
   };
 
   // A release elsewhere must not leave a press for a later app shortcut to inherit.
@@ -1532,7 +1345,6 @@ export class GhosttyTerminalSurface {
   };
 
   private readonly onPaste = (event: ClipboardEvent) => {
-    this.options.onInputStart?.();
     // Default textarea insertion would bypass bracketed-paste encoding through onInput.
     event.preventDefault();
     const data = event.clipboardData?.getData("text/plain") ?? "";
@@ -1545,11 +1357,10 @@ export class GhosttyTerminalSurface {
     // The native paste won the race with actual text; a pending clipboard read
     // must not double. An empty native paste leaves the read as the only path.
     this.pasteShortcutToken += 1;
-    this.sendInput(this.core.encodePaste(data));
+    this.options.onData(this.core.encodePaste(data));
   };
 
   private readonly onCompositionStart = () => {
-    this.options.onInputStart?.();
     this.clearPrimedCopy();
     this.clearCompositionInputSuppression();
     this.composing = true;
@@ -1558,7 +1369,7 @@ export class GhosttyTerminalSurface {
   private readonly onCompositionEnd = (event: CompositionEvent) => {
     this.composing = false;
     const data = this.input.value || event.data;
-    if (data.length > 0) this.sendInput(data);
+    if (data.length > 0) this.options.onData(data);
     this.input.value = "";
     this.compositionInputToSuppress = data;
     this.compositionSuppressionTimer = window.setTimeout(() => {
@@ -1577,7 +1388,7 @@ export class GhosttyTerminalSurface {
       return;
     }
     this.clearCompositionInputSuppression();
-    if (data.length > 0) this.sendInput(data);
+    if (data.length > 0) this.options.onData(data);
     this.input.value = "";
   };
 
@@ -1590,11 +1401,9 @@ export class GhosttyTerminalSurface {
   }
 
   private readonly onPointerDown = (event: PointerEvent) => {
-    this.cancelAutomationSelection();
     if (event.pointerType === "touch") {
       event.preventDefault();
       if (!event.isPrimary || this.touchScroll !== null) return;
-      this.options.onInputStart?.();
       this.touchScroll = {
         pointerId: event.pointerId,
         startX: event.clientX,
@@ -1626,7 +1435,6 @@ export class GhosttyTerminalSurface {
       return;
     }
     if (event.button !== 0) return;
-    this.options.onInputStart?.();
     const clickCount = this.recordSelectionClick(event);
     const link = this.linkAt(event.clientX, event.clientY);
     if (link && !event.shiftKey && clickCount === 1) {
@@ -1925,8 +1733,6 @@ export class GhosttyTerminalSurface {
 
   private readonly onWheel = (event: WheelEvent) => {
     if (event.deltaY === 0) return;
-    this.cancelAutomationSelection();
-    this.options.onInputStart?.();
     event.preventDefault();
     const delta = terminalWheelDeltaRows(
       event,
@@ -1935,26 +1741,23 @@ export class GhosttyTerminalSurface {
       this.wheelRemainder,
     );
     this.wheelRemainder = delta.remainder;
-    this.scrollRows(delta.rows, event, true);
+    this.scrollRows(delta.rows, event);
   };
 
   /** Scrolls the core by signed rows and schedules a full redraw with updated scrollbar geometry. */
-  private scrollRows(rows: number, event: MouseEvent, inputStarted = false): void {
+  private scrollRows(rows: number, event: MouseEvent): void {
     if (rows === 0) return;
     const magnitude = Math.abs(rows);
     if (shouldReportTerminalMouse(this.core.isMouseTracking(), event)) {
       const button = rows < 0 ? 4 : 5;
       for (let index = 0; index < magnitude; index += 1) {
-        this.sendMouse("press", button, event, inputStarted);
+        this.sendMouse("press", button, event);
       }
       return;
     }
     if (this.core.isAlternateScreen()) {
       // Alternate screens have no scrollback; send arrow keys like xterm.
-      this.sendInput(
-        terminalWheelArrowData(rows, this.core.isApplicationCursorKeys()),
-        inputStarted,
-      );
+      this.options.onData(terminalWheelArrowData(rows, this.core.isApplicationCursorKeys()));
       return;
     }
     this.scrollViewport(rows);
@@ -1987,8 +1790,6 @@ export class GhosttyTerminalSurface {
     const bounds = this.scrollbar.getBoundingClientRect();
     const geometry = terminalScrollbarGeometry(state, bounds.height);
     if (geometry === null) return;
-    this.cancelAutomationSelection();
-    this.options.onInputStart?.();
     event.preventDefault();
     event.stopPropagation();
     this.scrollbarPointerId = event.pointerId;
@@ -2043,8 +1844,6 @@ export class GhosttyTerminalSurface {
     }
     event.preventDefault();
     event.stopPropagation();
-    this.cancelAutomationSelection();
-    this.options.onInputStart?.();
     this.scrollViewport(delta);
   };
 
@@ -2223,14 +2022,6 @@ export class GhosttyTerminalSurface {
 
   /** Paints a visible, sized surface from core state; applies pending canvas changes and honors synchronized output. */
   private renderFrame(): void {
-    try {
-      this.renderAutomationFrame();
-    } finally {
-      for (const check of this.automationReadyWaiters) check();
-    }
-  }
-
-  private renderAutomationFrame(): void {
     if (this.disposed || !this.visible) return;
     if (this.frame !== 0) {
       window.cancelAnimationFrame(this.frame);
@@ -2408,12 +2199,7 @@ export class GhosttyTerminalSurface {
     return terminalLinkAtPositionWithRange(this.snapshot.rowData, cell.y, cell.x);
   }
 
-  private sendMouse(
-    action: TerminalMouseAction,
-    button: number | null,
-    event: MouseEvent,
-    inputStarted = false,
-  ): void {
+  private sendMouse(action: TerminalMouseAction, button: number | null, event: MouseEvent): void {
     const bounds = this.canvas.getBoundingClientRect();
     const data = this.core.encodeMouse({
       action,
@@ -2437,7 +2223,7 @@ export class GhosttyTerminalSurface {
     });
     const resolution = resolveTerminalMouseData(action, data, this.lastMouseMotionData);
     this.lastMouseMotionData = resolution.nextMotionData;
-    if (resolution.send) this.sendInput(data, inputStarted);
+    if (resolution.send) this.options.onData(data);
   }
 
   /** Refreshes DEC mouse-tracking state and invalidates stale motion deduplication; returns whether any-event tracking is active. */

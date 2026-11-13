@@ -1,37 +1,15 @@
-import {
-  AuthTerminalReadScope,
-  AuthTerminalOperateScope,
-  type ScopedThreadRef,
-  type ResolvedKeybindingsConfig,
-} from "@t3tools/contracts";
+import type { ResolvedKeybindingsConfig } from "@t3tools/contracts";
 import {
   parseScopedThreadKey,
   scopedThreadKey,
   scopeThreadRef,
 } from "@t3tools/client-runtime/environment";
-import {
-  createContext,
-  useContext,
-  useLayoutEffect,
-  useState,
-  useSyncExternalStore,
-  type Dispatch,
-  type SetStateAction,
-  type ReactNode,
-} from "react";
-import { RetainedTerminalPortal } from "./RetainedTerminalPortal";
-import {
-  getTerminalAutomation,
-  subscribeTerminalAutomation,
-  terminalAutomationRevision,
-} from "../../state/terminal";
-import { terminalCanUnmount } from "../../terminal/mountRetention";
+import { useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useComposerDraftStore } from "../../composerDraftStore";
 import type { TerminalContextSelection } from "../../lib/terminalContext";
 import { usePanelAnimationSettings, usePanelPresence } from "../../panelAnimations";
-import { useThreadRefs, useQuietThreadShell } from "../../state/entities";
-import { useEnvironmentScope } from "../../state/session";
+import { useThreadRefs } from "../../state/entities";
 import { useTerminalUiStateStore } from "../../terminalUiStateStore";
 import {
   MAX_HIDDEN_MOUNTED_TERMINAL_THREADS,
@@ -60,8 +38,7 @@ interface ChatTerminalDrawersProps {
  * to one finds its sessions as they were. Every thread's terminal and draft
  * state feeds the reconcile, so it subscribes here instead of in ChatView.
  */
-function RetainedChatTerminalDrawers(props: ChatTerminalDrawersProps) {
-  useSyncExternalStore(subscribeTerminalAutomation, terminalAutomationRevision);
+export function ChatTerminalDrawers(props: ChatTerminalDrawersProps) {
   const { activeThreadKey } = props;
   const openTerminalThreadKeys = useTerminalUiStateStore(
     useShallow((state) =>
@@ -91,18 +68,12 @@ function RetainedChatTerminalDrawers(props: ChatTerminalDrawersProps) {
     const existingThreadKeys = new Set<string>([...serverThreadKeys, ...draftThreadKeys]);
     return openTerminalThreadKeys.filter((nextThreadKey) => existingThreadKeys.has(nextThreadKey));
   })();
-  const existing = new Set([...serverThreadKeys, ...draftThreadKeys]);
-  const retainedThreadIds = mountedTerminalThreadKeys.filter((key) => {
-    const ref = parseScopedThreadKey(key);
-    return existing.has(key) && ref && !terminalCanUnmount(getTerminalAutomation(ref));
-  });
   const reconciledMountedTerminalThreadKeys = reconcileMountedTerminalThreadIds({
     currentThreadIds: mountedTerminalThreadKeys,
     openThreadIds: existingOpenTerminalThreadKeys,
     activeThreadId: activeThreadKey,
     activeThreadTerminalOpen: activeTerminalDrawerPresence.present,
     maxHiddenThreadCount: MAX_HIDDEN_MOUNTED_TERMINAL_THREADS,
-    retainedThreadIds,
   });
   if (
     reconciledMountedTerminalThreadKeys.length !== mountedTerminalThreadKeys.length ||
@@ -118,7 +89,7 @@ function RetainedChatTerminalDrawers(props: ChatTerminalDrawersProps) {
   });
 
   return mountedTerminalThreadRefs.map(({ key: mountedThreadKey, threadRef: mountedThreadRef }) => (
-    <RetainedThreadDrawer
+    <PersistentThreadTerminalDrawer
       key={mountedThreadKey}
       threadRef={mountedThreadRef}
       threadId={mountedThreadRef.threadId}
@@ -133,57 +104,4 @@ function RetainedChatTerminalDrawers(props: ChatTerminalDrawersProps) {
       onAddTerminalContext={props.onAddTerminalContext}
     />
   ));
-}
-
-function RetainedThreadDrawer(
-  props: React.ComponentProps<typeof PersistentThreadTerminalDrawer> & {
-    threadRef: ScopedThreadRef;
-  },
-) {
-  const canRead = useEnvironmentScope(props.threadRef.environmentId, AuthTerminalReadScope);
-  const canOperate = useEnvironmentScope(props.threadRef.environmentId, AuthTerminalOperateScope);
-  const thread = useQuietThreadShell(props.threadRef);
-  return canRead && canOperate && thread?.deletedAt == null ? (
-    <PersistentThreadTerminalDrawer {...props} />
-  ) : null;
-}
-
-type Configuration = { props: ChatTerminalDrawersProps; element: HTMLDivElement | null };
-const DrawerHostContext = createContext<Dispatch<SetStateAction<Configuration | null>> | null>(
-  null,
-);
-
-export function ChatTerminalDrawersProvider({ children }: { children: ReactNode }) {
-  const [configuration, configure] = useState<Configuration | null>(null);
-  return (
-    <DrawerHostContext.Provider value={configure}>
-      {children}
-      {configuration ? (
-        <RetainedTerminalPortal target={configuration.element} fill={false}>
-          <RetainedChatTerminalDrawers {...configuration.props} />
-        </RetainedTerminalPortal>
-      ) : null}
-    </DrawerHostContext.Provider>
-  );
-}
-
-export function ChatTerminalDrawers(props: ChatTerminalDrawersProps) {
-  const configure = useContext(DrawerHostContext);
-  const [element, setElement] = useState<HTMLDivElement | null>(null);
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- publishes the layout slot to the stable terminal owner above keyed ChatViews
-  useLayoutEffect(() => {
-    if (!configure) return;
-    const configuration = { props, element };
-    configure(configuration);
-    return () =>
-      configure((current) =>
-        current === configuration
-          ? {
-              props: { ...current.props, activeThreadKey: null, activeTerminalOpen: false },
-              element: null,
-            }
-          : current,
-      );
-  }, [configure, element, props]);
-  return <div className="flex min-h-0 shrink-0 flex-col" ref={setElement} />;
 }

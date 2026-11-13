@@ -30,10 +30,6 @@ Cases are JSON lines in `cases/`, one file per area. The case schema in `run.ts`
 
 Check that the case builds with `--dry-run --case <id>`. Then run it on the text before your fix, where it must fail, and on the text after, where it must pass.
 
-## Already-open terminal cases
-
-`cases/terminal.ndjson` guards uncertain delivery, human-confirmed resume, user terminal selection and independent child bindings, with history-reading and ordinary-coding controls. The runner imports the production terminal Toolkit and shared provider instructions. Grader tests build the cases and reject synthetic unsafe traces; they do not measure model behavior, execute terminal input or verify a real client. Run these cases on the same model before and after a text change to measure routing behavior.
-
 ## Device manager cases
 
 `cases/device-manager.ndjson` ports nine mechanisms from the [device-routing investigation described in #25661](https://github.com/pingdotgg/t3code/pull/25661) and adds seven cases from t3dotgg’s 2026-10-26 fleet device investigation. All prompts, files, hosts and prior turns are authored Acme data; the fleet cases cite finding ids without carrying source transcripts or identifiers.

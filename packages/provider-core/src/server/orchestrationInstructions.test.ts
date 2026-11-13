@@ -4,44 +4,10 @@ import {
   T3_CODE_DEVICE_TOOL_INSTRUCTIONS,
   T3_CODE_DEVICE_TOOL_INSTRUCTIONS_WITH_TOOL_SEARCH,
   T3_CODE_ORCHESTRATION_INSTRUCTIONS,
-  T3_CODE_ORCHESTRATION_SECTIONS,
   t3AcpPromptWithInstructions,
   t3OrchestrationPrompt,
   t3OrchestrationSystemPrompt,
 } from "./orchestrationInstructions.ts";
-
-it("delivers terminal boundaries through shared system, prompt and ACP channels within Codex limits", () => {
-  const channels = [
-    T3_CODE_ORCHESTRATION_INSTRUCTIONS,
-    t3OrchestrationSystemPrompt(true, false),
-    t3OrchestrationPrompt({
-      prompt: "Use the open terminal.",
-      hasT3Mcp: true,
-      hasDeviceTools: false,
-      orchestrationDelivered: false,
-      deviceInstructionsDelivered: false,
-    }),
-    t3AcpPromptWithInstructions({
-      prompt: "Use the open terminal.",
-      state: { interactionMode: "default", hasT3Mcp: true, hasDeviceTools: false },
-    }),
-  ];
-  for (const text of channels) {
-    for (const name of [
-      "terminal_status",
-      "terminal_bind",
-      "terminal_read",
-      "terminal_input",
-      "terminal_release",
-      "selection_required",
-      "receipt:{bindingId,requestId}",
-    ])
-      assert.include(text, name);
-    assert.include(text, "Only the user can explicitly confirm resume");
-  }
-  for (const section of T3_CODE_ORCHESTRATION_SECTIONS)
-    assert.isBelow(new TextEncoder().encode(section).byteLength, 4000);
-});
 
 describe("T3 device instructions", () => {
   it("route device work through device_open and give Claude the line that loads the tools", () => {

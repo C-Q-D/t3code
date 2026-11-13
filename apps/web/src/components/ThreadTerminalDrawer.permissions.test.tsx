@@ -8,7 +8,6 @@ import { DEFAULT_CLIENT_SETTINGS } from "@t3tools/contracts/settings";
 import { nextTerminalAttachSeedState } from "@t3tools/client-runtime/state/terminal";
 import { AsyncResult } from "effect/reactivity";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
-import type { ReactNode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
 import type {
   GhosttyTerminalSurface,
@@ -37,19 +36,6 @@ vi.mock("../hooks/useSettings", () => ({
 }));
 vi.mock("../editorPreferences", () => ({ useOpenInPreferredEditor: () => state.otherCommand }));
 vi.mock("../localApi", () => ({ readLocalApi: () => null }));
-vi.mock("../hooks/useLocalStorage", () => ({
-  useLocalStorage: (_key: string, value: unknown) => [value, () => {}],
-}));
-vi.mock("../lib/terminalFocus", () => ({
-  consumePendingTerminalFocus: () => false,
-  registerTerminalFocusTarget: () => () => {},
-  focusTerminal: () => {},
-  focusTerminalViewport: () => false,
-}));
-vi.mock("~/components/ui/popover", () => {
-  const Passthrough = ({ children }: { children: ReactNode }) => children;
-  return { Popover: Passthrough, PopoverPopup: Passthrough, PopoverTrigger: Passthrough };
-});
 vi.mock("../state/server", () => ({
   serverEnvironment: { configValueAtom: () => "config" },
 }));
@@ -59,7 +45,6 @@ vi.mock("../state/use-atom-command", () => ({
   useAtomCommand: (command: string) => (command === "resize" ? state.resize : state.otherCommand),
 }));
 vi.mock("../state/terminalSessions", () => ({
-  useKnownTerminalSessions: () => [],
   attachedTerminalSessionAtom: () => "terminal-session",
 }));
 vi.mock("../rpc/atomRegistry", () => ({
@@ -86,7 +71,7 @@ vi.mock("../state/session", async () => {
   };
 });
 
-import ThreadTerminalDrawer, { TerminalViewport } from "./ThreadTerminalDrawer";
+import { TerminalViewport } from "./ThreadTerminalDrawer";
 
 const threadRef = {
   environmentId: EnvironmentId.make("secondary-terminal"),
@@ -104,8 +89,6 @@ beforeEach(() => {
   // pending. Keep that unrelated setup pending while exercising its callback.
   state.createSurface.mockReset().mockReturnValue(new Promise(() => undefined));
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-  vi.stubGlobal("window", { addEventListener: () => {}, removeEventListener: () => {} });
-  vi.stubGlobal("HTMLElement", function HTMLElement() {});
   vi.stubGlobal("document", {
     body: {},
     documentElement: { classList: { contains: () => false } },
@@ -166,39 +149,4 @@ it("rechecks the target terminal grant when a retained surface callback reports 
     environmentId: threadRef.environmentId,
     input: { threadId: threadRef.threadId, terminalId: "terminal-1", cols: 100, rows: 30 },
   });
-});
-
-it("keeps opened terminal viewports mounted across tab switches and removes only a closed tab", async () => {
-  const renderDrawer = (ids: string[], active: string) => (
-    <ThreadTerminalDrawer
-      threadRef={threadRef}
-      threadId={threadRef.threadId}
-      cwd="/repo"
-      height={300}
-      terminalIds={ids}
-      activeTerminalId={active}
-      terminalGroups={ids.map((id) => ({ id, terminalIds: [id] }))}
-      activeTerminalGroupId={active}
-      keybindings={[]}
-      onSplitTerminal={state.otherCommand}
-      onSplitTerminalVertical={state.otherCommand}
-      onNewTerminal={state.otherCommand}
-      onActiveTerminalChange={state.otherCommand}
-      onCloseTerminal={state.otherCommand}
-      onHeightChange={state.otherCommand}
-      onAddTerminalContext={state.otherCommand}
-    />
-  );
-  await act(async () => {
-    renderer = create(renderDrawer(["a", "b"], "a"), {
-      createNodeMock: () => ({ closest: () => null, contains: () => false }),
-    });
-  });
-  const original = renderer!.root.findAllByType(TerminalViewport);
-  expect(original.map((view) => view.props.terminalId)).toEqual(["a", "b"]);
-  await act(async () => renderer!.update(renderDrawer(["a", "b"], "b")));
-  expect(renderer!.root.findAllByType(TerminalViewport)).toEqual(original);
-  expect(state.createSurface).toHaveBeenCalledTimes(2);
-  await act(async () => renderer!.update(renderDrawer(["b"], "b")));
-  expect(renderer!.root.findAllByType(TerminalViewport)).toEqual([original[1]]);
 });

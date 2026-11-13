@@ -27,12 +27,6 @@ import * as Layer from "effect/Layer";
 import * as PubSub from "effect/PubSub";
 import * as Queue from "effect/Queue";
 import * as Stream from "effect/Stream";
-import * as Scope from "effect/Scope";
-import * as Fiber from "effect/Fiber";
-import * as Exit from "effect/Exit";
-import * as A from "@t3tools/contracts";
-import * as RpcTest from "effect/rpc/RpcTest";
-import * as RpcAuthorization from "./auth/RpcAuthorization.ts";
 import * as TestClock from "effect/testing/TestClock";
 import { Headers } from "effect/http";
 import { RpcGroup, RpcMessage, RpcServer } from "effect/rpc";
@@ -102,7 +96,6 @@ import * as SourceControlSignIn from "./sourceControl/SourceControlSignIn.ts";
 import * as StorageCleanup from "./storageCleanup.ts";
 import * as DatabaseStorage from "./persistence/DatabaseStorage.ts";
 import * as TerminalManager from "./terminal/Manager.ts";
-import * as TerminalAutomation from "./terminal/AutomationService.ts";
 import * as ThreadLaunchService from "./orchestration-v2/ThreadLaunchService.ts";
 import * as ThreadSearch from "./orchestration-v2/ThreadSearch.ts";
 import * as UsageLimitSources from "./usage/UsageLimitSources.ts";
@@ -554,7 +547,6 @@ const layerUnusedConfigRpcServices = Layer.mergeAll(
   Layer.mock(StorageCleanup.StorageCleanup)({}),
   Layer.mock(DatabaseStorage.DatabaseStorage)({}),
   Layer.mock(TerminalManager.TerminalManager)({}),
-  TerminalAutomation.layer.pipe(Layer.provide(Layer.mock(TerminalManager.TerminalManager)({}))),
   Layer.mock(ThreadLaunchService.ThreadLaunchService)({}),
   Layer.mock(ThreadManagement.ThreadManagementService)({}),
   Layer.mock(ThreadSearch.ThreadSearch)({}),
@@ -579,125 +571,6 @@ const layerConfigSources = Layer.mergeAll(
     ),
   ),
   Layer.provideMerge(NodeServices.layer),
-);
-
-it.effect(
-  "keeps terminal automation alive after handler construction until the connection closes",
-  () =>
-    Effect.gen(function* () {
-      const connectionScope = yield* Scope.make();
-      yield* Effect.addFinalizer(() => Scope.close(connectionScope, Exit.void));
-      const group = A.TerminalAutomationRpcGroup.middleware(A.RpcScopeAuthorization);
-      const threadId = ThreadId.make("automation-thread");
-      const automation = yield* TerminalAutomation.TerminalAutomationService;
-      const client = yield* RpcTest.makeClient(group).pipe(
-        Effect.provide(
-          Layer.merge(
-            layerWsRpc(
-              {
-                sessionId: AuthSessionId.make("automation-test"),
-                subject: "automation-test",
-                method: "browser-session-cookie",
-                scopes: [A.AuthTerminalReadScope, A.AuthTerminalOperateScope],
-              },
-              {},
-              yield* ServerBrowser.ServerBrowser,
-              () => Effect.void,
-              connectionScope,
-            ),
-            RpcAuthorization.layer([A.AuthTerminalReadScope, A.AuthTerminalOperateScope]),
-          ).pipe(
-            Layer.provide(
-              Layer.mergeAll(
-                layerUnusedConfigRpcServices,
-                Layer.succeed(TerminalAutomation.TerminalAutomationService, automation),
-                Layer.mock(ThreadManagement.ThreadManagementService)({
-                  getThreadShell: () =>
-                    Effect.succeed({ deletedAt: null } as OrchestrationV2ThreadShell),
-                }),
-                Layer.mock(ServerEnvironment.ServerEnvironment)({
-                  getEnvironmentId: Effect.succeed(EnvironmentId.make("automation-test")),
-                }),
-                Layer.mock(ExternalLauncher.ExternalLauncher)({}),
-                Layer.mock(ProviderRegistry.ProviderRegistry)({}),
-                Layer.mock(UsageLimitSources.UsageLimitSources)({}),
-                Layer.mock(RemoteOpenTargets.RemoteOpenTargets)({}),
-                Layer.mock(DirectEndpoints.DirectEndpoints)({}),
-                Layer.mock(ManagedProjectFolders.ManagedProjectFolders)({
-                  namedProjectsRoot: process.cwd(),
-                }),
-                Layer.mock(ScratchThreadPromotion.ScratchThreadPromotion)({}),
-                Layer.mock(EnvironmentAuth.EnvironmentAuth)({}),
-              ),
-            ),
-          ),
-        ),
-      );
-      const subscription = client[A.WS_METHODS.terminalAutomationSubscribe]({ threadId });
-      const ready = yield* Deferred.make<
-        typeof A.TerminalAutomationRpcEvent.Type,
-        Stream.Error<typeof subscription>
-      >();
-      const subscribed = yield* subscription.pipe(
-        Stream.runForEach((event) => Deferred.succeed(ready, event)),
-        Effect.tapError((error) => Deferred.fail(ready, error)),
-        Effect.forkChild,
-      );
-      assert.deepEqual(yield* Deferred.await(ready), { type: "ready" });
-      const view: A.TerminalAutomationCandidate = {
-        candidateId: "local",
-        target: { terminalId: "terminal", terminalInstanceId: "instance", viewId: "view" },
-        title: "Shell",
-        visible: true,
-        readiness: "ready",
-        clientKind: "web",
-        capabilities: { read: true, input: true, show: true },
-      };
-      yield* client[A.WS_METHODS.terminalAutomationRegisterViews]({
-        threadId,
-        registration: { version: 1, views: [view] },
-      });
-      const caller = {
-        scope: { environmentId: EnvironmentId.make("automation-test"), threadId },
-        callerId: "observer",
-      };
-      assert.deepEqual(
-        (yield* automation.status(caller)).candidates.map((candidate) => candidate.target),
-        [view.target],
-      );
-      assert.deepEqual(
-        yield* client[A.WS_METHODS.terminalAutomationGetConnectionState]({ threadId }),
-        {
-          version: 1,
-          revision: 0,
-          bindings: [],
-          selections: [],
-        },
-      );
-      yield* Scope.close(connectionScope, Exit.void);
-      yield* Fiber.await(subscribed);
-      assert.deepEqual((yield* automation.status(caller)).candidates, []);
-      assert.deepEqual(
-        yield* Effect.flip(client[A.WS_METHODS.terminalAutomationGetConnectionState]({ threadId })),
-        { code: "client_unavailable" },
-      );
-    }).pipe(
-      Effect.provide(
-        Layer.mergeAll(
-          Layer.fresh(layerConfigSources),
-          Layer.mock(PreviewAutomationBroker.PreviewAutomationBroker)({}),
-          Layer.mock(ServerBrowser.ServerBrowser)({}),
-          TerminalAutomation.layer.pipe(
-            Layer.provide(
-              Layer.mock(TerminalManager.TerminalManager)({
-                inspectExisting: () =>
-                  Effect.succeed({ terminalInstanceId: "instance", humanInputEpoch: 0 }),
-              }),
-            ),
-          ),
-        ),
-      ),
-    ),
 );
 
 it.effect(
@@ -744,7 +617,6 @@ it.effect(
         }),
         Layer.mock(ScratchThreadPromotion.ScratchThreadPromotion)({}),
         Layer.mock(ServerEnvironment.ServerEnvironment)({
-          getEnvironmentId: Effect.succeed(EnvironmentId.make("config-test")),
           getDescriptor: Effect.succeed({
             environmentId: EnvironmentId.make("config-test"),
             label: "Config test",
@@ -798,7 +670,6 @@ it.effect(
             {},
             yield* ServerBrowser.ServerBrowser,
             () => Effect.void,
-            yield* Effect.scope,
           ).pipe(Layer.provide(configRpcServices)),
         ),
       );
@@ -924,7 +795,6 @@ it.effect("on-demand clients get provider config without workspace snapshots", (
       }),
       Layer.mock(ScratchThreadPromotion.ScratchThreadPromotion)({}),
       Layer.mock(ServerEnvironment.ServerEnvironment)({
-        getEnvironmentId: Effect.succeed(EnvironmentId.make("config-test")),
         getDescriptor: Effect.succeed({
           environmentId: EnvironmentId.make("config-test"),
           label: "Config test",
@@ -968,7 +838,6 @@ it.effect("on-demand clients get provider config without workspace snapshots", (
           {},
           yield* ServerBrowser.ServerBrowser,
           () => Effect.void,
-          yield* Effect.scope,
         ).pipe(Layer.provide(configRpcServices)),
       ),
     );

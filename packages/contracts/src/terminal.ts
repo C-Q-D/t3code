@@ -64,19 +64,8 @@ export type TerminalObserveInput = Schema.Codec.Encoded<typeof TerminalObserveIn
 export const TerminalWriteInput = Schema.Struct({
   ...TerminalSessionInput.fields,
   data: Schema.String.check(Schema.isNonEmpty()).check(Schema.isMaxLength(65_536)),
-  protocolReply: Schema.optional(
-    Schema.Unknown.check(
-      Schema.makeFilter(
-        (value) =>
-          value === null ||
-          typeof value !== "object" ||
-          Object.keys(value).every((key) => key === "terminalInstanceId") ||
-          "Unexpected protocol reply field",
-      ),
-    ).pipe(Schema.decodeTo(Schema.Struct({ terminalInstanceId: TerminalIdSchema }))),
-  ),
 });
-export type TerminalWriteInput = typeof TerminalWriteInput.Type;
+export type TerminalWriteInput = Schema.Codec.Encoded<typeof TerminalWriteInput>;
 
 export const TerminalResizeInput = Schema.Struct({
   ...TerminalSessionInput.fields,
@@ -99,7 +88,6 @@ export const TerminalSessionStatus = Schema.Literals(["starting", "running", "ex
 export type TerminalSessionStatus = typeof TerminalSessionStatus.Type;
 
 export const TerminalSessionSnapshot = Schema.Struct({
-  terminalInstanceId: Schema.optional(Schema.String.check(Schema.isNonEmpty())),
   threadId: Schema.String.check(Schema.isNonEmpty()),
   terminalId: Schema.String.check(Schema.isNonEmpty()),
   cwd: Schema.String.check(Schema.isNonEmpty()),
@@ -119,7 +107,6 @@ export const TerminalSessionSnapshot = Schema.Struct({
 export type TerminalSessionSnapshot = typeof TerminalSessionSnapshot.Type;
 
 export const TerminalSummary = Schema.Struct({
-  terminalInstanceId: Schema.optional(Schema.String.check(Schema.isNonEmpty())),
   threadId: Schema.String.check(Schema.isNonEmpty()),
   terminalId: Schema.String.check(Schema.isNonEmpty()),
   cwd: Schema.String.check(Schema.isNonEmpty()),

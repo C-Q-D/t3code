@@ -2,31 +2,6 @@
 import type { Messages } from "../en";
 
 export const chat: Messages["chat"] = {
-  terminalAutomation: {
-    unknownResume: "恢复结果尚未确认。请先核实状态，再决定是否重新确认。",
-    verify: "核实状态",
-    checking: "正在核实终端状态…",
-    staleResume: "人工输入已变化或确认已过期。请查看当前终端后重新确认。",
-    inputEpoch: (epoch: number) => `人工输入版本 ${epoch}`,
-    bound: "AI 已绑定终端",
-    paused: "人工输入后 AI 已暂停",
-    unavailable: "AI 终端连接不可用",
-    invalid: "AI 终端目标已失效",
-    resume: "恢复 AI 操作",
-    refresh: "刷新状态",
-    choose: "为 AI 选择终端",
-    description: "选择允许 AI 操作的原终端。确认后才会提交选择。",
-    web: "网页",
-    desktop: "桌面",
-    visible: "可见",
-    hidden: "隐藏",
-    confirm: "使用所选终端",
-    pending: "正在提交…",
-    selected: "已提交终端选择。",
-    cancelled: "已取消终端选择。",
-    stale: "请求已过期或终端已变化。请让 AI 重新请求终端。",
-    failed: "请求失败。请检查连接后重试。",
-  },
   searchExcerpt: { user: "你：", agent: "Agent：" },
   sideTabStates: {
     approval: "需要批准",

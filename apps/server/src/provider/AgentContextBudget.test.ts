@@ -45,13 +45,9 @@ import { buildCodexAdditionalContext } from "./CodexDeveloperInstructions.ts";
 import { DocumentText } from "./DocumentText.ts";
 import { ProviderRegistry } from "./ProviderRegistry.ts";
 import budget from "./agentContextBudget.json" with { type: "json" };
-import { EventSinkV2 } from "../orchestration-v2/EventSink.ts";
-import { TerminalAutomationService } from "../terminal/AutomationService.ts";
 
 // Registration only stores tool definitions, so the handlers' services are never called.
 const toolHandlerServices = Layer.mergeAll(
-  Layer.mock(EventSinkV2)({}),
-  Layer.mock(TerminalAutomationService)({}),
   Layer.mock(DeviceService)({}),
   Layer.mock(DiscussionTemplateService)({}),
   Layer.mock(DiscussionService)({}),

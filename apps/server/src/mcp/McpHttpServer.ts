@@ -79,8 +79,6 @@ import {
 } from "./toolkits/device/tools.ts";
 import * as HtmlHandlers from "./toolkits/html/handlers.ts";
 import { HtmlPreviewTool, HtmlPreviewToolkit, HtmlRenderToolkit } from "./toolkits/html/tools.ts";
-import { TerminalToolkit } from "./toolkits/terminal/tools.ts";
-import * as TerminalHandlers from "./toolkits/terminal/handlers.ts";
 
 const mcpResourceMetadataUrl = (request: HttpServerRequest.HttpServerRequest) =>
   HttpServerRequest.toURL(request).pipe(
@@ -1159,10 +1157,7 @@ export const layerMcpTransport = McpServer.layerHttp({
 }).pipe(Layer.provide(layerMcpAuthMiddleware));
 
 /** Every tool the T3 MCP server advertises. AgentContextBudget.test.ts measures this set. */
-export const layerTerminalToolkit = toolkitRegistration(TerminalToolkit, TerminalHandlers.layer);
-
 export const layerTools = Layer.mergeAll(
-  layerTerminalToolkit,
   layerPreviewToolkit,
   layerOrchestratorToolkit,
   layerThreadToolkit,

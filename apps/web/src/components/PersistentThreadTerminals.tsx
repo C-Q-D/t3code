@@ -239,7 +239,7 @@ export const PersistentThreadTerminalDrawer = memo(function PersistentThreadTerm
     onAddTerminalContext(selection);
   };
 
-  if (!project || !cwd) {
+  if (!project || (!terminalUiState.terminalOpen && !active) || !cwd) {
     return null;
   }
 

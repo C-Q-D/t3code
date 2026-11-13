@@ -3,34 +3,6 @@ import { englishWorkLogMessages } from "@t3tools/client-runtime/work-log/message
 import type { SourceControlProviderKind, WorktreeSubmodules } from "@t3tools/contracts";
 
 export const chat = {
-  terminalAutomation: {
-    unknownResume: "The resume result is unknown. Verify status before confirming again.",
-    verify: "Verify status",
-    checking: "Checking terminal state…",
-    staleResume:
-      "Manual input changed or the confirmation expired. Review the current terminal and confirm again.",
-    inputEpoch: (epoch: number) => `Manual input version ${epoch}`,
-    bound: "AI terminal bound",
-    paused: "AI paused after manual input",
-    unavailable: "AI terminal connection unavailable",
-    invalid: "AI terminal target is no longer valid",
-    resume: "Resume AI operation",
-    refresh: "Refresh status",
-    choose: "Choose a terminal for AI",
-    description:
-      "Select the existing terminal that AI can operate. No choice is sent until you confirm.",
-    web: "Web",
-    desktop: "Desktop",
-    visible: "Visible",
-    hidden: "Hidden",
-    confirm: "Use selected terminal",
-    pending: "Sending…",
-    selected: "Terminal choice sent.",
-    cancelled: "Terminal selection cancelled.",
-    stale:
-      "This request has expired or the terminal changed. Ask AI to request the terminal again.",
-    failed: "The request failed. Check the connection and try again.",
-  },
   searchExcerpt: { user: "You:", agent: "Agent:" },
   sideTabStates: {
     approval: "needs approval",

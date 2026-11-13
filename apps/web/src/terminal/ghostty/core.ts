@@ -139,29 +139,6 @@ export interface GhosttyScrollbar {
   readonly len: number;
 }
 
-/** Detached active-screen coordinates; revision invalidates cursors after output or geometry changes. */
-export interface GhosttyAutomationMetadata {
-  readonly frameRevision: number;
-  readonly cols: number;
-  readonly rows: number;
-  readonly activeScreen: "primary" | "alternate";
-  readonly viewportStartLine: number;
-  readonly retainedRange: { readonly startLine: number; readonly endLineExclusive: number };
-  readonly cursorColumn: number;
-  readonly cursorLine: number;
-  readonly pendingWrap: boolean;
-}
-
-/** Physical rows with formatter text; soft wraps retain their explicit row boundary. */
-export interface GhosttyAutomationRows {
-  readonly metadata: GhosttyAutomationMetadata;
-  readonly lines: readonly {
-    readonly line: number;
-    readonly text: string;
-    readonly softWrapAfter: boolean;
-  }[];
-}
-
 export interface GhosttyPointInput {
   readonly x: number;
   readonly y: number;
@@ -243,7 +220,6 @@ export class GhosttyTerminalCore {
   private scrollbar = 0;
   private rows: GhosttyRow[] = [];
   private disposed = false;
-  private frameRevision = 0;
   private keyboardLayoutMap: GhosttyKeyboardLayoutMap | undefined;
 
   private constructor(runtime: GhosttyRuntime) {
@@ -363,7 +339,6 @@ export class GhosttyTerminalCore {
     this.ensureActive();
     const bytes = typeof data === "string" ? encoder.encode(data) : data;
     if (bytes.length === 0) return;
-    this.frameRevision += 1;
     const pointer = this.runtime.alloc(bytes.length);
     this.runtime.bytes(pointer, bytes.length).set(bytes);
     // An existing render deadline belongs to one group. Observe Ghostty before
@@ -388,7 +363,6 @@ export class GhosttyTerminalCore {
 
   resetAndWrite(data: string): void {
     this.ensureActive();
-    this.frameRevision += 1;
     this.runtime.call("ghostty_terminal_reset", this.terminal);
     // RIS restores the built-in steady cursor; reapply the embedder default before replay.
     this.applyDefaultCursorBlink();
@@ -410,7 +384,6 @@ export class GhosttyTerminalCore {
 
   resize(cols: number, rows: number, cellWidth: number, cellHeight: number): void {
     this.ensureActive();
-    this.frameRevision += 1;
     this.assertSuccess(
       "ghostty_terminal_resize",
       this.runtime.call(
@@ -460,7 +433,6 @@ export class GhosttyTerminalCore {
 
   scroll(deltaRows: number): void {
     this.ensureActive();
-    this.frameRevision += 1;
     const layout = this.runtime.layout("GhosttyTerminalScrollViewport");
     const scroll = this.runtime.alloc(layout.size);
     this.runtime.setField(scroll, "GhosttyTerminalScrollViewport", "tag", 2);
@@ -472,7 +444,6 @@ export class GhosttyTerminalCore {
 
   scrollToBottom(): void {
     this.ensureActive();
-    this.frameRevision += 1;
     const layout = this.runtime.layout("GhosttyTerminalScrollViewport");
     const scroll = this.runtime.alloc(layout.size);
     this.runtime.setField(scroll, "GhosttyTerminalScrollViewport", "tag", 1);
@@ -524,53 +495,6 @@ export class GhosttyTerminalCore {
     );
   }
 
-  isPixelMouseReporting(): boolean {
-    this.ensureActive();
-    const slot = this.runtime.allocOpaque();
-    let encoder = 0;
-    let event = 0;
-    try {
-      this.assertSuccess(
-        "ghostty_mouse_encoder_new",
-        this.runtime.call("ghostty_mouse_encoder_new", 0, slot),
-      );
-      encoder = this.runtime.readPointer(slot);
-      this.assertSuccess(
-        "ghostty_mouse_event_new",
-        this.runtime.call("ghostty_mouse_event_new", 0, slot),
-      );
-      event = this.runtime.readPointer(slot);
-      // DEC mode bits can outlive the active format; probe an isolated encoder to preserve mouse tracking.
-      return (
-        this.encodeMouseWithHandles(
-          {
-            action: "press",
-            button: 1,
-            mods: 0,
-            anyButtonPressed: false,
-            x: 16,
-            y: 16,
-            cellWidth: 8,
-            cellHeight: 8,
-            screenWidth: 32,
-            screenHeight: 32,
-            paddingLeft: 0,
-            paddingRight: 0,
-            paddingTop: 0,
-            paddingBottom: 0,
-          },
-          false,
-          encoder,
-          event,
-        ) === "\x1b[<0;16;16M"
-      );
-    } finally {
-      if (event !== 0) this.runtime.call("ghostty_mouse_event_free", event);
-      if (encoder !== 0) this.runtime.call("ghostty_mouse_encoder_free", encoder);
-      this.runtime.freeOpaque(slot);
-    }
-  }
-
   isSynchronizedOutput(): boolean {
     this.ensureActive();
     this.runtime.bytes(this.scratch, 1)[0] = 0;
@@ -606,21 +530,7 @@ export class GhosttyTerminalCore {
     );
   }
 
-  encodeKey(
-    event: Pick<
-      KeyboardEvent,
-      | "key"
-      | "code"
-      | "repeat"
-      | "shiftKey"
-      | "ctrlKey"
-      | "altKey"
-      | "metaKey"
-      | "getModifierState"
-      | "isComposing"
-    >,
-    action: "press" | "release" = "press",
-  ): string {
+  encodeKey(event: KeyboardEvent, action: "press" | "release" = "press"): string {
     this.ensureActive();
     this.runtime.call("ghostty_key_encoder_setopt_from_terminal", this.keyEncoder, this.terminal);
     this.runtime.call(
@@ -714,19 +624,13 @@ export class GhosttyTerminalCore {
     return encoded;
   }
 
-  /** strictUtf8 rejects legacy mouse bytes that string transport cannot preserve; the default retains manual input behavior. */
-  encodeMouse(input: GhosttyMouseInput, strictUtf8 = false): string {
-    return this.encodeMouseWithHandles(input, strictUtf8, this.mouseEncoder, this.mouseEvent);
-  }
-
-  private encodeMouseWithHandles(
-    input: GhosttyMouseInput,
-    strictUtf8: boolean,
-    encoder: number,
-    event: number,
-  ): string {
+  encodeMouse(input: GhosttyMouseInput): string {
     this.ensureActive();
-    this.runtime.call("ghostty_mouse_encoder_setopt_from_terminal", encoder, this.terminal);
+    this.runtime.call(
+      "ghostty_mouse_encoder_setopt_from_terminal",
+      this.mouseEncoder,
+      this.terminal,
+    );
 
     const sizeLayout = this.runtime.layout("GhosttyMouseEncoderSize");
     const size = this.runtime.alloc(sizeLayout.size);
@@ -743,51 +647,46 @@ export class GhosttyTerminalCore {
     ] as const) {
       this.runtime.setField(size, "GhosttyMouseEncoderSize", field, Math.max(0, Math.round(value)));
     }
-    this.runtime.call("ghostty_mouse_encoder_setopt", encoder, 2, size);
+    this.runtime.call("ghostty_mouse_encoder_setopt", this.mouseEncoder, 2, size);
     this.runtime.free(size, sizeLayout.size);
 
     this.runtime.bytes(this.scratch, 1)[0] = input.anyButtonPressed ? 1 : 0;
-    this.runtime.call("ghostty_mouse_encoder_setopt", encoder, 3, this.scratch);
+    this.runtime.call("ghostty_mouse_encoder_setopt", this.mouseEncoder, 3, this.scratch);
     this.runtime.bytes(this.scratch, 1)[0] = 1;
-    this.runtime.call("ghostty_mouse_encoder_setopt", encoder, 4, this.scratch);
+    this.runtime.call("ghostty_mouse_encoder_setopt", this.mouseEncoder, 4, this.scratch);
 
     this.runtime.call(
       "ghostty_mouse_event_set_action",
-      event,
+      this.mouseEvent,
       input.action === "press" ? 0 : input.action === "release" ? 1 : 2,
     );
     if (input.button === null) {
-      this.runtime.call("ghostty_mouse_event_clear_button", event);
+      this.runtime.call("ghostty_mouse_event_clear_button", this.mouseEvent);
     } else {
-      this.runtime.call("ghostty_mouse_event_set_button", event, input.button);
+      this.runtime.call("ghostty_mouse_event_set_button", this.mouseEvent, input.button);
     }
-    this.runtime.call("ghostty_mouse_event_set_mods", event, input.mods);
+    this.runtime.call("ghostty_mouse_event_set_mods", this.mouseEvent, input.mods);
     const positionLayout = this.runtime.layout("GhosttyMousePosition");
     const position = this.runtime.alloc(positionLayout.size);
     const positionView = this.runtime.view(position, positionLayout.size);
     positionView.setFloat32(positionLayout.fields.x!.offset, input.x, true);
     positionView.setFloat32(positionLayout.fields.y!.offset, input.y, true);
-    this.runtime.call("ghostty_mouse_event_set_position", event, position);
+    this.runtime.call("ghostty_mouse_event_set_position", this.mouseEvent, position);
     this.runtime.free(position, positionLayout.size);
 
     const written = this.runtime.call("ghostty_wasm_alloc_usize");
-    try {
-      return this.encodeOutput(
+    const encoded = this.encodeOutput(written, (output, outputSize) =>
+      this.runtime.call(
+        "ghostty_mouse_encoder_encode",
+        this.mouseEncoder,
+        this.mouseEvent,
+        output,
+        outputSize,
         written,
-        (output, outputSize) =>
-          this.runtime.call(
-            "ghostty_mouse_encoder_encode",
-            encoder,
-            event,
-            output,
-            outputSize,
-            written,
-          ),
-        strictUtf8 ? new TextDecoder("utf-8", { fatal: true }) : decoder,
-      );
-    } finally {
-      this.runtime.call("ghostty_wasm_free_usize", written);
-    }
+      ),
+    );
+    this.runtime.call("ghostty_wasm_free_usize", written);
+    return encoded;
   }
 
   setSelection(anchor: GhosttyPointInput, end: GhosttyPointInput): void {
@@ -906,155 +805,6 @@ export class GhosttyTerminalCore {
   clearSelection(): void {
     this.ensureActive();
     this.runtime.call("ghostty_terminal_set", this.terminal, 21, 0);
-  }
-
-  /** Reads the active grid without consuming render dirty state or moving the viewport. */
-  automationMetadata(): GhosttyAutomationMetadata {
-    this.ensureActive();
-    const get = (id: number) => {
-      this.runtime.bytes(this.scratch, 4).fill(0);
-      this.assertSuccess(
-        "ghostty_terminal_get",
-        this.runtime.call("ghostty_terminal_get", this.terminal, id, this.scratch),
-      );
-      return this.runtime.view(this.scratch, 4).getUint32(0, true);
-    };
-    const cols = get(1);
-    const rows = get(2);
-    const cursorColumn = get(3);
-    const cursorRow = get(4);
-    const pendingWrap = get(5) !== 0;
-    const activeScreen = get(6) === 1 ? "alternate" : "primary";
-    const total = get(14);
-    const scrollback = get(15);
-    return {
-      cols,
-      rows,
-      cursorColumn,
-      cursorLine: scrollback + cursorRow,
-      pendingWrap,
-      activeScreen,
-      viewportStartLine: this.viewportPointToScreen(0, 0)?.y ?? scrollback,
-      retainedRange: {
-        startLine: Math.max(0, total - MAX_SCROLLBACK_ROWS),
-        endLineExclusive: total,
-      },
-      frameRevision: this.frameRevision,
-    };
-  }
-
-  /** Formats physical rows in [startLine, endLineExclusive); rejects ranges outside the active screen. */
-  readAutomationRows(startLine: number, endLineExclusive: number): GhosttyAutomationRows {
-    const metadata = this.automationMetadata();
-    if (
-      !Number.isInteger(startLine) ||
-      !Number.isInteger(endLineExclusive) ||
-      startLine < 0 ||
-      endLineExclusive < startLine ||
-      endLineExclusive > metadata.retainedRange.endLineExclusive
-    ) {
-      throw new RangeError("Ghostty automation range is outside the active screen");
-    }
-    const lines: GhosttyAutomationRows["lines"][number][] = [];
-    for (let line = startLine; line < endLineExclusive; line += 1) {
-      const ref = this.gridRef(0, line, 2);
-      try {
-        this.assertSuccess(
-          "ghostty_grid_ref_row",
-          this.runtime.call("ghostty_grid_ref_row", ref, this.scratch),
-        );
-        const raw = this.runtime.view(this.scratch, 8).getBigUint64(0, true);
-        this.assertSuccess(
-          "ghostty_row_get",
-          this.runtime.call("ghostty_row_get", raw, 1, this.scratch + 8),
-        );
-        const softWrapAfter = this.runtime.bytes(this.scratch + 8, 1)[0] !== 0;
-        lines.push({ line, text: this.formatAutomationRow(line, metadata.cols), softWrapAfter });
-      } finally {
-        this.runtime.free(ref, this.runtime.layout("GhosttyGridRef").size);
-      }
-    }
-    return { metadata, lines };
-  }
-
-  // A borrowed selection bounds formatting without installing a user selection.
-  private formatAutomationRow(line: number, cols: number): string {
-    const layout = this.runtime.layout("GhosttyFormatterTerminalOptions");
-    const selectionLayout = this.runtime.layout("GhosttySelection");
-    const options = this.runtime.alloc(layout.size);
-    let selection = 0;
-    let slot = 0;
-    let written = 0;
-    let formatter = 0;
-    const refs: number[] = [];
-    try {
-      selection = this.runtime.alloc(selectionLayout.size);
-      slot = this.runtime.allocOpaque();
-      written = this.runtime.call("ghostty_wasm_alloc_usize");
-      this.runtime.setField(options, "GhosttyFormatterTerminalOptions", "size", layout.size);
-      this.runtime.setField(options, "GhosttyFormatterTerminalOptions", "trim", 0);
-      const extra = options + layout.fields.extra!.offset;
-      this.runtime.setField(
-        extra,
-        "GhosttyFormatterTerminalExtra",
-        "size",
-        this.runtime.layout("GhosttyFormatterTerminalExtra").size,
-      );
-      this.runtime.setField(
-        extra + this.runtime.layout("GhosttyFormatterTerminalExtra").fields.screen!.offset,
-        "GhosttyFormatterScreenExtra",
-        "size",
-        this.runtime.layout("GhosttyFormatterScreenExtra").size,
-      );
-      this.runtime.setField(selection, "GhosttySelection", "size", selectionLayout.size);
-      for (const [field, column] of [
-        ["start", 0],
-        ["end", cols - 1],
-      ] as const) {
-        const ref = this.gridRef(column, line, 2);
-        refs.push(ref);
-        const target = selectionLayout.fields[field]!;
-        this.runtime
-          .bytes(selection + target.offset, target.size)
-          .set(this.runtime.bytes(ref, target.size));
-      }
-      this.runtime.view(options + layout.fields.selection!.offset, 4).setUint32(0, selection, true);
-      this.assertSuccess(
-        "ghostty_formatter_terminal_new",
-        this.runtime.call("ghostty_formatter_terminal_new", 0, slot, this.terminal, options),
-      );
-      formatter = this.runtime.readPointer(slot);
-      const sizeResult = this.runtime.call(
-        "ghostty_formatter_format_buf",
-        formatter,
-        0,
-        0,
-        written,
-      );
-      const size = this.runtime.view(written, 4).getUint32(0, true);
-      if (sizeResult !== GHOSTTY_OUT_OF_SPACE)
-        this.assertSuccess("ghostty_formatter_format_buf", sizeResult);
-      if (size === 0) return "";
-      const output = this.runtime.alloc(size);
-      try {
-        this.assertSuccess(
-          "ghostty_formatter_format_buf",
-          this.runtime.call("ghostty_formatter_format_buf", formatter, output, size, written),
-        );
-        return decoder.decode(
-          this.runtime.bytes(output, this.runtime.view(written, 4).getUint32(0, true)),
-        );
-      } finally {
-        this.runtime.free(output, size);
-      }
-    } finally {
-      if (formatter !== 0) this.runtime.call("ghostty_formatter_free", formatter);
-      for (const ref of refs) this.runtime.free(ref, this.runtime.layout("GhosttyGridRef").size);
-      if (written !== 0) this.runtime.call("ghostty_wasm_free_usize", written);
-      if (slot !== 0) this.runtime.freeOpaque(slot);
-      this.runtime.free(selection, selectionLayout.size);
-      this.runtime.free(options, layout.size);
-    }
   }
 
   snapshot(): GhosttySnapshot {
@@ -1236,7 +986,6 @@ export class GhosttyTerminalCore {
   private encodeOutput(
     written: number,
     encode: (output: number, outputSize: number) => number,
-    outputDecoder = decoder,
   ): string {
     const sizeResult = encode(0, 0);
     const outputSize = this.runtime.view(written, 4).getUint32(0, true);
@@ -1244,15 +993,12 @@ export class GhosttyTerminalCore {
     if (sizeResult !== GHOSTTY_OUT_OF_SPACE || outputSize === 0) return "";
 
     const output = this.runtime.alloc(outputSize);
-    try {
-      const result = encode(output, outputSize);
-      const outputLength = this.runtime.view(written, 4).getUint32(0, true);
-      return result === GHOSTTY_SUCCESS
-        ? outputDecoder.decode(this.runtime.bytes(output, outputLength))
-        : "";
-    } finally {
-      this.runtime.free(output, outputSize);
-    }
+    const result = encode(output, outputSize);
+    const outputLength = this.runtime.view(written, 4).getUint32(0, true);
+    const encoded =
+      result === GHOSTTY_SUCCESS ? decoder.decode(this.runtime.bytes(output, outputLength)) : "";
+    this.runtime.free(output, outputSize);
+    return encoded;
   }
 
   private readRow(

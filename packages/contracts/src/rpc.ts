@@ -1,9 +1,5 @@
 /** Defines typed RPC methods, request groups and transport errors; contains no handlers. */
 import {
-  TERMINAL_AUTOMATION_WS_METHODS,
-  TerminalAutomationRpcGroup,
-} from "./terminalAutomationRpc.ts";
-import {
   ComposerAssistError,
   ComposerSuggestInput,
   ComposerSuggestResult,
@@ -445,7 +441,6 @@ import { VcsError } from "./vcs.ts";
 import { Project, ProjectMutation, ProjectMutationError } from "./project.ts";
 
 export const WS_METHODS = {
-  ...TERMINAL_AUTOMATION_WS_METHODS,
   projectsListEntries: "projects.listEntries",
   projectsListIgnoredFiles: "projects.listIgnoredFiles",
   projectsReadFile: "projects.readFile",
@@ -2430,5 +2425,4 @@ export const WsRpcGroup = RpcGroup.make(
   WsOrchestrationV2SubscribeCommandOutputRpc,
 )
   .merge(WsDiscussionsRpcGroup)
-  .merge(TerminalAutomationRpcGroup)
   .middleware(RpcScopeAuthorization);

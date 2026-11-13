@@ -55,13 +55,7 @@ vi.mock("../state/server", async () => {
   const config = Atom.make(null);
   return { serverEnvironment: { configValueAtom: () => config } };
 });
-vi.mock("../state/terminal", () => ({
-  terminalEnvironment: { write: {}, resize: {} },
-  acquireTerminalAutomation: () => ({
-    controller: { setView: () => {}, removeView: () => {} },
-    release: () => {},
-  }),
-}));
+vi.mock("../state/terminal", () => ({ terminalEnvironment: { write: {}, resize: {} } }));
 vi.mock("../state/preview", () => ({ previewEnvironment: { open: {} } }));
 vi.mock("../editorPreferences", () => ({ useOpenInPreferredEditor: () => () => {} }));
 vi.mock("./preview/openTerminalLinkInPreview", () => ({ openTerminalLinkInPreview: () => {} }));
