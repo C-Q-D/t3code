@@ -78,6 +78,7 @@ export class TerminalAutomationController {
   private listeners = new Set<() => void>();
   private stop: (() => void) | undefined;
   private registrationVersion = 0;
+  private registrationTask = 0;
   private registering: Promise<void> | undefined;
   private snapshot: {
     ready: boolean;
@@ -125,10 +126,14 @@ export class TerminalAutomationController {
   private fail = (error: unknown) => {
     if (!this.disposed) this.publish({ error });
   };
-  private currentFailureHandler() {
+  private currentFailureHandler(registrationTask?: number) {
     const generation = this.generation;
     return (error: unknown) => {
-      if (generation === this.generation) this.fail(error);
+      if (
+        generation === this.generation &&
+        (registrationTask === undefined || registrationTask === this.registrationTask)
+      )
+        this.fail(error);
     };
   }
 
@@ -191,7 +196,7 @@ export class TerminalAutomationController {
         return;
       }
       this.publish({ ready: true });
-      void this.register().catch(this.currentFailureHandler());
+      void this.register().catch(this.currentFailureHandler(this.registrationTask));
     } else if ("selectionRequestId" in event) {
       if (this.authoritativeSelections) {
         void this.synchronize().catch(this.currentFailureHandler());
@@ -228,7 +233,8 @@ export class TerminalAutomationController {
       });
     }
     this.registrationVersion += 1;
-    if (this.snapshot.ready) void this.register().catch(this.currentFailureHandler());
+    if (this.snapshot.ready)
+      void this.register().catch(this.currentFailureHandler(this.registrationTask));
   }
 
   removeView(
@@ -249,12 +255,13 @@ export class TerminalAutomationController {
       void this.transport
         .reportEvent({ version: 1, target, event })
         .catch(this.currentFailureHandler());
-      void this.register().catch(this.currentFailureHandler());
+      void this.register().catch(this.currentFailureHandler(this.registrationTask));
     }
   }
 
   private register(): Promise<void> {
     if (this.registering) return this.registering;
+    this.registrationTask += 1;
     const generation = this.generation;
     let pending: Promise<void> | undefined;
     const work = async () => {

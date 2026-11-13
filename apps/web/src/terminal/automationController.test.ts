@@ -236,7 +236,11 @@ it.each(["waiting", "completion"] as const)(
     const settled = deferred<void>();
     let accepted: readonly A.TerminalAutomationCandidate[] = [];
     let first = true;
-    const update = () => f.controller.removeView(second.candidate.target);
+    const tasks: Promise<void>[] = [];
+    const update = () => {
+      f.controller.removeView(second.candidate.target);
+      tasks.push(Reflect.get(f.controller, "registering"));
+    };
     f.transport.registerViews = vi.fn((views) => {
       if (first) {
         first = false;
@@ -250,10 +254,12 @@ it.each(["waiting", "completion"] as const)(
       if (f.controller.getSnapshot().error || accepted.length > 0) settled.resolve();
     });
     f.controller.setView({ ...f.view, candidate: { ...f.view.candidate, visible: true } });
+    tasks.push(Reflect.get(f.controller, "registering"));
     if (stage === "waiting") update();
     proceed.reject({ code: "target_invalid" });
     await settled.promise;
-    await f.controller.synchronize();
+    await Promise.allSettled(tasks);
+    expect(f.controller.getSnapshot().error).toBeNull();
     expect(accepted).toEqual([{ ...f.view.candidate, visible: true }]);
     expect(f.transport.registerViews).toHaveBeenCalledTimes(2);
     expect(f.transport.registerViews).toHaveBeenLastCalledWith(accepted);
