@@ -118,7 +118,7 @@ export function createTerminalAutomationBridge(options: {
       allowedBindings = new Set(bindings.map((binding) => binding.bindingId));
       for (const [key, input] of inputs)
         if (!allowedBindings.has(input.bindingId)) {
-          options.surface.cancelAutomationSelection();
+          options.surface.cancelAutomationSelection(JSON.stringify([input.bindingId, input.epoch]));
           inputs.delete(key);
         }
     },

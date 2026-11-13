@@ -942,7 +942,8 @@ export class GhosttyTerminalSurface {
   }
 
   /** Drops automation gesture ownership without erasing the visible selection. */
-  cancelAutomationSelection(): void {
+  cancelAutomationSelection(owner?: string): void {
+    if (owner !== undefined && this.automationSelection?.owner !== owner) return;
     this.automationSelection = null;
   }
 
@@ -1593,6 +1594,7 @@ export class GhosttyTerminalSurface {
     if (event.pointerType === "touch") {
       event.preventDefault();
       if (!event.isPrimary || this.touchScroll !== null) return;
+      this.options.onInputStart?.();
       this.touchScroll = {
         pointerId: event.pointerId,
         startX: event.clientX,
@@ -1624,6 +1626,7 @@ export class GhosttyTerminalSurface {
       return;
     }
     if (event.button !== 0) return;
+    this.options.onInputStart?.();
     const clickCount = this.recordSelectionClick(event);
     const link = this.linkAt(event.clientX, event.clientY);
     if (link && !event.shiftKey && clickCount === 1) {
@@ -1922,6 +1925,8 @@ export class GhosttyTerminalSurface {
 
   private readonly onWheel = (event: WheelEvent) => {
     if (event.deltaY === 0) return;
+    this.cancelAutomationSelection();
+    this.options.onInputStart?.();
     event.preventDefault();
     const delta = terminalWheelDeltaRows(
       event,
@@ -1979,6 +1984,8 @@ export class GhosttyTerminalSurface {
     const bounds = this.scrollbar.getBoundingClientRect();
     const geometry = terminalScrollbarGeometry(state, bounds.height);
     if (geometry === null) return;
+    this.cancelAutomationSelection();
+    this.options.onInputStart?.();
     event.preventDefault();
     event.stopPropagation();
     this.scrollbarPointerId = event.pointerId;
@@ -2033,6 +2040,8 @@ export class GhosttyTerminalSurface {
     }
     event.preventDefault();
     event.stopPropagation();
+    this.cancelAutomationSelection();
+    this.options.onInputStart?.();
     this.scrollViewport(delta);
   };
 

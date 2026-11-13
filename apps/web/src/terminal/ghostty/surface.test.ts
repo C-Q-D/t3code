@@ -517,7 +517,12 @@ describe("GhosttyTerminalSurface visibility", () => {
 
   it("keeps real selection behind bridge authorization and clears released binding gestures", async () => {
     const harness = createHarness();
-    const surface = await harness.create();
+    let permitted = true;
+    const surface = await harness.create({
+      onInputStart: () => {
+        permitted = false;
+      },
+    });
     surface.write("abcdef");
     harness.flushFrame();
     const target = { terminalId: "term", terminalInstanceId: "instance", viewId: "view" };
@@ -530,14 +535,22 @@ describe("GhosttyTerminalSurface visibility", () => {
       show: async () => {},
     });
     const signal = new AbortController().signal;
-    let permitted = true;
     const guard = () => {
       if (!permitted) throw new Error("revoked");
     };
     let id = 0;
-    const prepare = async (phase: "press" | "move" | "release", column: number) => {
+    const prepare = async (
+      phase: "press" | "move" | "release",
+      column: number,
+      owner = binding,
+    ) => {
       const inputRequestId = `input-${++id}`;
-      const fields = { version: 1 as const, bridgeRequestId: "bridge", binding, inputRequestId };
+      const fields = {
+        version: 1 as const,
+        bridgeRequestId: "bridge",
+        binding: owner,
+        inputRequestId,
+      };
       await bridge.perform({ ...fields, operation: "prepare_input" }, guard, signal);
       const frameRevision = surface.automationFrame(0).frameRevision;
       const encoded = await bridge.perform(
@@ -589,6 +602,30 @@ describe("GhosttyTerminalSurface visibility", () => {
     await expect(bridge.perform(await prepare("move", 4), guard, signal)).rejects.toThrow(
       "stale_request",
     );
+    const other = { ...binding, bindingId: "other" };
+    bridge.retainBindings([binding, other]);
+    await bridge.perform(await prepare("press", 2, other), guard, signal);
+    bridge.retainBindings([other]);
+    await bridge.perform(await prepare("move", 4, other), guard, signal);
+    expect(surface.getSelection()).toBe("cde");
+    for (const intervene of [
+      () => harness.pointer("pointerdown", 21, 5),
+      () =>
+        surface.canvas.dispatchEvent(
+          Object.assign(new Event("wheel", { cancelable: true }), {
+            deltaY: -16,
+            deltaMode: 0,
+            shiftKey: false,
+          }),
+        ),
+    ]) {
+      permitted = true;
+      const late = await prepare("press", 0, other);
+      intervene();
+      const selection = surface.getSelection();
+      await expect(bridge.perform(late, guard, signal)).rejects.toThrow("revoked");
+      expect(surface.getSelection()).toBe(selection);
+    }
     expect(harness.onData).not.toHaveBeenCalled();
   });
 
