@@ -1099,9 +1099,13 @@ const make = Effect.gen(function* () {
             const plan = encoded.result.localAction;
             if (
               action.type !== "mouse" ||
-              action.event !== "wheel" ||
-              action.deltaColumns !== 0 ||
-              plan.deltaRows !== action.deltaRows
+              (plan.type === "scroll"
+                ? action.event !== "wheel" || plan.deltaRows !== action.deltaRows
+                : action.event === "wheel" ||
+                  action.button !== "left" ||
+                  plan.phase !== action.event ||
+                  plan.position.column !== action.position.column ||
+                  plan.position.row !== action.position.row)
             )
               return yield* Effect.fail(failure("stale_request"));
             yield* checkAuthorization(authorize);

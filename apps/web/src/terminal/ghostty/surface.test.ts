@@ -8,6 +8,8 @@ import {
 import { synchronizeTerminalSession } from "../../components/ThreadTerminalDrawer";
 
 import { GhosttyTerminalCore, type GhosttyCell, type GhosttyRow } from "./core";
+import { createTerminalAutomationBridge } from "../automationBridge";
+import type * as A from "@t3tools/contracts";
 import {
   advanceTerminalSelectionClickSequence,
   applyTerminalCopyEvent,
@@ -434,6 +436,160 @@ describe("GhosttyTerminalSurface visibility", () => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+  });
+
+  it.each(["primary", "reporting-shift", "alternate"])(
+    "applies authorized local drags through real Ghostty selection without PTY writes (%s)",
+    async (mode) => {
+      const harness = createHarness();
+      const surface = await harness.create();
+      surface.write(
+        (mode === "alternate"
+          ? "\x1b[?1049h"
+          : mode === "reporting-shift"
+            ? "\x1b[?1000h\x1b[?1006h"
+            : "") + "a中🙂z",
+      );
+      harness.flushFrame();
+      const action = (event: "press" | "move" | "release", column: number) => ({
+        type: "mouse" as const,
+        event,
+        button: "left" as const,
+        position: { column, row: 0 },
+        modifiers: { shift: mode === "reporting-shift", ctrl: false, alt: false, meta: false },
+        frameRevision: surface.automationFrame(0).frameRevision,
+      });
+      const apply = (event: "press" | "move" | "release", column: number, owner = "owner") => {
+        const input = action(event, column);
+        const result = surface.encodeAutomationInput(input, input.frameRevision);
+        expect(result.status).toBe("local_action");
+        if (result.status !== "local_action" || result.action !== "selection")
+          throw new Error("selection plan required");
+        surface.applyAutomationLocalAction(result.localAction, input.frameRevision, owner);
+      };
+      const input = action("press", 1);
+      expect(() =>
+        surface.encodeAutomationInput(
+          { ...input, position: { column: surface.cols, row: 0 } },
+          input.frameRevision,
+        ),
+      ).toThrow("stale_request");
+      expect(() => surface.encodeAutomationInput(input, input.frameRevision + 1)).toThrow(
+        "stale_request",
+      );
+      surface.encodeAutomationInput(input, input.frameRevision);
+      expect(surface.getSelection()).toBe("");
+      apply("press", 1);
+      apply("move", 4);
+      expect(surface.getSelection()).toBe("中🙂");
+      expect(() => apply("move", 5, "other")).toThrow("stale_request");
+      apply("release", 4);
+      expect(() => apply("move", 5)).toThrow("stale_request");
+      apply("press", 5);
+      apply("move", 3);
+      apply("move", 1);
+      apply("release", 1);
+      expect(surface.getSelection()).toBe("中🙂z");
+      for (const cancel of [
+        () => surface.cancelAutomationSelection(),
+        () => {
+          surface.setVisible(false);
+          surface.setVisible(true);
+          harness.flushFrame();
+        },
+        () => {
+          vi.advanceTimersByTime(10_000);
+        },
+        () => harness.pointer("pointerdown", 5, 1, { shiftKey: true }),
+      ]) {
+        apply("press", 1);
+        cancel();
+        expect(() => apply("move", 4)).toThrow("stale_request");
+      }
+      apply("press", 1);
+      apply("move", 4);
+      apply("release", 4);
+      harness.flushFrame();
+      expect(harness.renderedSnapshot.rowData[0]?.cells.some((cell) => cell.selected)).toBe(true);
+      expect(harness.onData).not.toHaveBeenCalled();
+    },
+  );
+
+  it("keeps real selection behind bridge authorization and clears released binding gestures", async () => {
+    const harness = createHarness();
+    const surface = await harness.create();
+    surface.write("abcdef");
+    harness.flushFrame();
+    const target = { terminalId: "term", terminalInstanceId: "instance", viewId: "view" };
+    const binding = { bindingId: "binding", inputEpoch: 0, alias: "terminal", target };
+    const bridge = createTerminalAutomationBridge({
+      surface,
+      target: () => target,
+      output: () => ({ terminalInstanceId: "instance", sequence: 0, chunks: [], gap: false }),
+      ready: () => true,
+      show: async () => {},
+    });
+    const signal = new AbortController().signal;
+    let permitted = true;
+    const guard = () => {
+      if (!permitted) throw new Error("revoked");
+    };
+    let id = 0;
+    const prepare = async (phase: "press" | "move" | "release", column: number) => {
+      const inputRequestId = `input-${++id}`;
+      const fields = { version: 1 as const, bridgeRequestId: "bridge", binding, inputRequestId };
+      await bridge.perform({ ...fields, operation: "prepare_input" }, guard, signal);
+      const frameRevision = surface.automationFrame(0).frameRevision;
+      const encoded = await bridge.perform(
+        {
+          ...fields,
+          operation: "encode_input",
+          frameRevision,
+          action: {
+            type: "mouse",
+            event: phase,
+            button: "left",
+            position: { column, row: 0 },
+            modifiers: { shift: false, ctrl: false, alt: false, meta: false },
+            frameRevision,
+          },
+        },
+        guard,
+        signal,
+      );
+      if (encoded.operation !== "encode_input" || !("localAction" in encoded))
+        throw new Error("plan required");
+      return {
+        ...fields,
+        operation: "apply_local" as const,
+        frameRevision,
+        localAction: encoded.localAction,
+      } satisfies A.TerminalAutomationClientRequest;
+    };
+    const press = await prepare("press", 0);
+    expect(surface.getSelection()).toBe("");
+    permitted = false;
+    await expect(bridge.perform(press, guard, signal)).rejects.toThrow("revoked");
+    expect(surface.getSelection()).toBe("");
+    permitted = true;
+    await bridge.perform(press, guard, signal);
+    const move = await prepare("move", 3);
+    expect(surface.getSelection()).toBe("a");
+    await bridge.perform(move, guard, signal);
+    expect(surface.getSelection()).toBe("abcd");
+    await bridge.perform(move, guard, signal);
+    expect(surface.getSelection()).toBe("abcd");
+    bridge.invalidate();
+    await expect(bridge.perform(await prepare("release", 4), guard, signal)).rejects.toThrow(
+      "stale_request",
+    );
+    await bridge.perform(await prepare("press", 0), guard, signal);
+    bridge.retainBindings([]);
+    bridge.retainBindings([binding]);
+    await expect(bridge.perform(await prepare("move", 4), guard, signal)).rejects.toThrow(
+      "stale_request",
+    );
+    expect(harness.onData).not.toHaveBeenCalled();
   });
 
   it("remeasures line spacing without recreating the core or losing terminal output", async () => {

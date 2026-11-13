@@ -6,7 +6,11 @@ import { TerminalBridgeError } from "./automationController";
 
 type Surface = Pick<
   GhosttyTerminalSurface,
-  "automationFrame" | "readAutomation" | "encodeAutomationInput" | "applyAutomationLocalAction"
+  | "automationFrame"
+  | "readAutomation"
+  | "encodeAutomationInput"
+  | "applyAutomationLocalAction"
+  | "cancelAutomationSelection"
 >;
 
 export function readAutomationOutput(
@@ -104,6 +108,7 @@ export function createTerminalAutomationBridge(options: {
   >();
   return {
     invalidate: () => {
+      options.surface.cancelAutomationSelection();
       for (const input of inputs.values()) {
         input.failed = true;
         delete input.plan;
@@ -112,7 +117,10 @@ export function createTerminalAutomationBridge(options: {
     retainBindings: (bindings: readonly A.TerminalAutomationBinding[]) => {
       allowedBindings = new Set(bindings.map((binding) => binding.bindingId));
       for (const [key, input] of inputs)
-        if (!allowedBindings.has(input.bindingId)) inputs.delete(key);
+        if (!allowedBindings.has(input.bindingId)) {
+          options.surface.cancelAutomationSelection();
+          inputs.delete(key);
+        }
     },
     async perform(
       request: A.TerminalAutomationClientRequest,
@@ -197,7 +205,10 @@ export function createTerminalAutomationBridge(options: {
           check();
           if (result.status === "not_sent") throw new TerminalBridgeError("unsupported_client");
           if (result.status === "local_action") {
-            prepared.plan = { type: "scroll", deltaRows: result.deltaRows };
+            prepared.plan =
+              result.action === "scroll"
+                ? { type: "scroll", deltaRows: result.deltaRows }
+                : result.localAction;
             return {
               operation: "encode_input",
               inputRequestId: request.inputRequestId,
@@ -214,12 +225,25 @@ export function createTerminalAutomationBridge(options: {
             encodedText: result.encodedText,
           };
         }
-        if (!prepared.plan || prepared.plan.deltaRows !== request.localAction.deltaRows)
+        if (
+          !prepared.plan ||
+          (prepared.plan.type === "scroll"
+            ? request.localAction.type !== "scroll" ||
+              prepared.plan.deltaRows !== request.localAction.deltaRows
+            : request.localAction.type !== "selection" ||
+              prepared.plan.phase !== request.localAction.phase ||
+              prepared.plan.position.column !== request.localAction.position.column ||
+              prepared.plan.position.row !== request.localAction.position.row)
+        )
           throw new TerminalBridgeError("stale_request");
         if (!prepared.applied) {
           check();
           prepared.failed = true;
-          options.surface.applyAutomationLocalAction(prepared.plan, request.frameRevision);
+          options.surface.applyAutomationLocalAction(
+            prepared.plan,
+            request.frameRevision,
+            JSON.stringify([request.binding.bindingId, request.binding.inputEpoch]),
+          );
           prepared.applied = true;
           prepared.failed = false;
         }

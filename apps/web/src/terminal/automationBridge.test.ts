@@ -170,6 +170,7 @@ it("reads hidden Ghostty buffers but rejects hidden input and invalid instances"
         encodeAutomationInput: () => {
           throw new Error("hidden encoding must not run");
         },
+        cancelAutomationSelection: () => {},
         applyAutomationLocalAction: () => {
           throw new Error("hidden local apply must not run");
         },
@@ -274,6 +275,7 @@ it("encodes through real Ghostty modes without writing or emitting human input",
             paddingTop: 0,
             paddingBottom: 0,
           }),
+        cancelAutomationSelection: () => {},
         applyAutomationLocalAction: () => {
           scrolls += 1;
           return { status: "local_applied" };

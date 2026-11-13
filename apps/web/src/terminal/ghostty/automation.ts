@@ -5,6 +5,7 @@ import type {
   TerminalAutomationReadResult,
   TerminalAutomationErrorCode,
   TerminalAutomationAction,
+  TerminalAutomationLocalAction,
 } from "@t3tools/contracts";
 import { GhosttyTerminalCore, type GhosttyAutomationMetadata } from "./core";
 import { US_SHIFTED_TO_UNSHIFTED_KEYS } from "@t3tools/shared/keybindings";
@@ -29,11 +30,16 @@ export interface GhosttyAutomationGeometry {
   readonly paddingBottom: number;
 }
 
-/** Local scroll is a plan; bridge authorization and deduplication must precede surface application. */
+/** Local actions are plans; bridge authorization and deduplication must precede surface application. */
 export type GhosttyAutomationEncoding =
   | { readonly status: "encoded"; readonly encodedText: string }
   | { readonly status: "not_sent" }
-  | { readonly status: "local_action"; readonly action: "scroll"; readonly deltaRows: number };
+  | { readonly status: "local_action"; readonly action: "scroll"; readonly deltaRows: number }
+  | {
+      readonly status: "local_action";
+      readonly action: "selection";
+      readonly localAction: TerminalAutomationLocalAction;
+    };
 
 /** Rejects geometry that cannot represent the current grid before a positional action is encoded or applied. */
 export function validateGhosttyAutomationGeometry(
@@ -132,8 +138,20 @@ export function encodeGhosttyAutomation(
     validateGhosttyAutomationGeometry(metadata, geometry);
     const reporting = core.isMouseTracking() && !action.modifiers.shift;
     if (!reporting) {
-      if (action.event !== "wheel" || action.deltaColumns !== 0)
-        throw new GhosttyAutomationError("unsupported_client");
+      if (action.event !== "wheel") {
+        if (action.button !== "left") throw new GhosttyAutomationError("unsupported_client");
+        return {
+          status: "local_action",
+          action: "selection",
+          localAction: {
+            type: "selection",
+            phase: action.event,
+            position: { ...action.position },
+          },
+        };
+      }
+      // The human surface ignores deltaX: there is no horizontal viewport.
+      if (action.deltaRows === 0) return { status: "not_sent" };
       if (!core.isAlternateScreen())
         return { status: "local_action", action: "scroll", deltaRows: action.deltaRows };
       const prefix = core.isApplicationCursorKeys() ? "\x1bO" : "\x1b[";

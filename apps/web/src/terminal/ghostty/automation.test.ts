@@ -250,9 +250,32 @@ it("validates mouse frames and cell geometry and distinguishes local wheel actio
       action: "scroll",
       deltaRows: -1,
     });
+    expect(
+      encodeGhosttyAutomation(core, { ...wheel, deltaColumns: 2 }, revision, geometry),
+    ).toEqual({
+      status: "local_action",
+      action: "scroll",
+      deltaRows: -1,
+    });
+    expect(
+      encodeGhosttyAutomation(
+        core,
+        { ...wheel, deltaColumns: 2, deltaRows: 0 },
+        revision,
+        geometry,
+      ),
+    ).toEqual({ status: "not_sent" });
     core.write("\x1b[?1000h\x1b[?1006h");
     expect(() => encodeGhosttyAutomation(core, wheel, revision, geometry)).toThrow("stale_request");
     const current = core.automationMetadata().frameRevision;
+    expect(
+      encodeGhosttyAutomation(
+        core,
+        { ...wheel, deltaColumns: 1, deltaRows: 0, frameRevision: current },
+        current,
+        geometry,
+      ),
+    ).toEqual({ status: "encoded", encodedText: "\x1b[<67;2;2M" });
     const press = {
       type: "mouse",
       event: "press",

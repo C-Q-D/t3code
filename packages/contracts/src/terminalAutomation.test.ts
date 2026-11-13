@@ -163,6 +163,16 @@ describe("terminal automation wire boundaries", () => {
       }).result,
     ).toMatchObject({ encodedText: "\u001b[A" });
     expect(decodeClientRequest(applyLocal)).toEqual(applyLocal);
+    for (const phase of ["press", "move", "release"] as const) {
+      const localAction = { type: "selection", phase, position: { column: 999, row: 499 } };
+      expect(decodeClientRequest({ ...applyLocal, localAction })).toMatchObject({ localAction });
+      expect(
+        decodeReply({ ...bridge, result: { ...localEncoding, localAction } }).result,
+      ).toMatchObject({ localAction });
+      expect(() =>
+        decodeClientRequest({ ...applyLocal, localAction: { ...localAction, deltaRows: 1 } }),
+      ).toThrow();
+    }
     expect(
       decodeClientRequest({ ...applyLocal, localAction: { type: "scroll", deltaRows: 100 } }),
     ).toMatchObject({ localAction: { type: "scroll", deltaRows: 100 } });

@@ -232,14 +232,21 @@ export const TerminalAutomationAction = Schema.Union([
 );
 export type TerminalAutomationAction = typeof TerminalAutomationAction.Type;
 
-// A plan only: encoding must not apply this scroll before server authorization.
-export const TerminalAutomationLocalAction = strict({
-  type: Schema.Literal("scroll"),
-  deltaRows: Schema.Int.check(
-    Schema.isBetween({ minimum: -100, maximum: 100 }),
-    Schema.makeFilter((rows) => rows !== 0),
-  ),
-});
+// Plans only: encoding must not mutate the viewport or selection before server authorization.
+export const TerminalAutomationLocalAction = Schema.Union([
+  strict({
+    type: Schema.Literal("scroll"),
+    deltaRows: Schema.Int.check(
+      Schema.isBetween({ minimum: -100, maximum: 100 }),
+      Schema.makeFilter((rows) => rows !== 0),
+    ),
+  }),
+  strict({
+    type: Schema.Literal("selection"),
+    phase: Schema.Literals(["press", "move", "release"]),
+    position: Position,
+  }),
+]);
 export type TerminalAutomationLocalAction = typeof TerminalAutomationLocalAction.Type;
 
 export const TerminalAutomationInput = strict({
@@ -411,7 +418,7 @@ export const TerminalAutomationClientRequest = Schema.Union([
     frameRevision: Counter,
     action: TerminalAutomationAction,
   }),
-  // Both peers revalidate the binding/epoch/frame; unknown delivery must never replay a scroll.
+  // Both peers revalidate the binding/epoch/frame; unknown delivery must never replay a local action.
   strict({
     ...BridgeFields,
     operation: Schema.Literal("apply_local"),

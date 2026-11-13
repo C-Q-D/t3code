@@ -1132,6 +1132,106 @@ it.effect("cancelling after apply dispatch preserves an unknown receipt", () =>
   }),
 );
 
+it.effect.each(["press", "move", "release"] as const)(
+  "authorizes a matching local selection %s without PTY writes",
+  (phase) =>
+    Effect.gen(function* () {
+      const { service, messages, writes } = yield* setup;
+      const bindingId = yield* bindOne(service);
+      const input: A.TerminalAutomationInput = {
+        bindingId,
+        requestId: "request",
+        action: {
+          type: "mouse",
+          event: phase,
+          button: "left",
+          position: { column: 1, row: 1 },
+          modifiers: { shift: false, ctrl: false, alt: false, meta: false },
+          frameRevision: 1,
+        },
+      };
+      const running = yield* service.input(caller, input, permission).pipe(Effect.forkChild);
+      const encode = yield* prepareToEncode(service, messages);
+      yield* service.replyBridge("client", {
+        version: 1,
+        bridgeRequestId: encode.bridgeRequestId,
+        binding: encode.binding,
+        result: {
+          operation: "encode_input",
+          inputRequestId: "request",
+          frameRevision: 1,
+          status: "local_action",
+          localAction: {
+            type: "selection",
+            phase,
+            position: { column: 1, row: 1 },
+          },
+        },
+      });
+      const apply = yield* takeBridge(messages);
+      expect(apply.operation).toBe("apply_local");
+      yield* service.replyBridge("client", {
+        version: 1,
+        bridgeRequestId: apply.bridgeRequestId,
+        binding: apply.binding,
+        result: { operation: "apply_local", inputRequestId: "request", status: "local_applied" },
+      });
+      expect(yield* Fiber.join(running)).toEqual({ status: "local_applied", requestId: "request" });
+      expect(yield* service.input(caller, input, permission)).toEqual({
+        status: "local_applied",
+        requestId: "request",
+      });
+      expect(writes).toEqual([]);
+    }),
+);
+
+it.effect.each([
+  { type: "selection" as const, phase: "move" as const, position: { column: 1, row: 1 } },
+  { type: "selection" as const, phase: "press" as const, position: { column: 2, row: 1 } },
+  { type: "selection" as const, phase: "press" as const, position: { column: 1, row: 2 } },
+])("rejects a client selection plan that changes the requested gesture: %j", (localAction) =>
+  Effect.gen(function* () {
+    const { service, messages, writes } = yield* setup;
+    const bindingId = yield* bindOne(service);
+    const running = yield* service
+      .input(
+        caller,
+        {
+          bindingId,
+          requestId: "request",
+          action: {
+            type: "mouse",
+            event: "press",
+            button: "left",
+            position: { column: 1, row: 1 },
+            modifiers: { shift: false, ctrl: false, alt: false, meta: false },
+            frameRevision: 1,
+          },
+        },
+        permission,
+      )
+      .pipe(Effect.forkChild);
+    const encode = yield* prepareToEncode(service, messages);
+    yield* service.replyBridge("client", {
+      version: 1,
+      bridgeRequestId: encode.bridgeRequestId,
+      binding: encode.binding,
+      result: {
+        operation: "encode_input",
+        inputRequestId: "request",
+        frameRevision: 1,
+        status: "local_action",
+        localAction,
+      },
+    });
+    expect(yield* Fiber.join(running)).toMatchObject({
+      status: "not_sent",
+      error: { code: "stale_request" },
+    });
+    expect(writes).toEqual([]);
+  }),
+);
+
 it.effect("apply replies require the original connection input ID and epoch", () =>
   Effect.gen(function* () {
     const { service, messages, writes } = yield* setup;
