@@ -929,6 +929,25 @@ describe("GhosttyTerminalSurface visibility", () => {
     expect(onProtocolData.mock.calls).toEqual([["\x1b[0n"]]);
     expect(onInputStart).not.toHaveBeenCalled();
     expect(harness.onData).not.toHaveBeenCalled();
+    for (const [mode, deltaY, deltaMode] of [
+      ["", -16, 0],
+      ["\x1b[?1049h", -1, 1],
+      ["", -0.01, 0],
+    ] as const) {
+      surface.write(mode);
+      onInputStart.mockClear();
+      surface.canvas.dispatchEvent(
+        Object.assign(new Event("wheel", { cancelable: true }), {
+          deltaY,
+          deltaMode,
+          shiftKey: false,
+        }),
+      );
+      expect(onInputStart).toHaveBeenCalledOnce();
+    }
+    expect(harness.onData.mock.calls).toEqual([["\x1b[A"]]);
+    harness.onData.mockClear();
+    onInputStart.mockClear();
     key(surface, "v", "KeyV", { metaKey: true });
     expect(onInputStart).toHaveBeenCalledOnce();
     expect(harness.onData).not.toHaveBeenCalled();

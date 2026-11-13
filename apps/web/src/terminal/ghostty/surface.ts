@@ -1926,7 +1926,6 @@ export class GhosttyTerminalSurface {
   private readonly onWheel = (event: WheelEvent) => {
     if (event.deltaY === 0) return;
     this.cancelAutomationSelection();
-    this.options.onInputStart?.();
     event.preventDefault();
     const delta = terminalWheelDeltaRows(
       event,
@@ -1935,6 +1934,12 @@ export class GhosttyTerminalSurface {
       this.wheelRemainder,
     );
     this.wheelRemainder = delta.remainder;
+    if (
+      delta.rows === 0 ||
+      (!shouldReportTerminalMouse(this.core.isMouseTracking(), event) &&
+        !this.core.isAlternateScreen())
+    )
+      this.options.onInputStart?.();
     this.scrollRows(delta.rows, event);
   };
 
