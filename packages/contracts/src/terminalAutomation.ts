@@ -2,8 +2,8 @@
 import * as Schema from "effect/Schema";
 import { EnvironmentId, ThreadId } from "./baseSchemas.ts";
 
-export const TERMINAL_AUTOMATION_VERSION = 1;
-export const TERMINAL_AUTOMATION_LIMITS = {
+const TERMINAL_AUTOMATION_VERSION = 1;
+const TERMINAL_AUTOMATION_LIMITS = {
   candidates: 64,
   inputCodeUnits: 65_536,
   encodedCodeUnits: 262_144,
