@@ -57,7 +57,7 @@ describe("Codex runtime context", () => {
 });
 
 describe("Codex orchestration context", () => {
-  it("routes subagents native first, delegate_task for the rest", () => {
+  it("keeps native-first defaults and scopes T3 review rules to T3 tasks", () => {
     const orchestration = Object.entries(buildCodexAdditionalContext({ model: "gpt-6.1-sol" }))
       .filter(([key]) => key.startsWith("t3_code_orchestration_"))
       .map(([, entry]) => entry.value)
@@ -67,7 +67,9 @@ describe("Codex orchestration context", () => {
     NodeAssert.ok(orchestration.includes("`run_in_background:false`"));
     NodeAssert.ok(orchestration.includes("A native type running another provider's model"));
     NodeAssert.ok(
-      orchestration.includes("Every new delegate review or re-check is a new `delegate_task`"),
+      orchestration.includes(
+        "For tasks started with `delegate_task`, every new review or re-check is a new `delegate_task`",
+      ),
     );
     NodeAssert.ok(orchestration.includes("never a `t3_thread_send`"));
     NodeAssert.ok(!orchestration.includes("inheritedOptions"));
