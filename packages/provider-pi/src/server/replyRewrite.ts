@@ -124,11 +124,13 @@ export const makePiReplyRewriteRunner = Effect.fn("makePiReplyRewriteRunner")(fu
       .makeTempDirectoryScoped({ prefix: "t3-pi-rewrite-" })
       .pipe(Effect.mapError((cause) => new PiReplyRewriteError({ code: "configuration", cause })));
     const extensionPath = path.join(cwd, "reply-rewrite-extension.mjs");
+    const systemPromptPath = path.join(cwd, "system-prompt.txt");
     yield* Effect.gen(function* () {
       yield* fs.makeDirectory(path.join(cwd, ".pi"));
       // RPC retry setters persist globally; project settings isolate both retry layers instead.
       yield* fs.writeFileString(path.join(cwd, ".pi", "settings.json"), REWRITE_SETTINGS);
       yield* fs.writeFileString(extensionPath, PI_REPLY_REWRITE_EXTENSION_SOURCE);
+      yield* fs.writeFileString(systemPromptPath, input.systemPrompt);
     }).pipe(Effect.mapError((cause) => new PiReplyRewriteError({ code: "configuration", cause })));
 
     const binary = input.binaryPath || "pi";
@@ -162,7 +164,7 @@ export const makePiReplyRewriteRunner = Effect.fn("makePiReplyRewriteRunner")(fu
         // Session-only trust applies to the runner-owned cwd, including its retry settings.
         "--approve",
         "--system-prompt",
-        input.systemPrompt,
+        systemPromptPath,
         "--extension",
         extensionPath,
       ],

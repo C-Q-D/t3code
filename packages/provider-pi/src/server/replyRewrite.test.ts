@@ -72,6 +72,7 @@ const makeFakePi = Effect.fn("test.makeRewritePi")(function* (
   const fs = yield* FileSystem.FileSystem;
   const settings: string[] = [];
   const extensions: string[] = [];
+  const systemPrompts: string[] = [];
   const emit = (record: Record<string, unknown>) =>
     Queue.offer(stdout, new TextEncoder().encode(`${JSON.stringify(record)}\n`));
   let buffered = "";
@@ -142,6 +143,9 @@ const makeFakePi = Effect.fn("test.makeRewritePi")(function* (
       settings.push(yield* fs.readFileString(`${cwd}/.pi/settings.json`));
       const extensionIndex = command.args.indexOf("--extension");
       extensions.push(yield* fs.readFileString(command.args[extensionIndex + 1]!));
+      systemPrompts.push(
+        yield* fs.readFileString(command.args[command.args.indexOf("--system-prompt") + 1]!),
+      );
       if (!options.omitReady) yield* emit({ type: "t3_reply_rewrite", kind: "ready", version: 1 });
       return ChildProcessSpawner.makeHandle({
         // Outside the valid pid range so teardown cannot signal a real process.
@@ -195,6 +199,7 @@ const makeFakePi = Effect.fn("test.makeRewritePi")(function* (
     commands,
     settings,
     extensions,
+    systemPrompts,
     held,
     emitted,
     directories,
@@ -235,10 +240,10 @@ it.effect(
           "--no-context-files",
           "--no-prompt-templates",
           "--system-prompt",
-          "Keep all facts.",
           "--extension",
         ],
       );
+      assert.equal(pi.systemPrompts[0], "Keep all facts.");
       assert.notEqual(command.options.cwd, process.cwd());
       assert.deepInclude(command.options.env, {
         SAFE_ENV: "kept",
@@ -530,11 +535,14 @@ it.effect("does not prompt if the dedicated extension never becomes ready", () =
 
 // This fixture loads the materialized extension but never loads Pi or provider credentials.
 const PROCESS_FIXTURE = `
+import { existsSync, readFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { pathToFileURL } from "node:url";
 const handlers = new Map();
 const emit = (record) => process.stdout.write(JSON.stringify(record) + "\\n");
+const systemSource = process.argv[process.argv.indexOf("--system-prompt") + 1];
+const systemPrompt = existsSync(systemSource) ? readFileSync(systemSource, "utf8") : systemSource;
 const extensionPath = process.argv[process.argv.indexOf("--extension") + 1];
 (await import(pathToFileURL(extensionPath).href)).default({
   on: (name, handler) => handlers.set(name, handler),
@@ -571,7 +579,7 @@ for await (const chunk of process.stdin) {
         type: "response.completed", response: { service_tier: "default", model: "fixture-model" },
       }});
       emit({ type: "message_end", message: {
-        role: "assistant", stopReason: "stop", content: [{ type: "text", text: command.message }],
+        role: "assistant", stopReason: "stop", content: [{ type: "text", text: command.message === "inspect-system" ? systemPrompt : command.message }],
       }});
       emit({ type: "agent_settled" });
     }
@@ -580,19 +588,25 @@ for await (const chunk of process.stdin) {
 }
 `;
 
-const makeProcessFixture = Effect.fn("test.makeRewriteProcessFixture")(function* () {
+const makeProcessFixture = Effect.fn("test.makeRewriteProcessFixture")(function* (useCmd = false) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const directory = yield* fs.makeTempDirectoryScoped({ prefix: "t3-pi-rewrite-fixture-" });
   const binaryPath = path.join(directory, "fixture.mjs");
   yield* fs.writeFileString(binaryPath, PROCESS_FIXTURE);
+  const cmdPath = path.join(directory, "pi.cmd");
+  if (useCmd)
+    yield* fs.writeFileString(cmdPath, `@echo off\r\n"${process.execPath}" "${binaryPath}" %*\r\n`);
   const pending = yield* Deferred.make<{ parentPid: number; childPid: number }>();
   const base = yield* ChildProcessSpawner.ChildProcessSpawner;
   const commands: ChildProcess.StandardCommand[] = [];
   const spawner = ChildProcessSpawner.make((command) =>
     Effect.gen(function* () {
       const child = yield* base.spawn(command);
-      if (!ChildProcess.isStandardCommand(command) || !command.args.includes(binaryPath))
+      if (
+        !ChildProcess.isStandardCommand(command) ||
+        (!command.args.includes(binaryPath) && !(useCmd && command.options.shell))
+      )
         return child;
       commands.push(command);
       let buffered = "";
@@ -627,10 +641,31 @@ const makeProcessFixture = Effect.fn("test.makeRewriteProcessFixture")(function*
   );
   const runner = yield* makePiReplyRewriteRunner().pipe(
     Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
-    Effect.provideService(HostProcess.Environment, { SystemRoot: process.env["SystemRoot"] }),
+    Effect.provideService(HostProcess.Environment, {
+      SystemRoot: process.env["SystemRoot"],
+      PATH: directory,
+      PATHEXT: ".CMD;.EXE",
+    }),
   );
-  return { runner, pending, binaryPath, commands };
+  return { runner, pending, binaryPath: useCmd ? "" : binaryPath, commands };
 });
+
+it.live.each(process.platform === "win32" ? [false, true] : [false])(
+  "preserves a multiline system prompt through the installed CLI path, cmd=%s",
+  (useCmd) =>
+    Effect.gen(function* () {
+      const fixture = yield* makeProcessFixture(useCmd);
+      const systemPrompt = '  first\r\nsecond\n "quotes" %PATH% & | < > ^ !\t尾  \r\n';
+      const result = yield* fixture.runner.run({
+        ...input,
+        sourceText: "inspect-system",
+        systemPrompt,
+        binaryPath: fixture.binaryPath,
+      });
+      assert.equal(result.text, '  first\r\nsecond\n "quotes" %PATH% & | < > ^ !\t尾  \r\n');
+      assert.equal(fixture.commands[0]!.options.shell, useCmd);
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);
 
 it.live(
   "loads the extension from an arbitrary install location and completes a real RPC subprocess",
