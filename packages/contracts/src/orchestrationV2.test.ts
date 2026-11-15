@@ -15,6 +15,7 @@ import {
   OrchestrationV2ThreadHistoryPage,
   OrchestrationV2TurnItem,
   OrchestrationV2TurnItemJson,
+  OrchestrationV2ConversationMessageJson,
 } from "./orchestrationV2.ts";
 
 const now = DateTime.makeUnsafe("2026-04-20T00:00:00.000Z");
@@ -35,6 +36,66 @@ const decodeOrchestrationV2ProviderCapabilities = Schema.decodeUnknownSync(
 );
 
 describe("orchestration V2 contracts", () => {
+  it.each([
+    { kind: "final", source: "codex_phase" },
+    { kind: "final", source: "codex_legacy_phase" },
+    { kind: "commentary", source: "codex_phase" },
+    { kind: "partial", source: "codex_phase" },
+    { kind: "unknown", source: "unknown" },
+  ])("keeps legacy messages decodable and preserves $kind from $source", (replyClassification) => {
+    const decodeMessage = Schema.decodeUnknownSync(OrchestrationV2ConversationMessageJson);
+    const legacy = {
+      createdBy: "user",
+      creationSource: "web",
+      id: "message-1",
+      threadId: "thread-1",
+      runId: "run-1",
+      nodeId: null,
+      role: "assistant",
+      text: "  Original response.\n",
+      attachments: [],
+      streaming: false,
+      createdAt: DateTime.formatIso(now),
+      updatedAt: DateTime.formatIso(now),
+    };
+    expect(decodeMessage(legacy).replyClassification).toBeUndefined();
+    expect(decodeMessage({ ...legacy, replyClassification })).toMatchObject({
+      text: "  Original response.\n",
+      replyClassification,
+    });
+    const turnItem = {
+      id: "item-1",
+      type: "assistant_message",
+      threadId: "thread-1",
+      runId: "run-1",
+      nodeId: null,
+      providerThreadId: null,
+      providerTurnId: null,
+      nativeItemRef: null,
+      parentItemId: null,
+      ordinal: 1,
+      status: "completed",
+      title: null,
+      startedAt: null,
+      completedAt: null,
+      updatedAt: DateTime.formatIso(now),
+      messageId: "message-1",
+      text: legacy.text,
+      streaming: false,
+    };
+    expect(decodeOrchestrationV2TurnItemJson(turnItem)).not.toHaveProperty("replyClassification");
+    expect(decodeOrchestrationV2TurnItemJson({ ...turnItem, replyClassification })).toMatchObject({
+      text: legacy.text,
+      replyClassification,
+    });
+    expect(() =>
+      decodeMessage({
+        ...legacy,
+        replyClassification: { kind: "commentary", source: "codex_legacy_phase" },
+      }),
+    ).toThrow();
+  });
+
   it("decodes thread event types from a newer server as skippable items", () => {
     const decodeWireItems = Schema.decodeUnknownSync(
       Schema.toCodecJson(Schema.Array(OrchestrationV2RpcSchemas.subscribeThread.output)),

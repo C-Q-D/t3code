@@ -16,6 +16,7 @@ import {
   globalIdleCompaction,
   idleCompactionPatch,
   requiredScopesForProjectMutation,
+  requiredScopesForServerSettingsPatch,
   resolveIdleCompaction,
   resolveProjectProviderInstanceEnabled,
   resolveProviderInstanceEnabled,
@@ -40,6 +41,49 @@ const decodeServerSettingsPatch = Schema.decodeUnknownSync(ServerSettingsPatch);
 const encodeServerSettings = Schema.encodeSync(ServerSettings);
 const encodeServerSettingsPatch = Schema.encodeSync(ServerSettingsPatch);
 const decodeClaudeSettings = Schema.decodeUnknownSync(ClaudeSettings);
+
+describe("reply rewrite settings", () => {
+  it("keeps old settings disabled and decodes a separate Pi configuration", () => {
+    expect(decodeServerSettings({}).replyRewrite).toEqual({
+      auto: false,
+      binaryPath: "pi",
+      provider: "openai-codex",
+      modelId: "gpt-6.1-terra",
+      thinkingLevel: "max",
+      requestedServiceTier: "priority",
+      customPrompt: "",
+    });
+    const replyRewrite = {
+      auto: true,
+      binaryPath: "C:/tools/pi.cmd",
+      provider: "custom-provider",
+      modelId: "custom-model",
+      thinkingLevel: "high",
+      requestedServiceTier: "default",
+      customPrompt: "  Keep code intact.\nUse short sentences.  ",
+    };
+    const settings = decodeServerSettings({ replyRewrite });
+    expect(encodeServerSettings(settings)).toMatchObject({ replyRewrite });
+    expect(decodeServerSettingsPatch({ replyRewrite: { customPrompt: "" } })).toEqual({
+      replyRewrite: { customPrompt: "" },
+    });
+    expect(() => decodeServerSettingsPatch({ replyRewrite: { binaryPath: " " } })).toThrow();
+    expect(() =>
+      decodeServerSettingsPatch({ replyRewrite: { requestedServiceTier: "fast" } }),
+    ).toThrow();
+  });
+
+  it.each([
+    [{ binaryPath: "pi-custom" }, ["providers:manage"]],
+    [{ customPrompt: "Use plain words." }, ["settings:write"]],
+    [{ auto: true }, ["settings:write"]],
+    [{ modelId: "other" }, ["settings:write"]],
+    [{ binaryPath: "pi-custom", auto: false }, ["settings:write", "providers:manage"]],
+    [{}, ["settings:write"]],
+  ])("separates executable authority from ordinary edits: %j", (replyRewrite, scopes) => {
+    expect(requiredScopesForServerSettingsPatch({ replyRewrite })).toEqual(scopes);
+  });
+});
 
 describe("composer assistance settings", () => {
   it("enables both features when decoding old client settings", () => {

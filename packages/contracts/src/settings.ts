@@ -51,6 +51,11 @@ import {
   ProviderDriverKind,
 } from "./providerInstance.ts";
 import { PullRequestMergeMethod } from "./pullRequest.ts";
+import {
+  DEFAULT_REPLY_REWRITE_SETTINGS,
+  ReplyRewriteSettings,
+  ReplyRewriteSettingsPatch,
+} from "./replyRewrite.ts";
 
 export const TimestampFormat = Schema.Literals(["locale", "12-hour", "24-hour"]);
 export type TimestampFormat = typeof TimestampFormat.Type;
@@ -1206,6 +1211,9 @@ export const StorageCleanupSettings = Schema.Struct({
 export type StorageCleanupSettings = typeof StorageCleanupSettings.Type;
 
 export const ServerSettings = Schema.Struct({
+  replyRewrite: ReplyRewriteSettings.pipe(
+    Schema.withDecodingDefault(Effect.succeed(DEFAULT_REPLY_REWRITE_SETTINGS)),
+  ),
   // Null means unmigrated; empty is authoritative and must not resurrect cleared preferences.
   favorites: Schema.NullOr(ModelFavorites).pipe(Schema.withDecodingDefault(Effect.succeed(null))),
   providerModelPreferences: Schema.NullOr(ProviderModelPreferences).pipe(
@@ -1552,6 +1560,7 @@ const ModelSelectionPatch = Schema.Struct({
 });
 
 export const ServerSettingsPatch = Schema.Struct({
+  replyRewrite: Schema.optionalKey(ReplyRewriteSettingsPatch),
   setModelFavorites: Schema.optionalKey(
     Schema.Array(Schema.Struct({ ...ModelFavorite.fields, favorite: Schema.Boolean })),
   ),
@@ -1723,6 +1732,14 @@ export function requiredScopesForServerSettingsPatch(
   let changesSettings = false;
   for (const [key, value] of Object.entries(patch)) {
     if (value === undefined) continue;
+    if (key === "replyRewrite") {
+      for (const [field, setting] of Object.entries(patch.replyRewrite ?? {})) {
+        if (setting === undefined) continue;
+        if (field === "binaryPath") changesProviders = true;
+        else changesSettings = true;
+      }
+      continue;
+    }
     if (
       key === "providers" ||
       key === "providerInstances" ||

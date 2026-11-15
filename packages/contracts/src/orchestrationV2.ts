@@ -1299,7 +1299,20 @@ export const OrchestrationV2IdleCompaction = Schema.Literals(["beforeCacheExpire
 /** Marks compaction work attached to an otherwise idle conversation. */
 export type OrchestrationV2IdleCompaction = typeof OrchestrationV2IdleCompaction.Type;
 
+/** Missing classification on old persisted messages means unknown, never inferred final. */
+export const OrchestrationV2AssistantReplyClassification = Schema.Union([
+  Schema.Struct({
+    kind: Schema.Literals(["final", "commentary", "partial"]),
+    source: Schema.Literal("codex_phase"),
+  }),
+  Schema.Struct({ kind: Schema.Literal("final"), source: Schema.Literal("codex_legacy_phase") }),
+  Schema.Struct({ kind: Schema.Literal("unknown"), source: Schema.Literal("unknown") }),
+]);
+export type OrchestrationV2AssistantReplyClassification =
+  typeof OrchestrationV2AssistantReplyClassification.Type;
+
 export const OrchestrationV2ConversationMessage = Schema.Struct({
+  replyClassification: Schema.optional(OrchestrationV2AssistantReplyClassification),
   notification: Schema.optional(OrchestrationV2Notification),
   ...OrchestrationV2CreationFields,
   scheduledTaskId: Schema.optional(ScheduledTaskId),
@@ -1626,6 +1639,7 @@ export const OrchestrationV2TurnItem = Schema.Union([
   Schema.Struct({
     ...OrchestrationV2TurnItemBaseFields,
     type: Schema.Literal("assistant_message"),
+    replyClassification: Schema.optional(OrchestrationV2AssistantReplyClassification),
     messageId: MessageId,
     text: Schema.String,
     textOmitted: DedupedBodyMarker,
@@ -2461,6 +2475,7 @@ export const OrchestrationV2TurnItemJson = Schema.Union([
   Schema.Struct({
     ...OrchestrationV2TurnItemJsonBaseFields,
     type: Schema.Literal("assistant_message"),
+    replyClassification: Schema.optional(OrchestrationV2AssistantReplyClassification),
     messageId: MessageId,
     text: Schema.String,
     attachments: Schema.optional(Schema.Array(ChatAttachment)),
