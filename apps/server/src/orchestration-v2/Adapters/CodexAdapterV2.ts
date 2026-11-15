@@ -6062,7 +6062,12 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
             }
             const message = { id: finalAnswer?.id ?? firstImageItemId, text };
             state.answer = message;
-            const artifacts = yield* buildAgentMessageArtifacts(context, message, true);
+            const artifacts = yield* buildAgentMessageArtifacts(
+              context,
+              message,
+              true,
+              replyClassificationsByTurn.get(nativeTurnId)?.get(message.id),
+            );
             yield* emitProviderEvent({
               type: "node.updated",
               driver: CODEX_PROVIDER,
