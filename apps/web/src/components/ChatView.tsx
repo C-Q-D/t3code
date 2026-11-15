@@ -861,6 +861,8 @@ export default function ChatView(props: ChatViewProps) {
   const supportsProviderSwitchingViaHandoff = threadSupportsProviderHandoff(serverProjection);
   const activeLatestRun = isServerThread ? serverLatestRun : (activeThread?.latestRun ?? null);
   const activeActivityRun = isServerThread ? serverActivityRun : (activeThread?.latestRun ?? null);
+  const activeReplyRewriteRun =
+    serverProjection?.runs.find((run) => run.id === activeActivityRun?.runId) ?? null;
   const activeRuntime = isServerThread ? serverRuntime : (activeThread?.runtime ?? null);
   const hasHeldQueuedRuns =
     isServerThread &&
@@ -3049,6 +3051,7 @@ export default function ChatView(props: ChatViewProps) {
     defaultRuntimeMode,
   });
   const { onSend } = useComposerSend({
+    activeReplyRewriteRun,
     environmentId,
     routeThreadKey,
     currentRouteThreadKeyRef,

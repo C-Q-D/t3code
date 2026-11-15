@@ -106,10 +106,12 @@ export function usePlanFollowUpSend(input: PlanFollowUpSendInput) {
   const { sendInFlight: sendInFlightRef } = draftSendState(routeThreadKey);
 
   return async function submitPlanFollowUp({
+    replyRewrite,
     text,
     context,
     interactionMode: nextInteractionMode,
   }: {
+    replyRewrite?: boolean;
     text: string;
     context?: ReturnType<typeof buildMessageContext>;
     interactionMode: "default" | "plan";
@@ -188,6 +190,7 @@ export function usePlanFollowUpSend(input: PlanFollowUpSendInput) {
         environmentId,
         input: {
           threadId: threadIdForSend,
+          ...(replyRewrite === undefined ? {} : { replyRewrite }),
           message: {
             messageId: messageIdForSend,
             role: "user",

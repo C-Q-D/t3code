@@ -18,6 +18,7 @@ import {
   composerDraftHasUserContent,
   type DraftId,
   useComposerDraftStore,
+  type ComposerThreadDraftState,
 } from "../../composerDraftStore";
 import type { ComposerHandleRef } from "../../composerHandleContext";
 import { releaseDraftAttachments } from "../../lib/attachmentUploadQueue";
@@ -98,8 +99,10 @@ export function useMultipleModelSend(input: MultipleModelSendInput) {
     readFileBlockReason,
     buildOutgoingMessageContext,
     isCurrentSend,
+    replyRewriteSelection,
   }: {
     readonly threadId: ThreadId;
+    readonly replyRewriteSelection: ComposerThreadDraftState["replyRewriteSelection"];
     readonly project: EnvironmentProject;
     readonly branch: string;
     readonly selections: ReadonlyArray<ModelSelection>;
@@ -164,6 +167,9 @@ export function useMultipleModelSend(input: MultipleModelSendInput) {
                 environmentId,
                 input: {
                   threadId: targetThreadId,
+                  ...(target.replyRewrite === undefined
+                    ? {}
+                    : { replyRewrite: target.replyRewrite }),
                   message: {
                     messageId: newMessageId(),
                     role: "user",
@@ -214,6 +220,11 @@ export function useMultipleModelSend(input: MultipleModelSendInput) {
       resetLocalDispatch();
       releasedComposer = true;
       await starts;
+      if (failedSelections.length === 0) {
+        useComposerDraftStore
+          .getState()
+          .completeReplyRewriteSend(composerDraftTarget, replyRewriteSelection);
+      }
       if (startedCount > 0) {
         toastManager.add(
           stackedThreadToast({

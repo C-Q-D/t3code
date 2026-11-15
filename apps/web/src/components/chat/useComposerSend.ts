@@ -97,6 +97,7 @@ import {
   loadBalancingSendWarning,
   multipleModelSendBlock,
   referencedThreadContexts,
+  composerReplyRewriteState,
 } from "./composerSend.logic";
 import { usePlanFollowUpSend } from "./useProposedPlanSend";
 import { useMultipleModelSend } from "./useMultipleModelSend";
@@ -148,6 +149,7 @@ import type { useWorktreeSetup } from "./useWorktreeSetup";
 const ENVIRONMENT_UNAVAILABLE_SEND_TOAST_TRAIL_SIZE = 3;
 
 const selectPlanModeEnabled = (settings: UnifiedSettings) => settings.planModeEnabled;
+const selectReplyRewriteAuto = (settings: UnifiedSettings) => settings.replyRewrite.auto;
 
 function readEnvironmentPresentation(environmentId: EnvironmentId) {
   return appAtomRegistry.get(environmentPresentations.presentationsAtom).get(environmentId);
@@ -165,6 +167,7 @@ type UsageLimitsPanel = ReturnType<typeof useUsageLimitsPanel>;
 type TimelineFollow = ReturnType<typeof useTimelineFollow>;
 
 interface ComposerSendInput {
+  readonly activeReplyRewriteRun?: { readonly replyRewrite?: boolean | undefined } | null;
   readonly environmentId: EnvironmentId;
   readonly routeThreadKey: string;
   readonly currentRouteThreadKeyRef: { readonly current: string | null };
@@ -339,6 +342,7 @@ export function useComposerSend(input: ComposerSendInput) {
   const navigate = useNavigate();
   const clientSettingsHydrated = useClientSettingsHydrated();
   const planModeEnabled = useEnvironmentSettings(environmentId, selectPlanModeEnabled);
+  const replyRewriteDefault = useEnvironmentSettings(environmentId, selectReplyRewriteAuto);
   const startThreadTurn = useOrchestrationCommand(threadEnvironment.startTurn, {
     reportFailure: false,
   });
@@ -589,6 +593,21 @@ export function useComposerSend(input: ComposerSendInput) {
       interactionMode: sendInteractionMode,
       interactionModeEnabled: sendInteractionModeEnabled,
     } = sendCtx;
+    const replyRewriteSelection = useComposerDraftStore
+      .getState()
+      .getComposerDraft(composerDraftTarget)?.replyRewriteSelection;
+    const replyRewrite = composerReplyRewriteState({
+      provider: ctxSelectedProvider,
+      defaultEnabled: replyRewriteDefault,
+      selection: replyRewriteSelection,
+      running: phase === "running",
+      dispatchMode,
+      activeRun: input.activeReplyRewriteRun,
+    }).replyRewrite;
+    const completeReplyRewriteSend = () =>
+      useComposerDraftStore
+        .getState()
+        .completeReplyRewriteSend(composerDraftTarget, replyRewriteSelection);
     const { images: composerImages, previewAnnotations: composerPreviewAnnotations } =
       mergeDirectPreviewAnnotation({
         images: sendContextImages,
@@ -741,6 +760,7 @@ export function useComposerSend(input: ComposerSendInput) {
       clearComposerDraftContent(composerDraftTarget);
       composerRef.current?.resetCursorState();
       const followUpSent = await submitPlanFollowUp({
+        replyRewrite,
         text: followUp.text,
         context: buildMessageContext({
           terminalContexts: sendableComposerTerminalContexts,
@@ -775,7 +795,11 @@ export function useComposerSend(input: ComposerSendInput) {
             setComposerDraftEnvironmentContexts(composerDraftTarget, [...records]),
           resetCursor: (options) => composerRef.current?.resetCursorState(options),
         });
-      } else if (
+      } else {
+        completeReplyRewriteSend();
+      }
+      if (
+        followUpSent &&
         submissionIntent === "background" &&
         currentRouteThreadKeyRef.current === routeThreadKey
       ) {
@@ -928,7 +952,14 @@ export function useComposerSend(input: ComposerSendInput) {
         return;
       }
       if (composerRef.current?.validateProviderInput(resolved.text) === false) return;
-      multipleTargets.push(resolved);
+      multipleTargets.push({
+        ...resolved,
+        replyRewrite:
+          providerInstanceEntries.find(
+            (entry) => entry.instanceId === resolved.selection.instanceId,
+          )?.driverKind === "codex" &&
+          (replyRewriteSelection?.enabled ?? replyRewriteDefault),
+      });
     }
 
     sendInFlightRef.current = true;
@@ -1167,6 +1198,7 @@ export function useComposerSend(input: ComposerSendInput) {
         readFileBlockReason: () => readLiveAttachmentCapabilities().fileBlockReason,
         buildOutgoingMessageContext,
         isCurrentSend: () => composerSendGenerationRef.current === sendGeneration,
+        replyRewriteSelection,
       });
       return;
     }
@@ -1343,6 +1375,7 @@ export function useComposerSend(input: ComposerSendInput) {
           runtimeMode,
           interactionMode: sendInteractionMode,
           dispatchMode: turnDispatchMode,
+          replyRewrite,
           ...(bootstrap ? { bootstrap } : {}),
           createdAt: messageCreatedAt,
         },
@@ -1375,6 +1408,7 @@ export function useComposerSend(input: ComposerSendInput) {
         failure = startResult;
       } else {
         turnStartSucceeded = true;
+        completeReplyRewriteSend();
         setKeepFullHistory(routeThreadKey, false);
         clearUsageLimitsFor(routeThreadKey);
         if (turnUsesAttachmentUploads) {

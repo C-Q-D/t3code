@@ -232,6 +232,7 @@ describe("V2 environment commands", () => {
         },
         runtimeMode: "full-access",
         interactionMode: "default",
+        replyRewrite: false,
         titleSeed: "Continue here",
         bootstrap: {
           createThread: {
@@ -251,6 +252,7 @@ describe("V2 environment commands", () => {
         threadId: v2ThreadId,
         title: "Continue here",
         generateTitle: true,
+        initialMessage: { replyRewrite: false },
         workspaceStrategy: {
           type: "existing_worktree",
           worktreePath: "/workspace/project-worktrees/feature",
@@ -267,6 +269,7 @@ describe("V2 environment commands", () => {
       const supervisor = yield* makeSupervisor({ commands, projects: [], projectionRequests });
 
       for (const [mode, expectedType] of [
+        ["start", "start_immediately"],
         ["queue", "queue_after_active"],
         ["auto", "start_immediately"],
         ["steer", "start_immediately"],
@@ -284,12 +287,14 @@ describe("V2 environment commands", () => {
           runtimeMode: "full-access",
           interactionMode: "default",
           dispatchMode: mode,
+          replyRewrite: mode !== "queue",
         }).pipe(Effect.provideService(EnvironmentSupervisor.EnvironmentSupervisor, supervisor));
 
         expect(commands.at(-1)).toMatchObject({
           type: "message.dispatch",
           dispatchMode: { type: expectedType },
-          ...(mode === "queue" ? {} : { deliveryIntent: mode }),
+          replyRewrite: mode !== "queue",
+          ...(mode === "queue" || mode === "start" ? {} : { deliveryIntent: mode }),
         });
       }
       expect(projectionRequests).toEqual([]);

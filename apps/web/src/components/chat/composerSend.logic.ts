@@ -2,6 +2,31 @@
 import { t } from "~/i18n";
 import type { EnvironmentId, ThreadContextRecord } from "@t3tools/contracts";
 import { collectInlineContextIds } from "../../lib/composerContextReferences";
+import type { ComposerDispatchMode } from "@t3tools/client-runtime/state/composer-dispatch";
+
+/** Resolves the visible run decision and freezes the wire value before asynchronous send work. */
+export function composerReplyRewriteState(input: {
+  readonly provider: string;
+  readonly defaultEnabled: boolean;
+  readonly selection?: { readonly enabled: boolean } | undefined;
+  readonly running: boolean;
+  readonly dispatchMode: ComposerDispatchMode;
+  readonly activeRun?: { readonly replyRewrite?: boolean | undefined } | null | undefined;
+}) {
+  const inherited =
+    input.running && (input.dispatchMode === "steer" || input.dispatchMode === "restart");
+  const supported = input.provider === "codex";
+  const selected = supported && (input.selection?.enabled ?? input.defaultEnabled);
+  const saved = inherited ? input.activeRun?.replyRewrite : undefined;
+  return {
+    inherited,
+    supported,
+    known: !inherited || saved !== undefined,
+    checked: inherited ? (saved ?? false) : selected,
+    // A completed run can turn a steer into a new run on the server.
+    replyRewrite: saved ?? selected,
+  };
+}
 
 /** Attached threads the prompt still links to; replacing linked text leaves stale records. */
 export function referencedThreadContexts(draft: {

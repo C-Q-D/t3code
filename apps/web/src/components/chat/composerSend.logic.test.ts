@@ -9,12 +9,73 @@ import {
   loadBalancingSendWarning,
   multipleModelSendBlock,
   referencedThreadContexts,
+  composerReplyRewriteState,
 } from "./composerSend.logic";
 
 const local = EnvironmentId.make("local");
 const remote = EnvironmentId.make("remote");
 const localThread = threadContextRecord(scopeThreadRef(local, ThreadId.make("a")), "Local");
 const remoteThread = threadContextRecord(scopeThreadRef(remote, ThreadId.make("b")), "Remote");
+
+describe("composerReplyRewriteState", () => {
+  it.each([
+    ["auto", false, true],
+    ["queue", true, true],
+    ["steer", true, false],
+    ["restart", true, false],
+    ["steer", false, true],
+  ] as const)("snapshots %s with running=%s", (dispatchMode, running, expected) => {
+    expect(
+      composerReplyRewriteState({
+        provider: "codex",
+        defaultEnabled: false,
+        selection: { enabled: true },
+        running,
+        dispatchMode,
+        activeRun: { replyRewrite: false },
+      }),
+    ).toMatchObject({
+      checked: expected,
+      replyRewrite: expected,
+      inherited: running && (dispatchMode === "steer" || dispatchMode === "restart"),
+    });
+  });
+
+  it("uses the default for new sends and never enables non-Codex replies", () => {
+    const input = {
+      provider: "codex",
+      defaultEnabled: true,
+      running: false,
+      dispatchMode: "auto" as const,
+    };
+    expect(composerReplyRewriteState(input).checked).toBe(true);
+    expect(composerReplyRewriteState({ ...input, selection: { enabled: false } }).checked).toBe(
+      false,
+    );
+    expect(composerReplyRewriteState({ ...input, provider: "claudeAgent" })).toMatchObject({
+      checked: false,
+      replyRewrite: false,
+      supported: false,
+    });
+  });
+
+  it("marks a legacy active run unknown and keeps a send value for a race to a new run", () => {
+    expect(
+      composerReplyRewriteState({
+        provider: "codex",
+        defaultEnabled: true,
+        running: true,
+        dispatchMode: "steer",
+        activeRun: {},
+      }),
+    ).toMatchObject({
+      checked: false,
+      inherited: true,
+      known: false,
+      replyRewrite: true,
+    });
+  });
+});
 
 describe("referencedThreadContexts", () => {
   it("keeps only the attached threads the prompt still links", () => {

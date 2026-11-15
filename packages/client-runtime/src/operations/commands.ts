@@ -167,6 +167,7 @@ interface StartThreadBootstrap {
 }
 
 export interface StartThreadTurnInput extends ThreadCommandInput {
+  readonly replyRewrite?: boolean;
   readonly manualContinuationOfRunId?: RunId;
   readonly message: {
     readonly messageId: MessageId;
@@ -722,6 +723,7 @@ export const startThreadTurn = Effect.fn("EnvironmentCommands.startThreadTurn")(
       interactionMode: input.interactionMode,
       workspaceStrategy,
       initialMessage: {
+        ...(input.replyRewrite === undefined ? {} : { replyRewrite: input.replyRewrite }),
         messageId: input.message.messageId,
         text: input.message.text,
         ...(context ? { context } : {}),
@@ -733,6 +735,7 @@ export const startThreadTurn = Effect.fn("EnvironmentCommands.startThreadTurn")(
   const requestedMode = input.dispatchMode ?? "auto";
   if (requestedMode === "start") {
     return yield* dispatch({
+      ...(input.replyRewrite === undefined ? {} : { replyRewrite: input.replyRewrite }),
       type: "message.dispatch",
       commandId,
       createdBy: "user",
@@ -762,6 +765,7 @@ export const startThreadTurn = Effect.fn("EnvironmentCommands.startThreadTurn")(
       : ({ type: "start_immediately" } as const);
   return yield* dispatch({
     type: "message.dispatch",
+    ...(input.replyRewrite === undefined ? {} : { replyRewrite: input.replyRewrite }),
     commandId,
     createdBy: "user",
     creationSource: input.creationSource ?? "web",

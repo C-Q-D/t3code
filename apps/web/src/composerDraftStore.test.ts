@@ -219,6 +219,41 @@ function draftByKey(key: string) {
   return useComposerDraftStore.getState().draftsByThreadKey[key] ?? undefined;
 }
 
+describe("per-send reply rewrite selection", () => {
+  it("retains a failed send selection, resets success, and isolates environments and threads", () => {
+    resetComposerDraftStore();
+    const a = scopeThreadRef(TEST_ENVIRONMENT_ID, ThreadId.make("rewrite-a"));
+    const b = scopeThreadRef(OTHER_TEST_ENVIRONMENT_ID, a.threadId);
+    const c = scopeThreadRef(TEST_ENVIRONMENT_ID, ThreadId.make("rewrite-c"));
+    const store = useComposerDraftStore.getState();
+    store.setReplyRewrite(a, true);
+    store.setReplyRewrite(b, false);
+    store.setReplyRewrite(c, true);
+    const sentSelection = store.getComposerDraft(a)?.replyRewriteSelection;
+    store.clearComposerContent(a);
+    expect(store.getComposerDraft(a)?.replyRewriteSelection?.enabled).toBe(true);
+    expect(store.getComposerDraft(b)?.replyRewriteSelection?.enabled).toBe(false);
+    expect(store.getComposerDraft(c)?.replyRewriteSelection?.enabled).toBe(true);
+    store.completeReplyRewriteSend(a, sentSelection);
+    expect(store.getComposerDraft(a)?.replyRewriteSelection).toBeUndefined();
+    expect(store.getComposerDraft(b)?.replyRewriteSelection?.enabled).toBe(false);
+    expect(store.getComposerDraft(c)?.replyRewriteSelection?.enabled).toBe(true);
+  });
+
+  it("does not let duplicate completion erase a newer unsent choice", () => {
+    resetComposerDraftStore();
+    const target = scopeThreadRef(TEST_ENVIRONMENT_ID, ThreadId.make("rewrite-overlap"));
+    const store = useComposerDraftStore.getState();
+    store.setReplyRewrite(target, true);
+    const sentSelection = store.getComposerDraft(target)?.replyRewriteSelection;
+    store.setReplyRewrite(target, false);
+    store.setReplyRewrite(target, true);
+    store.completeReplyRewriteSend(target, sentSelection);
+    store.completeReplyRewriteSend(target, sentSelection);
+    expect(store.getComposerDraft(target)?.replyRewriteSelection?.enabled).toBe(true);
+  });
+});
+
 describe("composerDraftStore addImages", () => {
   const threadId = ThreadId.make("thread-dedupe");
   const threadRef = scopeThreadRef(TEST_ENVIRONMENT_ID, threadId);

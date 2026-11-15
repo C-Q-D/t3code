@@ -272,6 +272,7 @@ export function restoreComposerDraft(
 }
 
 export interface MultipleModelTarget {
+  readonly replyRewrite?: boolean;
   readonly selection: ModelSelection;
   readonly text: string;
   readonly interactionMode: ProviderInteractionMode;

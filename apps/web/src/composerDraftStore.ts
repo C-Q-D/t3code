@@ -357,6 +357,8 @@ export type ComposerContextInsertionHandler = (
 const contextInsertionHandlers = new Map<string, ComposerContextInsertionHandler>();
 
 export interface ComposerThreadDraftState {
+  /** In-memory choice; object identity prevents a late receipt from clearing the next choice. */
+  replyRewriteSelection?: { readonly enabled: boolean };
   prompt: string;
   images: ComposerImageAttachment[];
   files: ComposerFileAttachment[];
@@ -504,6 +506,11 @@ interface ComposerDraftStoreState {
   clearDraftThread: (threadRef: ComposerThreadTarget) => void;
   setStickyModelSelection: (modelSelection: ModelSelection | null | undefined) => void;
   setPrompt: (threadRef: ComposerThreadTarget, prompt: string) => void;
+  setReplyRewrite: (threadRef: ComposerThreadTarget, enabled: boolean) => void;
+  completeReplyRewriteSend: (
+    threadRef: ComposerThreadTarget,
+    selection: ComposerThreadDraftState["replyRewriteSelection"],
+  ) => void;
   setTerminalContexts: (threadRef: ComposerThreadTarget, contexts: TerminalContextDraft[]) => void;
   setModelSelection: (
     threadRef: ComposerThreadTarget,
@@ -865,6 +872,7 @@ function normalizeTerminalContextsForThread(
 
 function shouldRemoveDraft(draft: ComposerThreadDraftState): boolean {
   return (
+    draft.replyRewriteSelection === undefined &&
     draft.prompt.length === 0 &&
     draft.images.length === 0 &&
     draft.files.length === 0 &&
@@ -2919,6 +2927,32 @@ const composerDraftStore = create<ComposerDraftStoreState>()(
               nextDraftsByThreadKey[threadKey] = nextDraft;
             }
             return { draftsByThreadKey: nextDraftsByThreadKey };
+          });
+        },
+        setReplyRewrite: (threadRef, enabled) => {
+          const threadKey = resolveComposerDraftKey(get(), threadRef);
+          if (!threadKey) return;
+          set((state) => ({
+            draftsByThreadKey: {
+              ...state.draftsByThreadKey,
+              [threadKey]: {
+                ...(state.draftsByThreadKey[threadKey] ?? createEmptyThreadDraft()),
+                replyRewriteSelection: { enabled },
+              },
+            },
+          }));
+        },
+        completeReplyRewriteSend: (threadRef, selection) => {
+          const threadKey = resolveComposerDraftKey(get(), threadRef);
+          if (!threadKey || selection === undefined) return;
+          set((state) => {
+            const current = state.draftsByThreadKey[threadKey];
+            if (current?.replyRewriteSelection !== selection) return state;
+            const { replyRewriteSelection: _sent, ...nextDraft } = current;
+            const draftsByThreadKey = { ...state.draftsByThreadKey };
+            if (shouldRemoveDraft(nextDraft)) delete draftsByThreadKey[threadKey];
+            else draftsByThreadKey[threadKey] = nextDraft;
+            return { draftsByThreadKey };
           });
         },
         setPrompt: (threadRef, prompt) => {
