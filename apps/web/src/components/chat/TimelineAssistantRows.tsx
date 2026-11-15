@@ -42,6 +42,7 @@ export function AssistantTimelineRow({ row }: { row: Extract<TimelineRow, { kind
         <AssistantReplyContent
           row={row}
           messageText={reading.text || (row.message.streaming ? "" : t.chat.timeline.emptyResponse)}
+          copyText={reading.text}
           rewriteRequestId={reading.rewriteRequestId}
           controls={controls}
         />
@@ -53,11 +54,13 @@ export function AssistantTimelineRow({ row }: { row: Extract<TimelineRow, { kind
 function AssistantReplyContent({
   row,
   messageText,
+  copyText,
   rewriteRequestId,
   controls,
 }: {
   row: Extract<TimelineRow, { kind: "message" }>;
   messageText: string;
+  copyText: string;
   rewriteRequestId?: string | undefined;
   controls?: React.ReactNode;
 }) {
@@ -107,7 +110,7 @@ function AssistantReplyContent({
             message={row.message}
             showCopyButton={row.showAssistantCopyButton}
             copyStreaming={row.assistantCopyStreaming}
-            copyText={messageText}
+            copyText={copyText}
           />
         ) : null}
       </div>

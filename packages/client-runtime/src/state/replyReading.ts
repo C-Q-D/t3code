@@ -13,11 +13,27 @@ export interface ReplyReadingIdentity extends ReplyRewriteTargetInput {
   readonly environmentId: EnvironmentId;
 }
 
-const preferences = Atom.family((_key: string) =>
-  Atom.make<ReplyReadingPreference>(null).pipe(Atom.setIdleTTL("30 minutes")),
+const MAX_READING_PREFERENCES = 4096;
+const preferenceValues = Atom.make<ReadonlyMap<string, ReplyReadingPreference>>(new Map()).pipe(
+  Atom.keepAlive,
+);
+const preferences = Atom.family((key: string) =>
+  Atom.writable(
+    (get): ReplyReadingPreference => get(preferenceValues).get(key) ?? null,
+    (context, preference: ReplyReadingPreference) => {
+      const values = new Map(context.get(preferenceValues));
+      values.delete(key);
+      if (preference !== null) values.set(key, preference);
+      if (values.size > MAX_READING_PREFERENCES) {
+        const oldest = values.keys().next().value;
+        if (oldest !== undefined) values.delete(oldest);
+      }
+      context.set(preferenceValues, values);
+    },
+  ),
 );
 
-/** Client-only choices expire after 30 idle minutes and never enter provider history. */
+/** Keeps the latest 4096 explicit choices for this client session, independently of row lifetimes. */
 export function replyReadingPreferenceAtom(identity: ReplyReadingIdentity) {
   return preferences(
     JSON.stringify([identity.environmentId, identity.threadId, identity.messageId]),

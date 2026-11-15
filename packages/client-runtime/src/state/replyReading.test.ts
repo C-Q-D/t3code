@@ -1,5 +1,6 @@
 /** Exercises display selection against identity, source changes and retained successful versions. */
 import { describe, expect, it } from "vite-plus/test";
+import { AtomRegistry } from "effect/reactivity";
 import {
   DEFAULT_REPLY_REWRITE_SETTINGS,
   EnvironmentId,
@@ -130,9 +131,19 @@ describe("reply reading", () => {
   });
 
   it("keeps choices scoped and resolves only the retained rewrite version", () => {
-    expect(replyReadingPreferenceAtom(identity)).not.toBe(
-      replyReadingPreferenceAtom({ ...identity, environmentId: EnvironmentId.make("other") }),
-    );
+    const registry = AtomRegistry.make();
+    const otherIdentity = { ...identity, environmentId: EnvironmentId.make("other") };
+    try {
+      registry.set(replyReadingPreferenceAtom(identity), "original");
+      registry.set(replyReadingPreferenceAtom(otherIdentity), "rewrite");
+      expect(registry.get(replyReadingPreferenceAtom({ ...identity }))).toBe("original");
+      expect(registry.get(replyReadingPreferenceAtom(otherIdentity))).toBe("rewrite");
+      registry.set(replyReadingPreferenceAtom(identity), null);
+      expect(registry.get(replyReadingPreferenceAtom(identity))).toBeNull();
+      expect(registry.get(replyReadingPreferenceAtom(otherIdentity))).toBe("rewrite");
+    } finally {
+      registry.dispose();
+    }
     const citation = {
       version: 2 as const,
       ...identity,

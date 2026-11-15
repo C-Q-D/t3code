@@ -51,6 +51,7 @@ export function ReplyRewriteResponse({
     !projected ||
     projected.item.type !== "assistant_message" ||
     row.message.streaming ||
+    !sourceText.trim() ||
     !row.message.runId ||
     !ctx.threadRef ||
     ctx.turnItemSource
@@ -143,7 +144,10 @@ function ReplyRewriteReading({
   const request = useAtomCommand(replyRewriteEnvironment.request);
   const cancel = useAtomCommand(replyRewriteEnvironment.cancel);
   const [busy, setBusy] = useState(false);
-  const [unconfirmedRequestId, setUnconfirmedRequestId] = useState<string | null>(null);
+  const [unconfirmedRequest, setUnconfirmedRequest] = useState<{
+    signature: string;
+    requestId: string;
+  } | null>(null);
   const readingInput = {
     identity,
     sourceText,
@@ -182,9 +186,16 @@ function ReplyRewriteReading({
     if (!allowed || active || busy) return;
     setBusy(true);
     try {
-      const requestId = unconfirmedRequestId ?? randomUUID();
+      const signature = JSON.stringify([target, sourceText]);
+      const requestId =
+        unconfirmedRequest?.signature === signature ? unconfirmedRequest.requestId : randomUUID();
       const result = await request({ environmentId, input: { ...target, requestId } });
-      setUnconfirmedRequestId(result._tag === "Failure" ? requestId : null);
+      const failure = result._tag === "Failure" ? Cause.squash(result.cause) : null;
+      setUnconfirmedRequest(
+        result._tag === "Failure" && !isRewriteError(failure) && !isAuthorizationError(failure)
+          ? { signature, requestId }
+          : null,
+      );
     } finally {
       refresh();
       setBusy(false);
