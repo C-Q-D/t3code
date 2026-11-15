@@ -362,6 +362,7 @@ export function useImplementPlanInNewThread(input: ImplementPlanInNewThreadInput
     }
 
     if (failure === null) {
+      useComposerDraftStore.getState().completeReplyRewriteSend(composerDraftTarget, selection);
       const startedResult = await settlePromise(() =>
         waitForStartedServerThread(scopeThreadRef(activeThread.environmentId, nextThreadId)),
       );
@@ -381,9 +382,6 @@ export function useImplementPlanInNewThread(input: ImplementPlanInNewThreadInput
       failure = navigateResult._tag === "Failure" ? navigateResult : null;
     }
 
-    if (failure === null) {
-      useComposerDraftStore.getState().completeReplyRewriteSend(composerDraftTarget, selection);
-    }
     if (failure !== null) {
       const cleanupResult = await deleteThread({
         environmentId,

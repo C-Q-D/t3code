@@ -173,17 +173,24 @@ it("keeps a new source choice when a delayed implementation send succeeds", asyn
   ).toBe(true);
 });
 
-it("clears the source choice when the new implementation thread succeeds", async () => {
-  await using h = await setup();
-  const store = useComposerDraftStore.getState();
-  store.setReplyRewrite(h.target, false);
-  await act(async () => {
-    await h.press();
-  });
-  expect(
-    store.getComposerDraft(h.target)?.replyRewriteSelections?.[h.target.environmentId],
-  ).toBeUndefined();
-});
+it.each([false, true])(
+  "clears the accepted choice even if navigation fails: %s",
+  async (navigationFails) => {
+    await using h = await setup();
+    if (navigationFails) {
+      fake.navigate.mockRejectedValueOnce(new Error("navigation failed"));
+      fake.remove.mockResolvedValueOnce(AsyncResult.fail(new Error("cleanup failed")));
+    }
+    const store = useComposerDraftStore.getState();
+    store.setReplyRewrite(h.target, false);
+    await act(async () => {
+      await h.press();
+    });
+    expect(
+      store.getComposerDraft(h.target)?.replyRewriteSelections?.[h.target.environmentId],
+    ).toBeUndefined();
+  },
+);
 
 it.each(["create", "start"] as const)(
   "preserves the choice after implementation %s failure and clears it after a successful retry",
