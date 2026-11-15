@@ -692,6 +692,8 @@ export const OrchestrationV2Run = Schema.Struct({
   modelSelection: ModelSelection,
   providerThreadId: Schema.NullOr(ProviderThreadId),
   userMessageId: MessageId,
+  /** Automatic rewrite decision captured at acceptance; absent on legacy runs. */
+  replyRewrite: Schema.optional(Schema.Boolean),
   rootNodeId: Schema.NullOr(NodeId),
   activeAttemptId: Schema.NullOr(RunAttemptId),
   status: OrchestrationV2RunStatus,
@@ -3164,6 +3166,8 @@ export const OrchestrationV2Command = Schema.Union([
   }),
   Schema.Struct({
     type: Schema.Literal("message.dispatch"),
+    /** Overrides auto for a new run only; steering retains the accepted run's decision. */
+    replyRewrite: Schema.optional(Schema.Boolean),
     notification: Schema.optional(OrchestrationV2Notification),
     /** Sends this pending guest message; the server uses the guest's text, not `text`. */
     guestMessageId: Schema.optional(GuestMessageId),
@@ -3664,6 +3668,7 @@ export const OrchestrationV2ThreadLaunchInput = Schema.Struct({
   initialMessage: Schema.optional(
     Schema.Struct({
       messageId: Schema.optional(MessageId),
+      replyRewrite: Schema.optional(Schema.Boolean),
       text: Schema.String,
       context: Schema.optional(OrchestrationMessageContext),
       attachments: Schema.Array(ChatAttachment),

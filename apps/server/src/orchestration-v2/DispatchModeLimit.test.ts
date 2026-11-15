@@ -4,11 +4,13 @@ import {
   ProjectId,
   ProviderDriverKind,
   ProviderInstanceId,
+  MessageId,
   ThreadId,
 } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
+import * as ServerSettings from "../serverSettings.ts";
 import { CodexProviderCapabilitiesV2 } from "./Adapters/CodexAdapterV2.ts";
 import { DispatchModeLimit } from "./DispatchModeLimit.ts";
 import * as Orchestrator from "./Orchestrator.ts";
@@ -26,13 +28,15 @@ const adapter = {
   openSession: () => Effect.die("No provider process needed for metadata commands"),
 } as ProviderAdapter.ProviderAdapterV2["Service"];
 const layerDatabase = SqlitePersistence.layerMemory;
+const layerSettings = ServerSettings.layerTest().pipe(Layer.orDie);
 const layerTest = Layer.mergeAll(
+  layerSettings,
   layerDatabase,
   ProjectionStore.layer.pipe(Layer.provide(layerDatabase)),
   ProviderReplayHarness.layerWithRegistry(
     { name: "dispatch-mode-limit" },
     ProviderAdapterRegistry.layerFromAdapters([adapter]),
-    { databaseLayer: layerDatabase, runEffectWorker: false },
+    { databaseLayer: layerDatabase, runEffectWorker: false, serverSettingsLayer: layerSettings },
   ),
 );
 
@@ -57,6 +61,58 @@ const createThread = (threadId: ThreadId) =>
   });
 
 it.layer(layerTest)("DispatchModeLimit", (it) => {
+  it.effect.each([
+    { auto: false, override: true, expected: true },
+    { auto: true, override: false, expected: false },
+    { auto: true, override: true, expected: true },
+    { auto: false, override: false, expected: false },
+    { auto: true, override: undefined, expected: true },
+    { auto: false, override: undefined, expected: false },
+  ])("snapshots rewrite at run acceptance: %j", ({ auto, override, expected }) =>
+    Effect.gen(function* () {
+      const orchestrator = yield* Orchestrator.OrchestratorV2;
+      const projections = yield* ProjectionStore.ProjectionStoreV2;
+      const settings = yield* ServerSettings.ServerSettingsService;
+      const threadId = ThreadId.make(`thread:rewrite:${auto}:${override}`);
+      yield* settings.updateSettings({ replyRewrite: { auto } });
+      yield* createThread(threadId);
+      const command = {
+        type: "message.dispatch" as const,
+        commandId: CommandId.make(`send:${threadId}`),
+        threadId,
+        messageId: MessageId.make(`message:${threadId}`),
+        createdBy: "user" as const,
+        creationSource: "web" as const,
+        text: "Explain it.",
+        attachments: [],
+        dispatchMode: { type: "defer_start" as const },
+        ...(override === undefined ? {} : { replyRewrite: override }),
+      };
+      yield* orchestrator.dispatch(command);
+      assert.equal(
+        (yield* projections.getThreadProjection(threadId)).runs[0]?.replyRewrite,
+        expected,
+      );
+      yield* settings.updateSettings({ replyRewrite: { auto: !auto } });
+      assert.isTrue((yield* orchestrator.dispatch(command)).replayed);
+      const queued = {
+        ...command,
+        commandId: CommandId.make(`queue:${threadId}`),
+        messageId: MessageId.make(`queued:${threadId}`),
+        dispatchMode: { type: "queue_after_active" as const },
+      };
+      yield* orchestrator.dispatch(queued);
+      const projection = yield* projections.getThreadProjection(threadId);
+      assert.equal(projection.runs[0]?.replyRewrite, expected);
+      assert.equal(projection.runs[1]?.replyRewrite, override ?? !auto);
+      assert.equal(projection.runs[1]?.status, "queued");
+      assert.deepEqual(
+        projection.messages.map((message) => message.text),
+        ["Explain it.", "Explain it."],
+      );
+    }),
+  );
+
   it.effect("refuses a limited command on a thread its user raised, and records nothing", () =>
     Effect.gen(function* () {
       const orchestrator = yield* Orchestrator.OrchestratorV2;

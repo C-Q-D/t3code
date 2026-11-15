@@ -136,6 +136,7 @@ export type ThreadManagementTerminalRunStatus = Extract<
 >;
 
 export interface ThreadManagementSendInput {
+  readonly replyRewrite?: boolean;
   readonly projectId: ProjectId;
   readonly commandId: CommandId;
   readonly threadId: ThreadId;
@@ -845,6 +846,7 @@ const make = Effect.gen(function* () {
       commandId: input.commandId,
       threadId: input.threadId,
       messageId: input.messageId,
+      ...(input.replyRewrite === undefined ? {} : { replyRewrite: input.replyRewrite }),
       ...(input.scheduledTaskId === undefined ? {} : { scheduledTaskId: input.scheduledTaskId }),
       ...(input.senderThreadId === undefined ? {} : { senderThreadId: input.senderThreadId }),
       text: input.text,

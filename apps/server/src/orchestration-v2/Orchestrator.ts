@@ -5719,6 +5719,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       return;
     }
 
+    const replyRewrite =
+      command.replyRewrite ??
+      (yield* serverSettings.getSettings.pipe(mapDispatchError(command))).replyRewrite.auto;
     const activeProviderThread = projection.providerThreads.find(
       (candidate) => candidate.id === projection.thread.activeProviderThreadId,
     );
@@ -5884,6 +5887,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         modelSelection,
         providerThreadId: queuedProviderThread.id,
         userMessageId: command.messageId,
+        replyRewrite,
         rootNodeId,
         activeAttemptId: attemptId,
         status: "queued",
@@ -6239,6 +6243,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         modelSelection,
         providerThreadId,
         userMessageId: command.messageId,
+        replyRewrite,
         rootNodeId,
         activeAttemptId: attemptId,
         status: dispatchMode.type === "defer_start" ? "preparing" : "starting",
@@ -6988,6 +6993,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       modelSelection,
       providerThreadId: providerThread.id,
       userMessageId: command.messageId,
+      replyRewrite,
       rootNodeId,
       activeAttemptId: attemptId,
       status: "starting",

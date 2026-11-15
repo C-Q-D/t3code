@@ -16,11 +16,13 @@ import {
   OrchestrationV2TurnItem,
   OrchestrationV2TurnItemJson,
   OrchestrationV2ConversationMessageJson,
+  OrchestrationV2Command,
 } from "./orchestrationV2.ts";
 
 const now = DateTime.makeUnsafe("2026-04-20T00:00:00.000Z");
 
 const decodeOrchestrationV2TurnItemJson = Schema.decodeUnknownSync(OrchestrationV2TurnItemJson);
+const decodeCommand = Schema.decodeSync(OrchestrationV2Command);
 const encodeOrchestrationV2TurnItemJson = Schema.encodeSync(OrchestrationV2TurnItemJson);
 const decodeOrchestrationV2Subagent = Schema.decodeUnknownSync(OrchestrationV2Subagent);
 const encodeOrchestrationV2SubagentJson = Schema.encodeSync(OrchestrationV2SubagentJson);
@@ -36,6 +38,26 @@ const decodeOrchestrationV2ProviderCapabilities = Schema.decodeUnknownSync(
 );
 
 describe("orchestration V2 contracts", () => {
+  it.each([true, false, undefined])(
+    "preserves per-send replyRewrite=%s through command decoding",
+    (replyRewrite) => {
+      const command = decodeCommand({
+        type: "message.dispatch",
+        commandId: "send-rewrite",
+        threadId: "thread-rewrite",
+        messageId: "message-rewrite",
+        createdBy: "user",
+        creationSource: "web",
+        text: "Explain it.",
+        attachments: [],
+        dispatchMode: { type: "start_immediately" },
+        ...(replyRewrite === undefined ? {} : { replyRewrite }),
+      });
+      expect(command).toHaveProperty("type", "message.dispatch");
+      expect("replyRewrite" in command ? command.replyRewrite : undefined).toBe(replyRewrite);
+    },
+  );
+
   it.each([
     { kind: "final", source: "codex_phase" },
     { kind: "final", source: "codex_legacy_phase" },

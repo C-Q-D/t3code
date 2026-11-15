@@ -12,7 +12,7 @@ import {
   type ModelSelection,
   NodeId,
   type OrchestrationV2AppThread,
-  type OrchestrationV2DomainEvent,
+  OrchestrationV2DomainEvent,
   type OrchestrationV2Run,
   type OrchestrationV2ThreadProjection,
   type OrchestrationV2TurnItem,
@@ -68,6 +68,8 @@ import * as TurnItemPositionStore from "./TurnItemPositionStore.ts";
 
 const isLiveStreamBufferError = Schema.is(LiveStreamBufferError);
 const encodeJson = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
+const encodeWireEvent = Schema.encodeEffect(Schema.toCodecJson(OrchestrationV2DomainEvent));
+const decodeWireEvent = Schema.decodeEffect(Schema.toCodecJson(OrchestrationV2DomainEvent));
 
 const layerDatabase = SqlitePersistence.layerMemory;
 const layerEventStoreProvided = EventStore.layer.pipe(Layer.provideMerge(layerDatabase));
@@ -93,6 +95,65 @@ const layerTest = Layer.mergeAll(
   layerCommandReceiptStoreProvided,
   IdAllocator.layer,
   layerProjectionMaintenanceProvided,
+);
+
+it.effect.each([true, false, undefined])(
+  "retains run replyRewrite=%s through persistence, wire encoding and projection rebuild",
+  (replyRewrite) =>
+    Effect.gen(function* () {
+      const sink = yield* EventSink.EventSinkV2;
+      const projections = yield* ProjectionStore.ProjectionStoreV2;
+      const maintenance = yield* ProjectionMaintenance.ProjectionMaintenanceV2;
+      const now = yield* DateTime.now;
+      const threadId = ThreadId.make(`thread:rewrite:${replyRewrite}`);
+      const runId = RunId.make(`run:rewrite:${replyRewrite}`);
+      const run = {
+        id: runId,
+        threadId,
+        ordinal: 1,
+        providerInstanceId,
+        modelSelection,
+        providerThreadId: null,
+        userMessageId: MessageId.make(`message:${runId}`),
+        rootNodeId: null,
+        activeAttemptId: null,
+        status: "queued" as const,
+        requestedAt: now,
+        startedAt: null,
+        completedAt: null,
+        checkpointId: null,
+        contextHandoffId: null,
+        ...(replyRewrite === undefined ? {} : { replyRewrite }),
+      };
+      const stored = yield* sink.write({
+        events: [
+          threadCreatedEvent({ id: `event:${threadId}`, thread: makeThread(threadId, now), now }),
+          {
+            id: EventId.make(`event:${runId}`),
+            type: "run.created",
+            threadId,
+            runId,
+            occurredAt: now,
+            payload: run,
+          },
+        ],
+      });
+      const wire = yield* encodeWireEvent(stored[1]!.event);
+      const decoded = yield* decodeWireEvent(wire);
+      assert.equal(
+        decoded.type === "run.created" ? decoded.payload.replyRewrite : "wrong event",
+        replyRewrite,
+      );
+      assert.equal(
+        (yield* projections.getThreadProjection(threadId)).runs[0]?.replyRewrite,
+        replyRewrite,
+      );
+      assert.isTrue((yield* maintenance.rebuild).valid);
+      assert.equal(
+        (yield* projections.getThreadProjection(threadId)).runs[0]?.replyRewrite,
+        replyRewrite,
+      );
+    }).pipe(Effect.provide(layerTest)),
 );
 
 const providerInstanceId = ProviderInstanceId.make("codex");
