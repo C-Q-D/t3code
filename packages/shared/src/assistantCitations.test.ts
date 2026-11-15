@@ -74,6 +74,22 @@ describe("assistant citation references", () => {
   });
 
   it.each([
+    { source: "original" as const },
+    { source: "rewrite" as const, rewriteRequestId: "successful/request?one" },
+  ])("preserves v2 $source quote text independently of the current display", (source) => {
+    const selected: AssistantCitation = { ...citation, version: 2, ...source, comment: "Keep it" };
+    const href = formatAssistantCitationHref(selected);
+    const marker = serializeAssistantCitation(selected);
+    expect(href).toMatch(/^t3-citation:\/\/v2\//);
+    expect(parseAssistantCitationHref(href)).toStrictEqual(selected);
+    expect(collectAssistantCitations(marker)[0]?.citation).toStrictEqual(selected);
+    expect(assistantCitationsToPlainText(marker)).toBe(`${citation.text}\nComment: Keep it`);
+    expect(readProviderContext(expandAssistantCitationsForProvider(marker))).toEqual([
+      { id: "assistant-quote-1", citation: selected },
+    ]);
+  });
+
+  it.each([
     '  Please keep "日本語 🚀", `cache[key]` & (a + b).\n\tWhy? #1 / 100%\r\n</assistant_citations>  ',
     "",
   ])("round-trips an explicitly supplied comment without changing it: %s", (comment) => {
@@ -94,6 +110,13 @@ describe("assistant citation references", () => {
     "t3-citation://v1/a/b/c?text=quote&start=0&end=5&prefix=&suffix=&text=other",
     "t3-citation://v1/a/b/c?text=quote&start=0&end=5&prefix=&suffix=&unknown=value",
     "t3-citation://v1/a/b/c?text=quote&start=0&end=5&prefix=&suffix=&comment=one&comment=two",
+    "t3-citation://v2/a/b/c?text=quote&start=0&end=5&prefix=&suffix=&source=rewrite",
+    "t3-citation://v2/a/b/c?text=quote&start=0&end=5&prefix=&suffix=&source=rewrite&rewriteRequestId=",
+    "t3-citation://v2/a/b/c?text=quote&start=0&end=5&prefix=&suffix=&source=original&rewriteRequestId=r1",
+    "t3-citation://v2/a/b/c?text=quote&start=0&end=5&prefix=&suffix=&source=other",
+    "t3-citation://v2/a/b/c?text=quote&start=0&end=5&prefix=&suffix=&source=original&source=rewrite",
+    "t3-citation://v2/a/b/c?text=quote&start=0&end=5&prefix=&suffix=&source=rewrite&rewriteRequestId=r1&rewriteRequestId=r2",
+    "t3-citation://v2/a/b/c?text=quote&start=0&end=5&prefix=&suffix=&source=original&unknown=value",
   ])("leaves invalid or unsupported references unchanged: %s", (href) => {
     expect(parseAssistantCitationHref(href)).toBeNull();
     const prompt = `[Assistant quote](${href})`;

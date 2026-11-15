@@ -8,11 +8,12 @@ import * as Schema from "effect/Schema";
 
 const CITATION_PROTOCOL = "t3-citation:";
 const CITATION_HREF_PREFIX = `${CITATION_PROTOCOL}//v1/`;
+const CITATION_V2_HREF_PREFIX = `${CITATION_PROTOCOL}//v2/`;
 // Percent encoding needs up to nine characters per UTF-16 code unit; 16k covers selectors.
 const MAX_CITATION_HREF_LENGTH =
   9 * (ASSISTANT_CITATION_MAX_TEXT_LENGTH + ASSISTANT_CITATION_MAX_COMMENT_LENGTH) + 16_000;
 const CITATION_LINK = new RegExp(
-  String.raw`\[Assistant quote\]\((${CITATION_HREF_PREFIX}[^\s)]{1,${MAX_CITATION_HREF_LENGTH - CITATION_HREF_PREFIX.length}})\)`,
+  String.raw`\[Assistant quote\]\((${CITATION_PROTOCOL}//v[12]/[^\s)]{1,${MAX_CITATION_HREF_LENGTH - CITATION_HREF_PREFIX.length}})\)`,
   "g",
 );
 const decodeCitation = Schema.decodeUnknownOption(AssistantCitation);
@@ -45,11 +46,19 @@ export function formatAssistantCitationHref(citation: AssistantCitation): string
     suffix: citation.suffix,
   });
   if (citation.comment !== undefined) query.set("comment", citation.comment);
-  return `${CITATION_HREF_PREFIX}${path}?${query}`;
+  if (citation.version === 2) {
+    query.set("source", citation.source);
+    if (citation.source === "rewrite") query.set("rewriteRequestId", citation.rewriteRequestId);
+  }
+  const prefix = citation.version === 1 ? CITATION_HREF_PREFIX : CITATION_V2_HREF_PREFIX;
+  return `${prefix}${path}?${query}`;
 }
 
 export function parseAssistantCitationHref(href: string): AssistantCitation | null {
-  if (!href.startsWith(CITATION_HREF_PREFIX) || href.length > MAX_CITATION_HREF_LENGTH) {
+  if (
+    (!href.startsWith(CITATION_HREF_PREFIX) && !href.startsWith(CITATION_V2_HREF_PREFIX)) ||
+    href.length > MAX_CITATION_HREF_LENGTH
+  ) {
     return null;
   }
   try {
@@ -57,7 +66,7 @@ export function parseAssistantCitationHref(href: string): AssistantCitation | nu
     const parts = url.pathname.slice(1).split("/");
     if (
       url.protocol !== CITATION_PROTOCOL ||
-      url.hostname !== "v1" ||
+      (url.hostname !== "v1" && url.hostname !== "v2") ||
       parts.length !== 3 ||
       url.username ||
       url.password ||
@@ -67,6 +76,12 @@ export function parseAssistantCitationHref(href: string): AssistantCitation | nu
       return null;
     }
     const requiredKeys = ["text", "start", "end", "prefix", "suffix"];
+    const version = url.hostname === "v1" ? 1 : 2;
+    const source = url.searchParams.get("source");
+    if (version === 2) {
+      requiredKeys.push("source");
+      if (source === "rewrite") requiredKeys.push("rewriteRequestId");
+    }
     const comment = url.searchParams.get("comment");
     if (
       url.searchParams.size !== requiredKeys.length + (comment === null ? 0 : 1) ||
@@ -79,7 +94,7 @@ export function parseAssistantCitationHref(href: string): AssistantCitation | nu
     if (!/^\d{1,16}$/.test(start) || !/^\d{1,16}$/.test(end)) return null;
     return Option.getOrNull(
       decodeCitation({
-        version: 1,
+        version,
         environmentId: decodeURIComponent(parts[0]!),
         threadId: decodeURIComponent(parts[1]!),
         messageId: decodeURIComponent(parts[2]!),
@@ -89,6 +104,10 @@ export function parseAssistantCitationHref(href: string): AssistantCitation | nu
         prefix: url.searchParams.get("prefix"),
         suffix: url.searchParams.get("suffix"),
         ...(comment === null ? {} : { comment }),
+        ...(version === 1 ? {} : { source }),
+        ...(version === 2 && source === "rewrite"
+          ? { rewriteRequestId: url.searchParams.get("rewriteRequestId") }
+          : {}),
       }),
     );
   } catch {
