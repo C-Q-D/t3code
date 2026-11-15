@@ -650,7 +650,7 @@ const makeProcessFixture = Effect.fn("test.makeRewriteProcessFixture")(function*
   return { runner, pending, binaryPath: useCmd ? "" : binaryPath, commands };
 });
 
-it.live.each(process.platform === "win32" ? [false, true] : [false])(
+it.live.each(HostProcess.Platform.defaultValue() === "win32" ? [false, true] : [false])(
   "preserves a multiline system prompt through the installed CLI path, cmd=%s",
   (useCmd) =>
     Effect.gen(function* () {
