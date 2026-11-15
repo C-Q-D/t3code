@@ -3,13 +3,20 @@ import * as Deferred from "effect/Deferred";
 import * as Fiber from "effect/Fiber";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
+import * as Option from "effect/Option";
 import * as Queue from "effect/Queue";
 import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 
-import { makePiRpcConnection, piRecordField, piRecordNumber, piRecordString } from "./rpc.ts";
+import {
+  makePiRpcConnection,
+  piRecordField,
+  piRecordNumber,
+  piRecordString,
+  type PiRpcRecord,
+} from "./rpc.ts";
 import { PI_REPLY_REWRITE_EXTENSION_SOURCE } from "./replyRewriteExtensionSource.ts";
 
 const REWRITE_SETTINGS = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))({
@@ -94,6 +101,61 @@ function readUsage(value: unknown, normalized: boolean): PiReplyRewriteOutput["u
 
 function safeLabel(value: unknown): string | null {
   return typeof value === "string" && /^[a-zA-Z0-9._:/-]{1,200}$/.test(value) ? value : null;
+}
+
+const ObservationLabel = Schema.NullOr(
+  Schema.String.check(Schema.isPattern(/^[a-zA-Z0-9._:/-]{1,200}$/)),
+);
+const ObservationTokens = Schema.Int.check(
+  Schema.isBetween({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
+);
+const observationHeader = {
+  namespace: Schema.Literal("t3.pi.reply-rewrite"),
+  version: Schema.Literal(1),
+};
+const decodeObservation = Schema.decodeUnknownOption(
+  Schema.Union([
+    Schema.Struct({ ...observationHeader, kind: Schema.Literal("ready") }),
+    Schema.Struct({ ...observationHeader, kind: Schema.Literal("request") }),
+    Schema.Struct({
+      ...observationHeader,
+      kind: Schema.Literal("response"),
+      status: Schema.Literals(["response.completed", "response.incomplete", "response.failed"]),
+      model: ObservationLabel,
+      actualServiceTier: ObservationLabel,
+      usage: Schema.NullOr(
+        Schema.Struct({
+          inputTokens: Schema.optional(ObservationTokens),
+          outputTokens: Schema.optional(ObservationTokens),
+          totalTokens: Schema.optional(ObservationTokens),
+        }),
+      ),
+    }),
+  ]),
+  { onExcessProperty: "error" },
+);
+const decodeNotificationJson = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown));
+
+function readObservation(event: PiRpcRecord) {
+  // Ignore unrelated notifications; malformed metadata in this protocol must fail the run.
+  const message = event["message"];
+  if (
+    event["type"] !== "extension_ui_request" ||
+    event["method"] !== "notify" ||
+    event["notifyType"] !== "info" ||
+    typeof message !== "string" ||
+    message.length > 4_096
+  )
+    return undefined;
+  const json = decodeNotificationJson(message);
+  if (
+    Option.isNone(json) ||
+    piRecordString(json.value, "namespace") !== "t3.pi.reply-rewrite" ||
+    piRecordNumber(json.value, "version") !== 1
+  )
+    return undefined;
+  const observation = decodeObservation(json.value);
+  return Option.isSome(observation) ? observation.value : false;
 }
 
 interface RewriteResources {
@@ -268,8 +330,9 @@ export const makePiReplyRewriteRunner = Effect.fn("makePiReplyRewriteRunner")(fu
       );
       if (event["type"] === "extension_error")
         return yield* new PiReplyRewriteError({ code: "configuration" });
-      ready =
-        event["type"] === "t3_reply_rewrite" && event["kind"] === "ready" && event["version"] === 1;
+      const observation = readObservation(event);
+      if (observation === false) return yield* new PiReplyRewriteError({ code: "protocol" });
+      ready = observation?.kind === "ready";
     }
 
     yield* connection
@@ -286,6 +349,8 @@ export const makePiReplyRewriteRunner = Effect.fn("makePiReplyRewriteRunner")(fu
         Effect.mapError((cause) => new PiReplyRewriteError({ code: "protocol", cause })),
       );
       const type = event["type"];
+      const observation = readObservation(event);
+      if (observation === false) return yield* new PiReplyRewriteError({ code: "protocol" });
       if (
         type === "extension_error" ||
         type === "auto_retry_start" ||
@@ -296,20 +361,18 @@ export const makePiReplyRewriteRunner = Effect.fn("makePiReplyRewriteRunner")(fu
       if (type === "tool_execution_start" || type === "tool_execution_end") {
         return yield* new PiReplyRewriteError({ code: "provider" });
       }
-      if (type === "t3_reply_rewrite" && event["kind"] === "request") {
+      if (observation?.kind === "request") {
         requestCount++;
         if (requestCount > 1) return yield* new PiReplyRewriteError({ code: "protocol" });
       }
-      if (type === "t3_reply_rewrite" && event["kind"] === "response") {
-        if (event["status"] === "response.incomplete")
+      if (observation?.kind === "response") {
+        if (observation.status === "response.incomplete")
           return yield* new PiReplyRewriteError({ code: "truncated" });
-        if (event["status"] === "response.failed")
+        if (observation.status === "response.failed")
           return yield* new PiReplyRewriteError({ code: "provider" });
-        if (event["status"] !== "response.completed")
-          return yield* new PiReplyRewriteError({ code: "protocol" });
-        outputModel = safeLabel(event["model"]) ?? outputModel;
-        actualServiceTier = safeLabel(event["actualServiceTier"]);
-        providerUsage = readUsage(event["usage"], true);
+        outputModel = observation.model ?? outputModel;
+        actualServiceTier = observation.actualServiceTier;
+        providerUsage = readUsage(observation.usage, true);
       }
       if (type === "message_end") {
         const message = event["message"];

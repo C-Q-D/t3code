@@ -52,6 +52,15 @@ const assistant = {
   },
 };
 
+function notification(metadata: Record<string, unknown>) {
+  return {
+    type: "extension_ui_request",
+    method: "notify",
+    notifyType: "info",
+    message: JSON.stringify({ namespace: "t3.pi.reply-rewrite", version: 1, ...metadata }),
+  };
+}
+
 const makeFakePi = Effect.fn("test.makeRewritePi")(function* (
   options: {
     readonly failCommand?: string;
@@ -59,6 +68,7 @@ const makeFakePi = Effect.fn("test.makeRewritePi")(function* (
     readonly events?: ReadonlyArray<Record<string, unknown>>;
     readonly holdCommand?: string;
     readonly omitReady?: boolean;
+    readonly readyEvents?: ReadonlyArray<Record<string, unknown>>;
     readonly holdSpawn?: boolean;
     readonly holdPreparation?: boolean;
     readonly holdCleanup?: "directory" | "process";
@@ -112,19 +122,19 @@ const makeFakePi = Effect.fn("test.makeRewritePi")(function* (
               pendingMessageCount: 0,
             },
           });
-          if (options.omitReady) yield* Deferred.succeed(held, undefined);
+          if (options.omitReady || options.readyEvents !== undefined)
+            yield* Deferred.succeed(held, undefined);
         } else if (record["type"] === "prompt") {
           yield* emit(response);
           for (const event of options.events ?? [
-            { type: "t3_reply_rewrite", kind: "request" },
-            {
-              type: "t3_reply_rewrite",
+            notification({ kind: "request" }),
+            notification({
               kind: "response",
               status: "response.completed",
               model: "served-model",
               actualServiceTier: "default",
               usage: { inputTokens: 11, outputTokens: 7, totalTokens: 18 },
-            },
+            }),
             assistant,
             { type: "agent_settled" },
           ])
@@ -151,7 +161,9 @@ const makeFakePi = Effect.fn("test.makeRewritePi")(function* (
       systemPrompts.push(
         yield* fs.readFileString(command.args[command.args.indexOf("--system-prompt") + 1]!),
       );
-      if (!options.omitReady) yield* emit({ type: "t3_reply_rewrite", kind: "ready", version: 1 });
+      if (!options.omitReady)
+        for (const event of options.readyEvents ?? [notification({ kind: "ready" })])
+          yield* emit(event);
       let running = true;
       yield* Effect.addFinalizer(() =>
         Effect.gen(function* () {
@@ -381,23 +393,74 @@ it.effect.each([
   { name: "automatic compaction", event: { type: "auto_compaction_start" }, code: "protocol" },
   {
     name: "provider incomplete",
-    event: { type: "t3_reply_rewrite", kind: "response", status: "response.incomplete" },
+    event: notification({
+      kind: "response",
+      status: "response.incomplete",
+      model: null,
+      actualServiceTier: null,
+      usage: null,
+    }),
     code: "truncated",
   },
   {
     name: "provider failed",
-    event: { type: "t3_reply_rewrite", kind: "response", status: "response.failed" },
+    event: notification({
+      kind: "response",
+      status: "response.failed",
+      model: null,
+      actualServiceTier: null,
+      usage: null,
+    }),
     code: "provider",
+  },
+  {
+    name: "extra observation field",
+    event: notification({
+      kind: "response",
+      status: "response.completed",
+      model: null,
+      actualServiceTier: null,
+      usage: null,
+      secret: "private credential",
+    }),
+    code: "protocol",
+  },
+  {
+    name: "unknown observation kind",
+    event: notification({ kind: "other" }),
+    code: "protocol",
+  },
+  ...[
+    { name: "extra usage field", usage: { inputTokens: 1, secret: "private credential" } },
+    { name: "negative token count", usage: { inputTokens: -1 } },
+    { name: "fractional token count", usage: { outputTokens: 1.5 } },
+    { name: "unsafe token count", usage: { totalTokens: Number.MAX_SAFE_INTEGER + 1 } },
+  ].map(({ name, usage }) => ({
+    name,
+    event: notification({
+      kind: "response",
+      status: "response.completed",
+      model: null,
+      actualServiceTier: null,
+      usage,
+    }),
+    code: "protocol",
+  })),
+  {
+    name: "unbounded provider label",
+    event: notification({
+      kind: "response",
+      status: "response.completed",
+      model: "private\nsource",
+      actualServiceTier: null,
+      usage: null,
+    }),
+    code: "protocol",
   },
 ])("rejects $name even after a complete assistant reply", ({ event, code }) =>
   Effect.gen(function* () {
     const pi = yield* makeFakePi({
-      events: [
-        { type: "t3_reply_rewrite", kind: "request" },
-        assistant,
-        event,
-        { type: "agent_settled" },
-      ],
+      events: [notification({ kind: "request" }), assistant, event, { type: "agent_settled" }],
     });
     const error = yield* pi.runner.run(input).pipe(Effect.flip);
     assert.equal(error.code, code);
@@ -437,27 +500,45 @@ it.effect.each([
   },
   {
     name: "extra provider request",
-    events: [{ type: "t3_reply_rewrite", kind: "request" }, assistant],
+    events: [notification({ kind: "request" }), assistant],
     code: "protocol",
   },
 ])("rejects $name at settlement", ({ events, code }) =>
   Effect.gen(function* () {
     const pi = yield* makeFakePi({
-      events: [{ type: "t3_reply_rewrite", kind: "request" }, ...events, { type: "agent_settled" }],
+      events: [notification({ kind: "request" }), ...events, { type: "agent_settled" }],
     });
     const error = yield* pi.runner.run(input).pipe(Effect.flip);
     assert.equal(error.code, code);
   }).pipe(Effect.provide(NodeServices.layer)),
 );
 
-it.effect("keeps actual tier unknown when the provider does not report it", () =>
+it.effect("ignores unrelated notifications and keeps unreported tier unknown", () =>
   Effect.gen(function* () {
     const pi = yield* makeFakePi({
-      events: [{ type: "t3_reply_rewrite", kind: "request" }, assistant, { type: "agent_settled" }],
+      events: [
+        notification({ namespace: "other.extension", kind: "request" }),
+        notification({
+          version: 2,
+          kind: "response",
+          status: "response.completed",
+          model: "wrong-model",
+          actualServiceTier: "priority",
+          usage: { inputTokens: 99 },
+        }),
+        { ...notification({ kind: "request" }), method: "setStatus" },
+        { ...notification({ kind: "request" }), notifyType: "warning" },
+        { ...notification({ kind: "request" }), message: "ordinary notification" },
+        { type: "t3_reply_rewrite", kind: "request" },
+        notification({ kind: "request" }),
+        assistant,
+        { type: "agent_settled" },
+      ],
     });
     const result = yield* pi.runner.run(input);
     assert.equal(result.actualServiceTier, null);
     assert.equal(result.requestedServiceTier, "priority");
+    assert.equal(result.model, "openai-codex/gpt-6.1-terra");
     assert.deepEqual(result.usage, { inputTokens: 15, outputTokens: 5, totalTokens: 20 });
   }).pipe(Effect.provide(NodeServices.layer)),
 );
@@ -482,7 +563,7 @@ it.effect("does not treat agent_end as settlement and preserves cancellation", (
   Effect.gen(function* () {
     const pi = yield* makeFakePi({
       events: [
-        { type: "t3_reply_rewrite", kind: "request" },
+        notification({ kind: "request" }),
         assistant,
         { type: "agent_end", messages: [assistant.message] },
       ],
@@ -502,7 +583,7 @@ it.effect("rejects errors after agent_end until authoritative settlement", () =>
   Effect.gen(function* () {
     const pi = yield* makeFakePi({
       events: [
-        { type: "t3_reply_rewrite", kind: "request" },
+        notification({ kind: "request" }),
         assistant,
         { type: "agent_end" },
         { type: "extension_error" },
@@ -517,7 +598,7 @@ it.effect("rejects errors after agent_end until authoritative settlement", () =>
 it.effect("times out while waiting for settlement after the assistant finished", () =>
   Effect.gen(function* () {
     const pi = yield* makeFakePi({
-      events: [{ type: "t3_reply_rewrite", kind: "request" }, assistant, { type: "agent_end" }],
+      events: [notification({ kind: "request" }), assistant, { type: "agent_end" }],
     });
     const fiber = yield* pi.runner.run(input).pipe(Effect.flip, Effect.forkChild);
     yield* Deferred.await(pi.emitted);
@@ -748,6 +829,35 @@ it.effect("does not prompt if the dedicated extension never becomes ready", () =
   }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
 
+it.effect("does not accept ordinary, legacy or other-version notifications as ready", () =>
+  Effect.gen(function* () {
+    const pi = yield* makeFakePi({
+      readyEvents: [
+        { ...notification({ kind: "ready" }), message: "ordinary notification" },
+        { ...notification({ kind: "ready" }), message: "{broken json" },
+        { ...notification({ kind: "ready" }), message: "[]" },
+        notification({ namespace: undefined, kind: "ready" }),
+        notification({ namespace: "other.extension", kind: "ready" }),
+        notification({ version: 2, kind: "ready" }),
+        notification({ version: "1", kind: "ready" }),
+        { ...notification({ kind: "ready" }), method: "setStatus" },
+        { ...notification({ kind: "ready" }), notifyType: "warning" },
+        {
+          ...notification({ kind: "ready" }),
+          message: notification({ kind: "ready" }).message + " ".repeat(4_096),
+        },
+        { type: "t3_reply_rewrite", kind: "ready", version: 1 },
+      ],
+    });
+    const fiber = yield* pi.runner.run(input).pipe(Effect.flip, Effect.forkChild);
+    yield* Deferred.await(pi.held);
+    yield* TestClock.adjust(input.timeoutMs);
+    assert.equal((yield* Fiber.join(fiber)).code, "timeout");
+    assert.isFalse(pi.received.some((record) => record["type"] === "prompt"));
+    yield* pi.runner.awaitIdle;
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);
+
 // This fixture loads the materialized extension but never loads Pi or provider credentials.
 const PROCESS_FIXTURE = `
 import { existsSync, readFileSync } from "node:fs";
@@ -756,7 +866,14 @@ import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { pathToFileURL } from "node:url";
 const handlers = new Map();
-const emit = (record) => process.stdout.write(JSON.stringify(record) + "\\n");
+const rawStdoutWrite = process.stdout.write.bind(process.stdout);
+const rawStderrWrite = process.stderr.write.bind(process.stderr);
+process.stdout.write = (chunk, encodingOrCallback, callback) => typeof encodingOrCallback === "function"
+  ? rawStderrWrite(String(chunk), encodingOrCallback) : rawStderrWrite(String(chunk), callback);
+const emit = (record) => rawStdoutWrite(JSON.stringify(record) + "\\n");
+const context = { ui: { notify: (message, notifyType) => emit({
+  type: "extension_ui_request", method: "notify", message, notifyType,
+}) }};
 const systemSource = process.argv[process.argv.indexOf("--system-prompt") + 1];
 const basePrompt = existsSync(systemSource) ? readFileSync(systemSource, "utf8") : systemSource;
 const appendIndex = process.argv.indexOf("--append-system-prompt");
@@ -766,7 +883,7 @@ const extensionPath = process.argv[process.argv.indexOf("--extension") + 1];
 (await import(pathToFileURL(extensionPath).href)).default({
   on: (name, handler) => handlers.set(name, handler),
 });
-handlers.get("session_start")();
+handlers.get("session_start")({ type: "session_start" }, context);
 let buffer = "";
 for await (const chunk of process.stdin) {
   buffer += chunk.toString("utf8");
@@ -783,9 +900,9 @@ for await (const chunk of process.stdin) {
     }});
   } else if (command.type === "prompt") {
     emit(response);
-    handlers.get("before_provider_request")({ payload: { input: command.message, tools: [] } });
+    handlers.get("before_provider_request")({ payload: { input: command.message, tools: [] } }, context);
     if (command.message === "exit") {
-      await new Promise((resolve) => process.stdout.write(JSON.stringify({
+      await new Promise((resolve) => rawStdoutWrite(JSON.stringify({
         type: "message_end", message: { role: "assistant", stopReason: "stop", content: [{ type: "text", text: "partial" }] },
       }) + "\\n", resolve));
       process.exit(17);
@@ -796,7 +913,7 @@ for await (const chunk of process.stdin) {
     } else {
       handlers.get("provider_stream_event")({ data: {
         type: "response.completed", response: { service_tier: "default", model: "fixture-model" },
-      }});
+      }}, context);
       emit({ type: "message_end", message: {
         role: "assistant", stopReason: "stop", content: [{ type: "text", text: command.message === "inspect-system" ? systemPrompt : command.message }],
       }});
@@ -912,7 +1029,11 @@ it.live(
   () =>
     Effect.gen(function* () {
       const fixture = yield* makeProcessFixture();
-      const result = yield* fixture.runner.run({ ...input, binaryPath: fixture.binaryPath });
+      const result = yield* fixture.runner.run({
+        ...input,
+        binaryPath: fixture.binaryPath,
+        timeoutMs: 2_000,
+      });
       assert.equal(result.text, "  原文\r\n\u2028末尾  ");
       assert.equal(result.model, "fixture-model");
       assert.equal(result.actualServiceTier, "default");
