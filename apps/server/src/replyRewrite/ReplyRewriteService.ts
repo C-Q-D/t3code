@@ -232,6 +232,11 @@ const make = Effect.gen(function* () {
         });
       return previous;
     }
+    if (receipt === undefined && Option.isSome(yield* outbox.get(jobId(input.requestId))))
+      return yield* new ReplyRewriteError({
+        code: "request_conflict",
+        message: "This request ID belongs to a retained rewrite job.",
+      });
     if (automatic && original.classification !== "final") return null;
     const current = previous?.currentAttempt;
     if (

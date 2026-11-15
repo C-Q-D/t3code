@@ -93,13 +93,15 @@ const seed = Effect.fn("ReplyRewriteTest.seed")(function* (
     classification?: OrchestrationV2ConversationMessage["replyClassification"];
     child?: boolean;
     sideChat?: boolean;
+    suffix?: string;
     driver?: string;
   } = {},
 ) {
   const now = yield* DateTime.now;
-  const threadId = ThreadId.make("thread:rewrite");
-  const runId = RunId.make("run:rewrite");
-  const providerThreadId = ProviderThreadId.make("provider-thread:rewrite");
+  const suffix = options.suffix === undefined ? "" : `:${options.suffix}`;
+  const threadId = ThreadId.make(`thread:rewrite${suffix}`);
+  const runId = RunId.make(`run:rewrite${suffix}`);
+  const providerThreadId = ProviderThreadId.make(`provider-thread:rewrite${suffix}`);
   const instanceId = ProviderInstanceId.make("codex");
   const modelSelection = { instanceId, model: "gpt-6.1-sol" };
   const thread: OrchestrationV2AppThread = {
@@ -137,7 +139,7 @@ const seed = Effect.fn("ReplyRewriteTest.seed")(function* (
     providerInstanceId: instanceId,
     modelSelection,
     providerThreadId,
-    userMessageId: MessageId.make("message:user"),
+    userMessageId: MessageId.make(`message:user${suffix}`),
     rootNodeId: null,
     activeAttemptId: null,
     status: options.status ?? "completed",
@@ -165,7 +167,7 @@ const seed = Effect.fn("ReplyRewriteTest.seed")(function* (
     updatedAt: now,
   };
   const message: OrchestrationV2ConversationMessage = {
-    id: MessageId.make("message:final"),
+    id: MessageId.make(`message:final${suffix}`),
     threadId,
     runId,
     nodeId: null,
@@ -187,7 +189,7 @@ const seed = Effect.fn("ReplyRewriteTest.seed")(function* (
   ): OrchestrationV2DomainEvent =>
     ({
       ...value,
-      id: EventId.make(`event:rewrite:${eventIndex++}`),
+      id: EventId.make(`event:rewrite${suffix}:${eventIndex++}`),
       threadId,
       occurredAt: now,
     }) as OrchestrationV2DomainEvent;
@@ -913,6 +915,60 @@ it.effect("records unsupported runner configuration without retrying or revertin
       );
     }).pipe(Effect.provide(testLayer(controlled.runner)));
   }),
+);
+
+it.effect.each(["pending", "running", "succeeded"] as const)(
+  "rejects a retained job's request ID across targets before and after deletion and recovery (stage: %s)",
+  (stage) =>
+    Effect.gen(function* () {
+      const controlled = yield* makeControlledRunner;
+      yield* Effect.gen(function* () {
+        const first = yield* seed();
+        const second = yield* seed({ suffix: "second" });
+        const service = yield* Service.ReplyRewriteService;
+        const outbox = yield* Outbox.EffectOutboxV2;
+        const worker = yield* Worker.ReplyRewriteWorker;
+        yield* service.request({ ...first.target, requestId: "retained-X" });
+        const before = yield* service
+          .request({ ...second.target, requestId: "retained-X" })
+          .pipe(Effect.flip);
+        assert.equal(isReplyRewriteError(before) ? before.code : "unexpected", "request_conflict");
+        const executing =
+          stage !== "pending" ? yield* worker.runOnce.pipe(Effect.forkScoped) : null;
+        const call = stage !== "pending" ? yield* Queue.take(controlled.calls) : null;
+        if (stage === "succeeded") {
+          yield* Deferred.succeed(call!.result, output("Saved before deletion."));
+          yield* Fiber.join(executing!);
+        }
+        yield* first.sink.write({
+          events: [
+            first.event({
+              type: "thread.deleted",
+              payload: { ...first.thread, deletedAt: yield* DateTime.now },
+            }),
+          ],
+        });
+        if (executing !== null) yield* Fiber.join(executing);
+        const after = yield* service
+          .request({ ...second.target, requestId: "retained-X" })
+          .pipe(Effect.flip);
+        assert.equal(isReplyRewriteError(after) ? after.code : "unexpected", "request_conflict");
+        yield* service.recover;
+        assert.isNull(yield* service.getDetail(second.target));
+        assert.equal(yield* worker.drain, 0);
+        yield* service.request({ ...second.target, requestId: "fresh-Y" });
+        yield* outbox.claimNext({ workerId: "crashed-before-call", workerGroup: "reply-rewrite" });
+        yield* service.recover;
+        const fresh = yield* worker.runOnce.pipe(Effect.forkScoped);
+        const newCall = yield* Queue.take(controlled.calls);
+        assert.equal(newCall.input.requestId, "fresh-Y");
+        yield* Deferred.succeed(newCall.result, output("Fresh B."));
+        yield* Fiber.join(fresh);
+        if (call !== null) yield* Deferred.succeed(call.result, output("Deleted A."));
+        assert.equal((yield* service.getDetail(second.target))?.lastSuccess?.text, "Fresh B.");
+        assert.equal(yield* worker.drain, 0);
+      }).pipe(Effect.provide(testLayer(controlled.runner)));
+    }),
 );
 
 it.effect(
