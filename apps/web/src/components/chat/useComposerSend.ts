@@ -245,7 +245,7 @@ interface ComposerSendInput {
   readonly acknowledgeActiveThreadWoke: () => void;
   readonly handleInteractionModeChange: (mode: ProviderInteractionMode) => void;
   /** Resolves true once the side chat started and got the prompt. */
-  readonly onSideChat?: ((prompt: string) => Promise<boolean>) | undefined;
+  readonly onSideChat?: ((prompt: string, replyRewrite?: boolean) => Promise<boolean>) | undefined;
   /** Refuses `/side` with this reason and keeps the draft. */
   readonly sideChatDisabledReason: string | null;
   readonly handleNewThreadInActiveProject: () => void;
@@ -486,6 +486,16 @@ export function useComposerSend(input: ComposerSendInput) {
       return;
     }
     const sendCtx = composerRef.current?.getSendContext();
+    const replyRewriteSelection = useComposerDraftStore
+      .getState()
+      .getComposerDraft(composerDraftTarget)?.replyRewriteSelections?.[environmentId];
+    const selectedReplyRewrite =
+      sendCtx?.selectedProvider === "codex" &&
+      (replyRewriteSelection?.enabled ?? replyRewriteDefault);
+    const completeReplyRewriteSend = () =>
+      useComposerDraftStore
+        .getState()
+        .completeReplyRewriteSend(composerDraftTarget, replyRewriteSelection);
     // `/side` beats an open question and a plan follow-up, which would send the text to main.
     const sideChatCommand =
       sendCtx && !directAnnotation && !queuedRunEdit.isEditing
@@ -522,7 +532,8 @@ export function useComposerSend(input: ComposerSendInput) {
         );
         return;
       }
-      const started = await onSideChat(sideChatCommand.prompt);
+      const started = await onSideChat(sideChatCommand.prompt, selectedReplyRewrite);
+      if (started) completeReplyRewriteSend();
       // Clear only what was sent; the user may have edited the draft or left meanwhile.
       if (
         started &&
@@ -593,9 +604,6 @@ export function useComposerSend(input: ComposerSendInput) {
       interactionMode: sendInteractionMode,
       interactionModeEnabled: sendInteractionModeEnabled,
     } = sendCtx;
-    const replyRewriteSelection = useComposerDraftStore
-      .getState()
-      .getComposerDraft(composerDraftTarget)?.replyRewriteSelection;
     const replyRewrite = composerReplyRewriteState({
       provider: ctxSelectedProvider,
       defaultEnabled: replyRewriteDefault,
@@ -604,10 +612,6 @@ export function useComposerSend(input: ComposerSendInput) {
       dispatchMode,
       activeRun: input.activeReplyRewriteRun,
     }).replyRewrite;
-    const completeReplyRewriteSend = () =>
-      useComposerDraftStore
-        .getState()
-        .completeReplyRewriteSend(composerDraftTarget, replyRewriteSelection);
     const { images: composerImages, previewAnnotations: composerPreviewAnnotations } =
       mergeDirectPreviewAnnotation({
         images: sendContextImages,

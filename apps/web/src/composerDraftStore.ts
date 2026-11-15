@@ -356,9 +356,14 @@ export type ComposerContextInsertionHandler = (
 ) => boolean;
 const contextInsertionHandlers = new Map<string, ComposerContextInsertionHandler>();
 
+export interface ComposerReplyRewriteSelection {
+  readonly enabled: boolean;
+  readonly environmentId: EnvironmentId;
+}
+
 export interface ComposerThreadDraftState {
   /** In-memory choice; object identity prevents a late receipt from clearing the next choice. */
-  replyRewriteSelection?: { readonly enabled: boolean };
+  replyRewriteSelections?: Readonly<Record<string, ComposerReplyRewriteSelection>>;
   prompt: string;
   images: ComposerImageAttachment[];
   files: ComposerFileAttachment[];
@@ -506,10 +511,14 @@ interface ComposerDraftStoreState {
   clearDraftThread: (threadRef: ComposerThreadTarget) => void;
   setStickyModelSelection: (modelSelection: ModelSelection | null | undefined) => void;
   setPrompt: (threadRef: ComposerThreadTarget, prompt: string) => void;
-  setReplyRewrite: (threadRef: ComposerThreadTarget, enabled: boolean) => void;
+  setReplyRewrite: (
+    threadRef: ComposerThreadTarget,
+    enabled: boolean,
+    environmentId?: EnvironmentId,
+  ) => void;
   completeReplyRewriteSend: (
     threadRef: ComposerThreadTarget,
-    selection: ComposerThreadDraftState["replyRewriteSelection"],
+    selection: ComposerReplyRewriteSelection | undefined,
   ) => void;
   setTerminalContexts: (threadRef: ComposerThreadTarget, contexts: TerminalContextDraft[]) => void;
   setModelSelection: (
@@ -872,7 +881,7 @@ function normalizeTerminalContextsForThread(
 
 function shouldRemoveDraft(draft: ComposerThreadDraftState): boolean {
   return (
-    draft.replyRewriteSelection === undefined &&
+    draft.replyRewriteSelections === undefined &&
     draft.prompt.length === 0 &&
     draft.images.length === 0 &&
     draft.files.length === 0 &&
@@ -2929,15 +2938,23 @@ const composerDraftStore = create<ComposerDraftStoreState>()(
             return { draftsByThreadKey: nextDraftsByThreadKey };
           });
         },
-        setReplyRewrite: (threadRef, enabled) => {
+        setReplyRewrite: (threadRef, enabled, environmentId) => {
           const threadKey = resolveComposerDraftKey(get(), threadRef);
-          if (!threadKey) return;
+          const targetEnvironmentId =
+            environmentId ??
+            (typeof threadRef === "string"
+              ? get().getDraftSession(threadRef)?.environmentId
+              : threadRef.environmentId);
+          if (!threadKey || targetEnvironmentId === undefined) return;
           set((state) => ({
             draftsByThreadKey: {
               ...state.draftsByThreadKey,
               [threadKey]: {
                 ...(state.draftsByThreadKey[threadKey] ?? createEmptyThreadDraft()),
-                replyRewriteSelection: { enabled },
+                replyRewriteSelections: {
+                  ...state.draftsByThreadKey[threadKey]?.replyRewriteSelections,
+                  [targetEnvironmentId]: { enabled, environmentId: targetEnvironmentId },
+                },
               },
             },
           }));
@@ -2947,8 +2964,15 @@ const composerDraftStore = create<ComposerDraftStoreState>()(
           if (!threadKey || selection === undefined) return;
           set((state) => {
             const current = state.draftsByThreadKey[threadKey];
-            if (current?.replyRewriteSelection !== selection) return state;
-            const { replyRewriteSelection: _sent, ...nextDraft } = current;
+            if (current?.replyRewriteSelections?.[selection.environmentId] !== selection)
+              return state;
+            const { [selection.environmentId]: _sent, ...remaining } =
+              current.replyRewriteSelections;
+            const { replyRewriteSelections: _selections, ...rest } = current;
+            const nextDraft =
+              Object.keys(remaining).length > 0
+                ? { ...rest, replyRewriteSelections: remaining }
+                : rest;
             const draftsByThreadKey = { ...state.draftsByThreadKey };
             if (shouldRemoveDraft(nextDraft)) delete draftsByThreadKey[threadKey];
             else draftsByThreadKey[threadKey] = nextDraft;

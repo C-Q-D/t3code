@@ -5,6 +5,7 @@ import {
   type ProviderInteractionMode,
   type RunId,
   type RuntimeMode,
+  type UnifiedSettings,
 } from "@t3tools/contracts";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
 import {
@@ -14,6 +15,8 @@ import {
 } from "@t3tools/client-runtime/state/runtime";
 import { useState } from "react";
 import { newMessageId } from "~/lib/utils";
+import { useEnvironmentSettings } from "../../hooks/useSettings";
+import { useComposerDraftStore, type ComposerThreadTarget } from "../../composerDraftStore";
 import type { ComposerHandleRef } from "../../composerHandleContext";
 import { threadEnvironment } from "../../state/threads";
 import { useOrchestrationCommand } from "../../state/use-orchestration-command";
@@ -22,7 +25,10 @@ import { draftSendState } from "./chatViewSend";
 import type { useTimelineFollow } from "./useTimelineFollow";
 import type { useUsageLimitsPanel } from "./useUsageLimitsPanel";
 
+const selectReplyRewriteAuto = (settings: UnifiedSettings) => settings.replyRewrite.auto;
+
 interface ComposerResumeInput {
+  readonly composerDraftTarget?: ComposerThreadTarget;
   readonly environmentId: EnvironmentId;
   readonly routeThreadKey: string;
   readonly currentRouteThreadKeyRef: { readonly current: string | null };
@@ -84,6 +90,7 @@ export function useComposerResume(input: ComposerResumeInput) {
     () => new Set(),
   );
   const isResuming = resumingThreadKeys.has(routeThreadKey);
+  const replyRewriteDefault = useEnvironmentSettings(environmentId, selectReplyRewriteAuto);
   const { sendInFlight: sendInFlightRef } = draftSendState(routeThreadKey);
 
   const onResume = async () => {
@@ -110,7 +117,16 @@ export function useComposerResume(input: ComposerResumeInput) {
       }
       // Read before the first await: the composer follows the route, so after the user switches
       // threads it holds the other thread's model.
-      const modelSelection = composerRef.current?.getSendContext().selectedModelSelection;
+      const sendContext = composerRef.current?.getSendContext();
+      const modelSelection = sendContext?.selectedModelSelection;
+      const draftTarget = input.composerDraftTarget;
+      const selection =
+        draftTarget === undefined
+          ? undefined
+          : useComposerDraftStore.getState().getComposerDraft(draftTarget)
+              ?.replyRewriteSelections?.[environmentId];
+      const replyRewrite =
+        sendContext?.selectedProvider === "codex" && (selection?.enabled ?? replyRewriteDefault);
       const createdAt = new Date().toISOString();
       const settingsResult = await persistThreadSettingsForNextTurn({
         threadId,
@@ -127,6 +143,7 @@ export function useComposerResume(input: ComposerResumeInput) {
         input: {
           threadId,
           manualContinuationOfRunId: resumableRunId,
+          replyRewrite,
           ...(modelSelection ? { modelSelection } : {}),
           message: {
             messageId: newMessageId(),
@@ -139,6 +156,9 @@ export function useComposerResume(input: ComposerResumeInput) {
           dispatchMode: "start",
         },
       });
+      if (turnResult._tag === "Success" && draftTarget !== undefined) {
+        useComposerDraftStore.getState().completeReplyRewriteSend(draftTarget, selection);
+      }
       if (turnResult._tag === "Failure" || !hasHeldQueuedRuns) return turnResult;
       clearUsageLimitsFor(routeThreadKey);
       return resumeThreadQueue({ environmentId, input: { threadId } });

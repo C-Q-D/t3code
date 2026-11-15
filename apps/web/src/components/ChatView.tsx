@@ -2958,7 +2958,9 @@ export default function ChatView(props: ChatViewProps) {
                 ? t.chat.navigationCopy.worktreeNotReady
                 : null;
   const openSideChatStable = useStableCallback(() => void sideChat.open());
-  const sendSideChatStable = useStableCallback((prompt: string) => sideChat.open(prompt));
+  const sendSideChatStable = useStableCallback((prompt: string, replyRewrite?: boolean) =>
+    sideChat.open(prompt, replyRewrite),
+  );
   const { onConfirmRevertStable, onForkFromRunStable, onRevertTimelineTurnStable } =
     useTimelineRewind({
       environmentId,
@@ -3016,6 +3018,7 @@ export default function ChatView(props: ChatViewProps) {
     scheduleComposerFocus,
   });
   const { onResume, isResuming } = useComposerResume({
+    composerDraftTarget,
     environmentId,
     routeThreadKey,
     currentRouteThreadKeyRef,
@@ -3652,6 +3655,13 @@ export default function ChatView(props: ChatViewProps) {
                           ) : null}
                           {!composerMounted ? null : (
                             <ChatComposer
+                              replyRewriteRun={
+                                queuedRunEdit.isEditing
+                                  ? (serverProjection?.runs.find(
+                                      (run) => run.id === queuedRunEdit.editingRunId,
+                                    ) ?? null)
+                                  : activeReplyRewriteRun
+                              }
                               embedded={Boolean(embedded)}
                               queuedRunsControl={queuedRunsControl}
                               canOperateThread={canOperateThread}

@@ -14,6 +14,21 @@ export const composer: Messages["composer"] = {
     btw: "与 /side 相同",
   },
   assist: {
+    tools: {
+      title: "表达工具",
+      optimizeDescription: "理清表达，让提问更准确",
+      optimizeNow: "立即优化",
+      optimizeUnavailable: "提示词优化已关闭或未获授权",
+      rewrite: "回复改写",
+      rewriteDescription: "让 AI 的回复更易读。",
+      rewriteOn: "本次回复改写已开启",
+      rewriteOff: "本次回复改写已关闭",
+      codexOnly: "仅支持 Codex 来源的回复",
+      inherited: "追加指令沿用当前回复的改写设置",
+      unknownRun: "当前回复的改写设置未知",
+      unavailable: "当前无法更改回复改写设置",
+      editingQueue: "编辑排队消息沿用已保存的改写设置",
+    },
     suggestion: {
       /** Announces the prediction and its insert-only keyboard action. */
       ariaDescription: (text: string) => `建议：${text}。按 Tab 填入`,

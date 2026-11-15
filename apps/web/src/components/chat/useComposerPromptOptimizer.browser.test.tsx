@@ -29,10 +29,10 @@ import {
   type ComposerPromptOptimizerInput,
 } from "./useComposerPromptOptimizer";
 import {
-  ComposerPromptOptimizeButton,
   ComposerPromptOptimizeTab,
   ComposerPromptOptimizeStatus,
 } from "./ComposerPromptOptimizeTab";
+import { ComposerAssistPopover } from "./ComposerAssistPopover";
 
 /** Lets each test release one RPC response at an explicit milestone. */
 function deferredResult() {
@@ -112,7 +112,7 @@ function Harness({
           Improve prompt
         </button>
       ) : null}
-      <ComposerPromptOptimizeButton optimizer={optimizer} shortcut="Ctrl+Shift+U" />
+      <ComposerAssistPopover optimizer={optimizer} shortcut="Ctrl+Shift+U" />
       <ComposerPromptEditor
         editorRef={editorRef}
         value={prompt}
@@ -150,14 +150,10 @@ it.each(["preparing", "queued", "starting"] as const)(
       shell: { status, activeRunId: status === "queued" ? null : "remote-run" },
     };
     await using screen = await render(<Harness options={options} />);
-    const button = screen.getByRole("button", { name: "优化提示词", exact: true });
+    await screen.getByRole("button", { name: /^表达工具/ }).click();
+    const button = page.getByRole("button", { name: "立即优化", exact: true });
     await expect.element(button).toBeDisabled();
-    await screen.getByRole("group", { name: "优化提示词" }).hover();
-    await vi.waitFor(() =>
-      expect(document.querySelector('[data-slot="tooltip-popup"]')?.textContent).toBe(
-        "等回复结束后再优化",
-      ),
-    );
+    await expect.element(page.getByText("等回复结束后再优化", { exact: true })).toBeVisible();
     await screen.getByRole("button", { name: "Improve", exact: true }).click();
     expect(fake.run).not.toHaveBeenCalled();
   },
@@ -232,7 +228,9 @@ it("dispatches from the visible improvement button", async () => {
       AsyncResult.success({ _tag: "Filtered", requestId: "button", reason: "unchanged" }),
     );
   await using screen = await render(<Harness />);
-  await screen.getByRole("button", { name: "Improve prompt", exact: true }).click();
+  await screen.getByRole("button", { name: /^Writing tools/ }).click();
+  expect(fake.run).not.toHaveBeenCalled();
+  await page.getByRole("button", { name: "Improve now", exact: true }).click();
   expect(fake.run).toHaveBeenCalledTimes(1);
   await expect.element(screen.getByRole("status")).toHaveTextContent("The draft is already clear");
 });
@@ -244,10 +242,10 @@ it.each([
 ] as const)("disables the button for %j and explains why", async (options, reason) => {
   fake.run.mockReset();
   await using screen = await render(<Harness options={options} />);
+  await screen.getByRole("button", { name: /^Writing tools/ }).click();
   await expect
-    .element(screen.getByRole("button", { name: "Improve prompt", exact: true }))
+    .element(page.getByRole("button", { name: "Improve now", exact: true }))
     .toBeDisabled();
-  await screen.getByRole("group", { name: "Improve prompt" }).hover();
   await expect.element(page.getByText(reason, { exact: true })).toBeVisible();
   expect(fake.run).not.toHaveBeenCalled();
 });
@@ -265,18 +263,17 @@ it("warns about expired cache before dispatch and during the request", async () 
       }}
     />,
   );
-  await screen.getByRole("group", { name: "Improve prompt" }).hover();
+  await screen.getByRole("button", { name: /^Writing tools/ }).click();
   await expect
-    .element(
-      page.getByText("Improve prompt Ctrl+Shift+U · This one may cost full price", { exact: true }),
-    )
+    .element(page.getByText("This one may cost full price", { exact: true }))
     .toBeVisible();
-  await screen.getByRole("button", { name: "Improve prompt", exact: true }).click();
+  await expect.element(page.getByText("Ctrl+Shift+U", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Improve now", exact: true }).click();
   await expect
     .element(screen.getByRole("status"))
     .toHaveTextContent("Improving… · This one may cost full price");
   await expect
-    .element(screen.getByRole("button", { name: "Improve prompt", exact: true }))
+    .element(page.getByRole("button", { name: "Improve now", exact: true }))
     .toBeDisabled();
   await act(async () =>
     pending.resolve(
@@ -292,12 +289,10 @@ it("does not warn while the cache is fresh", async () => {
   await using screen = await render(
     <Harness options={{ driver: "codex", lastTurnCompletedAt: "2026-01-01T00:00:00Z" }} />,
   );
-  await screen.getByRole("group", { name: "Improve prompt" }).hover();
-  await expect
-    .element(page.getByText("Improve prompt Ctrl+Shift+U", { exact: true }))
-    .toBeVisible();
+  await screen.getByRole("button", { name: /^Writing tools/ }).click();
+  await expect.element(page.getByText("Ctrl+Shift+U", { exact: true })).toBeVisible();
   expect(screen.container.querySelector("[data-composer-cache-warning]")).toBeNull();
-  await screen.getByRole("button", { name: "Improve prompt", exact: true }).click();
+  await page.getByRole("button", { name: "Improve now", exact: true }).click();
   await expect.element(screen.getByRole("status")).toHaveTextContent("Improving…");
   await act(async () =>
     pending.resolve(
@@ -307,16 +302,17 @@ it("does not warn while the cache is fresh", async () => {
 });
 
 it.each(["setting", "permission"] as const)(
-  "hides improvement and blocks dispatch when %s is off",
+  "disables improvement and blocks dispatch when %s is off",
   async (gate) => {
     fake.run.mockReset();
     using _permission = vi
       .spyOn(composerAssistEnvironment.optimizePrompt, "permissionAtom")
       .mockReturnValue(Atom.make(gate !== "permission"));
     await using screen = await render(<Harness options={{ enabled: gate !== "setting" }} />);
+    await screen.getByRole("button", { name: /^Writing tools/ }).click();
     await expect
-      .element(screen.getByRole("button", { name: "Improve prompt", exact: true }))
-      .not.toBeInTheDocument();
+      .element(page.getByRole("button", { name: "Improve now", exact: true }))
+      .toBeDisabled();
     await expect
       .element(screen.getByRole("menuitem", { name: "Improve prompt" }))
       .not.toBeInTheDocument();
@@ -522,7 +518,8 @@ it.each(["keyboard", "button"] as const)(
     await using screen = await render(<Harness thread={`cursor-${method}`} />);
     await screen.getByRole("textbox").fill("abcdefghij");
     await userEvent.keyboard("{Home}{ArrowRight}{ArrowRight}{ArrowRight}");
-    await screen.getByRole("button", { name: "Improve prompt", exact: true }).click();
+    await screen.getByRole("button", { name: /^Writing tools/ }).click();
+    await page.getByRole("button", { name: "Improve now", exact: true }).click();
     await screen.getByRole("textbox").click();
     await userEvent.keyboard(
       "{Home}{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}",
@@ -578,7 +575,8 @@ it.each([20000, 20001])("checks the serialized draft length at %i characters", a
     );
   await using screen = await render(<Harness thread={`length-${length}`} />);
   await screen.getByRole("textbox").fill("x".repeat(length));
-  const button = screen.getByRole("button", { name: "Improve prompt", exact: true });
+  await screen.getByRole("button", { name: /^Writing tools/ }).click();
+  const button = page.getByRole("button", { name: "Improve now", exact: true });
   if (length === 20000) {
     await button.click();
     expect(fake.run).toHaveBeenCalledTimes(1);
@@ -591,7 +589,7 @@ it.each([20000, 20001])("checks the serialized draft length at %i characters", a
     await userEvent.keyboard("{Control>}{Shift>}u{/Shift}{/Control}");
     await screen.getByRole("button", { name: "Improve", exact: true }).click();
     expect(fake.run).not.toHaveBeenCalled();
-    await screen.getByRole("group", { name: "Improve prompt" }).hover();
+    await screen.getByRole("button", { name: /^Writing tools/ }).click();
     await expect
       .element(page.getByText("Drafts over 20,000 characters can't be improved", { exact: true }))
       .toBeVisible();
@@ -728,20 +726,28 @@ it.each([
   {
     locale: "en",
     driver: "codex",
-    button: "Improve prompt",
+    button: "Improve now",
+    tools: /^Writing tools/,
     hint: "Available after the first message",
   },
-  { locale: "zh-CN", driver: "", button: "优化提示词", hint: "发送第一条消息后可用" },
+  {
+    locale: "zh-CN",
+    driver: "",
+    button: "立即优化",
+    tools: /^表达工具/,
+    hint: "发送第一条消息后可用",
+  },
 ] as const)(
   "blocks all draft-thread entry points and explains availability in $locale",
-  async ({ locale, driver, button, hint }) => {
+  async ({ locale, driver, button, tools, hint }) => {
     const previous = { locale: activeLocale, messages: t };
     using cleanup = new DisposableStack();
     cleanup.defer(() => installMessages(previous.locale, previous.messages));
     installMessages(locale, locale === "en" ? en : zhCN);
     fake.run.mockReset();
     await using screen = await render(<Harness options={{ threadId: null, driver }} />);
-    const optimizeButton = screen.getByRole("button", { name: button, exact: true });
+    await screen.getByRole("button", { name: tools }).click();
+    const optimizeButton = page.getByRole("button", { name: button, exact: true });
     await expect.element(optimizeButton).toBeDisabled();
     (optimizeButton.element() as HTMLButtonElement).click();
     expect(fake.run).not.toHaveBeenCalled();
@@ -753,14 +759,10 @@ it.each([
       .not.toBeInTheDocument();
     await screen.getByRole("button", { name: "Improve", exact: true }).click();
     expect(fake.run).not.toHaveBeenCalled();
-    await screen.getByRole("group", { name: button }).hover();
-    await vi.waitFor(() =>
-      expect(document.querySelector('[data-slot="tooltip-popup"]')?.textContent).toBe(hint),
-    );
+    await screen.getByRole("button", { name: tools }).click();
+    await expect.element(page.getByText(hint, { exact: true })).toBeVisible();
     await screen.getByRole("textbox").fill("");
-    await screen.getByRole("group", { name: button }).hover();
-    await vi.waitFor(() =>
-      expect(document.querySelector('[data-slot="tooltip-popup"]')?.textContent).toBe(hint),
-    );
+    await screen.getByRole("button", { name: tools }).click();
+    await expect.element(page.getByText(hint, { exact: true })).toBeVisible();
   },
 );

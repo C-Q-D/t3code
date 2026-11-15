@@ -16,20 +16,30 @@ function Switch({
   className,
   size = "default",
   mixed = false,
+  variant = "default",
   ...props
-}: SwitchPrimitive.Root.Props & { size?: "default" | "sm"; mixed?: boolean }) {
+}: SwitchPrimitive.Root.Props & {
+  size?: "default" | "sm";
+  mixed?: boolean;
+  variant?: "default" | "accent";
+}) {
   return (
     <SwitchPrimitive.Root
       className={cn(
         "group/switch inline-flex shrink-0 cursor-pointer items-center rounded-full bg-input p-0.5 shadow-switch-track outline-none [--switch-press-extra:0px] not-data-disabled:hover:bg-sidebar not-data-disabled:hover:shadow-switch-hover not-data-disabled:active:bg-input not-data-disabled:active:shadow-switch-pressed not-data-disabled:active:[--switch-press-extra:--spacing(1)] focus-visible:shadow-switch-pressed focus-visible:inset-shadow-focus data-disabled:cursor-not-allowed data-disabled:opacity-38 data-disabled:shadow-none",
         !mixed &&
+          variant === "default" &&
           "data-checked:bg-message-action data-checked:shadow-switch-on not-data-disabled:data-checked:hover:bg-message-action-hover not-data-disabled:data-checked:hover:shadow-none not-data-disabled:data-checked:active:bg-switch-on-pressed not-data-disabled:data-checked:active:shadow-none data-checked:focus-visible:shadow-none data-checked:data-disabled:shadow-none",
+        !mixed &&
+          variant === "accent" &&
+          "data-checked:bg-control-accent data-checked:shadow-switch-on not-data-disabled:data-checked:hover:bg-control-accent-hover not-data-disabled:data-checked:active:bg-control-accent-pressed",
         size === "sm"
           ? "h-4 w-6.5 [--switch-thumb:--spacing(3)] [--switch-travel:--spacing(2.5)]"
           : "h-5 w-9 [--switch-thumb:--spacing(4)] [--switch-travel:--spacing(4)]",
         className,
       )}
       data-size={size}
+      data-variant={variant}
       data-slot="switch"
       data-mixed={mixed ? "" : undefined}
       // Base UI overwrites aria-checked even with undefined; pass it only for mixed state.
@@ -40,7 +50,11 @@ function Switch({
         className={cn(
           "pointer-events-none block physics:transition-[translate] physics:duration-(--motion-snap-duration) physics:ease-(--ease-snap) h-(--switch-thumb) w-[calc(var(--switch-thumb)+var(--switch-press-extra))] shrink-0 rounded-full bg-fg-control-disabled shadow-switch-thumb group-not-data-disabled/switch:group-hover/switch:bg-placeholder group-not-data-disabled/switch:group-active/switch:bg-placeholder group-not-data-disabled/switch:group-active/switch:shadow-none group-focus-visible/switch:shadow-none data-disabled:shadow-none",
           !mixed &&
+            variant === "default" &&
             "data-checked:translate-x-[calc(var(--switch-travel)-var(--switch-press-extra))] data-checked:bg-message-action-foreground data-checked:shadow-switch-thumb-on group-not-data-disabled/switch:group-hover/switch:data-checked:bg-message-action-foreground group-not-data-disabled/switch:group-hover/switch:data-checked:shadow-none group-not-data-disabled/switch:group-active/switch:data-checked:bg-message-action-foreground group-not-data-disabled/switch:group-active/switch:data-checked:shadow-none data-checked:data-disabled:shadow-none data-checked:group-focus-visible/switch:shadow-none",
+          !mixed &&
+            variant === "accent" &&
+            "data-checked:translate-x-[calc(var(--switch-travel)-var(--switch-press-extra))] data-checked:bg-white data-checked:shadow-switch-thumb-on group-not-data-disabled/switch:group-hover/switch:data-checked:bg-white group-not-data-disabled/switch:group-active/switch:data-checked:bg-white",
           mixed &&
             "translate-x-[calc((var(--switch-travel)-var(--switch-press-extra))/2)] opacity-70",
         )}

@@ -21,6 +21,7 @@
 @import "./styles/sidebar.css";
 @import "./styles/timeline.css";
 @import "./styles/composer.css";
+@import "./styles/composer-assist.css";
 @import "./styles/chat-header.css";
 @import "./styles/panels.css";
 @import "./styles/pull-requests.css";

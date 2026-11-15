@@ -18,7 +18,7 @@ import {
   composerDraftHasUserContent,
   type DraftId,
   useComposerDraftStore,
-  type ComposerThreadDraftState,
+  type ComposerReplyRewriteSelection,
 } from "../../composerDraftStore";
 import type { ComposerHandleRef } from "../../composerHandleContext";
 import { releaseDraftAttachments } from "../../lib/attachmentUploadQueue";
@@ -102,7 +102,7 @@ export function useMultipleModelSend(input: MultipleModelSendInput) {
     replyRewriteSelection,
   }: {
     readonly threadId: ThreadId;
-    readonly replyRewriteSelection: ComposerThreadDraftState["replyRewriteSelection"];
+    readonly replyRewriteSelection: ComposerReplyRewriteSelection | undefined;
     readonly project: EnvironmentProject;
     readonly branch: string;
     readonly selections: ReadonlyArray<ModelSelection>;

@@ -220,6 +220,29 @@ function draftByKey(key: string) {
 }
 
 describe("per-send reply rewrite selection", () => {
+  it("keeps separate choices when an unsent draft changes environment", () => {
+    resetComposerDraftStore();
+    const draft = DraftId.make("rewrite-routing");
+    const store = useComposerDraftStore.getState();
+    store.setReplyRewrite(draft, true, TEST_ENVIRONMENT_ID);
+    store.setReplyRewrite(draft, false, OTHER_TEST_ENVIRONMENT_ID);
+    expect(
+      store.getComposerDraft(draft)?.replyRewriteSelections?.[TEST_ENVIRONMENT_ID]?.enabled,
+    ).toBe(true);
+    expect(
+      store.getComposerDraft(draft)?.replyRewriteSelections?.[OTHER_TEST_ENVIRONMENT_ID]?.enabled,
+    ).toBe(false);
+    store.completeReplyRewriteSend(
+      draft,
+      store.getComposerDraft(draft)?.replyRewriteSelections?.[TEST_ENVIRONMENT_ID],
+    );
+    expect(
+      store.getComposerDraft(draft)?.replyRewriteSelections?.[TEST_ENVIRONMENT_ID],
+    ).toBeUndefined();
+    expect(
+      store.getComposerDraft(draft)?.replyRewriteSelections?.[OTHER_TEST_ENVIRONMENT_ID]?.enabled,
+    ).toBe(false);
+  });
   it("retains a failed send selection, resets success, and isolates environments and threads", () => {
     resetComposerDraftStore();
     const a = scopeThreadRef(TEST_ENVIRONMENT_ID, ThreadId.make("rewrite-a"));
@@ -229,15 +252,25 @@ describe("per-send reply rewrite selection", () => {
     store.setReplyRewrite(a, true);
     store.setReplyRewrite(b, false);
     store.setReplyRewrite(c, true);
-    const sentSelection = store.getComposerDraft(a)?.replyRewriteSelection;
+    const sentSelection = store.getComposerDraft(a)?.replyRewriteSelections?.[a.environmentId];
     store.clearComposerContent(a);
-    expect(store.getComposerDraft(a)?.replyRewriteSelection?.enabled).toBe(true);
-    expect(store.getComposerDraft(b)?.replyRewriteSelection?.enabled).toBe(false);
-    expect(store.getComposerDraft(c)?.replyRewriteSelection?.enabled).toBe(true);
+    expect(store.getComposerDraft(a)?.replyRewriteSelections?.[a.environmentId]?.enabled).toBe(
+      true,
+    );
+    expect(store.getComposerDraft(b)?.replyRewriteSelections?.[b.environmentId]?.enabled).toBe(
+      false,
+    );
+    expect(store.getComposerDraft(c)?.replyRewriteSelections?.[c.environmentId]?.enabled).toBe(
+      true,
+    );
     store.completeReplyRewriteSend(a, sentSelection);
-    expect(store.getComposerDraft(a)?.replyRewriteSelection).toBeUndefined();
-    expect(store.getComposerDraft(b)?.replyRewriteSelection?.enabled).toBe(false);
-    expect(store.getComposerDraft(c)?.replyRewriteSelection?.enabled).toBe(true);
+    expect(store.getComposerDraft(a)?.replyRewriteSelections?.[a.environmentId]).toBeUndefined();
+    expect(store.getComposerDraft(b)?.replyRewriteSelections?.[b.environmentId]?.enabled).toBe(
+      false,
+    );
+    expect(store.getComposerDraft(c)?.replyRewriteSelections?.[c.environmentId]?.enabled).toBe(
+      true,
+    );
   });
 
   it("does not let duplicate completion erase a newer unsent choice", () => {
@@ -245,12 +278,15 @@ describe("per-send reply rewrite selection", () => {
     const target = scopeThreadRef(TEST_ENVIRONMENT_ID, ThreadId.make("rewrite-overlap"));
     const store = useComposerDraftStore.getState();
     store.setReplyRewrite(target, true);
-    const sentSelection = store.getComposerDraft(target)?.replyRewriteSelection;
+    const sentSelection =
+      store.getComposerDraft(target)?.replyRewriteSelections?.[target.environmentId];
     store.setReplyRewrite(target, false);
     store.setReplyRewrite(target, true);
     store.completeReplyRewriteSend(target, sentSelection);
     store.completeReplyRewriteSend(target, sentSelection);
-    expect(store.getComposerDraft(target)?.replyRewriteSelection?.enabled).toBe(true);
+    expect(
+      store.getComposerDraft(target)?.replyRewriteSelections?.[target.environmentId]?.enabled,
+    ).toBe(true);
   });
 });
 

@@ -2,6 +2,7 @@
 "use client";
 
 import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
+import type { ReactNode } from "react";
 
 import { cn } from "~/lib/utils";
 
@@ -55,10 +56,12 @@ function PopoverPopup({
   anchor,
   layer,
   touchBackdrop = false,
+  arrow,
   ...props
 }: PopoverPrimitive.Popup.Props & {
   padding?: keyof typeof popoverViewportPaddingClassName;
-  variant?: "default" | "panel";
+  variant?: "default" | "panel" | "bare";
+  arrow?: ReactNode;
   side?: PopoverPrimitive.Positioner.Props["side"];
   align?: PopoverPrimitive.Positioner.Props["align"];
   sideOffset?: PopoverPrimitive.Positioner.Props["sideOffset"];
@@ -107,7 +110,7 @@ function PopoverPopup({
         <PopoverPrimitive.Popup
           className={cn(
             "relative flex h-(--popup-height,auto) w-(--popup-width,auto) origin-(--transform-origin) rounded-overlay text-popover-foreground outline-none transition-[width,height,scale,opacity] physics:duration-(--popup-motion-duration) physics:ease-(--popup-motion-ease) data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0",
-            variant !== "panel" && "dropdown-glass",
+            variant === "default" && "dropdown-glass",
             tooltipStyle && "w-fit text-balance text-secondary-copy",
             width !== "auto" && ["max-w-[calc(100vw-2rem)]", popoverPopupWidthClassName[width]],
             variant === "panel" &&
@@ -131,6 +134,7 @@ function PopoverPopup({
           >
             {children}
           </Viewport>
+          {arrow}
         </PopoverPrimitive.Popup>
       </PopoverPrimitive.Positioner>
     </PopoverPrimitive.Portal>

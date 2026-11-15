@@ -14,6 +14,21 @@ export const composer = {
     btw: "Same as /side",
   },
   assist: {
+    tools: {
+      title: "Writing tools",
+      optimizeDescription: "Clarify your wording for a more precise question",
+      optimizeNow: "Improve now",
+      optimizeUnavailable: "Prompt improvement is disabled or not permitted",
+      rewrite: "Rewrite reply",
+      rewriteDescription: "Make the AI's reply easier to read.",
+      rewriteOn: "Reply rewrite on",
+      rewriteOff: "Reply rewrite off",
+      codexOnly: "Available for Codex replies only",
+      inherited: "Additional instructions use the current reply's rewrite setting",
+      unknownRun: "The current reply's rewrite setting is unknown",
+      unavailable: "Reply rewrite cannot be changed right now",
+      editingQueue: "Editing a queued message keeps its saved rewrite setting",
+    },
     suggestion: {
       /** Announces the prediction and its insert-only keyboard action. */
       ariaDescription: (text: string) => `Suggestion: ${text}. Press Tab to insert`,

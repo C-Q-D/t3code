@@ -2,17 +2,23 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { expect, it, vi } from "vite-plus/test";
-import { DEFAULT_UNIFIED_SETTINGS, EnvironmentId, ThreadId } from "@t3tools/contracts";
+import { DEFAULT_UNIFIED_SETTINGS, EnvironmentId, ThreadId, RunId } from "@t3tools/contracts";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { AsyncResult } from "effect/reactivity";
 import type { ComposerDispatchMode } from "@t3tools/client-runtime/state/composer-dispatch";
 import { useComposerDraftStore } from "../../composerDraftStore";
 import { submitComposerDraft } from "./composerSubmission";
 import { useComposerSend } from "./useComposerSend";
+import { useComposerResume } from "./useComposerResume";
 import { draftSendState } from "./chatViewSend";
 import { readEnvironmentScope } from "~/state/session";
 
-const fake = vi.hoisted(() => ({ start: vi.fn(), persist: vi.fn(), settings: vi.fn() }));
+const fake = vi.hoisted(() => ({
+  start: vi.fn(),
+  persist: vi.fn(),
+  settings: vi.fn(),
+  side: vi.fn(),
+}));
 vi.mock("~/hooks/useSettings", () => ({
   useClientSettingsHydrated: () => true,
   useEnvironmentSettings: (environmentId: string, select: (settings: unknown) => unknown) =>
@@ -31,11 +37,14 @@ async function setup(
     running?: boolean;
     saved?: boolean;
     provider?: string;
+    resume?: boolean;
+    side?: boolean;
   } = {},
 ) {
   vi.mocked(readEnvironmentScope).mockReturnValue(true);
   fake.start.mockReset().mockResolvedValue(AsyncResult.success({ sequence: 1 }));
   fake.persist.mockReset().mockResolvedValue(AsyncResult.success(undefined));
+  fake.side.mockReset().mockResolvedValue(true);
   let auto = false;
   fake.settings.mockReset().mockImplementation(() => ({
     ...DEFAULT_UNIFIED_SETTINGS,
@@ -77,7 +86,7 @@ async function setup(
   };
   let pending: Promise<void> | undefined;
   function Harness() {
-    const { onSend } = useComposerSend({
+    const sendInput = {
       environmentId,
       routeThreadKey: routeKey,
       currentRouteThreadKeyRef: { current: routeKey },
@@ -153,14 +162,24 @@ async function setup(
       handleInteractionModeChange: noop,
       handleNewThreadInActiveProject: noop,
       persistThreadSettingsForNextTurn: fake.persist,
-    } as unknown as Parameters<typeof useComposerSend>[0]);
+      onSideChat: options.side ? fake.side : undefined,
+      sideChatDisabledReason: null,
+    } as unknown as Parameters<typeof useComposerSend>[0];
+    const { onSend } = useComposerSend(sendInput);
+    const { onResume } = useComposerResume({
+      ...sendInput,
+      interactionMode: "default",
+      resumableRunId: RunId.make("interrupted"),
+      hasHeldQueuedRuns: false,
+      scrollToEnd: noop,
+    });
     const submit = () =>
       submitComposerDraft({
         event: undefined,
         prompt: promptRef.current,
         submissionTarget: "provider-turn",
         onSend: () => {
-          pending = onSend(undefined, options.mode ?? "auto");
+          pending = options.resume ? onResume() : onSend(undefined, options.mode ?? "auto");
         },
       });
     return (
@@ -229,7 +248,9 @@ it.each(["button", "keyboard"] as const)(
     expect(fake.start.mock.calls.map(([request]) => request.input)).toMatchObject([
       { replyRewrite: true, message: { text: "Keep the user text" } },
     ]);
-    expect(store.getComposerDraft(h.target)?.replyRewriteSelection?.enabled).toBe(false);
+    expect(
+      store.getComposerDraft(h.target)?.replyRewriteSelections?.[h.target.environmentId]?.enabled,
+    ).toBe(false);
   },
 );
 
@@ -241,12 +262,16 @@ it("retains the selection on failure and resets to the latest default on success
   await act(async () => {
     await h.press("button");
   });
-  expect(store.getComposerDraft(h.target)?.replyRewriteSelection?.enabled).toBe(true);
+  expect(
+    store.getComposerDraft(h.target)?.replyRewriteSelections?.[h.target.environmentId]?.enabled,
+  ).toBe(true);
   expect(h.promptRef.current).toBe("Keep the user text");
   await act(async () => {
     await h.press("keyboard");
   });
-  expect(store.getComposerDraft(h.target)?.replyRewriteSelection).toBeUndefined();
+  expect(
+    store.getComposerDraft(h.target)?.replyRewriteSelections?.[h.target.environmentId],
+  ).toBeUndefined();
   h.promptRef.current = "Next message";
   await act(async () => {
     await h.press("button");
@@ -262,6 +287,53 @@ it("retains the selection on failure and resets to the latest default on success
     false,
     true,
   ]);
+});
+
+it("snapshots resume before settings persistence and resets only after its new run starts", async () => {
+  await using h = await setup({ resume: true });
+  const store = useComposerDraftStore.getState();
+  store.setReplyRewrite(h.target, true);
+  fake.start.mockResolvedValueOnce(AsyncResult.fail(new Error("offline")));
+  await act(async () => {
+    await h.press("button");
+  });
+  expect(
+    store.getComposerDraft(h.target)?.replyRewriteSelections?.[h.target.environmentId]?.enabled,
+  ).toBe(true);
+  await act(async () => {
+    await h.press("button");
+  });
+  expect(
+    store.getComposerDraft(h.target)?.replyRewriteSelections?.[h.target.environmentId],
+  ).toBeUndefined();
+  expect(fake.start.mock.calls.map(([request]) => request.input)).toMatchObject([
+    { replyRewrite: true, manualContinuationOfRunId: "interrupted", dispatchMode: "start" },
+    { replyRewrite: true, manualContinuationOfRunId: "interrupted", dispatchMode: "start" },
+  ]);
+});
+
+it("passes the next reply choice into a side-chat send and retains it on failure", async () => {
+  await using h = await setup({ side: true });
+  const store = useComposerDraftStore.getState();
+  store.setReplyRewrite(h.target, true);
+  h.promptRef.current = "/side Explain this";
+  fake.side.mockResolvedValueOnce(false);
+  await act(async () => {
+    await h.press("button");
+  });
+  expect(
+    store.getComposerDraft(h.target)?.replyRewriteSelections?.[h.target.environmentId]?.enabled,
+  ).toBe(true);
+  await act(async () => {
+    await h.press("button");
+  });
+  expect(fake.side.mock.calls).toEqual([
+    ["Explain this", true],
+    ["Explain this", true],
+  ]);
+  expect(
+    store.getComposerDraft(h.target)?.replyRewriteSelections?.[h.target.environmentId],
+  ).toBeUndefined();
 });
 
 it.each([

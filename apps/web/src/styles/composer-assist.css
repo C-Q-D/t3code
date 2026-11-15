@@ -1,0 +1,170 @@
+@theme {
+  --color-control-accent: #8b5cf6;
+  --color-control-accent-hover: #a78bfa;
+  --color-control-accent-pressed: #7c3aed;
+  --color-control-accent-light: #c4b5fd;
+  --color-control-accent-soft: #f5d0fe;
+  --color-control-accent-ink: #2e1065;
+}
+
+.composer-assist-trigger {
+  --lucide-hue-override: currentColor;
+}
+
+.composer-assist-trigger[data-rewrite-enabled="true"],
+.composer-assist-trigger[data-panel-open="true"] {
+  color: #f2e8ff;
+  background: linear-gradient(145deg, #514066, #252236);
+  box-shadow:
+    0 0 0 1px #c58bf1,
+    0 2px 10px #a153cd55;
+}
+
+.composer-assist-trigger[data-panel-open="true"] {
+  box-shadow:
+    0 0 0 1.5px #e0b7ff,
+    0 3px 12px #a153cd66;
+}
+
+.composer-assist-trigger-icon {
+  position: relative;
+  display: inline-flex;
+}
+
+.composer-assist-sparkle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  top: -3px;
+  right: -4px;
+}
+
+.composer-assist-enabled-dot,
+.composer-assist-cache-dot {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  right: 1px;
+  bottom: 1px;
+  background: #dfb5ff;
+}
+
+.composer-assist-cache-dot {
+  top: 1px;
+  bottom: auto;
+  background: var(--color-warning);
+}
+
+.composer-assist-panel {
+  --lucide-hue-override: currentColor;
+  color: #f5efff;
+  padding: 16px;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  background:
+    linear-gradient(150deg, #29263bea, #242032f5 70%, #332445ed) padding-box,
+    linear-gradient(135deg, #a7a1f0, #c17ced 65%, #86b8d2) border-box;
+  box-shadow:
+    0 10px 28px #0c081c66,
+    inset 0 1px 12px #d2adff18;
+  backdrop-filter: blur(14px);
+}
+
+.composer-assist-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.composer-assist-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 34px;
+  height: 34px;
+  border-radius: 10px;
+  box-shadow:
+    inset 0 1px 0 #ffffff20,
+    0 3px 6px #100b2033;
+}
+
+.composer-assist-icon-optimize {
+  color: #f5d6ff;
+  background: linear-gradient(140deg, #6660a7, #754786 60%, #443052);
+}
+
+.composer-assist-icon-rewrite {
+  color: #b8e0ff;
+  background: linear-gradient(140deg, #565582, #45405e 65%, #35616d);
+}
+
+.composer-assist-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.composer-assist-title {
+  display: block;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  font-weight: 600;
+}
+
+.composer-assist-description {
+  margin: 3px 0 0;
+  color: #cec4dd;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.composer-assist-divider {
+  height: 1px;
+  margin: 14px 0;
+  background: linear-gradient(90deg, #b9a0db1a, #b9a0db3d, #b9a0db1a);
+}
+
+.composer-assist-help {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 6px 0 0 46px;
+  color: #d2c3e5;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.composer-assist-help:empty {
+  display: none;
+}
+
+.composer-assist-help p {
+  margin: 0;
+}
+
+.composer-assist-shortcut {
+  font-variant-numeric: tabular-nums;
+}
+
+.composer-assist-arrow {
+  display: flex;
+  position: absolute;
+  bottom: -10px;
+  fill: #2d233c;
+  stroke: #b88be0;
+  stroke-width: 1px;
+}
+
+[data-side="bottom"] > .composer-assist-arrow {
+  top: -10px;
+  bottom: auto;
+  rotate: 180deg;
+}
+
+@media (forced-colors: active) {
+  .composer-assist-panel,
+  .composer-assist-trigger[data-rewrite-enabled="true"],
+  .composer-assist-trigger[data-panel-open="true"] {
+    border: 1px solid Highlight;
+  }
+}

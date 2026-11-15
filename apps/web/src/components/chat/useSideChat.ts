@@ -40,7 +40,11 @@ export function useSideChat(input: {
     const error = squashAtomCommandFailure(failure);
     input.onError(error instanceof Error ? error.message : fallback);
   };
-  const start = async (threadRef: ScopedThreadRef, prompt: string | undefined) => {
+  const start = async (
+    threadRef: ScopedThreadRef,
+    prompt: string | undefined,
+    replyRewrite: boolean | undefined,
+  ) => {
     const targetThreadId = newThreadId();
     const fork = await forkSideChat({
       environmentId: threadRef.environmentId,
@@ -69,6 +73,7 @@ export function useSideChat(input: {
         environmentId: threadRef.environmentId,
         input: {
           threadId: targetThreadId,
+          ...(replyRewrite === undefined ? {} : { replyRewrite }),
           message: { messageId: newMessageId(), role: "user", text, attachments: [] },
           titleSeed: deriveThreadTitleSeed({ text, attachments: [] }),
           runtimeMode: "approval-required",
@@ -85,11 +90,11 @@ export function useSideChat(input: {
     useRightPanelStore.getState().openSideChat(threadRef, targetThreadId);
     return true;
   };
-  const open = async (prompt?: string) => {
+  const open = async (prompt?: string, replyRewrite?: boolean) => {
     const { threadRef } = input;
     if (!threadRef || pendingRef.current) return false;
     pendingRef.current = true;
-    return start(threadRef, prompt).finally(() => {
+    return start(threadRef, prompt, replyRewrite).finally(() => {
       pendingRef.current = false;
     });
   };

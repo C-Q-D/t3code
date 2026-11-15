@@ -84,6 +84,8 @@ const buttonVariants = cva(
           "h-7.5 gap-0.5 rounded-full pl-2 pr-1.5 [&_svg:not([class*='size-'])]:size-3.5",
       },
       variant: {
+        accent:
+          "bg-linear-to-r from-control-accent-light to-control-accent-soft text-control-accent-ink [--lucide-hue-override:currentColor] shadow-raise-xs-control not-disabled:not-aria-disabled:hover:brightness-110 not-disabled:not-aria-disabled:active:shadow-raise-xs-pressed [:disabled,[aria-disabled=true]]:opacity-45",
         default:
           "[--lucide-hue-override:currentColor] bg-primary text-primary-foreground font-bold text-shadow-none shadow-primary-button not-disabled:not-aria-disabled:hover:bg-message-action-hover not-disabled:not-aria-disabled:[:active,[data-pressed]]:bg-control-primary-pressed not-disabled:not-aria-disabled:[:active,[data-pressed]]:translate-y-0.5 not-disabled:not-aria-disabled:[:active,[data-pressed]]:shadow-primary-pressed [:disabled,[aria-disabled=true]]:bg-accent [:disabled,[aria-disabled=true]]:text-fg-control-disabled [:disabled,[aria-disabled=true]]:shadow-none focus-visible:shadow-primary-edge-control",
         destructive:
